@@ -720,6 +720,7 @@ final class JovieUITests: XCTestCase {
       app.textFields["Ask Jovie"].exists,
       "Composer did not appear on the all-components fixture.\n\(app.debugDescription)"
     )
+    attachScreenshot(named: "chat-all-components-composer", app: app)
 
     var missingLabels: Set<String> = [
       "Creating merch options…",
@@ -738,6 +739,10 @@ final class JovieUITests: XCTestCase {
     var sawToolCard = false
     var sawRetry = false
     var sawWebHandoff = false
+    var snappedChips = false
+    var snappedTool = false
+    var snappedMerch = false
+    var snappedVideo = false
 
     func consumeVisibleChatLabels() {
       for label in Array(missingLabels) {
@@ -754,6 +759,28 @@ final class JovieUITests: XCTestCase {
       }
       if app.buttons["Continue on web"].exists || app.links["Continue on web"].exists {
         sawWebHandoff = true
+      }
+      if !snappedChips,
+         !missingLabels.isSuperset(of: [
+           "Midnight Drive", "Porter Robinson", "Opus", "Coachella 2027", "Generate album art",
+         ])
+      {
+        attachScreenshot(named: "chat-all-components-entity-skill-chips", app: app)
+        snappedChips = true
+      }
+      if !snappedTool, sawToolCard {
+        attachScreenshot(named: "chat-all-components-tool-card", app: app)
+        snappedTool = true
+      }
+      if !snappedMerch,
+         !missingLabels.contains("Neon Pulse Tee") || !missingLabels.contains("Mono Mark")
+      {
+        attachScreenshot(named: "chat-all-components-merch", app: app)
+        snappedMerch = true
+      }
+      if !snappedVideo, !missingLabels.contains("Release day shout-out") {
+        attachScreenshot(named: "chat-all-components-video", app: app)
+        snappedVideo = true
       }
       assertVisibleChatHasNoRawMarkup(in: app)
     }
@@ -785,6 +812,19 @@ final class JovieUITests: XCTestCase {
       "Web handoff link did not appear.\n\(app.debugDescription)"
     )
 
+    let midnightDrive = app.descendants(matching: .any).matching(
+      NSPredicate(format: "label CONTAINS %@", "Midnight Drive")
+    ).firstMatch
+    for _ in 0..<20 {
+      if midnightDrive.isHittable { break }
+      app.swipeDown()
+    }
+    XCTAssertTrue(
+      midnightDrive.waitForExistence(timeout: 2),
+      "Could not bring entity chips on-screen for the device screenshot.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "chat-all-components-entity-skill-chips-visible", app: app)
+
     let plusButton = app.buttons["Open workflow sheet"]
     XCTAssertTrue(
       waitForHittable(plusButton, timeout: 3),
@@ -796,6 +836,7 @@ final class JovieUITests: XCTestCase {
       "Workflow sheet did not show Make merch.\n\(app.debugDescription)"
     )
 
+    attachScreenshot(named: "chat-all-components-workflow-sheet", app: app)
     attachScreenshot(named: "chat-all-components", app: app)
   }
 
@@ -1877,10 +1918,20 @@ final class JovieUITests: XCTestCase {
   }
 
   private func attachScreenshot(named name: String, app: XCUIApplication) {
-    let attachment = XCTAttachment(screenshot: app.screenshot())
+    let screenshot = app.screenshot()
+    let attachment = XCTAttachment(screenshot: screenshot)
     attachment.name = "iOS \(name)"
     attachment.lifetime = .keepAlways
     add(attachment)
+
+    if let directory = testEnvironmentValue("JOVIE_IOS_SCREENSHOT_DIR"), !directory.isEmpty {
+      let url = URL(fileURLWithPath: directory).appendingPathComponent("\(name).png")
+      try? FileManager.default.createDirectory(
+        at: url.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+      )
+      try? screenshot.pngRepresentation.write(to: url)
+    }
   }
 
 }
