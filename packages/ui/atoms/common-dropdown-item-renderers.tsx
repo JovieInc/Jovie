@@ -67,7 +67,7 @@ export function renderIcon(
   return IconComponent;
 }
 
-function StructuredMenuLabel({
+export function CommonDropdownItemLabel({
   label,
   description,
 }: {
@@ -203,7 +203,7 @@ export function renderActionItem(
               renderIcon(item.icon, 'h-4 w-4')
             )}
           </span>
-          <StructuredMenuLabel
+          <CommonDropdownItemLabel
             label={item.label}
             description={item.description}
           />
@@ -288,7 +288,10 @@ export function renderCheckboxItem(
           renderIcon(item.icon, 'h-4 w-4')
         )}
       </span>
-      <StructuredMenuLabel label={item.label} description={item.description} />
+      <CommonDropdownItemLabel
+        label={item.label}
+        description={item.description}
+      />
       <span className={MENU_TRAILING_SLOT_BASE}>{renderCount(item.count)}</span>
     </CheckboxItem>
   );
@@ -351,7 +354,10 @@ function renderRadioItem(
           renderIcon(item.icon, 'h-4 w-4')
         )}
       </span>
-      <StructuredMenuLabel label={item.label} description={item.description} />
+      <CommonDropdownItemLabel
+        label={item.label}
+        description={item.description}
+      />
       <span className={MENU_TRAILING_SLOT_BASE}>{renderCount(item.count)}</span>
     </RadioItem>
   );

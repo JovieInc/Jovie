@@ -1,5 +1,5 @@
-import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 import {
   SearchableList,
@@ -58,6 +58,26 @@ export const NestedMenu: Story = {
               { id: 'connected', label: 'Connected', items: ITEMS.slice(0, 2) },
               { id: 'available', label: 'Available', items: ITEMS.slice(2) },
             ]}
+            onSelect={() => undefined}
+          />
+        </DropdownMenuPrimitive.Content>
+      </DropdownMenuPrimitive.Portal>
+    </DropdownMenuPrimitive.Root>
+  ),
+};
+
+export const LoadingNestedMenu: Story = {
+  render: () => (
+    <DropdownMenuPrimitive.Root defaultOpen>
+      <DropdownMenuPrimitive.Trigger className='rounded-full border border-subtle bg-surface-1 px-3 py-2 text-sm text-primary-token'>
+        Add platform
+      </DropdownMenuPrimitive.Trigger>
+      <DropdownMenuPrimitive.Portal>
+        <DropdownMenuPrimitive.Content className='rounded-(--system-b-radius-overlay) border border-default bg-surface-elevated p-1 shadow-popover'>
+          <SearchableSubmenu
+            triggerLabel='Choose platform'
+            sections={[]}
+            isLoading
             onSelect={() => undefined}
           />
         </DropdownMenuPrimitive.Content>
