@@ -329,6 +329,16 @@
 |-------|---------|------|-------------|
 | `/api/link/[id]` | POST | `public` | Generate time-limited signed URL for sensitive links |
 
+### Library Documents
+
+| Route | Methods | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/library/documents` | GET, POST | `auth` | Cursor-page private ideas/scripts or capture an idempotent private idea |
+| `/api/library/documents/[id]` | PATCH | `auth` | Save an immutable rich-text document revision with optimistic concurrency |
+| `/api/library/documents/[id]/claims` | POST | `auth` | Attach a sourced evidence claim to the current private revision |
+| `/api/library/documents/[id]/review` | POST | `auth` | Freeze factual evidence for the exact current script revision |
+| `/api/library/documents/[id]/approve` | POST | `auth` (owner) | Approve and hand off the exact reviewed script revision for capture |
+
 ### Merch
 
 | Route | Methods | Auth | Description |
