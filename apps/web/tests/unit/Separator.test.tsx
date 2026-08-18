@@ -56,8 +56,8 @@ describe('Separator', () => {
       const { container } = render(<Separator />);
       const separator = container.querySelector('[data-slot="separator"]');
 
-      expect(separator).toHaveClass('bg-neutral-200');
-      expect(separator).toHaveClass('dark:bg-neutral-800');
+      expect(separator).toHaveClass('bg-subtle');
+      expect(separator).not.toHaveClass('bg-neutral-200');
     });
 
     it('applies shrink-0 class', () => {
@@ -71,16 +71,16 @@ describe('Separator', () => {
       const { container } = render(<Separator orientation='horizontal' />);
       const separator = container.querySelector('[data-slot="separator"]');
 
-      expect(separator).toHaveClass('data-[orientation=horizontal]:h-px');
-      expect(separator).toHaveClass('data-[orientation=horizontal]:w-full');
+      expect(separator).toHaveClass('h-px');
+      expect(separator).toHaveClass('w-full');
     });
 
     it('applies vertical sizing classes', () => {
       const { container } = render(<Separator orientation='vertical' />);
       const separator = container.querySelector('[data-slot="separator"]');
 
-      expect(separator).toHaveClass('data-[orientation=vertical]:h-full');
-      expect(separator).toHaveClass('data-[orientation=vertical]:w-px');
+      expect(separator).toHaveClass('h-full');
+      expect(separator).toHaveClass('w-px');
     });
   });
 

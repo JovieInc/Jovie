@@ -103,6 +103,9 @@ describe('Avatar Component', () => {
 
       let innerDiv = container.querySelector('[aria-hidden="true"]');
       expect(innerDiv).toHaveClass('size-8');
+      expect(innerDiv).toHaveAttribute('data-slot', 'app-avatar');
+      expect(innerDiv).toHaveAttribute('data-size', 'sm');
+      expect(innerDiv).toHaveStyle({ width: '32px', height: '32px' });
 
       rerender(
         <Avatar
@@ -115,6 +118,7 @@ describe('Avatar Component', () => {
 
       innerDiv = container.querySelector('[aria-hidden="true"]');
       expect(innerDiv).toHaveClass('size-16');
+      expect(innerDiv).toHaveStyle({ width: '64px', height: '64px' });
     });
 
     it('applies correct rounded classes', () => {

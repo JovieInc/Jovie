@@ -40,6 +40,8 @@ export {
 } from './icon-button-contract';
 export type { KbdProps } from './kbd';
 export { Kbd } from './kbd';
+export type { NativeSelectOption, NativeSelectProps } from './native-select';
+export { NativeSelect } from './native-select';
 export {
   Popover,
   PopoverAnchor,

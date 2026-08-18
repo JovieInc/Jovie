@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/components/atoms/Badge/Badge.test.tsx
 import { type BadgeProps, Badge as BaseBadge } from '@jovie/ui';
 import React from 'react';
 import { cn } from '@/lib/utils';
@@ -11,6 +12,7 @@ export const Badge = React.forwardRef<HTMLSpanElement, AppBadgeProps>(
     return (
       <BaseBadge
         ref={ref}
+        data-emphasis={emphasis}
         className={cn(
           emphasis === 'subtle' && 'bg-surface-1 text-tertiary-token',
           className
