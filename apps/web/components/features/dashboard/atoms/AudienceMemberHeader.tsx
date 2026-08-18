@@ -1,11 +1,8 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import {
-  DrawerEntityAvatar,
-  EntityHeaderCard,
-} from '@/components/molecules/drawer';
-import { cn } from '@/lib/utils';
+import { Avatar } from '@/components/molecules/Avatar';
+import { EntityHeaderCard } from '@/components/molecules/drawer';
 
 export interface AudienceMemberHeaderProps {
   readonly title: string;
@@ -30,12 +27,12 @@ export function AudienceMemberHeader({
 }: AudienceMemberHeaderProps) {
   return (
     <EntityHeaderCard
-      layout='grid'
       image={
-        <DrawerEntityAvatar
+        <Avatar
           src={avatarSrc}
+          alt={title ? `${title} avatar` : 'Audience member avatar'}
           name={avatarName}
-          testId='audience-entity-avatar-frame'
+          size='md'
         />
       }
       title={title}
@@ -48,8 +45,8 @@ export function AudienceMemberHeader({
       reserveSubtitleSlot
       reserveMetaSlot
       metaOverflow='scroll'
-      className={cn('px-2 py-2', className)}
-      titleClassName='text-base leading-5 tracking-[-0.02em]'
+      className={className}
+      bodyClassName='pr-9'
       data-testid={testId}
     />
   );

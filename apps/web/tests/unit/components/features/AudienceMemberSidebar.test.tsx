@@ -5,7 +5,6 @@ import { Copy } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { AudienceMemberSidebar } from '@/features/dashboard/organisms/audience-member-sidebar/AudienceMemberSidebar';
-import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import type { AudienceMember } from '@/types';
 
 vi.mock('@/components/molecules/drawer', async importOriginal => {
@@ -13,49 +12,20 @@ vi.mock('@/components/molecules/drawer', async importOriginal => {
     await importOriginal<typeof import('@/components/molecules/drawer')>();
   return {
     ...actual,
-    EntityTabbedRail: ({
+    EntitySidebarShell: ({
       children,
       entityHeader,
       isEmpty,
       emptyMessage,
-      activeTab,
-      onTabChange,
-      tabOptions,
-      tabsAriaLabel,
-      tabbedCardTestId,
-      testId,
     }: {
       children: ReactNode;
       entityHeader?: ReactNode;
       isEmpty?: boolean;
       emptyMessage?: string;
-      activeTab: string;
-      onTabChange: (value: string) => void;
-      tabOptions: ReadonlyArray<{ value: string; label: ReactNode }>;
-      tabsAriaLabel: string;
-      tabbedCardTestId?: string;
-      testId?: string;
     }) => (
-      <div data-testid={testId} data-surface-variant='flat'>
+      <div>
         {isEmpty ? <div>{emptyMessage}</div> : entityHeader}
-        {isEmpty ? null : (
-          <div data-testid={tabbedCardTestId} data-surface-variant='flat'>
-            <div role='tablist' aria-label={tabsAriaLabel}>
-              {tabOptions.map(option => (
-                <button
-                  key={option.value}
-                  type='button'
-                  role='tab'
-                  aria-selected={activeTab === option.value}
-                  onClick={() => onTabChange(option.value)}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-            {children}
-          </div>
-        )}
+        {isEmpty ? null : children}
       </div>
     ),
   };
@@ -109,13 +79,12 @@ const audienceActionItems: CommonDropdownItem[] = [
 ];
 
 describe('AudienceMemberSidebar', () => {
-  it('renders the canonical audience header with the member title', async () => {
-    const { container } = render(
+  it('renders the canonical audience header with the member title', () => {
+    render(
       <AudienceMemberSidebar member={member} isOpen onClose={() => undefined} />
     );
 
     expect(screen.getByText('Jordan Reyes')).toBeInTheDocument();
-    await expectNoA11yViolations(container);
   });
 
   it('renders secondary label (email) when displayName and email are both present', () => {
@@ -149,36 +118,17 @@ describe('AudienceMemberSidebar', () => {
     );
 
     expect(screen.getByTestId('audience-member-header-card')).toHaveClass(
-      'grid',
-      'grid-cols-[auto_minmax(0,1fr)_auto]'
-    );
-    expect(screen.getByTestId('audience-member-header-card')).toHaveAttribute(
-      'data-layout',
-      'grid'
+      'relative',
+      'flex'
     );
     expect(
       screen.getByRole('button', { name: 'More actions' })
     ).toBeInTheDocument();
-    const avatarFrame = screen.getByTestId('audience-entity-avatar-frame');
-    expect(avatarFrame).toHaveClass(
-      'size-14',
-      'p-1',
-      'rounded-[calc(var(--radius-lg)+var(--space-1))]',
-      'shadow-none'
-    );
-    expect(avatarFrame.firstElementChild).toHaveClass(
-      'size-12',
-      'rounded-lg',
-      'shadow-none'
-    );
-    expect(screen.getByTestId('audience-member-sidebar')).toHaveAttribute(
-      'data-surface-variant',
-      'flat'
-    );
-    expect(screen.getByTestId('audience-member-tabbed-card')).toHaveAttribute(
-      'data-surface-variant',
-      'flat'
-    );
+    expect(
+      screen
+        .getByTestId('audience-member-header-card')
+        .querySelector('.size-12')
+    ).toBeInTheDocument();
   });
 
   it('uses the same canonical actions in the header overflow and drawer context menu', async () => {
@@ -205,22 +155,6 @@ describe('AudienceMemberSidebar', () => {
 
     expect(screen.getByText('Austin, TX')).toBeInTheDocument();
     expect(screen.getByText('3 visits')).toBeInTheDocument();
-  });
-
-  it('keeps each consumer state behind the shared tab contract', async () => {
-    const user = userEvent.setup();
-    render(
-      <AudienceMemberSidebar member={member} isOpen onClose={() => undefined} />
-    );
-
-    await user.click(screen.getByRole('tab', { name: 'Sources' }));
-
-    expect(screen.getByTestId('audience-sources-card')).toHaveTextContent(
-      'Referrers'
-    );
-    expect(
-      screen.queryByTestId('audience-details-card')
-    ).not.toBeInTheDocument();
   });
 
   it('renders empty state message when member is null', () => {

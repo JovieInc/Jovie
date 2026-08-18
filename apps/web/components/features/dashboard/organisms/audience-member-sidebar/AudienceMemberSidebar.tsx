@@ -10,14 +10,17 @@
 
 import { MapPin } from 'lucide-react';
 import { useState } from 'react';
-import { EntityTabbedRail } from '@/components/molecules/drawer';
+import {
+  DrawerTabbedCard,
+  DrawerTabs,
+  EntitySidebarShell,
+} from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { AudienceMemberHeader } from '@/features/dashboard/atoms/AudienceMemberHeader';
 import { AudienceMemberActivityFeed } from './AudienceMemberActivityFeed';
 import { AudienceMemberDetails } from './AudienceMemberDetails';
 import { AudienceMemberReferrers } from './AudienceMemberReferrers';
 import type { AudienceMemberSidebarProps } from './types';
-import { computeMemberAvatarName, computeMemberAvatarSrc } from './utils';
 
 type AudienceTab = 'details' | 'activity' | 'sources';
 
@@ -47,35 +50,21 @@ export function AudienceMemberSidebar({
       : undefined;
 
   return (
-    <EntityTabbedRail
+    <EntitySidebarShell
       isOpen={isOpen}
       ariaLabel='Audience member details'
-      title='Audience member'
-      onClose={member ? undefined : onClose}
+      workspaceSurface='raised'
       contextMenuItems={contextMenuItems}
-      testId='audience-member-sidebar'
-      hideMinimalHeaderBar={Boolean(member)}
-      activeTab={activeTab}
-      onTabChange={setActiveTab}
-      tabOptions={AUDIENCE_TAB_OPTIONS}
-      tabsAriaLabel='Audience member tabs'
-      tabDistribution='fill'
-      tabbedCardTestId='audience-member-tabbed-card'
-      sectionKind={
-        activeTab === 'details'
-          ? 'facts'
-          : activeTab === 'activity'
-            ? 'status'
-            : 'details'
-      }
-      contentClassName='pt-2'
+      data-testid='audience-member-sidebar'
+      onClose={onClose}
+      headerMode='minimal'
+      hideMinimalHeaderBar
       entityHeader={
         member ? (
           <AudienceMemberHeader
             title={primaryLabel}
             subtitle={secondaryLabel}
-            avatarName={computeMemberAvatarName(member, primaryLabel)}
-            avatarSrc={computeMemberAvatarSrc(member)}
+            avatarName={primaryLabel}
             meta={
               member.locationLabel || member.visits > 0 ? (
                 <div className='flex items-center gap-2 text-2xs text-tertiary-token'>
@@ -106,8 +95,28 @@ export function AudienceMemberSidebar({
       isEmpty={!member}
       emptyMessage='Select a row in the table to view contact details.'
     >
-      {member ? (
-        <>
+      {member && (
+        <DrawerTabbedCard
+          testId='audience-member-tabbed-card'
+          sectionKind={
+            activeTab === 'details'
+              ? 'facts'
+              : activeTab === 'activity'
+                ? 'status'
+                : 'details'
+          }
+          className='pt-0.5'
+          tabs={
+            <DrawerTabs
+              value={activeTab}
+              onValueChange={value => setActiveTab(value as AudienceTab)}
+              options={AUDIENCE_TAB_OPTIONS}
+              ariaLabel='Audience member tabs'
+              distribution='fill'
+            />
+          }
+          contentClassName='pt-2'
+        >
           {activeTab === 'details' && (
             <div data-testid='audience-details-card'>
               <AudienceMemberDetails member={member} />
@@ -123,8 +132,8 @@ export function AudienceMemberSidebar({
               <AudienceMemberReferrers member={member} />
             </div>
           )}
-        </>
-      ) : null}
-    </EntityTabbedRail>
+        </DrawerTabbedCard>
+      )}
+    </EntitySidebarShell>
   );
 }
