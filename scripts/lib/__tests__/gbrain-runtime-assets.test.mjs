@@ -46,6 +46,9 @@ function runProcess(command, args, { env = {}, unset = [], stdin = '' } = {}) {
     child.stdout.on('data', chunk => {
       stdout += chunk;
     });
+    child.stdin.on('error', error => {
+      if (error.code !== 'EPIPE') rejectRun(error);
+    });
     child.stderr.on('data', chunk => {
       stderr += chunk;
     });
