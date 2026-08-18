@@ -9,6 +9,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
+- [internal] **Canonical Actions now have one contract package:** `@jovie/action-contracts` owns the four stable IDs, and authenticated `GET /api/v1/actions` can list what a profile can do. Nothing is created yet.
+
 - **iPhone chat home can introduce what’s new:** An empty chat highlights one feature or lists up to three recent changes. Dismiss stays dismissed. More than three changes ends on And more, which opens the changelog.
 
 - **Ovie is one morning screen:** `/hud` now carries the brief, a Loom-style screen walk, shipper, and dashboard. Fullscreen asks the logged-in admin for the kiosk token and reloads `/hud?fs=1&kiosk=…`. `/app/ov/ops` and `/hud-tv` redirect there.
