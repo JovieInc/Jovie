@@ -5,7 +5,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { CreatorDocumentsWorkspace } from './CreatorDocumentsWorkspace';
 
@@ -78,6 +78,10 @@ describe('CreatorDocumentsWorkspace', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('captures an idea privately with an idempotency key', async () => {
@@ -176,6 +180,30 @@ describe('CreatorDocumentsWorkspace', () => {
     expect(
       await screen.findByText('Saved as a new revision')
     ).toBeInTheDocument();
+  });
+
+  it('clears a saved status when the title is edited again', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ revision: 2 }), { status: 200 })
+    );
+    render(<CreatorDocumentsWorkspace initialDocuments={[document]} />);
+    fireEvent.click(screen.getByRole('button', { name: /A durable idea/ }));
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    if (!panel) throw new Error('Expected a document panel');
+    render(panel);
+
+    fireEvent.change(screen.getByLabelText('Document Title'), {
+      target: { value: 'First saved title' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Revision' }));
+    await screen.findByText('Saved as a new revision');
+
+    fireEvent.change(screen.getByLabelText('Document Title'), {
+      target: { value: 'New unsaved title' },
+    });
+
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+    expect(screen.queryByText('Saved as a new revision')).toBeNull();
   });
 
   it('keeps rich content and plain text aligned across later revisions', async () => {

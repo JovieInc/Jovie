@@ -194,7 +194,8 @@ function DocumentEditor({
   }, [document, onStageChanged, post, status]);
 
   const approveForCapture = useCallback(async () => {
-    if (isDirty || document.stage !== 'evidence_review') return;
+    if (status === 'saving' || isDirty || document.stage !== 'evidence_review')
+      return;
     setStatus('saving');
     const response = await post(
       `/api/library/documents/${document.id}/approve`,
@@ -204,7 +205,7 @@ function DocumentEditor({
       onStageChanged('capture_ready');
       router.refresh();
     }
-  }, [document, isDirty, onStageChanged, post, router]);
+  }, [document, isDirty, onStageChanged, post, router, status]);
 
   const claimNeedsSource = evidenceState === 'supported';
   const hasClaimDraft =
@@ -281,6 +282,7 @@ function DocumentEditor({
             editVersionRef.current += 1;
             setTitle(event.target.value);
             setIsDirty(true);
+            setStatus('idle');
           }}
           className='w-full bg-transparent text-lg font-semibold text-primary-token outline-none focus-visible:outline-2 focus-visible:outline-offset-2'
         />
@@ -293,6 +295,7 @@ function DocumentEditor({
               editVersionRef.current += 1;
               setKind(event.target.value as CreatorDocumentListItem['kind']);
               setIsDirty(true);
+              setStatus('idle');
             }}
             className='rounded-md border border-subtle bg-surface-1 px-2 py-1 text-primary-token focus-visible:outline-2 focus-visible:outline-offset-2'
           >

@@ -1302,12 +1302,20 @@ describe('TasksPageClient', () => {
 
   it('ignores an autosave completion from a previously selected task', async () => {
     let finishFirstSave: (() => void) | undefined;
-    mockUpdateTaskAsync.mockImplementationOnce(
-      () =>
-        new Promise<void>(resolve => {
-          finishFirstSave = resolve;
-        })
-    );
+    let finishSecondSave: (() => void) | undefined;
+    mockUpdateTaskAsync
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>(resolve => {
+            finishFirstSave = resolve;
+          })
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>(resolve => {
+            finishSecondSave = resolve;
+          })
+      );
     renderPage();
     openTask(mockTask);
 
@@ -1327,6 +1335,8 @@ describe('TasksPageClient', () => {
       data: { description: 'Edit task B and keep it' },
     });
     await act(async () => finishFirstSave?.());
+    expect(screen.getByText('Saving…')).toBeInTheDocument();
+    await act(async () => finishSecondSave?.());
     expect(screen.getByText('Saved')).toBeInTheDocument();
   });
 

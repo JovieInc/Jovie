@@ -6,6 +6,7 @@ const {
   saveCreatorDocumentRevision,
   approveCreatorRevisionForCapture,
   addCreatorRevisionClaim,
+  completeCreatorEvidenceReview,
   MockCreatorDocumentConflictError,
 } = vi.hoisted(() => ({
   getSessionContext: vi.fn(),
@@ -13,6 +14,7 @@ const {
   saveCreatorDocumentRevision: vi.fn(),
   approveCreatorRevisionForCapture: vi.fn(),
   addCreatorRevisionClaim: vi.fn(),
+  completeCreatorEvidenceReview: vi.fn(),
   MockCreatorDocumentConflictError: class extends Error {
     constructor(readonly code: string) {
       super('Claim ledger changed or the evidence source is inaccessible');
@@ -33,11 +35,13 @@ vi.mock('@/lib/db/creator-documents/store', () => ({
   saveCreatorDocumentRevision,
   approveCreatorRevisionForCapture,
   addCreatorRevisionClaim,
+  completeCreatorEvidenceReview,
 }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
 
 import { POST as approve } from './[id]/approve/route';
 import { POST as addClaim } from './[id]/claims/route';
+import { POST as review } from './[id]/review/route';
 import { PATCH as saveRevision } from './[id]/route';
 
 const context = {
@@ -149,6 +153,45 @@ describe('creator document route authorization', () => {
 
     expect(response.status).toBe(401);
     expect(approveCreatorRevisionForCapture).not.toHaveBeenCalled();
+  });
+
+  it('authorizes evidence review before mutating the revision stage', async () => {
+    completeCreatorEvidenceReview.mockResolvedValue(undefined);
+    const callOrder: string[] = [];
+    requireCreatorDocumentAccess.mockImplementationOnce(async () => {
+      callOrder.push('authorize');
+    });
+    completeCreatorEvidenceReview.mockImplementationOnce(async () => {
+      callOrder.push('review');
+    });
+
+    const response = await review(
+      new Request('https://jov.ie/api/library/documents/1/review', {
+        method: 'POST',
+        body: JSON.stringify({ revision: 2 }),
+      }),
+      context
+    );
+
+    expect(response.status).toBe(200);
+    expect(callOrder).toEqual(['authorize', 'review']);
+  });
+
+  it('fails closed before evidence review when profile access is rejected', async () => {
+    requireCreatorDocumentAccess.mockRejectedValueOnce(
+      new Error('Unauthorized')
+    );
+
+    const response = await review(
+      new Request('https://jov.ie/api/library/documents/1/review', {
+        method: 'POST',
+        body: JSON.stringify({ revision: 2 }),
+      }),
+      context
+    );
+
+    expect(response.status).toBe(401);
+    expect(completeCreatorEvidenceReview).not.toHaveBeenCalled();
   });
 
   it('never derives document ownership from the requested URL', async () => {

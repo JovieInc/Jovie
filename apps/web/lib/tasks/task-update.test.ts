@@ -110,6 +110,30 @@ describe('buildTaskUpdateFieldPatch', () => {
     });
   });
 
+  it('keeps plain text synchronized for a rich-content-only update', () => {
+    const content = {
+      type: 'doc' as const,
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Canonical rich text' }],
+        },
+      ],
+    };
+
+    expect(
+      buildTaskUpdateFieldPatch(
+        { descriptionContent: content },
+        { ...createExistingTask(), metadata: { source: 'release' } },
+        now
+      )
+    ).toEqual({
+      description: 'Canonical rich text',
+      metadata: { source: 'release', descriptionRichTextV1: content },
+      updatedAt: now,
+    });
+  });
+
   it('sets completedAt when a task first moves to done', () => {
     expect(
       buildTaskUpdateFieldPatch({ status: 'done' }, createExistingTask(), now)

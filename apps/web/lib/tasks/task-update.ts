@@ -1,4 +1,5 @@
 import { plainTextToRichTextDocument } from '@/lib/rich-text/document';
+import { richTextDocumentToPlainText } from '@/lib/rich-text/extensions';
 import { writeTaskDescriptionContent } from './task-rich-text';
 import type { TaskStatus, TaskView, UpdateTaskInput } from './types';
 
@@ -80,6 +81,7 @@ export function buildTaskUpdateFieldPatch(
   }
   if (data.metadata !== undefined) patch.metadata = data.metadata;
   if (data.descriptionContent !== undefined) {
+    patch.description = richTextDocumentToPlainText(data.descriptionContent);
     patch.metadata = writeTaskDescriptionContent(
       data.metadata ?? existingTask.metadata,
       data.descriptionContent

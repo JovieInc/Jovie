@@ -52,9 +52,9 @@ export function LibraryPageClient({
   };
   const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     const tabs = Array.from(
-      event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
-        '[role="tab"]'
-      ) ?? []
+      event.currentTarget
+        .closest('[role="tablist"]')
+        ?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? []
     );
     const currentIndex = tabs.indexOf(event.currentTarget);
     const nextIndex =
