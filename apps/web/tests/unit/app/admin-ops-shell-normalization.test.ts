@@ -2,6 +2,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import {
+  composeHudForPresentation,
+  HUD_NEED_SECTION_IDS,
+  type HudPresentation,
+} from '@/lib/hud/compose-hud-bands';
 
 const TEST_DIR = dirname(
   import.meta.url.startsWith('file:')
@@ -83,9 +88,48 @@ describe('admin ops shell normalization', () => {
     const hudSource = readSource(HUD_DASHBOARD_CLIENT);
 
     expect(hudSource).toContain('import { WhatShipped }');
-    expect(hudSource).toContain('<WhatShipped kioskToken={kioskToken} />');
+    expect(hudSource).toContain(
+      '<WhatShipped key={section.id} kioskToken={kioskToken} />'
+    );
+    expect(hudSource.indexOf("case 'factory-health'")).toBeLessThan(
+      hudSource.indexOf("case 'what-shipped'")
+    );
     expect(hudSource.indexOf('<HudSystemHealthStrip')).toBeLessThan(
       hudSource.indexOf('<WhatShipped')
+    );
+  });
+
+  it('does not mount WhatShipped or ShippingVelocityChart above the need band', () => {
+    const presentations: readonly HudPresentation[] = [
+      'shell',
+      'kiosk',
+      'token',
+    ];
+    for (const presentation of presentations) {
+      const sections = composeHudForPresentation(presentation);
+      const ids = sections.map(section => section.id);
+      const lastNeedIndex = Math.max(
+        ...HUD_NEED_SECTION_IDS.map(id => ids.indexOf(id))
+      );
+      expect(ids.indexOf('what-shipped')).toBeGreaterThan(lastNeedIndex);
+      expect(ids.indexOf('velocity')).toBeGreaterThan(lastNeedIndex);
+      expect(ids.indexOf('what-shipped')).toBeGreaterThan(
+        ids.indexOf('morning-walk')
+      );
+      expect(ids.indexOf('velocity')).toBeGreaterThan(ids.indexOf('cash-mrr'));
+    }
+
+    const hudSource = readSource(HUD_DASHBOARD_CLIENT);
+    expect(hudSource).toContain('composeHudForPresentation(presentation)');
+    expect(hudSource).not.toMatch(/if \(isShell\) \{/);
+    expect(hudSource.indexOf("case 'morning-walk'")).toBeLessThan(
+      hudSource.indexOf("case 'what-shipped'")
+    );
+    expect(hudSource.indexOf("case 'cash-mrr'")).toBeLessThan(
+      hudSource.indexOf("case 'velocity'")
+    );
+    expect(hudSource.indexOf("case 'factory-health'")).toBeLessThan(
+      hudSource.indexOf('<ShippingVelocityChart')
     );
   });
 
