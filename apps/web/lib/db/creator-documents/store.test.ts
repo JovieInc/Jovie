@@ -235,6 +235,23 @@ describe('creator document persistence boundaries', () => {
     ).rejects.toThrow('Claim ledger is frozen for review');
   });
 
+  it('resolves an exact claim retry before checking the current ledger stage', async () => {
+    const source = await readFile(
+      join(process.cwd(), 'lib/db/creator-documents/store.ts'),
+      'utf8'
+    );
+    const claimWrite = source.slice(
+      source.indexOf('export async function addCreatorRevisionClaim'),
+      source.length
+    );
+    expect(claimWrite).toContain('), existing as (');
+    expect(claimWrite).toContain('claim.idempotency_key');
+    expect(claimWrite).toContain('(select id from existing)');
+    expect(claimWrite.indexOf('), existing as (')).toBeLessThan(
+      claimWrite.indexOf('), inserted as (')
+    );
+  });
+
   it('distinguishes an inaccessible claim source from a stale revision', async () => {
     execute.mockResolvedValueOnce({
       rows: [

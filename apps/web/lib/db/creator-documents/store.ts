@@ -404,6 +404,12 @@ export async function addCreatorRevisionClaim(input: {
             and source.user_id::text = ${input.userId}
         )
       ) as accessible
+    ), existing as (
+      select claim.id
+      from locked_context
+      join creator_revision_claims claim
+        on claim.revision_id = locked_context.revision_id
+        and claim.idempotency_key = ${input.idempotencyKey}
     ), inserted as (
       insert into creator_revision_claims (
       revision_id,
@@ -425,12 +431,16 @@ export async function addCreatorRevisionClaim(input: {
         and locked_context.stage = 'private_draft'
         and locked_context.revision_id is not null
         and source_access.accessible
+        and not exists (select 1 from existing)
       on conflict (revision_id, idempotency_key)
       do update set idempotency_key = excluded.idempotency_key
       returning id
     )
     select
-      (select id from inserted) as id,
+      coalesce(
+        (select id from existing),
+        (select id from inserted)
+      ) as id,
       (select current_revision from locked_context) as "currentRevision",
       (select stage from locked_context) as stage,
       coalesce((select revision_id is not null from locked_context), false) as "revisionExists",

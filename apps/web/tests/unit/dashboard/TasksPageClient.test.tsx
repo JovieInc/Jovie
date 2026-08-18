@@ -1408,6 +1408,32 @@ describe('TasksPageClient', () => {
     });
   });
 
+  it('ignores a late metadata acknowledgement from the previously open task', () => {
+    renderPage();
+    openTask();
+    const urgentChoice = within(screen.getByTestId('task-document-pane'))
+      .getAllByText('Urgent')
+      .map(node => node.closest('button'))
+      .find((button): button is HTMLButtonElement => Boolean(button));
+    if (!urgentChoice) throw new Error('Expected an urgent priority choice');
+    fireEvent.click(urgentChoice);
+    const [, options] = mockUpdateTask.mock.calls.at(-1) ?? [];
+
+    openTask(mockTask);
+    act(() =>
+      options?.onSuccess?.({ ...mockTaskTwo, mutationVersion: 8 } as TaskView)
+    );
+    fireEvent.change(screen.getByLabelText('Task Title'), {
+      target: { value: 'Task B keeps its own version' },
+    });
+    act(() => vi.advanceTimersByTime(500));
+
+    expect(mockUpdateTaskAsync).toHaveBeenCalledWith({
+      taskId: 'task-1',
+      data: expect.objectContaining({ expectedMutationVersion: 7 }),
+    });
+  });
+
   it('shows the empty-description helper for supported release tasks', () => {
     mockTasksData = [mockHelperTask, mockTask];
 

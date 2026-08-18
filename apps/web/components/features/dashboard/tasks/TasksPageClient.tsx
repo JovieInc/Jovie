@@ -1808,15 +1808,11 @@ export function TasksPageClient() {
           : undefined,
       [editorTaskId]
     ),
-    onMutationAcknowledged: useCallback(
-      (taskId: string, task: TaskView) => {
-        if (taskId === editorTaskId) {
-          editorExpectedMutationVersionRef.current =
-            task.mutationVersion ?? null;
-        }
-      },
-      [editorTaskId]
-    ),
+    onMutationAcknowledged: useCallback((taskId: string, task: TaskView) => {
+      if (taskId === latestSelectedTaskIdRef.current) {
+        editorExpectedMutationVersionRef.current = task.mutationVersion ?? null;
+      }
+    }, []),
   });
   const handleMoveTask = useCallback(
     (input: MoveTaskInput) => {
