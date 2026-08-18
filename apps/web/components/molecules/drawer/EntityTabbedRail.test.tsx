@@ -26,7 +26,7 @@ const TABS = [
 ];
 
 describe('EntityTabbedRail', () => {
-  it('enforces one flat rail surface around identity, tabs, and content', async () => {
+  it('inherits canonical drawer geometry while keeping rail content flat', async () => {
     const onTabChange = vi.fn();
     const { container } = render(
       <EntityTabbedRail
@@ -47,13 +47,7 @@ describe('EntityTabbedRail', () => {
     const rail = screen.getByTestId('entity-rail');
     const workspace = rail.querySelector('[data-right-rail-workspace]');
 
-    expect(rail).toHaveClass(
-      'rounded-none',
-      'border-y-0',
-      'border-r-0',
-      'bg-surface-2',
-      'shadow-none'
-    );
+    expect(rail).not.toHaveAttribute('class');
     expect(workspace).toHaveAttribute('data-surface-variant', 'flat');
     expect(screen.getByTestId('entity-sidebar-entity-header')).toHaveAttribute(
       'data-surface-variant',

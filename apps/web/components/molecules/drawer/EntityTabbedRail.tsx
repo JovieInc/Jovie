@@ -72,7 +72,6 @@ export function EntityTabbedRail<T extends string>({
       hideMinimalHeaderBar={hideMinimalHeaderBar}
       entityHeaderSurface='flat'
       workspaceSurface='flat'
-      drawerClassName='rounded-none border-y-0 border-r-0 bg-surface-2 shadow-none'
       contextMenuItems={contextMenuItems}
       data-testid={testId}
       isEmpty={isEmpty}
