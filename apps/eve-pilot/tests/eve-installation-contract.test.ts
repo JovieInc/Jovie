@@ -9,10 +9,20 @@ describe('Eve installation contract', () => {
     const packageJson = JSON.parse(
       readFileSync(resolve(pilotRoot, 'package.json'), 'utf8')
     ) as {
+      engines?: { node?: string };
       dependencies?: { eve?: string };
     };
 
+    expect(packageJson.engines?.node).toBe('>=24');
     expect(packageJson.dependencies?.eve).toBe('0.39.0');
+    expect(existsSync(resolve(pilotRoot, '.nvmrc'))).toBe(true);
+    expect(readFileSync(resolve(pilotRoot, '.nvmrc'), 'utf8').trim()).toMatch(
+      /^24\./
+    );
+    expect(existsSync(resolve(pilotRoot, 'scripts/with-node24.sh'))).toBe(true);
+    expect(
+      readFileSync(resolve(pilotRoot, 'scripts/with-node24.sh'), 'utf8')
+    ).toContain('Node.js >= 24');
     expect(
       existsSync(resolve(pilotRoot, 'node_modules/eve/docs/README.md'))
     ).toBe(true);
