@@ -264,8 +264,7 @@ describe('CookieModal loads saved preferences', () => {
       screen.getByRole('link', { name: /cookie policy/i }).className
     ).toContain('min-h-12');
     const close = screen.getByRole('button', { name: 'Close' });
-    expect(close.className).toContain('h-12');
-    expect(close.className).toContain('w-12');
+    expect(close.className).toContain('size-12');
   });
 
   it('calls onSave and onClose when Save Preferences succeeds', async () => {
