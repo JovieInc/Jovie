@@ -53,10 +53,10 @@ export function SettingsPaymentsSection() {
     onboardingUnavailable || errorCode === 'platform_profile_incomplete';
 
   const renderPanel = (children: ReactNode, footer?: ReactNode) => (
-    <SettingsPanel>
-      <div className='px-4 py-4 sm:px-5'>{children}</div>
+    <SettingsPanel bodyClassName='px-4 py-4 sm:px-5'>
+      {children}
       {footer ? (
-        <div className='border-t border-subtle px-4 py-3.5 sm:px-5'>
+        <div className='-mx-4 -mb-4 mt-4 border-t border-subtle px-4 py-3.5 sm:-mx-5 sm:px-5'>
           {footer}
         </div>
       ) : null}
