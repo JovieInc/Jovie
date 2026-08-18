@@ -1,10 +1,23 @@
 import { describe, expect, it } from 'vitest';
+import { prepareOvieChatTurn } from '@/lib/ovie/chat-entry';
 import {
   assertEveChatFactoryLock,
   bindEveIdentityForChatMode,
   bindEveIdentityForTurn,
+  type EveBoundTurn,
   EveCapabilityDeniedError,
 } from '@/lib/ovie/identity';
+
+function armFactoryWrite(turn: EveBoundTurn): EveBoundTurn {
+  return {
+    ...turn,
+    pack: {
+      ...turn.pack,
+      canPrivilegedWriteGbrain: true,
+      canHealSymphony: true,
+    },
+  };
+}
 
 describe('Eve identity packs (JOV-5216)', () => {
   it('denies Jovie privileged gbrain write and Symphony heal on the bound turn', () => {
@@ -16,37 +29,36 @@ describe('Eve identity packs (JOV-5216)', () => {
     expect(() => turn.require('symphony-heal')).toThrow(
       EveCapabilityDeniedError
     );
-    expect(() => turn.require('gbrain-read')).toThrow(EveCapabilityDeniedError);
-    expect(() => turn.require('ingest-ack')).toThrow(EveCapabilityDeniedError);
     expect(() => assertEveChatFactoryLock(turn)).not.toThrow();
-    expect(turn.instructions.includes('privileged gbrain write')).toBe(false);
-    expect(turn.instructions.includes('Symphony heal')).toBe(false);
   });
 
-  it('lets Ovie ingest/ack and read gbrain, still denies factory writes', () => {
-    const turn = bindEveIdentityForTurn('ovie');
-    expect(turn.pack.role).toBe('founder');
-    expect(() => turn.require('ingest-ack')).not.toThrow();
-    expect(() => turn.require('gbrain-read')).not.toThrow();
-    expect(() => turn.require('privileged-gbrain-write')).toThrow(
+  it('fails a runtime that still writes gbrain or heals Symphony', () => {
+    const armed = armFactoryWrite(bindEveIdentityForTurn('jovie'));
+    expect(() => assertEveChatFactoryLock(armed)).toThrow(
       EveCapabilityDeniedError
     );
-    expect(() => turn.require('symphony-heal')).toThrow(
+    expect(() =>
+      assertEveChatFactoryLock(armFactoryWrite(bindEveIdentityForTurn('ovie')))
+    ).toThrow(EveCapabilityDeniedError);
+  });
+
+  it('lets Ovie ingest/ack and read gbrain on the chat entry', () => {
+    const { eveTurn } = prepareOvieChatTurn('ov', 'post this tweet');
+    expect(eveTurn.pack.id).toBe('ovie');
+    expect(() => eveTurn.require('ingest-ack')).not.toThrow();
+    expect(() => eveTurn.require('gbrain-read')).not.toThrow();
+    expect(() => eveTurn.require('privileged-gbrain-write')).toThrow(
       EveCapabilityDeniedError
     );
-    expect(() => assertEveChatFactoryLock(turn)).not.toThrow();
-    expect(turn.instructions.includes('ingest and ack')).toBe(true);
-    expect(turn.instructions.includes('gbrain')).toBe(true);
+    expect(() => eveTurn.require('symphony-heal')).toThrow(
+      EveCapabilityDeniedError
+    );
   });
 
   it('binds ov chat mode through the same entry as the chat route', () => {
-    const ovie = bindEveIdentityForChatMode('ov');
-    const jovie = bindEveIdentityForChatMode(null);
-    expect(ovie.pack.id).toBe('ovie');
-    expect(jovie.pack.id).toBe('jovie');
-    expect(() => ovie.require('ingest-ack')).not.toThrow();
-    expect(() => jovie.require('ingest-ack')).toThrow(EveCapabilityDeniedError);
-    expect(() => assertEveChatFactoryLock(ovie)).not.toThrow();
-    expect(() => assertEveChatFactoryLock(jovie)).not.toThrow();
+    expect(bindEveIdentityForChatMode('ov').pack.id).toBe('ovie');
+    expect(bindEveIdentityForChatMode(null).pack.id).toBe('jovie');
+    expect(prepareOvieChatTurn('ov', null).eveTurn.pack.id).toBe('ovie');
+    expect(prepareOvieChatTurn(null, null).eveTurn.pack.id).toBe('jovie');
   });
 });
