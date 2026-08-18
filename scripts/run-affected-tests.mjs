@@ -142,6 +142,20 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = new Set([
 const AFFECTED_TEST_SELECTOR_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const SAFE_PR_REMEDIATION_PRIMARY_INPUTS = new Set([
+  '.github/workflows/safe-pr-remediation.yml',
+  'scripts/lib/safe-pr-remediation.mjs',
+  'scripts/lib/__tests__/safe-pr-remediation.test.mjs',
+]);
+const SAFE_PR_REMEDIATION_LANE = new Set([
+  ...SAFE_PR_REMEDIATION_PRIMARY_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+const SAFE_PR_REMEDIATION_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/safe-pr-remediation.test.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+];
+const SAFE_PR_REMEDIATION_NODE_TESTS = ['scripts/typecheck-scripts.mjs'];
 const CI_UI_DRIFT_GUARDRAIL_INPUTS = new Set([
   '.github/workflows/ci.yml',
   'apps/desktop/scripts/desktop-shell-contract.test.mjs',
@@ -620,6 +634,22 @@ export function buildAffectedTestPlan(
       pythonUnittestTests: SYMPHONY_THROUGHPUT_PYTHON_TESTS,
       scriptVitestTests: SYMPHONY_THROUGHPUT_SCRIPT_TESTS,
       nodeTests: SYMPHONY_THROUGHPUT_NODE_TESTS,
+    };
+  }
+  const isBoundedSafePrRemediationChange =
+    files.some(file => SAFE_PR_REMEDIATION_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => SAFE_PR_REMEDIATION_LANE.has(file));
+  if (isBoundedSafePrRemediationChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: SAFE_PR_REMEDIATION_SCRIPT_TESTS,
+      nodeTests: SAFE_PR_REMEDIATION_NODE_TESTS,
     };
   }
   const isBoundedGemPrRehabilitationChange =

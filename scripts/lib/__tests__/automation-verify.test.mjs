@@ -168,6 +168,12 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = [
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const SAFE_PR_REMEDIATION_LANE = [
+  '.github/workflows/safe-pr-remediation.yml',
+  'scripts/lib/safe-pr-remediation.mjs',
+  'scripts/lib/__tests__/safe-pr-remediation.test.mjs',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+];
 const EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST = [
   '.github/workflows/fleet-gate-refresh.yml',
   'scripts/hermes/launchd/README.md',
@@ -653,6 +659,25 @@ describe('automation-verify affected scope', () => {
       buildAffectedTestPlan([
         ...GEM_PR_REHABILITATION_LANE,
         'apps/ios/Jovie/RootView.swift',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('selects the bounded safe PR remediation contract and fails closed on unrelated files', () => {
+    expect(buildAffectedTestPlan(SAFE_PR_REMEDIATION_LANE)).toMatchObject({
+      mode: 'selected',
+      selectedTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: [
+        'scripts/lib/__tests__/safe-pr-remediation.test.mjs',
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+      ],
+      nodeTests: ['scripts/typecheck-scripts.mjs'],
+    });
+    expect(
+      buildAffectedTestPlan([
+        ...SAFE_PR_REMEDIATION_LANE,
+        'apps/web/lib/unknown-safe-remediation-peer.ts',
       ]).mode
     ).toBe('full');
   });
