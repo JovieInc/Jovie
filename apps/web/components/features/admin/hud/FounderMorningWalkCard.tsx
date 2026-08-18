@@ -16,8 +16,6 @@ import { FOUNDER_WALK_CONFIRM_PATH } from '@/lib/hud/founder-walk';
 type WalkPhase = 'idle' | 'recording' | 'uploading';
 
 export function FounderMorningWalkCard(props: {
-  readonly mrrLabel: string;
-  readonly cashLabel: string;
   readonly defaultStatus: string;
 }) {
   const [phase, setPhase] = useState<WalkPhase>('idle');
@@ -78,10 +76,7 @@ export function FounderMorningWalkCard(props: {
           <p className='text-2xs font-medium uppercase tracking-[0.08em] text-tertiary-token'>
             Morning walk
           </p>
-          <p className='text-sm text-primary-token'>
-            MRR {props.mrrLabel} · Cash {props.cashLabel} ·{' '}
-            {props.defaultStatus}
-          </p>
+          <p className='text-sm text-primary-token'>{props.defaultStatus}</p>
           <p className='text-xs text-secondary-token'>
             Record the web path. Same account video store as creator capture.
             Classification is later. Nothing is admitted from this dump.
