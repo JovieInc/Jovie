@@ -30,6 +30,7 @@ describe('Badge Component', () => {
       render(<Badge emphasis='default'>Default Badge</Badge>);
 
       const badge = screen.getByText('Default Badge');
+      expect(badge).toHaveAttribute('data-emphasis', 'default');
       expect(badge).toHaveClass('tracking-[-0.006em]');
       expect(badge).not.toHaveClass('bg-surface-1');
     });
@@ -38,6 +39,7 @@ describe('Badge Component', () => {
       render(<Badge emphasis='subtle'>Subtle Badge</Badge>);
 
       const badge = screen.getByText('Subtle Badge');
+      expect(badge).toHaveAttribute('data-emphasis', 'subtle');
       expect(badge).toHaveClass('bg-surface-1');
       expect(badge).toHaveClass('text-tertiary-token');
     });

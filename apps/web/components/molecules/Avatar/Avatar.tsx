@@ -1,6 +1,11 @@
 'use client';
 
-import { getInitials } from '@jovie/ui';
+// @coverage-via apps/web/tests/unit/components/atoms/Avatar/Avatar.test.tsx
+import {
+  Avatar as BaseAvatar,
+  AvatarFallback as BaseAvatarFallback,
+  getInitials,
+} from '@jovie/ui';
 import Image from 'next/image';
 import React, { forwardRef, useMemo, useState } from 'react';
 import { VerifiedBadge } from '@/components/atoms/VerifiedBadge';
@@ -132,9 +137,6 @@ function generateInitials(name?: string): string {
  * - Accessibility support with proper ARIA attributes
  * - Dark mode support
  */
-const BORDER_RING =
-  'outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10';
-
 const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
   {
     src,
@@ -185,25 +187,29 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
   if (shouldShowFallback) {
     return (
       <div ref={ref} className={cn('relative', className)} style={style}>
-        <div
+        <BaseAvatar
+          size={size}
+          data-slot='app-avatar'
+          style={{ width, height }}
           className={cn(
             sizeClass,
             roundedClass,
-            'flex items-center justify-center bg-surface-2 text-primary-token',
-            BORDER_RING,
+            'overflow-hidden text-primary-token',
             'shadow-sm transition-colors duration-subtle'
           )}
           aria-hidden='true'
         >
-          <span
+          <BaseAvatarFallback
+            size={size}
             className={cn(
               'font-medium leading-none select-none text-primary-token',
+              roundedClass,
               textSize
             )}
           >
             {initials}
-          </span>
-        </div>
+          </BaseAvatarFallback>
+        </BaseAvatar>
         {verified && (
           <span className='absolute -bottom-0.5 -right-0.5'>
             <VerifiedBadge size={badgeSize} />
@@ -215,13 +221,15 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
 
   return (
     <div ref={ref} className={cn('relative', className)} style={style}>
-      <div
+      <BaseAvatar
+        size={size}
+        data-slot='app-avatar'
+        style={{ width, height }}
         className={cn(
           sizeClass,
           roundedClass,
           'overflow-hidden text-primary-token',
           isLoaded && 'bg-surface-1',
-          BORDER_RING,
           'shadow-sm transition-colors duration-subtle'
         )}
         aria-hidden='true'
@@ -255,7 +263,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
             aria-hidden='true'
           />
         )}
-      </div>
+      </BaseAvatar>
 
       {verified && (
         <span className='absolute -bottom-0.5 -right-0.5'>

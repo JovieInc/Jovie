@@ -207,6 +207,12 @@ export { Label, labelVariants } from './atoms/label';
 // Link
 export type { LinkProps } from './atoms/link';
 export { Link, linkVariants } from './atoms/link';
+// Native Select
+export type {
+  NativeSelectOption,
+  NativeSelectProps,
+} from './atoms/native-select';
+export { NativeSelect } from './atoms/native-select';
 // Popover
 export {
   Popover,
