@@ -645,6 +645,13 @@
       "when": 1786771710949,
       "tag": "0091_demonic_absorbing_man",
       "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1787013407756,
+      "tag": "0092_fresh_magdalene",
+      "breakpoints": true
     }
   ]
 }

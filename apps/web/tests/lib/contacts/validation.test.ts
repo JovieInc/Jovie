@@ -49,6 +49,89 @@ describe('sanitizeContactInput', () => {
       })
     ).toThrowError(/Add at least one contact channel/);
   });
+
+  it('normalizes multiple assignments while retaining territory on each assignment', () => {
+    const sanitized = sanitizeContactInput({
+      profileId: 'profile-123',
+      id: 'person-1',
+      role: 'management',
+      territories: [],
+      email: 'agent@example.com',
+      phone: null,
+      responsibilities: [
+        {
+          role: 'management',
+          territories: ['Worldwide'],
+          isPrimary: true,
+        },
+        {
+          role: 'bookings',
+          territories: [' Europe ', 'Europe'],
+          isPrimary: true,
+        },
+      ],
+    });
+
+    expect(sanitized.responsibilities).toEqual([
+      expect.objectContaining({
+        role: 'management',
+        territories: ['Worldwide'],
+        isPrimary: true,
+      }),
+      expect.objectContaining({
+        role: 'bookings',
+        territories: ['Europe'],
+        isPrimary: false,
+      }),
+    ]);
+  });
+
+  it('requires labels for custom responsibilities and rejects duplicate reusable roles', () => {
+    const base = {
+      profileId: 'profile-123',
+      role: 'management' as const,
+      territories: [],
+      email: 'agent@example.com',
+      phone: null,
+    };
+
+    expect(() =>
+      sanitizeContactInput({
+        ...base,
+        responsibilities: [{ role: 'other', customLabel: ' ' }],
+      })
+    ).toThrowError(/label for an Other responsibility/);
+
+    expect(() =>
+      sanitizeContactInput({
+        ...base,
+        responsibilities: [
+          { role: 'bookings', territories: [] },
+          { role: 'bookings', territories: ['Europe'] },
+        ],
+      })
+    ).toThrowError(/only be assigned once/);
+  });
+
+  it('promotes the first active assignment when a historical primary is retired', () => {
+    const sanitized = sanitizeContactInput({
+      profileId: 'profile-123',
+      role: 'management',
+      territories: [],
+      email: 'agent@example.com',
+      phone: null,
+      responsibilities: [
+        { role: 'management', isActive: false, isPrimary: false },
+        { role: 'bookings', isActive: true, isPrimary: false },
+      ],
+    });
+
+    expect(sanitized.responsibilities?.map(item => item.isPrimary)).toEqual([
+      false,
+      true,
+    ]);
+    expect(sanitized.role).toBe('bookings');
+  });
 });
 
 describe('validateEmail - ReDoS Protection', () => {
