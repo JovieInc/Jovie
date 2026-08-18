@@ -1,4 +1,4 @@
-name: Observability Issue Sync
+name: Observability Report (GitHub Issue sync retired)
 
 on:
   repository_dispatch:
@@ -12,10 +12,13 @@ concurrency:
 
 jobs:
   sync-issue:
+    # The dispatch producer must migrate to the Linear tracker facade before
+    # this lane can resume. Never fall back to GitHub Issues.
+    if: ${{ github.event_name == '__retired_linear_only__' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      issues: write
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

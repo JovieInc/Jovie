@@ -1,7 +1,9 @@
 import AppKit
 import Foundation
 
-/// Polls Hermes kanban (or GitHub fallback) for shipping counts and runs ops actions.
+private let githubIssueFallbackRetired = true
+
+/// Polls Linear-backed Symphony status for shipping counts and runs ops actions.
 @MainActor
 final class ShippingStatusStore: ObservableObject {
   @Published private(set) var inProgressCount: Int = 0
@@ -45,17 +47,9 @@ final class ShippingStatusStore: ObservableObject {
       lastError = nil
       lastRefresh = Date()
     } catch {
-      // GitHub fallback when hermes kanban is unavailable
-      do {
-        let ghCount = try await Self.fetchGitHubInProgressCount()
-        inProgressCount = ghCount
-        readyCount = 0
-        blockedCount = 0
-        lastError = "Kanban unavailable — GitHub fallback (\(error.localizedDescription))"
-        lastRefresh = Date()
-      } catch {
-        lastError = error.localizedDescription
-      }
+      // Fail closed: stale/unknown is safer than presenting GitHub Issue
+      // labels as canonical backlog or active-work counts.
+      lastError = "Linear/Symphony status unavailable — no GitHub Issue fallback (\(error.localizedDescription))"
     }
   }
 
@@ -156,8 +150,16 @@ final class ShippingStatusStore: ObservableObject {
     }.value
   }
 
+  /// Historical implementation retained for diagnostics only.
   nonisolated static func fetchGitHubInProgressCount() async throws -> Int {
-    try await Task.detached(priority: .utility) {
+    if githubIssueFallbackRetired {
+      throw NSError(
+        domain: "Jovie.LinearOnlyIntake",
+        code: 78,
+        userInfo: [NSLocalizedDescriptionKey: "GitHub Issue fallback retired"]
+      )
+    }
+    return try await Task.detached(priority: .utility) {
       let json = try runProcess(
         "/bin/zsh",
         args: [

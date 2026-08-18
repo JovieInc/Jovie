@@ -432,9 +432,9 @@ After making changes, **ALWAYS test these user scenarios manually**:
 
 ## Labels and Assignment
 
-- **Labels**: `mvp`, `agent:copilot`, and `area:*` (e.g., `area:landing`, `area:ui`, `area:fix`)
-- **Assignment**: `github-copilot` (the coding agent) or use repository automation
-- **Priority**: Use GitHub issue/PR templates for priority and complexity assessment
+- **Canonical intake**: Linear only. Never create, select, or infer backlog work from GitHub Issues.
+- **PR labels**: `mvp`, `agent:copilot`, and `area:*` (e.g., `area:landing`, `area:ui`, `area:fix`) are PR metadata, not backlog authority.
+- **Assignment and priority**: Use the Linear owner, priority, and complexity contract. GitHub remains scoped to the resulting PR, Actions, and merge-queue evidence.
 
 ## Development Notes and Gotchas
 

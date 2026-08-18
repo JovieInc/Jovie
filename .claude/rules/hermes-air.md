@@ -9,24 +9,24 @@ A dedicated orchestration node that:
 - Ingests Telegram brain dumps into the shared company workflows.
 - Retains a selected, private macOS Voice Memos shadow architecture for later activation. The watcher is disabled and must not process real memos until the activation gate below passes.
 - Persists shared company context to gbrain (Air-as-server, PGLite backend, exposed over Tailscale as a remote-MCP HTTP server). Raw Voice Memo audio and transcripts are excluded from that shared store.
-- Segments dumps into `memory` (gbrain only), `issue` (GitHub Issues), and `task` (sub-agent dispatch).
-- Files GitHub issues for engineering/product/ops work using the canonical follow-up shape from `.claude/rules/linear.md` via `scripts/hermes/lib/tracker-client.ts` (`gh issue create`). Linear mirrors behind `TRACKER_GITHUB_ONLY` during the parallel-run window.
+- Segments dumps into `memory` (gbrain only), `issue` (Linear), and `task` (sub-agent dispatch).
+- Files exactly one Linear issue for engineering/product/ops work using the canonical follow-up shape from `.claude/rules/linear.md` via `scripts/hermes/lib/tracker-client.ts`. Linear failures queue a Linear retry and fail closed; there is no GitHub fallback or dual-write.
 - Routes non-engineering tasks (calendar moves, Airtable updates, emails) to the right sub-agent which calls the appropriate MCP.
 - Runs deterministic cron jobs: PR-stuck monitor, CI failure triage, HUD refresh, daily briefing, cost monitor, deterministic-tracker (self-improvement), free-model health.
 
 ## What Hermes-Air IS NOT
 
 - **NOT a code editor.** No Claude Code sessions, no `pnpm` builds, no Conductor worktrees, no `git` commits, no PR merges from this node.
-- **NOT a dispatcher for engineering work over `repository_dispatch`.** Engineering intake files GitHub issues; CI (`github-ai-orchestrator.yml`) and the Pro codex issue shipper consume them.
+- **NOT a GitHub Issue dispatcher.** Engineering intake is Linear-only and selection belongs to Linear-backed Symphony. The GitHub AI dispatcher/orchestrator and Pro codex issue shipper are retired.
 - **NOT a hot path for product traffic.** Vercel still runs all product crons. Hermes-Air owns ops crons only.
-- **NOT a single source of truth.** Linear, GitHub, Airtable, Calendar, and gbrain are durable systems of record; Hermes-Air is a router and watcher.
+- **NOT a backlog source of truth.** Linear is the sole canonical backlog. GitHub remains authoritative for PRs, Actions, and merge-queue evidence; Airtable, Calendar, and gbrain keep their scoped records.
 
 ## Hard Invariants
 
 | Invariant | Enforced by |
 |---|---|
 | Hermes-Air never edits code or merges PRs | Profile gate (`JOVIE_AGENT_PROFILE!=coder`); `orchestrator-boundary-check.sh` hook on any Claude Code session that ever runs on Air (should be zero) |
-| All admitted engineering follow-ups go through GitHub Issues | Telegram intake handlers file via `tracker-client.ts` (`gh issue create`); no `repository_dispatch` from Air. Private voice proposals require Summer admission and sanitization first. |
+| All admitted engineering follow-ups go through Linear | Telegram intake handlers file via the Linear-only `tracker-client.ts`; no GitHub Issue fallback or `repository_dispatch` from Air. Private voice proposals require Summer admission and sanitization first. |
 | Inference cost is $0 unless user explicitly opts in | `free-model-router.ts` only selects `:free` OpenRouter variants; `cost-monitor.ts` kills non-watchdog jobs if any paid spend exceeds $0 in 24h |
 | gbrain stays local (Air-hosted, Tailscale-bound) | `gbrain serve --http --bind <tailscale-ip>` binds to the Tailscale interface only; no public exposure |
 | Voice memo source material stays private on the Air | Audio, raw transcripts, classifications, and proposals live only under non-symlinked `~/.hermes/private/` roots with `0700` directories and `0600` files. No raw shared gbrain, GitHub, Telegram, dispatch log, or repository write. |
@@ -45,7 +45,7 @@ Profiles are defined in `~/.hermes/config.yaml` (template at `scripts/hermes/con
 | `chief` | default routing, clarification questions, status replies | Linear, gbrain | edit code, spend money |
 | `cfo` | finance/spend/runway questions; cost monitor escalations | gbrain, Doppler (read-only), OpenRouter usage | edit code, move money, call Stripe |
 | `founder-os` | fundraising, GTM, company-state, warm network recall | Airtable (fundraising base), Gmail (read+draft, not send), Calendar, gbrain | edit code, send emails without confirmation |
-| `code-orchestrator` | PR triage, CI failure classification, file GitHub repair issues | GitHub (read/write issues), gbrain | edit code, merge PRs, push branches |
+| `code-orchestrator` | PR triage, CI failure classification, file Linear repair issues | Linear, GitHub (PR/Actions read), gbrain | edit code, merge PRs, push branches |
 
 ## Private Voice Shadow Architecture (Selected, Disabled)
 
@@ -63,12 +63,12 @@ The legacy `scripts/hermes/jobs/voice-memo-ingest.ts` watcher is not the activat
 ## Engineering Work Handoff (the only contract with the Pro)
 
 1. Telegram intake, or a sanitized voice proposal explicitly admitted by Summer, is classified as an `issue` span.
-2. Hermes-Air files a GitHub issue using the canonical follow-up shape from `.claude/rules/linear.md` (Source / Follow-up / Why it matters / Classification / Acceptance criteria). A voice-derived issue references only the sanitized private proposal receipt, never the raw memo or transcript.
-3. Optional: add the `agent-ready` label when the issue should enter the GitHub-native orchestrator immediately.
-4. The Pro codex issue shipper or `.github/workflows/github-ai-orchestrator.yml` discovers labeled/ready work — no Air-side `repository_dispatch`, no SSH.
-5. PR opens with `Fixes #N` in the body; GitHub native queue landing on `main` closes the GitHub issue. `linear-sync-on-merge.yml` still mirrors to Linear until `TRACKER_GITHUB_ONLY=1`.
+2. Hermes-Air files exactly one Linear issue using the canonical follow-up shape from `.claude/rules/linear.md` (Source / Follow-up / Why it matters / Classification / Acceptance criteria). A voice-derived issue references only the sanitized private proposal receipt, never the raw memo or transcript.
+3. Linear-backed Symphony selects eligible work under the Linear ownership contract.
+4. GitHub Issue dispatchers and local/remote GitHub issue shippers remain retired; GitHub is used only for the resulting PR, Actions, and merge-queue evidence.
+5. The PR preserves its Linear marker and `jov-XXXX` branch pattern so `linear-sync-on-merge.yml` transitions the canonical issue after merge.
 
-If the Air cannot file the GitHub issue (network down, `gh` outage), queue a Telegram-derived or already-sanitized intent in `~/.hermes/state/linear-queue.jsonl` for operator inspection. A voice-derived proposal remains only in the private voice store and may be retried after service recovery without copying its raw memo or transcript into shared gbrain or the queue.
+If Linear is unavailable, rate-limited, or rejects the mutation, queue a Telegram-derived or already-sanitized intent in `~/.hermes/state/linear-queue.jsonl` for operator inspection and dispatch nothing. Never fall back to GitHub. A voice-derived proposal remains only in the private voice store and may be retried after service recovery without copying its raw memo or transcript into shared gbrain or the queue.
 
 ## Self-Improvement Loop
 
@@ -76,8 +76,8 @@ If the Air cannot file the GitHub issue (network down, `gh` outage), queue a Tel
 
 - Reads Hermes dispatch log (`~/.hermes/logs/dispatch.jsonl`).
 - Clusters intents by shape (similar input → similar action).
-- For any cluster firing ≥5 times in a 30-day window, files a GitHub issue: "Replace LLM-driven path X with deterministic script."
-- The Pro's runner picks up these issues like any other and proposes a code change.
+- For any cluster firing ≥5 times in a 30-day window, files exactly one Linear issue: "Replace LLM-driven path X with deterministic script."
+- Linear-backed Symphony may pick up the issue under the normal ownership contract.
 
 This is how Hermes-Air keeps trending toward $0 model calls over time.
 

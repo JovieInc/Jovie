@@ -52,6 +52,7 @@ WORKFLOWS = {
 LINEAR_API = "https://api.linear.app/graphql"
 LINEAR_TEAM_KEY = "JOV"
 GITHUB_READY_LABELS = {"agent-ready", "ready-for-intake"}
+GITHUB_ISSUE_FALLBACK_RETIRED = True
 
 
 class IssueSourceUnavailable(RuntimeError):
@@ -535,6 +536,8 @@ def fetch_linear_issues() -> dict[str, Any]:
 
 
 def fetch_github_issues() -> dict[str, Any]:
+    if GITHUB_ISSUE_FALLBACK_RETIRED:
+        raise RuntimeError("GitHub Issue fallback retired; Linear is canonical")
     pages = run_json(
         ["gh", "api", "--paginate", "--slurp", f"repos/{REPO}/issues?state=open&per_page=100"]
     )
@@ -565,6 +568,14 @@ def fetch_issue_source() -> dict[str, Any]:
         }
     except Exception as exc:
         linear_error = linear_error_kind(exc)
+
+    if GITHUB_ISSUE_FALLBACK_RETIRED:
+        return {
+            "updated": iso(),
+            "error": f"linear_{linear_error}",
+            "source": "linear",
+            "degraded": True,
+        }
 
     try:
         counts = fetch_github_issues()
@@ -939,7 +950,7 @@ def render(state: dict[str, Any]) -> str:
                 if issues.get("error")
                 else "Linear workflow states"
                 if issue_source == "LINEAR"
-                else f"read-only GitHub fallback; Linear {issues.get('linear_error', 'unavailable')}"
+                else f"historical GitHub counts; non-canonical; Linear {issues.get('linear_error', 'unavailable')}"
             ),
         ),
         grid_row(
@@ -949,7 +960,7 @@ def render(state: dict[str, Any]) -> str:
             (
                 "Linear Backlog state"
                 if issue_source == "LINEAR"
-                else "all open GitHub issues; degraded semantics"
+                else "historical open GitHub issues; non-canonical"
             ),
         ),
         grid_row(
@@ -959,7 +970,7 @@ def render(state: dict[str, Any]) -> str:
             (
                 "Linear unstarted state"
                 if issue_source == "LINEAR"
-                else "agent-ready / ready-for-intake GitHub labels"
+                else "historical GitHub labels; never selectable"
             ),
         ),
         grid_row("In progress", counts.get("implementing", "?"), "RUNNING" if counts.get("implementing") else "IDLE", "local Symphony running status"),

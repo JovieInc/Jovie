@@ -15,6 +15,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Changed
 - [internal] **@types/node is 26.2.0 across workspace packages including desktop:** types-only bump; no DMG.
 
+- [internal] **Linear is the sole canonical backlog:** GitHub-Issue dispatchers and shippers are hard-retired, active tracker facades fail closed on Linear errors with no dual-write, and dashboards no longer substitute historical GitHub Issues for backlog counts.
 - **Ops and the TV HUD are aliases now:** admin nav “Ovie” opens `/hud`. The Mac app grants display-capture only on that route.
 - [internal] **Demo-video stories preserve document scrolling (JOV-4946):** both canonical route aliases now inherit the production marketing context without fixed-height overflow clipping at tablet or mobile viewports.
 - [internal] **Capital policy now protects survival before selectivity:** pre-PMF runway gets a fast path for credible, clean SAFE financing, while investor filtering tightens only after the company can afford to make capital optional.

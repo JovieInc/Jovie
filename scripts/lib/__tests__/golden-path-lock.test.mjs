@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { createGoldenPathLinearIssue } from '../golden-path-intake.mjs';
 import {
   buildAutofixPrompt,
   buildMergeGateReceipt,
@@ -254,5 +255,67 @@ describe('golden-path lock autofix planner', () => {
     expect(cursorAuthHeader('abc')).toBe(
       `Basic ${Buffer.from('abc:', 'utf8').toString('base64')}`
     );
+  });
+});
+
+describe('golden-path Linear-only intake', () => {
+  it('creates exactly one canonical Linear record', async () => {
+    const fetchImpl = vi.fn(
+      async (_input, _init) =>
+        new Response(
+          JSON.stringify({
+            data: {
+              issueCreate: {
+                success: true,
+                issue: {
+                  id: 'linear-1',
+                  identifier: 'JOV-1001',
+                  url: 'https://linear.app/jovie/issue/JOV-1001',
+                },
+              },
+            },
+          }),
+          { status: 200 }
+        )
+    );
+
+    const result = await createGoldenPathLinearIssue(
+      {
+        fingerprint: 'golden-path-lock:prod:test',
+        prompt: 'Fix the failure',
+        apiKey: 'linear-test-key',
+      },
+      fetchImpl
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      identifier: 'JOV-1001',
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(String(fetchImpl.mock.calls[0][1].body));
+    expect(payload.query).toContain('mutation CreateGoldenPathLockIssue');
+    expect(payload.query).toContain('issueCreate');
+  });
+
+  it('fails closed on a Linear rate limit without another tracker write', async () => {
+    const fetchImpl = vi.fn(
+      async (_input, _init) => new Response('rate limited', { status: 429 })
+    );
+
+    const result = await createGoldenPathLinearIssue(
+      {
+        fingerprint: 'golden-path-lock:prod:test',
+        prompt: 'Fix the failure',
+        apiKey: 'linear-test-key',
+      },
+      fetchImpl
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'linear_issue_429',
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 });

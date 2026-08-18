@@ -33,12 +33,9 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
-      issues: write
     env:
       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
       LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-      GITHUB_TOKEN: ${{ github.token }}
-      GITHUB_REPOSITORY: ${{ github.repository }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

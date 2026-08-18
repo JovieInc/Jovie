@@ -6,7 +6,7 @@ macOS menu bar app for live shipping counts + Hermes gateway controls (JOV-3593)
 
 - Menu bar icon (shipping box SF Symbol) with badge = in-progress kanban cards
 - Polls every 30s via `hermes kanban --board jovie-product list --json`
-- Falls back to `gh issue list … --label status:in-progress` if kanban fails
+- Fails closed with an explicit stale/error state if Linear-backed Symphony status is unavailable; GitHub Issues never supply backlog counts
 - Menu actions: restart gateway, restart daemons, status check, open Linear, quit
 
 ## Build

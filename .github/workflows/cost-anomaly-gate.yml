@@ -27,13 +27,13 @@
 # 2. Query Sentry for baseline event count: same hour-of-week from the
 #    prior 4 weeks, averaged.
 # 3. Anomaly if current exceeds either the baseline multiplier or absolute floor.
-# 4. On anomaly: Slack alert + GitHub issue. No production mutation.
+# 4. On anomaly: Slack alert + Actions receipt. No tracker mutation.
 #
 # SAFETY:
 # - Alert-only by construction; it has no Vercel credentials or rollback step.
 # - The absolute floor catches high volume even when a stale baseline is elevated.
-# - One open incident is the cooldown boundary: only the first observation
-#   creates an issue and sends Slack; later runs stay quiet until it is closed.
+# - GitHub Issue incident creation is retained below only as hard-retired
+#   history. Linear is the sole canonical tracker.
 
 name: Cost Anomaly Gate
 
@@ -65,7 +65,6 @@ concurrency:
 
 permissions:
   contents: read
-  issues: write
 
 jobs:
   evaluate:
@@ -235,29 +234,29 @@ jobs:
           fi
 
       - name: Create one open cost-anomaly incident
-        id: incident
-        if: steps.evaluate.outputs.status == 'anomaly'
+        id: retired-github-incident
+        if: ${{ github.event_name == '__retired_linear_only__' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+          if [ "${{ github.event_name }}" = "__retired_linear_only__" ]; then echo "::error::GitHub Issue intake is retired; this historical step cannot run."; exit 78; fi
           CURRENT="${{ steps.current.outputs.count }}"
           BASELINE="${{ steps.baseline.outputs.average }}"
           REASON="${{ steps.evaluate.outputs.reason }}"
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          INCIDENT_TITLE="[Cost Anomaly] Production event-volume incident"
+          RETIRED_TITLE="[Cost Anomaly] Production event-volume incident"
 
           # Concurrency serializes evaluators. A fixed open-incident identity
           # then deduplicates sequential 15-minute runs until operators close it.
-          gh label create cost-monitoring --force \
+          retired_github_cli label create cost-monitoring --force \
             --description "Cost monitoring and anomaly detection" --color "e4e669"
-          gh label create incident --force \
+          retired_github_cli label create incident --force \
             --description "Production incident requiring investigation" --color "d93f0b"
-          issues_json="$(gh issue list --state open --label cost-monitoring \
+          issues_json="$(retired_github_cli issue list --state open --label cost-monitoring \
             --limit 100 --json number,title,url)"
           jq -e 'type == "array"' >/dev/null <<<"$issues_json"
-          existing_json="$(jq -c --arg title "$INCIDENT_TITLE" \
+          existing_json="$(jq -c --arg title "$RETIRED_TITLE" \
             '[.[] | select(.title == $title)] | sort_by(.number) | first // empty' \
             <<<"$issues_json")"
           if [ -n "$existing_json" ]; then
@@ -288,12 +287,14 @@ jobs:
             printf '2. Identify the runaway code path: Sentry transactions, Vercel function logs, per-route invocation counts.\n'
             printf '3. Verify provider-side spend caps held (see docs/COST_MONITORING.md Layer 1 checklist).\n'
             printf '4. Patch the root cause and redeploy through the serialized production controller.\n'
+            # shellcheck disable=SC2016
             printf '5. If this was a false positive, tune `threshold_multiplier` or `absolute_floor` in the workflow.\n\n'
+            # shellcheck disable=SC2016
             printf '## Runbook\nSee `docs/COST_MONITORING.md`.\n'
           } > "$BODY_FILE"
 
-          incident_url="$(gh issue create \
-            --title "$INCIDENT_TITLE" \
+          incident_url="$(retired_github_cli issue create \
+            --title "$RETIRED_TITLE" \
             --label "cost-monitoring,incident" \
             --body-file "$BODY_FILE")"
           [[ "$incident_url" == https://github.com/* ]] || {
@@ -303,7 +304,16 @@ jobs:
           echo "should_notify=true" >> "$GITHUB_OUTPUT"
           echo "incident_url=$incident_url" >> "$GITHUB_OUTPUT"
 
-      - name: Slack alert on new anomaly incident
+      - name: Prepare Linear-only anomaly receipt
+        id: incident
+        if: steps.evaluate.outputs.status == 'anomaly'
+        run: |
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "should_notify=true" >> "$GITHUB_OUTPUT"
+          echo "incident_url=$RUN_URL" >> "$GITHUB_OUTPUT"
+          echo "::warning::Cost anomaly detected. Linear is canonical; GitHub Issue creation is retired."
+
+      - name: Slack alert on anomaly receipt
         if: steps.incident.outputs.should_notify == 'true' && env.SLACK_WEBHOOK_URL != ''
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -324,7 +334,7 @@ jobs:
                 {title: "Reason", value: $reason, short: false},
                 {title: "Current / baseline", value: ($current + " / " + $baseline), short: true},
                 {title: "Production mutation", value: "none", short: true},
-                {title: "Incident", value: ("<" + $incident + "|Open incident>"), short: false},
+                {title: "Receipt", value: ("<" + $incident + "|Open Actions receipt>"), short: false},
                 {title: "Run", value: ("<" + $run + "|View observer run>"), short: false}
               ]}]}')"
 
@@ -336,6 +346,7 @@ jobs:
           CURRENT="${{ steps.current.outputs.count }}"
           BASELINE="${{ steps.baseline.outputs.average }}"
 
+          # shellcheck disable=SC2129
           echo "### Cost Anomaly Gate Result" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "| Metric | Value |" >> "$GITHUB_STEP_SUMMARY"

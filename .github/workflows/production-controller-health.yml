@@ -8,7 +8,6 @@ on:
 permissions:
   actions: write
   contents: read
-  issues: write
 
 concurrency:
   group: production-controller-health
@@ -443,7 +442,8 @@ jobs:
           echo "Replayed exact successful CI once to redeliver the controller event."
 
       - name: Open one manual-recovery incident
-        if: ${{ always() && steps.evaluate.outputs.needs_manual == 'true' }}
+        # Retired: fail closed in Actions; never create a GitHub backlog item.
+        if: ${{ github.event_name == '__retired_linear_only__' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

@@ -19,7 +19,6 @@ on:
 permissions:
   contents: read
   actions: read
-  issues: write
 
 jobs:
   monitor:
@@ -32,7 +31,6 @@ jobs:
     permissions:
       contents: read
       actions: read
-      issues: write
     env:
       HEARTBEAT_MAX_AGE_SECONDS: '1500'
       HEARTBEAT_API_TIMEOUT_SECONDS: '20'
@@ -72,7 +70,9 @@ jobs:
 
       - name: Open one fixed-runner degradation incident
         continue-on-error: true
-        if: ${{ always() && steps.runners.outputs.health != 'up' }}
+        # Retired: Linear is the only backlog. The workflow summary and run
+        # conclusion remain the degraded operator-visible receipt.
+        if: ${{ github.event_name == '__retired_linear_only__' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

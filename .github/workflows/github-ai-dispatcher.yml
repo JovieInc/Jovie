@@ -1,19 +1,12 @@
 # GitHub AI Dispatcher
 #
-# Event-driven dispatch for issues labeled agent-ready. The dispatcher is
-# label-scoped so the orchestrator can open more work only when capacity allows.
-# A 5-PR cap left ~100 org runner slots idle; fill eligible work instead.
+# RETIRED: GitHub Issues are historical/reporting-only. Linear-backed Symphony
+# is the sole backlog intake and selector. Manual dispatch remains visible only
+# for auditability; the sole job is hard-disabled below.
 
 name: GitHub AI Dispatcher
 
 on:
-  issues:
-    types: [labeled]
-  pull_request:
-    types: [closed]
-  workflow_run:
-    workflows: ['CI']
-    types: [completed]
   workflow_dispatch:
     inputs:
       ready_label:
@@ -37,16 +30,12 @@ concurrency:
 
 jobs:
   dispatch:
-    name: Dispatch Ready GitHub Issues
-    if: >-
-      (github.event_name != 'issues' || github.event.label.name == 'agent-ready') &&
-      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion != 'cancelled')
+    name: Retired — GitHub Issues cannot dispatch work
+    if: ${{ github.event_name == '__retired_linear_only__' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
-      issues: read
-      actions: write
     env:
       READY_LABEL: ${{ inputs.ready_label || 'agent-ready' }}
       MAX_DISPATCH: ${{ inputs.max_dispatch || '8' }}

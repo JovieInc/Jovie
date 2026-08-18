@@ -1,4 +1,5 @@
 /**
+ * RETIRED HISTORICAL DESIGN — Linear-backed Symphony is now the sole selector.
  * Tracker facade — GitHub Issues first.
  *
  * Phase 1 of the Linear → GitHub Issues migration: a single place that files
@@ -11,7 +12,7 @@
  * Return shape mirrors scripts/qa-swarm/linear.mjs#fileLinearIssue so
  * consumers can treat the two trackers interchangeably: never throws,
  * `{ success, identifier, url }` on success, `{ success: false, error }` on
- * failure.
+ * failure. Every public entry point below is source-retired before execution.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -21,17 +22,21 @@ export const STATUS_IN_REVIEW = 'status:in-review';
 export const AGENT_READY_LABEL = 'agent-ready';
 export const CLAIM_OWNER_MARKER = 'github-ai-claim-owner';
 export const CLAIM_FINALIZED_MARKER = 'github-ai-claim-finalized';
+export const GITHUB_ISSUE_INTAKE_RETIRED = true;
+
+const RETIRED_ERROR = 'GitHub Issue intake retired; use Linear-backed Symphony';
 
 /** @type {ReadonlySet<string>} */
 export const STATUS_LABELS = new Set([STATUS_IN_PROGRESS, STATUS_IN_REVIEW]);
 
 /** @param {{ title: string, labels?: readonly string[] }} input */
 export function buildIssueCreateArgs({ title, labels = [] }) {
+  if (GITHUB_ISSUE_INTAKE_RETIRED) return []; /* v8 ignore start -- retired */
   const args = ['issue', 'create', '--title', title, '--body-file', '-'];
   for (const label of labels) {
     args.push('--label', label);
   }
-  return args;
+  return args; /* v8 ignore stop */
 }
 
 /** @param {string} url */
@@ -40,6 +45,7 @@ export function parseIssueNumber(url) {
   return match ? Number(match[1]) : null;
 }
 
+/* v8 ignore start -- source-retired historical helpers */
 function defaultExec(args, input) {
   return execFileSync('gh', args, { encoding: 'utf8', input });
 }
@@ -87,7 +93,7 @@ function swapLabels(issueNumber, removeLabels, addLabels, exec, repo) {
     ...addLabels.flatMap(label => ['--add-label', label]),
   ];
   exec(args);
-}
+} /* v8 ignore stop */
 
 /**
  * File a GitHub issue. Never throws.
@@ -97,6 +103,9 @@ function swapLabels(issueNumber, removeLabels, addLabels, exec, repo) {
  * @returns {{ success: boolean, number?: number | null, identifier?: string, url?: string | null, labelsDropped?: boolean, error?: string }}
  */
 export function fileGithubIssue(input, exec = defaultExec) {
+  if (GITHUB_ISSUE_INTAKE_RETIRED) {
+    return { success: false, url: null, error: RETIRED_ERROR };
+  } /* v8 ignore start -- retired */
   const { title, body, labels = [] } = input;
   try {
     let url;
@@ -124,12 +133,14 @@ export function fileGithubIssue(input, exec = defaultExec) {
       url: null,
       error: error instanceof Error ? error.message : String(error),
     };
-  }
+  } /* v8 ignore stop */
 }
 
 /** Mirror-to-Linear is on unless the cutover flag is set. */
 export function shouldMirrorLinear(env = process.env) {
-  return env.TRACKER_GITHUB_ONLY !== '1';
+  if (GITHUB_ISSUE_INTAKE_RETIRED)
+    return false; /* v8 ignore start -- retired */
+  return env.TRACKER_GITHUB_ONLY !== '1'; /* v8 ignore stop */
 }
 
 /**
@@ -139,7 +150,10 @@ export function shouldMirrorLinear(env = process.env) {
  * @param {{ number: number, assignee?: string, note?: string, repo?: string, ownerToken?: string }} input
  * @param {(args: string[]) => string} [exec]
  */
-export function claimIssue(input, exec = args => defaultExec(args)) {
+export function claimIssue(input, exec = defaultExec) {
+  if (GITHUB_ISSUE_INTAKE_RETIRED) {
+    return { success: false, changed: false, error: RETIRED_ERROR };
+  } /* v8 ignore start -- retired */
   const { number, assignee, note = 'Agent dispatch', repo, ownerToken } = input;
   try {
     if (ownerToken && !isValidClaimOwner(ownerToken)) {
@@ -204,7 +218,7 @@ export function claimIssue(input, exec = args => defaultExec(args)) {
       success: false,
       error: error instanceof Error ? error.message : String(error),
     };
-  }
+  } /* v8 ignore stop */
 }
 
 /**
@@ -216,7 +230,10 @@ export function claimIssue(input, exec = args => defaultExec(args)) {
  * @param {{ number: number, ownerToken: string, outcome: 'retryable' | 'in-review', note?: string, repo: string, expectedActor?: string }} input
  * @param {(args: string[]) => string} [exec]
  */
-export function finalizeIssueClaim(input, exec = args => defaultExec(args)) {
+export function finalizeIssueClaim(input, exec = defaultExec) {
+  if (GITHUB_ISSUE_INTAKE_RETIRED) {
+    return { success: false, changed: false, error: RETIRED_ERROR };
+  } /* v8 ignore start -- retired */
   const {
     number,
     ownerToken,
@@ -316,7 +333,7 @@ export function finalizeIssueClaim(input, exec = args => defaultExec(args)) {
       changed: false,
       error: error instanceof Error ? error.message : String(error),
     };
-  }
+  } /* v8 ignore stop */
 }
 
 /**
@@ -326,7 +343,10 @@ export function finalizeIssueClaim(input, exec = args => defaultExec(args)) {
  * @param {{ number: number, status: 'in-progress' | 'in-review' | 'done', note?: string, repo?: string }} input
  * @param {(args: string[]) => string} [exec]
  */
-export function transitionIssue(input, exec = args => defaultExec(args)) {
+export function transitionIssue(input, exec = defaultExec) {
+  if (GITHUB_ISSUE_INTAKE_RETIRED) {
+    return { success: false, changed: false, error: RETIRED_ERROR };
+  } /* v8 ignore start -- retired */
   const { number, status, note, repo } = input;
   try {
     if (status === 'done') {
@@ -372,7 +392,7 @@ export function transitionIssue(input, exec = args => defaultExec(args)) {
       success: false,
       error: error instanceof Error ? error.message : String(error),
     };
-  }
+  } /* v8 ignore stop */
 }
 
 /**
@@ -381,7 +401,14 @@ export function transitionIssue(input, exec = args => defaultExec(args)) {
  * @param {{ repo?: string, limit?: number, readyLabel?: string }} [input]
  * @param {(args: string[]) => string} [exec]
  */
-export function queryTodoIssues(input = {}, exec = args => defaultExec(args)) {
+export function queryTodoIssues(input = {}, exec = defaultExec) {
+  if (GITHUB_ISSUE_INTAKE_RETIRED) {
+    return {
+      success: false,
+      issues: [],
+      error: 'GitHub Issue selection retired; use Linear-backed Symphony',
+    };
+  } /* v8 ignore start -- retired */
   const { repo, limit = 40, readyLabel = AGENT_READY_LABEL } = input;
   try {
     const raw = exec([
@@ -400,7 +427,10 @@ export function queryTodoIssues(input = {}, exec = args => defaultExec(args)) {
     const issues = JSON.parse(raw);
     const eligible = issues
       .filter(issue => shouldDispatchIssue(issue))
-      .sort((a, b) => new Date(a.updatedAt) - new Date(b.updatedAt));
+      .sort(
+        (a, b) =>
+          new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()
+      );
     return { success: true, issues: eligible };
   } catch (error) {
     return {
@@ -408,11 +438,13 @@ export function queryTodoIssues(input = {}, exec = args => defaultExec(args)) {
       issues: [],
       error: error instanceof Error ? error.message : String(error),
     };
-  }
+  } /* v8 ignore stop */
 }
 
 /** @param {{ title?: string, body?: string | null, labels?: ReadonlyArray<{ name: string }> }} issue */
 export function shouldDispatchIssue(issue) {
+  if (GITHUB_ISSUE_INTAKE_RETIRED)
+    return false; /* v8 ignore start -- retired */
   const labels = (issue.labels ?? []).map(label => label.name.toLowerCase());
   const text = `${issue.title ?? ''}${issue.body ?? ''}`.toLowerCase();
 
@@ -435,5 +467,5 @@ export function shouldDispatchIssue(issue) {
   const hasStatus = labels.some(label => STATUS_LABELS.has(label));
   if (hasStatus) return false;
 
-  return labels.includes(AGENT_READY_LABEL);
+  return labels.includes(AGENT_READY_LABEL); /* v8 ignore stop */
 }

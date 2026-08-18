@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   AGENT_READY_LABEL,
   buildIssueCreateArgs,
@@ -19,7 +19,50 @@ import {
 const URL = 'https://github.com/JovieInc/Jovie/issues/1234\n';
 const REPO_ROOT = join(import.meta.dirname, '..', '..', '..');
 
-describe('buildIssueCreateArgs', () => {
+describe('retired GitHub Issue compatibility facade', () => {
+  it('fails every mutation closed without invoking an executor', () => {
+    const exec = vi.fn();
+    const results = [
+      fileGithubIssue({ title: 'T', body: 'B' }, exec),
+      claimIssue({ number: 42 }, exec),
+      finalizeIssueClaim(
+        {
+          number: 42,
+          ownerToken: 'github-ai:JovieInc/Jovie:123:1',
+          outcome: 'retryable',
+          repo: 'JovieInc/Jovie',
+        },
+        exec
+      ),
+      transitionIssue({ number: 42, status: 'done' }, exec),
+    ];
+
+    for (const result of results) {
+      expect(result).toMatchObject({
+        success: false,
+        error: expect.stringContaining('intake retired'),
+      });
+    }
+    expect(exec).not.toHaveBeenCalled();
+  });
+
+  it('cannot select, infer, or build GitHub Issue intake', () => {
+    const exec = vi.fn();
+    expect(queryTodoIssues({}, exec)).toMatchObject({
+      success: false,
+      issues: [],
+      error: expect.stringContaining('selection retired'),
+    });
+    expect(shouldDispatchIssue({ labels: [{ name: AGENT_READY_LABEL }] })).toBe(
+      false
+    );
+    expect(buildIssueCreateArgs({ title: 'T', labels: ['P0'] })).toEqual([]);
+    expect(shouldMirrorLinear({ TRACKER_GITHUB_ONLY: '0' })).toBe(false);
+    expect(exec).not.toHaveBeenCalled();
+  });
+});
+
+describe.skip('historical buildIssueCreateArgs behavior', () => {
   it('builds a stdin-body create with one --label per label', () => {
     expect(
       buildIssueCreateArgs({ title: 'Bug: x', labels: ['P0', 'qa-swarm'] })
@@ -48,7 +91,7 @@ describe('parseIssueNumber', () => {
   });
 });
 
-describe('fileGithubIssue', () => {
+describe.skip('historical fileGithubIssue behavior', () => {
   it('returns success with number, identifier, and url', () => {
     const calls = [];
     const exec = (args, input) => {
@@ -96,7 +139,7 @@ describe('fileGithubIssue', () => {
   });
 });
 
-describe('shouldMirrorLinear', () => {
+describe.skip('historical shouldMirrorLinear behavior', () => {
   it('mirrors by default and stops on TRACKER_GITHUB_ONLY=1', () => {
     expect(shouldMirrorLinear({})).toBe(true);
     expect(shouldMirrorLinear({ TRACKER_GITHUB_ONLY: '1' })).toBe(false);
@@ -104,7 +147,7 @@ describe('shouldMirrorLinear', () => {
   });
 });
 
-describe('claimIssue', () => {
+describe.skip('historical claimIssue behavior', () => {
   it('assigns, swaps to status:in-progress, and comments', () => {
     const calls = [];
     const exec = args => {
@@ -183,7 +226,7 @@ describe('claimIssue', () => {
   });
 });
 
-describe('finalizeIssueClaim', () => {
+describe.skip('historical finalizeIssueClaim behavior', () => {
   const ownerToken = 'github-ai:JovieInc/Jovie:123:1';
   const ownerMarker = `<!-- github-ai-claim-owner:${ownerToken} -->`;
 
@@ -328,7 +371,7 @@ describe('finalizeIssueClaim', () => {
   });
 });
 
-describe('transitionIssue', () => {
+describe.skip('historical transitionIssue behavior', () => {
   it('moves to in-review via label swap', () => {
     const calls = [];
     const exec = args => {
@@ -359,7 +402,7 @@ describe('transitionIssue', () => {
   });
 });
 
-describe('shouldDispatchIssue', () => {
+describe.skip('historical shouldDispatchIssue behavior', () => {
   it('requires agent-ready and no status labels', () => {
     expect(
       shouldDispatchIssue({
@@ -385,7 +428,7 @@ describe('shouldDispatchIssue', () => {
   });
 });
 
-describe('queryTodoIssues', () => {
+describe.skip('historical queryTodoIssues behavior', () => {
   it('filters to dispatchable agent-ready issues', () => {
     const exec = args => {
       expect(args).toContain('issue');
