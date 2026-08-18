@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Link } from './link';
 
 const meta: Meta<typeof Link> = {
-  title: 'UI/Atoms/Link',
+  title: 'shadcn/Link',
   component: Link,
   parameters: {
     layout: 'centered',
