@@ -1,26 +1,29 @@
 'use server';
 
-import { and, asc, count, eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, notInArray } from 'drizzle-orm';
 import {
   unstable_noStore as noStore,
   revalidateTag,
   unstable_cache,
 } from 'next/cache';
 import { cache } from 'react';
-
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
+import { getDashboardContacts } from '@/lib/contacts/queries';
 import { sanitizeContactInput } from '@/lib/contacts/validation';
 import { type DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
-import { creatorContacts, creatorProfiles } from '@/lib/db/schema/profiles';
+import {
+  creatorContactAssignments,
+  creatorContactPeople,
+  creatorContactResponsibilities,
+  creatorContacts,
+  creatorProfiles,
+} from '@/lib/db/schema/profiles';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import type { DashboardContact, DashboardContactInput } from '@/types/contacts';
 
-/**
- * Error thrown when the contact limit for the user's plan has been reached.
- */
 class ContactLimitError extends Error {
   constructor(
     public readonly limit: number,
@@ -31,25 +34,6 @@ class ContactLimitError extends Error {
     );
     this.name = 'ContactLimitError';
   }
-}
-
-function mapContact(
-  row: typeof creatorContacts.$inferSelect
-): DashboardContact {
-  return {
-    id: row.id,
-    creatorProfileId: row.creatorProfileId,
-    role: row.role,
-    customLabel: row.customLabel,
-    personName: row.personName,
-    companyName: row.companyName,
-    territories: row.territories ?? [],
-    email: row.email,
-    phone: row.phone,
-    preferredChannel: row.preferredChannel,
-    isActive: row.isActive ?? true,
-    sortOrder: row.sortOrder ?? 0,
-  };
 }
 
 async function assertProfileOwnership(
@@ -75,11 +59,6 @@ async function assertProfileOwnership(
   return profile;
 }
 
-/**
- * Core contacts fetch logic (cacheable).
- * Accepts clerkUserId explicitly so this function can run inside unstable_cache
- * without calling auth()/headers() (which are forbidden inside cached scopes).
- */
 async function fetchContactsCore(
   profileId: string,
   userId: string
@@ -87,26 +66,12 @@ async function fetchContactsCore(
   return withDbSessionTx(
     async (tx, sessionUserId) => {
       await assertProfileOwnership(tx, profileId, sessionUserId);
-
-      const rows = await tx
-        .select()
-        .from(creatorContacts)
-        .where(eq(creatorContacts.creatorProfileId, profileId))
-        .orderBy(
-          asc(creatorContacts.sortOrder),
-          asc(creatorContacts.createdAt)
-        );
-
-      return rows.map(mapContact);
+      return getDashboardContacts(tx, profileId);
     },
     { clerkUserId: userId }
   );
 }
 
-/**
- * Core contacts loading logic (cacheable).
- * Cache is invalidated on mutations (save, delete).
- */
 async function resolveProfileContactsForOwner(
   profileId: string
 ): Promise<DashboardContact[]> {
@@ -115,7 +80,6 @@ async function resolveProfileContactsForOwner(
     throw new Error('Unauthorized');
   }
 
-  // Cache with 30s TTL and tags for invalidation
   return unstable_cache(
     () => fetchContactsCore(profileId, userId),
     ['contacts', userId, profileId],
@@ -126,11 +90,11 @@ async function resolveProfileContactsForOwner(
   )();
 }
 
-/**
- * Cached loader for profile contacts.
- * Uses React's cache() for request-level deduplication.
- */
 export const getProfileContactsForOwner = cache(resolveProfileContactsForOwner);
+
+function responsibilityKey(role: string, customLabel: string | null): string {
+  return `${role}:${customLabel ?? ''}`;
+}
 
 export async function saveContact(
   input: DashboardContactInput
@@ -142,99 +106,257 @@ export async function saveContact(
   }
 
   const sanitized = sanitizeContactInput(input);
+  const responsibilities = sanitized.responsibilities ?? [];
+  // Older clients can submit the legacy single-role shape. Only a client that
+  // supplied the full assignment snapshot may retire missing assignments.
+  const shouldDeactivateMissingAssignments =
+    Array.isArray(input.responsibilities) && input.responsibilities.length > 0;
+  // Entitlements can consult billing/auth infrastructure; resolve them before
+  // opening the database transaction so the write path stays bounded to DB work.
+  let entitlement: Awaited<
+    ReturnType<typeof getCurrentUserEntitlements>
+  > | null = null;
+  if (!sanitized.id) {
+    try {
+      entitlement = await getCurrentUserEntitlements();
+    } catch {
+      // A billing outage must not prevent an otherwise valid directory save.
+      // The entitlement service normally degrades to free tier itself; this is
+      // the final safety net for an unexpected infrastructure failure.
+      entitlement = null;
+    }
+  }
 
-  const result = await withDbSessionTx(async (tx, clerkUserId) => {
-    const profile = await assertProfileOwnership(
-      tx,
-      sanitized.profileId,
-      clerkUserId
-    );
+  const result = await withDbSessionTx(
+    async (tx, sessionUserId) => {
+      const profile = await assertProfileOwnership(
+        tx,
+        sanitized.profileId,
+        sessionUserId
+      );
+      const now = new Date();
 
-    const values = {
-      creatorProfileId: sanitized.profileId,
-      role: sanitized.role,
-      customLabel: sanitized.customLabel,
-      personName: sanitized.personName,
-      companyName: sanitized.companyName,
-      territories: sanitized.territories,
-      email: sanitized.email,
-      phone: sanitized.phone,
-      preferredChannel: sanitized.preferredChannel,
-      isActive: sanitized.isActive ?? true,
-      sortOrder: sanitized.sortOrder ?? 0,
-      updatedAt: new Date(),
-    };
-
-    let saved: typeof creatorContacts.$inferSelect | null = null;
-
-    if (sanitized.id) {
-      const [existing] = await tx
-        .select({ id: creatorContacts.id })
-        .from(creatorContacts)
-        .where(
-          and(
-            eq(creatorContacts.id, sanitized.id),
-            eq(creatorContacts.creatorProfileId, sanitized.profileId)
+      let personId = sanitized.id;
+      if (personId) {
+        const [existingPerson] = await tx
+          .select({ id: creatorContactPeople.id })
+          .from(creatorContactPeople)
+          .where(
+            and(
+              eq(creatorContactPeople.id, personId),
+              eq(creatorContactPeople.creatorProfileId, sanitized.profileId)
+            )
           )
-        )
-        .limit(1);
-
-      if (!existing) {
-        throw new TypeError('Contact not found');
-      }
-
-      [saved] = await tx
-        .update(creatorContacts)
-        .set(values)
-        .where(eq(creatorContacts.id, sanitized.id))
-        .returning();
-    } else {
-      // Enforce contact limit for the user's plan before inserting new contacts.
-      // Updates to existing contacts are always allowed.
-      let entitlements;
-      try {
-        entitlements = await getCurrentUserEntitlements();
-      } catch {
-        // If billing is unavailable, allow the insert rather than blocking users.
-        entitlements = null;
-      }
-      const contactsLimit = entitlements?.contactsLimit;
-      if (contactsLimit !== null && contactsLimit !== undefined) {
-        const [{ total }] = await tx
-          .select({ total: count() })
-          .from(creatorContacts)
-          .where(eq(creatorContacts.creatorProfileId, sanitized.profileId));
-
-        if (total >= contactsLimit) {
-          throw new ContactLimitError(contactsLimit, total);
+          .limit(1);
+        if (!existingPerson) {
+          throw new Error('Contact not found');
         }
+
+        await tx
+          .update(creatorContactPeople)
+          .set({
+            displayName: sanitized.personName,
+            companyName: sanitized.companyName,
+            email: sanitized.email,
+            phone: sanitized.phone,
+            preferredChannel: sanitized.preferredChannel,
+            updatedAt: now,
+          })
+          .where(eq(creatorContactPeople.id, personId));
+      } else {
+        const [{ count: currentCount }] = await tx
+          .select({ count: drizzleSql<number>`count(*)::int` })
+          .from(creatorContactPeople)
+          .where(
+            eq(creatorContactPeople.creatorProfileId, sanitized.profileId)
+          );
+
+        if (
+          entitlement?.contactsLimit !== null &&
+          entitlement?.contactsLimit !== undefined &&
+          currentCount >= entitlement.contactsLimit
+        ) {
+          throw new ContactLimitError(entitlement.contactsLimit, currentCount);
+        }
+
+        const [person] = await tx
+          .insert(creatorContactPeople)
+          .values({
+            creatorProfileId: sanitized.profileId,
+            displayName: sanitized.personName,
+            companyName: sanitized.companyName,
+            email: sanitized.email,
+            phone: sanitized.phone,
+            preferredChannel: sanitized.preferredChannel,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .returning({ id: creatorContactPeople.id });
+        personId = person?.id;
       }
 
-      [saved] = await tx
-        .insert(creatorContacts)
-        .values({
-          ...values,
-          createdAt: new Date(),
+      if (!personId) {
+        throw new Error('Unable to save contact');
+      }
+
+      const existingResponsibilities = await tx
+        .select({
+          id: creatorContactResponsibilities.id,
+          role: creatorContactResponsibilities.role,
+          customLabel: creatorContactResponsibilities.customLabel,
         })
-        .returning();
-    }
+        .from(creatorContactResponsibilities)
+        .where(
+          eq(
+            creatorContactResponsibilities.creatorProfileId,
+            sanitized.profileId
+          )
+        );
+      const existingByKey = new Map(
+        existingResponsibilities.map(responsibility => [
+          responsibilityKey(
+            responsibility.role,
+            responsibility.customLabel || null
+          ),
+          responsibility,
+        ])
+      );
+      const missingResponsibilities = responsibilities.filter(
+        responsibility =>
+          !existingByKey.has(
+            responsibilityKey(
+              responsibility.role,
+              responsibility.customLabel ?? null
+            )
+          )
+      );
 
-    if (!saved) {
-      throw new Error('Unable to save contact');
-    }
+      if (missingResponsibilities.length > 0) {
+        await tx.insert(creatorContactResponsibilities).values(
+          missingResponsibilities.map(responsibility => ({
+            creatorProfileId: sanitized.profileId,
+            role: responsibility.role,
+            customLabel: responsibility.customLabel ?? '',
+            createdAt: now,
+            updatedAt: now,
+          }))
+        );
+      }
 
-    // Use centralized cache invalidation
-    await invalidateProfileCache(profile.usernameNormalized);
+      const allResponsibilities = await tx
+        .select({
+          id: creatorContactResponsibilities.id,
+          role: creatorContactResponsibilities.role,
+          customLabel: creatorContactResponsibilities.customLabel,
+        })
+        .from(creatorContactResponsibilities)
+        .where(
+          eq(
+            creatorContactResponsibilities.creatorProfileId,
+            sanitized.profileId
+          )
+        );
+      const responsibilityIds = new Map(
+        allResponsibilities.map(responsibility => [
+          responsibilityKey(
+            responsibility.role,
+            responsibility.customLabel || null
+          ),
+          responsibility.id,
+        ])
+      );
 
-    return mapContact(saved);
-  });
+      const assignmentValues = responsibilities.map(responsibility => {
+        const responsibilityId = responsibilityIds.get(
+          responsibilityKey(
+            responsibility.role,
+            responsibility.customLabel ?? null
+          )
+        );
+        if (!responsibilityId) {
+          throw new Error('Unable to resolve contact responsibility');
+        }
 
-  // Invalidate contacts cache after transaction completes
+        return {
+          personId,
+          responsibilityId,
+          territories: responsibility.territories ?? [],
+          isActive: responsibility.isActive ?? true,
+          isPrimary: responsibility.isPrimary ?? false,
+          sortOrder: responsibility.sortOrder ?? 0,
+          startedAt: responsibility.startedAt
+            ? new Date(responsibility.startedAt)
+            : now,
+          endedAt:
+            responsibility.isActive === false
+              ? responsibility.endedAt
+                ? new Date(responsibility.endedAt)
+                : now
+              : null,
+          createdAt: now,
+          updatedAt: now,
+        };
+      });
+
+      await tx
+        .insert(creatorContactAssignments)
+        .values(assignmentValues)
+        .onConflictDoUpdate({
+          target: [
+            creatorContactAssignments.personId,
+            creatorContactAssignments.responsibilityId,
+          ],
+          set: {
+            territories: drizzleSql`excluded.territories`,
+            isActive: drizzleSql`excluded.is_active`,
+            isPrimary: drizzleSql`excluded.is_primary`,
+            sortOrder: drizzleSql`excluded.sort_order`,
+            startedAt: drizzleSql`excluded.started_at`,
+            endedAt: drizzleSql`excluded.ended_at`,
+            updatedAt: now,
+          },
+        });
+
+      const assignedResponsibilityIds = assignmentValues.map(
+        assignment => assignment.responsibilityId
+      );
+      if (
+        shouldDeactivateMissingAssignments &&
+        assignedResponsibilityIds.length > 0
+      ) {
+        await tx
+          .update(creatorContactAssignments)
+          .set({
+            isActive: false,
+            isPrimary: false,
+            endedAt: now,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(creatorContactAssignments.personId, personId),
+              notInArray(
+                creatorContactAssignments.responsibilityId,
+                assignedResponsibilityIds
+              )
+            )
+          );
+      }
+
+      const contacts = await getDashboardContacts(tx, sanitized.profileId);
+      const saved = contacts.find(contact => contact.id === personId);
+      if (!saved) {
+        throw new Error('Unable to load saved contact');
+      }
+
+      return { saved, usernameNormalized: profile.usernameNormalized };
+    },
+    { clerkUserId: userId }
+  );
+
   revalidateTag(`contacts:${userId}:${sanitized.profileId}`, 'max');
-  // Skip revalidatePath — the mutation hook handles cache updates via local
-  // state, and a path revalidation resets client-side state (closing the sidebar).
-
-  return result;
+  await invalidateProfileCache(result.usernameNormalized);
+  return result.saved;
 }
 
 export async function deleteContact(
@@ -247,32 +369,45 @@ export async function deleteContact(
     throw new Error('Unauthorized');
   }
 
-  await withDbSessionTx(async (tx, clerkUserId) => {
-    const profile = await assertProfileOwnership(tx, profileId, clerkUserId);
-
-    const [existing] = await tx
-      .select({ id: creatorContacts.id })
-      .from(creatorContacts)
-      .where(
-        and(
-          eq(creatorContacts.id, contactId),
-          eq(creatorContacts.creatorProfileId, profileId)
+  const usernameNormalized = await withDbSessionTx(
+    async (tx, sessionUserId) => {
+      const profile = await assertProfileOwnership(
+        tx,
+        profileId,
+        sessionUserId
+      );
+      const [person] = await tx
+        .select({ id: creatorContactPeople.id })
+        .from(creatorContactPeople)
+        .where(
+          and(
+            eq(creatorContactPeople.id, contactId),
+            eq(creatorContactPeople.creatorProfileId, profileId)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
+      if (!person) {
+        throw new Error('Contact not found');
+      }
 
-    if (!existing) {
-      throw new TypeError('Contact not found');
-    }
+      await tx
+        .delete(creatorContactPeople)
+        .where(eq(creatorContactPeople.id, contactId));
+      // Backfilled people share the legacy UUID. Delete a legacy record only
+      // when the creator explicitly removes the corresponding person.
+      await tx
+        .delete(creatorContacts)
+        .where(
+          and(
+            eq(creatorContacts.id, contactId),
+            eq(creatorContacts.creatorProfileId, profileId)
+          )
+        );
+      return profile.usernameNormalized;
+    },
+    { clerkUserId: userId }
+  );
 
-    await tx.delete(creatorContacts).where(eq(creatorContacts.id, contactId));
-
-    // Use centralized cache invalidation
-    await invalidateProfileCache(profile.usernameNormalized);
-  });
-
-  // Invalidate contacts cache after transaction completes
   revalidateTag(`contacts:${userId}:${profileId}`, 'max');
-  // Skip revalidatePath — the mutation hook handles cache updates via local
-  // state, and a path revalidation resets client-side state (closing the sidebar).
+  await invalidateProfileCache(usernameNormalized);
 }

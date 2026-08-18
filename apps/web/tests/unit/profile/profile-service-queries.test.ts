@@ -56,6 +56,7 @@ vi.mock('@/lib/utils/logger', () => ({
 function createSelectChain(result: unknown[] = []) {
   const chain = {
     from: vi.fn().mockReturnThis(),
+    innerJoin: vi.fn().mockReturnThis(),
     where: vi.fn().mockReturnThis(),
     leftJoin: vi.fn().mockReturnThis(),
     orderBy: vi.fn().mockReturnThis(),
@@ -127,6 +128,8 @@ const mockContact = {
   preferredChannel: 'email',
   isActive: true,
   sortOrder: 0,
+  forwardInboxEmails: false,
+  autoMarkRead: false,
   createdAt: NOW,
   updatedAt: NOW,
 };
@@ -275,6 +278,7 @@ describe('Profile Service Queries', () => {
     it('returns empty array when table does not exist', async () => {
       const chain = {
         from: vi.fn().mockReturnThis(),
+        innerJoin: vi.fn().mockReturnThis(),
         where: vi.fn().mockReturnThis(),
         orderBy: vi.fn().mockReturnThis(),
         limit: vi
@@ -292,7 +296,7 @@ describe('Profile Service Queries', () => {
 
       expect(result).toEqual([]);
       expect(mockLoggerWarn).toHaveBeenCalledWith(
-        'creator_contacts table does not exist, returning empty',
+        'contact directory tables do not exist, returning empty',
         undefined,
         'profile-service'
       );
@@ -301,6 +305,7 @@ describe('Profile Service Queries', () => {
     it('rethrows non-table-missing errors', async () => {
       const chain = {
         from: vi.fn().mockReturnThis(),
+        innerJoin: vi.fn().mockReturnThis(),
         where: vi.fn().mockReturnThis(),
         orderBy: vi.fn().mockReturnThis(),
         limit: vi.fn().mockRejectedValue(new Error('connection timeout')),
@@ -380,6 +385,7 @@ describe('Profile Service Queries', () => {
         // Contacts query
         return {
           from: vi.fn().mockReturnThis(),
+          innerJoin: vi.fn().mockReturnThis(),
           where: vi.fn().mockReturnThis(),
           orderBy: vi.fn().mockReturnThis(),
           limit: vi.fn().mockResolvedValue([mockContact]),
@@ -424,6 +430,7 @@ describe('Profile Service Queries', () => {
         }
         return {
           from: vi.fn().mockReturnThis(),
+          innerJoin: vi.fn().mockReturnThis(),
           where: vi.fn().mockReturnThis(),
           orderBy: vi.fn().mockReturnThis(),
           limit: vi.fn().mockResolvedValue([]),
@@ -455,6 +462,7 @@ describe('Profile Service Queries', () => {
         }
         return {
           from: vi.fn().mockReturnThis(),
+          innerJoin: vi.fn().mockReturnThis(),
           where: vi.fn().mockReturnThis(),
           orderBy: vi.fn().mockReturnThis(),
           limit: vi.fn().mockResolvedValue([]),
@@ -521,6 +529,7 @@ describe('Profile Service Queries', () => {
         }
         return {
           from: vi.fn().mockReturnThis(),
+          innerJoin: vi.fn().mockReturnThis(),
           where: vi.fn().mockReturnThis(),
           orderBy: vi.fn().mockReturnThis(),
           limit: vi.fn().mockResolvedValue([]),
