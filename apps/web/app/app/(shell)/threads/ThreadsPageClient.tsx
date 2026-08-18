@@ -5,7 +5,9 @@ import { Search } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppSearchField } from '@/components/molecules/AppSearchField';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import { PageShell } from '@/components/organisms/PageShell';
+import { PageToolbar } from '@/components/organisms/table';
 import {
   readThreadReadState,
   type SidebarThread,
@@ -26,7 +28,12 @@ function ChatListSkeleton() {
   const skeletonRows = ['a', 'b', 'c', 'd', 'e', 'f'];
 
   return (
-    <div className='space-y-1.5'>
+    <div
+      className='space-y-1.5'
+      role='status'
+      aria-live='polite'
+      aria-label='Loading Chats'
+    >
       {skeletonRows.map(rowId => (
         <div
           key={`chat-skeleton-${rowId}`}
@@ -37,6 +44,30 @@ function ChatListSkeleton() {
         </div>
       ))}
     </div>
+  );
+}
+
+export function ChatsEmptyState({ query }: Readonly<{ query: string }>) {
+  const trimmedQuery = query.trim();
+  const hasQuery = trimmedQuery.length > 0;
+
+  return (
+    <EmptyState
+      variant={hasQuery ? 'search' : 'default'}
+      heading={hasQuery ? `No chats match "${trimmedQuery}".` : 'No chats yet'}
+      description={
+        hasQuery
+          ? 'Clear the search or try a different phrase.'
+          : 'Start a new chat and it will appear here.'
+      }
+      action={{
+        href: APP_ROUTES.CHAT,
+        label: 'New Chat',
+        variant: 'secondary',
+      }}
+      className='min-h-72'
+      testId='chats-empty-state'
+    />
   );
 }
 
@@ -126,10 +157,10 @@ export function ChatsPageClient() {
       frame='content-container'
       contentPadding='none'
       surfaceMode='default'
-    >
-      <div className='flex h-full min-h-0 flex-col'>
-        <div className='shrink-0 border-b border-subtle px-4 py-3 sm:px-6'>
-          <div className='flex items-center gap-2'>
+      toolbar={
+        <PageToolbar
+          className='border-b border-subtle'
+          start={
             <AppSearchField
               value={query}
               onChange={setQuery}
@@ -138,7 +169,9 @@ export function ChatsPageClient() {
               className='max-w-2xl flex-1'
               inputClassName='text-app'
             />
-            <div className='flex items-center gap-2'>
+          }
+          end={
+            <>
               {sidebarThreads.length > 0 ? (
                 <Button
                   type='button'
@@ -152,9 +185,14 @@ export function ChatsPageClient() {
               <Button asChild variant='secondary' size='sm'>
                 <Link href={APP_ROUTES.CHAT}>New Chat</Link>
               </Button>
-            </div>
-          </div>
-          <div className='mt-2 flex items-center gap-3 text-2xs text-tertiary-token'>
+            </>
+          }
+        />
+      }
+    >
+      <div className='flex h-full min-h-0 flex-col'>
+        <div className='shrink-0 border-b border-subtle px-3 py-2'>
+          <div className='flex flex-wrap items-center gap-3 text-2xs text-tertiary-token'>
             <span>{sidebarThreads.length} chats</span>
             <span className='inline-flex items-center gap-1'>
               <Search className='h-3 w-3' />
@@ -178,23 +216,7 @@ export function ChatsPageClient() {
               }}
             />
           ) : filteredThreads.length === 0 ? (
-            <div className='grid min-h-72 place-items-center rounded-2xl border border-dashed border-subtle bg-surface-0 px-6 py-10 text-center'>
-              <div className='max-w-sm space-y-3'>
-                <p className='text-sm font-semibold text-primary-token'>
-                  {normalizedQuery
-                    ? `No chats match "${trimmedQuery}".`
-                    : 'No chats yet'}
-                </p>
-                <p className='text-app leading-6 text-secondary-token'>
-                  {normalizedQuery
-                    ? 'Clear the search or try a different phrase.'
-                    : 'Start a new chat and it will appear here.'}
-                </p>
-                <Button asChild variant='secondary' size='sm'>
-                  <Link href={APP_ROUTES.CHAT}>New Chat</Link>
-                </Button>
-              </div>
-            </div>
+            <ChatsEmptyState query={trimmedQuery} />
           ) : (
             <div className='space-y-1.5'>
               {filteredThreads.map(thread => (

@@ -22,6 +22,7 @@ export function OpportunityInboxEmptyState({
       heading='Your Inbox Is Clear'
       description='Jovie is watching for the next opportunity.'
       action={{ href: ctaHref, label: ctaLabel }}
+      presentation='workspace'
       testId='opportunity-inbox-empty-state'
     />
   );

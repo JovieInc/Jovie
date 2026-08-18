@@ -27,11 +27,14 @@ describe('threads page System B source contract', () => {
     expect(source).not.toMatch(legacyFrameSeamPattern);
     expect(source).not.toMatch(legacyContentSurfacePattern);
     expect(source).toContain(
-      "className='shrink-0 border-b border-subtle px-4 py-3 sm:px-6'"
+      "import { PageToolbar } from '@/components/organisms/table';"
     );
+    expect(source).toContain('<PageToolbar');
     expect(source).toContain(
-      "className='grid min-h-72 place-items-center rounded-2xl border border-dashed border-subtle bg-surface-0 px-6 py-10 text-center'"
+      "import { EmptyState } from '@/components/molecules/EmptyState';"
     );
+    expect(source).toContain("testId='chats-empty-state'");
+    expect(source).not.toContain('border-dashed');
   });
 
   it('keeps layout-state wrappers stable across thread states', async () => {

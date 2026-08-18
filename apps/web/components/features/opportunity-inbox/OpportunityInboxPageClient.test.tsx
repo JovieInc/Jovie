@@ -127,6 +127,12 @@ describe('OpportunityInboxPageClient', () => {
       'data-initial-link-count',
       '1'
     );
+    expect(screen.getByTestId('opportunity-inbox-page').tagName).toBe(
+      'SECTION'
+    );
+    expect(screen.getByTestId('opportunity-inbox-content')).toHaveClass(
+      'system-b-opportunity-inbox-page'
+    );
   });
 
   it('renders the inbox feed when cards are present', () => {

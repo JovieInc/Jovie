@@ -12,6 +12,7 @@ import {
 } from 'react';
 import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
+import { PageShell } from '@/components/organisms/PageShell';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   OPPORTUNITY_SIGNAL_TYPE_META,
@@ -386,9 +387,9 @@ export function OpportunityInboxPageClient({
   ]);
 
   return (
-    <div
-      ref={inboxPageRef}
-      className='system-b-opportunity-inbox-page'
+    <PageShell
+      frame='content-container'
+      contentPadding='none'
       data-testid='opportunity-inbox-page'
     >
       <NavigationDestinationReady destination='inbox' />
@@ -396,103 +397,111 @@ export function OpportunityInboxPageClient({
         connectedDSPs={connectedDSPs}
         initialLinks={initialLinks}
       />
-      {pendingTourDates.length > 0 ? (
-        <section
-          className='system-b-opportunity-inbox-feed'
-          data-testid='opportunity-inbox-tour-date-review'
-          aria-label='Tour Dates To Review'
-        >
-          <div className='system-b-opportunity-inbox-section-label'>
-            Tour Dates To Review
-          </div>
-          <div className='system-b-opportunity-inbox-feed-list'>
-            {pendingTourDates.map(item => (
-              <OpportunityInboxTourDateRow
-                key={item.id}
-                item={item}
-                onConfirm={handleConfirmTourDate}
-                onReject={handleRejectTourDate}
-                isBusy={pendingTourDateActionId === item.id}
-              />
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {cards.length > 0 ? (
+      <div className='min-h-0 flex-1 overflow-y-auto overflow-x-hidden'>
         <div
-          className='mb-4 flex flex-wrap items-center gap-1.5'
-          role='toolbar'
-          aria-label='Filter Signals By Type'
-          data-testid='opportunity-inbox-signal-filters'
+          ref={inboxPageRef}
+          className='system-b-opportunity-inbox-page'
+          data-testid='opportunity-inbox-content'
         >
-          {SIGNAL_TYPE_FILTERS.map((filter, index) => {
-            const isActive = signalTypeFilter === filter.value;
-            return (
-              <button
-                key={filter.value}
-                type='button'
-                aria-pressed={isActive}
-                tabIndex={signalFilterFocusIndex === index ? 0 : -1}
-                data-testid={`opportunity-inbox-filter-${filter.value}`}
-                ref={node => {
-                  signalFilterRefs.current[index] = node;
-                }}
-                className={cn(
-                  'rounded-full border px-3 py-1 text-xs transition-colors',
-                  isActive
-                    ? 'border-subtle bg-surface-1 text-primary-token'
-                    : 'border-transparent text-secondary-token hover:bg-surface-1'
-                )}
-                onClick={() => selectSignalTypeFilter(filter.value, index)}
-                onFocus={() => setSignalFilterFocusIndex(index)}
-                onKeyDown={event => handleSignalFilterKeyDown(event, index)}
+          {pendingTourDates.length > 0 ? (
+            <section
+              className='system-b-opportunity-inbox-feed'
+              data-testid='opportunity-inbox-tour-date-review'
+              aria-label='Tour Dates To Review'
+            >
+              <div className='system-b-opportunity-inbox-section-label'>
+                Tour Dates To Review
+              </div>
+              <div className='system-b-opportunity-inbox-feed-list'>
+                {pendingTourDates.map(item => (
+                  <OpportunityInboxTourDateRow
+                    key={item.id}
+                    item={item}
+                    onConfirm={handleConfirmTourDate}
+                    onReject={handleRejectTourDate}
+                    isBusy={pendingTourDateActionId === item.id}
+                  />
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {cards.length > 0 ? (
+            <div
+              className='mb-4 flex flex-wrap items-center gap-1.5'
+              role='toolbar'
+              aria-label='Filter Signals By Type'
+              data-testid='opportunity-inbox-signal-filters'
+            >
+              {SIGNAL_TYPE_FILTERS.map((filter, index) => {
+                const isActive = signalTypeFilter === filter.value;
+                return (
+                  <button
+                    key={filter.value}
+                    type='button'
+                    aria-pressed={isActive}
+                    tabIndex={signalFilterFocusIndex === index ? 0 : -1}
+                    data-testid={`opportunity-inbox-filter-${filter.value}`}
+                    ref={node => {
+                      signalFilterRefs.current[index] = node;
+                    }}
+                    className={cn(
+                      'rounded-full border px-3 py-1 text-xs transition-colors',
+                      isActive
+                        ? 'border-subtle bg-surface-1 text-primary-token'
+                        : 'border-transparent text-secondary-token hover:bg-surface-1'
+                    )}
+                    onClick={() => selectSignalTypeFilter(filter.value, index)}
+                    onFocus={() => setSignalFilterFocusIndex(index)}
+                    onKeyDown={event => handleSignalFilterKeyDown(event, index)}
+                  >
+                    {filter.label}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {cards.length > 0 ? (
+            visibleCards.length > 0 ? (
+              <OpportunityInboxFeed
+                cards={visibleCards}
+                onApprove={handleApprove}
+                onDismiss={handleDismiss}
+                onOpen={handleOpen}
+                onFeedback={handleFeedback}
+                onNextStep={handleNextStep}
+                pendingActionId={pendingActionId}
+                pendingFeedbackId={pendingFeedbackId}
+                pendingNextStepId={pendingNextStepId}
+                enableStackInteractions={inboxHomeEnabled}
+                stackKeyboardControlRef={stackKeyboardControlRef}
+                onStackActionInitiated={beginStackAction}
+                onStackNextStep={handleStackNextStep}
+              />
+            ) : (
+              <p
+                className='text-secondary-token text-sm'
+                data-testid='opportunity-inbox-filter-empty'
               >
-                {filter.label}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
+                No pending signals of this type. Switch filters to see the rest
+                of your inbox.
+              </p>
+            )
+          ) : null}
 
-      {cards.length > 0 ? (
-        visibleCards.length > 0 ? (
-          <OpportunityInboxFeed
-            cards={visibleCards}
-            onApprove={handleApprove}
-            onDismiss={handleDismiss}
-            onOpen={handleOpen}
-            onFeedback={handleFeedback}
-            onNextStep={handleNextStep}
-            pendingActionId={pendingActionId}
-            pendingFeedbackId={pendingFeedbackId}
-            pendingNextStepId={pendingNextStepId}
-            enableStackInteractions={inboxHomeEnabled}
-            stackKeyboardControlRef={stackKeyboardControlRef}
-            onStackActionInitiated={beginStackAction}
-            onStackNextStep={handleStackNextStep}
+          {!hasReviewableItems ? (
+            <OpportunityInboxEmptyState actionCards={inbox.emptyActionCards} />
+          ) : null}
+
+          <OpportunityInboxConfirmedTourDates items={confirmedTourDates} />
+          <OpportunityInboxRejectedTourDates
+            items={rejectedTourDates}
+            onUndoReject={handleUndoRejectTourDate}
+            pendingUndoId={pendingUndoId}
           />
-        ) : (
-          <p
-            className='text-secondary-token text-sm'
-            data-testid='opportunity-inbox-filter-empty'
-          >
-            No pending signals of this type. Switch filters to see the rest of
-            your inbox.
-          </p>
-        )
-      ) : null}
-
-      {!hasReviewableItems ? (
-        <OpportunityInboxEmptyState actionCards={inbox.emptyActionCards} />
-      ) : null}
-
-      <OpportunityInboxConfirmedTourDates items={confirmedTourDates} />
-      <OpportunityInboxRejectedTourDates
-        items={rejectedTourDates}
-        onUndoReject={handleUndoRejectTourDate}
-        pendingUndoId={pendingUndoId}
-      />
-    </div>
+        </div>
+      </div>
+    </PageShell>
   );
 }

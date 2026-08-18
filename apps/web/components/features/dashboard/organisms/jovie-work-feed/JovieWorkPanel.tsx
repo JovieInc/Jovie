@@ -1,18 +1,17 @@
 'use client';
 
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import { PageShell } from '@/components/organisms/PageShell';
 import { JovieWorkFeed } from './JovieWorkFeed';
 
-export function JovieWorkPanel() {
-  const { selectedProfile } = useDashboardData();
-  const profileId = selectedProfile?.id;
-
+export function JovieWorkPanelView({
+  profileId,
+}: Readonly<{ profileId?: string }>) {
   return (
-    <PageShell frame='none' contentPadding='none' data-testid='jovie-work-page'>
+    <PageShell data-testid='jovie-work-page'>
       <div className='min-h-0 flex-1 overflow-y-auto overflow-x-hidden'>
-        <div className='flex flex-col gap-4 px-3 py-2.5 sm:px-4 sm:py-3.5'>
+        <div className='flex min-h-full flex-col gap-4'>
           <div className='space-y-1'>
             <h1 className='text-lg font-medium tracking-tight text-primary-token'>
               Jovie Did This
@@ -24,17 +23,27 @@ export function JovieWorkPanel() {
             </p>
           </div>
 
-          <ContentSurfaceCard className='p-4 sm:p-5'>
-            {profileId ? (
-              <JovieWorkFeed profileId={profileId} range='30d' />
-            ) : (
-              <p className='text-app text-secondary-token'>
-                Select a profile to see Jovie&apos;s autonomous work.
-              </p>
-            )}
-          </ContentSurfaceCard>
+          {profileId ? (
+            <JovieWorkFeed
+              profileId={profileId}
+              range='30d'
+              showHeader={false}
+            />
+          ) : (
+            <EmptyState
+              heading="Select a profile to see Jovie's autonomous work."
+              presentation='workspace'
+              testId='jovie-work-profile-empty-state'
+            />
+          )}
         </div>
       </div>
     </PageShell>
   );
+}
+
+export function JovieWorkPanel() {
+  const { selectedProfile } = useDashboardData();
+
+  return <JovieWorkPanelView profileId={selectedProfile?.id} />;
 }
