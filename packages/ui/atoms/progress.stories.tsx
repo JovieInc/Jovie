@@ -32,3 +32,19 @@ export const Indeterminate: Story = {
     label: 'Finding music across platforms',
   },
 };
+
+export const RangeAndStates: Story = {
+  render: () => (
+    <div className='grid w-80 gap-5'>
+      <ProgressBar value={25} label='Preparing upload' showValue />
+      <ProgressBar
+        value={100}
+        min={50}
+        max={150}
+        label='Catalog import'
+        showValue
+      />
+      <ProgressBar indeterminate label='Matching profiles' />
+    </div>
+  ),
+};

@@ -1,9 +1,10 @@
 'use client';
 
-import { cn } from '@jovie/ui/lib/utils';
 import { Slot } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
+
+import { cn } from '../lib/utils';
 
 const linkVariants = cva(
   [
@@ -95,6 +96,7 @@ const Link = React.forwardRef<HTMLAnchorElement, LinkProps>(
       active = false,
       disabled = false,
       visited = false,
+      onClick,
       ...props
     },
     ref
@@ -104,8 +106,17 @@ const Link = React.forwardRef<HTMLAnchorElement, LinkProps>(
       <Comp
         ref={ref}
         data-variant='link'
+        data-appearance={variant === null ? 'unstyled' : (variant ?? 'default')}
         data-state={getLinkDataState({ disabled, active, visited })}
         aria-disabled={disabled || undefined}
+        onClick={event => {
+          if (disabled) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+          onClick?.(event);
+        }}
         className={cn(
           linkVariants({ variant, className }),
           disabled && LINK_DISABLED_CLASSES

@@ -21,9 +21,12 @@ export interface ProgressBarProps {
 }
 
 function clampPercent(value: number, min: number, max: number): number {
-  if (max <= min) return 0;
   const ratio = (value - min) / (max - min);
   return Math.min(100, Math.max(0, ratio * 100));
+}
+
+function clampValue(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 /**
@@ -43,8 +46,23 @@ export function ProgressBar({
   fillClassName,
   children,
 }: ProgressBarProps) {
-  const hasDeterminateValue = typeof value === 'number' && !indeterminate;
-  const percent = hasDeterminateValue ? clampPercent(value, min, max) : 0;
+  const hasValidRange =
+    Number.isFinite(min) && Number.isFinite(max) && max > min;
+  const hasDeterminateValue =
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    hasValidRange &&
+    !indeterminate;
+  const safeMin = Number.isFinite(min) ? min : 0;
+  const safeMax = Number.isFinite(max) && max > safeMin ? max : safeMin + 100;
+  const currentValue = hasDeterminateValue
+    ? clampValue(value, safeMin, safeMax)
+    : undefined;
+  const percent =
+    currentValue === undefined
+      ? 0
+      : clampPercent(currentValue, safeMin, safeMax);
+  const state = hasDeterminateValue ? 'determinate' : 'indeterminate';
   const progressAriaLabel =
     ariaLabel ??
     label ??
@@ -75,31 +93,29 @@ export function ProgressBar({
       <div
         role='progressbar'
         aria-label={progressAriaLabel}
-        aria-valuemin={min}
-        aria-valuemax={max}
-        aria-valuenow={hasDeterminateValue ? Math.round(percent) : undefined}
+        aria-valuemin={safeMin}
+        aria-valuemax={safeMax}
+        aria-valuenow={currentValue === undefined ? undefined : currentValue}
+        aria-valuetext={
+          hasDeterminateValue ? `${Math.round(percent)}%` : undefined
+        }
+        data-part='track'
+        data-state={state}
         className={cn(
-          'h-1 w-full overflow-hidden rounded-full bg-surface-2',
+          'h-1.5 w-full overflow-hidden rounded-full bg-surface-2',
           trackClassName
         )}
       >
         <div
-          data-state={
-            indeterminate || !hasDeterminateValue
-              ? 'indeterminate'
-              : 'determinate'
-          }
+          data-part='indicator'
+          data-state={state}
           className={cn(
             'h-full rounded-full bg-accent transition-[width] duration-subtle ease-out motion-reduce:transition-none',
-            (indeterminate || !hasDeterminateValue) &&
+            !hasDeterminateValue &&
               'w-1/3 animate-[progress-indeterminate_1.5s_ease-in-out_infinite] motion-reduce:animate-none',
             fillClassName
           )}
-          style={
-            hasDeterminateValue && !indeterminate
-              ? { width: `${percent}%` }
-              : undefined
-          }
+          style={hasDeterminateValue ? { width: `${percent}%` } : undefined}
         />
       </div>
     </div>
