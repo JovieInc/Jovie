@@ -32,6 +32,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Fixed
 
 - **Public profiles keep names, places, and last songs readable:** Contact drawers show the person before the company, compact heroes keep the full city, Music’s last row clears the tab bar, and AEO mention links use the profile text token instead of browser purple.
+- **Waitlist copy sits in the middle:** The waitlist message and account switch stay centered when they fit. They only scroll if the type is too large.
 
 ## [26.8.1] - 2026-08-16
 

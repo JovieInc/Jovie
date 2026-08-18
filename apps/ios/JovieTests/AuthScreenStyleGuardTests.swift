@@ -24,6 +24,9 @@ struct AuthScreenStyleGuardTests {
     #expect(source.contains("WaitlistPendingLayout.reservedActionMinHeight"))
     #expect(source.contains(".opacity(isSwitchingAccount ? 1 : 0)"))
     #expect(!source.contains("if isSwitchingAccount {\n                ProgressView()"))
+    #expect(source.contains("WaitlistPendingLayout.contentMinHeight"))
+    #expect(source.contains("alignment: .center"))
+    #expect(source.contains(".scrollBounceBehavior(.basedOnSize)"))
   }
 
   @Test func waitlistActionCopyStaysStableAcrossSwitchingState() {
@@ -35,6 +38,13 @@ struct AuthScreenStyleGuardTests {
     )
     #expect(WaitlistPendingLayout.maxContentWidth == 420)
     #expect(WaitlistPendingLayout.reservedActionMinHeight == 48)
+  }
+
+  @Test func waitlistPendingCentersShortContentInTheSafeAreaViewport() {
+    #expect(WaitlistPendingLayout.contentMaxWidth == 420)
+    #expect(WaitlistPendingLayout.contentMinHeight(viewportHeight: 812) == 812)
+    #expect(WaitlistPendingLayout.contentMinHeight(viewportHeight: 0) == 0)
+    #expect(WaitlistPendingLayout.contentMinHeight(viewportHeight: -20) == 0)
   }
 
   @Test func continueInBrowserLoadingSpinnerUsesNeutralForeground() throws {
