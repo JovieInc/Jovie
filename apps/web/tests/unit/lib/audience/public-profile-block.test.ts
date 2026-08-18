@@ -69,6 +69,7 @@ import {
   checkProfileVisitorBlocked,
   getAudienceBlockIpFromHeaders,
   invalidateProfileAudienceBlockCache,
+  mapAudienceBlockPipelineResults,
   markProfileHasAudienceBlocks,
   markProfileHasNoAudienceBlocks,
 } from '@/lib/audience/public-profile-block';
@@ -449,6 +450,54 @@ describe('public profile audience block helper', () => {
     await expect(
       checkProfileVisitorBlocked('tim', '1.2.3.4', 'Mozilla')
     ).resolves.toBe(true);
+  });
+
+  it('fail-opens when the Redis pipeline payload is not an array', async () => {
+    process.env.NODE_ENV = 'production';
+    expect(() =>
+      mapAudienceBlockPipelineResults({ error: 'max requests limit' })
+    ).not.toThrow();
+    expect(
+      mapAudienceBlockPipelineResults({ error: 'max requests limit' })
+    ).toEqual([]);
+
+    const redis = {
+      pipeline() {
+        const commands: Array<{ command: unknown[] }> = [];
+        const pipeline = {
+          commands,
+          get(key: string) {
+            commands.push({ command: ['GET', key] });
+            return pipeline;
+          },
+          set(key: string, value: unknown) {
+            commands.push({ command: ['SET', key, value] });
+            return pipeline;
+          },
+          del(key: string) {
+            commands.push({ command: ['DEL', key] });
+            return pipeline;
+          },
+          client: {
+            request: async () => ({ error: 'max requests limit' }),
+          },
+          exec: async () => ({ error: 'max requests limit' }),
+        };
+        return pipeline;
+      },
+    };
+    mocks.getRedis.mockReturnValue(redis);
+    mocks.select.mockImplementation(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn(() => ({
+          limit: vi.fn().mockResolvedValue([]),
+        })),
+      })),
+    }));
+
+    await expect(
+      checkProfileVisitorBlocked('tim', '1.2.3.4', 'Mozilla')
+    ).resolves.toBe(false);
   });
 
   it('fails open when the DB query throws', async () => {

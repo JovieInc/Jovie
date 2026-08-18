@@ -211,12 +211,170 @@ function captureAudienceBlockWarning(
     .catch(() => {});
 }
 
+export interface AudienceBlockPipelineEntry {
+  readonly error: string | null;
+  readonly result: unknown;
+}
+
+interface AudienceBlockPipeline {
+  readonly client?: {
+    request: (opts: {
+      readonly path: readonly string[];
+      readonly body: readonly unknown[];
+    }) => Promise<unknown>;
+  };
+  exec?: (options?: { keepErrors?: boolean }) => Promise<unknown>;
+  get?: (key: string) => unknown;
+  set?: (key: string, value: unknown, opts?: { ex: number }) => unknown;
+  del?: (key: string) => unknown;
+}
+
+type AudienceBlockRedis = NonNullable<ReturnType<typeof getRedis>>;
+
+function asAudienceBlockPipeline(pipeline: unknown): AudienceBlockPipeline {
+  return pipeline as AudienceBlockPipeline;
+}
+
+function readAudienceBlockPipelineCommands(
+  pipeline: AudienceBlockPipeline
+): ReadonlyArray<{ readonly command: readonly unknown[] }> | null {
+  // Upstash types `Pipeline.commands` as private. Read it as a duck-typed
+  // field so we can issue one REST /pipeline call without assigning our
+  // public helper type onto that private property.
+  const commands = (pipeline as { commands?: unknown }).commands;
+  return Array.isArray(commands)
+    ? (commands as ReadonlyArray<{ readonly command: readonly unknown[] }>)
+    : null;
+}
+
+function getAudienceBlockPipeline(
+  redis: AudienceBlockRedis
+): AudienceBlockPipeline | null {
+  const pipelineFn = (redis as { pipeline?: () => unknown }).pipeline;
+  if (typeof pipelineFn !== 'function') return null;
+  return asAudienceBlockPipeline(pipelineFn.call(redis));
+}
+
+function normalizeAudienceBlockPipelineEntry(
+  entry: unknown
+): AudienceBlockPipelineEntry {
+  if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+    const record = entry as { error?: unknown; result?: unknown };
+    if ('result' in record || 'error' in record) {
+      return {
+        error: typeof record.error === 'string' ? record.error : null,
+        result: record.result ?? null,
+      };
+    }
+  }
+  if (Array.isArray(entry)) {
+    const [error, result] = entry;
+    return {
+      error: typeof error === 'string' ? error : null,
+      result: result ?? null,
+    };
+  }
+  return { error: null, result: entry ?? null };
+}
+
+/**
+ * Map an Upstash pipeline payload. Quota and auth errors return a plain
+ * object, so `@upstash/redis` Pipeline.exec throws `res.map is not a
+ * function`. A non-array payload fail-opens as a cache miss.
+ */
+export function mapAudienceBlockPipelineResults(
+  res: unknown
+): AudienceBlockPipelineEntry[] {
+  if (!Array.isArray(res)) {
+    return [];
+  }
+  return res.map(normalizeAudienceBlockPipelineEntry);
+}
+
+async function execAudienceBlockPipeline(
+  pipeline: AudienceBlockPipeline
+): Promise<AudienceBlockPipelineEntry[]> {
+  const commands = readAudienceBlockPipelineCommands(pipeline);
+  const request = pipeline.client?.request;
+  if (typeof request === 'function' && commands) {
+    const res = await request({
+      path: ['pipeline'],
+      body: commands.map(command => command.command),
+    });
+    return mapAudienceBlockPipelineResults(res);
+  }
+
+  if (typeof pipeline.exec !== 'function') {
+    return [];
+  }
+
+  try {
+    const res = await pipeline.exec({ keepErrors: true });
+    return mapAudienceBlockPipelineResults(res);
+  } catch (error) {
+    if (
+      error instanceof TypeError &&
+      /map is not a function/i.test(error.message)
+    ) {
+      return [];
+    }
+    throw error;
+  }
+}
+
+function readAudienceBlockPipelineResult<T>(
+  entries: readonly AudienceBlockPipelineEntry[]
+): T | null {
+  const entry = entries[0];
+  if (!entry || entry.error) return null;
+  return (entry.result as T | null | undefined) ?? null;
+}
+
+async function audienceBlockRedisGet<T>(
+  redis: AudienceBlockRedis,
+  cacheKey: string
+): Promise<T | null> {
+  const pipeline = getAudienceBlockPipeline(redis);
+  if (!pipeline) {
+    return redis.get<T>(cacheKey);
+  }
+  pipeline.get?.(cacheKey);
+  return readAudienceBlockPipelineResult<T>(
+    await execAudienceBlockPipeline(pipeline)
+  );
+}
+
+async function audienceBlockRedisSet(
+  redis: AudienceBlockRedis,
+  cacheKey: string,
+  value: unknown
+): Promise<void> {
+  const pipeline = getAudienceBlockPipeline(redis);
+  if (!pipeline) {
+    await redis.set(cacheKey, value, { ex: REDIS_CACHE_TTL_SECONDS });
+    return;
+  }
+  pipeline.set?.(cacheKey, value, { ex: REDIS_CACHE_TTL_SECONDS });
+  await execAudienceBlockPipeline(pipeline);
+}
+
+async function audienceBlockRedisDel(
+  redis: AudienceBlockRedis,
+  cacheKey: string
+): Promise<void> {
+  const pipeline = getAudienceBlockPipeline(redis);
+  if (!pipeline) {
+    await redis.del(cacheKey);
+    return;
+  }
+  pipeline.del?.(cacheKey);
+  await execAudienceBlockPipeline(pipeline);
+}
+
 async function withRedisDeadline<T>(params: {
   readonly cacheKey: string;
   readonly fallback: T;
-  readonly operation: (
-    redis: NonNullable<ReturnType<typeof getRedis>>
-  ) => Promise<T>;
+  readonly operation: (redis: AudienceBlockRedis) => Promise<T>;
   readonly telemetryKey?: string;
   readonly warning: string;
 }): Promise<T> {
@@ -246,7 +404,7 @@ async function tryGetRedisFlag(cacheKey: string): Promise<boolean> {
   const cached = await withRedisDeadline({
     cacheKey,
     fallback: null as boolean | null,
-    operation: redis => redis.get<boolean>(cacheKey),
+    operation: redis => audienceBlockRedisGet<boolean>(redis, cacheKey),
     warning: '[audience-block] Redis cache read failed',
   });
   const cacheDuration = Date.now() - cacheStart;
@@ -264,7 +422,7 @@ async function setRedisFlag(cacheKey: string): Promise<void> {
     cacheKey,
     fallback: undefined,
     operation: async redis => {
-      await redis.set(cacheKey, true, { ex: REDIS_CACHE_TTL_SECONDS });
+      await audienceBlockRedisSet(redis, cacheKey, true);
     },
     warning: '[audience-block] Redis cache write failed',
   });
@@ -275,7 +433,7 @@ async function deleteRedisFlag(cacheKey: string): Promise<void> {
     cacheKey,
     fallback: undefined,
     operation: async redis => {
-      await redis.del(cacheKey);
+      await audienceBlockRedisDel(redis, cacheKey);
     },
     warning: '[audience-block] Redis cache delete failed',
   });
@@ -292,7 +450,7 @@ async function getVisitorDecision(
   const cached = await withRedisDeadline({
     cacheKey,
     fallback: null as VisitorDecision | null,
-    operation: redis => redis.get<VisitorDecision>(cacheKey),
+    operation: redis => audienceBlockRedisGet<VisitorDecision>(redis, cacheKey),
     telemetryKey: `visitor:${normalizeUsername(username)}`,
     warning: '[audience-block] Redis visitor cache read failed',
   });
@@ -314,7 +472,7 @@ async function setVisitorDecision(
     cacheKey,
     fallback: undefined,
     operation: async redis => {
-      await redis.set(cacheKey, decision, { ex: REDIS_CACHE_TTL_SECONDS });
+      await audienceBlockRedisSet(redis, cacheKey, decision);
     },
     telemetryKey: `visitor:${normalizeUsername(username)}`,
     warning: '[audience-block] Redis visitor cache write failed',
