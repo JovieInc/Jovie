@@ -390,6 +390,7 @@ describe('LibrarySurface', () => {
   it('renders an empty read-only library state with a releases escape hatch', () => {
     renderLibrary([]);
 
+    const emptyState = screen.getByTestId('library-workspace-empty-state');
     expect(screen.getByText('No Library Items')).toBeDefined();
     expect(
       screen.getByText(
@@ -400,6 +401,10 @@ describe('LibrarySurface', () => {
       'href',
       APP_ROUTES.RELEASES
     );
+    expect(emptyState).toHaveClass('py-16', 'min-h-90');
+    expect(
+      screen.getByRole('heading', { name: 'No Library Items' })
+    ).toHaveClass('text-2xl', 'font-semibold', 'text-primary-token');
   });
 
   it('defaults to grid view on first load', () => {
