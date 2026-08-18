@@ -35,7 +35,11 @@ export interface PaletteSection {
   readonly id: string;
   readonly label: string;
   readonly items: readonly PickerItem[];
+  /** Empty-query cap. A non-empty query always searches the complete section. */
+  readonly defaultItemLimit?: number;
 }
+
+export const DEFAULT_PALETTE_SECTION_LIMIT = 5;
 
 export function fuzzyMatch(haystack: string, needle: string): boolean {
   if (!needle) return true;
@@ -50,6 +54,32 @@ export function flattenSections(
   return out;
 }
 
+export function applyPaletteDefaultLimits(
+  query: string,
+  sections: readonly PaletteSection[]
+): PaletteSection[] {
+  if (query.trim()) return [...sections];
+  return sections.map(section => {
+    if (section.defaultItemLimit === undefined) return section;
+    return {
+      ...section,
+      items: section.items.slice(0, section.defaultItemLimit),
+    };
+  });
+}
+
+export function hasHiddenPaletteDefaults(
+  query: string,
+  sections: readonly PaletteSection[]
+): boolean {
+  if (query.trim()) return false;
+  return sections.some(
+    section =>
+      section.defaultItemLimit !== undefined &&
+      section.items.length > section.defaultItemLimit
+  );
+}
+
 export function buildRegistrySections(
   query: string,
   skills: readonly SkillCommand[],
@@ -57,38 +87,40 @@ export function buildRegistrySections(
   releases: readonly EntityRef[],
   artists: readonly EntityRef[]
 ): PaletteSection[] {
-  const lower = query.toLowerCase();
+  const normalizedQuery = query.trim();
   const sections: PaletteSection[] = [];
   const matchedNavs = navs.filter(n =>
-    fuzzyMatch(`${n.label} ${n.description}`, query)
+    fuzzyMatch(`${n.label} ${n.description}`, normalizedQuery)
   );
   if (matchedNavs.length > 0) {
     sections.push({
       id: 'nav',
       label: 'Go To',
       items: matchedNavs.map(nav => ({ kind: 'nav' as const, nav })),
+      // Registry order is an explicit, reviewable product priority.
+      defaultItemLimit: DEFAULT_PALETTE_SECTION_LIMIT,
     });
   }
   const matchedSkills = skills.filter(s =>
-    fuzzyMatch(`${s.label} ${s.description}`, query)
+    fuzzyMatch(`${s.label} ${s.description}`, normalizedQuery)
   );
   if (matchedSkills.length > 0) {
     sections.push({
       id: 'skills',
       label: 'Skills',
       items: matchedSkills.map(skill => ({ kind: 'skill' as const, skill })),
+      // Registry order is an explicit, reviewable product priority.
+      defaultItemLimit: DEFAULT_PALETTE_SECTION_LIMIT,
     });
   }
-  const matchedReleases = releases.filter(r =>
-    !lower ? true : r.label.toLowerCase().includes(lower)
-  );
-  if (matchedReleases.length > 0) {
+  // Release rows have already been matched against both title and artist in
+  // useCmdkData. Do not narrow them a second time using only the display title.
+  if (releases.length > 0) {
     sections.push({
       id: 'releases',
       label: 'Releases',
-      items: matchedReleases
-        .slice(0, 6)
-        .map(entity => ({ kind: 'entity' as const, entity })),
+      items: releases.map(entity => ({ kind: 'entity' as const, entity })),
+      defaultItemLimit: DEFAULT_PALETTE_SECTION_LIMIT,
     });
   }
   if (artists.length > 0) {
@@ -112,7 +144,7 @@ export function filterAdditionalSections(
   additional: readonly PaletteSection[] | undefined
 ): PaletteSection[] {
   if (!additional || additional.length === 0) return [];
-  const lower = query.toLowerCase();
+  const lower = query.trim().toLowerCase();
   if (!lower) return [...additional];
   return additional
     .map(section => ({
@@ -125,7 +157,10 @@ export function filterAdditionalSections(
             `${item.prompt.label} ${item.prompt.description}`,
             lower
           );
-        return fuzzyMatch(item.entity.label, lower);
+        return fuzzyMatch(
+          `${item.entity.label} ${item.entity.meta?.subtitle ?? ''}`,
+          lower
+        );
       }),
     }))
     .filter(section => section.items.length > 0);
@@ -226,6 +261,7 @@ export function PaletteList({
         return (
           <div
             key={section.id}
+            data-palette-section={section.id}
             className={cn(
               variant === 'cmdk' &&
                 sectionIdx > 0 &&

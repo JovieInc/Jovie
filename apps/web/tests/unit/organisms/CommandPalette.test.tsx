@@ -6,9 +6,15 @@
  * query, and renders the autofocused search input.
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
@@ -89,8 +95,55 @@ vi.mock('@/lib/queries', async () => {
     ...actual,
     useChatConversationsQuery: () => ({
       data: [
-        { id: 'thread-a', title: 'Q1 release plan' },
-        { id: 'thread-b', title: null },
+        {
+          id: 'thread-active',
+          title: 'Active rollout',
+          createdAt: '2026-08-12T00:00:00.000Z',
+          updatedAt: '2026-08-12T00:00:00.000Z',
+          latestTurnStatus: 'streaming',
+        },
+        {
+          id: 'thread-failed',
+          title: 'Needs review',
+          createdAt: '2026-08-13T00:00:00.000Z',
+          updatedAt: '2026-08-13T00:00:00.000Z',
+          latestTurnStatus: 'failed_timeout',
+        },
+        {
+          id: 'thread-a',
+          title: 'Q1 release plan',
+          createdAt: '2026-08-18T00:00:00.000Z',
+          updatedAt: '2026-08-18T00:00:00.000Z',
+          latestTurnStatus: 'completed',
+        },
+        {
+          id: 'thread-b',
+          title: null,
+          createdAt: '2026-08-17T00:00:00.000Z',
+          updatedAt: '2026-08-17T00:00:00.000Z',
+          latestTurnStatus: 'completed',
+        },
+        {
+          id: 'thread-c',
+          title: 'Campaign planning',
+          createdAt: '2026-08-16T00:00:00.000Z',
+          updatedAt: '2026-08-16T00:00:00.000Z',
+          latestTurnStatus: 'completed',
+        },
+        {
+          id: 'thread-d',
+          title: 'Hidden default chat',
+          createdAt: '2026-08-15T00:00:00.000Z',
+          updatedAt: '2026-08-15T00:00:00.000Z',
+          latestTurnStatus: 'completed',
+        },
+        {
+          id: 'thread-e',
+          title: 'Older hidden chat',
+          createdAt: '2026-08-14T00:00:00.000Z',
+          updatedAt: '2026-08-14T00:00:00.000Z',
+          latestTurnStatus: 'completed',
+        },
       ],
       isLoading: false,
     }),
@@ -141,6 +194,10 @@ function withDashboard(node: ReactNode, isAdmin = false) {
 }
 
 describe('CommandPalette', () => {
+  beforeEach(() => {
+    pathnameMock.mockReturnValue('/app');
+  });
+
   it('renders nothing when DashboardDataContext is missing', () => {
     const { container } = render(<CommandPalette />);
     expect(container.firstChild).toBeNull();
@@ -247,6 +304,29 @@ describe('CommandPalette', () => {
     expect(screen.getByText('Recent Chats')).toBeInTheDocument();
     expect(screen.getByText('Q1 release plan')).toBeInTheDocument();
     expect(screen.getByText('Untitled chat')).toBeInTheDocument();
+    expect(screen.getByText('Active chat')).toBeVisible();
+    expect(screen.getByText('Needs attention')).toBeVisible();
+    expect(screen.queryByText('Hidden default chat')).toBeNull();
+  });
+
+  it('prioritizes the current chat and still finds chats outside the default five', () => {
+    pathnameMock.mockReturnValue('/app/chat/thread-d');
+    const { container } = render(withDashboard(<CommandPalette />));
+    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+
+    const recentSection = container.querySelector(
+      '[data-palette-section="recent-chats"]'
+    );
+    expect(recentSection).not.toBeNull();
+    const rows = within(recentSection as HTMLElement).getAllByRole('option');
+    expect(rows).toHaveLength(5);
+    expect(rows[0]).toHaveTextContent('Hidden default chat');
+    expect(rows[0]).toHaveTextContent('Current chat');
+
+    fireEvent.change(screen.getByLabelText('Command Palette Search'), {
+      target: { value: 'Older hidden chat' },
+    });
+    expect(screen.getByText('Older hidden chat')).toBeVisible();
   });
 
   it('shows the admin workspace action and its shortcut', () => {

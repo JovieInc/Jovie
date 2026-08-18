@@ -14,6 +14,7 @@ import type { SpotifyArtistResult } from '@/lib/contracts/api';
 export interface ReleaseLikeRow {
   readonly id: string;
   readonly title: string;
+  readonly status?: 'draft' | 'scheduled' | 'released';
   readonly artworkUrl?: string | null;
   readonly artistNames?: readonly string[];
   readonly releaseDate?: string;
@@ -78,10 +79,22 @@ export function releaseRowMatches(
 }
 
 /** Convert a release row to the picker's display-ready EntityRef. */
-export function releaseRowToEntityRef(release: ReleaseLikeRow): EntityRef {
+export function releaseRowToEntityRef(
+  release: ReleaseLikeRow,
+  options: { readonly includeWorkflowStatus?: boolean } = {}
+): EntityRef {
   const dateLabel = shortMonthDay(release.releaseDate);
   const typeLabel = releaseTypeLabel(release.releaseType);
-  const subtitle = dateLabel ? `${typeLabel} · ${dateLabel}` : typeLabel;
+  const workflowLabel = options.includeWorkflowStatus
+    ? release.status === 'draft'
+      ? 'Draft'
+      : release.status === 'scheduled'
+        ? 'Scheduled'
+        : null
+    : null;
+  const subtitle = [workflowLabel, typeLabel, dateLabel]
+    .filter(Boolean)
+    .join(' · ');
   return {
     kind: 'release',
     id: release.id,
