@@ -1,9 +1,15 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  getSidebarThreadStatus,
+  isTimestampAfter,
+  readThreadReadState,
   type SidebarThread,
   SidebarThreadsSection,
+  THREAD_READ_STORAGE_KEY,
+  toSidebarThread,
+  writeThreadReadState,
 } from './SidebarThreadsSection';
 
 const threads: SidebarThread[] = [
@@ -24,6 +30,10 @@ const threads: SidebarThread[] = [
 ];
 
 describe('SidebarThreadsSection', () => {
+  afterEach(() => {
+    localStorage.clear();
+  });
+
   it('routes thread utility glyphs through the shared sidebar icon contracts', () => {
     const { rerender } = render(
       <SidebarThreadsSection
@@ -150,7 +160,11 @@ describe('SidebarThreadsSection', () => {
       'shadow-[inset_2px_0_0_0_var(--color-accent)]'
     );
     expect(inactiveThread).toHaveClass('text-secondary-token');
-    expect(inactiveThread).toHaveClass('hover:bg-surface-1');
+    expect(inactiveThread).toHaveClass('hover:bg-sidebar-accent');
+    expect(inactiveThread).not.toHaveClass(
+      'hover:bg-surface-1',
+      'focus-visible:bg-surface-1'
+    );
     expect(inactiveThread).toHaveClass('focus-visible:ring-2');
   });
 
@@ -260,6 +274,8 @@ describe('SidebarThreadsSection', () => {
     const threadButton = screen.getByRole('button', { name: 'Draft thread' });
 
     expect(threadButton).toHaveAttribute('aria-pressed', 'true');
+    expect(threadButton).toHaveClass('h-6', 'bg-sidebar-accent-active');
+    expect(threadButton).not.toHaveClass('h-auto', 'hover:bg-transparent');
     fireEvent.click(threadButton);
     expect(onSelect).toHaveBeenCalledWith('draft-thread');
   });
@@ -281,7 +297,98 @@ describe('SidebarThreadsSection', () => {
       name: 'New Chat',
     });
 
+    expect(newThreadButton).toHaveClass('h-6', 'hover:bg-sidebar-accent/70');
+    expect(newThreadButton).not.toHaveClass('h-auto', 'hover:bg-transparent');
     fireEvent.click(newThreadButton);
     expect(onNewThread).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps loading and error rows on the same reserved geometry', () => {
+    const onRetry = vi.fn();
+    const { container, rerender } = render(
+      <SidebarThreadsSection
+        threads={[]}
+        activeThreadId={null}
+        state='loading'
+        collapsed={false}
+      />
+    );
+
+    const loadingRow =
+      container.querySelector('.skeleton')?.parentElement?.parentElement;
+    expect(loadingRow).toHaveClass('h-7');
+
+    rerender(
+      <SidebarThreadsSection
+        threads={[]}
+        activeThreadId={null}
+        state='error'
+        onRetry={onRetry}
+        collapsed={false}
+      />
+    );
+
+    const errorRow = screen.getByText(
+      'Conversations unavailable'
+    ).parentElement;
+    expect(errorRow).toHaveClass('h-7');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry Chats' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('maps conversation status, unread state, and fallback titles deterministically', () => {
+    expect(getSidebarThreadStatus(null)).toBe('complete');
+    expect(getSidebarThreadStatus('streaming')).toBe('running');
+    expect(getSidebarThreadStatus('failed_network')).toBe('errored');
+    expect(getSidebarThreadStatus('complete')).toBe('complete');
+
+    const conversation = {
+      id: 'thread / one',
+      title: '  ',
+      updatedAt: '2026-05-12T00:00:00.000Z',
+      latestMessageRole: 'assistant' as const,
+      latestTurnStatus: 'streaming' as const,
+    };
+
+    expect(
+      toSidebarThread(conversation, {
+        readAt: '2026-05-11T00:00:00.000Z',
+      })
+    ).toMatchObject({
+      href: `${APP_ROUTES.CHAT}/thread%20%2F%20one`,
+      title: 'Untitled chat',
+      status: 'running',
+      unread: true,
+    });
+    expect(
+      toSidebarThread(conversation, {
+        activeThreadId: conversation.id,
+        readAt: '2026-05-11T00:00:00.000Z',
+      }).unread
+    ).toBe(false);
+  });
+
+  it('persists valid read timestamps and degrades safely for invalid storage', () => {
+    const readState = { 'thread-one': '2026-05-12T00:00:00.000Z' };
+    writeThreadReadState(readState);
+    expect(readThreadReadState()).toEqual(readState);
+
+    localStorage.setItem(
+      THREAD_READ_STORAGE_KEY,
+      JSON.stringify({ ...readState, invalid: 42 })
+    );
+    expect(readThreadReadState()).toEqual(readState);
+
+    localStorage.setItem(THREAD_READ_STORAGE_KEY, '{invalid json');
+    expect(readThreadReadState()).toEqual({});
+  });
+
+  it('compares valid and fallback timestamps without marking missing candidates unread', () => {
+    expect(isTimestampAfter(undefined, undefined)).toBe(false);
+    expect(isTimestampAfter('2026-05-12T00:00:00.000Z', undefined)).toBe(true);
+    expect(
+      isTimestampAfter('2026-05-12T00:00:00.000Z', '2026-05-13T00:00:00.000Z')
+    ).toBe(false);
+    expect(isTimestampAfter('zeta', 'alpha')).toBe(true);
   });
 });
