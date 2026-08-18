@@ -40,6 +40,12 @@ export const DROPDOWN_TRANSITIONS =
  */
 export const DROPDOWN_SLIDE_ANIMATIONS = '';
 
+/** Default gap between a floating surface and its trigger/anchor. */
+export const OVERLAY_SIDE_OFFSET = 4;
+
+/** Viewport breathing room shared by all collision-aware floating surfaces. */
+export const OVERLAY_COLLISION_PADDING = 8;
+
 // ============================================================================
 // CONTENT (CONTAINER) STYLES
 // ============================================================================
@@ -71,6 +77,10 @@ export const OVERLAY_CONTENT_RADIUS = 'rounded-(--system-b-radius-overlay)';
  * corner arc shares the overlay's center.
  */
 export const OVERLAY_ITEM_RADIUS = 'rounded-(--system-b-radius-overlay-inner)';
+
+/** Shared keyboard-focus treatment kept inside the concentric row radius. */
+export const OVERLAY_ITEM_FOCUS =
+  'focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus/35';
 
 export const DROPDOWN_CONTENT_BASE = `z-50 min-w-48 overflow-hidden ${OVERLAY_CONTENT_RADIUS} ${OVERLAY_SURFACE_BASE} p-1`;
 
@@ -184,7 +194,7 @@ export const MENU_ITEM_BASE =
   'text-secondary-token hover:bg-surface-1 hover:text-primary-token ' +
   'data-[highlighted]:bg-surface-1 data-[highlighted]:text-primary-token ' +
   'data-[disabled]:pointer-events-none data-[disabled]:opacity-50 ' +
-  'focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-focus/35 ' +
+  `${OVERLAY_ITEM_FOCUS} ` +
   '[&_svg]:pointer-events-none [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:text-tertiary-token ' +
   'hover:[&_svg]:text-primary-token data-[highlighted]:[&_svg]:text-primary-token';
 
@@ -207,21 +217,21 @@ export const MENU_ITEM_SELECTED =
  * Checkbox and radio item styles (with left indicator space)
  */
 export const CHECKBOX_RADIO_ITEM_BASE =
-  `relative flex cursor-default select-none items-center ${OVERLAY_ITEM_RADIUS} py-1 pl-7 pr-2 text-xs font-normal leading-4 outline-none ` +
+  `relative flex min-h-8 cursor-default select-none items-center ${OVERLAY_ITEM_RADIUS} py-1 pl-7 pr-2 text-xs font-normal leading-4 outline-none ` +
   'transition-colors duration-fast ease-interactive ' +
   'text-secondary-token hover:bg-surface-1 hover:text-primary-token ' +
   'data-[highlighted]:bg-surface-1 data-[highlighted]:text-primary-token ' +
   'data-[disabled]:pointer-events-none data-[disabled]:opacity-50 ' +
-  'focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-focus/35';
+  OVERLAY_ITEM_FOCUS;
 
 /**
  * Select item base — unified with MENU_ITEM_BASE hover/focus behavior
  */
 export const SELECT_ITEM_BASE =
-  `relative flex w-full cursor-default select-none items-center ${OVERLAY_ITEM_RADIUS} py-1.5 pl-8 pr-2 text-app font-normal leading-5 outline-none ` +
+  `relative flex min-h-8 w-full cursor-default select-none items-center ${OVERLAY_ITEM_RADIUS} py-1.5 pl-8 pr-2 text-app font-normal leading-5 outline-none ` +
   'transition-colors duration-fast ease-interactive ' +
   'text-secondary-token ' +
-  'focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:text-primary-token focus-visible:ring-1 focus-visible:ring-focus/35 ' +
+  `${OVERLAY_ITEM_FOCUS} focus-visible:text-primary-token ` +
   'data-[highlighted]:bg-surface-1 data-[highlighted]:text-primary-token ' +
   'data-[disabled]:pointer-events-none data-[disabled]:opacity-50';
 
@@ -238,7 +248,7 @@ export const MENU_ITEM_COMPACT =
   'text-secondary-token hover:bg-surface-1 hover:text-primary-token ' +
   'data-[highlighted]:bg-surface-1 data-[highlighted]:text-primary-token ' +
   'data-[disabled]:pointer-events-none data-[disabled]:opacity-50 ' +
-  'focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-focus/35 ' +
+  `${OVERLAY_ITEM_FOCUS} ` +
   '[&_svg]:pointer-events-none [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:text-tertiary-token ' +
   'hover:[&_svg]:text-primary-token data-[highlighted]:[&_svg]:text-primary-token';
 
