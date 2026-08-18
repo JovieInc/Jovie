@@ -749,7 +749,7 @@ export function ProfileCompactSurface({
                           className='h-3.5 w-3.5 shrink-0 text-white/58'
                           aria-hidden='true'
                         />
-                        <span className='min-w-0 truncate'>
+                        <span className='shrink-0 whitespace-nowrap'>
                           {locationLabel}
                         </span>
                       </>
