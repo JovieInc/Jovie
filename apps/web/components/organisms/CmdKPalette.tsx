@@ -18,7 +18,6 @@ import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
-  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
   useCallback,
   useEffect,
@@ -32,6 +31,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { filterSkillsHidingBrokenAlbumArt } from '@/lib/chat/album-art-capability';
 import { type EntityRef } from '@/lib/commands/entities';
 import { resolveEntityHref } from '@/lib/commands/entity-routing';
+import { rankPaletteReleases } from '@/lib/commands/palette-ranking';
 import {
   type Command,
   commandsForSurface,
@@ -49,10 +49,13 @@ import {
   releaseRowToEntityRef,
 } from '../jovie/components/entity-mappers';
 import { pickerItemKey } from '../jovie/components/picker-rows';
+import { CmdKMainPlaneSearchInput } from './CmdKMainPlaneSearchInput';
 import {
+  applyPaletteDefaultLimits,
   buildRegistrySections,
   filterAdditionalSections,
   flattenSections,
+  hasHiddenPaletteDefaults,
   PaletteList,
   type PaletteSection,
 } from './SharedCommandPalette';
@@ -73,63 +76,6 @@ interface CmdKPaletteProps {
   readonly presentation?: 'dialog' | 'main';
   /** Supplies the live query field to the breadcrumb/header seam in main mode. */
   readonly onHeaderChange?: (header: ReactNode | null) => void;
-}
-
-function MainPlaneSearchInput({
-  onQueryChange,
-  onKeyDown,
-  listId,
-  activeRowId,
-}: {
-  readonly onQueryChange: (query: string) => void;
-  readonly onKeyDown: (event: KeyboardEvent) => void;
-  readonly listId: string;
-  readonly activeRowId: string | null;
-}) {
-  const [query, setQuery] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useLayoutEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  return (
-    <div className='flex h-full min-w-0 flex-1 items-center gap-2'>
-      <Search
-        className='size-4 shrink-0 text-tertiary-token'
-        aria-hidden='true'
-      />
-      <input
-        ref={inputRef}
-        type='search'
-        value={query}
-        onChange={event => {
-          const nextQuery = event.target.value;
-          setQuery(nextQuery);
-          onQueryChange(nextQuery);
-        }}
-        onKeyDown={(event: ReactKeyboardEvent<HTMLInputElement>) => {
-          // The shell header lives outside the command plane's DOM subtree.
-          // Commit here so Enter always reaches the selected result even when
-          // the header seam changes during a route transition.
-          event.stopPropagation();
-          onKeyDown(event.nativeEvent);
-        }}
-        placeholder='Search Jovie or run a command…'
-        className='min-w-0 flex-1 appearance-none bg-transparent text-sm text-primary-token outline-none placeholder:text-tertiary-token focus:outline-none focus-visible:outline-none'
-        aria-label='Command Palette Search'
-        role='combobox'
-        aria-autocomplete='list'
-        aria-controls={listId}
-        aria-activedescendant={activeRowId ?? undefined}
-        aria-expanded
-        data-testid='command-palette-header-input'
-      />
-      <span className='hidden shrink-0 text-2xs font-medium text-quaternary-token sm:inline'>
-        Esc
-      </span>
-    </div>
-  );
 }
 
 function useCmdkData(profileId: string, query: string, open: boolean) {
@@ -157,12 +103,15 @@ function useCmdkData(profileId: string, query: string, open: boolean) {
   const { data: releaseData } = useReleasesQuery(profileId, { enabled: open });
   const releaseEntities = useMemo<EntityRef[]>(
     () =>
-      (releaseData ?? [])
-        .filter(r =>
-          releaseRowMatches(r as ReleaseLikeRow, query.toLowerCase())
+      rankPaletteReleases(
+        (releaseData ?? []).filter(r =>
+          releaseRowMatches(r as ReleaseLikeRow, query.trim().toLowerCase())
         )
-        .slice(0, 8)
-        .map(r => releaseRowToEntityRef(r as ReleaseLikeRow)),
+      ).map(r =>
+        releaseRowToEntityRef(r as ReleaseLikeRow, {
+          includeWorkflowStatus: true,
+        })
+      ),
     [releaseData, query]
   );
 
@@ -208,6 +157,7 @@ export function CmdKPalette({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const generatedListId = useId();
+  const paletteDescriptionId = `${generatedListId}-description`;
 
   // Reset when closing so the next open starts clean.
   useEffect(() => {
@@ -226,9 +176,17 @@ export function CmdKPalette({
     () => filterAdditionalSections(query, additionalSectionsAfter),
     [query, additionalSectionsAfter]
   );
-  const allSections = useMemo<PaletteSection[]>(
+  const unboundedSections = useMemo<PaletteSection[]>(
     () => [...registrySections, ...filteredAdditional],
     [registrySections, filteredAdditional]
+  );
+  const allSections = useMemo<PaletteSection[]>(
+    () => applyPaletteDefaultLimits(query, unboundedSections),
+    [query, unboundedSections]
+  );
+  const hasHiddenDefaults = useMemo(
+    () => hasHiddenPaletteDefaults(query, unboundedSections),
+    [query, unboundedSections]
   );
 
   const flatItems = useMemo(() => flattenSections(allSections), [allSections]);
@@ -359,7 +317,9 @@ export function CmdKPalette({
     [activeIndex, commitIndex, flatItems.length, handleClose]
   );
   const handleKeyboardCommandRef = useRef(handleKeyboardCommand);
-  handleKeyboardCommandRef.current = handleKeyboardCommand;
+  useEffect(() => {
+    handleKeyboardCommandRef.current = handleKeyboardCommand;
+  }, [handleKeyboardCommand]);
 
   // Keyboard nav: arrow up/down/enter/escape with IME guard.
   useEffect(() => {
@@ -390,6 +350,7 @@ export function CmdKPalette({
         aria-autocomplete='list'
         aria-controls={generatedListId}
         aria-activedescendant={activeRowId ?? undefined}
+        aria-describedby={paletteDescriptionId}
         aria-expanded
         data-testid='command-palette-header-input'
       />
@@ -401,8 +362,14 @@ export function CmdKPalette({
 
   useEffect(() => {
     if (presentation !== 'main') return undefined;
+    if (!open) {
+      onHeaderChange?.(null);
+      return undefined;
+    }
     onHeaderChange?.(
-      <MainPlaneSearchInput
+      <CmdKMainPlaneSearchInput
+        value={query}
+        open={open}
         onQueryChange={nextQuery => {
           setQuery(nextQuery);
           setSelectedIndex(0);
@@ -413,29 +380,49 @@ export function CmdKPalette({
         onKeyDown={event => handleKeyboardCommandRef.current(event)}
         listId={generatedListId}
         activeRowId={activeRowId}
+        descriptionId={paletteDescriptionId}
       />
     );
     return () => onHeaderChange?.(null);
-  }, [activeRowId, generatedListId, onHeaderChange, presentation]);
+  }, [
+    activeRowId,
+    generatedListId,
+    onHeaderChange,
+    open,
+    paletteDescriptionId,
+    presentation,
+    query,
+  ]);
 
   const results = (
-    <div
-      className='min-h-0 flex-1 overflow-y-auto pb-2 pt-1.5'
-      role='listbox'
-      aria-label='Command Palette Results'
-      id={generatedListId}
-    >
-      <PaletteList
-        sections={allSections}
-        selectedIndex={activeIndex ?? -1}
-        setSelectedIndex={setSelectedIndex}
-        commitIndex={commitIndex}
-        emptyHint='No matches.'
-        variant='cmdk'
-        showIndexedShortcuts
-        listId={generatedListId}
-      />
-    </div>
+    <>
+      <p id={paletteDescriptionId} className='sr-only'>
+        When the search is empty, each prioritized group shows up to five items.
+        Type to search all matching items.
+      </p>
+      <div
+        className='min-h-0 flex-1 overflow-y-auto pb-2 pt-1.5'
+        role='listbox'
+        aria-label='Command Palette Results'
+        id={generatedListId}
+      >
+        <PaletteList
+          sections={allSections}
+          selectedIndex={activeIndex ?? -1}
+          setSelectedIndex={setSelectedIndex}
+          commitIndex={commitIndex}
+          emptyHint='No matches.'
+          variant='cmdk'
+          showIndexedShortcuts
+          listId={generatedListId}
+        />
+      </div>
+      {hasHiddenDefaults ? (
+        <p className='shrink-0 border-t border-(--app-shell-frame-seam) px-3.5 py-2 text-2xs text-tertiary-token'>
+          Showing top five per group. Type to search all results.
+        </p>
+      ) : null}
+    </>
   );
 
   if (presentation === 'main') {

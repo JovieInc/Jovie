@@ -18,11 +18,13 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
 } from 'react';
 import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { CmdKPalette } from '@/components/organisms/CmdKPalette';
-import { type PaletteSection } from '@/components/organisms/SharedCommandPalette';
+import {
+  DEFAULT_PALETTE_SECTION_LIMIT,
+  type PaletteSection,
+} from '@/components/organisms/SharedCommandPalette';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   useHeaderActions,
@@ -34,13 +36,23 @@ import {
   getNextAppShellWorkspace,
 } from '@/lib/app-shell/workspaces';
 import type { EntityRef } from '@/lib/commands/entities';
+import {
+  getPaletteConversationSubtitle,
+  rankPaletteConversations,
+} from '@/lib/commands/palette-ranking';
 import type { NavCommand } from '@/lib/commands/registry';
 import { WORKSPACE_SWITCH_SHORTCUT } from '@/lib/keyboard-shortcuts';
 import { useChatConversationsQuery } from '@/lib/queries';
 import { isFormElement } from '@/lib/utils/keyboard';
 import { OPEN_COMMAND_PALETTE_EVENT } from './command-palette-events';
 
-const RECENT_CHAT_LIMIT = 10;
+const RECENT_CHAT_QUERY_LIMIT = 50;
+
+function getCurrentConversationId(pathname: string): string | null {
+  const chatPrefix = `${APP_ROUTES.CHAT}/`;
+  if (!pathname.startsWith(chatPrefix)) return null;
+  return pathname.slice(chatPrefix.length).split('/')[0] || null;
+}
 
 export function CommandPalette() {
   // Read the context directly so we don't hit the throwing useDashboardData
@@ -91,8 +103,6 @@ interface CommandPaletteInnerProps {
 function CommandPaletteController() {
   const { closeCommandPalette, isCommandPaletteOpen, openCommandPalette } =
     useHeaderActions();
-  const isOpenRef = useRef(false);
-  isOpenRef.current = isCommandPaletteOpen;
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -100,7 +110,7 @@ function CommandPaletteController() {
       if (!isK || !(event.metaKey || event.ctrlKey)) return;
       if (event.shiftKey || event.altKey || isFormElement(event.target)) return;
       event.preventDefault();
-      if (isOpenRef.current) closeCommandPalette();
+      if (isCommandPaletteOpen) closeCommandPalette();
       else openCommandPalette();
     }
     globalThis.addEventListener('keydown', onKeyDown);
@@ -112,7 +122,7 @@ function CommandPaletteController() {
         openCommandPalette
       );
     };
-  }, [closeCommandPalette, openCommandPalette]);
+  }, [closeCommandPalette, isCommandPaletteOpen, openCommandPalette]);
 
   return null;
 }
@@ -129,7 +139,7 @@ function CommandPaletteInner({
   const pathname = usePathname();
 
   const { data: conversations } = useChatConversationsQuery({
-    limit: RECENT_CHAT_LIMIT,
+    limit: RECENT_CHAT_QUERY_LIMIT,
     enabled: open,
   });
 
@@ -163,17 +173,26 @@ function CommandPaletteInner({
       }
     }
     if (conversations && conversations.length > 0) {
+      const currentConversationId = getCurrentConversationId(pathname);
+      const rankedConversations = rankPaletteConversations(
+        conversations,
+        currentConversationId
+      );
       sections.push({
         id: 'recent-chats',
         label: 'Recent Chats',
-        items: conversations.map(convo => {
+        defaultItemLimit: DEFAULT_PALETTE_SECTION_LIMIT,
+        items: rankedConversations.map(convo => {
           const entity: EntityRef = {
             kind: 'track', // Reuses the generic Music2 fallback art.
             id: `thread:${convo.id}`,
             label: convo.title || 'Untitled chat',
             meta: {
               kind: 'track',
-              subtitle: 'Chat',
+              subtitle: getPaletteConversationSubtitle(
+                convo,
+                currentConversationId
+              ),
             },
           };
           return { kind: 'entity', entity };

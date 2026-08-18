@@ -6,7 +6,7 @@
  * via the additional-sections slot.
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { CmdKPalette } from '@/components/organisms/CmdKPalette';
@@ -75,6 +75,7 @@ vi.mock('@/lib/queries/useReleasesQuery', () => ({
       {
         id: 'rel-1',
         title: 'Midnight Run',
+        status: 'released',
         artworkUrl: 'https://cdn.example.com/midnight-run.jpg',
         artistNames: ['Test Artist'],
         releaseDate: '2024-01-01',
@@ -83,6 +84,14 @@ vi.mock('@/lib/queries/useReleasesQuery', () => ({
         totalTracks: 1,
         totalDurationMs: 200_000,
       },
+      ...Array.from({ length: 6 }, (_, index) => ({
+        id: `rel-${index + 2}`,
+        title: `Catalog Release ${index + 2}`,
+        status: 'released',
+        artistNames: index === 5 ? ['Hidden Collaborator'] : ['Test Artist'],
+        releaseDate: `2023-07-0${6 - index}`,
+        releaseType: 'single',
+      })),
     ],
     isLoading: false,
   }),
@@ -259,6 +268,58 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     expect(screen.getByText('Midnight Run')).toBeInTheDocument();
   });
 
+  it('shows five ranked defaults per bounded group and searches the full groups', () => {
+    const { container } = render(
+      <CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />
+    );
+
+    for (const sectionId of ['nav', 'skills', 'releases']) {
+      const section = container.querySelector(
+        `[data-palette-section="${sectionId}"]`
+      );
+      expect(section).not.toBeNull();
+      expect(
+        within(section as HTMLElement).getAllByRole('option')
+      ).toHaveLength(5);
+    }
+
+    const input = screen.getByRole('combobox', {
+      name: 'Command Palette Search',
+    });
+    const descriptionId = input.getAttribute('aria-describedby');
+    expect(descriptionId).not.toBeNull();
+    expect(document.getElementById(descriptionId!)).toHaveTextContent(
+      'Type to search all matching items.'
+    );
+    expect(
+      screen.getByText(
+        'Showing top five per group. Type to search all results.'
+      )
+    ).toBeVisible();
+    expect(screen.queryByText('Settings')).toBeNull();
+    expect(screen.queryByText('Send feedback')).toBeNull();
+    expect(screen.queryByText('Catalog Release 7')).toBeNull();
+
+    fireEvent.change(input, { target: { value: 'Settings' } });
+    expect(screen.getByText('Settings')).toBeVisible();
+
+    fireEvent.change(input, { target: { value: 'feedback' } });
+    expect(screen.getByText('Send feedback')).toBeVisible();
+
+    fireEvent.change(input, { target: { value: 'Catalog Release 7' } });
+    expect(screen.getByText('Catalog Release 7')).toBeVisible();
+  });
+
+  it('keeps artist-name release matches in the full query results', () => {
+    render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
+    fireEvent.change(
+      screen.getByRole('combobox', { name: 'Command Palette Search' }),
+      { target: { value: 'Hidden Collaborator' } }
+    );
+
+    expect(screen.getByText('Catalog Release 7')).toBeVisible();
+  });
+
   it('opens as a full-viewport search surface (JOV-2982)', () => {
     render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
     const shell = screen.getByTestId('cmdk-full-page');
@@ -361,6 +422,10 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
   it('routes Feedback from cmd+k through the same skill handoff', () => {
     pushMock.mockClear();
     render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
+    fireEvent.change(
+      screen.getByRole('combobox', { name: 'Command Palette Search' }),
+      { target: { value: 'feedback' } }
+    );
     const feedbackRow = screen
       .getAllByRole('option')
       .find(el => el.textContent?.includes('Share feedback'));
@@ -417,5 +482,42 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     expect(onAdditionalSelect).toHaveBeenCalledWith('thread:abc');
     // The additional path delegates to the caller; no router.push.
     expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('bounds recent-chat defaults and reveals every matching chat after input', () => {
+    const onAdditionalSelect = vi.fn();
+    render(
+      <CmdKPalette
+        profileId='profile-1'
+        open
+        onOpenChange={vi.fn()}
+        additionalSectionsAfter={[
+          {
+            id: 'recent-chats',
+            label: 'Recent chats',
+            defaultItemLimit: 5,
+            items: Array.from({ length: 7 }, (_, index) => ({
+              kind: 'entity' as const,
+              entity: {
+                kind: 'track' as const,
+                id: `thread:${index + 1}`,
+                label: `Chat result ${index + 1}`,
+                meta: { kind: 'track' as const, subtitle: 'Recent chat' },
+              },
+            })),
+          },
+        ]}
+        onAdditionalSelect={onAdditionalSelect}
+      />
+    );
+
+    expect(screen.getByText('Chat result 5')).toBeVisible();
+    expect(screen.queryByText('Chat result 6')).toBeNull();
+
+    fireEvent.change(
+      screen.getByRole('combobox', { name: 'Command Palette Search' }),
+      { target: { value: 'Chat result' } }
+    );
+    expect(screen.getAllByText(/^Chat result \d$/)).toHaveLength(7);
   });
 });
