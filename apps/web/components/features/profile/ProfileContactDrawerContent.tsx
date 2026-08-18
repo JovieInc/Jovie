@@ -3,7 +3,7 @@
 import { Badge, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import { ChannelIcon } from '@/features/profile/artist-contacts-button/ContactIcons';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
-import { formatPublicContactSubtitle } from '@/lib/contacts/mapper';
+import { formatPublicContactSubtitle } from '@/lib/contacts/format-public-contact';
 import type { PublicContact, PublicContactChannel } from '@/types/contacts';
 
 interface ProfileContactDrawerContentProps {

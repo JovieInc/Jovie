@@ -18,7 +18,7 @@ import {
 } from '@/features/profile/utils/venmo';
 import { PublicShareActionList } from '@/features/share/PublicShareMenu';
 import { track } from '@/lib/analytics';
-import { formatPublicContactSubtitle } from '@/lib/contacts/mapper';
+import { formatPublicContactSubtitle } from '@/lib/contacts/format-public-contact';
 import type { AvailableDSP } from '@/lib/dsp';
 import type { ShareContext } from '@/lib/share/types';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';

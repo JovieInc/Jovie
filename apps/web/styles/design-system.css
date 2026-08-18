@@ -49,6 +49,8 @@
   --page-pad: clamp(16px, 4vw, 32px);
   --cover-height: clamp(220px, 34svh, 400px);
   --content-max: 720px;
+  /* Extra --space-8 keeps the last Music/catalog row above the floating tab
+     bar. Home/Events/Alerts share this inset so the shell stays aligned. */
   --profile-bottom-nav-height: calc(
     var(--space-12) +
     var(--space-2-5) +

@@ -1,5 +1,6 @@
 import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ProfileUnifiedDrawer } from '@/features/profile/ProfileUnifiedDrawer';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 
@@ -51,18 +52,10 @@ const managementContact: PublicContact = {
   channels: [{ type: 'email', encoded: 'enc', preferred: true }],
 };
 
-let ProfileUnifiedDrawer: typeof import('@/features/profile/ProfileUnifiedDrawer').ProfileUnifiedDrawer;
-
 describe('ProfileUnifiedDrawer — contact person name', () => {
   // Regression: ISSUE-002 — compact contact drawer omitted person names
   // Found by /qa on 2026-08-17
   // Report: .gstack/qa-reports/qa-report-localhost-3100-2026-08-17.md
-
-  beforeAll(async () => {
-    ({ ProfileUnifiedDrawer } = await import(
-      '@/features/profile/ProfileUnifiedDrawer'
-    ));
-  });
 
   afterEach(() => {
     cleanup();

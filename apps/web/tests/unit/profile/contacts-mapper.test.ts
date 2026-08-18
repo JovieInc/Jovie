@@ -29,10 +29,8 @@ vi.mock('@/lib/contacts/constants', () => ({
   })),
 }));
 
-import {
-  formatPublicContactSubtitle,
-  toPublicContacts,
-} from '@/lib/contacts/mapper';
+import { formatPublicContactSubtitle } from '@/lib/contacts/format-public-contact';
+import { toPublicContacts } from '@/lib/contacts/mapper';
 
 // Helper to create a mock CreatorContact (Drizzle schema format)
 function createContact(overrides: Record<string, unknown> = {}) {
@@ -321,5 +319,16 @@ describe('formatPublicContactSubtitle', () => {
         secondaryLabel: 'Maverick',
       })
     ).toBe('Kelly Strickland · Maverick');
+  });
+
+  it('returns an empty string when both sides are missing', () => {
+    expect(
+      formatPublicContactSubtitle({
+        contactName: undefined,
+        primaryContactLabel: undefined,
+        companyLabel: undefined,
+        secondaryLabel: undefined,
+      })
+    ).toBe('');
   });
 });

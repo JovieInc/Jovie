@@ -16,8 +16,9 @@ describe('public profile QA regressions', () => {
     const source = readRepoFile(
       'components/features/profile/templates/ProfileCompactSurface.tsx'
     );
-    expect(source).toContain("className='shrink-0 whitespace-nowrap'");
-    expect(source).toContain('{locationLabel}');
+    expect(source).toMatch(
+      /className='shrink-0 whitespace-nowrap'\s*>\s*\{locationLabel\}/
+    );
   });
 
   it('reserves extra tab-bar clearance so Music rows are not clipped', () => {
@@ -26,7 +27,7 @@ describe('public profile QA regressions', () => {
     // Report: .gstack/qa-reports/qa-report-localhost-3100-2026-08-17.md
     const source = readRepoFile('styles/design-system.css');
     expect(source).toMatch(
-      /--profile-bottom-nav-height:[\s\S]*var\(--space-8\)/
+      /--profile-bottom-nav-height:\s*calc\(\s*var\(--space-12\)[\s\S]{0,160}?var\(--space-8\)\s*\)/
     );
   });
 
@@ -35,10 +36,12 @@ describe('public profile QA regressions', () => {
     // Found by /qa on 2026-08-17
     // Report: .gstack/qa-reports/qa-report-localhost-3100-2026-08-17.md
     const source = readRepoFile('styles/design-system.css');
-    expect(source).toContain(
-      '.profile-aeo-content__body .profile-entity-mention'
-    );
-    expect(source).toContain('color: var(--profile-aeo-text);');
+    expect(source).toContain(`.profile-aeo-content__body a,
+.profile-aeo-content__answer a,
+.profile-aeo-content__body .profile-entity-mention,
+.profile-aeo-content__answer .profile-entity-mention {
+  color: var(--profile-aeo-text);
+}`);
     expect(source).toContain(
       'color: var(--jovie-entity-accent, var(--profile-aeo-text, inherit));'
     );
