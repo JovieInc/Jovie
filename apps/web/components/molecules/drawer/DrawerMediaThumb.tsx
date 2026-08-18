@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import type { ReactNode } from 'react';
+import type { ReactEventHandler, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface DrawerMediaThumbProps {
@@ -14,6 +14,7 @@ export interface DrawerMediaThumbProps {
   readonly sizes?: string;
   readonly className?: string;
   readonly imageClassName?: string;
+  readonly onImageError?: ReactEventHandler<HTMLImageElement>;
 }
 
 export function DrawerMediaThumb({
@@ -25,6 +26,7 @@ export function DrawerMediaThumb({
   sizes = '64px',
   className,
   imageClassName,
+  onImageError,
 }: DrawerMediaThumbProps) {
   return (
     <div
@@ -42,6 +44,7 @@ export function DrawerMediaThumb({
           height={dimension}
           className={cn('h-full w-full object-cover', imageClassName)}
           sizes={sizes}
+          onError={onImageError}
         />
       ) : (
         <div className='flex h-full w-full items-center justify-center'>

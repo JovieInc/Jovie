@@ -26,6 +26,11 @@ export interface EntityHeaderCardProps {
   readonly badge?: ReactNode;
   /** Optional top-right action slot */
   readonly actions?: ReactNode;
+  /**
+   * Grid mode assigns image, identity, metadata, and actions to explicit cells.
+   * Inline preserves the legacy compact flow for existing consumers.
+   */
+  readonly layout?: 'inline' | 'grid';
   /** Optional footer rendered below the meta block */
   readonly footer?: ReactNode;
   /** Enables reserved header slots so entity selection changes do not resize the card. */
@@ -133,6 +138,7 @@ export function EntityHeaderCard({
   meta,
   badge,
   actions,
+  layout = 'inline',
   footer,
   stableLayout = false,
   titleLineClamp,
@@ -161,65 +167,125 @@ export function EntityHeaderCard({
   const resolvedMetaOverflow: EntityHeaderMetaOverflow =
     metaOverflow ?? (stableLayout ? 'scroll' : 'wrap');
 
+  const identityContent = (
+    <>
+      {eyebrow || shouldReserveEyebrow ? (
+        <StableHeaderTextSlot
+          reserve={shouldReserveEyebrow}
+          lineCount={1}
+          size='xs'
+          className='text-3xs font-caption leading-none tracking-[0.03em] text-tertiary-token'
+        >
+          {eyebrow}
+        </StableHeaderTextSlot>
+      ) : null}
+      <div className='flex items-start gap-1'>
+        <span
+          className={cn(
+            'min-w-0 flex-1 text-sm font-semibold leading-[18px] tracking-[-0.015em] text-primary-token',
+            resolvedTitleLineClamp
+              ? STABLE_HEADER_LINE_CLAMP_CLASSNAME[resolvedTitleLineClamp]
+              : 'truncate',
+            stableLayout &&
+              resolvedTitleLineClamp &&
+              STABLE_HEADER_TITLE_HEIGHT_CLASSNAME[resolvedTitleLineClamp],
+            titleClassName
+          )}
+        >
+          {title}
+        </span>
+        {badge}
+      </div>
+      {subtitle || shouldReserveSubtitle ? (
+        <StableHeaderTextSlot
+          reserve={shouldReserveSubtitle}
+          lineCount={resolvedSubtitleLineClamp}
+          size='xs'
+          className={cn(
+            'text-xs leading-4 tracking-[-0.005em] text-secondary-token',
+            subtitleClassName
+          )}
+        >
+          {subtitle}
+        </StableHeaderTextSlot>
+      ) : null}
+    </>
+  );
+
+  const metadataContent = (
+    <>
+      <EntityHeaderMetaSlot
+        meta={meta}
+        shouldReserveMeta={shouldReserveMeta}
+        resolvedMetaOverflow={resolvedMetaOverflow}
+        metaClassName={metaClassName}
+      />
+      <EntityHeaderFooterSlot
+        footer={footer}
+        shouldReserveFooter={shouldReserveFooter}
+        footerClassName={footerClassName}
+      />
+    </>
+  );
+
+  if (layout === 'grid') {
+    return (
+      <div
+        className={cn(
+          'grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-start gap-x-3 gap-y-1.5',
+          className
+        )}
+        data-layout='grid'
+        data-testid={testId}
+      >
+        {image ? (
+          <div
+            className='col-start-1 row-span-2 row-start-1'
+            data-entity-header-image
+          >
+            {image}
+          </div>
+        ) : null}
+        <div
+          className={cn(
+            'col-start-2 row-start-1 min-w-0 space-y-1',
+            bodyClassName
+          )}
+          data-entity-header-identity
+        >
+          {identityContent}
+        </div>
+        {actions ? (
+          <div
+            className='col-start-3 row-start-1 justify-self-end'
+            data-entity-header-actions
+          >
+            {actions}
+          </div>
+        ) : null}
+        {meta || shouldReserveMeta || footer || shouldReserveFooter ? (
+          <div
+            className='col-span-2 col-start-2 row-start-2 min-w-0'
+            data-entity-header-metadata
+          >
+            {metadataContent}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn('relative flex items-start gap-3', className)}
+      data-layout='inline'
       data-testid={testId}
     >
       {actions ? <div className='absolute right-0 top-0'>{actions}</div> : null}
       {image ?? null}
       <div className={cn('min-w-0 flex-1 space-y-1', bodyClassName)}>
-        {eyebrow || shouldReserveEyebrow ? (
-          <StableHeaderTextSlot
-            reserve={shouldReserveEyebrow}
-            lineCount={1}
-            size='xs'
-            className='text-3xs font-caption leading-none tracking-[0.03em] text-tertiary-token'
-          >
-            {eyebrow}
-          </StableHeaderTextSlot>
-        ) : null}
-        <div className='flex items-start gap-1'>
-          <span
-            className={cn(
-              'min-w-0 flex-1 text-sm font-semibold leading-[18px] tracking-[-0.015em] text-primary-token',
-              resolvedTitleLineClamp
-                ? STABLE_HEADER_LINE_CLAMP_CLASSNAME[resolvedTitleLineClamp]
-                : 'truncate',
-              stableLayout &&
-                resolvedTitleLineClamp &&
-                STABLE_HEADER_TITLE_HEIGHT_CLASSNAME[resolvedTitleLineClamp],
-              titleClassName
-            )}
-          >
-            {title}
-          </span>
-          {badge}
-        </div>
-        {subtitle || shouldReserveSubtitle ? (
-          <StableHeaderTextSlot
-            reserve={shouldReserveSubtitle}
-            lineCount={resolvedSubtitleLineClamp}
-            size='xs'
-            className={cn(
-              'text-xs leading-4 tracking-[-0.005em] text-secondary-token',
-              subtitleClassName
-            )}
-          >
-            {subtitle}
-          </StableHeaderTextSlot>
-        ) : null}
-        <EntityHeaderMetaSlot
-          meta={meta}
-          shouldReserveMeta={shouldReserveMeta}
-          resolvedMetaOverflow={resolvedMetaOverflow}
-          metaClassName={metaClassName}
-        />
-        <EntityHeaderFooterSlot
-          footer={footer}
-          shouldReserveFooter={shouldReserveFooter}
-          footerClassName={footerClassName}
-        />
+        {identityContent}
+        {metadataContent}
       </div>
     </div>
   );

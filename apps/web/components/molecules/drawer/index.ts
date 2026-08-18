@@ -30,10 +30,19 @@ export {
   type DrawerCardActionBarProps,
 } from './DrawerCardActionBar';
 export {
+  DrawerChoiceChipGroup,
+  type DrawerChoiceChipGroupProps,
+  type DrawerChoiceChipOption,
+} from './DrawerChoiceChipGroup';
+export {
   DrawerEditableTextField,
   type DrawerEditableTextFieldAction,
   type DrawerEditableTextFieldProps,
 } from './DrawerEditableTextField';
+export {
+  DrawerEntityAvatar,
+  type DrawerEntityAvatarProps,
+} from './DrawerEntityAvatar';
 export {
   DRAWER_FIELD_HELPER_CLASSNAME,
   DRAWER_FIELD_LABEL_CLASSNAME,
@@ -123,6 +132,10 @@ export {
   EntitySidebarShell,
   type EntitySidebarShellProps,
 } from './EntitySidebarShell';
+export {
+  EntityTabbedRail,
+  type EntityTabbedRailProps,
+} from './EntityTabbedRail';
 export {
   ShareableLinkRow,
   type ShareableLinkRowProps,

@@ -64,4 +64,35 @@ describe('EntityHeaderCard', () => {
       'min-h-4'
     );
   });
+
+  it('assigns image, identity, metadata, and actions to explicit grid cells', () => {
+    render(
+      <EntityHeaderCard
+        layout='grid'
+        title='Alex Rivera'
+        subtitle='Management'
+        image={<span>AR</span>}
+        meta={<span>North America</span>}
+        actions={<button type='button'>More actions</button>}
+        data-testid='entity-header'
+      />
+    );
+
+    const header = screen.getByTestId('entity-header');
+    const image = header.querySelector('[data-entity-header-image]');
+    const identity = header.querySelector('[data-entity-header-identity]');
+    const metadata = header.querySelector('[data-entity-header-metadata]');
+    const actions = header.querySelector('[data-entity-header-actions]');
+
+    expect(header).toHaveAttribute('data-layout', 'grid');
+    expect(header).toHaveClass(
+      'grid',
+      'grid-cols-[auto_minmax(0,1fr)_auto]',
+      'grid-rows-[auto_auto]'
+    );
+    expect(image).toHaveClass('col-start-1', 'row-span-2', 'row-start-1');
+    expect(identity).toHaveClass('col-start-2', 'row-start-1');
+    expect(metadata).toHaveClass('col-span-2', 'col-start-2', 'row-start-2');
+    expect(actions).toHaveClass('col-start-3', 'row-start-1');
+  });
 });
