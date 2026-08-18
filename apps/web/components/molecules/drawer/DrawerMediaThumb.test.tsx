@@ -7,6 +7,7 @@ const { nextImage } = vi.hoisted(() => ({ nextImage: vi.fn() }));
 vi.mock('next/image', () => ({
   default: ({
     fill: _fill,
+    alt,
     ...props
   }: {
     readonly src: string;
@@ -14,8 +15,8 @@ vi.mock('next/image', () => ({
     readonly fill?: boolean;
     readonly [key: string]: unknown;
   }) => {
-    nextImage(props);
-    return <img {...props} />;
+    nextImage({ alt, ...props });
+    return <img alt={alt} {...props} />;
   },
 }));
 
@@ -29,6 +30,7 @@ describe('DrawerMediaThumb', () => {
         alt='Artist profile'
         dimension={60}
         sizeClassName='h-15 w-15 rounded-xl'
+        imageClassName='rounded-xl'
         fallback={<span>AP</span>}
       />
     );
@@ -37,7 +39,7 @@ describe('DrawerMediaThumb', () => {
     expect(image).toHaveAttribute('width', '60');
     expect(image).toHaveAttribute('height', '60');
     expect(image).not.toHaveAttribute('fill');
-    expect(image).toHaveClass('h-full', 'w-full', 'object-cover');
+    expect(image).toHaveClass('h-full', 'w-full', 'object-cover', 'rounded-xl');
     expect(nextImage).toHaveBeenCalledWith(
       expect.objectContaining({ height: 60, width: 60 })
     );

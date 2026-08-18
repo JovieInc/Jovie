@@ -7,8 +7,16 @@ vi.mock('@/components/atoms/Icon', () => ({
 }));
 
 vi.mock('@/components/molecules/drawer', () => ({
-  DrawerInlineNote: ({ message }: { message: string }) => (
-    <div data-testid='drawer-empty'>{message}</div>
+  DrawerInlineNote: ({
+    message,
+    className,
+  }: {
+    message: string;
+    className?: string;
+  }) => (
+    <div data-class-name={className} data-testid='drawer-empty'>
+      {message}
+    </div>
   ),
 }));
 
@@ -53,6 +61,9 @@ describe('AudienceMemberActivityFeed', () => {
     const ActivityFeed = await loadComponent();
     render(<ActivityFeed member={baseMember} />);
     expect(screen.getByTestId('drawer-empty')).toBeInTheDocument();
+    expect(screen.getByTestId('drawer-empty')).not.toHaveAttribute(
+      'data-class-name'
+    );
   });
 
   it('renders actions as list items', async () => {
