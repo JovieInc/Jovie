@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { authorizeSummerControl } from '@/lib/ovie/control';
-import { ingestOvieDump } from '@/lib/ovie/ingest';
+import { applyOvieDump } from '@/lib/ovie/ingest';
 
 export async function POST(request: Request): Promise<NextResponse> {
   const entitlements = await getCurrentUserEntitlements();
@@ -24,6 +24,6 @@ export async function POST(request: Request): Promise<NextResponse> {
         )
       : [];
 
-  const receipts = ingestOvieDump(items);
+  const receipts = applyOvieDump(items);
   return NextResponse.json({ ok: true, receipts });
 }

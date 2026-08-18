@@ -136,8 +136,65 @@ export function ingestOvieDump(
   return items.map(item => ingestOvieItem(item, options));
 }
 
-/** Chat-route hook: ack the dump before executeChatTurn. */
+/** Chat-route hook: classify the dump. Prefer applyOvieDumpBeforeModel. */
 export function ackOvieDumpBeforeModel(userText: string | null): OvieReceipt[] {
   if (!userText || userText.trim() === '') return [];
   return ingestOvieDump([userText]);
+}
+
+const receiptLog: OvieReceipt[] = [];
+const linearRoutes: OvieReceipt[] = [];
+
+/** Durable receipt sink used by the chat/ingest path. */
+export function persistOvieReceipt(receipt: OvieReceipt): void {
+  receiptLog.push(receipt);
+}
+
+/**
+ * Engineering land path. Only Linear-destination receipts are recorded.
+ * Personal/taste/kanban never enter this log. Never spawns a worker.
+ */
+export function routeEngineeringToLinear(receipt: OvieReceipt): void {
+  if (receipt.destination !== DEST_LINEAR) return;
+  linearRoutes.push(receipt);
+}
+
+export function readOvieReceiptLog(): readonly OvieReceipt[] {
+  return receiptLog;
+}
+
+export function readOvieLinearRoutes(): readonly OvieReceipt[] {
+  return linearRoutes;
+}
+
+export function resetOvieIngestLog(): void {
+  receiptLog.length = 0;
+  linearRoutes.length = 0;
+}
+
+/**
+ * Shipped chat/ingest adapter: classify, persist one receipt per item, and
+ * route engineering to Linear. Spawn is accepted and ignored.
+ */
+export function applyOvieDump(
+  items: readonly string[],
+  options?: { readonly spawn?: SpawnFn }
+): OvieReceipt[] {
+  const receipts = ingestOvieDump(items, options);
+  for (const receipt of receipts) {
+    persistOvieReceipt(receipt);
+    if (receipt.destination === DEST_LINEAR) {
+      routeEngineeringToLinear(receipt);
+    }
+  }
+  return receipts;
+}
+
+/** Chat-route entry: ack + persist + Linear-route before executeChatTurn. */
+export function applyOvieDumpBeforeModel(
+  userText: string | null,
+  options?: { readonly spawn?: SpawnFn }
+): OvieReceipt[] {
+  if (!userText || userText.trim() === '') return [];
+  return applyOvieDump([userText], options);
 }

@@ -1,12 +1,19 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import {
-  ackOvieDumpBeforeModel,
+  applyOvieDump,
+  applyOvieDumpBeforeModel,
   DEST_LINEAR,
   DEST_PERSONAL,
-  ingestOvieDump,
+  readOvieLinearRoutes,
+  readOvieReceiptLog,
+  resetOvieIngestLog,
 } from '@/lib/ovie/ingest';
 
 describe('Ovie dump ingest (JOV-5215)', () => {
+  beforeEach(() => {
+    resetOvieIngestLog();
+  });
+
   it('acks a mixed dump without spawning workers', () => {
     const items = [
       'post this tweet',
@@ -16,7 +23,7 @@ describe('Ovie dump ingest (JOV-5215)', () => {
       'taste: is the hero too salesy',
     ];
     const spawned: string[] = [];
-    const receipts = ingestOvieDump(items, {
+    const receipts = applyOvieDump(items, {
       spawn: goal => {
         spawned.push(goal);
       },
@@ -38,14 +45,23 @@ describe('Ovie dump ingest (JOV-5215)', () => {
       expect(receipt.ack.startsWith('stored:')).toBe(true);
       expect(receipt.workerSpawned).toBe(false);
     }
+
+    expect(readOvieReceiptLog()).toEqual(receipts);
+    expect(readOvieLinearRoutes()).toEqual([receipts[2]]);
+    expect(readOvieLinearRoutes()[0]?.destination).toBe(DEST_LINEAR);
+    expect(
+      readOvieLinearRoutes().some(route => route.destination === DEST_PERSONAL)
+    ).toBe(false);
   });
 
-  it('acks before model on the chat hook', () => {
-    const receipts = ackOvieDumpBeforeModel(
+  it('persists and Linear-routes before model on the chat hook', () => {
+    const receipts = applyOvieDumpBeforeModel(
       'Jovie signup returns 500 on /start'
     );
     expect(receipts).toHaveLength(1);
     expect(receipts[0]?.lane).toBe('engineering');
     expect(receipts[0]?.destination).toBe(DEST_LINEAR);
+    expect(readOvieReceiptLog()).toEqual(receipts);
+    expect(readOvieLinearRoutes()).toEqual(receipts);
   });
 });
