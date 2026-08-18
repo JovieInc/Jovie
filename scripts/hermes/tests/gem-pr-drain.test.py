@@ -71,7 +71,7 @@ class JovieOwnershipTests(unittest.TestCase):
                     MODULE.acquire_pr_lease({"number": 42, "head": {"sha": head}})
             self.assertFalse((pathlib.Path(tmp) / "leases").exists())
 
-    def test_fleet_hold_does_not_block_exact_head_branch_refresh(self):
+    def test_jovie_host_observes_behind_heads_without_becoming_a_second_writer(self):
         pr = {
             "number": 42,
             "head": {"ref": "codex/fix", "sha": "a" * 40},
@@ -87,14 +87,15 @@ class JovieOwnershipTests(unittest.TestCase):
             with (
                 mock.patch.object(MODULE, "STATE", pathlib.Path(tmp)),
                 mock.patch.object(MODULE, "evaluate_remediation_gate", return_value=gate),
-                mock.patch.object(MODULE, "run", return_value='{"message":"Updating pull request branch"}') as run,
+                mock.patch.object(MODULE, "run") as run,
             ):
                 MODULE.WORK_GATE_CACHE.update(checked_at=0.0, blocker="fleet_gate_not_checked")
                 result = MODULE.update_one(pr)
 
-        self.assertEqual(result["action"], "api_update_branch")
-        self.assertEqual(result["result"], "ok")
-        self.assertIn("expected_head_sha=" + "a" * 40, run.call_args.args)
+        self.assertEqual(result["action"], "github_actions_single_writer")
+        self.assertEqual(result["result"], "skipped")
+        self.assertEqual(result["reason"], "jovie_branch_updates_owned_by_merge_queue_autoenroll")
+        run.assert_not_called()
 
     def test_red_gate_keeps_local_diagnosis_but_blocks_remote_refresh(self):
         pr = {

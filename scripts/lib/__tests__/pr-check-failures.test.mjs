@@ -5,7 +5,10 @@ import {
   ADVISORY_CHECK_NAMES,
   AGENT_BRANCH_RE,
   classifyQueueCheckBlockers,
+  classifyRemediationCandidate,
   collapseNewestCheckAttempts,
+  extractExactHeadControllerFailures,
+  extractTerminalControlPlaneFailures,
   extractTerminalFailures,
   isAdvisoryCheck,
   isAgentBranch,
@@ -17,6 +20,175 @@ import {
 const repoRoot = fileURLToPath(new URL('../../..', import.meta.url));
 
 describe('pr-check-failures', () => {
+  it('selects stale, conflicting, or failed exact heads without admitting held work', () => {
+    const candidate = (overrides = {}) => ({
+      number: 16060,
+      title: 'repair the control loop',
+      isDraft: false,
+      mergeable: 'MERGEABLE',
+      mergeStateStatus: 'CLEAN',
+      labels: [],
+      headRefName: 'codex/control-loop',
+      headRefOid: 'a'.repeat(40),
+      baseRefName: 'main',
+      nativeQueueState: {
+        headRefOid: 'a'.repeat(40),
+        queued: false,
+        autoMergeEnabled: false,
+      },
+      headRepositoryOwner: { login: 'JovieInc' },
+      ...overrides,
+    });
+
+    expect(
+      classifyRemediationCandidate(
+        candidate({ mergeStateStatus: 'BEHIND' }),
+        'JovieInc/Jovie',
+        []
+      )
+    ).toMatchObject({ reasons: ['branch_behind'] });
+    expect(
+      classifyRemediationCandidate(
+        candidate({ mergeable: 'CONFLICTING', mergeStateStatus: 'DIRTY' }),
+        'JovieInc/Jovie',
+        []
+      )
+    ).toMatchObject({ reasons: ['merge_conflict'] });
+    expect(
+      classifyRemediationCandidate(
+        candidate({
+          mergeable: 'CONFLICTING',
+          mergeStateStatus: 'DIRTY',
+          labels: [{ name: 'needs-conflict-resolution' }],
+        }),
+        'JovieInc/Jovie',
+        []
+      )
+    ).toMatchObject({ reasons: ['merge_conflict'] });
+    expect(
+      classifyRemediationCandidate(candidate(), 'JovieInc/Jovie', ['PR Ready'])
+    ).toMatchObject({ reasons: ['required_checks_failed'] });
+    expect(
+      classifyRemediationCandidate(
+        candidate(),
+        'JovieInc/Jovie',
+        [],
+        ['enroll']
+      )
+    ).toMatchObject({
+      reasons: ['control_plane_checks_failed'],
+      controlPlaneFailures: ['enroll'],
+    });
+    expect(
+      classifyRemediationCandidate(candidate(), 'JovieInc/Jovie', [])
+    ).toBeNull();
+
+    for (const excluded of [
+      { isDraft: true },
+      { baseRefName: 'release' },
+      { headRefName: 'human/manual-fix' },
+      { headRefName: 'dependabot/npm_and_yarn/example' },
+      ...[
+        'blocked',
+        'fast',
+        'gated',
+        'hold',
+        'human-review-required',
+        'needs-human',
+        'needs-human-review',
+        'needs-human-taste',
+        'needs:taste',
+        'needs-manual-rebase',
+        'no-auto',
+        'queue-deferred',
+        'risk:high',
+        'taste',
+      ].map(name => ({ labels: [{ name }] })),
+      { headRepositoryOwner: { login: 'fork-owner' } },
+      { isCrossRepository: true },
+      { headRepository: { nameWithOwner: 'JovieInc/another-repo' } },
+      {
+        nativeQueueState: {
+          headRefOid: 'a'.repeat(40),
+          queued: true,
+          autoMergeEnabled: true,
+        },
+      },
+    ]) {
+      expect(
+        classifyRemediationCandidate(
+          candidate({ mergeStateStatus: 'BEHIND', ...excluded }),
+          'JovieInc/Jovie',
+          []
+        )
+      ).toBeNull();
+    }
+  });
+
+  it('keeps terminal controller failures actionable without making them product gates', () => {
+    const controllerStatus = overrides => ({
+      context: 'jovie-gem-queue-remediation/v1',
+      state: 'failure',
+      updated_at: '2026-08-18T00:00:00Z',
+      creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+      target_url: 'https://github.com/JovieInc/Jovie/actions/runs/123',
+      ...overrides,
+    });
+    expect(
+      extractTerminalControlPlaneFailures([
+        {
+          name: 'enroll',
+          workflow: 'Merge Queue Auto-Enroll',
+          bucket: 'fail',
+          state: 'FAILURE',
+        },
+        {
+          name: 'PR Ready',
+          workflow: 'CI',
+          bucket: 'fail',
+          state: 'FAILURE',
+        },
+      ])
+    ).toEqual(['enroll']);
+
+    expect(
+      extractExactHeadControllerFailures(
+        {
+          statuses: [
+            controllerStatus(),
+            controllerStatus({
+              state: 'success',
+              updated_at: '2026-08-18T00:01:00Z',
+            }),
+          ],
+        },
+        'JovieInc/Jovie'
+      )
+    ).toEqual([]);
+    expect(
+      extractExactHeadControllerFailures(
+        {
+          statuses: [controllerStatus({ updated_at: '2026-08-18T00:02:00Z' })],
+        },
+        'JovieInc/Jovie'
+      )
+    ).toEqual(['jovie-gem-queue-remediation/v1']);
+    for (const untrusted of [
+      controllerStatus({ creator: { type: 'Bot', login: 'other-bot[bot]' } }),
+      controllerStatus({
+        target_url: 'https://github.com/Other/Repo/actions/runs/123',
+      }),
+      controllerStatus({ target_url: 'https://example.com/actions/runs/123' }),
+    ]) {
+      expect(
+        extractExactHeadControllerFailures(
+          { statuses: [untrusted] },
+          'JovieInc/Jovie'
+        )
+      ).toEqual([]);
+    }
+  });
+
   it('treats bucket=fail as terminal like drain-pr-queue.sh', () => {
     expect(
       isTerminalFailure({ bucket: 'fail', state: 'SUCCESS', name: 'PR Ready' })
@@ -103,6 +275,25 @@ describe('pr-check-failures', () => {
         { ...controllerFailure, workflow: 'Real Safety Workflow' },
       ])
     ).toEqual(['enroll']);
+  });
+
+  it('keeps an exact-head Gem failure receipt advisory while required gates stay authoritative', () => {
+    const required = [
+      'PR Ready',
+      'Migration Guard',
+      'Fork PR Gate',
+      'PR Size Guard',
+    ].map(name => ({ name, bucket: 'pass', state: 'SUCCESS' }));
+    expect(
+      classifyQueueCheckBlockers([
+        ...required,
+        {
+          name: 'jovie-gem-queue-remediation/v1',
+          bucket: 'fail',
+          state: 'FAILURE',
+        },
+      ])
+    ).toEqual([]);
   });
 
   it('treats a red Fork PR Gate Controller receipt with SKIPPED twin as advisory (JOV-4782)', () => {

@@ -6,11 +6,20 @@ export const RECOVERY_RECEIPT_MARKER =
 
 const HOLD_LABELS = new Set([
   'blocked',
+  'fast',
   'gated',
   'hold',
+  'human-review-required',
   'needs-conflict-resolution',
   'needs-human',
+  'needs-human-review',
+  'needs-human-taste',
+  'needs:taste',
+  'needs-manual-rebase',
+  'no-auto',
+  'queue-deferred',
   'risk:high',
+  'taste',
 ]);
 
 const MATERIAL_RISK_PATH =

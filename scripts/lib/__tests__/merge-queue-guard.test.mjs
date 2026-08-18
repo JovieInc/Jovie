@@ -1,7 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { remediateBlockedPrs } from '../../drain-pr-remediate.mjs';
+import {
+  buildRemediationReceipt,
+  classifyLiveRemediationEligibility,
+  remediateBlockedPrs,
+} from '../../drain-pr-remediate.mjs';
 import {
   classifyGitHubRebaseFailure,
   execFileTerminating,
@@ -838,6 +842,9 @@ function blockedPr(overrides = {}) {
   return {
     number: 123,
     headRefName: 'tim/jov-123-example',
+    headRefOid: ORIGINAL_HEAD,
+    baseRefName: 'main',
+    headUpdatedAt: '2026-07-01T00:00:00Z',
     updatedAt: '2026-07-01T00:00:00Z',
     labels: [],
     failures: ['CI / PR Ready'],
@@ -1014,10 +1021,7 @@ describe('absolute update-branch subprocess deadline', () => {
     try {
       await execFileTerminating(
         process.execPath,
-        [
-          '-e',
-          'process.stdout.write(String(process.pid)); setInterval(() => {}, 1000)',
-        ],
+        ['-e', 'console.log(process.pid); setInterval(() => {}, 1000)'],
         { encoding: 'utf8', timeout: 150 }
       );
     } catch (error) {
@@ -1545,6 +1549,149 @@ describe('remediation mutations', () => {
     limit: 10,
   };
 
+  it('revalidates exact identity and controller holds at the mutation boundary', () => {
+    const snapshot = {
+      state: 'OPEN',
+      isDraft: false,
+      mergeable: 'MERGEABLE',
+      labels: [],
+      headRefName: 'codex/blocked-pr',
+      headRefOid: ORIGINAL_HEAD,
+      baseRefName: 'main',
+      baseRefOid: BASE_HEAD,
+      headRepository: { nameWithOwner: 'JovieInc/Jovie' },
+      headRepositoryOwner: { login: 'JovieInc' },
+      isCrossRepository: false,
+    };
+    const input = {
+      snapshot,
+      nativeQueueState: {
+        headRefOid: ORIGINAL_HEAD,
+        queued: false,
+        autoMergeEnabled: false,
+      },
+      repo: options.repo,
+      expectedHeadRefName: snapshot.headRefName,
+      expectedHeadOid: ORIGINAL_HEAD,
+      expectedBaseRefName: 'main',
+      expectedBaseOid: BASE_HEAD,
+    };
+
+    expect(classifyLiveRemediationEligibility(input)).toMatchObject({
+      ok: true,
+      observedHeadOid: ORIGINAL_HEAD,
+    });
+    expect(
+      classifyLiveRemediationEligibility({
+        ...input,
+        snapshot: {
+          ...snapshot,
+          labels: [{ name: 'needs-conflict-resolution' }],
+        },
+      })
+    ).toMatchObject({ ok: true, observedHeadOid: ORIGINAL_HEAD });
+    expect(
+      classifyLiveRemediationEligibility({
+        ...input,
+        snapshot: { ...snapshot, labels: [{ name: 'queue-deferred' }] },
+      })
+    ).toMatchObject({ ok: false, category: 'policy_exception' });
+    expect(
+      classifyLiveRemediationEligibility({
+        ...input,
+        snapshot: { ...snapshot, headRefOid: UPDATED_HEAD },
+      })
+    ).toMatchObject({
+      ok: false,
+      category: 'stale_head',
+      observedHeadOid: UPDATED_HEAD,
+    });
+    expect(
+      classifyLiveRemediationEligibility({
+        ...input,
+        nativeQueueState: {
+          headRefOid: ORIGINAL_HEAD,
+          queued: true,
+          autoMergeEnabled: true,
+        },
+      })
+    ).toMatchObject({ ok: false, category: 'policy_exception' });
+  });
+
+  it('binds structured escalation receipts to one exact PR head', () => {
+    const receipt = buildRemediationReceipt({
+      repo: options.repo,
+      pr: blockedPr({ headRefOid: ORIGINAL_HEAD }),
+      item: {
+        action: 'rebase_failed',
+        result: 'escalated',
+        category: 'transient',
+        reason: 'GitHub returned HTTP 503',
+        expectedHeadOid: ORIGINAL_HEAD,
+        observedHeadOid: null,
+        mutationAttempted: true,
+        mutationApplied: false,
+      },
+      observedAt: '2026-07-18T00:00:00.000Z',
+      runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/123',
+    });
+
+    expect(receipt).toMatchObject({
+      schema: 'jovie-gem-remediation/v1',
+      repo: 'JovieInc/Jovie',
+      pr: 123,
+      expectedHead: ORIGINAL_HEAD,
+      category: 'transient',
+      owner: 'Gem',
+      nextAction: 'retry_exact_head',
+    });
+    expect(receipt.receiptKey).toBe(`JovieInc/Jovie#123@${ORIGINAL_HEAD}`);
+    const repeated = buildRemediationReceipt({
+      repo: options.repo,
+      pr: blockedPr({ headRefOid: ORIGINAL_HEAD }),
+      item: {
+        action: 'rebase_failed',
+        result: 'escalated',
+        category: 'transient',
+        reason: 'GitHub returned HTTP 503',
+        expectedHeadOid: ORIGINAL_HEAD,
+        observedHeadOid: null,
+        mutationAttempted: true,
+        mutationApplied: false,
+      },
+      observedAt: '2026-07-18T01:00:00.000Z',
+      runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/456',
+    });
+    expect(repeated.receiptFingerprint).toBe(receipt.receiptFingerprint);
+  });
+
+  it('routes controller-only no-action receipts back to Gem', () => {
+    const receipt = buildRemediationReceipt({
+      repo: options.repo,
+      pr: blockedPr({
+        failures: [],
+        controlPlaneFailures: ['enroll'],
+        reasons: ['control_plane_checks_failed'],
+      }),
+      item: {
+        action: 'rebase_noop',
+        result: 'no_action',
+        category: 'no_change',
+        reason: 'exact base is already an ancestor',
+        expectedHeadOid: ORIGINAL_HEAD,
+        mutationAttempted: false,
+        mutationApplied: false,
+      },
+      observedAt: '2026-07-18T00:00:00.000Z',
+    });
+
+    expect(receipt).toMatchObject({
+      owner: 'Gem',
+      nextAction: 'replay_exact_head_controller',
+      controlPlaneFailures: ['enroll'],
+    });
+  });
+
   it('bypasses the cooldown for a stale conflict label', async () => {
     const rebaseImpl = vi.fn(async () => ({
       ok: true,
@@ -1569,6 +1716,140 @@ describe('remediation mutations', () => {
 
     expect(rebaseImpl).toHaveBeenCalledOnce();
     expect(summary.applied).toBe(1);
+  });
+
+  it('does not let recent PR activity delay a verified behind-head refresh', async () => {
+    const rebaseImpl = vi.fn(async () => ({
+      ok: true,
+      updated: true,
+      dryRun: true,
+      expectedHeadOid: ORIGINAL_HEAD,
+      observedHeadOid: UPDATED_HEAD,
+      reason: 'would rebase exact head',
+    }));
+
+    const summary = await remediateBlockedPrs(
+      { ...options, dryRun: true, cooldownHours: 4 },
+      {
+        listBlockedAgentPrsImpl: async () => [
+          blockedPr({
+            updatedAt: '2026-07-18T17:59:00Z',
+            headUpdatedAt: '2026-07-18T17:59:00Z',
+            reasons: ['branch_behind'],
+          }),
+        ],
+        rebaseImpl,
+        nowMs: Date.parse('2026-07-18T18:00:00Z'),
+      }
+    );
+
+    expect(rebaseImpl).toHaveBeenCalledOnce();
+    expect(summary.applied).toBe(1);
+  });
+
+  it('does not cooldown an exact-head control-plane escalation', async () => {
+    const rebaseImpl = vi.fn(async () => ({
+      ok: true,
+      updated: false,
+      category: 'no_change',
+      expectedHeadOid: ORIGINAL_HEAD,
+      reason: 'exact base is already an ancestor',
+    }));
+
+    await remediateBlockedPrs(
+      { ...options, dryRun: true, cooldownHours: 4 },
+      {
+        listBlockedAgentPrsImpl: async () => [
+          blockedPr({
+            failures: [],
+            controlPlaneFailures: ['enroll'],
+            reasons: ['control_plane_checks_failed'],
+            headUpdatedAt: '2026-07-18T17:59:00Z',
+          }),
+        ],
+        rebaseImpl,
+        nowMs: Date.parse('2026-07-18T18:00:00Z'),
+      }
+    );
+
+    expect(rebaseImpl).toHaveBeenCalledOnce();
+  });
+
+  it('uses exact-head age instead of receipt or label activity for cooldown', async () => {
+    const rebaseImpl = vi.fn(async () => ({
+      ok: true,
+      updated: false,
+      category: 'no_change',
+      expectedHeadOid: ORIGINAL_HEAD,
+      reason: 'exact base is already an ancestor',
+    }));
+
+    await remediateBlockedPrs(
+      { ...options, cooldownHours: 4 },
+      {
+        listBlockedAgentPrsImpl: async () => [
+          blockedPr({
+            updatedAt: '2026-07-18T17:59:00Z',
+            headUpdatedAt: '2026-07-18T12:00:00Z',
+          }),
+        ],
+        rebaseImpl,
+        removeLabelPrImpl: vi.fn(),
+        commentPrImpl: vi.fn(),
+        nowMs: Date.parse('2026-07-18T18:00:00Z'),
+      }
+    );
+
+    expect(rebaseImpl).toHaveBeenCalledOnce();
+  });
+
+  it('keeps cooldown receipt fingerprints stable across scheduled observations', async () => {
+    const commentPrImpl = vi.fn();
+    const dependencies = nowMs => ({
+      listBlockedAgentPrsImpl: async () => [
+        blockedPr({ headUpdatedAt: '2026-07-18T17:00:00Z' }),
+      ],
+      rebaseImpl: vi.fn(),
+      commentPrImpl,
+      nowMs,
+    });
+
+    await remediateBlockedPrs(
+      { ...options, cooldownHours: 8 },
+      dependencies(Date.parse('2026-07-18T18:00:00Z'))
+    );
+    await remediateBlockedPrs(
+      { ...options, cooldownHours: 8 },
+      dependencies(Date.parse('2026-07-18T19:00:00Z'))
+    );
+
+    expect(commentPrImpl).toHaveBeenCalledTimes(2);
+    expect(commentPrImpl.mock.calls[0][4]).toBe(commentPrImpl.mock.calls[1][4]);
+    expect(commentPrImpl.mock.calls[0][3]).toContain(
+      'exact head cooldown is active until 2026-07-19T01:00:00.000Z'
+    );
+  });
+
+  it('escalates unknown exact-head age without attempting a rebase', async () => {
+    const rebaseImpl = vi.fn();
+    const commentPrImpl = vi.fn();
+
+    const summary = await remediateBlockedPrs(options, {
+      listBlockedAgentPrsImpl: async () => [
+        blockedPr({ headUpdatedAt: null, reasons: ['required_checks_failed'] }),
+      ],
+      rebaseImpl,
+      commentPrImpl,
+      nowMs: Date.parse('2026-07-18T18:00:00Z'),
+    });
+
+    expect(rebaseImpl).not.toHaveBeenCalled();
+    expect(summary.results[0]).toMatchObject({
+      action: 'skip_unknown_head_age',
+      category: 'snapshot_failure',
+      result: 'escalated',
+    });
+    expect(commentPrImpl).toHaveBeenCalledOnce();
   });
 
   it('does not add conflict or queue labels for transient rebase failures', async () => {
@@ -1597,7 +1878,13 @@ describe('remediation mutations', () => {
       requiresExactRereadBeforeRetry: false,
     });
     expect(labelPrImpl).not.toHaveBeenCalled();
-    expect(commentPrImpl).not.toHaveBeenCalled();
+    expect(commentPrImpl).toHaveBeenCalledOnce();
+    expect(commentPrImpl.mock.calls[0][2]).toBe(
+      `drain-auto-rebase-${ORIGINAL_HEAD}`
+    );
+    expect(commentPrImpl.mock.calls[0][3]).toContain(
+      '"schema": "jovie-gem-remediation/v1"'
+    );
   });
 
   it('stops after one attempted but unverified mutation', async () => {
@@ -1639,7 +1926,7 @@ describe('remediation mutations', () => {
       consumedBudget: true,
     });
     expect(labelPrImpl).not.toHaveBeenCalled();
-    expect(commentPrImpl).not.toHaveBeenCalled();
+    expect(commentPrImpl).toHaveBeenCalledOnce();
   });
 
   it('clears a stale conflict label on a verified no-op without queue churn', async () => {
@@ -1674,7 +1961,7 @@ describe('remediation mutations', () => {
       'needs-conflict-resolution'
     );
     expect(labelPrImpl).not.toHaveBeenCalled();
-    expect(commentPrImpl).not.toHaveBeenCalled();
+    expect(commentPrImpl).toHaveBeenCalledOnce();
   });
 
   it('adds needs-conflict-resolution only for confirmed conflicts', async () => {
@@ -1701,9 +1988,51 @@ describe('remediation mutations', () => {
       'needs-conflict-resolution'
     );
     expect(commentPrImpl).toHaveBeenCalledOnce();
+    expect(commentPrImpl.mock.calls[0][3]).toContain('"category": "conflict"');
   });
 
-  it('clears a stale conflict label before enrolling the rebased head', async () => {
+  it('passes the inventoried exact head and reuses one idempotent receipt marker', async () => {
+    const rebaseImpl = vi.fn(async () => ({
+      ok: false,
+      mutationAttempted: false,
+      mutationApplied: false,
+      conflict: false,
+      category: 'stale_head',
+      reason: 'exact head changed before mutation',
+    }));
+    const commentPrImpl = vi.fn();
+    const dependencies = {
+      listBlockedAgentPrsImpl: async () => [
+        blockedPr({ headRefOid: ORIGINAL_HEAD, reasons: ['branch_behind'] }),
+      ],
+      rebaseImpl,
+      labelPrImpl: vi.fn(),
+      removeLabelPrImpl: vi.fn(),
+      commentPrImpl,
+      nowMs: Date.parse('2026-07-18T00:00:00Z'),
+    };
+
+    await remediateBlockedPrs(options, dependencies);
+    await remediateBlockedPrs(options, dependencies);
+
+    expect(rebaseImpl).toHaveBeenCalledTimes(2);
+    expect(rebaseImpl.mock.calls[0][0]).toMatchObject({
+      expectedBaseRefName: 'main',
+      expectedHeadOid: ORIGINAL_HEAD,
+      preMutationCheckImpl: expect.any(Function),
+    });
+    expect(commentPrImpl).toHaveBeenCalledTimes(2);
+    expect(commentPrImpl.mock.calls.map(call => call[2])).toEqual([
+      `drain-auto-rebase-${ORIGINAL_HEAD}`,
+      `drain-auto-rebase-${ORIGINAL_HEAD}`,
+    ]);
+    expect(commentPrImpl.mock.calls[0][3]).toContain(
+      `"receiptKey": "JovieInc/Jovie#123@${ORIGINAL_HEAD}"`
+    );
+    expect(commentPrImpl.mock.calls[0][4]).toBe(commentPrImpl.mock.calls[1][4]);
+  });
+
+  it('clears a stale conflict label and waits for current-head CI after rebase', async () => {
     const labelPrImpl = vi.fn();
     const removeLabelPrImpl = vi.fn();
     const commentPrImpl = vi.fn();
@@ -1736,14 +2065,7 @@ describe('remediation mutations', () => {
       123,
       'needs-conflict-resolution'
     );
-    expect(labelPrImpl).toHaveBeenCalledWith(
-      'JovieInc/Jovie',
-      123,
-      'merge-queue'
-    );
-    expect(removeLabelPrImpl.mock.invocationCallOrder[0]).toBeLessThan(
-      labelPrImpl.mock.invocationCallOrder[0]
-    );
+    expect(labelPrImpl).not.toHaveBeenCalled();
     expect(commentPrImpl).toHaveBeenCalledOnce();
   });
 });

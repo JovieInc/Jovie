@@ -183,6 +183,11 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(controlTest).toContain(
       'lib/__tests__/merge-group-workflow-contract.test.mjs'
     );
+    expect(controlTest).toContain('lib/__tests__/merge-queue-backend.test.mjs');
+    expect(controlTest).toContain(
+      'lib/__tests__/ownerless-recovery-policy.test.mjs'
+    );
+    expect(controlTest).toContain('lib/__tests__/automation-verify.test.mjs');
   });
 
   it('enforces meaningful Gem rehabilitation policy coverage in structural CI', () => {
@@ -202,6 +207,12 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     expect(CI_FAST_SOURCE).toContain(
       "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs"
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      "'python3 scripts/hermes/tests/gem-pr-drain.test.py'"
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      "'python3 scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py'"
     );
   });
 

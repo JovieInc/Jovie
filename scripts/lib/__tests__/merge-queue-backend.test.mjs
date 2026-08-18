@@ -53,6 +53,7 @@ function prState(overrides = {}) {
     state: 'OPEN',
     isDraft: false,
     headRefOid: HEAD,
+    baseRefName: 'main',
     labels: { nodes: [] },
     isInMergeQueue: false,
     mergeQueueEntry: null,
@@ -230,6 +231,7 @@ function executeAdmissionScope({
   conclusion,
   name,
   workflowEvent = 'pull_request',
+  eventName = 'workflow_run',
 }) {
   const workflow = readRepoFile('.github/workflows/merge-queue-autoenroll.yml');
   const script = workflowRunScript(workflow, 'Resolve exact admission scope');
@@ -257,7 +259,7 @@ function executeAdmissionScope({
         encoding: 'utf8',
         env: {
           ...process.env,
-          EVENT_NAME: 'workflow_run',
+          EVENT_NAME: eventName,
           GITHUB_EVENT_PATH: eventPath,
           GITHUB_OUTPUT: outputPath,
           MANUAL_PR: '',
@@ -314,6 +316,47 @@ describe('merge queue backend resolution', () => {
 });
 
 describe('queue workflow mutation safety', () => {
+  it('runs scheduled maintenance without granting unscoped admission', () => {
+    const workflow = readRepoFile(
+      '.github/workflows/merge-queue-autoenroll.yml'
+    );
+    const scope = workflowStep(workflow, 'Resolve exact admission scope');
+    const rebaseJob = extractWorkflowJobBlock(workflow, 'rebase');
+    const enrollJob = extractWorkflowJobBlock(workflow, 'enroll');
+
+    expect(workflow).toMatch(/schedule:\n(?:\s+#.*\n)*\s+- cron: '[^']+'/);
+    expect(scope).toContain('schedule)');
+    expect(scope).toContain(
+      'Scheduled maintenance; bounded receipt and lost-event reconciliation only'
+    );
+    expect(workflow).not.toContain('queue: max');
+    expect(rebaseJob).toContain('needs: [fleet-policy, enroll]');
+    expect(enrollJob).toContain('timeout-minutes: 20');
+    expect(rebaseJob).toContain('timeout-minutes: 20');
+    expect(rebaseJob).toContain('!cancelled()');
+    expect(rebaseJob).toContain("github.event_name == 'schedule'");
+    expect(rebaseJob).toContain("needs.fleet-policy.result == 'success'");
+    expect(
+      executeAdmissionScope({
+        eventName: 'schedule',
+        path: '',
+        conclusion: '',
+        name: '',
+      })
+    ).toEqual(
+      expect.objectContaining({
+        pr_number: '',
+        head_sha: '',
+        recover_holds: '1',
+        recover_controller_failures: '1',
+      })
+    );
+    const enroll = workflowStep(workflow, 'Enroll clean PRs');
+    expect(enroll).toContain(
+      "DRAIN_RECONCILE_ELIGIBLE_HEADS: ${{ needs.fleet-policy.outputs.mode == 'normal' && '1' || '0' }}"
+    );
+  });
+
   it.each([
     ['success', '.github/workflows/production-controller.yml', true, '1'],
     [
@@ -425,8 +468,9 @@ describe('queue workflow mutation safety', () => {
     expect(drain).toContain('"$expected_head" != "$authorized_head"');
     expect(drain).toContain('select((.n | tostring) == $admission_pr)');
     expect(drain).toContain(
-      'enrollment_receipt="$(node scripts/merge-queue-backend.mjs enroll "$n" "$head_oid")"'
+      'node scripts/merge-queue-backend.mjs enroll "$n" "$head_oid" 2>"$enrollment_error_file"'
     );
+    expect(drain).toContain('cat "$enrollment_error_file" >&2');
     expect(drain).toContain(
       '.state.mergeQueueEntry.state | IN("QUEUED", "AWAITING_CHECKS", "MERGEABLE", "UNMERGEABLE", "LOCKED")'
     );
@@ -559,7 +603,7 @@ describe('queue workflow mutation safety', () => {
     );
     const rebaseMutation = workflowStep(
       workflow,
-      'Rebase blocked agent PRs onto main (Phase 2)'
+      'Refresh or escalate stale agent PR heads (Phase 2)'
     );
     const remediator = readRepoFile('scripts/drain-pr-remediate.mjs');
     const drain = readRepoFile('scripts/drain-pr-queue.sh');
@@ -574,7 +618,9 @@ describe('queue workflow mutation safety', () => {
       'MERGE_QUEUE_BACKEND="${MERGE_QUEUE_BACKEND:-native}"'
     );
     expect(drain).not.toContain('MERGE_QUEUE_BACKEND:-graphite');
-    expect(workflow).toContain('  rebase:\n    needs: enroll\n');
+    expect(workflow).toContain(
+      '  rebase:\n    needs: [fleet-policy, enroll]\n'
+    );
     for (const job of [enrollJob, rebaseJob]) {
       expect(job).toContain(tokenAction);
       expect(job).toContain('id: app-token');
@@ -1094,13 +1140,31 @@ describe('native enrollment', () => {
     expect(invokedEnrollment(runner)).toBe(false);
   });
 
-  it('refuses a held exact head before invoking the enrollment mutation', async () => {
+  it('refuses a retargeted base before invoking the enrollment mutation', async () => {
     const runner = createNativeRunner({
-      states: [prState({ labels: { nodes: [{ name: 'queue-deferred' }] } })],
+      states: [prState({ baseRefName: 'release' })],
+    });
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'base_changed',
+    });
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it.each([
+    'blocked',
+    'human-review-required',
+    'needs-human-review',
+    'needs-manual-rebase',
+    'no-auto',
+    'risk:high',
+    'queue-deferred',
+  ])('refuses an exact head held by %s before invoking the enrollment mutation', async label => {
+    const runner = createNativeRunner({
+      states: [prState({ labels: { nodes: [{ name: label }] } })],
     });
     await expect(enroll(runner)).rejects.toMatchObject({
       code: 'held_pull_request',
-      details: { labels: ['queue-deferred'] },
+      details: { labels: [label] },
     });
     expect(invokedEnrollment(runner)).toBe(false);
   });
@@ -1114,17 +1178,8 @@ describe('native enrollment', () => {
     });
     await expect(
       enroll(runner, { postconditionAttempts: 1 })
-    ).rejects.toMatchObject({
-      code: 'enrollment_postcondition_failed',
-      details: {
-        state: {
-          autoMergeEnabled: true,
-          mergeQueueEntry: null,
-          queued: false,
-        },
-      },
-    });
-    expect(invokedEnrollment(runner)).toBe(true);
+    ).rejects.toMatchObject({ code: 'auto_merge_owned_elsewhere' });
+    expect(invokedEnrollment(runner)).toBe(false);
   });
 
   it('no-ops only after GraphQL proves queue state and position', async () => {
@@ -1207,7 +1262,20 @@ describe('native enrollment', () => {
     });
 
     await expect(enroll(runner)).rejects.toMatchObject({
-      code: 'head_changed',
+      code: 'enrollment_postcondition_failed',
+      details: { observationError: { code: 'head_changed' } },
+    });
+    expect(invokedEnrollment(runner)).toBe(true);
+  });
+
+  it('treats a base retarget after mutation as an unproven enrollment', async () => {
+    const runner = createNativeRunner({
+      states: [prState(), prState({ baseRefName: 'release' })],
+    });
+
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'enrollment_postcondition_failed',
+      details: { observationError: { code: 'base_changed' } },
     });
     expect(invokedEnrollment(runner)).toBe(true);
   });
@@ -1239,17 +1307,37 @@ describe('native enrollment', () => {
         postconditionDelayMs: 2_000,
         wait,
       })
-    ).rejects.toMatchObject({
-      code: 'enrollment_postcondition_failed',
-      details: {
-        postconditionAttempts: 2,
-        state: {
+    ).rejects.toMatchObject({ code: 'auto_merge_owned_elsewhere' });
+    expect(invokedEnrollment(runner)).toBe(false);
+    expect(wait).not.toHaveBeenCalled();
+  });
+
+  it('waits through controller-owned auto-merge until a positioned queue entry appears', async () => {
+    const wait = vi.fn(async () => {});
+    const runner = createNativeRunner({
+      states: [
+        prState(),
+        prState({ autoMergeRequest: AUTO_MERGE }),
+        prState({
           autoMergeRequest: AUTO_MERGE,
-          mergeQueueEntry: null,
-        },
-      },
+          isInMergeQueue: true,
+          mergeQueueEntry: QUEUE_ENTRY,
+        }),
+      ],
+    });
+
+    await expect(
+      enroll(runner, {
+        postconditionAttempts: 2,
+        postconditionDelayMs: 1,
+        wait,
+      })
+    ).resolves.toMatchObject({
+      changed: true,
+      state: { queued: true, mergeQueueEntry: QUEUE_ENTRY },
     });
     expect(invokedEnrollment(runner)).toBe(true);
+    expect(wait).toHaveBeenCalledOnce();
   });
 });
 

@@ -39,13 +39,19 @@ const NATIVE_QUEUE_ENTRY_STATES = new Set([
   'LOCKED',
 ]);
 
-const PULL_REQUEST_STATE_FIELDS = `id number state isDraft headRefOid labels(first:100){nodes{name}} isInMergeQueue mergeQueueEntry { id state position } autoMergeRequest { enabledAt }`;
+const PULL_REQUEST_STATE_FIELDS = `id number state isDraft headRefOid baseRefName labels(first:100){nodes{name}} isInMergeQueue mergeQueueEntry { id state position } autoMergeRequest { enabledAt }`;
 const REQUIRED_NATIVE_STATE_FIELDS =
-  `id number state isDraft headRefOid labels isInMergeQueue mergeQueueEntry autoMergeRequest`.split(
+  `id number state isDraft headRefOid baseRefName labels isInMergeQueue mergeQueueEntry autoMergeRequest`.split(
     ' '
   );
 const HARD_HOLD_LABELS = new Set([
+  'blocked',
+  'human-review-required',
   'needs-human',
+  'needs-human-review',
+  'needs-manual-rebase',
+  'no-auto',
+  'risk:high',
   'hold',
   'gated',
   'queue-deferred',
@@ -622,7 +628,7 @@ export function dequeuePostcondition(state) {
   );
 }
 
-function assertEnrollCandidate(state, expectedHeadOid) {
+function assertEnrollCandidate(state, expectedHeadOid, expectedBaseRefName) {
   if (state.state !== 'OPEN' || state.isDraft !== false) {
     throw backendError(
       'ineligible_pull_request',
@@ -633,6 +639,12 @@ function assertEnrollCandidate(state, expectedHeadOid) {
     throw backendError(
       'head_changed',
       `PR #${state.number} head changed from ${expectedHeadOid} to ${state.headRefOid}`
+    );
+  }
+  if (state.baseRefName !== expectedBaseRefName) {
+    throw backendError(
+      'base_changed',
+      `PR #${state.number} base changed from ${expectedBaseRefName} to ${state.baseRefName}`
     );
   }
   const heldLabels = state.labels.nodes
@@ -650,6 +662,7 @@ function assertEnrollCandidate(state, expectedHeadOid) {
 async function pollEnrollmentPostcondition({
   stateOptions,
   expectedHeadOid,
+  expectedBaseRefName,
   attempts,
   delayMs,
   wait,
@@ -657,10 +670,10 @@ async function pollEnrollmentPostcondition({
   let state;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     state = await readPullRequestQueueState(stateOptions);
+    assertEnrollCandidate(state, expectedHeadOid, expectedBaseRefName);
     if (enrollmentPostcondition(state, expectedHeadOid)) {
       return { attempts: attempt, state };
     }
-    assertEnrollCandidate(state, expectedHeadOid);
     if (attempt < attempts) await wait(delayMs);
   }
   return { attempts, state };
@@ -700,7 +713,7 @@ export async function enrollPullRequest({
   });
 
   const before = await readPullRequestQueueState(stateOptions);
-  assertEnrollCandidate(before, expectedHead);
+  assertEnrollCandidate(before, expectedHead, baseBranch);
   if (enrollmentPostcondition(before, expectedHead)) {
     return {
       backend: resolvedBackend,
@@ -708,6 +721,12 @@ export async function enrollPullRequest({
       mutationActor,
       state: before,
     };
+  }
+  if (before.autoMergeRequest !== null) {
+    throw backendError(
+      'auto_merge_owned_elsewhere',
+      `PR #${before.number} already has auto-merge enabled without an authoritative native queue entry`
+    );
   }
 
   let mutationError = null;
@@ -721,13 +740,26 @@ export async function enrollPullRequest({
   } catch (error) {
     mutationError = error;
   }
-  const observation = await pollEnrollmentPostcondition({
-    stateOptions,
-    expectedHeadOid: expectedHead,
-    attempts: postconditionAttempts,
-    delayMs: postconditionDelayMs,
-    wait,
-  });
+  let observation;
+  try {
+    observation = await pollEnrollmentPostcondition({
+      stateOptions,
+      expectedHeadOid: expectedHead,
+      expectedBaseRefName: baseBranch,
+      attempts: postconditionAttempts,
+      delayMs: postconditionDelayMs,
+      wait,
+    });
+  } catch (error) {
+    throw backendError(
+      'enrollment_postcondition_failed',
+      `Could not prove PR #${parsedNumber} is enrolled at ${expectedHead} after the native mutation: ${error instanceof Error ? error.message : String(error)}`,
+      {
+        mutationError: mutationError ? errorEvidence(mutationError) : null,
+        observationError: errorEvidence(error),
+      }
+    );
+  }
   if (enrollmentPostcondition(observation.state, expectedHead)) {
     return {
       backend: resolvedBackend,
@@ -903,7 +935,13 @@ const isMain =
 if (isMain) {
   runCli(process.argv.slice(2)).catch(error => {
     const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`merge-queue-backend: ${message}\n`);
+    const code =
+      typeof error === 'object' &&
+      error !== null &&
+      typeof error.code === 'string'
+        ? error.code
+        : 'unclassified_error';
+    process.stderr.write(`merge-queue-backend[${code}]: ${message}\n`);
     process.exitCode = 1;
   });
 }

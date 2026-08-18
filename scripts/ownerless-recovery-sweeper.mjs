@@ -5,9 +5,9 @@ import {
   evaluateRecoveryCandidate,
   hasCompletePatch,
   renderRecoveryReceipt,
-  validateRecoveryMergeProof,
 } from './lib/ownerless-recovery-policy.mjs';
 import { classifyQueueCheckBlockers } from './lib/pr-check-failures.mjs';
+import { readPullRequestQueueState } from './merge-queue-backend.mjs';
 
 const execFileAsync = promisify(execFile);
 const repo =
@@ -30,6 +30,20 @@ async function ghJson(args) {
 const apiJson = endpoint => ghJson(['api', endpoint]);
 const prCommand = (command, number, ...args) =>
   gh(['pr', command, String(number), '-R', repo, ...args]);
+
+const dispatchExactAdmission = (number, expectedHead) =>
+  gh([
+    'api',
+    '-X',
+    'POST',
+    `repos/${repo}/dispatches`,
+    '-f',
+    'event_type=ownerless-recovery-admission',
+    '-F',
+    `client_payload[pr_number]=${number}`,
+    '-f',
+    `client_payload[head_sha]=${expectedHead}`,
+  ]);
 
 async function mainHead() {
   return gh(['api', `repos/${repo}/git/ref/heads/main`, '--jq', '.object.sha']);
@@ -92,11 +106,6 @@ async function repoGraph(query, fields = {}) {
   return data?.data?.repository;
 }
 
-async function readQueueProof(number) {
-  const query = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){state headRefOid isInMergeQueue autoMergeRequest{enabledAt} mergedAt mergeCommit{oid} mergeQueueEntry{id position state}}}}`;
-  return (await repoGraph(query, { number }))?.pullRequest ?? null;
-}
-
 async function openStackHeadShas(mainSha) {
   const query = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:100){pageInfo{hasNextPage} nodes{number headRefOid commits(first:100){pageInfo{hasNextPage} nodes{commit{oid}}} timelineItems(itemTypes:[HEAD_REF_FORCE_PUSHED_EVENT],first:100){pageInfo{hasNextPage} nodes{... on HeadRefForcePushedEvent{beforeCommit{oid} afterCommit{oid}}}}}}}}`;
   const pulls = (await repoGraph(query))?.pullRequests;
@@ -138,7 +147,7 @@ async function openStackHeadShas(mainSha) {
   return [...stackHeads, ...priorCommits.flat()];
 }
 
-async function upsertReceipt(number, body) {
+async function upsertReceipt(number, body, dedupeKey) {
   await execFileAsync(
     'bash',
     [
@@ -146,12 +155,29 @@ async function upsertReceipt(number, body) {
       String(number),
       'ownerless-recovery',
       body,
+      dedupeKey,
     ],
     {
       env: { ...process.env, GITHUB_REPOSITORY: repo },
       maxBuffer: 5 * 1024 * 1024,
     }
   );
+}
+
+export function classifyQueueOwnership(queueState, expectedHead) {
+  if (
+    !queueState ||
+    queueState.headRefOid?.toLowerCase() !== expectedHead.toLowerCase()
+  ) {
+    return { action: 'fail', outcome: 'queue-ownership-head-mismatch' };
+  }
+  if (queueState.queued === true) {
+    return { action: 'no_dispatch', outcome: 'already-delegated-exact-head' };
+  }
+  if (queueState.autoMergeEnabled === true) {
+    return { action: 'fail', outcome: 'foreign-auto-merge-hold' };
+  }
+  return { action: 'dispatch', outcome: 'unowned-exact-head' };
 }
 
 async function candidateEvidence(summary, mainSha, openHeadShas) {
@@ -221,7 +247,7 @@ async function promote(summary, mainSha, evidence, decision) {
     return { queued: false };
   }
 
-  const writeReceipt = (outcome, proof = null) =>
+  const writeReceipt = outcome =>
     upsertReceipt(
       number,
       renderRecoveryReceipt({
@@ -230,36 +256,46 @@ async function promote(summary, mainSha, evidence, decision) {
         main: mainSha,
         ownerlessSince: liveDecision.ownerlessSince,
         lanes: liveDecision.lanes,
-        action: 'gh-pr-merge-auto-squash',
+        action: 'dispatch-to-merge-queue-autoenroll',
         outcome,
-        mergeQueueState: proof?.mergeQueueEntry?.state,
-        mergeQueuePosition: proof?.mergeQueueEntry?.position,
-        mergeQueueEntryId: proof?.mergeQueueEntry?.id,
         observedAt: new Date().toISOString(),
-      })
+      }),
+      `${expectedHead}-${outcome}`
     );
+
+  let queueOwnership;
+  try {
+    queueOwnership = classifyQueueOwnership(
+      await readPullRequestQueueState({
+        backend: 'native',
+        repository: repo,
+        number,
+      }),
+      expectedHead
+    );
+  } catch (error) {
+    await writeReceipt('queue-ownership-read-failed');
+    throw error;
+  }
+  if (queueOwnership.action === 'no_dispatch') {
+    await writeReceipt(queueOwnership.outcome);
+    console.log(`#${number} exact head is already in the native queue`);
+    return { queued: true, pending: false };
+  }
+  if (queueOwnership.action === 'fail') {
+    await writeReceipt(queueOwnership.outcome);
+    return { queued: false, pending: false };
+  }
 
   await writeReceipt('attempting');
 
   const restoreDraft = live.draft;
-  const restoreDeferred = (live.labels ?? []).some(
-    label => label.name === 'queue-deferred'
-  );
   const compensate = async () => {
     const failures = [];
     const current = await apiJson(`repos/${repo}/pulls/${number}`).catch(
       () => null
     );
     if (!current) failures.push('state-read');
-    if (
-      restoreDeferred &&
-      (!current ||
-        !current.labels.some(label => label.name === 'queue-deferred'))
-    ) {
-      await prCommand('edit', number, '--add-label', 'queue-deferred').catch(
-        () => failures.push('queue-deferred-restore')
-      );
-    }
     if (restoreDraft && current?.draft !== true) {
       await prCommand('ready', number, '--undo').catch(() =>
         failures.push('draft-restore')
@@ -267,23 +303,10 @@ async function promote(summary, mainSha, evidence, decision) {
     }
     return failures;
   };
-  const disableAuto = async () => {
-    await prCommand('merge', number, '--disable-auto').catch(() => null);
-    const proof = await readQueueProof(number).catch(() => null);
-    const safe =
-      proof?.state === 'OPEN' &&
-      proof.headRefOid === expectedHead &&
-      proof.autoMergeRequest == null &&
-      proof.isInMergeQueue === false;
-    return { proof, safe };
-  };
 
   try {
     if (live.draft) {
       await prCommand('ready', number);
-    }
-    if (restoreDeferred) {
-      await prCommand('edit', number, '--remove-label', 'queue-deferred');
     }
 
     const postMutationEvidence = await candidateEvidence(
@@ -330,79 +353,21 @@ async function promote(summary, mainSha, evidence, decision) {
       return { queued: false };
     }
 
-    await prCommand(
-      'merge',
-      number,
-      '--auto',
-      '--squash',
-      '--match-head-commit',
-      expectedHead
-    );
+    await dispatchExactAdmission(number, expectedHead);
   } catch (error) {
-    const racedProof = await readQueueProof(number).catch(() => null);
-    const raced = validateRecoveryMergeProof(racedProof, expectedHead);
-    if (raced.proven) {
-      await writeReceipt(raced.outcome, racedProof);
-      console.log(
-        `#${number} recovery action: ${raced.outcome} (concurrent controller)`
-      );
-      return { queued: true };
-    }
-    const disabled = await disableAuto();
-    const concurrent = validateRecoveryMergeProof(disabled.proof, expectedHead);
-    if (concurrent.proven) {
-      await writeReceipt(concurrent.outcome, disabled.proof);
-      return { queued: true };
-    }
-    if (!disabled.safe) {
-      await writeReceipt(
-        'merge-request-unproven-disable-failed',
-        disabled.proof
-      );
-      return { queued: false };
-    }
     const failures = await compensate();
     await writeReceipt(
       failures.length === 0
-        ? 'merge-request-failed-compensated'
-        : `merge-request-compensation-failed:${failures.join(',')}`
+        ? 'dispatch-failed-compensated'
+        : `dispatch-failed-compensation-failed:${failures.join(',')}`
     );
     throw error;
   }
-
-  let proof = null;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    proof = await readQueueProof(number);
-    if (validateRecoveryMergeProof(proof, expectedHead).proven) break;
-    await new Promise(resolve => setTimeout(resolve, 2_000));
-  }
-  const verified = validateRecoveryMergeProof(proof, expectedHead);
-  if (!verified.proven) {
-    const disabled = await disableAuto();
-    const concurrent = validateRecoveryMergeProof(disabled.proof, expectedHead);
-    if (concurrent.proven) {
-      await writeReceipt(concurrent.outcome, disabled.proof);
-      return { queued: true };
-    }
-    if (!disabled.safe) {
-      await writeReceipt('requested-unproven-disable-failed', disabled.proof);
-      console.log(
-        `#${number} recovery action: requested-unproven-disable-failed`
-      );
-      return { queued: false };
-    }
-    const failures = await compensate();
-    const outcome =
-      failures.length === 0
-        ? 'requested-unproven-compensated'
-        : `requested-unproven-compensation-failed:${failures.join(',')}`;
-    await writeReceipt(outcome, proof);
-    console.log(`#${number} recovery action: ${outcome}`);
-    return { queued: false };
-  }
-  await writeReceipt(verified.outcome, proof);
-  console.log(`#${number} recovery action: ${verified.outcome}`);
-  return { queued: true };
+  await writeReceipt('delegated-exact-head-admission');
+  console.log(
+    `#${number} recovery action: delegated exact head to Merge Queue Auto-Enroll`
+  );
+  return { queued: false, pending: true };
 }
 
 export async function run() {

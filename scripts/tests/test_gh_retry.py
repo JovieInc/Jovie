@@ -23,6 +23,7 @@ import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _GH_RETRY = _REPO_ROOT / "scripts" / "lib" / "gh-retry.sh"
+_UPSERT_PR_COMMENT = _REPO_ROOT / "scripts" / "lib" / "upsert-pr-comment.sh"
 _DRAIN_SCRIPT = _REPO_ROOT / "scripts" / "drain-pr-queue.sh"
 _WATCHDOG_SCRIPT = _REPO_ROOT / "scripts" / "merge-queue-watchdog.sh"
 
@@ -65,6 +66,44 @@ def _drain_command(
 
 
 class TestGhRetryHelper:
+    def test_upsert_comment_dedupe_receipt_skips_external_write(
+        self, tmp_path: Path
+    ) -> None:
+        calls = tmp_path / "calls.log"
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                printf '%s\n' "$*" >>"${COMMENT_CALLS:?}"
+                if [[ "$1" == "api" && " $* " == *"/issues/123/comments --paginate --slurp "* ]]; then
+                  printf '%s\n' '[[{"id":17,"body":"<!-- bot-comment:gem-remediation-head -->\\n<!-- bot-comment-dedupe:stable-fingerprint -->\\nunchanged"}]]'
+                  exit 0
+                fi
+                echo "unexpected mutating gh call: $*" >&2
+                exit 99
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            f'bash "{_UPSERT_PR_COMMENT}" 123 gem-remediation-head body stable-fingerprint',
+            env={
+                "PATH": f"{tmp_path}:{os.environ['PATH']}",
+                "COMMENT_CALLS": str(calls),
+                "GITHUB_REPOSITORY": "JovieInc/Jovie",
+            },
+        )
+
+        assert result.returncode == 0, result.stderr
+        observed = calls.read_text(encoding="utf-8").splitlines()
+        assert len(observed) == 1
+        assert observed[0].startswith("api repos/JovieInc/Jovie/issues/123/comments")
+        assert "PATCH" not in observed[0]
+
     def test_retries_transient_504_then_succeeds(self, tmp_path: Path) -> None:
         counter = tmp_path / "calls"
         counter.write_text("0", encoding="utf-8")
@@ -309,6 +348,598 @@ class TestDrainPrQueueWiring:
         if dequeue_mode == "failure":
             assert "CRITICAL: could not compensate unproven" in result.stderr
 
+    def test_vanished_native_receipt_retries_exact_admission_once(
+        self, tmp_path: Path
+    ) -> None:
+        head = "a" * 40
+        list_calls = tmp_path / "list-calls"
+        enroll_calls = tmp_path / "enroll-calls"
+        list_calls.write_text("0", encoding="utf-8")
+        enroll_calls.write_text("0", encoding="utf-8")
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                case "${{2:-}}" in
+                  preflight) exit 0 ;;
+                  list-state)
+                    count=$(<"${{FAKE_LIST_CALLS:?}}")
+                    count=$((count + 1))
+                    echo "$count" >"${{FAKE_LIST_CALLS:?}}"
+                    if [[ "$count" -eq 1 ]]; then
+                      echo '{{"101":{{"headRefOid":"{head}","queued":true}}}}'
+                    else
+                      echo '{{"101":{{"headRefOid":"{head}","queued":false}}}}'
+                    fi
+                    ;;
+                  enroll)
+                    count=$(<"${{FAKE_ENROLL_CALLS:?}}")
+                    echo "$((count + 1))" >"${{FAKE_ENROLL_CALLS:?}}"
+                    echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":{{"id":"MQE_1","state":"AWAITING_CHECKS","position":1}}}}}}'
+                    ;;
+                  dequeue) echo '{{"state":{{"queued":false}}}}' ;;
+                  max-queue-depth) echo 16 ;;
+                  --classify-queue) echo '[]' ;;
+                  *) echo "unexpected node args: $*" >&2; exit 2 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":101,"t":"Receipt race","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/receipt-race","headOid":"{head}","base":"main","body":"","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{head}","baseRefName":"main","body":""}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then
+                  if [[ " $* " == *"/commits/{head}/status "* ]]; then
+                    echo '{{"statuses":[]}}'
+                    exit 0
+                  fi
+                  if [[ " $* " == *"/statuses/{head} "* ]]; then
+                    echo '{{}}'
+                    exit 0
+                  fi
+                  exit 1
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    f"DRAIN_ADMISSION_PR=101 DRAIN_ADMISSION_HEAD={head} "
+                    f"FAKE_LIST_CALLS={list_calls} FAKE_ENROLL_CALLS={enroll_calls} "
+                    "GITHUB_RUN_ID=42 GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "exact native receipt vanished; retrying scoped admission once" in result.stdout
+        assert "+native-queue on #101" in result.stdout
+        assert list_calls.read_text(encoding="utf-8").strip() == "2"
+        assert enroll_calls.read_text(encoding="utf-8").strip() == "1"
+
+    def test_vanished_native_receipt_does_not_retry_after_policy_change(
+        self, tmp_path: Path
+    ) -> None:
+        head = "b" * 40
+        list_calls = tmp_path / "list-calls"
+        enroll_calls = tmp_path / "enroll-calls"
+        list_calls.write_text("0", encoding="utf-8")
+        enroll_calls.write_text("0", encoding="utf-8")
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                case "${{2:-}}" in
+                  preflight) exit 0 ;;
+                  list-state)
+                    count=$(<"${{FAKE_LIST_CALLS:?}}")
+                    count=$((count + 1))
+                    echo "$count" >"${{FAKE_LIST_CALLS:?}}"
+                    if [[ "$count" -eq 1 ]]; then
+                      echo '{{"102":{{"headRefOid":"{head}","queued":true}}}}'
+                    else
+                      echo '{{"102":{{"headRefOid":"{head}","queued":false}}}}'
+                    fi
+                    ;;
+                  enroll)
+                    count=$(<"${{FAKE_ENROLL_CALLS:?}}")
+                    echo "$((count + 1))" >"${{FAKE_ENROLL_CALLS:?}}"
+                    exit 99
+                    ;;
+                  dequeue) echo '{{"state":{{"queued":false}}}}' ;;
+                  max-queue-depth) echo 16 ;;
+                  --classify-queue) echo '[]' ;;
+                  *) echo "unexpected node args: $*" >&2; exit 2 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":102,"t":"Policy changed","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/policy-change","headOid":"{head}","base":"main","body":"","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"state":"OPEN","isDraft":true,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{head}","baseRefName":"main","body":""}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then
+                  exit 1
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    f"DRAIN_ADMISSION_PR=102 DRAIN_ADMISSION_HEAD={head} "
+                    f"FAKE_LIST_CALLS={list_calls} FAKE_ENROLL_CALLS={enroll_calls}"
+                ),
+            )
+        )
+
+        assert result.returncode == 3, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "eligibility changed; refusing enrollment for #102" in result.stdout
+        assert "queue-noop: exact admission #102" in result.stderr
+        assert list_calls.read_text(encoding="utf-8").strip() == "2"
+        assert enroll_calls.read_text(encoding="utf-8").strip() == "0"
+
+    def test_vanished_native_receipt_does_not_retry_after_checks_turn_red(
+        self, tmp_path: Path
+    ) -> None:
+        head = "c" * 40
+        list_calls = tmp_path / "list-calls"
+        check_calls = tmp_path / "check-calls"
+        enroll_calls = tmp_path / "enroll-calls"
+        for path in (list_calls, check_calls, enroll_calls):
+            path.write_text("0", encoding="utf-8")
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                case "${{2:-}}" in
+                  preflight) exit 0 ;;
+                  list-state)
+                    count=$(<"${{FAKE_LIST_CALLS:?}}")
+                    count=$((count + 1)); echo "$count" >"${{FAKE_LIST_CALLS:?}}"
+                    if [[ "$count" -eq 1 ]]; then
+                      echo '{{"103":{{"headRefOid":"{head}","queued":true}}}}'
+                    else
+                      echo '{{"103":{{"headRefOid":"{head}","queued":false}}}}'
+                    fi
+                    ;;
+                  enroll)
+                    count=$(<"${{FAKE_ENROLL_CALLS:?}}")
+                    echo "$((count + 1))" >"${{FAKE_ENROLL_CALLS:?}}"
+                    exit 99
+                    ;;
+                  dequeue) echo '{{"state":{{"queued":false}}}}' ;;
+                  max-queue-depth) echo 16 ;;
+                  --classify-queue)
+                    raw=$(cat)
+                    if [[ "$raw" == *'"bucket":"fail"'* ]]; then
+                      echo '["PR Ready"]'
+                    else
+                      echo '[]'
+                    fi
+                    ;;
+                  *) echo "unexpected node args: $*" >&2; exit 2 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":103,"t":"Checks changed","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/check-race","headOid":"{head}","base":"main","body":"","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  count=$(<"${{FAKE_CHECK_CALLS:?}}")
+                  count=$((count + 1)); echo "$count" >"${{FAKE_CHECK_CALLS:?}}"
+                  if [[ "$count" -eq 1 ]]; then
+                    echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  else
+                    echo '[{{"name":"PR Ready","bucket":"fail","state":"FAILURE"}}]'
+                  fi
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{head}","baseRefName":"main","body":""}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then
+                  if [[ " $* " == *"/commits/{head}/status "* ]]; then
+                    echo '{{"statuses":[]}}'; exit 0
+                  fi
+                  exit 1
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    f"DRAIN_ADMISSION_PR=103 DRAIN_ADMISSION_HEAD={head} "
+                    f"FAKE_LIST_CALLS={list_calls} FAKE_CHECK_CALLS={check_calls} "
+                    f"FAKE_ENROLL_CALLS={enroll_calls}"
+                ),
+            )
+        )
+
+        assert result.returncode == 3, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "exact-head checks changed; refusing enrollment for #103" in result.stdout
+        assert enroll_calls.read_text(encoding="utf-8").strip() == "0"
+
+    def test_scheduled_controller_failure_receipt_replays_through_native_writer(
+        self, tmp_path: Path
+    ) -> None:
+        head = "d" * 40
+        real_node = shutil.which("node")
+        assert real_node is not None
+        enroll_calls = tmp_path / "enroll-calls"
+        enroll_calls.write_text("0", encoding="utf-8")
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                case "${{2:-}}" in
+                  preflight) exit 0 ;;
+                  list-state) echo '{{"104":{{"headRefOid":"{head}","queued":false}}}}' ;;
+                  enroll)
+                    count=$(<"${{FAKE_ENROLL_CALLS:?}}")
+                    echo "$((count + 1))" >"${{FAKE_ENROLL_CALLS:?}}"
+                    echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":{{"id":"MQE_104","state":"AWAITING_CHECKS","position":1}}}}}}'
+                    ;;
+                  dequeue) echo '{{"state":{{"queued":false}}}}' ;;
+                  max-queue-depth) echo 16 ;;
+                  --classify-queue) exec '{real_node}' "$1" "$2" ;;
+                  *) echo "unexpected node args: $*" >&2; exit 2 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":104,"t":"Controller retry","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/controller-retry","headOid":"{head}","base":"main","body":"","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"jovie-gem-queue-remediation/v1","bucket":"fail","state":"FAILURE"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{head}","baseRefName":"main","body":""}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then
+                  if [[ " $* " == *"/commits/{head}/status "* ]]; then
+                    echo '{{"statuses":[{{"context":"jovie-gem-queue-remediation/v1","state":"failure","creator":{{"type":"Bot","login":"jovie-bot[bot]"}},"target_url":"https://github.com/JovieInc/Jovie/actions/runs/41","updated_at":"2026-08-18T00:00:00Z"}}]}}'
+                    exit 0
+                  fi
+                  if [[ " $* " == *"/statuses/{head} "* ]]; then
+                    echo '{{}}'; exit 0
+                  fi
+                  if [[ "$2" == "repos/JovieInc/Jovie/actions/runs/41" ]]; then
+                    echo '{{"id":41,"name":"Merge Queue Auto-Enroll","path":".github/workflows/merge-queue-autoenroll.yml","html_url":"https://github.com/JovieInc/Jovie/actions/runs/41","repository":{{"full_name":"JovieInc/Jovie"}},"head_repository":{{"full_name":"JovieInc/Jovie"}},"head_sha":"{head}","workflow_id":99,"run_attempt":1}}'
+                    exit 0
+                  fi
+                  exit 1
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "DRAIN_RECOVER_CONTROLLER_FAILURES=1 "
+                    f"FAKE_ENROLL_CALLS={enroll_calls} GITHUB_RUN_ID=42 "
+                    "GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "replaying exact controller receipt" in result.stdout
+        assert "+native-queue on #104" in result.stdout
+        assert enroll_calls.read_text(encoding="utf-8").strip() == "1"
+
+    def test_surviving_green_run_reconciles_only_two_safe_lost_event_heads(
+        self, tmp_path: Path
+    ) -> None:
+        heads = {
+            number: character * 40
+            for number, character in zip(range(101, 108), "abcdef1")
+        }
+        queue_states = {
+            str(number): {
+                "headRefOid": head,
+                "queued": False,
+                "autoMergeEnabled": number == 104,
+            }
+            for number, head in heads.items()
+        }
+        pulls = [
+            {
+                "n": number,
+                "t": f"Candidate {number}",
+                "draft": False,
+                "m": "MERGEABLE",
+                "ms": "CLEAN",
+                "head": (
+                    "codegen-bot/candidate-105"
+                    if number == 105
+                    else "release/jov-106-recovery"
+                    if number == 106
+                    else f"codex/candidate-{number}"
+                ),
+                "headOid": head,
+                "headOwner": "fork-owner" if number == 103 else "JovieInc",
+                "cross": number == 103,
+                "base": "main",
+                "body": "",
+                "L": ["no-auto"] if number == 102 else [],
+                "fail": [],
+            }
+            for number, head in heads.items()
+        ]
+        enrolled = tmp_path / "enrolled"
+        dequeued = tmp_path / "dequeued"
+        enrolled.write_text("", encoding="utf-8")
+        dequeued.write_text("", encoding="utf-8")
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                case "${{2:-}}" in
+                  preflight) exit 0 ;;
+                  list-state) printf '%s\n' '{json.dumps(queue_states)}' ;;
+                  enroll)
+                    pr="${{3:?}}"; head="${{4:?}}"
+                    printf '%s\n' "$pr" >>"${{FAKE_ENROLLED:?}}"
+                    printf '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"%s","mergeQueueEntry":{{"id":"MQE_%s","state":"AWAITING_CHECKS","position":1}}}}}}\n' "$head" "$pr"
+                    ;;
+                  dequeue)
+                    printf '%s\n' "${{3:?}}" >>"${{FAKE_DEQUEUED:?}}"
+                    echo '{{"state":{{"queued":false}}}}'
+                    ;;
+                  max-queue-depth) echo 16 ;;
+                  --classify-queue)
+                    raw=$(cat)
+                    if [[ "$raw" == *'"bucket":"fail"'* ]]; then
+                      echo '["PR Ready"]'
+                    else
+                      echo '[]'
+                    fi
+                    ;;
+                  *) echo "unexpected node args: $*" >&2; exit 2 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  printf '%s\n' '{json.dumps(pulls)}'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  if [[ "$3" == "101" ]]; then
+                    echo '[{{"name":"PR Ready","bucket":"fail","state":"FAILURE"}}]'
+                  else
+                    echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  fi
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  case "$3" in
+                    105) head='{heads[105]}' ;;
+                    106) head='{heads[106]}' ;;
+                    *) echo "unexpected pr view: $*" >&2; exit 2 ;;
+                  esac
+                  printf '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"%s","baseRefName":"main","body":""}}\n' "$head"
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then
+                  if [[ " $* " == *"/commits/"*"/status "* ]]; then
+                    echo '{{"statuses":[]}}'; exit 0
+                  fi
+                  if [[ " $* " == *"/statuses/"* ]]; then
+                    echo '{{}}'; exit 0
+                  fi
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "DRAIN_RECONCILE_ELIGIBLE_HEADS=1 "
+                    "DRAIN_ELIGIBLE_HEAD_RECOVERY_MAX_PER_RUN=2 "
+                    f"FAKE_ENROLLED={enrolled} FAKE_DEQUEUED={dequeued} "
+                    "GITHUB_RUN_ID=42 GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert enrolled.read_text(encoding="utf-8").splitlines() == ["105", "106"]
+        assert dequeued.read_text(encoding="utf-8") == ""
+        assert "reached eligible-head recovery cap (2)" in result.stdout
+        for excluded in (101, 102, 103, 104, 107):
+            assert f"+native-queue on #{excluded}" not in result.stdout
+
+    def test_scheduled_controller_recovery_rejects_spoofed_workflow_receipt(
+        self, tmp_path: Path
+    ) -> None:
+        head = "e" * 40
+        enroll_calls = tmp_path / "enroll-calls"
+        enroll_calls.write_text("0", encoding="utf-8")
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                case "${{2:-}}" in
+                  preflight) exit 0 ;;
+                  list-state) echo '{{"108":{{"headRefOid":"{head}","queued":false,"autoMergeEnabled":false}}}}' ;;
+                  enroll)
+                    count=$(<"${{FAKE_ENROLL_CALLS:?}}")
+                    echo "$((count + 1))" >"${{FAKE_ENROLL_CALLS:?}}"
+                    exit 99
+                    ;;
+                  dequeue) echo '{{"state":{{"queued":false}}}}' ;;
+                  max-queue-depth) echo 16 ;;
+                  --classify-queue) echo '[]' ;;
+                  *) echo "unexpected node args: $*" >&2; exit 2 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":108,"t":"Foreign receipt","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/foreign-receipt","headOid":"{head}","headOwner":"JovieInc","cross":false,"base":"main","body":"","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then
+                  if [[ " $* " == *"/commits/{head}/status "* ]]; then
+                    echo '{{"statuses":[{{"context":"jovie-gem-queue-remediation/v1","state":"failure","creator":{{"type":"Bot","login":"jovie-bot[bot]"}},"target_url":"https://github.com/JovieInc/Jovie/actions/runs/41","updated_at":"2026-08-18T00:00:00Z"}}]}}'
+                    exit 0
+                  fi
+                  if [[ "$2" == "repos/JovieInc/Jovie/actions/runs/41" ]]; then
+                    echo '{{"id":41,"name":"Unrelated Workflow","path":".github/workflows/unrelated.yml","html_url":"https://github.com/JovieInc/Jovie/actions/runs/41","repository":{{"full_name":"JovieInc/Jovie"}},"head_repository":{{"full_name":"JovieInc/Jovie"}},"head_sha":"{head}","workflow_id":100,"run_attempt":1}}'
+                    exit 0
+                  fi
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "DRAIN_RECOVER_CONTROLLER_FAILURES=1 "
+                    f"FAKE_ENROLL_CALLS={enroll_calls} GITHUB_RUN_ID=42 "
+                    "GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "replaying exact controller receipt" not in result.stdout
+        assert enroll_calls.read_text(encoding="utf-8").strip() == "0"
+
     def test_composite_ci_reentry_recovers_only_bounded_exact_bot_receipts(
         self, tmp_path: Path
     ) -> None:
@@ -371,7 +1002,11 @@ JSON
                 if [[ "$1" == "api" ]]; then
                   if [[ "$2" == *"/commits/"*"/status"* ]]; then
                     head="${{2#*/commits/}}"; head="${{head%%/status*}}"
-                    echo "{{\\"statuses\\":[{{\\"context\\":\\"jovie-queue-reentry/v1\\",\\"state\\":\\"success\\",\\"description\\":\\"Native queue admission recorded at exact head\\",\\"creator\\":{{\\"type\\":\\"Bot\\"}},\\"target_url\\":\\"https://github.com/JovieInc/Jovie/actions/runs/77\\",\\"updated_at\\":\\"2026-08-15T12:00:00Z\\"}}]}}"
+                    echo "{{\\"statuses\\":[{{\\"context\\":\\"jovie-queue-reentry/v1\\",\\"state\\":\\"success\\",\\"description\\":\\"Native queue admission recorded at exact head\\",\\"creator\\":{{\\"type\\":\\"Bot\\",\\"login\\":\\"jovie-bot[bot]\\"}},\\"target_url\\":\\"https://github.com/JovieInc/Jovie/actions/runs/77\\",\\"updated_at\\":\\"2026-08-15T12:00:00Z\\"}}]}}"
+                    exit 0
+                  fi
+                  if [[ "$2" == "repos/JovieInc/Jovie/actions/runs/77" ]]; then
+                    echo '{{"id":77,"name":"Merge Queue Auto-Enroll","path":".github/workflows/merge-queue-autoenroll.yml","html_url":"https://github.com/JovieInc/Jovie/actions/runs/77","repository":{{"full_name":"JovieInc/Jovie"}},"head_repository":{{"full_name":"JovieInc/Jovie"}},"head_sha":"main-head","workflow_id":99,"run_attempt":1}}'
                     exit 0
                   fi
                   # Merge-group churn is unknown in this isolated receipt test;
@@ -1048,7 +1683,11 @@ JSON
                   exit 0
                 fi
                 if [[ "$1" == "api" && " $* " == *"/commits/{head}/status "* ]]; then
-                  echo '{{"statuses":[{{"context":"jovie-fleet-queue-hold/v1","state":"pending","creator":{{"type":"Bot"}},"target_url":"https://github.com/JovieInc/Jovie/actions/runs/77","updated_at":"{stale}"}}]}}'
+                  echo '{{"statuses":[{{"context":"jovie-fleet-queue-hold/v1","state":"pending","creator":{{"type":"Bot","login":"jovie-bot[bot]"}},"target_url":"https://github.com/JovieInc/Jovie/actions/runs/77","updated_at":"{stale}"}}]}}'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "api repos/JovieInc/Jovie/actions/runs/77" ]]; then
+                  echo '{{"id":77,"name":"Merge Queue Auto-Enroll","path":".github/workflows/merge-queue-autoenroll.yml","html_url":"https://github.com/JovieInc/Jovie/actions/runs/77","repository":{{"full_name":"JovieInc/Jovie"}},"head_repository":{{"full_name":"JovieInc/Jovie"}},"head_sha":"{head}","workflow_id":99,"run_attempt":1}}'
                   exit 0
                 fi
                 echo "unexpected gh args: $*" >&2
@@ -1254,7 +1893,11 @@ JSON
                   exit 0
                 fi
                 if [[ "$1" == "api" && " $* " == *"/commits/{head}/status "* ]]; then
-                  echo '{{"statuses":[{{"context":"jovie-fleet-queue-hold/v1","state":"pending","creator":{{"type":"Bot"}},"target_url":"https://github.com/JovieInc/Jovie/actions/runs/77","updated_at":"{fresh}"}}]}}'
+                  echo '{{"statuses":[{{"context":"jovie-fleet-queue-hold/v1","state":"pending","creator":{{"type":"Bot","login":"jovie-bot[bot]"}},"target_url":"https://github.com/JovieInc/Jovie/actions/runs/77","updated_at":"{fresh}"}}]}}'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "api repos/JovieInc/Jovie/actions/runs/77" ]]; then
+                  echo '{{"id":77,"name":"Merge Queue Auto-Enroll","path":".github/workflows/merge-queue-autoenroll.yml","html_url":"https://github.com/JovieInc/Jovie/actions/runs/77","repository":{{"full_name":"JovieInc/Jovie"}},"head_repository":{{"full_name":"JovieInc/Jovie"}},"head_sha":"{head}","workflow_id":99,"run_attempt":1}}'
                   exit 0
                 fi
                 echo "unexpected gh args: $*" >&2
@@ -1403,10 +2046,14 @@ JSON
                 fi
                 if [[ "$1" == "api" ]]; then
                   if [[ " $* " == *"/commits/{head}/status "* ]]; then
-                    echo '{{"statuses":[{{"context":"jovie-fleet-queue-hold/v1","state":"pending","creator":{{"type":"Bot"}},"target_url":"https://github.com/JovieInc/Jovie/actions/runs/77","updated_at":"2026-08-15T12:00:00Z"}}]}}'
+                    echo '{{"statuses":[{{"context":"jovie-fleet-queue-hold/v1","state":"pending","creator":{{"type":"Bot","login":"jovie-bot[bot]"}},"target_url":"https://github.com/JovieInc/Jovie/actions/runs/77","updated_at":"2026-08-15T12:00:00Z"}}]}}'
                     exit 0
                   fi
                   if [[ " $* " == *"/statuses/{head} "* ]]; then exit 0; fi
+                  if [[ "$2" == "repos/JovieInc/Jovie/actions/runs/77" ]]; then
+                    echo '{{"id":77,"name":"Merge Queue Auto-Enroll","path":".github/workflows/merge-queue-autoenroll.yml","html_url":"https://github.com/JovieInc/Jovie/actions/runs/77","repository":{{"full_name":"JovieInc/Jovie"}},"head_repository":{{"full_name":"JovieInc/Jovie"}},"head_sha":"{head}","workflow_id":99,"run_attempt":1}}'
+                    exit 0
+                  fi
                 fi
                 echo "unexpected gh args: $*" >&2
                 exit 2
@@ -1433,6 +2080,186 @@ JSON
         assert "+merge-queue on #905" in result.stdout
         assert "-jovie-fleet-queue-hold/v1 on #905" in result.stdout
         assert state.read_text(encoding="utf-8").strip() == "queued"
+
+    def test_native_fleet_hold_recovery_requires_positioned_exact_head_receipt(
+        self, tmp_path: Path
+    ) -> None:
+        head = "f" * 40
+        enroll_calls = tmp_path / "enroll-calls"
+        enroll_calls.write_text("0", encoding="utf-8")
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                case "${{2:-}}" in
+                  preflight) exit 0 ;;
+                  list-state) echo '{{"906":{{"headRefOid":"{head}","queued":false,"autoMergeEnabled":false}}}}' ;;
+                  enroll)
+                    count=$(<"${{FAKE_ENROLL_CALLS:?}}")
+                    echo "$((count + 1))" >"${{FAKE_ENROLL_CALLS:?}}"
+                    echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":{{"id":"MQE_906","state":"AWAITING_CHECKS","position":1}}}}}}'
+                    ;;
+                  dequeue) echo '{{"state":{{"queued":false}}}}' ;;
+                  max-queue-depth) echo 16 ;;
+                  --classify-queue) echo '[]' ;;
+                  *) echo "unexpected node args: $*" >&2; exit 2 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":906,"t":"Native held candidate","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/native-hold","headOid":"{head}","headOwner":"JovieInc","cross":false,"base":"main","body":"","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{head}","baseRefName":"main","body":""}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then
+                  if [[ " $* " == *"/commits/{head}/status "* ]]; then
+                    echo '{{"statuses":[{{"context":"jovie-fleet-queue-hold/v1","state":"pending","creator":{{"type":"Bot","login":"jovie-bot[bot]"}},"target_url":"https://github.com/JovieInc/Jovie/actions/runs/77","updated_at":"2026-08-15T12:00:00Z"}}]}}'
+                    exit 0
+                  fi
+                  if [[ " $* " == *"/statuses/{head} "* ]]; then
+                    echo '{{}}'; exit 0
+                  fi
+                  if [[ "$2" == "repos/JovieInc/Jovie/actions/runs/77" ]]; then
+                    echo '{{"id":77,"name":"Merge Queue Auto-Enroll","path":".github/workflows/merge-queue-autoenroll.yml","html_url":"https://github.com/JovieInc/Jovie/actions/runs/77","repository":{{"full_name":"JovieInc/Jovie"}},"head_repository":{{"full_name":"JovieInc/Jovie"}},"head_sha":"{head}","workflow_id":99,"run_attempt":1}}'
+                    exit 0
+                  fi
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "DRAIN_RECOVER_FLEET_HOLDS=1 "
+                    f"FAKE_ENROLL_CALLS={enroll_calls} GITHUB_RUN_ID=77 "
+                    "GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "exact fleet recovery at " + head in result.stdout
+        assert "+native-queue on #906" in result.stdout
+        assert "-jovie-fleet-queue-hold/v1 on #906" in result.stdout
+        assert enroll_calls.read_text(encoding="utf-8").strip() == "1"
+
+    def test_queued_exact_head_closes_pending_fleet_hold_once_without_reenroll(
+        self, tmp_path: Path
+    ) -> None:
+        head = "9" * 40
+        hold_state = tmp_path / "hold-state"
+        enroll_calls = tmp_path / "enroll-calls"
+        status_writes = tmp_path / "status-writes"
+        hold_state.write_text("pending", encoding="utf-8")
+        enroll_calls.write_text("0", encoding="utf-8")
+        status_writes.write_text("0", encoding="utf-8")
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                case "${{2:-}}" in
+                  preflight) exit 0 ;;
+                  list-state) echo '{{"907":{{"headRefOid":"{head}","queued":true,"autoMergeEnabled":true}}}}' ;;
+                  enroll)
+                    count=$(<"${{FAKE_ENROLL_CALLS:?}}")
+                    echo "$((count + 1))" >"${{FAKE_ENROLL_CALLS:?}}"
+                    exit 99
+                    ;;
+                  dequeue) echo '{{"state":{{"queued":false}}}}' ;;
+                  max-queue-depth) echo 16 ;;
+                  --classify-queue) echo '[]' ;;
+                  *) echo "unexpected node args: $*" >&2; exit 2 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":907,"t":"Queued held candidate","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/queued-hold","headOid":"{head}","headOwner":"JovieInc","cross":false,"base":"main","body":"","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then
+                  if [[ " $* " == *"/commits/{head}/status "* ]]; then
+                    state=$(<"${{FAKE_HOLD_STATE:?}}")
+                    printf '{{"statuses":[{{"context":"jovie-fleet-queue-hold/v1","state":"%s","creator":{{"type":"Bot","login":"jovie-bot[bot]"}},"target_url":"https://github.com/JovieInc/Jovie/actions/runs/77","updated_at":"2026-08-15T12:00:00Z"}}]}}\n' "$state"
+                    exit 0
+                  fi
+                  if [[ " $* " == *"/statuses/{head} "* ]]; then
+                    count=$(<"${{FAKE_STATUS_WRITES:?}}")
+                    echo "$((count + 1))" >"${{FAKE_STATUS_WRITES:?}}"
+                    printf success >"${{FAKE_HOLD_STATE:?}}"
+                    echo '{{}}'; exit 0
+                  fi
+                  if [[ "$2" == "repos/JovieInc/Jovie/actions/runs/77" ]]; then
+                    echo '{{"id":77,"name":"Merge Queue Auto-Enroll","path":".github/workflows/merge-queue-autoenroll.yml","html_url":"https://github.com/JovieInc/Jovie/actions/runs/77","repository":{{"full_name":"JovieInc/Jovie"}},"head_repository":{{"full_name":"JovieInc/Jovie"}},"head_sha":"{head}","workflow_id":99,"run_attempt":1}}'
+                    exit 0
+                  fi
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+        command = _drain_command(
+            tmp_path,
+            backend="native",
+            extra_env=(
+                "DRAIN_RECOVER_FLEET_HOLDS=1 "
+                f"FAKE_HOLD_STATE={hold_state} FAKE_ENROLL_CALLS={enroll_calls} "
+                f"FAKE_STATUS_WRITES={status_writes} GITHUB_RUN_ID=77 "
+                "GITHUB_SERVER_URL=https://github.com"
+            ),
+        )
+
+        first = _run_bash(command)
+        second = _run_bash(command)
+
+        assert first.returncode == 0, f"stdout={first.stdout}\nstderr={first.stderr}"
+        assert second.returncode == 0, f"stdout={second.stdout}\nstderr={second.stderr}"
+        assert "exact head already queued; closing stale fleet hold" in first.stdout
+        assert "exact head already queued; closing stale fleet hold" not in second.stdout
+        assert enroll_calls.read_text(encoding="utf-8").strip() == "0"
+        assert status_writes.read_text(encoding="utf-8").strip() == "1"
 
     def test_hold_intake_does_not_dequeue_transient_unknown_mergeable(
         self, tmp_path: Path

@@ -3,7 +3,7 @@
 # on repeat runs instead of posting a fresh comment every time. This stops
 # status/guard workflows from spamming a PR with dozens of identical comments.
 #
-# Usage: upsert-pr-comment.sh <pr_number> <marker> <body>
+# Usage: upsert-pr-comment.sh <pr_number> <marker> <body> [dedupe_key]
 #   <marker> is a short stable slug, e.g. "ci-branching-guard". It is embedded
 #   as a hidden HTML comment so the comment can be found and updated later.
 #
@@ -13,16 +13,42 @@ set -euo pipefail
 pr_number="${1:?pr number required}"
 marker="${2:?marker required}"
 body="${3:?body required}"
+dedupe_key="${4:-}"
 repo="${GITHUB_REPOSITORY:-JovieInc/Jovie}"
 
 hidden="<!-- bot-comment:${marker} -->"
+dedupe_hidden=""
+if [ -n "${dedupe_key}" ]; then
+  dedupe_hidden="<!-- bot-comment-dedupe:${dedupe_key} -->"
+fi
 full_body="${hidden}
+${dedupe_hidden}
 ${body}"
 
-existing_id=$(gh api "repos/${repo}/issues/${pr_number}/comments" --paginate \
-  --jq ".[] | select(.body | contains(\"${hidden}\")) | .id" 2>/dev/null | head -1)
+comments=$(gh api "repos/${repo}/issues/${pr_number}/comments" --paginate --slurp 2>/dev/null)
+comments="${comments:-[]}"
+existing=$(jq -c --arg hidden "${hidden}" '
+  def comments:
+    if type != "array" then []
+    elif length == 0 then []
+    elif (.[0] | type) == "array" then add
+    else .
+    end;
+  comments
+  | map(select((.body // "") | contains($hidden)))
+  | first // empty
+' <<<"${comments}")
+existing_id=""
+if [ -n "${existing}" ]; then
+  existing_id=$(jq -r '.id // empty' <<<"${existing}")
+fi
 
 if [ -n "${existing_id}" ]; then
+  if [ -n "${dedupe_hidden}" ] \
+    && jq -e --arg marker "${dedupe_hidden}" '.body | contains($marker)' \
+      <<<"${existing}" >/dev/null; then
+    exit 0
+  fi
   gh api -X PATCH "repos/${repo}/issues/comments/${existing_id}" \
     -f body="${full_body}" >/dev/null
 else

@@ -46,6 +46,10 @@ jobs:
           GEM_CONTROLLER_EXPECTED_REVISION: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
+          FLEET_INSTALL_VERIFY_ONLY=true bash scripts/hermes/install-gem-fleet-controller.sh
+          GEM_REHABILITATION_VERIFY_ONLY=true bash scripts/hermes/install-gem-pr-rehabilitation.sh
+          FLEET_INSTALL_PREFLIGHT_ONLY=true bash scripts/hermes/install-gem-fleet-controller.sh
+          GEM_REHABILITATION_PREFLIGHT_ONLY=true bash scripts/hermes/install-gem-pr-rehabilitation.sh
           bash scripts/hermes/install-gem-fleet-controller.sh
           bash scripts/hermes/install-gem-pr-rehabilitation.sh
       - name: Verify runtime identity after reload

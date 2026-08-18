@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
+import { listPullRequestQueueStates } from '../merge-queue-backend.mjs';
 import { parseRequiredStatusChecksFromYaml } from './merge-queue-guard.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -96,6 +97,10 @@ export const ADVISORY_CHECK_NAMES = Object.freeze(
     // Bounded fleet recovery selector. A pending/expired hold must never
     // classify as a product-quality gate or pin CLEAN enroll (JOV-5169).
     'jovie-fleet-queue-hold/v1',
+    // Exact-head Gem controller failure receipt. This is the selector for a
+    // safe replay, not a product-quality failure; the four required source
+    // gates remain independently fail-closed.
+    'jovie-gem-queue-remediation/v1',
   ].filter((name, index, names) => names.indexOf(name) === index)
 );
 
@@ -403,6 +408,86 @@ export async function fetchRequiredCheckFailures(repo, prNumber) {
   }
 }
 
+export function extractTerminalControlPlaneFailures(checks) {
+  const latest = collapseNewestCheckAttempts(checks);
+  return latest.checks
+    .filter(
+      check =>
+        ADVISORY_CHECK_WORKFLOWS.includes(check?.workflow ?? '') &&
+        isTerminalFailure(check)
+    )
+    .map(normalizeCheckName)
+    .sort();
+}
+
+export const GEM_QUEUE_REMEDIATION_CONTEXT = 'jovie-gem-queue-remediation/v1';
+
+export function extractExactHeadControllerFailures(combinedStatus, repo) {
+  const actionsPrefix = `https://github.com/${repo}/actions/runs/`;
+  const latest = (combinedStatus?.statuses ?? [])
+    .filter(status => {
+      if (
+        status?.context !== GEM_QUEUE_REMEDIATION_CONTEXT ||
+        status?.creator?.type !== 'Bot' ||
+        status?.creator?.login !== 'jovie-bot[bot]' ||
+        !status?.target_url?.startsWith(actionsPrefix)
+      ) {
+        return false;
+      }
+      return /^[1-9][0-9]*$/.test(
+        status.target_url.slice(actionsPrefix.length)
+      );
+    })
+    .sort((left, right) =>
+      String(left?.updated_at ?? '').localeCompare(
+        String(right?.updated_at ?? '')
+      )
+    )
+    .at(-1);
+  return latest && ['error', 'failure'].includes(latest.state)
+    ? [GEM_QUEUE_REMEDIATION_CONTEXT]
+    : [];
+}
+
+/** Controller failures stay advisory to product quality but actionable by Gem. */
+export async function fetchControlPlaneFailures(repo, prNumber, headRefOid) {
+  let checkFailures = [];
+  try {
+    const checks = await ghJson(
+      [
+        'pr',
+        'checks',
+        String(prNumber),
+        '--json',
+        'name,bucket,state,workflow,description,startedAt,completedAt',
+      ],
+      { repo }
+    );
+    checkFailures = extractTerminalControlPlaneFailures(checks);
+  } catch (error) {
+    const stdout = error.stdout?.trim();
+    if (stdout) {
+      try {
+        checkFailures = extractTerminalControlPlaneFailures(JSON.parse(stdout));
+      } catch {
+        // fall through
+      }
+    }
+  }
+  let exactHeadFailures = [];
+  if (/^[0-9a-f]{40}$/.test(headRefOid ?? '')) {
+    try {
+      exactHeadFailures = extractExactHeadControllerFailures(
+        await ghJson(['api', `repos/${repo}/commits/${headRefOid}/status`]),
+        repo
+      );
+    } catch {
+      // Unknown exact-head receipt is a no-mutation signal, not permission.
+    }
+  }
+  return [...new Set([...checkFailures, ...exactHeadFailures])].sort();
+}
+
 export async function fetchOpenPrSummaries(repo, limit = 200) {
   return ghJson(
     [
@@ -413,13 +498,28 @@ export async function fetchOpenPrSummaries(repo, limit = 200) {
       '--limit',
       String(limit),
       '--json',
-      'number,title,isDraft,mergeable,mergeStateStatus,labels,headRefName,updatedAt,headRepositoryOwner',
+      'number,title,isDraft,mergeable,mergeStateStatus,labels,headRefName,headRefOid,baseRefName,updatedAt,headRepository,headRepositoryOwner,isCrossRepository',
     ],
     { repo }
   );
 }
 
-const HARD_GATE_LABELS = new Set(['needs-human', 'hold', 'gated']);
+const HARD_GATE_LABELS = new Set([
+  'blocked',
+  'needs-human',
+  'hold',
+  'gated',
+  'queue-deferred',
+  'fast',
+  'human-review-required',
+  'needs-human-review',
+  'needs-human-taste',
+  'needs:taste',
+  'needs-manual-rebase',
+  'no-auto',
+  'risk:high',
+  'taste',
+]);
 
 export function isHardGated(labels) {
   return (labels ?? []).some(label =>
@@ -428,37 +528,116 @@ export function isHardGated(labels) {
 }
 
 export function isSameRepoPr(pr, repo) {
+  if (pr.isCrossRepository === true) return false;
+  const nameWithOwner = pr.headRepository?.nameWithOwner;
+  if (nameWithOwner) {
+    return nameWithOwner.toLowerCase() === repo.toLowerCase();
+  }
   const owner = pr.headRepositoryOwner?.login;
-  if (!owner) return true;
+  if (!owner) return false;
   const [repoOwner] = repo.split('/');
-  return owner === repoOwner;
+  return owner.toLowerCase() === repoOwner?.toLowerCase();
+}
+
+function hasRemediationIdentity(pr, repo) {
+  return (
+    !pr.isDraft &&
+    pr.baseRefName === 'main' &&
+    isAgentBranch(pr.headRefName) &&
+    !pr.headRefName.startsWith('dependabot/') &&
+    !isHardGated(pr.labels) &&
+    isSameRepoPr(pr, repo) &&
+    /^[0-9a-f]{40}$/.test(pr.headRefOid ?? '')
+  );
+}
+
+function hasUnownedNativeQueueState(pr) {
+  const state = pr.nativeQueueState;
+  return Boolean(
+    state &&
+      state.headRefOid?.toLowerCase() === pr.headRefOid &&
+      state.queued === false &&
+      state.autoMergeEnabled === false
+  );
+}
+
+export async function fetchExactHeadUpdatedAt(repo, headRefOid) {
+  try {
+    const commit = await ghJson(['api', `repos/${repo}/commits/${headRefOid}`]);
+    return (
+      commit?.commit?.committer?.date ?? commit?.commit?.author?.date ?? null
+    );
+  } catch {
+    return null;
+  }
 }
 
 /**
- * Returns open agent PRs that are mergeable with terminal failing required checks.
+ * Classify one exact PR head for bounded mechanical remediation. Product-code
+ * failures, stale branches, and confirmed conflicts are distinct reasons; the
+ * caller never turns this classification into merge admission.
  */
+export function classifyRemediationCandidate(
+  pr,
+  repo,
+  failures = [],
+  controlPlaneFailures = []
+) {
+  if (!hasRemediationIdentity(pr, repo) || !hasUnownedNativeQueueState(pr)) {
+    return null;
+  }
+
+  const reasons = [];
+  if (pr.mergeable === 'CONFLICTING' || pr.mergeStateStatus === 'DIRTY') {
+    reasons.push('merge_conflict');
+  } else if (pr.mergeStateStatus === 'BEHIND') {
+    reasons.push('branch_behind');
+  }
+  if (failures.length > 0) reasons.push('required_checks_failed');
+  if (controlPlaneFailures.length > 0) {
+    reasons.push('control_plane_checks_failed');
+  }
+  if (reasons.length === 0) return null;
+
+  return {
+    ...pr,
+    failures,
+    controlPlaneFailures,
+    reasons,
+  };
+}
+
+/** Returns exact agent PR heads that need refresh or structured escalation. */
 export async function listBlockedAgentPrs(repo, { limit = 200 } = {}) {
-  const prs = await fetchOpenPrSummaries(repo, limit);
+  const [prs, nativeQueueStates] = await Promise.all([
+    fetchOpenPrSummaries(repo, limit),
+    listPullRequestQueueStates({ backend: 'native', repository: repo }),
+  ]);
   const blocked = [];
 
-  for (const pr of prs) {
-    if (pr.isDraft) continue;
-    if (pr.mergeable !== 'MERGEABLE') continue;
-    if (!isAgentBranch(pr.headRefName)) continue;
-    if (isHardGated(pr.labels)) continue;
-    if (!isSameRepoPr(pr, repo)) continue;
-
-    const failures = await fetchRequiredCheckFailures(repo, pr.number);
-    if (failures.length === 0) continue;
-
-    blocked.push({
-      number: pr.number,
-      title: pr.title,
-      headRefName: pr.headRefName,
-      updatedAt: pr.updatedAt,
-      labels: pr.labels,
+  for (const summary of prs) {
+    const pr = {
+      ...summary,
+      nativeQueueState: nativeQueueStates[String(summary.number)] ?? null,
+    };
+    if (!hasRemediationIdentity(pr, repo)) continue;
+    const [failures, controlPlaneFailures] = await Promise.all([
+      fetchRequiredCheckFailures(repo, pr.number),
+      fetchControlPlaneFailures(repo, pr.number, pr.headRefOid),
+    ]);
+    const candidate = classifyRemediationCandidate(
+      pr,
+      repo,
       failures,
-    });
+      controlPlaneFailures
+    );
+    if (candidate) {
+      candidate.headUpdatedAt = await fetchExactHeadUpdatedAt(
+        repo,
+        candidate.headRefOid
+      );
+      blocked.push(candidate);
+    }
   }
 
   return blocked;
