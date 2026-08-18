@@ -1308,15 +1308,14 @@ describe('TasksPageClient', () => {
     fireEvent.change(screen.getByLabelText('Task Description'), {
       target: { value: 'Edit task B and keep it' },
     });
-    await act(async () => finishFirstSave?.());
-
-    expect(screen.getByText('Edited')).toBeInTheDocument();
-    act(() => vi.advanceTimersByTime(500));
+    await act(async () => vi.advanceTimersByTime(500));
     expect(mockUpdateTaskAsync).toHaveBeenCalledTimes(2);
     expect(mockUpdateTaskAsync.mock.calls[1]?.[0]).toMatchObject({
       taskId: 'task-2',
       data: { description: 'Edit task B and keep it' },
     });
+    await act(async () => finishFirstSave?.());
+    expect(screen.getByText('Saved')).toBeInTheDocument();
   });
 
   it('does not reset unsaved title text when task metadata refreshes', () => {

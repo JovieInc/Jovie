@@ -1340,7 +1340,9 @@ export function TasksPageClient() {
     useState<RichTextDocument>(emptyRichTextDocument);
   const [editorSaveStatus, setEditorSaveStatus] =
     useState<TaskEditorSaveStatus>('idle');
-  const [editorSaveInFlight, setEditorSaveInFlight] = useState(false);
+  const [editorSavingTaskIds, setEditorSavingTaskIds] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
   const [editorTaskId, setEditorTaskId] = useState<string | null>(null);
   const editorRevisionRef = useRef(0);
   const editorSaveRequestRef = useRef(0);
@@ -1821,7 +1823,7 @@ export function TasksPageClient() {
       !hasChanges ||
       !nextTitle ||
       editorSaveStatus !== 'dirty' ||
-      editorSaveInFlight
+      editorSavingTaskIds.has(selectedTaskEditorId)
     ) {
       return;
     }
@@ -1836,7 +1838,11 @@ export function TasksPageClient() {
       }
 
       setEditorSaveStatus('saving');
-      setEditorSaveInFlight(true);
+      setEditorSavingTaskIds(current => {
+        const next = new Set(current);
+        next.add(selectedTaskIdAtSchedule);
+        return next;
+      });
       void updateTaskAsync({
         taskId: selectedTaskIdAtSchedule,
         data: {
@@ -1846,7 +1852,11 @@ export function TasksPageClient() {
         },
       }).then(
         () => {
-          setEditorSaveInFlight(false);
+          setEditorSavingTaskIds(current => {
+            const next = new Set(current);
+            next.delete(selectedTaskIdAtSchedule);
+            return next;
+          });
           if (
             latestSelectedTaskIdRef.current !== selectedTaskIdAtSchedule ||
             editorSaveRequestRef.current !== requestAtSchedule
@@ -1858,7 +1868,11 @@ export function TasksPageClient() {
           );
         },
         () => {
-          setEditorSaveInFlight(false);
+          setEditorSavingTaskIds(current => {
+            const next = new Set(current);
+            next.delete(selectedTaskIdAtSchedule);
+            return next;
+          });
           if (
             latestSelectedTaskIdRef.current !== selectedTaskIdAtSchedule ||
             editorSaveRequestRef.current !== requestAtSchedule
@@ -1879,7 +1893,7 @@ export function TasksPageClient() {
   }, [
     editorDescription,
     editorDescriptionContent,
-    editorSaveInFlight,
+    editorSavingTaskIds,
     editorSaveStatus,
     editorTaskId,
     editorTitle,

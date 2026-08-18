@@ -71,6 +71,10 @@ function getClientProps(result: Awaited<ReturnType<typeof LibraryPage>>) {
   return hydrate.props.children.props;
 }
 
+function renderLibraryPage(section?: string) {
+  return LibraryPage({ searchParams: Promise.resolve({ section }) });
+}
+
 describe('LibraryPage private document boundary', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -102,7 +106,7 @@ describe('LibraryPage private document boundary', () => {
   });
 
   it('authorizes the selected profile before listing private documents', async () => {
-    await LibraryPage();
+    await renderLibraryPage('documents');
 
     expect(mocks.requireCreatorDocumentAccess).toHaveBeenCalledWith({
       userId: 'user_1',
@@ -113,10 +117,8 @@ describe('LibraryPage private document boundary', () => {
     ).toBeLessThan(mocks.listCreatorDocuments.mock.invocationCallOrder[0] ?? 0);
   });
 
-  it('keeps private documents when an unrelated library load fails', async () => {
-    mocks.fetchQuery.mockRejectedValueOnce(new Error('Release load failed'));
-
-    const result = await LibraryPage();
+  it('loads private documents independently from asset data', async () => {
+    const result = await renderLibraryPage('documents');
 
     expect(getClientProps(result)).toMatchObject({
       creatorDocuments: [privateDocument],
@@ -130,7 +132,7 @@ describe('LibraryPage private document boundary', () => {
       new Error('Unauthorized')
     );
 
-    const result = await LibraryPage();
+    const result = await renderLibraryPage('documents');
 
     expect(mocks.listCreatorDocuments).not.toHaveBeenCalled();
     expect(getClientProps(result)).toMatchObject({
@@ -138,5 +140,24 @@ describe('LibraryPage private document boundary', () => {
       creatorDocumentsNextCursor: null,
       creatorDocumentsLoadFailed: true,
     });
+  });
+
+  it('does not load or serialize documents for the default Assets tab', async () => {
+    const result = await renderLibraryPage();
+
+    expect(mocks.requireCreatorDocumentAccess).not.toHaveBeenCalled();
+    expect(mocks.listCreatorDocuments).not.toHaveBeenCalled();
+    expect(getClientProps(result)).toMatchObject({
+      creatorDocuments: [],
+      creatorDocumentsNextCursor: null,
+      creatorDocumentsLoadFailed: false,
+    });
+  });
+
+  it('does not load asset payloads for the Documents tab', async () => {
+    await renderLibraryPage('documents');
+
+    expect(mocks.fetchQuery).not.toHaveBeenCalled();
+    expect(mocks.getLibraryMerchCardsForProfile).not.toHaveBeenCalled();
   });
 });

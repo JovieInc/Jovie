@@ -21,6 +21,7 @@ import {
   approveCreatorRevisionForCapture,
   captureCreatorIdea,
   completeCreatorEvidenceReview,
+  listCreatorDocuments,
   saveCreatorDocumentRevision,
 } from './store';
 
@@ -124,6 +125,22 @@ describe('creator document persistence boundaries', () => {
     expect(listing).toContain('nextCursor');
     expect(listing).toContain('desc(creatorDocuments.id)');
     expect(listing).not.toContain('.limit(100)');
+  });
+
+  it('rejects malformed UUID cursor ids before querying PostgreSQL', async () => {
+    const malformedCursor = Buffer.from(
+      JSON.stringify({
+        updatedAt: '2026-08-18T00:00:00.000Z',
+        id: '------------------------------------',
+      })
+    ).toString('base64url');
+    await expect(
+      listCreatorDocuments('22222222-2222-4222-8222-222222222222', {
+        cursor: malformedCursor,
+      })
+    ).rejects.toThrow('Invalid creator document cursor');
+
+    expect(execute).not.toHaveBeenCalled();
   });
 
   it('creates only a handoff boundary after exact-revision approval', async () => {

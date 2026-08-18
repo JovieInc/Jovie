@@ -1,4 +1,5 @@
 import { and, desc, sql as drizzleSql, eq, lt, or } from 'drizzle-orm';
+import { isCanonicalUuid } from '@/lib/auth/profile-access';
 import {
   hashRevision,
   ideaContent,
@@ -64,7 +65,7 @@ function decodeDocumentCursor(cursor: string | null | undefined) {
     if (
       Number.isNaN(updatedAt.getTime()) ||
       typeof parsed.id !== 'string' ||
-      !/^[0-9a-f-]{36}$/i.test(parsed.id)
+      !isCanonicalUuid(parsed.id)
     ) {
       return null;
     }
