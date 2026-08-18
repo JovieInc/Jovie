@@ -105,6 +105,34 @@ describe('pr-check-failures', () => {
     ).toEqual(['enroll']);
   });
 
+  it('keeps failed fleet-refresh receipts out of product gate classification', () => {
+    const required = [
+      { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },
+      { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
+      { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
+      { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
+    ];
+    const fleetRefreshFailure = {
+      bucket: 'fail',
+      state: 'FAILURE',
+      name: 'Refresh persisted fleet gate receipt',
+      workflow: 'Fleet Gate Refresh',
+    };
+
+    expect(isAdvisoryCheck(fleetRefreshFailure)).toBe(true);
+    expect(
+      classifyQueueCheckBlockers([...required, fleetRefreshFailure])
+    ).toEqual([]);
+    // The workflow exception cannot hide a real required-gate failure.
+    expect(
+      classifyQueueCheckBlockers([
+        ...required.filter(check => check.name !== 'PR Ready'),
+        { bucket: 'fail', state: 'FAILURE', name: 'PR Ready' },
+        fleetRefreshFailure,
+      ])
+    ).toEqual(['PR Ready', 'PR Ready (not successful)']);
+  });
+
   it('treats a red Fork PR Gate Controller receipt with SKIPPED twin as advisory (JOV-4782)', () => {
     const required = [
       { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },

@@ -108,6 +108,11 @@ export const ADVISORY_CHECK_NAMES = Object.freeze(
 // `enroll` safety check still fails closed.
 export const ADVISORY_CHECK_WORKFLOWS = Object.freeze([
   'Merge Queue Auto-Enroll',
+  // Fleet policy is enforced independently before native admission. This
+  // workflow only refreshes the persisted controller receipt, so a transient
+  // refresh failure must not masquerade as product CI and eject an already
+  // admitted exact head from the queue.
+  'Fleet Gate Refresh',
 ]);
 
 export const REQUIRED_CHECK_NAMES = Object.freeze(
