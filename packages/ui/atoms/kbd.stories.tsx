@@ -15,3 +15,14 @@ export const TooltipVariant: Story = {
   args: { children: 'Esc', variant: 'tooltip' },
   parameters: { backgrounds: { default: 'dark' } },
 };
+
+export const ShortcutSequence: Story = {
+  render: () => (
+    <div className='flex items-center gap-1.5 text-sm text-secondary-token'>
+      <Kbd>⌘</Kbd>
+      <Kbd>⇧</Kbd>
+      <Kbd>P</Kbd>
+      <span className='ml-2'>Open command palette</span>
+    </div>
+  ),
+};

@@ -6,10 +6,12 @@ import { Kbd } from './kbd';
 
 describe('Kbd', () => {
   describe('Basic Rendering', () => {
-    it('renders as span element', () => {
+    it('renders with native keyboard-input semantics', () => {
       render(<Kbd data-testid='kbd'>⌘K</Kbd>);
       const kbd = screen.getByTestId('kbd');
-      expect(kbd.tagName).toBe('SPAN');
+      expect(kbd.tagName).toBe('KBD');
+      expect(kbd).toHaveAttribute('data-slot', 'kbd');
+      expect(kbd).toHaveAttribute('data-variant', 'default');
     });
 
     it('renders text content', () => {
@@ -18,9 +20,9 @@ describe('Kbd', () => {
     });
 
     it('forwards refs correctly', () => {
-      const ref = React.createRef<HTMLSpanElement>();
+      const ref = React.createRef<HTMLElement>();
       render(<Kbd ref={ref}>⌘K</Kbd>);
-      expect(ref.current).toBeInstanceOf(HTMLSpanElement);
+      expect(ref.current).toBeInstanceOf(HTMLElement);
     });
 
     it('has correct displayName', () => {
@@ -69,12 +71,15 @@ describe('Kbd', () => {
       expect(kbd.className).toContain('items-center');
       expect(kbd.className).toContain('justify-center');
       expect(kbd.className).toContain('rounded-(--linear-app-radius-item)');
-      expect(kbd.className).toContain('px-1');
+      expect(kbd.className).toContain('min-h-5');
+      expect(kbd.className).toContain('min-w-5');
+      expect(kbd.className).toContain('px-1.5');
       expect(kbd.className).toContain('py-px');
       expect(kbd.className).toContain('leading-none');
       expect(kbd.className).toContain('font-mono');
       expect(kbd.className).toContain('text-[11px]');
-      expect(kbd.className).toContain('font-[400]');
+      expect(kbd.className).toContain('font-[510]');
+      expect(kbd.className).toContain('shadow-sm');
     });
 
     it('merges custom className', () => {

@@ -7,7 +7,7 @@ import * as React from 'react';
 import { cn } from '../lib/utils';
 
 const labelVariants = cva(
-  'text-[13px] font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70',
+  'inline-flex cursor-pointer items-center text-[13px] font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-[var(--state-disabled-opacity)]',
   {
     variants: {
       variant: {
@@ -41,13 +41,15 @@ const Label = React.forwardRef<
 >(({ className, variant, required, children, ...props }, ref) => (
   <LabelPrimitive.Root
     ref={ref}
+    data-required={required ? 'true' : 'false'}
+    data-variant={variant ?? 'default'}
     className={cn(labelVariants({ variant }), className)}
     {...props}
   >
     {children}
     {required && (
       <>
-        <span className='text-destructive ml-1' aria-hidden='true'>
+        <span className='ml-1 text-destructive' aria-hidden='true'>
           *
         </span>
         <span className='sr-only'>(required)</span>

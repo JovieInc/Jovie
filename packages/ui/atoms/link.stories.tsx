@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Link } from './link';
 
 const meta: Meta<typeof Link> = {
-  title: 'shadcn/Link',
+  title: 'UI/Atoms/Link',
   component: Link,
   parameters: {
     layout: 'centered',
@@ -131,4 +131,24 @@ export const AsChild: Story = {
       },
     },
   },
+};
+
+export const StateMatrix: Story = {
+  render: () => (
+    <div className='grid justify-items-start gap-3'>
+      <Link href='#default'>Default destination</Link>
+      <Link href='#subtle' variant='subtle'>
+        Subtle destination
+      </Link>
+      <Link href='#inline' variant='inline'>
+        Inline destination
+      </Link>
+      <Link href='#current' active>
+        Current destination
+      </Link>
+      <Link href='#disabled' disabled>
+        Unavailable destination
+      </Link>
+    </div>
+  ),
 };

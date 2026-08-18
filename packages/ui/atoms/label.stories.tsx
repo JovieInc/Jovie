@@ -22,8 +22,21 @@ export const Default: Story = {
 
 export const Required: Story = {
   render: () => (
-    <Label htmlFor='lbl-req' required>
-      Email
-    </Label>
+    <div className='flex flex-col gap-1.5'>
+      <Label htmlFor='lbl-req' required>
+        Email
+      </Label>
+      <Input id='lbl-req' type='email' required aria-required='true' />
+    </div>
+  ),
+};
+
+export const Variants: Story = {
+  render: () => (
+    <div className='grid gap-3'>
+      <Label variant='default'>Default label</Label>
+      <Label variant='muted'>Optional metadata</Label>
+      <Label variant='error'>Resolve this field</Label>
+    </div>
   ),
 };

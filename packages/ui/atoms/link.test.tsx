@@ -14,6 +14,7 @@ describe('Link', () => {
     const link = screen.getByTestId('link');
     expect(link.tagName).toBe('A');
     expect(link).toHaveAttribute('data-variant', 'link');
+    expect(link).toHaveAttribute('data-appearance', 'default');
     expect(link).toHaveAttribute('data-state', 'idle');
     expect(link.className).toContain('text-(--color-link-default)');
     expect(link.className).toContain('visited:text-(--color-link-visited)');
@@ -60,6 +61,34 @@ describe('Link', () => {
     expect(link.className).toContain('pointer-events-none');
     expect(link.className).toContain('text-(--color-text-disabled-token)');
     expect(link.className).toContain('opacity-[var(--state-disabled-opacity)]');
+  });
+
+  it('prevents disabled links from navigating or calling consumer handlers', () => {
+    const onClick = vi.fn();
+    render(
+      <Link href='/off' disabled onClick={onClick} data-testid='disabled-link'>
+        Disabled
+      </Link>
+    );
+
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+    const dispatched = screen.getByTestId('disabled-link').dispatchEvent(click);
+
+    expect(dispatched).toBe(false);
+    expect(click.defaultPrevented).toBe(true);
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('calls consumer handlers for enabled links', () => {
+    const onClick = vi.fn(event => event.preventDefault());
+    render(
+      <Link href='/docs' onClick={onClick}>
+        Documentation
+      </Link>
+    );
+
+    screen.getByRole('link', { name: 'Documentation' }).click();
+    expect(onClick).toHaveBeenCalledTimes(1);
   });
 
   it('prioritizes disabled over active and visited in data-state', () => {
@@ -124,6 +153,7 @@ describe('Link', () => {
 
     const link = screen.getByTestId('null-variant-link');
     expect(link).toHaveAttribute('data-variant', 'link');
+    expect(link).toHaveAttribute('data-appearance', 'unstyled');
     expect(link.className).not.toContain('text-(--color-link-default)');
     expect(link.className).not.toContain('visited:text-(--color-link-visited)');
   });
