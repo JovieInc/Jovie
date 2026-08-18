@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { SegmentControl } from './segment-control';
@@ -24,7 +25,7 @@ describe('SegmentControl', () => {
       expect(screen.getByRole('tab', { name: 'Videos' })).toBeInTheDocument();
     });
 
-    it('renders as tablist', () => {
+    it('renders as a named tablist by default', () => {
       render(
         <SegmentControl
           value='links'
@@ -32,7 +33,9 @@ describe('SegmentControl', () => {
           options={defaultOptions}
         />
       );
-      expect(screen.getByRole('tablist')).toBeInTheDocument();
+      expect(
+        screen.getByRole('tablist', { name: 'Choose a view' })
+      ).toBeInTheDocument();
     });
 
     it('renders tabs', () => {
@@ -61,7 +64,8 @@ describe('SegmentControl', () => {
       expect(musicTab).toHaveAttribute('data-state', 'active');
     });
 
-    it('calls onValueChange when option is clicked', () => {
+    it('calls onValueChange when option is clicked', async () => {
+      const user = userEvent.setup();
       const onValueChange = vi.fn();
       render(
         <SegmentControl
@@ -71,22 +75,9 @@ describe('SegmentControl', () => {
         />
       );
 
-      const musicTab = screen.getByRole('tab', { name: 'Music' });
-      // Radix Tabs may not trigger onValueChange synchronously with fireEvent
-      // in jsdom - use mouseDown/mouseUp sequence for more reliable triggering
-      fireEvent.mouseDown(musicTab);
-      fireEvent.mouseUp(musicTab);
-      fireEvent.click(musicTab);
+      await user.click(screen.getByRole('tab', { name: 'Music' }));
 
-      // If the callback was triggered, verify it was called with 'music'
-      // This verifies the prop is wired correctly even if jsdom behavior varies
-      if (onValueChange.mock.calls.length > 0) {
-        expect(onValueChange).toHaveBeenCalledWith('music');
-      } else {
-        // Verify the tab is interactive (not disabled)
-        expect(musicTab).not.toBeDisabled();
-        expect(musicTab).toHaveAttribute('aria-selected', 'false');
-      }
+      expect(onValueChange).toHaveBeenCalledWith('music');
     });
 
     it('updates selected state on value change', () => {
@@ -275,6 +266,7 @@ describe('SegmentControl', () => {
       expect((container.firstChild as HTMLElement).className).toContain(
         'p-(--linear-pill-track-padding)'
       );
+      expect(indicator).toHaveClass('inset-y-0', 'left-0');
       expect((container.firstChild as HTMLElement).className).not.toContain(
         'p-0.5'
       );
@@ -286,6 +278,109 @@ describe('SegmentControl', () => {
       expect(activeTab.className).not.toContain('font-[510]');
       expect(activeTab.className).not.toContain('tracking-[-0.01em]');
       expect(activeTab.className).not.toContain('text-[12px]');
+    });
+
+    it('resyncs and disconnects the indicator resize observer', () => {
+      const originalResizeObserver = globalThis.ResizeObserver;
+      const observe = vi.fn();
+      const disconnect = vi.fn();
+      let notify = () => undefined;
+
+      class TestResizeObserver {
+        constructor(callback: ResizeObserverCallback) {
+          notify = () => callback([], this as unknown as ResizeObserver);
+        }
+        observe = observe;
+        unobserve = vi.fn();
+        disconnect = disconnect;
+      }
+
+      globalThis.ResizeObserver =
+        TestResizeObserver as unknown as typeof ResizeObserver;
+
+      try {
+        const { unmount } = render(
+          <SegmentControl
+            value='links'
+            onValueChange={vi.fn()}
+            options={defaultOptions}
+            variant='linear-pill'
+          />
+        );
+
+        expect(observe).toHaveBeenCalledTimes(4);
+        act(() => notify());
+        unmount();
+        expect(disconnect).toHaveBeenCalledOnce();
+      } finally {
+        globalThis.ResizeObserver = originalResizeObserver;
+      }
+    });
+
+    it('falls back to the window resize event without ResizeObserver', () => {
+      const originalResizeObserver = globalThis.ResizeObserver;
+      const addEventListener = vi.spyOn(globalThis, 'addEventListener');
+      const removeEventListener = vi.spyOn(globalThis, 'removeEventListener');
+      globalThis.ResizeObserver = undefined as unknown as typeof ResizeObserver;
+
+      try {
+        const { unmount } = render(
+          <SegmentControl
+            value='links'
+            onValueChange={vi.fn()}
+            options={defaultOptions}
+            variant='linear-pill'
+          />
+        );
+
+        expect(addEventListener).toHaveBeenCalledWith(
+          'resize',
+          expect.any(Function)
+        );
+        unmount();
+        expect(removeEventListener).toHaveBeenCalledWith(
+          'resize',
+          expect.any(Function)
+        );
+      } finally {
+        globalThis.ResizeObserver = originalResizeObserver;
+        addEventListener.mockRestore();
+        removeEventListener.mockRestore();
+      }
+    });
+
+    it('resyncs the indicator after document fonts are ready', async () => {
+      const descriptor = Object.getOwnPropertyDescriptor(document, 'fonts');
+      Object.defineProperty(document, 'fonts', {
+        configurable: true,
+        value: { ready: Promise.resolve() },
+      });
+
+      try {
+        await act(async () => {
+          render(
+            <SegmentControl
+              value='links'
+              onValueChange={vi.fn()}
+              options={defaultOptions}
+              variant='linear-pill'
+            />
+          );
+          await Promise.resolve();
+        });
+
+        expect(
+          screen
+            .getByRole('tablist')
+            .querySelector(':scope > [aria-hidden="true"]')
+        ).toBeInTheDocument();
+      } finally {
+        if (descriptor) {
+          Object.defineProperty(document, 'fonts', descriptor);
+        } else {
+          Reflect.deleteProperty(document, 'fonts');
+        }
+      }
     });
   });
 
@@ -332,6 +427,26 @@ describe('SegmentControl', () => {
 
       expect(screen.getByRole('tablist')).toHaveClass('flex-wrap', 'gap-1.5');
     });
+
+    it('keeps long labels inside a shrinking text slot', () => {
+      render(
+        <SegmentControl
+          value='audience'
+          onValueChange={vi.fn()}
+          options={[
+            { value: 'audience', label: 'Audience engagement overview' },
+            { value: 'sources', label: 'Acquisition sources' },
+          ]}
+        />
+      );
+
+      expect(screen.getByText('Audience engagement overview')).toHaveClass(
+        'min-w-0',
+        'overflow-hidden',
+        'text-ellipsis',
+        'whitespace-nowrap'
+      );
+    });
   });
 
   describe('Accessibility', () => {
@@ -346,6 +461,35 @@ describe('SegmentControl', () => {
       );
       expect(
         screen.getByRole('tablist', { name: 'Select category' })
+      ).toBeInTheDocument();
+    });
+
+    it('supports accessible names for icon-only options', () => {
+      render(
+        <SegmentControl
+          value='grid'
+          onValueChange={vi.fn()}
+          options={[
+            {
+              value: 'grid',
+              label: <span aria-hidden='true'>▦</span>,
+              ariaLabel: 'Grid view',
+            },
+            {
+              value: 'list',
+              label: <span aria-hidden='true'>☷</span>,
+              ariaLabel: 'List view',
+            },
+          ]}
+        />
+      );
+
+      expect(screen.getByRole('tab', { name: 'Grid view' })).toHaveAttribute(
+        'aria-selected',
+        'true'
+      );
+      expect(
+        screen.getByRole('tab', { name: 'List view' })
       ).toBeInTheDocument();
     });
 
@@ -405,6 +549,9 @@ describe('SegmentControl', () => {
       const root = container.firstChild;
       expect((root as HTMLElement).className).toContain('inline-flex');
       expect((root as HTMLElement).className).toContain('rounded-full');
+      expect(root).toHaveAttribute('data-layout', 'fill');
+      expect(root).toHaveAttribute('data-size', 'md');
+      expect(root).toHaveAttribute('data-variant', 'default');
     });
 
     it('merges custom className', () => {
@@ -444,9 +591,11 @@ describe('SegmentControl', () => {
       const tab = screen.getByRole('tab', { name: 'Links' });
       expect(tab.className).toContain('focus-visible:outline-none');
       expect(tab.className).toContain('focus-visible:ring-2');
+      expect(tab.className).toContain('focus-visible:ring-focus/55');
+      expect(tab.className).toContain('focus-visible:ring-offset-surface-page');
     });
 
-    it('applies motion-safe transition', () => {
+    it('uses a 44px target and reduced-motion-safe semantic timing', () => {
       render(
         <SegmentControl
           value='links'
@@ -455,7 +604,11 @@ describe('SegmentControl', () => {
         />
       );
       const tab = screen.getByRole('tab', { name: 'Links' });
-      expect(tab.className).toContain('motion-safe:transition');
+      expect(tab.className).toContain('before:h-11');
+      expect(tab.className).toContain('before:min-w-11');
+      expect(tab.className).toContain('duration-subtle');
+      expect(tab.className).toContain('ease-subtle');
+      expect(tab.className).toContain('motion-reduce:transition-none');
     });
   });
 
