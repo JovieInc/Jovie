@@ -1,5 +1,6 @@
 'use client';
 
+import { ConfirmDialog } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import {
   lazy,
@@ -20,7 +21,6 @@ import {
 import { instantiateReleaseTasksFromCatalog } from '@/app/app/(shell)/dashboard/releases/catalog-task-actions';
 import { instantiateReleaseTasks } from '@/app/app/(shell)/dashboard/releases/task-actions';
 import { toast } from '@/components/feedback';
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { DrawerLoadingSkeleton } from '@/components/molecules/drawer';
 import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkeleton';
 import { PageShell } from '@/components/organisms/PageShell';

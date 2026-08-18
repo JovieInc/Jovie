@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, ConfirmDialog } from '@jovie/ui';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -12,7 +12,6 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from '@/components/feedback';
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { MismatchCard } from './MismatchCard';
 import type { CatalogMismatch, CatalogScan } from './types';
 
@@ -419,7 +418,7 @@ export function CatalogHealthSection({
                     className='h-7 text-xs'
                     onClick={() => setBulkDismissOpen(true)}
                   >
-                    Dismiss all
+                    Dismiss All
                   </Button>
                 )}
               </div>

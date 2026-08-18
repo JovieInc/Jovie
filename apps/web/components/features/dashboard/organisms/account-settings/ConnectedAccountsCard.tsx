@@ -7,10 +7,9 @@
  * Allows users to disconnect providers they no longer want connected.
  */
 
-import { Badge, Button } from '@jovie/ui';
+import { Badge, Button, ConfirmDialog } from '@jovie/ui';
 import { CheckCircle, Link2, Link2Off } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 

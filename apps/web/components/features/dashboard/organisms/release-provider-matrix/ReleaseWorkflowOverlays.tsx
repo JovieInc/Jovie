@@ -1,7 +1,7 @@
 'use client';
 
+import { ConfirmDialog } from '@jovie/ui';
 import { Suspense } from 'react';
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkeleton';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import type { ReleaseContext } from '@/lib/release-tasks/applicability';

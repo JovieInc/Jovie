@@ -1,8 +1,8 @@
 'use client';
 
+import { ConfirmDialog } from '@jovie/ui';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { TableContextMenu } from '@/components/organisms/table';
 import { cn } from '@/lib/utils';
 import { buildLinkActions } from './link-actions-builder';
@@ -80,7 +80,7 @@ export const LinkActions = memo(function LinkActions({
             type='button'
             onPointerDown={onDragHandlePointerDown}
             className='opacity-0 transition-opacity duration-subtle ease-out hover:opacity-100 group-hover:opacity-70 group-focus-within:opacity-100'
-            aria-label='Drag to reorder'
+            aria-label='Drag To Reorder'
           >
             <span className='inline-flex h-7 w-7 items-center justify-center rounded-md border border-default bg-surface-2 text-secondary-token shadow-xs'>
               <Icon name='GripVertical' className='h-3.5 w-3.5' />
@@ -92,7 +92,7 @@ export const LinkActions = memo(function LinkActions({
           <button
             ref={triggerRef}
             type='button'
-            aria-label='Link actions'
+            aria-label='Link Actions'
             aria-expanded={open}
             aria-controls={menuId}
             aria-haspopup='menu'
@@ -109,7 +109,7 @@ export const LinkActions = memo(function LinkActions({
               ref={menuRef}
               id={menuId}
               role='menu'
-              aria-label='Link actions menu'
+              aria-label='Link Actions Menu'
               tabIndex={-1}
               className='absolute right-0 top-9 z-50 min-w-35 rounded-lg border border-default bg-surface-1 p-1 text-app shadow-popover focus-visible:outline-none'
               onKeyDown={handleKeyDown}

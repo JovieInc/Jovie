@@ -160,7 +160,8 @@ vi.mock('@/components/molecules/LoadingSkeleton', () => ({
   LoadingSkeleton: () => <div data-testid='loading-skeleton' />,
 }));
 
-vi.mock('@/components/molecules/ConfirmDialog', () => ({
+vi.mock('@jovie/ui', async importOriginal => ({
+  ...(await importOriginal<typeof import('@jovie/ui')>()),
   ConfirmDialog: () => null,
 }));
 

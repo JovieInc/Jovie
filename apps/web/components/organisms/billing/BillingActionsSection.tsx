@@ -1,10 +1,9 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, ConfirmDialog } from '@jovie/ui';
 import { CreditCard, XCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { BillingPortalLink } from '@/components/molecules/BillingPortalLink';
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { track } from '@/lib/analytics';

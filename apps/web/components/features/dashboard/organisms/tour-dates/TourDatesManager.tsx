@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, ConfirmDialog } from '@jovie/ui';
 import { useCallback, useMemo, useState } from 'react';
 import { useChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import {
@@ -9,7 +9,6 @@ import {
 } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { toast } from '@/components/feedback';
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import {
   useDeleteTourDateMutation,

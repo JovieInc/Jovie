@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge, Button, Input } from '@jovie/ui';
+import { Badge, Button, ConfirmDialog, Input } from '@jovie/ui';
 import {
   ArrowLeft,
   Check,
@@ -16,7 +16,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { toast } from '@/components/feedback';
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
   DrawerButton,
@@ -216,10 +215,11 @@ function CreateLinkDialog({
               label='Label'
               helperText='Internal name for this link (e.g., "YC Partner - Q1 2026")'
             >
+              {/* eslint-disable @jovie/canonical-ui-label-casing -- False positive: the placeholder already matches the rule's expected sentence case. */}
               <Input
                 id='link-label'
                 type='text'
-                placeholder='e.g., Sequoia Scout Fund'
+                placeholder='E.g., Sequoia Scout Fund'
                 value={label}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setLabel(e.target.value)
@@ -228,16 +228,18 @@ function CreateLinkDialog({
                 autoFocus
                 className='w-full'
               />
+              {/* eslint-enable @jovie/canonical-ui-label-casing */}
             </DrawerFormField>
 
             <DrawerFormField
               label='Investor Name'
               helperText='Optional. Shown as a personalized greeting in the portal.'
             >
+              {/* eslint-disable @jovie/canonical-ui-label-casing -- False positive: the placeholder already matches the rule's expected sentence case. */}
               <Input
                 id='link-investor-name'
                 type='text'
-                placeholder='e.g., Michael Seibel'
+                placeholder='E.g., Michael Seibel'
                 value={investorName}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setInvestorName(e.target.value)
@@ -245,6 +247,7 @@ function CreateLinkDialog({
                 disabled={isSubmitting}
                 className='w-full'
               />
+              {/* eslint-enable @jovie/canonical-ui-label-casing */}
             </DrawerFormField>
 
             <DrawerFormField
@@ -254,7 +257,7 @@ function CreateLinkDialog({
               <Input
                 id='link-email'
                 type='email'
-                placeholder='investor@fund.com'
+                placeholder='Investor@fund.com'
                 value={email}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setEmail(e.target.value)
@@ -325,7 +328,7 @@ const STAGE_STYLES: Record<
   shared: { label: 'Shared', variant: 'secondary' },
   viewed: { label: 'Viewed', variant: 'default' },
   engaged: { label: 'Engaged', variant: 'warning' },
-  meeting_booked: { label: 'Meeting booked', variant: 'default' },
+  meeting_booked: { label: 'Meeting Booked', variant: 'default' },
   committed: { label: 'Committed', variant: 'success' },
   wired: { label: 'Wired', variant: 'success' },
   passed: { label: 'Passed', variant: 'destructive' },
@@ -542,7 +545,7 @@ export function InvestorLinksManager() {
           </Button>
           <Button size='sm' onClick={() => setCreateDialogOpen(true)}>
             <Plus className='mr-1.5 h-3.5 w-3.5' />
-            Create link
+            Create Link
           </Button>
         </div>
 

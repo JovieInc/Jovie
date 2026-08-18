@@ -29,27 +29,6 @@ vi.mock('@jovie/ui', () => ({
       {children}
     </button>
   ),
-  Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => (
-    <input {...props} />
-  ),
-  Switch: ({
-    checked,
-    onCheckedChange,
-  }: {
-    checked: boolean;
-    onCheckedChange: (checked: boolean) => void;
-  }) => (
-    <button
-      type='button'
-      aria-pressed={checked}
-      onClick={() => onCheckedChange(!checked)}
-    >
-      Playlist Engine
-    </button>
-  ),
-}));
-
-vi.mock('@/components/molecules/ConfirmDialog', () => ({
   ConfirmDialog: ({
     open,
     title,
@@ -71,6 +50,24 @@ vi.mock('@/components/molecules/ConfirmDialog', () => ({
         </button>
       </div>
     ) : null,
+  Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => (
+    <input {...props} />
+  ),
+  Switch: ({
+    checked,
+    onCheckedChange,
+  }: {
+    checked: boolean;
+    onCheckedChange: (checked: boolean) => void;
+  }) => (
+    <button
+      type='button'
+      aria-pressed={checked}
+      onClick={() => onCheckedChange(!checked)}
+    >
+      Playlist Engine
+    </button>
+  ),
 }));
 
 vi.mock('@/app/app/(shell)/admin/platform-connections/actions', () => ({
