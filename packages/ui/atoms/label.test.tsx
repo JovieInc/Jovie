@@ -31,6 +31,7 @@ describe('Label', () => {
       expect(label.className).toContain('text-primary-token');
       expect(label).toHaveAttribute('data-variant', 'default');
       expect(label).toHaveAttribute('data-required', 'false');
+      expect(label).toHaveAttribute('data-disabled', 'false');
     });
 
     it('applies muted variant classes', () => {
@@ -98,6 +99,21 @@ describe('Label', () => {
       expect(label.className).toContain('peer-disabled:cursor-not-allowed');
       expect(label.className).toContain(
         'peer-disabled:opacity-[var(--state-disabled-opacity)]'
+      );
+    });
+
+    it('exposes an explicit accessible disabled state', () => {
+      render(
+        <Label disabled data-testid='label'>
+          Locked field
+        </Label>
+      );
+
+      const label = screen.getByTestId('label');
+      expect(label).toHaveAttribute('aria-disabled', 'true');
+      expect(label).toHaveAttribute('data-disabled', 'true');
+      expect(label.className).toContain(
+        'data-[disabled=true]:text-(--color-text-disabled-token)'
       );
     });
 

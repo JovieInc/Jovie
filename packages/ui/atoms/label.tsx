@@ -7,7 +7,7 @@ import * as React from 'react';
 import { cn } from '../lib/utils';
 
 const labelVariants = cva(
-  'inline-flex cursor-pointer items-center text-[13px] font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-[var(--state-disabled-opacity)]',
+  'inline-flex cursor-pointer items-center text-[13px] font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-[var(--state-disabled-opacity)] data-[disabled=true]:cursor-not-allowed data-[disabled=true]:text-(--color-text-disabled-token) data-[disabled=true]:opacity-[var(--state-disabled-opacity)]',
   {
     variants: {
       variant: {
@@ -29,6 +29,8 @@ export interface LabelProps
    * Whether the field is required. Adds a visual indicator.
    */
   readonly required?: boolean;
+  /** Whether the associated field is unavailable. */
+  readonly disabled?: boolean;
 }
 
 /**
@@ -38,25 +40,32 @@ export interface LabelProps
 const Label = React.forwardRef<
   React.ComponentRef<typeof LabelPrimitive.Root>,
   LabelProps
->(({ className, variant, required, children, ...props }, ref) => (
-  <LabelPrimitive.Root
-    ref={ref}
-    data-required={required ? 'true' : 'false'}
-    data-variant={variant ?? 'default'}
-    className={cn(labelVariants({ variant }), className)}
-    {...props}
-  >
-    {children}
-    {required && (
-      <>
-        <span className='ml-1 text-destructive' aria-hidden='true'>
-          *
-        </span>
-        <span className='sr-only'>(required)</span>
-      </>
-    )}
-  </LabelPrimitive.Root>
-));
+>(
+  (
+    { className, variant, required, disabled = false, children, ...props },
+    ref
+  ) => (
+    <LabelPrimitive.Root
+      ref={ref}
+      aria-disabled={disabled || undefined}
+      data-disabled={disabled ? 'true' : 'false'}
+      data-required={required ? 'true' : 'false'}
+      data-variant={variant ?? 'default'}
+      className={cn(labelVariants({ variant }), className)}
+      {...props}
+    >
+      {children}
+      {required && (
+        <>
+          <span className='ml-1 text-destructive' aria-hidden='true'>
+            *
+          </span>
+          <span className='sr-only'>(required)</span>
+        </>
+      )}
+    </LabelPrimitive.Root>
+  )
+);
 Label.displayName = LabelPrimitive.Root.displayName;
 
 export { Label, labelVariants };

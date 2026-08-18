@@ -40,3 +40,15 @@ export const Variants: Story = {
     </div>
   ),
 };
+
+export const Disabled: Story = {
+  args: { disabled: true },
+  render: args => (
+    <div className='flex flex-col gap-1.5'>
+      <Label {...args} htmlFor='lbl-disabled'>
+        Managed identity
+      </Label>
+      <Input id='lbl-disabled' value='Unavailable' disabled readOnly />
+    </div>
+  ),
+};
