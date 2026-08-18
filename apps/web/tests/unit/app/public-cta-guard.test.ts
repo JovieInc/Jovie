@@ -8,6 +8,10 @@ const TARGET_DIRS = [
   join(ROOT, 'components', 'features', 'home'),
   join(ROOT, 'components', 'features', 'pay'),
 ] as const;
+const TARGET_FILES = [
+  join(ROOT, 'components', 'organisms', 'HeaderNav.tsx'),
+  join(ROOT, 'components', 'molecules', 'AuthActions.tsx'),
+] as const;
 
 const LEGACY_CTA_PATTERNS = [
   'btn-linear-login',
@@ -36,9 +40,14 @@ function collectFiles(dir: string, results: string[] = []): string[] {
 describe('public CTA guard', () => {
   it('keeps legacy public CTA classnames out of production marketing and key public feature surfaces', () => {
     const missingDirs = TARGET_DIRS.filter(dir => !existsSync(dir));
+    const missingFiles = TARGET_FILES.filter(file => !existsSync(file));
     expect(missingDirs).toEqual([]);
+    expect(missingFiles).toEqual([]);
 
-    const files = TARGET_DIRS.flatMap(dir => collectFiles(dir));
+    const files = [
+      ...TARGET_DIRS.flatMap(dir => collectFiles(dir)),
+      ...TARGET_FILES,
+    ];
 
     const offenders = files.filter(filePath => {
       const contents = readFileSync(filePath, 'utf8');
