@@ -24,6 +24,19 @@ describe('profile admission fixture guard', () => {
         NEXT_PUBLIC_E2E_MODE: undefined,
       })
     ).toBe(false);
+    expect(
+      isProfileAdmissionFixtureEnabled({
+        NODE_ENV: 'development',
+        NEXT_PUBLIC_E2E_MODE: '1',
+        PUBLIC_NOAUTH_SMOKE: '1',
+      })
+    ).toBe(true);
+    expect(
+      isProfileAdmissionFixtureEnabled({
+        NODE_ENV: 'development',
+        NEXT_PUBLIC_E2E_MODE: '1',
+      })
+    ).toBe(false);
   });
 
   it('is defensively excluded from indexing and crawling', () => {
