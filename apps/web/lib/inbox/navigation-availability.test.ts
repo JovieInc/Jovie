@@ -1,11 +1,21 @@
 import { describe, expect, it } from 'vitest';
+import { suggestedActionStatusEnum } from '@/lib/db/schema/enums';
 import {
+  PENDING_SUGGESTED_ACTION_STATUS,
   resolveInboxNavigationAvailability,
   shouldShowInboxNavigation,
   UNKNOWN_INBOX_NAVIGATION_AVAILABILITY,
 } from './navigation-availability';
 
 describe('Inbox navigation availability', () => {
+  it('filters the pending count by a status literal the prod enum has (JOV-5160)', () => {
+    // JOV-3125/JOV-5160 class: an out-of-enum status literal breaks the
+    // suggested_actions count read on every Inbox load.
+    expect(suggestedActionStatusEnum.enumValues).toContain(
+      PENDING_SUGGESTED_ACTION_STATUS
+    );
+  });
+
   it('marks the Inbox available when either review queue has pending work', () => {
     expect(resolveInboxNavigationAvailability(1, 0)).toEqual({
       state: 'available',

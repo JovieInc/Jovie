@@ -26,6 +26,7 @@ type TxState = { poisoned: boolean };
 const {
   captureExceptionMock,
   loggerErrorMock,
+  loggerWarnMock,
   outcomes,
   txStates,
   withDbSessionTxMock,
@@ -100,6 +101,7 @@ const {
   return {
     captureExceptionMock: vi.fn(),
     loggerErrorMock: vi.fn(),
+    loggerWarnMock: vi.fn(),
     outcomes,
     txStates,
     withDbSessionTxMock,
@@ -150,7 +152,7 @@ vi.mock('@sentry/nextjs', async importOriginal => {
     addBreadcrumb: vi.fn(),
     logger: {
       error: loggerErrorMock,
-      warn: vi.fn(),
+      warn: loggerWarnMock,
     },
     startSpan: vi.fn(
       async (_options: unknown, callback: () => Promise<unknown>) => callback()
@@ -392,6 +394,58 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     expect(capturedCascadeErrors()).toEqual([]);
 
     // Isolation mechanism: 1 base transaction + 4 per-read transactions.
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+  });
+
+  it('degrades the Inbox count read log-only on connector schema drift (JOV-5160)', async () => {
+    // Prod fingerprint of Sentry issue 7673925206: the suggested_actions
+    // pending-count read throws when prod predates migration 0048. Drizzle
+    // wraps the PG error — outer message names the query, the 42P01 code and
+    // "relation does not exist" live on the cause.
+    const driftError = new Error(
+      'Failed query: select count(*) from "suggested_actions" where ("suggested_actions"."user_id" = $1 and "suggested_actions"."status" = $2)',
+      {
+        cause: Object.assign(
+          new Error('relation "suggested_actions" does not exist'),
+          { code: '42P01' }
+        ),
+      }
+    );
+    outcomes.push(
+      ok([userRow]),
+      ok([dashboardProfile]),
+      ok([{ sidebarCollapsed: false }]),
+      fail(driftError), // Inbox suggested-actions count read fails on drift
+      ok([{ hasLinks: true, hasMusicLinks: true }]),
+      ok([{ width: 1024, height: 1024 }]),
+      ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
+      ok([{ total: 3, qr: 1, link: 2 }])
+    );
+
+    const { getDashboardData } = await import(
+      '@/app/app/(shell)/dashboard/actions/dashboard-data'
+    );
+    const result = await getDashboardData();
+
+    // The shell still renders and the Inbox fails open — never hidden by a
+    // transient data failure.
+    expect(result.inboxNavigation).toEqual({
+      state: 'unknown',
+      pendingCount: null,
+    });
+
+    // Known drift is log-only: no Sentry error event may be emitted.
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.stringContaining('schema drift')
+    );
+
+    // Sibling reads are unaffected.
+    expect(result.avatarQuality).toEqual({
+      status: 'ok',
+      width: 1024,
+      height: 1024,
+    });
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
   });
 
