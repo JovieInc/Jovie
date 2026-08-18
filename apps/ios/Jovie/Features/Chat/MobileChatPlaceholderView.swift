@@ -45,6 +45,7 @@ struct MobileChatPlaceholderView: View {
           .background(JovieColor.backgroundBase)
       }
     }
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier("mobile-chat")
   }
 }

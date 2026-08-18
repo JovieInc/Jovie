@@ -77,4 +77,42 @@ struct AppShellChatFirstTests {
     #expect(appShellShowsChatUnderlay(selectedTab: .chat, chatEnabled: false) == false)
     #expect(appShellShowsChatUnderlay(selectedTab: .library, chatEnabled: false) == false)
   }
+
+  @Test func autoScrollsOnlyWhilePinnedToLatest() {
+    #expect(MobileChatScrollPolicy.shouldAutoScrollToLatest(isAtBottom: true))
+    #expect(MobileChatScrollPolicy.shouldAutoScrollToLatest(isAtBottom: false) == false)
+  }
+
+  @Test func jumpToLatestAppearsOnlyAfterUserScrollsAway() {
+    #expect(MobileChatScrollPolicy.shouldShowJumpToLatest(isAtBottom: false))
+    #expect(MobileChatScrollPolicy.shouldShowJumpToLatest(isAtBottom: true) == false)
+  }
+
+  @Test func composerSendStaysDisabledForEmptyOrInFlightDrafts() {
+    #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "", isSending: false) == false)
+    #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "Ask Jovie", isSending: true) == false)
+    #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "Ask Jovie", isSending: false))
+  }
+
+  @Test func composerPlusDisablesWhileSending() {
+    #expect(ChatComposerMetrics.isPlusEnabled(isSending: false))
+    #expect(ChatComposerMetrics.isPlusEnabled(isSending: true) == false)
+  }
+
+  @Test func composerGeometryReservesSendSlotWithoutGrowingTheBar() {
+    #expect(ChatComposerMetrics.barHeight == 76)
+    #expect(ChatComposerMetrics.sendSlotSize == 52)
+    #expect(ChatComposerMetrics.plusButtonSize == 36)
+    #expect(ChatComposerMetrics.sendSlotSize < ChatComposerMetrics.barHeight)
+  }
+
+  @Test func waitlistLaunchStaysOffTheAppShell() {
+    #expect(
+      LaunchMode.resolving(arguments: ["-ui-testing-waitlist-pending"], isXCTest: false)
+        == .uiTestingWaitlistPending
+    )
+    #expect(LaunchMode.uiTestingWaitlistPending.usesLiveAuth == false)
+    #expect(LaunchMode.uiTestingWaitlistPending.opensChatOnLaunch == false)
+    #expect(LaunchMode.uiTestingWaitlistPending.needsChatRepository == false)
+  }
 }

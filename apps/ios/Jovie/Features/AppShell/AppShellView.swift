@@ -668,8 +668,12 @@ struct AppShellView<
   private func edgeRailGesture(openOffset: CGFloat, containerWidth: CGFloat) -> some Gesture {
     DragGesture(minimumDistance: 8, coordinateSpace: .global)
       .onChanged { value in
-        guard !reduceMotion, !isKeyboardVisible, !isShowingTalkOverlay,
-              teleprompterProposal == nil else { return }
+        guard AppShellGesturePolicy.allowsEdgeRailDrag(
+          reduceMotion: reduceMotion,
+          isKeyboardVisible: isKeyboardVisible,
+          isShowingTalkOverlay: isShowingTalkOverlay,
+          hasTeleprompterProposal: teleprompterProposal != nil
+        ) else { return }
 
         if isShowingDrawer {
           drawerDragOffset = min(0, value.translation.width)
@@ -680,8 +684,12 @@ struct AppShellView<
         }
       }
       .onEnded { value in
-        guard !reduceMotion, !isKeyboardVisible, !isShowingTalkOverlay,
-              teleprompterProposal == nil else { return }
+        guard AppShellGesturePolicy.allowsEdgeRailDrag(
+          reduceMotion: reduceMotion,
+          isKeyboardVisible: isKeyboardVisible,
+          isShowingTalkOverlay: isShowingTalkOverlay,
+          hasTeleprompterProposal: teleprompterProposal != nil
+        ) else { return }
 
         let predicted = value.predictedEndTranslation.width
         if isShowingDrawer {

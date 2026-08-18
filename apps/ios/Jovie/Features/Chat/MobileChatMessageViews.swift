@@ -199,7 +199,7 @@ struct ChatComposerView: View {
       isFocused: $isComposerFocused,
       placeholder: isOffline ? "Ask Jovie (offline)" : "Ask Jovie",
       isSending: isSending,
-      isPlusEnabled: !isSending,
+      isPlusEnabled: ChatComposerMetrics.isPlusEnabled(isSending: isSending),
       onSend: onSend,
       onSelectWorkflow: onSelectWorkflow,
       onDraftEdited: onDraftEdited

@@ -147,4 +147,14 @@ enum AppShellGesturePolicy {
   static func shouldSwitchTabFromHorizontalSwipe() -> Bool {
     false
   }
+
+  /// Edge-drag rails must not fight text selection, Talk, or a teleprompter.
+  static func allowsEdgeRailDrag(
+    reduceMotion: Bool,
+    isKeyboardVisible: Bool,
+    isShowingTalkOverlay: Bool,
+    hasTeleprompterProposal: Bool
+  ) -> Bool {
+    !reduceMotion && !isKeyboardVisible && !isShowingTalkOverlay && !hasTeleprompterProposal
+  }
 }

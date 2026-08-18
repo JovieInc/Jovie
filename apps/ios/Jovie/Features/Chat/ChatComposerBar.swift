@@ -1,5 +1,19 @@
 import SwiftUI
 
+enum ChatComposerMetrics {
+  static let barHeight: CGFloat = 76
+  static let sendSlotSize: CGFloat = 52
+  static let plusButtonSize: CGFloat = 36
+
+  static func isPlusEnabled(isSending: Bool) -> Bool {
+    !isSending
+  }
+
+  static func isSendEnabled(trimmedDraft: String, isSending: Bool) -> Bool {
+    !trimmedDraft.isEmpty && !isSending
+  }
+}
+
 struct ChatComposerBar: View {
   @Binding var draft: String
   @FocusState.Binding var isFocused: Bool
@@ -32,7 +46,7 @@ struct ChatComposerBar: View {
           .foregroundStyle(
             isPlusEnabled ? JovieColor.textPrimary : JovieColor.textTertiary
           )
-          .frame(width: 36, height: 36)
+          .frame(width: ChatComposerMetrics.plusButtonSize, height: ChatComposerMetrics.plusButtonSize)
           .background(JovieColor.surface2, in: Circle())
       }
       .buttonStyle(.plain)
@@ -47,26 +61,27 @@ struct ChatComposerBar: View {
         .disableAutocorrection(false)
         .font(JovieFont.body(size: 16))
         .foregroundStyle(JovieColor.textPrimary)
-        .frame(height: 52)
+        .frame(height: ChatComposerMetrics.sendSlotSize)
         .onChange(of: draft) {
           onDraftEdited()
         }
 
-      // Reserve a stable trailing 52pt slot so empty → typed never shifts layout.
+      // Reserve a stable trailing slot so empty → typed never shifts layout.
       ZStack {
         if !trimmedDraft.isEmpty {
           sendButton(trimmedDraft: trimmedDraft)
         }
       }
-      .frame(width: 52, height: 52)
+      .frame(width: ChatComposerMetrics.sendSlotSize, height: ChatComposerMetrics.sendSlotSize)
     }
     .padding(.horizontal, JovieSpacing.large)
-    .frame(height: 76)
+    .frame(height: ChatComposerMetrics.barHeight)
     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
     .overlay {
       RoundedRectangle(cornerRadius: 28, style: .continuous)
         .stroke(JovieColor.borderDefault, lineWidth: 1)
     }
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier("chat-composer")
     .overlay(alignment: .top) {
       // Anchored ABOVE the bar via alignmentGuide so the transcript and the
@@ -132,19 +147,22 @@ struct ChatComposerBar: View {
       Image(systemName: isSending ? "ellipsis" : "arrow.up")
         .font(.system(size: 16, weight: .bold))
         .foregroundStyle(
-          trimmedDraft.isEmpty || isSending
-            ? JovieColor.textTertiary
-            : JovieColor.backgroundBase
+          ChatComposerMetrics.isSendEnabled(trimmedDraft: trimmedDraft, isSending: isSending)
+            ? JovieColor.backgroundBase
+            : JovieColor.textTertiary
         )
-        .frame(width: 52, height: 52)
+        .frame(width: ChatComposerMetrics.sendSlotSize, height: ChatComposerMetrics.sendSlotSize)
         .background(
-          trimmedDraft.isEmpty || isSending ? JovieColor.surface2 : Color.white,
+          ChatComposerMetrics.isSendEnabled(trimmedDraft: trimmedDraft, isSending: isSending)
+            ? Color.white
+            : JovieColor.surface2,
           in: Circle()
         )
     }
     .buttonStyle(.plain)
-    .disabled(trimmedDraft.isEmpty || isSending)
+    .disabled(!ChatComposerMetrics.isSendEnabled(trimmedDraft: trimmedDraft, isSending: isSending))
     .accessibilityLabel("Send")
+    .accessibilityIdentifier("chat-composer-send")
   }
 }
 
@@ -239,10 +257,29 @@ enum ComposerSlashPalette {
   }
 }
 
-private enum ComposerSlashPaletteMetrics {
+enum ComposerSlashPaletteMetrics {
   static let rowHeight: CGFloat = 44
   static let headerHeight: CGFloat = 24
   static let maxHeight: CGFloat = 320
+
+  static func estimatedHeight(workflowCount: Int, skillCount: Int) -> CGFloat {
+    var height = JovieSpacing.small * 2
+    var sectionCount = 0
+    if workflowCount > 0 {
+      sectionCount += 1
+      height += headerHeight
+      height += CGFloat(workflowCount) * rowHeight
+    }
+    if skillCount > 0 {
+      sectionCount += 1
+      height += headerHeight
+      height += CGFloat(skillCount) * rowHeight
+    }
+    if sectionCount == 2 {
+      height += JovieSpacing.small
+    }
+    return min(maxHeight, height)
+  }
 }
 
 private struct ComposerSlashPaletteView: View {
@@ -269,27 +306,18 @@ private struct ComposerSlashPaletteView: View {
       }
       .padding(JovieSpacing.small)
     }
-    .frame(height: min(ComposerSlashPaletteMetrics.maxHeight, estimatedContentHeight))
+    .frame(
+      height: ComposerSlashPaletteMetrics.estimatedHeight(
+        workflowCount: workflows.count,
+        skillCount: skills.count
+      )
+    )
     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: JovieRadius.xLarge, style: .continuous))
     .overlay {
       RoundedRectangle(cornerRadius: JovieRadius.xLarge, style: .continuous)
         .stroke(JovieColor.borderDefault, lineWidth: 1)
     }
     .accessibilityIdentifier("composer-slash-palette")
-  }
-
-  private var estimatedContentHeight: CGFloat {
-    var height = JovieSpacing.small * 2
-    var sectionCount = 0
-    for sectionItems in [workflows, skills] where !sectionItems.isEmpty {
-      sectionCount += 1
-      height += ComposerSlashPaletteMetrics.headerHeight
-      height += CGFloat(sectionItems.count) * ComposerSlashPaletteMetrics.rowHeight
-    }
-    if sectionCount == 2 {
-      height += JovieSpacing.small
-    }
-    return height
   }
 
   private func section(header: String, items: [ComposerSlashItem]) -> some View {

@@ -25,6 +25,55 @@ struct AppShellTabBarTests {
     #expect(AppShellGesturePolicy.shouldSwitchTabFromHorizontalSwipe() == false)
   }
 
+  @Test func reservedTabBarHeightStaysThumbSized() {
+    #expect(AppShellTabBarLayout.barHeight == 56)
+    #expect(AppShellTabBarLayout.talkFabSize == 58)
+    #expect(AppShellTabBarLayout.talkFabLift == 18)
+  }
+
+  @Test func edgeRailDragLocksWhileComposerKeyboardIsVisible() {
+    #expect(
+      AppShellGesturePolicy.allowsEdgeRailDrag(
+        reduceMotion: false,
+        isKeyboardVisible: false,
+        isShowingTalkOverlay: false,
+        hasTeleprompterProposal: false
+      )
+    )
+    #expect(
+      AppShellGesturePolicy.allowsEdgeRailDrag(
+        reduceMotion: false,
+        isKeyboardVisible: true,
+        isShowingTalkOverlay: false,
+        hasTeleprompterProposal: false
+      ) == false
+    )
+    #expect(
+      AppShellGesturePolicy.allowsEdgeRailDrag(
+        reduceMotion: true,
+        isKeyboardVisible: false,
+        isShowingTalkOverlay: false,
+        hasTeleprompterProposal: false
+      ) == false
+    )
+    #expect(
+      AppShellGesturePolicy.allowsEdgeRailDrag(
+        reduceMotion: false,
+        isKeyboardVisible: false,
+        isShowingTalkOverlay: true,
+        hasTeleprompterProposal: false
+      ) == false
+    )
+    #expect(
+      AppShellGesturePolicy.allowsEdgeRailDrag(
+        reduceMotion: false,
+        isKeyboardVisible: false,
+        isShowingTalkOverlay: false,
+        hasTeleprompterProposal: true
+      ) == false
+    )
+  }
+
   @Test func leftEdgeOpenRecognizesLeadingEdgeDrag() {
     #expect(
       AppShellGesturePolicy.isLeftEdgeOpen(startX: 12, translationX: 90, predictedX: 100)
