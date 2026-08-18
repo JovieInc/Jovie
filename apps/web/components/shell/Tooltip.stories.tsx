@@ -1,3 +1,4 @@
+import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Tooltip } from './Tooltip';
 
@@ -6,7 +7,11 @@ const meta = {
   component: Tooltip,
   parameters: { layout: 'centered' },
   args: {
-    children: <button type='button'>Audience</button>,
+    children: (
+      <Button type='button' variant='secondary'>
+        Audience
+      </Button>
+    ),
     label: 'Open audience',
     defaultOpen: true,
   },
