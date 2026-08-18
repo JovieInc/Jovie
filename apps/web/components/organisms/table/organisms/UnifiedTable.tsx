@@ -2,6 +2,7 @@
 
 // @coverage-via apps/web/components/organisms/table/organisms/UnifiedTable.keyboard.test.tsx
 
+import { Spinner as LoadingSpinner } from '@jovie/ui';
 import {
   type ColumnDef,
   type ColumnPinningState,
@@ -22,7 +23,6 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { TABLE_EMPTY_STATE_MIN_HEIGHT_PX } from '../atoms/TableEmptyState';
 import { GroupedTableBody } from '../molecules/GroupedTableBody';

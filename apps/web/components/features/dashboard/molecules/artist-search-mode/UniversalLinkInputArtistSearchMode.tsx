@@ -1,10 +1,8 @@
 'use client';
 
-import { Input } from '@jovie/ui';
+import { Input, Spinner as LoadingSpinner } from '@jovie/ui';
 import { X } from 'lucide-react';
 import Image from 'next/image';
-
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';

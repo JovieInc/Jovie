@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge } from '@jovie/ui';
+import { Badge, Spinner as LoadingSpinner } from '@jovie/ui';
 import {
   type CellContext,
   type ColumnDef,
@@ -8,7 +8,6 @@ import {
 } from '@tanstack/react-table';
 import { ExternalLink } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { toast } from '@/components/feedback';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';

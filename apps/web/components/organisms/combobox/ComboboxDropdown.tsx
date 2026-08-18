@@ -1,9 +1,9 @@
 'use client';
 
 import { ComboboxOptions } from '@headlessui/react';
+import { Spinner as LoadingSpinner } from '@jovie/ui';
 import { clsx } from 'clsx';
 import { forwardRef } from 'react';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ComboboxOptionItem } from './ComboboxOptionItem';
 import type { ComboboxOption } from './types';
 

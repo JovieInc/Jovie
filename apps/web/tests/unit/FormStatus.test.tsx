@@ -2,9 +2,8 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { FormStatus } from '@/components/molecules/FormStatus';
 
-// Mock the LoadingSpinner component
-vi.mock('@/components/atoms/LoadingSpinner', () => ({
-  LoadingSpinner: ({ size }: { size?: string }) => (
+vi.mock('@jovie/ui', () => ({
+  Spinner: ({ size }: { size?: string }) => (
     <div data-testid='loading-spinner' data-size={size}>
       Loading...
     </div>

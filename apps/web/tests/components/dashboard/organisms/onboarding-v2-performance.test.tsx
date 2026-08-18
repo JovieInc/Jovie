@@ -216,12 +216,9 @@ vi.mock('@jovie/ui', async importOriginal => {
       asChild?: boolean;
       children: ReactNode;
     }) => <button {...rest}>{children}</button>,
+    Spinner: () => <div data-testid='loading-spinner' />,
   };
 });
-
-vi.mock('@/components/atoms/LoadingSpinner', () => ({
-  LoadingSpinner: () => <div data-testid='loading-spinner' />,
-}));
 
 vi.mock('@/components/molecules/ContentSurfaceCard', () => ({
   ContentSurfaceCard: ({

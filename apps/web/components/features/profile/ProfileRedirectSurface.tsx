@@ -1,4 +1,4 @@
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { Spinner as LoadingSpinner } from '@jovie/ui';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
