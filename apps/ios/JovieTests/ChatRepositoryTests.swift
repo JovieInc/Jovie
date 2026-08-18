@@ -531,6 +531,29 @@ struct ChatRepositoryTests {
     #expect(repository.sessionExpired == false)
   }
 
+  @Test func seedAllComponentsFixtureKeepsWireContentAndSkipsNetworkRefresh() async {
+    let repository = ChatRepository(
+      client: FailingChatClient(),
+      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-all-components")!),
+      userID: "user_repo_all_components",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+
+    repository.seedTimelineForUITesting(
+      MobileChatAllComponentsFixture.default,
+      activeConversationID: MobileChatAllComponentsFixture.conversationID
+    )
+    await repository.refreshConversations()
+
+    #expect(repository.activeConversationID == MobileChatAllComponentsFixture.conversationID)
+    #expect(repository.timeline.count == MobileChatAllComponentsFixture.default.count)
+    #expect(repository.timeline.contains { $0.content.contains("<tool_call>") })
+    #expect(repository.timeline.contains { $0.status == .streaming && $0.content.isEmpty })
+    #expect(repository.timeline.contains { $0.status == .failed })
+    #expect(repository.timeline.contains { $0.requiresWebHandoff && $0.handoffURL != nil })
+    #expect(repository.isOffline == false)
+  }
+
   @Test func sendOnTransportFailureMarksOfflineAndDoesNotExpireSession() async {
     let client = ScriptedChatClient(
       sendTurnResult: .failure(MobileChatClientError.transportFailed(code: -1009)),

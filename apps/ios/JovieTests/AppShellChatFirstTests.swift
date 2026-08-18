@@ -34,6 +34,25 @@ struct AppShellChatFirstTests {
     #expect(LaunchMode.uiTestingChat.defaultInitialTab == .chat)
   }
 
+  @Test func uiTestingChatAllComponentsYieldsChatDefaultAndResolvesArg() {
+    #expect(LaunchMode.uiTestingChatAllComponents.defaultInitialTab == .chat)
+    #expect(LaunchMode.uiTestingChatAllComponents.opensChatOnLaunch)
+    #expect(LaunchMode.uiTestingChatAllComponents.usesLiveAuth == false)
+    #expect(LaunchMode.uiTestingChatAllComponents.needsChatRepository)
+    #expect(
+      LaunchMode.resolving(arguments: ["-ui-testing-chat-all-components"], isXCTest: false)
+        == .uiTestingChatAllComponents
+    )
+    #expect(
+      LaunchMode.uiTestingChatAllComponents.chatEntityFixture
+        == MobileChatAllComponentsFixture.default
+    )
+    #expect(
+      LaunchMode.uiTestingChatAllComponents.chatFixtureConversationID
+        == MobileChatAllComponentsFixture.conversationID
+    )
+  }
+
   @Test func uiTestingAudienceYieldsChatDefault() {
     #expect(LaunchMode.uiTestingAudience.defaultInitialTab == .chat)
   }

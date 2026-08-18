@@ -24,6 +24,26 @@ describe('Eve installation contract', () => {
     expect(existsSync(resolve(pilotRoot, 'agent/channels/photon.ts'))).toBe(
       true
     );
+    expect(existsSync(resolve(pilotRoot, 'evals/evals.config.ts'))).toBe(true);
+    expect(
+      existsSync(resolve(pilotRoot, 'evals/core-chat/session-succeeds.eval.ts'))
+    ).toBe(true);
+    expect(
+      existsSync(
+        resolve(pilotRoot, 'evals/core-chat/capability-readonly.eval.ts')
+      )
+    ).toBe(true);
+    expect(
+      existsSync(
+        resolve(pilotRoot, 'evals/core-chat/no-secrets-in-session.eval.ts')
+      )
+    ).toBe(true);
+    expect(
+      existsSync(resolve(pilotRoot, 'evals/core-chat/fail-closed.eval.ts'))
+    ).toBe(true);
+    expect(readFileSync(resolve(pilotRoot, 'agent/agent.ts'), 'utf8')).toContain(
+      'openai/gpt-5.4-mini'
+    );
     expect(
       readFileSync(
         resolve(pilotRoot, 'agent/tools/jovie_capability_manifest.ts'),

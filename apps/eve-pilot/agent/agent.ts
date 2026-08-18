@@ -5,6 +5,7 @@ import {
   eveIdentityForChannel,
   eveIdentityForRuntime,
 } from './select-identity';
+import './lib/smoke-network-probe';
 
 /** Bind the Jovie/Ovie pack when Eve loads this agent. */
 export const evePilotIdentity = eveIdentityForRuntime();

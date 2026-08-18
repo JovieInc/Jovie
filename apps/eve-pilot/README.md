@@ -59,6 +59,11 @@ Node 24 or later. Isolated from the monorepo Node 22 CI runner.
     pnpm --dir apps/eve-pilot --ignore-workspace run typecheck
     pnpm --dir apps/eve-pilot --ignore-workspace run test
     pnpm --dir apps/eve-pilot --ignore-workspace run build
+    pnpm --dir apps/eve-pilot --ignore-workspace exec eve eval --strict
+
+The last command boots the real Eve session HTTP surface and grades
+deterministic `defineEval` cases under `evals/` (`mockModel` only — no live
+provider). It must exit 0. Use Node 24 or later (`nvm use 24`).
 
 ## What this unit does not do
 

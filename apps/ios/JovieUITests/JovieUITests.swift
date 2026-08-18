@@ -698,6 +698,141 @@ final class JovieUITests: XCTestCase {
     attachScreenshot(named: "chat-entity-chips", app: app)
   }
 
+  // Catalog: every in-chat display type that can live in a transcript is
+  // seeded as raw wire and rendered by the shipped parser. Empty state and
+  // offline placeholder stay on `-ui-testing-chat` /
+  // `-ui-testing-chat-offline` (see testDrawerSwitchesBetweenChatAndProfile
+  // and testOfflineChatLaunchShowsCachedHistoryIntro).
+  func testAllChatComponentsRenderLabelsNotRawMarkup() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-chat-all-components",
+      expectedElementDescription: "\"Ask Jovie\"",
+      timeout: 10
+    ) {
+      $0.textFields["Ask Jovie"]
+    }
+
+    if app.buttons["whats-new-done"].waitForExistence(timeout: 1) {
+      app.buttons["whats-new-done"].tap()
+    }
+
+    XCTAssertTrue(
+      app.textFields["Ask Jovie"].exists,
+      "Composer did not appear on the all-components fixture.\n\(app.debugDescription)"
+    )
+
+    var missingLabels: Set<String> = [
+      "Creating merch options…",
+      "Merch options ready",
+      "Couldn't create merch",
+      "Neon Pulse Tee",
+      "Mono Mark",
+      "Release day shout-out",
+      "Midnight Drive",
+      "Porter Robinson",
+      "Opus",
+      "Coachella 2027",
+      "Generate album art",
+      "Thinking",
+    ]
+    var sawToolCard = false
+    var sawRetry = false
+    var sawWebHandoff = false
+
+    func consumeVisibleChatLabels() {
+      for label in Array(missingLabels) {
+        let predicate = NSPredicate(format: "label CONTAINS %@", label)
+        if app.descendants(matching: .any).matching(predicate).firstMatch.exists {
+          missingLabels.remove(label)
+        }
+      }
+      if app.descendants(matching: .any)["mobile-chat-tool-card"].exists {
+        sawToolCard = true
+      }
+      if app.buttons["Retry"].exists {
+        sawRetry = true
+      }
+      if app.buttons["Continue on web"].exists || app.links["Continue on web"].exists {
+        sawWebHandoff = true
+      }
+      assertVisibleChatHasNoRawMarkup(in: app)
+    }
+
+    let chat = app.scrollViews["mobile-chat"]
+    consumeVisibleChatLabels()
+    for _ in 0..<16 {
+      if missingLabels.isEmpty, sawToolCard, sawRetry, sawWebHandoff {
+        break
+      }
+      if chat.exists { chat.swipeDown() } else { app.swipeDown() }
+      consumeVisibleChatLabels()
+    }
+
+    XCTAssertTrue(
+      missingLabels.isEmpty,
+      "Missing in-chat labels: \(missingLabels.sorted().joined(separator: ", ")).\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      sawToolCard,
+      "Tool card accessibility identifier missing.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      sawRetry,
+      "Retry control did not appear.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      sawWebHandoff,
+      "Web handoff link did not appear.\n\(app.debugDescription)"
+    )
+
+    let plusButton = app.buttons["Open workflow sheet"]
+    XCTAssertTrue(
+      waitForHittable(plusButton, timeout: 3),
+      "Open workflow sheet was not hittable.\n\(app.debugDescription)"
+    )
+    plusButton.tap()
+    XCTAssertTrue(
+      app.buttons["Make merch"].waitForExistence(timeout: 3),
+      "Workflow sheet did not show Make merch.\n\(app.debugDescription)"
+    )
+
+    attachScreenshot(named: "chat-all-components", app: app)
+  }
+
+  func testAllChatComponentsRuntimePerformance() throws {
+    guard testEnvironmentValue("JOVIE_IOS_RUNTIME_PERFORMANCE") == "1" else {
+      throw XCTSkip("Set JOVIE_IOS_RUNTIME_PERFORMANCE=1 to run all-components hitch evidence.")
+    }
+
+    let timeoutSeconds =
+      Double(testEnvironmentValue("JOVIE_IOS_RUNTIME_TIMEOUT_SECONDS") ?? "") ?? 3
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-chat-all-components",
+      expectedElementDescription: "\"Ask Jovie\"",
+      timeout: 10
+    ) {
+      $0.textFields["Ask Jovie"]
+    }
+
+    XCTAssertTrue(
+      app.descendants(matching: .any)["mobile-chat"].firstMatch.waitForExistence(
+        timeout: timeoutSeconds
+      ),
+      "All-components chat did not appear before hitch measurement.\n\(app.debugDescription)"
+    )
+
+    measure(metrics: shellRuntimeMetrics(for: app)) {
+      // Swipe the app, not `mobile-chat`: that identifier is on the chat
+      // ZStack and also matches descendant rows, so XCUI cannot pick one.
+      app.swipeUp()
+      app.swipeDown()
+      XCTAssertTrue(
+        app.textFields["Ask Jovie"].waitForExistence(timeout: timeoutSeconds),
+        "Composer disappeared during all-components scroll measurement.\n\(app.debugDescription)"
+      )
+    }
+  }
+
   // JOV-3635: horizontal page-swipes between tabs are banned. Profile is
   // drawer-only — open the drawer, pick Profile, then return via Chat tab.
   func testSwipeNavigatesBetweenProfileAndChat() {
@@ -943,8 +1078,12 @@ final class JovieUITests: XCTestCase {
     measure(metrics: shellRuntimeMetrics(for: app)) {
       drawerOpenButton.tap()
       XCTAssertTrue(
-        waitForHittable(profileSurface, timeout: timeoutSeconds),
-        "Drawer surface switcher did not become hittable.\n\(app.debugDescription)"
+        waitForDrawerSurfaceToBeUncovered(
+          profileSurface,
+          contentPlaneMarker: drawerOpenButton,
+          timeout: timeoutSeconds
+        ),
+        "Drawer surface switcher stayed covered by the content plane.\n\(app.debugDescription)"
       )
       profileSurface.tap()
       XCTAssertTrue(
@@ -954,8 +1093,12 @@ final class JovieUITests: XCTestCase {
 
       drawerOpenButton.tap()
       XCTAssertTrue(
-        waitForHittable(chatSurface, timeout: timeoutSeconds),
-        "Drawer surface switcher did not become hittable.\n\(app.debugDescription)"
+        waitForDrawerSurfaceToBeUncovered(
+          chatSurface,
+          contentPlaneMarker: drawerOpenButton,
+          timeout: timeoutSeconds
+        ),
+        "Drawer chat surface stayed covered by the content plane.\n\(app.debugDescription)"
       )
       chatSurface.tap()
       XCTAssertTrue(
@@ -1566,6 +1709,28 @@ final class JovieUITests: XCTestCase {
     }
 
     return metrics
+  }
+
+  private func assertVisibleChatHasNoRawMarkup(
+    in app: XCUIApplication,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) {
+    let rawPredicates = [
+      NSPredicate(format: "label MATCHES %@", ".*@\\w+:.*"),
+      NSPredicate(format: "label MATCHES %@", ".*/skill:\\w+.*"),
+      NSPredicate(format: "label CONTAINS %@", "<tool_call>"),
+    ]
+
+    for predicate in rawPredicates {
+      XCTAssertEqual(
+        app.descendants(matching: .any).matching(predicate).count,
+        0,
+        "Transcript showed raw chat markup.\n\(app.debugDescription)",
+        file: file,
+        line: line
+      )
+    }
   }
 
   private func waitForHittable(_ element: XCUIElement, timeout: TimeInterval) -> Bool {

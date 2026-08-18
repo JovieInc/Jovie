@@ -102,19 +102,20 @@ final class AppState {
       route = .ready
       dashboardState = .loaded(.previewReady)
       isOffline = false
-    case .uiTestingChatEntityFixture:
-      // Unlike the other `.ready` UI-testing modes, this one needs a real
-      // `ChatRepository` instance so `RootView` can seed it with
-      // `MobileChatEntityFixture.default` -- that seeding only happens
-      // inside the `.task(id: appState.activeUserID)` block, which
-      // short-circuits to a nil repository (rendering the empty-state
-      // placeholder instead of the fixture transcript) unless
+    case .uiTestingChatEntityFixture, .uiTestingChatAllComponents:
+      // Unlike the other `.ready` UI-testing modes, fixture chat modes need a
+      // real `ChatRepository` instance so `RootView` can seed the timeline --
+      // that seeding only happens inside the `.task(id: appState.activeUserID)`
+      // block, which short-circuits to a nil repository (rendering the
+      // empty-state placeholder instead of the fixture transcript) unless
       // `activeUserID` is non-nil. Mirrors the synthetic id already used by
       // the auth-callback UI-testing path (`"user_ui_auth_callback"`).
       route = .ready
       dashboardState = .loaded(.previewReady)
       isOffline = false
-      activeUserID = "user_ui_testing_chat_entity_fixture"
+      activeUserID = launchMode == .uiTestingChatAllComponents
+        ? "user_ui_testing_chat_all_components"
+        : "user_ui_testing_chat_entity_fixture"
     case .uiTestingQRUnavailable:
       route = .ready
       dashboardState = .loaded(.previewReadyWithoutQR)

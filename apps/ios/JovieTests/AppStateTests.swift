@@ -1042,6 +1042,49 @@ struct AppStateTests {
     #expect(appState.launchMode.opensChatOnLaunch == true)
   }
 
+  @Test func allComponentsChatLaunchModeOpensChatWithActiveUserID() async throws {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .uiTestingChatAllComponents,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+
+    await appState.completeLaunch()
+
+    #expect(appState.route == .ready)
+    #expect(appState.dashboardState == .loaded(.previewReady))
+    #expect(appState.isOffline == false)
+    #expect(appState.activeUserID == "user_ui_testing_chat_all_components")
+    #expect(appState.launchMode.opensChatOnLaunch == true)
+    #expect(appState.launchMode.chatEntityFixture?.isEmpty == false)
+  }
+
+  @Test func entityFixtureChatLaunchModeSetsActiveUserID() async throws {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .uiTestingChatEntityFixture,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+
+    await appState.completeLaunch()
+
+    #expect(appState.route == .ready)
+    #expect(appState.activeUserID == "user_ui_testing_chat_entity_fixture")
+    #expect(appState.launchMode.opensChatOnLaunch == true)
+  }
+
   @Test func offlineChatLaunchModeOpensChatWithOfflineState() async throws {
     let repository = MockRepository(
       nextResult: .success(

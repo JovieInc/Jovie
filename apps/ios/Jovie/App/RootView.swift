@@ -47,6 +47,7 @@ private struct AppContentView: View {
          .uiTestingReady,
          .uiTestingChat,
          .uiTestingChatEntityFixture,
+         .uiTestingChatAllComponents,
          .uiTestingSettings,
          .uiTestingVenueMode,
          .uiTestingLibrary,
@@ -279,12 +280,13 @@ private struct AppContentView: View {
         chatRepository = repository
 
         if let fixtureTimeline = appState.launchMode.chatEntityFixture {
-          // Deterministic UI-testing fixture (JOV-3608): bypasses the network
-          // client/cache entirely so entity/skill chip rendering can be
-          // asserted without a mocked backend.
+          // Deterministic UI-testing fixture: bypasses the network
+          // client/cache entirely so parse→render can be asserted without a
+          // mocked backend.
           repository.seedTimelineForUITesting(
             fixtureTimeline,
-            activeConversationID: MobileChatEntityFixture.conversationID
+            activeConversationID: appState.launchMode.chatFixtureConversationID
+              ?? MobileChatEntityFixture.conversationID
           )
         } else {
           Task { await repository.bootstrap() }
@@ -312,6 +314,7 @@ private struct AppContentView: View {
          .uiTestingChat,
          .uiTestingChatOffline,
          .uiTestingChatEntityFixture,
+         .uiTestingChatAllComponents,
          .uiTestingSettings,
          .uiTestingVenueMode,
          .uiTestingAuthCallback,
@@ -395,6 +398,7 @@ private struct AppContentView: View {
       || appState.launchMode == .uiTestingChat
       || appState.launchMode == .uiTestingAuthCallback
       || appState.launchMode == .uiTestingChatEntityFixture
+      || appState.launchMode == .uiTestingChatAllComponents
       || appState.launchMode == .uiTestingSettings
       || appState.launchMode == .uiTestingVenueMode
     {
