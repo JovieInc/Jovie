@@ -31,30 +31,59 @@ describe('TooltipShortcut', () => {
   });
 
   describe('Tooltip Content', () => {
-    it('shows label in tooltip when open', () => {
-      render(
-        <TooltipProvider delayDuration={0}>
-          <TooltipShortcut label='Bold'>
-            <button type='button'>B</button>
-          </TooltipShortcut>
-        </TooltipProvider>
+    it('shows a compact label and shortcut when open', () => {
+      renderWithProvider(
+        <TooltipShortcut label=' Bold ' shortcut=' ⌘B ' defaultOpen>
+          <button type='button'>B</button>
+        </TooltipShortcut>
       );
-      // The tooltip content is controlled by Radix and appears on hover
-      // We can verify the component renders without errors
-      expect(screen.getByRole('button', { name: 'B' })).toBeInTheDocument();
+
+      const tooltip = screen.getByRole('tooltip');
+      expect(tooltip).toHaveTextContent('Bold');
+      expect(tooltip).toHaveTextContent('⌘B');
+      expect(screen.getByTestId('tooltip-content')).toHaveClass(
+        'rounded-full',
+        'whitespace-nowrap'
+      );
+    });
+
+    it('uses a safe label when whitespace-only text is provided', () => {
+      renderWithProvider(
+        <TooltipShortcut label='   ' defaultOpen>
+          <button type='button'>Info</button>
+        </TooltipShortcut>
+      );
+
+      expect(screen.getByRole('tooltip')).toHaveTextContent('More information');
+    });
+
+    it('supports an explicit rich wrapping contract', () => {
+      renderWithProvider(
+        <TooltipShortcut
+          label='Detailed explanation'
+          contentVariant='rich'
+          defaultOpen
+        >
+          <button type='button'>B</button>
+        </TooltipShortcut>
+      );
+
+      expect(screen.getByTestId('tooltip-content')).not.toHaveClass(
+        'whitespace-nowrap'
+      );
     });
   });
 
   it('forwards the explicit compact contract for a toolbar label', () => {
     render(
       <TooltipProvider delayDuration={0}>
-        <TooltipShortcut label='Display' contentVariant='compact'>
+        <TooltipShortcut label='Display' contentVariant='compact' defaultOpen>
           <button type='button'>Display</button>
         </TooltipShortcut>
       </TooltipProvider>
     );
 
-    expect(screen.getByRole('button', { name: 'Display' })).toBeInTheDocument();
+    expect(screen.getByTestId('tooltip-content')).toHaveClass('rounded-full');
   });
 
   describe('Props', () => {

@@ -1,6 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Button } from './button';
-import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip';
 import { TooltipShortcut } from './tooltip-shortcut';
 
 const meta: Meta<typeof TooltipShortcut> = {
@@ -14,13 +13,21 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   render: () => (
-    <Tooltip defaultOpen>
-      <TooltipTrigger asChild>
-        <Button variant='ghost'>Command</Button>
-      </TooltipTrigger>
-      <TooltipContent>
-        <TooltipShortcut label='Open command palette' shortcut='⌘K' />
-      </TooltipContent>
-    </Tooltip>
+    <TooltipShortcut label='Open command palette' shortcut='⌘K' defaultOpen>
+      <Button variant='ghost'>Command</Button>
+    </TooltipShortcut>
+  ),
+};
+
+export const RichExplanation: Story = {
+  render: () => (
+    <TooltipShortcut
+      label='Exports every visible row using the active filters.'
+      contentVariant='rich'
+      defaultOpen
+      side='bottom'
+    >
+      <Button variant='secondary'>Export</Button>
+    </TooltipShortcut>
   ),
 };

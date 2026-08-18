@@ -30,6 +30,8 @@ describe('InputGroup', () => {
       );
       const group = screen.getByTestId('input-group');
       expect(group).toHaveAttribute('data-slot', 'control');
+      expect(group).toHaveAttribute('data-component', 'input-group');
+      expect(group).toHaveAttribute('data-size', 'md');
     });
 
     it('applies relative positioning', () => {
@@ -165,8 +167,28 @@ describe('InputGroup', () => {
       );
       const group = screen.getByTestId('input-group');
       expect(group.className).toContain(
-        '[&>[data-slot=icon]]:text-(--linear-text-tertiary)'
+        '[&>[data-slot=icon]]:text-tertiary-token'
       );
+      expect(group.className).not.toContain('--linear-text-tertiary');
+    });
+
+    it('emits statically discoverable size selectors', () => {
+      render(
+        <InputGroup size='lg' data-testid='input-group'>
+          <MockIcon />
+          <Input />
+          <MockIcon />
+        </InputGroup>
+      );
+
+      const group = screen.getByTestId('input-group');
+      expect(group).toHaveAttribute('data-size', 'lg');
+      expect(group.className).toContain('[&>[data-slot=icon]]:size-5');
+      expect(group.className).toContain(
+        '[&>[data-slot=icon]:first-child]:left-3.5'
+      );
+      expect(group.className).toContain('[&>input~[data-slot=icon]]:right-3.5');
+      expect(group.className).not.toContain('${');
     });
 
     it('merges custom className', () => {

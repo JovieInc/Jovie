@@ -48,7 +48,7 @@ const visibleCap = (maxVisible: number) => Math.max(1, maxVisible);
 const itemClasses = (item: StackableBadgeItem) =>
   cn(
     badgeVariants({ size: 'sm', tone: item.tone ?? 'neutral' }),
-    'h-5 shrink-0 justify-center border-2 border-surface-0 transition-colors duration-fast ease-interactive',
+    'h-5 shrink-0 justify-center border-2 border-surface-0 transition-colors duration-fast ease-interactive motion-reduce:transition-none',
     item.selected && 'ring-1 ring-accent/40',
     item.disabled && 'opacity-50',
     'group-hover/badge-stack:bg-surface-2 group-focus-within/badge-stack:bg-surface-2'
@@ -77,18 +77,24 @@ export function StackableBadgeGroup({
   const visible = items.slice(0, visibleCap(maxVisible));
   const overflowCount = Math.max(0, items.length - visible.length);
   const primary = visible[0];
-  const groupLabel = ariaLabel ?? items.map(item => item.label).join(', ');
+  const itemLabel = items
+    .map(item => item.label.trim())
+    .filter(Boolean)
+    .join(', ');
+  const groupLabel = ariaLabel?.trim() || itemLabel || 'Badges';
 
   return (
     <fieldset
       aria-label={groupLabel}
       className={cn(
-        'group/badge-stack m-0 inline-flex h-5 max-w-full items-center overflow-hidden border-0 p-0',
+        'group/badge-stack m-0 inline-flex h-5 max-w-full min-w-0 items-center overflow-visible border-0 p-0',
         width === 'compact' ? 'w-32' : 'w-40',
         density === 'standard' && 'h-6',
         className
       )}
       data-slot='stackable-badge-group'
+      data-density={density}
+      data-width={width}
       {...props}
     >
       <span
@@ -98,6 +104,8 @@ export function StackableBadgeGroup({
           density === 'standard' && 'h-6'
         )}
         title={primary.label}
+        data-selected={primary.selected || undefined}
+        data-disabled={primary.disabled || undefined}
       >
         {primary.icon && (
           <span aria-hidden='true' className='grid shrink-0 place-items-center'>
@@ -117,6 +125,8 @@ export function StackableBadgeGroup({
               density === 'standard' && 'h-6 w-6'
             )}
             title={item.label}
+            data-selected={item.selected || undefined}
+            data-disabled={item.disabled || undefined}
           >
             <span className='grid shrink-0 place-items-center'>
               {item.icon ?? (
@@ -147,6 +157,8 @@ export function StackableBadgeGroup({
               {items.map(item => (
                 <li
                   key={item.id}
+                  aria-current={item.selected ? 'true' : undefined}
+                  aria-disabled={item.disabled || undefined}
                   className={cn(
                     'flex min-h-8 items-center gap-2 rounded-lg px-2 text-xs text-secondary-token',
                     item.selected && 'bg-surface-1 text-primary-token',

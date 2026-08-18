@@ -24,10 +24,12 @@ export interface TooltipShortcutProps {
    * compact by definition; explanatory labels should opt into `rich`.
    */
   readonly contentVariant?: 'compact' | 'rich';
+  /** Opens the tooltip on first render, primarily for previews and tours. */
+  readonly defaultOpen?: boolean;
   /**
    * The trigger element (button, link, etc.)
    */
-  readonly children: React.ReactNode;
+  readonly children: React.ReactElement;
 }
 
 /**
@@ -38,19 +40,23 @@ export function TooltipShortcut({
   label,
   shortcut,
   side = 'top',
-  contentVariant = 'rich',
+  contentVariant = 'compact',
+  defaultOpen,
   children,
 }: TooltipShortcutProps) {
+  const visibleLabel = label.trim() || 'More information';
+  const visibleShortcut = shortcut?.trim();
+
   return (
-    <Tooltip>
+    <Tooltip defaultOpen={defaultOpen}>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
       <TooltipContent
         contentVariant={contentVariant}
         side={side}
         className='flex items-center gap-2'
       >
-        <span>{label}</span>
-        {shortcut && <Kbd variant='tooltip'>{shortcut}</Kbd>}
+        <span>{visibleLabel}</span>
+        {visibleShortcut && <Kbd variant='tooltip'>{visibleShortcut}</Kbd>}
       </TooltipContent>
     </Tooltip>
   );

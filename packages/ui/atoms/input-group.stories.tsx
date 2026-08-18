@@ -13,18 +13,40 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   render: () => (
-    <InputGroup>
-      <span className='px-2 text-sm text-secondary-token'>https://</span>
-      <Input placeholder='jov.ie/you' className='border-0' />
+    <InputGroup className='w-72'>
+      <span data-slot='icon' aria-hidden='true'>
+        @
+      </span>
+      <Input aria-label='Profile handle' placeholder='artist' />
     </InputGroup>
   ),
 };
 
 export const Disabled: Story = {
   render: () => (
-    <InputGroup>
-      <span className='px-2 text-sm opacity-50'>$</span>
-      <Input disabled defaultValue='0.00' className='border-0' />
+    <InputGroup className='w-72'>
+      <span data-slot='icon' aria-hidden='true'>
+        $
+      </span>
+      <Input aria-label='Balance' disabled defaultValue='0.00' />
+    </InputGroup>
+  ),
+};
+
+export const LeadingAndTrailing: Story = {
+  render: () => (
+    <InputGroup className='w-72' size='lg'>
+      <span data-slot='icon' aria-hidden='true'>
+        ?
+      </span>
+      <Input
+        aria-label='Search creators'
+        placeholder='Search creators'
+        size='lg'
+      />
+      <span data-slot='icon' aria-hidden='true'>
+        /
+      </span>
     </InputGroup>
   ),
 };
