@@ -11,7 +11,11 @@ import {
 } from '@/components/organisms/RichTextEditor';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
+import { richTextDocumentSchema } from '@/lib/rich-text/document';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
+
+const DOCUMENT_DRAFT_KEY_PREFIX = 'jovie:creator-document-draft:v1:';
+const IDEA_DRAFT_KEY = 'jovie:creator-idea-draft:v1';
 
 type EditorStatus =
   | 'idle'
@@ -60,7 +64,60 @@ function DocumentEditor({
   const [sourceRecordId, setSourceRecordId] = useState('');
   const editVersionRef = useRef(0);
   const claimVersionRef = useRef(0);
+  const draftRestoredRef = useRef(false);
   const router = useRouter();
+
+  useEffect(() => {
+    try {
+      const raw = globalThis.sessionStorage.getItem(
+        `${DOCUMENT_DRAFT_KEY_PREFIX}${document.id}`
+      );
+      if (raw) {
+        const draft = JSON.parse(raw) as Record<string, unknown>;
+        const content = richTextDocumentSchema.safeParse(draft.content);
+        if (
+          typeof draft.title === 'string' &&
+          (draft.kind === 'idea' ||
+            draft.kind === 'research' ||
+            draft.kind === 'script') &&
+          content.success &&
+          typeof draft.plainText === 'string'
+        ) {
+          setTitle(draft.title);
+          setKind(draft.kind);
+          setEditorContent(content.data);
+          setEditorPlainText(draft.plainText);
+          setIsDirty(true);
+          editVersionRef.current += 1;
+        }
+        if (typeof draft.claimText === 'string') {
+          setClaimText(draft.claimText);
+        }
+        if (
+          draft.claimKind === 'fact' ||
+          draft.claimKind === 'inference' ||
+          draft.claimKind === 'opinion' ||
+          draft.claimKind === 'anecdote'
+        ) {
+          setClaimKind(draft.claimKind);
+        }
+        if (
+          draft.evidenceState === 'supported' ||
+          draft.evidenceState === 'contested' ||
+          draft.evidenceState === 'unresolved'
+        ) {
+          setEvidenceState(draft.evidenceState);
+        }
+        if (typeof draft.sourceRecordId === 'string') {
+          setSourceRecordId(draft.sourceRecordId);
+        }
+      }
+    } catch {
+      // Ignore malformed or unavailable browser storage.
+    } finally {
+      draftRestoredRef.current = true;
+    }
+  }, [document.id]);
   const handleEditorChange = useCallback((change: RichTextEditorChange) => {
     editVersionRef.current += 1;
     setEditorContent(change.content);
@@ -223,6 +280,44 @@ function DocumentEditor({
     claimText.trim().length > 0 &&
     (!claimNeedsSource || sourceRecordId.trim().length > 0) &&
     status !== 'saving';
+
+  useEffect(() => {
+    if (!draftRestoredRef.current) return;
+    const key = `${DOCUMENT_DRAFT_KEY_PREFIX}${document.id}`;
+    try {
+      if (!isDirty && !hasClaimDraft) {
+        globalThis.sessionStorage.removeItem(key);
+        return;
+      }
+      globalThis.sessionStorage.setItem(
+        key,
+        JSON.stringify({
+          title,
+          kind,
+          content: editorContent,
+          plainText: editorPlainText,
+          claimText,
+          claimKind,
+          evidenceState,
+          sourceRecordId,
+        })
+      );
+    } catch {
+      // Keep the in-memory draft even when browser storage is unavailable.
+    }
+  }, [
+    claimKind,
+    claimText,
+    document.id,
+    editorContent,
+    editorPlainText,
+    evidenceState,
+    hasClaimDraft,
+    isDirty,
+    kind,
+    sourceRecordId,
+    title,
+  ]);
 
   useEffect(() => {
     onDraftStateChange(isDirty || hasClaimDraft || status === 'saving');
@@ -495,6 +590,7 @@ export function CreatorDocumentsWorkspace({
     'idle'
   );
   const ideaIdempotencyKey = useRef<string | null>(null);
+  const ideaDraftRestoredRef = useRef(false);
   const [hasDocumentDraft, setHasDocumentDraft] = useState(false);
   const hasIdeaDraft =
     ideaStatus === 'saving' ||
@@ -503,6 +599,40 @@ export function CreatorDocumentsWorkspace({
   const hasUnsavedDraft = hasDocumentDraft || hasIdeaDraft;
   const selected =
     documents.find(document => document.id === selectedId) ?? null;
+
+  useEffect(() => {
+    try {
+      const raw = globalThis.sessionStorage.getItem(IDEA_DRAFT_KEY);
+      if (raw) {
+        const draft = JSON.parse(raw) as Record<string, unknown>;
+        if (typeof draft.title === 'string' && typeof draft.body === 'string') {
+          setTitle(draft.title);
+          setBody(draft.body);
+          setShowCapture(true);
+        }
+      }
+    } catch {
+      // Ignore malformed or unavailable browser storage.
+    } finally {
+      ideaDraftRestoredRef.current = true;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!ideaDraftRestoredRef.current) return;
+    try {
+      if (!title.trim() && !body.trim()) {
+        globalThis.sessionStorage.removeItem(IDEA_DRAFT_KEY);
+      } else {
+        globalThis.sessionStorage.setItem(
+          IDEA_DRAFT_KEY,
+          JSON.stringify({ title, body })
+        );
+      }
+    } catch {
+      // Keep the in-memory draft even when browser storage is unavailable.
+    }
+  }, [body, title]);
 
   useEffect(() => {
     onUnsavedDraftChange?.(hasUnsavedDraft);
@@ -612,6 +742,11 @@ export function CreatorDocumentsWorkspace({
         }),
       });
       if (!response.ok) throw new Error('Capture failed');
+      try {
+        globalThis.sessionStorage.removeItem(IDEA_DRAFT_KEY);
+      } catch {
+        // The durable server write succeeded even if browser cleanup is blocked.
+      }
       globalThis.location.reload();
     } catch {
       setIdeaStatus('error');

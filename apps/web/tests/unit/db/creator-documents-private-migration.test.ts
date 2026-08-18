@@ -26,6 +26,9 @@ describe('creator documents private migration', () => {
   it('freezes claim ledgers and validates approval and handoff tuples', async () => {
     const sql = await readFile(migrationPath, 'utf8');
     expect(sql).toContain('creator_claim_ledger_open_guard');
+    expect(sql).toContain('creator_revision_immutable_guard');
+    expect(sql).toContain('creator document revisions are immutable');
+    expect(sql).toContain('creator claim revision is immutable');
     expect(sql).toContain("v_stage IS DISTINCT FROM 'private_draft'");
     expect(sql).toContain('FOR UPDATE OF d');
     expect(sql).toContain('creator_approval_integrity_guard');
@@ -35,6 +38,10 @@ describe('creator documents private migration', () => {
       'CREATE CONSTRAINT TRIGGER creator_handoff_integrity_guard'
     );
     expect(sql).toContain('DEFERRABLE INITIALLY DEFERRED');
+    expect(sql).toContain('creator_documents_profile_created_idx');
+    expect(sql).toContain(
+      'ALTER TABLE "tasks" ADD COLUMN "mutation_version" integer DEFAULT 1 NOT NULL'
+    );
   });
 
   it('requires canonical claims for private creator documents', async () => {

@@ -83,6 +83,7 @@ describe('CreatorDocumentsWorkspace', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal('fetch', vi.fn());
+    globalThis.sessionStorage.clear();
   });
 
   afterEach(() => {
@@ -344,6 +345,50 @@ describe('CreatorDocumentsWorkspace', () => {
     expect(confirm).toHaveBeenCalledTimes(2);
     expect(screen.getByLabelText('Document Title')).toHaveValue(
       'Unsaved document title'
+    );
+  });
+
+  it('restores document and claim drafts after client-side navigation', async () => {
+    const firstWorkspace = render(
+      <CreatorDocumentsWorkspace
+        initialDocuments={[{ ...document, kind: 'script' }]}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /A durable idea/ }));
+    const firstPanel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    if (!firstPanel) throw new Error('Expected a document panel');
+    const firstPanelView = render(firstPanel);
+    fireEvent.change(screen.getByLabelText('Document Title'), {
+      target: { value: 'Recovered title draft' },
+    });
+    fireEvent.change(screen.getByLabelText('Claim Text'), {
+      target: { value: 'Recovered evidence draft' },
+    });
+    await waitFor(() =>
+      expect(globalThis.sessionStorage.length).toBeGreaterThan(0)
+    );
+    firstPanelView.unmount();
+    firstWorkspace.unmount();
+
+    render(
+      <CreatorDocumentsWorkspace
+        initialDocuments={[{ ...document, kind: 'script' }]}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /A durable idea/ }));
+    const restoredPanel = vi
+      .mocked(useRegisterRightPanel)
+      .mock.calls.at(-1)?.[0];
+    if (!restoredPanel) throw new Error('Expected a restored document panel');
+    render(restoredPanel);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Document Title')).toHaveValue(
+        'Recovered title draft'
+      )
+    );
+    expect(screen.getByLabelText('Claim Text')).toHaveValue(
+      'Recovered evidence draft'
     );
   });
 

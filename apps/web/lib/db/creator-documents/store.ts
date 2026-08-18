@@ -46,11 +46,11 @@ export class CreatorDocumentConflictError extends Error {
 const CREATOR_DOCUMENT_PAGE_SIZE = 50;
 
 function encodeDocumentCursor(input: {
-  readonly updatedAtCursor: string;
+  readonly createdAtCursor: string;
   readonly id: string;
 }) {
   return Buffer.from(
-    JSON.stringify({ updatedAt: input.updatedAtCursor, id: input.id })
+    JSON.stringify({ createdAt: input.createdAtCursor, id: input.id })
   ).toString('base64url');
 }
 
@@ -58,18 +58,18 @@ function decodeDocumentCursor(cursor: string | null | undefined) {
   if (!cursor) return null;
   try {
     const parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString()) as {
-      updatedAt?: unknown;
+      createdAt?: unknown;
       id?: unknown;
     };
-    const updatedAt = String(parsed.updatedAt);
+    const createdAt = String(parsed.createdAt);
     if (
-      Number.isNaN(new Date(updatedAt).getTime()) ||
+      Number.isNaN(new Date(createdAt).getTime()) ||
       typeof parsed.id !== 'string' ||
       !isCanonicalUuid(parsed.id)
     ) {
       return null;
     }
-    return { updatedAt, id: parsed.id };
+    return { createdAt, id: parsed.id };
   } catch {
     return null;
   }
@@ -93,7 +93,7 @@ export async function listCreatorDocuments(
       content: creatorDocumentRevisions.content,
       plainText: creatorDocumentRevisions.plainText,
       updatedAt: creatorDocuments.updatedAt,
-      updatedAtCursor: drizzleSql<string>`${creatorDocuments.updatedAt}::text`,
+      createdAtCursor: drizzleSql<string>`${creatorDocuments.createdAt}::text`,
     })
     .from(creatorDocuments)
     .innerJoin(
@@ -108,21 +108,21 @@ export async function listCreatorDocuments(
         eq(creatorDocuments.creatorProfileId, creatorProfileId),
         cursor
           ? or(
-              drizzleSql`${creatorDocuments.updatedAt} < ${cursor.updatedAt}::timestamptz`,
+              drizzleSql`${creatorDocuments.createdAt} < ${cursor.createdAt}::timestamptz`,
               and(
-                drizzleSql`${creatorDocuments.updatedAt} = ${cursor.updatedAt}::timestamptz`,
+                drizzleSql`${creatorDocuments.createdAt} = ${cursor.createdAt}::timestamptz`,
                 lt(creatorDocuments.id, cursor.id)
               )
             )
           : undefined
       )
     )
-    .orderBy(desc(creatorDocuments.updatedAt), desc(creatorDocuments.id))
+    .orderBy(desc(creatorDocuments.createdAt), desc(creatorDocuments.id))
     .limit(CREATOR_DOCUMENT_PAGE_SIZE + 1);
 
   const pageRows = rows.slice(0, CREATOR_DOCUMENT_PAGE_SIZE);
   const documents: CreatorDocumentListItem[] = pageRows.map(
-    ({ updatedAtCursor: _updatedAtCursor, ...row }) => ({
+    ({ createdAtCursor: _createdAtCursor, ...row }) => ({
       ...row,
       updatedAt: row.updatedAt.toISOString(),
     })
@@ -144,62 +144,55 @@ export async function captureCreatorIdea(input: {
   readonly body: string;
   readonly idempotencyKey: string;
 }): Promise<{ readonly documentId: string; readonly deduplicated: boolean }> {
-  const existing = await db.query.creatorDocuments.findFirst({
-    where: and(
-      eq(creatorDocuments.creatorProfileId, input.creatorProfileId),
-      eq(creatorDocuments.captureIdempotencyKey, input.idempotencyKey)
-    ),
-    columns: { id: true },
+  const content = ideaContent(input.body);
+  const contentHash = hashRevision({
+    title: input.title,
+    kind: 'idea',
+    content,
   });
-  const inserted = existing
-    ? []
-    : await db
-        .insert(creatorDocuments)
-        .values({
-          creatorProfileId: input.creatorProfileId,
-          title: input.title,
-          captureIdempotencyKey: input.idempotencyKey,
-        })
-        .onConflictDoNothing()
-        .returning({ id: creatorDocuments.id });
-
-  const documentId =
-    existing?.id ??
-    inserted[0]?.id ??
-    (
-      await db.query.creatorDocuments.findFirst({
-        where: and(
-          eq(creatorDocuments.creatorProfileId, input.creatorProfileId),
-          eq(creatorDocuments.captureIdempotencyKey, input.idempotencyKey)
-        ),
-        columns: { id: true },
-      })
-    )?.id;
-  if (!documentId) {
+  const captured = await db.execute<{
+    documentId: string;
+    created: boolean;
+  }>(drizzleSql`
+    with inserted_document as (
+      insert into ${creatorDocuments} (
+        "creator_profile_id", "title", "kind", "capture_idempotency_key"
+      )
+      values (
+        ${input.creatorProfileId}, ${input.title}, 'idea', ${input.idempotencyKey}
+      )
+      on conflict ("creator_profile_id", "capture_idempotency_key")
+        where "capture_idempotency_key" is not null
+      do update set
+        "capture_idempotency_key" = excluded."capture_idempotency_key"
+      returning "id", (xmax = 0) as created
+    ), target_document as (
+      select "id", created from inserted_document
+    ), inserted_revision as (
+      insert into ${creatorDocumentRevisions} (
+        "document_id", "revision", "title", "kind", "content", "plain_text",
+        "schema_version", "content_hash", "created_by_user_id"
+      )
+      select
+        target_document."id", 1, ${input.title}, 'idea',
+        ${JSON.stringify(content)}::jsonb, ${input.body}, 1, ${contentHash},
+        ${input.userId}
+      from target_document
+      on conflict ("document_id", "revision") do nothing
+      returning "document_id"
+    )
+    select
+      target_document."id" as "documentId",
+      target_document.created
+    from target_document
+    left join inserted_revision
+      on inserted_revision."document_id" = target_document."id"
+  `);
+  const result = captured.rows[0];
+  if (!result?.documentId) {
     throw new Error('Idea capture did not persist');
   }
-
-  const content = ideaContent(input.body);
-  await db
-    .insert(creatorDocumentRevisions)
-    .values({
-      documentId,
-      revision: 1,
-      title: input.title,
-      kind: 'idea',
-      content,
-      plainText: input.body,
-      contentHash: hashRevision({ title: input.title, kind: 'idea', content }),
-      createdByUserId: input.userId,
-    })
-    .onConflictDoNothing({
-      target: [
-        creatorDocumentRevisions.documentId,
-        creatorDocumentRevisions.revision,
-      ],
-    });
-
-  return { documentId, deduplicated: inserted.length === 0 };
+  return { documentId: result.documentId, deduplicated: !result.created };
 }
 
 export async function saveCreatorDocumentRevision(input: {

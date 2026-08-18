@@ -2,17 +2,13 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { findFirst, execute, insert } = vi.hoisted(() => ({
-  findFirst: vi.fn(),
+const { execute } = vi.hoisted(() => ({
   execute: vi.fn(),
-  insert: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
   db: {
-    query: { creatorDocuments: { findFirst } },
     execute,
-    insert,
   },
 }));
 
@@ -31,15 +27,14 @@ describe('creator document persistence boundaries', () => {
   });
 
   it('deduplicates capture while repairing a missing first revision', async () => {
-    findFirst.mockResolvedValueOnce({
-      id: '11111111-1111-4111-8111-111111111111',
+    execute.mockResolvedValueOnce({
+      rows: [
+        {
+          documentId: '11111111-1111-4111-8111-111111111111',
+          created: false,
+        },
+      ],
     });
-
-    const revisionInsert = {
-      values: vi.fn().mockReturnThis(),
-      onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
-    };
-    insert.mockReturnValueOnce(revisionInsert);
 
     await expect(
       captureCreatorIdea({
@@ -53,8 +48,20 @@ describe('creator document persistence boundaries', () => {
       documentId: '11111111-1111-4111-8111-111111111111',
       deduplicated: true,
     });
-    expect(insert).toHaveBeenCalledOnce();
-    expect(revisionInsert.onConflictDoNothing).toHaveBeenCalledOnce();
+    expect(execute).toHaveBeenCalledOnce();
+    const source = await readFile(
+      join(process.cwd(), 'lib/db/creator-documents/store.ts'),
+      'utf8'
+    );
+    const capture = source.slice(
+      source.indexOf('export async function captureCreatorIdea'),
+      source.indexOf('export async function saveCreatorDocumentRevision')
+    );
+    expect(capture).toContain('inserted_document');
+    expect(capture).toContain('inserted_revision');
+    expect(capture).toContain('do update set');
+    expect(capture).toContain('(xmax = 0) as created');
+    expect(capture.match(/await db\.execute/g)).toHaveLength(1);
   });
 
   it('fails closed when an exact evidence-backed script is not eligible', async () => {
@@ -124,7 +131,8 @@ describe('creator document persistence boundaries', () => {
     expect(listing).toContain('CREATOR_DOCUMENT_PAGE_SIZE + 1');
     expect(listing).toContain('nextCursor');
     expect(listing).toContain('desc(creatorDocuments.id)');
-    expect(listing).toContain('updatedAtCursor');
+    expect(listing).toContain('createdAtCursor');
+    expect(listing).toContain('creatorDocuments.createdAt');
     expect(listing).toContain('::text');
     expect(listing).toContain('::timestamptz');
     expect(listing).not.toContain('.limit(100)');
@@ -133,7 +141,7 @@ describe('creator document persistence boundaries', () => {
   it('rejects malformed UUID cursor ids before querying PostgreSQL', async () => {
     const malformedCursor = Buffer.from(
       JSON.stringify({
-        updatedAt: '2026-08-18T00:00:00.000Z',
+        createdAt: '2026-08-18T00:00:00.000Z',
         id: '------------------------------------',
       })
     ).toString('base64url');

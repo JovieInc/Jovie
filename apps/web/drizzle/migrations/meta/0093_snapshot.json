@@ -8229,8 +8229,8 @@
         }
       },
       "indexes": {
-        "creator_documents_profile_updated_idx": {
-          "name": "creator_documents_profile_updated_idx",
+        "creator_documents_profile_created_idx": {
+          "name": "creator_documents_profile_created_idx",
           "columns": [
             {
               "expression": "creator_profile_id",
@@ -8239,7 +8239,13 @@
               "nulls": "last"
             },
             {
-              "expression": "updated_at",
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -28531,6 +28537,13 @@
           "primaryKey": false,
           "notNull": false,
           "default": "'{}'::jsonb"
+        },
+        "mutation_version": {
+          "name": "mutation_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
         },
         "created_at": {
           "name": "created_at",

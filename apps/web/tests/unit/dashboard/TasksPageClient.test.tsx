@@ -215,6 +215,7 @@ const mockTask = {
   position: 0,
   sourceTemplateId: null,
   metadata: null,
+  mutationVersion: 7,
   createdAt: new Date('2026-04-01T00:00:00.000Z'),
   updatedAt: new Date('2026-04-01T00:00:00.000Z'),
 } as const;
@@ -1246,6 +1247,7 @@ describe('TasksPageClient', () => {
         title: 'Updated release handoff title',
         description: mockTaskTwo.description,
         descriptionContent: expect.objectContaining({ type: 'doc' }),
+        expectedMutationVersion: mockTaskTwo.mutationVersion,
       }),
     });
   });

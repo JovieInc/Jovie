@@ -60,6 +60,7 @@ export interface TaskView {
   readonly position: number;
   readonly sourceTemplateId: string | null;
   readonly metadata: Record<string, unknown> | null;
+  readonly mutationVersion?: number;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
@@ -122,6 +123,7 @@ export interface CreateTaskInput {
 }
 
 export interface UpdateTaskInput {
+  readonly expectedMutationVersion?: number;
   readonly title?: string;
   readonly description?: string | null;
   readonly descriptionContent?: RichTextDocument;

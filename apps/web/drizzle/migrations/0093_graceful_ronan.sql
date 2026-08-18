@@ -79,11 +79,12 @@ ALTER TABLE "creator_revision_approvals" ADD CONSTRAINT "creator_revision_approv
 ALTER TABLE "creator_revision_approvals" ADD CONSTRAINT "creator_revision_approvals_revision_id_creator_document_revisions_id_fk" FOREIGN KEY ("revision_id") REFERENCES "public"."creator_document_revisions"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "creator_revision_claims" ADD CONSTRAINT "creator_revision_claims_revision_id_creator_document_revisions_id_fk" FOREIGN KEY ("revision_id") REFERENCES "public"."creator_document_revisions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "creator_revision_claims" ADD CONSTRAINT "creator_revision_claims_source_record_id_memory_source_records_id_fk" FOREIGN KEY ("source_record_id") REFERENCES "public"."memory_source_records"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tasks" ADD COLUMN "mutation_version" integer DEFAULT 1 NOT NULL;--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "creator_capture_handoffs_approval_unique" ON "creator_capture_handoffs" USING btree ("approval_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "creator_capture_handoffs_profile_created_idx" ON "creator_capture_handoffs" USING btree ("creator_profile_id","created_at");--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "creator_document_revisions_document_revision_unique" ON "creator_document_revisions" USING btree ("document_id","revision");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "creator_document_revisions_content_hash_idx" ON "creator_document_revisions" USING btree ("document_id","content_hash");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "creator_documents_profile_updated_idx" ON "creator_documents" USING btree ("creator_profile_id","updated_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "creator_documents_profile_created_idx" ON "creator_documents" USING btree ("creator_profile_id","created_at","id");--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "creator_documents_capture_idempotency_unique" ON "creator_documents" USING btree ("creator_profile_id","capture_idempotency_key") WHERE capture_idempotency_key IS NOT NULL;--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "creator_revision_approvals_exact_revision_unique" ON "creator_revision_approvals" USING btree ("document_id","revision_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "creator_revision_claims_revision_idx" ON "creator_revision_claims" USING btree ("revision_id");
@@ -174,6 +175,28 @@ CREATE POLICY "creator_document_revisions_owner_bridge" ON "creator_document_rev
   WITH CHECK (is_rls_session_unset() AND is_rls_table_owner('creator_document_revisions'));
 --> statement-breakpoint
 
+CREATE OR REPLACE FUNCTION enforce_creator_revision_immutable()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF TG_OP = 'DELETE' AND NOT EXISTS (
+    SELECT 1 FROM creator_documents d WHERE d.id = OLD.document_id
+  ) THEN
+    RETURN OLD;
+  END IF;
+  RAISE EXCEPTION 'creator document revisions are immutable';
+END;
+$$;
+--> statement-breakpoint
+
+DROP TRIGGER IF EXISTS creator_revision_immutable_guard ON creator_document_revisions;
+CREATE TRIGGER creator_revision_immutable_guard
+  BEFORE UPDATE OR DELETE ON creator_document_revisions
+  FOR EACH ROW EXECUTE FUNCTION enforce_creator_revision_immutable();
+--> statement-breakpoint
+
 DROP POLICY IF EXISTS "creator_revision_claims_private_access" ON "creator_revision_claims";
 DROP POLICY IF EXISTS "creator_revision_claims_system_all" ON "creator_revision_claims";
 DROP POLICY IF EXISTS "creator_revision_claims_owner_bridge" ON "creator_revision_claims";
@@ -236,6 +259,9 @@ DECLARE
   v_revision_id uuid := COALESCE(NEW.revision_id, OLD.revision_id);
   v_stage creator_document_stage;
 BEGIN
+  IF TG_OP = 'UPDATE' AND NEW.revision_id IS DISTINCT FROM OLD.revision_id THEN
+    RAISE EXCEPTION 'creator claim revision is immutable';
+  END IF;
   SELECT d.stage INTO v_stage
     FROM creator_document_revisions r
     JOIN creator_documents d ON d.id = r.document_id

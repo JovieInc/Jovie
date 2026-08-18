@@ -63,9 +63,10 @@ export const creatorDocuments = pgTable(
       .defaultNow(),
   },
   table => ({
-    profileUpdatedIdx: index('creator_documents_profile_updated_idx').on(
+    profileCreatedIdx: index('creator_documents_profile_created_idx').on(
       table.creatorProfileId,
-      table.updatedAt
+      table.createdAt,
+      table.id
     ),
     captureIdempotencyUnique: uniqueIndex(
       'creator_documents_capture_idempotency_unique'

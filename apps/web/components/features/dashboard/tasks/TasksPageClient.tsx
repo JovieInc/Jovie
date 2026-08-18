@@ -1347,6 +1347,7 @@ export function TasksPageClient() {
   const [editorTaskId, setEditorTaskId] = useState<string | null>(null);
   const editorRevisionRef = useRef(0);
   const editorSaveRequestRef = useRef(0);
+  const editorExpectedMutationVersionRef = useRef<number | null>(null);
   const latestSelectedTaskIdRef = useRef<string | null>(null);
   const deferredPills = useDeferredValue(pills);
   const searchFilter = useMemo(
@@ -1652,6 +1653,7 @@ export function TasksPageClient() {
       setEditorDescriptionContent(emptyRichTextDocument);
       setEditorSaveStatus('idle');
       setEditorTaskId(null);
+      editorExpectedMutationVersionRef.current = null;
       editorRevisionRef.current = 0;
       return;
     }
@@ -1661,6 +1663,8 @@ export function TasksPageClient() {
     setEditorDescriptionContent(selectedTaskEditorContent);
     setEditorSaveStatus('idle');
     setEditorTaskId(selectedTaskEditorId);
+    editorExpectedMutationVersionRef.current =
+      selectedTask?.mutationVersion ?? null;
     editorRevisionRef.current = 0;
   }, [
     editorTaskId,
@@ -1668,6 +1672,7 @@ export function TasksPageClient() {
     selectedTaskEditorDescription,
     selectedTaskEditorId,
     selectedTaskEditorTitle,
+    selectedTask?.mutationVersion,
   ]);
 
   const openReleaseSidebar = useCallback((task: TaskView) => {
@@ -1884,9 +1889,15 @@ export function TasksPageClient() {
           title: nextTitle,
           description: nextDescription || null,
           descriptionContent: editorDescriptionContent,
+          expectedMutationVersion:
+            editorExpectedMutationVersionRef.current ?? undefined,
         },
       }).then(
-        () => {
+        savedTask => {
+          if (savedTask?.mutationVersion !== undefined) {
+            editorExpectedMutationVersionRef.current =
+              savedTask.mutationVersion;
+          }
           setEditorSavingTaskIds(current => {
             const next = new Set(current);
             next.delete(selectedTaskIdAtSchedule);
