@@ -217,7 +217,6 @@ export interface AudienceBlockPipelineEntry {
 }
 
 interface AudienceBlockPipeline {
-  readonly commands?: ReadonlyArray<{ readonly command: readonly unknown[] }>;
   readonly client?: {
     request: (opts: {
       readonly path: readonly string[];
@@ -230,9 +229,31 @@ interface AudienceBlockPipeline {
   del?: (key: string) => unknown;
 }
 
-type AudienceBlockRedis = NonNullable<ReturnType<typeof getRedis>> & {
-  pipeline?: () => AudienceBlockPipeline;
-};
+type AudienceBlockRedis = NonNullable<ReturnType<typeof getRedis>>;
+
+function asAudienceBlockPipeline(pipeline: unknown): AudienceBlockPipeline {
+  return pipeline as AudienceBlockPipeline;
+}
+
+function readAudienceBlockPipelineCommands(
+  pipeline: AudienceBlockPipeline
+): ReadonlyArray<{ readonly command: readonly unknown[] }> | null {
+  // Upstash types `Pipeline.commands` as private. Read it as a duck-typed
+  // field so we can issue one REST /pipeline call without assigning our
+  // public helper type onto that private property.
+  const commands = (pipeline as { commands?: unknown }).commands;
+  return Array.isArray(commands)
+    ? (commands as ReadonlyArray<{ readonly command: readonly unknown[] }>)
+    : null;
+}
+
+function getAudienceBlockPipeline(
+  redis: AudienceBlockRedis
+): AudienceBlockPipeline | null {
+  const pipelineFn = (redis as { pipeline?: () => unknown }).pipeline;
+  if (typeof pipelineFn !== 'function') return null;
+  return asAudienceBlockPipeline(pipelineFn.call(redis));
+}
 
 function normalizeAudienceBlockPipelineEntry(
   entry: unknown
@@ -273,9 +294,9 @@ export function mapAudienceBlockPipelineResults(
 async function execAudienceBlockPipeline(
   pipeline: AudienceBlockPipeline
 ): Promise<AudienceBlockPipelineEntry[]> {
-  const commands = pipeline.commands;
+  const commands = readAudienceBlockPipelineCommands(pipeline);
   const request = pipeline.client?.request;
-  if (typeof request === 'function' && Array.isArray(commands)) {
+  if (typeof request === 'function' && commands) {
     const res = await request({
       path: ['pipeline'],
       body: commands.map(command => command.command),
@@ -313,10 +334,10 @@ async function audienceBlockRedisGet<T>(
   redis: AudienceBlockRedis,
   cacheKey: string
 ): Promise<T | null> {
-  if (typeof redis.pipeline !== 'function') {
+  const pipeline = getAudienceBlockPipeline(redis);
+  if (!pipeline) {
     return redis.get<T>(cacheKey);
   }
-  const pipeline = redis.pipeline();
   pipeline.get?.(cacheKey);
   return readAudienceBlockPipelineResult<T>(
     await execAudienceBlockPipeline(pipeline)
@@ -328,11 +349,11 @@ async function audienceBlockRedisSet(
   cacheKey: string,
   value: unknown
 ): Promise<void> {
-  if (typeof redis.pipeline !== 'function') {
+  const pipeline = getAudienceBlockPipeline(redis);
+  if (!pipeline) {
     await redis.set(cacheKey, value, { ex: REDIS_CACHE_TTL_SECONDS });
     return;
   }
-  const pipeline = redis.pipeline();
   pipeline.set?.(cacheKey, value, { ex: REDIS_CACHE_TTL_SECONDS });
   await execAudienceBlockPipeline(pipeline);
 }
@@ -341,11 +362,11 @@ async function audienceBlockRedisDel(
   redis: AudienceBlockRedis,
   cacheKey: string
 ): Promise<void> {
-  if (typeof redis.pipeline !== 'function') {
+  const pipeline = getAudienceBlockPipeline(redis);
+  if (!pipeline) {
     await redis.del(cacheKey);
     return;
   }
-  const pipeline = redis.pipeline();
   pipeline.del?.(cacheKey);
   await execAudienceBlockPipeline(pipeline);
 }
