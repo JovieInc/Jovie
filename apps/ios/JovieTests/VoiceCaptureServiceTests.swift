@@ -351,6 +351,35 @@ struct VoiceCaptureServiceTests {
   }
 
   @MainActor
+  @Test func quickVlogLaunchesPromptFirstWithoutChangingChatProposalDefaults() {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let quickVlog = MobileChatVideoProposalPayload.quickVlog
+    let quickViewModel = TeleprompterViewModel(
+      proposal: quickVlog,
+      store: VlogSessionStore(rootURL: root)
+    )
+    #expect(quickVlog.title == "Quick Vlog")
+    #expect(quickVlog.script == "What do you want to share?")
+    #expect(quickViewModel.contentMode == .prompt)
+    #expect(quickViewModel.promptText == "What do you want to share?")
+
+    let chatProposal = MobileChatVideoProposalPayload(
+      kind: .promo,
+      title: "Release Day",
+      script: "Tell fans why this song matters."
+    )
+    let chatViewModel = TeleprompterViewModel(
+      proposal: chatProposal,
+      store: VlogSessionStore(rootURL: root)
+    )
+    #expect(chatViewModel.contentMode == .script)
+    #expect(chatViewModel.promptText == "Release Day")
+  }
+
+  @MainActor
   @Test func teleprompterOverlayStatesStayIndependentAndFeedbackQueuesLocally() async throws {
     let root = FileManager.default.temporaryDirectory
       .appendingPathComponent(UUID().uuidString, isDirectory: true)

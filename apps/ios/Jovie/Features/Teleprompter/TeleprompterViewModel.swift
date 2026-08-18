@@ -129,6 +129,7 @@ final class TeleprompterViewModel {
     scriptTitle = proposal.title
     scriptText = proposal.script
     follower = KaraokeScriptFollower(script: proposal.script)
+    contentMode = proposal.initialContentMode
     self.store = store
     self.overlayAutoResumeDelay = overlayAutoResumeDelay
     self.overlayAutoResumeSleeper = overlayAutoResumeSleeper
@@ -161,7 +162,7 @@ final class TeleprompterViewModel {
   }
 
   var promptText: String {
-    proposal.title
+    proposal.prompt ?? proposal.title
   }
 
   func setOverlayVisible(_ isVisible: Bool) {

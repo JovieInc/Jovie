@@ -393,6 +393,31 @@ final class JovieUITests: XCTestCase {
     )
   }
 
+  func testShellVlogControlOpensPromptCaptureDirectly() {
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
+      $0.textFields["Ask Jovie"]
+    }
+
+    let vlogControl = app.descendants(matching: .any)["shell-vlog-open"]
+    XCTAssertTrue(
+      waitForHittable(vlogControl, timeout: 3),
+      "Direct Vlog control did not become available in the chat shell.\n\(app.debugDescription)"
+    )
+    XCTAssertGreaterThanOrEqual(vlogControl.frame.width, 44)
+    XCTAssertGreaterThanOrEqual(vlogControl.frame.height, 44)
+
+    vlogControl.tap()
+
+    let prompt = app.descendants(matching: .any)["teleprompter-prompt"]
+    XCTAssertTrue(
+      prompt.waitForExistence(timeout: 3),
+      "Direct Vlog control did not open the Prompt Mode capture surface.\n\(app.debugDescription)"
+    )
+    XCTAssertEqual(prompt.label, "What do you want to share?")
+    XCTAssertTrue(app.buttons["teleprompter-content-prompt"].isSelected)
+    XCTAssertTrue(app.buttons["teleprompter-header-close"].exists)
+  }
+
   // GH-12948: "Audience" must stay on one line in the drawer surface switcher.
   func testDrawerSurfaceSwitcherLabelsStaySingleLine() {
     let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
