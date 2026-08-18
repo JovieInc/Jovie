@@ -87,6 +87,20 @@ export const PermissionState: Story = {
   },
 };
 
+export const WorkspaceCanvas: Story = {
+  args: {
+    presentation: 'workspace',
+    heading: 'No Contacts Yet',
+    description: 'Add bookings, management, and press contacts.',
+    icon: undefined,
+  },
+  render: args => (
+    <div className='flex h-96 w-[min(40rem,calc(100vw-2rem))] bg-(--app-shell-content-surface)'>
+      <EmptyState {...args} />
+    </div>
+  ),
+};
+
 export const Gallery: Story = {
   render: (args: EmptyStateProps) => (
     <div className='grid gap-8 md:grid-cols-2'>

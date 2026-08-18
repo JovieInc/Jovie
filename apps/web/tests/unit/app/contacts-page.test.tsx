@@ -1,11 +1,18 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 
-const { loadRouteContextMock, contactsPageClientMock } = vi.hoisted(() => ({
-  loadRouteContextMock: vi.fn(),
-  contactsPageClientMock: vi.fn(),
+const { loadRouteContextMock, contactsPageClientMock, routerPushMock } =
+  vi.hoisted(() => ({
+    loadRouteContextMock: vi.fn(),
+    contactsPageClientMock: vi.fn(),
+    routerPushMock: vi.fn(),
+  }));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: routerPushMock }),
 }));
 
 vi.mock('@/app/app/(shell)/app-shell-route-context', () => ({
@@ -21,8 +28,6 @@ vi.mock('@/app/app/(shell)/contacts/ContactsPageClient', () => ({
 
 vi.mock('@/components/organisms/table/molecules/PageToolbar', () => ({
   PageToolbar: ({ start }: { start: ReactNode }) => <div>{start}</div>,
-  PAGE_TOOLBAR_TAB_BUTTON_CLASS: 'page-toolbar-tab',
-  PAGE_TOOLBAR_TAB_ACTIVE_CLASS: 'page-toolbar-tab-active',
 }));
 
 import ContactsPage, {
@@ -40,6 +45,7 @@ describe('canonical contacts page', () => {
   beforeEach(() => {
     loadRouteContextMock.mockReset();
     contactsPageClientMock.mockReset();
+    routerPushMock.mockReset();
     loadRouteContextMock.mockResolvedValue({
       ok: true,
       profileId: profile.id,
@@ -48,6 +54,7 @@ describe('canonical contacts page', () => {
   });
 
   it('renders without blocking on the contacts query', async () => {
+    const user = userEvent.setup();
     render(await ContactsPage());
 
     expect(loadRouteContextMock).toHaveBeenCalledWith({
@@ -62,15 +69,31 @@ describe('canonical contacts page', () => {
       artistHandle: profile.usernameNormalized,
     });
     expect(screen.getByText('Contacts workspace')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Audience' })).toHaveAttribute(
-      'href',
+    expect(screen.getByRole('tab', { name: 'Contacts' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    await user.click(screen.getByRole('tab', { name: 'Audience' }));
+    expect(routerPushMock).toHaveBeenCalledWith(
       `${APP_ROUTES.CONTACTS}?tab=audience`
     );
   });
 
-  it('normalizes workspace state and preserves audience filters in the tab URL', () => {
+  it('normalizes workspace state and preserves audience filters in the tab URL', async () => {
+    const user = userEvent.setup();
     expect(resolveContactsWorkspaceTab('audience')).toBe('audience');
     expect(resolveContactsWorkspaceTab('other')).toBe('contacts');
+
+    render(
+      await ContactsPage({
+        searchParams: Promise.resolve({ q: 'berlin', page: '2' }),
+      })
+    );
+
+    await user.click(screen.getByRole('tab', { name: 'Audience' }));
+    expect(routerPushMock).toHaveBeenCalledWith(
+      `${APP_ROUTES.CONTACTS}?q=berlin&page=2&tab=audience`
+    );
   });
 
   it('renders the shared route-context error', async () => {

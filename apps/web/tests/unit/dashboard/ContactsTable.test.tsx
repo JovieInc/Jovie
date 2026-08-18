@@ -217,6 +217,14 @@ describe('ContactsTable', () => {
     expect(
       screen.getByText('Add bookings, management, and press contacts.')
     ).toBeVisible();
+    const emptyState = screen
+      .getByRole('heading', { name: 'No Contacts Yet' })
+      .closest('output');
+    expect(emptyState).not.toBeNull();
+    if (!emptyState) throw new TypeError('Expected canonical empty state');
+    expect(emptyState.className).toContain('min-h-full');
+    expect(emptyState.parentElement?.className).toContain('flex');
+    expect(emptyState.querySelector('svg')).toBeNull();
     expect(
       screen.queryByRole('button', { name: 'Add Contact' })
     ).not.toBeInTheDocument();

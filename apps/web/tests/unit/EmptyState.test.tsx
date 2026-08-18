@@ -167,4 +167,29 @@ describe('EmptyState (canonical molecule API)', () => {
       '/x'
     );
   });
+
+  it('provides an iconless workspace hierarchy without decorative chrome', () => {
+    render(
+      <EmptyState
+        heading='No Contacts Yet'
+        description='Add bookings, management, and press contacts.'
+        presentation='workspace'
+        className='min-h-full'
+      />
+    );
+
+    const status = screen.getByRole('status');
+    const heading = screen.getByRole('heading', { name: 'No Contacts Yet' });
+    const description = screen.getByText(
+      'Add bookings, management, and press contacts.'
+    );
+
+    expect(status.className).toContain('justify-center');
+    expect(status.className).toContain('min-h-full');
+    expect(status.querySelector('svg')).toBeNull();
+    expect(heading.className).toContain('text-sm');
+    expect(heading.className).toContain('text-primary-token');
+    expect(description.className).toContain('text-secondary-token');
+    expect(description.className).toContain('mb-0');
+  });
 });
