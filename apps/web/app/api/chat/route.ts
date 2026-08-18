@@ -148,6 +148,8 @@ import {
   showMerchSales,
   updateMerchCardDetails,
 } from '@/lib/merch/service';
+import { eveIdentityForChatMode } from '@/lib/ovie/identity';
+import { ackOvieDumpBeforeModel } from '@/lib/ovie/ingest';
 import {
   albumArtGenerationBurstLimiter,
   albumArtGenerationLimiter,
@@ -2437,6 +2439,13 @@ export async function POST(req: Request) {
     );
   }
   const userText = extractLastUserText(uiMessages);
+  // JOV-5215/5216: identity pack is selected explicitly; dump acks before
+  // executeChatTurn. Taste stays a separate Ovie surface (DEST_TASTE).
+  const eveIdentity = eveIdentityForChatMode(chatMode);
+  const ovieIngestReceipts = eveIdentity.canIngestAck
+    ? ackOvieDumpBeforeModel(userText)
+    : [];
+  void ovieIngestReceipts;
   const clientTurnId = normalizeClientId(body.clientTurnId);
   const clientMessageId = normalizeClientId(body.clientMessageId);
   const source = normalizeChatTurnSource(body.source);
