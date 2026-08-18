@@ -24,10 +24,6 @@ as a reference fixture until an owner confirms deletion.
 | `/exp/shell-v1` | Reference fixture | Many primitives extracted to `components/shell`; still owns the integrated shell composition, mock data, and unextracted route-level behavior. | Do not delete until shell composition, mock fixtures, and migration parity checks are represented elsewhere. |
 | `/exp/library-v1` | Blocked | Exports `generateAssets`, `emptyFilters`, `LeftRail`, `Grid`, `Table`, `Drawer`, `StatusBar`, and related types used by `shell-v1`. | Cannot delete while `shell-v1` imports from it. If this graduates, move exported pieces to feature/shell-owned modules first. |
 | `/exp/right-rail-shotgun` | Reference fixture | Design comparison for right-rail drawer strategy; overlaps with extracted `DrawerHero`, `DrawerTabStrip`, `DspAvatarStack`, `RowWaveform`, and metadata primitives. | Delete only after selected drawer strategy is documented in the production drawer/sidebar component owner. |
-| `/exp/onboarding-v1` | Reference fixture | Chat-first staged onboarding concept with local shims, including an internal `AudioBarShim`. | Candidate for deletion after onboarding V2/product onboarding owns the accepted interaction model. |
-| `/exp/auth-v1` | Reference fixture | Experimental auth card and cold-start vocabulary. | Candidate for deletion after auth/product sign-in decisions are represented outside `/exp`. |
-| `/exp/home-v1` | Reference fixture | Marketing hero variants with static mock creators. | Candidate for deletion after the accepted homepage/Page Builder path owns any surviving sections. |
-| `/exp/profile-v1` | Reference fixture | Public profile mock with local icon components and static data. | Candidate for deletion after public profile direction is captured in production profile components or screenshots. |
 | `/exp/page-builder` | Utility fixture | Registry-driven landing-page composition preview. | Keep while marketing section registry work is active. It is noindex and Suspense-wrapped for static prerender safety. |
 | `/exp/component-checker` | Utility fixture | Single-section registry preview for landing components. | Keep while component QA/design review uses it. It is noindex and Suspense-wrapped for static prerender safety. |
 | `/exp/dev-overlay` | Utility fixture | Carbon/accent/radius playground. | Delete when token decisions no longer require this manual preview. No production imports found. |
@@ -66,8 +62,6 @@ state at route/feature boundaries.
   `hasLyrics`) because its label/transport needs are different from compact
   now-playing cards. Do not merge these shapes unless a real production caller
   needs one shared player view model.
-- `onboarding-v1` still contains a local `AudioBarShim`; it is design debt, not
-  a reusable player component.
 
 ## Blockers Before Deletion
 

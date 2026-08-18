@@ -17,6 +17,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - **Screen walks reuse one account-video store:** founder walks and later creator screen recordings upload through `lib/capture` into the Jovie account blob. The walk is stored and not admitted until Summer classifies it.
 
 ### Changed
+- [internal] **Removed unused `/exp` fake-UI fixtures:** deleted admin-only `auth-v1`, `home-v1`, `profile-v1`, and `onboarding-v1` playgrounds plus their style-guard tests, and lowered the raw-button, arbitrary-value, and `--linear-*` ratchet floors to match.
 - **Saving a vlog opens Collections:** the new clip lands with its shoot instead of in Catalog.
 - **Empty chat Talk lives inside the composer pill:** typing swaps Talk for Send without moving the bar. Tap, drag, or Done dismisses the keyboard.
 - **Drawer Profile stays Dashboard:** tapping the account name opens the public profile when a URL exists. Venue QR stays in the sidebar.
