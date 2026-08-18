@@ -42,25 +42,25 @@ PY
 }
 
 snapshot_value() {
-  python3 - "$1" "$2" <<'PY'
+  python3 -c '
 import json
 import sys
 
-value = json.loads(sys.argv[1]).get(sys.argv[2])
+value = json.load(sys.stdin).get(sys.argv[1])
 if isinstance(value, str):
     sys.stdout.write(value)
-PY
+' "$1"
 }
 
 if [[ -f "$GBRAIN_CONFIG_FILE" ]] && \
    [[ -z "${GBRAIN_DATABASE_URL:-}" || -z "${GBRAIN_DIRECT_DATABASE_URL:-}" ]]; then
   CONFIG_SNAPSHOT="$(read_config_snapshot)"
   if [[ -z "${GBRAIN_DATABASE_URL:-}" ]]; then
-    GBRAIN_DATABASE_URL="$(snapshot_value "$CONFIG_SNAPSHOT" database_url)"
+    GBRAIN_DATABASE_URL="$(printf '%s' "$CONFIG_SNAPSHOT" | snapshot_value database_url)"
     export GBRAIN_DATABASE_URL
   fi
   if [[ -z "${GBRAIN_DIRECT_DATABASE_URL:-}" ]]; then
-    GBRAIN_DIRECT_DATABASE_URL="$(snapshot_value "$CONFIG_SNAPSHOT" direct_database_url)"
+    GBRAIN_DIRECT_DATABASE_URL="$(printf '%s' "$CONFIG_SNAPSHOT" | snapshot_value direct_database_url)"
     export GBRAIN_DIRECT_DATABASE_URL
   fi
 fi

@@ -16,6 +16,9 @@ a separate, approval-gated operation.
   ambiguous transport failure. A bounded worker pool prevents one stalled
   request from blocking every client request on the same stdio connection, and
   SSE events are emitted as they arrive instead of being buffered to EOF.
+  Requests have a 120-second absolute deadline, response/request/token byte
+  limits, and validated JSON-RPC correlation. Provider URLs are parsed from one
+  config snapshot and passed to helpers over stdin, never process arguments.
 - The plist template is a reviewable candidate for the future launchd unit. It
   is kept outside `launchd/` and `launchd/pro/` so no existing bootstrap command
   can activate it accidentally.

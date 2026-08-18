@@ -25,6 +25,7 @@ TOKEN_FILE = pathlib.Path(
 )
 RETRY_DELAYS = (0.0, 0.25, 1.0)
 MAX_WORKERS_RAW = os.environ.get("GBRAIN_MCP_MAX_WORKERS", "8")
+REQUEST_DEADLINE_RAW = os.environ.get("GBRAIN_MCP_REQUEST_DEADLINE_SECONDS", "120")
 MAX_REQUEST_BYTES = 1024 * 1024
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 MAX_TOKEN_BYTES = 16 * 1024
@@ -67,6 +68,20 @@ def resolve_worker_budget() -> int:
     if not 1 <= max_workers <= 32:
         raise RuntimeError("GBRAIN_MCP_MAX_WORKERS must be between 1 and 32")
     return max_workers
+
+
+def resolve_request_deadline() -> float:
+    try:
+        deadline = float(REQUEST_DEADLINE_RAW)
+    except ValueError as exc:
+        raise RuntimeError(
+            "GBRAIN_MCP_REQUEST_DEADLINE_SECONDS must be numeric"
+        ) from exc
+    if not 1 <= deadline <= 300:
+        raise RuntimeError(
+            "GBRAIN_MCP_REQUEST_DEADLINE_SECONDS must be between 1 and 300"
+        )
+    return deadline
 
 
 def read_token_file() -> str:
@@ -124,13 +139,20 @@ def error_response(request_id: object, message: str) -> dict:
     }
 
 
-def iter_response(response):
+def iter_response(response, deadline: float):
     content_type = response.headers.get("content-type", "application/json")
     if "text/event-stream" in content_type:
+        total_bytes = 0
+        event_count = 0
         while True:
+            if time.monotonic() >= deadline:
+                raise RuntimeError("shared gbrain HTTP exceeded total deadline")
             raw_line = response.readline(MAX_RESPONSE_BYTES + 1)
             if not raw_line:
                 break
+            total_bytes += len(raw_line)
+            if total_bytes > MAX_RESPONSE_BYTES:
+                raise RuntimeError("shared gbrain SSE response exceeds size limit")
             if len(raw_line) > MAX_RESPONSE_BYTES:
                 raise RuntimeError("shared gbrain SSE event exceeds size limit")
             line = raw_line.decode()
@@ -138,26 +160,44 @@ def iter_response(response):
                 continue
             data = line[5:].lstrip().strip()
             if data and data != "[DONE]":
+                event_count += 1
+                if event_count > 1024:
+                    raise RuntimeError("shared gbrain SSE event count exceeds limit")
                 yield json.loads(data)
         return
-    body_bytes = response.read(MAX_RESPONSE_BYTES + 1)
-    if len(body_bytes) > MAX_RESPONSE_BYTES:
-        raise RuntimeError("shared gbrain HTTP response exceeds size limit")
+    body_chunks = []
+    body_size = 0
+    while True:
+        if time.monotonic() >= deadline:
+            raise RuntimeError("shared gbrain HTTP exceeded total deadline")
+        chunk = response.read(min(64 * 1024, MAX_RESPONSE_BYTES + 1 - body_size))
+        if not chunk:
+            break
+        body_chunks.append(chunk)
+        body_size += len(chunk)
+        if body_size > MAX_RESPONSE_BYTES:
+            raise RuntimeError("shared gbrain HTTP response exceeds size limit")
+    body_bytes = b"".join(body_chunks)
     body = body_bytes.decode()
     if body.strip():
         yield json.loads(body)
 
 
-def forward(payload: dict, token: str) -> None:
+def forward(payload: dict, token: str, deadline_seconds: float) -> None:
     data = json.dumps(payload, separators=(",", ":")).encode()
     last_error: Exception | None = None
+    total_deadline = time.monotonic() + deadline_seconds
     # tools/call can mutate state. An ambiguous response failure must surface to
     # the client instead of replaying a write that may already have committed.
     delays = (0.0,) if payload.get("method") == "tools/call" else RETRY_DELAYS
     for delay in delays:
         emitted = False
+        if time.monotonic() >= total_deadline:
+            raise RuntimeError("shared gbrain HTTP exceeded total deadline")
         if delay:
             time.sleep(delay)
+        if time.monotonic() >= total_deadline:
+            raise RuntimeError("shared gbrain HTTP exceeded total deadline")
         request = urllib.request.Request(
             MCP_URL,
             data=data,
@@ -168,10 +208,11 @@ def forward(payload: dict, token: str) -> None:
             },
         )
         try:
-            with HTTP_OPENER.open(request, timeout=90) as response:
+            remaining = max(1.0, total_deadline - time.monotonic())
+            with HTTP_OPENER.open(request, timeout=min(90.0, remaining)) as response:
                 emitted = False
                 terminal_emitted = False
-                for response_payload in iter_response(response):
+                for response_payload in iter_response(response, total_deadline):
                     if not isinstance(response_payload, dict):
                         error = RuntimeError("shared gbrain returned non-object JSON-RPC")
                         if terminal_emitted:
@@ -193,7 +234,21 @@ def forward(payload: dict, token: str) -> None:
                             raise PostResponseProtocolError(
                                 "shared gbrain returned multiple terminal responses"
                             )
+                        has_result = "result" in response_payload
+                        has_error = "error" in response_payload
+                        if has_result == has_error:
+                            raise RuntimeError(
+                                "shared gbrain returned invalid terminal response shape"
+                            )
+                        if has_error and not isinstance(response_payload["error"], dict):
+                            raise RuntimeError(
+                                "shared gbrain returned invalid JSON-RPC error shape"
+                            )
                         terminal_emitted = True
+                    elif not isinstance(response_payload.get("method"), str):
+                        raise RuntimeError(
+                            "shared gbrain returned invalid JSON-RPC notification"
+                        )
                     emit(response_payload)
                     emitted = True
                     if terminal_emitted:
@@ -220,12 +275,25 @@ def forward(payload: dict, token: str) -> None:
     )
 
 
-def handle_line(line: str, token: str) -> None:
+def handle_line(raw_line: bytes, token: str, deadline_seconds: float) -> None:
     request_id: object = None
     try:
-        payload = json.loads(line)
+        try:
+            line = raw_line.decode()
+            payload = json.loads(line)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            emit(error_response(None, "invalid JSON-RPC request"))
+            return
+        if not isinstance(payload, dict):
+            emit(error_response(None, "invalid JSON-RPC request"))
+            return
+        if payload.get("jsonrpc") != "2.0" or not isinstance(
+            payload.get("method"), str
+        ):
+            emit(error_response(payload.get("id"), "invalid JSON-RPC request"))
+            return
         request_id = payload.get("id")
-        forward(payload, token)
+        forward(payload, token, deadline_seconds)
     except Exception as exc:
         # Keep stdio alive. A daemon restart fails one call, not the task.
         message = public_error(exc)
@@ -245,6 +313,7 @@ def main() -> int:
     try:
         validate_mcp_url()
         max_workers = resolve_worker_budget()
+        request_deadline = resolve_request_deadline()
         token = read_token_file()
         validate_token(token)
     except (OSError, RuntimeError) as exc:
@@ -262,11 +331,11 @@ def main() -> int:
                 with OUTPUT_LOCK:
                     sys.stderr.write("gbrain proxy: request exceeds size limit\n")
                     sys.stderr.flush()
-                continue
+                return 1
             if not raw_line.strip():
                 continue
             capacity.acquire()
-            future = executor.submit(handle_line, raw_line.decode(), token)
+            future = executor.submit(handle_line, raw_line, token, request_deadline)
             future.add_done_callback(lambda _future: capacity.release())
     return 0
 
