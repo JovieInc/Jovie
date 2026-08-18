@@ -65,6 +65,7 @@ import {
 } from '@/lib/profile/avatar-quality';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
+import { isMissingTourDatesConfirmationStatusError } from '@/lib/tour-dates/queries';
 import { mapSocialLinkExistence } from './social-link-utils';
 
 const { logger } = Sentry;
@@ -513,7 +514,20 @@ async function loadInboxNavigationAvailability(
           ),
       'Inbox navigation tour dates count query',
       { db: tx, timeoutMs: QUERY_TIMEOUTS.api }
-    );
+    ).catch((error: unknown) => {
+      // Migration drift (JOV-4857): migration 0042 (tour_dates
+      // .confirmation_status) not yet applied on prod. Degrade to 0 pending
+      // so the dashboard still renders and the 'Failed query' Sentry alert
+      // stops firing. Any other error still throws to the outer catch.
+      if (!isMissingTourDatesConfirmationStatusError(error)) {
+        throw error;
+      }
+      Sentry.logger.warn(
+        '[Dashboard] tour_dates.confirmation_status missing (migration drift); treating pending tour-date count as 0',
+        { profileId }
+      );
+      return [{ count: 0 }];
+    });
 
     return resolveInboxNavigationAvailability(
       Number(pendingSuggestedActions[0]?.count ?? 0),
