@@ -406,6 +406,13 @@ export const ServerEnvSchema = z.object({
    */
   OUTBOUND_SMS_ENABLED: z.string().optional(),
   /**
+   * Live send for the one-time artist first-sale SMS (JOV-5207).
+   * Unset/false is dry-run: we still claim the mile and log, but do not
+   * call Twilio. Flip to 'true' only after artist phone coverage + A2P
+   * are ready. OUTBOUND_SMS_ENABLED remains the provider POST gate.
+   */
+  FIRST_SALE_TEXT_LIVE: z.string().optional(),
+  /**
    * Demo override that bypasses the existing SMS Pro-gating in
    * subscribeToNotificationsDomain when set to 'true'. Off by default;
    * intended for the YC demo window only. See autoplan decision row #32 / F7.
@@ -606,6 +613,7 @@ export const ENV_KEYS = [
   'TWILIO_VERIFY_SERVICE_SID',
   'NATIVE_SMS_ENABLED',
   'OUTBOUND_SMS_ENABLED',
+  'FIRST_SALE_TEXT_LIVE',
   'SMS_DEMO_BYPASS_PRO_GATE',
   'GOOGLE_OAUTH_CLIENT_ID',
   'GOOGLE_OAUTH_CLIENT_SECRET',
