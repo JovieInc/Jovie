@@ -7,6 +7,18 @@ import { describe, expect, it } from 'vitest';
 import { Input } from './input';
 
 describe('Input', () => {
+  describe('System B motion contract', () => {
+    it('uses tokenized, reduced-motion-safe transitions', () => {
+      render(<Input aria-label='Name' data-testid='input' />);
+      const input = screen.getByTestId('input');
+
+      expect(input.className).toContain('duration-subtle');
+      expect(input.className).toContain('ease-subtle');
+      expect(input.className).toContain('motion-reduce:transition-none');
+      expect(input.className).not.toContain('transition-all');
+    });
+  });
+
   describe('System B typography contract', () => {
     it('uses neutral tracking instead of arbitrary negative letter spacing', () => {
       const source = readFileSync(path.join(process.cwd(), 'atoms/input.tsx'), {
@@ -62,39 +74,35 @@ describe('Input', () => {
     it('applies default variant classes', () => {
       render(<Input data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('border-(--linear-border-subtle)');
-      expect(input.className).toContain('bg-(--linear-bg-surface-1)');
+      expect(input.className).toContain('border-subtle');
+      expect(input.className).toContain('bg-surface-1');
     });
 
     it('applies hover border class', () => {
       render(<Input data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain(
-        'hover:border-(--linear-border-default)'
-      );
+      expect(input.className).toContain('hover:border-default');
     });
 
     it('applies Jovie focus token classes', () => {
       render(<Input data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain(
-        'focus-visible:border-(--linear-border-focus)'
-      );
-      expect(input.className).toContain(
-        'focus-visible:ring-(--linear-border-focus)'
-      );
+      expect(input.className).toContain('focus-visible:border-focus');
+      expect(input.className).toContain('focus-visible:ring-focus/25');
     });
 
     it('applies error variant classes', () => {
       render(<Input variant='error' data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('border-(--linear-error)');
+      expect(input.className).toContain('border-error');
+      expect(input.className).toContain('focus-visible:ring-error/25');
     });
 
     it('applies success variant classes', () => {
       render(<Input variant='success' data-testid='input' />);
       const input = screen.getByTestId('input');
       expect(input.className).toContain('border-success');
+      expect(input.className).toContain('focus-visible:ring-success/25');
     });
 
     it('applies sm size classes', () => {
@@ -128,7 +136,7 @@ describe('Input', () => {
       render(<Input className='custom-class' data-testid='input' />);
       const input = screen.getByTestId('input');
       expect(input.className).toContain('custom-class');
-      expect(input.className).toContain('border-(--linear-border-subtle)');
+      expect(input.className).toContain('border-subtle');
     });
   });
 
@@ -190,7 +198,7 @@ describe('Input', () => {
     it('applies error variant when error prop is provided', () => {
       render(<Input error='Invalid email' data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('border-(--linear-error)');
+      expect(input.className).toContain('border-error');
     });
 
     it('sets aria-invalid when error is present', () => {
@@ -199,6 +207,25 @@ describe('Input', () => {
         'aria-invalid',
         'true'
       );
+    });
+
+    it('honors boolean aria-invalid from form libraries', () => {
+      render(<Input aria-invalid={true} data-testid='input' />);
+      const input = screen.getByTestId('input');
+
+      expect(input).toHaveAttribute('aria-invalid', 'true');
+      expect(input.className).toContain('border-error');
+    });
+
+    it.each([
+      'grammar',
+      'spelling',
+    ] as const)('preserves the %s aria-invalid reason', reason => {
+      render(<Input aria-invalid={reason} data-testid='input' />);
+      const input = screen.getByTestId('input');
+
+      expect(input).toHaveAttribute('aria-invalid', reason);
+      expect(input.className).toContain('border-error');
     });
 
     it('associates error message with input via aria-describedby', () => {
@@ -213,7 +240,7 @@ describe('Input', () => {
     it('applies invalid validation state', () => {
       render(<Input validationState='invalid' data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('border-(--linear-error)');
+      expect(input.className).toContain('border-error');
       expect(input).toHaveAttribute('aria-invalid', 'true');
     });
 
@@ -227,6 +254,34 @@ describe('Input', () => {
       render(<Input validationState='pending' data-testid='input' />);
       const input = screen.getByTestId('input');
       expect(input).toHaveAttribute('aria-busy', 'true');
+    });
+
+    it('lets pending state override aria-busy=false', () => {
+      render(
+        <Input
+          validationState='pending'
+          aria-busy={false}
+          data-testid='input'
+        />
+      );
+      expect(screen.getByTestId('input')).toHaveAttribute('aria-busy', 'true');
+    });
+  });
+
+  describe('Layout stability', () => {
+    it('reserves feedback space before an error appears', () => {
+      const { container, rerender } = render(
+        <Input label='Email' data-testid='input' />
+      );
+      expect(container.querySelector('.min-h-5')).toBeInTheDocument();
+
+      rerender(
+        <Input label='Email' error='Invalid email' data-testid='input' />
+      );
+      expect(container.querySelector('.min-h-5')).toBeInTheDocument();
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveTextContent('Invalid email');
+      expect(alert.parentElement).toHaveAttribute('aria-live', 'polite');
     });
   });
 

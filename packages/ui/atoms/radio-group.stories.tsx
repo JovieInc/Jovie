@@ -28,9 +28,32 @@ export const Default: Story = {
 
 export const Disabled: Story = {
   render: () => (
-    <RadioGroup defaultValue='a' disabled className='flex gap-4'>
-      <RadioGroupItem value='a' id='rg-da' />
-      <RadioGroupItem value='b' id='rg-db' />
+    <RadioGroup defaultValue='a' disabled className='flex gap-6'>
+      <div className='flex items-center gap-2'>
+        <RadioGroupItem value='a' id='rg-da' />
+        <Label htmlFor='rg-da'>Selected</Label>
+      </div>
+      <div className='flex items-center gap-2'>
+        <RadioGroupItem value='b' id='rg-db' />
+        <Label htmlFor='rg-db'>Unselected</Label>
+      </div>
+    </RadioGroup>
+  ),
+};
+
+export const Horizontal: Story = {
+  render: () => (
+    <RadioGroup defaultValue='email' className='flex gap-6'>
+      {[
+        ['email', 'Email'],
+        ['sms', 'SMS'],
+        ['none', 'None'],
+      ].map(([value, label]) => (
+        <div className='flex items-center gap-2' key={value}>
+          <RadioGroupItem value={value} id={`rg-${value}`} />
+          <Label htmlFor={`rg-${value}`}>{label}</Label>
+        </div>
+      ))}
     </RadioGroup>
   ),
 };
