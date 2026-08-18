@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  CANONICAL_NATIVE_MUTATION_ACTOR,
   DEFAULT_MERGE_QUEUE_BACKEND,
   dequeuePullRequest,
   enrollPullRequest,
@@ -76,6 +77,9 @@ function createNativeRunner({
   states = [],
   listPages = null,
   enableResult = ok({ data: {} }),
+  viewerPayload = /** @type {unknown} */ ({
+    data: { viewer: { login: CANONICAL_NATIVE_MUTATION_ACTOR } },
+  }),
 } = {}) {
   const stateQueue = [...states];
   const restResponses = new Map([
@@ -90,6 +94,9 @@ function createNativeRunner({
     }
 
     const query = queryText(args);
+    if (query.includes('MergeQueueNativeMutationActor')) {
+      return ok(viewerPayload);
+    }
     if (query.includes('MergeQueueBranchProtection')) {
       return ok({ data: { repository: { ref: branchProtectionRef } } });
     }
@@ -142,6 +149,16 @@ const dequeue = runner => dequeuePullRequest(nativeOptions(runner));
 const invokedEnrollment = runner =>
   runner.mock.calls.some(([args]) =>
     queryText(args).includes('enablePullRequestAutoMerge')
+  );
+const invokedNativeMutation = runner =>
+  runner.mock.calls.some(([args]) =>
+    /enablePullRequestAutoMerge|dequeuePullRequest|disablePullRequestAutoMerge/.test(
+      queryText(args)
+    )
+  );
+const invokedMutationActorCheck = runner =>
+  runner.mock.calls.some(([args]) =>
+    queryText(args).includes('MergeQueueNativeMutationActor')
   );
 
 function readRepoFile(path) {
@@ -381,8 +398,12 @@ describe('queue workflow mutation safety', () => {
     expect(scope).toContain('--json number,headRefOid,baseRefName');
     expect(scope).toContain('select(.baseRefName == "main")');
     expect(scope).toContain('No unique open main PR owns workflow_run head');
-    expect(scope).toContain('Untargeted manual dispatch; maintenance-only');
-    expect(scope).toContain('Main push; maintenance-only');
+    expect(scope).toContain(
+      'Untargeted manual dispatch; no primary target (bounded reconciliation remains enabled)'
+    );
+    expect(scope).toContain(
+      'Main push; no primary target (bounded reconciliation remains enabled)'
+    );
     expect(enroll).toContain(
       'DRAIN_ADMISSION_PR: ${{ steps.admission.outputs.pr_number }}'
     );
@@ -393,6 +414,9 @@ describe('queue workflow mutation safety', () => {
     expect(enroll).not.toContain("github.event_name == 'push' && '1' || '0'");
     expect(drain).toContain(
       'admission scope: maintenance-only (no new enrollment)'
+    );
+    expect(drain).toContain(
+      'admission scope: no primary target (bounded missed-admission recovery enabled)'
     );
     expect(drain).toContain(
       'no typed pressure-deferral provenance; owner release required'
@@ -444,14 +468,23 @@ describe('queue workflow mutation safety', () => {
     expect(scope).toContain('.workflow_run.event // empty');
     expect(scope).toContain('== "merge_group"');
     expect(enroll).toContain('DRAIN_RECONCILE_QUEUE_REENTRY:');
+    expect(enroll).toContain('DRAIN_RECONCILE_MISSED_ADMISSION:');
+    expect(enroll).toContain("steps.admission.outputs.deferred_release != '1'");
+    expect(enroll).toContain(
+      "needs.fleet-policy.outputs.mode == 'hold-intake'"
+    );
+    expect(enroll).toContain("needs.fleet-policy.outputs.mode == 'draft-only'");
     expect(enroll).toContain("DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '2'");
     expect(drain).toContain('QUEUE_REENTRY_CONTEXT="jovie-queue-reentry/v1"');
-    expect(drain).toContain(
-      'bounded exact-head native re-entry after composite CI'
-    );
-    expect(drain).toContain('DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 3');
+    expect(drain).toContain('bounded exact-head native admission');
+    expect(drain).toContain('DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 2');
     expect(drain).toContain('queue_reentry_receipt_is_recoverable "$head_oid"');
     expect(drain).toContain('check_failures_for_pr "$n"');
+    expect(drain).toContain(
+      '[[ "$ENROLLED_THIS_RUN" -ge "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" ]]'
+    );
+    expect(drain).toContain('select((.n | tostring) != $admission_pr)');
+    expect(drain).toContain('enroll_if_still_eligible "$n" "$n" "$head_oid"');
   });
 
   it('excludes stacked non-main PRs from admission and live eligibility', () => {
@@ -869,6 +902,94 @@ describe('native live preflight', () => {
   });
 });
 
+describe('native mutation actor boundary', () => {
+  it('rejects an authorized CLI intent when GitHub identifies the Tim user', async () => {
+    const runner = createNativeRunner({
+      viewerPayload: { data: { viewer: { login: 'itstimwhite' } } },
+    });
+
+    await expect(
+      runCli(['enroll', '14359', HEAD], {
+        env: {
+          MERGE_QUEUE_BACKEND: 'native',
+          GITHUB_REPOSITORY: REPOSITORY,
+          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'merge-queue-autoenroll',
+        },
+        runner,
+        write: vi.fn(),
+      })
+    ).rejects.toMatchObject({
+      code: 'native_mutation_actor_unauthorized',
+      details: {
+        expectedActor: CANONICAL_NATIVE_MUTATION_ACTOR,
+        observedActor: 'itstimwhite',
+      },
+    });
+    expect(runner.mock.calls).toHaveLength(1);
+    expect(invokedMutationActorCheck(runner)).toBe(true);
+    expect(invokedNativeMutation(runner)).toBe(false);
+  });
+
+  it.each([
+    ['enroll', runner => enroll(runner)],
+    ['dequeue', runner => dequeue(runner)],
+  ])('protects direct %s imports from bypassing actor identity', async (_name, invoke) => {
+    const runner = createNativeRunner({
+      viewerPayload: { data: { viewer: { login: 'itstimwhite' } } },
+    });
+
+    await expect(invoke(runner)).rejects.toMatchObject({
+      code: 'native_mutation_actor_unauthorized',
+    });
+    expect(runner.mock.calls).toHaveLength(1);
+    expect(invokedNativeMutation(runner)).toBe(false);
+  });
+
+  it.each([
+    [
+      'missing viewer',
+      { data: { viewer: null } },
+      'native_mutation_actor_unauthorized',
+    ],
+    [
+      'malformed login',
+      { data: { viewer: { login: 42 } } },
+      'native_mutation_actor_unauthorized',
+    ],
+    [
+      'GraphQL error',
+      { errors: [{ message: 'viewer unavailable' }] },
+      'github_graphql_error',
+    ],
+  ])('fails closed on %s evidence', async (_name, viewerPayload, code) => {
+    const runner = createNativeRunner({ viewerPayload });
+
+    await expect(enroll(runner)).rejects.toMatchObject({ code });
+    expect(invokedNativeMutation(runner)).toBe(false);
+  });
+
+  it('keeps preflight and state listing read-only for noncanonical actors', async () => {
+    const viewerPayload = { data: { viewer: { login: 'itstimwhite' } } };
+    const preflightRunner = createNativeRunner({ viewerPayload });
+    const listRunner = createNativeRunner({
+      viewerPayload,
+      states: [prState({ number: 99 })],
+    });
+
+    await expect(
+      preflightMergeQueue({
+        repository: REPOSITORY,
+        runner: preflightRunner,
+      })
+    ).resolves.toMatchObject({ ready: true });
+    await expect(
+      listPullRequestQueueStates(nativeOptions(listRunner))
+    ).resolves.toMatchObject({ 99: { backend: 'native' } });
+    expect(invokedMutationActorCheck(preflightRunner)).toBe(false);
+    expect(invokedMutationActorCheck(listRunner)).toBe(false);
+  });
+});
+
 describe('native enrollment', () => {
   it('uses the native GraphQL mutation and proves a positioned queue receipt', async () => {
     const runner = createNativeRunner({
@@ -881,7 +1002,11 @@ describe('native enrollment', () => {
       ],
     });
     const result = await enroll(runner);
-    expect(result).toMatchObject({ backend: 'native', changed: true });
+    expect(result).toMatchObject({
+      backend: 'native',
+      changed: true,
+      mutationActor: CANONICAL_NATIVE_MUTATION_ACTOR,
+    });
     const mutationCall = runner.mock.calls.find(([args]) =>
       queryText(args).includes('enablePullRequestAutoMerge')
     )?.[0];
@@ -1144,6 +1269,7 @@ describe('native dequeue', () => {
     await expect(dequeue(runner)).resolves.toMatchObject({
       backend: 'native',
       changed: true,
+      mutationActor: CANONICAL_NATIVE_MUTATION_ACTOR,
     });
     const dequeueCall = runner.mock.calls.find(([args]) =>
       queryText(args).includes('dequeuePullRequest')
