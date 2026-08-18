@@ -88,9 +88,22 @@ function toggleTerritoryForContact(
       profileId,
       territories: nextTerritories,
     } as DashboardContactInput);
-    return { ...contact, territories: sanitized.territories };
+    const responsibilities = contact.responsibilities?.map(responsibility =>
+      responsibility.isPrimary
+        ? {
+            ...responsibility,
+            territories: sanitized.territories,
+          }
+        : responsibility
+    );
+    return { ...contact, territories: sanitized.territories, responsibilities };
   } catch {
-    return { ...contact, territories: nextTerritories };
+    const responsibilities = contact.responsibilities?.map(responsibility =>
+      responsibility.isPrimary
+        ? { ...responsibility, territories: nextTerritories }
+        : responsibility
+    );
+    return { ...contact, territories: nextTerritories, responsibilities };
   }
 }
 
@@ -270,6 +283,12 @@ export function useContactsManager({
 
   const handleSave = useCallback(
     async (contact: EditableContact): Promise<string | undefined> => {
+      if (contact.isSystemDefault) {
+        toast.error(
+          'Jovie is the default manager until you add a human manager'
+        );
+        return undefined;
+      }
       const contactId = contact.id;
       const isNewContact = contactId.startsWith('temp-');
 
@@ -350,6 +369,9 @@ export function useContactsManager({
     useState<EditableContact | null>(null);
 
   const handleDelete = useCallback((contact: EditableContact) => {
+    if (contact.isSystemDefault) {
+      return;
+    }
     const contactId = contact.id;
 
     // Handle temp contacts (not persisted yet) - no confirmation needed
@@ -468,6 +490,19 @@ export function useContactsManager({
         preferredChannel: null,
         isActive: true,
         sortOrder: contacts.length,
+        responsibilities: [
+          {
+            id: `${newId}-responsibility`,
+            role,
+            customLabel: role === 'other' ? '' : null,
+            territories: [],
+            isActive: true,
+            isPrimary: true,
+            sortOrder: contacts.length,
+            startedAt: null,
+            endedAt: null,
+          },
+        ],
       };
       setContacts(prev => [...prev, newContact]);
       setUiState(prev => ({
