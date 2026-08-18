@@ -1,22 +1,17 @@
-import type { ComponentPropsWithoutRef, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
-import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
+import {
+  AppShellContentPanel,
+  type AppShellContentPanelProps,
+} from '@/components/organisms/AppShellContentPanel';
 import { cn } from '@/lib/utils';
 
-export interface PageShellProps
-  extends Omit<ComponentPropsWithoutRef<'section'>, 'children'> {
-  readonly children: ReactNode;
-  readonly toolbar?: ReactNode;
-  readonly maxWidth?: 'full' | 'wide' | 'reading' | 'form';
-  readonly frame?: 'none' | 'content-container';
-  readonly contentPadding?: 'none' | 'compact' | 'default';
-  readonly surfaceMode?: 'default' | 'table';
-  readonly scroll?: 'panel' | 'page';
-  readonly className?: string;
-  readonly surfaceClassName?: string;
-  readonly contentClassName?: string;
-  readonly 'data-testid'?: string;
-}
+/**
+ * Compatibility name for the canonical authenticated content-panel contract.
+ * Keeping this as an alias prevents the adapter's props from drifting from its
+ * owner while existing page consumers migrate independently.
+ */
+export type PageShellProps = AppShellContentPanelProps;
 
 /**
  * PageShell — compatibility adapter over {@link AppShellContentPanel}.

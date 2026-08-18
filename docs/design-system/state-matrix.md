@@ -87,8 +87,8 @@ These states apply across families and were previously undocumented.
 | Loading | `--color-skeleton-base` | `[aria-busy="true"]` | `Atoms/Input/Loading` | `packages/ui/atoms/input.tsx` |
 | Skeleton | `--color-skeleton-base`, `--color-skeleton-shimmer` | `.skeleton`, `[data-state="shimmer"]` | `shadcn/Skeleton/LoadingShimmer` | `packages/ui/atoms/skeleton.tsx` |
 | Success | `--color-success-subtle` | `[data-content-state="success"]` | `Molecules/FormStatus/Success` | `apps/web/components/molecules/FormStatus.tsx` |
-| Empty | `--color-text-secondary-token` | `[data-content-state="empty"]` | `UI/EmptyState/Default` | `apps/web/components/organisms/EmptyState.tsx` |
-| Error | `--color-error-subtle`, `--color-error` | `[data-content-state="error"]`, `variant="error"` | `UI/EmptyState/ErrorState` | `apps/web/components/organisms/EmptyState.tsx` |
+| Empty | `--color-text-secondary-token` | `[data-content-state="empty"]` | `UI/Molecules/EmptyState/Default` | `apps/web/components/molecules/EmptyState.tsx` |
+| Error | `--color-error-subtle`, `--color-error` | `[data-content-state="error"]`, `variant="error"` | `UI/Molecules/EmptyState/ErrorState` | `apps/web/components/molecules/EmptyState.tsx` |
 | Offline/retry | `--state-offline-bg`, `--state-offline-fg` | `[data-state="offline"]` | `shadcn/InlineOffline/Default` | `packages/ui/atoms/inline-offline.tsx` |
 | Partial data | `--state-partial-opacity` | `[data-content-state="partial"]` | `UI/Atoms/Card/PartialData` | `packages/ui/atoms/card.tsx` |
 
@@ -135,8 +135,8 @@ These states apply across families and were previously undocumented.
 | Hover | `--color-interactive-hover` | `:hover`, `hover:bg-surface-*` | `UI/Atoms/Card/Hoverable` | `packages/ui/atoms/card.tsx` |
 | Selected/current | `--color-accent-subtle` | `[data-state="checked"]`, `[aria-selected="true"]` | `shadcn/CommonDropdown/Default` | `packages/ui/atoms/common-dropdown.tsx` |
 | Loading | `--color-skeleton-base` | `[data-state="loading"]`, `[aria-busy="true"]` | `shadcn/Skeleton/LoadingShimmer` | `packages/ui/atoms/skeleton.tsx` |
-| Empty | `--color-text-secondary-token` | `[data-content-state="empty"]` | `UI/EmptyState/Default` | `apps/web/components/organisms/EmptyState.tsx` |
-| Error | `--color-error-subtle` | `[data-content-state="error"]` | `UI/EmptyState/ErrorState` | `apps/web/components/organisms/EmptyState.tsx` |
+| Empty | `--color-text-secondary-token` | `[data-content-state="empty"]` | `UI/Molecules/EmptyState/Default` | `apps/web/components/molecules/EmptyState.tsx` |
+| Error | `--color-error-subtle` | `[data-content-state="error"]` | `UI/Molecules/EmptyState/ErrorState` | `apps/web/components/molecules/EmptyState.tsx` |
 | Stale/refreshing | `--state-partial-opacity` | `[data-content-state="partial"]`, `[data-refreshing="true"]` | `UI/Atoms/Card/PartialData` | `packages/ui/atoms/card.tsx` |
 | Permission restricted | `--state-permission-fg` | `[data-state="permission-restricted"]` | `shadcn/Badge/PermissionRestricted` | `packages/ui/atoms/badge.tsx` |
 | Long content | `--color-text-primary-token` | `[data-content-length="long"]` | `UI/Atoms/Card/LongContent` | `packages/ui/atoms/card.tsx` |

@@ -33,7 +33,7 @@ vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
   }),
 }));
 
-vi.mock('@/components/organisms/RightDrawer', () => ({
+vi.mock('@/components/molecules/drawer/RightDrawer', () => ({
   RightDrawer: ({ children }: { children: ReactNode }) => (
     <div data-testid='right-drawer'>{children}</div>
   ),

@@ -18,7 +18,7 @@ vi.mock('sonner', () => ({
   toast: mockToast,
 }));
 
-vi.mock('@/components/organisms/RightDrawer', () => ({
+vi.mock('@/components/molecules/drawer/RightDrawer', () => ({
   RightDrawer: ({
     children,
     'data-testid': testId,

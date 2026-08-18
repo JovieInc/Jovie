@@ -42,7 +42,7 @@ const APP_SHELL_GLOBS = [
   'components/molecules/SettingsLoadingSkeleton.tsx',
   'components/organisms/AppShellSkeleton.tsx',
   'components/organisms/table/atoms/TableEmptyState.tsx',
-  'components/organisms/EmptyState.tsx',
+  'components/molecules/EmptyState.tsx',
 ];
 
 describe('surface elevation guardrails', () => {
