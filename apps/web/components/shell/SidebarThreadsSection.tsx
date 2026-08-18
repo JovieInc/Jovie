@@ -335,7 +335,7 @@ export function SidebarThreadsSection({
     <div className='space-y-1.5'>
       <div className='flex items-center justify-between px-2.5 pb-0.5 pt-2'>
         <span className='text-xs font-caption tracking-normal text-sidebar-muted/90'>
-          Chats
+          Recent
         </span>
         {unreadCount > 0 && (
           <NavBadge

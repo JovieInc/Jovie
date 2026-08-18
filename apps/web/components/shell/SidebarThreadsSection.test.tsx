@@ -232,7 +232,7 @@ describe('SidebarThreadsSection', () => {
     expect(unreadBadge).toHaveAttribute('data-nav-badge', 'count');
   });
 
-  it('groups Chats through spacing without a visible section divider', () => {
+  it('groups Recent threads through spacing without a visible section divider', () => {
     render(
       <SidebarThreadsSection
         threads={threads}
@@ -242,7 +242,7 @@ describe('SidebarThreadsSection', () => {
       />
     );
 
-    const sectionHeader = screen.getByText('Chats').parentElement;
+    const sectionHeader = screen.getByText('Recent').parentElement;
 
     expect(sectionHeader).toHaveClass('px-2.5', 'pb-0.5', 'pt-2');
     expect(sectionHeader).not.toHaveClass('border-t');
