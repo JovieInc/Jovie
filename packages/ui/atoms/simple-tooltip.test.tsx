@@ -2,34 +2,11 @@ import { render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it } from 'vitest';
 import { SimpleTooltip } from './simple-tooltip';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from './tooltip';
+import { TooltipProvider } from './tooltip';
 
 // Wrapper component that provides TooltipProvider
 const TestWrapper = ({ children }: { children: React.ReactNode }) => (
   <TooltipProvider delayDuration={0}>{children}</TooltipProvider>
-);
-
-// Helper to create controlled tooltip for testing content
-const ControlledSimpleTooltip = ({
-  content,
-  children,
-  ...props
-}: {
-  content: React.ReactNode;
-  children: React.ReactElement;
-  [key: string]: any;
-}) => (
-  <TooltipProvider delayDuration={0}>
-    <Tooltip defaultOpen>
-      <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent {...props}>{content}</TooltipContent>
-    </Tooltip>
-  </TooltipProvider>
 );
 
 describe('SimpleTooltip', () => {
@@ -73,9 +50,11 @@ describe('SimpleTooltip', () => {
   describe('Content', () => {
     it('renders string content when open', () => {
       render(
-        <ControlledSimpleTooltip content='Simple text'>
-          <button type='button'>Trigger</button>
-        </ControlledSimpleTooltip>
+        <TestWrapper>
+          <SimpleTooltip content='Simple text' defaultOpen>
+            <button type='button'>Trigger</button>
+          </SimpleTooltip>
+        </TestWrapper>
       );
 
       expect(screen.getByTestId('tooltip-content')).toHaveTextContent(
@@ -85,15 +64,18 @@ describe('SimpleTooltip', () => {
 
     it('renders React node content when open', () => {
       render(
-        <ControlledSimpleTooltip
-          content={
-            <span>
-              <strong>Bold</strong> text
-            </span>
-          }
-        >
-          <button type='button'>Trigger</button>
-        </ControlledSimpleTooltip>
+        <TestWrapper>
+          <SimpleTooltip
+            content={
+              <span>
+                <strong>Bold</strong> text
+              </span>
+            }
+            defaultOpen
+          >
+            <button type='button'>Trigger</button>
+          </SimpleTooltip>
+        </TestWrapper>
       );
 
       const content = screen.getByTestId('tooltip-content');
@@ -105,9 +87,11 @@ describe('SimpleTooltip', () => {
   describe('Side Positioning', () => {
     it('defaults to top side', () => {
       render(
-        <ControlledSimpleTooltip content='Content'>
-          <button type='button'>Trigger</button>
-        </ControlledSimpleTooltip>
+        <TestWrapper>
+          <SimpleTooltip content='Content' defaultOpen>
+            <button type='button'>Trigger</button>
+          </SimpleTooltip>
+        </TestWrapper>
       );
 
       const content = screen.getByTestId('tooltip-content');
@@ -116,9 +100,11 @@ describe('SimpleTooltip', () => {
 
     it('supports right side', () => {
       render(
-        <ControlledSimpleTooltip content='Content' side='right'>
-          <button type='button'>Trigger</button>
-        </ControlledSimpleTooltip>
+        <TestWrapper>
+          <SimpleTooltip content='Content' side='right' defaultOpen>
+            <button type='button'>Trigger</button>
+          </SimpleTooltip>
+        </TestWrapper>
       );
 
       const content = screen.getByTestId('tooltip-content');
@@ -127,9 +113,11 @@ describe('SimpleTooltip', () => {
 
     it('supports bottom side', () => {
       render(
-        <ControlledSimpleTooltip content='Content' side='bottom'>
-          <button type='button'>Trigger</button>
-        </ControlledSimpleTooltip>
+        <TestWrapper>
+          <SimpleTooltip content='Content' side='bottom' defaultOpen>
+            <button type='button'>Trigger</button>
+          </SimpleTooltip>
+        </TestWrapper>
       );
 
       const content = screen.getByTestId('tooltip-content');
@@ -138,9 +126,11 @@ describe('SimpleTooltip', () => {
 
     it('supports left side', () => {
       render(
-        <ControlledSimpleTooltip content='Content' side='left'>
-          <button type='button'>Trigger</button>
-        </ControlledSimpleTooltip>
+        <TestWrapper>
+          <SimpleTooltip content='Content' side='left' defaultOpen>
+            <button type='button'>Trigger</button>
+          </SimpleTooltip>
+        </TestWrapper>
       );
 
       const content = screen.getByTestId('tooltip-content');
@@ -151,9 +141,11 @@ describe('SimpleTooltip', () => {
   describe('Options', () => {
     it('supports custom sideOffset', () => {
       render(
-        <ControlledSimpleTooltip content='Content' sideOffset={12}>
-          <button type='button'>Trigger</button>
-        </ControlledSimpleTooltip>
+        <TestWrapper>
+          <SimpleTooltip content='Content' sideOffset={12} defaultOpen>
+            <button type='button'>Trigger</button>
+          </SimpleTooltip>
+        </TestWrapper>
       );
 
       expect(screen.getByTestId('tooltip-content')).toBeInTheDocument();
@@ -161,9 +153,11 @@ describe('SimpleTooltip', () => {
 
     it('supports showArrow option', () => {
       render(
-        <ControlledSimpleTooltip content='Content' showArrow>
-          <button type='button'>Trigger</button>
-        </ControlledSimpleTooltip>
+        <TestWrapper>
+          <SimpleTooltip content='Content' showArrow defaultOpen>
+            <button type='button'>Trigger</button>
+          </SimpleTooltip>
+        </TestWrapper>
       );
 
       expect(screen.getByTestId('tooltip-arrow')).toBeInTheDocument();
@@ -171,22 +165,56 @@ describe('SimpleTooltip', () => {
 
     it('supports custom className', () => {
       render(
-        <ControlledSimpleTooltip content='Content' className='custom-class'>
-          <button type='button'>Trigger</button>
-        </ControlledSimpleTooltip>
+        <TestWrapper>
+          <SimpleTooltip content='Content' className='custom-class' defaultOpen>
+            <button type='button'>Trigger</button>
+          </SimpleTooltip>
+        </TestWrapper>
       );
 
       const content = screen.getByTestId('tooltip-content');
       expect(content.className).toContain('custom-class');
+    });
+
+    it('passes compact and rich content contracts through the wrapper', () => {
+      const { rerender } = render(
+        <TestWrapper>
+          <SimpleTooltip
+            content='Compact label'
+            contentVariant='compact'
+            defaultOpen
+          >
+            <button type='button'>Trigger</button>
+          </SimpleTooltip>
+        </TestWrapper>
+      );
+      expect(screen.getByTestId('tooltip-content')).toHaveClass(
+        'rounded-full',
+        'whitespace-nowrap'
+      );
+
+      rerender(
+        <TestWrapper>
+          <SimpleTooltip content='Rich explanation' defaultOpen>
+            <button type='button'>Trigger</button>
+          </SimpleTooltip>
+        </TestWrapper>
+      );
+      expect(screen.getByTestId('tooltip-content')).toHaveClass(
+        'max-w-56',
+        'break-words'
+      );
     });
   });
 
   describe('Trigger Types', () => {
     it('works with button trigger', () => {
       render(
-        <ControlledSimpleTooltip content='Button tooltip'>
-          <button type='button'>Button</button>
-        </ControlledSimpleTooltip>
+        <TestWrapper>
+          <SimpleTooltip content='Button tooltip' defaultOpen>
+            <button type='button'>Button</button>
+          </SimpleTooltip>
+        </TestWrapper>
       );
 
       expect(screen.getByTestId('tooltip-content')).toHaveTextContent(
@@ -196,9 +224,11 @@ describe('SimpleTooltip', () => {
 
     it('works with link trigger', () => {
       render(
-        <ControlledSimpleTooltip content='Link tooltip'>
-          <a href='https://example.com'>Link</a>
-        </ControlledSimpleTooltip>
+        <TestWrapper>
+          <SimpleTooltip content='Link tooltip' defaultOpen>
+            <a href='https://example.com'>Link</a>
+          </SimpleTooltip>
+        </TestWrapper>
       );
 
       expect(screen.getByTestId('tooltip-content')).toHaveTextContent(
@@ -208,9 +238,11 @@ describe('SimpleTooltip', () => {
 
     it('works with span trigger', () => {
       render(
-        <ControlledSimpleTooltip content='Span tooltip'>
-          <span data-testid='span-trigger'>Span</span>
-        </ControlledSimpleTooltip>
+        <TestWrapper>
+          <SimpleTooltip content='Span tooltip' defaultOpen>
+            <span data-testid='span-trigger'>Span</span>
+          </SimpleTooltip>
+        </TestWrapper>
       );
 
       expect(screen.getByTestId('tooltip-content')).toHaveTextContent(

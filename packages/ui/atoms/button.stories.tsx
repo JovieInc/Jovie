@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { Button } from './button';
+import { BUTTON_SIZE_NAMES, BUTTON_VARIANT_NAMES, Button } from './button';
 
 const meta: Meta<typeof Button> = {
   title: 'shadcn/Button',
@@ -17,12 +17,12 @@ const meta: Meta<typeof Button> = {
   argTypes: {
     variant: {
       control: { type: 'select' },
-      options: ['primary', 'secondary', 'tertiary', 'ghost', 'link'],
+      options: [...BUTTON_VARIANT_NAMES],
       description: 'Visual style variant',
     },
     size: {
       control: { type: 'select' },
-      options: ['sm', 'md', 'lg', 'icon'],
+      options: [...BUTTON_SIZE_NAMES],
       description: 'Button size',
     },
     destructive: {
@@ -189,6 +189,31 @@ export const FocusVisible: Story = {
       },
     },
   },
+};
+
+export const ActionStateMatrix: Story = {
+  render: () => (
+    <div className='grid gap-4 p-6'>
+      {BUTTON_VARIANT_NAMES.filter(variant => variant !== 'link').map(
+        variant => (
+          <div className='flex flex-wrap items-center gap-3' key={variant}>
+            <span className='w-20 text-xs text-tertiary-token'>{variant}</span>
+            <Button variant={variant}>Idle</Button>
+            <Button variant={variant} loading>
+              Loading
+            </Button>
+            <Button variant={variant} disabled>
+              Disabled
+            </Button>
+            <Button variant={variant} destructive>
+              Destructive
+            </Button>
+          </div>
+        )
+      )}
+    </div>
+  ),
+  parameters: { layout: 'padded' },
 };
 
 // Production-backed primary/lg fixtures (Pen master button/primary/lg/idle)

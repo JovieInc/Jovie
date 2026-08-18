@@ -151,6 +151,17 @@ describe('Button', () => {
     expect(btn.className).not.toMatch(/(?:^|\s)h-11(?:\s|$)/);
   });
 
+  it('keeps every text-button size inside a 44px minimum target', () => {
+    for (const size of ['sm', 'marketing', 'md', 'lg'] as const) {
+      const { unmount } = render(<Button size={size}>Action {size}</Button>);
+      const btn = screen.getByRole('button', { name: `Action ${size}` });
+
+      expect(btn.className).toContain('before:h-11');
+      expect(btn.className).toContain('before:min-w-11');
+      unmount();
+    }
+  });
+
   it('renders every entry in the server-safe button registry', () => {
     render(
       <>
@@ -304,12 +315,8 @@ describe('Button', () => {
   it('uses the Jovie focus token', () => {
     render(<Button>Press</Button>);
     const btn = screen.getByRole('button');
-    expect(btn.className).toContain(
-      'focus-visible:ring-(--linear-border-focus)'
-    );
-    expect(btn.className).toContain(
-      'focus-visible:ring-offset-(--linear-bg-page)'
-    );
+    expect(btn.className).toContain('focus-visible:ring-focus/55');
+    expect(btn.className).toContain('focus-visible:ring-offset-surface-page');
   });
 
   it('keeps normal focus transitions while disabling them for reduced motion', () => {
@@ -319,14 +326,17 @@ describe('Button', () => {
     expect(btn.className).toContain(
       'transition-[background-color,border-color,color,box-shadow,opacity,transform]'
     );
-    expect(btn.className).toContain('motion-reduce:!transition-none');
+    expect(btn.className).toContain('duration-subtle');
+    expect(btn.className).toContain('ease-subtle');
+    expect(btn.className).toContain('motion-reduce:transition-none');
   });
 
   it('uses raised control styling for secondary buttons', () => {
     render(<Button variant='secondary'>Press</Button>);
     const btn = screen.getByRole('button');
     expect(btn.className).toContain('shadow-[');
-    expect(btn.className).toContain('hover:border-(--linear-border-default)');
+    expect(btn.className).toContain('hover:border-default');
+    expect(btn.className).toContain('hover:bg-(--color-btn-secondary-hover)');
   });
 
   it.each([
@@ -373,6 +383,36 @@ describe('Button', () => {
     render(<Button loading>Load</Button>);
     expect(screen.getByTestId('spinner')).toBeInTheDocument();
     expect(screen.getByRole('button')).toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('keeps loading and disabled accessibility state authoritative', () => {
+    render(
+      <Button
+        loading
+        aria-busy={false}
+        aria-disabled={false}
+        data-state='caller-state'
+      >
+        Save
+      </Button>
+    );
+    const btn = screen.getByRole('button');
+
+    expect(btn).toHaveAttribute('aria-busy', 'true');
+    expect(btn).toHaveAttribute('aria-disabled', 'true');
+    expect(btn).toHaveAttribute('data-state', 'loading');
+  });
+
+  it('preserves caller accessibility state while idle', () => {
+    render(
+      <Button aria-busy='false' aria-disabled='false'>
+        Save
+      </Button>
+    );
+    const btn = screen.getByRole('button');
+
+    expect(btn).toHaveAttribute('aria-busy', 'false');
+    expect(btn).toHaveAttribute('aria-disabled', 'false');
   });
   // href prop removed; use asChild with an anchor element instead
 });

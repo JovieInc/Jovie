@@ -107,7 +107,8 @@ describe('demovideo page System B source contract', () => {
     );
 
     expect(demoSource).toContain('motion-reduce:!transition-none');
-    expect(buttonSource).toContain('motion-reduce:!transition-none');
+    expect(buttonSource).toContain('motion-reduce:transition-none');
+    expect(buttonSource).not.toContain('motion-reduce:!transition-none');
     expect(pillSource).toContain('motion-reduce:!transition-none');
     expect(headerSource).toContain('@media (prefers-reduced-motion: reduce)');
     expect(headerSource).toContain('transition: none;');

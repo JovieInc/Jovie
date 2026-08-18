@@ -161,9 +161,7 @@ describe('IconButton', () => {
       const button = screen.getByRole('button', {
         name: `${variant} action`,
       });
-      expect(button.className).toContain(
-        'focus-visible:ring-(--linear-border-focus)/55'
-      );
+      expect(button.className).toContain('focus-visible:ring-focus/55');
       expect(button.className).toContain('motion-reduce:transition-none');
       expect(button.className).not.toContain('focus-visible:ring-ring');
       expect(button.className).not.toContain('focus-visible:ring-focus/16');
@@ -178,5 +176,31 @@ describe('IconButton', () => {
       </IconButton>
     );
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
+  });
+
+  it('falls back to aria-label when ariaLabel is blank and trims the label', () => {
+    render(
+      <IconButton ariaLabel='   ' aria-label='  Close menu  '>
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+
+    expect(screen.getByRole('button', { name: 'Close menu' })).toHaveAttribute(
+      'aria-label',
+      'Close menu'
+    );
+  });
+
+  it('uses the shared subtle motion contract for circular chrome', () => {
+    render(
+      <IconButton ariaLabel='Surface action' variant='surface'>
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+    const button = screen.getByRole('button');
+
+    expect(button.className).toContain('duration-subtle');
+    expect(button.className).toContain('ease-subtle');
+    expect(button.className).not.toContain('ease-out');
   });
 });

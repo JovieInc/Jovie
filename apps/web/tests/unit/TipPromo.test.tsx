@@ -67,7 +67,7 @@ describe('PayPromo', () => {
     // Check CTA button styling - CTAButton uses the shared secondary token set.
     const ctaButton = screen.getByRole('link', { name: 'See it live' });
     expect(ctaButton).toHaveClass('bg-btn-secondary');
-    expect(ctaButton).toHaveClass('hover:bg-(--linear-btn-secondary-hover)');
+    expect(ctaButton).toHaveClass('hover:bg-(--color-btn-secondary-hover)');
   });
 
   it('contains "Pay, instantly." heading when feature flag is enabled', () => {

@@ -27,6 +27,7 @@ export function InlineOfflineNotice({
     <div
       role='status'
       aria-live='polite'
+      aria-atomic='true'
       data-state='offline'
       className={cn(
         'flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2 text-[13px]',
@@ -39,7 +40,7 @@ export function InlineOfflineNotice({
       {onRetry ? (
         <Button
           type='button'
-          variant='outline'
+          variant='secondary'
           size='sm'
           onClick={onRetry}
           className='shrink-0'
