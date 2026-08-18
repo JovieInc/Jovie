@@ -1,7 +1,6 @@
-import { Button, Input, Label } from '@jovie/ui';
+import { Badge, Button, Input, Label } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Badge } from '@/components/atoms/Badge';
 import { DotBadge } from '@/components/atoms/DotBadge';
 import { Icon } from '@/components/atoms/Icon';
 import { NavLink } from '@/components/atoms/NavLink';
@@ -198,7 +197,7 @@ describe('Atoms Integration Tests', () => {
         <div className='flex items-center gap-2'>
           <span>John Doe</span>
           <VerifiedBadge size='sm' />
-          <Badge emphasis='subtle'>Pro</Badge>
+          <Badge tone='neutral'>Pro</Badge>
         </div>
       );
 
