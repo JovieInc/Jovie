@@ -2,6 +2,7 @@
 
 import { ChevronRight } from 'lucide-react';
 import { useMemo } from 'react';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
   PAGE_TOOLBAR_META_TEXT_CLASS,
@@ -115,11 +116,17 @@ export function ReleaseTaskPage({
         ) : null}
 
         {upNextTasks.length > 0 && !allDone && (
+          // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Preserve established release-playbook copy in this substrate-only migration.
           <section aria-label='Up next' className='space-y-2'>
+            {/* eslint-disable-next-line @jovie/canonical-ui-label-casing -- Preserve established release-playbook copy in this substrate-only migration. */}
             <h2 className='px-1 text-xs font-medium text-secondary-token'>
               Up next
             </h2>
-            <div className='rounded-lg border border-subtle bg-surface-1 p-1 shadow-app-control'>
+            <ContentSurfaceCard
+              surface='nested'
+              className='p-1 shadow-app-control'
+              data-testid='release-task-up-next-card'
+            >
               {upNextTasks.map(task => (
                 <ReleaseTaskRow
                   key={task.id}
@@ -127,7 +134,7 @@ export function ReleaseTaskPage({
                   onToggle={handleToggle}
                 />
               ))}
-            </div>
+            </ContentSurfaceCard>
           </section>
         )}
 
@@ -143,6 +150,7 @@ export function ReleaseTaskPage({
   );
 }
 
+/* eslint-disable @jovie/canonical-ui-label-casing -- Preserve the existing loading announcement in this substrate-only migration. */
 export function ReleaseTaskPageSkeleton() {
   return (
     <PageShell
@@ -166,10 +174,14 @@ export function ReleaseTaskPageSkeleton() {
       }
     >
       <div className='mx-auto flex w-full max-w-3xl flex-col gap-5 px-3 py-3 sm:px-4 lg:px-5'>
-        <div className='rounded-lg border border-subtle bg-surface-1 p-3 shadow-app-control'>
+        <ContentSurfaceCard
+          surface='nested'
+          className='p-3 shadow-app-control'
+          data-testid='release-task-skeleton-summary-card'
+        >
           <div className='mb-2 h-3 w-24 rounded bg-surface-2' />
           <div className='h-1 w-full rounded-full bg-surface-2' />
-        </div>
+        </ContentSurfaceCard>
 
         <div className='space-y-3'>
           {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
@@ -184,3 +196,4 @@ export function ReleaseTaskPageSkeleton() {
     </PageShell>
   );
 }
+/* eslint-enable @jovie/canonical-ui-label-casing */
