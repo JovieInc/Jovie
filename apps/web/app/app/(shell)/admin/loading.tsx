@@ -1,4 +1,4 @@
-import { PageContent, PageShell } from '@/components/organisms/PageShell';
+import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { AdminHealthDashboardSkeleton } from './_components/AdminHealthDashboard';
 
 /**
@@ -6,12 +6,12 @@ import { AdminHealthDashboardSkeleton } from './_components/AdminHealthDashboard
  */
 export default function AdminLoading() {
   return (
-    <PageShell frame='none' contentPadding='none'>
-      <PageContent>
-        <div className='flex h-full flex-col gap-4'>
-          <AdminHealthDashboardSkeleton />
-        </div>
-      </PageContent>
-    </PageShell>
+    <AdminPage
+      title='Overview'
+      testId='admin-overview-loading'
+      viewTestId='admin-dashboard-loading-content'
+    >
+      <AdminHealthDashboardSkeleton />
+    </AdminPage>
   );
 }

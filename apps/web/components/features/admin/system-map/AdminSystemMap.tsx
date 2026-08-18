@@ -1,5 +1,7 @@
 import { Cable, Database, Wrench } from 'lucide-react';
 import type { SystemMapTab } from '@/app/app/(shell)/admin/system/page';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import { SKILL_REGISTRY } from '@/lib/agents/registry';
 import { getConnectorDefinitions } from '@/lib/connectors/registry';
 import { AdminSystemMapSkillsTab } from './AdminSystemMapSkillsTab';
@@ -8,7 +10,7 @@ interface AdminSystemMapProps {
   readonly activeTab: SystemMapTab;
 }
 
-export async function AdminSystemMap({ activeTab }: AdminSystemMapProps) {
+export function AdminSystemMap({ activeTab }: AdminSystemMapProps) {
   if (activeTab === 'skills') {
     return <AdminSystemMapSkillsTab />;
   }
@@ -18,9 +20,10 @@ export async function AdminSystemMap({ activeTab }: AdminSystemMapProps) {
     return (
       <div data-testid='system-map-connectors' className='space-y-3'>
         {connectors.map(c => (
-          <div
+          <ContentSurfaceCard
             key={c.id}
-            className='flex items-start gap-3 rounded-lg border border-subtle bg-surface-1 p-4'
+            surface='nested'
+            className='flex items-start gap-3 p-4'
           >
             <Cable className='mt-0.5 h-4 w-4 shrink-0 text-secondary-token' />
             <div className='min-w-0'>
@@ -31,7 +34,7 @@ export async function AdminSystemMap({ activeTab }: AdminSystemMapProps) {
                 {c.description}
               </p>
             </div>
-          </div>
+          </ContentSurfaceCard>
         ))}
       </div>
     );
@@ -42,12 +45,16 @@ export async function AdminSystemMap({ activeTab }: AdminSystemMapProps) {
     return (
       <div data-testid='system-map-tools' className='space-y-3'>
         {tools.length === 0 ? (
-          <p className='text-sm text-secondary-token'>No tools registered.</p>
+          <EmptyState
+            heading='No tools registered.'
+            testId='system-map-tools-empty'
+          />
         ) : (
           tools.map(t => (
-            <div
+            <ContentSurfaceCard
               key={t.id}
-              className='flex items-start gap-3 rounded-lg border border-subtle bg-surface-1 p-4'
+              surface='nested'
+              className='flex items-start gap-3 p-4'
             >
               <Wrench className='mt-0.5 h-4 w-4 shrink-0 text-secondary-token' />
               <div className='min-w-0'>
@@ -61,7 +68,7 @@ export async function AdminSystemMap({ activeTab }: AdminSystemMapProps) {
                   {t.model}
                 </p>
               </div>
-            </div>
+            </ContentSurfaceCard>
           ))
         )}
       </div>

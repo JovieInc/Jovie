@@ -1,3 +1,4 @@
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { formatUsd } from '@/lib/admin/format';
 import { formatSourceFreshness, isSourceStale } from '@/lib/hud/source-trust';
 import type { RevenueLiftDashboardData } from '@/lib/metrics/revenue-lift-dashboard';
@@ -37,8 +38,9 @@ function KpiTile({
   tile: RevenueLiftDashboardData['kpiTree'][number];
 }>) {
   return (
-    <div
-      className='rounded-md border border-subtle bg-surface-1 p-4'
+    <ContentSurfaceCard
+      surface='nested'
+      className='p-4'
       data-testid={`revenue-lift-kpi-${tile.id}`}
     >
       <div className='flex items-start justify-between gap-2'>
@@ -52,7 +54,7 @@ function KpiTile({
       </p>
       <p className='mt-1 min-h-8 text-xs text-secondary-token'>{tile.signal}</p>
       <SourceLine source={tile.source} />
-    </div>
+    </ContentSurfaceCard>
   );
 }
 
@@ -71,8 +73,9 @@ export function RevenueLiftDashboardView({
   return (
     <div className='space-y-6' data-testid='revenue-lift-dashboard'>
       {/* North Star hero */}
-      <section
-        className='rounded-md border border-subtle bg-surface-1 p-5'
+      <ContentSurfaceCard
+        as='section'
+        className='p-5'
         data-testid='revenue-lift-irpaa-hero'
         aria-labelledby='revenue-lift-irpaa-heading'
       >
@@ -104,7 +107,7 @@ export function RevenueLiftDashboardView({
           .
         </p>
         <SourceLine source={data.irpaaSource} />
-      </section>
+      </ContentSurfaceCard>
 
       {/* KPI tree */}
       <section aria-labelledby='revenue-lift-kpi-heading'>
@@ -131,7 +134,7 @@ export function RevenueLiftDashboardView({
         >
           Metric → Signal → VC Interpretation
         </h2>
-        <div className='overflow-x-auto rounded-md border border-subtle bg-surface-1'>
+        <ContentSurfaceCard surface='table' className='overflow-x-auto'>
           <table className='w-full min-w-[40rem] text-left text-sm'>
             <thead className='border-b border-subtle bg-surface-0 text-xs text-secondary-token'>
               <tr>
@@ -170,7 +173,7 @@ export function RevenueLiftDashboardView({
               ))}
             </tbody>
           </table>
-        </div>
+        </ContentSurfaceCard>
       </section>
 
       {/* Cohort strip */}
@@ -182,7 +185,7 @@ export function RevenueLiftDashboardView({
           Per Artist Cohort
         </h2>
         <div className='mb-3 grid gap-3 sm:grid-cols-2'>
-          <div className='rounded-md border border-subtle bg-surface-1 p-4'>
+          <ContentSurfaceCard surface='nested' className='p-4'>
             <p className='text-xs font-medium text-secondary-token'>
               Jovie Active
             </p>
@@ -195,8 +198,8 @@ export function RevenueLiftDashboardView({
                 ? formatAmount(data.cohorts.activeMedianLiftCents)
                 : '—'}
             </p>
-          </div>
-          <div className='rounded-md border border-subtle bg-surface-1 p-4'>
+          </ContentSurfaceCard>
+          <ContentSurfaceCard surface='nested' className='p-4'>
             <p className='text-xs font-medium text-secondary-token'>Control</p>
             <p className='mt-1 text-2xl font-semibold text-primary-token'>
               {data.cohorts.controlCount}
@@ -207,10 +210,10 @@ export function RevenueLiftDashboardView({
                 ? formatAmount(data.cohorts.controlMedianLiftCents)
                 : '—'}
             </p>
-          </div>
+          </ContentSurfaceCard>
         </div>
         <SourceLine source={data.cohorts.source} />
-        <div className='mt-3 overflow-x-auto rounded-md border border-subtle bg-surface-1'>
+        <ContentSurfaceCard surface='table' className='mt-3 overflow-x-auto'>
           <table className='w-full min-w-[32rem] text-left text-sm'>
             <thead className='border-b border-subtle bg-surface-0 text-xs text-secondary-token'>
               <tr>
@@ -262,7 +265,7 @@ export function RevenueLiftDashboardView({
               )}
             </tbody>
           </table>
-        </div>
+        </ContentSurfaceCard>
       </section>
 
       {/* Multi agent contribution */}
@@ -273,7 +276,7 @@ export function RevenueLiftDashboardView({
         >
           Multi Agent Contribution
         </h2>
-        <div className='overflow-x-auto rounded-md border border-subtle bg-surface-1'>
+        <ContentSurfaceCard surface='table' className='overflow-x-auto'>
           <table className='w-full min-w-[36rem] text-left text-sm'>
             <thead className='border-b border-subtle bg-surface-0 text-xs text-secondary-token'>
               <tr>
@@ -327,7 +330,7 @@ export function RevenueLiftDashboardView({
               )}
             </tbody>
           </table>
-        </div>
+        </ContentSurfaceCard>
         <SourceLine source={data.agentsSource} />
       </section>
 

@@ -98,5 +98,10 @@ describe('AdminHealthDashboard', () => {
     expect(
       screen.getByTestId('admin-health-dashboard-skeleton').children
     ).toHaveLength(4);
+    for (const tile of screen.getByTestId('admin-health-dashboard-skeleton')
+      .children) {
+      expect(tile).toHaveClass('rounded-xl', 'skeleton');
+      expect(tile.className).toContain('border-(--app-shell-border)');
+    }
   });
 });

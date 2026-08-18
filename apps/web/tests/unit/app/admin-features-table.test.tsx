@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -92,6 +92,7 @@ describe('getFlagEnvStatus', () => {
 describe('AdminFeaturesTable', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: {
@@ -185,6 +186,48 @@ describe('AdminFeaturesTable', () => {
         name: /Staging: On, Override\. Toggle value\./i,
       })
     ).toBeInTheDocument();
+  });
+
+  it('persists canonical switch changes and reset controls', async () => {
+    const user = userEvent.setup();
+    render(<AdminFeaturesTable initialRows={ROWS} currentTier='dev' />);
+
+    await user.click(
+      screen.getByRole('switch', {
+        name: 'Dev (current): Off, Default. Toggle value.',
+      })
+    );
+
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/admin/feature-flags',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            flagKey: 'spotify_oauth',
+            envTier: 'dev',
+            enabled: true,
+          }),
+        })
+      )
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Reset Staging to default' })
+    );
+
+    await waitFor(() =>
+      expect(fetch).toHaveBeenLastCalledWith(
+        '/api/admin/feature-flags',
+        expect.objectContaining({
+          body: JSON.stringify({
+            flagKey: 'spotify_oauth',
+            envTier: 'staging',
+            enabled: null,
+          }),
+        })
+      )
+    );
   });
 
   it('keeps flag name and description visible alongside the raw key', () => {
