@@ -1,28 +1,35 @@
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+import {
+  bindEvePilotIdentity,
+  EvePilotCapabilityDeniedError,
+} from '../agent/select-identity';
 
 describe('eve identity instruction packs', () => {
-  it('keeps Jovie artist instructions off factory tools', () => {
-    const text = readFileSync(
-      resolve(root, 'identities/jovie/instructions.md'),
-      'utf8'
+  it('denies Jovie privileged gbrain write and Symphony heal at the Eve entry', () => {
+    const turn = bindEvePilotIdentity('jovie');
+    expect(turn.instructions.includes('artist-facing')).toBe(true);
+    expect(turn.instructions.includes('privileged gbrain write')).toBe(false);
+    expect(turn.instructions.includes('Symphony heal')).toBe(false);
+    expect(() => turn.require('privileged-gbrain-write')).toThrow(
+      EvePilotCapabilityDeniedError
     );
-    expect(text.includes('artist-facing')).toBe(true);
-    expect(text.includes('privileged gbrain write')).toBe(false);
-    expect(text.includes('Symphony heal')).toBe(false);
+    expect(() => turn.require('symphony-heal')).toThrow(
+      EvePilotCapabilityDeniedError
+    );
   });
 
-  it('lets Ovie ingest/ack and read gbrain', () => {
-    const text = readFileSync(
-      resolve(root, 'identities/ovie/instructions.md'),
-      'utf8'
+  it('lets Ovie ingest/ack and read gbrain at the Eve entry', () => {
+    const turn = bindEvePilotIdentity('ovie');
+    expect(turn.instructions.includes('ingest and ack')).toBe(true);
+    expect(turn.instructions.includes('gbrain')).toBe(true);
+    expect(turn.instructions.includes('read')).toBe(true);
+    expect(() => turn.require('ingest-ack')).not.toThrow();
+    expect(() => turn.require('gbrain-read')).not.toThrow();
+    expect(() => turn.require('privileged-gbrain-write')).toThrow(
+      EvePilotCapabilityDeniedError
     );
-    expect(text.includes('ingest and ack')).toBe(true);
-    expect(text.includes('gbrain')).toBe(true);
-    expect(text.includes('read')).toBe(true);
+    expect(() => turn.require('symphony-heal')).toThrow(
+      EvePilotCapabilityDeniedError
+    );
   });
 });
