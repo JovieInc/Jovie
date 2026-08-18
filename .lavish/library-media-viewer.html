@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Jovie Library — media viewer prototype v1</title>
+  <style>
+    :root {
+      --bg: #06070A;
+      --surface-1: #101216;
+      --surface-2: #161A20;
+      --text: #FFFFFF;
+      --text-2: #E3E4E6;
+      --text-3: #969799;
+      --border: rgba(255,255,255,0.08);
+      --accent: #7170FF;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--text); font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif; }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 20px 80px; }
+    h1 { font-size: 28px; font-weight: 600; margin: 0 0 8px; }
+    .lede { color: var(--text-3); font-size: 15px; margin: 0 0 28px; max-width: 62ch; }
+    .phones { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+    .device { background: #0A0B0E; border: 1px solid var(--border); border-radius: 36px; padding: 18px 0 0; overflow: hidden; }
+    .notch { width: 108px; height: 22px; background: #000; border-radius: 0 0 16px 16px; margin: 0 auto 8px; }
+    .screen { padding: 0 16px 20px; }
+    .title { font-size: 22px; font-weight: 600; margin: 8px 0 12px; }
+    .search { height: 36px; border-radius: 999px; background: var(--surface-1); border: 1px solid var(--border); color: var(--text-3); display: flex; align-items: center; padding: 0 14px; font-size: 14px; margin-bottom: 10px; }
+    .chips { display: flex; gap: 8px; overflow: hidden; margin-bottom: 8px; }
+    .chip { font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 999px; background: var(--surface-1); color: var(--text-2); }
+    .chip.on { background: #fff; color: #06070A; }
+    .row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--border); }
+    .row .meta { min-width: 0; flex: 1; }
+    .row .name { font-size: 16px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .row .sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+    .thumb { width: 36px; height: 36px; border-radius: 4px; background: var(--surface-2); flex: 0 0 36px; }
+    .thumb.circle { border-radius: 999px; }
+    .now { margin-top: 16px; background: var(--surface-1); border: 1px solid var(--border); border-radius: 16px; padding: 10px 12px; display: flex; gap: 10px; align-items: center; }
+    .now .art { width: 44px; height: 44px; border-radius: 8px; background: linear-gradient(135deg, #4D7DFF, #9B4DFF); }
+    .player { background: #000; border-radius: 12px; aspect-ratio: 16/9; position: relative; overflow: hidden; }
+    .player .scrim { position: absolute; inset: auto 0 0 0; height: 72px; background: linear-gradient(transparent, rgba(0,0,0,.8)); }
+    .player .tc { position: absolute; left: 12px; bottom: 28px; font-variant-numeric: tabular-nums; font-size: 12px; }
+    .timeline { position: absolute; left: 12px; right: 12px; bottom: 12px; height: 3px; background: rgba(255,255,255,.2); border-radius: 99px; }
+    .timeline i { display: block; width: 38%; height: 100%; background: var(--accent); border-radius: 99px; }
+    .note { margin-top: 12px; background: var(--surface-1); border-radius: 12px; padding: 10px 12px; font-size: 13px; }
+    .note b { color: var(--accent); font-weight: 600; }
+    .section { margin-top: 36px; }
+    .q { background: var(--surface-1); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; margin: 10px 0; }
+    .q h3 { margin: 0 0 6px; font-size: 15px; }
+    .q p { margin: 0; color: var(--text-3); font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Library viewer v1 — iPod list + Frame.io review</h1>
+    <p class="lede">Not shipped. Brain-dump on this. Locked decisions already applied: full-width native list, no Smart Links filter, video/audio/docs/releases/merch in one scroll, playback hands off to the existing audio player.</p>
+
+    <div class="phones">
+      <div class="device">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="title">Library</div>
+          <div class="search">Search takes, releases, merch, docs</div>
+          <div class="chips">
+            <span class="chip on">All</span>
+            <span class="chip">Video</span>
+            <span class="chip">Audio</span>
+            <span class="chip">Releases</span>
+            <span class="chip">Merch</span>
+            <span class="chip">Docs</span>
+          </div>
+          <div class="row"><div class="thumb"></div><div class="meta"><div class="name">Ferry take 03</div><div class="sub">Video · just shot · 0:47</div></div></div>
+          <div class="row"><div class="thumb"></div><div class="meta"><div class="name">Midnight Drive</div><div class="sub">Release · 8 tracks</div></div></div>
+          <div class="row"><div class="thumb circle"></div><div class="meta"><div class="name">Tour hoodie</div><div class="sub">Merch · live</div></div></div>
+          <div class="row"><div class="thumb"></div><div class="meta"><div class="name">One-sheet — spring</div><div class="sub">Document · PDF</div></div></div>
+          <div class="row"><div class="thumb"></div><div class="meta"><div class="name">Voice memo — hook</div><div class="sub">Audio · 1:12</div></div></div>
+          <div class="now"><div class="art"></div><div class="meta"><div class="name">Midnight Drive</div><div class="sub">Now playing · audio player</div></div></div>
+        </div>
+      </div>
+
+      <div class="device">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="title">Ferry take 03</div>
+          <div class="player">
+            <div class="scrim"></div>
+            <div class="tc">00:12:04</div>
+            <div class="timeline"><i></i></div>
+          </div>
+          <div class="note"><b>00:12:04</b> — “Hold the look at the water one more beat.” Tap the note, land on the frame. Type pauses. Send resumes.</div>
+          <div class="note"><b>Versions</b> — take 01, take 02, take 03. Same review surface as a finished video.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h1>Interview — dump on these</h1>
+      <div class="q"><h3>1. One surface or two modes?</h3><p>Is reviewing a just-shot vlog the same Library row as Midnight Drive, or a hidden Recents / Dailies shelf that still plays in the same player?</p></div>
+      <div class="q"><h3>2. Who comments?</h3><p>Just you marking your own takes today, or collaborator review (manager, editor) in v1?</p></div>
+      <div class="q"><h3>3. Audio player contract</h3><p>Mini player sticky across Chat and Library? Lock Screen + AirPlay in v1? Video should duck or replace audio?</p></div>
+      <div class="q"><h3>4. Documents</h3><p>Press kits and one-sheets only, or also contracts, lyrics, call sheets?</p></div>
+      <div class="q"><h3>5. Smart links</h3><p>Never a filter — but still a row type, or only a property on a release?</p></div>
+      <div class="q"><h3>6. Surfaces for v1 ship</h3><p>iOS only after lock, or iOS + web + Ovie in the same pass?</p></div>
+    </div>
+  </div>
+</body>
+</html>

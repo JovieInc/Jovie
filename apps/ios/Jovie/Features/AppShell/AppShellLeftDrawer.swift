@@ -56,6 +56,8 @@ struct AppShellLeftDrawer: View {
   let onSelectConversation: (String) -> Void
   let onOpenSettings: () -> Void
   let onTalk: () -> Void
+  var onOpenPublicProfile: () -> Void = {}
+  var onOpenProfileQR: () -> Void = {}
 
   @State private var threadSearch = ""
   // Decorative open-stagger only; the drawer is fully interactive regardless
@@ -88,11 +90,19 @@ struct AppShellLeftDrawer: View {
             chatEnabled: chatEnabled,
             audienceEnabled: audienceEnabled,
             selectedTab: selectedTab,
-            onSelectTab: onSelectTab
+            hasProfileQR: profile.qrPayload != nil,
+            onSelectTab: { tab in
+              if tab == .profile {
+                onOpenPublicProfile()
+                return
+              }
+              onSelectTab(tab)
+            },
+            onOpenProfileQR: onOpenProfileQR
           )
           .drawerRowReveal(isRevealed: contentRevealed, delay: 0, reduceMotion: reduceMotion)
 
-          DrawerAccountHeader(profile: profile)
+          DrawerAccountHeader(profile: profile, onOpenPublicProfile: onOpenPublicProfile)
             .drawerRowReveal(isRevealed: contentRevealed, delay: 0.04, reduceMotion: reduceMotion)
 
           if chatEnabled {
@@ -179,30 +189,35 @@ private extension View {
 
 private struct DrawerAccountHeader: View {
   let profile: AppShellProfile
+  let onOpenPublicProfile: () -> Void
 
   var body: some View {
-    HStack(spacing: JovieSpacing.medium) {
-      DashboardAvatarView(
-        name: profile.displayName,
-        avatarURL: profile.avatarURL
-      )
-      .frame(width: 40, height: 40)
+    Button(action: onOpenPublicProfile) {
+      HStack(spacing: JovieSpacing.medium) {
+        DashboardAvatarView(
+          name: profile.displayName,
+          avatarURL: profile.avatarURL
+        )
+        .frame(width: 40, height: 40)
 
-      VStack(alignment: .leading, spacing: JovieSpacing.xSmall) {
-        Text(profile.displayName)
-          .font(JovieFont.body(size: 16, weight: .semibold))
-          .foregroundStyle(JovieColor.textPrimary)
-          .lineLimit(1)
+        VStack(alignment: .leading, spacing: JovieSpacing.xSmall) {
+          Text(profile.displayName)
+            .font(JovieFont.body(size: 16, weight: .semibold))
+            .foregroundStyle(JovieColor.textPrimary)
+            .lineLimit(1)
 
-        Text(profile.secondaryText)
-          .font(JovieFont.body(size: 13, weight: .medium))
-          .foregroundStyle(JovieColor.textTertiary)
-          .lineLimit(1)
+          Text(profile.secondaryText)
+            .font(JovieFont.body(size: 13, weight: .medium))
+            .foregroundStyle(JovieColor.textTertiary)
+            .lineLimit(1)
+        }
+
+        Spacer(minLength: 0)
       }
-
-      Spacer(minLength: 0)
     }
+    .buttonStyle(.plain)
     .accessibilityElement(children: .combine)
+    .accessibilityLabel("Open \(profile.displayName) public profile")
     .accessibilityIdentifier("shell-drawer-account")
   }
 }
@@ -211,7 +226,9 @@ private struct DrawerSurfaceSwitcher: View {
   let chatEnabled: Bool
   let audienceEnabled: Bool
   let selectedTab: AppShellTab
+  let hasProfileQR: Bool
   let onSelectTab: (AppShellTab) -> Void
+  let onOpenProfileQR: () -> Void
 
   private var surfaces: [AppShellTab] {
     AppShellPanePolicy.sidebarDestinations(
@@ -228,11 +245,29 @@ private struct DrawerSurfaceSwitcher: View {
 
       VStack(spacing: JovieSpacing.small) {
         ForEach(surfaces, id: \.self) { tab in
-          DrawerSurfaceButton(
-            tab: tab,
-            isSelected: selectedTab == tab,
-            action: { onSelectTab(tab) }
-          )
+          HStack(spacing: JovieSpacing.small) {
+            DrawerSurfaceButton(
+              tab: tab,
+              isSelected: selectedTab == tab,
+              action: { onSelectTab(tab) }
+            )
+
+            if tab == .profile, hasProfileQR {
+              Button(action: onOpenProfileQR) {
+                Image(systemName: "qrcode")
+                  .font(.system(size: 16, weight: .semibold))
+                  .foregroundStyle(JovieColor.textPrimary)
+                  .frame(width: 48, height: 48)
+                  .background(
+                    JovieColor.surface1,
+                    in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous)
+                  )
+              }
+              .buttonStyle(JoviePressFeedbackButtonStyle())
+              .accessibilityLabel("Profile QR code")
+              .accessibilityIdentifier("shell-drawer-profile-qr")
+            }
+          }
         }
       }
     }

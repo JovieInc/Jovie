@@ -97,12 +97,14 @@ struct AppShellProfile: Equatable {
   let displayName: String
   let username: String?
   let publicProfileURL: String?
+  let qrPayload: String?
   let avatarURL: URL?
 
   init(response: MobileMeResponse?) {
     displayName = response?.displayName ?? response?.username ?? "Jovie"
     username = response?.username
     publicProfileURL = response?.publicProfileURL
+    qrPayload = response?.qrPayload
     avatarURL = response?.avatarURL.flatMap(URL.init(string:))
   }
 
@@ -128,6 +130,7 @@ struct AppShellView<
   let profile: AppShellProfile
   let isOffline: Bool
   let opensSettingsOnLaunch: Bool
+  let webBaseURL: URL
   let accountURL: URL
   let billingURL: URL
   let chatEnabled: Bool
@@ -165,6 +168,8 @@ struct AppShellView<
   @State private var talkVoiceService = VoiceCaptureService()
   @State private var teleprompterProposal: MobileChatVideoProposalPayload?
   @State private var videoPlaybackAsset: LibraryAsset?
+  @State private var publicProfileBrowserItem: PublicProfileBrowserDestination?
+  @State private var isShowingProfileQR = false
   @State private var entityContext: EntityContextItem?
   @State private var lastEntityContext: EntityContextItem?
   @State private var intentStore = IntentNavigationStore.shared
@@ -175,6 +180,7 @@ struct AppShellView<
     isOffline: Bool,
     initialTab: AppShellTab = .chat,
     opensSettingsOnLaunch: Bool = false,
+    webBaseURL: URL,
     accountURL: URL,
     billingURL: URL,
     chatEnabled: Bool = false,
@@ -209,6 +215,7 @@ struct AppShellView<
     self.profile = profile
     self.isOffline = isOffline
     self.opensSettingsOnLaunch = opensSettingsOnLaunch
+    self.webBaseURL = webBaseURL
     self.accountURL = accountURL
     self.billingURL = billingURL
     self.chatEnabled = chatEnabled
@@ -277,6 +284,12 @@ struct AppShellView<
             onTalk: {
               closeDrawer()
               openTalkOverlay()
+            },
+            onOpenPublicProfile: {
+              openPublicProfile()
+            },
+            onOpenProfileQR: {
+              openProfileQR()
             }
           )
           .opacity(
@@ -378,6 +391,18 @@ struct AppShellView<
           .ignoresSafeArea()
           .background(Color.black)
           .accessibilityIdentifier("library-video-player")
+      }
+    }
+    .fullScreenCover(item: $publicProfileBrowserItem) { destination in
+      PublicProfileBrowserView(initialURL: destination.url, policy: destination.policy)
+    }
+    .fullScreenCover(isPresented: $isShowingProfileQR) {
+      if let payload = profile.qrPayload {
+        VenueModeView(
+          qrPayload: payload,
+          brightnessManager: ScreenBrightnessManager(),
+          onDismiss: { isShowingProfileQR = false }
+        )
       }
     }
     .task(id: opensSettingsOnLaunch) {
@@ -550,6 +575,25 @@ struct AppShellView<
     guard chatEnabled else { return }
     dismissKeyboardIfNeeded()
     isShowingTalkOverlay = true
+  }
+
+  private func openPublicProfile() {
+    dismissKeyboardIfNeeded()
+    applyOpenPane(.none)
+    guard
+      let urlString = profile.publicProfileURL,
+      let policy = PublicProfileURLPolicy(publicProfileURL: urlString)
+        ?? PublicProfileURLPolicy(webBaseURL: webBaseURL),
+      let url = policy.validatedURL(from: urlString)
+    else { return }
+    publicProfileBrowserItem = PublicProfileBrowserDestination(url: url, policy: policy)
+  }
+
+  private func openProfileQR() {
+    dismissKeyboardIfNeeded()
+    applyOpenPane(.none)
+    guard profile.qrPayload != nil else { return }
+    isShowingProfileQR = true
   }
 
   private func presentVideoProposal(_ proposal: MobileChatVideoProposalPayload) {

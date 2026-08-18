@@ -190,6 +190,7 @@ struct ChatComposerView: View {
   let isSending: Bool
   let isOffline: Bool
   let onSend: () -> Void
+  var onMic: () -> Void = {}
   let onSelectWorkflow: (ComposerWorkflowAction) -> Void
   let onDraftEdited: () -> Void
 
@@ -201,6 +202,7 @@ struct ChatComposerView: View {
       isSending: isSending,
       isPlusEnabled: ChatComposerMetrics.isPlusEnabled(isSending: isSending),
       onSend: onSend,
+      onMic: onMic,
       onSelectWorkflow: onSelectWorkflow,
       onDraftEdited: onDraftEdited
     )

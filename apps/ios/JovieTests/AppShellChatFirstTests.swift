@@ -79,6 +79,16 @@ struct AppShellChatFirstTests {
     #expect(MobileChatKeyboardPolicy.shouldDismissOnStreamingStart(userEditedSinceSend: true) == false)
   }
 
+  @Test func keyboardDismissesOnDownwardDragPastThreshold() {
+    #expect(MobileChatKeyboardPolicy.shouldDismissOnDownwardDrag(translationHeight: 41))
+    #expect(MobileChatKeyboardPolicy.shouldDismissOnDownwardDrag(translationHeight: 40) == false)
+  }
+
+  @Test func composerTrailingSlotIsMicWhenEmptyAndSendWhenTyped() {
+    #expect(ChatComposerTrailingAction.action(draftIsEmpty: true) == .mic)
+    #expect(ChatComposerTrailingAction.action(draftIsEmpty: false) == .send)
+  }
+
   @Test func keepsChatMountedAcrossTabs() {
     #expect(appShellKeepsChatMountedAcrossTabs())
   }
@@ -119,10 +129,10 @@ struct AppShellChatFirstTests {
   }
 
   @Test func composerGeometryReservesSendSlotWithoutGrowingTheBar() {
-    #expect(ChatComposerMetrics.barHeight == 76)
-    #expect(ChatComposerMetrics.sendSlotSize == 52)
+    #expect(ChatComposerMetrics.barHeight == 52)
+    #expect(ChatComposerMetrics.sendSlotSize == 36)
     #expect(ChatComposerMetrics.plusButtonSize == 36)
-    #expect(ChatComposerMetrics.sendSlotSize < ChatComposerMetrics.barHeight)
+    #expect(ChatComposerMetrics.sendSlotSize <= ChatComposerMetrics.barHeight)
   }
 
   @Test func waitlistLaunchStaysOffTheAppShell() {

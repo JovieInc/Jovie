@@ -2,11 +2,6 @@ import PassKit
 import SwiftUI
 import UIKit
 
-private struct PublicProfileBrowserDestination: Identifiable {
-  let url: URL
-  var id: URL { url }
-}
-
 struct DashboardAvatarView: View {
   let name: String
   let avatarURL: URL?
@@ -62,11 +57,8 @@ struct DashboardView: View {
     ZStack {
       JovieColor.backgroundBase.ignoresSafeArea()
 
-      VStack(spacing: JovieSpacing.xLarge) {
-        header
-        content
-      }
-      .padding(JovieSpacing.xLarge)
+      content
+        .padding(JovieSpacing.xLarge)
     }
     .fullScreenCover(isPresented: $isShowingVenueMode) {
       if case let .loaded(response) = state, let payload = response.qrPayload {
@@ -78,9 +70,7 @@ struct DashboardView: View {
       }
     }
     .fullScreenCover(item: $publicProfileBrowserDestination) { destination in
-      if let policy = PublicProfileURLPolicy(webBaseURL: webBaseURL) {
-        PublicProfileBrowserView(initialURL: destination.url, policy: policy)
-      }
+      PublicProfileBrowserView(initialURL: destination.url, policy: destination.policy)
     }
     .sheet(item: $appleWalletPassSheet) { sheet in
       AppleWalletAddPassView(pass: sheet.pass)
@@ -110,35 +100,6 @@ struct DashboardView: View {
       didPresentLaunchVenueMode = true
       await Task.yield()
       isShowingVenueMode = true
-    }
-  }
-
-  private var header: some View {
-    HStack(spacing: JovieSpacing.medium) {
-      switch state {
-      case let .loaded(response):
-        DashboardAvatarView(
-          name: response.displayName ?? response.username ?? "Jovie",
-          avatarURL: response.avatarURL.flatMap(URL.init(string:))
-        )
-
-        Text(response.displayName ?? response.username ?? "Jovie")
-          .font(JovieFont.body(size: 15, weight: .medium))
-          .foregroundStyle(JovieColor.textPrimary)
-      case .idle, .loading, .error:
-        DashboardAvatarView(name: "Jovie", avatarURL: nil)
-        Text("Jovie")
-          .font(JovieFont.body(size: 15, weight: .medium))
-          .foregroundStyle(JovieColor.textPrimary)
-      }
-
-      Spacer()
-    }
-    .padding(.bottom, JovieSpacing.large)
-    .overlay(alignment: .bottom) {
-      Rectangle()
-        .fill(JovieColor.borderSubtle)
-        .frame(height: 1)
     }
   }
 
@@ -214,12 +175,12 @@ struct DashboardView: View {
         .accessibilityIdentifier("dashboard-profile-url")
 
       Button("Open Public Profile") {
-        if let url = validatedPublicProfileURL(response.publicProfileURL) {
-          publicProfileBrowserDestination = PublicProfileBrowserDestination(url: url)
+        if let destination = publicProfileDestination(from: response.publicProfileURL) {
+          publicProfileBrowserDestination = destination
         }
       }
       .buttonStyle(JoviePillButtonStyle(filled: true))
-      .disabled(validatedPublicProfileURL(response.publicProfileURL) == nil)
+      .disabled(publicProfileDestination(from: response.publicProfileURL) == nil)
       .accessibilityIdentifier("dashboard-open-public-profile-button")
 
       HStack(spacing: JovieSpacing.medium) {
@@ -263,8 +224,12 @@ struct DashboardView: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
   }
 
-  private func validatedPublicProfileURL(_ value: String?) -> URL? {
-    PublicProfileURLPolicy(webBaseURL: webBaseURL)?.validatedURL(from: value)
+  private func publicProfileDestination(from value: String?) -> PublicProfileBrowserDestination? {
+    guard let value else { return nil }
+    let policy = PublicProfileURLPolicy(publicProfileURL: value)
+      ?? PublicProfileURLPolicy(webBaseURL: webBaseURL)
+    guard let policy, let url = policy.validatedURL(from: value) else { return nil }
+    return PublicProfileBrowserDestination(url: url, policy: policy)
   }
 
   private func addAppleWalletPass() async {

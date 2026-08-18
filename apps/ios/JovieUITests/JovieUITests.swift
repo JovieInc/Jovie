@@ -87,7 +87,7 @@ final class JovieUITests: XCTestCase {
       $0.buttons["Copy URL"]
     }
 
-    XCTAssertTrue(app.staticTexts["Tim White"].exists)
+    XCTAssertTrue(app.staticTexts["Profile"].exists)
     XCTAssertTrue(app.buttons["Open navigation drawer"].exists)
     XCTAssertTrue(app.buttons["Open Settings"].exists)
     XCTAssertTrue(app.buttons["dashboard-copy-url-button"].isEnabled)
@@ -148,7 +148,7 @@ final class JovieUITests: XCTestCase {
       $0.buttons["QR unavailable"]
     }
 
-    XCTAssertTrue(app.staticTexts["Tim White"].exists)
+    XCTAssertTrue(app.staticTexts["Profile"].exists)
     let copyButton = app.buttons["dashboard-copy-url-button"]
     let shareButton = app.buttons["dashboard-share-profile-button"]
     XCTAssertTrue(copyButton.exists)

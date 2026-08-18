@@ -89,6 +89,7 @@ final class TeleprompterViewModel {
   private(set) var pendingPromptFeedback: TeleprompterPromptFeedback?
   private(set) var followMode: TeleprompterFollowMode = .voice
   var speedWordsPerMinute: Double = TeleprompterAutoScroller.defaultWordsPerMinute
+  private(set) var speechRevision = 0
   var isEditingScript = false
 
   private(set) var isStarting = false
@@ -264,6 +265,9 @@ final class TeleprompterViewModel {
         guard let self else { return }
         // Keep ingesting in every follow mode so voice re-sync is instant.
         self.follower.ingest(transcript: transcript)
+        if !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+          self.speechRevision += 1
+        }
       }
 
       try await captureController.start(videoURL: videoURL)

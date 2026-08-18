@@ -350,6 +350,14 @@ struct VoiceCaptureServiceTests {
     #expect(viewModel.currentWordIndex == 2)
   }
 
+  @Test func teleprompterRotationTurnsNinetyNotOneHundredEighty() {
+    #expect(TeleprompterCaptureOrientation.videoRotationAngle(for: .portrait) == 90)
+    #expect(TeleprompterCaptureOrientation.videoRotationAngle(for: .landscapeRight) == 0)
+    #expect(TeleprompterCaptureOrientation.videoRotationAngle(for: .landscapeLeft) == 180)
+    #expect(TeleprompterCaptureOrientation.videoRotationAngle(for: .portraitUpsideDown) == 270)
+    #expect(TeleprompterCaptureOrientation.resolvedDeviceOrientation(.faceUp) == .portrait)
+  }
+
   @MainActor
   @Test func quickVlogLaunchesPromptFirstWithoutChangingChatProposalDefaults() {
     let root = FileManager.default.temporaryDirectory
