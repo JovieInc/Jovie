@@ -134,7 +134,6 @@ describe('ownerless recovery policy', () => {
       'queue-deferred',
       'no-auto',
       'needs-human-review',
-      'needs-human-taste',
       'needs-manual-rebase',
     ]) {
       expect(evaluate({ labels: [{ name }] })).toMatchObject({
@@ -142,6 +141,17 @@ describe('ownerless recovery policy', () => {
         reason: `held:${name}`,
       });
     }
+  });
+
+  it.each([
+    'needs-human-taste',
+    'needs:taste',
+    'taste',
+  ])('keeps advisory taste label %s eligible for recovery', name => {
+    expect(evaluate({ labels: [{ name }] })).toMatchObject({
+      eligible: true,
+      reason: 'focused-recovery',
+    });
   });
 
   it('delegates exact-head intent to Auto-Enroll instead of writing the native queue', () => {

@@ -115,13 +115,10 @@ describe('pr-check-failures', () => {
         'human-review-required',
         'needs-human',
         'needs-human-review',
-        'needs-human-taste',
-        'needs:taste',
         'needs-manual-rebase',
         'no-auto',
         'queue-deferred',
         'risk:high',
-        'taste',
       ].map(name => ({ labels: [{ name }] })),
       { headRepositoryOwner: { login: 'fork-owner' } },
       { isCrossRepository: true },
@@ -141,6 +138,23 @@ describe('pr-check-failures', () => {
           []
         )
       ).toBeNull();
+    }
+
+    for (const advisoryTasteLabel of [
+      'needs-human-taste',
+      'needs:taste',
+      'taste',
+    ]) {
+      expect(
+        classifyRemediationCandidate(
+          candidate({
+            mergeStateStatus: 'BEHIND',
+            labels: [{ name: advisoryTasteLabel }],
+          }),
+          'JovieInc/Jovie',
+          []
+        )
+      ).toMatchObject({ reasons: ['branch_behind'] });
     }
   });
 

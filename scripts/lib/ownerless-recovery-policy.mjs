@@ -13,13 +13,10 @@ const HOLD_LABELS = new Set([
   'needs-conflict-resolution',
   'needs-human',
   'needs-human-review',
-  'needs-human-taste',
-  'needs:taste',
   'needs-manual-rebase',
   'no-auto',
   'queue-deferred',
   'risk:high',
-  'taste',
 ]);
 
 const MATERIAL_RISK_PATH =

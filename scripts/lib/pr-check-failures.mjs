@@ -699,12 +699,9 @@ const HARD_GATE_LABELS = new Set([
   'fast',
   'human-review-required',
   'needs-human-review',
-  'needs-human-taste',
-  'needs:taste',
   'needs-manual-rebase',
   'no-auto',
   'risk:high',
-  'taste',
 ]);
 
 export function isHardGated(labels) {
