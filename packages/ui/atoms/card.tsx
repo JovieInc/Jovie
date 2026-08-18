@@ -28,6 +28,12 @@ export interface CardProps
     VariantProps<typeof cardVariants> {
   readonly asChild?: boolean;
   /**
+   * Compose Card's polymorphic root without applying canonical chrome.
+   * Reserved for compatibility adapters that already own a stable visual
+   * contract and are migrating to the canonical Card substrate incrementally.
+   */
+  readonly unstyled?: boolean;
+  /**
    * Async/partial content state for data-backed cards.
    */
   readonly contentState?: CardContentState;
@@ -39,6 +45,7 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
       className,
       variant,
       asChild = false,
+      unstyled = false,
       contentState = 'default',
       'aria-busy': ariaBusy,
       ...props
@@ -55,13 +62,17 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
         data-content-state={
           contentState === 'default' ? undefined : contentState
         }
-        data-variant={resolvedVariant}
+        data-variant={unstyled ? undefined : resolvedVariant}
         aria-busy={contentState === 'partial' ? true : ariaBusy}
-        className={cn(
-          cardVariants({ variant: resolvedVariant, className }),
-          contentState === 'partial' &&
-            'opacity-[var(--state-partial-opacity)] saturate-75'
-        )}
+        className={
+          unstyled
+            ? className
+            : cn(
+                cardVariants({ variant: resolvedVariant, className }),
+                contentState === 'partial' &&
+                  'opacity-[var(--state-partial-opacity)] saturate-75'
+              )
+        }
       />
     );
   }
