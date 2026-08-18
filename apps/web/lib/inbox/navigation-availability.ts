@@ -14,6 +14,14 @@ export const UNKNOWN_INBOX_NAVIGATION_AVAILABILITY: InboxNavigationAvailability 
     pendingCount: null,
   };
 
+/**
+ * Status literal the Inbox pending-count query filters `suggested_actions` by.
+ * Must stay a member of the `suggested_action_status` pg enum — an out-of-enum
+ * literal breaks every Inbox load in prod (JOV-3125/JOV-5160 class). Covered
+ * by a unit test against `suggestedActionStatusEnum.enumValues`.
+ */
+export const PENDING_SUGGESTED_ACTION_STATUS = 'pending' as const;
+
 export function resolveInboxNavigationAvailability(
   pendingSuggestedActionCount: number,
   pendingTourDateCount: number
