@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { DrawerLoadingSkeleton } from '@/components/molecules/drawer/DrawerLoadingSkeleton';
 
-vi.mock('@/components/organisms/RightDrawer', () => ({
+vi.mock('@/components/molecules/drawer/RightDrawer', () => ({
   RightDrawer: ({
     children,
     ariaLabel,

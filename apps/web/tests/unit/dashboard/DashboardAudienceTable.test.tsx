@@ -91,7 +91,7 @@ vi.mock('@/features/dashboard/organisms/AnalyticsSidebar', () => ({
   AnalyticsSidebar: () => null,
 }));
 
-vi.mock('@/components/organisms/EmptyState', () => ({
+vi.mock('@/components/molecules/EmptyState', () => ({
   EmptyState: ({ heading, testId }: { heading?: string; testId?: string }) => (
     <div data-testid={testId ?? 'empty-state'}>{heading}</div>
   ),

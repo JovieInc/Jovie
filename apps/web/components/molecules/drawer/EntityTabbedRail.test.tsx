@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { EntityTabbedRail } from './EntityTabbedRail';
 
-vi.mock('@/components/organisms/RightDrawer', () => ({
+vi.mock('@/components/molecules/drawer/RightDrawer', () => ({
   RightDrawer: ({
     children,
     className,

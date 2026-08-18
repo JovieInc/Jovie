@@ -4,8 +4,8 @@
 
 import type { CommonDropdownItem } from '@jovie/ui';
 import type { ReactNode } from 'react';
+import { RightDrawer } from '@/components/molecules/drawer/RightDrawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
-import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
 import { DrawerHeader } from './DrawerHeader';

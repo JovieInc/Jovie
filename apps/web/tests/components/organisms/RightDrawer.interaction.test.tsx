@@ -21,7 +21,9 @@ vi.mock('@jovie/ui', () => ({
   ),
 }));
 
-const { RightDrawer } = await import('@/components/organisms/RightDrawer');
+const { RightDrawer } = await import(
+  '@/components/molecules/drawer/RightDrawer'
+);
 
 describe('RightDrawer', () => {
   beforeEach(() => {

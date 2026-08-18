@@ -2,6 +2,9 @@
 // Complex combinations of molecules and atoms
 // Named exports for tree-shaking (no `export *`)
 
+// Compatibility export; canonical owner lives at the molecule layer.
+export type { EmptyStateProps } from '../molecules/EmptyState';
+export { EmptyState } from '../molecules/EmptyState';
 export type { AvatarUploadableProps } from './AvatarUploadable';
 export { AvatarUploadable } from './AvatarUploadable';
 export type { BenefitsSectionProps } from './BenefitsSection';
@@ -15,9 +18,6 @@ export { CTASection } from './CTASection';
 export { DashboardErrorFallback } from './DashboardErrorFallback';
 export type { DeferredSectionProps } from './DeferredSection';
 export { DeferredSection } from './DeferredSection';
-// Migrated from /ui
-export type { EmptyStateProps } from './EmptyState';
-export { EmptyState } from './EmptyState';
 export { default as ErrorBoundary } from './ErrorBoundary';
 export type {
   FeaturedCreator,

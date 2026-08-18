@@ -133,9 +133,9 @@ export const APP_SCREEN_COMPONENT_REGISTRY = [
   },
   {
     id: 'component.empty-state',
-    source: 'apps/web/components/organisms/EmptyState.tsx',
-    storySource: 'apps/web/components/organisms/EmptyState.stories.tsx',
-    storybookTitle: 'UI/EmptyState',
+    source: 'apps/web/components/molecules/EmptyState.tsx',
+    storySource: 'apps/web/components/molecules/EmptyState.stories.tsx',
+    storybookTitle: 'UI/Molecules/EmptyState',
     penRootId: null,
     penReferenceEligible: false,
     penIdentityReason:
