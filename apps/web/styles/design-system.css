@@ -53,7 +53,8 @@
     var(--space-12) +
     var(--space-2-5) +
     max(10px, env(safe-area-inset-bottom)) +
-    var(--space-2)
+    var(--space-2) +
+    var(--space-8)
   );
 
   /* DS_FOUNDATION_V1: canonical semantic aliases (do not redefine downstream) */
@@ -525,6 +526,13 @@
 :where(.profile-aeo-content__body),
 :where(.profile-aeo-content__answer) {
   color: var(--profile-aeo-muted);
+}
+
+.profile-aeo-content__body a,
+.profile-aeo-content__answer a,
+.profile-aeo-content__body .profile-entity-mention,
+.profile-aeo-content__answer .profile-entity-mention {
+  color: var(--profile-aeo-text);
 }
 
 :where(.profile-aeo-content__faq-list) {
@@ -2556,7 +2564,7 @@ html:not(.dark) .smart-link-powered-by {
 /* Inline entity links in public profile bio/AEO copy. The entity-kind accent
    is provided via the `--jovie-entity-accent` custom property on the link. */
 .profile-entity-mention {
-  color: var(--jovie-entity-accent);
+  color: var(--jovie-entity-accent, var(--profile-aeo-text, inherit));
   text-decoration-color: color-mix(
     in srgb,
     var(--jovie-entity-accent) 45%,
