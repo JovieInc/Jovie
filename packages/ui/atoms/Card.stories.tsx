@@ -31,6 +31,9 @@ const meta: Meta<typeof Card> = {
     asChild: {
       control: { type: 'boolean' },
     },
+    unstyled: {
+      control: { type: 'boolean' },
+    },
   },
 };
 
@@ -168,6 +171,32 @@ export const AsSection: Story = {
         </CardContent>
       </section>
     ),
+  },
+};
+
+export const CompatibilityComposition: Story = {
+  args: {
+    asChild: true,
+    unstyled: true,
+    className:
+      'max-w-md rounded-lg border border-subtle bg-surface-1 p-4 shadow-none',
+    children: (
+      <section>
+        <p className='text-sm font-medium'>Legacy surface adapter</p>
+        <p className='mt-1 text-sm text-secondary-token'>
+          Canonical Card owns the polymorphic root while the compatibility
+          adapter preserves its established chrome.
+        </p>
+      </section>
+    ),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Migration-only composition mode for established adapters that must retain exact visual and DOM parity.',
+      },
+    },
   },
 };
 

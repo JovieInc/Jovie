@@ -76,6 +76,21 @@ describe('Card', () => {
     expect(section.className).toContain('bg-surface-1');
   });
 
+  it('supports unstyled compatibility composition without leaking card chrome', () => {
+    render(
+      <Card asChild unstyled className='legacy-surface'>
+        <section data-testid='legacy-card'>Legacy content</section>
+      </Card>
+    );
+
+    const card = screen.getByTestId('legacy-card');
+    expect(card.tagName).toBe('SECTION');
+    expect(card).toHaveClass('legacy-surface');
+    expect(card).not.toHaveAttribute('data-variant');
+    expect(card.className).not.toContain('shadow-card');
+    expect(card.className).not.toContain('rounded-(--system-b-radius-card)');
+  });
+
   it('merges custom className with default classes', () => {
     render(
       <Card className='custom-class' data-testid='card'>
