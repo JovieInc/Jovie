@@ -55,9 +55,7 @@ describe('Contacts authenticated-surface evals', () => {
       'components/features/dashboard/atoms/AudienceMemberHeader.tsx'
     );
 
-    expect(rail).toContain(
-      "drawerClassName='rounded-none border-y-0 border-r-0 bg-surface-2 shadow-none'"
-    );
+    expect(rail).not.toContain('drawerClassName=');
     expect(rail).toContain("workspaceSurface='flat'");
     expect(rail).toContain("surfaceVariant='flat'");
     expect(details).toContain('<EntityTabbedRail');
