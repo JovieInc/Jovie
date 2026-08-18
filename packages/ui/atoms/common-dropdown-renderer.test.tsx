@@ -15,7 +15,7 @@ describe('SearchableContent', () => {
       />
     );
 
-    const input = screen.getByRole('searchbox', { name: 'Search artists' });
+    const input = screen.getByRole('textbox', { name: 'Search artists' });
     fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
 
     expect(onClear).toHaveBeenCalledOnce();

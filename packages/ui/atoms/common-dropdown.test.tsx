@@ -564,7 +564,7 @@ describe('CommonDropdown', () => {
       );
       await user.click(screen.getByRole('button', { name: 'More actions' }));
       await user.type(
-        screen.getByRole('searchbox', { name: 'Search actions' }),
+        screen.getByRole('textbox', { name: 'Search actions' }),
         'help'
       );
 

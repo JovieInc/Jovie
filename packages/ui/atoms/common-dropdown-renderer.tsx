@@ -147,7 +147,7 @@ export function SearchableContent({
         <Search aria-hidden='true' className={MENU_SEARCH_ICON_BASE} />
         <input
           ref={setInputRef}
-          type='search'
+          type='text'
           data-slot='common-dropdown-search-input'
           placeholder={placeholder}
           aria-label={placeholder}
