@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import UIKit
 @testable import Jovie
 
 struct MobileChatContentParserTests {
@@ -621,23 +622,98 @@ struct MobileChatEntityThumbnailResolverTests {
 }
 
 struct MobileChatProseFlowTokenTests {
-  @Test func splitsPlainTextIntoWordTokens() {
-    let tokens = MobileChatProseText.flowTokens(from: [.text("Hello world")])
-    #expect(tokens == [.textWord("Hello"), .textWord(" "), .textWord("world")])
+  @Test func keepsPlainTextInOneWrapFlow() {
+    let sentence = "Hello world"
+    let tokens = MobileChatBubbleText.wrapUnits(from: [.text(sentence)])
+    #expect(tokens == [.text(sentence)])
+    #expect(String(MobileChatBubbleText.attributedText(from: tokens).characters) == sentence)
+    #expect(MobileChatProseText.flowTokens(from: [.text(sentence)]) == tokens)
+  }
+
+  @Test(
+    arguments: [
+      "Yo what's the move tonight after the show",
+      "Jovie can you look at this release for me",
+      "Other than that we should ship the drop today",
+      "Ask me anything about the remaining tour dates",
+      "this is a longer user message about the next release",
+    ]
+  )
+  func doesNotDetachTheFirstWordAsItsOwnRun(sentence: String) {
+    let units = MobileChatBubbleText.wrapUnits(from: [.text(sentence)])
+    #expect(units == [.text(sentence)])
+
+    let attributed = MobileChatBubbleText.attributedText(from: units)
+    #expect(String(attributed.characters) == sentence)
+    #expect(Array(attributed.runs).count == 1)
+
+    let firstWord = String(sentence.split(separator: " ").first ?? "")
+    let lines = textKitLineFragments(attributed, maxWidth: 160)
+    #expect(!lines.isEmpty)
+    #expect(lines[0].hasPrefix("\(firstWord) "))
+    #expect(lines[0].split(whereSeparator: \.isWhitespace).count > 1)
+  }
+
+  @Test func mergesAdjacentTextRunsIntoOneWrapFlow() {
+    let units = MobileChatBubbleText.wrapUnits(from: [
+      .text("Yo"),
+      .text(" what's the move"),
+    ])
+    #expect(units == [.text("Yo what's the move")])
+    #expect(
+      String(MobileChatBubbleText.attributedText(from: units).characters) == "Yo what's the move"
+    )
   }
 
   @Test func preservesEntityRunsAsSingleChipToken() {
-    let tokens = MobileChatProseText.flowTokens(from: [
+    let tokens = MobileChatBubbleText.wrapUnits(from: [
       .text("See "),
       .entity(kind: .release, id: "rel_1", label: "Midnight Drive"),
       .text(" today"),
     ])
-    #expect(tokens.count == 5)
-    guard case .entity(.release, "rel_1", "Midnight Drive") = tokens[2] else {
-      Issue.record("Expected entity token at index 2")
-      return
-    }
+    #expect(tokens == [
+      .text("See "),
+      .entity(kind: .release, id: "rel_1", label: "Midnight Drive"),
+      .text(" today"),
+    ])
+    #expect(
+      String(MobileChatBubbleText.attributedText(from: tokens).characters) == "See  today"
+    )
   }
+
+  @Test func skillLabelsStayInsideTheAttributedTextFlow() {
+    let units = MobileChatBubbleText.wrapUnits(from: [
+      .text("Ask "),
+      .skill(id: "generateAlbumArt", label: "Generate album art"),
+      .text(" now"),
+    ])
+    let attributed = MobileChatBubbleText.attributedText(from: units)
+    #expect(String(attributed.characters) == "Ask Generate album art now")
+    #expect(units.contains(where: \.isEntityChip) == false)
+  }
+}
+
+private func textKitLineFragments(_ attributed: AttributedString, maxWidth: CGFloat) -> [String] {
+  let ns = NSMutableAttributedString(attributed)
+  let fullRange = NSRange(location: 0, length: ns.length)
+  if ns.length > 0, ns.attribute(.font, at: 0, effectiveRange: nil) == nil {
+    ns.addAttribute(.font, value: UIFont.systemFont(ofSize: 16), range: fullRange)
+  }
+
+  let storage = NSTextStorage(attributedString: ns)
+  let layoutManager = NSLayoutManager()
+  let container = NSTextContainer(size: CGSize(width: maxWidth, height: .greatestFiniteMagnitude))
+  container.lineFragmentPadding = 0
+  layoutManager.addTextContainer(container)
+  storage.addLayoutManager(layoutManager)
+
+  var lines: [String] = []
+  let glyphRange = NSRange(location: 0, length: layoutManager.numberOfGlyphs)
+  layoutManager.enumerateLineFragments(forGlyphRange: glyphRange) { _, _, _, lineGlyphRange, _ in
+    let characterRange = layoutManager.characterRange(forGlyphRange: lineGlyphRange, actualGlyphRange: nil)
+    lines.append((ns.string as NSString).substring(with: characterRange))
+  }
+  return lines
 }
 
 private final class SpyObservabilityProvider: ObservabilityProvider {

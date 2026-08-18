@@ -32,6 +32,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Fixed
 
 - [internal] **Public profile block checks fail open on a bad Redis pipeline payload (JOV-5196):** a non-array Upstash response is treated as a cache miss instead of throwing `res.map is not a function`.
+- **iPhone chat bubbles wrap like Messages:** The first word stays in the same sentence instead of sitting alone on the left.
 - **Public profiles keep names, places, and last songs readable:** Contact drawers show the person before the company, compact heroes keep the full city, Music’s last row clears the tab bar, and AEO mention links use the profile text token instead of browser purple.
 - **Waitlist copy sits in the middle:** The waitlist message and account switch stay centered when they fit. They only scroll if the type is too large.
 
