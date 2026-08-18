@@ -107,6 +107,8 @@ describe('Contacts authenticated-surface evals', () => {
     expect(table).toContain('ContactDetailSidebar');
     expect(settings).toContain('ContactDetailSidebar');
     expect(settings).toContain('useContactsManager');
+    expect(settings).toContain('ContactListRow');
+    expect(settings).toContain('ContactDeleteConfirmDialog');
     expect(manager).not.toMatch(/\balert\s*\(|\bconfirm\s*\(|\bprompt\s*\(/);
     expect(settings).not.toMatch(/\balert\s*\(|\bconfirm\s*\(|\bprompt\s*\(/);
   });
