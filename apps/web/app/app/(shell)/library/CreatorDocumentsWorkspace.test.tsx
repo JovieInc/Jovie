@@ -11,12 +11,35 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn() }),
 }));
 
-vi.mock('@tiptap/react', () => ({
-  EditorContent: () => <textarea aria-label='Document content' readOnly />,
-  useEditor: () => ({
-    getJSON: () => ({ type: 'doc', content: [] }),
-    getText: () => 'Updated body',
-  }),
+vi.mock('@/components/organisms/RichTextEditor', () => ({
+  RichTextEditor: ({
+    ariaLabel,
+    onChange,
+  }: {
+    ariaLabel: string;
+    onChange: (change: {
+      content: { type: 'doc'; content: Record<string, unknown>[] };
+      plainText: string;
+    }) => void;
+  }) => (
+    <textarea
+      aria-label={ariaLabel}
+      onChange={event =>
+        onChange({
+          content: {
+            type: 'doc',
+            content: [
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', text: event.target.value }],
+              },
+            ],
+          },
+          plainText: event.target.value,
+        })
+      }
+    />
+  ),
 }));
 
 vi.mock('@/components/molecules/drawer/EntitySidebarShell', () => ({
@@ -142,7 +165,7 @@ describe('CreatorDocumentsWorkspace', () => {
     expect(JSON.parse(String(request?.body))).toMatchObject({
       expectedRevision: 1,
       title: 'A durable revised idea',
-      plainText: 'Updated body',
+      plainText: 'Body',
     });
     expect(
       await screen.findByText('Saved as a new revision')

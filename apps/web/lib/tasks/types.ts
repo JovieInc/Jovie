@@ -122,6 +122,7 @@ export interface CreateTaskInput {
 export interface UpdateTaskInput {
   readonly title?: string;
   readonly description?: string | null;
+  readonly descriptionContent?: RichTextDocument;
   readonly status?: TaskStatus;
   readonly priority?: TaskPriority;
   readonly assigneeKind?: TaskAssigneeKind;
@@ -142,3 +143,5 @@ export interface UpdateTaskInput {
   readonly sourceTemplateId?: string | null;
   readonly metadata?: Record<string, unknown> | null;
 }
+
+import type { RichTextDocument } from '@/lib/rich-text/document';

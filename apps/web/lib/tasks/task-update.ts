@@ -1,3 +1,4 @@
+import { writeTaskDescriptionContent } from './task-rich-text';
 import type { TaskStatus, TaskView, UpdateTaskInput } from './types';
 
 export interface TaskUpdateFieldPatch {
@@ -41,7 +42,8 @@ function resolvePatchCompletedAt(
 
 export function buildTaskUpdateFieldPatch(
   data: UpdateTaskInput,
-  existingTask: Pick<TaskView, 'completedAt' | 'status'>,
+  existingTask: Pick<TaskView, 'completedAt' | 'status'> &
+    Partial<Pick<TaskView, 'metadata'>>,
   now = new Date()
 ): TaskUpdateFieldPatch {
   const patch: Partial<MutableTaskUpdateFieldPatch> = {
@@ -76,6 +78,12 @@ export function buildTaskUpdateFieldPatch(
     patch.sourceTemplateId = data.sourceTemplateId;
   }
   if (data.metadata !== undefined) patch.metadata = data.metadata;
+  if (data.descriptionContent !== undefined) {
+    patch.metadata = writeTaskDescriptionContent(
+      data.metadata ?? existingTask.metadata,
+      data.descriptionContent
+    );
+  }
 
   return patch as TaskUpdateFieldPatch;
 }

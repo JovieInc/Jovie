@@ -1,13 +1,14 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import type { Content } from '@tiptap/core';
-import { EditorContent, useEditor } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
 import { FileText, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { EntitySidebarShell } from '@/components/molecules/drawer/EntitySidebarShell';
+import {
+  RichTextEditor,
+  type RichTextEditorChange,
+} from '@/components/organisms/RichTextEditor';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
@@ -41,6 +42,8 @@ function DocumentEditor({
   const [kind, setKind] = useState(document.kind);
   const [status, setStatus] = useState<EditorStatus>('idle');
   const [isDirty, setIsDirty] = useState(false);
+  const [editorContent, setEditorContent] = useState(document.content);
+  const [editorPlainText, setEditorPlainText] = useState(document.plainText);
   const [claimText, setClaimText] = useState('');
   const [claimKind, setClaimKind] = useState<
     'fact' | 'inference' | 'opinion' | 'anecdote'
@@ -50,19 +53,12 @@ function DocumentEditor({
   >('supported');
   const [sourceRecordId, setSourceRecordId] = useState('');
   const router = useRouter();
-  const editor = useEditor({
-    extensions: [StarterKit],
-    content: document.content as Content,
-    immediatelyRender: false,
-    onUpdate: () => setIsDirty(true),
-    editorProps: {
-      attributes: {
-        class:
-          'min-h-64 px-4 py-3 text-sm leading-6 text-primary-token outline-none focus-visible:outline-2 focus-visible:outline-offset-2',
-        'aria-label': 'Document content',
-      },
-    },
-  });
+  const handleEditorChange = useCallback((change: RichTextEditorChange) => {
+    setEditorContent(change.content);
+    setEditorPlainText(change.plainText);
+    setIsDirty(true);
+    setStatus('idle');
+  }, []);
 
   const post = useCallback(async (url: string, body: unknown) => {
     try {
@@ -84,9 +80,8 @@ function DocumentEditor({
   }, []);
 
   const save = useCallback(async () => {
-    if (!editor || status === 'saving') return;
+    if (status === 'saving') return;
     setStatus('saving');
-    const content = editor.getJSON() as CreatorDocumentListItem['content'];
     try {
       const response = await fetch(`/api/library/documents/${document.id}`, {
         method: 'PATCH',
@@ -95,8 +90,8 @@ function DocumentEditor({
           expectedRevision: document.currentRevision,
           title,
           kind,
-          content,
-          plainText: editor.getText(),
+          content: editorContent,
+          plainText: editorPlainText,
         }),
       });
       if (response.status === 409) {
@@ -105,13 +100,13 @@ function DocumentEditor({
       }
       if (!response.ok) throw new Error('Save failed');
       const payload = (await response.json()) as { revision: number };
-      onSaved(payload.revision, title, kind, content);
+      onSaved(payload.revision, title, kind, editorContent);
       setIsDirty(false);
       setStatus('saved');
     } catch {
       setStatus('error');
     }
-  }, [document, editor, kind, onSaved, status, title]);
+  }, [document, editorContent, editorPlainText, kind, onSaved, status, title]);
 
   const addClaim = useCallback(async () => {
     if (status === 'saving') return;
@@ -270,9 +265,39 @@ function DocumentEditor({
               : 'Not handed off'}
           </span>
         </div>
-        <div className='min-h-64 overflow-hidden rounded-md border border-subtle bg-surface-1'>
-          <EditorContent editor={editor} />
-        </div>
+        <RichTextEditor
+          content={editorContent}
+          onChange={handleEditorChange}
+          ariaLabel='Document Content'
+          placeholder={
+            kind === 'script'
+              ? 'Write the scene, beat, or line…'
+              : 'Start writing…'
+          }
+          statusLabel={
+            status === 'saving'
+              ? 'Saving…'
+              : status === 'saved'
+                ? `Saved · R${document.currentRevision}`
+                : status === 'conflict'
+                  ? 'Conflict'
+                  : status === 'error'
+                    ? 'Not saved'
+                    : isDirty
+                      ? 'Edited'
+                      : `Revision ${document.currentRevision}`
+          }
+          statusTone={
+            status === 'saving'
+              ? 'pending'
+              : status === 'saved'
+                ? 'success'
+                : status === 'conflict' || status === 'error'
+                  ? 'error'
+                  : 'neutral'
+          }
+          minHeight='22rem'
+        />
         {kind === 'script' && document.stage === 'private_draft' ? (
           <fieldset
             className='flex flex-col gap-2 border-t border-subtle pt-3'
@@ -384,7 +409,7 @@ export function CreatorDocumentsWorkspace({
     () =>
       selected ? (
         <DocumentEditor
-          key={`${selected.id}:${selected.currentRevision}`}
+          key={selected.id}
           document={selected}
           onClose={() => setSelectedId(null)}
           onSaved={(revision, savedTitle, savedKind, content) =>

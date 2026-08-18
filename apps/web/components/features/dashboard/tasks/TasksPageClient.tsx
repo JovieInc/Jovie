@@ -59,6 +59,11 @@ import {
 } from '@/components/molecules/menus/ToolbarMenuPrimitives';
 import { ReleaseDueBadge } from '@/components/molecules/ReleaseDueBadge';
 import { PageShell } from '@/components/organisms/PageShell';
+import {
+  RichTextEditor,
+  type RichTextEditorChange,
+  type RichTextEditorHandle,
+} from '@/components/organisms/RichTextEditor';
 import { ReleaseSidebar } from '@/components/organisms/release-sidebar';
 import {
   ShellListRowButton,
@@ -95,6 +100,10 @@ import {
 } from '@/lib/queries/useTasksQuery';
 import { DEFAULT_RELEASE_TASK_TEMPLATE } from '@/lib/release-tasks/default-template';
 import {
+  emptyRichTextDocument,
+  type RichTextDocument,
+} from '@/lib/rich-text/document';
+import {
   buildTaskPitchChatPrompt,
   isPitchRelatedText,
 } from '@/lib/services/pitch/targets';
@@ -106,6 +115,7 @@ import {
   readTaskDescriptionHelper,
   type TaskDescriptionHelperPayload,
 } from '@/lib/tasks/task-description-helper';
+import { readTaskDescriptionContent } from '@/lib/tasks/task-rich-text';
 import type {
   MoveTaskInput,
   TaskAssigneeKind,
@@ -170,6 +180,7 @@ const TASK_VIEW_MODES: Array<'board' | 'list'> = ['board', 'list'];
 
 type MobileTaskScope = 'all' | 'open' | 'done';
 type ReleasePanelStatus = 'loading' | 'error' | 'empty';
+type TaskEditorSaveStatus = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
 
 const MOBILE_TASK_SCOPE_OPTIONS = [
   ['all', 'All'],
@@ -586,8 +597,11 @@ function TaskDocumentPanel({
   task,
   title,
   description,
+  descriptionContent,
+  saveStatus,
   onTitleChange,
   onDescriptionChange,
+  onRetrySave,
   onClose,
   onOpenRelease,
   onUpdateStatus,
@@ -601,8 +615,11 @@ function TaskDocumentPanel({
   task: TaskView | null;
   title: string;
   description: string;
+  descriptionContent: RichTextDocument;
+  saveStatus: TaskEditorSaveStatus;
   onTitleChange: (value: string) => void;
-  onDescriptionChange: (value: string) => void;
+  onDescriptionChange: (change: RichTextEditorChange) => void;
+  onRetrySave: () => void;
   onClose: () => void;
   onOpenRelease: (task: TaskView) => void;
   onUpdateStatus: (taskId: string, status: TaskStatus) => void;
@@ -613,7 +630,7 @@ function TaskDocumentPanel({
   isDesktopLayout: boolean;
   compactMetadata?: boolean;
 }>) {
-  const descriptionEditorRef = useRef<HTMLTextAreaElement>(null);
+  const descriptionEditorRef = useRef<RichTextEditorHandle>(null);
   const [descriptionHelperDismissed, setDescriptionHelperDismissed] =
     useState(false);
   const metadataDescriptionHelper = readTaskDescriptionHelper(task?.metadata);
@@ -834,19 +851,44 @@ function TaskDocumentPanel({
               )}
             </div>
 
-            <div className='relative'>
-              <textarea
+            <div className='relative min-h-130'>
+              <RichTextEditor
                 ref={descriptionEditorRef}
-                id='task-context-editor'
-                aria-label='Task Description'
-                value={description}
-                onFocus={handleDescriptionFocus}
-                onChange={event => onDescriptionChange(event.target.value)}
+                content={descriptionContent}
+                onChange={onDescriptionChange}
+                ariaLabel='Task Description'
                 placeholder={
-                  showDescriptionHelper ? undefined : 'Start writing...'
+                  showDescriptionHelper
+                    ? ''
+                    : 'Write context, decisions, and next steps…'
                 }
-                className='min-h-130 w-full resize-none rounded-md border-0 bg-transparent px-0 py-0 text-mid leading-[1.8] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)] transition-colors duration-fast focus:outline-none! focus-visible:ring-0! focus:shadow-none! focus-visible:bg-[color-mix(in_oklab,var(--linear-border-focus)_16%,transparent)]'
-                style={{ boxShadow: 'none' }}
+                onFocus={handleDescriptionFocus}
+                minHeight='32.5rem'
+                statusLabel={
+                  saveStatus === 'saving'
+                    ? 'Saving…'
+                    : saveStatus === 'saved'
+                      ? 'Saved'
+                      : saveStatus === 'error'
+                        ? 'Not saved'
+                        : saveStatus === 'dirty'
+                          ? 'Edited'
+                          : 'Up to date'
+                }
+                statusTone={
+                  saveStatus === 'saving'
+                    ? 'pending'
+                    : saveStatus === 'saved'
+                      ? 'success'
+                      : saveStatus === 'error'
+                        ? 'error'
+                        : 'neutral'
+                }
+                statusAction={
+                  saveStatus === 'error'
+                    ? { label: 'Retry', onClick: onRetrySave }
+                    : undefined
+                }
               />
               {showDescriptionHelper && descriptionHelper ? (
                 <TaskDescriptionHelper
@@ -1294,6 +1336,12 @@ export function TasksPageClient() {
   );
   const [editorTitle, setEditorTitle] = useState('');
   const [editorDescription, setEditorDescription] = useState('');
+  const [editorDescriptionContent, setEditorDescriptionContent] =
+    useState<RichTextDocument>(emptyRichTextDocument);
+  const [editorSaveStatus, setEditorSaveStatus] =
+    useState<TaskEditorSaveStatus>('idle');
+  const [editorTaskId, setEditorTaskId] = useState<string | null>(null);
+  const editorRevisionRef = useRef(0);
   const latestSelectedTaskIdRef = useRef<string | null>(null);
   const deferredPills = useDeferredValue(pills);
   const searchFilter = useMemo(
@@ -1580,17 +1628,36 @@ export function TasksPageClient() {
   const selectedTaskEditorId = selectedTask?.id ?? null;
   const selectedTaskEditorTitle = selectedTask?.title ?? '';
   const selectedTaskEditorDescription = selectedTask?.description ?? '';
+  const selectedTaskEditorContent = useMemo(
+    () =>
+      readTaskDescriptionContent(
+        selectedTask?.metadata,
+        selectedTaskEditorDescription
+      ),
+    [selectedTask?.metadata, selectedTaskEditorDescription]
+  );
 
   useEffect(() => {
+    if (selectedTaskEditorId === editorTaskId) return;
     if (!selectedTaskEditorId) {
       setEditorTitle('');
       setEditorDescription('');
+      setEditorDescriptionContent(emptyRichTextDocument);
+      setEditorSaveStatus('idle');
+      setEditorTaskId(null);
+      editorRevisionRef.current = 0;
       return;
     }
 
     setEditorTitle(selectedTaskEditorTitle);
     setEditorDescription(selectedTaskEditorDescription);
+    setEditorDescriptionContent(selectedTaskEditorContent);
+    setEditorSaveStatus('idle');
+    setEditorTaskId(selectedTaskEditorId);
+    editorRevisionRef.current = 0;
   }, [
+    editorTaskId,
+    selectedTaskEditorContent,
     selectedTaskEditorDescription,
     selectedTaskEditorId,
     selectedTaskEditorTitle,
@@ -1731,40 +1798,58 @@ export function TasksPageClient() {
   }, [selectedTaskEditorId]);
 
   useEffect(() => {
-    if (!selectedTaskEditorId) {
+    if (!selectedTaskEditorId || editorTaskId !== selectedTaskEditorId) {
       return;
     }
 
     const nextTitle = editorTitle.trim();
     const nextDescription = editorDescription.trim();
     const currentDescription = selectedTaskEditorDescription;
+    const contentChanged =
+      JSON.stringify(editorDescriptionContent) !==
+      JSON.stringify(selectedTaskEditorContent);
     const hasChanges =
       nextTitle !== selectedTaskEditorTitle ||
-      nextDescription !== currentDescription;
+      nextDescription !== currentDescription ||
+      contentChanged;
 
-    if (!hasChanges || !nextTitle) {
+    if (!hasChanges || !nextTitle || editorSaveStatus !== 'dirty') {
       return;
     }
 
     const selectedTaskIdAtSchedule = selectedTaskEditorId;
+    const revisionAtSchedule = editorRevisionRef.current;
 
     const timeoutId = globalThis.setTimeout(() => {
       if (selectedTaskIdAtSchedule !== latestSelectedTaskIdRef.current) {
         return;
       }
 
+      setEditorSaveStatus('saving');
       updateTask(
         {
           taskId: selectedTaskIdAtSchedule,
           data: {
             title: nextTitle,
             description: nextDescription || null,
+            descriptionContent: editorDescriptionContent,
           },
         },
         {
           onError: () => {
+            setEditorSaveStatus(
+              editorRevisionRef.current === revisionAtSchedule
+                ? 'error'
+                : 'dirty'
+            );
             toast.error("Couldn't update task");
           },
+          onSuccess: () =>
+            setEditorSaveStatus(
+              editorRevisionRef.current === revisionAtSchedule
+                ? 'saved'
+                : 'dirty'
+            ),
         }
       );
     }, 450);
@@ -1774,9 +1859,13 @@ export function TasksPageClient() {
     };
   }, [
     editorDescription,
+    editorDescriptionContent,
+    editorSaveStatus,
+    editorTaskId,
     editorTitle,
     selectedTaskEditorDescription,
     selectedTaskEditorId,
+    selectedTaskEditorContent,
     selectedTaskEditorTitle,
     updateTask,
   ]);
@@ -2238,10 +2327,34 @@ export function TasksPageClient() {
                 {selectedTask ? (
                   <TaskDocumentPanel
                     task={selectedTask}
-                    title={editorTitle}
-                    description={editorDescription}
-                    onTitleChange={setEditorTitle}
-                    onDescriptionChange={setEditorDescription}
+                    title={
+                      editorTaskId === selectedTask.id
+                        ? editorTitle
+                        : selectedTaskEditorTitle
+                    }
+                    description={
+                      editorTaskId === selectedTask.id
+                        ? editorDescription
+                        : selectedTaskEditorDescription
+                    }
+                    descriptionContent={
+                      editorTaskId === selectedTask.id
+                        ? editorDescriptionContent
+                        : selectedTaskEditorContent
+                    }
+                    saveStatus={editorSaveStatus}
+                    onTitleChange={value => {
+                      editorRevisionRef.current += 1;
+                      setEditorTitle(value);
+                      setEditorSaveStatus('dirty');
+                    }}
+                    onDescriptionChange={change => {
+                      editorRevisionRef.current += 1;
+                      setEditorDescription(change.plainText);
+                      setEditorDescriptionContent(change.content);
+                      setEditorSaveStatus('dirty');
+                    }}
+                    onRetrySave={() => setEditorSaveStatus('dirty')}
                     onClose={() => setSelectedTaskId(null)}
                     onOpenRelease={openReleaseSidebar}
                     onUpdateStatus={(taskId, status) =>
@@ -2263,8 +2376,11 @@ export function TasksPageClient() {
                     task={null}
                     title=''
                     description=''
+                    descriptionContent={emptyRichTextDocument}
+                    saveStatus='idle'
                     onTitleChange={NOOP}
                     onDescriptionChange={NOOP}
+                    onRetrySave={NOOP}
                     onClose={NOOP}
                     onOpenRelease={NOOP_TASK_OPEN}
                     onUpdateStatus={NOOP_TASK_STATUS_UPDATE}

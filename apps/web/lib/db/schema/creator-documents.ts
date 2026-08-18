@@ -12,6 +12,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
+import type { RichTextDocument } from '@/lib/rich-text/document';
 import { memorySourceRecords } from './memory';
 import { creatorProfiles } from './profiles';
 
@@ -40,10 +41,7 @@ export const creatorClaimEvidenceStateEnum = pgEnum(
   ['supported', 'contested', 'unresolved']
 );
 
-export type CreatorDocumentContent = {
-  readonly type: 'doc';
-  readonly content?: Record<string, unknown>[];
-};
+export type CreatorDocumentContent = RichTextDocument;
 
 export const creatorDocuments = pgTable(
   'creator_documents',

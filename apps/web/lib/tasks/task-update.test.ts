@@ -44,6 +44,27 @@ describe('buildTaskUpdateFieldPatch', () => {
     });
   });
 
+  it('merges rich description content into existing metadata', () => {
+    const content = {
+      type: 'doc' as const,
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'Set list' }] },
+      ],
+    };
+
+    expect(
+      buildTaskUpdateFieldPatch(
+        { description: 'Set list', descriptionContent: content },
+        { ...createExistingTask(), metadata: { source: 'release' } },
+        now
+      )
+    ).toEqual({
+      description: 'Set list',
+      metadata: { source: 'release', descriptionRichTextV1: content },
+      updatedAt: now,
+    });
+  });
+
   it('sets completedAt when a task first moves to done', () => {
     expect(
       buildTaskUpdateFieldPatch({ status: 'done' }, createExistingTask(), now)

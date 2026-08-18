@@ -351,8 +351,10 @@ export function useUpdateTaskMutation() {
         data.completedAt === undefined
           ? getOptimisticCompletedAt(previousTask, data.status)
           : data.completedAt;
+      const { descriptionContent: _descriptionContent, ...optimisticData } =
+        data;
       const optimisticPatch: Partial<TaskView> = {
-        ...data,
+        ...optimisticData,
         ...(optimisticCompletedAt === undefined
           ? {}
           : { completedAt: optimisticCompletedAt }),

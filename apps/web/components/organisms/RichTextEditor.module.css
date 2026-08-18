@@ -1,0 +1,88 @@
+.editor {
+  min-height: var(--editor-min-height, 16rem);
+  padding: 1rem 1.125rem 4rem;
+  color: var(--color-text-primary-token);
+  font-size: 0.9375rem;
+  line-height: 1.75;
+  outline: none;
+}
+
+.editor p,
+.editor blockquote,
+.editor pre,
+.editor ul,
+.editor ol {
+  margin: 0.65rem 0;
+}
+
+.editor h1,
+.editor h2,
+.editor h3 {
+  margin: 1.5rem 0 0.55rem;
+  color: var(--color-text-primary-token);
+  font-weight: 650;
+  letter-spacing: -0.018em;
+}
+
+.editor h1 {
+  font-size: 1.75rem;
+  line-height: 1.2;
+}
+
+.editor h2 {
+  font-size: 1.35rem;
+  line-height: 1.3;
+}
+
+.editor h3 {
+  font-size: 1.05rem;
+  line-height: 1.4;
+}
+
+.editor ul,
+.editor ol {
+  padding-left: 1.45rem;
+}
+
+.editor ul {
+  list-style: disc;
+}
+
+.editor ol {
+  list-style: decimal;
+}
+
+.editor blockquote {
+  border-left: 2px solid var(--color-border-strong);
+  padding-left: 1rem;
+  color: var(--color-text-secondary-token);
+}
+
+.editor code {
+  border-radius: 0.25rem;
+  background: var(--color-bg-surface-2);
+  padding: 0.1rem 0.3rem;
+  font-size: 0.875em;
+}
+
+.editor pre {
+  overflow-x: auto;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 0.5rem;
+  background: var(--color-bg-surface-2);
+  padding: 0.875rem 1rem;
+}
+
+.editor a {
+  color: var(--color-text-primary-token);
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
+}
+
+.editor p.is-editor-empty:first-child::before {
+  float: left;
+  height: 0;
+  color: var(--color-text-tertiary-token);
+  content: attr(data-placeholder);
+  pointer-events: none;
+}
