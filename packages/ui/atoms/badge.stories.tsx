@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Badge } from './badge';
 
 const meta: Meta<typeof Badge> = {
-  title: 'shadcn/Badge',
+  title: 'UI/Atoms/Badge',
   component: Badge,
   parameters: {
     layout: 'centered',
@@ -33,4 +33,51 @@ export const PermissionRestricted: Story = {
       },
     },
   },
+};
+
+export const Variants: Story = {
+  render: () => (
+    <div className='flex flex-wrap items-center gap-2'>
+      {(
+        [
+          ['default', 'Default'],
+          ['secondary', 'Secondary'],
+          ['outline', 'Outline'],
+          ['success', 'Success'],
+          ['warning', 'Warning'],
+          ['destructive', 'Destructive'],
+        ] as const
+      ).map(([variant, label]) => (
+        <Badge key={variant} variant={variant}>
+          {label}
+        </Badge>
+      ))}
+    </div>
+  ),
+};
+
+export const Sizes: Story = {
+  render: () => (
+    <div className='flex items-center gap-2'>
+      {(['sm', 'md', 'lg', 'xl'] as const).map(size => (
+        <Badge key={size} size={size}>
+          {size}
+        </Badge>
+      ))}
+    </div>
+  ),
+};
+
+export const Tones: Story = {
+  render: () => (
+    <div className='flex flex-wrap items-center gap-2'>
+      {(
+        ['neutral', 'info', 'success', 'accent', 'warning', 'error'] as const
+      ).map(tone => (
+        <Badge key={tone} tone={tone}>
+          {tone}
+        </Badge>
+      ))}
+    </div>
+  ),
 };

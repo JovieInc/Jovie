@@ -108,6 +108,7 @@ describe('LoadingSkeleton', () => {
       render(<LoadingSkeleton />);
       const skeletons = document.querySelectorAll('.skeleton');
       expect(skeletons).toHaveLength(1);
+      expect(screen.getByRole('status')).toHaveAttribute('data-lines', '1');
     });
 
     it('applies default height and width', () => {
@@ -134,6 +135,13 @@ describe('LoadingSkeleton', () => {
       const skeleton = document.querySelector('.skeleton');
       expect(skeleton?.className).toContain('rounded-lg');
     });
+
+    it('announces a useful loading label', () => {
+      render(<LoadingSkeleton label='Loading audience' />);
+
+      expect(screen.getByRole('status')).toHaveTextContent('Loading audience');
+      expect(screen.getByRole('status')).toHaveAttribute('aria-atomic', 'true');
+    });
   });
 
   describe('Multiple Lines', () => {
@@ -141,6 +149,7 @@ describe('LoadingSkeleton', () => {
       render(<LoadingSkeleton lines={3} />);
       const skeletons = document.querySelectorAll('.skeleton');
       expect(skeletons).toHaveLength(3);
+      expect(screen.getByRole('status')).toHaveAttribute('data-lines', '3');
     });
 
     it('last line has 3/4 width', () => {
@@ -168,6 +177,20 @@ describe('LoadingSkeleton', () => {
       const container = document.querySelector('.space-y-2');
       expect(container).toHaveAttribute('aria-busy', 'true');
       expect(container).toHaveAttribute('role', 'status');
+    });
+
+    it('normalizes invalid line counts to one visible placeholder', () => {
+      render(<LoadingSkeleton lines={0} />);
+
+      expect(document.querySelectorAll('.skeleton')).toHaveLength(1);
+      expect(screen.getByRole('status')).toHaveAttribute('data-lines', '1');
+    });
+
+    it('normalizes non-finite line counts to one visible placeholder', () => {
+      render(<LoadingSkeleton lines={Number.NaN} />);
+
+      expect(document.querySelectorAll('.skeleton')).toHaveLength(1);
+      expect(screen.getByRole('status')).toHaveAttribute('data-lines', '1');
     });
   });
 

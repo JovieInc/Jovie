@@ -30,7 +30,7 @@ describe('Separator', () => {
     it('renders horizontal by default', () => {
       render(<Separator data-testid='separator' />);
       const separator = screen.getByTestId('separator');
-      expect(separator.className).toContain('h-[1px]');
+      expect(separator.className).toContain('h-px');
       expect(separator.className).toContain('w-full');
     });
 
@@ -38,7 +38,7 @@ describe('Separator', () => {
       render(<Separator orientation='vertical' data-testid='separator' />);
       const separator = screen.getByTestId('separator');
       expect(separator.className).toContain('h-full');
-      expect(separator.className).toContain('w-[1px]');
+      expect(separator.className).toContain('w-px');
     });
 
     it('sets aria-orientation when not decorative', () => {
@@ -73,14 +73,15 @@ describe('Separator', () => {
       render(<Separator data-testid='separator' />);
       const separator = screen.getByTestId('separator');
       expect(separator.className).toContain('shrink-0');
-      expect(separator.className).toContain('bg-border');
+      expect(separator.className).toContain('bg-subtle');
+      expect(separator).toHaveAttribute('data-slot', 'separator');
     });
 
     it('merges custom className', () => {
       render(<Separator className='my-4' data-testid='separator' />);
       const separator = screen.getByTestId('separator');
       expect(separator.className).toContain('my-4');
-      expect(separator.className).toContain('bg-border');
+      expect(separator.className).toContain('bg-subtle');
     });
   });
 

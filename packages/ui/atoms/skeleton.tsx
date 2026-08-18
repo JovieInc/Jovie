@@ -87,6 +87,8 @@ export interface LoadingSkeletonProps {
    * @default 'sm'
    */
   readonly rounded?: RoundedVariant;
+  /** Accessible text announced while the placeholder is busy. */
+  readonly label?: string;
 }
 
 /**
@@ -111,34 +113,37 @@ export function LoadingSkeleton({
   height = 'h-4',
   width = 'w-full',
   rounded = 'sm',
+  label = 'Loading content',
 }: LoadingSkeletonProps) {
-  // Generate stable keys for multi-line skeletons (always called to satisfy hook rules)
-  const lineKeys = React.useMemo(
-    () => Array.from({ length: lines }, (_, i) => `skeleton-line-${i}`),
-    [lines]
-  );
+  const normalizedLines = Number.isFinite(lines)
+    ? Math.max(1, Math.floor(lines))
+    : 1;
 
-  if (lines === 1) {
-    return (
-      <div role='status' aria-busy='true' aria-live='polite' className='w-full'>
-        <Skeleton className={cn(height, width, className)} rounded={rounded} />
-      </div>
-    );
-  }
+  // Generate stable keys for multi-line skeletons.
+  const lineKeys = React.useMemo(
+    () =>
+      Array.from({ length: normalizedLines }, (_, i) => `skeleton-line-${i}`),
+    [normalizedLines]
+  );
 
   return (
     <div
-      className='space-y-2'
+      className={normalizedLines === 1 ? 'w-full' : 'space-y-2'}
       role='status'
       aria-busy='true'
       aria-live='polite'
+      aria-atomic='true'
+      data-lines={normalizedLines}
     >
+      <span className='sr-only'>{label}</span>
       {lineKeys.map((key, index) => (
         <Skeleton
           key={key}
           className={cn(
             height,
-            index === lines - 1 ? 'w-3/4' : width,
+            normalizedLines > 1 && index === normalizedLines - 1
+              ? 'w-3/4'
+              : width,
             className
           )}
           rounded={rounded}

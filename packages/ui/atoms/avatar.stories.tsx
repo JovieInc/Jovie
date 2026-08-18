@@ -31,8 +31,7 @@ export const WithImage: Story = {
         src='https://cdn.jov.ie/static/placeholder-avatar.png'
         alt='Artist'
       />
-      <AvatarFallback>AR</AvatarFallback>
-      <AvatarStatusDot status='online' />
+      <AvatarStatusDot status='online' size='lg' />
     </Avatar>
   ),
 };
@@ -43,11 +42,24 @@ export const User: Story = {
 
 export const Sizes: Story = {
   render: () => (
-    <div className='flex items-end gap-2'>
-      {(['sm', 'md', 'lg', 'xl'] as const).map(size => (
+    <div className='flex items-end gap-3'>
+      {(['xs', 'sm', 'md', 'lg', 'xl', '2xl'] as const).map(size => (
         <Avatar key={size} size={size}>
-          <AvatarFallback>{size}</AvatarFallback>
+          <AvatarFallback size={size}>{size}</AvatarFallback>
         </Avatar>
+      ))}
+    </div>
+  ),
+};
+
+export const PresenceStates: Story = {
+  render: () => (
+    <div className='flex items-center gap-4'>
+      {(['online', 'away', 'offline'] as const).map(status => (
+        <div key={status} className='grid justify-items-center gap-2'>
+          <UserAvatar name={status} size='lg' status={status} />
+          <span className='text-xs text-tertiary-token'>{status}</span>
+        </div>
       ))}
     </div>
   ),
