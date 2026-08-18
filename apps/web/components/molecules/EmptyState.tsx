@@ -282,7 +282,7 @@ export function EmptyState({
           'mb-1 text-app font-caption',
           styles.heading,
           isWorkspacePresentation &&
-            'mb-1.5 text-sm font-medium text-primary-token'
+            'mb-2 text-2xl font-semibold tracking-tight text-primary-token'
         )}
       >
         {heading}
@@ -295,7 +295,10 @@ export function EmptyState({
             'mb-5 max-w-sm text-app leading-[1.45]',
             styles.descriptionClassName,
             isWorkspacePresentation &&
-              cn('leading-relaxed text-secondary-token', !hasActions && 'mb-0')
+              cn(
+                'max-w-md text-base leading-6 text-secondary-token',
+                !hasActions && 'mb-0'
+              )
           )}
         >
           {description}

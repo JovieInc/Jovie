@@ -187,8 +187,12 @@ describe('EmptyState (canonical molecule API)', () => {
     expect(status.className).toContain('justify-center');
     expect(status.className).toContain('min-h-full');
     expect(status.querySelector('svg')).toBeNull();
-    expect(heading.className).toContain('text-sm');
+    expect(heading.className).toContain('text-2xl');
+    expect(heading.className).toContain('font-semibold');
+    expect(heading.className).toContain('tracking-tight');
     expect(heading.className).toContain('text-primary-token');
+    expect(description.className).toContain('text-base');
+    expect(description.className).toContain('max-w-md');
     expect(description.className).toContain('text-secondary-token');
     expect(description.className).toContain('mb-0');
   });
