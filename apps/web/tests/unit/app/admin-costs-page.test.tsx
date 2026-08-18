@@ -26,8 +26,7 @@ vi.mock('@/components/features/admin/layout/AdminPage', () => ({
     description: string;
     testId: string;
   }) => (
-    <section data-testid={testId}>
-      <h1>{title}</h1>
+    <section data-testid={testId} data-page-title={title}>
       <p>{description}</p>
       {children}
     </section>
@@ -68,7 +67,13 @@ describe('AdminCostsPage', () => {
     render(await AdminCostsPage());
 
     expect(screen.getByTestId('admin-costs-page')).toBeInTheDocument();
-    expect(screen.getByText('Costs')).toBeInTheDocument();
+    expect(screen.getByTestId('admin-costs-page')).toHaveAttribute(
+      'data-page-title',
+      'Costs'
+    );
+    expect(
+      screen.queryByRole('heading', { name: 'Costs' })
+    ).not.toBeInTheDocument();
     expect(mockCaptureError).toHaveBeenCalledWith(
       'Admin costs page failed to load optional data',
       expect.any(Error),

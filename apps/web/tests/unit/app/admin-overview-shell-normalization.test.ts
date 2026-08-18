@@ -16,6 +16,10 @@ const ADMIN_HEALTH_DASHBOARD = join(
   TEST_DIR,
   '../../../app/app/(shell)/admin/_components/AdminHealthDashboard.tsx'
 );
+const ADMIN_LOADING_ROUTE = join(
+  TEST_DIR,
+  '../../../app/app/(shell)/admin/loading.tsx'
+);
 const ADMIN_NAV = join(TEST_DIR, '../../../constants/admin-navigation.ts');
 
 describe('admin overview shell normalization (JOV-2525 + JOV-2098)', () => {
@@ -34,6 +38,15 @@ describe('admin overview shell normalization (JOV-2525 + JOV-2098)', () => {
     expect(source).not.toContain('view=scoreboard');
     expect(source).not.toContain('view=workspaces');
     expect(source).not.toContain('WorkspaceTabsSurface');
+  });
+
+  it('keeps the loading route in the same canonical AdminPage shell', () => {
+    const source = readFileSync(ADMIN_LOADING_ROUTE, 'utf8');
+
+    expect(source).toContain('import { AdminPage }');
+    expect(source).toMatch(/title=["']Overview["']/);
+    expect(source).toMatch(/testId=["']admin-overview-loading["']/);
+    expect(source).not.toContain('PageShell');
   });
 
   it('renders Overview as a health dashboard only (JOV-2098)', () => {
@@ -60,7 +73,7 @@ describe('admin health dashboard ownership (JOV-2098)', () => {
     expect(source).toContain('APP_ROUTES.ADMIN_REVENUE_LIFT');
     expect(source).toContain('APP_ROUTES.ADMIN_GROWTH');
     expect(source).toContain('APP_ROUTES.ADMIN_OPS');
-    expect(source).toContain("buildAdminPeopleHref('waitlist')");
+    expect(source).toMatch(/buildAdminPeopleHref\(["']waitlist["']\)/);
   });
 });
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { IconButton } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { ExternalLink } from 'lucide-react';
 import { useMemo } from 'react';
@@ -84,15 +85,16 @@ export function CostsTable({ items, lastRefreshedLabel }: CostsTableProps) {
             const url = info.getValue();
             if (!url) return null;
             return (
-              <a
-                href={url}
-                target='_blank'
-                rel='noopener noreferrer'
-                className='inline-flex text-primary-token hover:text-primary-token/80'
-                aria-label={`Open ${info.row.original.label} dashboard`}
+              <IconButton
+                asChild
+                variant='inline'
+                size='xs'
+                ariaLabel={`Open ${info.row.original.label} dashboard`}
               >
-                <ExternalLink className='h-3.5 w-3.5' />
-              </a>
+                <a href={url} target='_blank' rel='noopener noreferrer'>
+                  <ExternalLink aria-hidden />
+                </a>
+              </IconButton>
             );
           },
           enableSorting: false,

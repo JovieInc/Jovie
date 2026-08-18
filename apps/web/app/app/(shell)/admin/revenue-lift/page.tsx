@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { captureError } from '@/lib/error-tracking';
 import { loadRevenueLiftDashboard } from '@/lib/metrics/revenue-lift-dashboard';
@@ -39,13 +40,12 @@ export default async function AdminRevenueLiftPage() {
       {data ? (
         <RevenueLiftDashboardView data={data} />
       ) : (
-        <div
-          className='rounded-md border border-subtle bg-surface-1 px-4 py-6 text-sm text-secondary-token'
-          data-testid='admin-revenue-lift-error'
-        >
-          Could not load revenue-lift metrics. Check server logs and
-          workflow_run_outcomes availability.
-        </div>
+        <EmptyState
+          variant='error'
+          heading='Could not load revenue-lift metrics.'
+          description='Check server logs and workflow_run_outcomes availability.'
+          testId='admin-revenue-lift-error'
+        />
       )}
     </AdminPage>
   );
