@@ -410,6 +410,10 @@ function runStructural() {
     // expected-head mutation remain executable CI behavior without adding the
     // full backlog suite to every structural lane.
     "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs",
+    'python3 scripts/hermes/tests/gem-pr-drain.test.py',
+    'python3 scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
+    'python3 scripts/hermes/tests/gem-priority-gate.test.py',
+    'python3 scripts/hermes/tests/test_evaluate_fleet_gate.py',
     // CI installs the hash-pinned pytest + coverage toolchain. The pure policy
     // is the safety boundary for holds, retry budgets, exact-head leases, and
     // bounded fanout, so branch-aware coverage is a hard structural gate.
