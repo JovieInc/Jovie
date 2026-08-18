@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge } from '@jovie/ui';
+import { Badge, Button } from '@jovie/ui';
 import { memo } from 'react';
 import {
   getContactRoleLabel,
@@ -25,11 +25,13 @@ export const ContactListRow = memo(function ContactListRow({
   );
 
   return (
-    <button
+    <Button
       type='button'
+      variant='ghost'
+      size='md'
       onClick={onClick}
       aria-pressed={isSelected}
-      className={`flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition-[background-color,border-color,box-shadow] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-base ${
+      className={`h-auto w-full justify-start gap-3 rounded-lg border px-3 py-3 text-left font-normal before:hidden [&>span]:w-full [&>span]:justify-start [&>span]:gap-3 ${
         isSelected
           ? 'border-subtle bg-surface-0'
           : 'border-transparent hover:bg-surface-0'
@@ -59,6 +61,6 @@ export const ContactListRow = memo(function ContactListRow({
           {territorySummary}
         </Badge>
       ) : null}
-    </button>
+    </Button>
   );
 });
