@@ -13,7 +13,9 @@ a separate, approval-gated operation.
   the shared authenticated loopback endpoint. Remote URLs require an explicit
   opt-in, token files must deny group/other access, and `tools/call` is never
   retried automatically because it may have committed a write before an
-  ambiguous transport failure.
+  ambiguous transport failure. A bounded worker pool prevents one stalled
+  request from blocking every client request on the same stdio connection, and
+  SSE events are emitted as they arrive instead of being buffered to EOF.
 - The plist template is a reviewable candidate for the future launchd unit. It
   is kept outside `launchd/` and `launchd/pro/` so no existing bootstrap command
   can activate it accidentally.
@@ -50,6 +52,10 @@ Do not install the candidate unit until all of the following have receipts:
 Activation must be an explicit copy/render operation followed by a controlled
 `launchctl bootout`/`bootstrap`; this directory intentionally provides no
 one-shot installer. Preserve the previous unit under a timestamped directory.
+Before bootstrap, inventory and boot out the exact prior service label, then
+prove its process and listeners are gone. After bootstrap, require exactly one
+`gbrain serve` process and exactly one approved listener; a port-conflict exit
+is not a successful replacement receipt.
 
 Rollback is equally explicit: boot out the candidate label, restore the exact
 previous wrapper/proxy/plist/config files, bootstrap the previous plist, and

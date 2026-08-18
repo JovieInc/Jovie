@@ -27,26 +27,40 @@ fi
 
 # launchd starts with a sparse environment. Load connection URLs from GBrain's
 # operator-owned configuration without printing or copying them into this repo.
-read_config_value() {
-  python3 - "$GBRAIN_CONFIG_FILE" "$1" <<'PY'
+read_config_snapshot() {
+  python3 - "$GBRAIN_CONFIG_FILE" <<'PY'
 import json
 import sys
 
 with open(sys.argv[1], encoding="utf-8") as handle:
     config = json.load(handle)
-value = config.get(sys.argv[2])
+sys.stdout.write(json.dumps({
+    "database_url": config.get("database_url", ""),
+    "direct_database_url": config.get("direct_database_url", ""),
+}, separators=(",", ":")))
+PY
+}
+
+snapshot_value() {
+  python3 - "$1" "$2" <<'PY'
+import json
+import sys
+
+value = json.loads(sys.argv[1]).get(sys.argv[2])
 if isinstance(value, str):
     sys.stdout.write(value)
 PY
 }
 
-if [[ -f "$GBRAIN_CONFIG_FILE" ]]; then
+if [[ -f "$GBRAIN_CONFIG_FILE" ]] && \
+   [[ -z "${GBRAIN_DATABASE_URL:-}" || -z "${GBRAIN_DIRECT_DATABASE_URL:-}" ]]; then
+  CONFIG_SNAPSHOT="$(read_config_snapshot)"
   if [[ -z "${GBRAIN_DATABASE_URL:-}" ]]; then
-    GBRAIN_DATABASE_URL="$(read_config_value database_url)"
+    GBRAIN_DATABASE_URL="$(snapshot_value "$CONFIG_SNAPSHOT" database_url)"
     export GBRAIN_DATABASE_URL
   fi
   if [[ -z "${GBRAIN_DIRECT_DATABASE_URL:-}" ]]; then
-    GBRAIN_DIRECT_DATABASE_URL="$(read_config_value direct_database_url)"
+    GBRAIN_DIRECT_DATABASE_URL="$(snapshot_value "$CONFIG_SNAPSHOT" direct_database_url)"
     export GBRAIN_DIRECT_DATABASE_URL
   fi
 fi
