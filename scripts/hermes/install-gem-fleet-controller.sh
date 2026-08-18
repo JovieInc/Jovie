@@ -25,20 +25,8 @@ readonly CONSUMER_TARGET="${GEM_ROOT}/scripts/gem-pr-drain.py"
 readonly POLICY_TARGET="${GEM_ROOT}/scripts/gem_rehabilitation_policy.py"
 readonly WORKFLOW_TARGET="${SYMPHONY_ROOT}/WORKFLOW.jovie-ui-pilot.md"
 readonly SERVICE_UNIT_TARGET="${HOME}/.config/systemd/user/symphony-ui-pilot.service"
-
-prepare_user_systemd_context() {
-  if [[ -z "${XDG_RUNTIME_DIR:-}" ]]; then
-    XDG_RUNTIME_DIR="/run/user/$(id -u)"
-    export XDG_RUNTIME_DIR
-  fi
-  DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
-  export DBUS_SESSION_BUS_ADDRESS
-  if ! systemctl --user show-environment >/dev/null; then
-    printf 'Gem user systemd preflight failed; refusing controller writes (XDG_RUNTIME_DIR=%s)\n' \
-      "${XDG_RUNTIME_DIR}" >&2
-    return 4
-  fi
-}
+# shellcheck source=lib/user-systemd-context.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/user-systemd-context.sh"
 
 smoke_consumer_import() {
   local consumer="$1" module_root
@@ -84,12 +72,14 @@ git -C "${SOURCE_ROOT}" diff --quiet -- \
   scripts/hermes/gem-pr-drain.py \
   scripts/hermes/gem_rehabilitation_policy.py \
   scripts/hermes/WORKFLOW.jovie-ui-pilot.md \
-  scripts/hermes/systemd/symphony-ui-pilot.service
+  scripts/hermes/systemd/symphony-ui-pilot.service \
+  scripts/hermes/lib/user-systemd-context.sh
 git -C "${SOURCE_ROOT}" diff --cached --quiet -- \
   scripts/hermes/gem-priority-gate.py \
   scripts/hermes/gem_gate_contract.py \
   scripts/hermes/gem-pr-drain.py \
   scripts/hermes/gem_rehabilitation_policy.py \
+  scripts/hermes/lib/user-systemd-context.sh \
   scripts/hermes/WORKFLOW.jovie-ui-pilot.md
 
 SOURCE_REVISION="$(git -C "${SOURCE_ROOT}" rev-parse HEAD)"
