@@ -474,6 +474,22 @@ describe('repository-owned GBrain runtime assets', () => {
       200,
       '{"jsonrpc":"2.0","id":17,"error":"not-an-object"}',
     ],
+    ['empty-error', 200, '{"jsonrpc":"2.0","id":17,"error":{}}'],
+    [
+      'string-error-code',
+      200,
+      '{"jsonrpc":"2.0","id":17,"error":{"code":"-1","message":"bad"}}',
+    ],
+    [
+      'boolean-error-code',
+      200,
+      '{"jsonrpc":"2.0","id":17,"error":{"code":true,"message":"bad"}}',
+    ],
+    [
+      'non-string-error-message',
+      200,
+      '{"jsonrpc":"2.0","id":17,"error":{"code":-1,"message":42}}',
+    ],
   ])('rejects an invalid %s daemon response', async (_name, status, body) => {
     const port = await listen((_request, response) => {
       response.writeHead(status, { 'content-type': 'application/json' });
@@ -727,7 +743,7 @@ describe('repository-owned GBrain runtime assets', () => {
     15_000
   );
 
-  it('reclaims a worker after the absolute request deadline', async () => {
+  it('applies one absolute deadline to active and queued requests', async () => {
     const port = await listen(async (request, response) => {
       const chunks = [];
       for await (const chunk of request) chunks.push(chunk);
@@ -766,9 +782,90 @@ describe('repository-owned GBrain runtime assets', () => {
       })
     );
     expect(responses).toContainEqual(
-      expect.objectContaining({ id: 22, result: { ok: true } })
+      expect.objectContaining({
+        id: 22,
+        error: expect.objectContaining({
+          message: 'shared gbrain HTTP exceeded total deadline',
+        }),
+      })
     );
   }, 10_000);
+
+  it.each(['text/event-stream', 'application/json'])(
+    'interrupts a silent %s read at the absolute request deadline',
+    async contentType => {
+      const port = await listen((_request, response) => {
+        response.writeHead(200, { 'content-type': contentType });
+        const interval = setInterval(() => {
+          response.write(contentType === 'text/event-stream' ? ': late\n\n' : ' ');
+        }, 750);
+        response.on('close', () => clearInterval(interval));
+      });
+      const started = performance.now();
+      const result = await runProxy({
+        port,
+        payload: { jsonrpc: '2.0', id: 23, method: 'tools/list' },
+        extraEnv: { GBRAIN_MCP_REQUEST_DEADLINE_SECONDS: '1' },
+      });
+
+      expect(performance.now() - started).toBeLessThan(1600);
+      expect(JSON.parse(result.stdout)).toMatchObject({
+        id: 23,
+        error: {
+          code: -32000,
+          message: 'shared gbrain HTTP exceeded total deadline',
+        },
+      });
+    },
+    5000
+  );
+
+  it('includes executor queue time in the absolute request deadline', async () => {
+    const port = await listen(async (request, response) => {
+      const chunks = [];
+      for await (const chunk of request) chunks.push(chunk);
+      const payload = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      response.writeHead(200, { 'content-type': 'text/event-stream' });
+      const interval = setInterval(() => response.write(': occupied\n\n'), 100);
+      response.on('close', () => clearInterval(interval));
+      if (payload.id === 25) {
+        setTimeout(() => {
+          clearInterval(interval);
+          response.end(
+            'data: {"jsonrpc":"2.0","id":25,"result":{"ok":true}}\n\n'
+          );
+        }, 900);
+      }
+    });
+    const started = performance.now();
+    const result = await runProxy({
+      port,
+      rawInput:
+        '{"jsonrpc":"2.0","id":25,"method":"tools/list"}\n' +
+        '{"jsonrpc":"2.0","id":26,"method":"tools/list"}\n',
+      extraEnv: {
+        GBRAIN_MCP_MAX_WORKERS: '1',
+        GBRAIN_MCP_REQUEST_DEADLINE_SECONDS: '1',
+      },
+    });
+    const responses = result.stdout
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line));
+
+    expect(performance.now() - started).toBeLessThan(1600);
+    expect(responses).toContainEqual(
+      expect.objectContaining({ id: 25, result: { ok: true } })
+    );
+    expect(responses).toContainEqual(
+      expect.objectContaining({
+        id: 26,
+        error: expect.objectContaining({
+          message: 'shared gbrain HTTP exceeded total deadline',
+        }),
+      })
+    );
+  }, 5000);
 
   it('survives malformed input before serving the next valid request', async () => {
     const port = await listen(async (request, response) => {

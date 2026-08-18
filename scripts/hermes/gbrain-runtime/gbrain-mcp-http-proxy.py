@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import pathlib
+import socket
 import stat
 import sys
 import threading
@@ -139,6 +140,14 @@ def error_response(request_id: object, message: str) -> dict:
     }
 
 
+def abort_response_at_deadline(response, expired: threading.Event) -> None:
+    expired.set()
+    try:
+        response.fp.raw._sock.shutdown(socket.SHUT_RDWR)
+    except (AttributeError, OSError):
+        response.close()
+
+
 def iter_response(response, deadline: float):
     content_type = response.headers.get("content-type", "application/json")
     if "text/event-stream" in content_type:
@@ -183,10 +192,9 @@ def iter_response(response, deadline: float):
         yield json.loads(body)
 
 
-def forward(payload: dict, token: str, deadline_seconds: float) -> None:
+def forward(payload: dict, token: str, total_deadline: float) -> None:
     data = json.dumps(payload, separators=(",", ":")).encode()
     last_error: Exception | None = None
-    total_deadline = time.monotonic() + deadline_seconds
     # tools/call can mutate state. An ambiguous response failure must surface to
     # the client instead of replaying a write that may already have committed.
     delays = (0.0,) if payload.get("method") == "tools/call" else RETRY_DELAYS
@@ -208,51 +216,83 @@ def forward(payload: dict, token: str, deadline_seconds: float) -> None:
             },
         )
         try:
-            remaining = max(1.0, total_deadline - time.monotonic())
+            remaining = max(0.001, total_deadline - time.monotonic())
             with HTTP_OPENER.open(request, timeout=min(90.0, remaining)) as response:
+                deadline_expired = threading.Event()
+                deadline_timer = threading.Timer(
+                    max(0.001, total_deadline - time.monotonic()),
+                    abort_response_at_deadline,
+                    args=(response, deadline_expired),
+                )
+                deadline_timer.daemon = True
+                deadline_timer.start()
                 emitted = False
                 terminal_emitted = False
-                for response_payload in iter_response(response, total_deadline):
-                    if not isinstance(response_payload, dict):
-                        error = RuntimeError("shared gbrain returned non-object JSON-RPC")
-                        if terminal_emitted:
-                            raise PostResponseProtocolError(str(error))
-                        raise error
-                    if response_payload.get("jsonrpc") != "2.0":
-                        error = RuntimeError("shared gbrain returned invalid JSON-RPC version")
-                        if terminal_emitted:
-                            raise PostResponseProtocolError(str(error))
-                        raise error
-                    response_id = response_payload.get("id")
-                    if response_id is not None:
-                        if response_id != payload.get("id"):
-                            error = RuntimeError("shared gbrain returned mismatched JSON-RPC id")
+                try:
+                    for response_payload in iter_response(response, total_deadline):
+                        if not isinstance(response_payload, dict):
+                            error = RuntimeError(
+                                "shared gbrain returned non-object JSON-RPC"
+                            )
                             if terminal_emitted:
                                 raise PostResponseProtocolError(str(error))
                             raise error
+                        if response_payload.get("jsonrpc") != "2.0":
+                            error = RuntimeError(
+                                "shared gbrain returned invalid JSON-RPC version"
+                            )
+                            if terminal_emitted:
+                                raise PostResponseProtocolError(str(error))
+                            raise error
+                        response_id = response_payload.get("id")
+                        if response_id is not None:
+                            if response_id != payload.get("id"):
+                                error = RuntimeError(
+                                    "shared gbrain returned mismatched JSON-RPC id"
+                                )
+                                if terminal_emitted:
+                                    raise PostResponseProtocolError(str(error))
+                                raise error
+                            if terminal_emitted:
+                                raise PostResponseProtocolError(
+                                    "shared gbrain returned multiple terminal responses"
+                                )
+                            has_result = "result" in response_payload
+                            has_error = "error" in response_payload
+                            if has_result == has_error:
+                                raise RuntimeError(
+                                    "shared gbrain returned invalid terminal response shape"
+                                )
+                            if has_error:
+                                error_payload = response_payload["error"]
+                                if (
+                                    not isinstance(error_payload, dict)
+                                    or not isinstance(error_payload.get("code"), int)
+                                    or isinstance(error_payload.get("code"), bool)
+                                    or not isinstance(error_payload.get("message"), str)
+                                ):
+                                    raise RuntimeError(
+                                        "shared gbrain returned invalid JSON-RPC error shape"
+                                    )
+                            terminal_emitted = True
+                        elif not isinstance(response_payload.get("method"), str):
+                            raise RuntimeError(
+                                "shared gbrain returned invalid JSON-RPC notification"
+                            )
+                        emit(response_payload)
+                        emitted = True
                         if terminal_emitted:
-                            raise PostResponseProtocolError(
-                                "shared gbrain returned multiple terminal responses"
-                            )
-                        has_result = "result" in response_payload
-                        has_error = "error" in response_payload
-                        if has_result == has_error:
-                            raise RuntimeError(
-                                "shared gbrain returned invalid terminal response shape"
-                            )
-                        if has_error and not isinstance(response_payload["error"], dict):
-                            raise RuntimeError(
-                                "shared gbrain returned invalid JSON-RPC error shape"
-                            )
-                        terminal_emitted = True
-                    elif not isinstance(response_payload.get("method"), str):
+                            break
+                except Exception as exc:
+                    if deadline_expired.is_set():
                         raise RuntimeError(
-                            "shared gbrain returned invalid JSON-RPC notification"
-                        )
-                    emit(response_payload)
-                    emitted = True
-                    if terminal_emitted:
-                        break
+                            "shared gbrain HTTP exceeded total deadline"
+                        ) from exc
+                    raise
+                finally:
+                    deadline_timer.cancel()
+                if deadline_expired.is_set():
+                    raise RuntimeError("shared gbrain HTTP exceeded total deadline")
                 if payload.get("id") is not None and not terminal_emitted:
                     raise RuntimeError("shared gbrain returned no terminal response")
                 return
@@ -264,6 +304,8 @@ def forward(payload: dict, token: str, deadline_seconds: float) -> None:
                 raise RuntimeError(f"shared gbrain HTTP returned {exc.code}") from exc
             last_error = exc
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            if time.monotonic() >= total_deadline:
+                raise RuntimeError("shared gbrain HTTP exceeded total deadline") from exc
             if emitted:
                 raise RuntimeError(
                     "shared gbrain HTTP interrupted after response began"
@@ -275,7 +317,7 @@ def forward(payload: dict, token: str, deadline_seconds: float) -> None:
     )
 
 
-def handle_line(raw_line: bytes, token: str, deadline_seconds: float) -> None:
+def handle_line(raw_line: bytes, token: str, total_deadline: float) -> None:
     request_id: object = None
     try:
         try:
@@ -293,7 +335,7 @@ def handle_line(raw_line: bytes, token: str, deadline_seconds: float) -> None:
             emit(error_response(payload.get("id"), "invalid JSON-RPC request"))
             return
         request_id = payload.get("id")
-        forward(payload, token, deadline_seconds)
+        forward(payload, token, total_deadline)
     except Exception as exc:
         # Keep stdio alive. A daemon restart fails one call, not the task.
         message = public_error(exc)
@@ -334,8 +376,9 @@ def main() -> int:
                 return 1
             if not raw_line.strip():
                 continue
+            total_deadline = time.monotonic() + request_deadline
             capacity.acquire()
-            future = executor.submit(handle_line, raw_line, token, request_deadline)
+            future = executor.submit(handle_line, raw_line, token, total_deadline)
             future.add_done_callback(lambda _future: capacity.release())
     return 0
 
