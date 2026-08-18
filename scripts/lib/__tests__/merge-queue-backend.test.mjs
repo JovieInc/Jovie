@@ -151,15 +151,17 @@ const dequeue = runner => dequeuePullRequest(nativeOptions(runner));
 const dequeueCompensation = (runner, expectedHeadOid = HEAD) =>
   dequeuePullRequest(nativeOptions(runner, { expectedHeadOid }));
 const invokedEnrollment = runner =>
-  runner.mock.calls.some(([args]) =>
-    args[0] === 'pr' &&
-    args[1] === 'merge' &&
-    args.includes('--match-head-commit')
+  runner.mock.calls.some(
+    ([args]) =>
+      args[0] === 'pr' &&
+      args[1] === 'merge' &&
+      args.includes('--match-head-commit')
   );
 const invokedNativeMutation = runner =>
-  runner.mock.calls.some(([args]) =>
-    (args[0] === 'pr' && args[1] === 'merge') ||
-    /dequeuePullRequest|disablePullRequestAutoMerge/.test(queryText(args))
+  runner.mock.calls.some(
+    ([args]) =>
+      (args[0] === 'pr' && args[1] === 'merge') ||
+      /dequeuePullRequest|disablePullRequestAutoMerge/.test(queryText(args))
   );
 const invokedMutationActorCheck = runner =>
   runner.mock.calls.some(([args]) =>
@@ -433,7 +435,9 @@ describe('queue workflow mutation safety', () => {
     expect(scope).toContain(
       '[[ "$payload_main_sha" == "$FLEET_POLICY_MAIN_SHA" && -n "$payload_ownerless_since" ]]'
     );
-    expect(scope).toMatch(/repository_dispatch\)[\s\S]*pr_number=''[\s\S]*head_sha=''[\s\S]*;;/);
+    expect(scope).toMatch(
+      /repository_dispatch\)[\s\S]*pr_number=''[\s\S]*head_sha=''[\s\S]*;;/
+    );
     expect(
       executeAdmissionScope({
         eventName: 'repository_dispatch',
@@ -595,15 +599,11 @@ describe('queue workflow mutation safety', () => {
     expect(receiptJob).toContain('needs: fleet-policy');
     expect(receiptJob).toContain('always()');
     expect(receiptJob).toContain("needs.fleet-policy.result != 'success'");
-    expect(receiptJob).toContain(
-      "github.event_name != 'repository_dispatch'"
-    );
+    expect(receiptJob).toContain("github.event_name != 'repository_dispatch'");
     expect(receiptJob).toContain('timeout-minutes: 5');
     expect(receiptJob).toContain('permission-statuses: write');
     expect(receiptJob).toContain('--paginate --slurp');
-    expect(receiptJob).toContain(
-      '.state == "OPEN" and .baseRefName == "main"'
-    );
+    expect(receiptJob).toContain('.state == "OPEN" and .baseRefName == "main"');
     expect(receiptJob).toContain(
       '-f context="jovie-gem-queue-remediation/v1/pr-$pr_number"'
     );
@@ -919,7 +919,9 @@ describe('queue workflow mutation safety', () => {
     expect(enroll).toContain(
       "needs.fleet-policy.outputs.mode == 'hold-intake'"
     );
-    expect(enroll).not.toContain("needs.fleet-policy.outputs.mode == 'draft-only'");
+    expect(enroll).not.toContain(
+      "needs.fleet-policy.outputs.mode == 'draft-only'"
+    );
     expect(enroll).toContain("DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '2'");
     expect(drain).toContain('QUEUE_REENTRY_CONTEXT="jovie-queue-reentry/v1"');
     expect(drain).toContain('bounded exact-head native admission');
@@ -1484,8 +1486,8 @@ describe('native enrollment', () => {
       changed: true,
       mutationActor: CANONICAL_NATIVE_MUTATION_ACTOR,
     });
-    const mutationCall = runner.mock.calls.find(([args]) =>
-      args[0] === 'pr' && args[1] === 'merge'
+    const mutationCall = runner.mock.calls.find(
+      ([args]) => args[0] === 'pr' && args[1] === 'merge'
     )?.[0];
     expect(mutationCall).toEqual([
       'pr',

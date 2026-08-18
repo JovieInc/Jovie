@@ -14,8 +14,8 @@ import {
   isAdvisoryCheck,
   isAgentBranch,
   isAutoEnrollRunProvenance,
-  isTrustedExactHeadConflictReceipt,
   isTerminalFailure,
+  isTrustedExactHeadConflictReceipt,
   MERGE_GATE_CHECK_NAMES,
   normalizeCheckName,
 } from '../pr-check-failures.mjs';
@@ -189,7 +189,8 @@ describe('pr-check-failures', () => {
       updated_at: '2026-08-18T00:00:00Z',
       creator: { type: 'Bot', login: 'jovie-bot[bot]' },
       target_url: 'https://github.com/JovieInc/Jovie/actions/runs/123',
-      description: 'PR #16060: Exact-head queue controller requires Gem remediation',
+      description:
+        'PR #16060: Exact-head queue controller requires Gem remediation',
       ...overrides,
     });
     const controllerRun = overrides => ({

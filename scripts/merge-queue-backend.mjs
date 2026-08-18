@@ -1015,8 +1015,7 @@ export async function runCli(
         ...options,
         number: args[0],
         expectedHeadOid: args[1],
-        controllerEnrollmentCompensation:
-          args[2] === 'controller-enrollment',
+        controllerEnrollmentCompensation: args[2] === 'controller-enrollment',
       }),
   };
   const usage = {

@@ -131,9 +131,10 @@ export function rotateRemediationCandidates(
 }
 
 function recordLabelReconciliationFailure(item, operation, error) {
-  const detail = `${error?.stderr ?? error?.message ?? error ?? 'unknown error'}`
-    .trim()
-    .slice(0, 500);
+  const detail =
+    `${error?.stderr ?? error?.message ?? error ?? 'unknown error'}`
+      .trim()
+      .slice(0, 500);
   item.result = 'escalated';
   item.category = 'label_reconciliation_failure';
   item.reason = `${item.reason}; ${operation} failed: ${detail}`;
@@ -486,11 +487,9 @@ export async function remediateBlockedPrs(options, dependencies = {}) {
     const hours = hoursSince(pr.headUpdatedAt, nowMs);
     const hasConflictLabel = hasPrLabel(pr, 'needs-conflict-resolution');
     const timeSensitive = (pr.reasons ?? []).some(reason =>
-      [
-        'branch_behind',
-        'merge_conflict',
-        'stale_conflict_label',
-      ].includes(reason)
+      ['branch_behind', 'merge_conflict', 'stale_conflict_label'].includes(
+        reason
+      )
     );
     if (!Number.isFinite(hours)) {
       const item = {
