@@ -191,9 +191,14 @@ describe('ci-fast bounded parallel workflow', () => {
       'ci-profile-admission-browser'
     );
 
-    expect(remaining).toContain(
-      'scripts/hermes/(gem-|gem_|install-gem-pr-rehabilitation)'
+    expect(remaining).toContain('scripts/hermes/(gbrain-runtime/|gem-');
+    expect(remaining).toContain('gbrain-runtime-assets|merge-group');
+    expect(CI_FAST_SOURCE).toContain(
+      'GBRAIN_PROXY_COVERAGE=1 pnpm exec vitest --root scripts'
     );
+    expect(CI_FAST_SOURCE).toContain('--precision=2 --fail-under=78');
+    expect(CI_FAST_SOURCE).toContain('elif [ "${CI:-}" = "true" ]');
+    expect(CI_FAST_SOURCE).not.toContain('elif [[');
     expect(CI_FAST_SOURCE).toContain(
       'coverage run --branch scripts/hermes/tests/gem-rehabilitation-policy.test.py'
     );

@@ -43,10 +43,8 @@ Do not install the candidate unit until all of the following have receipts:
 
 ## Activation and rollback
 
-Activation must be an explicit copy/render operation followed by a controlled
-`launchctl bootout`/`bootstrap`; this directory intentionally provides no
-one-shot installer. Preserve the previous unit under a timestamped directory.
-Before bootstrap, inventory and boot out the exact prior service label, then
+Activation must be an explicit copy/render operation followed by controlled
+`launchctl bootout`/`bootstrap`. Preserve the prior unit, then boot out its label and
 prove its process and listeners are gone. After bootstrap, require exactly one
 `gbrain serve` process and exactly one approved listener; a port-conflict exit
 is not a successful replacement receipt.
@@ -56,9 +54,3 @@ previous wrapper/proxy/plist/config files, bootstrap the previous plist, and
 verify `/health`, an authenticated MCP `tools/list`, semantic query, and a
 known-page read. A database-provider rollback is a different procedure and must
 use a tested provider restore/PITR receipt rather than this service rollback.
-
-The current daemon exposes `/health`; `/ready` is not a supported readiness
-endpoint in the verified release.
-
-`scripts/lib/__tests__/gbrain-runtime-assets.test.mjs` exercises the wrapper and
-real loopback HTTP transport under the existing `ci:harness:test` selector.
