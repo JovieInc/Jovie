@@ -61,6 +61,7 @@ CREATE TABLE "creator_revision_approvals" (
 CREATE TABLE "creator_revision_claims" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"revision_id" uuid NOT NULL,
+	"idempotency_key" text NOT NULL,
 	"claim_text" text NOT NULL,
 	"kind" "creator_claim_kind" NOT NULL,
 	"evidence_state" "creator_claim_evidence_state" DEFAULT 'unresolved' NOT NULL,
@@ -88,6 +89,7 @@ CREATE INDEX IF NOT EXISTS "creator_documents_profile_created_idx" ON "creator_d
 CREATE UNIQUE INDEX IF NOT EXISTS "creator_documents_capture_idempotency_unique" ON "creator_documents" USING btree ("creator_profile_id","capture_idempotency_key") WHERE capture_idempotency_key IS NOT NULL;--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "creator_revision_approvals_exact_revision_unique" ON "creator_revision_approvals" USING btree ("document_id","revision_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "creator_revision_claims_revision_idx" ON "creator_revision_claims" USING btree ("revision_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "creator_revision_claims_revision_idempotency_unique" ON "creator_revision_claims" USING btree ("revision_id","idempotency_key");
 --> statement-breakpoint
 
 -- Private creator documents are never public-readable. FORCE protects the

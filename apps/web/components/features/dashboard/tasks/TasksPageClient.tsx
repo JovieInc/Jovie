@@ -180,7 +180,13 @@ const TASK_VIEW_MODES: Array<'board' | 'list'> = ['board', 'list'];
 
 type MobileTaskScope = 'all' | 'open' | 'done';
 type ReleasePanelStatus = 'loading' | 'error' | 'empty';
-type TaskEditorSaveStatus = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
+type TaskEditorSaveStatus =
+  | 'idle'
+  | 'dirty'
+  | 'saving'
+  | 'saved'
+  | 'conflict'
+  | 'error';
 
 const MOBILE_TASK_SCOPE_OPTIONS = [
   ['all', 'All'],
@@ -602,6 +608,7 @@ function TaskDocumentPanel({
   onTitleChange,
   onDescriptionChange,
   onRetrySave,
+  onResolveConflict,
   onClose,
   onOpenRelease,
   onUpdateStatus,
@@ -620,6 +627,7 @@ function TaskDocumentPanel({
   onTitleChange: (value: string) => void;
   onDescriptionChange: (change: RichTextEditorChange) => void;
   onRetrySave: () => void;
+  onResolveConflict: () => void;
   onClose: () => void;
   onOpenRelease: (task: TaskView) => void;
   onUpdateStatus: (taskId: string, status: TaskStatus) => void;
@@ -872,9 +880,11 @@ function TaskDocumentPanel({
                       ? 'Saved'
                       : saveStatus === 'error'
                         ? 'Not saved'
-                        : saveStatus === 'dirty'
-                          ? 'Edited'
-                          : 'Up to date'
+                        : saveStatus === 'conflict'
+                          ? 'Conflict · reload task changes'
+                          : saveStatus === 'dirty'
+                            ? 'Edited'
+                            : 'Up to date'
                 }
                 statusTone={
                   saveStatus === 'saving'
@@ -883,12 +893,16 @@ function TaskDocumentPanel({
                       ? 'success'
                       : saveStatus === 'error'
                         ? 'error'
-                        : 'neutral'
+                        : saveStatus === 'conflict'
+                          ? 'error'
+                          : 'neutral'
                 }
                 statusAction={
                   saveStatus === 'error'
                     ? { label: 'Retry', onClick: onRetrySave }
-                    : undefined
+                    : saveStatus === 'conflict'
+                      ? { label: 'Reload', onClick: onResolveConflict }
+                      : undefined
                 }
               />
               {showDescriptionHelper && descriptionHelper ? (
@@ -1188,6 +1202,8 @@ function useTaskActions({
   openReleaseSidebar,
   openTaskDocument,
   updateTask,
+  getExpectedMutationVersion,
+  onMutationAcknowledged,
 }: {
   artistName: string | null | undefined;
   onGeneratePitch: (task: TaskView) => void;
@@ -1197,10 +1213,14 @@ function useTaskActions({
   updateTask: (
     params: {
       taskId: string;
-      data: Partial<Pick<TaskView, 'status' | 'priority' | 'assigneeKind'>>;
+      data: Partial<Pick<TaskView, 'status' | 'priority' | 'assigneeKind'>> & {
+        readonly expectedMutationVersion?: number;
+      };
     },
-    opts: { onError: () => void }
+    opts: { onError: () => void; onSuccess?: (task: TaskView) => void }
   ) => void;
+  getExpectedMutationVersion: (taskId: string) => number | undefined;
+  onMutationAcknowledged: (taskId: string, task: TaskView) => void;
 }) {
   const updateTaskField = useCallback(
     (
@@ -1208,11 +1228,20 @@ function useTaskActions({
       data: Partial<Pick<TaskView, 'status' | 'priority' | 'assigneeKind'>>
     ) => {
       updateTask(
-        { taskId, data },
-        { onError: () => toast.error("Couldn't update task") }
+        {
+          taskId,
+          data: {
+            ...data,
+            expectedMutationVersion: getExpectedMutationVersion(taskId),
+          },
+        },
+        {
+          onError: () => toast.error("Couldn't update task"),
+          onSuccess: task => onMutationAcknowledged(taskId, task),
+        }
       );
     },
-    [updateTask]
+    [getExpectedMutationVersion, onMutationAcknowledged, updateTask]
   );
 
   const handleDeleteTask = useCallback(
@@ -1652,9 +1681,25 @@ export function TasksPageClient() {
       selectedTask.mutationVersion >
         (editorExpectedMutationVersionRef.current ?? 0)
     ) {
-      editorExpectedMutationVersionRef.current = selectedTask.mutationVersion;
+      if (editorSaveStatus === 'idle' || editorSaveStatus === 'saved') {
+        editorExpectedMutationVersionRef.current = selectedTask.mutationVersion;
+        setEditorTitle(selectedTaskEditorTitle);
+        setEditorDescription(selectedTaskEditorDescription);
+        setEditorDescriptionContent(selectedTaskEditorContent);
+        setEditorSaveStatus('idle');
+      } else {
+        setEditorSaveStatus('conflict');
+      }
     }
-  }, [editorTaskId, selectedTask?.mutationVersion, selectedTaskEditorId]);
+  }, [
+    editorSaveStatus,
+    editorTaskId,
+    selectedTask?.mutationVersion,
+    selectedTaskEditorContent,
+    selectedTaskEditorDescription,
+    selectedTaskEditorId,
+    selectedTaskEditorTitle,
+  ]);
 
   useEffect(() => {
     if (selectedTaskEditorId === editorTaskId) return;
@@ -1756,6 +1801,22 @@ export function TasksPageClient() {
     openReleaseSidebar,
     openTaskDocument,
     updateTask,
+    getExpectedMutationVersion: useCallback(
+      (taskId: string) =>
+        taskId === editorTaskId
+          ? (editorExpectedMutationVersionRef.current ?? undefined)
+          : undefined,
+      [editorTaskId]
+    ),
+    onMutationAcknowledged: useCallback(
+      (taskId: string, task: TaskView) => {
+        if (taskId === editorTaskId) {
+          editorExpectedMutationVersionRef.current =
+            task.mutationVersion ?? null;
+        }
+      },
+      [editorTaskId]
+    ),
   });
   const handleMoveTask = useCallback(
     (input: MoveTaskInput) => {
@@ -2447,6 +2508,15 @@ export function TasksPageClient() {
                       setEditorSaveStatus('dirty');
                     }}
                     onRetrySave={() => setEditorSaveStatus('dirty')}
+                    onResolveConflict={() => {
+                      setEditorTitle(selectedTaskEditorTitle);
+                      setEditorDescription(selectedTaskEditorDescription);
+                      setEditorDescriptionContent(selectedTaskEditorContent);
+                      editorExpectedMutationVersionRef.current =
+                        selectedTask.mutationVersion ?? null;
+                      editorRevisionRef.current += 1;
+                      setEditorSaveStatus('idle');
+                    }}
                     onClose={closeTaskDocument}
                     onOpenRelease={openReleaseSidebar}
                     onUpdateStatus={(taskId, status) =>
@@ -2473,6 +2543,7 @@ export function TasksPageClient() {
                     onTitleChange={NOOP}
                     onDescriptionChange={NOOP}
                     onRetrySave={NOOP}
+                    onResolveConflict={NOOP}
                     onClose={NOOP}
                     onOpenRelease={NOOP_TASK_OPEN}
                     onUpdateStatus={NOOP_TASK_STATUS_UPDATE}

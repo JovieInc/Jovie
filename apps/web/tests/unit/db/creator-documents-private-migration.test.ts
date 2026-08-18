@@ -40,6 +40,9 @@ describe('creator documents private migration', () => {
     expect(sql).toContain('DEFERRABLE INITIALLY DEFERRED');
     expect(sql).toContain('creator_documents_profile_created_idx');
     expect(sql).toContain(
+      'creator_revision_claims_revision_idempotency_unique'
+    );
+    expect(sql).toContain(
       'ALTER TABLE "tasks" ADD COLUMN "mutation_version" integer DEFAULT 1 NOT NULL'
     );
   });

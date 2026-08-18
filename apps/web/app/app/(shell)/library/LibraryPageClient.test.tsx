@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { replace, search } = vi.hoisted(() => ({
+const { discardDrafts, replace, search } = vi.hoisted(() => ({
+  discardDrafts: vi.fn(),
   replace: vi.fn(),
   search: { value: '' },
 }));
@@ -17,16 +18,21 @@ vi.mock('../dashboard/releases/ReleaseCatalogPageClient', () => ({
 vi.mock('./CreatorDocumentsWorkspace', () => ({
   CreatorDocumentsWorkspace: ({
     onUnsavedDraftChange,
+    onDiscardDraftsReady,
   }: {
     onUnsavedDraftChange: (hasDraft: boolean) => void;
-  }) => (
-    <div>
-      Documents panel
-      <button type='button' onClick={() => onUnsavedDraftChange(true)}>
-        Mark document dirty
-      </button>
-    </div>
-  ),
+    onDiscardDraftsReady: (discard: () => void) => void;
+  }) => {
+    onDiscardDraftsReady(discardDrafts);
+    return (
+      <div>
+        Documents panel
+        <button type='button' onClick={() => onUnsavedDraftChange(true)}>
+          Mark document dirty
+        </button>
+      </div>
+    );
+  },
 }));
 
 import { LibraryPageClient } from './LibraryPageClient';
@@ -94,5 +100,22 @@ describe('LibraryPageClient sections', () => {
 
     expect(confirm).toHaveBeenCalledOnce();
     expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('purges persisted drafts after confirmed destructive navigation', () => {
+    search.value = 'section=documents';
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => true)
+    );
+    render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Mark document dirty' })
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Assets' }));
+
+    expect(discardDrafts).toHaveBeenCalledOnce();
+    expect(replace).toHaveBeenCalledWith('/app/library', { scroll: false });
   });
 });

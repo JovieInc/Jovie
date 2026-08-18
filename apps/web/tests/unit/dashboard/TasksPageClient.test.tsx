@@ -1333,7 +1333,7 @@ describe('TasksPageClient', () => {
     );
   });
 
-  it('does not reset unsaved title text when task metadata refreshes', () => {
+  it('turns a remote task version into a conflict without overwriting the draft', () => {
     const view = renderPage();
     openTask();
 
@@ -1345,6 +1345,7 @@ describe('TasksPageClient', () => {
     mockTasksData = [
       {
         ...mockTaskTwo,
+        title: 'Remote task title',
         priority: 'urgent',
         assigneeKind: 'human',
         mutationVersion: 8,
@@ -1365,18 +1366,45 @@ describe('TasksPageClient', () => {
       'Unsaved metadata-safe title'
     );
 
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
+    expect(
+      screen.getByText('Conflict · reload task changes')
+    ).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(500));
+    expect(mockUpdateTaskAsync).not.toHaveBeenCalled();
 
+    fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
+    expect(screen.getByLabelText('Task Title')).toHaveValue(
+      'Remote task title'
+    );
+  });
+
+  it('advances the editor version only after its own metadata update succeeds', () => {
+    renderPage();
+    openTask();
+
+    const urgentChoice = within(screen.getByTestId('task-document-pane'))
+      .getAllByText('Urgent')
+      .map(node => node.closest('button'))
+      .find((button): button is HTMLButtonElement => Boolean(button));
+    if (!urgentChoice) throw new Error('Expected an urgent priority choice');
+    fireEvent.click(urgentChoice);
+
+    const [input, options] = mockUpdateTask.mock.calls.at(-1) ?? [];
+    expect(input).toEqual({
+      taskId: 'task-2',
+      data: { priority: 'urgent', expectedMutationVersion: 7 },
+    });
+    act(() =>
+      options?.onSuccess?.({ ...mockTaskTwo, mutationVersion: 8 } as TaskView)
+    );
+
+    fireEvent.change(screen.getByLabelText('Task Title'), {
+      target: { value: 'Draft after local metadata update' },
+    });
+    act(() => vi.advanceTimersByTime(500));
     expect(mockUpdateTaskAsync).toHaveBeenCalledWith({
       taskId: 'task-2',
-      data: expect.objectContaining({
-        title: 'Unsaved metadata-safe title',
-        description: mockTaskTwo.description,
-        descriptionContent: expect.objectContaining({ type: 'doc' }),
-        expectedMutationVersion: 8,
-      }),
+      data: expect.objectContaining({ expectedMutationVersion: 8 }),
     });
   });
 

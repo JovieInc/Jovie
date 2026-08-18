@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { type KeyboardEvent, useState } from 'react';
+import { type KeyboardEvent, useRef, useState } from 'react';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
@@ -42,6 +42,7 @@ export function LibraryPageClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [hasUnsavedDocumentDraft, setHasUnsavedDocumentDraft] = useState(false);
+  const discardDocumentDraftsRef = useRef<(() => void) | null>(null);
   const mode =
     searchParams.get('section') === 'documents' ? 'documents' : 'assets';
   const setMode = (nextMode: 'assets' | 'documents') => {
@@ -51,6 +52,9 @@ export function LibraryPageClient({
       !globalThis.confirm('Discard your unsaved document changes?')
     ) {
       return;
+    }
+    if (nextMode !== mode && hasUnsavedDocumentDraft) {
+      discardDocumentDraftsRef.current?.();
     }
     const next = new URLSearchParams(searchParams.toString());
     if (nextMode === 'assets') next.delete('section');
@@ -129,11 +133,15 @@ export function LibraryPageClient({
           className='flex min-h-0 flex-1'
         >
           <CreatorDocumentsWorkspace
+            key={creatorProfileId}
             creatorProfileId={creatorProfileId}
             initialDocuments={creatorDocuments}
             initialNextCursor={creatorDocumentsNextCursor}
             initialLoadFailed={creatorDocumentsLoadFailed}
             onUnsavedDraftChange={setHasUnsavedDocumentDraft}
+            onDiscardDraftsReady={discard => {
+              discardDocumentDraftsRef.current = discard;
+            }}
           />
         </div>
       ) : (

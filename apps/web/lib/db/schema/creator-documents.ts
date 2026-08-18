@@ -121,6 +121,7 @@ export const creatorRevisionClaims = pgTable(
     revisionId: uuid('revision_id')
       .notNull()
       .references(() => creatorDocumentRevisions.id, { onDelete: 'cascade' }),
+    idempotencyKey: text('idempotency_key').notNull(),
     claimText: text('claim_text').notNull(),
     kind: creatorClaimKindEnum('kind').notNull(),
     evidenceState: creatorClaimEvidenceStateEnum('evidence_state')
@@ -138,6 +139,9 @@ export const creatorRevisionClaims = pgTable(
     revisionIdx: index('creator_revision_claims_revision_idx').on(
       table.revisionId
     ),
+    revisionIdempotencyUnique: uniqueIndex(
+      'creator_revision_claims_revision_idempotency_unique'
+    ).on(table.revisionId, table.idempotencyKey),
     supportedClaimsHaveEvidence: check(
       'creator_revision_claims_supported_have_evidence',
       drizzleSql`${table.evidenceState} <> 'supported' OR ${table.sourceRecordId} IS NOT NULL`

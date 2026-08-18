@@ -271,6 +271,22 @@ export async function approveCreatorRevisionForCapture(input: {
       where ${creatorDocuments.id} = ${input.documentId}
         and ${creatorDocuments.creatorProfileId} = ${input.creatorProfileId}
       for update
+    ), completed_retry as (
+      select locked_document.document_id
+      from locked_document
+      join ${creatorDocumentRevisions}
+        on ${creatorDocumentRevisions.documentId} = locked_document.document_id
+        and ${creatorDocumentRevisions.revision} = locked_document.current_revision
+      join creator_revision_approvals approval
+        on approval.document_id = locked_document.document_id
+        and approval.revision_id = ${creatorDocumentRevisions.id}
+        and approval.revoked_at is null
+      join creator_capture_handoffs handoff
+        on handoff.document_id = locked_document.document_id
+        and handoff.revision_id = ${creatorDocumentRevisions.id}
+        and handoff.approval_id = approval.id
+      where locked_document.current_revision = ${input.revision}
+        and locked_document.stage = 'capture_ready'
     ), eligible as (
       select
         locked_document.document_id,
@@ -311,12 +327,17 @@ export async function approveCreatorRevisionForCapture(input: {
       select ${input.creatorProfileId}, document_id, revision_id, id
       from approved
       on conflict (approval_id) do nothing
+    ), updated as (
+      update ${creatorDocuments}
+      set "stage" = 'capture_ready', "updated_at" = now()
+      from eligible
+      where ${creatorDocuments.id} = eligible.document_id
+      returning ${creatorDocuments.id} as id
     )
-    update ${creatorDocuments}
-    set "stage" = 'capture_ready', "updated_at" = now()
-    from eligible
-    where ${creatorDocuments.id} = eligible.document_id
-    returning ${creatorDocuments.id} as id
+    select id from updated
+    union all
+    select document_id as id from completed_retry
+    limit 1
   `);
   if (!result.rows[0]?.id) {
     throw new CreatorDocumentConflictError('approval_ineligible');
@@ -348,6 +369,7 @@ export async function addCreatorRevisionClaim(input: {
   readonly userId: string;
   readonly documentId: string;
   readonly revision: number;
+  readonly idempotencyKey: string;
   readonly claimText: string;
   readonly kind: 'fact' | 'inference' | 'opinion' | 'anecdote';
   readonly evidenceState: 'supported' | 'contested' | 'unresolved';
@@ -385,6 +407,7 @@ export async function addCreatorRevisionClaim(input: {
     ), inserted as (
       insert into creator_revision_claims (
       revision_id,
+      idempotency_key,
       claim_text,
       kind,
       evidence_state,
@@ -392,6 +415,7 @@ export async function addCreatorRevisionClaim(input: {
     )
       select
       locked_context.revision_id,
+      ${input.idempotencyKey},
       ${input.claimText},
       ${input.kind},
       ${input.evidenceState},
@@ -401,6 +425,8 @@ export async function addCreatorRevisionClaim(input: {
         and locked_context.stage = 'private_draft'
         and locked_context.revision_id is not null
         and source_access.accessible
+      on conflict (revision_id, idempotency_key)
+      do update set idempotency_key = excluded.idempotency_key
       returning id
     )
     select

@@ -669,6 +669,40 @@ describe('CreatorDocumentsWorkspace', () => {
     );
   });
 
+  it('retries a lost claim response with the same ledger key', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 500 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ claimId: 'claim-1' }), { status: 201 })
+      );
+    render(
+      <CreatorDocumentsWorkspace
+        initialDocuments={[{ ...document, kind: 'script' }]}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /A durable idea/ }));
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    if (!panel) throw new Error('Expected a document panel');
+    render(panel);
+    fireEvent.change(screen.getByLabelText('Claim Text'), {
+      target: { value: 'Retry-safe evidence' },
+    });
+    fireEvent.change(screen.getByLabelText('Memory Source Record ID'), {
+      target: { value: '44444444-4444-4444-8444-444444444444' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add Claim' }));
+    await screen.findByText('Action failed. Retry safely.');
+    fireEvent.click(screen.getByRole('button', { name: 'Add Claim' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    const first = JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body));
+    const second = JSON.parse(
+      String(vi.mocked(fetch).mock.calls[1]?.[1]?.body)
+    );
+    expect(first.idempotencyKey).toBeTruthy();
+    expect(second.idempotencyKey).toBe(first.idempotencyKey);
+  });
+
   it('does not clear newer evidence entered during claim submission', async () => {
     let finishClaim: ((response: Response) => void) | undefined;
     vi.mocked(fetch).mockReturnValueOnce(

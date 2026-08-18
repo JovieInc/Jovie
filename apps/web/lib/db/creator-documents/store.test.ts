@@ -178,6 +178,8 @@ describe('creator document persistence boundaries', () => {
     expect(approval).toContain('on conflict (document_id, revision_id)');
     expect(approval).toContain('do nothing');
     expect(approval).not.toContain('approved_by_user_id = excluded');
+    expect(approval).toContain('completed_retry');
+    expect(approval).toContain("locked_document.stage = 'capture_ready'");
   });
 
   it('fails closed when factual evidence review is incomplete', async () => {
@@ -224,6 +226,7 @@ describe('creator document persistence boundaries', () => {
         userId: '33333333-3333-4333-8333-333333333333',
         documentId: '11111111-1111-4111-8111-111111111111',
         revision: 3,
+        idempotencyKey: '55555555-5555-4555-8555-555555555555',
         claimText: 'A frozen claim',
         kind: 'fact',
         evidenceState: 'supported',
@@ -250,6 +253,7 @@ describe('creator document persistence boundaries', () => {
         userId: '33333333-3333-4333-8333-333333333333',
         documentId: '11111111-1111-4111-8111-111111111111',
         revision: 3,
+        idempotencyKey: '55555555-5555-4555-8555-555555555555',
         claimText: 'A sourced claim',
         kind: 'fact',
         evidenceState: 'supported',

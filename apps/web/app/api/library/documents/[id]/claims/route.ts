@@ -15,6 +15,7 @@ import { NO_STORE_HEADERS } from '@/lib/http/headers';
 const claimSchema = z
   .object({
     revision: z.number().int().positive(),
+    idempotencyKey: z.string().uuid(),
     claimText: z.string().trim().min(1).max(2_000),
     kind: z.enum(['fact', 'inference', 'opinion', 'anecdote']),
     evidenceState: z.enum(['supported', 'contested', 'unresolved']),

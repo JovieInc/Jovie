@@ -64,6 +64,7 @@ function DocumentEditor({
   const [sourceRecordId, setSourceRecordId] = useState('');
   const editVersionRef = useRef(0);
   const claimVersionRef = useRef(0);
+  const claimIdempotencyKeyRef = useRef<string | null>(null);
   const baseRevisionRef = useRef(document.currentRevision);
   const draftRestoredRef = useRef(false);
   const router = useRouter();
@@ -114,6 +115,9 @@ function DocumentEditor({
         }
         if (typeof draft.sourceRecordId === 'string') {
           setSourceRecordId(draft.sourceRecordId);
+        }
+        if (typeof draft.claimIdempotencyKey === 'string') {
+          claimIdempotencyKeyRef.current = draft.claimIdempotencyKey;
         }
       }
     } catch {
@@ -214,11 +218,33 @@ function DocumentEditor({
   const addClaim = useCallback(async () => {
     if (status === 'saving') return;
     const claimVersionAtSave = claimVersionRef.current;
+    claimIdempotencyKeyRef.current ??= globalThis.crypto.randomUUID();
     setStatus('saving');
+    const draftKey = `${DOCUMENT_DRAFT_KEY_PREFIX}${document.id}`;
+    try {
+      globalThis.sessionStorage.setItem(
+        draftKey,
+        JSON.stringify({
+          title,
+          kind,
+          baseRevision: baseRevisionRef.current,
+          content: editorContent,
+          plainText: editorPlainText,
+          claimText,
+          claimKind,
+          evidenceState,
+          sourceRecordId,
+          claimIdempotencyKey: claimIdempotencyKeyRef.current,
+        })
+      );
+    } catch {
+      // The request remains idempotent for this mounted session.
+    }
     const response = await post(
       `/api/library/documents/${document.id}/claims`,
       {
         revision: document.currentRevision,
+        idempotencyKey: claimIdempotencyKeyRef.current,
         claimText,
         kind: claimKind,
         evidenceState,
@@ -232,6 +258,7 @@ function DocumentEditor({
       setClaimKind('fact');
       setEvidenceState('supported');
       setSourceRecordId('');
+      claimIdempotencyKeyRef.current = null;
       setStatus('claim-saved');
     } else {
       setStatus('idle');
@@ -240,10 +267,14 @@ function DocumentEditor({
     claimKind,
     claimText,
     document,
+    editorContent,
+    editorPlainText,
     evidenceState,
+    kind,
     post,
     sourceRecordId,
     status,
+    title,
   ]);
 
   const completeEvidenceReview = useCallback(async () => {
@@ -306,6 +337,7 @@ function DocumentEditor({
           claimKind,
           evidenceState,
           sourceRecordId,
+          claimIdempotencyKey: claimIdempotencyKeyRef.current,
         })
       );
     } catch {
@@ -491,6 +523,7 @@ function DocumentEditor({
               value={claimText}
               onChange={event => {
                 claimVersionRef.current += 1;
+                claimIdempotencyKeyRef.current = null;
                 setClaimText(event.target.value);
               }}
               placeholder='One factual statement from this exact script revision'
@@ -502,6 +535,7 @@ function DocumentEditor({
                 value={claimKind}
                 onChange={event => {
                   claimVersionRef.current += 1;
+                  claimIdempotencyKeyRef.current = null;
                   const nextKind = event.target.value as typeof claimKind;
                   setClaimKind(nextKind);
                   if (nextKind === 'fact') setEvidenceState('supported');
@@ -518,6 +552,7 @@ function DocumentEditor({
                 value={evidenceState}
                 onChange={event => {
                   claimVersionRef.current += 1;
+                  claimIdempotencyKeyRef.current = null;
                   setEvidenceState(event.target.value as typeof evidenceState);
                 }}
                 className='rounded-md border border-subtle bg-surface-1 px-2 py-1 text-sm focus-visible:outline-2 focus-visible:outline-offset-2'
@@ -536,6 +571,7 @@ function DocumentEditor({
               value={sourceRecordId}
               onChange={event => {
                 claimVersionRef.current += 1;
+                claimIdempotencyKeyRef.current = null;
                 setSourceRecordId(event.target.value);
               }}
               placeholder='Private memory source record ID'
@@ -578,12 +614,14 @@ export function CreatorDocumentsWorkspace({
   initialNextCursor = null,
   initialLoadFailed = false,
   onUnsavedDraftChange,
+  onDiscardDraftsReady,
 }: Readonly<{
   creatorProfileId: string;
   initialDocuments: readonly CreatorDocumentListItem[];
   initialNextCursor?: string | null;
   initialLoadFailed?: boolean;
   onUnsavedDraftChange?: (hasDraft: boolean) => void;
+  onDiscardDraftsReady?: (discard: (() => void) | null) => void;
 }>) {
   const [documents, setDocuments] = useState([...initialDocuments]);
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
@@ -688,6 +726,11 @@ export function CreatorDocumentsWorkspace({
     ideaIdempotencyKey.current = null;
     setHasDocumentDraft(false);
   }, [ideaDraftKey, selectedId]);
+
+  useEffect(() => {
+    onDiscardDraftsReady?.(discardPersistedDrafts);
+    return () => onDiscardDraftsReady?.(null);
+  }, [discardPersistedDrafts, onDiscardDraftsReady]);
 
   const selectDocument = useCallback(
     (documentId: string | null) => {

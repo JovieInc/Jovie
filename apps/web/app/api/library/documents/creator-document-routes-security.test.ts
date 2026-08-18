@@ -229,6 +229,7 @@ describe('creator document route authorization', () => {
         method: 'POST',
         body: JSON.stringify({
           revision: 1,
+          idempotencyKey: '55555555-5555-4555-8555-555555555555',
           claimText: 'A supported opinion',
           kind: 'opinion',
           evidenceState: 'supported',
@@ -251,6 +252,7 @@ describe('creator document route authorization', () => {
         method: 'POST',
         body: JSON.stringify({
           revision: 1,
+          idempotencyKey: '55555555-5555-4555-8555-555555555555',
           claimText: 'A supported fact',
           kind: 'fact',
           evidenceState: 'supported',
