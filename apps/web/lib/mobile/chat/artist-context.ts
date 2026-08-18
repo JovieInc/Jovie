@@ -1,10 +1,10 @@
 import 'server-only';
 
 import { and, count, sql as drizzleSql, eq } from 'drizzle-orm';
+import { getExactProfileAccess } from '@/lib/auth/profile-access';
 import type { ArtistContext } from '@/lib/chat/types';
 import { db } from '@/lib/db';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
-import { users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlAny } from '@/lib/db/sql-helpers';
@@ -12,8 +12,17 @@ import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 
 export async function fetchMobileArtistContext(input: {
   readonly profileId: string;
-  readonly clerkUserId: string;
+  readonly appUserId: string;
 }): Promise<ArtistContext | null> {
+  const access = await getExactProfileAccess(
+    db,
+    input.appUserId,
+    input.profileId
+  );
+  if (!access.ok) {
+    return null;
+  }
+
   const [result] = await db
     .select({
       displayName: creatorProfiles.displayName,
@@ -25,14 +34,12 @@ export async function fetchMobileArtistContext(input: {
       spotifyUrl: creatorProfiles.spotifyUrl,
       appleMusicUrl: creatorProfiles.appleMusicUrl,
       profileViews: creatorProfiles.profileViews,
-      userClerkId: users.clerkId,
     })
     .from(creatorProfiles)
-    .leftJoin(users, eq(users.id, creatorProfiles.userId))
     .where(eq(creatorProfiles.id, input.profileId))
     .limit(1);
 
-  if (result?.userClerkId !== input.clerkUserId) {
+  if (!result) {
     return null;
   }
 
