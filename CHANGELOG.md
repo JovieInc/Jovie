@@ -32,6 +32,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Fixed
 
 - **Public profiles keep names, places, and last songs readable:** Contact drawers show the person before the company, compact heroes keep the full city, Music’s last row clears the tab bar, and AEO mention links use the profile text token instead of browser purple.
+- **Chat messages stop jumping in:** New messages fade instead of sliding. The jump-to-latest control fades, and Reduce Motion turns both off.
 
 ## [26.8.1] - 2026-08-16
 
