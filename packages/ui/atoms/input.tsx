@@ -7,23 +7,23 @@ import { cn } from '../lib/utils';
 
 const inputVariants = cva(
   [
-    'flex w-full rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3',
-    'text-[13px] font-[400] tracking-normal text-(--linear-text-primary)',
+    'flex w-full rounded-full border border-subtle bg-surface-1 px-3',
+    'text-[13px] font-[400] tracking-normal text-primary-token',
     'file:border-0 file:bg-transparent file:text-sm file:font-medium',
-    'placeholder:text-(--linear-text-tertiary)',
-    'hover:border-(--linear-border-default)',
-    'focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/24',
-    'disabled:cursor-not-allowed disabled:opacity-50',
-    'transition-colors duration-normal',
+    'placeholder:text-tertiary-token',
+    'hover:border-default',
+    'focus-visible:outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25',
+    'disabled:cursor-not-allowed disabled:opacity-[var(--state-disabled-opacity)]',
+    'transition-[background-color,border-color,box-shadow,color,opacity] duration-subtle ease-subtle motion-reduce:transition-none',
   ],
   {
     variants: {
       variant: {
         default: '',
         error:
-          'border-(--linear-error) hover:border-(--linear-error) focus-visible:border-(--linear-error)',
+          'border-error hover:border-error focus-visible:border-error focus-visible:ring-error/25',
         success:
-          'border-success hover:border-success focus-visible:border-success',
+          'border-success hover:border-success focus-visible:border-success focus-visible:ring-success/25',
       },
       inputSize: {
         sm: 'h-7 px-2 py-1 text-xs',
@@ -133,10 +133,14 @@ function getValidationState({
   loading?: boolean;
 }) {
   const isInvalid =
-    validationState === 'invalid' || Boolean(error) || ariaInvalid === 'true';
+    validationState === 'invalid' ||
+    Boolean(error) ||
+    ariaInvalid === true ||
+    ariaInvalid === 'true' ||
+    ariaInvalid === 'grammar' ||
+    ariaInvalid === 'spelling';
   return {
     isInvalid,
-    isValid: validationState === 'valid',
     isPending: validationState === 'pending' || loading,
   };
 }
@@ -190,6 +194,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       helpText,
       validationState,
       'aria-invalid': ariaInvalid,
+      'aria-busy': ariaBusy,
       'aria-describedby': ariaDescribedBy,
       ...props
     },
@@ -205,11 +210,14 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       ariaInvalid,
       loading,
     });
-    const effectiveVariant = getVariantFromValidation(
-      variant,
-      validationState,
-      error
-    );
+    const effectiveVariant = isInvalid
+      ? 'error'
+      : getVariantFromValidation(variant, validationState, error);
+    const effectiveAriaInvalid =
+      ariaInvalid === 'grammar' || ariaInvalid === 'spelling'
+        ? ariaInvalid
+        : isInvalid || undefined;
+    const effectiveAriaBusy = isPending ? true : ariaBusy;
     const describedBy = getDescribedByIds({
       ariaDescribedBy,
       helpText,
@@ -233,8 +241,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           )}
           ref={ref}
           disabled={disabled || loading}
-          aria-invalid={isInvalid || undefined}
-          aria-busy={isPending || undefined}
+          aria-invalid={effectiveAriaInvalid}
+          aria-busy={effectiveAriaBusy}
           aria-describedby={describedBy}
           {...props}
         />
@@ -298,16 +306,13 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
 
           {inputElement}
 
-          {error && (
-            <p
-              id={errorId}
-              className='text-sm text-destructive'
-              role='alert'
-              aria-live='polite'
-            >
-              {error}
-            </p>
-          )}
+          <div className='min-h-5' aria-live='polite'>
+            {error && (
+              <p id={errorId} className='text-sm text-destructive' role='alert'>
+                {error}
+              </p>
+            )}
+          </div>
         </div>
       );
     }

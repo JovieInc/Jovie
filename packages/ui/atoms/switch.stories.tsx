@@ -21,14 +21,40 @@ export const Default: Story = {
 };
 
 export const Checked: Story = {
-  render: () => <Switch id='sw-on' defaultChecked />,
+  render: () => (
+    <div className='flex items-center gap-2'>
+      <Switch id='sw-on' defaultChecked />
+      <Label htmlFor='sw-on'>Notifications enabled</Label>
+    </div>
+  ),
 };
 
 export const Disabled: Story = {
   render: () => (
-    <div className='flex gap-3'>
-      <Switch id='sw-off-dis' disabled />
-      <Switch id='sw-on-dis' disabled defaultChecked />
+    <div className='grid gap-4'>
+      <div className='flex items-center gap-2'>
+        <Switch id='sw-off-dis' disabled />
+        <Label htmlFor='sw-off-dis'>Disabled</Label>
+      </div>
+      <div className='flex items-center gap-2'>
+        <Switch id='sw-on-dis' disabled defaultChecked />
+        <Label htmlFor='sw-on-dis'>Disabled and enabled</Label>
+      </div>
+    </div>
+  ),
+};
+
+export const StateMatrix: Story = {
+  render: () => (
+    <div className='grid gap-4'>
+      <div className='flex items-center gap-2'>
+        <Switch id='sw-matrix-off' />
+        <Label htmlFor='sw-matrix-off'>Off</Label>
+      </div>
+      <div className='flex items-center gap-2'>
+        <Switch id='sw-matrix-on' defaultChecked />
+        <Label htmlFor='sw-matrix-on'>On</Label>
+      </div>
     </div>
   ),
 };

@@ -37,12 +37,13 @@ const Checkbox = React.forwardRef<
       ref={ref}
       checked={effectiveChecked}
       className={cn(
-        'peer h-4 w-4 shrink-0 rounded-(--linear-app-radius-item) border border-(--linear-border-strong) bg-transparent cursor-pointer transition-colors duration-fast ease-interactive',
-        'hover:border-(--color-accent) hover:bg-(--linear-bg-surface-1)',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
-        'disabled:cursor-not-allowed disabled:opacity-50',
-        'data-[state=checked]:bg-(--linear-btn-primary-bg) data-[state=checked]:border-(--linear-btn-primary-bg) data-[state=checked]:text-(--linear-btn-primary-fg) data-[state=checked]:hover:bg-(--linear-btn-primary-bg) data-[state=checked]:hover:border-(--linear-btn-primary-bg)',
-        'data-[state=indeterminate]:bg-(--linear-btn-primary-bg) data-[state=indeterminate]:border-(--linear-btn-primary-bg) data-[state=indeterminate]:text-(--linear-btn-primary-fg) data-[state=indeterminate]:hover:bg-(--linear-btn-primary-bg) data-[state=indeterminate]:hover:border-(--linear-btn-primary-bg)',
+        'peer relative h-4 w-4 shrink-0 cursor-pointer rounded-(--linear-app-radius-item) border border-strong bg-transparent transition-colors duration-subtle ease-subtle motion-reduce:transition-none',
+        'before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
+        'hover:border-default hover:bg-surface-1',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/55 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page',
+        'disabled:cursor-not-allowed disabled:opacity-[var(--state-disabled-opacity)]',
+        'data-[state=checked]:border-btn-primary data-[state=checked]:bg-btn-primary data-[state=checked]:text-btn-primary-foreground data-[state=checked]:hover:border-btn-primary data-[state=checked]:hover:bg-btn-primary',
+        'data-[state=indeterminate]:border-btn-primary data-[state=indeterminate]:bg-btn-primary data-[state=indeterminate]:text-btn-primary-foreground data-[state=indeterminate]:hover:border-btn-primary data-[state=indeterminate]:hover:bg-btn-primary',
         className
       )}
       {...props}

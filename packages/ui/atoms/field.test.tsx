@@ -135,7 +135,7 @@ describe('Field', () => {
       );
       const input = screen.getByTestId('input');
       // The Field component should inject variant="error"
-      expect(input.className).toContain('border-(--linear-error)');
+      expect(input.className).toContain('border-error');
     });
   });
 
