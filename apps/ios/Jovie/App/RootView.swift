@@ -441,47 +441,54 @@ private struct WaitlistPendingView: View {
     ZStack {
       JovieColor.backgroundBase.ignoresSafeArea()
 
-      ScrollView {
-        VStack(alignment: .leading, spacing: JovieSpacing.large) {
-          VStack(alignment: .leading, spacing: JovieSpacing.small) {
-            Text("You're on the Waitlist")
-              .font(.title.bold())
-              .foregroundStyle(JovieColor.textPrimary)
-              .accessibilityAddTraits(.isHeader)
+      GeometryReader { proxy in
+        ScrollView {
+          VStack(alignment: .leading, spacing: JovieSpacing.large) {
+            VStack(alignment: .leading, spacing: JovieSpacing.small) {
+              Text("You're on the Waitlist")
+                .font(.title.bold())
+                .foregroundStyle(JovieColor.textPrimary)
+                .accessibilityAddTraits(.isHeader)
 
-            Text("This account doesn't have access yet. You can use a different account instead.")
-              .font(.body)
-              .foregroundStyle(JovieColor.textSecondary)
-          }
-
-          Button {
-            guard !isSwitchingAccount else { return }
-            isSwitchingAccount = true
-            Task { await onUseDifferentAccount() }
-          } label: {
-            ZStack {
-              Text(WaitlistPendingLayout.actionTitle(isSwitchingAccount: false))
-                .opacity(isSwitchingAccount ? 0 : 1)
-                .accessibilityHidden(isSwitchingAccount)
-
-              HStack(spacing: JovieSpacing.small) {
-                ProgressView()
-                  .tint(JovieColor.backgroundBase)
-                Text(WaitlistPendingLayout.actionTitle(isSwitchingAccount: true))
-              }
-              .opacity(isSwitchingAccount ? 1 : 0)
-              .accessibilityHidden(!isSwitchingAccount)
+              Text("This account doesn't have access yet. You can use a different account instead.")
+                .font(.body)
+                .foregroundStyle(JovieColor.textSecondary)
             }
-            .frame(maxWidth: .infinity)
-            .frame(minHeight: WaitlistPendingLayout.reservedActionMinHeight)
+
+            Button {
+              guard !isSwitchingAccount else { return }
+              isSwitchingAccount = true
+              Task { await onUseDifferentAccount() }
+            } label: {
+              ZStack {
+                Text(WaitlistPendingLayout.actionTitle(isSwitchingAccount: false))
+                  .opacity(isSwitchingAccount ? 0 : 1)
+                  .accessibilityHidden(isSwitchingAccount)
+
+                HStack(spacing: JovieSpacing.small) {
+                  ProgressView()
+                    .tint(JovieColor.backgroundBase)
+                  Text(WaitlistPendingLayout.actionTitle(isSwitchingAccount: true))
+                }
+                .opacity(isSwitchingAccount ? 1 : 0)
+                .accessibilityHidden(!isSwitchingAccount)
+              }
+              .frame(maxWidth: .infinity)
+              .frame(minHeight: WaitlistPendingLayout.reservedActionMinHeight)
+            }
+            .buttonStyle(JoviePillButtonStyle(filled: true))
+            .disabled(isSwitchingAccount)
+            .accessibilityIdentifier("waitlist-use-different-account")
           }
-          .buttonStyle(JoviePillButtonStyle(filled: true))
-          .disabled(isSwitchingAccount)
-          .accessibilityIdentifier("waitlist-use-different-account")
+          .frame(maxWidth: WaitlistPendingLayout.maxContentWidth, alignment: .leading)
+          .padding(JovieSpacing.xLarge)
+          .frame(
+            maxWidth: .infinity,
+            minHeight: WaitlistPendingLayout.contentMinHeight(viewportHeight: proxy.size.height),
+            alignment: .center
+          )
         }
-        .frame(maxWidth: WaitlistPendingLayout.maxContentWidth, alignment: .leading)
-        .padding(JovieSpacing.xLarge)
-        .frame(maxWidth: .infinity, alignment: .center)
+        .scrollBounceBehavior(.basedOnSize)
       }
     }
     .accessibilityIdentifier("waitlist-pending")
