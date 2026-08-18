@@ -2,7 +2,14 @@
 
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useMemo, useState } from 'react';
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { APP_ROUTES } from '@/constants/routes';
@@ -20,6 +27,7 @@ import { useAppFlag } from '@/lib/flags/client';
 import { useOpportunityInboxMutations } from '@/lib/queries/useOpportunityInboxMutations';
 import { useTourDateReviewMutations } from '@/lib/queries/useTourDateReviewMutations';
 import { cn } from '@/lib/utils';
+import { getRovingFocusIndex } from '@/lib/utils/keyboard';
 import { OpportunityInboxEmptyState } from './OpportunityInboxEmptyState';
 import { OpportunityInboxFeed } from './OpportunityInboxFeed';
 import { OpportunityInboxTourDateRow } from './OpportunityInboxTourDateRow';
@@ -93,12 +101,19 @@ export function OpportunityInboxPageClient({
   connectedDSPs = [],
   initialLinks = [],
 }: OpportunityInboxPageClientProps) {
+  const inboxPageRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const router = useRouter();
   const inboxHomeEnabled = useAppFlag('INBOX_HOME');
   const [cards, setCards] = useState(inbox.cards);
   const [signalTypeFilter, setSignalTypeFilter] =
     useState<SignalTypeFilter>('all');
+  const [signalFilterFocusIndex, setSignalFilterFocusIndex] = useState(0);
+  const signalFilterRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const stackKeyboardControlRef = useRef<HTMLButtonElement | null>(null);
+  const stackActionNeedsFocusRecoveryRef = useRef<string | null>(null);
+  const latestStackActionIdRef = useRef<string | null>(null);
+  const [stackFocusRecoveryVersion, setStackFocusRecoveryVersion] = useState(0);
   const initialTourDates =
     inbox.tourDates ?? EMPTY_OPPORTUNITY_INBOX_TOUR_DATES;
   const [pendingTourDates, setPendingTourDates] = useState(
@@ -169,6 +184,20 @@ export function OpportunityInboxPageClient({
     ? (undoRejectMutation.variables ?? null)
     : null;
 
+  const scheduleStackFocusRecovery = useCallback((id: string) => {
+    if (latestStackActionIdRef.current !== id) return;
+    stackActionNeedsFocusRecoveryRef.current = id;
+    setStackFocusRecoveryVersion(version => version + 1);
+  }, []);
+
+  const beginStackAction = useCallback(
+    (id: string) => {
+      latestStackActionIdRef.current = id;
+      scheduleStackFocusRecovery(id);
+    },
+    [scheduleStackFocusRecovery]
+  );
+
   const handleApprove = useCallback(
     (id: string) => {
       const card = cards.find(candidate => candidate.id === id);
@@ -179,10 +208,11 @@ export function OpportunityInboxPageClient({
           if (card) {
             setCards(current => [card, ...current]);
           }
+          scheduleStackFocusRecovery(id);
         },
       });
     },
-    [approveMutation, cards]
+    [approveMutation, cards, scheduleStackFocusRecovery]
   );
 
   const handleDismiss = useCallback(
@@ -194,10 +224,11 @@ export function OpportunityInboxPageClient({
           if (card) {
             setCards(current => [card, ...current]);
           }
+          scheduleStackFocusRecovery(id);
         },
       });
     },
-    [cards, dismissMutation]
+    [cards, dismissMutation, scheduleStackFocusRecovery]
   );
 
   /** Open chat with the card pinned (JOV-3932/3933). */
@@ -221,13 +252,32 @@ export function OpportunityInboxPageClient({
     });
   };
 
-  const handleNextStep = (id: string) => {
-    nextStepMutation.mutate(id, {
-      onSuccess: () => {
-        setCards(current => current.filter(card => card.id !== id));
-      },
-    });
-  };
+  const runNextStep = useCallback(
+    (id: string, onSuccess?: () => void) => {
+      nextStepMutation.mutate(id, {
+        onSuccess: () => {
+          onSuccess?.();
+          setCards(current => current.filter(card => card.id !== id));
+        },
+      });
+    },
+    [nextStepMutation]
+  );
+
+  const handleNextStep = useCallback(
+    (id: string) => runNextStep(id),
+    [runNextStep]
+  );
+
+  const handleStackNextStep = useCallback(
+    (id: string) => {
+      latestStackActionIdRef.current = id;
+      runNextStep(id, () => {
+        scheduleStackFocusRecovery(id);
+      });
+    },
+    [runNextStep, scheduleStackFocusRecovery]
+  );
 
   const handleConfirmTourDate = (id: string) => {
     const item = pendingTourDates.find(candidate => candidate.id === id);
@@ -278,10 +328,66 @@ export function OpportunityInboxPageClient({
     });
   };
 
+  const selectSignalTypeFilter = useCallback(
+    (filter: SignalTypeFilter, focusIndex: number) => {
+      setSignalTypeFilter(filter);
+      setSignalFilterFocusIndex(focusIndex);
+    },
+    []
+  );
+
+  const handleSignalFilterKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLButtonElement>, currentIndex: number) => {
+      if (
+        event.defaultPrevented ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.shiftKey
+      ) {
+        return;
+      }
+
+      const nextIndex = getRovingFocusIndex(
+        event.key,
+        currentIndex,
+        SIGNAL_TYPE_FILTERS.length
+      );
+      if (nextIndex === null) return;
+
+      event.preventDefault();
+      setSignalFilterFocusIndex(nextIndex);
+      signalFilterRefs.current[nextIndex]?.focus();
+    },
+    []
+  );
+
   const hasReviewableItems = cards.length > 0 || pendingTourDates.length > 0;
+
+  useEffect(() => {
+    if (stackActionNeedsFocusRecoveryRef.current === null) return;
+
+    const recoveryTarget =
+      stackKeyboardControlRef.current ??
+      signalFilterRefs.current[signalFilterFocusIndex] ??
+      inboxPageRef.current?.querySelector<HTMLElement>(
+        '[data-testid="opportunity-inbox-tour-date-review"] button, [data-testid="opportunity-inbox-empty-state"] a, [data-testid="opportunity-inbox-empty-state"] button'
+      );
+
+    recoveryTarget?.focus();
+    stackActionNeedsFocusRecoveryRef.current = null;
+  }, [
+    cards.length,
+    hasReviewableItems,
+    pendingTourDates.length,
+    signalFilterFocusIndex,
+    stackFocusRecoveryVersion,
+    visibleCards.length,
+  ]);
 
   return (
     <div
+      ref={inboxPageRef}
       className='system-b-opportunity-inbox-page'
       data-testid='opportunity-inbox-page'
     >
@@ -316,26 +422,31 @@ export function OpportunityInboxPageClient({
       {cards.length > 0 ? (
         <div
           className='mb-4 flex flex-wrap items-center gap-1.5'
-          role='tablist'
+          role='toolbar'
           aria-label='Filter Signals By Type'
           data-testid='opportunity-inbox-signal-filters'
         >
-          {SIGNAL_TYPE_FILTERS.map(filter => {
+          {SIGNAL_TYPE_FILTERS.map((filter, index) => {
             const isActive = signalTypeFilter === filter.value;
             return (
               <button
                 key={filter.value}
                 type='button'
-                role='tab'
-                aria-selected={isActive}
+                aria-pressed={isActive}
+                tabIndex={signalFilterFocusIndex === index ? 0 : -1}
                 data-testid={`opportunity-inbox-filter-${filter.value}`}
+                ref={node => {
+                  signalFilterRefs.current[index] = node;
+                }}
                 className={cn(
                   'rounded-full border px-3 py-1 text-xs transition-colors',
                   isActive
                     ? 'border-subtle bg-surface-1 text-primary-token'
                     : 'border-transparent text-secondary-token hover:bg-surface-1'
                 )}
-                onClick={() => setSignalTypeFilter(filter.value)}
+                onClick={() => selectSignalTypeFilter(filter.value, index)}
+                onFocus={() => setSignalFilterFocusIndex(index)}
+                onKeyDown={event => handleSignalFilterKeyDown(event, index)}
               >
                 {filter.label}
               </button>
@@ -357,6 +468,9 @@ export function OpportunityInboxPageClient({
             pendingFeedbackId={pendingFeedbackId}
             pendingNextStepId={pendingNextStepId}
             enableStackInteractions={inboxHomeEnabled}
+            stackKeyboardControlRef={stackKeyboardControlRef}
+            onStackActionInitiated={beginStackAction}
+            onStackNextStep={handleStackNextStep}
           />
         ) : (
           <p

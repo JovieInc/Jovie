@@ -1,6 +1,10 @@
 import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { handleActivationKeyDown, isFormElement } from './keyboard';
+import {
+  getRovingFocusIndex,
+  handleActivationKeyDown,
+  isFormElement,
+} from './keyboard';
 
 describe('handleActivationKeyDown', () => {
   const createEvent = (
@@ -157,5 +161,25 @@ describe('isFormElement', () => {
   it('returns false for non-HTMLElement EventTarget', () => {
     const target = new EventTarget();
     expect(isFormElement(target)).toBe(false);
+  });
+});
+
+describe('getRovingFocusIndex', () => {
+  it.each([
+    ['ArrowRight', 0, 3, 1],
+    ['ArrowDown', 2, 3, 0],
+    ['ArrowLeft', 0, 3, 2],
+    ['ArrowUp', 1, 3, 0],
+    ['Home', 2, 3, 0],
+    ['End', 0, 3, 2],
+  ])('moves %s from %i within %i items', (key, current, count, expected) => {
+    expect(getRovingFocusIndex(key, current, count)).toBe(expected);
+  });
+
+  it('leaves unrelated keys and invalid collections to the caller', () => {
+    expect(getRovingFocusIndex('Enter', 0, 3)).toBeNull();
+    expect(getRovingFocusIndex('ArrowRight', 0, 0)).toBeNull();
+    expect(getRovingFocusIndex('ArrowRight', -1, 3)).toBeNull();
+    expect(getRovingFocusIndex('ArrowRight', 3, 3)).toBeNull();
   });
 });

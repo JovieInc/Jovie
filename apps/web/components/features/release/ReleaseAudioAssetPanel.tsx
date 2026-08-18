@@ -11,6 +11,8 @@ import {
   useState,
 } from 'react';
 import { toast } from '@/components/feedback';
+import { useAuthSafe } from '@/hooks/useJovieAuth';
+import { buildAudioBlobPath } from '@/lib/audio/blob-path';
 import {
   AUDIO_FILE_ACCEPT,
   type AudioUploadRejection,
@@ -48,6 +50,7 @@ export function ReleaseAudioAssetPanel({
   disabledTabIndex,
   testIdPrefix = 'release',
 }: ReleaseAudioAssetPanelProps) {
+  const { userId } = useAuthSafe();
   const dropzoneTestId =
     testIdPrefix === 'library'
       ? 'library-audio-dropzone'
@@ -147,11 +150,15 @@ export function ReleaseAudioAssetPanel({
       setUploadRejection(null);
 
       try {
-        const blob = await upload(file.name, file, {
-          access: 'public',
-          handleUploadUrl: '/api/library/audio/upload-token',
-          contentType: uploadMime,
-        });
+        const blob = await upload(
+          buildAudioBlobPath('library', userId ?? 'unknown', file.name),
+          file,
+          {
+            access: 'public',
+            handleUploadUrl: '/api/library/audio/upload-token',
+            contentType: uploadMime,
+          }
+        );
 
         const response = await fetch('/api/library/audio/confirm', {
           method: 'POST',
@@ -190,7 +197,7 @@ export function ReleaseAudioAssetPanel({
         if (inputRef.current) inputRef.current.value = '';
       }
     },
-    [isEditable, onUploaded, releaseId]
+    [isEditable, onUploaded, releaseId, userId]
   );
 
   const handleInputChange = useCallback(

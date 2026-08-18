@@ -10,6 +10,10 @@ import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
+  AudioBlobVerificationError,
+  verifyAudioBlob,
+} from '@/lib/audio/blob-verifier';
+import {
   AUDIO_UPLOAD_POLICIES,
   resolveAudioUploadMime,
 } from '@/lib/audio/constants';
@@ -136,6 +140,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const verifiedBlob = await verifyAudioBlob({
+      blobUrl: parsed.data.blobUrl,
+      blobPathname,
+      userId: clerkUserId,
+      surface: 'promo_download',
+      fileName,
+      fileMimeType,
+      maxSizeBytes: AUDIO_UPLOAD_POLICIES.promo_download.maxFileSizeBytes,
+    });
+
     // Verify release belongs to this creator
     const [release] = await db
       .select({ id: discogReleases.id })
@@ -177,10 +191,10 @@ export async function POST(request: NextRequest) {
         releaseId,
         title,
         slug,
-        fileUrl: blobPathname,
+        fileUrl: verifiedBlob.pathname,
         fileName,
-        fileSizeBytes: fileSizeBytes ?? null,
-        fileMimeType: canonicalMimeType,
+        fileSizeBytes: verifiedBlob.sizeBytes,
+        fileMimeType: verifiedBlob.canonicalMimeType,
         position: nextPosition,
       })
       .returning();
@@ -190,6 +204,12 @@ export async function POST(request: NextRequest) {
       { status: 201, headers: NO_STORE_HEADERS }
     );
   } catch (err) {
+    if (err instanceof AudioBlobVerificationError) {
+      return NextResponse.json(
+        { error: err.message, code: err.code, rule: err.rule, cta: err.cta },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
     captureError('Promo download confirm error', err);
     return NextResponse.json(
       { error: 'Failed to confirm upload' },

@@ -2,7 +2,8 @@
 
 import { upload } from '@vercel/blob/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-
+import { useAuthSafe } from '@/hooks/useJovieAuth';
+import { buildAudioBlobPath } from '@/lib/audio/blob-path';
 import {
   AUDIO_FILE_ACCEPT,
   resolveAudioUploadMime,
@@ -63,6 +64,7 @@ export function useChatAudioAttachments({
   onUploaded,
   disabled = false,
 }: UseChatAudioAttachmentsOptions): UseChatAudioAttachmentsReturn {
+  const { userId } = useAuthSafe();
   const [pendingAudio, setPendingAudio] = useState<PendingAudio | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -125,11 +127,15 @@ export function useChatAudioAttachments({
       };
 
       try {
-        const blob = await upload(file.name, file, {
-          access: 'public',
-          handleUploadUrl: '/api/library/audio/upload-token',
-          contentType: uploadMime,
-        });
+        const blob = await upload(
+          buildAudioBlobPath('chat', userId ?? 'unknown', file.name),
+          file,
+          {
+            access: 'public',
+            handleUploadUrl: '/api/library/audio/upload-token',
+            contentType: uploadMime,
+          }
+        );
 
         updatePendingAudio({ status: 'processing' });
 
@@ -185,7 +191,7 @@ export function useChatAudioAttachments({
         setIsProcessing(false);
       }
     },
-    [onError, onUploaded]
+    [onError, onUploaded, userId]
   );
 
   const addFiles = useCallback(

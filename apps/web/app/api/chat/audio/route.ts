@@ -7,6 +7,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import {
+  AudioBlobVerificationError,
+  verifyAudioBlob,
+} from '@/lib/audio/blob-verifier';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { getSessionContext } from '@/lib/auth/session';
 import { routeChatAudioUpload } from '@/lib/chat/route-audio-upload';
@@ -50,10 +54,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const verifiedBlob = await verifyAudioBlob({
+      blobUrl: parsed.data.blobUrl,
+      blobPathname: parsed.data.blobPathname,
+      userId: clerkUserId,
+      surface: 'chat',
+      fileName: parsed.data.fileName,
+      fileMimeType: parsed.data.fileMimeType,
+      maxSizeBytes: 157_286_400,
+    });
+
     const result = await routeChatAudioUpload({
       clerkUserId,
       profileId: profile.id,
       ...parsed.data,
+      blobUrl: verifiedBlob.url,
+      blobPathname: verifiedBlob.pathname,
+      fileMimeType: verifiedBlob.canonicalMimeType,
+      fileSizeBytes: verifiedBlob.sizeBytes,
     });
 
     return NextResponse.json(result, {
@@ -61,6 +79,12 @@ export async function POST(request: NextRequest) {
       headers: NO_STORE_HEADERS,
     });
   } catch (err) {
+    if (err instanceof AudioBlobVerificationError) {
+      return NextResponse.json(
+        { error: err.message, code: err.code, rule: err.rule, cta: err.cta },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
     const message = err instanceof Error ? err.message : 'Audio upload failed';
     captureError('Chat audio upload error', err);
     return NextResponse.json(

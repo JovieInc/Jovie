@@ -2,11 +2,9 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, GitBranch, Loader2, Ship } from 'lucide-react';
-import Link from 'next/link';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { APP_ROUTES } from '@/constants/routes';
 import type { HudTone } from '@/lib/hud/tone-determination';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
 import { getAccentCssVars, HUD_TONE_ACCENT } from '@/lib/ui/accent-palette';
@@ -15,7 +13,6 @@ import type {
   HudGithubRateLimitsPayload,
   HudShipperState,
   HudShipperStatusPayload,
-  HudWhatShippedPayload,
 } from '@/types/hud-shipper';
 
 function formatTimestamp(value: string | null): string {
@@ -44,6 +41,9 @@ function shipperLabel(state: HudShipperState): string {
   if (state === 'idle') return 'Idle';
   return 'Not Running';
 }
+
+const GRAPHQL_LABEL = 'GraphQL';
+const NO_SIGNAL_LABEL = 'No Signal';
 
 function rateLimitSubtitle(bucket: HudGithubRateLimitsPayload['core']): string {
   if (!bucket) return 'No data';
@@ -179,54 +179,6 @@ function ShipperStatusPanel({
   );
 }
 
-function WhatShippedPanel({
-  payload,
-}: Readonly<{ readonly payload: HudWhatShippedPayload }>) {
-  return (
-    <ContentSurfaceCard
-      surface='details'
-      className='space-y-3 p-3'
-      data-testid='hud-what-shipped-panel'
-    >
-      <SectionLabel>What shipped</SectionLabel>
-      {payload.entries.length > 0 ? (
-        <div className='grid gap-2'>
-          {payload.entries.map(entry => (
-            <div
-              key={`${entry.title}-${entry.mergedAt}`}
-              className='rounded-md border border-subtle bg-surface-0 px-3 py-2'
-            >
-              <p className='text-app font-semibold text-primary-token'>
-                {entry.title}
-              </p>
-              <p className='mt-1 text-2xs text-tertiary-token'>
-                {formatTimestamp(entry.mergedAt)}
-                {entry.issueNumber ? ` · #${entry.issueNumber}` : ''}
-              </p>
-              {entry.url ? (
-                <Link
-                  href={entry.url}
-                  target='_blank'
-                  rel='noopener noreferrer'
-                  className='mt-1 inline-flex text-2xs text-secondary-token underline-offset-2 hover:underline'
-                >
-                  View PR
-                </Link>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className='text-app text-secondary-token'>
-          {payload.availability === 'available'
-            ? 'No recent shipments recorded.'
-            : 'Ship log unavailable on this host.'}
-        </p>
-      )}
-    </ContentSurfaceCard>
-  );
-}
-
 function GithubRateLimitsPanel({
   payload,
 }: Readonly<{ readonly payload: HudGithubRateLimitsPayload }>) {
@@ -252,7 +204,7 @@ function GithubRateLimitsPanel({
           valueClassName='text-2xl font-[620] leading-none tracking-[-0.03em]'
         />
         <ContentMetricCard
-          label='GraphQL'
+          label={GRAPHQL_LABEL}
           value={payload.graphql?.remaining.toLocaleString('en-US') ?? '—'}
           subtitle={rateLimitSubtitle(payload.graphql)}
           className='p-3'
@@ -286,7 +238,11 @@ function PanelSkeleton() {
   );
 }
 
-export function HudShipperPanels() {
+export function HudShipperNeedPanel({
+  source,
+}: Readonly<{
+  readonly source: 'admin-session' | 'kiosk-token';
+}>) {
   const shipperQuery = useQuery({
     queryKey: ['hud', 'shipper'],
     queryFn: ({ signal }) =>
@@ -294,15 +250,38 @@ export function HudShipperPanels() {
     ...FREQUENT_CACHE,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
+    enabled: source === 'admin-session',
   });
-  const whatShippedQuery = useQuery({
-    queryKey: ['hud', 'what-shipped'],
-    queryFn: ({ signal }) =>
-      fetchJson<HudWhatShippedPayload>('/api/admin/hud/what-shipped', signal),
-    ...FREQUENT_CACHE,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
-  });
+
+  if (source === 'kiosk-token') {
+    return (
+      <ContentSurfaceCard
+        surface='details'
+        className='space-y-3 p-3'
+        data-testid='hud-shipper-status-panel'
+      >
+        <div className='flex items-center justify-between gap-3'>
+          <div className='flex items-center gap-2'>
+            <Ship className='h-4 w-4 text-secondary-token' aria-hidden='true' />
+            <SectionLabel>Shipper</SectionLabel>
+          </div>
+          <HudStatusPill label={NO_SIGNAL_LABEL} tone='neutral' />
+        </div>
+        <p className='text-app text-secondary-token'>
+          Shipper status stays on the signed-in operator path.
+        </p>
+      </ContentSurfaceCard>
+    );
+  }
+
+  if (!shipperQuery.data) {
+    return <PanelSkeleton />;
+  }
+
+  return <ShipperStatusPanel payload={shipperQuery.data} />;
+}
+
+export function HudGithubBudgetPanel() {
   const rateLimitsQuery = useQuery({
     queryKey: ['hud', 'github-rate-limits'],
     queryFn: ({ signal }) =>
@@ -315,39 +294,9 @@ export function HudShipperPanels() {
     refetchOnWindowFocus: true,
   });
 
-  return (
-    <div className='flex flex-col gap-3' data-testid='hud-shipper-panels'>
-      <div className='flex flex-wrap items-center justify-between gap-2'>
-        <p className='text-app text-secondary-token'>
-          Codex shipper, in-flight ledger, and GitHub budget for operator
-          sessions.
-        </p>
-        <Link
-          href={APP_ROUTES.ADMIN_OPS}
-          className='text-xs text-secondary-token underline-offset-2 hover:underline'
-        >
-          Open full Ops surface
-        </Link>
-      </div>
+  if (!rateLimitsQuery.data) {
+    return <PanelSkeleton />;
+  }
 
-      <div className='grid gap-3 xl:grid-cols-2'>
-        {shipperQuery.data ? (
-          <ShipperStatusPanel payload={shipperQuery.data} />
-        ) : (
-          <PanelSkeleton />
-        )}
-        {whatShippedQuery.data ? (
-          <WhatShippedPanel payload={whatShippedQuery.data} />
-        ) : (
-          <PanelSkeleton />
-        )}
-      </div>
-
-      {rateLimitsQuery.data ? (
-        <GithubRateLimitsPanel payload={rateLimitsQuery.data} />
-      ) : (
-        <PanelSkeleton />
-      )}
-    </div>
-  );
+  return <GithubRateLimitsPanel payload={rateLimitsQuery.data} />;
 }
