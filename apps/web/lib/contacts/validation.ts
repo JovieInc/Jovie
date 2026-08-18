@@ -1,4 +1,8 @@
-import type { ContactChannel, DashboardContactInput } from '@/types/contacts';
+import type {
+  ContactChannel,
+  ContactResponsibilityAssignmentInput,
+  DashboardContactInput,
+} from '@/types/contacts';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/; // NOSONAR (S5852) - ReDoS bounded by RFC 5321 length check (≤254 chars) in validateEmail below
 
@@ -78,8 +82,6 @@ export function sanitizeContactInput(
     throw new TypeError('Add at least one contact channel (email or phone)');
   }
 
-  const territories = normalizeTerritories(input.territories ?? []);
-
   const clip = (value: string | null | undefined, max: number) => {
     if (!value) return null;
     const trimmed = value.trim();
@@ -89,13 +91,76 @@ export function sanitizeContactInput(
 
   const personName = clip(input.personName, 120);
   const companyName = clip(input.companyName, 160);
-  const customLabel = clip(input.customLabel, 80);
 
   const preferredChannel = resolvePreferredChannel(
     email,
     phone,
     input.preferredChannel
   );
+
+  const rawResponsibilities =
+    input.responsibilities && input.responsibilities.length > 0
+      ? input.responsibilities
+      : [
+          {
+            role: input.role,
+            customLabel: input.customLabel,
+            territories: input.territories,
+            isActive: input.isActive,
+            sortOrder: input.sortOrder,
+          },
+        ];
+
+  const seenResponsibilities = new Set<string>();
+  let primaryAssigned = false;
+  let responsibilities = rawResponsibilities.map((responsibility, index) => {
+    const customLabel = clip(responsibility.customLabel, 80);
+    if (responsibility.role === 'other' && !customLabel) {
+      throw new TypeError('Add a label for an Other responsibility');
+    }
+
+    const key = `${responsibility.role}:${customLabel ?? ''}`;
+    if (seenResponsibilities.has(key)) {
+      throw new TypeError('Each responsibility can only be assigned once');
+    }
+    seenResponsibilities.add(key);
+
+    const isActive = responsibility.isActive ?? true;
+    const requestedPrimary = responsibility.isPrimary ?? index === 0;
+    const isPrimary = isActive && requestedPrimary && !primaryAssigned;
+    if (isPrimary) primaryAssigned = true;
+
+    return {
+      ...responsibility,
+      customLabel,
+      territories: normalizeTerritories(responsibility.territories ?? []),
+      isActive,
+      isPrimary,
+      sortOrder: responsibility.sortOrder ?? index,
+      startedAt: responsibility.startedAt ?? null,
+      endedAt: responsibility.endedAt ?? null,
+    } satisfies ContactResponsibilityAssignmentInput;
+  });
+
+  if (!responsibilities.some(responsibility => responsibility.isPrimary)) {
+    const fallbackPrimaryIndex = responsibilities.findIndex(
+      responsibility => responsibility.isActive
+    );
+    if (fallbackPrimaryIndex >= 0) {
+      responsibilities = responsibilities.map((responsibility, index) => ({
+        ...responsibility,
+        isPrimary: index === fallbackPrimaryIndex,
+      }));
+    }
+  }
+
+  const selected =
+    responsibilities.find(responsibility => responsibility.isPrimary) ??
+    responsibilities.find(responsibility => responsibility.isActive) ??
+    responsibilities[0];
+  if (!selected) {
+    throw new TypeError('Add at least one responsibility');
+  }
 
   return {
     ...input,
@@ -104,9 +169,11 @@ export function sanitizeContactInput(
     preferredChannel,
     personName,
     companyName,
-    customLabel,
-    territories,
-    isActive: input.isActive ?? true,
-    sortOrder: input.sortOrder ?? 0,
+    role: selected.role,
+    customLabel: selected.customLabel,
+    territories: selected.territories ?? [],
+    isActive: selected.isActive ?? true,
+    sortOrder: selected.sortOrder ?? 0,
+    responsibilities,
   };
 }
