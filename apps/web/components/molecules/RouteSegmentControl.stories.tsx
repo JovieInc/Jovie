@@ -58,3 +58,12 @@ export const Narrow: Story = {
     </div>
   ),
 };
+
+export const WithDisabledRoute: Story = {
+  args: {
+    value: 'contacts',
+    options: [options[0], { ...options[1], disabled: true }],
+    'aria-label': 'Contacts Workspace',
+    className: 'max-w-60',
+  },
+};
