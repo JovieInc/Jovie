@@ -13,6 +13,8 @@ import {
 import Link from 'next/link';
 import { memo } from 'react';
 import { ActivityFeedSkeleton } from '@/components/molecules/ActivityFeed';
+import { EmptyState } from '@/components/molecules/EmptyState';
+import { PageErrorState } from '@/features/feedback/PageErrorState';
 import type {
   JovieWorkIcon,
   JovieWorkItem,
@@ -53,12 +55,12 @@ function JovieWorkEmptyState({
 }) {
   return (
     <div className={isRefreshing ? 'opacity-70 transition-opacity' : undefined}>
-      <div className='flex min-h-35 items-center rounded-md bg-surface-1 px-2'>
-        <p className='text-xs leading-[17px] text-secondary-token'>
-          Jovie has not shipped autonomous work in this window yet. Release
-          autopilot, fan notifications, and agent runs will show up here.
-        </p>
-      </div>
+      <EmptyState
+        heading='Jovie has not shipped autonomous work in this window yet.'
+        description='Release autopilot, fan notifications, and agent runs will show up here.'
+        className='min-h-45 py-8'
+        testId='jovie-work-empty-state'
+      />
     </div>
   );
 }
@@ -131,12 +133,17 @@ const JovieWorkItemRow = memo(function JovieWorkItemRow({
   );
 });
 
-export function JovieWorkFeed({ profileId, range = '7d' }: JovieWorkFeedProps) {
+export function JovieWorkFeed({
+  profileId,
+  range = '7d',
+  showHeader = true,
+}: JovieWorkFeedProps) {
   const {
     data: items = [],
     isLoading,
     isFetching,
     error,
+    refetch,
   } = useJovieWorkFeedQuery({
     profileId,
     range,
@@ -146,34 +153,42 @@ export function JovieWorkFeed({ profileId, range = '7d' }: JovieWorkFeedProps) {
 
   return (
     <div className='space-y-1.5' data-testid='jovie-work-feed'>
-      <div className='flex items-center justify-between gap-4'>
-        <div className='flex items-center gap-2'>
-          <div className='flex h-6 w-6 items-center justify-center rounded-full bg-surface-0'>
-            <CircleDashed
-              className='h-4 w-4 text-tertiary-token'
-              aria-hidden='true'
-            />
+      {showHeader ? (
+        <div className='flex items-center justify-between gap-4'>
+          <div className='flex items-center gap-2'>
+            <div className='flex h-6 w-6 items-center justify-center rounded-full bg-surface-0'>
+              <CircleDashed
+                className='h-4 w-4 text-tertiary-token'
+                aria-hidden='true'
+              />
+            </div>
+            <h3 className='text-app font-caption tracking-tight text-secondary-token'>
+              Jovie Did This
+            </h3>
           </div>
-          <h3 className='text-app font-caption tracking-tight text-secondary-token'>
-            Jovie Did This
-          </h3>
+          <span className='inline-flex shrink-0 items-center gap-1.5 text-2xs font-caption text-tertiary-token'>
+            <span
+              aria-hidden='true'
+              className='h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse'
+            />
+            <span>Live</span>
+          </span>
         </div>
-        <span className='inline-flex shrink-0 items-center gap-1.5 text-2xs font-caption text-tertiary-token'>
-          <span
-            aria-hidden='true'
-            className='h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse'
-          />
-          <span>Live</span>
-        </span>
-      </div>
+      ) : null}
 
       <div className='min-h-45'>
         {(() => {
           if (error) {
             return (
-              <p className='text-app text-error-token'>
-                {error.message || 'Failed to load Jovie work feed'}
-              </p>
+              <PageErrorState
+                title='Failed to load Jovie work feed'
+                message={error.message || 'Please try again.'}
+                error={error}
+                actionLabel='Retry load'
+                onRetry={() => {
+                  void refetch();
+                }}
+              />
             );
           }
 

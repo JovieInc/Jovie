@@ -1,8 +1,9 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { useJovieWorkFeedQueryMock } = vi.hoisted(() => ({
+const { useJovieWorkFeedQueryMock, refetchMock } = vi.hoisted(() => ({
   useJovieWorkFeedQueryMock: vi.fn(),
+  refetchMock: vi.fn(),
 }));
 
 vi.mock('@/lib/queries/useJovieWorkFeedQuery', () => ({
@@ -14,6 +15,7 @@ import { JovieWorkFeed } from '@/components/features/dashboard/organisms/jovie-w
 describe('JovieWorkFeed', () => {
   beforeEach(() => {
     useJovieWorkFeedQueryMock.mockReset();
+    refetchMock.mockReset();
   });
 
   it('renders autonomous work items with phase badges', () => {
@@ -34,6 +36,7 @@ describe('JovieWorkFeed', () => {
       isLoading: false,
       isFetching: false,
       error: null,
+      refetch: refetchMock,
     });
 
     render(<JovieWorkFeed profileId='profile-123' />);
@@ -53,6 +56,7 @@ describe('JovieWorkFeed', () => {
       isLoading: false,
       isFetching: false,
       error: null,
+      refetch: refetchMock,
     });
 
     render(<JovieWorkFeed profileId='profile-123' />);
@@ -60,5 +64,50 @@ describe('JovieWorkFeed', () => {
     expect(
       screen.getByText(/Jovie has not shipped autonomous work/i)
     ).toBeInTheDocument();
+    expect(screen.getByTestId('jovie-work-empty-state').tagName).toBe('OUTPUT');
+  });
+
+  it('can hide the duplicate feed heading inside the full workspace', () => {
+    useJovieWorkFeedQueryMock.mockReturnValue({
+      data: [
+        {
+          id: 'workflow:1',
+          source: 'workflow_run',
+          phase: 'completed',
+          title: 'Release autopilot',
+          description: 'Jovie ran release-to-revenue for Midnight Drive.',
+          icon: 'workflow',
+          timestamp: '2026-06-23T00:00:00.000Z',
+          statusLabel: 'Done',
+        },
+      ],
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: refetchMock,
+    });
+
+    render(<JovieWorkFeed profileId='profile-123' showHeader={false} />);
+
+    expect(screen.queryByText('Jovie Did This')).toBeNull();
+    expect(screen.getByText('Release autopilot')).toBeVisible();
+  });
+
+  it('offers canonical retry behavior after a feed error', () => {
+    useJovieWorkFeedQueryMock.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isFetching: false,
+      error: new Error('Feed request failed'),
+      refetch: refetchMock,
+    });
+
+    render(<JovieWorkFeed profileId='profile-123' />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Failed to load Jovie work feed'
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Retry load' }));
+    expect(refetchMock).toHaveBeenCalledOnce();
   });
 });

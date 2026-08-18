@@ -225,6 +225,7 @@ export function DemoShowcaseSurface({
             selectedCategory={selectedInsightCategory}
             onCategoryChange={setSelectedInsightCategory}
             onGenerate={noop}
+            onRetry={noop}
             isGenerating={false}
             testId='demo-showcase-analytics'
           />

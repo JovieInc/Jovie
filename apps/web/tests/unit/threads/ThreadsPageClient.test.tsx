@@ -178,6 +178,10 @@ describe('ChatsPageClient', () => {
     });
 
     expect(screen.getByText('No chats match "Missing".')).toBeInTheDocument();
+    expect(screen.getByTestId('chats-empty-state').tagName).toBe('OUTPUT');
+    expect(screen.getByTestId('chats-empty-state')).not.toHaveClass(
+      'border-dashed'
+    );
     expect(screen.getAllByRole('link', { name: 'New Chat' })).toHaveLength(2);
   });
 

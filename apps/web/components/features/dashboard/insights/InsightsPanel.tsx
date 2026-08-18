@@ -1,6 +1,5 @@
 'use client';
 
-import { Sparkles } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
@@ -13,6 +12,7 @@ import {
   PageToolbarActionButton,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { useGenerateInsightsMutation, useInsightsQuery } from '@/lib/queries';
 import { getAccentCssVars } from '@/lib/ui/accent-palette';
 import type { InsightCategory, InsightResponse } from '@/types/insights';
@@ -59,6 +59,7 @@ interface InsightsPanelContentProps {
     low: InsightResponse[];
   };
   readonly onGenerate: () => void;
+  readonly onRetry: () => void;
   readonly isGenerating: boolean;
 }
 
@@ -68,6 +69,7 @@ function InsightsPanelContent({
   insights,
   grouped,
   onGenerate,
+  onRetry,
   isGenerating,
 }: InsightsPanelContentProps) {
   if (isLoading) {
@@ -92,33 +94,33 @@ function InsightsPanelContent({
 
   if (error) {
     return (
-      <ContentSurfaceCard className='p-6 text-center'>
-        <p className='text-app text-secondary-token'>
-          Failed to load insights. Please try again.
-        </p>
-      </ContentSurfaceCard>
+      <PageErrorState
+        title='Failed to load insights.'
+        message='Please try again.'
+        error={error}
+        actionLabel='Retry load'
+        onRetry={onRetry}
+      />
     );
   }
 
   if (insights.length === 0) {
     return (
-      <ContentSurfaceCard className='flex flex-col items-center justify-center px-2.5 py-2.5 text-center'>
-        <EmptyState
-          icon={<Sparkles className='h-4 w-4' aria-hidden='true' />}
-          heading='No Insights Yet'
-          description='Generate your first set of AI-powered insights to discover actionable trends in your analytics.'
-          action={{
-            label: isGenerating ? 'Generating...' : 'Generate Insights',
-            onClick: onGenerate,
-            disabled: isGenerating,
-          }}
-          secondaryAction={{
-            label: 'Share Profile',
-            href: APP_ROUTES.CHAT_PROFILE_PANEL,
-          }}
-          className='py-6'
-        />
-      </ContentSurfaceCard>
+      <EmptyState
+        heading='No Insights Yet'
+        description='Generate your first set of AI-powered insights to discover actionable trends in your analytics.'
+        action={{
+          label: isGenerating ? 'Generating...' : 'Generate Insights',
+          onClick: onGenerate,
+          disabled: isGenerating,
+        }}
+        secondaryAction={{
+          label: 'Share Profile',
+          href: APP_ROUTES.CHAT_PROFILE_PANEL,
+        }}
+        presentation='workspace'
+        testId='insights-empty-state'
+      />
     );
   }
 
@@ -162,6 +164,7 @@ export interface InsightsPanelViewProps {
   readonly selectedCategory: InsightCategory | 'all';
   readonly onCategoryChange: (category: InsightCategory | 'all') => void;
   readonly onGenerate: () => void;
+  readonly onRetry: () => void;
   readonly isGenerating: boolean;
   readonly testId?: string;
 }
@@ -173,6 +176,7 @@ export function InsightsPanelView({
   selectedCategory,
   onCategoryChange,
   onGenerate,
+  onRetry,
   isGenerating,
   testId = 'dashboard-insights-workspace',
 }: Readonly<InsightsPanelViewProps>) {
@@ -208,14 +212,9 @@ export function InsightsPanelView({
   );
 
   return (
-    <PageShell
-      frame='none'
-      contentPadding='none'
-      toolbar={toolbar}
-      data-testid={testId}
-    >
+    <PageShell toolbar={toolbar} data-testid={testId}>
       <div className='min-h-0 flex-1 overflow-y-auto overflow-x-hidden'>
-        <div className='flex flex-col gap-4 px-3 py-2.5 sm:px-4 sm:py-3.5'>
+        <div className='flex min-h-full flex-col gap-4'>
           <AppSegmentControl
             value={selectedCategory}
             onValueChange={onCategoryChange}
@@ -223,9 +222,7 @@ export function InsightsPanelView({
             aria-label='Filter Insights By Category'
             surface='ghost'
             layout='hug'
-            className='w-full rounded-none border-0 bg-transparent p-0'
             listClassName='flex-wrap gap-1.5'
-            triggerClassName='min-h-8 border border-subtle bg-surface-1 px-3 py-1 text-xs text-secondary-token hover:border-default hover:bg-surface-0 hover:text-primary-token data-[state=active]:border-default data-[state=active]:bg-surface-0 data-[state=active]:text-primary-token'
           />
 
           <InsightsPanelContent
@@ -234,6 +231,7 @@ export function InsightsPanelView({
             insights={insights}
             grouped={grouped}
             onGenerate={onGenerate}
+            onRetry={onRetry}
             isGenerating={isGenerating}
           />
         </div>
@@ -252,7 +250,7 @@ export function InsightsPanel() {
     [selectedCategory]
   );
 
-  const { data, isLoading, error } = useInsightsQuery({
+  const { data, isLoading, error, refetch } = useInsightsQuery({
     category: categoryFilter,
     limit: 50,
   });
@@ -270,6 +268,9 @@ export function InsightsPanel() {
       selectedCategory={selectedCategory}
       onCategoryChange={setSelectedCategory}
       onGenerate={() => generate()}
+      onRetry={() => {
+        void refetch();
+      }}
       isGenerating={isGenerating}
     />
   );

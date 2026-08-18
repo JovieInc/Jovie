@@ -269,6 +269,7 @@ describe('ChatPageClient', () => {
     expect(container.textContent).toContain(
       'Something went wrong loading chat. Please try again.'
     );
+    expect(screen.getByTestId('chat-error-state').tagName).toBe('OUTPUT');
     expect(mockNavigationReady).not.toHaveBeenCalled();
   });
 
@@ -532,6 +533,9 @@ describe('ChatPageClient', () => {
     expect(container.querySelector('[data-testid="jovie-chat"]')).toBeNull();
     expect(container.textContent).toContain(
       'We hit a problem loading your profile. Please retry in a moment.'
+    );
+    expect(screen.getByTestId('chat-profile-error-state').tagName).toBe(
+      'OUTPUT'
     );
     const retryButton = Array.from(container.querySelectorAll('button')).find(
       button => button.textContent?.trim() === 'Try again'
