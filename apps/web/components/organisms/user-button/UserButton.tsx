@@ -3,7 +3,7 @@
 // @coverage-via apps/web/tests/components/user-button.test.tsx
 
 import type { CommonDropdownItem, CommonDropdownSubmenu } from '@jovie/ui';
-import { Button, CommonDropdown } from '@jovie/ui';
+import { Badge, Button, CommonDropdown } from '@jovie/ui';
 import {
   Cookie,
   CreditCard,
@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useState } from 'react';
-import { Badge } from '@/components/atoms/Badge';
 import { APP_ROUTES } from '@/constants/routes';
 import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
 import { track } from '@/lib/analytics';

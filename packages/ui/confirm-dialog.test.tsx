@@ -111,6 +111,55 @@ describe('ConfirmDialog', () => {
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
+  it('confirms once and closes after the action succeeds', async () => {
+    const onConfirm = vi.fn().mockResolvedValue(undefined);
+    const onOpenChange = vi.fn();
+
+    render(
+      <ConfirmDialog
+        open={true}
+        onOpenChange={onOpenChange}
+        title='Publish changes?'
+        body='Your public profile will update immediately.'
+        confirmLabel='Publish changes'
+        onConfirm={onConfirm}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Publish changes' }));
+
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledOnce());
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('prevents dismissal while an external action is pending', () => {
+    const onCancel = vi.fn();
+    const onOpenChange = vi.fn();
+
+    render(
+      <ConfirmDialog
+        open={true}
+        onOpenChange={onOpenChange}
+        title='Disconnecting Spotify'
+        body='Jovie is preserving the latest synced data.'
+        isLoading={true}
+        onCancel={onCancel}
+        onConfirm={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Please wait...' })
+    ).toBeDisabled();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.click(screen.getByTestId('dialog-overlay'));
+
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
   it('keeps the dialog open and shows an error when confirm fails', async () => {
     const onOpenChange = vi.fn();
     const onError = vi.fn();

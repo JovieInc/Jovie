@@ -1,6 +1,6 @@
+import { Badge } from '@jovie/ui';
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import { Badge } from '@/components/atoms/Badge';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ProfileAboutShare } from '@/features/profile/ProfileAboutShare';
 import { normalizePlatformKey } from '@/lib/dsp-registry';

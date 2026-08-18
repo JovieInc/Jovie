@@ -20,8 +20,6 @@ export { AvatarUploadAnnouncer } from './AvatarUploadAnnouncer';
 export type { AvatarUploadOverlayProps } from './AvatarUploadOverlay';
 export { AvatarUploadOverlay } from './AvatarUploadOverlay';
 export { BACKGROUND_PATTERNS, BackgroundPattern } from './BackgroundPattern';
-export type { AppBadgeProps } from './Badge';
-export { Badge } from './Badge';
 export type { BrandLogoProps, BrandLogoTone } from './BrandLogo';
 export { BrandLogo } from './BrandLogo';
 export type {
@@ -80,8 +78,6 @@ export { ProviderIcon } from './ProviderIcon';
 export { ReleaseArtworkThumb } from './ReleaseArtworkThumb';
 export type { SectionHeadingProps } from './SectionHeading';
 export { SectionHeading } from './SectionHeading';
-export { Select } from './Select';
-export { Separator } from './Separator';
 export type { SkipToContentProps } from './SkipToContent';
 export { SkipToContent } from './SkipToContent';
 export {
