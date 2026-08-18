@@ -1292,31 +1292,121 @@ struct AppStateTests {
   }
 }
 
-struct WhatsNewPresentationPolicyTests {
-  @Test func presentsOnlyForAnUnseenVersionWhenEligible() {
-    #expect(WhatsNewPresentationPolicy.shouldPresent(
-      currentVersion: "2.4",
-      lastPresentedVersion: nil,
-      isEligible: true
-    ))
-    #expect(WhatsNewPresentationPolicy.shouldPresent(
-      currentVersion: "2.4",
-      lastPresentedVersion: "2.3",
-      isEligible: true
-    ))
-    #expect(!WhatsNewPresentationPolicy.shouldPresent(
-      currentVersion: "2.4",
-      lastPresentedVersion: "2.4",
-      isEligible: true
-    ))
+struct FeatureIntroPresentationTests {
+  private let highlight = FeatureIntroHighlight(
+    id: "highlight-a",
+    systemImage: "sparkles",
+    title: "Your Catalog Is Already In Chat",
+    oneLine: "Ask about a release, a show, or the next move.",
+    ctaTitle: "Ask Something"
+  )
+
+  private var fourBullets: [FeatureIntroBullet] {
+    [
+      FeatureIntroBullet(id: "one", text: "Talk from the home screen.", accent: .accent),
+      FeatureIntroBullet(id: "two", text: "Library stays nearby.", accent: .blue),
+      FeatureIntroBullet(id: "three", text: "Profile setup stays on iPhone.", accent: .orange),
+      FeatureIntroBullet(id: "four", text: "Canceled sign-in is recoverable.", accent: .accent),
+    ]
   }
 
-  @Test func doesNotPresentUntilTheAppIsReady() {
-    #expect(!WhatsNewPresentationPolicy.shouldPresent(
-      currentVersion: "2.4",
-      lastPresentedVersion: nil,
-      isEligible: false
-    ))
+  @Test func prefersHighlightOverWhatsNewUntilThatHighlightIsDismissed() {
+    let catalog = FeatureIntroCatalog(
+      highlight: highlight,
+      whatsNewID: "wave-1",
+      whatsNewItems: Array(fourBullets.prefix(2))
+    )
+
+    #expect(
+      FeatureIntroPresentation.resolve(
+        catalog: catalog,
+        dismissedHighlightID: nil,
+        dismissedWhatsNewID: nil
+      ) == .highlight(highlight)
+    )
+    #expect(
+      FeatureIntroPresentation.resolve(
+        catalog: catalog,
+        dismissedHighlightID: "",
+        dismissedWhatsNewID: nil
+      ) == .highlight(highlight)
+    )
+
+    guard case let .whatsNew(id, rows) = FeatureIntroPresentation.resolve(
+      catalog: catalog,
+      dismissedHighlightID: highlight.id,
+      dismissedWhatsNewID: nil
+    ) else {
+      Issue.record("Expected what's new after the highlight is dismissed")
+      return
+    }
+    #expect(id == "wave-1")
+    #expect(rows == fourBullets.prefix(2).map(FeatureIntroVisibleRow.bullet))
+  }
+
+  @Test func usesWhatsNewWhenTheCatalogHasNoHighlight() {
+    let catalog = FeatureIntroCatalog(
+      highlight: nil,
+      whatsNewID: "wave-1",
+      whatsNewItems: Array(fourBullets.prefix(2))
+    )
+
+    guard case let .whatsNew(id, _) = FeatureIntroPresentation.resolve(
+      catalog: catalog,
+      dismissedHighlightID: nil,
+      dismissedWhatsNewID: nil
+    ) else {
+      Issue.record("Expected what's new when no highlight is published")
+      return
+    }
+    #expect(id == "wave-1")
+  }
+
+  @Test func dismissPersistenceHidesTheSameCardAcrossLaunches() {
+    let catalog = FeatureIntroCatalog(
+      highlight: highlight,
+      whatsNewID: "wave-1",
+      whatsNewItems: Array(fourBullets.prefix(2))
+    )
+
+    #expect(
+      FeatureIntroPresentation.resolve(
+        catalog: catalog,
+        dismissedHighlightID: highlight.id,
+        dismissedWhatsNewID: "wave-1"
+      ) == nil
+    )
+    #expect(
+      FeatureIntroPresentation.isDismissed(id: highlight.id, dismissedID: highlight.id)
+    )
+    #expect(
+      !FeatureIntroPresentation.isDismissed(id: highlight.id, dismissedID: "other")
+    )
+    #expect(FeatureIntroStorage.dismissedHighlightIDKey == "jovie.featureIntro.dismissedHighlightID")
+    #expect(FeatureIntroStorage.dismissedWhatsNewIDKey == "jovie.featureIntro.dismissedWhatsNewID")
+  }
+
+  @Test func capsWhatsNewAtThreeRowsAndUsesAndMoreWhenThereAreMoreThanThreeItems() {
+    let overflow = FeatureIntroPresentation.visibleWhatsNewRows(from: fourBullets)
+    #expect(overflow.count == FeatureIntroPresentation.maxWhatsNewRows)
+    #expect(overflow == [
+      .bullet(fourBullets[0]),
+      .bullet(fourBullets[1]),
+      .andMore,
+    ])
+
+    let three = FeatureIntroPresentation.visibleWhatsNewRows(from: Array(fourBullets.prefix(3)))
+    #expect(three == fourBullets.prefix(3).map(FeatureIntroVisibleRow.bullet))
+    #expect(!three.contains(.andMore))
+
+    let two = FeatureIntroPresentation.visibleWhatsNewRows(from: Array(fourBullets.prefix(2)))
+    #expect(two.count == 2)
+    #expect(!two.contains(.andMore))
+  }
+
+  @Test func changelogURLStaysOnTheWebOrigin() {
+    let url = FeatureIntroCatalog.changelogURL(from: URL(string: "https://jov.ie")!)
+    #expect(url.absoluteString == "https://jov.ie/changelog")
   }
 }
 

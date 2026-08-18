@@ -59,7 +59,18 @@ struct MobileChatView: View {
         }
       }
       .safeAreaInset(edge: .bottom, spacing: 0) {
-        composerChrome
+        VStack(spacing: JovieSpacing.medium) {
+          if repository.timeline.isEmpty {
+            FeatureIntroHost(
+              catalog: .current,
+              changelogURL: FeatureIntroCatalog.changelogURL(from: webBaseURL),
+              onHighlightCTA: { isComposerFocused = true }
+            )
+            .padding(.horizontal, JovieSpacing.large)
+          }
+
+          composerChrome
+        }
       }
     }
     .accessibilityElement(children: .contain)
