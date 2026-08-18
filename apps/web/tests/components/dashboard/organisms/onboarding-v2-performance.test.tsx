@@ -203,23 +203,21 @@ vi.mock('next/link', () => ({
   ),
 }));
 
-vi.mock('@jovie/ui', () => ({
-  Button: ({
-    asChild,
-    children,
-    ...rest
-  }: {
-    asChild?: boolean;
-    children: ReactNode;
-  }) => <button {...rest}>{children}</button>,
-  getInitials: (value: string) =>
-    value
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map(part => part[0]?.toUpperCase() ?? '')
-      .join(''),
-}));
+vi.mock('@jovie/ui', async importOriginal => {
+  const actual = await importOriginal<typeof import('@jovie/ui')>();
+
+  return {
+    ...actual,
+    Button: ({
+      asChild,
+      children,
+      ...rest
+    }: {
+      asChild?: boolean;
+      children: ReactNode;
+    }) => <button {...rest}>{children}</button>,
+  };
+});
 
 vi.mock('@/components/atoms/LoadingSpinner', () => ({
   LoadingSpinner: () => <div data-testid='loading-spinner' />,
