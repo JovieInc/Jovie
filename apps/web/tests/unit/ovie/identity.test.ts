@@ -5,11 +5,11 @@ import { eveIdentityForChatMode, selectEveIdentity } from '@/lib/ovie/identity';
 
 const JOVIE_INSTRUCTIONS = resolve(
   __dirname,
-  '../../../../eve-pilot/agent/identities/jovie/instructions.md'
+  '../../../../eve-pilot/identities/jovie/instructions.md'
 );
 const OVIE_INSTRUCTIONS = resolve(
   __dirname,
-  '../../../../eve-pilot/agent/identities/ovie/instructions.md'
+  '../../../../eve-pilot/identities/ovie/instructions.md'
 );
 
 describe('Eve identity packs (JOV-5216)', () => {

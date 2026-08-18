@@ -8,7 +8,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 describe('eve identity instruction packs', () => {
   it('keeps Jovie artist instructions off factory tools', () => {
     const text = readFileSync(
-      resolve(root, 'agent/identities/jovie/instructions.md'),
+      resolve(root, 'identities/jovie/instructions.md'),
       'utf8'
     );
     expect(text.includes('artist-facing')).toBe(true);
@@ -18,7 +18,7 @@ describe('eve identity instruction packs', () => {
 
   it('lets Ovie ingest/ack and read gbrain', () => {
     const text = readFileSync(
-      resolve(root, 'agent/identities/ovie/instructions.md'),
+      resolve(root, 'identities/ovie/instructions.md'),
       'utf8'
     );
     expect(text.includes('ingest and ack')).toBe(true);
