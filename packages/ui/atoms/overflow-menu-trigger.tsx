@@ -26,7 +26,7 @@ const overflowTriggerVariants = cva(MENU_OVERFLOW_TRIGGER_BASE, {
 export interface OverflowMenuTriggerProps
   extends VariantProps<typeof overflowTriggerVariants> {
   /** Whether the active tab is hidden in the overflow menu */
-  readonly hasActiveOverflow: boolean;
+  readonly hasActiveOverflow?: boolean;
   readonly className?: string;
 }
 
@@ -37,21 +37,41 @@ export interface OverflowMenuTriggerProps
 export const OverflowMenuTrigger = React.forwardRef<
   HTMLButtonElement,
   OverflowMenuTriggerProps & React.ButtonHTMLAttributes<HTMLButtonElement>
->(({ hasActiveOverflow, variant, className, ...props }, ref) => (
-  <button
-    ref={ref}
-    type='button'
-    aria-label='More tabs'
-    className={cn(overflowTriggerVariants({ variant }), className)}
-    {...props}
-  >
-    <MoreHorizontal className='h-3.5 w-3.5' />
-    {hasActiveOverflow ? (
-      <span
-        className='absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-accent'
-        aria-hidden='true'
-      />
-    ) : null}
-  </button>
-));
+>(
+  (
+    {
+      hasActiveOverflow = false,
+      variant,
+      className,
+      'aria-label': ariaLabel,
+      ...props
+    },
+    ref
+  ) => (
+    <button
+      {...props}
+      ref={ref}
+      type='button'
+      aria-label={
+        ariaLabel ??
+        (hasActiveOverflow ? 'More tabs, current tab hidden' : 'More tabs')
+      }
+      data-active-overflow={hasActiveOverflow ? 'true' : undefined}
+      className={cn(
+        overflowTriggerVariants({ variant }),
+        'before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-full before:min-w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
+        'duration-subtle ease-subtle motion-reduce:transition-none',
+        className
+      )}
+    >
+      <MoreHorizontal className='h-3.5 w-3.5' />
+      {hasActiveOverflow ? (
+        <span
+          className='absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-accent'
+          aria-hidden='true'
+        />
+      ) : null}
+    </button>
+  )
+);
 OverflowMenuTrigger.displayName = 'OverflowMenuTrigger';

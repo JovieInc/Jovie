@@ -25,6 +25,13 @@ export interface SimpleTooltipProps {
    */
   readonly showArrow?: boolean;
   /**
+   * Compact is for author-confirmed single-line labels; rich permits wrapping.
+   * @default 'rich'
+   */
+  readonly contentVariant?: 'compact' | 'rich';
+  /** Opens the tooltip initially, primarily for deterministic previews. */
+  readonly defaultOpen?: boolean;
+  /**
    * Additional class name for the tooltip content.
    */
   readonly className?: string;
@@ -56,16 +63,19 @@ export function SimpleTooltip({
   side = 'top',
   sideOffset,
   showArrow,
+  contentVariant = 'rich',
+  defaultOpen,
   className,
   children,
 }: SimpleTooltipProps) {
   return (
-    <Tooltip>
+    <Tooltip defaultOpen={defaultOpen}>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
       <TooltipContent
         side={side}
         sideOffset={sideOffset}
         showArrow={showArrow}
+        contentVariant={contentVariant}
         className={className}
       >
         {content}

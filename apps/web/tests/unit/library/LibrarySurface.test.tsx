@@ -1699,10 +1699,10 @@ describe('LibrarySurface', () => {
     const before = contentFrame.getBoundingClientRect();
     const trigger = screen.getByRole('button', { name: 'Show filters' });
     expect(trigger).toHaveClass('h-7', 'w-7');
-    expect(trigger.className).toContain('before:h-10');
-    expect(trigger.className).toContain('before:min-w-10');
-    expect(trigger.className).not.toContain('min-h-11');
-    expect(trigger.className).not.toContain('min-w-11');
+    expect(trigger.className).toContain('before:h-11');
+    expect(trigger.className).toContain('before:min-w-11');
+    expect(trigger.className).not.toMatch(/(?:^|\s)min-h-11(?:\s|$)/);
+    expect(trigger.className).not.toMatch(/(?:^|\s)min-w-11(?:\s|$)/);
 
     await user.click(trigger);
 

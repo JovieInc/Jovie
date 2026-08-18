@@ -49,7 +49,7 @@ const ICON_BUTTON_VARIANT_TO_BUTTON_VARIANT: Record<
 // Shared chrome for the circular surface family (profile chrome, auth back
 // buttons): soft-material layering plus the legacy circular transition.
 const CIRCLE_CHROME_CLASSNAME =
-  'relative isolate overflow-hidden cursor-pointer transition-colors duration-subtle ease-out';
+  'relative isolate cursor-pointer overflow-hidden transition-colors duration-subtle ease-subtle';
 
 const iconButtonVariants = cva(
   // Shared base: uniform reduced-motion + touch behavior. Focus ring and
@@ -161,13 +161,15 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
     },
     ref
   ) {
+    const resolvedAriaLabel = ariaLabel?.trim() || ariaLabelProp?.trim();
+
     return (
       <Button
         ref={ref}
         variant={ICON_BUTTON_VARIANT_TO_BUTTON_VARIANT[variant]}
         size={ICON_BUTTON_SIZE_TO_BUTTON_SIZE[size]}
         className={cn(iconButtonVariants({ variant, size }), className)}
-        aria-label={ariaLabel ?? ariaLabelProp}
+        aria-label={resolvedAriaLabel}
         {...props}
       >
         {children}
