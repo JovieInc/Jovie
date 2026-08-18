@@ -244,6 +244,12 @@ describe('Select', () => {
       );
       const listbox = screen.getByRole('listbox');
       expect(listbox.className).toContain('custom-content');
+      expect(listbox.className).toContain(
+        'rounded-(--system-b-radius-overlay)'
+      );
+      const option = screen.getByRole('option', { name: 'Test' });
+      expect(option.className).toContain('min-h-8');
+      expect(option.className).toContain('focus-visible:ring-inset');
     });
   });
 });

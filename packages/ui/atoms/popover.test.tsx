@@ -211,6 +211,8 @@ describe('Popover', () => {
 
       const content = screen.getByText('Test popover content').closest('div');
       expect(content).toHaveClass('custom-class');
+      expect(content).toHaveClass('rounded-(--system-b-radius-overlay)');
+      expect(content).toHaveClass('bg-surface-elevated');
     });
 
     it('renders arrow when showArrow is true', () => {
@@ -220,7 +222,9 @@ describe('Popover', () => {
       const content = screen
         .getByText('Test popover content')
         .closest('[role]');
-      expect(content?.querySelector('svg')).toBeInTheDocument();
+      const arrow = content?.querySelector('svg');
+      expect(arrow).toBeInTheDocument();
+      expect(arrow).toHaveClass('fill-surface-elevated');
     });
 
     it('does not render arrow by default', () => {

@@ -33,3 +33,23 @@ export const Default: Story = {
     </DropdownMenu>
   ),
 };
+
+export const EdgeCollision: Story = {
+  parameters: { layout: 'fullscreen' },
+  render: () => (
+    <div className='flex min-h-48 items-start justify-end p-2'>
+      <DropdownMenu defaultOpen>
+        <DropdownMenuTrigger asChild>
+          <Button variant='secondary'>Edge menu</Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align='end'>
+          <DropdownMenuLabel>Move contact</DropdownMenuLabel>
+          <DropdownMenuItem>Audience</DropdownMenuItem>
+          <DropdownMenuItem>Collaborators</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem disabled>Archived</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  ),
+};

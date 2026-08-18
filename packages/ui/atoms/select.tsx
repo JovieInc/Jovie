@@ -7,6 +7,8 @@ import * as React from 'react';
 import {
   MENU_LABEL_BASE,
   MENU_SEPARATOR_BASE,
+  OVERLAY_COLLISION_PADDING,
+  OVERLAY_SIDE_OFFSET,
   SELECT_ITEM_BASE,
   SELECT_TRIGGER_BASE,
   SELECT_VIEWPORT_BASE,
@@ -84,6 +86,8 @@ const SelectContent = React.forwardRef<
       className,
       children,
       position = 'popper',
+      sideOffset = OVERLAY_SIDE_OFFSET,
+      collisionPadding = OVERLAY_COLLISION_PADDING,
       portalProps,
       disablePortal = false,
       ...props
@@ -100,13 +104,10 @@ const SelectContent = React.forwardRef<
     const content = (
       <SelectPrimitive.Content
         ref={ref}
-        className={cn(
-          selectContentClasses,
-          isPopper &&
-            'data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1',
-          className
-        )}
+        className={cn(selectContentClasses, className)}
         position={position}
+        sideOffset={sideOffset}
+        collisionPadding={collisionPadding}
         {...props}
       >
         <SelectScrollUpButton />

@@ -30,3 +30,22 @@ export const Default: Story = {
     </ContextMenu>
   ),
 };
+
+export const EdgeCollision: Story = {
+  parameters: { layout: 'fullscreen' },
+  render: () => (
+    <div className='flex min-h-56 items-end justify-end p-2'>
+      <ContextMenu>
+        <ContextMenuTrigger className='flex h-24 w-48 items-center justify-center rounded-md border border-subtle bg-surface-1 text-sm'>
+          Right-click at the edge
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem>Open profile</ContextMenuItem>
+          <ContextMenuItem>Copy email</ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem disabled>Remove</ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+    </div>
+  ),
+};

@@ -168,13 +168,13 @@ export const Placements: Story = {
 /**
  * Far-edge placement — trigger pinned to the far right of the viewport
  * (mirrors the header artist-profile rail toggle). With avoidCollisions +
- * the default 8px collisionPadding, the content shifts left to stay fully
- * inside the viewport instead of clipping off the right edge.
+ * the shared 4px trigger gap and 8px collision padding, the content shifts
+ * left to stay fully inside the viewport instead of clipping off the edge.
  */
 export const FarEdgePlacement: Story = {
   parameters: { layout: 'fullscreen' },
   render: () => (
-    <div className='flex w-full justify-end p-2'>
+    <div className='flex min-h-32 w-full items-start justify-end p-2'>
       <Tooltip defaultOpen>
         <TooltipTrigger>
           <Button variant='outline'>Far-right trigger</Button>
