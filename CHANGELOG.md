@@ -24,6 +24,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] **Local Eve verification is deterministic and credential-free (JOV-5171):** the isolated `eve@0.27.8` pilot now has one root-invokable smoke command that runs from a cold app root, blocks model-catalog network access, and fails when the allowed skills, tools, channels, subagents, or schedules drift.
 - **Label logo bars now align by visible artwork instead of file padding:** one shared asset registry measures transparent bounds, preserves aspect ratio, and propagates approved optical corrections across homepage, artist-profile, and experimental review surfaces.
 
+### Fixed
+
+- **Public profiles keep names, places, and last songs readable:** Contact drawers show the person before the company, compact heroes keep the full city, Music’s last row clears the tab bar, and AEO mention links use the profile text token instead of browser purple.
+
 ## [26.8.1] - 2026-08-16
 
 ### Changed
