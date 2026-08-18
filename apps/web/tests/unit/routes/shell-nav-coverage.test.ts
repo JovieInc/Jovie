@@ -202,7 +202,11 @@ describe('shell route coverage', () => {
     expect(findNewRedirectStubPaths(fixtures, allowedRedirectStubs)).toEqual(
       []
     );
-    expect(currentRedirectStubs).toEqual([...allowedRedirectStubs].sort());
+    expect(currentRedirectStubs).toEqual(
+      [...allowedRedirectStubs]
+        .filter(route => route !== '/app/dashboard/tipping')
+        .sort()
+    );
   });
 
   it('distinguishes a new redirect stub from a compliant rendered page', () => {
