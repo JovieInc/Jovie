@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
-# Create GitHub issues from the launch readiness audit.
+# RETIRED: historical GitHub-Issue generator for the launch readiness audit.
 # Usage: ./scripts/create-launch-issues.sh
 # Requires: gh CLI authenticated (gh auth login)
 set -euo pipefail
+
+echo "GitHub Issue intake is retired; create canonical work in Linear." >&2
+exit 78
 
 REPO="JovieInc/Jovie"
 

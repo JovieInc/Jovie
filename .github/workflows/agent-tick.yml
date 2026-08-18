@@ -116,7 +116,6 @@ jobs:
             PR_NUMBER=$(echo "$PR" | jq -r '.number')
             PR_TITLE=$(echo "$PR" | jq -r '.title')
             PR_SHA=$(echo "$PR" | jq -r '.head_sha')
-            PR_BRANCH=$(echo "$PR" | jq -r '.head_ref')
             PR_QUEUED=$(echo "$PR" | jq -r '.queued')
             LABELS=$(echo "$PR" | jq -r '[.labels[]] | join(",")')
 
@@ -211,13 +210,12 @@ jobs:
   # --------------------------------------------------------------------------
   cost-anomaly:
     name: Cost Anomaly Gate (retired)
-    # Agent Tick has no schedule trigger, so this retired lane cannot execute.
-    if: ${{ github.event_name == 'schedule' }}
+    # Hard-disabled: a state/config flip must not restore GitHub Issue writes.
+    if: ${{ github.event_name == '__retired_linear_only__' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
-      issues: write
 
     env:
       THRESHOLD_MULTIPLIER: '5'
@@ -277,7 +275,6 @@ jobs:
           THRESHOLD=$((MULTIPLIED > ABSOLUTE_FLOOR ? MULTIPLIED : ABSOLUTE_FLOOR))
           echo "Current: $CURRENT | Baseline: $BASELINE | Threshold: $THRESHOLD"
           if [[ "$CURRENT" -gt "$THRESHOLD" ]]; then
-            RATIO=$((BASELINE > 0 ? CURRENT * 100 / BASELINE : 0))
             echo "status=anomaly" >> "$GITHUB_OUTPUT"
             echo "reason=Spike: ${CURRENT} vs baseline ${BASELINE}" >> "$GITHUB_OUTPUT"
           else
@@ -307,13 +304,12 @@ jobs:
   # Formerly: github-ai-dispatcher.yml (every 15 min)
   # --------------------------------------------------------------------------
   dispatch:
-    name: Dispatch Ready Issues
+    name: Retired — GitHub Issues cannot dispatch work
+    if: ${{ github.event_name == '__retired_linear_only__' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
-      issues: read
-      actions: write
     env:
       MAX_DISPATCH: '2'
       MAX_OPEN_AGENT_PRS: '5'

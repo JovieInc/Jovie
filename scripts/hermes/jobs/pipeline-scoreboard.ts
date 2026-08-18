@@ -2,9 +2,9 @@
 /**
  * Pipeline Scoreboard — Hermes (read-only).
  *
- * Computes the daily codex issue shipper funnel and writes it to local state,
- * gbrain, and ops notifications. This is local control-plane telemetry, not a
- * production app cron.
+ * RETIRED: this scoreboard derives backlog counts from historical GitHub
+ * Issues. Linear is canonical, so the job exits before reading or publishing
+ * those counts. PR/Actions delivery reporting remains owned by the Gem HUD.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -37,6 +37,7 @@ import {
 } from '../lib/pipeline-scoreboard';
 
 const JOB = 'pipeline-scoreboard';
+const GITHUB_ISSUE_SCOREBOARD_RETIRED = true;
 const REPO = process.env.HERMES_GITHUB_REPO ?? 'JovieInc/Jovie';
 const ISSUE_LIMIT = process.env.HERMES_PIPELINE_SCOREBOARD_ISSUE_LIMIT ?? '500';
 const PR_MAX_PAGES = Number.parseInt(
@@ -213,6 +214,11 @@ export async function notifyNewAlarms(
 }
 
 async function main(): Promise<void> {
+  if (GITHUB_ISSUE_SCOREBOARD_RETIRED) {
+    logJobEvent({ job: JOB, event: 'retired_linear_only' });
+    return;
+  }
+
   await withJobLogging(JOB, async () => {
     const now = new Date();
     const daily = dailyWindow(now);

@@ -1547,10 +1547,11 @@ describe('Test failure triage in ship skill', () => {
     expect(content).toContain('Create required Linear follow-up');
   });
 
-  test('ship/SKILL.md triage has GitHub issue assignment for collaborative mode', () => {
+  test('ship/SKILL.md triage has Linear-only assignment for collaborative mode', () => {
     const content = fs.readFileSync(path.join(ROOT, 'ship', 'SKILL.md'), 'utf-8');
-    expect(content).toContain('gh issue create');
-    expect(content).toContain('--assignee');
+    expect(content).toContain('Blame + assign required Linear issue');
+    expect(content).toContain('Never fall back to a GitHub or GitLab issue');
+    expect(content).not.toContain('gh issue create');
   });
 
   test('{{TEST_FAILURE_TRIAGE}} placeholder is fully resolved in ship/SKILL.md', () => {

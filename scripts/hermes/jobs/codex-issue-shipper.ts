@@ -2,9 +2,9 @@
 /**
  * Codex Issue Shipper — Hermes-Air
  *
- * Watches all open GitHub issues (not just codex-labeled), claims one
- * eligible issue, writes dispatch context to gbrain, then starts a
- * coder-profile agent to ship it.
+ * RETIRED: GitHub Issues are historical/reporting-only. Linear-backed
+ * Symphony is the sole backlog selector. The implementation remains for
+ * historical recovery context, behind an unconditional source guard.
  *
  * Issues labeled `no-auto`, `invalid` (confirmed misroutes), `type:epic`
  * (pointer trackers with no code), or already claimed/blocked are excluded.
@@ -97,6 +97,7 @@ import {
 } from '../lib/spawn-resource';
 
 const JOB = 'codex-issue-shipper';
+const GITHUB_ISSUE_INTAKE_RETIRED = true;
 const ghEagainBackoff = new GhEagainBackoff();
 
 function sleep(ms: number): Promise<void> {
@@ -1678,6 +1679,11 @@ async function main(): Promise<void> {
 }
 
 async function runShipper(): Promise<void> {
+  if (GITHUB_ISSUE_INTAKE_RETIRED) {
+    logJobEvent({ job: JOB, event: 'retired_linear_only' });
+    return;
+  }
+
   loadHermesEnv();
 
   // Pause sentinel: if the operator has touched ~/.hermes/shipping-paused,

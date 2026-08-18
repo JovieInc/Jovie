@@ -6,6 +6,7 @@ import {
 } from './observability-issue-sync.mjs';
 
 const GITHUB_API = 'https://api.github.com';
+export const GITHUB_OBSERVABILITY_ISSUE_SYNC_RETIRED = true;
 
 export async function syncObservabilityIssue({
   token,
@@ -15,6 +16,11 @@ export async function syncObservabilityIssue({
   occurrenceDelta = 1,
   fetchImpl = fetch,
 }) {
+  if (GITHUB_OBSERVABILITY_ISSUE_SYNC_RETIRED) {
+    throw new Error(
+      'GitHub observability Issue sync is retired; use Linear intake.'
+    );
+  }
   const payload = buildObservabilityIssuePayload(report, occurrenceDelta);
   const existing = await findIssueByFingerprint({
     token,
@@ -143,6 +149,11 @@ async function githubRequest({ token, path, method = 'GET', body, fetchImpl }) {
 }
 
 async function main() {
+  if (GITHUB_OBSERVABILITY_ISSUE_SYNC_RETIRED) {
+    throw new Error(
+      'GitHub observability Issue sync is retired; use Linear intake.'
+    );
+  }
   const token = process.env.GH_TOKEN;
   const owner = process.env.GITHUB_REPOSITORY_OWNER ?? 'JovieInc';
   const repo = process.env.GITHUB_REPOSITORY?.split('/')[1] ?? 'Jovie';

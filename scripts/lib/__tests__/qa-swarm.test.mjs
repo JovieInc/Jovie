@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   enqueueForEve,
@@ -29,6 +29,8 @@ import {
 const tempRoots = [];
 
 afterEach(() => {
+  vi.unstubAllGlobals();
+  delete process.env.LINEAR_API_KEY;
   while (tempRoots.length > 0) {
     const root = tempRoots.pop();
     if (root) {
@@ -150,6 +152,115 @@ describe('qa-swarm autonomy', () => {
 });
 
 describe('qa-swarm propose pipeline', () => {
+  it('creates exactly one Linear record before fast-track dispatch', async () => {
+    const { restore } = makeTempRepo();
+    process.env.LINEAR_API_KEY = 'linear-test-key';
+    const fetchSpy = vi.fn(async (_url, init) => {
+      const payload = JSON.parse(init.body);
+      if (payload.query.includes('query Teams')) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: { teams: { nodes: [{ id: 'team-1', key: 'JOV' }] } },
+          }),
+        };
+      }
+      if (payload.query.includes('query TeamLabels')) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: { team: { labels: { nodes: [] } } },
+          }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          data: {
+            issueCreate: {
+              success: true,
+              issue: {
+                id: 'linear-1',
+                identifier: 'JOV-1000',
+                url: 'https://linear.app/jovie/issue/JOV-1000',
+              },
+            },
+          },
+        }),
+      };
+    });
+    vi.stubGlobal('fetch', fetchSpy);
+
+    try {
+      const summary = await proposeQaSwarmFindings({
+        recipeId: 'diff-review',
+        findings: [
+          {
+            id: 'linear-only-fast-track',
+            recipeId: 'diff-review',
+            title: 'Linear-only fast track',
+            summary: 'Must have canonical intake before remediation dispatch.',
+            priority: 'P0',
+            kind: 'objective',
+            evidencePaths: [],
+          },
+        ],
+      });
+
+      const mutations = fetchSpy.mock.calls
+        .map(([, init]) => JSON.parse(init.body))
+        .filter(payload => payload.query.includes('mutation Create('));
+      expect(mutations).toHaveLength(1);
+      expect(summary.fastTrackedCount).toBe(1);
+      expect(summary.proposed[0]).toMatchObject({
+        linear: { identifier: 'JOV-1000' },
+      });
+      expect(summary.proposed[0]).not.toHaveProperty('github');
+    } finally {
+      restore();
+    }
+  });
+
+  it('fails closed without remediation dispatch when Linear is rate-limited', async () => {
+    const { restore } = makeTempRepo();
+    process.env.LINEAR_API_KEY = 'linear-test-key';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: false,
+        status: 429,
+        text: async () => 'rate limited',
+      }))
+    );
+
+    try {
+      const summary = await proposeQaSwarmFindings({
+        recipeId: 'diff-review',
+        eveEnabled: true,
+        findings: [
+          {
+            id: 'linear-rate-limit',
+            recipeId: 'diff-review',
+            title: 'Linear rate limit',
+            summary: 'Must not dispatch without canonical intake.',
+            priority: 'P0',
+            kind: 'objective',
+            evidencePaths: [],
+          },
+        ],
+      });
+
+      expect(summary.fastTrackedCount).toBe(0);
+      expect(summary.eveQueuedCount).toBe(0);
+      expect(summary.proposed[0].linear).toMatchObject({
+        success: false,
+        queued: true,
+      });
+    } finally {
+      restore();
+    }
+  });
+
   it.each([
     '../escape',
     'nested/run',

@@ -138,7 +138,7 @@ ok "validated and installed launchd artifacts"
 if [[ "$MODE" == "reconfigure" ]]; then
   log "Reconfigure complete. Restart with:"
   echo "  launchctl kickstart -k gui/\$(id -u)/co.jovie.hermes.cron-codex-kanban-ship"
-  echo "  launchctl kickstart -k gui/\$(id -u)/co.jovie.hermes.cron-codex-issue-shipper"
+  echo "  GitHub Issue shipper remains retired and disabled."
   exit 0
 fi
 
@@ -152,10 +152,9 @@ while IFS= read -r label; do
 done < <(pro_labels)
 
 for label in co.jovie.hermes.cron-codex-issue-shipper; do
-  plist="${LAUNCH_AGENTS}/${label}.plist"
   launchctl bootout "gui/$(id -u)/${label}" 2>/dev/null || true
-  launchctl bootstrap "gui/$(id -u)" "$plist"
-  ok "bootstrapped $label"
+  launchctl disable "gui/$(id -u)/${label}"
+  ok "kept retired $label disabled"
 done
 
 # agentcookie sender (optional — only if binary is installed and env vars are set)
@@ -171,5 +170,5 @@ fi
 
 ok "Houston launchd bootstrap complete."
 log "Force a run: launchctl kickstart -k gui/\$(id -u)/co.jovie.hermes.cron-codex-kanban-ship"
-log "Force shipper: launchctl kickstart -k gui/\$(id -u)/co.jovie.hermes.cron-codex-issue-shipper"
-log "Tail logs: tail -f ~/.hermes/logs/launchd/cron-codex-kanban-ship.log ~/.hermes/logs/ship-loop.log ~/.hermes/logs/launchd/cron-codex-issue-shipper.log"
+log "GitHub Issue shipper is retired; do not kickstart it."
+log "Tail logs: tail -f ~/.hermes/logs/launchd/cron-codex-kanban-ship.log ~/.hermes/logs/ship-loop.log"

@@ -17,6 +17,9 @@ from pathlib import Path
 from typing import Iterable
 
 
+GITHUB_ISSUE_INTAKE_RETIRED = True
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -427,6 +430,10 @@ def resolve_tsx(repo_root: Path) -> str | None:
 
 
 def main() -> int:
+    if GITHUB_ISSUE_INTAKE_RETIRED:
+        log("RETIRED: Linear-backed Symphony is the sole intake selector")
+        return 0
+
     hermes_home = Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes"))
     load_env_file(hermes_home / ".env")
 

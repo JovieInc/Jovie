@@ -50,15 +50,16 @@ describe('test coverage audit workflow', () => {
     }
   });
 
-  it('reports failures and cancellations with a provisioned label', () => {
+  it('keeps the historical GitHub Issue notifier behind an impossible guard', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const notifyStep = getStepBlock(workflow, 'Notify on failure');
 
-    expect(notifyStep).toContain('if: failure() || cancelled()');
     expect(notifyStep).toContain(
-      'gh label create "test-coverage-audit-failure"'
+      "if: ${{ github.event_name == '__retired_linear_only__' }}"
     );
-    expect(notifyStep).toContain('--force');
-    expect(notifyStep).toContain('--label "test-coverage-audit-failure"');
+    expect(notifyStep).toContain(
+      'Historical writer retained behind the impossible retirement guard.'
+    );
+    expect(workflow).not.toContain('issues: write');
   });
 });

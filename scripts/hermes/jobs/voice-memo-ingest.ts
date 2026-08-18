@@ -13,7 +13,7 @@
  *     back to whisper.cpp (~700 MB peak, guarded by heavy-job lock).
  *  3. Write the full transcript to gbrain (durable memory).
  *  4. Classify into spans: memory | issue | task.
- *  5. For each `issue` span → file a GitHub issue (Linear mirror optional).
+ *  5. For each `issue` span → file exactly one Linear issue.
  *  6. For each `task` span → log for Hermes daemon routing (the daemon
  *     polls this log and routes to sub-agents). v1: log only; Hermes
  *     daemon integration follows after observability.
@@ -216,7 +216,7 @@ async function classifyTranscript(
   const system =
     'You segment voice-memo transcripts for an orchestration agent named Hermes. ' +
     'Return ONLY a JSON array of spans. Each span is {"kind":"memory"|"issue"|"task","text":"...","title":"...","target":"chief|cfo|founder-os|code-orchestrator"}. ' +
-    'kind=memory for ambient brain dumps. kind=issue for engineering/product/ops work that should become a GitHub issue (include a concise imperative title). kind=task for non-engineering actions (calendar, airtable, email) routed to a sub-agent (set target). ' +
+    'kind=memory for ambient brain dumps. kind=issue for engineering/product/ops work that should become exactly one Linear issue (include a concise imperative title). kind=task for non-engineering actions (calendar, airtable, email) routed to a sub-agent (set target). ' +
     'If unsure, default to memory. Do not include any prose outside the JSON.';
 
   const result = await chat(
@@ -409,7 +409,7 @@ async function ingestFile(filePath: string): Promise<void> {
     `Memo ingested (${durationS}s).`,
     `gbrain: ${gbrainId.slice(0, 12)}…`,
     filedIssues.length > 0
-      ? `GitHub: ${filedIssues.map(f => f.identifier).join(', ')}`
+      ? `Linear: ${filedIssues.map(f => f.identifier).join(', ')}`
       : null,
     taskCount > 0 ? `Tasks queued: ${taskCount}` : null,
     memoryCount > 0 ? `Memory spans: ${memoryCount}` : null,

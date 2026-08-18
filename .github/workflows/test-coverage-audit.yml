@@ -38,7 +38,6 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: write
-      issues: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -94,12 +93,14 @@ jobs:
           git push
 
       - name: Notify on failure
-        if: failure() || cancelled()
+        # Retired: artifacts and the failed run are the reporting receipt.
+        # Linear ingestion must be added before tracker notification resumes.
+        if: ${{ github.event_name == '__retired_linear_only__' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Surface cron failures as a Linear-trackable GitHub issue rather
-          # than silently letting the nightly heatmap go stale.
+          # Historical writer retained behind the impossible retirement guard.
+          # A Linear-only notifier is required before reactivation.
           gh label create "test-coverage-audit-failure" \
             --color "B60205" \
             --description "Nightly test coverage audit failures" \

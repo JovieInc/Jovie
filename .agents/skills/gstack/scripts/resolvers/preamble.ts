@@ -339,9 +339,9 @@ Use AskUserQuestion:
 >
 > This is a collaborative repo — these may be someone else's responsibility.
 >
-> RECOMMENDATION: Choose B — assign it to whoever broke it so the right person fixes it. Completeness: 9/10.
+> RECOMMENDATION: Choose B — assign the canonical Linear issue to whoever broke it so the right person fixes it. Completeness: 9/10.
 > A) Investigate and fix now anyway — Completeness: 10/10
-> B) Blame + assign GitHub issue to the author — Completeness: 9/10
+> B) Blame + assign required Linear issue to the author — Completeness: 9/10
 > C) Create required Linear follow-up — Completeness: 7/10
 > D) Skip — ship anyway — Completeness: 3/10
 
@@ -359,7 +359,7 @@ Use AskUserQuestion:
 - Do not add the \`automated\` label unless a human explicitly asks for unattended dispatch.
 - Continue with the workflow — treat the pre-existing failure as non-blocking once the Linear issue ID is captured.
 
-**If "Blame + assign GitHub issue" (collaborative only):**
+**If "Blame + assign required Linear issue" (collaborative only):**
 - Find who likely broke it. Check BOTH the test file AND the production code it tests:
   \`\`\`bash
   # Who last touched the failing test?
@@ -368,22 +368,10 @@ Use AskUserQuestion:
   git log --format="%an (%ae)" -1 -- <source-file-under-test>
   \`\`\`
   If these are different people, prefer the production code author — they likely introduced the regression.
-- Create an issue assigned to that person (use the platform detected in Step 0):
-  - **If GitHub:**
-    \`\`\`bash
-    gh issue create \\
-      --title "Pre-existing test failure: <test-name>" \\
-      --body "Found failing on branch <current-branch>. Failure is pre-existing.\\n\\n**Error:**\\n\`\`\`\\n<first 10 lines>\\n\`\`\`\\n\\n**Last modified by:** <author>\\n**Noticed by:** gstack /ship on <date>" \\
-      --assignee "<github-username>"
-    \`\`\`
-  - **If GitLab:**
-    \`\`\`bash
-    glab issue create \\
-      -t "Pre-existing test failure: <test-name>" \\
-      -d "Found failing on branch <current-branch>. Failure is pre-existing.\\n\\n**Error:**\\n\`\`\`\\n<first 10 lines>\\n\`\`\`\\n\\n**Last modified by:** <author>\\n**Noticed by:** gstack /ship on <date>" \\
-      -a "<gitlab-username>"
-    \`\`\`
-- If neither CLI is available or \`--assignee\`/\`-a\` fails (user not in org, etc.), create the issue without assignee and note who should look at it in the body.
+- Create one required Linear issue using \`${linearFollowupsPath}\`, include the
+  attribution evidence above, and assign it to that person when they have a
+  Linear identity. If assignment is unavailable, name the intended owner in the
+  body. Never fall back to a GitHub or GitLab issue.
 - Continue with the workflow.
 
 **If "Skip":**

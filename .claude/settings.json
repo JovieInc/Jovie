@@ -323,7 +323,6 @@
         "gh pr ready *",
         "gh pr close *",
         "gh pr reopen *",
-        "gh issue create *",
         "gh run rerun *",
         "gh run cancel *",
         "gh workflow run *",

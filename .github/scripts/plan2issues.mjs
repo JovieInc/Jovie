@@ -4,6 +4,13 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { Octokit } from 'octokit';
 
+const GITHUB_ISSUE_INTAKE_RETIRED = true;
+if (GITHUB_ISSUE_INTAKE_RETIRED) {
+  throw new Error(
+    'GitHub Issue intake is retired; create canonical work in Linear.'
+  );
+}
+
 const planPath = process.env.PLAN_PATH || 'PLAN.md'; // or your plan file
 const copilotAssignee = process.env.COPILOT_ASSIGNEE || 'copilot'; // adjust if UI shows a different handle
 const token = process.env.GITHUB_TOKEN;

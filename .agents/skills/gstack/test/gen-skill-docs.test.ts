@@ -773,9 +773,9 @@ describe('TEST_FAILURE_TRIAGE resolver', () => {
     expect(shipSkill).toContain('Skip');
   });
 
-  test('collaborative mode offers blame + assign option', () => {
-    expect(shipSkill).toContain('Blame + assign GitHub issue');
-    expect(shipSkill).toContain('gh issue create');
+  test('collaborative mode offers a Linear-only blame + assign option', () => {
+    expect(shipSkill).toContain('Blame + assign required Linear issue');
+    expect(shipSkill).not.toContain('gh issue create');
   });
 
   test('defaults ambiguous failures to in-branch (safety)', () => {

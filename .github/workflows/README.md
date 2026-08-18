@@ -18,10 +18,12 @@ This repository uses trunk-based development with a single long-lived branch:
 Workflow triggers below describe YAML capability, not live GitHub enablement.
 During the all-PR drain, enable **Merge Queue Auto-Enroll** and **Auto-Ready Agent
 Drafts** first. Enable **Main CI Health Monitor** and **Main Autofix** only after
-the queue and production topology have produced bounded proof. Keep GitHub AI
-Orchestrator, Agent Pipeline, PR Conflict Handler, Agent Tick, Stuck Draft
-Auto-Close, Auto-Fix Lint on Agent Drafts, Taste Classifier/Guard, Auto-PR on
-Agent Push, and the legacy Release Loop disabled throughout the drain. The newly added Production
+the queue and production topology have produced bounded proof. GitHub AI
+Orchestrator, GitHub AI Dispatcher, and Agent Tick are retired at source because
+Linear-backed Symphony is the sole intake selector. Keep Agent Pipeline, PR
+Conflict Handler, Stuck Draft Auto-Close, Auto-Fix Lint on Agent Drafts, Taste
+Classifier/Guard, Auto-PR on Agent Push, and the legacy Release Loop disabled
+throughout the drain. The newly added Production
 Controller, Production Controller Health, and Production Release workflows
 should register active on land; verify their live state before relying on
 continuous delivery. A workflow-file merge does not re-enable a workflow that
@@ -98,22 +100,23 @@ The `agent-landing-sweep.yml` workflow is manual-only. When explicitly dispatche
 
 Use it as an operator recovery tool when the event-driven pipeline missed delivery; it is not an active polling loop.
 
-## GitHub AI Automation
+## Linear-only intake and retired GitHub Issue automation
 
-The GitHub-native agent path uses two workflows:
+Linear-backed Symphony is the only canonical backlog selector. GitHub remains
+authoritative for PRs, Actions, and merge-queue evidence. The historical
+GitHub-Issue workflows remain visible for auditability but cannot run:
 
 - **`github-ai-orchestrator.yml`**
-  - Trigger: `issues.labeled` with `agent-ready`, or `workflow_dispatch` replay
-  - Behavior: claims the issue (`status:in-progress`), runs Claude Code implementation, opens a PR with `Fixes #N`, then moves the issue to `status:in-review`
-  - Capacity controls: new agent work is deferred when 5 agent PRs are already open
+  - Trigger: manual `workflow_dispatch` is retained only for visibility
+  - Behavior: all jobs are unconditionally skipped; a workflow-state flip cannot restore GitHub Issue selection
 
 - **`github-ai-dispatcher.yml`**
-  - Trigger: `workflow_dispatch` only
-  - Behavior: scans open `agent-ready` issues without status labels, dispatches the orchestrator when capacity allows
+  - Trigger: manual `workflow_dispatch` is retained only for visibility
+  - Behavior: its only job is unconditionally skipped; it never scans GitHub Issues
 
-- **`linear-sync-on-merge.yml`** (parallel-run mirror only)
+- **`linear-sync-on-merge.yml`**
   - Trigger: `pull_request.closed` (merged)
-  - Behavior: reads legacy Linear markers from PR body and syncs the mirror issue to Done until `TRACKER_GITHUB_ONLY=1`
+  - Behavior: reads the canonical Linear marker from the merged PR and transitions that issue to Done
 
 ## Main CI Health Monitor
 

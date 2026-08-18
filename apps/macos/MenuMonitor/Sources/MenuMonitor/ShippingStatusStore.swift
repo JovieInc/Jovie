@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-/// Polls Hermes kanban (or GitHub fallback) for shipping counts and runs ops actions.
+/// Polls Linear-backed Symphony status for shipping counts and runs ops actions.
 @MainActor
 final class ShippingStatusStore: ObservableObject {
   @Published private(set) var inProgressCount: Int = 0
@@ -45,17 +45,9 @@ final class ShippingStatusStore: ObservableObject {
       lastError = nil
       lastRefresh = Date()
     } catch {
-      // GitHub fallback when hermes kanban is unavailable
-      do {
-        let ghCount = try await Self.fetchGitHubInProgressCount()
-        inProgressCount = ghCount
-        readyCount = 0
-        blockedCount = 0
-        lastError = "Kanban unavailable — GitHub fallback (\(error.localizedDescription))"
-        lastRefresh = Date()
-      } catch {
-        lastError = error.localizedDescription
-      }
+      // Fail closed: stale/unknown is safer than presenting GitHub Issue
+      // labels as canonical backlog or active-work counts.
+      lastError = "Linear/Symphony status unavailable — no GitHub Issue fallback (\(error.localizedDescription))"
     }
   }
 
@@ -153,24 +145,6 @@ final class ShippingStatusStore: ObservableObject {
         }
       }
       return Counts(inProgress: inProgress, ready: ready, blocked: blocked)
-    }.value
-  }
-
-  nonisolated static func fetchGitHubInProgressCount() async throws -> Int {
-    try await Task.detached(priority: .utility) {
-      let json = try runProcess(
-        "/bin/zsh",
-        args: [
-          "-lc",
-          "gh issue list -R JovieInc/Jovie --state open --label 'status:in-progress' --json number --limit 100 2>/dev/null",
-        ]
-      )
-      guard let data = json.data(using: .utf8),
-            let rows = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
-      else {
-        return 0
-      }
-      return rows.count
     }.value
   }
 

@@ -71,21 +71,21 @@ Multiple agents run in parallel (Conductor workspaces, autopilot, ad-hoc session
 
 ### The contract
 
-1. **On start — mark the Linear issue `In Progress`.** Do this BEFORE reading code or editing files. If the issue is unassigned, assign it to yourself (or the human owner) at the same time. This is the required initial manual transition (the only one for orchestrator-dispatched work; ad-hoc work also needs a manual `In Review` transition on PR open — see step 2).
+1. **On start — require an `In Progress` Linear receipt.** Linear-backed Symphony records the transition as part of an admitted lease. Ad-hoc agents must do it manually before edits. If the issue is unassigned, assign it to yourself (or the human owner) at the same time.
 
 2. **On PR open —** behavior depends on how the work was started:
-   - **Orchestrator-dispatched work** (branches created by `linear-ai-orchestrator.yml`): no action required. The `sync_linear_in_review` job auto-transitions the issue to `In Review` when the PR opens.
-   - **Ad-hoc work** (direct agent sessions, manually opened PRs): manually transition the Linear issue to `In Review` when you open the PR. The orchestrator's `sync_linear_in_review` job does NOT run for branches it didn't dispatch.
+   - **Symphony-dispatched work:** follow the lease handoff and require its `In Review` transition receipt.
+   - **Ad-hoc work** (direct agent sessions, manually opened PRs): manually transition the Linear issue to `In Review` when you open the PR.
 
    In both cases, preserve the PR body's `<!-- linear-issue-id:... -->` comment and the `jov-XXXX` branch pattern so `linear-sync-on-merge.yml` can find the issue at merge time.
 
 3. **On merge — no action required.** `linear-sync-on-merge.yml` auto-transitions the issue to `Done` and posts the merge SHA as a comment.
 
-Do NOT manually perform the In Review or Done transitions — you will race the workflows and produce confusing state.
+Do not duplicate a Symphony-owned transition. Never manually perform the `Done` transition; that races the merge workflow.
 
-### Orchestrator-dispatched work
+### Symphony-dispatched work
 
-When the Linear AI orchestrator dispatches work (`linear-ai-orchestrator.yml` `assign_to_codex` job), it sets `In Progress` at dispatch time. If your session was started by the orchestrator, the transition is already done — skip step 1.
+When Linear-backed Symphony dispatches work, it must hold the Linear lease and record the `In Progress` transition before implementation begins. If your session was started by Symphony, verify that receipt and do not create or consult a GitHub Issue as fallback intake.
 
 ### How to transition
 
@@ -99,7 +99,7 @@ mcp__claude_ai_Linear__list_issue_statuses({ team: "<team-id-or-key>" })
 mcp__claude_ai_Linear__save_issue({ id: "<issue-id>", state: "<in-progress-state-id>" })
 ```
 
-Without Linear MCP, use the GraphQL API directly (same pattern as `.github/workflows/linear-ai-orchestrator.yml` — look up the state where `name` matches `/in progress/i`, then call `issueUpdate`).
+Without Linear MCP, use the existing Linear GraphQL client pattern: look up the state where `name` matches `/in progress/i`, then call `issueUpdate`. Fail closed on authentication, rate-limit, or mutation errors; never fall back to GitHub Issues.
 
 ### No Linear issue (ad-hoc work)
 

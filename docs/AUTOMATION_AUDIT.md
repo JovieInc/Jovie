@@ -79,8 +79,10 @@ Declared YAML triggers describe workflow capability, not the repository's live
 GitHub enablement state. During the PR-drain rollout, enable only **Merge Queue
 Auto-Enroll** and **Auto-Ready Agent Drafts** first. Enable **Main CI Health
 Monitor** and **Main Autofix** only after the staged queue and production path
-have produced bounded proof. Keep **GitHub AI Orchestrator**, **Agent Pipeline**,
-**PR Conflict Handler**, **Agent Tick**, **Stuck Draft Auto-Close**, **Auto-Fix
+have produced bounded proof. **GitHub AI Orchestrator**, **GitHub AI
+Dispatcher**, and **Agent Tick** are retired at source under the Linear-only
+intake contract. Keep **Agent Pipeline**,
+**PR Conflict Handler**, **Stuck Draft Auto-Close**, **Auto-Fix
 Lint on Agent Drafts**, **Taste Classifier**, **Taste Label Guard**, **Auto-PR on
 Agent Push**, and the legacy **Release Loop** disabled throughout the drain. The new **Production
 Controller**, **Production Controller Health**, and **Production Release**
@@ -96,8 +98,8 @@ until the observer-only definition lands and is proven.
 
 | Workflow | File | Trigger | What It Does | Usage Pattern | Recommendation |
 |----------|------|---------|--------------|--------------|----------------|
-| **GitHub AI Orchestrator** | `github-ai-orchestrator.yml` | GitHub issue receives `agent-ready` + `workflow_dispatch` replay | Implements one eligible GitHub issue, pushes a branch, and opens a PR; capacity-gated at 5 open agent PRs | Verified `disabled_manually` (workflow ID `306926687`) at rollout preparation | **Keep disabled during drain** — do not admit new agent work while draining existing PRs |
-| **GitHub AI Dispatcher** | `github-ai-dispatcher.yml` | `workflow_dispatch` only | Scans `agent-ready` GitHub issues and dispatches bounded orchestrator replays | Manual recovery | **Manual-only** — no active polling schedule |
+| **GitHub AI Orchestrator** | `github-ai-orchestrator.yml` | Audit-only `workflow_dispatch` | All jobs are hard-skipped; GitHub Issues cannot select, claim, or dispatch work | Verified `disabled_manually` (workflow ID `306926687`) | **Retired** — Linear-backed Symphony is the sole backlog selector |
+| **GitHub AI Dispatcher** | `github-ai-dispatcher.yml` | Audit-only `workflow_dispatch` | Its only job is hard-skipped; no GitHub Issue scan or dispatch can run | Verified `disabled_manually` (workflow ID `306926686`) | **Retired** — a workflow-state flip cannot restore intake |
 | **Linear AI Dispatcher** | retired (workflow removed) | none | Legacy scheduled Linear polling loop | none | **Retired** — no active `linear-ai-dispatcher.yml` exists |
 | **Hermes CLI Worker** | `hermes-cli-worker.yml` | `repository_dispatch` (`hermes_cli_worker`) + `workflow_dispatch` | Runs a self-hosted CLI worker (codex-cli, claude-code, or ruflo) on Hermes tasks; supports kinds: investigation, bug_patch, code_review, qa, triage, support_draft | Recently shipped (PR #8092); triggered on-demand | **Keep — enable if self-hosted runner is ready** — requires `[self-hosted, hermes]` runner. Verify runner is operational before routing work here. |
 | **Merge Queue Auto-Enroll** | `merge-queue-autoenroll.yml` | PR/CI/main events + manual; no schedule | Revalidates the exact current head and enrolls eligible PRs into GitHub's native merge queue | First controller enabled during drain | **Keep enabled first** — canonical queue enrollment owner |
@@ -110,7 +112,7 @@ until the observer-only definition lands and is proven.
 | **Nightly Tests** | `nightly-tests.yml` | `30 23 * * *` America/Los_Angeles + manual | Runs Knip dead-code audit, full unit test suite, E2E suite (including Design V1 canary and full-surface chaos), Slack alerts on failure | Daily; at least a 90-minute buffer before the 09:00 UTC screenshot/Tuesday harness lanes | **Keep** — only place full E2E and dead-code audits run; flags regressions before they compound |
 | **Nightly Testing Agent** | `nightly-testing-agent.yml` | Scheduled `30 4 * * *` PT | Risk-ranked target selection, unit telemetry normalization, Stryker mutation hotspots, commits `docs/NIGHTLY_TESTING_AGENT_REPORT.md`, publishes Redis ops snapshot for `/app/admin/ops` | Daily | **Keep** — deterministic, LLM-free regression intelligence loop (JOV-1870) |
 | **Synthetic Monitoring** | `synthetic-monitoring.yml` | Every 6 hours + manual dispatch | Front-door, Better Auth production account, onboarding, and public-profile canaries against `jov.ie`; the account canary creates one exact throwaway identity and transactionally proves zero residue | Independent production health lane | **Keep** — isolated from the retired Agent Tick monolith and outside deploy-blocking CI |
-| **Cost Anomaly Gate** | `cost-anomaly-gate.yml` | Declared `*/15 * * * *` UTC + manual | Alert-only Sentry event-volume observer; opens one deduplicated incident and never mutates production | Every 15 minutes only when the workflow is explicitly enabled and Production secrets resolve | **Keep activation-gated** — verify workflow state and secrets before relying on continuous coverage |
+| **Cost Anomaly Gate** | `cost-anomaly-gate.yml` | Declared `*/15 * * * *` UTC + manual | Alert-only Sentry event-volume observer; emits Slack + Actions evidence and never creates a GitHub Issue or mutates production | Every 15 minutes only when the workflow is explicitly enabled and Production secrets resolve | **Keep activation-gated** — Linear incident ingestion remains a separate fail-closed migration |
 | **Linear Sync on Merge** | `linear-sync-on-merge.yml` | `pull_request` (closed) | Extracts Linear issue marker from merged PR, transitions issue to Done, posts merge SHA comment | Per-merge | **Keep** — closes the Linear state loop for all merged PRs, not just agent ones |
 | **Auto-PR on Agent Push** | `auto-pr-on-push.yml` | `push` to `codex/**`, `codegen-bot/**`, `linear/**`, `claude/**`, `*/jov-**` | Creates draft PR when agent pushes branch without an existing PR; extracts Linear ticket ID | Disabled throughout drain; trigger is declarative only | **Keep disabled during drain** — avoids admitting new work while draining the queue |
 | **Agent PR Verify Ready** | retired (workflow disabled and removed) | none | Duplicated source-PR verification and promoted drafts from stale event runs | none | **Retired** — canonical `CI / PR Ready` plus the current-head Auto-Ready controller own this transition without a second CI fanout |
@@ -141,7 +143,7 @@ Founder priorities (current cycle): **product stability → design system transf
 
 | Automation | KPI Impact | Mechanism |
 |------------|-----------|-----------|
-| `github-ai-orchestrator` | Agentic ops lock, design system transfer | Event-driven GitHub issue → implementation → PR pipeline |
+| Linear-backed Symphony | Agentic ops lock, design system transfer | Canonical Linear issue → owned implementation → GitHub PR pipeline |
 | `main-autofix` + `main-ci-health-monitor` | Product stability | Catches and fixes red main without founder interrupt; 3-attempt cap prevents runaway |
 | `sentry-autofix` | Product stability | Closes the production-error → fix loop automatically; each Sentry issue that gets auto-fixed is one fewer interrupt for the founder |
 | `agent-pipeline` (auto-approve + auto-merge) | All KPIs | Reduces PR review queue backlog; agent-generated code flows to production without founder bottleneck when quality gates pass |

@@ -712,23 +712,21 @@ def test_scheduled_synthetic_alerts_before_preserving_failure() -> None:
     )
 
 
-def test_github_ai_orchestrator_always_finalizes_exact_owned_claim() -> None:
-    """Every claimed run must release for retry or transition its PR to review."""
-    block = _job_block("github-ai-orchestrator.yml", "finalize_claim")
-    claim = _job_block("github-ai-orchestrator.yml", "claim_issue")
-
-    assert "needs: [guard, claim_issue, implement_and_open_pr]" in block
-    assert "if: ${{ always() && needs.guard.outputs.should_run == 'true' }}" in block
-    assert "IMPLEMENT_RESULT: ${{ needs.implement_and_open_pr.result }}" in block
-    assert 'OUTCOME="retryable"' in block
-    assert 'OUTCOME="in-review"' in block
-    assert "github-finalize-issue-claim.mjs" in block
-    owner_token = (
-        "github-ai:${{ github.repository }}:${{ github.run_id }}:"
-        "${{ github.run_attempt }}"
+def test_github_ai_orchestrator_is_manual_only_and_hard_disabled() -> None:
+    """A workflow-state flip must not restore GitHub Issue intake."""
+    workflow = (WORKFLOWS / "github-ai-orchestrator.yml").read_text(
+        encoding="utf-8"
     )
-    assert owner_token in block
-    assert owner_token in claim
+    triggers = workflow.split("\njobs:", 1)[0]
+
+    assert "workflow_dispatch:" in triggers
+    assert "issues:" not in triggers
+    for job in ("guard", "claim_issue", "implement_and_open_pr", "finalize_claim"):
+        job_block = _job_block("github-ai-orchestrator.yml", job)
+        assert (
+            "if: ${{ github.event_name == '__retired_linear_only__' }}"
+            in job_block
+        )
 
 
 def test_live_model_work_never_fans_out_from_pull_requests() -> None:
@@ -1006,17 +1004,16 @@ def test_fleet_controllers_share_one_evaluate_action() -> None:
     assert "expected-sha: ${{ github.event.workflow_run.head_sha }}" in production
 
 
-def test_github_ai_dispatcher_wakes_on_capacity_and_uses_idle_slots() -> None:
-    """Agent-ready work must not sit while org runner concurrency is idle."""
+def test_github_ai_dispatcher_is_manual_only_and_hard_disabled() -> None:
+    """GitHub Issues cannot select work even if the workflow is re-enabled."""
     workflow = (WORKFLOWS / "github-ai-dispatcher.yml").read_text(encoding="utf-8")
     block = _job_block("github-ai-dispatcher.yml", "dispatch")
+    triggers = workflow.split("\njobs:", 1)[0]
 
-    assert "workflow_run:" in workflow
-    assert "pull_request:" in workflow
-    assert "issues:" in workflow
-    assert "github.event.workflow_run.conclusion != 'cancelled'" in block
-    assert "github.event.label.name == 'agent-ready'" in block
-    assert "MAX_OPEN_AGENT_PRS: '24'" in block
-    assert "MAX_DISPATCH: ${{ inputs.max_dispatch || '8' }}" in block
-    assert "MAX_OPEN_AGENT_PRS: '5'" not in block
-    assert "schedule:" not in workflow.split("\njobs:", 1)[0]
+    assert "workflow_dispatch:" in triggers
+    assert "workflow_run:" not in triggers
+    assert "pull_request:" not in triggers
+    assert "issues:" not in triggers
+    assert (
+        "if: ${{ github.event_name == '__retired_linear_only__' }}" in block
+    )
