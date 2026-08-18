@@ -15,6 +15,10 @@ describe('UtmBuilderDialog', () => {
   it('shows the bare URL until params are entered', () => {
     render(<UtmBuilderDialog open onClose={vi.fn()} baseUrl={baseUrl} />);
     expect(screen.getByText(baseUrl)).toBeInTheDocument();
+
+    const sourceLabel = screen.getByText('Source');
+    expect(sourceLabel).toHaveAttribute('data-required', 'true');
+    expect(sourceLabel.closest('div')).toHaveClass('grid', 'gap-1.5');
   });
 
   it('appends only non-empty utm params and copies the result', async () => {

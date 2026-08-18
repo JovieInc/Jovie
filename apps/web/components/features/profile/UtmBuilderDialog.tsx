@@ -1,9 +1,8 @@
 'use client';
 
-import { Button, Input } from '@jovie/ui';
+import { Button, Input, Label } from '@jovie/ui';
 import { Check, Copy, ExternalLink } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { Label } from '@/components/atoms/Label';
 import { toast } from '@/components/feedback';
 import {
   Dialog,
@@ -100,7 +99,7 @@ export function UtmBuilderDialog({
       <DialogTitle>UTM Builder</DialogTitle>
       <DialogBody className='space-y-3'>
         {UTM_FIELDS.map(({ key, label, required, placeholder }) => (
-          <div key={key}>
+          <div key={key} className='grid gap-1.5'>
             <Label htmlFor={`utm-${key}`} required={required}>
               {label}
             </Label>
