@@ -31,6 +31,19 @@ export const CI_CONTROL_TEST_FILES = Object.freeze([
   'scripts/lib/__tests__/setup-worktree-health.test.mjs',
 ]);
 
+/**
+ * @typedef {object} CiControlSpawnResult
+ * @property {Error} [error]
+ * @property {number | null} [status]
+ */
+
+/**
+ * @typedef {(command: string, args: readonly string[], options: import('node:child_process').SpawnSyncOptions) => CiControlSpawnResult} CiControlSpawn
+ */
+
+/**
+ * @param {{ spawnSyncImpl?: CiControlSpawn }} [options]
+ */
 export function runCiControlTests({ spawnSyncImpl = spawnSync } = {}) {
   const testFiles = CI_CONTROL_TEST_FILES.map(file =>
     file.replace(/^scripts\//, '')
