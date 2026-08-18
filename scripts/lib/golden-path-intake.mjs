@@ -1,6 +1,5 @@
 const LINEAR_API = 'https://api.linear.app/graphql';
 const JOVIE_TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
-
 async function readResponse(response) {
   const text = await response.text();
   if (!text) return { json: null, text: '' };
@@ -11,10 +10,6 @@ async function readResponse(response) {
   }
 }
 
-/**
- * Create the one canonical Linear record required before golden-path dispatch.
- * Never falls back or retries through another tracker.
- */
 export async function createGoldenPathLinearIssue(
   { fingerprint, prompt, apiKey = process.env.LINEAR_API_KEY },
   fetchImpl = fetch

@@ -2,8 +2,8 @@
 #
 # PURPOSE: Continuous post-deploy safety net that detects when production event
 # volume (a proxy for cost-driving activity: function invocations, external API
-# calls, log volume) spikes beyond a baseline. On anomaly: emit an Actions
-# receipt and alert Slack; this observer never mutates production or a tracker.
+# calls, log volume) spikes beyond a baseline. On anomaly: alert and open an
+# incident; this observer never mutates production.
 #
 # This complements the one-shot Sentry Error Gate. The error gate catches
 # regressions that THROW; this gate catches runaways that SUCCEED — a tight
@@ -27,13 +27,13 @@
 # 2. Query Sentry for baseline event count: same hour-of-week from the
 #    prior 4 weeks, averaged.
 # 3. Anomaly if current exceeds either the baseline multiplier or absolute floor.
-# 4. On anomaly: Slack alert + Actions receipt. No production mutation.
+# 4. On anomaly: Slack alert + Actions receipt. No tracker mutation.
 #
 # SAFETY:
 # - Alert-only by construction; it has no Vercel credentials or rollback step.
 # - The absolute floor catches high volume even when a stale baseline is elevated.
-# - GitHub Issues are historical only. Every detected anomaly emits an Actions
-#   receipt and may alert Slack; Linear ingestion is a separate fail-closed path.
+# - GitHub Issue incident creation is retained below only as hard-retired
+#   history. Linear is the sole canonical tracker.
 
 name: Cost Anomaly Gate
 
@@ -233,6 +233,77 @@ jobs:
             echo "reason=Within normal range (current=${CURRENT}, baseline_threshold=${MULTIPLIED}, absolute_floor=${ABSOLUTE_FLOOR})" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Create one open cost-anomaly incident
+        id: retired-github-incident
+        if: ${{ github.event_name == '__retired_linear_only__' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          CURRENT="${{ steps.current.outputs.count }}"
+          BASELINE="${{ steps.baseline.outputs.average }}"
+          REASON="${{ steps.evaluate.outputs.reason }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          INCIDENT_TITLE="[Cost Anomaly] Production event-volume incident"
+
+          # Concurrency serializes evaluators. A fixed open-incident identity
+          # then deduplicates sequential 15-minute runs until operators close it.
+          gh label create cost-monitoring --force \
+            --description "Cost monitoring and anomaly detection" --color "e4e669"
+          gh label create incident --force \
+            --description "Production incident requiring investigation" --color "d93f0b"
+          issues_json="$(gh issue list --state open --label cost-monitoring \
+            --limit 100 --json number,title,url)"
+          jq -e 'type == "array"' >/dev/null <<<"$issues_json"
+          existing_json="$(jq -c --arg title "$INCIDENT_TITLE" \
+            '[.[] | select(.title == $title)] | sort_by(.number) | first // empty' \
+            <<<"$issues_json")"
+          if [ -n "$existing_json" ]; then
+            existing_number="$(jq -r '.number' <<<"$existing_json")"
+            existing_url="$(jq -r '.url' <<<"$existing_json")"
+            [[ "$existing_number" =~ ^[1-9][0-9]*$ ]] &&
+              [[ "$existing_url" == https://github.com/* ]] || {
+              echo "::error::Existing cost anomaly incident evidence is malformed."
+              exit 1
+            }
+            echo "should_notify=false" >> "$GITHUB_OUTPUT"
+            echo "incident_url=$existing_url" >> "$GITHUB_OUTPUT"
+            echo "Cost anomaly remains open in #$existing_number; suppressing duplicate issue and Slack alert."
+            exit 0
+          fi
+
+          BODY_FILE=$(mktemp)
+          {
+            printf '## Cost anomaly detected (alert only)\n\n'
+            printf '**Reason:** %s\n\n' "$REASON"
+            printf '**Current event volume:** %s (last %s min)\n' "$CURRENT" "$LOOKBACK_MINUTES"
+            printf '**Baseline (4-week avg):** %s\n' "$BASELINE"
+            printf '**Threshold:** %sx baseline OR %s absolute floor\n\n' "$THRESHOLD_MULTIPLIER" "$ABSOLUTE_FLOOR"
+            printf '**Production mutation:** none; investigate before using the serialized release controller.\n\n'
+            printf '**Workflow run:** %s\n\n' "$RUN_URL"
+            printf '## Required follow-up\n\n'
+            printf '1. Identify which deployment or traffic source caused the spike.\n'
+            printf '2. Identify the runaway code path: Sentry transactions, Vercel function logs, per-route invocation counts.\n'
+            printf '3. Verify provider-side spend caps held (see docs/COST_MONITORING.md Layer 1 checklist).\n'
+            printf '4. Patch the root cause and redeploy through the serialized production controller.\n'
+            # shellcheck disable=SC2016
+            printf '5. If this was a false positive, tune `threshold_multiplier` or `absolute_floor` in the workflow.\n\n'
+            # shellcheck disable=SC2016
+            printf '## Runbook\nSee `docs/COST_MONITORING.md`.\n'
+          } > "$BODY_FILE"
+
+          incident_url="$(gh issue create \
+            --title "$INCIDENT_TITLE" \
+            --label "cost-monitoring,incident" \
+            --body-file "$BODY_FILE")"
+          [[ "$incident_url" == https://github.com/* ]] || {
+            echo "::error::GitHub did not return the created incident URL."
+            exit 1
+          }
+          echo "should_notify=true" >> "$GITHUB_OUTPUT"
+          echo "incident_url=$incident_url" >> "$GITHUB_OUTPUT"
+
       - name: Prepare Linear-only anomaly receipt
         id: incident
         if: steps.evaluate.outputs.status == 'anomaly'
@@ -263,7 +334,7 @@ jobs:
                 {title: "Reason", value: $reason, short: false},
                 {title: "Current / baseline", value: ($current + " / " + $baseline), short: true},
                 {title: "Production mutation", value: "none", short: true},
-                {title: "Incident", value: ("<" + $incident + "|Open incident>"), short: false},
+                {title: "Receipt", value: ("<" + $incident + "|Open Actions receipt>"), short: false},
                 {title: "Run", value: ("<" + $run + "|View observer run>"), short: false}
               ]}]}')"
 
@@ -275,15 +346,14 @@ jobs:
           CURRENT="${{ steps.current.outputs.count }}"
           BASELINE="${{ steps.baseline.outputs.average }}"
 
-          {
-            echo "### Cost Anomaly Gate Result"
-            echo ""
-            echo "| Metric | Value |"
-            echo "|--------|-------|"
-            echo "| Status | $STATUS |"
-            echo "| Current events (${LOOKBACK_MINUTES} min) | $CURRENT |"
-            echo "| Baseline (4-week avg) | $BASELINE |"
-            echo "| Threshold multiplier | ${THRESHOLD_MULTIPLIER}x |"
-            echo "| Absolute floor | $ABSOLUTE_FLOOR |"
-            echo "| Reason | $REASON |"
-          } >> "$GITHUB_STEP_SUMMARY"
+          # shellcheck disable=SC2129
+          echo "### Cost Anomaly Gate Result" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Metric | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Status | $STATUS |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Current events (${LOOKBACK_MINUTES} min) | $CURRENT |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Baseline (4-week avg) | $BASELINE |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Threshold multiplier | ${THRESHOLD_MULTIPLIER}x |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Absolute floor | $ABSOLUTE_FLOOR |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Reason | $REASON |" >> "$GITHUB_STEP_SUMMARY"

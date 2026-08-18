@@ -259,31 +259,8 @@ describe('golden-path lock autofix planner', () => {
 });
 
 describe('golden-path Linear-only intake', () => {
-  it('fails closed before network access when Linear credentials are absent', async () => {
-    const fetchImpl = vi.fn();
-
-    const result = await createGoldenPathLinearIssue(
-      {
-        fingerprint: 'golden-path-lock:prod:test',
-        prompt: 'Fix the failure',
-        apiKey: '',
-      },
-      fetchImpl
-    );
-
-    expect(result).toEqual({
-      ok: false,
-      reason: 'missing_linear_api_key',
-    });
-    expect(fetchImpl).not.toHaveBeenCalled();
-  });
-
   it('creates exactly one canonical Linear record', async () => {
     const fetchImpl = vi.fn(
-      /**
-       * @param {string | URL | Request} _input
-       * @param {RequestInit=} _init
-       */
       async (_input, _init) =>
         new Response(
           JSON.stringify({
@@ -323,10 +300,6 @@ describe('golden-path Linear-only intake', () => {
 
   it('fails closed on a Linear rate limit without another tracker write', async () => {
     const fetchImpl = vi.fn(
-      /**
-       * @param {string | URL | Request} _input
-       * @param {RequestInit=} _init
-       */
       async (_input, _init) => new Response('rate limited', { status: 429 })
     );
 

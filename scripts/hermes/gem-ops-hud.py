@@ -51,6 +51,12 @@ WORKFLOWS = {
 }
 LINEAR_API = "https://api.linear.app/graphql"
 LINEAR_TEAM_KEY = "JOV"
+GITHUB_READY_LABELS = {"agent-ready", "ready-for-intake"}
+GITHUB_ISSUE_FALLBACK_RETIRED = True
+
+
+class IssueSourceUnavailable(RuntimeError):
+    """Both read-only issue sources were unavailable."""
 
 
 def now() -> dt.datetime:
@@ -529,6 +535,27 @@ def fetch_linear_issues() -> dict[str, Any]:
     }
 
 
+def fetch_github_issues() -> dict[str, Any]:
+    if GITHUB_ISSUE_FALLBACK_RETIRED:
+        raise RuntimeError("GitHub Issue fallback retired; Linear is canonical")
+    pages = run_json(
+        ["gh", "api", "--paginate", "--slurp", f"repos/{REPO}/issues?state=open&per_page=100"]
+    )
+    issues = [
+        item for page in pages for item in page if not item.get("pull_request")
+    ]
+    ready = 0
+    for issue in issues:
+        labels = {
+            label.get("name", "").lower()
+            for label in issue.get("labels", [])
+            if isinstance(label, dict)
+        }
+        if labels & GITHUB_READY_LABELS:
+            ready += 1
+    return {"open": len(issues), "backlog": len(issues), "ready": ready}
+
+
 def fetch_issue_source() -> dict[str, Any]:
     try:
         counts = fetch_linear_issues()
@@ -541,12 +568,29 @@ def fetch_issue_source() -> dict[str, Any]:
         }
     except Exception as exc:
         linear_error = linear_error_kind(exc)
+
+    if GITHUB_ISSUE_FALLBACK_RETIRED:
         return {
             "updated": iso(),
             "error": f"linear_{linear_error}",
             "source": "linear",
             "degraded": True,
         }
+
+    try:
+        counts = fetch_github_issues()
+        return {
+            "updated": iso(),
+            "error": None,
+            "source": "github",
+            "degraded": True,
+            "linear_error": linear_error,
+            **counts,
+        }
+    except Exception as exc:
+        raise IssueSourceUnavailable(
+            f"linear_{linear_error};github_{type(exc).__name__}"
+        ) from None
 
 
 def process_count(needle: str) -> int:
@@ -845,6 +889,8 @@ def render(state: dict[str, Any]) -> str:
     issue_status = (
         "AUTHORITATIVE"
         if issue_source == "LINEAR"
+        else "DEGRADED"
+        if issue_source == "GITHUB"
         else "NOT MEASURED"
     )
     if issues.get("error"):
@@ -900,11 +946,11 @@ def render(state: dict[str, Any]) -> str:
             (
                 f"last-known counts; {issues.get('error')}"
                 if issues.get("error") and has_issue_counts
-                else f"Linear unavailable; GitHub Issue fallback prohibited; {issues.get('error')}"
+                else f"both read-only sources unavailable; {issues.get('error')}"
                 if issues.get("error")
                 else "Linear workflow states"
                 if issue_source == "LINEAR"
-                else "canonical Linear source unavailable"
+                else f"historical GitHub counts; non-canonical; Linear {issues.get('linear_error', 'unavailable')}"
             ),
         ),
         grid_row(
@@ -912,9 +958,9 @@ def render(state: dict[str, Any]) -> str:
             issues.get("backlog", "?"),
             issue_count_status,
             (
-                "not measured; GitHub Issues are historical only"
-                if issues.get("error")
-                else "Linear Backlog state"
+                "Linear Backlog state"
+                if issue_source == "LINEAR"
+                else "historical open GitHub issues; non-canonical"
             ),
         ),
         grid_row(
@@ -922,9 +968,9 @@ def render(state: dict[str, Any]) -> str:
             issues.get("ready", "?"),
             issue_count_status,
             (
-                "not measured; no GitHub Issue fallback"
-                if issues.get("error")
-                else "Linear unstarted state"
+                "Linear unstarted state"
+                if issue_source == "LINEAR"
+                else "historical GitHub labels; never selectable"
             ),
         ),
         grid_row("In progress", counts.get("implementing", "?"), "RUNNING" if counts.get("implementing") else "IDLE", "local Symphony running status"),
@@ -993,7 +1039,12 @@ def refresh(state: dict[str, Any], remote: bool) -> dict[str, Any]:
         except Exception as exc:
             section = state.setdefault("delivery", {})
             section["error"] = type(exc).__name__
-        state["issues"] = fetch_issue_source()
+        try:
+            state["issues"] = fetch_issue_source()
+        except IssueSourceUnavailable as exc:
+            section = state.setdefault("issues", {})
+            section["error"] = str(exc)
+            section["degraded"] = True
     save_state(state)
     return state
 

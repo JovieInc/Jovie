@@ -28,6 +28,27 @@ import {
 
 const tempRoots = [];
 
+function linearFinding(id, title) {
+  return /** @type {const} */ ({
+    id,
+    recipeId: 'diff-review',
+    title,
+    summary: 'Canonical Linear intake must precede remediation dispatch.',
+    priority: 'P0',
+    kind: 'objective',
+    evidencePaths: [],
+  });
+}
+
+function jsonResponse(data, status = 200) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => data,
+    text: async () => JSON.stringify(data),
+  };
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
   delete process.env.LINEAR_API_KEY;
@@ -158,36 +179,25 @@ describe('qa-swarm propose pipeline', () => {
     const fetchSpy = vi.fn(async (_url, init) => {
       const payload = JSON.parse(init.body);
       if (payload.query.includes('query Teams')) {
-        return {
-          ok: true,
-          json: async () => ({
-            data: { teams: { nodes: [{ id: 'team-1', key: 'JOV' }] } },
-          }),
-        };
+        return jsonResponse({
+          data: { teams: { nodes: [{ id: 'team-1', key: 'JOV' }] } },
+        });
       }
       if (payload.query.includes('query TeamLabels')) {
-        return {
-          ok: true,
-          json: async () => ({
-            data: { team: { labels: { nodes: [] } } },
-          }),
-        };
+        return jsonResponse({ data: { team: { labels: { nodes: [] } } } });
       }
-      return {
-        ok: true,
-        json: async () => ({
-          data: {
-            issueCreate: {
-              success: true,
-              issue: {
-                id: 'linear-1',
-                identifier: 'JOV-1000',
-                url: 'https://linear.app/jovie/issue/JOV-1000',
-              },
+      return jsonResponse({
+        data: {
+          issueCreate: {
+            success: true,
+            issue: {
+              id: 'linear-1',
+              identifier: 'JOV-1000',
+              url: 'https://linear.app/jovie/issue/JOV-1000',
             },
           },
-        }),
-      };
+        },
+      });
     });
     vi.stubGlobal('fetch', fetchSpy);
 
@@ -195,15 +205,7 @@ describe('qa-swarm propose pipeline', () => {
       const summary = await proposeQaSwarmFindings({
         recipeId: 'diff-review',
         findings: [
-          {
-            id: 'linear-only-fast-track',
-            recipeId: 'diff-review',
-            title: 'Linear-only fast track',
-            summary: 'Must have canonical intake before remediation dispatch.',
-            priority: 'P0',
-            kind: 'objective',
-            evidencePaths: [],
-          },
+          linearFinding('linear-only-fast-track', 'Linear-only fast track'),
         ],
       });
 
@@ -237,17 +239,7 @@ describe('qa-swarm propose pipeline', () => {
       const summary = await proposeQaSwarmFindings({
         recipeId: 'diff-review',
         eveEnabled: true,
-        findings: [
-          {
-            id: 'linear-rate-limit',
-            recipeId: 'diff-review',
-            title: 'Linear rate limit',
-            summary: 'Must not dispatch without canonical intake.',
-            priority: 'P0',
-            kind: 'objective',
-            evidencePaths: [],
-          },
-        ],
+        findings: [linearFinding('linear-rate-limit', 'Linear rate limit')],
       });
 
       expect(summary.fastTrackedCount).toBe(0);

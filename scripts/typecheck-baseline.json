@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "tool": "scripts/typecheck-scripts.mjs",
-  "generatedAt": "2026-08-18T01:24:55.828Z",
-  "totalErrors": 169,
+  "generatedAt": "2026-08-18T03:22:07.664Z",
+  "totalErrors": 168,
   "files": {
     ".github/scripts/verify-main-release-readiness.mjs": {
       "TS2339": 3
@@ -104,9 +104,6 @@
     },
     "scripts/lib/__tests__/ship-ledger.test.mjs": {
       "TS2339": 4
-    },
-    "scripts/lib/__tests__/tracker-client.test.mjs": {
-      "TS2339": 1
     },
     "scripts/lib/ci-duration-ratchet.mjs": {
       "TS2353": 1

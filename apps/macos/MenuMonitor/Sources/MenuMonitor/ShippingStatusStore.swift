@@ -1,6 +1,8 @@
 import AppKit
 import Foundation
 
+private let githubIssueFallbackRetired = true
+
 /// Polls Linear-backed Symphony status for shipping counts and runs ops actions.
 @MainActor
 final class ShippingStatusStore: ObservableObject {
@@ -145,6 +147,32 @@ final class ShippingStatusStore: ObservableObject {
         }
       }
       return Counts(inProgress: inProgress, ready: ready, blocked: blocked)
+    }.value
+  }
+
+  /// Historical implementation retained for diagnostics only.
+  nonisolated static func fetchGitHubInProgressCount() async throws -> Int {
+    if githubIssueFallbackRetired {
+      throw NSError(
+        domain: "Jovie.LinearOnlyIntake",
+        code: 78,
+        userInfo: [NSLocalizedDescriptionKey: "GitHub Issue fallback retired"]
+      )
+    }
+    return try await Task.detached(priority: .utility) {
+      let json = try runProcess(
+        "/bin/zsh",
+        args: [
+          "-lc",
+          "gh issue list -R JovieInc/Jovie --state open --label 'status:in-progress' --json number --limit 100 2>/dev/null",
+        ]
+      )
+      guard let data = json.data(using: .utf8),
+            let rows = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+      else {
+        return 0
+      }
+      return rows.count
     }.value
   }
 
