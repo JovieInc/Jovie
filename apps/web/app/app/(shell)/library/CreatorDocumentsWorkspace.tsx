@@ -3,7 +3,7 @@
 import { Button } from '@jovie/ui';
 import { FileText, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EntitySidebarShell } from '@/components/molecules/drawer/EntitySidebarShell';
 import {
   RichTextEditor,
@@ -19,6 +19,7 @@ type EditorStatus =
   | 'saved'
   | 'claim-saved'
   | 'reviewed'
+  | 'approved'
   | 'evidence-incomplete'
   | 'claim-ineligible'
   | 'conflict'
@@ -29,6 +30,7 @@ function DocumentEditor({
   onClose,
   onSaved,
   onStageChanged,
+  onDraftStateChange,
 }: Readonly<{
   document: CreatorDocumentListItem;
   onClose: () => void;
@@ -40,6 +42,7 @@ function DocumentEditor({
     plainText: string
   ) => void;
   onStageChanged: (stage: CreatorDocumentListItem['stage']) => void;
+  onDraftStateChange: (hasDraft: boolean) => void;
 }>) {
   const [title, setTitle] = useState(document.title);
   const [kind, setKind] = useState(document.kind);
@@ -203,6 +206,7 @@ function DocumentEditor({
     );
     if (response) {
       onStageChanged('capture_ready');
+      setStatus('approved');
       router.refresh();
     }
   }, [document, isDirty, onStageChanged, post, router, status]);
@@ -219,6 +223,11 @@ function DocumentEditor({
     claimText.trim().length > 0 &&
     (!claimNeedsSource || sourceRecordId.trim().length > 0) &&
     status !== 'saving';
+
+  useEffect(() => {
+    onDraftStateChange(isDirty || hasClaimDraft || status === 'saving');
+    return () => onDraftStateChange(false);
+  }, [hasClaimDraft, isDirty, onDraftStateChange, status]);
 
   return (
     <EntitySidebarShell
@@ -242,17 +251,19 @@ function DocumentEditor({
                   ? 'Claim added to this revision'
                   : status === 'reviewed'
                     ? 'Evidence review complete'
-                    : status === 'evidence-incomplete'
-                      ? 'Resolve or source every factual claim, then retry.'
-                      : status === 'claim-ineligible'
-                        ? 'The revision changed or that source is not available.'
-                        : status === 'conflict'
-                          ? 'Revision changed. Reload before continuing.'
-                          : status === 'error'
-                            ? 'Action failed. Retry safely.'
-                            : isDirty
-                              ? 'Unsaved changes'
-                              : 'Private document'}
+                    : status === 'approved'
+                      ? 'Approved for capture'
+                      : status === 'evidence-incomplete'
+                        ? 'Resolve or source every factual claim, then retry.'
+                        : status === 'claim-ineligible'
+                          ? 'The revision changed or that source is not available.'
+                          : status === 'conflict'
+                            ? 'Revision changed. Reload before continuing.'
+                            : status === 'error'
+                              ? 'Action failed. Retry safely.'
+                              : isDirty
+                                ? 'Unsaved changes'
+                                : 'Private document'}
           </span>
           <Button
             size='sm'
@@ -338,22 +349,24 @@ function DocumentEditor({
               ? 'Saving…'
               : status === 'saved'
                 ? `Saved · R${document.currentRevision}`
-                : status === 'conflict'
-                  ? 'Conflict'
-                  : status === 'evidence-incomplete'
-                    ? 'Evidence incomplete'
-                    : status === 'claim-ineligible'
-                      ? 'Evidence unavailable'
-                      : status === 'error'
-                        ? 'Not saved'
-                        : isDirty
-                          ? 'Edited'
-                          : `Revision ${document.currentRevision}`
+                : status === 'approved'
+                  ? 'Approved for capture'
+                  : status === 'conflict'
+                    ? 'Conflict'
+                    : status === 'evidence-incomplete'
+                      ? 'Evidence incomplete'
+                      : status === 'claim-ineligible'
+                        ? 'Evidence unavailable'
+                        : status === 'error'
+                          ? 'Not saved'
+                          : isDirty
+                            ? 'Edited'
+                            : `Revision ${document.currentRevision}`
           }
           statusTone={
             status === 'saving'
               ? 'pending'
-              : status === 'saved'
+              : status === 'saved' || status === 'approved'
                 ? 'success'
                 : status === 'conflict' ||
                     status === 'evidence-incomplete' ||
@@ -462,10 +475,12 @@ export function CreatorDocumentsWorkspace({
   initialDocuments,
   initialNextCursor = null,
   initialLoadFailed = false,
+  onUnsavedDraftChange,
 }: Readonly<{
   initialDocuments: readonly CreatorDocumentListItem[];
   initialNextCursor?: string | null;
   initialLoadFailed?: boolean;
+  onUnsavedDraftChange?: (hasDraft: boolean) => void;
 }>) {
   const [documents, setDocuments] = useState([...initialDocuments]);
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
@@ -480,8 +495,43 @@ export function CreatorDocumentsWorkspace({
     'idle'
   );
   const ideaIdempotencyKey = useRef<string | null>(null);
+  const [hasDocumentDraft, setHasDocumentDraft] = useState(false);
+  const hasIdeaDraft =
+    ideaStatus === 'saving' ||
+    title.trim().length > 0 ||
+    body.trim().length > 0;
+  const hasUnsavedDraft = hasDocumentDraft || hasIdeaDraft;
   const selected =
     documents.find(document => document.id === selectedId) ?? null;
+
+  useEffect(() => {
+    onUnsavedDraftChange?.(hasUnsavedDraft);
+    return () => onUnsavedDraftChange?.(false);
+  }, [hasUnsavedDraft, onUnsavedDraftChange]);
+
+  useEffect(() => {
+    if (!hasUnsavedDraft) return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    globalThis.addEventListener('beforeunload', warnBeforeUnload);
+    return () =>
+      globalThis.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [hasUnsavedDraft]);
+
+  const confirmDiscardDraft = useCallback(() => {
+    if (!hasUnsavedDraft) return true;
+    return globalThis.confirm('Discard your unsaved document changes?');
+  }, [hasUnsavedDraft]);
+
+  const selectDocument = useCallback(
+    (documentId: string | null) => {
+      if (documentId === selectedId || !confirmDiscardDraft()) return;
+      setHasDocumentDraft(false);
+      setSelectedId(documentId);
+    },
+    [confirmDiscardDraft, selectedId]
+  );
 
   const updateSelected = useCallback(
     (changes: Partial<CreatorDocumentListItem>) => {
@@ -501,7 +551,7 @@ export function CreatorDocumentsWorkspace({
         <DocumentEditor
           key={selected.id}
           document={selected}
-          onClose={() => setSelectedId(null)}
+          onClose={() => selectDocument(null)}
           onSaved={(revision, savedTitle, savedKind, content, plainText) =>
             updateSelected({
               title: savedTitle,
@@ -513,9 +563,10 @@ export function CreatorDocumentsWorkspace({
             })
           }
           onStageChanged={stage => updateSelected({ stage })}
+          onDraftStateChange={setHasDocumentDraft}
         />
       ) : null,
-    [selected, updateSelected]
+    [selectDocument, selected, updateSelected]
   );
   useRegisterRightPanel(panel);
 
@@ -599,7 +650,19 @@ export function CreatorDocumentsWorkspace({
               Private until you approve one exact script revision.
             </p>
           </div>
-          <Button size='sm' onClick={() => setShowCapture(value => !value)}>
+          <Button
+            size='sm'
+            onClick={() => {
+              if (showCapture && !confirmDiscardDraft()) return;
+              setShowCapture(value => !value);
+              if (showCapture) {
+                setTitle('');
+                setBody('');
+                ideaIdempotencyKey.current = null;
+                setIdeaStatus('idle');
+              }
+            }}
+          >
             <Plus className='h-4 w-4' aria-hidden='true' /> Save Idea
           </Button>
         </div>
@@ -667,7 +730,7 @@ export function CreatorDocumentsWorkspace({
                 key={document.id}
                 type='button'
                 variant='ghost'
-                onClick={() => setSelectedId(document.id)}
+                onClick={() => selectDocument(document.id)}
                 className='flex w-full items-center justify-between gap-4 px-3 py-3 text-left hover:bg-surface-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2'
               >
                 <span className='min-w-0 truncate text-sm font-medium text-primary-token'>

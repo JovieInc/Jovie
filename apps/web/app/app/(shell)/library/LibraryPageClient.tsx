@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import type { KeyboardEvent } from 'react';
+import { type KeyboardEvent, useState } from 'react';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
@@ -39,9 +39,17 @@ export function LibraryPageClient({
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [hasUnsavedDocumentDraft, setHasUnsavedDocumentDraft] = useState(false);
   const mode =
     searchParams.get('section') === 'documents' ? 'documents' : 'assets';
   const setMode = (nextMode: 'assets' | 'documents') => {
+    if (
+      nextMode !== mode &&
+      hasUnsavedDocumentDraft &&
+      !globalThis.confirm('Discard your unsaved document changes?')
+    ) {
+      return;
+    }
     const next = new URLSearchParams(searchParams.toString());
     if (nextMode === 'assets') next.delete('section');
     else next.set('section', 'documents');
@@ -122,6 +130,7 @@ export function LibraryPageClient({
             initialDocuments={creatorDocuments}
             initialNextCursor={creatorDocumentsNextCursor}
             initialLoadFailed={creatorDocumentsLoadFailed}
+            onUnsavedDraftChange={setHasUnsavedDocumentDraft}
           />
         </div>
       ) : (

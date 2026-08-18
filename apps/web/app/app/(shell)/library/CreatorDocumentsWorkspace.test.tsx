@@ -52,11 +52,16 @@ vi.mock('@/components/molecules/drawer/EntitySidebarShell', () => ({
   EntitySidebarShell: ({
     children,
     footer,
+    onClose,
   }: {
     children: React.ReactNode;
     footer: React.ReactNode;
+    onClose: () => void;
   }) => (
     <aside>
+      <button type='button' onClick={onClose}>
+        Close document
+      </button>
       {children}
       {footer}
     </aside>
@@ -297,6 +302,75 @@ describe('CreatorDocumentsWorkspace', () => {
       screen.getByRole('button', { name: 'Approve For Capture' })
     ).toBeDisabled();
     expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+  });
+
+  it('guards closing and switching documents while a draft is unsaved', async () => {
+    const confirm = vi.fn(() => false);
+    vi.stubGlobal('confirm', confirm);
+    const secondDocument = {
+      ...document,
+      id: '22222222-2222-4222-8222-222222222222',
+      title: 'Second document',
+    };
+    render(
+      <CreatorDocumentsWorkspace
+        initialDocuments={[document, secondDocument]}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /A durable idea/ }));
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    if (!panel) throw new Error('Expected a document panel');
+    const panelView = render(panel);
+    const panelRegistrationCount = vi.mocked(useRegisterRightPanel).mock.calls
+      .length;
+    fireEvent.change(screen.getByLabelText('Document Title'), {
+      target: { value: 'Unsaved document title' },
+    });
+
+    await waitFor(() =>
+      expect(
+        vi.mocked(useRegisterRightPanel).mock.calls.length
+      ).toBeGreaterThan(panelRegistrationCount)
+    );
+    const guardedPanel = vi
+      .mocked(useRegisterRightPanel)
+      .mock.calls.at(-1)?.[0];
+    if (!guardedPanel) throw new Error('Expected a guarded document panel');
+    panelView.rerender(guardedPanel);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close document' }));
+    fireEvent.click(screen.getByRole('button', { name: /Second document/ }));
+
+    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(screen.getByLabelText('Document Title')).toHaveValue(
+      'Unsaved document title'
+    );
+  });
+
+  it('shows a completed status after exact-revision capture approval', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ stage: 'capture_ready' }), { status: 200 })
+    );
+    render(
+      <CreatorDocumentsWorkspace
+        initialDocuments={[
+          { ...document, kind: 'script', stage: 'evidence_review' },
+        ]}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /A durable idea/ }));
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    if (!panel) throw new Error('Expected a document panel');
+    render(panel);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Approve For Capture' })
+    );
+
+    expect(
+      (await screen.findAllByText('Approved for capture')).length
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText('Saving…')).toBeNull();
   });
 
   it('provides an evidence path before creator approval', async () => {

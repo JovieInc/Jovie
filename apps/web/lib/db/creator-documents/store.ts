@@ -46,11 +46,11 @@ export class CreatorDocumentConflictError extends Error {
 const CREATOR_DOCUMENT_PAGE_SIZE = 50;
 
 function encodeDocumentCursor(input: {
-  readonly updatedAt: Date;
+  readonly updatedAtCursor: string;
   readonly id: string;
 }) {
   return Buffer.from(
-    JSON.stringify({ updatedAt: input.updatedAt.toISOString(), id: input.id })
+    JSON.stringify({ updatedAt: input.updatedAtCursor, id: input.id })
   ).toString('base64url');
 }
 
@@ -61,9 +61,9 @@ function decodeDocumentCursor(cursor: string | null | undefined) {
       updatedAt?: unknown;
       id?: unknown;
     };
-    const updatedAt = new Date(String(parsed.updatedAt));
+    const updatedAt = String(parsed.updatedAt);
     if (
-      Number.isNaN(updatedAt.getTime()) ||
+      Number.isNaN(new Date(updatedAt).getTime()) ||
       typeof parsed.id !== 'string' ||
       !isCanonicalUuid(parsed.id)
     ) {
@@ -93,6 +93,7 @@ export async function listCreatorDocuments(
       content: creatorDocumentRevisions.content,
       plainText: creatorDocumentRevisions.plainText,
       updatedAt: creatorDocuments.updatedAt,
+      updatedAtCursor: drizzleSql<string>`${creatorDocuments.updatedAt}::text`,
     })
     .from(creatorDocuments)
     .innerJoin(
@@ -107,9 +108,9 @@ export async function listCreatorDocuments(
         eq(creatorDocuments.creatorProfileId, creatorProfileId),
         cursor
           ? or(
-              lt(creatorDocuments.updatedAt, cursor.updatedAt),
+              drizzleSql`${creatorDocuments.updatedAt} < ${cursor.updatedAt}::timestamptz`,
               and(
-                eq(creatorDocuments.updatedAt, cursor.updatedAt),
+                drizzleSql`${creatorDocuments.updatedAt} = ${cursor.updatedAt}::timestamptz`,
                 lt(creatorDocuments.id, cursor.id)
               )
             )
@@ -120,10 +121,12 @@ export async function listCreatorDocuments(
     .limit(CREATOR_DOCUMENT_PAGE_SIZE + 1);
 
   const pageRows = rows.slice(0, CREATOR_DOCUMENT_PAGE_SIZE);
-  const documents: CreatorDocumentListItem[] = pageRows.map(row => ({
-    ...row,
-    updatedAt: row.updatedAt.toISOString(),
-  }));
+  const documents: CreatorDocumentListItem[] = pageRows.map(
+    ({ updatedAtCursor: _updatedAtCursor, ...row }) => ({
+      ...row,
+      updatedAt: row.updatedAt.toISOString(),
+    })
+  );
   const last = pageRows.at(-1);
   return {
     documents,

@@ -1300,22 +1300,14 @@ describe('TasksPageClient', () => {
     expect(mockUpdateTaskAsync).toHaveBeenCalledTimes(2);
   });
 
-  it('ignores an autosave completion from a previously selected task', async () => {
+  it('blocks task switching until the active autosave finishes', async () => {
     let finishFirstSave: (() => void) | undefined;
-    let finishSecondSave: (() => void) | undefined;
-    mockUpdateTaskAsync
-      .mockImplementationOnce(
-        () =>
-          new Promise<void>(resolve => {
-            finishFirstSave = resolve;
-          })
-      )
-      .mockImplementationOnce(
-        () =>
-          new Promise<void>(resolve => {
-            finishSecondSave = resolve;
-          })
-      );
+    mockUpdateTaskAsync.mockImplementationOnce(
+      () =>
+        new Promise<void>(resolve => {
+          finishFirstSave = resolve;
+        })
+    );
     renderPage();
     openTask(mockTask);
 
@@ -1325,19 +1317,18 @@ describe('TasksPageClient', () => {
     act(() => vi.advanceTimersByTime(500));
 
     openTask(mockTaskTwo);
-    fireEvent.change(screen.getByLabelText('Task Description'), {
-      target: { value: 'Edit task B and keep it' },
-    });
-    await act(async () => vi.advanceTimersByTime(500));
-    expect(mockUpdateTaskAsync).toHaveBeenCalledTimes(2);
-    expect(mockUpdateTaskAsync.mock.calls[1]?.[0]).toMatchObject({
-      taskId: 'task-2',
-      data: { description: 'Edit task B and keep it' },
-    });
+    expect(screen.getByLabelText('Task Description')).toHaveValue(
+      'Edit task A'
+    );
+    expect(mockUpdateTaskAsync).toHaveBeenCalledOnce();
+
     await act(async () => finishFirstSave?.());
-    expect(screen.getByText('Saving…')).toBeInTheDocument();
-    await act(async () => finishSecondSave?.());
     expect(screen.getByText('Saved')).toBeInTheDocument();
+
+    openTask(mockTaskTwo);
+    expect(screen.getByLabelText('Task Description')).toHaveValue(
+      mockTaskTwo.description
+    );
   });
 
   it('does not reset unsaved title text when task metadata refreshes', () => {

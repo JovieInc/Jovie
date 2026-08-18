@@ -124,6 +124,9 @@ describe('creator document persistence boundaries', () => {
     expect(listing).toContain('CREATOR_DOCUMENT_PAGE_SIZE + 1');
     expect(listing).toContain('nextCursor');
     expect(listing).toContain('desc(creatorDocuments.id)');
+    expect(listing).toContain('updatedAtCursor');
+    expect(listing).toContain('::text');
+    expect(listing).toContain('::timestamptz');
     expect(listing).not.toContain('.limit(100)');
   });
 

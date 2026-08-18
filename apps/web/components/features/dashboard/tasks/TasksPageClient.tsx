@@ -1678,14 +1678,35 @@ export function TasksPageClient() {
 
   const openTaskDocument = useCallback(
     (task: TaskView) => {
+      if (
+        selectedTaskEditorId &&
+        task.id !== selectedTaskEditorId &&
+        editorSaveStatus !== 'idle' &&
+        editorSaveStatus !== 'saved'
+      ) {
+        toast.error('Wait for this task to save before opening another task.');
+        return;
+      }
       setHeaderMode(current => (current === 'create' ? 'default' : current));
       if (!canShowTaskDocumentAlongsideReleaseSidebar) {
         setSelectedReleaseId(null);
       }
       setSelectedTaskId(task.id);
     },
-    [canShowTaskDocumentAlongsideReleaseSidebar]
+    [
+      canShowTaskDocumentAlongsideReleaseSidebar,
+      editorSaveStatus,
+      selectedTaskEditorId,
+    ]
   );
+
+  const closeTaskDocument = useCallback(() => {
+    if (editorSaveStatus !== 'idle' && editorSaveStatus !== 'saved') {
+      toast.error('Wait for this task to save before closing it.');
+      return;
+    }
+    setSelectedTaskId(null);
+  }, [editorSaveStatus]);
 
   const handleGenerateTaskPitch = useCallback(
     (task: TaskView) => {
@@ -1754,7 +1775,10 @@ export function TasksPageClient() {
     }
 
     if (tasks.length === 0) {
-      if (selectedTaskId !== null) {
+      if (
+        selectedTaskId !== null &&
+        (editorSaveStatus === 'idle' || editorSaveStatus === 'saved')
+      ) {
         setSelectedTaskId(null);
       }
       return;
@@ -1767,10 +1791,20 @@ export function TasksPageClient() {
       return;
     }
 
-    if (!hasVisibleSelection) {
+    if (
+      !hasVisibleSelection &&
+      (editorSaveStatus === 'idle' || editorSaveStatus === 'saved')
+    ) {
       setSelectedTaskId(null);
     }
-  }, [isBoardMode, isLoading, selectedTaskId, tasks, visibleTasks]);
+  }, [
+    editorSaveStatus,
+    isBoardMode,
+    isLoading,
+    selectedTaskId,
+    tasks,
+    visibleTasks,
+  ]);
 
   const selectTaskByIndex = useCallback(
     (index: number) => {
@@ -1917,10 +1951,10 @@ export function TasksPageClient() {
 
       if (selectedTask) {
         event.preventDefault();
-        setSelectedTaskId(null);
+        closeTaskDocument();
       }
     },
-    [headerMode, selectedTask]
+    [closeTaskDocument, headerMode, selectedTask]
   );
 
   const handleRowNavigationShortcut = useCallback(
@@ -2390,7 +2424,7 @@ export function TasksPageClient() {
                       setEditorSaveStatus('dirty');
                     }}
                     onRetrySave={() => setEditorSaveStatus('dirty')}
-                    onClose={() => setSelectedTaskId(null)}
+                    onClose={closeTaskDocument}
                     onOpenRelease={openReleaseSidebar}
                     onUpdateStatus={(taskId, status) =>
                       updateTaskField(taskId, { status })

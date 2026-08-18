@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { replace, search } = vi.hoisted(() => ({
   replace: vi.fn(),
@@ -15,7 +15,18 @@ vi.mock('../dashboard/releases/ReleaseCatalogPageClient', () => ({
   ReleaseCatalogPageClient: () => <div>Assets panel</div>,
 }));
 vi.mock('./CreatorDocumentsWorkspace', () => ({
-  CreatorDocumentsWorkspace: () => <div>Documents panel</div>,
+  CreatorDocumentsWorkspace: ({
+    onUnsavedDraftChange,
+  }: {
+    onUnsavedDraftChange: (hasDraft: boolean) => void;
+  }) => (
+    <div>
+      Documents panel
+      <button type='button' onClick={() => onUnsavedDraftChange(true)}>
+        Mark document dirty
+      </button>
+    </div>
+  ),
 }));
 
 import { LibraryPageClient } from './LibraryPageClient';
@@ -24,6 +35,10 @@ describe('LibraryPageClient sections', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     search.value = '';
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('uses accessible tabs and persists the document section in the URL', () => {
@@ -64,5 +79,20 @@ describe('LibraryPageClient sections', () => {
     expect(replace).toHaveBeenCalledWith('/app/library?section=documents', {
       scroll: false,
     });
+  });
+
+  it('guards leaving the document section with an unsaved draft', () => {
+    search.value = 'section=documents';
+    const confirm = vi.fn(() => false);
+    vi.stubGlobal('confirm', confirm);
+    render(<LibraryPageClient merchCards={[]} />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Mark document dirty' })
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Assets' }));
+
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(replace).not.toHaveBeenCalled();
   });
 });
