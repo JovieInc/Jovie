@@ -18,6 +18,7 @@ import {
 } from '@/features/profile/utils/venmo';
 import { PublicShareActionList } from '@/features/share/PublicShareMenu';
 import { track } from '@/lib/analytics';
+import { formatPublicContactSubtitle } from '@/lib/contacts/format-public-contact';
 import type { AvailableDSP } from '@/lib/dsp';
 import type { ShareContext } from '@/lib/share/types';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
@@ -154,6 +155,7 @@ function ContactList({
       {contacts.map(contact => {
         const primary = primaryChannel(contact);
         const primaryHref = getActionHref(primary);
+        const subtitle = formatPublicContactSubtitle(contact);
 
         return (
           <div key={contact.id} className={PROFILE_DRAWER_TOGGLE_ROW_CLASS}>
@@ -166,9 +168,12 @@ function ContactList({
                 <span className={PROFILE_DRAWER_TITLE_CLASS}>
                   {contact.roleLabel}
                 </span>
-                {contact.secondaryLabel ? (
-                  <span className={PROFILE_DRAWER_META_CLASS}>
-                    {contact.secondaryLabel}
+                {subtitle ? (
+                  <span
+                    className={PROFILE_DRAWER_META_CLASS}
+                    data-testid='profile-mode-drawer-contact-meta'
+                  >
+                    {subtitle}
                   </span>
                 ) : null}
               </a>

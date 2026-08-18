@@ -20,8 +20,8 @@ export const TAB_BAR_HEIGHT_REM = '3.625rem' as const;
 
 /**
  * Canonical Tailwind padding class for content rendered below the tab bar.
- * Combines the fixed tab bar height, device safe-area inset, and 8px of
- * breathing room so floating glass never obscures interactive content.
+ * `--profile-bottom-nav-height` owns the real inset: bar height, safe-area,
+ * and extra `--space-8` so the last Music row stays tappable.
  *
  * Spec: docs/public-profile-surface-spec.md §2.6
  *

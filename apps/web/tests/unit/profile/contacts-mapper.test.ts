@@ -29,6 +29,7 @@ vi.mock('@/lib/contacts/constants', () => ({
   })),
 }));
 
+import { formatPublicContactSubtitle } from '@/lib/contacts/format-public-contact';
 import { toPublicContacts } from '@/lib/contacts/mapper';
 
 // Helper to create a mock CreatorContact (Drizzle schema format)
@@ -279,5 +280,55 @@ describe('toPublicContacts', () => {
     expect(result[0].role).toBe('bookings');
     expect(result[1].role).toBe('management');
     expect(result[2].role).toBe('press_pr');
+  });
+});
+
+describe('formatPublicContactSubtitle', () => {
+  // Regression: ISSUE-002 — compact contact drawer omitted person names
+  // Found by /qa on 2026-08-17
+  // Report: .gstack/qa-reports/qa-report-localhost-3100-2026-08-17.md
+
+  it('uses the person name when the company is missing', () => {
+    expect(
+      formatPublicContactSubtitle({
+        contactName: 'Kelly Strickland',
+        primaryContactLabel: 'Kelly Strickland',
+        companyLabel: undefined,
+        secondaryLabel: undefined,
+      })
+    ).toBe('Kelly Strickland');
+  });
+
+  it('uses the company when the person name is missing', () => {
+    expect(
+      formatPublicContactSubtitle({
+        contactName: undefined,
+        primaryContactLabel: undefined,
+        companyLabel: 'TBF',
+        secondaryLabel: 'TBF',
+      })
+    ).toBe('TBF');
+  });
+
+  it('joins person name and company', () => {
+    expect(
+      formatPublicContactSubtitle({
+        contactName: 'Kelly Strickland',
+        primaryContactLabel: 'Kelly Strickland',
+        companyLabel: 'Maverick',
+        secondaryLabel: 'Maverick',
+      })
+    ).toBe('Kelly Strickland · Maverick');
+  });
+
+  it('returns an empty string when both sides are missing', () => {
+    expect(
+      formatPublicContactSubtitle({
+        contactName: undefined,
+        primaryContactLabel: undefined,
+        companyLabel: undefined,
+        secondaryLabel: undefined,
+      })
+    ).toBe('');
   });
 });
