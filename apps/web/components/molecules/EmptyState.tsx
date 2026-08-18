@@ -67,6 +67,12 @@ interface EmptyStateBaseProps {
   readonly variant?: EmptyStateVariant;
   /** Button size - use 'sm' for less padding */
   readonly size?: 'default' | 'sm';
+  /**
+   * Presentation tuned for empty workspaces that own the remaining canvas.
+   * Keeps the canonical anatomy while strengthening type hierarchy and
+   * removing spacing reserved for actions when none are present.
+   */
+  readonly presentation?: 'default' | 'workspace';
   readonly className?: string;
   readonly testId?: string;
 }
@@ -152,6 +158,7 @@ export function EmptyState({
   secondaryAction,
   variant = 'default',
   size = 'sm',
+  presentation = 'default',
   className,
   testId,
 }: EmptyStateProps) {
@@ -159,6 +166,8 @@ export function EmptyState({
   const descriptionId = React.useId();
   const styles = variantStyles[variant] ?? variantStyles.default;
   const buttonSize = size === 'sm' ? 'sm' : 'default';
+  const hasActions = Boolean(actionSlot || action || secondaryAction);
+  const isWorkspacePresentation = presentation === 'workspace';
 
   const renderPrimaryAction = (): React.ReactNode => {
     if (!action) return null;
@@ -251,6 +260,7 @@ export function EmptyState({
       data-testid={testId}
       className={cn(
         'flex flex-1 flex-col items-center justify-center px-3 py-10 text-center',
+        isWorkspacePresentation && 'px-6 py-16',
         className
       )}
     >
@@ -268,7 +278,12 @@ export function EmptyState({
 
       <h3
         id={headingId}
-        className={cn('mb-1 text-app font-caption', styles.heading)}
+        className={cn(
+          'mb-1 text-app font-caption',
+          styles.heading,
+          isWorkspacePresentation &&
+            'mb-2 text-2xl font-semibold tracking-tight text-primary-token'
+        )}
       >
         {heading}
       </h3>
@@ -278,14 +293,19 @@ export function EmptyState({
           id={descriptionId}
           className={cn(
             'mb-5 max-w-sm text-app leading-[1.45]',
-            styles.descriptionClassName
+            styles.descriptionClassName,
+            isWorkspacePresentation &&
+              cn(
+                'max-w-md text-base leading-6 text-secondary-token',
+                !hasActions && 'mb-0'
+              )
           )}
         >
           {description}
         </p>
       )}
 
-      {(actionSlot || action || secondaryAction) && (
+      {hasActions && (
         <div className='flex flex-col items-center gap-2 sm:flex-row sm:gap-3'>
           {actionSlot}
           {renderPrimaryAction()}

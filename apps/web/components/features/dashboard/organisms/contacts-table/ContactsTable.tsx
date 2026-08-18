@@ -1,6 +1,6 @@
 'use client';
 
-import { Plus, UserPlus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import {
@@ -239,12 +239,13 @@ export const ContactsTable = memo(function ContactsTable({
         />
 
         {/* Scrollable content area */}
-        <div className='flex-1 min-h-0 overflow-auto'>
+        <div className='flex min-h-0 flex-1 overflow-auto'>
           {isEmpty ? (
             <EmptyState
-              icon={<UserPlus className='h-6 w-6' aria-hidden='true' />}
               heading='No Contacts Yet'
               description='Add bookings, management, and press contacts.'
+              presentation='workspace'
+              className='min-h-full'
             />
           ) : (
             <UnifiedTable

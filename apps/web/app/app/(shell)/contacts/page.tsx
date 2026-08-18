@@ -1,12 +1,8 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import type { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
-import {
-  PAGE_TOOLBAR_TAB_ACTIVE_CLASS,
-  PAGE_TOOLBAR_TAB_BUTTON_CLASS,
-  PageToolbar,
-} from '@/components/organisms/table/molecules/PageToolbar';
+import { RouteSegmentControl } from '@/components/molecules/RouteSegmentControl';
+import { PageToolbar } from '@/components/organisms/table/molecules/PageToolbar';
 import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { AudienceTableLoadingShell } from '@/features/dashboard/organisms/dashboard-audience-table/AudienceTableLoadingShell';
@@ -15,7 +11,6 @@ import { LazyDashboardAudienceClient } from '@/features/dashboard/organisms/Lazy
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { captureError } from '@/lib/error-tracking';
 import { audienceFilters, audienceSearchParams } from '@/lib/nuqs';
-import { cn } from '@/lib/utils';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import {
   trimLeadingSlashes,
@@ -67,28 +62,23 @@ function ContactsWorkspaceTabs({
     <PageToolbar
       className='border-b border-subtle'
       start={
-        <>
-          <Link
-            href={APP_ROUTES.CONTACTS}
-            className={cn(
-              PAGE_TOOLBAR_TAB_BUTTON_CLASS,
-              activeTab === 'contacts' && PAGE_TOOLBAR_TAB_ACTIVE_CLASS
-            )}
-            aria-current={activeTab === 'contacts' ? 'page' : undefined}
-          >
-            Contacts
-          </Link>
-          <Link
-            href={buildAudienceWorkspaceHref(searchParams)}
-            className={cn(
-              PAGE_TOOLBAR_TAB_BUTTON_CLASS,
-              activeTab === 'audience' && PAGE_TOOLBAR_TAB_ACTIVE_CLASS
-            )}
-            aria-current={activeTab === 'audience' ? 'page' : undefined}
-          >
-            Audience
-          </Link>
-        </>
+        <RouteSegmentControl
+          value={activeTab}
+          aria-label='Contacts Workspace'
+          className='max-w-60'
+          options={[
+            {
+              value: 'contacts',
+              label: 'Contacts',
+              href: APP_ROUTES.CONTACTS,
+            },
+            {
+              value: 'audience',
+              label: 'Audience',
+              href: buildAudienceWorkspaceHref(searchParams),
+            },
+          ]}
+        />
       }
     />
   );
