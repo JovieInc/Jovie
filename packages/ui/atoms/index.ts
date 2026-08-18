@@ -11,6 +11,12 @@ export {
   type ButtonSize,
   type ButtonVariant,
 } from './button-contract';
+export type { CloseButtonIconProps } from './close-button';
+export {
+  CloseButtonIcon,
+  closeButtonClassName,
+  closeButtonStyles,
+} from './close-button';
 export {
   DropdownMenu,
   DropdownMenuCheckboxItem,

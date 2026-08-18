@@ -1,11 +1,23 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-
+import {
+  CloseButtonIcon as RootCloseButtonIcon,
+  closeButtonClassName as rootCloseButtonClassName,
+  closeButtonStyles as rootCloseButtonStyles,
+} from '../index';
 import {
   CloseButtonIcon,
   closeButtonClassName,
   closeButtonStyles,
 } from './close-button';
+
+describe('@jovie/ui root close-button exports', () => {
+  it('resolve to the canonical close-button contract', () => {
+    expect(RootCloseButtonIcon).toBe(CloseButtonIcon);
+    expect(rootCloseButtonClassName).toBe(closeButtonClassName);
+    expect(rootCloseButtonStyles).toBe(closeButtonStyles);
+  });
+});
 
 describe('CloseButtonIcon', () => {
   describe('Basic Rendering', () => {
