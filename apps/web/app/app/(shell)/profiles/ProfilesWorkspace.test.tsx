@@ -173,12 +173,13 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
   it('uses the canonical empty state with a direct artist-profile action', () => {
     renderWorkspace(null);
 
-    expect(
-      screen.getByTestId('profiles-workspace-empty-state')
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('profiles-workspace-empty-state')).toHaveClass(
+      'py-16',
+      'min-h-75'
+    );
     expect(
       screen.getByRole('heading', { name: 'No Artist Profile Selected' })
-    ).toBeInTheDocument();
+    ).toHaveClass('text-2xl', 'font-semibold', 'text-primary-token');
     expect(
       screen.getByRole('link', { name: 'Set Up Artist Profile' })
     ).toHaveAttribute('href', '/app/settings/artist-profile');
