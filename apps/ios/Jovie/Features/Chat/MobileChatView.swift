@@ -19,6 +19,21 @@ enum MobileChatScrollPolicy {
   }
 }
 
+enum MobileChatTranscriptMotion {
+  /// New rows fade only. Offset or scale on insert hitch the transcript.
+  static var rowTransition: AnyTransition { .opacity }
+
+  static func rowInsertion(reduceMotion: Bool) -> Animation? {
+    reduceMotion ? nil : JovieMotion.easeOut()
+  }
+
+  static var jumpToLatestTransition: AnyTransition { .opacity }
+
+  static func jumpToLatest(reduceMotion: Bool) -> Animation? {
+    reduceMotion ? nil : JovieMotion.easeOut(duration: JovieMotion.slowDuration)
+  }
+}
+
 struct MobileChatView: View {
   @Bindable var repository: ChatRepository
   @Binding var draft: String
@@ -30,6 +45,7 @@ struct MobileChatView: View {
   @FocusState private var isComposerFocused: Bool
   @State private var isAtBottom = true
   @State private var userEditedSinceSend = false
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   init(
     repository: ChatRepository,
@@ -102,13 +118,16 @@ struct MobileChatView: View {
               onEntityTap: onEntityTap,
               onRecordVideo: onRecordVideo
             )
-            .transition(.opacity.combined(with: .offset(y: 6)))
+            .transition(MobileChatTranscriptMotion.rowTransition)
           }
         }
         // Keyed on `count` only, so this fires when a message is appended --
         // never on in-place streaming text/status mutations of an existing
         // row, which must render without animation.
-        .animation(JovieMotion.easeOut(), value: repository.timeline.count)
+        .animation(
+          MobileChatTranscriptMotion.rowInsertion(reduceMotion: reduceMotion),
+          value: repository.timeline.count
+        )
         .padding(.horizontal, JovieSpacing.large)
         .padding(.top, JovieSpacing.xLarge)
         .padding(.bottom, JovieSpacing.medium)
@@ -146,7 +165,7 @@ struct MobileChatView: View {
         if MobileChatScrollPolicy.shouldShowJumpToLatest(isAtBottom: isAtBottom) {
           Button {
             isAtBottom = true
-            withAnimation(.easeOut(duration: 0.25)) {
+            withAnimation(MobileChatTranscriptMotion.jumpToLatest(reduceMotion: reduceMotion)) {
               proxy.scrollTo("chat-bottom", anchor: .bottom)
             }
           } label: {
@@ -154,8 +173,11 @@ struct MobileChatView: View {
           }
           .buttonStyle(JovieIconButtonStyle())
           .padding(.bottom, JovieSpacing.medium)
-          .transition(.opacity.combined(with: .scale(scale: 0.85)))
-          .animation(.spring(duration: 0.2), value: isAtBottom)
+          .transition(MobileChatTranscriptMotion.jumpToLatestTransition)
+          .animation(
+            MobileChatTranscriptMotion.jumpToLatest(reduceMotion: reduceMotion),
+            value: isAtBottom
+          )
           .accessibilityLabel("Scroll to latest message")
           .accessibilityIdentifier("chat-scroll-to-latest")
         }
@@ -205,7 +227,7 @@ struct MobileChatView: View {
   ) {
     guard MobileChatScrollPolicy.shouldAutoScrollToLatest(isAtBottom: isAtBottom) else { return }
     if animated {
-      withAnimation(.easeOut(duration: 0.25)) {
+      withAnimation(MobileChatTranscriptMotion.jumpToLatest(reduceMotion: reduceMotion)) {
         proxy.scrollTo("chat-bottom", anchor: .bottom)
       }
     } else {

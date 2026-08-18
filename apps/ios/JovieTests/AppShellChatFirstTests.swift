@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import Jovie
 
@@ -114,5 +115,27 @@ struct AppShellChatFirstTests {
     #expect(LaunchMode.uiTestingWaitlistPending.usesLiveAuth == false)
     #expect(LaunchMode.uiTestingWaitlistPending.opensChatOnLaunch == false)
     #expect(LaunchMode.uiTestingWaitlistPending.needsChatRepository == false)
+  }
+
+  @Test func transcriptDropsMotionUnderReduceMotion() {
+    #expect(MobileChatTranscriptMotion.rowInsertion(reduceMotion: true) == nil)
+    #expect(MobileChatTranscriptMotion.jumpToLatest(reduceMotion: true) == nil)
+    #expect(MobileChatTranscriptMotion.rowInsertion(reduceMotion: false) != nil)
+    #expect(MobileChatTranscriptMotion.jumpToLatest(reduceMotion: false) != nil)
+  }
+
+  @Test func transcriptSourceNeverOffsetsOrScalesRows() throws {
+    let sourceURL = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("Jovie/Features/Chat/MobileChatView.swift")
+    let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+    #expect(source.contains("MobileChatTranscriptMotion.rowTransition"))
+    #expect(source.contains("MobileChatTranscriptMotion.jumpToLatestTransition"))
+    #expect(!source.contains(".offset(y: 6)"))
+    #expect(!source.contains("scale(scale: 0.85)"))
+    #expect(!source.contains("easeOut(duration: 0.25)"))
+    #expect(!source.contains(".spring(duration: 0.2)"))
   }
 }
