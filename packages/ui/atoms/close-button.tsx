@@ -29,7 +29,7 @@ export const closeButtonClassName = [
   closeButtonStyles.offset,
 ].join(' ');
 
-interface CloseButtonIconProps
+export interface CloseButtonIconProps
   extends Readonly<{
     /**
      * Size of the X icon in four-pixel spacing units.

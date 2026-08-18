@@ -87,6 +87,13 @@ export {
 // Checkbox
 export type { CheckboxProps } from './atoms/checkbox';
 export { Checkbox } from './atoms/checkbox';
+// Close Button
+export type { CloseButtonIconProps } from './atoms/close-button';
+export {
+  CloseButtonIcon,
+  closeButtonClassName,
+  closeButtonStyles,
+} from './atoms/close-button';
 export { CommonDropdown } from './atoms/common-dropdown';
 // Common Dropdown
 export type {
