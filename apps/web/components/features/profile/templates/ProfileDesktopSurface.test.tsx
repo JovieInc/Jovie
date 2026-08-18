@@ -23,7 +23,7 @@ vi.mock('@/components/atoms/ImageWithFallback', () => ({
     alt,
     src,
     fill: _fill,
-    priority: _priority,
+    priority,
     fallbackVariant: _fallbackVariant,
     fallbackClassName: _fallbackClassName,
     ...props
@@ -35,7 +35,13 @@ vi.mock('@/components/atoms/ImageWithFallback', () => ({
     readonly fallbackVariant?: string;
     readonly fallbackClassName?: string;
     readonly [key: string]: unknown;
-  }) => React.createElement('img', { alt, src: src ?? undefined, ...props }),
+  }) =>
+    React.createElement('img', {
+      alt,
+      src: src ?? undefined,
+      ...props,
+      'data-priority': priority ? 'true' : 'false',
+    }),
 }));
 
 vi.mock('@/components/atoms/SocialIcon', () => ({
@@ -189,6 +195,14 @@ describe('ProfileDesktopSurface', () => {
         socialLinks={[]}
         contacts={contacts}
         photoDownloadSizes={[]}
+        latestRelease={{
+          title: 'Never Say A Word',
+          slug: 'never-say-a-word',
+          artworkUrl: 'https://example.com/never-say-a-word.jpg',
+          releaseDate: '2026-08-01T00:00:00.000Z',
+          releaseType: 'single',
+        }}
+        profileSettings={{ showOldReleases: true }}
         drawerOpen={false}
         drawerView='menu'
         activeMode='listen'
@@ -207,6 +221,10 @@ describe('ProfileDesktopSurface', () => {
 
     expect(screen.getByTestId('mock-static-listen-interface')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Spotify' })).toBeVisible();
+    expect(screen.getByAltText('Never Say A Word')).toHaveAttribute(
+      'data-priority',
+      'true'
+    );
   });
 
   // Regression: JOV-4103 — desktop hero must render social media icons.

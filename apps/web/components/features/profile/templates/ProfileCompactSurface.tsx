@@ -3,7 +3,14 @@
 import { BadgeCheck, ChevronLeft, MapPin, MoreHorizontal } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
@@ -20,7 +27,11 @@ import { ProfileHomeRail } from '@/features/profile/ProfileHomeRail';
 import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
 import { ProfilePrimaryTabPanel } from '@/features/profile/ProfilePrimaryTabPanel';
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
-import { resolveProfileSurfaceState } from '@/features/profile/profile-surface-state';
+import {
+  hasPublicProfileHistoryDestination,
+  resolveProfileSurfaceState,
+  shouldShowPublicProfileBackChevron,
+} from '@/features/profile/profile-surface-state';
 import { getProfileModeDefinition } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
@@ -243,6 +254,21 @@ function resolveActivePrimaryTab(params: {
   }
 }
 
+function subscribeToPublicProfileHistory() {
+  return () => {};
+}
+
+function getPublicProfileHistorySnapshot() {
+  return hasPublicProfileHistoryDestination({
+    historyLength: globalThis.history.length,
+    referrer: document.referrer,
+  });
+}
+
+function getPublicProfileHistoryServerSnapshot() {
+  return false;
+}
+
 export function ProfileCompactSurface({
   renderMode = 'interactive',
   presentation = 'standalone',
@@ -461,6 +487,16 @@ export function ProfileCompactSurface({
   const homeContentScrollClassName = 'min-h-0 flex-1';
   // Prefer current/based location for the hero pin; hometown lives in About.
   const locationLabel = artist.location?.trim() || null;
+  const hasHistoryDestination = useSyncExternalStore(
+    subscribeToPublicProfileHistory,
+    getPublicProfileHistorySnapshot,
+    getPublicProfileHistoryServerSnapshot
+  );
+  const showBackChevron = shouldShowPublicProfileBackChevron({
+    isProfileRoot: activeMode === 'profile',
+    hasHistoryDestination,
+    forceHidden: hideBackButton || isNotificationsFlowOpen,
+  });
 
   const registerNotificationsReveal = useCallback(
     (reveal: () => void) => {
@@ -647,9 +683,7 @@ export function ProfileCompactSurface({
               className='flex w-full items-start justify-between'
               data-testid='profile-top-chrome'
             >
-              {hideBackButton || isNotificationsFlowOpen ? (
-                <div className='h-11 w-11 shrink-0' aria-hidden='true' />
-              ) : (
+              {showBackChevron ? (
                 <CircleIconButton
                   onClick={onBack}
                   size='lg'
@@ -659,6 +693,8 @@ export function ProfileCompactSurface({
                 >
                   <ChevronLeft className='h-5 w-5' />
                 </CircleIconButton>
+              ) : (
+                <div className='h-11 w-11 shrink-0' aria-hidden='true' />
               )}
 
               <p

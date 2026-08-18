@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { toast } from '@/components/feedback';
 import { PaySelector } from '@/components/molecules/PaySelector';
 import { ChannelIcon } from '@/features/profile/artist-contacts-button/ContactIcons';
+import { formatPublicContactChannelAriaLabel } from '@/features/profile/artist-contacts-button/contact-channel-label';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
 import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
 import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
@@ -182,17 +183,17 @@ function ContactList({
               {contact.channels.map(channel => {
                 const channelHref = getActionHref(channel);
                 if (!channelHref) return null;
-                const labels: Record<string, string> = {
-                  email: 'Email',
-                  sms: 'Text',
-                };
                 return (
                   <a
                     key={`${contact.id}-${channel.type}`}
                     href={channelHref}
                     className='flex h-8 w-8 items-center justify-center rounded-full text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-interactive-active hover:text-primary-token'
-                    aria-label={`${labels[channel.type] ?? 'Call'} ${contact.roleLabel}`}
+                    aria-label={formatPublicContactChannelAriaLabel(
+                      channel.type,
+                      contact
+                    )}
                     onClick={() => trackAction(channel, contact)}
+                    data-testid='contact-drawer-channel-action'
                   >
                     <ChannelIcon type={channel.type} />
                   </a>

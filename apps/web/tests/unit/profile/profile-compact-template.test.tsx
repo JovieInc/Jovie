@@ -330,10 +330,25 @@ describe('ProfileCompactTemplate', () => {
     vi.useRealTimers();
   });
 
-  it('renders the floating back control in the compact header', async () => {
+  it('hides the floating back control on the public profile root first landing', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Back' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps the floating back control on nested modes with a profile-root destination', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='listen'
         artist={mockArtist}
         socialLinks={[]}
         contacts={[]}
@@ -578,7 +593,9 @@ describe('ProfileCompactTemplate', () => {
     expect(
       screen.queryByRole('button', { name: 'More' })
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Back' })
+    ).not.toBeInTheDocument();
   });
 
   it('renders the compact bottom navigation with four primary icon tabs', async () => {
@@ -696,6 +713,34 @@ describe('ProfileCompactTemplate', () => {
       configurable: true,
       value: originalReferrer,
     });
+    backSpy.mockRestore();
+  });
+
+  it('returns nested listen mode to the profile root instead of leaving the profile', async () => {
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {
+      // noop
+    });
+
+    render(
+      <ProfileCompactTemplate
+        mode='listen'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(backSpy).not.toHaveBeenCalled();
+    expect(screen.getByTestId('profile-compact-surface')).toHaveAttribute(
+      'data-mode',
+      'profile'
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Back' })
+    ).not.toBeInTheDocument();
+
     backSpy.mockRestore();
   });
 

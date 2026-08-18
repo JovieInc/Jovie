@@ -22,6 +22,7 @@ import type {
   ProfileSurfacePresentation,
 } from '@/features/profile/contracts';
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
+import { resolvePublicProfileBackAction } from '@/features/profile/profile-surface-state';
 import {
   getProfileMode,
   getProfileModeHref,
@@ -745,17 +746,21 @@ export function ProfileCompactTemplate({
   }, [clearCloseResetTimer, mergedDSPs.length]);
 
   const handleBack = useCallback(() => {
-    if (
-      globalThis.window !== undefined &&
-      globalThis.history.length > 1 &&
-      document.referrer.length > 0
-    ) {
-      globalThis.history.back();
+    const action = resolvePublicProfileBackAction({
+      isProfileRoot: requestedMode === 'profile',
+      historyLength: globalThis.history.length,
+      referrer: document.referrer,
+    });
+
+    if (action === 'profile-root') {
+      setRequestedMode('profile');
       return;
     }
 
-    globalThis.location.assign(APP_ROUTES.ARTIST_PROFILES);
-  }, []);
+    if (action === 'history-back') {
+      globalThis.history.back();
+    }
+  }, [requestedMode]);
 
   const handleShare = useCallback(async () => {
     const profileUrl = `${BASE_URL}/${artist.handle}`;

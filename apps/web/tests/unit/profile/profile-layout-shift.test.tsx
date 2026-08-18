@@ -139,16 +139,15 @@ describe('notification flow shell sizing', () => {
     mockUseProfileNotifications.mockReturnValue(buildProfileNotifications());
   });
 
-  it('ArtistNotificationsCTA suppresses inline hydration chrome', async () => {
+  it('ArtistNotificationsCTA reserves inline hydration with a skeleton', async () => {
     mockUseSubscriptionForm.mockReturnValue(
       buildFormState({ hydrationStatus: 'checking' })
     );
 
-    const { container } = render(
-      <ArtistNotificationsCTA artist={artist} autoOpen />
-    );
+    render(<ArtistNotificationsCTA artist={artist} autoOpen />);
 
-    expect(container).toBeEmptyDOMElement();
+    expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByText('Loading subscription form')).toBeInTheDocument();
   });
 
   it('ArtistNotificationsCTA uses the full-height inline flow shell when expanded', async () => {

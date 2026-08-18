@@ -169,6 +169,8 @@ export function ReleasesView({
                   alt={release.title}
                   fill
                   sizes='44px'
+                  priority={index === 0}
+                  loading={index === 0 ? undefined : 'lazy'}
                   className='object-cover grayscale contrast-[1.04]'
                   fallbackVariant='release'
                 />

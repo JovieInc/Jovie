@@ -116,5 +116,10 @@ describe('ProfileUnifiedDrawer — contact person name', () => {
     expect(
       screen.getByTestId('profile-mode-drawer-contact-meta').textContent
     ).toBe('Kelly Strickland');
+    expect(
+      screen.getByRole('link', {
+        name: 'Email Management, Kelly Strickland',
+      })
+    ).toBeInTheDocument();
   });
 });
