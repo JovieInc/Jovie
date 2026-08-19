@@ -163,6 +163,39 @@ class JovieOwnershipTests(unittest.TestCase):
         )
         self.assertTrue(decision["new_issue_intake"])
 
+    def test_ready_autonomous_draft_marks_grok_jov_drafts(self):
+        pr = self._open_pr(16211, mergeable_state="unstable", created_at="2026-08-19T18:59:08Z")
+        pr["draft"] = True
+        pr["head"]["ref"] = "grok/JOV-4894-fix"
+        with mock.patch.object(MODULE, "run", return_value="") as run:
+            result = MODULE.ready_autonomous_draft(pr)
+        self.assertEqual(result["result"], "ok")
+        self.assertEqual(run.call_args.args[:3], ("gh", "pr", "ready"))
+        self.assertEqual(run.call_args.args[3], "16211")
+
+    def test_ready_autonomous_draft_ignores_unrelated_drafts(self):
+        pr = self._open_pr(1, mergeable_state="clean", created_at="2026-08-19T18:00:00Z")
+        pr["draft"] = True
+        pr["head"]["ref"] = "feat/manual"
+        with mock.patch.object(MODULE, "run") as run:
+            result = MODULE.ready_autonomous_draft(pr)
+        self.assertEqual(result["result"], "skipped")
+        self.assertEqual(result["reason"], "not_autonomous_draft")
+        run.assert_not_called()
+
+    def test_ready_autonomous_draft_skips_big_pr_and_dirty_heads(self):
+        big = self._open_pr(15913, mergeable_state="unstable", created_at="2026-08-13T15:12:46Z")
+        big["draft"] = True
+        big["head"]["ref"] = "symphony/JOV-5041-fix"
+        big["labels"] = [{"name": "big-pr"}]
+        dirty = self._open_pr(16187, mergeable_state="dirty", created_at="2026-08-18T19:38:53Z")
+        dirty["draft"] = True
+        dirty["head"]["ref"] = "grok/JOV-5041-fix"
+        with mock.patch.object(MODULE, "run") as run:
+            self.assertEqual(MODULE.ready_autonomous_draft(big)["reason"], "too_large_for_queue")
+            self.assertEqual(MODULE.ready_autonomous_draft(dirty)["reason"], "conflicting")
+        run.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

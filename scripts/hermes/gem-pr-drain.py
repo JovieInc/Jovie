@@ -218,6 +218,40 @@ def excluded(pr):
     )
 
 
+AUTONOMOUS_HEAD_PREFIXES = ("symphony/", "grok/JOV-", "grok/LYB-", "fallback/")
+
+
+def autonomous_head(pr):
+    ref = pr.get("head", {}).get("ref") or ""
+    return any(ref.startswith(prefix) for prefix in AUTONOMOUS_HEAD_PREFIXES)
+
+
+def ready_autonomous_draft(pr):
+    """Mark sidecar/Symphony drafts ready so merge-queue autoenroll can see them.
+
+    Older grok-ship-one prompts opened drafts. Drain previously excluded every
+    draft, so those PRs never entered the queue.
+    """
+    result = {
+        "number": pr["number"],
+        "head": pr.get("head", {}).get("ref"),
+        "before_state": pr.get("mergeable_state"),
+        "priority_class": pr.get("priority_class") or priority_class(pr),
+        "action": "ready_autonomous_draft",
+    }
+    if not pr.get("draft") or not autonomous_head(pr):
+        return {**result, "result": "skipped", "reason": "not_autonomous_draft"}
+    if "big-pr" in labels(pr):
+        return {**result, "result": "skipped", "reason": "too_large_for_queue"}
+    if pr.get("mergeable_state") == "dirty":
+        return {**result, "result": "skipped", "reason": "conflicting"}
+    try:
+        run("gh", "pr", "ready", str(pr["number"]), "--repo", REPO, timeout=60)
+    except Exception as error:
+        return {**result, "result": "error", "error": type(error).__name__}
+    return {**result, "result": "ok"}
+
+
 def priority_class(pr):
     if labels(pr) & EXCLUDED:
         return "taste_or_human"
@@ -510,10 +544,17 @@ def main():
                 for pr in selected
             ]
         else:
+            ready_results = [
+                ready_autonomous_draft(pr)
+                for pr in all_open
+                if pr.get("draft") and autonomous_head(pr)
+            ]
             with concurrent.futures.ThreadPoolExecutor(
                 max_workers=max(1, len(selected))
             ) as executor:
-                document["processed"] = list(executor.map(update_one, selected))
+                document["processed"] = ready_results + list(
+                    executor.map(update_one, selected)
+                )
     except Exception as error:
         document["errors"].append(f"{type(error).__name__}:{error}")
         document["status"] = "error"

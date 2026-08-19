@@ -236,6 +236,9 @@ if [ "$pr_count" -gt 0 ]; then
     echo "PR exists but queue-deferred hold could not be proven" >&2
     exit 2
   fi
+  if [ "$(gh pr view "$pr_number" --repo "$REPO" --json isDraft --jq '.isDraft')" = "true" ]; then
+    gh pr ready "$pr_number" --repo "$REPO"
+  fi
   update_state "$IN_REVIEW_STATE_ID"
   echo "END $ID rc=$rc pr=open $(date -u +%FT%TZ)" | tee -a "$LOG"
   exit "$rc"
