@@ -23,7 +23,10 @@ import {
   ovieFounderLoginLocation,
   pkceS256,
 } from '@/lib/ovie/mcp/oauth';
-import { MemoryOperatingStore } from '@/lib/ovie/mcp/store';
+import {
+  MemoryOperatingStore,
+  memoryRecordBackend,
+} from '@/lib/ovie/mcp/store';
 import { OVIE_MCP_TOOLS } from '@/lib/ovie/mcp/types';
 
 const founder = {
@@ -102,8 +105,9 @@ describe('Ovie MCP handler', () => {
   });
 
   it('round-trips create_initiative then get_initiative without spawning', async () => {
+    const backend = memoryRecordBackend();
     const created = await handleOvieMcpRequest({
-      store: new MemoryOperatingStore(),
+      store: new MemoryOperatingStore(backend),
       principal: founder,
       body: rpc(
         'tools/call',
@@ -113,7 +117,9 @@ describe('Ovie MCP handler', () => {
             title: 'Public Artist Profile Certification',
             intent: 'Map and certify launch-critical profile capabilities',
             desired_outcome: 'Launch-ready public profiles',
+            why: 'Cannot ship uncertified profiles',
             provenance: 'chatgpt-mcp-dogfood',
+            priority: 'engineering',
           },
         },
         'c1'
@@ -124,14 +130,28 @@ describe('Ovie MCP handler', () => {
       id: string;
       workerSpawned: boolean;
       status: string;
+      evidence: Array<{ summary: string }>;
+      receipts: Array<{ destination: string }>;
+      handoff: {
+        title: string;
+        desired_outcome?: string;
+        provenance?: string;
+      };
     }>(created.body);
     expect((created.body as { id: string }).id).toBe('c1');
     expect(createdBody.workerSpawned).toBe(false);
-    expect(createdBody.id.startsWith('ini_')).toBe(true);
-    expect(createdBody.id.length).toBeLessThan(800);
+    expect(createdBody.id).toMatch(/^ini_[A-Za-z0-9_-]{8,24}$/);
+    expect(createdBody.id.includes('.')).toBe(false);
+    expect(createdBody.id.length).toBeLessThan(48);
+    expect(createdBody.evidence.length).toBeGreaterThan(0);
+    expect(createdBody.receipts.length).toBeGreaterThan(0);
+    expect(createdBody.handoff.desired_outcome).toBe(
+      'Launch-ready public profiles'
+    );
+    expect(createdBody.handoff.provenance).toBe('chatgpt-mcp-dogfood');
 
     const fetched = await handleOvieMcpRequest({
-      store: new MemoryOperatingStore(),
+      store: new MemoryOperatingStore(backend),
       principal: founder,
       body: rpc(
         'tools/call',
@@ -143,10 +163,39 @@ describe('Ovie MCP handler', () => {
       id: string;
       complete: boolean;
       merged_is_not_complete: boolean;
+      evidence: Array<{ summary: string }>;
+      receipts: Array<{ destination: string }>;
+      handoff: {
+        title: string;
+        desired_outcome?: string;
+        why?: string;
+        provenance?: string;
+      };
     }>(fetched.body);
     expect(fetchedBody.id).toBe(createdBody.id);
     expect(fetchedBody.complete).toBe(false);
     expect(fetchedBody.merged_is_not_complete).toBe(true);
+    expect(fetchedBody.evidence).toEqual(createdBody.evidence);
+    expect(fetchedBody.receipts).toEqual(createdBody.receipts);
+    expect(fetchedBody.handoff.desired_outcome).toBe(
+      createdBody.handoff.desired_outcome
+    );
+    expect(fetchedBody.handoff.why).toBe('Cannot ship uncertified profiles');
+    expect(fetchedBody.handoff.provenance).toBe('chatgpt-mcp-dogfood');
+
+    const isolated = await handleOvieMcpRequest({
+      store: new MemoryOperatingStore(),
+      principal: founder,
+      body: rpc(
+        'tools/call',
+        { name: 'get_initiative', arguments: { id: createdBody.id } },
+        'g-miss'
+      ),
+    });
+    expect(isolated.status).toBe(200);
+    expect(isolated.body).toMatchObject({
+      error: { message: `unknown initiative ${createdBody.id}` },
+    });
   });
 
   it('persists a decision that later work can reference', async () => {

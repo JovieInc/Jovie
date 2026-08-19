@@ -12,7 +12,7 @@ import {
   stringList,
   stringOpt,
 } from './handoff';
-import { type OperatingStore, sealId } from './store';
+import { newRecordId, type OperatingStore } from './store';
 import {
   type InitiativeStatus,
   OVIE_MCP_IDENTITY,
@@ -98,13 +98,13 @@ export async function callOvieMcpTool(
 
   switch (name) {
     case 'get_org_state':
-      return { ok: true, result: getOrgState(store, args) };
+      return { ok: true, result: await getOrgState(store, args) };
     case 'record_decision':
-      return { ok: true, result: recordDecision(store, args) };
+      return { ok: true, result: await recordDecision(store, args) };
     case 'create_initiative':
-      return { ok: true, result: createInitiative(store, args) };
+      return { ok: true, result: await createInitiative(store, args) };
     case 'get_initiative':
-      return getInitiative(store, args);
+      return await getInitiative(store, args);
     case 'get_feature_state':
       return { ok: true, result: getFeatureState(args) };
     case 'certify_feature':
@@ -118,9 +118,13 @@ export async function callOvieMcpTool(
   }
 }
 
-function getOrgState(store: OperatingStore, args: Record<string, unknown>) {
-  const initiatives = store.listInitiatives();
+async function getOrgState(
+  store: OperatingStore,
+  args: Record<string, unknown>
+) {
+  const initiatives = await store.listInitiatives();
   const inventory = loadProfileCapabilitiesFromDisk();
+  const decisions = await store.listDecisions();
   return {
     identity: OVIE_MCP_IDENTITY,
     role: 'founder',
@@ -130,13 +134,10 @@ function getOrgState(store: OperatingStore, args: Record<string, unknown>) {
       title: item.handoff.title,
       status: item.status,
     })),
-    recent_decisions: store
-      .listDecisions()
-      .slice(-8)
-      .map(item => ({
-        id: item.id,
-        decided: item.decided,
-      })),
+    recent_decisions: decisions.slice(-8).map(item => ({
+      id: item.id,
+      decided: item.decided,
+    })),
     awaiting_tim: initiatives
       .filter(item => item.status === 'blocked')
       .map(item => item.id),
@@ -145,7 +146,10 @@ function getOrgState(store: OperatingStore, args: Record<string, unknown>) {
   };
 }
 
-function recordDecision(store: OperatingStore, args: Record<string, unknown>) {
+async function recordDecision(
+  store: OperatingStore,
+  args: Record<string, unknown>
+) {
   const decided = (
     stringOpt(args.decided) ??
     stringOpt(args.what) ??
@@ -162,12 +166,12 @@ function recordDecision(store: OperatingStore, args: Record<string, unknown>) {
     supersedes: stringOpt(args.supersedes),
     createdAt: new Date().toISOString(),
   };
-  const record = { ...draft, id: sealId('dec', draft) };
-  store.putDecision(record);
+  const record = { ...draft, id: newRecordId('dec') };
+  await store.putDecision(record);
   return record;
 }
 
-function createInitiative(
+async function createInitiative(
   store: OperatingStore,
   args: Record<string, unknown>
 ) {
@@ -194,14 +198,17 @@ function createInitiative(
       ref: receipt.destination,
     })),
   };
-  const record = { ...draft, id: sealId('ini', draft) };
-  store.putInitiative(record);
+  const record = { ...draft, id: newRecordId('ini') };
+  await store.putInitiative(record);
   return record;
 }
 
-function getInitiative(store: OperatingStore, args: Record<string, unknown>) {
+async function getInitiative(
+  store: OperatingStore,
+  args: Record<string, unknown>
+) {
   const id = typeof args.id === 'string' ? args.id : '';
-  const record = store.getInitiative(id);
+  const record = await store.getInitiative(id);
   if (!record)
     return { ok: false as const, message: `unknown initiative ${id}` };
   return {

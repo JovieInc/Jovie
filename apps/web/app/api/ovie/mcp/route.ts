@@ -9,7 +9,13 @@ import {
   getOvieOAuthIssuer,
   ovieIssuerSecret,
 } from '@/lib/ovie/mcp/oauth';
+import {
+  DurableOperatingStore,
+  getDefaultOperatingStore,
+  redisRecordBackend,
+} from '@/lib/ovie/mcp/store';
 import type { OvieMcpPrincipal } from '@/lib/ovie/mcp/types';
+import { getRedis } from '@/lib/redis';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,11 +54,19 @@ async function resolvePrincipal(request: Request): Promise<OvieMcpPrincipal> {
   };
 }
 
+function operatingStore() {
+  const redis = getRedis();
+  return redis
+    ? new DurableOperatingStore(redisRecordBackend(redis))
+    : getDefaultOperatingStore();
+}
+
 export async function POST(request: Request): Promise<NextResponse> {
   const body: unknown = await request.json().catch(() => null);
   const result = await handleOvieMcpRequest({
     body,
     principal: await resolvePrincipal(request),
+    store: operatingStore(),
   });
   if (result.body === null) {
     return new NextResponse(null, { status: result.status, headers: CORS });
