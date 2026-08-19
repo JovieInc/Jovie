@@ -149,6 +149,7 @@ import {
   updateMerchCardDetails,
 } from '@/lib/merch/service';
 import { prepareOvieChatTurn } from '@/lib/ovie/chat-entry';
+import { getOvieOperatingStore } from '@/lib/ovie/mcp/runtime-store';
 import {
   albumArtGenerationBurstLimiter,
   albumArtGenerationLimiter,
@@ -2449,9 +2450,10 @@ export async function POST(req: Request) {
   }
   const userText = extractLastUserText(uiMessages);
   // JOV-5215/5216: bind Eve pack + persist/Linear-route dump before model.
-  const { eveTurn, receipts: ovieIngestReceipts } = prepareOvieChatTurn(
+  const { eveTurn, receipts: ovieIngestReceipts } = await prepareOvieChatTurn(
     chatMode,
-    userText
+    userText,
+    { store: getOvieOperatingStore() }
   );
   const clientTurnId = normalizeClientId(body.clientTurnId);
   const clientMessageId = normalizeClientId(body.clientMessageId);

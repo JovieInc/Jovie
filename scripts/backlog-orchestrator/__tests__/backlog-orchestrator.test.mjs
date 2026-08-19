@@ -885,17 +885,32 @@ describe('entrypoint contract', () => {
 });
 
 describe('deterministic Symphony admission boundary', () => {
+  /**
+   * @param {{
+   *   skipReceipts?: boolean
+   *   id?: string
+   *   identifier?: string
+   *   title?: string
+   *   state?: string
+   *   labels?: string[]
+   *   assignee?: { id?: string, name?: string } | null
+   *   comments?: Array<{ body?: string, createdAt?: string }>
+   * }} [overrides]
+   */
   function admissionIssue(overrides = {}) {
-    return makeIssue({
-      id: overrides.id || `${overrides.identifier || 'JOV-900'}-id`,
-      identifier: overrides.identifier || 'JOV-900',
+    const skipReceipts = Boolean(overrides.skipReceipts);
+    const identifier = overrides.identifier || 'JOV-900';
+    const issue = makeIssue({
+      id: overrides.id || `${identifier}-id`,
+      identifier,
       title: overrides.title || 'Fix the real thing',
       state: overrides.state || 'Triage',
-      labels: overrides.labels || ['plan-approved', 'admission-approved'],
+      labels: overrides.labels || [],
       assignee: overrides.assignee || null,
       comments: overrides.comments || [],
-      ...overrides,
     });
+    if (skipReceipts || overrides.comments) return issue;
+    return withFullGateReceipts(issue);
   }
 
   function classification(issue) {

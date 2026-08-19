@@ -53,10 +53,12 @@ RUNTIME_NAMES = (
     "model-registry.json",
 )
 LAUNCHER_NAMES = (*LEGACY_RUNTIME_NAMES, "grok-ship-one")
-# `symphony` is the routing lease. Plan/admission labels are advisory evidence,
-# not a second waitlist: RED and explicit human/blocked labels remain the hard
-# integrity gates.
-REQUIRED_ADMISSION_LABELS = frozenset(("symphony",))
+# Labels are derived audit evidence, never independent admission blockers.
+# The machine-written admission-gate/v1 receipt is the source of truth.
+REQUIRED_ADMISSION_LABELS = frozenset()
+ADMISSION_GATE_PREFIX = "<!-- admission-gate/v1 -->"
+ADMISSION_GATE_SUFFIX = "<!--/admission-gate-->"
+ADMISSION_GATE_SCHEMA = "admission-gate/v1"
 # Single source of truth for the Grok sidecar admission predicate. `blocked` is
 # included because human-review flags (needs-human / needs:human / blocked / hold)
 # must gate out of auto-ship; reconcile and grok-ship-one both use this set.
@@ -102,14 +104,14 @@ query($first: Int!, $after: String) {
     first: $first
     after: $after
     filter: {
-      labels: { name: { eq: "symphony" } }
       state: { name: { in: ["Todo", "In Progress", "In Review"] } }
     }
   ) {
     nodes {
-      identifier updatedAt
+      identifier title description updatedAt
       team { key }
       labels { nodes { name } }
+      comments { nodes { body } }
     }
     pageInfo {
       hasNextPage
@@ -126,6 +128,7 @@ query($id: String!) {
     state { id name }
     team { key states { nodes { id name } } }
     labels { nodes { name } }
+    comments { nodes { body } }
   }
 }
 """
@@ -255,6 +258,12 @@ def _model_router_selection() -> tuple[dict | None, str]:
         return None, "model_router_bundle_missing"
     env = os.environ.copy()
     env["GEM_MODEL_REGISTRY"] = str(registry)
+    local_bin = str(pathlib.Path.home() / ".local/bin")
+    env["PATH"] = f"{local_bin}:{env.get('PATH', '/usr/bin:/bin')}"
+    grok_exe = _grok_executable()
+    if grok_exe:
+        env.setdefault("GEM_GROK_EXECUTABLE", grok_exe)
+        env.setdefault("GEM_GROK_BIN", grok_exe)
     try:
         result = subprocess.run(
             [sys.executable, str(router), "choose", "--workflow", "new_pr", "--capability", "code", "--exclude-pool", "codex"],
@@ -499,21 +508,79 @@ def _linear_api_key_from_file() -> str | None:
     return key
 
 
-def admission_decision(team_key: str, identifier: str, labels: set[str]) -> tuple[bool, str]:
+def _issue_revision(identifier: str, title: str, description: str) -> str:
+    canonical = f"{identifier or ''}\n{(title or '').strip()}\n{(description or '').strip()}"
+    return hashlib.sha256(canonical.encode()).hexdigest()[:24]
+
+
+def _comment_bodies(comments: object) -> list[str]:
+    if isinstance(comments, list):
+        nodes = comments
+    elif isinstance(comments, dict):
+        nodes = comments.get("nodes")
+        if not isinstance(nodes, list):
+            return []
+    else:
+        return []
+    bodies: list[str] = []
+    for comment in nodes:
+        if isinstance(comment, str):
+            bodies.append(comment)
+        elif isinstance(comment, dict) and isinstance(comment.get("body"), str):
+            bodies.append(comment["body"])
+    return bodies
+
+
+def admission_receipt(identifier: str, title: str, description: str, comments: object) -> dict | None:
+    """Return the current revision-scoped admission-gate/v1 receipt, or None."""
+    prefix = f"{ADMISSION_GATE_PREFIX}\n"
+    suffix = f"\n{ADMISSION_GATE_SUFFIX}"
+    for body in reversed(_comment_bodies(comments)):
+        if not (body.startswith(prefix) and body.endswith(suffix)):
+            continue
+        try:
+            payload = json.loads(body[len(prefix) : -len(suffix)])
+        except (TypeError, ValueError):
+            return None
+        if (
+            not isinstance(payload, dict)
+            or payload.get("schema") != ADMISSION_GATE_SCHEMA
+            or payload.get("issue") != identifier
+            or payload.get("decision") != "approved"
+            or not isinstance(payload.get("fingerprint"), str)
+            or not payload.get("fingerprint")
+            or payload.get("issueRevision") != _issue_revision(identifier, title, description)
+        ):
+            return None
+        return payload
+    return None
+
+
+def admission_decision(
+    team_key: str,
+    identifier: str,
+    labels: set[str],
+    title: str = "",
+    description: str = "",
+    comments: object = None,
+) -> tuple[bool, str]:
     """Single admission predicate shared by reconcile listing, reconcile
     pre-launch verification, and grok-ship-one's check-admission command.
 
-    An issue is admitted only when it is a supported-team identifier carrying
-    every required admission label and no blocked/human-review label.
+    An issue is admitted only when a current admission-gate/v1 receipt matches
+    this revision and no blocked/human-review label is present. Labels are
+    derived audit evidence, never a second waitlist.
     """
     if not IDENTIFIER.fullmatch(identifier):
         return False, "invalid_identifier"
     if team_key.upper() not in SUPPORTED_TEAMS:
         return False, "unsupported_team"
-    if not REQUIRED_ADMISSION_LABELS.issubset(labels):
+    if REQUIRED_ADMISSION_LABELS and not REQUIRED_ADMISSION_LABELS.issubset(labels):
         return False, "missing_admission_labels"
     if not BLOCKED_ADMISSION_LABELS.isdisjoint(labels):
         return False, "blocked"
+    if admission_receipt(identifier, title, description, comments) is None:
+        return False, "admission_receipt_missing_or_stale"
     return True, "admitted"
 
 
@@ -558,7 +625,16 @@ def _admitted_issue_identifier(node: object) -> str | None:
             raise ValueError("malformed issue node")
         labels.add(label["name"].strip().lower())
     identifier = node["identifier"]
-    ok, _reason = admission_decision(team_key, identifier, labels)
+    title = node.get("title") if isinstance(node.get("title"), str) else ""
+    description = node.get("description") if isinstance(node.get("description"), str) else ""
+    ok, _reason = admission_decision(
+        team_key,
+        identifier,
+        labels,
+        title=title,
+        description=description,
+        comments=node.get("comments"),
+    )
     return identifier if ok else None
 
 
@@ -638,7 +714,16 @@ def _issue_meta(issue: dict, identifier: str) -> tuple[bool, str, dict | None]:
         for node in label_connection.get("nodes", [])
         if isinstance(node, dict)
     }
-    ok, reason = admission_decision(team_key, identifier, labels)
+    title = issue.get("title") if isinstance(issue.get("title"), str) else ""
+    description = issue.get("description") if isinstance(issue.get("description"), str) else ""
+    ok, reason = admission_decision(
+        team_key,
+        identifier,
+        labels,
+        title=title,
+        description=description,
+        comments=issue.get("comments"),
+    )
     if not ok:
         return False, reason, None
     if issue["identifier"] != identifier:
@@ -737,7 +822,7 @@ def _autonomous_open_pr_index(identifiers: list[str]) -> dict[str, dict]:
                 "--limit",
                 "100",
                 "--json",
-                "number,headRefName",
+                "number,headRefName,mergeStateStatus",
             ]
         )
         if not isinstance(payload, list):
@@ -757,8 +842,12 @@ def _autonomous_open_pr_index(identifiers: list[str]) -> dict[str, dict]:
                     "number": pr.get("number"),
                     "head": head,
                     "repo": repo,
+                    "mergeStateStatus": pr.get("mergeStateStatus"),
                 }
     return index
+
+
+_REMOUNT_IGNORE_FAILURES = frozenset({"enroll", "PR Ready"})
 
 
 def _pr_has_failing_check(repo: str, number: int) -> bool:
@@ -770,12 +859,23 @@ def _pr_has_failing_check(repo: str, number: int) -> bool:
     checks = payload.get("statusCheckRollup") or []
     if not isinstance(checks, list):
         return False
+    pending = False
+    failing = False
     for check in checks:
         if not isinstance(check, dict):
             continue
+        name = str(check.get("name") or "")
+        status = str(check.get("status") or "").upper()
+        if status in {"IN_PROGRESS", "QUEUED", "PENDING"}:
+            pending = True
+            continue
+        if name in _REMOUNT_IGNORE_FAILURES:
+            continue
         if check.get("conclusion") == "FAILURE" or check.get("state") == "FAILURE":
-            return True
-    return False
+            failing = True
+    # Pending CI after a remount push is not a product failure. Remounting
+    # again fights the in-flight checks (live #16211 at 20:17).
+    return failing and not pending
 
 
 def _open_pr_verdict(identifier: str, index: dict[str, dict]) -> tuple[str, dict | None]:
@@ -787,6 +887,16 @@ def _open_pr_verdict(identifier: str, index: dict[str, dict]) -> tuple[str, dict
     number = pr.get("number")
     if not isinstance(repo, str) or not isinstance(number, int):
         return "skip", pr
+    status = str(pr.get("mergeStateStatus") or "").upper()
+    # CLEAN heads are already merge-queue eligible. Remounting them fights
+    # github-merge-queue and can knock a green autonomous PR out of the queue.
+    if status == "CLEAN":
+        return "skip", pr
+    # DIRTY/BEHIND after a sibling merge is not product-CI-red, but the head
+    # cannot enroll until it merges main. Live #16211 was skipped as inflight
+    # after #16212 landed (sidecar: open_pr_inflight).
+    if status in {"DIRTY", "BEHIND"}:
+        return "remount", pr
     if _pr_has_failing_check(repo, number):
         return "remount", pr
     return "skip", pr
@@ -864,9 +974,12 @@ def _grok_command(
 ) -> list[str]:
     encoded = base64.b64encode(json.dumps(selection, separators=(",", ":")).encode()).decode()
     unit = _fallback_unit(identifier, issue_revision)
+    grok_exe = _grok_executable() or str(pathlib.Path.home() / ".local/bin/grok")
     return [
         "systemd-run", "--user", f"--unit={unit}", "--collect",
         "-p", "Type=exec", "-p", f"Environment=PATH={pathlib.Path.home()}/.local/bin:/usr/bin:/bin",
+        "-p", f"Environment=GEM_GROK_EXECUTABLE={grok_exe}",
+        "-p", f"Environment=GEM_GROK_BIN={grok_exe}",
         "-p", f"Environment=SYMPHONY_FALLBACK_SELECTION_B64={encoded}",
         "-p", f"Environment=SYMPHONY_FALLBACK_ISSUE_REVISION={issue_revision}",
         "-p", f"Environment=SYMPHONY_FALLBACK_BUNDLE_REVISION={bundle_revision}",

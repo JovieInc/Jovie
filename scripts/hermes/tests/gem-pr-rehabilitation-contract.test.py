@@ -411,10 +411,12 @@ class ModelPolicyContractTests(unittest.TestCase):
         arguments = grok["agent_argv"]
         self.assertEqual(grok["model"], "grok-4.6")
         self.assertIn("{cwd}", arguments)
-        self.assertIn("acceptEdits", arguments)
-        self.assertIn("Bash,WebFetch,WebSearch", arguments)
+        self.assertIn("-m", arguments)
+        self.assertIn("--always-approve", arguments)
+        self.assertIn("--disable-web-search", arguments)
         self.assertIn("--no-subagents", arguments)
-        self.assertNotIn("--always-approve", arguments)
+        self.assertIn("-p", arguments)
+        self.assertNotIn("agent", arguments)
 
 
 if __name__ == "__main__":

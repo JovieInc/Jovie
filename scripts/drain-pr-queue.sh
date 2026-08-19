@@ -693,12 +693,31 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     and .baseRefName == "main"
     and ([.labels[].name] | any(
       . == "needs-human" or . == "hold" or . == "gated"
-      or . == "queue-deferred" or . == "needs-conflict-resolution"
+      or . == "needs-conflict-resolution"
       or . == "fast" or ($backend == "test-label-fixture" and . == "merge-queue")
     ) | not)
   ' <<<"$current" >/dev/null; then
     echo "    ⏸ eligibility changed; refusing enrollment for #$n"
     return 2
+  fi
+  if jq -e '[.labels[].name] | index("queue-deferred")' <<<"$current" >/dev/null; then
+    if [[ "$DRAIN_PROMOTION_MODE" != "hold-intake" && "$DRAIN_PROMOTION_MODE" != "normal" ]]; then
+      echo "    ⏸ queue-deferred hold still applies for #$n"
+      return 2
+    fi
+    if [[ "$DRY_RUN" == "1" ]]; then
+      echo "    [dry-run] would -queue-deferred on #$n (exact admission)"
+    else
+      if ! gh_retry pr edit "$n" -R "$REPO" --remove-label queue-deferred >/dev/null 2>&1; then
+        echo "    !! failed to remove queue-deferred on #$n" >&2
+        return 1
+      fi
+      echo "    -queue-deferred on #$n (exact admission under $DRAIN_PROMOTION_MODE)"
+      if ! current="$(gh_retry pr view "$n" -R "$REPO" --json "$json_fields" 2>/dev/null)"; then
+        echo "    !! could not refresh #$n after releasing queue-deferred" >&2
+        return 1
+      fi
+    fi
   fi
   head_oid="$(jq -r '.headRefOid // empty' <<<"$current")"
   if [[ ! "$head_oid" =~ ^[0-9a-fA-F]{40}$ ]]; then
@@ -1164,11 +1183,17 @@ while IFS= read -r pr; do
   stop_if_budget_exhausted && break
   n="$(jq -r '.n' <<<"$pr")"
   fail="[]"
-  if jq -e '
+  if jq -e --arg admission_pr "$DRAIN_ADMISSION_PR" '
     (.draft | not)
     and (.base == "main")
     and (.m == "MERGEABLE")
-    and (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "fast")) | not)
+    and (
+      (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "fast")) | not)
+      and (
+        (([.L[]] | index("queue-deferred")) == null)
+        or ((.n | tostring) == $admission_pr)
+      )
+    )
   ' <<<"$pr" >/dev/null; then
     fail="$(check_failures_for_pr "$n")"
   fi
@@ -1477,7 +1502,11 @@ done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" --arg pro
   | select(.base=="main")
   | select(.fail|length==0)
   | select(.q | not)
-  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or .=="needs-conflict-resolution" or .=="fast") | not)')
+  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="needs-conflict-resolution" or .=="fast") | not)
+  | select(
+      ([.L[]] | index("queue-deferred") == null)
+      or ((.n | tostring) == $admission_pr)
+    )')
 
 # A scoped CI-completion event that reaches this point without an exact-head
 # native queue receipt is not a successful controller pass. Previously this

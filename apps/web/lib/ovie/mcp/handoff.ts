@@ -1,5 +1,5 @@
 import {
-  applyOvieDump,
+  ingestOvieDump,
   type OvieLane,
   type OvieReceipt,
 } from '@/lib/ovie/ingest';
@@ -65,7 +65,7 @@ export function classifyHandoff(handoff: OvieHandoff): {
   readonly lane: OvieLane;
   readonly destination: OvieReceipt['destination'];
 } {
-  const receipts = applyOvieDump([handoffDumpText(handoff)]);
+  const receipts = ingestOvieDump([handoffDumpText(handoff)]);
   const first = receipts[0];
   return {
     receipts,

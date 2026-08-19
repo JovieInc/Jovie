@@ -906,6 +906,93 @@ JSON
         assert "[dry-run] would +merge-queue on #904" in result.stdout
         assert "would record jovie-fleet-queue-hold/v1 on #904" not in result.stdout
 
+    def test_hold_intake_enrolls_exact_admission_despite_queue_deferred(
+        self, tmp_path: Path
+    ) -> None:
+        """Live #16211 was CI-green under hold-intake but autoenroll no-op'd
+        because grok-ship-one had added queue-deferred (hard gate).
+        """
+        head = "a138997d50393a3f609e47c13fc6327bc22a8892"
+        receipt = {
+            "schema": "jovie-fleet-gate/v1",
+            "state": "AMBER",
+            "promotionMode": "hold-intake",
+            "observedAt": datetime.now(timezone.utc).isoformat(),
+            "signals": {
+                "main": {"status": "green", "sha": "a" * 40},
+                "production": {"status": "green", "deployedSha": "b" * 40},
+                "controller": {"status": "green"},
+                "queue": {
+                    "status": "known",
+                    "eligiblePrs": 1,
+                    "greenReadyPrs": 1,
+                    "target": 15,
+                },
+                "integrity": {"status": "clear"},
+            },
+            "promotionAdmission": {"allowed": False},
+            "isolatedPromotionAdmission": {
+                "allowed": False,
+                "deploymentsAllowed": False,
+            },
+            "productionUnboundRepairAdmission": {
+                "allowed": True,
+                "condition": "production-deployment-unbound",
+                "mainSha": "a" * 40,
+                "deployedSha": "b" * 40,
+                "maxConcurrent": 1,
+                "deploymentsAllowed": False,
+            },
+            "alreadyAdmittedCohort": {
+                "preserve": True,
+                "newIntakeAllowed": True,
+                "semantics": "preserve-cohort-and-continue-isolated-implementation",
+            },
+        }
+        encoded = base64.b64encode(json.dumps(receipt).encode()).decode()
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":16211,"t":"Grok remount","draft":false,"m":"MERGEABLE","head":"grok/JOV-4894-fix","headOid":"{head}","base":"main","L":["queue-deferred"],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"enroll","bucket":"fail","state":"FAILURE","workflow":"Merge Queue Auto-Enroll"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[{{"name":"queue-deferred"}}],"headRefOid":"{head}","baseRefName":"main","body":"Fixes JOV-4894"}}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(
+            fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRY_RUN=1 DRAIN_PROMOTION_MODE=hold-intake "
+                    "DRAIN_ADMISSION_PR=16211 "
+                    f"DRAIN_ADMISSION_HEAD={head} DRAIN_FLEET_GATE_B64={encoded}"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "would -queue-deferred on #16211" in result.stdout
+        assert "[dry-run] would +merge-queue on #16211" in result.stdout
+
     def test_draft_only_enrolls_clean_unrelated_pr(self, tmp_path: Path) -> None:
         head = "c" * 40
         receipt = {

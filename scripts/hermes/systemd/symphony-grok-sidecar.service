@@ -3,6 +3,9 @@ Description=Symphony Grok sidecar when Codex exhausted
 
 [Service]
 Type=oneshot
+Environment=GEM_GROK_EXECUTABLE=%h/.local/bin/grok
+Environment=GEM_GROK_BIN=%h/.local/bin/grok
+Environment=PATH=%h/.local/bin:/usr/bin:/bin
 ExecStart=%h/.local/bin/symphony-grok-sidecar
 # Exit-status contract (scripts/hermes/symphony-codex-exhausted.py):
 #   0  reconciled (ready/idle, recovery deferred, or Grok workers launched)
