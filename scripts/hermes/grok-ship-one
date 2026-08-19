@@ -168,7 +168,14 @@ if [ "$REMOUNT" = 1 ]; then
   if ! git -C "$WS" merge-base HEAD origin/main >/dev/null 2>&1; then
     git -C "$WS" fetch --deepen=500 origin
   fi
-  git -C "$WS" merge --no-edit origin/main
+  if ! git -C "$WS" merge --no-edit origin/main; then
+    if [ -n "$(git -C "$WS" ls-files -u)" ]; then
+      echo "$(date -u +%FT%TZ) $ID remount_merge_conflicts" >> "$LOG"
+    else
+      echo "merge origin/main failed without conflicts: $WS" >&2
+      exit 2
+    fi
+  fi
 else
   git -C "$WS" fetch --depth 1 origin main
   git -C "$WS" checkout -B "$BRANCH" origin/main
