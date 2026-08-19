@@ -1448,13 +1448,15 @@ class FallbackTests(unittest.TestCase):
     def test_open_pr_verdict_skips_inflight_and_remounts_failure(self):
         module = self.load_controller_module()
         index = {
-            "JOV-1": {"number": 16211, "head": "grok/JOV-1-fix", "repo": "JovieInc/Jovie"},
-            "JOV-2": {"number": 16212, "head": "grok/JOV-2-fix", "repo": "JovieInc/Jovie"},
+            "JOV-1": {"number": 16211, "head": "grok/JOV-1-fix", "repo": "JovieInc/Jovie", "mergeStateStatus": "BLOCKED"},
+            "JOV-2": {"number": 16212, "head": "grok/JOV-2-fix", "repo": "JovieInc/Jovie", "mergeStateStatus": "BLOCKED"},
+            "JOV-4": {"number": 16214, "head": "grok/JOV-4-fix", "repo": "JovieInc/Jovie", "mergeStateStatus": "CLEAN"},
         }
-        with mock.patch.object(module, "_pr_has_failing_check", side_effect=lambda repo, number: number == 16212):
+        with mock.patch.object(module, "_pr_has_failing_check", side_effect=lambda repo, number: number in (16212, 16214)):
             self.assertEqual(module._open_pr_verdict("JOV-1", index)[0], "skip")
             self.assertEqual(module._open_pr_verdict("JOV-2", index)[0], "remount")
             self.assertEqual(module._open_pr_verdict("JOV-3", index)[0], "none")
+            self.assertEqual(module._open_pr_verdict("JOV-4", index)[0], "skip")
 
     def test_launch_skips_inflight_open_prs_and_fills_capacity_with_unblocked(self):
         """Live sidecar launched identifiers that already had grok/JOV PRs; units
@@ -1544,7 +1546,11 @@ class FallbackTests(unittest.TestCase):
             "git",
             'printf "git %s\\n" "$*" >> "$GEM_EVENTS"\n'
             '[ "$1" != clone ] || mkdir -p "$5/.git"\n'
-            'case "$*" in *"rev-parse HEAD") printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";; esac\n',
+            'case "$*" in\n'
+            '  *"rev-parse HEAD") printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";;\n'
+            '  *"rev-parse --is-shallow-repository") printf "true\\n";;\n'
+            '  *"merge-base HEAD origin/main") exit 1;;\n'
+            'esac\n',
         )
         self.command(
             "grok",
@@ -1569,7 +1575,14 @@ class FallbackTests(unittest.TestCase):
         log = (self.root / "logs/JOV-7.log").read_text()
         self.assertIn("remount_ci_red", log)
         events = self.events.read_text()
+        self.assertIn("fetch origin refs/heads/grok/JOV-7-fix:refs/remotes/origin/grok/JOV-7-fix", events)
+        self.assertIn("fetch origin main", events)
+        self.assertIn("fetch --unshallow origin", events)
+        self.assertIn("fetch --deepen=500 origin", events)
         self.assertIn("checkout -B grok/JOV-7-fix origin/grok/JOV-7-fix", events)
+        self.assertIn("reset --hard origin/grok/JOV-7-fix", events)
+        self.assertIn("merge --no-edit origin/main", events)
+        self.assertNotIn("fetch --depth 1 origin refs/heads/grok/JOV-7-fix", events)
         self.assertNotIn("checkout -B fallback/JOV-7-fix origin/main", events)
         self.assertIn("failing CI", events)
 

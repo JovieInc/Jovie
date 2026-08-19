@@ -19,8 +19,9 @@ import tempfile
 import time
 
 QUOTA_RE = re.compile(
-    r"(429|rate.?limit|quota|usage (limit|exceeded|cap)|too many requests|"
-    r"insufficient (credit|quota)|weekly usage|limit reached)",
+    r"(429|402|rate.?limit|quota|usage (limit|exceeded|cap)|too many requests|"
+    r"insufficient (credit|quota)|weekly usage|limit reached|can only afford|"
+    r"max_tokens)",
     re.I,
 )
 
@@ -125,10 +126,37 @@ def save_state(d):
 
 def model_map(cfg): return {m["id"]: m for m in cfg["models"]}
 
+def _runnable(candidate: str) -> str | None:
+    if not candidate:
+        return None
+    path = pathlib.Path(candidate).expanduser()
+    resolved = str(path) if path.is_absolute() else shutil.which(candidate)
+    if resolved and os.access(resolved, os.X_OK):
+        return resolved
+    return None
+
+
 def configured_executable(model, prefix=""):
     env_key = model.get(f"{prefix}executable_env", "")
     default = model.get(f"{prefix}executable_default", "")
-    return str(os.environ.get(env_key, default))
+    explicit = os.environ.get(env_key) if env_key else None
+    if explicit:
+        return str(explicit)
+    candidates = []
+    if model.get("provider") == "grok":
+        alias = os.environ.get("GEM_GROK_BIN")
+        if alias:
+            candidates.append(alias)
+        home = pathlib.Path.home()
+        candidates.append(str(home / ".local/bin/grok"))
+        candidates.append(str(home / ".grok/bin/grok"))
+    if default:
+        candidates.append(str(default))
+    for candidate in candidates:
+        resolved = _runnable(candidate)
+        if resolved:
+            return resolved
+    return str(default)
 
 
 def executable(model):

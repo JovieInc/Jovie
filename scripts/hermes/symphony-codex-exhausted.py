@@ -255,6 +255,12 @@ def _model_router_selection() -> tuple[dict | None, str]:
         return None, "model_router_bundle_missing"
     env = os.environ.copy()
     env["GEM_MODEL_REGISTRY"] = str(registry)
+    local_bin = str(pathlib.Path.home() / ".local/bin")
+    env["PATH"] = f"{local_bin}:{env.get('PATH', '/usr/bin:/bin')}"
+    grok_exe = _grok_executable()
+    if grok_exe:
+        env.setdefault("GEM_GROK_EXECUTABLE", grok_exe)
+        env.setdefault("GEM_GROK_BIN", grok_exe)
     try:
         result = subprocess.run(
             [sys.executable, str(router), "choose", "--workflow", "new_pr", "--capability", "code", "--exclude-pool", "codex"],
@@ -737,7 +743,7 @@ def _autonomous_open_pr_index(identifiers: list[str]) -> dict[str, dict]:
                 "--limit",
                 "100",
                 "--json",
-                "number,headRefName",
+                "number,headRefName,mergeStateStatus",
             ]
         )
         if not isinstance(payload, list):
@@ -757,6 +763,7 @@ def _autonomous_open_pr_index(identifiers: list[str]) -> dict[str, dict]:
                     "number": pr.get("number"),
                     "head": head,
                     "repo": repo,
+                    "mergeStateStatus": pr.get("mergeStateStatus"),
                 }
     return index
 
@@ -786,6 +793,10 @@ def _open_pr_verdict(identifier: str, index: dict[str, dict]) -> tuple[str, dict
     repo = pr.get("repo")
     number = pr.get("number")
     if not isinstance(repo, str) or not isinstance(number, int):
+        return "skip", pr
+    # CLEAN heads are already merge-queue eligible. Remounting them fights
+    # github-merge-queue and can knock a green autonomous PR out of the queue.
+    if str(pr.get("mergeStateStatus") or "").upper() == "CLEAN":
         return "skip", pr
     if _pr_has_failing_check(repo, number):
         return "remount", pr
@@ -864,9 +875,12 @@ def _grok_command(
 ) -> list[str]:
     encoded = base64.b64encode(json.dumps(selection, separators=(",", ":")).encode()).decode()
     unit = _fallback_unit(identifier, issue_revision)
+    grok_exe = _grok_executable() or str(pathlib.Path.home() / ".local/bin/grok")
     return [
         "systemd-run", "--user", f"--unit={unit}", "--collect",
         "-p", "Type=exec", "-p", f"Environment=PATH={pathlib.Path.home()}/.local/bin:/usr/bin:/bin",
+        "-p", f"Environment=GEM_GROK_EXECUTABLE={grok_exe}",
+        "-p", f"Environment=GEM_GROK_BIN={grok_exe}",
         "-p", f"Environment=SYMPHONY_FALLBACK_SELECTION_B64={encoded}",
         "-p", f"Environment=SYMPHONY_FALLBACK_ISSUE_REVISION={issue_revision}",
         "-p", f"Environment=SYMPHONY_FALLBACK_BUNDLE_REVISION={bundle_revision}",
