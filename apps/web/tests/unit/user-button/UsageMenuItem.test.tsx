@@ -13,80 +13,61 @@ vi.mock('@/lib/queries', () => ({
 
 const baseUsage: ChatUsageData = {
   plan: 'free',
-  dailyLimit: 10,
-  used: 9,
+  weeklyLimit: 15,
+  used: 14,
   remaining: 1,
-  resetAt: '2026-05-23T19:27:00.000Z',
-  monthlyLimit: 310,
-  monthlyUsed: 24,
-  monthlyRemaining: 286,
-  monthlyResetAt: '2026-06-01T00:00:00.000Z',
+  resetAt: '2026-05-30T19:27:00.000Z',
   isExhausted: false,
-  warningThreshold: 2,
+  warningThreshold: 3,
   isNearLimit: true,
 };
 
-describe('UsageMenuItem', () => {
-  it('shows a collapsed usage remaining percent for authed menu users', () => {
-    mockUseChatUsageQuery.mockReturnValue({
-      data: baseUsage,
-      isLoading: false,
-      error: null,
-    });
+function mockUsage(data: ChatUsageData | undefined = baseUsage) {
+  mockUseChatUsageQuery.mockReturnValue({
+    data,
+    isLoading: false,
+    error: data ? null : new Error('usage unavailable'),
+  });
+}
 
-    render(
-      <UsageMenuItem
-        usageStatsUrl={APP_ROUTES.SETTINGS_USAGE}
-        onUpgrade={vi.fn()}
-      />
-    );
+describe('UsageMenuItem', () => {
+  it('shows the weekly remaining percentage in the collapsed menu', () => {
+    mockUsage();
+    render(<UsageMenuItem usageStatsUrl={APP_ROUTES.SETTINGS_USAGE} />);
 
     const usageButton = screen.getByRole('button', {
       name: /usage remaining/i,
     });
     expect(usageButton).toHaveClass('min-h-8');
     expect(usageButton.querySelector('svg.lucide-gauge')).toBeInTheDocument();
-    expect(screen.getByText('Usage remaining')).toBeInTheDocument();
-    expect(screen.getByText('10%')).toBeInTheDocument();
+    expect(screen.getByText('7%')).toBeInTheDocument();
   });
 
-  it('expands inline to daily and monthly breakdown without navigating away', async () => {
-    mockUseChatUsageQuery.mockReturnValue({
-      data: baseUsage,
-      isLoading: false,
-      error: null,
-    });
-
+  it('expands to exactly one weekly meter with one warning marker', async () => {
+    mockUsage();
     const user = userEvent.setup();
-    render(
-      <UsageMenuItem
-        usageStatsUrl={APP_ROUTES.SETTINGS_USAGE}
-        onUpgrade={vi.fn()}
-      />
-    );
+    render(<UsageMenuItem usageStatsUrl={APP_ROUTES.SETTINGS_USAGE} />);
 
     await user.click(screen.getByRole('button', { name: /usage remaining/i }));
 
-    expect(screen.getByText('Daily')).toBeInTheDocument();
-    expect(screen.getByText(/10% ·/)).toBeInTheDocument();
-    expect(screen.getByText('Monthly')).toBeInTheDocument();
-    expect(screen.getByText('Monthly').closest('div')?.textContent).toMatch(
-      /92% · (May 31|Jun 1)/
-    );
+    const meter = screen.getByRole('progressbar', {
+      name: 'Weekly Messages remaining',
+    });
+    expect(meter).toHaveAttribute('aria-valuenow', '1');
+    expect(screen.getAllByRole('progressbar')).toHaveLength(1);
+    expect(meter.querySelectorAll('[data-threshold]')).toHaveLength(1);
+    expect(meter.querySelector('[data-threshold="warning"]')).toHaveStyle({
+      left: '20%',
+    });
     expect(screen.getByRole('link', { name: /learn more/i })).toHaveAttribute(
       'href',
       APP_ROUTES.SETTINGS_USAGE
     );
   });
 
-  it('surfaces a neutral upgrade nudge when near the limit', async () => {
+  it('surfaces the free-plan upsell when the weekly balance is low', async () => {
+    mockUsage();
     const onUpgrade = vi.fn();
-    mockUseChatUsageQuery.mockReturnValue({
-      data: baseUsage,
-      isLoading: false,
-      error: null,
-    });
-
     const user = userEvent.setup();
     render(
       <UsageMenuItem
@@ -98,7 +79,33 @@ describe('UsageMenuItem', () => {
 
     await user.click(screen.getByRole('button', { name: /usage remaining/i }));
     await user.click(screen.getByRole('button', { name: /upgrade to pro/i }));
-
     expect(onUpgrade).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens and closes the disclosure from the keyboard', async () => {
+    mockUsage();
+    const user = userEvent.setup();
+    render(<UsageMenuItem usageStatsUrl={APP_ROUTES.SETTINGS_USAGE} />);
+
+    await user.tab();
+    const toggle = screen.getByRole('button', { name: /usage remaining/i });
+    await user.keyboard('{Enter}');
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getAllByRole('progressbar')).toHaveLength(1);
+
+    await user.keyboard(' ');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+  });
+
+  it('labels a stale weekly snapshot without inventing another metric', async () => {
+    mockUsage({ ...baseUsage, _stale: true });
+    const user = userEvent.setup();
+    render(<UsageMenuItem usageStatsUrl={APP_ROUTES.SETTINGS_USAGE} />);
+
+    await user.click(screen.getByRole('button', { name: /usage remaining/i }));
+    expect(screen.getByText('Sync delayed')).toBeInTheDocument();
+    expect(screen.getByText('Weekly Messages')).toBeInTheDocument();
+    expect(screen.getAllByRole('progressbar')).toHaveLength(1);
   });
 });
