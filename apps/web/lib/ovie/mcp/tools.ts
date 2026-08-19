@@ -2,6 +2,7 @@ import { authorizeSummerControl } from '@/lib/ovie/control';
 import { bindEveIdentityForTurn } from '@/lib/ovie/identity';
 import { getPage, searchPages } from '@/lib/wiki/gbrain-client';
 import {
+  certificationPasses,
   findProfileCapability,
   loadProfileCapabilitiesFromDisk,
   renderArtistProfileInventory,
@@ -14,6 +15,8 @@ import {
 } from './handoff';
 import { type OperatingStore, sealId } from './store';
 import {
+  INITIATIVE_CONFIDENCE,
+  type InitiativeConfidence,
   type InitiativeStatus,
   OVIE_MCP_IDENTITY,
   OVIE_MCP_TOOLS,
@@ -64,13 +67,13 @@ function toolDescription(name: OvieMcpToolName): string {
     case 'record_decision':
       return 'Persist a decision. Does not execute.';
     case 'create_initiative':
-      return 'Ack and persist an Ovie initiative. No worker spawn.';
+      return 'Ack and persist an Ovie initiative with confidence. No worker spawn.';
     case 'get_initiative':
       return 'Status plus evidence. Merged code is not certified.';
     case 'get_feature_state':
       return 'Implementation, flag, and certification ladder for a feature.';
     case 'certify_feature':
-      return 'Draft or return an outcome-level certification spec. Does not run live money missions.';
+      return 'Draft a four-pass outcome certification spec. Does not run live money missions.';
     case 'search_gbrain':
       return 'Read-only gbrain search. Does not write memory.';
     case 'get_gbrain_page':
@@ -121,6 +124,13 @@ export async function callOvieMcpTool(
 function getOrgState(store: OperatingStore, args: Record<string, unknown>) {
   const initiatives = store.listInitiatives();
   const inventory = loadProfileCapabilitiesFromDisk();
+  const launchCritical = inventory.filter(
+    item => item.launchRelevance === 'must-sell'
+  );
+  const uncertifiedLaunch = launchCritical.filter(
+    item => item.certLevel !== 'certified' && item.certLevel !== 'trusted'
+  );
+  const decisions = store.listDecisions().slice(-8);
   return {
     identity: OVIE_MCP_IDENTITY,
     role: 'founder',
@@ -129,18 +139,32 @@ function getOrgState(store: OperatingStore, args: Record<string, unknown>) {
       id: item.id,
       title: item.handoff.title,
       status: item.status,
+      confidence: item.confidence,
     })),
-    recent_decisions: store
-      .listDecisions()
-      .slice(-8)
-      .map(item => ({
-        id: item.id,
-        decided: item.decided,
-      })),
+    recent_decisions: decisions.map(item => ({
+      id: item.id,
+      decided: item.decided,
+    })),
     awaiting_tim: initiatives
       .filter(item => item.status === 'blocked')
       .map(item => item.id),
     profile_capabilities: inventory.length,
+    uncertified_launch_critical: uncertifiedLaunch.map(item => ({
+      id: item.id,
+      feature: item.feature,
+      cert_level: item.certLevel,
+    })),
+    session_handoff: {
+      decisions: decisions.map(item => item.decided),
+      initiatives: initiatives.map(item => ({
+        title: item.handoff.title,
+        confidence: item.confidence,
+        status: item.status,
+      })),
+      open_questions: initiatives.flatMap(
+        item => item.handoff.open_questions ?? []
+      ),
+    },
     note: 'Merged code is not certified. Execution is ack + route, not in-request spawn.',
   };
 }
@@ -167,6 +191,17 @@ function recordDecision(store: OperatingStore, args: Record<string, unknown>) {
   return record;
 }
 
+function parseConfidence(value: unknown): InitiativeConfidence {
+  if (value === undefined || value === null || value === '') return 'medium';
+  if (
+    typeof value === 'string' &&
+    (INITIATIVE_CONFIDENCE as readonly string[]).includes(value)
+  ) {
+    return value as InitiativeConfidence;
+  }
+  throw new Error('confidence must be high, medium, or low');
+}
+
 function createInitiative(
   store: OperatingStore,
   args: Record<string, unknown>
@@ -180,6 +215,7 @@ function createInitiative(
     status: (args.status === 'proposed'
       ? 'proposed'
       : 'accepted') as InitiativeStatus,
+    confidence: parseConfidence(args.confidence),
     handoff: parsed,
     lane: classified.lane,
     destination: classified.destination,
@@ -236,13 +272,15 @@ function certifyFeature(args: Record<string, unknown>) {
     typeof args.feature === 'string' ? args.feature : 'public-profile';
   const inventory = loadProfileCapabilitiesFromDisk();
   const match = findProfileCapability(inventory, query);
+  const spec =
+    match?.proposedMission ??
+    'Draft an outcome-level mission: a real user path must succeed; implementation details are not enough.';
   return {
     feature: query,
     executed_live_mission: false,
     money_path_executed: false,
-    spec:
-      match?.proposedMission ??
-      'Draft an outcome-level mission: a real user path must succeed; implementation details are not enough.',
+    spec,
+    passes: certificationPasses(spec),
     current_level: match?.certLevel ?? 'discovered',
     inventory: match,
     map: renderArtistProfileInventory(inventory).slice(0, 4000),
