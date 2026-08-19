@@ -13,6 +13,11 @@ import { renderWithQueryClient } from '@/tests/utils/test-utils';
 
 const mockChatState = vi.hoisted(() => ({
   isLoadingConversation: false,
+  hasMessages: true,
+  isLoading: true,
+  isSubmitting: false,
+  status: 'streaming' as 'ready' | 'streaming',
+  messages: [{ id: 'm1', role: 'user', parts: [{ type: 'text', text: 'Hi' }] }],
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
@@ -51,16 +56,14 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
     useJovieChat: () => ({
       input: '',
       setInput: vi.fn(),
-      messages: [
-        { id: 'm1', role: 'user', parts: [{ type: 'text', text: 'Hi' }] },
-      ],
+      messages: mockChatState.messages,
       chatError: null,
-      isLoading: true,
-      isSubmitting: false,
-      hasMessages: true,
+      isLoading: mockChatState.isLoading,
+      isSubmitting: mockChatState.isSubmitting,
+      hasMessages: mockChatState.hasMessages,
       isLoadingConversation: mockChatState.isLoadingConversation,
       conversationTitle: null,
-      status: 'streaming',
+      status: mockChatState.status,
       inputRef: { current: null },
       handleSubmit: vi.fn(),
       handleRetry: vi.fn(),
@@ -152,6 +155,13 @@ beforeAll(() => {
 
 afterEach(() => {
   mockChatState.isLoadingConversation = false;
+  mockChatState.hasMessages = true;
+  mockChatState.isLoading = true;
+  mockChatState.isSubmitting = false;
+  mockChatState.status = 'streaming';
+  mockChatState.messages = [
+    { id: 'm1', role: 'user', parts: [{ type: 'text', text: 'Hi' }] },
+  ];
 });
 
 afterAll(() => {
@@ -195,8 +205,31 @@ describe('JovieChat styling regressions', () => {
     expect(composerDock?.className).toContain('system-b-chat-composer-dock');
   });
 
-  it('marks runtime conversation loading shell as busy for assistive technology', () => {
+  it('keeps the live transcript mounted when a reserved conversation starts loading', () => {
     mockChatState.isLoadingConversation = true;
+
+    const { container } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    expect(
+      container.querySelector(
+        '[data-testid="chat-loading-conversation-skeleton"]'
+      )
+    ).toBeNull();
+    expect(
+      container.querySelector('[data-testid="chat-content"]')
+    ).toBeTruthy();
+    expect(container.querySelector('[data-testid="chat-input"]')).toBeTruthy();
+  });
+
+  it('marks an empty conversation-load shell as busy for assistive technology', () => {
+    mockChatState.isLoadingConversation = true;
+    mockChatState.hasMessages = false;
+    mockChatState.isLoading = false;
+    mockChatState.isSubmitting = false;
+    mockChatState.status = 'ready';
+    mockChatState.messages = [];
 
     const { container } = renderWithQueryClient(
       <JovieChat profileId='profile-1' />

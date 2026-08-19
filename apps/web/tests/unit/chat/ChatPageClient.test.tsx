@@ -335,7 +335,7 @@ describe('ChatPageClient', () => {
 
   it('uses history.replaceState for the first conversation on the chat root', () => {
     window.history.replaceState({}, '', APP_ROUTES.CHAT);
-    const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
+    const replaceStateSpy = vi.spyOn(History.prototype, 'replaceState');
 
     try {
       renderChatPage();
@@ -351,6 +351,34 @@ describe('ChatPageClient', () => {
       expect(mockReplace).not.toHaveBeenCalled();
     } finally {
       replaceStateSpy.mockRestore();
+    }
+  });
+
+  it('reserves the thread URL without Next.js navigation when the answer starts', () => {
+    window.history.replaceState({}, '', APP_ROUTES.CHAT);
+    const nativeReplaceState = History.prototype.replaceState;
+    const nativeSpy = vi.fn(function (
+      this: History,
+      data: unknown,
+      unused: string,
+      url?: string | URL | null
+    ) {
+      return nativeReplaceState.call(this, data, unused, url);
+    });
+    History.prototype.replaceState = nativeSpy;
+    const nextPatchedReplaceState = vi.fn();
+    window.history.replaceState = nextPatchedReplaceState;
+
+    try {
+      renderChatPage();
+      capturedOnConversationCreate?.('conv-123', 'reserved');
+
+      expect(nextPatchedReplaceState).not.toHaveBeenCalled();
+      expect(mockReplace).not.toHaveBeenCalled();
+      expect(nativeSpy).toHaveBeenCalledTimes(1);
+      expect(window.location.pathname).toBe(`${APP_ROUTES.CHAT}/conv-123`);
+    } finally {
+      History.prototype.replaceState = nativeReplaceState;
     }
   });
 

@@ -617,6 +617,44 @@ describe('useJovieChat', () => {
     expect(result.current.isSubmitting).toBe(false);
   });
 
+  it('does not wipe an in-flight transcript when the route adopts the reserved id', async () => {
+    const { result, rerender } = renderHook(
+      ({ conversationId }: { conversationId?: string }) =>
+        useJovieChat({ profileId: 'profile_1', conversationId }),
+      { initialProps: { conversationId: undefined } }
+    );
+
+    await act(async () => {
+      await result.current.submitMessage('Hello Jovie');
+    });
+
+    expect(result.current.messages.length).toBeGreaterThan(0);
+
+    act(() => {
+      onFinishHandler?.({
+        message: {
+          metadata: {
+            conversationId: 'conv_reserved',
+            turnId: 'turn_reserved',
+            requestId: 'req_reserved',
+          },
+        },
+        messages: [],
+        isAbort: false,
+        isDisconnect: false,
+        isError: false,
+      });
+    });
+
+    const messageCountAfterFinish = result.current.messages.length;
+    expect(messageCountAfterFinish).toBeGreaterThan(0);
+
+    rerender({ conversationId: 'conv_reserved' });
+
+    expect(result.current.messages).toHaveLength(messageCountAfterFinish);
+    expect(result.current.activeConversationId).toBe('conv_reserved');
+  });
+
   it('does not persist messages client-side while waiting for the server stream', async () => {
     const { result, rerender } = renderHook(() =>
       useJovieChat({ profileId: 'profile_1', conversationId: 'conv_123' })

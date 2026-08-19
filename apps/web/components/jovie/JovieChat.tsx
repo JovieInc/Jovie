@@ -616,7 +616,9 @@ export function JovieChat({
     };
   }, [scrollContainerRef, scrollThreadToBottom, shouldReservePickerClearance]);
 
-  if (isLoadingConversation) {
+  // A reserved/first-token conversation fetch must not unmount a live turn.
+  // Electron hits this when the thread URL is reserved as the answer starts.
+  if (isLoadingConversation && !hasMessages && !conversationInProgress) {
     return <ChatLoadingConversationSkeleton />;
   }
 

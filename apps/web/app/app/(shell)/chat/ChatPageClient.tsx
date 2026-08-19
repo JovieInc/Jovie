@@ -36,6 +36,11 @@ import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { RECOVERY_COPY } from '@/features/feedback/recovery-contract';
 import { useClipboard } from '@/hooks/useClipboard';
+import {
+  buildChatThreadRoute,
+  isChatThreadSurfacePath,
+  syncChatThreadUrlWithoutNavigation,
+} from '@/lib/chat/sync-chat-thread-url';
 import { env } from '@/lib/env-client';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
@@ -549,26 +554,18 @@ export function ChatPageClient({
       newConversationId: string,
       phase: 'reserved' | 'completed' = 'completed'
     ) => {
-      const nextRoute = `${APP_ROUTES.CHAT}/${encodeURIComponent(newConversationId)}`;
+      const nextRoute = buildChatThreadRoute(newConversationId);
       const currentPath = globalThis.location?.pathname;
 
-      if (currentPath === APP_ROUTES.CHAT) {
-        globalThis.history?.replaceState(
-          globalThis.history.state,
-          '',
-          nextRoute
-        );
+      // Stay on the live chat tree. Next's patched history.replaceState treats
+      // `/app/chat` → `/app/chat/{id}` as navigation and remounts the page;
+      // Electron then drops the composer/transcript once the answer starts.
+      if (isChatThreadSurfacePath(currentPath)) {
+        syncChatThreadUrlWithoutNavigation(newConversationId, currentPath);
+        return;
       }
 
-      // New chats reserve the final URL with history.replaceState as soon as
-      // the server acknowledges the turn. A second router.replace on stream
-      // completion remounts the chat surface and can let stale refetch data
-      // replace the settled local timeline.
-      if (
-        phase === 'completed' &&
-        currentPath !== APP_ROUTES.CHAT &&
-        currentPath !== nextRoute
-      ) {
+      if (phase === 'completed' && currentPath !== nextRoute) {
         router.replace(nextRoute, {
           scroll: false,
         });
