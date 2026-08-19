@@ -374,11 +374,9 @@ final class JovieUITests: XCTestCase {
 
     profileSurface.tap()
 
-    let openedPublicProfile = app.buttons["Close Public Profile"].waitForExistence(timeout: 3)
-    let openedDashboard = app.buttons["Copy URL"].waitForExistence(timeout: 3)
     XCTAssertTrue(
-      openedPublicProfile || openedDashboard,
-      "Drawer Profile did not open the public profile or dashboard.\n\(app.debugDescription)"
+      app.buttons["Copy URL"].waitForExistence(timeout: 3),
+      "Drawer Profile did not open Dashboard (Copy URL).\n\(app.debugDescription)"
     )
   }
 
@@ -920,20 +918,19 @@ final class JovieUITests: XCTestCase {
     profileSurface.tap()
     XCTAssertTrue(
       app.buttons["Copy URL"].waitForExistence(timeout: 3),
-      "Selecting Profile from the drawer did not reveal Profile.\n\(app.debugDescription)"
+      "Selecting Profile from the drawer did not reveal Dashboard.\n\(app.debugDescription)"
     )
 
-    let chatTab = firstMatchingButton(
-      app,
-      identifiers: ["shell-tab-chat"],
-      labels: ["Chat"],
-      timeout: 3
+    app.buttons["Open navigation drawer"].tap()
+    let chatSurfaceAfterProfile = app.buttons["shell-drawer-surface-shell-tab-chat"]
+    XCTAssertTrue(
+      chatSurfaceAfterProfile.waitForExistence(timeout: 3),
+      "Drawer Chat surface missing after Profile.\n\(app.debugDescription)"
     )
-    XCTAssertTrue(chatTab.exists, "Chat tab missing after Profile.\n\(app.debugDescription)")
-    chatTab.tap()
+    chatSurfaceAfterProfile.tap()
     XCTAssertTrue(
       app.textFields["Ask Jovie"].waitForExistence(timeout: 3),
-      "Chat tab did not return to Chat.\n\(app.debugDescription)"
+      "Drawer Chat did not return to Chat.\n\(app.debugDescription)"
     )
   }
 
@@ -1091,15 +1088,18 @@ final class JovieUITests: XCTestCase {
       "Drawer did not close after switching to Profile.\n\(app.debugDescription)"
     )
 
-    // Return via the tab bar because chat stays mounted as a ZStack underlay.
-    let chatTab = firstMatchingButton(
-      app,
-      identifiers: ["shell-tab-chat"],
-      labels: ["Chat"],
-      timeout: 3
+    // Chat-first has no bottom tab bar. Return via the drawer Chat surface.
+    app.buttons["Open navigation drawer"].tap()
+    let chatSurface = app.buttons["shell-drawer-surface-shell-tab-chat"]
+    XCTAssertTrue(
+      waitForDrawerSurfaceToBeUncovered(
+        chatSurface,
+        contentPlaneMarker: contentPlaneMarker,
+        timeout: 6
+      ),
+      "Chat surface stayed covered after returning from Profile.\n\(app.debugDescription)"
     )
-    XCTAssertTrue(chatTab.exists, "Chat tab missing after Profile.\n\(app.debugDescription)")
-    chatTab.tap()
+    chatSurface.tap()
     let restoredInput = app.textFields["Ask Jovie"]
     XCTAssertTrue(
       waitForHittable(restoredInput, timeout: 10),

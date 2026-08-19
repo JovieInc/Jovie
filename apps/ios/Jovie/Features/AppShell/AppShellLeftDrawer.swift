@@ -1,7 +1,11 @@
 import SwiftUI
 
 enum AppShellDrawerProfilePolicy {
-  static func opensEmbeddedPublicProfile(publicProfileURL: String?) -> Bool {
+  /// Name/avatar opens the public page. The Profile surface always opens
+  /// Dashboard (QR, Copy URL, Wallet) so those controls stay reachable.
+  static func profileSurfaceOpensDashboard() -> Bool { true }
+
+  static func accountHeaderOpensEmbeddedPublicProfile(publicProfileURL: String?) -> Bool {
     publicProfileURL?.isEmpty == false
   }
 }
@@ -97,22 +101,23 @@ struct AppShellLeftDrawer: View {
             audienceEnabled: audienceEnabled,
             selectedTab: selectedTab,
             hasProfileQR: profile.qrPayload != nil,
-            onSelectTab: { tab in
-              if tab == .profile,
-                 AppShellDrawerProfilePolicy.opensEmbeddedPublicProfile(
-                   publicProfileURL: profile.publicProfileURL
-                 )
-              {
-                onOpenPublicProfile()
-                return
-              }
-              onSelectTab(tab)
-            },
+            onSelectTab: onSelectTab,
             onOpenProfileQR: onOpenProfileQR
           )
           .drawerRowReveal(isRevealed: contentRevealed, delay: 0, reduceMotion: reduceMotion)
 
-          DrawerAccountHeader(profile: profile, onOpenPublicProfile: onOpenPublicProfile)
+          DrawerAccountHeader(
+            profile: profile,
+            action: {
+              if AppShellDrawerProfilePolicy.accountHeaderOpensEmbeddedPublicProfile(
+                publicProfileURL: profile.publicProfileURL
+              ) {
+                onOpenPublicProfile()
+              } else {
+                onSelectTab(.profile)
+              }
+            }
+          )
             .drawerRowReveal(isRevealed: contentRevealed, delay: 0.04, reduceMotion: reduceMotion)
 
           if chatEnabled {
@@ -199,10 +204,10 @@ private extension View {
 
 private struct DrawerAccountHeader: View {
   let profile: AppShellProfile
-  let onOpenPublicProfile: () -> Void
+  let action: () -> Void
 
   var body: some View {
-    Button(action: onOpenPublicProfile) {
+    Button(action: action) {
       HStack(spacing: JovieSpacing.medium) {
         DashboardAvatarView(
           name: profile.displayName,

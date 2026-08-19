@@ -145,20 +145,20 @@ struct AppShellTabBarTests {
 }
 
 struct AppShellDrawerProfilePolicyTests {
-  @Test func profileWithPublicURLOpensEmbeddedBrowser() {
+  @Test func profileSurfaceAlwaysOpensDashboard() {
+    #expect(AppShellDrawerProfilePolicy.profileSurfaceOpensDashboard())
+  }
+
+  @Test func accountHeaderOpensEmbeddedBrowserWhenURLExists() {
     #expect(
-      AppShellDrawerProfilePolicy.opensEmbeddedPublicProfile(
+      AppShellDrawerProfilePolicy.accountHeaderOpensEmbeddedPublicProfile(
         publicProfileURL: "https://jov.ie/tim"
       )
     )
-  }
-
-  @Test func profileWithoutURLFallsBackToDashboard() {
     #expect(
-      AppShellDrawerProfilePolicy.opensEmbeddedPublicProfile(publicProfileURL: nil) == false
-    )
-    #expect(
-      AppShellDrawerProfilePolicy.opensEmbeddedPublicProfile(publicProfileURL: "") == false
+      AppShellDrawerProfilePolicy.accountHeaderOpensEmbeddedPublicProfile(
+        publicProfileURL: nil
+      ) == false
     )
   }
 }
