@@ -3,105 +3,468 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Jovie Library — media viewer prototype v1</title>
+  <title>Jovie Library — prototype v2</title>
   <style>
     :root {
       --bg: #06070A;
-      --surface-1: #101216;
-      --surface-2: #161A20;
+      --ink: #0A0B0E;
+      --s1: #101216;
+      --s2: #161A20;
       --text: #FFFFFF;
       --text-2: #E3E4E6;
       --text-3: #969799;
       --border: rgba(255,255,255,0.08);
       --accent: #7170FF;
+      --ok: #5BD39A;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; background: var(--bg); color: var(--text); font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif; }
-    .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 20px 80px; }
-    h1 { font-size: 28px; font-weight: 600; margin: 0 0 8px; }
-    .lede { color: var(--text-3); font-size: 15px; margin: 0 0 28px; max-width: 62ch; }
-    .phones { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
-    .device { background: #0A0B0E; border: 1px solid var(--border); border-radius: 36px; padding: 18px 0 0; overflow: hidden; }
-    .notch { width: 108px; height: 22px; background: #000; border-radius: 0 0 16px 16px; margin: 0 auto 8px; }
-    .screen { padding: 0 16px 20px; }
-    .title { font-size: 22px; font-weight: 600; margin: 8px 0 12px; }
-    .search { height: 36px; border-radius: 999px; background: var(--surface-1); border: 1px solid var(--border); color: var(--text-3); display: flex; align-items: center; padding: 0 14px; font-size: 14px; margin-bottom: 10px; }
-    .chips { display: flex; gap: 8px; overflow: hidden; margin-bottom: 8px; }
-    .chip { font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 999px; background: var(--surface-1); color: var(--text-2); }
-    .chip.on { background: #fff; color: #06070A; }
+    .wrap { max-width: 1280px; margin: 0 auto; padding: 28px 20px 96px; }
+    h1 { font-size: 28px; font-weight: 600; margin: 0 0 8px; letter-spacing: -0.02em; }
+    .lede { color: var(--text-3); font-size: 15px; margin: 0 0 22px; max-width: 72ch; line-height: 1.45; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+    .tabs button {
+      border: 1px solid var(--border);
+      background: var(--s1);
+      color: var(--text-2);
+      border-radius: 999px;
+      padding: 8px 14px;
+      font: 600 13px/1 Inter, sans-serif;
+      cursor: pointer;
+    }
+    .tabs button.on { background: #fff; color: #06070A; }
+    .stage { display: none; }
+    .stage.on { display: block; }
+    .phones { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 320px)); gap: 22px; align-items: start; }
+    .device { background: var(--ink); border: 1px solid var(--border); border-radius: 36px; padding: 16px 0 0; overflow: hidden; }
+    .notch { width: 108px; height: 20px; background: #000; border-radius: 0 0 16px 16px; margin: 0 auto 6px; }
+    .screen { padding: 0 16px 18px; min-height: 560px; display: flex; flex-direction: column; }
+    .nav { font-size: 13px; color: var(--text-3); margin-bottom: 4px; }
+    .title { font-size: 22px; font-weight: 600; margin: 0 0 10px; }
+    .search { height: 36px; border-radius: 999px; background: var(--s1); border: 1px solid var(--border); color: var(--text-3); display: flex; align-items: center; padding: 0 14px; font-size: 14px; margin-bottom: 10px; }
+    .seg { display: flex; gap: 6px; margin-bottom: 12px; }
+    .seg span { font-size: 12px; font-weight: 600; padding: 6px 11px; border-radius: 999px; background: var(--s1); color: var(--text-2); }
+    .seg span.on { background: #fff; color: #06070A; }
     .row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--border); }
     .row .meta { min-width: 0; flex: 1; }
     .row .name { font-size: 16px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .row .sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
-    .thumb { width: 36px; height: 36px; border-radius: 4px; background: var(--surface-2); flex: 0 0 36px; }
-    .thumb.circle { border-radius: 999px; }
-    .now { margin-top: 16px; background: var(--surface-1); border: 1px solid var(--border); border-radius: 16px; padding: 10px 12px; display: flex; gap: 10px; align-items: center; }
-    .now .art { width: 44px; height: 44px; border-radius: 8px; background: linear-gradient(135deg, #4D7DFF, #9B4DFF); }
+    .thumb { width: 36px; height: 36px; border-radius: 4px; background: var(--s2); flex: 0 0 36px; }
+    .thumb.wide { width: 48px; height: 32px; }
+    .thumb.round { border-radius: 999px; }
+    .count { font-size: 12px; color: var(--text-3); }
+    .now { margin-top: auto; background: var(--s1); border: 1px solid var(--border); border-radius: 16px; padding: 10px 12px; display: flex; gap: 10px; align-items: center; }
+    .now .art { width: 44px; height: 44px; border-radius: 8px; background: #2A2C32; }
     .player { background: #000; border-radius: 12px; aspect-ratio: 16/9; position: relative; overflow: hidden; }
-    .player .scrim { position: absolute; inset: auto 0 0 0; height: 72px; background: linear-gradient(transparent, rgba(0,0,0,.8)); }
+    .player.square { aspect-ratio: 1; }
     .player .tc { position: absolute; left: 12px; bottom: 28px; font-variant-numeric: tabular-nums; font-size: 12px; }
     .timeline { position: absolute; left: 12px; right: 12px; bottom: 12px; height: 3px; background: rgba(255,255,255,.2); border-radius: 99px; }
-    .timeline i { display: block; width: 38%; height: 100%; background: var(--accent); border-radius: 99px; }
-    .note { margin-top: 12px; background: var(--surface-1); border-radius: 12px; padding: 10px 12px; font-size: 13px; }
-    .note b { color: var(--accent); font-weight: 600; }
+    .timeline i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+    .note { margin-top: 12px; background: var(--s1); border-radius: 12px; padding: 10px 12px; font-size: 13px; color: var(--text-2); line-height: 1.4; }
+    .note b { color: var(--text); }
+    .pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; background: var(--s2); color: var(--text-3); }
+    .pill.live { color: var(--ok); }
+    .dialog { margin: 48px 8px 0; background: var(--s1); border: 1px solid var(--border); border-radius: 22px; padding: 22px 18px 16px; text-align: center; }
+    .dialog h2 { margin: 10px 0 6px; font-size: 18px; }
+    .dialog p { margin: 0 0 16px; color: var(--text-3); font-size: 14px; line-height: 1.4; }
+    .avatar { width: 64px; height: 64px; border-radius: 999px; background: var(--s2); margin: 0 auto; }
+    .actions { display: flex; gap: 8px; }
+    .actions button { flex: 1; height: 44px; border-radius: 999px; border: 0; font: 600 15px Inter, sans-serif; cursor: default; }
+    .reject { background: var(--s2); color: var(--text); }
+    .accept { background: #fff; color: #06070A; }
+    .caption { margin-top: 12px; font-size: 13px; color: var(--text-3); }
     .section { margin-top: 36px; }
-    .q { background: var(--surface-1); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; margin: 10px 0; }
-    .q h3 { margin: 0 0 6px; font-size: 15px; }
-    .q p { margin: 0; color: var(--text-3); font-size: 14px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+    .card { background: var(--s1); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; }
+    .card h3 { margin: 0 0 6px; font-size: 15px; }
+    .card p { margin: 0; color: var(--text-3); font-size: 14px; line-height: 1.45; }
+    .locked { color: var(--ok); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+    .open { color: var(--accent); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Library viewer v1 — iPod list + Frame.io review</h1>
-    <p class="lede">Not shipped. Brain-dump on this. Locked decisions already applied: full-width native list, no Smart Links filter, video/audio/docs/releases/merch in one scroll, playback hands off to the existing audio player.</p>
+    <h1>Library v2.1 — locked · iOS first</h1>
+    <p class="lede">
+      Contract locked. iOS Catalog / Collections / Ideas is shipping first.
+      NFC day-pair stays design-only. Ideas stay untyped unless they say so.
+      Pair lasts 12 hours. One interrupt bus. One Jovie link per asset.
+    </p>
 
-    <div class="phones">
-      <div class="device">
-        <div class="notch"></div>
-        <div class="screen">
-          <div class="title">Library</div>
-          <div class="search">Search takes, releases, merch, docs</div>
-          <div class="chips">
-            <span class="chip on">All</span>
-            <span class="chip">Video</span>
-            <span class="chip">Audio</span>
-            <span class="chip">Releases</span>
-            <span class="chip">Merch</span>
-            <span class="chip">Docs</span>
+    <div class="tabs" id="tabs">
+      <button class="on" data-stage="catalog">1. Catalog home</button>
+      <button data-stage="collection">2. Collection</button>
+      <button data-stage="player">3. Player</button>
+      <button data-stage="pair">4. NFC day-pair</button>
+      <button data-stage="collab">5. Collab collection</button>
+    </div>
+
+    <div id="catalog" class="stage on">
+      <div class="phones">
+        <div class="device">
+          <div class="notch"></div>
+          <div class="screen">
+            <div class="title">Library</div>
+            <div class="search">Search songs, merch, ideas, collections</div>
+            <div class="seg">
+              <span class="on">Catalog</span>
+              <span>Collections</span>
+              <span>Ideas</span>
+            </div>
+            <div class="row">
+              <div class="thumb"></div>
+              <div class="meta">
+                <div class="name">Midnight Drive</div>
+                <div class="sub">Release · 8 tracks · 2.4M streams</div>
+              </div>
+              <span class="pill live">jov.ie/r/md</span>
+            </div>
+            <div class="row">
+              <div class="thumb"></div>
+              <div class="meta">
+                <div class="name">All This Noise</div>
+                <div class="sub">Release · EP · public</div>
+              </div>
+              <span class="pill live">jov.ie/r/atn</span>
+            </div>
+            <div class="row">
+              <div class="thumb round"></div>
+              <div class="meta">
+                <div class="name">Tour hoodie</div>
+                <div class="sub">Merch · same link whether live or private</div>
+              </div>
+              <span class="pill">jov.ie/m/hood</span>
+            </div>
+            <div class="row">
+              <div class="thumb"></div>
+              <div class="meta">
+                <div class="name">Hook in the kitchen</div>
+                <div class="sub">Idea · untagged · 0:41</div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="thumb wide"></div>
+              <div class="meta">
+                <div class="name">Ferry vlog</div>
+                <div class="sub">Collection · script + 3 takes + B-roll</div>
+              </div>
+              <span class="count">6</span>
+            </div>
+            <div class="now">
+              <div class="art"></div>
+              <div class="meta">
+                <div class="name">Midnight Drive — Track 2</div>
+                <div class="sub">Now playing · lock screen live</div>
+              </div>
+            </div>
           </div>
-          <div class="row"><div class="thumb"></div><div class="meta"><div class="name">Ferry take 03</div><div class="sub">Video · just shot · 0:47</div></div></div>
-          <div class="row"><div class="thumb"></div><div class="meta"><div class="name">Midnight Drive</div><div class="sub">Release · 8 tracks</div></div></div>
-          <div class="row"><div class="thumb circle"></div><div class="meta"><div class="name">Tour hoodie</div><div class="sub">Merch · live</div></div></div>
-          <div class="row"><div class="thumb"></div><div class="meta"><div class="name">One-sheet — spring</div><div class="sub">Document · PDF</div></div></div>
-          <div class="row"><div class="thumb"></div><div class="meta"><div class="name">Voice memo — hook</div><div class="sub">Audio · 1:12</div></div></div>
-          <div class="now"><div class="art"></div><div class="meta"><div class="name">Midnight Drive</div><div class="sub">Now playing · audio player</div></div></div>
+        </div>
+        <div class="device">
+          <div class="notch"></div>
+          <div class="screen">
+            <div class="title">Collections</div>
+            <div class="search">Search shoots and paired days</div>
+            <div class="seg">
+              <span>Catalog</span>
+              <span class="on">Collections</span>
+              <span>Ideas</span>
+            </div>
+            <div class="row">
+              <div class="thumb wide"></div>
+              <div class="meta">
+                <div class="name">Ferry vlog</div>
+                <div class="sub">Today · auto-bundled from script</div>
+              </div>
+              <span class="count">6</span>
+            </div>
+            <div class="row">
+              <div class="thumb wide"></div>
+              <div class="meta">
+                <div class="name">Paired with Maya · Aug 18</div>
+                <div class="sub">Day-pair · both phones, both footage</div>
+              </div>
+              <span class="count">11</span>
+            </div>
+            <div class="row">
+              <div class="thumb wide"></div>
+              <div class="meta">
+                <div class="name">Studio dump · Tuesday</div>
+                <div class="sub">Ideas + voice notes sitting on a song</div>
+              </div>
+              <span class="count">4</span>
+            </div>
+            <p class="caption">A Collection is not a folder you file. The script starts it. Matching takes and B-roll fall in. Search still finds a single take.</p>
+            <div class="now">
+              <div class="art"></div>
+              <div class="meta">
+                <div class="name">Midnight Drive — Track 2</div>
+                <div class="sub">Still playing · you only peeked a take</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
+    </div>
 
-      <div class="device">
-        <div class="notch"></div>
-        <div class="screen">
-          <div class="title">Ferry take 03</div>
-          <div class="player">
-            <div class="scrim"></div>
-            <div class="tc">00:12:04</div>
-            <div class="timeline"><i></i></div>
+    <div id="collection" class="stage">
+      <div class="phones">
+        <div class="device">
+          <div class="notch"></div>
+          <div class="screen">
+            <div class="nav">Collections</div>
+            <div class="title">Ferry vlog</div>
+            <div class="row">
+              <div class="thumb"></div>
+              <div class="meta">
+                <div class="name">Script</div>
+                <div class="sub">Teleprompter · “What changed when the ferry arrived”</div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="thumb wide"></div>
+              <div class="meta">
+                <div class="name">Take 03</div>
+                <div class="sub">A-cam · 0:47 · best so far</div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="thumb wide"></div>
+              <div class="meta">
+                <div class="name">Take 02</div>
+                <div class="sub">A-cam · 0:51 · flubbed the close</div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="thumb wide"></div>
+              <div class="meta">
+                <div class="name">B-roll · water</div>
+                <div class="sub">Matched to this script</div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="thumb"></div>
+              <div class="meta">
+                <div class="name">Voice note · line rewrite</div>
+                <div class="sub">Idea captured on the dock</div>
+              </div>
+            </div>
+            <div class="note"><b>One Jovie link</b> for the collection: jov.ie/c/ferry. Private today, public later, same URL. Retargeting rides the link, not a new slug.</div>
           </div>
-          <div class="note"><b>00:12:04</b> — “Hold the look at the water one more beat.” Tap the note, land on the frame. Type pauses. Send resumes.</div>
-          <div class="note"><b>Versions</b> — take 01, take 02, take 03. Same review surface as a finished video.</div>
+        </div>
+        <div class="device">
+          <div class="notch"></div>
+          <div class="screen">
+            <div class="nav">Catalog · Midnight Drive</div>
+            <div class="title">Track 2</div>
+            <div class="player">
+              <div class="tc">artwork or video, same chrome</div>
+              <div class="timeline"><i style="width:42%"></i></div>
+            </div>
+            <div class="note"><b>jov.ie/r/md/2</b> — unreleased, private, or live. Same link. Pezens pulls Instagram, that URL still redirects with the pixel.</div>
+            <div class="note">Not a Smart Link type. The link is how the asset exists on the internet.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="player" class="stage">
+      <div class="phones">
+        <div class="device">
+          <div class="notch"></div>
+          <div class="screen">
+            <div class="nav">Playing</div>
+            <div class="title">Take 03</div>
+            <div class="player">
+              <div class="tc">00:00:18</div>
+              <div class="timeline"><i style="width:38%"></i></div>
+            </div>
+            <div class="note"><b>Commit play</b> (open the row, hit play) replaces Now Playing. Video and audio are the same primitive. Lock screen, Dynamic Island, AirPlay all own this session.</div>
+            <div class="now">
+              <div class="art"></div>
+              <div class="meta">
+                <div class="name">Take 03 · Ferry vlog</div>
+                <div class="sub">You committed. Queue moved.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="device">
+          <div class="notch"></div>
+          <div class="screen">
+            <div class="nav">Peek</div>
+            <div class="title">Hook in the kitchen</div>
+            <div class="player square">
+              <div class="tc">voice memo · hold to preview</div>
+              <div class="timeline"><i style="width:20%"></i></div>
+            </div>
+            <div class="note"><b>Peek / hold</b> ducks Midnight Drive for a few seconds. Release, and Track 2 is still the session. Tape It / Music Memos lesson: capture and find ideas without wrecking what you were listening to.</div>
+            <div class="now">
+              <div class="art"></div>
+              <div class="meta">
+                <div class="name">Midnight Drive — Track 2</div>
+                <div class="sub">Ducked · not replaced</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="pair" class="stage">
+      <div class="phones">
+        <div class="device">
+          <div class="notch"></div>
+          <div class="screen">
+            <div class="dialog">
+              <div class="avatar"></div>
+              <h2>Maya Chen wants to collab</h2>
+              <p>Phones tapped. Pair for today. Everything you both shoot lands in one collection on both devices.</p>
+              <div class="actions">
+                <button class="reject">Reject</button>
+                <button class="accept">Accept</button>
+              </div>
+            </div>
+            <p class="caption">NameDrop shape: both phones, both must accept. Pair lasts 12 hours, not midnight. A night out does not get cut off at 12:01.</p>
+          </div>
+        </div>
+        <div class="device">
+          <div class="notch"></div>
+          <div class="screen">
+            <div class="dialog">
+              <div class="avatar"></div>
+              <h2>Paired with Maya · today</h2>
+              <p>Until midnight. New takes, B-roll, and voice notes go to “Paired with Maya · Aug 18” on both libraries.</p>
+              <div class="actions">
+                <button class="reject">End early</button>
+                <button class="accept">Keep shooting</button>
+              </div>
+            </div>
+            <p class="caption">If they open vlog inside the 12 hours and both phones report a fresh fix about 10+ miles apart, one in-vlog prompt: “Still with Maya?” Once per pair. No OS push. If GPS is missing or noisy, stay silent.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="collab" class="stage">
+      <div class="phones">
+        <div class="device">
+          <div class="notch"></div>
+          <div class="screen">
+            <div class="nav">Collections</div>
+            <div class="title">Paired with Maya</div>
+            <div class="row">
+              <div class="thumb wide"></div>
+              <div class="meta">
+                <div class="name">Tim · Take 01</div>
+                <div class="sub">Your A-cam</div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="thumb wide"></div>
+              <div class="meta">
+                <div class="name">Maya · Take 01</div>
+                <div class="sub">Her A-cam · same beat</div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="thumb wide"></div>
+              <div class="meta">
+                <div class="name">Shared B-roll</div>
+                <div class="sub">Both libraries</div>
+              </div>
+            </div>
+            <div class="note">Outputs (later): <b>Your cut</b> · <b>Her cut</b> · <b>YouTube collab</b>. Same footage, three intents.</div>
+          </div>
+        </div>
+        <div class="device">
+          <div class="notch"></div>
+          <div class="screen">
+            <div class="title">Ideas</div>
+            <div class="search">Hooks, mumbles, voice dumps</div>
+            <div class="row">
+              <div class="thumb"></div>
+              <div class="meta">
+                <div class="name">Hook in the kitchen</div>
+                <div class="sub">Untagged · they did not name it</div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="thumb"></div>
+              <div class="meta">
+                <div class="name">“Here’s a song idea”</div>
+                <div class="sub">Tagged song idea · their words</div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="thumb"></div>
+              <div class="meta">
+                <div class="name">Bass line on the walk</div>
+                <div class="sub">Suggested: Midnight Drive · high lyric match</div>
+              </div>
+            </div>
+            <div class="note">Default is Ideas, untyped. Tag only from their words. Auto-link only at high confidence. Otherwise suggest, do not silently attach.</div>
+          </div>
         </div>
       </div>
     </div>
 
     <div class="section">
-      <h1>Interview — dump on these</h1>
-      <div class="q"><h3>1. One surface or two modes?</h3><p>Is reviewing a just-shot vlog the same Library row as Midnight Drive, or a hidden Recents / Dailies shelf that still plays in the same player?</p></div>
-      <div class="q"><h3>2. Who comments?</h3><p>Just you marking your own takes today, or collaborator review (manager, editor) in v1?</p></div>
-      <div class="q"><h3>3. Audio player contract</h3><p>Mini player sticky across Chat and Library? Lock Screen + AirPlay in v1? Video should duck or replace audio?</p></div>
-      <div class="q"><h3>4. Documents</h3><p>Press kits and one-sheets only, or also contracts, lyrics, call sheets?</p></div>
-      <div class="q"><h3>5. Smart links</h3><p>Never a filter — but still a row type, or only a property on a release?</p></div>
-      <div class="q"><h3>6. Surfaces for v1 ship</h3><p>iOS only after lock, or iOS + web + Ovie in the same pass?</p></div>
+      <h1>What I locked from your dump</h1>
+      <div class="grid">
+        <div class="card">
+          <div class="locked">Locked</div>
+          <h3>Catalog vs Collections</h3>
+          <p>Catalog is the 50 records, merch, docs. Collections hold auto-bundled capture (script + matching takes + B-roll + notes). You never scroll 500 clips to find Midnight Drive.</p>
+        </div>
+        <div class="card">
+          <div class="locked">Locked</div>
+          <h3>No comment collab</h3>
+          <p>Review notes are just you. The only collab is NFC day-pair: tap, both accept, both libraries get the footage, later cuts per channel or a YouTube collab.</p>
+        </div>
+        <div class="card">
+          <div class="locked">Locked</div>
+          <h3>One Jovie link per asset</h3>
+          <p>Not a type. Merch, Instagram pull, unreleased song, public song: same URL. Private/public is state. That’s the retargeting web.</p>
+        </div>
+        <div class="card">
+          <div class="locked">Locked</div>
+          <h3>One player, video first-class</h3>
+          <p>Commit play replaces the session. Peek/hold ducks it. Voice memos are queue items. Lock Screen and AirPlay are required.</p>
+        </div>
+        <div class="card">
+          <div class="locked">Locked</div>
+          <h3>iOS first</h3>
+          <p>Ship the viewer on iPhone, then web and Ovie immediately after. Same contract.</p>
+        </div>
+        <div class="card">
+          <div class="locked">Locked</div>
+          <h3>Ideas is a third home</h3>
+          <p>Rough dumps land untyped. “This is a song idea” tags it. Mention a title or a high-confidence lyric match: suggest a link, or attach automatically only when sure. They stay an Idea until then.</p>
+        </div>
+        <div class="card">
+          <div class="locked">Locked</div>
+          <h3>12-hour pair, not midnight</h3>
+          <p>A night out does not die at 12:01. End early is still there. If they open vlog inside the window and both phones look about 10+ miles apart, one in-vlog “Still with Maya?” Once. No push. Noisy GPS stays silent.</p>
+        </div>
+        <div class="card">
+          <div class="locked">Locked</div>
+          <h3>One interrupt bus</h3>
+          <p>Toasts, sheets, push, and in-flow prompts share one slot. Features cannot ship their own stacked popups. Written into <code>docs/NOTIFICATION_GUIDELINES.md</code> and <code>.claude/rules/ui.md</code>.</p>
+        </div>
+      </div>
     </div>
   </div>
+  <script>
+    const tabs = document.querySelectorAll("#tabs button");
+    const stages = document.querySelectorAll(".stage");
+    tabs.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        tabs.forEach((b) => b.classList.remove("on"));
+        stages.forEach((s) => s.classList.remove("on"));
+        btn.classList.add("on");
+        document.getElementById(btn.dataset.stage).classList.add("on");
+      });
+    });
+  </script>
 </body>
 </html>

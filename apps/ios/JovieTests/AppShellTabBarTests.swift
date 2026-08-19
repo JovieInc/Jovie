@@ -164,8 +164,64 @@ struct LibraryFeedTests {
   }
 
   @Test func filterChipsLeadWithAll() {
-    #expect(LibraryFilter.chips.first == .all)
-    #expect(LibraryFilter.chips.count == LibraryAssetType.allCases.count + 1)
+    #expect(LibraryFilter.catalogChips.first == .all)
+    #expect(LibraryFilter.catalogChips.map(\.id) == ["all", "release", "merch", "press"])
+    #expect(LibraryFilter.catalogChips.contains { $0.id == "smartLink" } == false)
+  }
+
+  @Test func catalogHidesVideosAndSmartLinkRows() {
+    let mixed = LibraryFeed.previewAssets + [
+      LibraryAsset(
+        id: "vlog-ferry",
+        name: "Ferry vlog",
+        type: .video,
+        isPublic: false,
+        coverURL: nil,
+        liveStatLabel: "Recorded just now",
+        publicURL: nil
+      ),
+    ]
+    let catalog = LibraryFeed.catalog(assets: mixed, filter: .all)
+    #expect(catalog.allSatisfy { LibraryFeed.catalogTypes.contains($0.type) })
+    #expect(catalog.contains { $0.id == "lib-release-midnight" })
+    #expect(catalog.contains { $0.id == "vlog-ferry" } == false)
+  }
+
+  @Test func collectionsGroupTakesByScriptTitle() {
+    let takes = [
+      LibraryAsset(
+        id: "a",
+        name: "Ferry vlog",
+        type: .video,
+        isPublic: false,
+        coverURL: nil,
+        liveStatLabel: "now",
+        publicURL: nil
+      ),
+      LibraryAsset(
+        id: "b",
+        name: "Ferry vlog",
+        type: .video,
+        isPublic: false,
+        coverURL: nil,
+        liveStatLabel: "now",
+        publicURL: nil
+      ),
+      LibraryAsset(
+        id: "c",
+        name: "Studio dump",
+        type: .video,
+        isPublic: false,
+        coverURL: nil,
+        liveStatLabel: "now",
+        publicURL: nil
+      ),
+    ]
+    let grouped = LibraryFeed.collections(from: takes)
+    #expect(grouped.count == 2)
+    #expect(grouped[0].name == "Ferry vlog")
+    #expect(grouped[0].count == 2)
+    #expect(grouped[1].name == "Studio dump")
   }
 
   @Test func emptyAssetsStayEmptyForEveryChip() {
