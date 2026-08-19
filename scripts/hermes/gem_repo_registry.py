@@ -9,12 +9,30 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-REGISTRY = Path(
-    os.environ.get(
-        "GEM_REPO_REGISTRY",
-        Path(__file__).with_name("config") / "gem-repo-registry.json",
-    )
-)
+def resolve_registry_path(
+    *,
+    module_file: Path | None = None,
+    env: dict[str, str] | None = None,
+) -> Path:
+    """Resolve the allowlist JSON for source vs installed Gem layouts.
+
+    Env ``GEM_REPO_REGISTRY`` always wins. Otherwise:
+    - installed: ``gem-workspace/scripts/gem_repo_registry.py`` →
+      ``gem-workspace/config/gem-repo-registry.json``
+    - source: ``scripts/hermes/gem_repo_registry.py`` →
+      ``scripts/hermes/config/gem-repo-registry.json``
+    """
+    mapping = os.environ if env is None else env
+    override = (mapping.get("GEM_REPO_REGISTRY") or "").strip()
+    if override:
+        return Path(override)
+    here = Path(module_file or __file__).resolve()
+    if here.parent.name == "scripts":
+        return here.parent.parent / "config" / "gem-repo-registry.json"
+    return here.with_name("config") / "gem-repo-registry.json"
+
+
+REGISTRY = resolve_registry_path()
 
 
 @dataclass(frozen=True)

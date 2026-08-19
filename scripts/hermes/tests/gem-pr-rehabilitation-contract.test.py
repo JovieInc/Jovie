@@ -50,6 +50,75 @@ class RegistryContractTests(unittest.TestCase):
         self.assertTrue(policy.issue_intake)
         self.assertEqual(policy.default_branch, "main")
 
+    def test_installed_layout_does_not_look_beside_the_module(self) -> None:
+        """Drain import on Gem copies this module to gem-workspace/scripts/.
+
+        The installer places the JSON at gem-workspace/config/, not
+        gem-workspace/scripts/config/. A with_name('config') default
+        reproduces the FileNotFoundError that rolled back activation.
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            scripts = root / "scripts"
+            config = root / "config"
+            scripts.mkdir()
+            config.mkdir()
+            shutil.copy2(REGISTRY_SOURCE, scripts / "gem_repo_registry.py")
+            sample = {
+                "schema_version": 1,
+                "repos": [
+                    {
+                        "id": "jovie",
+                        "github": "JovieInc/Jovie",
+                        "class": "product",
+                        "owner": "gem",
+                        "kpi": "ship",
+                        "local_path": "/home/timwhite/Jovie",
+                        "default_branch": "main",
+                        "policies": {"health": True, "pr_drain": True, "issue_intake": True},
+                    }
+                ],
+            }
+            (config / "gem-repo-registry.json").write_text(json.dumps(sample), encoding="utf-8")
+            spec = importlib.util.spec_from_file_location(
+                "gem_repo_registry_installed", scripts / "gem_repo_registry.py"
+            )
+            assert spec and spec.loader
+            installed = importlib.util.module_from_spec(spec)
+            sys.modules[spec.name] = installed
+            spec.loader.exec_module(installed)
+            resolved = installed.resolve_registry_path(
+                module_file=scripts / "gem_repo_registry.py",
+                env={},
+            )
+            self.assertEqual(resolved, (config / "gem-repo-registry.json").resolve())
+            self.assertNotEqual(
+                resolved,
+                scripts / "config" / "gem-repo-registry.json",
+            )
+            self.assertTrue(resolved.is_file())
+            repos = installed.load_registry(resolved)
+            self.assertEqual(repos[0].github, "JovieInc/Jovie")
+            # Importing drain after PYTHONPATH=scripts must not FileNotFound
+            # on scripts/config/gem-repo-registry.json.
+            env = {**os.environ}
+            env.pop("GEM_REPO_REGISTRY", None)
+            drain = HERMES / "gem-pr-drain.py"
+            # Use the shipped resolver, not drain's module-level by_github
+            # against the source tree.
+            self.assertEqual(
+                installed.resolve_registry_path(module_file=scripts / "gem_repo_registry.py", env={}),
+                (root / "config" / "gem-repo-registry.json").resolve(),
+            )
+
+    def test_env_override_wins_for_registry_path(self) -> None:
+        override = pathlib.Path("/tmp/explicit-gem-repo-registry.json")
+        got = REGISTRY.resolve_registry_path(
+            module_file=HERMES / "gem_repo_registry.py",
+            env={"GEM_REPO_REGISTRY": str(override)},
+        )
+        self.assertEqual(got, override)
+
     def test_every_repository_is_unique_and_explicit(self):
         repositories = REGISTRY.load_registry()
         names = [repo.github.casefold() for repo in repositories]
