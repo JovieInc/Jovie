@@ -97,10 +97,33 @@ export function assertEvePilotFactoryLock(turn: EvePilotBoundTurn): void {
   }
 }
 
-export function eveIdentityForRuntime() {
-  const turn = bindEvePilotIdentity(
-    process.env.EVE_IDENTITY === 'ovie' ? 'ovie' : 'jovie'
-  );
+export type EvePilotChannelSource =
+  | 'telegram'
+  | 'imessage'
+  | 'photon'
+  | 'jovie-core-chat'
+  | string;
+
+/**
+ * Telegram and iMessage are always the Ovie founder pack. Other sources
+ * follow EVE_IDENTITY (default Jovie) so the artist runtime cannot inherit
+ * founder mail.
+ */
+export function eveIdentityIdForChannel(
+  source?: EvePilotChannelSource
+): EvePilotIdentityId {
+  if (source === 'telegram' || source === 'imessage' || source === 'photon') {
+    return 'ovie';
+  }
+  return process.env.EVE_IDENTITY === 'ovie' ? 'ovie' : 'jovie';
+}
+
+export function eveIdentityForChannel(source?: EvePilotChannelSource) {
+  const turn = bindEvePilotIdentity(eveIdentityIdForChannel(source));
   assertEvePilotFactoryLock(turn);
   return turn;
+}
+
+export function eveIdentityForRuntime() {
+  return eveIdentityForChannel();
 }

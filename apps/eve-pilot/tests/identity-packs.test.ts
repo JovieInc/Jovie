@@ -4,6 +4,7 @@ import {
   bindEvePilotIdentity,
   type EvePilotBoundTurn,
   EvePilotCapabilityDeniedError,
+  eveIdentityForChannel,
   eveIdentityForRuntime,
 } from '../agent/select-identity';
 
@@ -56,6 +57,20 @@ describe('eve identity instruction packs', () => {
     delete process.env.EVE_IDENTITY;
     const turn = eveIdentityForRuntime();
     expect(turn.pack.id).toBe('jovie');
+    expect(() => assertEvePilotFactoryLock(turn)).not.toThrow();
+    if (previous === undefined) {
+      delete process.env.EVE_IDENTITY;
+    } else {
+      process.env.EVE_IDENTITY = previous;
+    }
+  });
+
+  it('binds Telegram to Ovie even when the runtime default is Jovie', () => {
+    const previous = process.env.EVE_IDENTITY;
+    delete process.env.EVE_IDENTITY;
+    const turn = eveIdentityForChannel('telegram');
+    expect(turn.pack.id).toBe('ovie');
+    expect(() => turn.require('ingest-ack')).not.toThrow();
     expect(() => assertEvePilotFactoryLock(turn)).not.toThrow();
     if (previous === undefined) {
       delete process.env.EVE_IDENTITY;
