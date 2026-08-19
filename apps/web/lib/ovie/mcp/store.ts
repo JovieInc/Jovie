@@ -10,20 +10,98 @@ export type OperatingStore = {
   listInitiatives(): readonly OvieInitiative[];
 };
 
-export function sealId(prefix: 'ini' | 'dec', record: unknown): string {
-  return `${prefix}_${signPayload(ovieIssuerSecret(), record)}`;
+type CompactInitiative = {
+  readonly t: 'i';
+  readonly title: string;
+  readonly intent: string;
+  readonly status: OvieInitiative['status'];
+  readonly lane: OvieInitiative['lane'];
+  readonly dest: OvieInitiative['destination'];
+  readonly created: string;
+};
+
+type CompactDecision = {
+  readonly t: 'd';
+  readonly decided: string;
+  readonly created: string;
+};
+
+const CLIP = 180;
+
+function clip(value: string): string {
+  return value.length <= CLIP ? value : value.slice(0, CLIP);
 }
 
-function unseal<T extends { id: string }>(
-  prefix: 'ini' | 'dec',
-  id: string
-): T | undefined {
-  if (!id.startsWith(`${prefix}_`)) return undefined;
-  const draft = verifyPayload<Omit<T, 'id'>>(
+export function sealId(prefix: 'ini' | 'dec', record: unknown): string {
+  if (prefix === 'ini') {
+    const initiative = record as OvieInitiative;
+    const compact: CompactInitiative = {
+      t: 'i',
+      title: clip(initiative.handoff.title),
+      intent: clip(initiative.handoff.intent),
+      status: initiative.status,
+      lane: initiative.lane,
+      dest: initiative.destination,
+      created: initiative.createdAt,
+    };
+    return `${prefix}_${signPayload(ovieIssuerSecret(), compact)}`;
+  }
+  const decision = record as OvieDecision;
+  const compact: CompactDecision = {
+    t: 'd',
+    decided: clip(decision.decided),
+    created: decision.createdAt,
+  };
+  return `${prefix}_${signPayload(ovieIssuerSecret(), compact)}`;
+}
+
+function unsealInitiative(id: string): OvieInitiative | undefined {
+  if (!id.startsWith('ini_')) return undefined;
+  const draft = verifyPayload<CompactInitiative | Omit<OvieInitiative, 'id'>>(
     ovieIssuerSecret(),
-    id.slice(prefix.length + 1)
+    id.slice(4)
   );
-  return draft ? ({ ...draft, id } as T) : undefined;
+  if (!draft) return undefined;
+  if ('t' in draft && draft.t === 'i') {
+    return {
+      id,
+      kind: 'initiative',
+      status: draft.status,
+      handoff: { title: draft.title, intent: draft.intent },
+      lane: draft.lane,
+      destination: draft.dest,
+      receipts: [],
+      workerSpawned: false,
+      createdAt: draft.created,
+      updatedAt: draft.created,
+      evidence: [],
+    };
+  }
+  if ('kind' in draft && draft.kind === 'initiative') {
+    return { ...draft, id };
+  }
+  return undefined;
+}
+
+function unsealDecision(id: string): OvieDecision | undefined {
+  if (!id.startsWith('dec_')) return undefined;
+  const draft = verifyPayload<CompactDecision | Omit<OvieDecision, 'id'>>(
+    ovieIssuerSecret(),
+    id.slice(4)
+  );
+  if (!draft) return undefined;
+  if ('t' in draft && draft.t === 'd') {
+    return {
+      id,
+      kind: 'decision',
+      decided: draft.decided,
+      createdAt: draft.created,
+    };
+  }
+  if ('kind' in draft && draft.kind === 'decision') {
+    return { ...draft, id };
+  }
+  return undefined;
 }
 
 export class MemoryOperatingStore implements OperatingStore {
@@ -35,7 +113,7 @@ export class MemoryOperatingStore implements OperatingStore {
   }
 
   getDecision(id: string): OvieDecision | undefined {
-    return this.decisions.get(id) ?? unseal<OvieDecision>('dec', id);
+    return this.decisions.get(id) ?? unsealDecision(id);
   }
 
   listDecisions(): readonly OvieDecision[] {
@@ -47,7 +125,7 @@ export class MemoryOperatingStore implements OperatingStore {
   }
 
   getInitiative(id: string): OvieInitiative | undefined {
-    return this.initiatives.get(id) ?? unseal<OvieInitiative>('ini', id);
+    return this.initiatives.get(id) ?? unsealInitiative(id);
   }
 
   listInitiatives(): readonly OvieInitiative[] {
