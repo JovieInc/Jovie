@@ -1,7 +1,20 @@
 import { spawnSync } from 'node:child_process';
-import { readdirSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+  createGitRunner,
+  LIVE_MAIN_FETCH_REF,
+  resolveMergeGroupPathDiff,
+} from '../resolve-merge-group-path-diff.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const CI_WORKFLOW = readFileSync(
@@ -42,6 +55,10 @@ const CLAUDE_REVIEW_WORKFLOW = readFileSync(
 );
 const MEMBER_POLICY = readFileSync(
   resolve(REPO_ROOT, 'scripts/lib/merge-group-member-policy.mjs'),
+  'utf8'
+);
+const PATH_DIFF_HELPER = readFileSync(
+  resolve(REPO_ROOT, 'scripts/lib/resolve-merge-group-path-diff.mjs'),
   'utf8'
 );
 const BRANCH_RULESET = readFileSync(
@@ -146,7 +163,12 @@ describe('merge_group workflow contract', () => {
       'MERGE_GROUP_HEAD_SHA="${{ github.event.merge_group.head_sha }}"'
     );
     expect(CI_WORKFLOW).toContain(
-      'git diff --name-only "$MERGE_GROUP_BASE_SHA...$MERGE_GROUP_HEAD_SHA"'
+      'node scripts/lib/resolve-merge-group-path-diff.mjs'
+    );
+    expect(CI_WORKFLOW).toContain('--base "$MERGE_GROUP_BASE_SHA"');
+    expect(CI_WORKFLOW).toContain('--head "$MERGE_GROUP_HEAD_SHA"');
+    expect(PATH_DIFF_HELPER).toContain(
+      "['diff', '--name-only', `${baseSha}...${headSha}`]"
     );
     expect(CI_WORKFLOW).not.toContain('withgraphite/graphite-ci-action');
     expect(CI_WORKFLOW).not.toContain('steps.graphite');
@@ -418,12 +440,17 @@ describe('merge_group workflow contract', () => {
       'MERGE_GROUP_HEAD_SHA="${{ github.event.merge_group.head_sha }}"'
     );
     expect(pathChanges).toContain(
-      'git diff --name-only "$MERGE_GROUP_BASE_SHA...$MERGE_GROUP_HEAD_SHA"'
+      'node scripts/lib/resolve-merge-group-path-diff.mjs'
     );
-    expect(pathChanges).toContain('No tree changes vs merge_group base');
-    expect(pathChanges).toContain(
-      'continuing as an explicit no-op combined head'
+    expect(pathChanges).toContain('--base "$MERGE_GROUP_BASE_SHA"');
+    expect(pathChanges).toContain('--head "$MERGE_GROUP_HEAD_SHA"');
+    expect(PATH_DIFF_HELPER).toContain(
+      "['diff', '--name-only', `${baseSha}...${headSha}`]"
     );
+    expect(PATH_DIFF_HELPER).toContain(LIVE_MAIN_FETCH_REF);
+    expect(PATH_DIFF_HELPER).not.toContain('github.event.before');
+    expect(PATH_DIFF_HELPER).not.toContain('github.base_ref');
+    expect(pathChanges).toContain('IS_NOOP');
     expect(pathChanges).toContain(
       "is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}"
     );
@@ -469,6 +496,35 @@ describe('merge_group workflow contract', () => {
     expect(mergeIdx).toBeGreaterThanOrEqual(0);
     expect(pushIdx).toBeGreaterThan(mergeIdx);
     expect(beforeAssignIdx).toBeGreaterThan(pushIdx);
+  });
+
+  it('keeps the pull_request empty-diff docs-only hard-fail (JOV-4905)', () => {
+    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+    const detectStep = pathChanges.slice(
+      pathChanges.indexOf('Detect path changes for all job types')
+    );
+    const pullRequestStart = detectStep.indexOf(
+      'elif [[ "${{ github.event_name }}" == "pull_request" ]]; then'
+    );
+    const mergeGroupStart = detectStep.indexOf(
+      'if [[ "${{ github.event_name }}" == "merge_group" ]]; then'
+    );
+    expect(pullRequestStart).toBeGreaterThan(mergeGroupStart);
+    const pullRequestBranch = detectStep.slice(pullRequestStart);
+    expect(pullRequestBranch).toContain(
+      'Empty changed-file list vs origin/${{ github.base_ref }}; refusing a false docs-only classification.'
+    );
+    const mergeGroupBranch = detectStep.slice(
+      mergeGroupStart,
+      pullRequestStart
+    );
+    expect(mergeGroupBranch).not.toContain('refusing a false docs-only');
+    expect(mergeGroupBranch).not.toMatch(
+      /(?:DIFF_BASE|CHANGED_FILES)=.*github\.event\.before/
+    );
+    expect(mergeGroupBranch).not.toMatch(
+      /(?:DIFF_BASE|CHANGED_FILES|git fetch).*\${{ github\.base_ref }}/
+    );
   });
 
   it('short-circuits only expensive lanes for a typed empty-diff merge group', () => {
@@ -1164,5 +1220,192 @@ ${heavyGateScript}`,
     expect(FORK_GATE_WORKFLOW.match(/-f context="Fork PR Gate"/g)).toHaveLength(
       3
     );
+  });
+});
+
+describe('resolveMergeGroupPathDiff coalesced heads (JOV-4905)', () => {
+  const tempRoots = [];
+
+  afterEach(() => {
+    for (const root of tempRoots.splice(0)) {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  function git(cwd, args) {
+    const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
+    if (result.status !== 0) {
+      throw new Error(
+        `git ${args.join(' ')} failed: ${result.stderr || result.stdout}`
+      );
+    }
+    return result.stdout.trim();
+  }
+
+  function writeAndCommit(cwd, relativePath, contents, message) {
+    const absolutePath = join(cwd, relativePath);
+    mkdirSync(join(absolutePath, '..'), { recursive: true });
+    writeFileSync(absolutePath, contents);
+    git(cwd, ['add', relativePath]);
+    git(cwd, ['commit', '-q', '-m', message]);
+    return git(cwd, ['rev-parse', 'HEAD']);
+  }
+
+  function createFixture() {
+    const root = mkdtempSync(join(tmpdir(), 'jovie-path-diff-'));
+    tempRoots.push(root);
+    const origin = join(root, 'origin.git');
+    const seed = join(root, 'seed');
+    git(root, ['init', '--bare', '-q', origin]);
+    git(root, ['init', '-q', '-b', 'main', seed]);
+    git(seed, ['config', 'user.name', 'Path Diff Test']);
+    git(seed, ['config', 'user.email', 'path-diff@example.invalid']);
+    git(seed, ['config', 'commit.gpgsign', 'false']);
+    git(seed, ['remote', 'add', 'origin', origin]);
+    const rootSha = writeAndCommit(seed, 'README.md', 'root\n', 'root');
+    return { root, origin, seed, rootSha };
+  }
+
+  it('uses the event-base three-dot range when it has files', () => {
+    const { seed, rootSha } = createFixture();
+    git(seed, ['switch', '-q', '-c', 'feature']);
+    const headSha = writeAndCommit(
+      seed,
+      'apps/web/product.ts',
+      'export const ready = true;\n',
+      'add product'
+    );
+
+    const result = resolveMergeGroupPathDiff({
+      git: createGitRunner(seed),
+      eventBaseSha: rootSha,
+      eventHeadSha: headSha,
+      fetchLiveMain: false,
+    });
+
+    expect(result).toMatchObject({
+      source: 'event_base',
+      isNoop: false,
+      files: ['apps/web/product.ts'],
+      baseSha: rootSha,
+      headSha,
+    });
+  });
+
+  it('recomputes against live main when the event-base range is empty', () => {
+    const { origin, seed, rootSha } = createFixture();
+    git(seed, ['switch', '-q', '-c', 'feature']);
+    const headSha = writeAndCommit(
+      seed,
+      'apps/web/product.ts',
+      'export const ready = true;\n',
+      'add product'
+    );
+    git(seed, ['push', '-q', 'origin', `${rootSha}:refs/heads/main`]);
+    git(seed, ['push', '-q', 'origin', `${headSha}:refs/heads/feature`]);
+
+    const work = join(seed, '..', 'work');
+    git(seed, [
+      'clone',
+      '-q',
+      '--branch',
+      'feature',
+      '--single-branch',
+      origin,
+      work,
+    ]);
+    git(work, ['config', 'user.name', 'Path Diff Test']);
+    git(work, ['config', 'user.email', 'path-diff@example.invalid']);
+    git(work, ['config', 'commit.gpgsign', 'false']);
+
+    const result = resolveMergeGroupPathDiff({
+      git: createGitRunner(work),
+      eventBaseSha: headSha,
+      eventHeadSha: headSha,
+      fetchLiveMain: true,
+    });
+
+    expect(result).toMatchObject({
+      source: 'live_main_merge_base',
+      isNoop: false,
+      files: ['apps/web/product.ts'],
+      headSha,
+    });
+  });
+
+  it('treats a valid empty live-main range as a typed no-op', () => {
+    const { seed, rootSha } = createFixture();
+    git(seed, ['push', '-q', 'origin', 'HEAD:refs/heads/main']);
+
+    const result = resolveMergeGroupPathDiff({
+      git: createGitRunner(seed),
+      eventBaseSha: rootSha,
+      eventHeadSha: rootSha,
+      fetchLiveMain: true,
+    });
+
+    expect(result.isNoop).toBe(true);
+    expect(result.source).toBe('noop');
+    expect(result.files).toEqual([]);
+    expect(result.headSha).toBe(rootSha);
+  });
+
+  it('falls back to live main when the event base is missing from the local graph', () => {
+    const { seed, rootSha } = createFixture();
+    git(seed, ['switch', '-q', '-c', 'feature']);
+    const headSha = writeAndCommit(
+      seed,
+      'apps/web/product.ts',
+      'export const ready = true;\n',
+      'add product'
+    );
+    git(seed, ['push', '-q', 'origin', `${rootSha}:refs/heads/main`]);
+    git(seed, ['push', '-q', 'origin', `${headSha}:refs/heads/feature`]);
+    const missingBase = 'cd'.repeat(20);
+
+    const result = resolveMergeGroupPathDiff({
+      git: createGitRunner(seed),
+      eventBaseSha: missingBase,
+      eventHeadSha: headSha,
+      fetchLiveMain: true,
+    });
+
+    expect(result).toMatchObject({
+      source: 'live_main_merge_base',
+      isNoop: false,
+      files: ['apps/web/product.ts'],
+      headSha,
+    });
+  });
+
+  it('does not hard-fail when live main cannot be fetched after an empty event diff', () => {
+    const { seed, rootSha } = createFixture();
+    git(seed, ['remote', 'remove', 'origin']);
+
+    const result = resolveMergeGroupPathDiff({
+      git: createGitRunner(seed),
+      eventBaseSha: rootSha,
+      eventHeadSha: rootSha,
+      fetchLiveMain: true,
+    });
+
+    expect(result.isNoop).toBe(true);
+    expect(result.source).toBe('noop');
+    expect(result.files).toEqual([]);
+    expect(result.notice).toMatch(/Live refs\/heads\/main was unavailable/);
+  });
+
+  it('fails closed when the merge_group head is not a valid tree', () => {
+    const { seed, rootSha } = createFixture();
+    const missingHead = 'ab'.repeat(20);
+
+    expect(() =>
+      resolveMergeGroupPathDiff({
+        git: createGitRunner(seed),
+        eventBaseSha: rootSha,
+        eventHeadSha: missingHead,
+        fetchLiveMain: false,
+      })
+    ).toThrow(/is not a valid tree/);
   });
 });
