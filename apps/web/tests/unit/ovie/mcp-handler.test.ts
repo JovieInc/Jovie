@@ -19,6 +19,7 @@ import { handleOvieMcpRequest } from '@/lib/ovie/mcp/handler';
 import {
   getOvieOAuthIssuer,
   isAllowedRedirect,
+  isOvieOAuthFounder,
   pkceS256,
 } from '@/lib/ovie/mcp/oauth';
 import { MemoryOperatingStore } from '@/lib/ovie/mcp/store';
@@ -238,6 +239,23 @@ describe('Ovie MCP OAuth', () => {
     expect(claims?.isAdmin).toBe(true);
     expect(claims?.email).toBe('tim@meetjovie.com');
     expect(isAllowedRedirect('https://evil.example/cb')).toBe(false);
+  });
+
+  it('treats Better Auth DB admins as Ovie OAuth founders', () => {
+    expect(
+      isOvieOAuthFounder({
+        authenticated: true,
+        entitlementsAdmin: false,
+        dbAdmin: true,
+      })
+    ).toBe(true);
+    expect(
+      isOvieOAuthFounder({
+        authenticated: true,
+        entitlementsAdmin: false,
+        dbAdmin: false,
+      })
+    ).toBe(false);
   });
 
   it('refuses non-founder authorization codes', () => {

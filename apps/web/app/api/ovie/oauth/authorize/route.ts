@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
+import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
-import { getOvieOAuthIssuer, ovieIssuerSecret } from '@/lib/ovie/mcp/oauth';
+import {
+  getOvieOAuthIssuer,
+  isOvieOAuthFounder,
+  ovieIssuerSecret,
+} from '@/lib/ovie/mcp/oauth';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +21,15 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   const entitlements = await getCurrentUserEntitlements();
-  if (!entitlements.isAuthenticated || !entitlements.isAdmin) {
+  const dbAdmin = entitlements.userId
+    ? await checkAdminRole(entitlements.userId)
+    : false;
+  const founder = isOvieOAuthFounder({
+    authenticated: entitlements.isAuthenticated,
+    entitlementsAdmin: entitlements.isAdmin,
+    dbAdmin,
+  });
+  if (!founder) {
     const next = encodeURIComponent(`${url.pathname}${url.search}`);
     return NextResponse.redirect(new URL(`/identity?next=${next}`, url.origin));
   }
@@ -28,7 +41,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       codeChallenge: challenge,
       subject: entitlements.userId ?? entitlements.email ?? 'founder',
       email: entitlements.email ?? undefined,
-      isAdmin: entitlements.isAdmin,
+      isAdmin: true,
     });
     const target = new URL(redirectUri);
     target.searchParams.set('code', code);
