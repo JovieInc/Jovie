@@ -183,6 +183,19 @@ class JovieOwnershipTests(unittest.TestCase):
         self.assertEqual(result["reason"], "not_autonomous_draft")
         run.assert_not_called()
 
+    def test_ready_autonomous_draft_skips_big_pr_and_dirty_heads(self):
+        big = self._open_pr(15913, mergeable_state="unstable", created_at="2026-08-13T15:12:46Z")
+        big["draft"] = True
+        big["head"]["ref"] = "symphony/JOV-5041-fix"
+        big["labels"] = [{"name": "big-pr"}]
+        dirty = self._open_pr(16187, mergeable_state="dirty", created_at="2026-08-18T19:38:53Z")
+        dirty["draft"] = True
+        dirty["head"]["ref"] = "grok/JOV-5041-fix"
+        with mock.patch.object(MODULE, "run") as run:
+            self.assertEqual(MODULE.ready_autonomous_draft(big)["reason"], "too_large_for_queue")
+            self.assertEqual(MODULE.ready_autonomous_draft(dirty)["reason"], "conflicting")
+        run.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

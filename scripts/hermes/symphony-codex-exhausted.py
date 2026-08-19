@@ -413,7 +413,7 @@ def _start_jov_primary() -> bool:
     started = _control(_systemctl("start", PRIMARY_SERVICE))
     for service in OPTIONAL_SERVICES:
         _control(_systemctl("start", service))
-    return started and _jov_active()
+    return started
 
 
 def _services_active() -> bool:
@@ -897,17 +897,9 @@ def _continue_exhausted_reconcile(reason: str) -> int:
         )
         return EXIT_SAFE_FAIL_CLOSED
 
-    # The canonical router probe above makes the fallback available before Symphony is
-    # released. Symphony remains the sole implementation owner until its
-    # scheduler is stopped, so Todo/In Progress work can never have two owners.
-    # This handoff is reversible: if no Grok worker survives the bounded launch
-    # batch and stability window, restore and verify Symphony before returning.
-    # systemctl stop is synchronous, so success proves the old owner has
-    # released its scheduler before a new implementation owner starts.
-    if not _control(_systemctl("stop", *SERVICES)):
-        print("codex_exhausted symphony_stop_failed grok_unchanged", file=sys.stderr)
-        return EXIT_SAFE_FAIL_CLOSED
-
+    # Exclusive implementation is the fallback lease flock; the Codex launcher
+    # exits 78 when that lock is held. Do not stop JOV: fleet-gate observes
+    # :4041 on Gem, and a stopped UI freezes promotion (zero merge-queue slots).
     launched_units, _capacity_used = _launch_fallback_workers(
         identifiers, active, executable, bundle_revision, selection, limit
     )
@@ -933,6 +925,12 @@ def _continue_exhausted_reconcile(reason: str) -> int:
             return EXIT_DEGRADED
         if survived:
             started = len(launched_units.intersection(survived))
+            if not _jov_active() and not _start_jov_primary():
+                print(
+                    f"codex_exhausted {reason} grok_started={started} grok_survived={len(survived)} symphony_api_restore_failed",
+                    file=sys.stderr,
+                )
+                return EXIT_DEGRADED
             print(
                 f"codex_exhausted {reason} grok_started={started} grok_survived={len(survived)}",
                 file=sys.stderr,

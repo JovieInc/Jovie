@@ -439,8 +439,11 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         events = self.events.read_text().splitlines()
         launch_index = next(i for i, line in enumerate(events) if line.startswith("systemd-run"))
-        stop_index = events.index("systemctl --user stop symphony-ui-pilot.service symphony-lyb.service")
-        self.assertLess(stop_index, launch_index, events)
+        self.assertNotIn(
+            "systemctl --user stop symphony-ui-pilot.service symphony-lyb.service",
+            events,
+        )
+        self.assertGreaterEqual(launch_index, 0, events)
         self.assertIn("codex_exhausted", result.stderr)
         self.assertNotIn("codex_not_exhausted", result.stderr)
 
@@ -720,8 +723,8 @@ class FallbackTests(unittest.TestCase):
         ):
             self.assertEqual(module.reconcile(), module.EXIT_SAFE_FAIL_CLOSED)
 
-        stop = "systemctl --user stop symphony-ui-pilot.service symphony-lyb.service"
-        self.assertLess(events.index("model-router"), events.index(stop))
+        self.assertIn("model-router", events)
+        self.assertNotIn("systemctl --user stop symphony-ui-pilot.service symphony-lyb.service", events)
 
     def test_live_canary_requires_luna_and_exact_marker(self):
         canary = self.command("codex-rotate", "printf '%s\\n' \"$*\" > \"$GEM_EVENTS\"; printf 'GEM_MODEL_READY\\n'")
@@ -768,7 +771,6 @@ class FallbackTests(unittest.TestCase):
             "systemctl --user start symphony-ui-pilot.service",
             "systemctl --user start symphony-lyb.service",
             "systemctl --user is-active --quiet symphony-ui-pilot.service",
-            "systemctl --user is-active --quiet symphony-ui-pilot.service",
         ])
         self.assertIn("idle", result.stderr)
 
@@ -783,10 +785,20 @@ class FallbackTests(unittest.TestCase):
 
     def test_usable_recovery_defers_while_grok_ship_is_active(self):
         canary = self.command("codex-rotate", "echo GEM_MODEL_READY")
-        self.command("systemctl", "[ \"$2\" = list-units ] && printf 'grok-ship-JOV-1.service loaded active running\\n'; exit 0")
+        self.command(
+            "systemctl",
+            """
+            case "$*" in
+              *list-units*)
+                printf 'grok-ship-JOV-1.service loaded active running\\n'
+                ;;
+            esac
+            exit 0
+            """,
+        )
         destination = self.install_runtime()
         result = subprocess.run([destination / "symphony-grok-sidecar"], capture_output=True, text=True, env=self.env(GEM_CODEX_ROTATE_BIN=canary), check=False)
-        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("recovery_deferred", result.stderr)
 
     def test_exhausted_recovery_stops_symphony_and_bounds_grok_launches(self):
@@ -807,8 +819,11 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         events = self.events.read_text().splitlines()
         first_launch = next(i for i, line in enumerate(events) if line.startswith("systemd-run"))
-        stop_index = events.index("systemctl --user stop symphony-ui-pilot.service symphony-lyb.service")
-        self.assertLess(stop_index, first_launch, events)
+        self.assertGreaterEqual(first_launch, 0, events)
+        self.assertNotIn(
+            "systemctl --user stop symphony-ui-pilot.service symphony-lyb.service",
+            events,
+        )
         self.assertEqual(len([line for line in events if line.startswith("systemd-run")]), 2)
         self.assertTrue(any("fallback-ship-LYB-3" in line for line in events))
         self.assertFalse(any("fallback-ship-JOV-4" in line or "fallback-ship-LYB-5" in line for line in events))
@@ -958,9 +973,8 @@ class FallbackTests(unittest.TestCase):
         self.assertIn("not admitted", result.stderr)
         events = self.events.read_text() if self.events.exists() else ""
         self.assertNotIn("systemd-run", events)
-        stop_index = events.index("systemctl --user stop")
-        restore_index = events.index("systemctl --user start")
-        self.assertLess(stop_index, restore_index)
+        self.assertNotIn("systemctl --user stop", events)
+        self.assertIn("systemctl --user start symphony-ui-pilot.service", events)
         self.assertIn("symphony_restored", result.stderr)
 
     def test_zero_grok_capacity_preserves_symphony(self):
@@ -1051,7 +1065,6 @@ class FallbackTests(unittest.TestCase):
 
         launches = [command for command in controls if command[0] == "systemd-run"]
         self.assertEqual(len(launches), 2)
-        stop_index = next(i for i, command in enumerate(controls) if "stop" in command)
         first_launch = next(i for i, command in enumerate(controls) if command[0] == "systemd-run")
         restore_index = next(i for i, command in enumerate(controls) if "start" in command)
         cleanup_index = next(
@@ -1059,9 +1072,15 @@ class FallbackTests(unittest.TestCase):
             if command[:3] == ["systemctl", "--user", "stop"]
             and any(str(item).startswith("fallback-ship-") for item in command)
         )
-        self.assertLess(stop_index, first_launch)
         self.assertLess(first_launch, cleanup_index)
         self.assertLess(cleanup_index, restore_index)
+        self.assertFalse(
+            any(
+                command[:3] == ["systemctl", "--user", "stop"]
+                and "symphony-ui-pilot.service" in command
+                for command in controls
+            )
+        )
 
     def test_grok_worker_collapse_during_survival_window_restores_symphony(self):
         module = self.load_controller_module()
@@ -1200,8 +1219,14 @@ class FallbackTests(unittest.TestCase):
         ):
             self.assertEqual(module.reconcile(), 2)
 
-        self.assertTrue(any("stop" in command for command in controls))
         self.assertTrue(any("start" in command for command in controls))
+        self.assertFalse(
+            any(
+                command[:3] == ["systemctl", "--user", "stop"]
+                and "symphony-ui-pilot.service" in command
+                for command in controls
+            )
+        )
 
     def test_unknown_final_grok_state_never_restarts_competing_owner(self):
         module = self.load_controller_module()
@@ -1222,9 +1247,15 @@ class FallbackTests(unittest.TestCase):
         ):
             self.assertEqual(module.reconcile(), module.EXIT_DEGRADED)
 
-        self.assertTrue(any("stop" in command for command in controls))
         self.assertTrue(any(command[0] == "systemd-run" for command in controls))
         self.assertFalse(any("start" in command for command in controls))
+        self.assertFalse(
+            any(
+                command[:3] == ["systemctl", "--user", "stop"]
+                and "symphony-ui-pilot.service" in command
+                for command in controls
+            )
+        )
 
     def test_delayed_unit_seen_after_cleanup_blocks_primary_restore(self):
         module = self.load_controller_module()

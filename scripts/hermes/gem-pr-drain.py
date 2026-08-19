@@ -241,6 +241,10 @@ def ready_autonomous_draft(pr):
     }
     if not pr.get("draft") or not autonomous_head(pr):
         return {**result, "result": "skipped", "reason": "not_autonomous_draft"}
+    if "big-pr" in labels(pr):
+        return {**result, "result": "skipped", "reason": "too_large_for_queue"}
+    if pr.get("mergeable_state") == "dirty":
+        return {**result, "result": "skipped", "reason": "conflicting"}
     try:
         run("gh", "pr", "ready", str(pr["number"]), "--repo", REPO, timeout=60)
     except Exception as error:
