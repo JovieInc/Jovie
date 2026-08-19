@@ -121,6 +121,48 @@ class JovieOwnershipTests(unittest.TestCase):
         self.assertEqual(result["reason"], "remediation_push_gate_red")
         run.assert_not_called()
 
+    def _open_pr(self, number: int, *, mergeable_state: str, created_at: str):
+        return {
+            "number": number,
+            "created_at": created_at,
+            "title": f"pr-{number}",
+            "body": "",
+            "draft": False,
+            "labels": [],
+            "mergeable_state": mergeable_state,
+            "base": {"ref": "main"},
+            "head": {"ref": f"branch-{number}", "sha": f"{number:040x}"},
+            "changed_files": [],
+        }
+
+    def test_dirty_skip_only_heads_do_not_consume_drain_capacity(self):
+        """Live Gem selected oldest dirty PRs, skipped them, and never touched
+        behind heads. Capacity must go to PRs drain can actually refresh.
+        """
+        dirty = [
+            self._open_pr(n, mergeable_state="dirty", created_at=f"2026-08-17T09:0{n}:00Z")
+            for n in range(1, 6)
+        ]
+        behind = self._open_pr(
+            99, mergeable_state="behind", created_at="2026-08-19T12:00:00Z"
+        )
+        selected = MODULE.select_prs(
+            dirty + [behind], main_green=True, worker_capacity=4
+        )
+        self.assertEqual([pr["number"] for pr in selected], [99])
+
+    def test_dirty_conflict_backlog_does_not_pause_new_issue_intake(self):
+        dirty = [
+            self._open_pr(n, mergeable_state="dirty", created_at=f"2026-08-17T09:0{n}:00Z")
+            for n in range(1, 11)
+        ]
+        count = MODULE.intake_backlog_count(dirty)
+        self.assertEqual(count, 0)
+        decision = MODULE.policy_decision(
+            main_green=True, queue_count=count, target=5, worker_capacity=4
+        )
+        self.assertTrue(decision["new_issue_intake"])
+
 
 if __name__ == "__main__":
     unittest.main()
