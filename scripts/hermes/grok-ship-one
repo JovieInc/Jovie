@@ -151,7 +151,14 @@ fi
 if [ "$REMOUNT" = 1 ]; then
   # Depth-1 fetches of main and the PR head do not share a merge-base, so
   # `git merge origin/main` fails with unrelated histories and the PR stays DIRTY.
-  git -C "$WS" fetch origin "refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}"
+  # Leftover merge/rebase index from a prior remount blocks `git fetch origin main`
+  # (live JOV-5041: CHANGELOG.md needs merge). Force-update the remote-tracking
+  # PR ref: remounts rewrite history, so a non-plus fetch rejects non-fast-forward
+  # (live JOV-4894 on #16211).
+  git -C "$WS" merge --abort >/dev/null 2>&1 || true
+  git -C "$WS" rebase --abort >/dev/null 2>&1 || true
+  git -C "$WS" reset --hard HEAD
+  git -C "$WS" fetch origin "+refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}"
   git -C "$WS" fetch origin main
   git -C "$WS" checkout -B "$BRANCH" "origin/$BRANCH"
   git -C "$WS" reset --hard "origin/$BRANCH"

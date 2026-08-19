@@ -1878,7 +1878,9 @@ class FallbackTests(unittest.TestCase):
         log = (self.root / "logs/JOV-7.log").read_text()
         self.assertIn("remount_ci_red", log)
         events = self.events.read_text()
-        self.assertIn("fetch origin refs/heads/grok/JOV-7-fix:refs/remotes/origin/grok/JOV-7-fix", events)
+        self.assertIn("fetch origin +refs/heads/grok/JOV-7-fix:refs/remotes/origin/grok/JOV-7-fix", events)
+        self.assertIn("merge --abort", events)
+        self.assertIn("reset --hard HEAD", events)
         self.assertIn("fetch origin main", events)
         self.assertIn("fetch --unshallow origin", events)
         self.assertIn("fetch --deepen=500 origin", events)
@@ -1936,6 +1938,8 @@ class FallbackTests(unittest.TestCase):
         self.assertIn("remount_ci_red", log)
         events = self.events.read_text()
         self.assertIn("checkout -B grok/JOV-7-fix origin/grok/JOV-7-fix", events)
+        self.assertIn("fetch origin +refs/heads/grok/JOV-7-fix:refs/remotes/origin/grok/JOV-7-fix", events)
+        self.assertIn("merge --abort", events)
         self.assertIn("merge --no-edit origin/main", events)
 
     def test_check_admission_remount_skips_receipt(self):
