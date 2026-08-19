@@ -64,6 +64,9 @@ describe('queue-deferred release closed loop (JOV-5054)', () => {
       "steps.admission.outputs.deferred_release == '1'"
     );
     expect(autoenroll).toContain("'deferred-release-only'");
+    expect(autoenroll).toContain(
+      "needs.fleet-policy.outputs.mode != 'hold-intake'"
+    );
     expect(drain).toContain(
       'exact-head controller queue-deferred release receipt'
     );

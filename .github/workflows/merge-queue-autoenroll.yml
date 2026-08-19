@@ -247,7 +247,13 @@ jobs:
           # The shared Bash pre-enqueue guard requires the bot-authored typed
           # release receipt plus green source/main/production evidence. It is
           # not a general AMBER admission path.
-          DRAIN_PROMOTION_MODE: ${{ steps.admission.outputs.deferred_release == '1' && 'deferred-release-only' || needs.fleet-policy.outputs.mode }}
+          # Live #16211: jovie-bot unlabeled queue-deferred, this chose
+          # deferred-release-only, and hold-intake fleet refused enrollment
+          # ("does not authorize the exact queue-deferred release fallback")
+          # while PR Ready was already green. Keep hold-intake as the AMBER
+          # exact-head mode; deferred-release-only is only for when the fleet
+          # policy itself is that fallback.
+          DRAIN_PROMOTION_MODE: ${{ steps.admission.outputs.deferred_release == '1' && needs.fleet-policy.outputs.mode != 'hold-intake' && 'deferred-release-only' || needs.fleet-policy.outputs.mode }}
           DRAIN_FLEET_GATE_B64: ${{ needs.fleet-policy.outputs.receipt_b64 }}
           DRAIN_RECOVER_FLEET_HOLDS: ${{ needs.fleet-policy.outputs.mode == 'normal' && steps.admission.outputs.recover_holds == '1' && '1' || '0' }}
           # Composite CI heads cannot map to source PRs. The drain consumes
