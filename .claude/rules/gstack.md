@@ -74,27 +74,11 @@ Key routing rules:
 
 ## gbrain (long-term memory layer)
 
-For cross-session recall and prior-art lookup, consult gbrain via MCP **only when the question touches durable founder/strategic context**. Do not ritually query for purely local code questions.
+Same contract as `CLAUDE.md`: query gbrain before architectural decisions and for the Agent Coordination Preflight. Do not ritually query for purely local code.
 
-Exception: the Agent Coordination Preflight in `AGENTS.md` is mandatory for every task. That org-chart/existing-work check is a coordination gate, not optional durable-context lookup. If gbrain is unreachable during the coordination gate, stop and alert with a `system-blocker`.
+If gbrain is unreachable, continue with repo tools and record `gbrain-unavailable`. Do not invent coordination state.
 
-Conditional triggers:
-- Decisions involving people, companies, customers, fundraising, pricing, or competitive positioning
-- Repeated strategic questions ("did we already decide X?")
-- Architectural rationale that spans more than one session
-- Cross-repo recall (Jovie code + ops + meetings + email + calendar once those senses are wired)
-
-When triggered, prefer:
-- `mcp__gbrain__query` — natural-language hybrid search (vector + keyword + graph)
-- `mcp__gbrain__get` — fetch a known page by slug
-- `mcp__gbrain__graph_query` — typed-edge traversal (e.g., who advised whom)
-
-Skip when:
-- The question is pure local code (use Grep, Read, the codebase docs in `docs/`)
-- MCP tools aren't loaded in the session (call out as "gbrain unavailable" instead of failing)
-- gbrain doctor health is < 70 (check via `gbrain doctor --fast --json`)
-
-After shipping a non-trivial decision, write a brief decision page so the next agent (or future you) can find it. ruflo agentdb is for swarm-session memory; gbrain is for long-term founder/personal memory. They are complementary, not redundant.
+Tools: MCP `gbrain__search` and `gbrain__recall`. CLI: `gbrain search` and `gbrain query`. After a durable decision, write a short gbrain page. ruflo agentdb is swarm-session memory; gbrain is long-term founder memory.
 
 ## Skill File Hygiene
 
