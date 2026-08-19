@@ -164,6 +164,10 @@ Photon webhook signing secret. Must match the registered webhook.
 
 Comma- or whitespace-separated phone numbers / handles. Empty fails closed.
 
+## Private Ovie MCP (ChatGPT)
+
+`/api/ovie/mcp` Streamable HTTP. OAuth at `/api/ovie/oauth`. See `docs/OVIE_MCP.md`.
+
 ## Feature Flags (Statsig)
 
 ### `STATSIG_SERVER_SECRET`

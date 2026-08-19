@@ -68,6 +68,11 @@ export function eveIdentityForChatMode(
   return selectEveIdentity(chatMode === 'ov' ? 'ovie' : 'jovie');
 }
 
+/** ChatGPT / private founder MCP is always the Ovie pack. */
+export function eveIdentityForMcpDoor(): EveIdentityPack {
+  return selectEveIdentity('ovie');
+}
+
 export function authorizeEveCapability(
   pack: EveIdentityPack,
   capability: EveCapability
