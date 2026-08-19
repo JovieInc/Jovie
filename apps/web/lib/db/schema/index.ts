@@ -816,6 +816,11 @@ export {
   onboardingScriptLines,
   selectOnboardingScriptLineSchema,
 } from './onboarding-script';
+// Ovie MCP operating records (initiatives / decisions)
+export {
+  type OvieOperatingKvRow,
+  ovieOperatingKv,
+} from './ovie';
 // Pixel Tracking (Events, Creator Configs)
 export {
   type CreatorPixel,

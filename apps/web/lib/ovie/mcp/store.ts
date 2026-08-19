@@ -90,6 +90,107 @@ export class MemoryOperatingStore extends DurableOperatingStore {
   }
 }
 
+export type FailoverOperatingStoreOptions = {
+  readonly primary: OperatingStore;
+  readonly fallback: OperatingStore;
+  readonly isPrimaryFailure: (error: unknown) => boolean;
+  readonly onPrimaryFailure?: (error: unknown) => void;
+  readonly writeThrough?: boolean;
+};
+
+/**
+ * Prefer primary (Redis). On quota/unavailable, use fallback (Postgres).
+ * Successful primary writes are also copied to fallback so a later instance
+ * can read evidence without Redis.
+ */
+export class FailoverOperatingStore implements OperatingStore {
+  constructor(private readonly options: FailoverOperatingStoreOptions) {}
+
+  putDecision(record: OvieDecision): Promise<void> {
+    return this.put('putDecision', record);
+  }
+
+  getDecision(id: string): Promise<OvieDecision | undefined> {
+    return this.get('getDecision', id);
+  }
+
+  listDecisions(): Promise<readonly OvieDecision[]> {
+    return this.list('listDecisions');
+  }
+
+  putInitiative(record: OvieInitiative): Promise<void> {
+    return this.put('putInitiative', record);
+  }
+
+  getInitiative(id: string): Promise<OvieInitiative | undefined> {
+    return this.get('getInitiative', id);
+  }
+
+  listInitiatives(): Promise<readonly OvieInitiative[]> {
+    return this.list('listInitiatives');
+  }
+
+  private async put<K extends 'putDecision' | 'putInitiative'>(
+    method: K,
+    record: Parameters<OperatingStore[K]>[0]
+  ): Promise<void> {
+    const { primary, fallback, writeThrough } = this.options;
+    try {
+      await (primary[method] as (row: typeof record) => Promise<void>)(record);
+    } catch (error) {
+      this.noteFailure(error);
+      if (!this.options.isPrimaryFailure(error)) throw error;
+      await (fallback[method] as (row: typeof record) => Promise<void>)(record);
+      return;
+    }
+    if (writeThrough) {
+      await (fallback[method] as (row: typeof record) => Promise<void>)(
+        record
+      ).catch(() => undefined);
+    }
+  }
+
+  private async get<K extends 'getDecision' | 'getInitiative'>(
+    method: K,
+    id: string
+  ): Promise<Awaited<ReturnType<OperatingStore[K]>>> {
+    const { primary, fallback } = this.options;
+    try {
+      const hit = await primary[method](id);
+      if (hit) return hit as Awaited<ReturnType<OperatingStore[K]>>;
+    } catch (error) {
+      this.noteFailure(error);
+      if (!this.options.isPrimaryFailure(error)) throw error;
+    }
+    return fallback[method](id) as Awaited<ReturnType<OperatingStore[K]>>;
+  }
+
+  private async list<K extends 'listDecisions' | 'listInitiatives'>(
+    method: K
+  ): Promise<Awaited<ReturnType<OperatingStore[K]>>> {
+    const { primary, fallback } = this.options;
+    const fallbackRows = await fallback[method]().catch(
+      () => [] as Awaited<ReturnType<OperatingStore[K]>>
+    );
+    try {
+      const primaryRows = await primary[method]();
+      const seen = new Set(primaryRows.map(row => row.id));
+      return [
+        ...primaryRows,
+        ...fallbackRows.filter(row => !seen.has(row.id)),
+      ].slice(-INDEX_CAP) as Awaited<ReturnType<OperatingStore[K]>>;
+    } catch (error) {
+      this.noteFailure(error);
+      if (!this.options.isPrimaryFailure(error)) throw error;
+      return fallbackRows as Awaited<ReturnType<OperatingStore[K]>>;
+    }
+  }
+
+  private noteFailure(error: unknown): void {
+    this.options.onPrimaryFailure?.(error);
+  }
+}
+
 const INITIATIVE_INDEX = 'ovie:mcp:v1:ini:index';
 const DECISION_INDEX = 'ovie:mcp:v1:dec:index';
 
