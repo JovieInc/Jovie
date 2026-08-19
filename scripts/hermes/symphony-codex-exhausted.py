@@ -103,7 +103,7 @@ query($first: Int!, $after: String) {
     after: $after
     filter: {
       labels: { name: { eq: "symphony" } }
-      state: { name: { in: ["Todo", "In Progress"] } }
+      state: { name: { in: ["Todo", "In Progress", "In Review"] } }
     }
   ) {
     nodes {
@@ -130,9 +130,13 @@ query($id: String!) {
 }
 """
 
-# Admission must mirror the list query: only Todo / In Progress issues are
-# eligible for pipe through the Grok sidecar.
-ADMITTED_STATES = frozenset(("todo", "in progress"))
+# Admission must mirror the list query. In Review stays eligible so a CI-red
+# autonomous PR can be remounted; launch still skips inflight green/pending PRs.
+ADMITTED_STATES = frozenset(("todo", "in progress", "in review"))
+AUTONOMOUS_HEAD_RE = re.compile(r"^(?:symphony|grok|fallback)/((?:JOV|LYB)-\d+)-fix$")
+GH_TIMEOUT_SECONDS = 20.0
+JOV_REPO = "JovieInc/Jovie"
+LYB_REPO = "JovieInc/LogYourBody"
 
 
 def _state_path() -> pathlib.Path:
@@ -690,6 +694,120 @@ def _fallback_unit(identifier: str, issue_revision: str) -> str:
     return f"fallback-ship-{identifier}-{revision}"
 
 
+def _repo_for_identifier(identifier: str) -> str | None:
+    if identifier.startswith("JOV-"):
+        return JOV_REPO
+    if identifier.startswith("LYB-"):
+        return LYB_REPO
+    return None
+
+
+def _gh_json(command: list[str]) -> object | None:
+    result = _captured(command, GH_TIMEOUT_SECONDS)
+    if result is None or result.returncode != 0:
+        return None
+    try:
+        return json.loads(result.stdout.decode())
+    except ValueError:
+        return None
+
+
+def _autonomous_open_pr_index(identifiers: list[str]) -> dict[str, dict]:
+    """Map identifier -> {number, head, repo} for open autonomous heads.
+
+    Listing failure is fail-open (empty): better to risk a duplicate than to
+    starve leftover Todo work because `gh` blipped.
+    """
+    # Unit tests set SYMPHONY_OPEN_PR_INDEX=empty so reconcile never calls live gh.
+    if os.environ.get("SYMPHONY_OPEN_PR_INDEX") == "empty":
+        return {}
+    index: dict[str, dict] = {}
+    wanted = set(identifiers)
+    repos = {repo for ident in identifiers if (repo := _repo_for_identifier(ident))}
+    for repo in repos:
+        payload = _gh_json(
+            [
+                "gh",
+                "pr",
+                "list",
+                "--repo",
+                repo,
+                "--state",
+                "open",
+                "--limit",
+                "100",
+                "--json",
+                "number,headRefName",
+            ]
+        )
+        if not isinstance(payload, list):
+            continue
+        for pr in payload:
+            if not isinstance(pr, dict):
+                continue
+            head = pr.get("headRefName") or ""
+            if not isinstance(head, str):
+                continue
+            match = AUTONOMOUS_HEAD_RE.fullmatch(head)
+            if match is None:
+                continue
+            ident = match.group(1)
+            if ident in wanted and ident not in index:
+                index[ident] = {
+                    "number": pr.get("number"),
+                    "head": head,
+                    "repo": repo,
+                }
+    return index
+
+
+def _pr_has_failing_check(repo: str, number: int) -> bool:
+    payload = _gh_json(
+        ["gh", "pr", "view", str(number), "--repo", repo, "--json", "statusCheckRollup"]
+    )
+    if not isinstance(payload, dict):
+        return False
+    checks = payload.get("statusCheckRollup") or []
+    if not isinstance(checks, list):
+        return False
+    for check in checks:
+        if not isinstance(check, dict):
+            continue
+        if check.get("conclusion") == "FAILURE" or check.get("state") == "FAILURE":
+            return True
+    return False
+
+
+def _open_pr_verdict(identifier: str, index: dict[str, dict]) -> tuple[str, dict | None]:
+    """Return (none|skip|remount, pr). skip = inflight green/pending open PR."""
+    pr = index.get(identifier)
+    if pr is None:
+        return "none", None
+    repo = pr.get("repo")
+    number = pr.get("number")
+    if not isinstance(repo, str) or not isinstance(number, int):
+        return "skip", pr
+    if _pr_has_failing_check(repo, number):
+        return "remount", pr
+    return "skip", pr
+
+
+def open_pr_verdict_command(identifier: str) -> int:
+    """CLI for grok-ship-one: JSON {verdict, number?, head?} on stdout."""
+    if not IDENTIFIER.fullmatch(identifier):
+        print("open-pr-verdict:malformed_identifier", file=sys.stderr)
+        return 2
+    index = _autonomous_open_pr_index([identifier])
+    verdict, pr = _open_pr_verdict(identifier, index)
+    payload: dict = {"verdict": verdict}
+    if pr is not None:
+        payload["number"] = pr.get("number")
+        payload["head"] = pr.get("head")
+        payload["repo"] = pr.get("repo")
+    print(json.dumps(payload))
+    return 0
+
+
 def _launch_fallback_workers(
     identifiers: list[str],
     active: list[str],
@@ -702,12 +820,17 @@ def _launch_fallback_workers(
     active_units = set(active)
     capacity_used = len(active_units)
     launched_units: set[str] = set()
+    open_prs = _autonomous_open_pr_index(identifiers)
     for identifier in identifiers:
         if capacity_used >= limit:
             break
         legacy_unit = f"grok-ship-{identifier}.service"
         fallback_prefix = f"fallback-ship-{identifier}-"
         if legacy_unit in active_units or any(unit.startswith(fallback_prefix) for unit in active_units):
+            continue
+        verdict, _pr = _open_pr_verdict(identifier, open_prs)
+        if verdict == "skip":
+            print(f"fallback skip {identifier} open_pr_inflight", file=sys.stderr)
             continue
         issue = _fetch_single_issue(identifier)
         if issue is None:
@@ -1168,7 +1291,7 @@ def main() -> int:
     parser.add_argument(
         "command",
         nargs="?",
-        choices=("probe", "reconcile", "install", "check-admission"),
+        choices=("probe", "reconcile", "install", "check-admission", "open-pr-verdict"),
         default=default,
     )
     parser.add_argument("identifier", nargs="?")
@@ -1183,6 +1306,11 @@ def main() -> int:
             print("check-admission requires an issue identifier", file=sys.stderr)
             return 2
         return check_admission(args.identifier)
+    if args.command == "open-pr-verdict":
+        if not args.identifier:
+            print("open-pr-verdict requires an issue identifier", file=sys.stderr)
+            return 2
+        return open_pr_verdict_command(args.identifier)
     ready, _ = codex_canary_ready()
     print("no" if ready else "yes")
     return 1 if ready else 0
