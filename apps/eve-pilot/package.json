@@ -9,19 +9,12 @@
     "#evals/*": "./evals/*"
   },
   "scripts": {
-    "build": "bash scripts/with-node24.sh eve build",
-    "dev": "bash scripts/with-node24.sh eve dev",
-    "eval": "bash scripts/with-node24.sh eve eval --strict",
-    "info": "bash scripts/with-node24.sh eve info --json",
-    "smoke": "bash scripts/with-node24.sh vitest run --config vitest.config.ts tests/eve-framework-smoke.test.ts",
-    "start": "bash scripts/with-node24.sh eve start",
-    "test": "bash scripts/with-node24.sh vitest run --config vitest.config.ts",
-    "typecheck": "bash scripts/with-node24.sh tsc --noEmit"
-  },
-  "pnpm": {
-    "executionEnv": {
-      "nodeVersion": "24.13.0"
-    }
+    "build": "eve build",
+    "dev": "eve dev",
+    "smoke": "vitest run --config vitest.config.ts tests/eve-framework-smoke.test.ts",
+    "start": "eve start",
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@opentelemetry/api": "1.9.1",

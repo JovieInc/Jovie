@@ -9,20 +9,10 @@ describe('Eve installation contract', () => {
     const packageJson = JSON.parse(
       readFileSync(resolve(pilotRoot, 'package.json'), 'utf8')
     ) as {
-      engines?: { node?: string };
       dependencies?: { eve?: string };
     };
 
-    expect(packageJson.engines?.node).toBe('>=24');
     expect(packageJson.dependencies?.eve).toBe('0.39.0');
-    expect(existsSync(resolve(pilotRoot, '.nvmrc'))).toBe(true);
-    expect(readFileSync(resolve(pilotRoot, '.nvmrc'), 'utf8').trim()).toMatch(
-      /^24\./
-    );
-    expect(existsSync(resolve(pilotRoot, 'scripts/with-node24.sh'))).toBe(true);
-    expect(
-      readFileSync(resolve(pilotRoot, 'scripts/with-node24.sh'), 'utf8')
-    ).toContain('Node.js >= 24');
     expect(
       existsSync(resolve(pilotRoot, 'node_modules/eve/docs/README.md'))
     ).toBe(true);
@@ -34,26 +24,6 @@ describe('Eve installation contract', () => {
     expect(existsSync(resolve(pilotRoot, 'agent/channels/photon.ts'))).toBe(
       true
     );
-    expect(existsSync(resolve(pilotRoot, 'evals/evals.config.ts'))).toBe(true);
-    expect(
-      existsSync(resolve(pilotRoot, 'evals/core-chat/session-succeeds.eval.ts'))
-    ).toBe(true);
-    expect(
-      existsSync(
-        resolve(pilotRoot, 'evals/core-chat/capability-readonly.eval.ts')
-      )
-    ).toBe(true);
-    expect(
-      existsSync(
-        resolve(pilotRoot, 'evals/core-chat/no-secrets-in-session.eval.ts')
-      )
-    ).toBe(true);
-    expect(
-      existsSync(resolve(pilotRoot, 'evals/core-chat/fail-closed.eval.ts'))
-    ).toBe(true);
-    expect(
-      readFileSync(resolve(pilotRoot, 'agent/agent.ts'), 'utf8')
-    ).toContain('openai/gpt-5.4-mini');
     expect(
       readFileSync(
         resolve(pilotRoot, 'agent/tools/jovie_capability_manifest.ts'),

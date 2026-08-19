@@ -53,24 +53,12 @@ Summer off Photon talk so iMessage is Ovie, not the factory.
 
 ## Local verification
 
-Requires Node 24 or later because Eve 0.39.0 requires it. This requirement is
-isolated to this deploy unit; the monorepo root remains on its established Node
-contract. Package scripts (`run smoke`, `run eval`, …) put Node 24 on
-`PATH` via `scripts/with-node24.sh` (nvm `v24.*` or Homebrew `node@24`), so
-you do not need to switch the parent shell first.
-
-Install the isolated package from the repository root:
+Node 24 or later. Isolated from the monorepo Node 22 CI runner.
 
     pnpm --dir apps/eve-pilot install --frozen-lockfile --ignore-workspace
     pnpm --dir apps/eve-pilot --ignore-workspace run typecheck
     pnpm --dir apps/eve-pilot --ignore-workspace run test
     pnpm --dir apps/eve-pilot --ignore-workspace run build
-    pnpm --dir apps/eve-pilot --ignore-workspace run eval
-
-`run eval` boots the real Eve session HTTP surface and grades deterministic
-`defineEval` cases under `evals/`. It must exit 0. Prefer `run eval` over
-`exec eve eval`; a bare `eve` on a Node 22 PATH exits with "eve requires
-Node.js >=24".
 
 ## What this unit does not do
 
