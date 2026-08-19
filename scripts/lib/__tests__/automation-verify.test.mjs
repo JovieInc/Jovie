@@ -91,6 +91,7 @@ const MERGE_QUEUE_CONTROLLER_INPUTS = [
   'scripts/ci-merge-queue-check.mjs',
   'scripts/drain-pr-queue.sh',
   'scripts/lib/merge-queue-guard.mjs',
+  'scripts/lib/resolve-merge-group-path-diff.mjs',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',

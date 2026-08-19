@@ -36,6 +36,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- [internal] **Merge-queue Path Changes no longer rejects coalesced heads:** an empty event-base diff now recomputes against live `main` before a typed no-op, so green combined heads can land.
 - **Mac chat stays on screen once the answer starts:** reserving the thread URL no longer remounts the live composer and transcript.
 - **Vlog capture matches how you hold the phone:** portrait, landscape left, and landscape right record the right way up. Landscape keeps record controls on screen.
 - **Expired iPhone chat sessions fail closed:** a 401 ends the turn as a failed reply and asks you to sign in again, instead of inventing an answer.
