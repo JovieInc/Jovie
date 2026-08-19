@@ -109,6 +109,7 @@ query($first: Int!, $after: String) {
   ) {
     nodes {
       identifier title description updatedAt
+      state { name }
       team { key }
       labels { nodes { name } }
       comments { nodes { body } }
@@ -136,6 +137,10 @@ query($id: String!) {
 # Admission must mirror the list query. In Review stays eligible so a CI-red
 # autonomous PR can be remounted; launch still skips inflight green/pending PRs.
 ADMITTED_STATES = frozenset(("todo", "in progress", "in review"))
+# Already-claimed work (Symphony retrying In Review with no Codex slots) must
+# keep flowing on the grok fallback after #16212 emptied the receipt list.
+# Todo still requires a current admission-gate/v1 receipt.
+CONTINUE_WITHOUT_RECEIPT_STATES = frozenset(("in progress", "in review"))
 AUTONOMOUS_HEAD_RE = re.compile(r"^(?:symphony|grok|fallback)/((?:JOV|LYB)-\d+)-fix$")
 GH_TIMEOUT_SECONDS = 20.0
 JOV_REPO = "JovieInc/Jovie"
@@ -627,7 +632,7 @@ def _admitted_issue_identifier(node: object) -> str | None:
     identifier = node["identifier"]
     title = node.get("title") if isinstance(node.get("title"), str) else ""
     description = node.get("description") if isinstance(node.get("description"), str) else ""
-    ok, _reason = admission_decision(
+    ok, reason = admission_decision(
         team_key,
         identifier,
         labels,
@@ -635,7 +640,19 @@ def _admitted_issue_identifier(node: object) -> str | None:
         description=description,
         comments=node.get("comments"),
     )
-    return identifier if ok else None
+    if ok:
+        return identifier
+    if reason == "admission_receipt_missing_or_stale" and _continue_without_receipt(node):
+        return identifier
+    return None
+
+
+def _continue_without_receipt(issue: dict) -> bool:
+    """In Progress/In Review already left Todo; skip a missing receipt."""
+    state = issue.get("state")
+    if not isinstance(state, dict):
+        return False
+    return str(state.get("name") or "").strip().lower() in CONTINUE_WITHOUT_RECEIPT_STATES
 
 
 def _linear_identifiers() -> list[str] | None:
@@ -784,7 +801,11 @@ def check_admission(identifier: str, *, remount: bool = False) -> int:
     if issue is None:
         print("not admitted:admission_unverifiable", file=sys.stderr)
         return 2
-    ok, reason, meta = _issue_meta(issue, identifier, require_receipt=not remount)
+    ok, reason, meta = _issue_meta(
+        issue,
+        identifier,
+        require_receipt=not remount and not _continue_without_receipt(issue),
+    )
     if not ok:
         print(f"not admitted:{reason}", file=sys.stderr)
         return 1
@@ -1005,7 +1026,9 @@ def _launch_fallback_workers(
             print(f"fallback skip {identifier} admission_unverifiable", file=sys.stderr)
             continue
         ok, _reason, meta = _issue_meta(
-            issue, identifier, require_receipt=(verdict != "remount")
+            issue,
+            identifier,
+            require_receipt=(verdict != "remount" and not _continue_without_receipt(issue)),
         )
         if not ok:
             print(f"fallback skip {identifier} not admitted", file=sys.stderr)
