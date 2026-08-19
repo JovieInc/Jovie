@@ -1,6 +1,8 @@
 # gstack (Workflow Toolkit) + Skill Routing
 
-This repo includes [gstack](https://github.com/garrytan/gstack) as a git submodule at `.claude/skills/gstack/`. It provides specialized workflow skills available to all AI agents.
+This repo vendors [gstack](https://github.com/garrytan/gstack) at `.agents/skills/gstack/` (scripts, tests, and leaf `SKILL.md` files). Executable Jovie copies of those leaves also live under `.claude/skills/<name>/`. `.claude/skills/gstack/` is only the small Jovie overlay (`design-canonical`), not a git submodule.
+
+`src/`, `test/`, and `bin/` inside the gstack checkout are implementation, not skills. Do not treat files there as catalog entries.
 
 **Conflict rule:** gstack commands are canonical. If a gstack skill conflicts with any other command or workflow, the gstack version takes precedence.
 
@@ -36,13 +38,13 @@ This repo includes [gstack](https://github.com/garrytan/gstack) as a git submodu
 gstack requires **Bun v1.0+**. The session-start hook installs Bun and runs setup automatically. For manual setup:
 
 ```bash
-cd .claude/skills/gstack && ./setup
+cd .agents/skills/gstack && ./setup
 ```
 
 ## Updating gstack
 
 ```bash
-cd .claude/skills/gstack && git pull origin main && ./setup
+cd .agents/skills/gstack && git pull origin main && ./setup
 ```
 
 Or use `/gstack-upgrade` from within Claude Code.

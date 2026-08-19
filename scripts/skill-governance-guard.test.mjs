@@ -90,6 +90,25 @@ test('the current repository satisfies skill governance', () => {
   assert.deepEqual(evaluateSkillGovernance(), []);
 });
 
+test('blocks SKILL.md planted under gstack src/test/bin', () => {
+  const root = createFixture();
+  try {
+    write(root, '.agents/skills/gstack/src/SKILL.md', 'not a skill\n');
+    write(
+      root,
+      '.agents/skills/gstack/test/fixtures/alpha/SKILL.md',
+      'fixture\n'
+    );
+    write(root, '.claude/skills/gstack/bin/SKILL.md', 'bin\n');
+    const errors = evaluateSkillGovernance({ root }).join('\n');
+    assert.match(errors, /gstack\/src\/SKILL\.md/);
+    assert.match(errors, /test\/fixtures\/alpha\/SKILL\.md/);
+    assert.match(errors, /gstack\/bin\/SKILL\.md/);
+  } finally {
+    rmSync(root, { force: true, recursive: true });
+  }
+});
+
 test('blocks nested .bak/.cursor/.factory SKILL.md through the real guard', () => {
   const root = createFixture();
   try {
