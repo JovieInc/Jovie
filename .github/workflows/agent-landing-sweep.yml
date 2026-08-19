@@ -1,26 +1,26 @@
 # Agent Landing Sweep
 #
-# PURPOSE: Scheduled fallback for the event-driven agent-pipeline approve job.
-# Sweeps all open, non-draft agent PRs every 15 minutes and enables auto-merge
-# on any that are CI-green, scope-judge-passed, CodeRabbit-unblocked, and free
-# of sensitive file changes or the needs-human label.
+# PURPOSE: Dispatch-only fallback for the event-driven agent-pipeline approve job.
+# Sweeps open, non-draft agent PRs and enables auto-merge on any that are
+# CI-green, CodeRabbit-unblocked, and free of sensitive file changes or the
+# needs-human label.
 #
-# WHY A CRON IN ADDITION TO workflow_run EVENTS:
-# The event-driven path in agent-pipeline.yml fires when CI or Scope Judge
-# *completes*. PRs that passed CI before the pipeline was listening, workflows
-# that fired but silently failed, or GitHub Actions delivery delays can leave
-# eligible PRs stuck in "approved but not yet auto-merged" limbo. This sweep
-# acts as a reliable 15-minute safety net that catches those cases.
+# WHY A FALLBACK IN ADDITION TO workflow_run EVENTS:
+# The event-driven path in agent-pipeline.yml fires when CI *completes*. PRs
+# that passed CI before the pipeline was listening, workflows that fired but
+# silently failed, or GitHub Actions delivery delays can leave eligible PRs
+# stuck in "approved but not yet auto-merged" limbo. This sweep is a safety
+# net that catches those cases.
 #
 # GUARDRAILS (same as agent-pipeline.yml approve job):
 # 1. Only agent branches (linear/*, claude/*, codegen-bot/*, codex/*, */jov-*)
 # 2. Not a draft PR
 # 3. No needs-human label
 # 4. CI PR Ready check = success
-# 5. Scope judge = success
-# 6. CodeRabbit not blocking (no CHANGES_REQUESTED)
-# 7. CI harness risk classifier does not block unattended auto-merge
-# 8. Queue pressure guard: defers when native merge-queue depth hits the configured cap
+# 5. CodeRabbit not blocking (no CHANGES_REQUESTED)
+# 6. CI harness risk classifier does not block unattended auto-merge
+# 7. Queue pressure guard: defers when native merge-queue depth hits the configured cap
+# Scope Judge was deleted in #14484 and is not a landing gate.
 #
 # RELATIONSHIP TO agent-pipeline.yml:
 # This workflow is idempotent. Enabling auto-merge on an already-queued PR is
@@ -179,15 +179,6 @@ jobs:
               echo "CI PR Ready is not success ($CI_PR_READY). Skipping."
               SKIPPED=$((SKIPPED + 1))
               continue
-            fi
-
-            # Advisory: scope judge (LLM alignment — off fast auto-landing path)
-            SCOPE_STATUS=$(gh api "repos/$GH_REPO/commits/$PR_SHA/status" \
-              --jq '[.statuses[] | select(.context == "scope-judge")] | sort_by(.updated_at) | last | .state // "pending"' \
-              2>/dev/null || echo "unknown")
-            echo "Scope judge (advisory): $SCOPE_STATUS"
-            if [[ "$SCOPE_STATUS" != "success" && "$SCOPE_STATUS" != "pending" ]]; then
-              echo "::warning::scope-judge reported $SCOPE_STATUS — advisory only, not blocking auto-landing."
             fi
 
             # Gate: CodeRabbit must not be blocking

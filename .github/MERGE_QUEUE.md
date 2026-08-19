@@ -80,6 +80,13 @@ gh api repos/JovieInc/Jovie/rulesets/10512119 \
   --jq '{bypass_actors, rules: [.rules[] | select(.type == "merge_queue" or .type == "required_status_checks")]}'
 ```
 
+`ci:merge-queue:check` (repo YAML only) already runs in `ci-fast`.
+`ci:merge-queue:verify` (live ruleset `10512119` via `gh api`) runs in
+`.github/workflows/merge-queue-ruleset-verify.yml` on a daily schedule, on
+`main` pushes that touch the ruleset/check sources, and on `workflow_dispatch`.
+It is not a source `PR Ready` context. Pending native cohort cutover fields
+are already exempted in `validateLiveMergeQueueRuleset`.
+
 Bare local controller/check commands default to `native`, matching the live
 repository variable. Unknown backends fail closed. Native enrollment/dequeue
 mutations additionally require the dedicated controller authorization, so a
