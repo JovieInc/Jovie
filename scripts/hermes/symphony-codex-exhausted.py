@@ -33,7 +33,9 @@ MAX_GROK_SURVIVAL_SECONDS = 120.0
 CONTROL_TIMEOUT_SECONDS = 10.0
 DEFAULT_GROK_MAX = 4  # Gem 16c/62GB safely runs 4 concurrent grok-ship workers (per-unit idempotent, active units skipped)
 MAX_GROK_MAX = 10  # hard ceiling; 10 only via explicit SYMPHONY_GROK_MAX (free-tier Build quota / dispatch risk above 4)
-SERVICES = ("symphony-ui-pilot.service", "symphony-lyb.service")
+PRIMARY_SERVICE = "symphony-ui-pilot.service"
+OPTIONAL_SERVICES = ("symphony-lyb.service",)
+SERVICES = (PRIMARY_SERVICE, *OPTIONAL_SERVICES)
 LINEAR_API = "https://api.linear.app/graphql"
 LINEAR_ENV_PATH = "~/.config/symphony/linear.env"
 IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
@@ -402,9 +404,21 @@ def _control(command: list[str]) -> bool:
     return result is not None and result.returncode == 0
 
 
+def _jov_active() -> bool:
+    """JOV dispatch does not depend on the optional LYB worker remaining up."""
+    return _control(_systemctl("is-active", "--quiet", PRIMARY_SERVICE))
+
+
+def _start_jov_primary() -> bool:
+    started = _control(_systemctl("start", PRIMARY_SERVICE))
+    for service in OPTIONAL_SERVICES:
+        _control(_systemctl("start", service))
+    return started and _jov_active()
+
+
 def _services_active() -> bool:
-    """Require every primary service to be active, not merely one of them."""
-    return all(_control(_systemctl("is-active", "--quiet", service)) for service in SERVICES)
+    """JOV Symphony UI is the required owner. LYB is best-effort."""
+    return _jov_active()
 
 
 def _active_grok_units() -> list[str] | None:
@@ -748,7 +762,7 @@ def reconcile() -> int:
         if active:
             print("codex_not_exhausted recovery_deferred grok_ship_active", file=sys.stderr)
             return 0
-        if not _control(_systemctl("start", *SERVICES)):
+        if not _start_jov_primary():
             print("codex_not_exhausted symphony_start_failed", file=sys.stderr)
             return EXIT_DEGRADED
         if not _services_active():
@@ -835,8 +849,20 @@ def _continue_exhausted_reconcile(reason: str) -> int:
         )
         return EXIT_SAFE_FAIL_CLOSED
     if not identifiers and not active:
+        if _jov_active():
+            print(
+                f"codex_exhausted {reason} no_admitted_work symphony_unchanged",
+                file=sys.stderr,
+            )
+            return 0
+        if not _start_jov_primary():
+            print(
+                f"codex_exhausted {reason} no_admitted_work symphony_restore_failed",
+                file=sys.stderr,
+            )
+            return EXIT_DEGRADED
         print(
-            f"codex_exhausted {reason} no_admitted_work symphony_unchanged",
+            f"codex_exhausted {reason} no_admitted_work symphony_restored",
             file=sys.stderr,
         )
         return 0
@@ -941,7 +967,7 @@ def _continue_exhausted_reconcile(reason: str) -> int:
     # No fallback owner survived the handoff. Restore the primary owner and
     # verify it is active so this failure path self-heals instead of stranding a
     # zero-worker runtime.
-    if not _control(_systemctl("start", *SERVICES)):
+    if not _start_jov_primary():
         print(
             f"codex_exhausted {reason} grok_started=0 symphony_restore_failed",
             file=sys.stderr,

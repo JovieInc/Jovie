@@ -595,7 +595,54 @@ class FallbackTests(unittest.TestCase):
                 ):
                     expected_rc = 0 if expected == "no_admitted_work" else 2
                     self.assertEqual(module.reconcile(), expected_rc)
-                self.assertEqual(controls, [])
+                if expected == "no_admitted_work":
+                    # Stopped JOV must be restored even when Linear has no
+                    # sidecar-admitted issues; leaving it down is a permanent hold.
+                    self.assertTrue(
+                        any(
+                            command[:4] == ["systemctl", "--user", "is-active", "--quiet"]
+                            and "symphony-ui-pilot.service" in command
+                            for command in controls
+                        ),
+                        controls,
+                    )
+                else:
+                    self.assertEqual(controls, [])
+
+    def test_exhausted_no_admitted_work_starts_stopped_jov(self):
+        module = self.load_controller_module()
+        controls: list[list[str]] = []
+        jov_started = {"value": False}
+
+        def control(command):
+            controls.append(command)
+            if command[:3] == ["systemctl", "--user", "start"] and module.PRIMARY_SERVICE in command:
+                jov_started["value"] = True
+                return True
+            if (
+                command[:4] == ["systemctl", "--user", "is-active", "--quiet"]
+                and module.PRIMARY_SERVICE in command
+            ):
+                return jov_started["value"]
+            return True
+
+        with (
+            mock.patch.object(
+                module,
+                "codex_canary_ready",
+                return_value=(False, "all_accounts_cooldown"),
+            ),
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_linear_identifiers", return_value=[]),
+            mock.patch.object(module, "_active_grok_units", return_value=[]),
+            mock.patch.object(module, "_control", side_effect=control),
+        ):
+            self.assertEqual(module.reconcile(), 0)
+        self.assertTrue(jov_started["value"], controls)
+        self.assertIn(
+            ["systemctl", "--user", "start", module.PRIMARY_SERVICE],
+            controls,
+        )
 
     def test_model_router_failure_preserves_symphony(self):
         module = self.load_controller_module()
@@ -718,9 +765,10 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.events.read_text().splitlines(), [
             "systemctl --user list-units --type=service --state=active grok-ship-*.service fallback-ship-*.service --no-legend --no-pager",
-            "systemctl --user start symphony-ui-pilot.service symphony-lyb.service",
+            "systemctl --user start symphony-ui-pilot.service",
+            "systemctl --user start symphony-lyb.service",
             "systemctl --user is-active --quiet symphony-ui-pilot.service",
-            "systemctl --user is-active --quiet symphony-lyb.service",
+            "systemctl --user is-active --quiet symphony-ui-pilot.service",
         ])
         self.assertIn("idle", result.stderr)
 
@@ -1204,7 +1252,7 @@ class FallbackTests(unittest.TestCase):
         self.assertTrue(any(command[0] == "systemd-run" for command in controls))
         self.assertFalse(any("start" in command for command in controls))
 
-    def test_restore_requires_every_symphony_service_active(self):
+    def test_restore_jov_even_when_lyb_is_down(self):
         module = self.load_controller_module()
         controls: list[list[str]] = []
 
@@ -1224,13 +1272,22 @@ class FallbackTests(unittest.TestCase):
             mock.patch.object(module, "_issue_meta", return_value=(False, "blocked", None)),
             mock.patch.object(module, "_control", side_effect=control),
         ):
-            self.assertEqual(module.reconcile(), module.EXIT_DEGRADED)
+            self.assertEqual(module.reconcile(), module.EXIT_SAFE_FAIL_CLOSED)
 
-        primary_checks = [
-            command for command in controls
-            if "is-active" in command and any(service in command for service in module.SERVICES)
-        ]
-        self.assertEqual(len(primary_checks), 2)
+        self.assertTrue(
+            any(
+                "is-active" in command and "symphony-ui-pilot.service" in command
+                for command in controls
+            ),
+            controls,
+        )
+        self.assertFalse(
+            any(
+                "is-active" in command and "symphony-lyb.service" in command
+                for command in controls
+            ),
+            controls,
+        )
 
     def test_managed_grok_worker_routes_jov_and_lyb_and_updates_team_states(self):
         created = self.root / "pr-created"

@@ -244,6 +244,18 @@ def priority_class(pr):
     )
 
 
+# Drain can currently mutate only behind heads (exact-head update-branch).
+# Dirty conflicted heads are classified for replant and skipped. Counting those
+# skip-only PRs as intake backlog paused Linear admission while workers spent
+# their bound selecting work they then discarded.
+DRAIN_ACTIONABLE_STATES = frozenset({"behind"})
+
+
+def intake_backlog_count(prs):
+    """Count open PRs that still occupy drain/intake capacity."""
+    return sum(1 for pr in prs if pr.get("mergeable_state") != "dirty")
+
+
 def policy_decision(*, main_green, queue_count, target, worker_capacity):
     intake = bool(main_green and queue_count <= target)
     return {
@@ -273,11 +285,15 @@ def select_prs(prs, *, main_green, worker_capacity):
     ]
     for pr in eligible:
         pr["priority_class"] = priority_class(pr)
-    eligible.sort(key=lambda pr: (pr.get("created_at", ""), pr.get("number", 0)))
+    actionable = [
+        pr for pr in eligible if pr.get("mergeable_state") in DRAIN_ACTIONABLE_STATES
+    ]
+    pool = actionable
+    pool.sort(key=lambda pr: (pr.get("created_at", ""), pr.get("number", 0)))
     if main_green:
-        return bounded_selection(eligible, max(0, worker_capacity))
-    main_repairs = [pr for pr in eligible if pr["priority_class"] == "main_green_fix"]
-    others = [pr for pr in eligible if pr["priority_class"] != "main_green_fix"]
+        return bounded_selection(pool, max(0, worker_capacity))
+    main_repairs = [pr for pr in pool if pr["priority_class"] == "main_green_fix"]
+    others = [pr for pr in pool if pr["priority_class"] != "main_green_fix"]
     return bounded_selection(main_repairs + others, max(0, worker_capacity))
 
 
@@ -460,7 +476,7 @@ def main():
         main_green = gate["signals"]["main"]["status"] == "green"
         decision = policy_decision(
             main_green=main_green,
-            queue_count=len(eligible),
+            queue_count=intake_backlog_count(eligible),
             target=TARGET,
             worker_capacity=worker_capacity,
         )
