@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { getRedis } from '@/lib/redis';
+import { isRedisQuotaFailure } from '@/lib/utils/errors';
 
 const PROBE_TTL_SECONDS = 60;
 
@@ -26,10 +27,7 @@ export class RedisOperabilityError extends Error {
 }
 
 export function classifyRedisFailure(error: unknown): RedisFailureKind {
-  const message = error instanceof Error ? error.message : String(error);
-  if (
-    /max requests limit|quota exceeded|request limit exceeded/i.test(message)
-  ) {
+  if (isRedisQuotaFailure(error)) {
     return 'quota_exceeded';
   }
   return 'unavailable';

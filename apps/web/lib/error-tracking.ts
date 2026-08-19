@@ -30,6 +30,12 @@ import {
   isSentryInitialized,
   type SentryMode,
 } from '@/lib/sentry/init';
+import {
+  errorJsonReplacer,
+  isRedisQuotaFailure,
+  unwrapCapturedContext,
+  unwrapCapturedError,
+} from '@/lib/utils/errors';
 
 // NOTE: This module is used in both server and client contexts, so we read
 // NODE_ENV directly from process.env rather than importing from env-server.ts
@@ -145,12 +151,20 @@ function sendToSentry(params: {
       tags.error_class = context.error_class;
     }
 
+    const quotaFailure = isRedisQuotaFailure(error);
+    if (quotaFailure && !tags.error_class) {
+      tags.error_class = 'redis_quota_exceeded';
+    }
+
     // Stable fingerprint overrides default grouping so distinct failure classes
     // (e.g. RLS set_config) never merge into generic "Failed query" issues.
+    // Quota exhaustion is one incident (JOV-5199), not one Linear issue per route.
     const fingerprint =
       typeof context?.fingerprint === 'string' && context.fingerprint
         ? [context.fingerprint]
-        : undefined;
+        : quotaFailure
+          ? ['redis-quota-exceeded']
+          : undefined;
 
     Sentry.captureException(errorInstance, {
       extra: {
@@ -191,7 +205,7 @@ function formatError(error: unknown): {
   }
 
   return {
-    message: JSON.stringify(error),
+    message: JSON.stringify(error, errorJsonReplacer),
     type: 'UnknownError',
   };
 }
@@ -222,26 +236,28 @@ export async function captureError(
   context?: ErrorContext,
   severity: ErrorSeverity = 'error'
 ): Promise<void> {
-  const errorData = formatError(error);
+  const normalizedError = unwrapCapturedError(error);
+  const normalizedContext = unwrapCapturedContext(error, context);
+  const errorData = formatError(normalizedError);
   const sentryMode = getSentryMode();
   const environment = getEnvironment();
 
   // Always log to console for debugging
   logToConsole(severity, message, {
     ...errorData,
-    ...context,
+    ...normalizedContext,
     sentryMode,
   });
 
   // Send to Sentry for error tracking (primary)
   sendToSentry({
-    error,
+    error: normalizedError,
     errorMessage: errorData.message,
     message,
     severity,
     sentryMode,
     environment,
-    context,
+    context: normalizedContext,
   });
 
   // Send to analytics for monitoring (secondary, fire-and-forget)
@@ -258,9 +274,9 @@ export async function captureError(
       error_raw_message: errorData.message,
       sentry_mode: sentryMode,
       sentry_initialized: isSentryInitialized(),
-      ...context,
+      ...normalizedContext,
     },
-    context?.userId as string | undefined
+    normalizedContext?.userId as string | undefined
   ).catch(trackingError => {
     console.warn(
       '[Error Tracking] Failed to send analytics event:',

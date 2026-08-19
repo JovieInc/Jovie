@@ -49,3 +49,23 @@ export function isTransientInfraHttpTransaction(
     transaction => normalized === transaction.toLowerCase()
   );
 }
+
+const OPAQUE_UPSTASH_ERROR_TITLE =
+  /"error"\s*:\s*\{\s*"name"\s*:\s*"UpstashError"\s*\}/;
+const REDIS_QUOTA_UPSTASH_TITLE =
+  /upstasherror.*(?:max requests limit|quota exceeded|request limit exceeded)/i;
+
+/**
+ * Opaque `{error:{name:"UpstashError"}}` titles and quota-exhausted
+ * UpstashError events are one Redis-quota incident, not per-route bugs.
+ * The health canary owns the paging class (`redis_operability_quota_exceeded`).
+ */
+export function isNonActionableUpstashIssue(
+  issue: SentryIssueSummary
+): boolean {
+  const title = issue.title ?? '';
+  return (
+    OPAQUE_UPSTASH_ERROR_TITLE.test(title) ||
+    REDIS_QUOTA_UPSTASH_TITLE.test(title)
+  );
+}
