@@ -217,6 +217,14 @@ class FallbackTests(unittest.TestCase):
         python.write_text("#!/bin/sh\nexec /usr/bin/python3 \"$@\"\n")
         python.chmod(0o755)
         self.command("grok", "printf 'GROK_MODEL_READY\\n'")
+        self.command(
+            "gh",
+            'case "$*" in\n'
+            '  *headRefName*) echo "[]";;\n'
+            '  *statusCheckRollup*) echo \'{"statusCheckRollup":[]}\';;\n'
+            '  *) echo 0;;\n'
+            'esac\n',
+        )
         self.model_probe = self.command("model-probe", "echo qwen3-coder:30b")
         self.model_agent = self.command("model-agent", "exit 0")
         self.command("flock", "exit 0")
@@ -227,6 +235,7 @@ class FallbackTests(unittest.TestCase):
             "workAdmission": {"allowed": True, "newIssueLeaseAllowed": False},
         }))
         self.environment = mock.patch.dict(os.environ, {
+            "SYMPHONY_OPEN_PR_INDEX": "empty",
             "GEM_FLEET_GATE_RECEIPT": str(self.gate),
             "GEM_PR_DRAIN_QWEN": str(self.model_probe),
             "GEM_QWEN_AGENT_EXECUTABLE": str(self.model_agent),
@@ -1405,6 +1414,164 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(first, module._fallback_unit("JOV-1", "revision-a"))
         self.assertNotEqual(first, module._fallback_unit("JOV-1", "revision-b"))
         self.assertTrue(first.startswith("fallback-ship-JOV-1-"))
+
+    def _admitted_issue(self, identifier="JOV-1", state="Todo"):
+        team = identifier.split("-", 1)[0]
+        return {
+            "id": f"uuid-{identifier}",
+            "identifier": identifier,
+            "title": f"Ship {identifier}",
+            "description": "",
+            "url": f"https://linear.example/{identifier}",
+            "updatedAt": "2026-08-19T18:46:00Z",
+            "state": {"id": f"{team}-state", "name": state},
+            "team": {
+                "key": team,
+                "states": {
+                    "nodes": [
+                        {"id": f"{team}-progress", "name": "In Progress"},
+                        {"id": f"{team}-review", "name": "In Review"},
+                    ]
+                },
+            },
+            "labels": {"nodes": [{"name": "symphony"}]},
+        }
+
+    def test_in_review_is_admitted_so_ci_red_heads_can_remount(self):
+        module = self.load_controller_module()
+        ok, reason, meta = module._issue_meta(
+            self._admitted_issue("JOV-4894", "In Review"), "JOV-4894"
+        )
+        self.assertTrue(ok, reason)
+        self.assertEqual(meta["original_state_name"], "In Review")
+
+    def test_open_pr_verdict_skips_inflight_and_remounts_failure(self):
+        module = self.load_controller_module()
+        index = {
+            "JOV-1": {"number": 16211, "head": "grok/JOV-1-fix", "repo": "JovieInc/Jovie"},
+            "JOV-2": {"number": 16212, "head": "grok/JOV-2-fix", "repo": "JovieInc/Jovie"},
+        }
+        with mock.patch.object(module, "_pr_has_failing_check", side_effect=lambda repo, number: number == 16212):
+            self.assertEqual(module._open_pr_verdict("JOV-1", index)[0], "skip")
+            self.assertEqual(module._open_pr_verdict("JOV-2", index)[0], "remount")
+            self.assertEqual(module._open_pr_verdict("JOV-3", index)[0], "none")
+
+    def test_launch_skips_inflight_open_prs_and_fills_capacity_with_unblocked(self):
+        """Live sidecar launched identifiers that already had grok/JOV PRs; units
+        exited immediately and leftover Todo work never got a slot."""
+        module = self.load_controller_module()
+        launches: list[list[str]] = []
+
+        def verdict(identifier, _index):
+            if identifier == "JOV-1":
+                return "skip", {"number": 16211, "head": "grok/JOV-1-fix"}
+            if identifier == "JOV-2":
+                return "remount", {"number": 16212, "head": "grok/JOV-2-fix"}
+            return "none", None
+
+        def control(command):
+            launches.append(command)
+            return True
+
+        with (
+            mock.patch.object(module, "_autonomous_open_pr_index", return_value={}),
+            mock.patch.object(module, "_open_pr_verdict", side_effect=verdict),
+            mock.patch.object(module, "_fetch_single_issue", return_value=self._admitted_issue()),
+            mock.patch.object(
+                module,
+                "_issue_meta",
+                return_value=(True, "admitted", {"issue_revision": "2026-08-19T18:46:00Z"}),
+            ),
+            mock.patch.object(module, "_control", side_effect=control),
+        ):
+            launched, used = module._launch_fallback_workers(
+                ["JOV-1", "JOV-2", "JOV-3"],
+                [],
+                "/bin/true",
+                "a" * 64,
+                {"selected": {"id": "grok"}},
+                2,
+            )
+        units = [arg for command in launches if command[0] == "systemd-run" for arg in command if arg.startswith("--unit=")]
+        self.assertEqual(len(units), 2)
+        self.assertTrue(any("JOV-2" in unit for unit in units), units)
+        self.assertTrue(any("JOV-3" in unit for unit in units), units)
+        self.assertFalse(any("JOV-1" in unit for unit in units), units)
+        self.assertEqual(used, 2)
+        self.assertEqual(len(launched), 2)
+
+    def test_grok_ship_one_skips_existing_grok_prefix_pr(self):
+        self.command(
+            "gh",
+            'case "$*" in\n'
+            '  *headRefName*) echo \'[{"number":16211,"headRefName":"grok/JOV-7-fix"}]\';;\n'
+            '  *statusCheckRollup*) echo \'{"statusCheckRollup":[{"conclusion":"SUCCESS"}]}\';;\n'
+            '  *) echo 0;;\n'
+            'esac\n',
+        )
+        self.command("git", 'printf "git %s\\n" "$*" >> "$GEM_EVENTS"')
+        self.command("grok", 'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"')
+        result = subprocess.run(
+            [self.install_runtime() / GROK_SHIP.name, "JOV-7"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_EVENTS=self.events,
+                GROK_SHIP_WS_ROOT=self.root / "workspaces",
+                GROK_SHIP_LOG_DIR=self.root / "logs",
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.grok_linear_url(),
+            ),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("open_pr_exists", (self.root / "logs/JOV-7.log").read_text())
+        events = self.events.read_text() if self.events.exists() else ""
+        self.assertNotIn("git clone", events)
+        self.assertNotIn("grok -", events)
+
+    def test_grok_ship_one_remounts_ci_red_existing_head(self):
+        created = self.root / "pr-created"
+        self.command(
+            "gh",
+            'case "$*" in\n'
+            '  *headRefName*) echo \'[{"number":16211,"headRefName":"grok/JOV-7-fix"}]\';;\n'
+            '  *statusCheckRollup*) echo \'{"statusCheckRollup":[{"conclusion":"FAILURE"}]}\';;\n'
+            '  *) [ ! -f "$GROK_CREATED" ] && echo 0 || echo 1;;\n'
+            'esac\n',
+        )
+        self.command(
+            "git",
+            'printf "git %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            '[ "$1" != clone ] || mkdir -p "$5/.git"\n'
+            'case "$*" in *"rev-parse HEAD") printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";; esac\n',
+        )
+        self.command(
+            "grok",
+            'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            'touch "$GROK_CREATED"\n',
+        )
+        result = subprocess.run(
+            [self.install_runtime() / GROK_SHIP.name, "JOV-7"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_EVENTS=self.events,
+                GROK_CREATED=created,
+                GROK_SHIP_WS_ROOT=self.root / "workspaces",
+                GROK_SHIP_LOG_DIR=self.root / "logs",
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.grok_linear_url(),
+            ),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        log = (self.root / "logs/JOV-7.log").read_text()
+        self.assertIn("remount_ci_red", log)
+        events = self.events.read_text()
+        self.assertIn("checkout -B grok/JOV-7-fix origin/grok/JOV-7-fix", events)
+        self.assertNotIn("checkout -B fallback/JOV-7-fix origin/main", events)
+        self.assertIn("failing CI", events)
 
     def test_grok_ship_one_delegates_admission_and_respects_blocked(self):
         # grok-ship-one must not keep its own copy of the admission predicate:
