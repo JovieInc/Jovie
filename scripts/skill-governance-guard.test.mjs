@@ -94,7 +94,11 @@ test('blocks SKILL.md planted under gstack src/test/bin', () => {
   const root = createFixture();
   try {
     write(root, '.agents/skills/gstack/src/SKILL.md', 'not a skill\n');
-    write(root, '.agents/skills/gstack/test/fixtures/alpha/SKILL.md', 'fixture\n');
+    write(
+      root,
+      '.agents/skills/gstack/test/fixtures/alpha/SKILL.md',
+      'fixture\n'
+    );
     write(root, '.claude/skills/gstack/bin/SKILL.md', 'bin\n');
     const errors = evaluateSkillGovernance({ root }).join('\n');
     assert.match(errors, /gstack\/src\/SKILL\.md/);
