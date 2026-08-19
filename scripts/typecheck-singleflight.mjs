@@ -16,6 +16,11 @@ import {
 import { relative, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import {
+  collectOwnerDiagnostics,
+  collectWaitDiagnostics,
+  formatDiagnosticLogLine,
+} from './lib/typecheck-singleflight-diagnostics.mjs';
+import {
   evaluateLockRecovery as evaluateLockRecoveryDecision,
   formatRecoveryLogLine,
 } from './lib/typecheck-singleflight-lock.mjs';
@@ -23,6 +28,7 @@ import {
 const DEFAULT_POLL_MS = 500;
 const DEFAULT_REUSE_WINDOW_MS = 30_000;
 const DEFAULT_STALE_MS = 30 * 60_000;
+const DEFAULT_HEARTBEAT_MS = 15_000;
 const MAX_REPLAY_BYTES = 1_000_000;
 
 const separatorIndex = process.argv.indexOf('--');
@@ -57,6 +63,10 @@ const staleMs = readPositiveInt(
   'TYPECHECK_SINGLEFLIGHT_STALE_MS',
   DEFAULT_STALE_MS
 );
+const heartbeatMs = readPositiveInt(
+  'TYPECHECK_SINGLEFLIGHT_HEARTBEAT_MS',
+  DEFAULT_HEARTBEAT_MS
+);
 const invocation = {
   command,
   cwd: relative(repoRoot, cwd) || '.',
@@ -71,6 +81,8 @@ process.exit(exitCode);
 
 async function main() {
   let announcedWait = false;
+  let waitStartedAtMs = 0;
+  let lastWaitHeartbeatAtMs = 0;
 
   for (;;) {
     const reusableResult = readReusableResult();
@@ -78,6 +90,22 @@ async function main() {
       replayResult(reusableResult);
       console.error(
         `[typecheck-singleflight] reused completed ${formatCommand(command)} result from pid ${reusableResult.pid}.`
+      );
+      emitDiagnostic(
+        collectOwnerDiagnostics({
+          phase: 'reuse',
+          startedAtMs: Number(
+            reusableResult.startedAtMs ??
+              reusableResult.completedAtMs ??
+              Date.now()
+          ),
+          nowMs: Date.now(),
+          childPid: null,
+          command,
+          cwd,
+          pid: reusableResult.pid ?? null,
+          exitCode: reusableResult.exitCode ?? null,
+        })
       );
       return reusableResult.exitCode;
     }
@@ -94,12 +122,31 @@ async function main() {
       continue;
     }
 
+    const nowMs = Date.now();
     if (!announcedWait) {
+      waitStartedAtMs = nowMs;
+      lastWaitHeartbeatAtMs = nowMs;
+      announcedWait = true;
       const owner = recovery.pid ? `pid ${recovery.pid}` : 'another process';
       console.error(
         `[typecheck-singleflight] waiting for ${owner} to finish ${formatCommand(existingLock?.command ?? command)}.`
       );
-      announcedWait = true;
+      emitWaitDiagnostic(
+        'wait',
+        existingLock,
+        recovery,
+        waitStartedAtMs,
+        nowMs
+      );
+    } else if (nowMs - lastWaitHeartbeatAtMs >= heartbeatMs) {
+      lastWaitHeartbeatAtMs = nowMs;
+      emitWaitDiagnostic(
+        'heartbeat',
+        existingLock,
+        recovery,
+        waitStartedAtMs,
+        nowMs
+      );
     }
 
     await sleep(pollMs);
@@ -134,9 +181,32 @@ function tryAcquireLock() {
 
 async function runAsOwner() {
   const startedAtMs = Date.now();
+  emitDiagnostic(
+    collectOwnerDiagnostics({
+      phase: 'acquire',
+      startedAtMs,
+      nowMs: startedAtMs,
+      childPid: null,
+      command,
+      cwd,
+      pid: process.pid,
+    })
+  );
 
   try {
-    const result = await runCommand(command);
+    const result = await runCommand(command, { startedAtMs });
+    emitDiagnostic(
+      collectOwnerDiagnostics({
+        phase: 'child-complete',
+        startedAtMs,
+        nowMs: Date.now(),
+        childPid: result.childPid,
+        command,
+        cwd,
+        pid: process.pid,
+        exitCode: result.exitCode,
+      })
+    );
     try {
       writeResult({
         ...invocation,
@@ -159,7 +229,12 @@ async function runAsOwner() {
   }
 }
 
-function runCommand([executable, ...args]) {
+/**
+ * @param {[string, ...string[]]} commandParts
+ * @param {{ readonly startedAtMs?: number }} [options]
+ */
+function runCommand([executable, ...args], options = {}) {
+  const { startedAtMs } = options;
   return new Promise(resolveRun => {
     const child = spawn(executable, args, {
       cwd,
@@ -169,6 +244,8 @@ function runCommand([executable, ...args]) {
     });
     const stdout = [];
     const stderr = [];
+    const childPid = child.pid ?? null;
+    const stopHeartbeat = startOwnerHeartbeat(child, startedAtMs, childPid);
 
     child.stdout.on('data', chunk => {
       stdout.push(Buffer.from(chunk));
@@ -179,18 +256,22 @@ function runCommand([executable, ...args]) {
       process.stderr.write(chunk);
     });
     child.on('error', error => {
+      stopHeartbeat();
       const message = `Failed to start ${formatCommand(command)}: ${error.message}\n`;
       process.stderr.write(message);
       stderr.push(Buffer.from(message));
       resolveRun({
         exitCode: 127,
+        childPid,
         stdout: Buffer.concat(stdout),
         stderr: Buffer.concat(stderr),
       });
     });
     child.on('close', code => {
+      stopHeartbeat();
       resolveRun({
         exitCode: code ?? 1,
+        childPid,
         stdout: Buffer.concat(stdout),
         stderr: Buffer.concat(stderr),
       });
@@ -198,6 +279,52 @@ function runCommand([executable, ...args]) {
   });
 }
 
+function startOwnerHeartbeat(child, startedAtMs, childPid) {
+  const emitHeartbeat = phase => {
+    emitDiagnostic(
+      collectOwnerDiagnostics({
+        phase,
+        startedAtMs: startedAtMs ?? Date.now(),
+        nowMs: Date.now(),
+        childPid,
+        command,
+        cwd,
+        pid: process.pid,
+      })
+    );
+  };
+  emitHeartbeat('child-start');
+  // Read-only sample. Never signal or replace the live child.
+  const timer = setInterval(() => {
+    if (child.exitCode === null && !child.signalCode) {
+      emitHeartbeat('heartbeat');
+    }
+  }, heartbeatMs);
+  timer.unref?.();
+  return () => clearInterval(timer);
+}
+function emitWaitDiagnostic(phase, existingLock, recovery, startedAtMs, nowMs) {
+  emitDiagnostic(
+    collectWaitDiagnostics({
+      phase,
+      startedAtMs,
+      nowMs,
+      ownerPid: recovery.pid,
+      ownerAlive: recovery.pid ? isProcessAlive(recovery.pid) : null,
+      lockAgeMs: recovery.ageMs,
+      command: existingLock?.command ?? command,
+    })
+  );
+}
+function emitDiagnostic(diagnostic) {
+  try {
+    console.error(formatDiagnosticLogLine(diagnostic));
+  } catch (error) {
+    console.error(
+      `[typecheck-singleflight] diagnostic emission failed: ${formatError(error)}`
+    );
+  }
+}
 function readReusableResult() {
   const result = readJson(resultPath);
   if (!result || !matchesInvocation(result)) {
