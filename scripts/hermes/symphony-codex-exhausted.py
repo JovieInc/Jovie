@@ -887,10 +887,16 @@ def _open_pr_verdict(identifier: str, index: dict[str, dict]) -> tuple[str, dict
     number = pr.get("number")
     if not isinstance(repo, str) or not isinstance(number, int):
         return "skip", pr
+    status = str(pr.get("mergeStateStatus") or "").upper()
     # CLEAN heads are already merge-queue eligible. Remounting them fights
     # github-merge-queue and can knock a green autonomous PR out of the queue.
-    if str(pr.get("mergeStateStatus") or "").upper() == "CLEAN":
+    if status == "CLEAN":
         return "skip", pr
+    # DIRTY/BEHIND after a sibling merge is not product-CI-red, but the head
+    # cannot enroll until it merges main. Live #16211 was skipped as inflight
+    # after #16212 landed (sidecar: open_pr_inflight).
+    if status in {"DIRTY", "BEHIND"}:
+        return "remount", pr
     if _pr_has_failing_check(repo, number):
         return "remount", pr
     return "skip", pr
