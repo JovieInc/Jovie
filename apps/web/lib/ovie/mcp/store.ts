@@ -116,36 +116,8 @@ function asDecision(value: unknown): OvieDecision | undefined {
   return rec as OvieDecision;
 }
 
-export function redisRecordBackend(redis: {
-  get: (key: string) => Promise<unknown>;
-  set: (
-    key: string,
-    value: unknown,
-    opts?: { ex?: number }
-  ) => Promise<unknown>;
-  lpush: (key: string, value: string) => Promise<unknown>;
-  lrange: (key: string, start: number, stop: number) => Promise<unknown>;
-  ltrim: (key: string, start: number, stop: number) => Promise<unknown>;
-}): RecordBackend {
-  return {
-    async get(key) {
-      return redis.get(key);
-    },
-    async set(key, value) {
-      await redis.set(key, value, { ex: TTL_SECONDS });
-    },
-    async lpush(key, value) {
-      await redis.lpush(key, value);
-      await redis.ltrim(key, 0, INDEX_CAP - 1);
-    },
-    async lrange(key, start, stop) {
-      const rows = await redis.lrange(key, start, stop);
-      return Array.isArray(rows)
-        ? rows.map(row => (typeof row === 'string' ? row : String(row)))
-        : [];
-    },
-  };
-}
+export const OVIE_MCP_RECORD_TTL_SECONDS = TTL_SECONDS;
+export const OVIE_MCP_INDEX_CAP = INDEX_CAP;
 
 const processMemory = memoryRecordBackend();
 let defaultStore: OperatingStore | undefined;

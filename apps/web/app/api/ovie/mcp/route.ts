@@ -12,7 +12,8 @@ import {
 import {
   DurableOperatingStore,
   getDefaultOperatingStore,
-  redisRecordBackend,
+  OVIE_MCP_INDEX_CAP,
+  OVIE_MCP_RECORD_TTL_SECONDS,
 } from '@/lib/ovie/mcp/store';
 import type { OvieMcpPrincipal } from '@/lib/ovie/mcp/types';
 import { getRedis } from '@/lib/redis';
@@ -57,15 +58,20 @@ async function resolvePrincipal(request: Request): Promise<OvieMcpPrincipal> {
 function operatingStore() {
   const redis = getRedis();
   if (!redis) return getDefaultOperatingStore();
-  return new DurableOperatingStore(
-    redisRecordBackend({
-      get: key => redis.get(key),
-      set: (key, value, opts) => redis.set(key, value, opts),
-      lpush: (key, value) => redis.lpush(key, value),
-      lrange: (key, start, stop) => redis.lrange(key, start, stop),
-      ltrim: (key, start, stop) => redis.ltrim(key, start, stop),
-    })
-  );
+  return new DurableOperatingStore({
+    get: async key => redis.get(key),
+    set: async (key, value) => {
+      await redis.set(key, value, { ex: OVIE_MCP_RECORD_TTL_SECONDS });
+    },
+    lpush: async (key, value) => {
+      await redis.lpush(key, value);
+      await redis.ltrim(key, 0, OVIE_MCP_INDEX_CAP - 1);
+    },
+    lrange: async (key, start, stop) => {
+      const rows = await redis.lrange(key, start, stop);
+      return Array.isArray(rows) ? rows.map(String) : [];
+    },
+  });
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
