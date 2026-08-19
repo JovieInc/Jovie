@@ -58,14 +58,14 @@ Gate evidence names are stable strings:
 - `gstack.review`
 - `gstack.ship`
 - `github.ci`
-- `github.scope-judge`
+- `github.scope-judge` (retired producer; historical name only — workflow deleted in #14484)
 - `github.coderabbit`
 - `github.greptile`
 - `github.branch-protection`
 - `gstack.land-and-deploy`
 - `sentry.canary`
 
-Agent PR automation must treat missing required gate evidence as blocked, not successful.
+AgentOS may record GStack `qa`/`review`/`ship` artifacts on a PR for the operator board. Those comments are self-attested local CLI runs, not GitHub Actions run IDs, so agent-pipeline auto-approve must not consume them as provenance. Missing GStack comments are incomplete telemetry, not a merge-gate failure. Required merge evidence remains `github.ci` (`PR Ready`) plus the deterministic queue contract.
 
 ## PR Rollout
 
