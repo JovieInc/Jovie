@@ -142,11 +142,19 @@ if [ "$REMOUNT" != 1 ] && [ -n "$(git -C "$WS" status --porcelain)" ]; then
   exit 2
 fi
 if [ "$REMOUNT" = 1 ]; then
-  git -C "$WS" fetch --depth 1 origin main
-  git -C "$WS" fetch --depth 1 origin "refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}"
+  # Depth-1 fetches of main and the PR head do not share a merge-base, so
+  # `git merge origin/main` fails with unrelated histories and the PR stays DIRTY.
+  git -C "$WS" fetch origin "refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}"
+  git -C "$WS" fetch origin main
   git -C "$WS" checkout -B "$BRANCH" "origin/$BRANCH"
   git -C "$WS" reset --hard "origin/$BRANCH"
-  git -C "$WS" merge --no-edit origin/main || true
+  if [ "$(git -C "$WS" rev-parse --is-shallow-repository 2>/dev/null || printf true)" = "true" ]; then
+    git -C "$WS" fetch --unshallow origin || git -C "$WS" fetch --deepen=200 origin
+  fi
+  if ! git -C "$WS" merge-base HEAD origin/main >/dev/null 2>&1; then
+    git -C "$WS" fetch --deepen=500 origin
+  fi
+  git -C "$WS" merge --no-edit origin/main
 else
   git -C "$WS" fetch --depth 1 origin main
   git -C "$WS" checkout -B "$BRANCH" origin/main

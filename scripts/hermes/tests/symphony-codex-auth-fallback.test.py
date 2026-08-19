@@ -1546,7 +1546,11 @@ class FallbackTests(unittest.TestCase):
             "git",
             'printf "git %s\\n" "$*" >> "$GEM_EVENTS"\n'
             '[ "$1" != clone ] || mkdir -p "$5/.git"\n'
-            'case "$*" in *"rev-parse HEAD") printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";; esac\n',
+            'case "$*" in\n'
+            '  *"rev-parse HEAD") printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";;\n'
+            '  *"rev-parse --is-shallow-repository") printf "true\\n";;\n'
+            '  *"merge-base HEAD origin/main") exit 1;;\n'
+            'esac\n',
         )
         self.command(
             "grok",
@@ -1571,11 +1575,14 @@ class FallbackTests(unittest.TestCase):
         log = (self.root / "logs/JOV-7.log").read_text()
         self.assertIn("remount_ci_red", log)
         events = self.events.read_text()
-        self.assertIn("fetch --depth 1 origin main", events)
-        self.assertIn("fetch --depth 1 origin refs/heads/grok/JOV-7-fix:refs/remotes/origin/grok/JOV-7-fix", events)
+        self.assertIn("fetch origin refs/heads/grok/JOV-7-fix:refs/remotes/origin/grok/JOV-7-fix", events)
+        self.assertIn("fetch origin main", events)
+        self.assertIn("fetch --unshallow origin", events)
+        self.assertIn("fetch --deepen=500 origin", events)
         self.assertIn("checkout -B grok/JOV-7-fix origin/grok/JOV-7-fix", events)
         self.assertIn("reset --hard origin/grok/JOV-7-fix", events)
         self.assertIn("merge --no-edit origin/main", events)
+        self.assertNotIn("fetch --depth 1 origin refs/heads/grok/JOV-7-fix", events)
         self.assertNotIn("checkout -B fallback/JOV-7-fix origin/main", events)
         self.assertIn("failing CI", events)
 
