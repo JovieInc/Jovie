@@ -167,6 +167,69 @@ function sendToSentry(params: {
   }
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    !(value instanceof Error)
+  );
+}
+
+function readErrorName(error: unknown): string {
+  if (error instanceof Error) return error.name;
+  if (isPlainObject(error) && typeof error.name === 'string') {
+    return error.name;
+  }
+  return '';
+}
+
+function readErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  if (isPlainObject(error) && typeof error.message === 'string') {
+    return error.message;
+  }
+  return '';
+}
+
+/**
+ * Call sites historically passed a context bag as the error argument:
+ * `captureWarning(msg, { error })`. JSON.stringify of an UpstashError with
+ * enumerable `name` becomes `{"error":{"name":"UpstashError"}}`, which Sentry
+ * auto-files as Linear JOV-5219.
+ */
+export function unwrapCaptureErrorInput(
+  error: unknown,
+  context?: ErrorContext
+): { error: unknown; context: ErrorContext | undefined } {
+  if (!isPlainObject(error) || !('error' in error)) {
+    return { error, context };
+  }
+
+  const { error: nestedError, ...rest } = error;
+  const restContext = Object.keys(rest).length > 0 ? rest : undefined;
+  const mergedContext =
+    restContext || context
+      ? { ...(restContext ?? {}), ...(context ?? {}) }
+      : undefined;
+
+  return { error: nestedError, context: mergedContext };
+}
+
+/**
+ * Redis quota / Upstash REST failures are expected degrade-and-continue
+ * warnings. Capturing each one as a Sentry exception floods Linear with
+ * duplicate `Error: {"error":{"name":"UpstashError"}}` issues (JOV-5219).
+ */
+export function isNonActionableRedisInfraError(error: unknown): boolean {
+  if (readErrorName(error) === 'UpstashError') return true;
+  const message = readErrorMessage(error);
+  return /max requests limit|quota exceeded|request limit exceeded/i.test(
+    message
+  );
+}
+
 /**
  * Format error for logging and tracking
  */
@@ -190,10 +253,9 @@ function formatError(error: unknown): {
     };
   }
 
-  return {
-    message: JSON.stringify(error),
-    type: 'UnknownError',
-  };
+  const type = readErrorName(error) || 'UnknownError';
+  const message = readErrorMessage(error) || type;
+  return { message, type };
 }
 
 /**
@@ -222,26 +284,42 @@ export async function captureError(
   context?: ErrorContext,
   severity: ErrorSeverity = 'error'
 ): Promise<void> {
-  const errorData = formatError(error);
+  const unwrapped = unwrapCaptureErrorInput(error, context);
+  const capturedError = unwrapped.error;
+  const capturedContext = unwrapped.context;
+  const errorData = formatError(capturedError);
   const sentryMode = getSentryMode();
   const environment = getEnvironment();
 
   // Always log to console for debugging
   logToConsole(severity, message, {
     ...errorData,
-    ...context,
+    ...capturedContext,
     sentryMode,
   });
 
+  if (severity === 'warning' && isNonActionableRedisInfraError(capturedError)) {
+    Sentry.addBreadcrumb({
+      category: 'redis',
+      message,
+      level: 'warning',
+      data: {
+        error_class: 'redis_infra_warning',
+        error_name: errorData.type,
+      },
+    });
+    return;
+  }
+
   // Send to Sentry for error tracking (primary)
   sendToSentry({
-    error,
+    error: capturedError,
     errorMessage: errorData.message,
     message,
     severity,
     sentryMode,
     environment,
-    context,
+    context: capturedContext,
   });
 
   // Send to analytics for monitoring (secondary, fire-and-forget)
@@ -258,9 +336,9 @@ export async function captureError(
       error_raw_message: errorData.message,
       sentry_mode: sentryMode,
       sentry_initialized: isSentryInitialized(),
-      ...context,
+      ...capturedContext,
     },
-    context?.userId as string | undefined
+    capturedContext?.userId as string | undefined
   ).catch(trackingError => {
     console.warn(
       '[Error Tracking] Failed to send analytics event:',
