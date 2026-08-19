@@ -69,6 +69,15 @@ describe('Redis operability', () => {
     ).toBe('quota_exceeded');
   });
 
+  it('classifies the opaque JSON UpstashError bag as quota exhaustion (JOV-5221)', () => {
+    expect(classifyRedisFailure({ error: { name: 'UpstashError' } })).toBe(
+      'quota_exceeded'
+    );
+    expect(
+      classifyRedisFailure(new Error('{"error":{"name":"UpstashError"}}'))
+    ).toBe('quota_exceeded');
+  });
+
   it('classifies other provider failures as unavailable', async () => {
     mockSet.mockRejectedValue(new Error('connection reset'));
 

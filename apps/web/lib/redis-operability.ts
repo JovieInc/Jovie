@@ -25,10 +25,32 @@ export class RedisOperabilityError extends Error {
   }
 }
 
+function serializeRedisFailure(error: unknown): string {
+  if (error instanceof Error) {
+    return `${error.name} ${error.message}`;
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+  try {
+    return JSON.stringify(error) ?? String(error);
+  } catch {
+    return String(error);
+  }
+}
+
 export function classifyRedisFailure(error: unknown): RedisFailureKind {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = serializeRedisFailure(error);
   if (
     /max requests limit|quota exceeded|request limit exceeded/i.test(message)
+  ) {
+    return 'quota_exceeded';
+  }
+  // captureWarning({ error: UpstashError }) JSON.stringifies to
+  // {"error":{"name":"UpstashError"}} because message/stack are
+  // non-enumerable. That payload is the quota cluster (JOV-5221).
+  if (
+    /\{\s*(?:"error"\s*:\s*\{\s*)?"name"\s*:\s*"UpstashError"/.test(message)
   ) {
     return 'quota_exceeded';
   }

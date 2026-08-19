@@ -42,6 +42,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - **Vlog capture matches how you hold the phone:** portrait, landscape left, and landscape right record the right way up. Landscape keeps record controls on screen.
 - **Expired iPhone chat sessions fail closed:** a 401 ends the turn as a failed reply and asks you to sign in again, instead of inventing an answer.
 - **Mobile chat uses the signed-in artist:** the second claims check that blocked a valid session profile is gone.
+- [internal] **Redis quota warnings no longer file as `Error: {"error":{"name":"UpstashError"}}` (JOV-5221):** captureWarning unwraps `{ error }` bags, classifies the opaque JSON payload as quota exhaustion, and drops that noise from Sentry. The hourly Redis canary still owns the standing alert.
 - [internal] **Public profile block checks fail open on a bad Redis pipeline payload (JOV-5196):** a non-array Upstash response is treated as a cache miss instead of throwing `res.map is not a function`.
 - **iPhone chat bubbles wrap like Messages:** The first word stays in the same sentence instead of sitting alone on the left.
 - **Public profiles keep names, places, and last songs readable:** Contact drawers show the person before the company, compact heroes keep the full city, Music’s last row clears the tab bar, and AEO mention links use the profile text token instead of browser purple.

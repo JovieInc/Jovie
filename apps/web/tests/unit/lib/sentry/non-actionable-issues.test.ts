@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   isTransientInfraHttpIssue,
   isTransientInfraHttpTransaction,
+  isUpstashQuotaNoise,
+  isUpstashQuotaSentryEvent,
 } from '@/lib/sentry/non-actionable-issues';
 
 describe('non-actionable Sentry issues', () => {
@@ -39,6 +41,48 @@ describe('non-actionable Sentry issues', () => {
         isTransientInfraHttpIssue({
           title: 'TypeError: Cannot read properties of undefined',
           culprit: 'POST /pipeline',
+        })
+      ).toBe(false);
+    });
+  });
+
+  describe('isUpstashQuotaNoise', () => {
+    it('matches the opaque JSON bag Sentry titled as JOV-5221', () => {
+      expect(
+        isUpstashQuotaNoise('Error: {"error":{"name":"UpstashError"}}')
+      ).toBe(true);
+    });
+
+    it('matches the production quota command text', () => {
+      expect(
+        isUpstashQuotaNoise(
+          'UpstashError: Command failed: ERR max requests limit exceeded. Limit: 500000'
+        )
+      ).toBe(true);
+    });
+
+    it('does not match unrelated application errors', () => {
+      expect(isUpstashQuotaNoise('TypeError: res.map is not a function')).toBe(
+        false
+      );
+    });
+  });
+
+  describe('isUpstashQuotaSentryEvent', () => {
+    it('drops events whose exception value is the JSON bag', () => {
+      expect(
+        isUpstashQuotaSentryEvent({
+          exception: {
+            values: [{ value: '{"error":{"name":"UpstashError"}}' }],
+          },
+        })
+      ).toBe(true);
+    });
+
+    it('keeps unrelated exceptions', () => {
+      expect(
+        isUpstashQuotaSentryEvent({
+          exception: { values: [{ value: 'Unauthorized' }] },
         })
       ).toBe(false);
     });
