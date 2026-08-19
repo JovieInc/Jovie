@@ -32,7 +32,14 @@ The lead never edits files. If the lead discovers product work, it creates a man
 
 ## Coordination Layer (ruflo MCP)
 
-ruflo MCP tools provide the shared state layer across agents. The lead initializes swarm state; coder agents read and write it.
+ruflo is **not** on the default coding MCP path (see `.grok/config.toml`). Attach it only when this swarm recipe is in use:
+
+```bash
+grok mcp enable ruflo
+# or Claude compat: enable the `ruflo` server in ~/.claude.json for this session
+```
+
+Then the lead initializes swarm state; coder agents read and write it. Detach after the swarm (`grok mcp disable ruflo`) so ordinary coding sessions stay slim.
 
 ### Swarm init (lead)
 
