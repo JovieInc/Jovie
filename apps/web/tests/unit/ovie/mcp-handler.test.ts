@@ -128,6 +128,7 @@ describe('Ovie MCP handler', () => {
     expect((created.body as { id: string }).id).toBe('c1');
     expect(createdBody.workerSpawned).toBe(false);
     expect(createdBody.id.startsWith('ini_')).toBe(true);
+    expect(createdBody.id.length).toBeLessThan(800);
 
     const fetched = await handleOvieMcpRequest({
       store: new MemoryOperatingStore(),
