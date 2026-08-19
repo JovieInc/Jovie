@@ -40,6 +40,12 @@ describe('Eve framework smoke', () => {
       cpSync(resolve(pilotRoot, 'agent'), join(isolatedRoot, 'agent'), {
         recursive: true,
       });
+      const identities = resolve(pilotRoot, 'identities');
+      if (existsSync(identities)) {
+        cpSync(identities, join(isolatedRoot, 'identities'), {
+          recursive: true,
+        });
+      }
       symlinkSync(
         resolve(pilotRoot, 'node_modules'),
         join(isolatedRoot, 'node_modules'),

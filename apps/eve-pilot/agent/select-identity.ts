@@ -13,8 +13,8 @@ export type EvePilotCapability =
 export type EvePilotPack = {
   readonly id: EvePilotIdentityId;
   readonly role: 'artist' | 'founder';
-  readonly canPrivilegedWriteGbrain: false;
-  readonly canHealSymphony: false;
+  readonly canPrivilegedWriteGbrain: boolean;
+  readonly canHealSymphony: boolean;
   readonly canIngestAck: boolean;
   readonly canReadGbrain: boolean;
 };
@@ -83,8 +83,24 @@ export function bindEvePilotIdentity(id: EvePilotIdentityId) {
   };
 }
 
+export type EvePilotBoundTurn = ReturnType<typeof bindEvePilotIdentity>;
+
+export function assertEvePilotFactoryLock(turn: EvePilotBoundTurn): void {
+  if (allowed(turn.pack, 'privileged-gbrain-write')) {
+    throw new EvePilotCapabilityDeniedError(
+      turn.pack.id,
+      'privileged-gbrain-write'
+    );
+  }
+  if (allowed(turn.pack, 'symphony-heal')) {
+    throw new EvePilotCapabilityDeniedError(turn.pack.id, 'symphony-heal');
+  }
+}
+
 export function eveIdentityForRuntime() {
-  return bindEvePilotIdentity(
+  const turn = bindEvePilotIdentity(
     process.env.EVE_IDENTITY === 'ovie' ? 'ovie' : 'jovie'
   );
+  assertEvePilotFactoryLock(turn);
+  return turn;
 }
