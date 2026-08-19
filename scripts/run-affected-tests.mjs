@@ -3,6 +3,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CI_CONTROL_TEST_FILES } from './ci-control-tests.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Full-suite shards are deliberately independent so one Vitest process cannot
@@ -19,6 +20,7 @@ const GLOBAL_TEST_INPUTS = new Set([
   'apps/web/package.json',
   'apps/web/vitest.config.mjs',
   'apps/web/tests/setup.ts',
+  'scripts/ci-control-tests.mjs',
 ]);
 const TESTABLE_FILE = /\.(?:[cm]?[jt]sx?|json)$/;
 const INVESTOR_NOTE_INGESTION_TESTS = [
@@ -191,40 +193,25 @@ const EVENT_DRIVEN_SHIPPER_MANIFEST = new Set([
   ...EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
-const CI_CONTROL_SCRIPT_TESTS = [
-  'scripts/lib/__tests__/automation-verify.test.mjs',
-  'scripts/lib/__tests__/ci-harness.test.mjs',
-  'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
-  'scripts/lib/__tests__/ci-branching-guard.test.mjs',
-  'scripts/lib/__tests__/merge-queue-guard.test.mjs',
-  'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
-  'scripts/lib/__tests__/auto-ready-agent-drafts.test.mjs',
-  'scripts/lib/__tests__/eval-main-health-action.test.mjs',
-  'scripts/lib/__tests__/pr-check-failures.test.mjs',
-  'scripts/lib/__tests__/pr-conflict-handler.test.mjs',
-  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
-  'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
-  'scripts/lib/__tests__/lockfile-specifier-preflight.test.mjs',
-  'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
-  'scripts/lib/__tests__/golden-path-lock.test.mjs',
-  'scripts/lib/__tests__/golden-path-prod-autofix-workflow-contract.test.mjs',
-  'scripts/lib/__tests__/queue-deferral-receipt.test.mjs',
-  'scripts/lib/__tests__/queue-deferred-release.test.mjs',
-  'scripts/lib/__tests__/queue-deferred-release-admission.test.mjs',
-  'scripts/lib/__tests__/setup-worktree-health.test.mjs',
-];
+const CI_CONTROL_SCRIPT_TESTS = [...CI_CONTROL_TEST_FILES];
 const MERGE_QUEUE_CONTROLLER_INPUTS = new Set([
   '.github/workflows/merge-queue-autoenroll.yml',
   'docs/PR_FLOW.md',
   'scripts/ci-merge-queue-check.mjs',
   'scripts/drain-pr-queue.sh',
+  'scripts/drain-pr-remediate.mjs',
   'scripts/lib/merge-queue-guard.mjs',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
+  'scripts/lib/ownerless-recovery-policy.mjs',
+  'scripts/lib/pr-check-failures.mjs',
+  'scripts/lib/upsert-pr-comment.sh',
   'scripts/merge-queue-backend.mjs',
+  'scripts/ownerless-recovery-sweeper.mjs',
   'scripts/tests/test_gh_retry.py',
 ]);
 const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
@@ -233,6 +220,7 @@ const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
 ];
 const MERGE_QUEUE_CONTROLLER_PYTHON_TESTS = ['scripts/tests/test_gh_retry.py'];
@@ -286,8 +274,11 @@ const SYMPHONY_THROUGHPUT_PYTHON_TESTS = [
   'scripts/hermes/tests/codex-rotate.test.py',
 ];
 const FLEET_PROMOTION_GATE_INPUTS = new Set([
+  '.github/actions/evaluate-fleet-gate/action.yml',
+  'scripts/hermes/evaluate-fleet-gate.sh',
   'scripts/hermes/gem-priority-gate.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
 ]);
 const FLEET_PROMOTION_GATE_LANE = new Set([
   ...FLEET_PROMOTION_GATE_INPUTS,
@@ -297,6 +288,7 @@ const FLEET_PROMOTION_GATE_LANE = new Set([
 ]);
 const FLEET_PROMOTION_GATE_PYTHON_TESTS = [
   'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
 ];
 const GEM_PR_REHABILITATION_LANE = new Set([
   '.github/requirements/pytest.in',
@@ -321,6 +313,7 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   'scripts/hermes/tests/gem-ops-hud.test.py',
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
   'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
   'scripts/hermes/tests/test-model-router.py',
@@ -331,6 +324,7 @@ const GEM_PR_REHABILITATION_LANE = new Set([
 ]);
 const GEM_PR_REHABILITATION_PYTHON_TESTS = [
   'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
   'scripts/hermes/tests/gem-pr-drain.test.py',
   'scripts/hermes/tests/gem-ops-hud.test.py',
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',

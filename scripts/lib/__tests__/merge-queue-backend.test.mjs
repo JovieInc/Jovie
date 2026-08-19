@@ -236,6 +236,7 @@ function executeAdmissionScope({
   const directory = mkdtempSync(join(tmpdir(), 'merge-queue-admission-'));
   const eventPath = join(directory, 'event.json');
   const outputPath = join(directory, 'output.txt');
+  const ghPath = join(directory, 'gh');
   writeFileSync(
     eventPath,
     JSON.stringify({
@@ -249,6 +250,11 @@ function executeAdmissionScope({
     })
   );
   writeFileSync(outputPath, '');
+  writeFileSync(
+    ghPath,
+    '#!/usr/bin/env bash\nset -euo pipefail\nif [[ "$1 $2" == "pr list" ]]; then\n  printf "[]\\n"\n  exit 0\nfi\necho "unexpected gh args: $*" >&2\nexit 2\n',
+    { mode: 0o755 }
+  );
   try {
     const result = spawnSync(
       'bash',
@@ -257,6 +263,7 @@ function executeAdmissionScope({
         encoding: 'utf8',
         env: {
           ...process.env,
+          PATH: `${directory}:${process.env.PATH ?? ''}`,
           EVENT_NAME: 'workflow_run',
           GITHUB_EVENT_PATH: eventPath,
           GITHUB_OUTPUT: outputPath,

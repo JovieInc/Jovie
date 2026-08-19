@@ -86,7 +86,7 @@ const LANES = [
     id: 'structural',
     name: 'Structural Contract',
     nextLocalCommand:
-      'pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm component-ship-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
+      'pnpm ci:harness:check && node scripts/ci-control-tests.mjs && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm component-ship-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
     run: runStructural,
   },
 ];
@@ -384,7 +384,7 @@ function runStructural() {
     'pnpm ci:harness:check',
     'pnpm ci:incident-contract:validate',
     'node --test scripts/ci-release-trigger-contract.test.mjs',
-    'pnpm ci:control:test',
+    'node scripts/ci-control-tests.mjs',
     'pnpm ci:branching-guard:validate',
     'pnpm ci:merge-queue:check',
     'pnpm ci:typecheck-gate-guard',
@@ -410,6 +410,11 @@ function runStructural() {
     // expected-head mutation remain executable CI behavior without adding the
     // full backlog suite to every structural lane.
     "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs",
+    'python3 scripts/hermes/tests/gem-pr-drain.test.py',
+    'python3 scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
+    'python3 scripts/hermes/tests/gem-priority-gate.test.py',
+    'python3 scripts/hermes/tests/test_evaluate_fleet_gate.py',
+    'python3 scripts/hermes/tests/test-model-router.py',
     // CI installs the hash-pinned pytest + coverage toolchain. The pure policy
     // is the safety boundary for holds, retry budgets, exact-head leases, and
     // bounded fanout, so branch-aware coverage is a hard structural gate.
