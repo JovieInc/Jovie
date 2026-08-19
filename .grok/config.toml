@@ -1,0 +1,7 @@
+# Default coding sessions do not load ruflo (243 tool schemas).
+# Attach it only for an explicit swarm: `grok mcp enable ruflo`
+# or set enabled = true in a throwaway local override.
+# Swarm recipe: `.claude/rules/swarm.md`.
+
+[mcp_servers.ruflo]
+enabled = false
