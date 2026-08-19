@@ -456,7 +456,9 @@ export {
 } from './enums';
 // Feature flag per-environment overrides
 export {
+  type FeatureFlagAuditEventRow,
   type FeatureFlagOverrideRow,
+  featureFlagAuditEvents,
   featureFlagOverrides,
 } from './feature-flags';
 // Feedback

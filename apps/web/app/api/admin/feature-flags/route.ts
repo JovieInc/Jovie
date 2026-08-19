@@ -6,18 +6,19 @@
  * that environment). Works in all environments including production, gated by
  * `requireAdmin()`. Backs the admin Features page and the dev bar
  * "publish to env" action.
+ *
+ * Every write appends a `feature_flag_audit_events` row (actor, previous/new
+ * value, action, optional reason) so flag changes are attributable; see
+ * `lib/flags/write-override.server.ts`.
  */
 
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAdmin } from '@/lib/admin/middleware';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { db } from '@/lib/db';
-import { featureFlagOverrides } from '@/lib/db/schema/feature-flags';
 import { captureError } from '@/lib/error-tracking';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
-import { FLAG_ENV_TIER_COLUMN } from '@/lib/flags/env-tier';
-import { revalidateFeatureFlags } from '@/lib/flags/overrides-store.server';
+import { writeFlagOverride } from '@/lib/flags/write-override.server';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -28,6 +29,7 @@ const RequestSchema = z.object({
   flagKey: z.enum(KNOWN_FLAG_KEYS),
   envTier: z.enum(['dev', 'staging', 'prod']),
   enabled: z.boolean().nullable(),
+  reason: z.string().trim().max(500).optional(),
 });
 
 export async function POST(req: Request) {
@@ -48,27 +50,16 @@ export async function POST(req: Request) {
     );
   }
 
-  const { flagKey, envTier, enabled } = parsed.data;
-  const column = FLAG_ENV_TIER_COLUMN[envTier];
+  const { flagKey, envTier, enabled, reason } = parsed.data;
 
   try {
-    await db
-      .insert(featureFlagOverrides)
-      .values({
-        flagKey,
-        [column]: enabled,
-        updatedBy: userId,
-      })
-      .onConflictDoUpdate({
-        target: featureFlagOverrides.flagKey,
-        set: {
-          [column]: enabled,
-          updatedAt: new Date(),
-          updatedBy: userId,
-        },
-      });
-
-    revalidateFeatureFlags();
+    await writeFlagOverride({
+      flagKey,
+      envTier,
+      enabled,
+      actor: userId,
+      reason,
+    });
 
     return NextResponse.json({ ok: true, flagKey, envTier, enabled });
   } catch (error) {
