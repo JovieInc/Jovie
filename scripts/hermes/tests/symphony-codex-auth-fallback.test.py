@@ -1578,12 +1578,14 @@ class FallbackTests(unittest.TestCase):
             "JOV-1": {"number": 16211, "head": "grok/JOV-1-fix", "repo": "JovieInc/Jovie", "mergeStateStatus": "BLOCKED"},
             "JOV-2": {"number": 16212, "head": "grok/JOV-2-fix", "repo": "JovieInc/Jovie", "mergeStateStatus": "BLOCKED"},
             "JOV-4": {"number": 16214, "head": "grok/JOV-4-fix", "repo": "JovieInc/Jovie", "mergeStateStatus": "CLEAN"},
+            "JOV-5": {"number": 16211, "head": "grok/JOV-5-fix", "repo": "JovieInc/Jovie", "mergeStateStatus": "DIRTY"},
         }
         with mock.patch.object(module, "_pr_has_failing_check", side_effect=lambda repo, number: number in (16212, 16214)):
             self.assertEqual(module._open_pr_verdict("JOV-1", index)[0], "skip")
             self.assertEqual(module._open_pr_verdict("JOV-2", index)[0], "remount")
             self.assertEqual(module._open_pr_verdict("JOV-3", index)[0], "none")
             self.assertEqual(module._open_pr_verdict("JOV-4", index)[0], "skip")
+            self.assertEqual(module._open_pr_verdict("JOV-5", index)[0], "remount")
 
     def test_enroll_failure_does_not_count_as_product_ci_red(self):
         module = self.load_controller_module()
