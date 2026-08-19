@@ -24,8 +24,11 @@ import {
   pkceS256,
 } from '@/lib/ovie/mcp/oauth';
 import {
+  DurableOperatingStore,
+  FailoverOperatingStore,
   MemoryOperatingStore,
   memoryRecordBackend,
+  type RecordBackend,
 } from '@/lib/ovie/mcp/store';
 import { OVIE_MCP_TOOLS } from '@/lib/ovie/mcp/types';
 
@@ -196,6 +199,85 @@ describe('Ovie MCP handler', () => {
     expect(isolated.body).toMatchObject({
       error: { message: `unknown initiative ${createdBody.id}` },
     });
+  });
+
+  it('returns evidence after Redis quota by reading a second fallback store', async () => {
+    const durable = memoryRecordBackend();
+    const quota = new Error('ERR max requests limit exceeded. Limit: 500000');
+    const failingPrimary = new DurableOperatingStore({
+      get: async () => {
+        throw quota;
+      },
+      set: async () => {
+        throw quota;
+      },
+      lpush: async () => {
+        throw quota;
+      },
+      lrange: async () => {
+        throw quota;
+      },
+    } satisfies RecordBackend);
+
+    const created = await handleOvieMcpRequest({
+      store: new FailoverOperatingStore({
+        primary: failingPrimary,
+        fallback: new MemoryOperatingStore(durable),
+        isPrimaryFailure: () => true,
+        writeThrough: true,
+      }),
+      principal: founder,
+      body: rpc(
+        'tools/call',
+        {
+          name: 'create_initiative',
+          arguments: {
+            title: 'Public Artist Profile Certification',
+            intent: 'Map and certify launch-critical profile capabilities',
+            desired_outcome: 'Launch-ready public profiles',
+            why: 'Cannot ship uncertified profiles',
+            provenance: 'chatgpt-mcp-dogfood',
+            priority: 'engineering',
+          },
+        },
+        'c-quota'
+      ),
+    });
+    const createdBody = toolResult<{
+      id: string;
+      evidence: Array<{ summary: string }>;
+      handoff: { desired_outcome?: string; why?: string; provenance?: string };
+    }>(created.body);
+    expect(createdBody.id).toMatch(/^ini_[A-Za-z0-9_-]{8,24}$/);
+    expect(createdBody.evidence.length).toBeGreaterThan(0);
+
+    const fetched = await handleOvieMcpRequest({
+      store: new FailoverOperatingStore({
+        primary: failingPrimary,
+        fallback: new MemoryOperatingStore(durable),
+        isPrimaryFailure: () => true,
+      }),
+      principal: founder,
+      body: rpc(
+        'tools/call',
+        { name: 'get_initiative', arguments: { id: createdBody.id } },
+        'g-quota'
+      ),
+    });
+    const fetchedBody = toolResult<{
+      id: string;
+      evidence: Array<{ summary: string }>;
+      receipts: Array<{ destination: string }>;
+      handoff: { desired_outcome?: string; why?: string; provenance?: string };
+    }>(fetched.body);
+    expect(fetchedBody.id).toBe(createdBody.id);
+    expect(fetchedBody.evidence).toEqual(createdBody.evidence);
+    expect(fetchedBody.handoff.desired_outcome).toBe(
+      'Launch-ready public profiles'
+    );
+    expect(fetchedBody.handoff.why).toBe('Cannot ship uncertified profiles');
+    expect(fetchedBody.handoff.provenance).toBe('chatgpt-mcp-dogfood');
+    expect(fetchedBody.receipts.length).toBeGreaterThan(0);
   });
 
   it('persists a decision that later work can reference', async () => {
