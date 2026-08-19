@@ -737,7 +737,7 @@ def _autonomous_open_pr_index(identifiers: list[str]) -> dict[str, dict]:
                 "--limit",
                 "100",
                 "--json",
-                "number,headRefName",
+                "number,headRefName,mergeStateStatus",
             ]
         )
         if not isinstance(payload, list):
@@ -757,6 +757,7 @@ def _autonomous_open_pr_index(identifiers: list[str]) -> dict[str, dict]:
                     "number": pr.get("number"),
                     "head": head,
                     "repo": repo,
+                    "mergeStateStatus": pr.get("mergeStateStatus"),
                 }
     return index
 
@@ -786,6 +787,10 @@ def _open_pr_verdict(identifier: str, index: dict[str, dict]) -> tuple[str, dict
     repo = pr.get("repo")
     number = pr.get("number")
     if not isinstance(repo, str) or not isinstance(number, int):
+        return "skip", pr
+    # CLEAN heads are already merge-queue eligible. Remounting them fights
+    # github-merge-queue and can knock a green autonomous PR out of the queue.
+    if str(pr.get("mergeStateStatus") or "").upper() == "CLEAN":
         return "skip", pr
     if _pr_has_failing_check(repo, number):
         return "remount", pr

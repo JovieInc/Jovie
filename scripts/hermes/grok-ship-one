@@ -137,13 +137,14 @@ if [ ! -d "$WS/.git" ]; then
   fi
   git clone --depth 1 "https://github.com/$REPO.git" "$WS"
 fi
-if [ -n "$(git -C "$WS" status --porcelain)" ]; then
+if [ "$REMOUNT" != 1 ] && [ -n "$(git -C "$WS" status --porcelain)" ]; then
   echo "workspace has uncommitted changes: $WS" >&2
   exit 2
 fi
 if [ "$REMOUNT" = 1 ]; then
-  git -C "$WS" fetch --depth 1 origin "$BRANCH"
+  git -C "$WS" fetch --depth 1 origin "refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}"
   git -C "$WS" checkout -B "$BRANCH" "origin/$BRANCH"
+  git -C "$WS" reset --hard "origin/$BRANCH"
 else
   git -C "$WS" fetch --depth 1 origin main
   git -C "$WS" checkout -B "$BRANCH" origin/main
