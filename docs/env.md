@@ -166,7 +166,7 @@ Comma- or whitespace-separated phone numbers / handles. Empty fails closed.
 
 ## Private Ovie MCP (ChatGPT)
 
-`/api/ovie/mcp` Streamable HTTP. OAuth at `/api/ovie/oauth`. See `docs/OVIE_MCP.md`.
+`/api/ovie/mcp` Streamable HTTP. OAuth at `/api/ovie/oauth`. Mac lander: `GET /api/ovie/pending` + `POST /api/ovie/landed` with founder session or lander bearer. See `docs/OVIE_MCP.md`.
 
 ## Feature Flags (Statsig)
 

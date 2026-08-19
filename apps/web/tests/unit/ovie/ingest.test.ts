@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { prepareOvieChatTurn } from '@/lib/ovie/chat-entry';
 import {
-  applyOvieDump,
   DEST_LINEAR,
   DEST_PERSONAL,
   readOvieLinearRoutes,
   readOvieReceiptLog,
   resetOvieIngestLog,
 } from '@/lib/ovie/ingest';
+import { MemoryOperatingStore } from '@/lib/ovie/mcp/store';
+import { applyOvieDump } from '@/lib/ovie/persist';
 
 const MIXED = [
   'post this tweet',
@@ -22,9 +23,10 @@ describe('Ovie dump ingest (JOV-5215)', () => {
     resetOvieIngestLog();
   });
 
-  it('acks a mixed dump without spawning workers', () => {
+  it('acks a mixed dump without spawning workers', async () => {
     const spawned: string[] = [];
-    const receipts = applyOvieDump(MIXED, {
+    const receipts = await applyOvieDump(MIXED, {
+      store: new MemoryOperatingStore(),
       spawn: goal => {
         spawned.push(goal);
       },
@@ -50,9 +52,10 @@ describe('Ovie dump ingest (JOV-5215)', () => {
     expect(readOvieLinearRoutes()).toEqual([receipts[2]]);
   });
 
-  it('persists mixed dump on the shipped chat entry and skips spawn', () => {
+  it('persists mixed dump on the shipped chat entry and skips spawn', async () => {
     const spawned: string[] = [];
-    const { eveTurn, receipts } = prepareOvieChatTurn('ov', MIXED[2], {
+    const { eveTurn, receipts } = await prepareOvieChatTurn('ov', MIXED[2], {
+      store: new MemoryOperatingStore(),
       spawn: goal => {
         spawned.push(goal);
       },
@@ -66,10 +69,11 @@ describe('Ovie dump ingest (JOV-5215)', () => {
     expect(readOvieLinearRoutes()).toEqual(receipts);
   });
 
-  it('does not ingest on the Jovie artist chat entry', () => {
-    const { eveTurn, receipts } = prepareOvieChatTurn(
+  it('does not ingest on the Jovie artist chat entry', async () => {
+    const { eveTurn, receipts } = await prepareOvieChatTurn(
       null,
-      'Jovie signup returns 500 on /start'
+      'Jovie signup returns 500 on /start',
+      { store: new MemoryOperatingStore() }
     );
     expect(eveTurn.pack.id).toBe('jovie');
     expect(receipts).toEqual([]);

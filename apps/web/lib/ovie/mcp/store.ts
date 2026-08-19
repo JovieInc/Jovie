@@ -68,8 +68,9 @@ export class DurableOperatingStore implements OperatingStore {
   }
 
   async putInitiative(record: OvieInitiative): Promise<void> {
+    const existing = await this.getInitiative(record.id);
     await this.backend.set(initiativeKey(record.id), record);
-    await this.backend.lpush(INITIATIVE_INDEX, record.id);
+    if (!existing) await this.backend.lpush(INITIATIVE_INDEX, record.id);
   }
 
   async getInitiative(id: string): Promise<OvieInitiative | undefined> {
