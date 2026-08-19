@@ -619,6 +619,82 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertEqual(cached["target"], 16)
         self.assertIn("queue-observation-failed-used-last-known", cached["error"])
 
+    def test_controller_observation_reuses_last_known_after_connection_refused(self):
+        now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self):
+                return b'{"running":[],"retrying":[]}'
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "controller-snapshot.json"
+            with mock.patch.object(MODULE.urllib.request, "urlopen", return_value=FakeResponse()):
+                live = MODULE.observe_controller(
+                    "http://127.0.0.1:4041/api/v1/state",
+                    snapshot_path=path,
+                    now=now,
+                )
+            with mock.patch.object(
+                MODULE.urllib.request,
+                "urlopen",
+                side_effect=ConnectionRefusedError("Connection refused"),
+            ):
+                cached = MODULE.observe_controller(
+                    "http://127.0.0.1:4041/api/v1/state",
+                    snapshot_path=path,
+                    now=now + MODULE.timedelta(minutes=2),
+                )
+            with mock.patch.object(
+                MODULE.urllib.request,
+                "urlopen",
+                side_effect=ConnectionRefusedError("Connection refused"),
+            ):
+                stale = MODULE.observe_controller(
+                    "http://127.0.0.1:4041/api/v1/state",
+                    snapshot_path=path,
+                    now=now + MODULE.timedelta(minutes=11),
+                )
+
+        self.assertEqual(live["status"], "green")
+        self.assertEqual(live["source"], "live")
+        self.assertEqual(cached["status"], "green")
+        self.assertEqual(cached["source"], "last-known")
+        self.assertIn("controller-observation-failed-used-last-known", cached["error"])
+        self.assertEqual(stale["status"], "failed")
+
+    def test_last_known_green_controller_keeps_hold_intake(self):
+        now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green", "deployedSha": "b" * 40}
+        signals["independentReview"] = {
+            **GREEN_SIGNALS["independentReview"],
+            "observedAt": MODULE.isoformat(now),
+        }
+        signals["controller"] = {"status": "green", "source": "last-known"}
+        receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+
+    def test_failed_controller_observation_blocks_hold_intake(self):
+        now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green", "deployedSha": "b" * 40}
+        signals["independentReview"] = {
+            **GREEN_SIGNALS["independentReview"],
+            "observedAt": MODULE.isoformat(now),
+        }
+        signals["controller"] = {
+            "status": "failed",
+            "error": "controller-observation-failed: Connection refused",
+        }
+        receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
+        self.assertEqual(receipt["promotionMode"], "blocked")
+
     def test_queue_observation_does_not_reuse_stale_or_auth_last_known(self):
         timeout = subprocess.CalledProcessError(
             1, ["gh"], stderr="HTTP 503: No server is currently available"
