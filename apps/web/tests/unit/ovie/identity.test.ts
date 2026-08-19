@@ -7,6 +7,7 @@ import {
   type EveBoundTurn,
   EveCapabilityDeniedError,
 } from '@/lib/ovie/identity';
+import { MemoryOperatingStore } from '@/lib/ovie/mcp/store';
 
 function armFactoryWrite(turn: EveBoundTurn): EveBoundTurn {
   return {
@@ -42,8 +43,10 @@ describe('Eve identity packs (JOV-5216)', () => {
     ).toThrow(EveCapabilityDeniedError);
   });
 
-  it('lets Ovie ingest/ack and read gbrain on the chat entry', () => {
-    const { eveTurn } = prepareOvieChatTurn('ov', 'post this tweet');
+  it('lets Ovie ingest/ack and read gbrain on the chat entry', async () => {
+    const { eveTurn } = await prepareOvieChatTurn('ov', 'post this tweet', {
+      store: new MemoryOperatingStore(),
+    });
     expect(eveTurn.pack.id).toBe('ovie');
     expect(() => eveTurn.require('ingest-ack')).not.toThrow();
     expect(() => eveTurn.require('gbrain-read')).not.toThrow();
@@ -55,10 +58,22 @@ describe('Eve identity packs (JOV-5216)', () => {
     );
   });
 
-  it('binds ov chat mode through the same entry as the chat route', () => {
+  it('binds ov chat mode through the same entry as the chat route', async () => {
     expect(bindEveIdentityForChatMode('ov').pack.id).toBe('ovie');
     expect(bindEveIdentityForChatMode(null).pack.id).toBe('jovie');
-    expect(prepareOvieChatTurn('ov', null).eveTurn.pack.id).toBe('ovie');
-    expect(prepareOvieChatTurn(null, null).eveTurn.pack.id).toBe('jovie');
+    expect(
+      (
+        await prepareOvieChatTurn('ov', null, {
+          store: new MemoryOperatingStore(),
+        })
+      ).eveTurn.pack.id
+    ).toBe('ovie');
+    expect(
+      (
+        await prepareOvieChatTurn(null, null, {
+          store: new MemoryOperatingStore(),
+        })
+      ).eveTurn.pack.id
+    ).toBe('jovie');
   });
 });

@@ -220,6 +220,32 @@ export function extractBearer(authorization: string | null): string | null {
   return token || null;
 }
 
+/**
+ * Founder-scoped machine token for the Mac lander. Same HMAC access-token
+ * shape as OAuth so /api/ovie/pending and /api/ovie/landed reuse
+ * verifyAccessToken. Mint locally with BETTER_AUTH_SECRET — no public mint
+ * route and not /api/mcp/{username}.
+ */
+export function issueOvieLanderAccessToken(input?: {
+  readonly subject?: string;
+  readonly ttlSec?: number;
+  readonly secret?: string;
+}): OvieIssuedToken {
+  const ttlSec = input?.ttlSec ?? 60 * 60 * 24;
+  const exp = Math.floor(Date.now() / 1000) + ttlSec;
+  return {
+    access_token: signPayload(input?.secret ?? ovieIssuerSecret(), {
+      sub: input?.subject ?? 'ovie-lander',
+      isAdmin: true,
+      scopes: ['ovie:read', 'ovie:write'],
+      exp,
+    } satisfies OvieAccessClaims),
+    token_type: 'Bearer',
+    expires_in: ttlSec,
+    scope: 'ovie:read ovie:write',
+  };
+}
+
 /** Entitlements.isAdmin is Clerk-MFA gated; Better Auth has no has() so DB admin is enough. */
 export function isOvieOAuthFounder(input: {
   readonly authenticated: boolean;

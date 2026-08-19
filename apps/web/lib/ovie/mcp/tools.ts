@@ -1,5 +1,6 @@
 import { authorizeSummerControl } from '@/lib/ovie/control';
 import { bindEveIdentityForTurn } from '@/lib/ovie/identity';
+import { initiativeAckView } from '@/lib/ovie/persist';
 import { getPage, searchPages } from '@/lib/wiki/gbrain-client';
 import {
   findProfileCapability,
@@ -190,6 +191,7 @@ async function createInitiative(
     receipts: classified.receipts,
     decisionId: stringOpt(args.decision_id),
     workerSpawned: false as const,
+    destinationHandle: null,
     createdAt: now,
     updatedAt: now,
     evidence: classified.receipts.map(receipt => ({
@@ -200,7 +202,7 @@ async function createInitiative(
   };
   const record = { ...draft, id: newRecordId('ini') };
   await store.putInitiative(record);
-  return record;
+  return initiativeAckView(record);
 }
 
 async function getInitiative(
@@ -214,8 +216,7 @@ async function getInitiative(
   return {
     ok: true as const,
     result: {
-      ...record,
-      complete: false,
+      ...initiativeAckView(record),
       certified: record.status === 'certified',
       merged_is_not_complete: true,
     },

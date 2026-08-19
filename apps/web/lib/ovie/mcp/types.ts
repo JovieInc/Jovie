@@ -83,15 +83,24 @@ export type OvieInitiative = {
   readonly receipts: readonly OvieReceipt[];
   readonly decisionId?: string;
   readonly workerSpawned: false;
+  /** Kanban task id or Linear identifier. Null until ovie-intake-to-kanban.py lands. */
+  readonly destinationHandle?: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly evidence: readonly OvieEvidence[];
 };
 
 export type OvieEvidence = {
-  readonly kind: 'receipt' | 'destination' | 'cert-spec' | 'inventory';
+  readonly kind:
+    | 'receipt'
+    | 'destination'
+    | 'cert-spec'
+    | 'inventory'
+    | 'landed';
   readonly summary: string;
   readonly ref?: string;
+  /** Kanban task id or Linear identifier after the Mac lander writes. */
+  readonly landed_ref?: string;
 };
 
 export type OvieMcpPrincipal = {

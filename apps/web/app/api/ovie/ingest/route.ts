@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { authorizeSummerControl } from '@/lib/ovie/control';
-import { applyOvieDump } from '@/lib/ovie/ingest';
+import { getOvieOperatingStore } from '@/lib/ovie/mcp/runtime-store';
+import { applyOvieDump } from '@/lib/ovie/persist';
 
 export async function POST(request: Request): Promise<NextResponse> {
   const entitlements = await getCurrentUserEntitlements();
@@ -24,6 +25,8 @@ export async function POST(request: Request): Promise<NextResponse> {
         )
       : [];
 
-  const receipts = applyOvieDump(items);
-  return NextResponse.json({ ok: true, receipts });
+  const receipts = await applyOvieDump(items, {
+    store: getOvieOperatingStore(),
+  });
+  return NextResponse.json({ ok: true, receipts, workerSpawned: false });
 }

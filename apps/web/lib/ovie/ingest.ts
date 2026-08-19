@@ -3,6 +3,7 @@
  *
  * One durable receipt per item. Never spawn a worker per item. Engineering
  * goes Linear→Symphony. Personal never goes to Linear. Taste stays Taste.
+ * Destination writer is ovie-intake-to-kanban.py.
  */
 
 export const OVIE_LANES = [
@@ -28,11 +29,20 @@ export type OvieDestination =
 
 export type SpawnFn = (goal: string) => void;
 
+/** Incomplete until the Mac lander writes a Kanban task id or Linear identifier. */
+export const OVIE_QUEUED_ACK = 'stored and queued for Summer lander';
+
+export function ovieAckForHandle(handle: string | null | undefined): string {
+  const id = handle?.trim();
+  return id ? `landed:${id}` : OVIE_QUEUED_ACK;
+}
+
 export type OvieReceipt = {
   readonly text: string;
   readonly lane: OvieLane;
   readonly destination: OvieDestination;
   readonly ack: string;
+  readonly destinationHandle: string | null;
   readonly workerSpawned: false;
 };
 
@@ -123,7 +133,8 @@ export function ingestOvieItem(
     text,
     lane,
     destination,
-    ack: `stored:${lane}:${destination}`,
+    ack: OVIE_QUEUED_ACK,
+    destinationHandle: null,
     workerSpawned: false,
   };
 }
@@ -145,7 +156,7 @@ export function ackOvieDumpBeforeModel(userText: string | null): OvieReceipt[] {
 const receiptLog: OvieReceipt[] = [];
 const linearRoutes: OvieReceipt[] = [];
 
-/** Durable receipt sink used by the chat/ingest path. */
+/** In-process receipt log. Durable persist is applyOvieDump → OperatingStore. */
 export function persistOvieReceipt(receipt: OvieReceipt): void {
   receiptLog.push(receipt);
 }
@@ -170,31 +181,4 @@ export function readOvieLinearRoutes(): readonly OvieReceipt[] {
 export function resetOvieIngestLog(): void {
   receiptLog.length = 0;
   linearRoutes.length = 0;
-}
-
-/**
- * Shipped chat/ingest adapter: classify, persist one receipt per item, and
- * route engineering to Linear. Spawn is accepted and ignored.
- */
-export function applyOvieDump(
-  items: readonly string[],
-  options?: { readonly spawn?: SpawnFn }
-): OvieReceipt[] {
-  const receipts = ingestOvieDump(items, options);
-  for (const receipt of receipts) {
-    persistOvieReceipt(receipt);
-    if (receipt.destination === DEST_LINEAR) {
-      routeEngineeringToLinear(receipt);
-    }
-  }
-  return receipts;
-}
-
-/** Chat-route entry: ack + persist + Linear-route before executeChatTurn. */
-export function applyOvieDumpBeforeModel(
-  userText: string | null,
-  options?: { readonly spawn?: SpawnFn }
-): OvieReceipt[] {
-  if (!userText || userText.trim() === '') return [];
-  return applyOvieDump([userText], options);
 }
