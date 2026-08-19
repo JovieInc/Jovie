@@ -323,24 +323,33 @@ export async function notifySlackWaitlist(
   return result;
 }
 
+export const FEEDBACK_SLACK_MAX_CHARS = 280;
+const EMAIL_IN_TEXT = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
+
+export function redactFeedbackMessageForSlack(message: string): string {
+  const redacted = message.replace(EMAIL_IN_TEXT, '[REDACTED_EMAIL]');
+  if (redacted.length <= FEEDBACK_SLACK_MAX_CHARS) return redacted;
+  return `${redacted.slice(0, FEEDBACK_SLACK_MAX_CHARS)}…`;
+}
+
 /**
  * Send a feedback submission notification to Slack.
+ * Email and other raw identifiers stay out of this sink (JOV-5238).
  */
 export async function notifySlackFeedbackSubmission(params: {
   message: string;
   name: string;
-  email?: string | null;
   source: string;
   pathname?: string | null;
 }): Promise<SlackNotificationResult> {
   const text = `💬 ${params.name} submitted feedback`;
   const contextLine = [
-    params.email ? `📧 ${params.email}` : null,
     `Source: ${params.source}`,
     params.pathname ? `Path: ${params.pathname}` : null,
   ]
     .filter(Boolean)
     .join('  •  ');
+  const safeMessage = redactFeedbackMessageForSlack(params.message);
 
   const message: SlackMessage = {
     text,
@@ -365,7 +374,7 @@ export async function notifySlackFeedbackSubmission(params: {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `> ${params.message}`,
+          text: `> ${safeMessage}`,
         },
       },
     ],
