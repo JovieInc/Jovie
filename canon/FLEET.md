@@ -63,7 +63,7 @@ Summer owns the company bottleneck. Gem owns the engineering bottleneck. If Symp
 
 Tim may dump every day. **Admission is not filing.**
 
-WIP: **1 sellability packet** + **1 factory packet only if overnight ships are down**.
+WIP (dated 2026-08-17, **not current**): the old `1 sellability + 1 factory` static cap is retired. **2026-08-18 lock:** no static WIP. Admit from measured Gem CPU/RAM, CI wait, provider capacity, and lane p95 (`capacity-admission`). Repos are independent.
 
 | Video bucket | Action |
 |---|---|
