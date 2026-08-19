@@ -46,7 +46,7 @@ describe('POST /api/auth/reset', () => {
     expect(setCookies.some(c => c.startsWith('jv_country='))).toBe(false);
   });
 
-  it('deletes only on host scope for apex hosts', async () => {
+  it('deletes host and parent .jov.ie scope on apex hosts', async () => {
     const res = await POST(
       buildRequest(
         'https://jov.ie/api/auth/reset',
@@ -57,8 +57,22 @@ describe('POST /api/auth/reset', () => {
     const sessionCookies = setCookies.filter(c =>
       c.startsWith('better-auth.session_token=')
     );
-    // Apex has only 2 parts so no parent scope delete
-    expect(sessionCookies.length).toBe(1);
+    expect(sessionCookies.length).toBe(2);
+    expect(
+      sessionCookies.some(c => c.toLowerCase().includes('domain=.jov.ie'))
+    ).toBe(true);
+  });
+
+  it('preserves a same-origin redirect_url through the sign-in bounce', async () => {
+    const res = await POST(
+      buildRequest(
+        'https://jov.ie/api/auth/reset?redirect_url=%2Fapi%2Fovie%2Foauth%2Fauthorize%3Fresponse_type%3Dcode'
+      )
+    );
+    expect(res.status).toBe(303);
+    expect(res.headers.get('location')).toBe(
+      'https://jov.ie/signin?reset=1&redirect_url=%2Fapi%2Fovie%2Foauth%2Fauthorize%3Fresponse_type%3Dcode'
+    );
   });
 
   it('is idempotent when no clerk cookies are present', async () => {

@@ -228,3 +228,17 @@ export function isOvieOAuthFounder(input: {
 }): boolean {
   return input.authenticated && (input.entitlementsAdmin || input.dbAdmin);
 }
+
+/**
+ * /identity is Apple-only shared identity (LYB). ChatGPT founder OAuth
+ * must use the full Jovie /signin (Google + email). A signed-in
+ * non-founder (Hide My Email waitlist) has to reset first or /signin
+ * bounces them back to /waitlist.
+ */
+export function ovieFounderLoginLocation(
+  authorizePathAndQuery: string,
+  authenticated: boolean
+): string {
+  const dest = authenticated ? '/api/auth/reset' : '/signin';
+  return `${dest}?redirect_url=${encodeURIComponent(authorizePathAndQuery)}`;
+}

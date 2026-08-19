@@ -4,6 +4,7 @@ import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
   getOvieOAuthIssuer,
   isOvieOAuthFounder,
+  ovieFounderLoginLocation,
   ovieIssuerSecret,
 } from '@/lib/ovie/mcp/oauth';
 
@@ -30,8 +31,13 @@ export async function GET(request: Request): Promise<NextResponse> {
     dbAdmin,
   });
   if (!founder) {
-    const next = encodeURIComponent(`${url.pathname}${url.search}`);
-    return NextResponse.redirect(new URL(`/identity?next=${next}`, url.origin));
+    const next = `${url.pathname}${url.search}`;
+    return NextResponse.redirect(
+      new URL(
+        ovieFounderLoginLocation(next, entitlements.isAuthenticated),
+        url.origin
+      )
+    );
   }
 
   try {

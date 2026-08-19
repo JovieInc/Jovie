@@ -4,6 +4,6 @@
 
 Tools: `get_org_state`, `record_decision`, `create_initiative`, `get_initiative`, `get_feature_state`, `certify_feature`, `search_gbrain`, `get_gbrain_page`. Writes need founder token. gbrain tools are read-only. No in-request worker spawn. Merged ≠ certified.
 
-ChatGPT: Settings → Apps → Advanced → Developer mode → connector URL above. Sign in as `tim@meetjovie.com`.
+ChatGPT: Settings → Apps → Advanced → Developer mode → connector URL above. Authorize uses Jovie `/signin` (Google or email), not Apple-only `/identity`. Sign in as founder (`tim@meetjovie.com` or `t@timwhite.co`). A wrong-account session is reset first so waitlist Hide-My-Email cannot trap the flow.
 
 Test: unauthenticated `initialize` → 401; founder `tools/list` → six tools.

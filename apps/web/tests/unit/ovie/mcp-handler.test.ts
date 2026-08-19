@@ -20,6 +20,7 @@ import {
   getOvieOAuthIssuer,
   isAllowedRedirect,
   isOvieOAuthFounder,
+  ovieFounderLoginLocation,
   pkceS256,
 } from '@/lib/ovie/mcp/oauth';
 import { MemoryOperatingStore } from '@/lib/ovie/mcp/store';
@@ -239,6 +240,17 @@ describe('Ovie MCP OAuth', () => {
     expect(claims?.isAdmin).toBe(true);
     expect(claims?.email).toBe('tim@meetjovie.com');
     expect(isAllowedRedirect('https://evil.example/cb')).toBe(false);
+  });
+
+  it('sends ChatGPT OAuth to /signin, and resets a wrong-account session', () => {
+    const next = '/api/ovie/oauth/authorize?response_type=code&client_id=x';
+    expect(ovieFounderLoginLocation(next, false)).toBe(
+      `/signin?redirect_url=${encodeURIComponent(next)}`
+    );
+    expect(ovieFounderLoginLocation(next, true)).toBe(
+      `/api/auth/reset?redirect_url=${encodeURIComponent(next)}`
+    );
+    expect(ovieFounderLoginLocation(next, false)).not.toContain('/identity');
   });
 
   it('treats Better Auth DB admins as Ovie OAuth founders', () => {
