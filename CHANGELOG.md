@@ -36,6 +36,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- [internal] **Long typechecks now report phase timing instead of looking stuck:** singleflight logs elapsed time, tsbuildinfo age/size, and child CPU/RSS while the live compiler keeps ownership.
 - [internal] **Merge-queue Path Changes no longer rejects coalesced heads:** an empty event-base diff now recomputes against live `main` before a typed no-op, so green combined heads can land.
 - **Mac chat stays on screen once the answer starts:** reserving the thread URL no longer remounts the live composer and transcript.
 - **Vlog capture matches how you hold the phone:** portrait, landscape left, and landscape right record the right way up. Landscape keeps record controls on screen.
