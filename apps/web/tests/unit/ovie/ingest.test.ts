@@ -3,6 +3,7 @@ import { prepareOvieChatTurn } from '@/lib/ovie/chat-entry';
 import {
   DEST_LINEAR,
   DEST_PERSONAL,
+  OVIE_QUEUED_ACK,
   readOvieLinearRoutes,
   readOvieReceiptLog,
   resetOvieIngestLog,
@@ -45,7 +46,8 @@ describe('Ovie dump ingest (JOV-5215)', () => {
     expect(receipts[3]?.destination).toBe(DEST_PERSONAL);
     expect(receipts[3]?.destination).not.toBe(DEST_LINEAR);
     for (const receipt of receipts) {
-      expect(receipt.ack.startsWith('stored:')).toBe(true);
+      expect(receipt.ack).toBe(OVIE_QUEUED_ACK);
+      expect(receipt.destinationHandle).toBeNull();
       expect(receipt.workerSpawned).toBe(false);
     }
     expect(readOvieReceiptLog()).toEqual(receipts);

@@ -32,9 +32,7 @@ export type SpawnFn = (goal: string) => void;
 /** Incomplete until the Mac lander writes a Kanban task id or Linear identifier. */
 export const OVIE_QUEUED_ACK = 'stored and queued for Summer lander';
 
-export function ovieAckForHandle(
-  handle: string | null | undefined
-): string {
+export function ovieAckForHandle(handle: string | null | undefined): string {
   const id = handle?.trim();
   return id ? `landed:${id}` : OVIE_QUEUED_ACK;
 }

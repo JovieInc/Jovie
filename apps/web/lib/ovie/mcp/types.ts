@@ -83,6 +83,8 @@ export type OvieInitiative = {
   readonly receipts: readonly OvieReceipt[];
   readonly decisionId?: string;
   readonly workerSpawned: false;
+  /** Kanban task id or Linear identifier. Null until ovie-intake-to-kanban.py lands. */
+  readonly destinationHandle?: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly evidence: readonly OvieEvidence[];

@@ -15,6 +15,12 @@ export async function POST(request: Request): Promise<NextResponse> {
     isAdmin: principal.isAdmin,
     store: getOvieOperatingStore(),
     id: typeof rec.id === 'string' ? rec.id : '',
-    landed_ref: typeof rec.landed_ref === 'string' ? rec.landed_ref : '',
+    landed_ref:
+      (typeof rec.landed_ref === 'string' && rec.landed_ref) ||
+      (typeof rec.linear_id === 'string' && rec.linear_id) ||
+      (typeof rec.task_id === 'string' && rec.task_id) ||
+      '',
+    task_id: typeof rec.task_id === 'string' ? rec.task_id : undefined,
+    linear_id: typeof rec.linear_id === 'string' ? rec.linear_id : undefined,
   });
 }

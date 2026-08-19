@@ -3,6 +3,7 @@
  *
  * Chat/MCP share OperatingStore. Dump never spawns a worker.
  * Mac lander: GET /api/ovie/pending then POST /api/ovie/landed.
+ * Destination writer is ovie-intake-to-kanban.py.
  * Kanban idempotency_key is ovie-<initiative_id>; created-by ovie.
  */
 
@@ -10,6 +11,7 @@ import {
   DEST_LINEAR,
   ingestOvieDump,
   type OvieReceipt,
+  ovieAckForHandle,
   persistOvieReceipt,
   routeEngineeringToLinear,
   type SpawnFn,
@@ -28,13 +30,38 @@ export type OvieDumpOptions = {
   readonly store: OperatingStore;
 };
 
-export function isInitiativeLanded(initiative: OvieInitiative): boolean {
-  return initiative.evidence.some(ev => {
-    if (typeof ev.landed_ref === 'string' && ev.landed_ref.length > 0) {
-      return true;
+export function destinationHandleOf(initiative: OvieInitiative): string | null {
+  const direct = initiative.destinationHandle?.trim();
+  if (direct) return direct;
+  for (const receipt of initiative.receipts) {
+    const handle = receipt.destinationHandle?.trim();
+    if (handle) return handle;
+  }
+  for (const ev of initiative.evidence) {
+    const landed = ev.landed_ref?.trim();
+    if (landed) return landed;
+    if (ev.summary.startsWith('landed:')) {
+      const rest = ev.summary.slice('landed:'.length).trim();
+      if (rest) return rest;
     }
-    return ev.kind === 'landed' || ev.summary.startsWith('landed:');
-  });
+  }
+  return null;
+}
+
+export function isInitiativeLanded(initiative: OvieInitiative): boolean {
+  return destinationHandleOf(initiative) !== null;
+}
+
+export function initiativeAckView(initiative: OvieInitiative) {
+  const destinationHandle = destinationHandleOf(initiative);
+  return {
+    ...initiative,
+    destinationHandle,
+    ack: ovieAckForHandle(destinationHandle),
+    complete: Boolean(destinationHandle),
+    workerSpawned: false as const,
+    queuedFor: destinationHandle ? undefined : ('summer-lander' as const),
+  };
 }
 
 export function receiptToInitiative(receipt: OvieReceipt): OvieInitiative {
@@ -52,6 +79,7 @@ export function receiptToInitiative(receipt: OvieReceipt): OvieInitiative {
     destination: receipt.destination,
     receipts: [receipt],
     workerSpawned: false,
+    destinationHandle: null,
     createdAt: now,
     updatedAt: now,
     evidence: [
@@ -109,24 +137,48 @@ export async function listPendingInitiatives(
   return rows.filter(row => !isInitiativeLanded(row));
 }
 
+export type LandInitiativeInput = {
+  readonly id: string;
+  readonly landed_ref?: string;
+  readonly task_id?: string;
+  readonly linear_id?: string;
+};
+
+export function resolveLandedHandle(input: LandInitiativeInput): string {
+  return (
+    input.linear_id?.trim() ||
+    input.task_id?.trim() ||
+    input.landed_ref?.trim() ||
+    ''
+  );
+}
+
 export async function markInitiativeLanded(
   store: OperatingStore,
-  input: { readonly id: string; readonly landed_ref: string }
+  input: LandInitiativeInput
 ): Promise<OvieInitiative | undefined> {
-  const landedRef = input.landed_ref.trim();
+  const landedRef = resolveLandedHandle(input);
   if (!landedRef) throw new Error('landed_ref is required');
   const current = await store.getInitiative(input.id);
   if (!current) return undefined;
   if (isInitiativeLanded(current)) return current;
   const now = new Date().toISOString();
+  const ack = ovieAckForHandle(landedRef);
   const next: OvieInitiative = {
     ...current,
     updatedAt: now,
+    destinationHandle: landedRef,
+    receipts: current.receipts.map(receipt => ({
+      ...receipt,
+      destinationHandle: landedRef,
+      ack,
+      workerSpawned: false,
+    })),
     evidence: [
       ...current.evidence,
       {
         kind: 'landed',
-        summary: `landed:${landedRef}`,
+        summary: ack,
         ref: landedRef,
         landed_ref: landedRef,
       },
@@ -140,6 +192,8 @@ export type PendingInitiativeView = OvieInitiative & {
   readonly idempotency_key: string;
   readonly created_by: typeof OVIE_CREATED_BY;
   readonly landed: false;
+  readonly ack: string;
+  readonly destinationHandle: null;
 };
 
 export function toPendingInitiativeView(
@@ -150,5 +204,7 @@ export function toPendingInitiativeView(
     idempotency_key: ovieIdempotencyKey(initiative.id),
     created_by: OVIE_CREATED_BY,
     landed: false,
+    ack: ovieAckForHandle(null),
+    destinationHandle: null,
   };
 }

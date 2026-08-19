@@ -36,7 +36,8 @@ describe('Ovie durable dump persist', () => {
     });
     expect(spawned).toEqual([]);
     expect(receipts[0]?.workerSpawned).toBe(false);
-    expect(receipts[0]?.ack).toBe('stored:heavy:kanban');
+    expect(receipts[0]?.ack).toBe('stored and queued for Summer lander');
+    expect(receipts[0]?.destinationHandle).toBeNull();
 
     const reader = new DurableOperatingStore(backend);
     const listed = await reader.listInitiatives();

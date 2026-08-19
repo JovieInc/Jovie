@@ -132,6 +132,9 @@ describe('Ovie MCP handler', () => {
     const createdBody = toolResult<{
       id: string;
       workerSpawned: boolean;
+      destinationHandle: string | null;
+      ack: string;
+      queuedFor?: string;
       status: string;
       evidence: Array<{ summary: string }>;
       receipts: Array<{ destination: string }>;
@@ -143,6 +146,9 @@ describe('Ovie MCP handler', () => {
     }>(created.body);
     expect((created.body as { id: string }).id).toBe('c1');
     expect(createdBody.workerSpawned).toBe(false);
+    expect(createdBody.destinationHandle).toBeNull();
+    expect(createdBody.ack).toBe('stored and queued for Summer lander');
+    expect(createdBody.queuedFor).toBe('summer-lander');
     expect(createdBody.id).toMatch(/^ini_[A-Za-z0-9_-]{8,24}$/);
     expect(createdBody.id.includes('.')).toBe(false);
     expect(createdBody.id.length).toBeLessThan(48);
