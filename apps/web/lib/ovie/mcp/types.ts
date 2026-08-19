@@ -11,6 +11,8 @@ export const OVIE_MCP_TOOLS = [
   'get_initiative',
   'get_feature_state',
   'certify_feature',
+  'search_gbrain',
+  'get_gbrain_page',
 ] as const;
 
 export type OvieMcpToolName = (typeof OVIE_MCP_TOOLS)[number];

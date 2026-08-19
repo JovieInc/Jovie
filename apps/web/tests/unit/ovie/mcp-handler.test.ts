@@ -1,4 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@/lib/wiki/gbrain-client', () => ({
+  searchPages: vi.fn(async (query: string) => [
+    { slug: 'ovie-mcp', title: `hit:${query}`, score: 0.9 },
+  ]),
+  getPage: vi.fn(async (slug: string) =>
+    slug === 'ovie-mcp'
+      ? { slug, title: 'Ovie MCP', compiled_truth: 'read-only' }
+      : null
+  ),
+}));
+
 import {
   bindEveIdentityForTurn,
   eveIdentityForMcpDoor,
@@ -7,6 +19,7 @@ import { handleOvieMcpRequest } from '@/lib/ovie/mcp/handler';
 import {
   getOvieOAuthIssuer,
   isAllowedRedirect,
+  isOvieOAuthFounder,
   pkceS256,
 } from '@/lib/ovie/mcp/oauth';
 import { MemoryOperatingStore } from '@/lib/ovie/mcp/store';
@@ -34,8 +47,8 @@ function toolResult<T>(body: unknown): T {
 }
 
 describe('Ovie MCP handler', () => {
-  it('rejects unauthenticated initialize', () => {
-    const result = handleOvieMcpRequest({
+  it('rejects unauthenticated initialize', async () => {
+    const result = await handleOvieMcpRequest({
       body: rpc('initialize', {}, 42),
       principal: guest,
     });
@@ -48,8 +61,8 @@ describe('Ovie MCP handler', () => {
     expect(result.headers?.['www-authenticate']).toContain('resource_metadata');
   });
 
-  it('echoes JSON-RPC id and lists the six Ovie tools', () => {
-    const result = handleOvieMcpRequest({
+  it('echoes JSON-RPC id and lists the Ovie tools', async () => {
+    const result = await handleOvieMcpRequest({
       body: rpc('tools/list', {}, 'list-7'),
       principal: founder,
     });
@@ -76,8 +89,8 @@ describe('Ovie MCP handler', () => {
     ).toThrow();
   });
 
-  it('rejects non-founder writes', () => {
-    const result = handleOvieMcpRequest({
+  it('rejects non-founder writes', async () => {
+    const result = await handleOvieMcpRequest({
       body: rpc('tools/call', {
         name: 'create_initiative',
         arguments: { title: 'x', intent: 'y' },
@@ -87,8 +100,8 @@ describe('Ovie MCP handler', () => {
     expect(result.status).toBe(403);
   });
 
-  it('round-trips create_initiative then get_initiative without spawning', () => {
-    const created = handleOvieMcpRequest({
+  it('round-trips create_initiative then get_initiative without spawning', async () => {
+    const created = await handleOvieMcpRequest({
       store: new MemoryOperatingStore(),
       principal: founder,
       body: rpc(
@@ -115,7 +128,7 @@ describe('Ovie MCP handler', () => {
     expect(createdBody.workerSpawned).toBe(false);
     expect(createdBody.id.startsWith('ini_')).toBe(true);
 
-    const fetched = handleOvieMcpRequest({
+    const fetched = await handleOvieMcpRequest({
       store: new MemoryOperatingStore(),
       principal: founder,
       body: rpc(
@@ -134,41 +147,45 @@ describe('Ovie MCP handler', () => {
     expect(fetchedBody.merged_is_not_complete).toBe(true);
   });
 
-  it('persists a decision that later work can reference', () => {
+  it('persists a decision that later work can reference', async () => {
     const store = new MemoryOperatingStore();
     const decision = toolResult<{ id: string }>(
-      handleOvieMcpRequest({
-        store,
-        principal: founder,
-        body: rpc('tools/call', {
-          name: 'record_decision',
-          arguments: {
-            decided: 'Certify public artist profiles before launch',
-            why: 'Cannot announce what is uncertified',
-            provenance: 'strategy-chat',
-          },
-        }),
-      }).body
+      (
+        await handleOvieMcpRequest({
+          store,
+          principal: founder,
+          body: rpc('tools/call', {
+            name: 'record_decision',
+            arguments: {
+              decided: 'Certify public artist profiles before launch',
+              why: 'Cannot announce what is uncertified',
+              provenance: 'strategy-chat',
+            },
+          }),
+        })
+      ).body
     );
     const initiative = toolResult<{ decisionId?: string }>(
-      handleOvieMcpRequest({
-        store,
-        principal: founder,
-        body: rpc('tools/call', {
-          name: 'create_initiative',
-          arguments: {
-            title: 'Profile cert',
-            intent: 'Execute the decision',
-            decision_id: decision.id,
-          },
-        }),
-      }).body
+      (
+        await handleOvieMcpRequest({
+          store,
+          principal: founder,
+          body: rpc('tools/call', {
+            name: 'create_initiative',
+            arguments: {
+              title: 'Profile cert',
+              intent: 'Execute the decision',
+              decision_id: decision.id,
+            },
+          }),
+        })
+      ).body
     );
     expect(initiative.decisionId).toBe(decision.id);
   });
 
-  it('lets authenticated non-founders read org state', () => {
-    const result = handleOvieMcpRequest({
+  it('lets authenticated non-founders read org state', async () => {
+    const result = await handleOvieMcpRequest({
       principal: user,
       body: rpc('tools/call', {
         name: 'get_org_state',
@@ -177,6 +194,23 @@ describe('Ovie MCP handler', () => {
     });
     expect(result.status).toBe(200);
     expect(toolResult<{ identity: string }>(result.body).identity).toBe('ovie');
+  });
+
+  it('searches gbrain read-only through the Ovie pack', async () => {
+    const result = await handleOvieMcpRequest({
+      principal: founder,
+      body: rpc('tools/call', {
+        name: 'search_gbrain',
+        arguments: { query: 'ovie mcp' },
+      }),
+    });
+    expect(result.status).toBe(200);
+    const body = toolResult<{
+      write: boolean;
+      hits: Array<{ slug: string }>;
+    }>(result.body);
+    expect(body.write).toBe(false);
+    expect(body.hits[0]?.slug).toBe('ovie-mcp');
   });
 });
 
@@ -205,6 +239,23 @@ describe('Ovie MCP OAuth', () => {
     expect(claims?.isAdmin).toBe(true);
     expect(claims?.email).toBe('tim@meetjovie.com');
     expect(isAllowedRedirect('https://evil.example/cb')).toBe(false);
+  });
+
+  it('treats Better Auth DB admins as Ovie OAuth founders', () => {
+    expect(
+      isOvieOAuthFounder({
+        authenticated: true,
+        entitlementsAdmin: false,
+        dbAdmin: true,
+      })
+    ).toBe(true);
+    expect(
+      isOvieOAuthFounder({
+        authenticated: true,
+        entitlementsAdmin: false,
+        dbAdmin: false,
+      })
+    ).toBe(false);
   });
 
   it('refuses non-founder authorization codes', () => {

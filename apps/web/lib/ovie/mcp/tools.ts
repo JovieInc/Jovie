@@ -1,5 +1,6 @@
 import { authorizeSummerControl } from '@/lib/ovie/control';
 import { bindEveIdentityForTurn } from '@/lib/ovie/identity';
+import { getPage, searchPages } from '@/lib/wiki/gbrain-client';
 import {
   findProfileCapability,
   loadProfileCapabilitiesFromDisk,
@@ -70,22 +71,30 @@ function toolDescription(name: OvieMcpToolName): string {
       return 'Implementation, flag, and certification ladder for a feature.';
     case 'certify_feature':
       return 'Draft or return an outcome-level certification spec. Does not run live money missions.';
+    case 'search_gbrain':
+      return 'Read-only gbrain search. Does not write memory.';
+    case 'get_gbrain_page':
+      return 'Read-only gbrain page by slug. Does not write memory.';
   }
 }
 
-export function callOvieMcpTool(
+export async function callOvieMcpTool(
   store: OperatingStore,
   principal: OvieMcpPrincipal,
   name: string,
   args: Record<string, unknown>
-):
+): Promise<
   | { ok: true; result: unknown }
-  | { ok: false; message: string; status?: 401 | 403 } {
+  | { ok: false; message: string; status?: 401 | 403 }
+> {
   const authz = authorizeOvieMcpTool(principal, name);
   if (!authz.ok) return authz;
 
   const turn = bindEveIdentityForTurn(OVIE_MCP_IDENTITY);
   if (isOvieWriteTool(name)) turn.require('ingest-ack');
+  if (name === 'search_gbrain' || name === 'get_gbrain_page') {
+    turn.require('gbrain-read');
+  }
 
   switch (name) {
     case 'get_org_state':
@@ -100,6 +109,10 @@ export function callOvieMcpTool(
       return { ok: true, result: getFeatureState(args) };
     case 'certify_feature':
       return { ok: true, result: certifyFeature(args) };
+    case 'search_gbrain':
+      return { ok: true, result: await searchGbrain(args) };
+    case 'get_gbrain_page':
+      return { ok: true, result: await getGbrainPage(args) };
     default:
       return { ok: false, message: `Unknown tool: ${name}` };
   }
@@ -234,4 +247,19 @@ function certifyFeature(args: Record<string, unknown>) {
     inventory: match,
     map: renderArtistProfileInventory(inventory).slice(0, 4000),
   };
+}
+
+async function searchGbrain(args: Record<string, unknown>) {
+  const query = typeof args.query === 'string' ? args.query.trim() : '';
+  if (!query) throw new Error('query is required');
+  const limit = typeof args.limit === 'number' ? args.limit : 8;
+  const hits = await searchPages(query, Math.min(Math.max(limit, 1), 20));
+  return { query, write: false, hits };
+}
+
+async function getGbrainPage(args: Record<string, unknown>) {
+  const slug = typeof args.slug === 'string' ? args.slug.trim() : '';
+  if (!slug) throw new Error('slug is required');
+  const page = await getPage(slug);
+  return { slug, write: false, found: Boolean(page), page };
 }

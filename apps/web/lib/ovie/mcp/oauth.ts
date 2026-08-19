@@ -219,3 +219,12 @@ export function extractBearer(authorization: string | null): string | null {
   const token = authorization.slice('Bearer '.length).trim();
   return token || null;
 }
+
+/** Entitlements.isAdmin is Clerk-MFA gated; Better Auth has no has() so DB admin is enough. */
+export function isOvieOAuthFounder(input: {
+  readonly authenticated: boolean;
+  readonly entitlementsAdmin: boolean;
+  readonly dbAdmin: boolean;
+}): boolean {
+  return input.authenticated && (input.entitlementsAdmin || input.dbAdmin);
+}
