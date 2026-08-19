@@ -7,6 +7,10 @@ const WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/sentry-autofix.yml'),
   'utf8'
 );
+const RECURRENCE = readFileSync(
+  resolve(REPO_ROOT, '.github/workflows/sentry-autofix-recurrence.yml'),
+  'utf8'
+);
 
 describe('Sentry autofix workflow contract', () => {
   it('deduplicates automation by root signature with issue ID fallback', () => {
@@ -49,5 +53,17 @@ describe('Sentry autofix workflow contract', () => {
       'This PR does not close the incident. Resolution requires post-deploy recurrence evidence'
     );
     expect(WORKFLOW).not.toMatch(/close[sd]?\s+(the\s+)?(Sentry\s+)?issue/i);
+  });
+
+  it('closes the loop on a scheduled or manual recurrence check, never source PRs', () => {
+    expect(RECURRENCE).toContain('cron:');
+    expect(RECURRENCE).toContain('workflow_dispatch:');
+    expect(RECURRENCE).not.toMatch(/^\s*pull_request:/m);
+    expect(RECURRENCE).not.toMatch(/^\s*merge_group:/m);
+    expect(RECURRENCE).toContain(
+      "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
+    );
+    expect(RECURRENCE).toContain('node scripts/sentry-autofix-recurrence.mjs');
+    expect(RECURRENCE).toContain('secrets.SENTRY_AUTH_TOKEN');
   });
 });
