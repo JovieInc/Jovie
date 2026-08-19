@@ -16,7 +16,10 @@ describe('jovie core-chat mock model', () => {
     const response = respondToJovieCoreChat(emptyRequest);
     expect(response).toEqual({
       toolCalls: [
-        { name: 'jovie_capability_manifest', input: { capability: 'core_chat' } },
+        {
+          name: 'jovie_capability_manifest',
+          input: { capability: 'core_chat' },
+        },
       ],
     });
   });

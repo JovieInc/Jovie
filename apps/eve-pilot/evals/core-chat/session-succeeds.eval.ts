@@ -1,8 +1,7 @@
 import { defineEval } from 'eve/evals';
 import { equals, satisfies } from 'eve/evals/expect';
-
-import { SESSION_PATH } from './shared';
 import { coreChatSessionBody } from './shadow-payload';
+import { SESSION_PATH } from './shared';
 
 export default defineEval({
   description:

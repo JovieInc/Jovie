@@ -60,9 +60,7 @@ export function postSessionRaw(input: {
         setHost: input.hostHeader === undefined,
         headers: {
           'content-type': 'application/json',
-          ...(input.hostHeader === undefined
-            ? {}
-            : { host: input.hostHeader }),
+          ...(input.hostHeader === undefined ? {} : { host: input.hostHeader }),
           ...input.headers,
         },
       },

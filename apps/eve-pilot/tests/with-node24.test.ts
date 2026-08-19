@@ -6,7 +6,12 @@ describe('with-node24', () => {
   it('puts Node >= 24 on PATH even when the parent is older', () => {
     const version = execFileSync(
       'bash',
-      [resolve(process.cwd(), 'scripts/with-node24.sh'), 'node', '-p', 'process.versions.node'],
+      [
+        resolve(process.cwd(), 'scripts/with-node24.sh'),
+        'node',
+        '-p',
+        'process.versions.node',
+      ],
       {
         encoding: 'utf8',
         env: {

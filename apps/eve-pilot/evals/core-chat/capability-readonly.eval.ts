@@ -2,8 +2,8 @@ import { defineEval } from 'eve/evals';
 import { includes, satisfies } from 'eve/evals/expect';
 
 import { capabilityManifest } from '../../agent/tools/jovie_capability_manifest';
-import { serializedEventsLeak } from './shared';
 import { coreChatSessionBody } from './shadow-payload';
+import { serializedEventsLeak } from './shared';
 
 export default defineEval({
   description:

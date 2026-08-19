@@ -9,7 +9,8 @@ export const CORE_CHAT_PROTOCOL_VERSION = 1;
 export const MAX_USER_MESSAGE_CHARS = 4_000;
 
 export function coreChatSessionBody(message: string, requestId: string) {
-  const text = message.trim() ||
+  const text =
+    message.trim() ||
     'Register this Jovie core chat turn as a shadow observation.';
 
   return {

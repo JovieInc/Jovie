@@ -2,11 +2,11 @@ import { defineEval } from 'eve/evals';
 import { equals, satisfies } from 'eve/evals/expect';
 
 import { capabilityManifest } from '../../agent/tools/jovie_capability_manifest';
-import { SESSION_PATH, serializedEventsLeak } from './shared';
 import {
   coreChatSessionBody,
   sessionBodyHasForbiddenKeys,
 } from './shadow-payload';
+import { SESSION_PATH, serializedEventsLeak } from './shared';
 
 const LEAK_NEEDLE = 'sk_live_LEAK_CANARY';
 const USER_NEEDLE = 'user_LEAK_CANARY';
@@ -85,7 +85,9 @@ export default defineEval({
         'stuffed POST still opens a session id'
       )
     );
-    const stuffedSession = await t.target.attachSession(String(stuffedSessionId));
+    const stuffedSession = await t.target.attachSession(
+      String(stuffedSessionId)
+    );
     stuffedSession.succeeded();
     stuffedSession.eventsSatisfy(
       'unknown leak fields never enter the session stream',
