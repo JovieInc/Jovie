@@ -265,7 +265,6 @@ export async function handleMobileChatTurn(
 
   const artistContext = await fetchMobileArtistContext({
     profileId,
-    clerkUserId: userId,
   });
 
   if (!artistContext) {

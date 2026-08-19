@@ -42,14 +42,9 @@ enum AppShellTab: Equatable, Hashable {
     }
   }
 
-  /// Primary thumb-zone destinations (Audience + Profile are drawer-only).
+  /// Bottom-bar destinations are unused. Every surface is sidebar or rail.
   var isPrimaryTab: Bool {
-    switch self {
-    case .chat, .library, .calendar, .inbox:
-      return true
-    case .profile, .audience:
-      return false
-    }
+    false
   }
 }
 
@@ -86,6 +81,14 @@ func appShellShowsChatUnderlay(selectedTab: AppShellTab, chatEnabled: Bool) -> B
   }
 }
 
+func appShellRightRailOpacity(isShowing: Bool, dragOffset: CGFloat) -> Double {
+  (isShowing || dragOffset != 0) ? 1 : 0
+}
+
+func appShellHomeSurface(chatEnabled: Bool) -> AppShellTab {
+  AppShellPanePolicy.homeSurface(chatEnabled: chatEnabled)
+}
+
 private enum AppShellRoute: Hashable {
   case settings
 }
@@ -94,12 +97,14 @@ struct AppShellProfile: Equatable {
   let displayName: String
   let username: String?
   let publicProfileURL: String?
+  let qrPayload: String?
   let avatarURL: URL?
 
   init(response: MobileMeResponse?) {
     displayName = response?.displayName ?? response?.username ?? "Jovie"
     username = response?.username
     publicProfileURL = response?.publicProfileURL
+    qrPayload = response?.qrPayload
     avatarURL = response?.avatarURL.flatMap(URL.init(string:))
   }
 
@@ -125,6 +130,7 @@ struct AppShellView<
   let profile: AppShellProfile
   let isOffline: Bool
   let opensSettingsOnLaunch: Bool
+  let webBaseURL: URL
   let accountURL: URL
   let billingURL: URL
   let chatEnabled: Bool
@@ -138,7 +144,10 @@ struct AppShellView<
   let onLogout: @MainActor () async -> Void
   @ViewBuilder let profileContent: ProfileContent
   @ViewBuilder let audienceContent: (_ askJovie: @escaping (String) -> Void) -> AudienceContent
-  @ViewBuilder let libraryContent: (_ onSelectAsset: @escaping (LibraryAsset) -> Void) -> LibraryContent
+  @ViewBuilder let libraryContent: (
+    _ onSelectAsset: @escaping (LibraryAsset) -> Void,
+    _ home: Binding<LibraryHome>
+  ) -> LibraryContent
   @ViewBuilder let calendarContent: (_ askJovie: @escaping (String) -> Void) -> CalendarContent
   @ViewBuilder let inboxContent: (_ askJovie: @escaping (String) -> Void) -> InboxContent
   let chatContent: (
@@ -152,6 +161,8 @@ struct AppShellView<
   @State private var navigationPath: [AppShellRoute] = []
   @State private var isShowingDrawer = false
   @State private var drawerDragOffset: CGFloat = 0
+  @State private var isShowingRightRail = false
+  @State private var railDragOffset: CGFloat = 0
   @State private var isKeyboardVisible = false
   @State private var didOpenLaunchSettings = false
   @State private var chatDraft = ""
@@ -159,7 +170,10 @@ struct AppShellView<
   @State private var isShowingTalkOverlay = false
   @State private var talkVoiceService = VoiceCaptureService()
   @State private var teleprompterProposal: MobileChatVideoProposalPayload?
+  @State private var libraryHome: LibraryHome = .catalog
   @State private var videoPlaybackAsset: LibraryAsset?
+  @State private var publicProfileBrowserItem: PublicProfileBrowserDestination?
+  @State private var isShowingProfileQR = false
   @State private var entityContext: EntityContextItem?
   @State private var lastEntityContext: EntityContextItem?
   @State private var intentStore = IntentNavigationStore.shared
@@ -170,6 +184,7 @@ struct AppShellView<
     isOffline: Bool,
     initialTab: AppShellTab = .chat,
     opensSettingsOnLaunch: Bool = false,
+    webBaseURL: URL,
     accountURL: URL,
     billingURL: URL,
     chatEnabled: Bool = false,
@@ -183,8 +198,10 @@ struct AppShellView<
     onLogout: @escaping @MainActor () async -> Void,
     @ViewBuilder profileContent: () -> ProfileContent,
     @ViewBuilder audienceContent: @escaping (_ askJovie: @escaping (String) -> Void) -> AudienceContent,
-    @ViewBuilder libraryContent: @escaping (_ onSelectAsset: @escaping (LibraryAsset) -> Void)
-      -> LibraryContent = { _ in EmptyView() },
+    @ViewBuilder libraryContent: @escaping (
+      _ onSelectAsset: @escaping (LibraryAsset) -> Void,
+      _ home: Binding<LibraryHome>
+    ) -> LibraryContent = { _, _ in EmptyView() },
     @ViewBuilder calendarContent: @escaping (_ askJovie: @escaping (String) -> Void) -> CalendarContent = { _ in
       EmptyView()
     },
@@ -204,6 +221,7 @@ struct AppShellView<
     self.profile = profile
     self.isOffline = isOffline
     self.opensSettingsOnLaunch = opensSettingsOnLaunch
+    self.webBaseURL = webBaseURL
     self.accountURL = accountURL
     self.billingURL = billingURL
     self.chatEnabled = chatEnabled
@@ -268,6 +286,16 @@ struct AppShellView<
             onOpenSettings: {
               closeDrawer()
               navigationPath.append(.settings)
+            },
+            onTalk: {
+              closeDrawer()
+              openTalkOverlay()
+            },
+            onOpenPublicProfile: {
+              openPublicProfile()
+            },
+            onOpenProfileQR: {
+              openProfileQR()
             }
           )
           .opacity(
@@ -282,10 +310,34 @@ struct AppShellView<
 
           shellContent
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .offset(x: reduceMotion ? 0 : contentOffset(openOffset: openOffset))
+            .offset(
+              x: reduceMotion
+                ? 0
+                : contentOffset(openOffset: openOffset, railOpenOffset: railWidth)
+            )
             .opacity(reduceMotion && isShowingDrawer ? 0 : 1)
             .animation(drawerAnimation, value: isShowingDrawer)
+            .animation(drawerAnimation, value: isShowingRightRail)
             .animation(reduceMotion ? nil : drawerAnimation, value: drawerDragOffset)
+            .animation(reduceMotion ? nil : drawerAnimation, value: railDragOffset)
+
+          AppShellRightRail(
+            item: lastEntityContext,
+            onTalk: openTalkOverlay,
+            onEditInChat: { prompt in
+              applyOpenPane(.none)
+              chatDraft = prompt
+              selectTab(.chat)
+            },
+            onClose: { applyOpenPane(.none) }
+          )
+          .frame(width: railWidth)
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+          .offset(x: reduceMotion ? 0 : rightRailOffset(railOpenOffset: railWidth))
+          .opacity(appShellRightRailOpacity(isShowing: isShowingRightRail, dragOffset: railDragOffset))
+          .animation(drawerAnimation, value: isShowingRightRail)
+          .accessibilityHidden(!isShowingRightRail && railDragOffset == 0)
+          .allowsHitTesting(isShowingRightRail)
 
           if isShowingTalkOverlay, chatEnabled {
             TalkOverlayView(
@@ -332,6 +384,7 @@ struct AppShellView<
         item: item,
         onEditInChat: { prompt in
           entityContext = nil
+          applyOpenPane(.none)
           chatDraft = prompt
           selectTab(.chat)
         },
@@ -344,6 +397,18 @@ struct AppShellView<
           .ignoresSafeArea()
           .background(Color.black)
           .accessibilityIdentifier("library-video-player")
+      }
+    }
+    .fullScreenCover(item: $publicProfileBrowserItem) { destination in
+      PublicProfileBrowserView(initialURL: destination.url, policy: destination.policy)
+    }
+    .fullScreenCover(isPresented: $isShowingProfileQR) {
+      if let payload = profile.qrPayload {
+        VenueModeView(
+          qrPayload: payload,
+          brightnessManager: ScreenBrightnessManager(),
+          onDismiss: { isShowingProfileQR = false }
+        )
       }
     }
     .task(id: opensSettingsOnLaunch) {
@@ -380,6 +445,7 @@ struct AppShellView<
   // drawer transform reads as one spatial move.
   private var shellContent: some View {
     let isElevated = isShowingDrawer || drawerDragOffset != 0
+      || isShowingRightRail || railDragOffset != 0
 
     return ZStack {
       ZStack {
@@ -394,7 +460,7 @@ struct AppShellView<
         shellToolbar
       }
       .safeAreaInset(edge: .bottom, spacing: 0) {
-        if chatEnabled {
+        if AppShellPanePolicy.showsBottomTabBar(), chatEnabled {
           AppShellTabBar(
             selectedTab: selectedTab,
             onSelect: { primary in
@@ -517,6 +583,25 @@ struct AppShellView<
     isShowingTalkOverlay = true
   }
 
+  private func openPublicProfile() {
+    dismissKeyboardIfNeeded()
+    applyOpenPane(.none)
+    guard
+      let urlString = profile.publicProfileURL,
+      let policy = PublicProfileURLPolicy(publicProfileURL: urlString)
+        ?? PublicProfileURLPolicy(webBaseURL: webBaseURL),
+      let url = policy.validatedURL(from: urlString)
+    else { return }
+    publicProfileBrowserItem = PublicProfileBrowserDestination(url: url, policy: policy)
+  }
+
+  private func openProfileQR() {
+    dismissKeyboardIfNeeded()
+    applyOpenPane(.none)
+    guard profile.qrPayload != nil else { return }
+    isShowingProfileQR = true
+  }
+
   private func presentVideoProposal(_ proposal: MobileChatVideoProposalPayload) {
     guard chatEnabled else { return }
     dismissKeyboardIfNeeded()
@@ -529,7 +614,8 @@ struct AppShellView<
 
   private func presentEntity(_ item: EntityContextItem) {
     lastEntityContext = item
-    entityContext = item
+    entityContext = nil
+    applyOpenPane(.rail)
   }
 
   /// The proposal's script auto-loads into the overlay; saving a recording
@@ -543,6 +629,7 @@ struct AppShellView<
     }
     viewModel.onSaved = { _ in
       self.teleprompterProposal = nil
+      self.libraryHome = LibraryLandingPolicy.homeAfterSavingVlog()
       self.selectTab(.library)
     }
     return viewModel
@@ -577,6 +664,10 @@ struct AppShellView<
     min(320, UIScreen.main.bounds.width * 0.86)
   }
 
+  private var railWidth: CGFloat {
+    min(320, UIScreen.main.bounds.width * 0.86)
+  }
+
   private var drawerAnimation: Animation {
     reduceMotion ? JovieMotion.subtle : JovieMotion.cinematic
   }
@@ -585,22 +676,54 @@ struct AppShellView<
     drawerWidth + safeAreaLeading
   }
 
-  private func contentOffset(openOffset: CGFloat) -> CGFloat {
+  private func contentOffset(openOffset: CGFloat, railOpenOffset: CGFloat) -> CGFloat {
     if isShowingDrawer {
       return max(0, openOffset + drawerDragOffset)
+    }
+    if isShowingRightRail {
+      return min(0, -railOpenOffset + railDragOffset)
+    }
+    if railDragOffset != 0 {
+      return min(0, railDragOffset)
     }
     return max(0, drawerDragOffset)
   }
 
+  private func rightRailOffset(railOpenOffset: CGFloat) -> CGFloat {
+    if isShowingRightRail {
+      return min(0, railDragOffset)
+    }
+    return railOpenOffset + min(0, railDragOffset)
+  }
+
+  private func applyOpenPane(_ pane: AppShellOpenPane) {
+    dismissKeyboardIfNeeded()
+    switch pane {
+    case .none:
+      isShowingDrawer = false
+      isShowingRightRail = false
+      drawerDragOffset = 0
+      railDragOffset = 0
+    case .sidebar:
+      isShowingRightRail = false
+      railDragOffset = 0
+      isShowingDrawer = true
+      drawerDragOffset = 0
+    case .rail:
+      isShowingDrawer = false
+      drawerDragOffset = 0
+      isShowingRightRail = true
+      railDragOffset = 0
+    }
+  }
+
   private func openDrawer() {
     guard !isShowingDrawer else { return }
-    dismissKeyboardIfNeeded()
-    isShowingDrawer = true
+    applyOpenPane(.sidebar)
   }
 
   private func closeDrawer() {
-    drawerDragOffset = 0
-    isShowingDrawer = false
+    applyOpenPane(.none)
   }
 
   private func closeDrawerThenSelect(_ tab: AppShellTab) {
@@ -648,7 +771,7 @@ struct AppShellView<
     case .chat:
       profileContent
     case .library:
-      libraryContent(presentEntityFromLibrary)
+      libraryContent(presentEntityFromLibrary, $libraryHome)
     case .calendar:
       calendarContent(openAudienceChat)
     case .inbox:
@@ -677,10 +800,16 @@ struct AppShellView<
 
         if isShowingDrawer {
           drawerDragOffset = min(0, value.translation.width)
+        } else if isShowingRightRail {
+          railDragOffset = max(0, value.translation.width)
         } else if value.startLocation.x < AppShellGesturePolicy.leftEdgeOpenWidth,
                   value.translation.width > 0
         {
           drawerDragOffset = min(value.translation.width, openOffset)
+        } else if value.startLocation.x > containerWidth - AppShellGesturePolicy.rightEdgeOpenWidth,
+                  value.translation.width < 0
+        {
+          railDragOffset = max(value.translation.width, -railWidth)
         }
       }
       .onEnded { value in
@@ -696,9 +825,22 @@ struct AppShellView<
           if value.translation.width < -AppShellGesturePolicy.openDistance
             || predicted < -AppShellGesturePolicy.openPredicted
           {
-            closeDrawer()
+            applyOpenPane(AppShellPanePolicy.paneAfterDismiss())
           } else {
             drawerDragOffset = 0
+          }
+          return
+        }
+
+        if isShowingRightRail {
+          if AppShellGesturePolicy.isRightEdgeClose(
+            isRailOpen: true,
+            translationX: value.translation.width,
+            predictedX: predicted
+          ) {
+            applyOpenPane(AppShellPanePolicy.paneAfterDismiss())
+          } else {
+            railDragOffset = 0
           }
           return
         }
@@ -708,8 +850,7 @@ struct AppShellView<
           translationX: value.translation.width,
           predictedX: predicted
         ) {
-          openDrawer()
-          drawerDragOffset = 0
+          applyOpenPane(AppShellPanePolicy.paneAfterLeadingSwipe(current: .none))
           return
         }
 
@@ -718,10 +859,12 @@ struct AppShellView<
           containerWidth: containerWidth,
           translationX: value.translation.width,
           predictedX: predicted
-        ), let lastEntityContext {
-          presentEntity(lastEntityContext)
+        ) {
+          applyOpenPane(AppShellPanePolicy.paneAfterTrailingSwipe(current: .none))
+          return
         }
         drawerDragOffset = 0
+        railDragOffset = 0
       }
   }
 
@@ -761,6 +904,14 @@ struct AppShellView<
         .accessibilityLabel("Open Vlog Mode")
         .accessibilityHint("Start a private on-device vlog in Prompt Mode")
         .accessibilityIdentifier("shell-vlog-open")
+
+        Button(action: openTalkOverlay) {
+          Image(systemName: "mic.fill")
+        }
+        .buttonStyle(JovieIconButtonStyle())
+        .accessibilityLabel("Talk")
+        .accessibilityIdentifier("shell-talk-fab")
+        .accessibilityHint("Opens full-screen voice capture")
       }
 
       Button {

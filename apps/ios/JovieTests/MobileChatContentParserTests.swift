@@ -60,6 +60,18 @@ struct MobileChatContentParserTests {
     #expect(MobileChatContentParser.displayText(from: content, isStreaming: false).isEmpty)
   }
 
+  @Test func qualityEvalHidesRawEntitySkillAndToolMarkup() {
+    let content = """
+    Check @release:rel_1[Midnight Drive] and /skill:merch then
+    <tool_call><name>createMerch</name><parameters></parameters></tool_call>
+    """
+    let display = MobileChatContentParser.displayText(from: content, isStreaming: false)
+    #expect(display.contains("@release:") == false)
+    #expect(display.contains("/skill:") == false)
+    #expect(display.contains("<tool_call>") == false)
+    #expect(display.contains("Midnight Drive"))
+  }
+
   @Test func leavesPlainTextUntouched() {
     let content = "Just a normal assistant reply."
 
@@ -206,6 +218,101 @@ struct MobileChatContentParserTests {
       .data(using: .utf8)!
 
     #expect(MobileChatContentParser.decodeVideoProposal(from: data) == nil)
+  }
+
+  @Test func allComponentsFixtureWireParsesToCardsWithoutRawMarkup() {
+    let running = MobileChatContentParser.segments(
+      from: MobileChatAllComponentsFixture.runningToolCall,
+      isStreaming: false
+    )
+    guard case let .toolCall(runningModel) = running.first else {
+      Issue.record("Expected running tool card from fixture wire")
+      return
+    }
+    #expect(runningModel.state == .running)
+    #expect(runningModel.title == "Creating merch options…")
+    #expect(
+      MobileChatContentParser.displayText(
+        from: MobileChatAllComponentsFixture.runningToolCall,
+        isStreaming: false
+      ).contains("<tool_call>") == false
+    )
+
+    let failed = MobileChatContentParser.segments(
+      from: MobileChatAllComponentsFixture.failedToolCall,
+      isStreaming: false
+    )
+    guard case let .toolCall(failedModel) = failed.first else {
+      Issue.record("Expected failed tool card from fixture wire")
+      return
+    }
+    #expect(failedModel.state == .failed)
+    #expect(failedModel.title == "Couldn't create merch")
+
+    let merch = MobileChatContentParser.segments(
+      from: MobileChatAllComponentsFixture.merchProductOptions,
+      isStreaming: false
+    )
+    #expect(
+      merch.contains {
+        if case let .toolCall(model) = $0 {
+          return model.state == .succeeded && model.title == "Merch options ready"
+        }
+        return false
+      }
+    )
+    guard case let .merchArtifact(.productOptions(payload)) = merch.last else {
+      Issue.record("Expected merch product options from fixture wire")
+      return
+    }
+    #expect(payload.options[0].designName == "Neon Pulse Tee")
+
+    let carousel = MobileChatContentParser.segments(
+      from: MobileChatAllComponentsFixture.merchDesignCarousel,
+      isStreaming: false
+    )
+    guard case let .merchArtifact(.designCarousel(designs)) = carousel.last else {
+      Issue.record("Expected merch design carousel from fixture wire")
+      return
+    }
+    #expect(designs.designs[0].designName == "Mono Mark")
+
+    let video = MobileChatContentParser.segments(
+      from: MobileChatAllComponentsFixture.videoProposal,
+      isStreaming: false
+    )
+    guard case let .videoProposal(proposal) = video.last else {
+      Issue.record("Expected video proposal from fixture wire")
+      return
+    }
+    #expect(proposal.title == "Release day shout-out")
+
+    let assistantDisplay = MobileChatContentParser.displayText(
+      from: MobileChatAllComponentsFixture.assistantProse,
+      isStreaming: false
+    )
+    #expect(assistantDisplay.contains("@release:") == false)
+    #expect(assistantDisplay.contains("/skill:") == false)
+    #expect(assistantDisplay.contains("Midnight Drive"))
+    #expect(assistantDisplay.contains("Opus"))
+    #expect(assistantDisplay.contains("Coachella 2027"))
+    #expect(assistantDisplay.contains("Generate album art"))
+
+    let userDisplay = MobileChatContentParser.displayText(
+      from: MobileChatAllComponentsFixture.userProse,
+      isStreaming: false
+    )
+    #expect(userDisplay.contains("Porter Robinson"))
+    #expect(userDisplay.contains("@artist:") == false)
+
+    #expect(MobileChatContentParser.segments(from: "", isStreaming: true).isEmpty)
+    #expect(MobileChatAllComponentsFixture.default.contains { $0.status == .failed })
+    #expect(MobileChatAllComponentsFixture.default.contains { $0.requiresWebHandoff })
+    #expect(
+      MobileChatAllComponentsFixture.default.contains {
+        $0.status == .streaming && $0.content.isEmpty
+      }
+    )
   }
 
 }

@@ -1042,6 +1042,49 @@ struct AppStateTests {
     #expect(appState.launchMode.opensChatOnLaunch == true)
   }
 
+  @Test func allComponentsChatLaunchModeOpensChatWithActiveUserID() async throws {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .uiTestingChatAllComponents,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+
+    await appState.completeLaunch()
+
+    #expect(appState.route == .ready)
+    #expect(appState.dashboardState == .loaded(.previewReady))
+    #expect(appState.isOffline == false)
+    #expect(appState.activeUserID == "user_ui_testing_chat_all_components")
+    #expect(appState.launchMode.opensChatOnLaunch == true)
+    #expect(appState.launchMode.chatEntityFixture?.isEmpty == false)
+  }
+
+  @Test func entityFixtureChatLaunchModeSetsActiveUserID() async throws {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .uiTestingChatEntityFixture,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+
+    await appState.completeLaunch()
+
+    #expect(appState.route == .ready)
+    #expect(appState.activeUserID == "user_ui_testing_chat_entity_fixture")
+    #expect(appState.launchMode.opensChatOnLaunch == true)
+  }
+
   @Test func offlineChatLaunchModeOpensChatWithOfflineState() async throws {
     let repository = MockRepository(
       nextResult: .success(
@@ -1407,6 +1450,33 @@ struct FeatureIntroPresentationTests {
   @Test func changelogURLStaysOnTheWebOrigin() {
     let url = FeatureIntroCatalog.changelogURL(from: URL(string: "https://jov.ie")!)
     #expect(url.absoluteString == "https://jov.ie/changelog")
+  }
+
+  @Test func versionedItemsNameTestableChanges() {
+    let items = WhatsNewCatalog.items(for: "1.0")
+    #expect(items.isEmpty == false)
+    #expect(items.allSatisfy { !$0.title.isEmpty && !$0.testHint.isEmpty })
+    #expect(items.contains(where: { $0.testHint.localizedCaseInsensitiveContains("Ask Jovie") }))
+    #expect(items.contains(where: { $0.testHint.localizedCaseInsensitiveContains("bottom tab") }))
+    #expect(items.contains(where: { $0.testHint.localizedCaseInsensitiveContains("sidebar") }))
+  }
+
+  @Test func unknownVersionStillShipsATestableItem() {
+    let items = WhatsNewCatalog.items(for: "9.9")
+    #expect(items.isEmpty == false)
+    #expect(items.allSatisfy { !$0.testHint.isEmpty })
+    #expect(items[0].testHint.contains("9.9"))
+  }
+
+  @Test func whatsNewLaunchModePresentsOnReadyChat() {
+    #expect(
+      LaunchMode.resolving(arguments: ["-ui-testing-whats-new"], isXCTest: false)
+        == .uiTestingWhatsNew
+    )
+    #expect(LaunchMode.uiTestingWhatsNew.presentsWhatsNew)
+    #expect(LaunchMode.uiTestingWhatsNew.defaultInitialTab == .chat)
+    #expect(LaunchMode.uiTestingChat.presentsWhatsNew == false)
+    #expect(LaunchMode.live.presentsWhatsNew)
   }
 }
 

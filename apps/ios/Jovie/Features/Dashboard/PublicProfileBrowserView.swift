@@ -1,6 +1,12 @@
 import SwiftUI
 import WebKit
 
+struct PublicProfileBrowserDestination: Identifiable, Equatable {
+  let url: URL
+  let policy: PublicProfileURLPolicy
+  var id: URL { url }
+}
+
 struct PublicProfileURLPolicy: Equatable {
   let allowedHost: String
 
@@ -13,6 +19,11 @@ struct PublicProfileURLPolicy: Equatable {
     }
 
     allowedHost = host
+  }
+
+  init?(publicProfileURL: String) {
+    guard let url = URL(string: publicProfileURL) else { return nil }
+    self.init(webBaseURL: url)
   }
 
   func validatedURL(from value: String?) -> URL? {

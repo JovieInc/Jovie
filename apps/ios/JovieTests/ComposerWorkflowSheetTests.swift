@@ -171,8 +171,9 @@ struct ChatComposerAccessibilityGuardTests {
 
     #expect(source.contains(".accessibilityElement(children: .contain)"))
     #expect(source.contains("accessibilityIdentifier(\"chat-composer\")"))
-    #expect(source.contains("accessibilityIdentifier(\"chat-composer-send\")"))
+    #expect(source.contains("chat-composer-send"))
     #expect(source.contains("accessibilityIdentifier(\"chat-composer-plus\")"))
+    #expect(source.contains("chat-composer-mic"))
   }
 
   @Test func mobileChatContainerDoesNotSwallowChildIdentifiers() throws {

@@ -380,6 +380,7 @@ This is the subtraction principle applied specifically to container boundaries. 
   - **Confirmations (irreversible actions)** → `<ConfirmDialog>` from `@/components/molecules/ConfirmDialog`
   - **Notifications / async errors** → `toast.error()` / `toast.success()` from `@/components/feedback` (canonical feedback system; never import `sonner` directly)
   - **Reversible actions** → optimistic update + undo-toast (pattern not yet codified — file a Linear ticket if you need this)
+  - **One interrupt at a time** → toasts, sheets, OS push, and in-flow prompts (vlog, pairing, What’s New) share one bus. A feature may not ship its own stacked popup. See `docs/NOTIFICATION_GUIDELINES.md` → “One interrupt bus”.
 - See `DESIGN.md` → "Confirmations & Destructive Actions" for the full decision rule and copy guidance.
 - Storybook stories (`*.stories.tsx`) and CLI scripts (`apps/web/scripts/**`) are exempted via the Biome override; they may use `alert()` for handler-fired signals.
 

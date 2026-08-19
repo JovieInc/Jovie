@@ -190,6 +190,7 @@ struct ChatComposerView: View {
   let isSending: Bool
   let isOffline: Bool
   let onSend: () -> Void
+  var onMic: () -> Void = {}
   let onSelectWorkflow: (ComposerWorkflowAction) -> Void
   let onDraftEdited: () -> Void
 
@@ -201,6 +202,7 @@ struct ChatComposerView: View {
       isSending: isSending,
       isPlusEnabled: ChatComposerMetrics.isPlusEnabled(isSending: isSending),
       onSend: onSend,
+      onMic: onMic,
       onSelectWorkflow: onSelectWorkflow,
       onDraftEdited: onDraftEdited
     )
@@ -409,6 +411,79 @@ private struct MobileChatEntityChipView: View {
   }
 }
 
+/// Compact skill pill matching web `.system-b-transcript-skill-chip`
+/// (dot + truncated label, 220pt max). One layout subview so the inline
+/// flow wraps the whole chip, not the words inside the label.
+private struct MobileChatSkillChipView: View {
+  let id: String
+  let label: String
+  let tone: MobileChatProseTone
+
+  private static let maxChipWidth: CGFloat = 220
+  private static let dotSize: CGFloat = 6
+
+  var body: some View {
+    HStack(spacing: 6) {
+      Circle()
+        .fill(dotColor)
+        .frame(width: Self.dotSize, height: Self.dotSize)
+        .accessibilityHidden(true)
+      Text(label)
+        .lineLimit(1)
+        .truncationMode(.tail)
+    }
+    .font(JovieFont.body(size: 12, weight: .medium))
+    .foregroundStyle(textColor)
+    .padding(.horizontal, 8)
+    .padding(.vertical, 4)
+    .frame(maxWidth: Self.maxChipWidth)
+    .background(chipBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    .overlay(
+      RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .stroke(chipBorder, lineWidth: 1)
+    )
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("Skill: \(label)")
+    .accessibilityIdentifier("skill-chip-\(id)")
+  }
+
+  private var textColor: Color {
+    switch tone {
+    case .onDark:
+      return JovieColor.textPrimary
+    case .onLight:
+      return JovieColor.backgroundBase
+    }
+  }
+
+  private var chipBackground: Color {
+    switch tone {
+    case .onDark:
+      return Color.white.opacity(0.035)
+    case .onLight:
+      return Color.black.opacity(0.055)
+    }
+  }
+
+  private var chipBorder: Color {
+    switch tone {
+    case .onDark:
+      return Color.white.opacity(0.085)
+    case .onLight:
+      return Color.black.opacity(0.10)
+    }
+  }
+
+  private var dotColor: Color {
+    switch tone {
+    case .onDark:
+      return JovieColor.textTertiary
+    case .onLight:
+      return Color.black.opacity(0.45)
+    }
+  }
+}
+
 /// Renders an ordered `[MobileChatProseRun]` inline within a chat bubble.
 /// Entity mentions use transcript pill chips with cached thumbnails (GH-12708);
 /// skill invocations stay text-only; plain text is one wrap flow (JOV-5204).
@@ -451,10 +526,8 @@ struct MobileChatProseText: View {
         tone: tone,
         onTap: onEntityTap
       )
-    case let .skill(_, label):
-      Text(label)
-        .foregroundStyle(skillLabelColor)
-        .fontWeight(.medium)
+    case let .skill(id, label):
+      MobileChatSkillChipView(id: id, label: label, tone: tone)
     }
   }
 
@@ -464,15 +537,6 @@ struct MobileChatProseText: View {
       return JovieColor.textPrimary
     case .onLight:
       return JovieColor.backgroundBase
-    }
-  }
-
-  private var skillLabelColor: Color {
-    switch tone {
-    case .onDark:
-      return JovieColor.textSecondary
-    case .onLight:
-      return JovieColor.backgroundBase.opacity(0.72)
     }
   }
 

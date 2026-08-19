@@ -1,8 +1,8 @@
 import SwiftUI
 
 enum ChatComposerMetrics {
-  static let barHeight: CGFloat = 76
-  static let sendSlotSize: CGFloat = 52
+  static let barHeight: CGFloat = 52
+  static let sendSlotSize: CGFloat = 36
   static let plusButtonSize: CGFloat = 36
 
   static func isPlusEnabled(isSending: Bool) -> Bool {
@@ -14,6 +14,29 @@ enum ChatComposerMetrics {
   }
 }
 
+enum ChatComposerTrailingAction: Equatable {
+  case mic
+  case send
+
+  static func action(draftIsEmpty: Bool) -> Self {
+    draftIsEmpty ? .mic : .send
+  }
+
+  var accessibilityIdentifier: String {
+    switch self {
+    case .mic: return "chat-composer-mic"
+    case .send: return "chat-composer-send"
+    }
+  }
+
+  var accessibilityLabel: String {
+    switch self {
+    case .mic: return "Talk"
+    case .send: return "Send"
+    }
+  }
+}
+
 struct ChatComposerBar: View {
   @Binding var draft: String
   @FocusState.Binding var isFocused: Bool
@@ -21,6 +44,7 @@ struct ChatComposerBar: View {
   let isSending: Bool
   let isPlusEnabled: Bool
   let onSend: () -> Void
+  var onMic: () -> Void = {}
   let onSelectWorkflow: (ComposerWorkflowAction) -> Void
   let onDraftEdited: () -> Void
 
@@ -29,25 +53,24 @@ struct ChatComposerBar: View {
 
   var body: some View {
     let trimmedDraft = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+    let trailing = ChatComposerTrailingAction.action(draftIsEmpty: trimmedDraft.isEmpty)
     let slashQuery = ComposerSlashPalette.query(from: draft)
     let slashItems = slashQuery.map {
       ComposerSlashPalette.items(matching: $0, skills: ComposerSlashPalette.defaultSkills)
     } ?? []
     let isSlashPaletteVisible = slashQuery != nil && !slashItems.isEmpty
 
-    // JOV-3636: composer is text-only. Voice is shell Talk FAB → full-screen
-    // overlay. OS keyboard mic still handles dictate-to-text.
-    HStack(spacing: JovieSpacing.medium) {
+    // Web hero pill: full capsule, plus left, mic/send inside the right.
+    HStack(spacing: JovieSpacing.small) {
       Button {
         isShowingWorkflowSheet = true
       } label: {
         Image(systemName: "plus")
-          .font(.system(size: 18, weight: .semibold))
+          .font(.system(size: 17, weight: .semibold))
           .foregroundStyle(
             isPlusEnabled ? JovieColor.textPrimary : JovieColor.textTertiary
           )
           .frame(width: ChatComposerMetrics.plusButtonSize, height: ChatComposerMetrics.plusButtonSize)
-          .background(JovieColor.surface2, in: Circle())
       }
       .buttonStyle(.plain)
       .disabled(!isPlusEnabled)
@@ -61,24 +84,28 @@ struct ChatComposerBar: View {
         .disableAutocorrection(false)
         .font(JovieFont.body(size: 16))
         .foregroundStyle(JovieColor.textPrimary)
-        .frame(height: ChatComposerMetrics.sendSlotSize)
         .onChange(of: draft) {
           onDraftEdited()
         }
 
-      // Reserve a stable trailing slot so empty → typed never shifts layout.
+      // Stable trailing slot: mic when empty, send when typed. No layout shift.
       ZStack {
-        if !trimmedDraft.isEmpty {
+        switch trailing {
+        case .mic:
+          micButton
+        case .send:
           sendButton(trimmedDraft: trimmedDraft)
         }
       }
       .frame(width: ChatComposerMetrics.sendSlotSize, height: ChatComposerMetrics.sendSlotSize)
     }
-    .padding(.horizontal, JovieSpacing.large)
-    .frame(height: ChatComposerMetrics.barHeight)
-    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+    .padding(.leading, 10)
+    .padding(.trailing, 8)
+    .padding(.vertical, 8)
+    .frame(minHeight: ChatComposerMetrics.barHeight)
+    .background(.ultraThinMaterial, in: Capsule())
     .overlay {
-      RoundedRectangle(cornerRadius: 28, style: .continuous)
+      Capsule()
         .stroke(JovieColor.borderDefault, lineWidth: 1)
     }
     .accessibilityElement(children: .contain)
@@ -142,10 +169,23 @@ struct ChatComposerBar: View {
     }
   }
 
+  private var micButton: some View {
+    Button(action: onMic) {
+      Image(systemName: "mic.fill")
+        .font(.system(size: 15, weight: .semibold))
+        .foregroundStyle(JovieColor.textPrimary)
+        .frame(width: 36, height: 36)
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(ChatComposerTrailingAction.mic.accessibilityLabel)
+    .accessibilityIdentifier(ChatComposerTrailingAction.mic.accessibilityIdentifier)
+    .accessibilityHint("Opens voice capture")
+  }
+
   private func sendButton(trimmedDraft: String) -> some View {
     Button(action: onSend) {
       Image(systemName: isSending ? "ellipsis" : "arrow.up")
-        .font(.system(size: 16, weight: .bold))
+        .font(.system(size: 14, weight: .bold))
         .foregroundStyle(
           ChatComposerMetrics.isSendEnabled(trimmedDraft: trimmedDraft, isSending: isSending)
             ? JovieColor.backgroundBase
@@ -161,8 +201,8 @@ struct ChatComposerBar: View {
     }
     .buttonStyle(.plain)
     .disabled(!ChatComposerMetrics.isSendEnabled(trimmedDraft: trimmedDraft, isSending: isSending))
-    .accessibilityLabel("Send")
-    .accessibilityIdentifier("chat-composer-send")
+    .accessibilityLabel(ChatComposerTrailingAction.send.accessibilityLabel)
+    .accessibilityIdentifier(ChatComposerTrailingAction.send.accessibilityIdentifier)
   }
 }
 

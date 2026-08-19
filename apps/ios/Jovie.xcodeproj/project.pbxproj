@@ -10,6 +10,7 @@
 		A0F17E100000000000000004 /* VlogTeleprompterCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F17E100000000000000003 /* VlogTeleprompterCore.swift */; };
 		A0F507500000000000000002 /* TeleprompterProposal.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F507500000000000000001 /* TeleprompterProposal.swift */; };
 		A0F507500000000000000004 /* TeleprompterCaptureController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F507500000000000000003 /* TeleprompterCaptureController.swift */; };
+		A0F507500000000000000010 /* TeleprompterCaptureOrientation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F50750000000000000000F /* TeleprompterCaptureOrientation.swift */; };
 		A0F507500000000000000006 /* TeleprompterViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F507500000000000000005 /* TeleprompterViewModel.swift */; };
 		A0F507500000000000000008 /* TeleprompterOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F507500000000000000007 /* TeleprompterOverlayView.swift */; };
 		A0J0V3632A00000000000002 /* AppShellTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3632A00000000000001 /* AppShellTabBar.swift */; };
@@ -146,6 +147,7 @@
 		A0F17E100000000000000003 /* VlogTeleprompterCore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VlogTeleprompterCore.swift; sourceTree = "<group>"; };
 		A0F507500000000000000001 /* TeleprompterProposal.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeleprompterProposal.swift; sourceTree = "<group>"; };
 		A0F507500000000000000003 /* TeleprompterCaptureController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeleprompterCaptureController.swift; sourceTree = "<group>"; };
+		A0F50750000000000000000F /* TeleprompterCaptureOrientation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeleprompterCaptureOrientation.swift; sourceTree = "<group>"; };
 		A0F507500000000000000005 /* TeleprompterViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeleprompterViewModel.swift; sourceTree = "<group>"; };
 		A0F507500000000000000007 /* TeleprompterOverlayView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeleprompterOverlayView.swift; sourceTree = "<group>"; };
 		A0J0V3632A00000000000001 /* AppShellTabBar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellTabBar.swift; sourceTree = "<group>"; };
@@ -483,6 +485,7 @@
 			children = (
 				A0F507500000000000000001 /* TeleprompterProposal.swift */,
 				A0F507500000000000000003 /* TeleprompterCaptureController.swift */,
+				A0F50750000000000000000F /* TeleprompterCaptureOrientation.swift */,
 				A0F507500000000000000005 /* TeleprompterViewModel.swift */,
 				A0F507500000000000000007 /* TeleprompterOverlayView.swift */,
 			);
@@ -859,6 +862,7 @@
 				A0F17E100000000000000004 /* VlogTeleprompterCore.swift in Sources */,
 				A0F507500000000000000002 /* TeleprompterProposal.swift in Sources */,
 				A0F507500000000000000004 /* TeleprompterCaptureController.swift in Sources */,
+				A0F507500000000000000010 /* TeleprompterCaptureOrientation.swift in Sources */,
 				A0F507500000000000000006 /* TeleprompterViewModel.swift in Sources */,
 				A0F507500000000000000008 /* TeleprompterOverlayView.swift in Sources */,
 				A0J0V3632A00000000000006 /* EntityContextSheet.swift in Sources */,

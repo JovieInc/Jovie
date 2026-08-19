@@ -5,6 +5,10 @@ enum MobileChatKeyboardPolicy {
   static func shouldDismissOnStreamingStart(userEditedSinceSend: Bool) -> Bool {
     !userEditedSinceSend
   }
+
+  static func shouldDismissOnDownwardDrag(translationHeight: CGFloat) -> Bool {
+    translationHeight > 40
+  }
 }
 
 enum MobileChatScrollPolicy {
@@ -75,6 +79,28 @@ struct MobileChatView: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("mobile-chat")
+    .contentShape(Rectangle())
+    .onTapGesture {
+      isComposerFocused = false
+    }
+    .simultaneousGesture(
+      DragGesture(minimumDistance: 24)
+        .onChanged { value in
+          guard MobileChatKeyboardPolicy.shouldDismissOnDownwardDrag(
+            translationHeight: value.translation.height
+          ) else { return }
+          isComposerFocused = false
+        }
+    )
+    .toolbar {
+      ToolbarItemGroup(placement: .keyboard) {
+        Spacer()
+        Button("Done") {
+          isComposerFocused = false
+        }
+        .accessibilityIdentifier("chat-keyboard-done")
+      }
+    }
     .task {
       await repository.refreshConversations()
     }
@@ -183,7 +209,12 @@ struct MobileChatView: View {
           let text = draft
           draft = ""
           userEditedSinceSend = false
+          isComposerFocused = false
           Task { await repository.send(text: text) }
+        },
+        onMic: {
+          isComposerFocused = false
+          voiceCaptureTrigger += 1
         },
         onSelectWorkflow: { action in
           draft = action.prompt
@@ -214,33 +245,41 @@ struct MobileChatView: View {
   }
 
   private var emptyState: some View {
-    VStack(spacing: JovieSpacing.large) {
-      Spacer(minLength: 120)
-
+    ScrollView {
       VStack(spacing: JovieSpacing.large) {
-        JovieLogoMark(size: 34)
+        Spacer(minLength: 120)
 
-        VStack(spacing: JovieSpacing.small) {
-          Text("Ask Jovie")
-            .font(JovieFont.display(size: 28))
-            .foregroundStyle(JovieColor.textPrimary)
+        VStack(spacing: JovieSpacing.large) {
+          JovieLogoMark(size: 34)
+
+          VStack(spacing: JovieSpacing.small) {
+            Text("Ask Jovie")
+              .font(JovieFont.display(size: 28))
+              .foregroundStyle(JovieColor.textPrimary)
+              .multilineTextAlignment(.center)
+
+            Text(
+              repository.isOffline
+                ? "Offline. Drafts stay on this device and cached history remains available."
+                : "Ask Jovie about your profile, releases, and next moves."
+            )
+            .font(JovieFont.body(size: 15))
+            .foregroundStyle(JovieColor.textTertiary)
             .multilineTextAlignment(.center)
-
-          Text(
-            repository.isOffline
-              ? "Offline. Drafts stay on this device and cached history remains available."
-              : "Ask Jovie about your profile, releases, and next moves."
-          )
-          .font(JovieFont.body(size: 15))
-          .foregroundStyle(JovieColor.textTertiary)
-          .multilineTextAlignment(.center)
-          .fixedSize(horizontal: false, vertical: true)
+            .fixedSize(horizontal: false, vertical: true)
+          }
         }
-      }
-      .frame(maxWidth: 330)
-      .padding(.horizontal, JovieSpacing.xLarge)
+        .frame(maxWidth: 330)
+        .padding(.horizontal, JovieSpacing.xLarge)
 
-      Spacer(minLength: 48)
+        Spacer(minLength: 48)
+      }
+      .frame(maxWidth: .infinity)
+    }
+    .scrollDismissesKeyboard(.interactively)
+    .contentShape(Rectangle())
+    .onTapGesture {
+      isComposerFocused = false
     }
   }
 

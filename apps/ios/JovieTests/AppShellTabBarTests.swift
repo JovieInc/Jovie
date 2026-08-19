@@ -2,16 +2,19 @@ import Testing
 @testable import Jovie
 
 struct AppShellTabBarTests {
-  @Test func primaryTabsMatchChatLibraryCalendarInbox() {
-    let tabs = AppShellPrimaryTab.allCases.map(\.shellTab)
-    #expect(tabs == [.chat, .library, .calendar, .inbox])
+  @Test func primaryBottomTabsAreUnused() {
+    #expect(AppShellPanePolicy.primaryBottomTabs().isEmpty)
+    #expect(AppShellPanePolicy.showsBottomTabBar() == false)
+    #expect(AppShellPrimaryTab.allCases.map(\.shellTab) == [.chat, .library, .calendar, .inbox])
   }
 
-  @Test func profileAndAudienceAreNotPrimary() {
+  @Test func noSurfaceIsABottomBarPrimaryTab() {
     #expect(AppShellTab.profile.isPrimaryTab == false)
     #expect(AppShellTab.audience.isPrimaryTab == false)
-    #expect(AppShellTab.chat.isPrimaryTab)
-    #expect(AppShellTab.library.isPrimaryTab)
+    #expect(AppShellTab.chat.isPrimaryTab == false)
+    #expect(AppShellTab.library.isPrimaryTab == false)
+    #expect(AppShellTab.calendar.isPrimaryTab == false)
+    #expect(AppShellTab.inbox.isPrimaryTab == false)
   }
 
   @Test func accessibilityIDsAreStable() {
@@ -103,7 +106,33 @@ struct AppShellTabBarTests {
     )
   }
 
-  @Test func resolveInitialTabKeepsPrimaryWhenChatEnabled() {
+  @Test func homeSurfaceIsChatWhenChatEnabled() {
+    #expect(appShellHomeSurface(chatEnabled: true) == .chat)
+    #expect(AppShellPanePolicy.homeSurface(chatEnabled: true) == .chat)
+    #expect(appShellHomeSurface(chatEnabled: false) == .profile)
+  }
+
+  @Test func leadingSwipeOpensSidebarAndTrailingSwipeOpensRail() {
+    #expect(AppShellPanePolicy.paneAfterLeadingSwipe(current: .none) == .sidebar)
+    #expect(AppShellPanePolicy.paneAfterTrailingSwipe(current: .none) == .rail)
+    #expect(AppShellPanePolicy.paneAfterLeadingSwipe(current: .rail) == .sidebar)
+    #expect(AppShellPanePolicy.paneAfterTrailingSwipe(current: .sidebar) == .rail)
+    #expect(AppShellPanePolicy.paneAfterDismiss() == .none)
+  }
+
+  @Test func sidebarHoldsFormerBottomDestinations() {
+    let destinations = AppShellPanePolicy.sidebarDestinations(
+      chatEnabled: true,
+      audienceEnabled: true
+    )
+    #expect(destinations == [.chat, .library, .calendar, .inbox, .profile, .audience])
+    #expect(
+      AppShellPanePolicy.sidebarDestinations(chatEnabled: false, audienceEnabled: false)
+        == [.library, .calendar, .inbox, .profile]
+    )
+  }
+
+  @Test func resolveInitialTabKeepsFixtureDestinationWhenChatEnabled() {
     #expect(resolveShellInitialTab(.library, chatEnabled: true) == .library)
     #expect(resolveShellInitialTab(.calendar, chatEnabled: true) == .calendar)
     #expect(resolveShellInitialTab(.inbox, chatEnabled: true) == .inbox)
@@ -115,6 +144,25 @@ struct AppShellTabBarTests {
   }
 }
 
+struct AppShellDrawerProfilePolicyTests {
+  @Test func profileSurfaceAlwaysOpensDashboard() {
+    #expect(AppShellDrawerProfilePolicy.profileSurfaceOpensDashboard())
+  }
+
+  @Test func accountHeaderOpensEmbeddedBrowserWhenURLExists() {
+    #expect(
+      AppShellDrawerProfilePolicy.accountHeaderOpensEmbeddedPublicProfile(
+        publicProfileURL: "https://jov.ie/tim"
+      )
+    )
+    #expect(
+      AppShellDrawerProfilePolicy.accountHeaderOpensEmbeddedPublicProfile(
+        publicProfileURL: nil
+      ) == false
+    )
+  }
+}
+
 struct SharedPressFeedbackStyleTests {
   @Test func plainRowPressFeedbackHasOneCanonicalDefaultOpacity() {
     #expect(JoviePressFeedbackButtonStyle.defaultPressedOpacity == 0.72)
@@ -122,6 +170,25 @@ struct SharedPressFeedbackStyleTests {
 }
 
 struct LibraryFeedTests {
+  @Test func savingAVlogLandsOnCollectionsNotCatalog() {
+    #expect(LibraryLandingPolicy.defaultHome() == .catalog)
+    #expect(LibraryLandingPolicy.homeAfterSavingVlog() == .collections)
+  }
+
+  @Test func homesAreCatalogCollectionsIdeasWithStableA11y() {
+    #expect(LibraryHome.allCases.map(\.id) == ["catalog", "collections", "ideas"])
+    #expect(LibraryHome.allCases.map(\.title) == ["Catalog", "Collections", "Ideas"])
+    #expect(LibraryHome.catalog.accessibilityIdentifier == "library-home-catalog")
+    #expect(LibraryHome.collections.accessibilityIdentifier == "library-home-collections")
+    #expect(LibraryHome.ideas.accessibilityIdentifier == "library-home-ideas")
+  }
+
+  @Test func searchMatchesCatalogNameAndIgnoresTakes() {
+    let hits = LibraryFeed.matching(LibraryFeed.previewAssets, query: "midnight")
+    #expect(hits.map(\.id) == ["lib-release-midnight"])
+    #expect(LibraryFeed.matching(LibraryFeed.previewAssets, query: "   ").count == LibraryFeed.previewAssets.count)
+  }
+
   @Test func filterAllReturnsEveryAsset() {
     let assets = LibraryFeed.previewAssets
     #expect(LibraryFeed.filtered(assets: assets, filter: .all).count == assets.count)
@@ -135,8 +202,64 @@ struct LibraryFeedTests {
   }
 
   @Test func filterChipsLeadWithAll() {
-    #expect(LibraryFilter.chips.first == .all)
-    #expect(LibraryFilter.chips.count == LibraryAssetType.allCases.count + 1)
+    #expect(LibraryFilter.catalogChips.first == .all)
+    #expect(LibraryFilter.catalogChips.map(\.id) == ["all", "release", "merch", "press"])
+    #expect(LibraryFilter.catalogChips.contains { $0.id == "smartLink" } == false)
+  }
+
+  @Test func catalogHidesVideosAndSmartLinkRows() {
+    let mixed = LibraryFeed.previewAssets + [
+      LibraryAsset(
+        id: "vlog-ferry",
+        name: "Ferry vlog",
+        type: .video,
+        isPublic: false,
+        coverURL: nil,
+        liveStatLabel: "Recorded just now",
+        publicURL: nil
+      ),
+    ]
+    let catalog = LibraryFeed.catalog(assets: mixed, filter: .all)
+    #expect(catalog.allSatisfy { LibraryFeed.catalogTypes.contains($0.type) })
+    #expect(catalog.contains { $0.id == "lib-release-midnight" })
+    #expect(catalog.contains { $0.id == "vlog-ferry" } == false)
+  }
+
+  @Test func collectionsGroupTakesByScriptTitle() {
+    let takes = [
+      LibraryAsset(
+        id: "a",
+        name: "Ferry vlog",
+        type: .video,
+        isPublic: false,
+        coverURL: nil,
+        liveStatLabel: "now",
+        publicURL: nil
+      ),
+      LibraryAsset(
+        id: "b",
+        name: "Ferry vlog",
+        type: .video,
+        isPublic: false,
+        coverURL: nil,
+        liveStatLabel: "now",
+        publicURL: nil
+      ),
+      LibraryAsset(
+        id: "c",
+        name: "Studio dump",
+        type: .video,
+        isPublic: false,
+        coverURL: nil,
+        liveStatLabel: "now",
+        publicURL: nil
+      ),
+    ]
+    let grouped = LibraryFeed.collections(from: takes)
+    #expect(grouped.count == 2)
+    #expect(grouped[0].name == "Ferry vlog")
+    #expect(grouped[0].count == 2)
+    #expect(grouped[1].name == "Studio dump")
   }
 
   @Test func emptyAssetsStayEmptyForEveryChip() {

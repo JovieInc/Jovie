@@ -1,5 +1,15 @@
 import SwiftUI
 
+enum AppShellDrawerProfilePolicy {
+  /// Name/avatar opens the public page. The Profile surface always opens
+  /// Dashboard (QR, Copy URL, Wallet) so those controls stay reachable.
+  static func profileSurfaceOpensDashboard() -> Bool { true }
+
+  static func accountHeaderOpensEmbeddedPublicProfile(publicProfileURL: String?) -> Bool {
+    publicProfileURL?.isEmpty == false
+  }
+}
+
 enum AppShellDrawerSurfaceLayout {
   static let labelMinimumScaleFactor: CGFloat = 0.85
   static let maxSingleLineSurfaceButtonHeight: CGFloat = 56
@@ -55,6 +65,9 @@ struct AppShellLeftDrawer: View {
   let onStartNewChat: () -> Void
   let onSelectConversation: (String) -> Void
   let onOpenSettings: () -> Void
+  let onTalk: () -> Void
+  var onOpenPublicProfile: () -> Void = {}
+  var onOpenProfileQR: () -> Void = {}
 
   @State private var threadSearch = ""
   // Decorative open-stagger only; the drawer is fully interactive regardless
@@ -87,14 +100,30 @@ struct AppShellLeftDrawer: View {
             chatEnabled: chatEnabled,
             audienceEnabled: audienceEnabled,
             selectedTab: selectedTab,
-            onSelectTab: onSelectTab
+            hasProfileQR: profile.qrPayload != nil,
+            onSelectTab: onSelectTab,
+            onOpenProfileQR: onOpenProfileQR
           )
           .drawerRowReveal(isRevealed: contentRevealed, delay: 0, reduceMotion: reduceMotion)
 
-          DrawerAccountHeader(profile: profile)
+          DrawerAccountHeader(
+            profile: profile,
+            action: {
+              if AppShellDrawerProfilePolicy.accountHeaderOpensEmbeddedPublicProfile(
+                publicProfileURL: profile.publicProfileURL
+              ) {
+                onOpenPublicProfile()
+              } else {
+                onSelectTab(.profile)
+              }
+            }
+          )
             .drawerRowReveal(isRevealed: contentRevealed, delay: 0.04, reduceMotion: reduceMotion)
 
           if chatEnabled {
+            DrawerTalkRow(action: onTalk)
+              .drawerRowReveal(isRevealed: contentRevealed, delay: 0.06, reduceMotion: reduceMotion)
+
             DrawerNewChatButton(action: onStartNewChat)
               .drawerRowReveal(isRevealed: contentRevealed, delay: 0.08, reduceMotion: reduceMotion)
 
@@ -175,30 +204,35 @@ private extension View {
 
 private struct DrawerAccountHeader: View {
   let profile: AppShellProfile
+  let action: () -> Void
 
   var body: some View {
-    HStack(spacing: JovieSpacing.medium) {
-      DashboardAvatarView(
-        name: profile.displayName,
-        avatarURL: profile.avatarURL
-      )
-      .frame(width: 40, height: 40)
+    Button(action: action) {
+      HStack(spacing: JovieSpacing.medium) {
+        DashboardAvatarView(
+          name: profile.displayName,
+          avatarURL: profile.avatarURL
+        )
+        .frame(width: 40, height: 40)
 
-      VStack(alignment: .leading, spacing: JovieSpacing.xSmall) {
-        Text(profile.displayName)
-          .font(JovieFont.body(size: 16, weight: .semibold))
-          .foregroundStyle(JovieColor.textPrimary)
-          .lineLimit(1)
+        VStack(alignment: .leading, spacing: JovieSpacing.xSmall) {
+          Text(profile.displayName)
+            .font(JovieFont.body(size: 16, weight: .semibold))
+            .foregroundStyle(JovieColor.textPrimary)
+            .lineLimit(1)
 
-        Text(profile.secondaryText)
-          .font(JovieFont.body(size: 13, weight: .medium))
-          .foregroundStyle(JovieColor.textTertiary)
-          .lineLimit(1)
+          Text(profile.secondaryText)
+            .font(JovieFont.body(size: 13, weight: .medium))
+            .foregroundStyle(JovieColor.textTertiary)
+            .lineLimit(1)
+        }
+
+        Spacer(minLength: 0)
       }
-
-      Spacer(minLength: 0)
     }
+    .buttonStyle(.plain)
     .accessibilityElement(children: .combine)
+    .accessibilityLabel("Open \(profile.displayName) public profile")
     .accessibilityIdentifier("shell-drawer-account")
   }
 }
@@ -207,17 +241,15 @@ private struct DrawerSurfaceSwitcher: View {
   let chatEnabled: Bool
   let audienceEnabled: Bool
   let selectedTab: AppShellTab
+  let hasProfileQR: Bool
   let onSelectTab: (AppShellTab) -> Void
+  let onOpenProfileQR: () -> Void
 
   private var surfaces: [AppShellTab] {
-    var tabs: [AppShellTab] = [.profile]
-    if audienceEnabled {
-      tabs.append(.audience)
-    }
-    if chatEnabled {
-      tabs.append(.chat)
-    }
-    return tabs
+    AppShellPanePolicy.sidebarDestinations(
+      chatEnabled: chatEnabled,
+      audienceEnabled: audienceEnabled
+    )
   }
 
   var body: some View {
@@ -226,16 +258,33 @@ private struct DrawerSurfaceSwitcher: View {
         .font(JovieFont.body(size: 13, weight: .semibold))
         .foregroundStyle(JovieColor.textTertiary)
 
-      HStack(spacing: JovieSpacing.small) {
+      VStack(spacing: JovieSpacing.small) {
         ForEach(surfaces, id: \.self) { tab in
-          DrawerSurfaceButton(
-            tab: tab,
-            isSelected: selectedTab == tab,
-            action: { onSelectTab(tab) }
-          )
+          HStack(spacing: JovieSpacing.small) {
+            DrawerSurfaceButton(
+              tab: tab,
+              isSelected: selectedTab == tab,
+              action: { onSelectTab(tab) }
+            )
+
+            if tab == .profile, hasProfileQR {
+              Button(action: onOpenProfileQR) {
+                Image(systemName: "qrcode")
+                  .font(.system(size: 16, weight: .semibold))
+                  .foregroundStyle(JovieColor.textPrimary)
+                  .frame(width: 48, height: 48)
+                  .background(
+                    JovieColor.surface1,
+                    in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous)
+                  )
+              }
+              .buttonStyle(JoviePressFeedbackButtonStyle())
+              .accessibilityLabel("Profile QR code")
+              .accessibilityIdentifier("shell-drawer-profile-qr")
+            }
+          }
         }
       }
-      .frame(height: 62)
     }
   }
 }
@@ -247,21 +296,22 @@ private struct DrawerSurfaceButton: View {
 
   var body: some View {
     Button(action: action) {
-      VStack(spacing: JovieSpacing.xSmall) {
+      HStack(spacing: JovieSpacing.medium) {
         Image(systemName: tab.systemImage)
-          .font(.system(size: 14, weight: .semibold))
+          .font(.system(size: 16, weight: .semibold))
+          .frame(width: 22)
 
         Text(tab.title)
-          .font(JovieFont.body(size: 15, weight: .semibold))
+          .font(JovieFont.body(size: 16, weight: .semibold))
           .lineLimit(1)
           .minimumScaleFactor(AppShellDrawerSurfaceLayout.labelMinimumScaleFactor)
-          .multilineTextAlignment(.center)
-          .frame(maxWidth: .infinity)
+
+        Spacer(minLength: 0)
       }
       .foregroundStyle(isSelected ? JovieColor.textPrimary : JovieColor.textSecondary)
-      .padding(.horizontal, JovieSpacing.small)
+      .padding(.horizontal, JovieSpacing.medium)
       .padding(.vertical, 11)
-      .frame(maxWidth: .infinity, minHeight: 62, maxHeight: 62)
+      .frame(maxWidth: .infinity, minHeight: 48, maxHeight: 48, alignment: .leading)
       .background(
         isSelected ? JovieColor.surface1 : JovieColor.surface1.opacity(0.001),
         in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous)
@@ -272,10 +322,36 @@ private struct DrawerSurfaceButton: View {
       }
     }
     .buttonStyle(JoviePressFeedbackButtonStyle())
-    .frame(maxWidth: .infinity, minHeight: 62, maxHeight: 62)
+    .frame(maxWidth: .infinity, minHeight: 48, maxHeight: 48)
     .accessibilityLabel(tab.title)
     .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     .accessibilityIdentifier("shell-drawer-surface-\(tab.accessibilityID)")
+  }
+}
+
+private struct DrawerTalkRow: View {
+  let action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      HStack(spacing: JovieSpacing.medium) {
+        Image(systemName: "mic.fill")
+          .frame(width: 22)
+
+        Text("Talk")
+          .lineLimit(1)
+
+        Spacer(minLength: 0)
+      }
+      .font(JovieFont.body(size: 18, weight: .semibold))
+      .foregroundStyle(JovieColor.textPrimary)
+      .padding(.vertical, 13)
+      .padding(.horizontal, JovieSpacing.medium)
+      .background(JovieColor.surface1, in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
+    }
+    .buttonStyle(JoviePressFeedbackButtonStyle())
+    .accessibilityLabel("Talk")
+    .accessibilityIdentifier("shell-drawer-talk")
   }
 }
 

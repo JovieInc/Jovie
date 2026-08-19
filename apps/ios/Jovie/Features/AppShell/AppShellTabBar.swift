@@ -143,6 +143,15 @@ enum AppShellGesturePolicy {
       && (translationX < -openDistance || predictedX < -openPredicted)
   }
 
+  static func isRightEdgeClose(
+    isRailOpen: Bool,
+    translationX: CGFloat,
+    predictedX: CGFloat
+  ) -> Bool {
+    isRailOpen
+      && (translationX > openDistance || predictedX > openPredicted)
+  }
+
   /// Tabs switch only via explicit selection — never via horizontal swipe.
   static func shouldSwitchTabFromHorizontalSwipe() -> Bool {
     false
@@ -156,5 +165,50 @@ enum AppShellGesturePolicy {
     hasTeleprompterProposal: Bool
   ) -> Bool {
     !reduceMotion && !isKeyboardVisible && !isShowingTalkOverlay && !hasTeleprompterProposal
+  }
+}
+
+/// Chat-first pane policy: sidebar / main / right rail. No bottom bar.
+enum AppShellOpenPane: Equatable {
+  case none
+  case sidebar
+  case rail
+}
+
+enum AppShellPanePolicy {
+  static func homeSurface(chatEnabled: Bool) -> AppShellTab {
+    chatEnabled ? .chat : .profile
+  }
+
+  static func primaryBottomTabs() -> [AppShellPrimaryTab] {
+    []
+  }
+
+  static func showsBottomTabBar() -> Bool {
+    false
+  }
+
+  static func paneAfterLeadingSwipe(current _: AppShellOpenPane) -> AppShellOpenPane {
+    .sidebar
+  }
+
+  static func paneAfterTrailingSwipe(current _: AppShellOpenPane) -> AppShellOpenPane {
+    .rail
+  }
+
+  static func paneAfterDismiss() -> AppShellOpenPane {
+    .none
+  }
+
+  static func sidebarDestinations(chatEnabled: Bool, audienceEnabled: Bool) -> [AppShellTab] {
+    var tabs: [AppShellTab] = []
+    if chatEnabled {
+      tabs.append(.chat)
+    }
+    tabs.append(contentsOf: [.library, .calendar, .inbox, .profile])
+    if audienceEnabled {
+      tabs.append(.audience)
+    }
+    return tabs
   }
 }

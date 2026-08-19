@@ -8,6 +8,22 @@ Jovie uses a unified toast notification system that provides consistent user fee
 
 > **Note**: This notification system was designed to replace direct calls to external toast libraries and provide a consistent user experience throughout the application.
 
+## One interrupt bus (all surfaces)
+
+Toasts, sheets, full-screen covers, OS push, and in-flow prompts (vlog, Talk, pairing) are one attention system. Features do not own their own popup contract. They request a slot. If another interrupt is live, the new one waits, merges, or dies. They never stack.
+
+Hard rules for every new interrupt, including future NFC day-pair and “still collabing?”:
+
+1. **One visible interrupt at a time.** A pair dialog, a What’s New card, a confirm sheet, and a push banner cannot appear together. The bus holds one foreground prompt.
+2. **In-flow beats push.** Ask inside the surface the user just opened (vlog overlay, chat). Do not send an OS notification for a question they can answer on the current screen.
+3. **Ask once per session.** “Still paired?” fires at most once per day-pair. Silence is the default if location is missing, stale, or noisy.
+4. **No background geofence chatter.** Distance is checked only when they open vlog (or another capture surface), never as a roaming alert.
+5. **False positives stay quiet.** Urban GPS drift, a block, a venue, or a parking garage is not “materially far.” Use a wide bar (about 10 miles / 16 km) and require both devices to report a fresh fix. If unsure, do not ask.
+6. **Dedup across channels.** Same `id` / `dedupKey` for in-app, push, email, SMS. Dismissing one stops the others (`dismissNotification`).
+7. **Cap.** In-app toasts stay at a max of 5 and already dedupe identical copy. Foreground dialogs cap at 1. Push is not a second copy of a dialog that is already on screen.
+
+If a feature cannot name which bus slot it needs and what it yields to, it does not ship a prompt.
+
 ## Server-delivered notifications (email/sms/push/in-app)
 
 - Send cross-channel notifications through `lib/notifications/service.ts` to avoid duplicating provider logic.
