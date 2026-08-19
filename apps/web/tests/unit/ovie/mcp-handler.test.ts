@@ -5,9 +5,9 @@ import {
 } from '@/lib/ovie/identity';
 import { handleOvieMcpRequest } from '@/lib/ovie/mcp/handler';
 import {
-  challengeOf,
   getOvieOAuthIssuer,
   isAllowedRedirect,
+  pkceS256,
 } from '@/lib/ovie/mcp/oauth';
 import { MemoryOperatingStore } from '@/lib/ovie/mcp/store';
 import { OVIE_MCP_TOOLS } from '@/lib/ovie/mcp/types';
@@ -17,13 +17,7 @@ const founder = {
   isAdmin: true,
   scopes: ['ovie:read', 'ovie:write'] as const,
 };
-
-const guest = {
-  authenticated: false,
-  isAdmin: false,
-  scopes: [] as const,
-};
-
+const guest = { authenticated: false, isAdmin: false, scopes: [] as const };
 const user = {
   authenticated: true,
   isAdmin: false,
@@ -32,6 +26,11 @@ const user = {
 
 function rpc(method: string, params?: unknown, id: string | number = 'req-1') {
   return { jsonrpc: '2.0', id, method, params };
+}
+
+function toolResult<T>(body: unknown): T {
+  return (body as { result: { structuredContent: T } }).result
+    .structuredContent;
 }
 
 describe('Ovie MCP handler', () => {
@@ -89,9 +88,8 @@ describe('Ovie MCP handler', () => {
   });
 
   it('round-trips create_initiative then get_initiative without spawning', () => {
-    const store = new MemoryOperatingStore();
     const created = handleOvieMcpRequest({
-      store,
+      store: new MemoryOperatingStore(),
       principal: founder,
       body: rpc(
         'tools/call',
@@ -108,78 +106,64 @@ describe('Ovie MCP handler', () => {
       ),
     });
     expect(created.status).toBe(200);
-    const createdBody = created.body as {
+    const createdBody = toolResult<{
       id: string;
-      result: {
-        structuredContent: {
-          id: string;
-          workerSpawned: boolean;
-          status: string;
-        };
-      };
-    };
-    expect(createdBody.id).toBe('c1');
-    expect(createdBody.result.structuredContent.workerSpawned).toBe(false);
-    const id = createdBody.result.structuredContent.id;
-    expect(id.startsWith('ini_')).toBe(true);
+      workerSpawned: boolean;
+      status: string;
+    }>(created.body);
+    expect((created.body as { id: string }).id).toBe('c1');
+    expect(createdBody.workerSpawned).toBe(false);
+    expect(createdBody.id.startsWith('ini_')).toBe(true);
 
     const fetched = handleOvieMcpRequest({
-      store,
+      store: new MemoryOperatingStore(),
       principal: founder,
       body: rpc(
         'tools/call',
-        { name: 'get_initiative', arguments: { id } },
+        { name: 'get_initiative', arguments: { id: createdBody.id } },
         'g1'
       ),
     });
-    const fetchedBody = fetched.body as {
-      result: {
-        structuredContent: {
-          id: string;
-          complete: boolean;
-          merged_is_not_complete: boolean;
-        };
-      };
-    };
-    expect(fetchedBody.result.structuredContent.id).toBe(id);
-    expect(fetchedBody.result.structuredContent.complete).toBe(false);
-    expect(fetchedBody.result.structuredContent.merged_is_not_complete).toBe(
-      true
-    );
+    const fetchedBody = toolResult<{
+      id: string;
+      complete: boolean;
+      merged_is_not_complete: boolean;
+    }>(fetched.body);
+    expect(fetchedBody.id).toBe(createdBody.id);
+    expect(fetchedBody.complete).toBe(false);
+    expect(fetchedBody.merged_is_not_complete).toBe(true);
   });
 
   it('persists a decision that later work can reference', () => {
     const store = new MemoryOperatingStore();
-    const decided = handleOvieMcpRequest({
-      store,
-      principal: founder,
-      body: rpc('tools/call', {
-        name: 'record_decision',
-        arguments: {
-          decided: 'Certify public artist profiles before launch',
-          why: 'Cannot announce what is uncertified',
-          provenance: 'strategy-chat',
-        },
-      }),
-    });
-    const decision = (
-      decided.body as { result: { structuredContent: { id: string } } }
-    ).result.structuredContent;
-    const created = handleOvieMcpRequest({
-      store,
-      principal: founder,
-      body: rpc('tools/call', {
-        name: 'create_initiative',
-        arguments: {
-          title: 'Profile cert',
-          intent: 'Execute the decision',
-          decision_id: decision.id,
-        },
-      }),
-    });
-    const initiative = (
-      created.body as { result: { structuredContent: { decisionId?: string } } }
-    ).result.structuredContent;
+    const decision = toolResult<{ id: string }>(
+      handleOvieMcpRequest({
+        store,
+        principal: founder,
+        body: rpc('tools/call', {
+          name: 'record_decision',
+          arguments: {
+            decided: 'Certify public artist profiles before launch',
+            why: 'Cannot announce what is uncertified',
+            provenance: 'strategy-chat',
+          },
+        }),
+      }).body
+    );
+    const initiative = toolResult<{ decisionId?: string }>(
+      handleOvieMcpRequest({
+        store,
+        principal: founder,
+        body: rpc('tools/call', {
+          name: 'create_initiative',
+          arguments: {
+            title: 'Profile cert',
+            intent: 'Execute the decision',
+            decision_id: decision.id,
+          },
+        }),
+      }).body
+    );
     expect(initiative.decisionId).toBe(decision.id);
   });
 
@@ -192,35 +176,32 @@ describe('Ovie MCP handler', () => {
       }),
     });
     expect(result.status).toBe(200);
-    const body = result.body as {
-      result: { structuredContent: { identity: string } };
-    };
-    expect(body.result.structuredContent.identity).toBe('ovie');
+    expect(toolResult<{ identity: string }>(result.body).identity).toBe('ovie');
   });
 });
 
 describe('Ovie MCP OAuth', () => {
-  it('registers ChatGPT redirects and completes PKCE', () => {
-    const issuer = getOvieOAuthIssuer('test-secret');
+  it('registers ChatGPT redirects and completes PKCE across instances', () => {
+    const registrar = getOvieOAuthIssuer('test-secret');
+    const exchanger = getOvieOAuthIssuer('test-secret');
     const verifier = 'verifier-abcdefghijklmnopqrstuvwxyz0123456789';
-    const client = issuer.registerClient({
-      redirect_uris: ['https://chatgpt.com/connector/oauth/callback'],
-    });
-    const code = issuer.issueCode({
+    const redirectUri = 'https://chatgpt.com/connector/oauth/callback';
+    const client = registrar.registerClient({ redirect_uris: [redirectUri] });
+    const code = registrar.issueCode({
       clientId: client.client_id,
-      redirectUri: 'https://chatgpt.com/connector/oauth/callback',
-      codeChallenge: challengeOf(verifier),
+      redirectUri,
+      codeChallenge: pkceS256(verifier),
       subject: 'tim',
       email: 'tim@meetjovie.com',
       isAdmin: true,
     });
-    const token = issuer.exchangeToken({
+    const token = exchanger.exchangeToken({
       clientId: client.client_id,
-      redirectUri: 'https://chatgpt.com/connector/oauth/callback',
+      redirectUri,
       code,
       codeVerifier: verifier,
     });
-    const claims = issuer.verifyAccessToken(token.access_token);
+    const claims = exchanger.verifyAccessToken(token.access_token);
     expect(claims?.isAdmin).toBe(true);
     expect(claims?.email).toBe('tim@meetjovie.com');
     expect(isAllowedRedirect('https://evil.example/cb')).toBe(false);

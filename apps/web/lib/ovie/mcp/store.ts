@@ -1,3 +1,4 @@
+import { ovieIssuerSecret, signPayload, verifyPayload } from './oauth';
 import type { OvieDecision, OvieInitiative } from './types';
 
 export type OperatingStore = {
@@ -9,6 +10,22 @@ export type OperatingStore = {
   listInitiatives(): readonly OvieInitiative[];
 };
 
+export function sealId(prefix: 'ini' | 'dec', record: unknown): string {
+  return `${prefix}_${signPayload(ovieIssuerSecret(), record)}`;
+}
+
+function unseal<T extends { id: string }>(
+  prefix: 'ini' | 'dec',
+  id: string
+): T | undefined {
+  if (!id.startsWith(`${prefix}_`)) return undefined;
+  const draft = verifyPayload<Omit<T, 'id'>>(
+    ovieIssuerSecret(),
+    id.slice(prefix.length + 1)
+  );
+  return draft ? ({ ...draft, id } as T) : undefined;
+}
+
 export class MemoryOperatingStore implements OperatingStore {
   private readonly decisions = new Map<string, OvieDecision>();
   private readonly initiatives = new Map<string, OvieInitiative>();
@@ -18,7 +35,7 @@ export class MemoryOperatingStore implements OperatingStore {
   }
 
   getDecision(id: string): OvieDecision | undefined {
-    return this.decisions.get(id);
+    return this.decisions.get(id) ?? unseal<OvieDecision>('dec', id);
   }
 
   listDecisions(): readonly OvieDecision[] {
@@ -30,7 +47,7 @@ export class MemoryOperatingStore implements OperatingStore {
   }
 
   getInitiative(id: string): OvieInitiative | undefined {
-    return this.initiatives.get(id);
+    return this.initiatives.get(id) ?? unseal<OvieInitiative>('ini', id);
   }
 
   listInitiatives(): readonly OvieInitiative[] {

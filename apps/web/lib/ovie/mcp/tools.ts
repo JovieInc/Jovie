@@ -5,8 +5,13 @@ import {
   loadProfileCapabilitiesFromDisk,
   renderArtistProfileInventory,
 } from './artist-profile-inventory';
-import { classifyHandoff, newOvieId, parseHandoff } from './handoff';
-import type { OperatingStore } from './store';
+import {
+  classifyHandoff,
+  parseHandoff,
+  stringList,
+  stringOpt,
+} from './handoff';
+import { type OperatingStore, sealId } from './store';
 import {
   type InitiativeStatus,
   OVIE_MCP_IDENTITY,
@@ -80,9 +85,7 @@ export function callOvieMcpTool(
   if (!authz.ok) return authz;
 
   const turn = bindEveIdentityForTurn(OVIE_MCP_IDENTITY);
-  if (isOvieWriteTool(name)) {
-    turn.require('ingest-ack');
-  }
+  if (isOvieWriteTool(name)) turn.require('ingest-ack');
 
   switch (name) {
     case 'get_org_state':
@@ -103,23 +106,24 @@ export function callOvieMcpTool(
 }
 
 function getOrgState(store: OperatingStore, args: Record<string, unknown>) {
-  const query = typeof args.query === 'string' ? args.query : '';
   const initiatives = store.listInitiatives();
-  const decisions = store.listDecisions();
   const inventory = loadProfileCapabilitiesFromDisk();
   return {
     identity: OVIE_MCP_IDENTITY,
     role: 'founder',
-    query,
+    query: typeof args.query === 'string' ? args.query : '',
     active_initiatives: initiatives.map(item => ({
       id: item.id,
       title: item.handoff.title,
       status: item.status,
     })),
-    recent_decisions: decisions.slice(-8).map(item => ({
-      id: item.id,
-      decided: item.decided,
-    })),
+    recent_decisions: store
+      .listDecisions()
+      .slice(-8)
+      .map(item => ({
+        id: item.id,
+        decided: item.decided,
+      })),
     awaiting_tim: initiatives
       .filter(item => item.status === 'blocked')
       .map(item => item.id),
@@ -129,35 +133,23 @@ function getOrgState(store: OperatingStore, args: Record<string, unknown>) {
 }
 
 function recordDecision(store: OperatingStore, args: Record<string, unknown>) {
-  const decided =
-    typeof args.decided === 'string'
-      ? args.decided
-      : typeof args.what === 'string'
-        ? args.what
-        : '';
-  if (!decided.trim()) {
-    throw new Error('decided is required');
-  }
-  const id = newOvieId('dec');
-  const record = {
-    id,
+  const decided = (
+    stringOpt(args.decided) ??
+    stringOpt(args.what) ??
+    ''
+  ).trim();
+  if (!decided) throw new Error('decided is required');
+  const draft = {
     kind: 'decision' as const,
-    decided: decided.trim(),
-    why: typeof args.why === 'string' ? args.why : undefined,
-    constraints: Array.isArray(args.constraints)
-      ? args.constraints.filter(
-          (item): item is string => typeof item === 'string'
-        )
-      : undefined,
-    provenance:
-      typeof args.provenance === 'string' ? args.provenance : undefined,
-    affected: Array.isArray(args.affected)
-      ? args.affected.filter((item): item is string => typeof item === 'string')
-      : undefined,
-    supersedes:
-      typeof args.supersedes === 'string' ? args.supersedes : undefined,
+    decided,
+    why: stringOpt(args.why),
+    constraints: stringList(args.constraints),
+    provenance: stringOpt(args.provenance),
+    affected: stringList(args.affected),
+    supersedes: stringOpt(args.supersedes),
     createdAt: new Date().toISOString(),
   };
+  const record = { ...draft, id: sealId('dec', draft) };
   store.putDecision(record);
   return record;
 }
@@ -169,21 +161,17 @@ function createInitiative(
   const parsed = parseHandoff(args.handoff ?? args);
   if (typeof parsed === 'string') throw new Error(parsed);
   const classified = classifyHandoff(parsed);
-  const id = newOvieId('ini');
   const now = new Date().toISOString();
-  const status: InitiativeStatus =
-    args.status === 'proposed' ? 'proposed' : 'accepted';
-  const decisionId =
-    typeof args.decision_id === 'string' ? args.decision_id : undefined;
-  const record = {
-    id,
+  const draft = {
     kind: 'initiative' as const,
-    status,
+    status: (args.status === 'proposed'
+      ? 'proposed'
+      : 'accepted') as InitiativeStatus,
     handoff: parsed,
     lane: classified.lane,
     destination: classified.destination,
     receipts: classified.receipts,
-    decisionId,
+    decisionId: stringOpt(args.decision_id),
     workerSpawned: false as const,
     createdAt: now,
     updatedAt: now,
@@ -193,6 +181,7 @@ function createInitiative(
       ref: receipt.destination,
     })),
   };
+  const record = { ...draft, id: sealId('ini', draft) };
   store.putInitiative(record);
   return record;
 }
@@ -218,11 +207,7 @@ function getFeatureState(args: Record<string, unknown>) {
   const inventory = loadProfileCapabilitiesFromDisk();
   const match = findProfileCapability(inventory, query);
   if (!match) {
-    return {
-      feature: query,
-      found: false,
-      inventory_size: inventory.length,
-    };
+    return { feature: query, found: false, inventory_size: inventory.length };
   }
   return {
     found: true,

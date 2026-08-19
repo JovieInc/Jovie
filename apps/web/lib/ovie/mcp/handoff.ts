@@ -38,11 +38,11 @@ export function parseHandoff(input: unknown): OvieHandoff | string {
   };
 }
 
-function stringOpt(value: unknown): string | undefined {
+export function stringOpt(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
-function stringList(value: unknown): readonly string[] | undefined {
+export function stringList(value: unknown): readonly string[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const items = value.filter(
     (item): item is string => typeof item === 'string'
@@ -72,8 +72,4 @@ export function classifyHandoff(handoff: OvieHandoff): {
     lane: handoff.priority ?? first.lane,
     destination: first.destination,
   };
-}
-
-export function newOvieId(prefix: 'ini' | 'dec'): string {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }

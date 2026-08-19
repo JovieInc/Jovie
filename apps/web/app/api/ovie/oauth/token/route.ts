@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getOvieOAuthIssuer } from '@/lib/ovie/mcp/oauth';
+import { getOvieOAuthIssuer, ovieIssuerSecret } from '@/lib/ovie/mcp/oauth';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,10 +10,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     : ((await request.json().catch(() => ({}))) as Record<string, string>);
 
   try {
-    const issued = getOvieOAuthIssuer(
-      process.env.BETTER_AUTH_SECRET ||
-        'jovie-non-production-better-auth-fallback-secret'
-    ).exchangeToken({
+    const issued = getOvieOAuthIssuer(ovieIssuerSecret()).exchangeToken({
       clientId: params.client_id ?? '',
       redirectUri: params.redirect_uri ?? '',
       code: params.code ?? '',

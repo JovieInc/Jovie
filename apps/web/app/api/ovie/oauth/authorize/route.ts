@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
-import { getOvieOAuthIssuer } from '@/lib/ovie/mcp/oauth';
+import { getOvieOAuthIssuer, ovieIssuerSecret } from '@/lib/ovie/mcp/oauth';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,10 +22,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   try {
-    const code = getOvieOAuthIssuer(
-      process.env.BETTER_AUTH_SECRET ||
-        'jovie-non-production-better-auth-fallback-secret'
-    ).issueCode({
+    const code = getOvieOAuthIssuer(ovieIssuerSecret()).issueCode({
       clientId,
       redirectUri,
       codeChallenge: challenge,

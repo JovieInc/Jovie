@@ -4,22 +4,28 @@ import {
   handleOvieMcpRequest,
   UNAUTHENTICATED_WWW_AUTHENTICATE,
 } from '@/lib/ovie/mcp/handler';
-import { extractBearer, getOvieOAuthIssuer } from '@/lib/ovie/mcp/oauth';
+import {
+  extractBearer,
+  getOvieOAuthIssuer,
+  ovieIssuerSecret,
+} from '@/lib/ovie/mcp/oauth';
 import type { OvieMcpPrincipal } from '@/lib/ovie/mcp/types';
 
 export const dynamic = 'force-dynamic';
 
-function issuerSecret(): string {
-  return (
-    process.env.BETTER_AUTH_SECRET ||
-    'jovie-non-production-better-auth-fallback-secret'
-  );
-}
+const CORS = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'GET, POST, OPTIONS',
+  'access-control-allow-headers':
+    'Authorization, Content-Type, MCP-Protocol-Version',
+};
 
 async function resolvePrincipal(request: Request): Promise<OvieMcpPrincipal> {
   const bearer = extractBearer(request.headers.get('authorization'));
   if (bearer) {
-    const claims = getOvieOAuthIssuer(issuerSecret()).verifyAccessToken(bearer);
+    const claims = getOvieOAuthIssuer(ovieIssuerSecret()).verifyAccessToken(
+      bearer
+    );
     if (claims) {
       return {
         authenticated: true,
@@ -29,11 +35,7 @@ async function resolvePrincipal(request: Request): Promise<OvieMcpPrincipal> {
         scopes: claims.scopes,
       };
     }
-    return {
-      authenticated: false,
-      isAdmin: false,
-      scopes: [],
-    };
+    return { authenticated: false, isAdmin: false, scopes: [] };
   }
 
   const entitlements = await getCurrentUserEntitlements();
@@ -48,20 +50,26 @@ async function resolvePrincipal(request: Request): Promise<OvieMcpPrincipal> {
 
 export async function POST(request: Request): Promise<NextResponse> {
   const body: unknown = await request.json().catch(() => null);
-  const principal = await resolvePrincipal(request);
-  const result = handleOvieMcpRequest({ body, principal });
+  const result = handleOvieMcpRequest({
+    body,
+    principal: await resolvePrincipal(request),
+  });
   if (result.body === null) {
-    return new NextResponse(null, { status: result.status });
+    return new NextResponse(null, { status: result.status, headers: CORS });
   }
   return NextResponse.json(result.body, {
     status: result.status,
-    headers: result.headers,
+    headers: { ...CORS, ...result.headers },
   });
 }
 
 export async function GET(): Promise<NextResponse> {
   return new NextResponse(null, {
     status: 401,
-    headers: { 'www-authenticate': UNAUTHENTICATED_WWW_AUTHENTICATE },
+    headers: { ...CORS, 'www-authenticate': UNAUTHENTICATED_WWW_AUTHENTICATE },
   });
+}
+
+export async function OPTIONS(): Promise<NextResponse> {
+  return new NextResponse(null, { status: 204, headers: CORS });
 }

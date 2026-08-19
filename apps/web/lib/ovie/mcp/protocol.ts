@@ -1,17 +1,5 @@
 import type { JsonRpcId, JsonRpcRequest } from './types';
 
-export type JsonRpcSuccess = {
-  readonly jsonrpc: '2.0';
-  readonly id: JsonRpcId;
-  readonly result: unknown;
-};
-
-export type JsonRpcFailure = {
-  readonly jsonrpc: '2.0';
-  readonly id: JsonRpcId;
-  readonly error: { readonly code: number; readonly message: string };
-};
-
 export function parseJsonRpc(body: unknown): JsonRpcRequest | null {
   if (!body || typeof body !== 'object') return null;
   const rec = body as Record<string, unknown>;
@@ -24,21 +12,14 @@ export function parseJsonRpc(body: unknown): JsonRpcRequest | null {
   };
 }
 
-export function rpcOk(
-  id: JsonRpcId | undefined,
-  result: unknown
-): JsonRpcSuccess {
-  return { jsonrpc: '2.0', id: id ?? null, result };
+export function rpcOk(id: JsonRpcId | undefined, result: unknown) {
+  return { jsonrpc: '2.0' as const, id: id ?? null, result };
 }
 
 export function rpcError(
   id: JsonRpcId | undefined,
   code: number,
   message: string
-): JsonRpcFailure {
-  return { jsonrpc: '2.0', id: id ?? null, error: { code, message } };
-}
-
-export function echoJsonRpcId(request: JsonRpcRequest): JsonRpcId | undefined {
-  return request.id;
+) {
+  return { jsonrpc: '2.0' as const, id: id ?? null, error: { code, message } };
 }

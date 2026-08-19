@@ -21,35 +21,27 @@ export const OVIE_WRITE_TOOLS = [
   'certify_feature',
 ] as const;
 
-export type OvieWriteToolName = (typeof OVIE_WRITE_TOOLS)[number];
+export type CertLevel =
+  | 'discovered'
+  | 'implemented'
+  | 'verified'
+  | 'production-dogfooded'
+  | 'certified'
+  | 'broadly-rolled-out'
+  | 'trusted';
 
-export const CERT_LADDER = [
-  'discovered',
-  'implemented',
-  'verified',
-  'production-dogfooded',
-  'certified',
-  'broadly-rolled-out',
-  'trusted',
-] as const;
-
-export type CertLevel = (typeof CERT_LADDER)[number];
-
-export const INITIATIVE_STATUSES = [
-  'proposed',
-  'accepted',
-  'planned',
-  'executing',
-  'blocked',
-  'implemented',
-  'verified',
-  'certified',
-  'rolled-out',
-  'failed',
-  'cancelled',
-] as const;
-
-export type InitiativeStatus = (typeof INITIATIVE_STATUSES)[number];
+export type InitiativeStatus =
+  | 'proposed'
+  | 'accepted'
+  | 'planned'
+  | 'executing'
+  | 'blocked'
+  | 'implemented'
+  | 'verified'
+  | 'certified'
+  | 'rolled-out'
+  | 'failed'
+  | 'cancelled';
 
 export type OvieHandoff = {
   readonly title: string;
