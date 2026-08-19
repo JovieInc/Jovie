@@ -163,6 +163,26 @@ class JovieOwnershipTests(unittest.TestCase):
         )
         self.assertTrue(decision["new_issue_intake"])
 
+    def test_ready_autonomous_draft_marks_grok_jov_drafts(self):
+        pr = self._open_pr(16211, mergeable_state="unstable", created_at="2026-08-19T18:59:08Z")
+        pr["draft"] = True
+        pr["head"]["ref"] = "grok/JOV-4894-fix"
+        with mock.patch.object(MODULE, "run", return_value="") as run:
+            result = MODULE.ready_autonomous_draft(pr)
+        self.assertEqual(result["result"], "ok")
+        self.assertEqual(run.call_args.args[:3], ("gh", "pr", "ready"))
+        self.assertEqual(run.call_args.args[3], "16211")
+
+    def test_ready_autonomous_draft_ignores_unrelated_drafts(self):
+        pr = self._open_pr(1, mergeable_state="clean", created_at="2026-08-19T18:00:00Z")
+        pr["draft"] = True
+        pr["head"]["ref"] = "feat/manual"
+        with mock.patch.object(MODULE, "run") as run:
+            result = MODULE.ready_autonomous_draft(pr)
+        self.assertEqual(result["result"], "skipped")
+        self.assertEqual(result["reason"], "not_autonomous_draft")
+        run.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
