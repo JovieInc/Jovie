@@ -236,18 +236,12 @@ describe('deterministic no-model gates', () => {
     assert.deepEqual(calls, { comments: 1, labels: 1, reads: 3 });
   });
 
-  it('counts an admitted intent before Symphony starts work', () => {
+  it('counts an admitted intent from the receipt without the triple labels', () => {
     const base = plannedIssue();
     const gateReceipt = admissionGate.buildAdmissionGateReceipt(base);
     const admitted = plannedIssue({
       state: { name: 'Todo' },
-      labels: {
-        nodes: [
-          ...base.labels.nodes,
-          { id: 'admission-id', name: 'admission-approved' },
-          { id: 'symphony-id', name: 'symphony' },
-        ],
-      },
+      labels: { nodes: [] },
       comments: {
         nodes: [...base.comments.nodes, { body: gateReceipt }],
       },
@@ -256,5 +250,15 @@ describe('deterministic no-model gates', () => {
       count: 1,
       identifiers: ['JOV-4305'],
     });
+    assert.equal(
+      deterministicGates.validateDeterministicPlanCandidate(admitted),
+      'already-admitted'
+    );
+    assert.equal(
+      deterministicGates.validateDeterministicPlanCandidate(
+        issue({ labels: { nodes: [{ name: 'symphony' }] } })
+      ),
+      null
+    );
   });
 });

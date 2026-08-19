@@ -616,16 +616,6 @@ function commentsOf(issue) {
   return issue?.comments?.nodes || issue?.comments || [];
 }
 
-function commentText(issue) {
-  return commentsOf(issue)
-    .map(comment =>
-      typeof comment === 'string'
-        ? comment
-        : `${comment.body || ''} ${comment.event || ''}`
-    )
-    .join('\n');
-}
-
 export function isConcreteJovieIssue(issue) {
   return Boolean(issue?.id && /^(?:JOV|LYB)-\d+$/.test(issue.identifier || ''));
 }
@@ -640,17 +630,22 @@ function isTimOwned(issue) {
 
 export function hasAdmissionEvidence(issue, classification = issue) {
   const labels = new Set([...namesOf(issue), ...namesOf(classification)]);
-  const text = commentText(issue).toLowerCase();
+  const planReceipt = planGateReceipt(issue);
+  const admissionReceipt = admissionGateReceipt(issue);
   const planApproved =
-    [...PLAN_LABELS].some(label => labels.has(label)) ||
-    /plan[- ]approved|approved[- ]plan/.test(text);
+    Boolean(planReceipt) || [...PLAN_LABELS].some(label => labels.has(label));
   const admissionApproved =
-    [...ADMISSION_LABELS].some(label => labels.has(label)) ||
-    /admission[- ]approved|symphony[- ]admission[- ]approved/.test(text);
+    Boolean(admissionReceipt) ||
+    [...ADMISSION_LABELS].some(label => labels.has(label));
   return {
     planApproved,
     admissionApproved,
-    eligible: planApproved && admissionApproved,
+    eligible: Boolean(admissionReceipt),
+    derivedLabels: {
+      planApproved: [...PLAN_LABELS].some(label => labels.has(label)),
+      admissionApproved: [...ADMISSION_LABELS].some(label => labels.has(label)),
+      symphony: labels.has(SYMPHONY_LABEL),
+    },
   };
 }
 

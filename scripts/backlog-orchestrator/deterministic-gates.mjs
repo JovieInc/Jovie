@@ -1,9 +1,7 @@
 /** No-model plan and admission gate orchestration. */
 
-import { ADMISSION_APPROVED_LABEL } from './admission-gate.mjs';
+import { admissionGateReceipt } from './admission-gate.mjs';
 import { hasProtectedAdmissionLabel } from './admission-policy.mjs';
-import { ADMISSION_RECEIPT_PREFIX, SYMPHONY_LABEL } from './admitter.mjs';
-import { PLAN_APPROVED_LABEL } from './plan-gate.mjs';
 
 export const TEAM_ROUTES = Object.freeze({
   JOV: Object.freeze({
@@ -33,13 +31,6 @@ function activePullRequestPattern(route) {
     `github\\.com/${route.repo.replace('/', '\\/')}\\/pull\\/\\d+`,
     'i'
   );
-}
-
-function labelsOf(issue) {
-  return (issue?.labels?.nodes || issue?.labels || [])
-    .map(label => (typeof label === 'string' ? label : label?.name))
-    .filter(Boolean)
-    .map(label => label.toLowerCase());
 }
 
 function commentsOf(issue) {
@@ -112,9 +103,8 @@ export function validateDeterministicPlanCandidate(
   // this deterministic policy. Readiness, plan, and admission labels are
   // durable evidence written by the control plane, not a human prerequisite.
   // Explicit opt-out, ownership, and security labels remain fail-closed below.
-  const labels = labelsOf(issue);
-  if (hasProtectedAdmissionLabel(issue) || labels.includes('symphony'))
-    return 'protected-or-human-review';
+  if (hasProtectedAdmissionLabel(issue)) return 'protected-or-human-review';
+  if (admissionGateReceipt(issue)) return 'already-admitted';
   if ((issue.children?.nodes || []).length > 0) return 'parent-or-bundle';
 
   const text = `${issue.title || ''}\n${issue.description || ''}`;
@@ -216,30 +206,12 @@ export function selectDeterministicPlanCandidate(
   };
 }
 
-function hasLabels(issue, names) {
-  const labels = new Set(labelsOf(issue));
-  return names.every(name => labels.has(name));
-}
-
 export function admissionIntentLoad(issues) {
   const active = issues.filter(issue => {
     if (!['Todo', 'In Progress', 'In Review'].includes(issue.state?.name))
       return false;
-    if (
-      !hasLabels(issue, [
-        PLAN_APPROVED_LABEL,
-        ADMISSION_APPROVED_LABEL,
-        SYMPHONY_LABEL,
-      ])
-    )
-      return false;
-    return commentsOf(issue).some(comment => {
-      const body = commentBody(comment);
-      return (
-        body.startsWith('<!-- admission-gate/v1 -->') ||
-        body.startsWith(ADMISSION_RECEIPT_PREFIX)
-      );
-    });
+    if (hasProtectedAdmissionLabel(issue)) return false;
+    return Boolean(admissionGateReceipt(issue));
   });
   return { count: active.length, identifiers: active.map(x => x.identifier) };
 }
