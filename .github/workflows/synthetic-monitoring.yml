@@ -241,6 +241,14 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
+      - name: File Linear issue on failure
+        if: ${{ always() && (failure() || steps.test-results.outputs.test_status != 'passed') }}
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          FAILED_TESTS: ${{ steps.test-results.outputs.failed_tests }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/synthetic-monitoring-intake.mjs
+
       - name: Send Slack Success Notification (Scheduled Summary)
         if: ${{ always() && !failure() && steps.test-results.outputs.test_status == 'passed' && github.event_name == 'schedule' }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0

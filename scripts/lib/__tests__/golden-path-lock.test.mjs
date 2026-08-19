@@ -6,9 +6,12 @@ import {
   buildProdProbeReceipt,
   classifyChangedPaths,
   cursorAuthHeader,
+  evaluateBillingHealth,
   evaluateChatFirstMessage,
+  evaluateClaimUnauth,
   evaluateHomepageHtml,
   evaluateProdProbe,
+  evaluateStripeWebhookLiveness,
   evaluateWaitlistUnauth,
   findOwnedAgents,
   GOLDEN_PATH_LOCK_SCHEMA,
@@ -102,21 +105,56 @@ describe('golden-path lock evaluators', () => {
     });
   });
 
-  it('aggregates the three live-path checks', () => {
+  it('requires unauthenticated claim writes to 401', () => {
+    expect(evaluateClaimUnauth({ status: 401 })).toMatchObject({ ok: true });
+    expect(evaluateClaimUnauth({ status: 200 })).toMatchObject({ ok: false });
+  });
+
+  it('requires billing health 200 healthy:true', () => {
+    expect(
+      evaluateBillingHealth({ status: 200, body: { healthy: true } })
+    ).toMatchObject({ ok: true });
+    expect(
+      evaluateBillingHealth({ status: 503, body: { healthy: false } })
+    ).toMatchObject({ ok: false });
+    expect(evaluateBillingHealth({ status: 404 })).toMatchObject({ ok: false });
+  });
+
+  it('requires unsigned Stripe webhooks to 400', () => {
+    expect(evaluateStripeWebhookLiveness({ status: 400 })).toMatchObject({
+      ok: true,
+    });
+    expect(evaluateStripeWebhookLiveness({ status: 500 })).toMatchObject({
+      ok: false,
+    });
+    expect(evaluateStripeWebhookLiveness({ status: 404 })).toMatchObject({
+      ok: false,
+    });
+  });
+
+  it('aggregates the live-path checks including claim, billing, and Stripe', () => {
+    const liveExtras = {
+      claimStatus: 401,
+      billingStatus: 200,
+      billingBody: { healthy: true },
+      stripeWebhookStatus: 400,
+    };
     const ok = evaluateProdProbe({
       homepageHtml: '<a href="/start">Get started</a>',
       chatStatus: 403,
       chatBody: { errorCode: 'TURNSTILE_REQUIRED' },
       waitlistStatus: 401,
+      ...liveExtras,
     });
     expect(ok.ok).toBe(true);
-    expect(ok.checks).toHaveLength(3);
+    expect(ok.checks).toHaveLength(6);
 
     const broken = evaluateProdProbe({
       homepageHtml: '<a href="/start">Get started</a>',
       chatStatus: 401,
       chatBody: { error: 'Unauthorized' },
       waitlistStatus: 401,
+      ...liveExtras,
     });
     expect(broken.ok).toBe(false);
     expect(
@@ -172,6 +210,10 @@ describe('golden-path lock receipts', () => {
       chatStatus: 403,
       chatBody: { errorCode: 'TURNSTILE_REQUIRED' },
       waitlistStatus: 401,
+      claimStatus: 401,
+      billingStatus: 200,
+      billingBody: { healthy: true },
+      stripeWebhookStatus: 400,
     });
     const receipt = buildProdProbeReceipt({
       ok: evaluated.ok,
