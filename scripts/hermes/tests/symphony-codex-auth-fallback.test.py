@@ -1571,9 +1571,11 @@ class FallbackTests(unittest.TestCase):
         log = (self.root / "logs/JOV-7.log").read_text()
         self.assertIn("remount_ci_red", log)
         events = self.events.read_text()
+        self.assertIn("fetch --depth 1 origin main", events)
         self.assertIn("fetch --depth 1 origin refs/heads/grok/JOV-7-fix:refs/remotes/origin/grok/JOV-7-fix", events)
         self.assertIn("checkout -B grok/JOV-7-fix origin/grok/JOV-7-fix", events)
         self.assertIn("reset --hard origin/grok/JOV-7-fix", events)
+        self.assertIn("merge --no-edit origin/main", events)
         self.assertNotIn("checkout -B fallback/JOV-7-fix origin/main", events)
         self.assertIn("failing CI", events)
 

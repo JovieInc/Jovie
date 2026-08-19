@@ -142,9 +142,11 @@ if [ "$REMOUNT" != 1 ] && [ -n "$(git -C "$WS" status --porcelain)" ]; then
   exit 2
 fi
 if [ "$REMOUNT" = 1 ]; then
+  git -C "$WS" fetch --depth 1 origin main
   git -C "$WS" fetch --depth 1 origin "refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}"
   git -C "$WS" checkout -B "$BRANCH" "origin/$BRANCH"
   git -C "$WS" reset --hard "origin/$BRANCH"
+  git -C "$WS" merge --no-edit origin/main || true
 else
   git -C "$WS" fetch --depth 1 origin main
   git -C "$WS" checkout -B "$BRANCH" origin/main
@@ -183,7 +185,7 @@ URL: $URL
 Description:
 $DESC
 
-Work only in this checkout of $BRANCH. Do not open a second PR. Do not reset to main. Push to the existing head.
+Work only in this checkout of $BRANCH. Do not open a second PR. Do not reset to main. If the branch is behind or conflicting with origin/main, finish the merge/rebase onto origin/main, then push to the existing head.
 Fix the failing checks. If scripts-typecheck exceeds the baseline, fix the new TypeScript errors; do not regenerate the baseline unless the errors are genuinely pre-existing on main.
 Do not weaken or skip gates. Do not merge, deploy, promote, or remove queue-deferred. If blocked, write BLOCKER.md with the exact reason and exit. Start now."
 else
