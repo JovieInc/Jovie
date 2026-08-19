@@ -87,6 +87,10 @@ struct AppShellChatFirstTests {
   @Test func composerTrailingSlotIsMicWhenEmptyAndSendWhenTyped() {
     #expect(ChatComposerTrailingAction.action(draftIsEmpty: true) == .mic)
     #expect(ChatComposerTrailingAction.action(draftIsEmpty: false) == .send)
+    #expect(ChatComposerTrailingAction.mic.accessibilityIdentifier == "chat-composer-mic")
+    #expect(ChatComposerTrailingAction.send.accessibilityIdentifier == "chat-composer-send")
+    #expect(ChatComposerTrailingAction.mic.accessibilityLabel == "Talk")
+    #expect(ChatComposerTrailingAction.send.accessibilityLabel == "Send")
   }
 
   @Test func keepsChatMountedAcrossTabs() {

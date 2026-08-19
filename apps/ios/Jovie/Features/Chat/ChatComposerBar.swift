@@ -21,6 +21,20 @@ enum ChatComposerTrailingAction: Equatable {
   static func action(draftIsEmpty: Bool) -> Self {
     draftIsEmpty ? .mic : .send
   }
+
+  var accessibilityIdentifier: String {
+    switch self {
+    case .mic: return "chat-composer-mic"
+    case .send: return "chat-composer-send"
+    }
+  }
+
+  var accessibilityLabel: String {
+    switch self {
+    case .mic: return "Talk"
+    case .send: return "Send"
+    }
+  }
 }
 
 struct ChatComposerBar: View {
@@ -163,8 +177,8 @@ struct ChatComposerBar: View {
         .frame(width: 36, height: 36)
     }
     .buttonStyle(.plain)
-    .accessibilityLabel("Talk")
-    .accessibilityIdentifier("chat-composer-mic")
+    .accessibilityLabel(ChatComposerTrailingAction.mic.accessibilityLabel)
+    .accessibilityIdentifier(ChatComposerTrailingAction.mic.accessibilityIdentifier)
     .accessibilityHint("Opens voice capture")
   }
 
@@ -187,8 +201,8 @@ struct ChatComposerBar: View {
     }
     .buttonStyle(.plain)
     .disabled(!ChatComposerMetrics.isSendEnabled(trimmedDraft: trimmedDraft, isSending: isSending))
-    .accessibilityLabel("Send")
-    .accessibilityIdentifier("chat-composer-send")
+    .accessibilityLabel(ChatComposerTrailingAction.send.accessibilityLabel)
+    .accessibilityIdentifier(ChatComposerTrailingAction.send.accessibilityIdentifier)
   }
 }
 

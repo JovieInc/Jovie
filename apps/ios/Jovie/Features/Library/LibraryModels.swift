@@ -44,6 +44,12 @@ enum LibraryAssetType: String, CaseIterable, Identifiable, Sendable {
   }
 }
 
+enum LibraryLandingPolicy {
+  static func defaultHome() -> LibraryHome { .catalog }
+
+  static func homeAfterSavingVlog() -> LibraryHome { .collections }
+}
+
 enum LibraryHome: String, CaseIterable, Identifiable, Sendable {
   case catalog
   case collections
@@ -57,6 +63,10 @@ enum LibraryHome: String, CaseIterable, Identifiable, Sendable {
     case .collections: return "Collections"
     case .ideas: return "Ideas"
     }
+  }
+
+  var accessibilityIdentifier: String {
+    "library-home-\(id)"
   }
 }
 

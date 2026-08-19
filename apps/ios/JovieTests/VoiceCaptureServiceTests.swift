@@ -350,6 +350,21 @@ struct VoiceCaptureServiceTests {
     #expect(viewModel.currentWordIndex == 2)
   }
 
+  @Test func landscapeScriptRegionStaysCompactSoControlsRemain() {
+    #expect(
+      TeleprompterCaptureOrientation.scriptRegionHeight(
+        isLandscape: true,
+        presentationMode: .fullscreen
+      ) == 72
+    )
+    #expect(
+      TeleprompterCaptureOrientation.scriptRegionHeight(
+        isLandscape: false,
+        presentationMode: .notch
+      ) == 120
+    )
+  }
+
   @Test func teleprompterRotationTurnsNinetyNotOneHundredEighty() {
     #expect(TeleprompterCaptureOrientation.videoRotationAngle(for: .portrait) == 90)
     #expect(TeleprompterCaptureOrientation.videoRotationAngle(for: .landscapeRight) == 0)

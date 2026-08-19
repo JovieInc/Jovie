@@ -157,7 +157,7 @@ private struct AppContentView: View {
           )
         } audienceContent: { _ in
           EmptyView()
-        } libraryContent: { _ in
+        } libraryContent: { _, _ in
           EmptyView()
         } calendarContent: { _ in
           EmptyView()
@@ -223,9 +223,10 @@ private struct AppContentView: View {
             onRetry: { await reloadAudienceHighlights(for: appState.activeUserID) },
             onAskJovie: askJovie
           )
-        } libraryContent: { onSelectAsset in
+        } libraryContent: { onSelectAsset, home in
           LibrarySurfaceView(
             assets: Self.previewLibraryAssets(for: appState.launchMode),
+            home: home,
             onSelectAsset: onSelectAsset
           )
         } calendarContent: { askJovie in

@@ -31,6 +31,14 @@ enum TeleprompterCaptureOrientation {
     }
   }
 
+  static func scriptRegionHeight(
+    isLandscape: Bool,
+    presentationMode: TeleprompterPresentationMode
+  ) -> CGFloat {
+    if isLandscape { return 72 }
+    return presentationMode == .notch ? 120 : 320
+  }
+
   static func apply(to connection: AVCaptureConnection, orientation: UIDeviceOrientation) {
     let angle = videoRotationAngle(for: orientation)
     guard connection.isVideoRotationAngleSupported(angle) else { return }

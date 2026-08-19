@@ -374,9 +374,11 @@ final class JovieUITests: XCTestCase {
 
     profileSurface.tap()
 
+    let openedPublicProfile = app.buttons["Close Public Profile"].waitForExistence(timeout: 3)
+    let openedDashboard = app.buttons["Copy URL"].waitForExistence(timeout: 3)
     XCTAssertTrue(
-      app.buttons["Copy URL"].waitForExistence(timeout: 3),
-      "Drawer switcher did not switch to Profile.\n\(app.debugDescription)"
+      openedPublicProfile || openedDashboard,
+      "Drawer Profile did not open the public profile or dashboard.\n\(app.debugDescription)"
     )
   }
 

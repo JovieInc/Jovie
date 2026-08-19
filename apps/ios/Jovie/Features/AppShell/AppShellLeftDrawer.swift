@@ -1,5 +1,11 @@
 import SwiftUI
 
+enum AppShellDrawerProfilePolicy {
+  static func opensEmbeddedPublicProfile(publicProfileURL: String?) -> Bool {
+    publicProfileURL?.isEmpty == false
+  }
+}
+
 enum AppShellDrawerSurfaceLayout {
   static let labelMinimumScaleFactor: CGFloat = 0.85
   static let maxSingleLineSurfaceButtonHeight: CGFloat = 56
@@ -92,7 +98,11 @@ struct AppShellLeftDrawer: View {
             selectedTab: selectedTab,
             hasProfileQR: profile.qrPayload != nil,
             onSelectTab: { tab in
-              if tab == .profile {
+              if tab == .profile,
+                 AppShellDrawerProfilePolicy.opensEmbeddedPublicProfile(
+                   publicProfileURL: profile.publicProfileURL
+                 )
+              {
                 onOpenPublicProfile()
                 return
               }

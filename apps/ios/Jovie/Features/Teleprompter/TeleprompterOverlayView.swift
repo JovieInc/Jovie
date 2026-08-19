@@ -234,8 +234,10 @@ struct TeleprompterOverlayView: View {
   /// a mode, so recording state transitions cannot shift the layout.
   /// Landscape stays compact so header + record controls remain on screen.
   private var scriptRegionHeight: CGFloat {
-    if isLandscape { return 72 }
-    return viewModel.presentationMode == .notch ? 120 : 320
+    TeleprompterCaptureOrientation.scriptRegionHeight(
+      isLandscape: isLandscape,
+      presentationMode: viewModel.presentationMode
+    )
   }
 
   private var isLockedWhileLive: Bool {

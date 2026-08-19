@@ -490,6 +490,18 @@ struct ChatRepositoryTests {
     #expect(repository.sessionExpired == true)
     #expect(repository.lastErrorMessage == nil)
     #expect(repository.timeline.last?.status == .failed)
+    let assistant = repository.timeline.last { $0.role == .assistant }
+    #expect(assistant?.status == .failed)
+    #expect(assistant?.status != .completed)
+    #expect(assistant?.content.contains("Jovie") == false)
+  }
+
+  @Test func terminalAuthFailureIsFailClosedFor401AndMissingToken() {
+    #expect(isTerminalChatAuthFailure(APIClientError.missingToken))
+    #expect(isTerminalChatAuthFailure(APIClientError.requestFailed(statusCode: 401)))
+    #expect(isTerminalChatAuthFailure(MobileChatClientError.requestFailed(statusCode: 401)))
+    #expect(isTerminalChatAuthFailure(MobileChatClientError.requestFailed(statusCode: 500)) == false)
+    #expect(isTerminalChatAuthFailure(APIClientError.requestFailed(statusCode: 503)) == false)
   }
 
   @Test func retryOn401SetsSessionExpiredNotOffline() async {

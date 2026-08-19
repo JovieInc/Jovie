@@ -5,9 +5,8 @@ import SwiftUI
 /// not a filter.
 struct LibrarySurfaceView: View {
   let assets: [LibraryAsset]
+  @Binding var home: LibraryHome
   let onSelectAsset: (LibraryAsset) -> Void
-
-  @State private var home: LibraryHome = .catalog
   @State private var filter: LibraryFilter = .all
   @State private var query = ""
   @State private var localVideoAssets: [LibraryAsset] = []
@@ -90,7 +89,7 @@ struct LibrarySurfaceView: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(home == segment ? [.isSelected] : [])
-        .accessibilityIdentifier("library-home-\(segment.id)")
+        .accessibilityIdentifier(segment.accessibilityIdentifier)
       }
     }
     .padding(.horizontal, JovieSpacing.large)

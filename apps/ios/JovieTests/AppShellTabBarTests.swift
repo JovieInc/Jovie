@@ -144,6 +144,25 @@ struct AppShellTabBarTests {
   }
 }
 
+struct AppShellDrawerProfilePolicyTests {
+  @Test func profileWithPublicURLOpensEmbeddedBrowser() {
+    #expect(
+      AppShellDrawerProfilePolicy.opensEmbeddedPublicProfile(
+        publicProfileURL: "https://jov.ie/tim"
+      )
+    )
+  }
+
+  @Test func profileWithoutURLFallsBackToDashboard() {
+    #expect(
+      AppShellDrawerProfilePolicy.opensEmbeddedPublicProfile(publicProfileURL: nil) == false
+    )
+    #expect(
+      AppShellDrawerProfilePolicy.opensEmbeddedPublicProfile(publicProfileURL: "") == false
+    )
+  }
+}
+
 struct SharedPressFeedbackStyleTests {
   @Test func plainRowPressFeedbackHasOneCanonicalDefaultOpacity() {
     #expect(JoviePressFeedbackButtonStyle.defaultPressedOpacity == 0.72)
@@ -151,6 +170,25 @@ struct SharedPressFeedbackStyleTests {
 }
 
 struct LibraryFeedTests {
+  @Test func savingAVlogLandsOnCollectionsNotCatalog() {
+    #expect(LibraryLandingPolicy.defaultHome() == .catalog)
+    #expect(LibraryLandingPolicy.homeAfterSavingVlog() == .collections)
+  }
+
+  @Test func homesAreCatalogCollectionsIdeasWithStableA11y() {
+    #expect(LibraryHome.allCases.map(\.id) == ["catalog", "collections", "ideas"])
+    #expect(LibraryHome.allCases.map(\.title) == ["Catalog", "Collections", "Ideas"])
+    #expect(LibraryHome.catalog.accessibilityIdentifier == "library-home-catalog")
+    #expect(LibraryHome.collections.accessibilityIdentifier == "library-home-collections")
+    #expect(LibraryHome.ideas.accessibilityIdentifier == "library-home-ideas")
+  }
+
+  @Test func searchMatchesCatalogNameAndIgnoresTakes() {
+    let hits = LibraryFeed.matching(LibraryFeed.previewAssets, query: "midnight")
+    #expect(hits.map(\.id) == ["lib-release-midnight"])
+    #expect(LibraryFeed.matching(LibraryFeed.previewAssets, query: "   ").count == LibraryFeed.previewAssets.count)
+  }
+
   @Test func filterAllReturnsEveryAsset() {
     let assets = LibraryFeed.previewAssets
     #expect(LibraryFeed.filtered(assets: assets, filter: .all).count == assets.count)

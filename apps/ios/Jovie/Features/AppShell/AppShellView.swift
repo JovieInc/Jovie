@@ -144,7 +144,10 @@ struct AppShellView<
   let onLogout: @MainActor () async -> Void
   @ViewBuilder let profileContent: ProfileContent
   @ViewBuilder let audienceContent: (_ askJovie: @escaping (String) -> Void) -> AudienceContent
-  @ViewBuilder let libraryContent: (_ onSelectAsset: @escaping (LibraryAsset) -> Void) -> LibraryContent
+  @ViewBuilder let libraryContent: (
+    _ onSelectAsset: @escaping (LibraryAsset) -> Void,
+    _ home: Binding<LibraryHome>
+  ) -> LibraryContent
   @ViewBuilder let calendarContent: (_ askJovie: @escaping (String) -> Void) -> CalendarContent
   @ViewBuilder let inboxContent: (_ askJovie: @escaping (String) -> Void) -> InboxContent
   let chatContent: (
@@ -167,6 +170,7 @@ struct AppShellView<
   @State private var isShowingTalkOverlay = false
   @State private var talkVoiceService = VoiceCaptureService()
   @State private var teleprompterProposal: MobileChatVideoProposalPayload?
+  @State private var libraryHome: LibraryHome = .catalog
   @State private var videoPlaybackAsset: LibraryAsset?
   @State private var publicProfileBrowserItem: PublicProfileBrowserDestination?
   @State private var isShowingProfileQR = false
@@ -194,8 +198,10 @@ struct AppShellView<
     onLogout: @escaping @MainActor () async -> Void,
     @ViewBuilder profileContent: () -> ProfileContent,
     @ViewBuilder audienceContent: @escaping (_ askJovie: @escaping (String) -> Void) -> AudienceContent,
-    @ViewBuilder libraryContent: @escaping (_ onSelectAsset: @escaping (LibraryAsset) -> Void)
-      -> LibraryContent = { _ in EmptyView() },
+    @ViewBuilder libraryContent: @escaping (
+      _ onSelectAsset: @escaping (LibraryAsset) -> Void,
+      _ home: Binding<LibraryHome>
+    ) -> LibraryContent = { _, _ in EmptyView() },
     @ViewBuilder calendarContent: @escaping (_ askJovie: @escaping (String) -> Void) -> CalendarContent = { _ in
       EmptyView()
     },
@@ -623,6 +629,7 @@ struct AppShellView<
     }
     viewModel.onSaved = { _ in
       self.teleprompterProposal = nil
+      self.libraryHome = LibraryLandingPolicy.homeAfterSavingVlog()
       self.selectTab(.library)
     }
     return viewModel
@@ -764,7 +771,7 @@ struct AppShellView<
     case .chat:
       profileContent
     case .library:
-      libraryContent(presentEntityFromLibrary)
+      libraryContent(presentEntityFromLibrary, $libraryHome)
     case .calendar:
       calendarContent(openAudienceChat)
     case .inbox:
