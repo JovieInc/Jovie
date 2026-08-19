@@ -64,6 +64,7 @@ class LinearHandler(http.server.BaseHTTPRequestHandler):
             "title": f"Ship {identifier}",
             "description": "Bounded admitted work.",
             "team": {"key": identifier.split("-", 1)[0]},
+            "state": {"name": "Todo"},
             "labels": {"nodes": [{"name": name} for name in labels]},
             "comments": {
                 "nodes": (
@@ -168,7 +169,10 @@ class LinearHandler(http.server.BaseHTTPRequestHandler):
                             "description": node.get("description") or "Bounded admitted work.",
                             "url": f"https://linear.example/{identifier}",
                             "updatedAt": "2026-08-14T19:00:00Z",
-                            "state": {"id": f"{team}-todo", "name": "Todo"},
+                            "state": node.get("state")
+                            if isinstance(node.get("state"), dict)
+                            and isinstance(node.get("state", {}).get("name"), str)
+                            else {"id": f"{team}-todo", "name": "Todo"},
                             "team": {
                                 "key": team,
                                 "states": {
@@ -198,6 +202,7 @@ class GrokLinearHandler(http.server.BaseHTTPRequestHandler):
     requests: list[dict] = []
     labels: dict[str, list[str]] = {}
     omit_receipt: set[str] = set()
+    states: dict[str, str] = {}
 
     def do_POST(self):  # noqa: N802 - stdlib handler API
         payload = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
@@ -228,7 +233,10 @@ class GrokLinearHandler(http.server.BaseHTTPRequestHandler):
                         "description": description,
                         "url": f"https://linear.example/{identifier}",
                         "updatedAt": "2026-08-14T19:00:00Z",
-                        "state": {"id": f"{team}-todo", "name": "Todo"},
+                        "state": {
+                            "id": f"{team}-state",
+                            "name": self.__class__.states.get(identifier) or "Todo",
+                        },
                         "team": {
                             "key": team,
                             "states": {
@@ -436,6 +444,7 @@ class FallbackTests(unittest.TestCase):
         GrokLinearHandler.requests = []
         GrokLinearHandler.labels = {}
         GrokLinearHandler.omit_receipt = set()
+        GrokLinearHandler.states = {}
         server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), GrokLinearHandler)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.addCleanup(server.shutdown)
@@ -893,7 +902,7 @@ class FallbackTests(unittest.TestCase):
         self.assertIn("hasNextPage", request_body)
         self.assertNotIn("first: 20", request_body)
 
-    def _issue_node(self, identifier, *labels, receipt=None, title=None, description=None):
+    def _issue_node(self, identifier, *labels, receipt=None, title=None, description=None, state="Todo"):
         title = title if title is not None else f"Ship {identifier}"
         description = description if description is not None else "Bounded admitted work."
         blocked = any(
@@ -914,6 +923,7 @@ class FallbackTests(unittest.TestCase):
             "identifier": identifier,
             "title": title,
             "description": description,
+            "state": {"name": state},
             "team": {"key": identifier.split("-", 1)[0]},
             "labels": {"nodes": [{"name": name} for name in labels]},
             "comments": {"nodes": comments},
@@ -948,7 +958,65 @@ class FallbackTests(unittest.TestCase):
         self.assertNotIn("first: 20", first["query"])
         self.assertNotIn('labels: { name: { eq: "symphony" } }', first["query"])
         self.assertIn('"In Review"', first["query"])
+        self.assertIn("state { name }", first["query"])
         self.assertEqual(module.REQUIRED_ADMISSION_LABELS, frozenset())
+
+    def test_linear_identifiers_continues_in_review_without_receipt(self):
+        """Live :4041 retrying In Review issues after #16212 emptied receipts."""
+        module = self.load_controller_module()
+        url = self.linear_url()
+        LinearHandler.pages = [
+            [
+                self._issue_node("JOV-5015", "symphony", receipt=False, state="In Review"),
+                self._issue_node("JOV-5000", "symphony", receipt=False, state="Todo"),
+                self._issue_node(
+                    "JOV-4998", "symphony", "blocked", receipt=False, state="In Review"
+                ),
+            ]
+        ]
+        with mock.patch.dict(os.environ, {"LINEAR_API_KEY": "linear-secret", "LINEAR_API_URL": url}):
+            identifiers = module._linear_identifiers()
+        self.assertEqual(identifiers, ["JOV-5015"])
+
+    def test_launch_continues_in_review_head_without_receipt(self):
+        module = self.load_controller_module()
+        launches: list[list[str]] = []
+        issue = self._admitted_issue("JOV-5015", "In Review")
+        issue["comments"] = {"nodes": []}
+        with (
+            mock.patch.object(module, "_autonomous_open_pr_index", return_value={}),
+            mock.patch.object(module, "_fetch_single_issue", return_value=issue),
+            mock.patch.object(
+                module, "_control", side_effect=lambda command: launches.append(command) or True
+            ),
+        ):
+            launched, used = module._launch_fallback_workers(
+                ["JOV-5015"],
+                [],
+                "/bin/true",
+                "a" * 64,
+                {"selected": {"id": "grok"}},
+                2,
+            )
+        self.assertEqual(used, 1)
+        self.assertEqual(len(launched), 1)
+        self.assertTrue(any("JOV-5015" in arg for command in launches for arg in command), launches)
+
+    def test_check_admission_continues_in_review_without_receipt(self):
+        url = self.linear_url()
+        original_nodes = LinearHandler.nodes
+        LinearHandler.nodes = [
+            self._issue_node("JOV-5015", "symphony", receipt=False, state="In Review")
+        ]
+        self.addCleanup(lambda: setattr(LinearHandler, "nodes", original_nodes))
+        result = self.run_controller(
+            "check-admission",
+            "JOV-5015",
+            LINEAR_API_KEY="linear-secret",
+            LINEAR_API_URL=url,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["original_state_name"], "In Review")
 
     def test_linear_identifiers_fails_closed_on_malformed_page_info(self):
         module = self.load_controller_module()

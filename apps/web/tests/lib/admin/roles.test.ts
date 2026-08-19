@@ -189,7 +189,7 @@ describe('Admin Roles', () => {
       expect(dbModule.db.select).toHaveBeenCalledTimes(1);
       expect(mockCaptureWarning).toHaveBeenCalledWith(
         '[admin/roles] Redis cache failed, falling back to database query',
-        { error: expect.any(Error) }
+        expect.any(Error)
       );
     });
   });

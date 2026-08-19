@@ -23,7 +23,7 @@ Set `JOVIE_AGENT_PROFILE` before editing. Non-coding profiles (`default`, Chief,
 
 ## Agent Coordination Preflight
 
-Before starting any task, agents must query gbrain for both the org chart and existing work in the area. Fetch `gbrain:agent-org-chart` when available, read `shared-skills/coordination-basics/SKILL.md` when present, and run a targeted ownership/current-priorities query for the task. If another agent owns the area, delegate through the coordination inbox instead of starting overlapping work. If gbrain is unreachable, stop and alert with a `system-blocker`; do not proceed without the coordination check.
+Before starting any task, query gbrain for the org chart and existing work (`gbrain:agent-org-chart` when available, plus a targeted ownership query). If another agent owns the area, delegate instead of overlapping. If gbrain is unreachable, continue with repo tools and record `gbrain-unavailable` — do not invent coordination state. Tools: MCP `gbrain__search` / `gbrain__recall`; CLI `gbrain search` / `gbrain query`.
 
 ## Pen Workspace File Lock
 

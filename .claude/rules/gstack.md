@@ -1,6 +1,8 @@
 # gstack (Workflow Toolkit) + Skill Routing
 
-This repo includes [gstack](https://github.com/garrytan/gstack) as a git submodule at `.claude/skills/gstack/`. It provides specialized workflow skills available to all AI agents.
+This repo vendors [gstack](https://github.com/garrytan/gstack) at `.agents/skills/gstack/` (scripts, tests, and leaf `SKILL.md` files). Executable Jovie copies of those leaves also live under `.claude/skills/<name>/`. `.claude/skills/gstack/` is only the small Jovie overlay (`design-canonical`), not a git submodule.
+
+`src/`, `test/`, and `bin/` inside the gstack checkout are implementation, not skills. Do not treat files there as catalog entries.
 
 **Conflict rule:** gstack commands are canonical. If a gstack skill conflicts with any other command or workflow, the gstack version takes precedence.
 
@@ -36,13 +38,13 @@ This repo includes [gstack](https://github.com/garrytan/gstack) as a git submodu
 gstack requires **Bun v1.0+**. The session-start hook installs Bun and runs setup automatically. For manual setup:
 
 ```bash
-cd .claude/skills/gstack && ./setup
+cd .agents/skills/gstack && ./setup
 ```
 
 ## Updating gstack
 
 ```bash
-cd .claude/skills/gstack && git pull origin main && ./setup
+cd .agents/skills/gstack && git pull origin main && ./setup
 ```
 
 Or use `/gstack-upgrade` from within Claude Code.
@@ -74,27 +76,11 @@ Key routing rules:
 
 ## gbrain (long-term memory layer)
 
-For cross-session recall and prior-art lookup, consult gbrain via MCP **only when the question touches durable founder/strategic context**. Do not ritually query for purely local code questions.
+Same contract as `CLAUDE.md`: query gbrain before architectural decisions and for the Agent Coordination Preflight. Do not ritually query for purely local code.
 
-Exception: the Agent Coordination Preflight in `AGENTS.md` is mandatory for every task. That org-chart/existing-work check is a coordination gate, not optional durable-context lookup. If gbrain is unreachable during the coordination gate, stop and alert with a `system-blocker`.
+If gbrain is unreachable, continue with repo tools and record `gbrain-unavailable`. Do not invent coordination state.
 
-Conditional triggers:
-- Decisions involving people, companies, customers, fundraising, pricing, or competitive positioning
-- Repeated strategic questions ("did we already decide X?")
-- Architectural rationale that spans more than one session
-- Cross-repo recall (Jovie code + ops + meetings + email + calendar once those senses are wired)
-
-When triggered, prefer:
-- `mcp__gbrain__query` — natural-language hybrid search (vector + keyword + graph)
-- `mcp__gbrain__get` — fetch a known page by slug
-- `mcp__gbrain__graph_query` — typed-edge traversal (e.g., who advised whom)
-
-Skip when:
-- The question is pure local code (use Grep, Read, the codebase docs in `docs/`)
-- MCP tools aren't loaded in the session (call out as "gbrain unavailable" instead of failing)
-- gbrain doctor health is < 70 (check via `gbrain doctor --fast --json`)
-
-After shipping a non-trivial decision, write a brief decision page so the next agent (or future you) can find it. ruflo agentdb is for swarm-session memory; gbrain is for long-term founder/personal memory. They are complementary, not redundant.
+Tools: MCP `gbrain__search` and `gbrain__recall`. CLI: `gbrain search` and `gbrain query`. After a durable decision, write a short gbrain page. ruflo agentdb is swarm-session memory; gbrain is long-term founder memory.
 
 ## Skill File Hygiene
 

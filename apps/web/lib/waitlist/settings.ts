@@ -89,9 +89,7 @@ export async function isWaitlistGateEnabled(): Promise<boolean> {
         },
       });
     } catch (cacheError) {
-      captureWarning('[waitlist-gate] Redis cache read failed', {
-        error: cacheError,
-      });
+      captureWarning('[waitlist-gate] Redis cache read failed', cacheError);
     }
   }
 
@@ -107,9 +105,7 @@ export async function isWaitlistGateEnabled(): Promise<boolean> {
     redis
       .set(GATE_CACHE_KEY, value, { ex: GATE_REDIS_TTL_SECONDS })
       .catch(cacheError => {
-        captureWarning('[waitlist-gate] Redis cache write failed', {
-          error: cacheError,
-        });
+        captureWarning('[waitlist-gate] Redis cache write failed', cacheError);
       });
   }
 
@@ -150,9 +146,7 @@ export async function invalidateWaitlistGateCache(): Promise<void> {
         data: { cacheKey: GATE_CACHE_KEY },
       });
     } catch (error) {
-      captureWarning('[waitlist-gate] Failed to invalidate Redis cache', {
-        error,
-      });
+      captureWarning('[waitlist-gate] Failed to invalidate Redis cache', error);
     }
   }
 }

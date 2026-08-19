@@ -30,6 +30,7 @@ import {
   isSentryInitialized,
   type SentryMode,
 } from '@/lib/sentry/init';
+import { isUpstashQuotaNoise } from '@/lib/sentry/non-actionable-issues';
 import {
   errorJsonReplacer,
   isRedisQuotaFailure,
@@ -44,6 +45,21 @@ const nodeEnv = process.env.NODE_ENV ?? 'development';
 
 type ErrorSeverity = 'error' | 'critical' | 'warning';
 type ErrorContext = Record<string, unknown>;
+
+/**
+ * Call sites historically passed `{ error }` or `{ clerkUserId, error }` as
+ * the error argument. `JSON.stringify` of an `UpstashError` only enumerates
+ * `name`, so Sentry titles become `Error: {"error":{"name":"UpstashError"}}`
+ * (JOV-5220, JOV-5221). Unwrap the inner value and keep sibling fields as context.
+ */
+export function splitCapturedErrorBag(error: unknown): {
+  readonly error: unknown;
+  readonly context?: ErrorContext;
+} {
+  const inner = unwrapCapturedError(error);
+  const leftover = unwrapCapturedContext(error);
+  return leftover ? { error: inner, context: leftover } : { error: inner };
+}
 
 /**
  * Get current environment tag
@@ -184,6 +200,20 @@ function sendToSentry(params: {
 /**
  * Format error for logging and tracking
  */
+function quotaNoiseText(error: unknown): string {
+  if (error instanceof Error) {
+    return `${error.name} ${error.message}`;
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+  try {
+    return JSON.stringify(error, errorJsonReplacer) ?? String(error);
+  } catch {
+    return String(error);
+  }
+}
+
 function formatError(error: unknown): {
   message: string;
   stack?: string;
@@ -236,29 +266,37 @@ export async function captureError(
   context?: ErrorContext,
   severity: ErrorSeverity = 'error'
 ): Promise<void> {
-  const normalizedError = unwrapCapturedError(error);
-  const normalizedContext = unwrapCapturedContext(error, context);
-  const errorData = formatError(normalizedError);
+  const resolvedError = unwrapCapturedError(error);
+  const resolvedContext = unwrapCapturedContext(error, context);
+  const errorData = formatError(resolvedError);
   const sentryMode = getSentryMode();
   const environment = getEnvironment();
 
   // Always log to console for debugging
   logToConsole(severity, message, {
     ...errorData,
-    ...normalizedContext,
+    ...resolvedContext,
     sentryMode,
   });
 
-  // Send to Sentry for error tracking (primary)
-  sendToSentry({
-    error: normalizedError,
-    errorMessage: errorData.message,
-    message,
-    severity,
-    sentryMode,
-    environment,
-    context: normalizedContext,
-  });
+  // Best-effort Redis quota warnings already degrade in-process. The hourly
+  // operability canary owns the standing alert (JOV-5086); per-request
+  // captureException of the JSON bag flooded Linear as JOV-5221.
+  const quotaNoise =
+    severity === 'warning' &&
+    isUpstashQuotaNoise(quotaNoiseText(resolvedError));
+
+  if (!quotaNoise) {
+    sendToSentry({
+      error: resolvedError,
+      errorMessage: errorData.message,
+      message,
+      severity,
+      sentryMode,
+      environment,
+      context: resolvedContext,
+    });
+  }
 
   // Send to analytics for monitoring (secondary, fire-and-forget)
   const eventName =
@@ -274,9 +312,9 @@ export async function captureError(
       error_raw_message: errorData.message,
       sentry_mode: sentryMode,
       sentry_initialized: isSentryInitialized(),
-      ...normalizedContext,
+      ...resolvedContext,
     },
-    normalizedContext?.userId as string | undefined
+    resolvedContext?.userId as string | undefined
   ).catch(trackingError => {
     console.warn(
       '[Error Tracking] Failed to send analytics event:',
