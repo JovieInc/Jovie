@@ -47,6 +47,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- [internal] **Agent QC wires no longer advertise dead gates (JOV-5235):** Scope Judge is retired, Slop Gate stays post-merge informational, auto-approve ignores self-attested GStack comments, needs-human autoclose notifies Slack/Linear first, and the agent-pipeline branch check uses the shared allowlist.
 - [internal] **Stale grok remount units no longer block a fresh rebase:** sidecar stops a DIRTY/CONFLICTING fallback-ship older than 15 minutes so changelog remounts can run after a sibling lands. Merge-queue UNMERGEABLE (`CONFLICTING`) counts as remount, not inflight skip.
 - [internal] **DIRTY remounts that only conflict on CHANGELOG.md merge and push without waiting on grok:** Unreleased bullets from the branch are unioned onto main so sibling ships stop parking CLEAN-except-changelog heads for an hour.
 - [internal] **Hold-intake missed-admission recovery now enrolls CLEAN `queue-deferred` heads:** exact admission already strips that label, but a main-push recovery used to skip it and left CI-green Symphony PRs parked off the merge queue.

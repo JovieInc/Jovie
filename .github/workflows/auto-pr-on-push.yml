@@ -12,7 +12,7 @@
 # - Skips audit-only pushes (branches with only docs/audits and no code changes)
 # - Extracts Linear ticket ID from branch name for traceability
 # - Creates a draft PR so verification can run before it enters the full pipeline
-# - Does NOT bypass any quality gates (CI, scope judge, auto-approve all still apply)
+# - Does NOT bypass any quality gates (CI and auto-approve still apply)
 
 name: Auto-PR on Agent Push
 

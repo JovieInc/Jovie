@@ -359,11 +359,9 @@ def test_agent_pipeline_retires_dead_qc_wires() -> None:
     stale = _job_block("agent-pipeline.yml", "stale-cleanup")
     assert "SLACK_WEBHOOK_URL" in stale
     assert "LINEAR_API_KEY" in stale
-    assert (
-        'test("^(codex|codegen-bot|linear|claude)/") or test("^[^/]+/jov-[0-9]+([_-].+)?$"; "i")'
-        in stale
-    )
-    assert "gh pr close" in stale
+    assert "scripts/lib/needs-human-autoclose.mjs" in stale
+    assert "scripts/lib/agent-branch-pattern.mjs" in stale
+    assert "scripts/lib/agent-branch-pattern.mjs --match" in workflow
     landing = (WORKFLOWS / "agent-landing-sweep.yml").read_text(encoding="utf-8")
     assert "scope-judge" not in landing
     assert "Scope Judge" not in landing.split("\njobs:", 1)[1]

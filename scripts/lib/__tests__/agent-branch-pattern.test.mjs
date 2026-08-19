@@ -78,7 +78,7 @@ describe('agent-branch-pattern (open-agent-PR capacity)', () => {
       `${repoRoot}/.github/workflows/agent-pipeline.yml`,
       'utf8'
     );
-    expect(text).toContain('scripts/lib/agent-branch-pattern.mjs');
+    expect(text).toContain('scripts/lib/agent-branch-pattern.mjs --match');
     expect(text).toMatch(/\^\(codex\|codegen-bot\|linear\|claude\)\//);
     expect(text).toContain('^[^/]+/jov-[0-9]+([_-].+)?$');
     expect(text).not.toMatch(
