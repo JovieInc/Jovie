@@ -992,9 +992,9 @@ final class JovieUITests: XCTestCase {
     let heightBefore = composer.frame.height
     XCTAssertEqual(
       heightBefore,
-      76,
+      52,
       accuracy: 2,
-      "Empty composer left the reserved 76pt bar.\n\(app.debugDescription)"
+      "Empty composer left the reserved 52pt capsule bar.\n\(app.debugDescription)"
     )
     XCTAssertFalse(
       app.descendants(matching: .any)["chat-composer-send"].exists,

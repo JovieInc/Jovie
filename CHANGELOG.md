@@ -9,13 +9,18 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
+- **iPhone Library is Catalog, Collections, and Ideas:** Catalog is releases, merch, and docs. Collections auto-bundles a vlog with its script, takes, and B-roll. Ideas is the untagged third home.
+- **iPhone chat is home:** Ask Jovie is the first signed-in surface. There is no bottom tab bar. Swipe from the leading edge for the sidebar and from the trailing edge for the right rail.
 - **iPhone chat home can introduce what’s new:** An empty chat highlights one feature or lists up to three recent changes. Dismiss stays dismissed. More than three changes ends on And more, which opens the changelog.
 
 - **Ovie is one morning screen:** `/hud` now carries the brief, a Loom-style screen walk, shipper, and dashboard. Fullscreen asks the logged-in admin for the kiosk token and reloads `/hud?fs=1&kiosk=…`. `/app/ov/ops` and `/hud-tv` redirect there.
 - **Screen walks reuse one account-video store:** founder walks and later creator screen recordings upload through `lib/capture` into the Jovie account blob. The walk is stored and not admitted until Summer classifies it.
 
 ### Changed
-- [internal] **iOS chat composer, waitlist, and shell now have focused QA coverage:** reserved composer send slot, slash palette overlay, waitlist action geometry, and keyboard-locked edge-drag are locked by unit and UI tests. No tab-bar redesign.
+- **Saving a vlog opens Collections:** the new clip lands with its shoot instead of in Catalog.
+- **Empty chat Talk lives inside the composer pill:** typing swaps Talk for Send without moving the bar. Tap, drag, or Done dismisses the keyboard.
+- **Drawer Profile stays Dashboard:** tapping the account name opens the public profile when a URL exists. Venue QR stays in the sidebar.
+- [internal] **iOS chat composer, waitlist, and shell now have focused QA coverage:** reserved composer send slot, slash palette overlay, waitlist action geometry, and keyboard-locked edge-drag are locked by unit and UI tests.
 
 - [internal] **@types/node is 26.2.0 across workspace packages including desktop:** types-only bump; no DMG.
 
@@ -26,12 +31,16 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] **Product UI no longer uses raw black/white color utilities:** remaining contrast-ratchet hits now use named Noir Ion tokens, and the owned baseline buckets are at zero.
 - [internal] **Token-drift eval drives the shipped contrast scanner:** a fail-closed unit eval imports `lint-contrast-ratchet.mjs` and requires owned raw-token buckets to stay at zero.
 - [internal] **Gem activation has a direct host preflight:** production-proven controller activation uses the fixed fleet and fails before writes when user supervision is unavailable.
-- [internal] **Local Eve verification is deterministic and credential-free (JOV-5171):** the isolated `eve@0.27.8` pilot now has one root-invokable smoke command that runs from a cold app root, blocks model-catalog network access, and fails when the allowed skills, tools, channels, subagents, or schedules drift.
+- [internal] **Local Eve verification is deterministic and credential-free (JOV-5171):** the isolated Eve pilot now has one root-invokable smoke command that runs from a cold app root, blocks model-catalog network access, and fails when the allowed skills, tools, channels, subagents, or schedules drift.
+- [internal] **Eve-pilot core-chat evals cover session, fail-closed auth, and secret leak:** `eve eval --strict` drives the real session HTTP surface. Package scripts wrap Eve on Node 24 so a Node 22 parent shell still works.
 - **Label logo bars now align by visible artwork instead of file padding:** one shared asset registry measures transparent bounds, preserves aspect ratio, and propagates approved optical corrections across homepage, artist-profile, and experimental review surfaces.
 
 ### Fixed
 
 - **Mac chat stays on screen once the answer starts:** reserving the thread URL no longer remounts the live composer and transcript.
+- **Vlog capture matches how you hold the phone:** portrait, landscape left, and landscape right record the right way up. Landscape keeps record controls on screen.
+- **Expired iPhone chat sessions fail closed:** a 401 ends the turn as a failed reply and asks you to sign in again, instead of inventing an answer.
+- **Mobile chat uses the signed-in artist:** the second claims check that blocked a valid session profile is gone.
 - [internal] **Public profile block checks fail open on a bad Redis pipeline payload (JOV-5196):** a non-array Upstash response is treated as a cache miss instead of throwing `res.map is not a function`.
 - **iPhone chat bubbles wrap like Messages:** The first word stays in the same sentence instead of sitting alone on the left.
 - **Public profiles keep names, places, and last songs readable:** Contact drawers show the person before the company, compact heroes keep the full city, Music’s last row clears the tab bar, and AEO mention links use the profile text token instead of browser purple.

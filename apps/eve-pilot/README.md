@@ -68,9 +68,9 @@ Install the isolated package from the repository root:
     pnpm --dir apps/eve-pilot --ignore-workspace run eval
 
 `run eval` boots the real Eve session HTTP surface and grades deterministic
-`defineEval` cases under `evals/` (`mockModel` only — no live provider). It
-must exit 0. Prefer `run eval` over `exec eve eval`; a bare `eve` on a Node
-22 PATH exits with "eve requires Node.js >=24".
+`defineEval` cases under `evals/`. It must exit 0. Prefer `run eval` over
+`exec eve eval`; a bare `eve` on a Node 22 PATH exits with "eve requires
+Node.js >=24".
 
 ## What this unit does not do
 
