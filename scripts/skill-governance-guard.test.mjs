@@ -11,6 +11,7 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import {
   APPROVED_VERCEL_SKILLS,
+  collectAdapterSkillMarkdown,
   computeSkillFolderHash,
   evaluateSkillGovernance,
 } from './skill-governance-guard.mjs';
@@ -87,6 +88,37 @@ function createFixture() {
 
 test('the current repository satisfies skill governance', () => {
   assert.deepEqual(evaluateSkillGovernance(), []);
+});
+
+test('blocks nested .bak/.cursor/.factory SKILL.md through the real guard', () => {
+  const root = createFixture();
+  try {
+    write(root, '.claude/skills/gstack/.bak/SKILL.md', 'stale bak copy\n');
+    write(
+      root,
+      '.agents/skills/browse/.cursor/skills/gstack-browse/SKILL.md',
+      'stale cursor copy\n'
+    );
+    write(
+      root,
+      '.claude/skills/gstack/.factory/skills/gstack-ship/SKILL.md',
+      'stale factory copy\n'
+    );
+
+    const adapterHits = collectAdapterSkillMarkdown(root);
+    assert.equal(adapterHits.length, 3);
+    assert.ok(adapterHits.some(path => path.includes('/.bak/')));
+    assert.ok(adapterHits.some(path => path.includes('/.cursor/')));
+    assert.ok(adapterHits.some(path => path.includes('/.factory/')));
+
+    const errors = evaluateSkillGovernance({ root }).join('\n');
+    assert.match(errors, /\.bak\/SKILL\.md/);
+    assert.match(errors, /\.cursor\//);
+    assert.match(errors, /\.factory\//);
+    assert.match(errors, /must not be catalog-visible/);
+  } finally {
+    rmSync(root, { force: true, recursive: true });
+  }
 });
 
 test('accepts the exact approved project-scoped Vercel skills', () => {

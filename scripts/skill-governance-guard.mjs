@@ -13,6 +13,13 @@ import { tmpdir } from 'node:os';
 import { relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+/** Path segments that host adapters dump duplicate SKILL.md into. */
+export const ADAPTER_SKILL_SEGMENTS = Object.freeze([
+  '.bak',
+  '.cursor',
+  '.factory',
+]);
+
 export const APPROVED_VERCEL_SKILLS = Object.freeze({
   'ai-sdk': Object.freeze({
     ref: 'baee8388b935746407dd7091b2403b66c979a6d7',
@@ -63,6 +70,40 @@ const REQUIRED_EXECUTED_SKILL_OVERLAYS = Object.freeze({
     '`suppressHydrationWarning`',
   ],
 });
+
+export function collectAdapterSkillMarkdown(root) {
+  const hits = [];
+  for (const resolverRoot of ['.claude/skills', '.agents/skills']) {
+    walkSkillTree(resolve(root, resolverRoot), resolverRoot, hits);
+  }
+  return hits;
+}
+
+function walkSkillTree(absolute, relative, hits) {
+  if (!existsSync(absolute)) return;
+  let entries;
+  try {
+    entries = readdirSync(absolute, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  const parts = relative.split(/[/\\]/);
+  const underAdapter = ADAPTER_SKILL_SEGMENTS.some(segment =>
+    parts.includes(segment)
+  );
+  for (const entry of entries) {
+    if (entry.name === '.git' || entry.name === 'node_modules') continue;
+    const childAbsolute = resolve(absolute, entry.name);
+    const childRelative = relative ? `${relative}/${entry.name}` : entry.name;
+    if (entry.isDirectory() || entry.isSymbolicLink()) {
+      walkSkillTree(childAbsolute, childRelative, hits);
+      continue;
+    }
+    if (underAdapter && /^SKILL\.md$/i.test(entry.name)) {
+      hits.push(childRelative);
+    }
+  }
+}
 
 function readText(root, path, errors) {
   const absolute = resolve(root, path);
@@ -126,6 +167,11 @@ function validateSkillDirectory(
 
 export function evaluateSkillGovernance({ root = process.cwd() } = {}) {
   const errors = [];
+  for (const adapterPath of collectAdapterSkillMarkdown(root)) {
+    errors.push(
+      `${adapterPath}: adapter SKILL.md under .bak/.cursor/.factory must not be catalog-visible`
+    );
+  }
   const lockText = readText(root, 'skills-lock.json', errors);
   let lock;
   try {
