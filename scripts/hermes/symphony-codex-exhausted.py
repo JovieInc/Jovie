@@ -847,6 +847,9 @@ def _autonomous_open_pr_index(identifiers: list[str]) -> dict[str, dict]:
     return index
 
 
+_REMOUNT_IGNORE_FAILURES = frozenset({"enroll", "PR Ready"})
+
+
 def _pr_has_failing_check(repo: str, number: int) -> bool:
     payload = _gh_json(
         ["gh", "pr", "view", str(number), "--repo", repo, "--json", "statusCheckRollup"]
@@ -856,12 +859,23 @@ def _pr_has_failing_check(repo: str, number: int) -> bool:
     checks = payload.get("statusCheckRollup") or []
     if not isinstance(checks, list):
         return False
+    pending = False
+    failing = False
     for check in checks:
         if not isinstance(check, dict):
             continue
+        name = str(check.get("name") or "")
+        status = str(check.get("status") or "").upper()
+        if status in {"IN_PROGRESS", "QUEUED", "PENDING"}:
+            pending = True
+            continue
+        if name in _REMOUNT_IGNORE_FAILURES:
+            continue
         if check.get("conclusion") == "FAILURE" or check.get("state") == "FAILURE":
-            return True
-    return False
+            failing = True
+    # Pending CI after a remount push is not a product failure. Remounting
+    # again fights the in-flight checks (live #16211 at 20:17).
+    return failing and not pending
 
 
 def _open_pr_verdict(identifier: str, index: dict[str, dict]) -> tuple[str, dict | None]:

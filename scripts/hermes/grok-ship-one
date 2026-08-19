@@ -312,10 +312,13 @@ set -e
 pr_count="$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number --jq 'length' 2>/dev/null || printf 0)"
 if [ "$pr_count" -gt 0 ]; then
   pr_number="$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number --jq '.[0].number' 2>/dev/null || true)"
-  if [ -z "$pr_number" ] || ! gh pr edit "$pr_number" --repo "$REPO" --add-label queue-deferred >/dev/null; then
-    echo "PR exists but queue-deferred hold could not be proven" >&2
+  if [ -z "$pr_number" ]; then
+    echo "PR exists but number could not be proven" >&2
     exit 2
   fi
+  # Do not add queue-deferred. That label hard-gates native autoenroll during
+  # hold-intake (production-unbound), which is the common AMBER lane while
+  # Production Controller FIFO catches up. Native MQ is the hold.
   if [ "$(gh pr view "$pr_number" --repo "$REPO" --json isDraft --jq '.isDraft')" = "true" ]; then
     gh pr ready "$pr_number" --repo "$REPO"
   fi

@@ -1585,6 +1585,21 @@ class FallbackTests(unittest.TestCase):
             self.assertEqual(module._open_pr_verdict("JOV-3", index)[0], "none")
             self.assertEqual(module._open_pr_verdict("JOV-4", index)[0], "skip")
 
+    def test_enroll_failure_does_not_count_as_product_ci_red(self):
+        module = self.load_controller_module()
+        with mock.patch.object(
+            module,
+            "_gh_json",
+            return_value={
+                "statusCheckRollup": [
+                    {"name": "ci-fast", "conclusion": "SUCCESS", "status": "COMPLETED"},
+                    {"name": "enroll", "conclusion": "FAILURE", "status": "COMPLETED"},
+                    {"name": "PR Ready", "conclusion": "FAILURE", "status": "COMPLETED"},
+                ]
+            },
+        ):
+            self.assertFalse(module._pr_has_failing_check("JovieInc/Jovie", 16211))
+
     def test_launch_skips_inflight_open_prs_and_fills_capacity_with_unblocked(self):
         """Live sidecar launched identifiers that already had grok/JOV PRs; units
         exited immediately and leftover Todo work never got a slot."""
