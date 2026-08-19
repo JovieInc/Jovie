@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import base64
+import hashlib
 import http.server
 import importlib.util
 import io
@@ -34,20 +35,58 @@ RUNTIME_NAMES = tuple(path.name for path in RUNTIME_ARTIFACTS)
 LAUNCHER_NAMES = (WRAPPER.name, CONTROLLER.name, SIDECAR.name, GROK_SHIP.name)
 
 
+def issue_revision(identifier, title="", description=""):
+    canonical = f"{identifier}\n{title.strip()}\n{description.strip()}"
+    return hashlib.sha256(canonical.encode()).hexdigest()[:24]
+
+
+def admission_comment(identifier, title="", description="", *, stale=False):
+    revision = "0" * 24 if stale else issue_revision(identifier, title, description)
+    payload = {
+        "schema": "admission-gate/v1",
+        "issue": identifier,
+        "issueRevision": revision,
+        "fingerprint": "a" * 24,
+        "decision": "approved",
+    }
+    return (
+        "<!-- admission-gate/v1 -->\n"
+        + json.dumps(payload)
+        + "\n<!--/admission-gate-->"
+    )
+
+
 class LinearHandler(http.server.BaseHTTPRequestHandler):
     requests: list[tuple[str | None, str]] = []
     nodes = [
         {
             "identifier": identifier,
+            "title": f"Ship {identifier}",
+            "description": "Bounded admitted work.",
             "team": {"key": identifier.split("-", 1)[0]},
             "labels": {"nodes": [{"name": name} for name in labels]},
+            "comments": {
+                "nodes": (
+                    []
+                    if blocked
+                    else [
+                        {
+                            "body": admission_comment(
+                                identifier,
+                                f"Ship {identifier}",
+                                "Bounded admitted work.",
+                            )
+                        }
+                    ]
+                )
+            },
         }
-        for identifier, labels in (
-            ("JOV-1", ("symphony", "plan-approved", "admission-approved")),
-            ("JOV-2", ("symphony", "plan-approved", "admission-approved")),
-            ("LYB-3", ("symphony", "plan-approved", "admission-approved")),
-            ("JOV-4", ("symphony", "needs:human")),
-            ("LYB-5", ("symphony", "hold")),
+        for identifier, labels, blocked in (
+            ("JOV-1", ("symphony", "plan-approved", "admission-approved"), False),
+            ("JOV-2", (), False),
+            ("LYB-3", ("symphony",), False),
+            ("JOV-4", ("symphony", "needs:human"), True),
+            ("LYB-5", ("symphony", "hold"), True),
         )
     ]
     # Override for single-issue admission re-checks (simulates a label guard
@@ -125,8 +164,8 @@ class LinearHandler(http.server.BaseHTTPRequestHandler):
                         "issue": {
                             "id": f"uuid-{identifier}",
                             "identifier": identifier,
-                            "title": f"Ship {identifier}",
-                            "description": "Bounded admitted work.",
+                            "title": node.get("title") or f"Ship {identifier}",
+                            "description": node.get("description") or "Bounded admitted work.",
                             "url": f"https://linear.example/{identifier}",
                             "updatedAt": "2026-08-14T19:00:00Z",
                             "state": {"id": f"{team}-todo", "name": "Todo"},
@@ -140,6 +179,7 @@ class LinearHandler(http.server.BaseHTTPRequestHandler):
                                 },
                             },
                             "labels": {"nodes": [{"name": name} for name in labels]},
+                            "comments": node.get("comments") or {"nodes": []},
                         }
                     }
                 }
@@ -166,18 +206,19 @@ class GrokLinearHandler(http.server.BaseHTTPRequestHandler):
         else:
             identifier = payload["variables"]["id"]
             team = identifier.split("-", 1)[0]
-            labels = self.__class__.labels.get(identifier) or [
-                "symphony",
-                "plan-approved",
-                "admission-approved",
-            ]
+            title = f"Ship {identifier}"
+            description = "Bounded admitted work."
+            labels = self.__class__.labels.get(identifier) or []
+            comments = [
+                {"body": admission_comment(identifier, title, description)}
+            ] if "needs-human" not in labels and "blocked" not in labels else []
             response = {
                 "data": {
                     "issue": {
                         "id": f"uuid-{identifier}",
                         "identifier": identifier,
-                        "title": f"Ship {identifier}",
-                        "description": "Bounded admitted work.",
+                        "title": title,
+                        "description": description,
                         "url": f"https://linear.example/{identifier}",
                         "updatedAt": "2026-08-14T19:00:00Z",
                         "state": {"id": f"{team}-todo", "name": "Todo"},
@@ -191,6 +232,7 @@ class GrokLinearHandler(http.server.BaseHTTPRequestHandler):
                             },
                         },
                         "labels": {"nodes": [{"name": name} for name in labels]},
+                        "comments": {"nodes": comments},
                     }
                 }
             }
@@ -843,11 +885,30 @@ class FallbackTests(unittest.TestCase):
         self.assertIn("hasNextPage", request_body)
         self.assertNotIn("first: 20", request_body)
 
-    def _issue_node(self, identifier, *labels):
+    def _issue_node(self, identifier, *labels, receipt=None, title=None, description=None):
+        title = title if title is not None else f"Ship {identifier}"
+        description = description if description is not None else "Bounded admitted work."
+        blocked = any(
+            label.lower() in {"needs:human", "needs-human", "hold", "blocked", "human-review-required"}
+            for label in labels
+        )
+        include_receipt = receipt if receipt is not None else not blocked
+        comments = []
+        if include_receipt:
+            comments.append(
+                {
+                    "body": admission_comment(identifier, title, description)
+                    if include_receipt is True
+                    else include_receipt
+                }
+            )
         return {
             "identifier": identifier,
+            "title": title,
+            "description": description,
             "team": {"key": identifier.split("-", 1)[0]},
             "labels": {"nodes": [{"name": name} for name in labels]},
+            "comments": {"nodes": comments},
         }
 
     def test_linear_identifiers_paginates_until_no_next_page(self):
@@ -877,7 +938,9 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(second["variables"]["after"], "cursor-0")
         self.assertGreater(module.LINEAR_PAGE_SIZE, 20)
         self.assertNotIn("first: 20", first["query"])
-        self.assertEqual(module.REQUIRED_ADMISSION_LABELS, frozenset(("symphony",)))
+        self.assertNotIn('labels: { name: { eq: "symphony" } }', first["query"])
+        self.assertIn('"In Review"', first["query"])
+        self.assertEqual(module.REQUIRED_ADMISSION_LABELS, frozenset())
 
     def test_linear_identifiers_fails_closed_on_malformed_page_info(self):
         module = self.load_controller_module()
@@ -913,24 +976,83 @@ class FallbackTests(unittest.TestCase):
         for label in ("held", "decision-required", "manual-incident"):
             self.assertIn(label, module.BLOCKED_ADMISSION_LABELS)
         # admission_decision is one predicate shared front-to-back.
+        comment = admission_comment("JOV-1", "Ship JOV-1", "Bounded admitted work.")
         ok, _reason = module.admission_decision(
-            "JOV", "JOV-1", {"symphony", "plan-approved", "admission-approved"}
+            "JOV",
+            "JOV-1",
+            set(),
+            title="Ship JOV-1",
+            description="Bounded admitted work.",
+            comments=[{"body": comment}],
         )
         self.assertTrue(ok)
         ok, reason = module.admission_decision(
-            "JOV", "JOV-1",
-            {"symphony", "plan-approved", "admission-approved", "blocked", "needs-human"},
+            "JOV",
+            "JOV-1",
+            {"blocked", "needs-human"},
+            title="Ship JOV-1",
+            description="Bounded admitted work.",
+            comments=[{"body": comment}],
         )
         self.assertFalse(ok)
         self.assertEqual(reason, "blocked")
         for label in ("held", "decision-required", "manual-incident"):
             ok, reason = module.admission_decision(
-                "JOV", "JOV-1", {"symphony", "plan-approved", "admission-approved", label}
+                "JOV",
+                "JOV-1",
+                {label},
+                title="Ship JOV-1",
+                description="Bounded admitted work.",
+                comments=[{"body": comment}],
             )
             self.assertFalse(ok)
             self.assertEqual(reason, "blocked")
-        symphony_only, reason = module.admission_decision("JOV", "JOV-2", {"symphony"})
-        self.assertTrue(symphony_only, reason)
+        labels_only, reason = module.admission_decision(
+            "JOV",
+            "JOV-2",
+            {"symphony", "plan-approved", "admission-approved"},
+            title="Ship JOV-2",
+            description="Bounded admitted work.",
+            comments=[],
+        )
+        self.assertFalse(labels_only)
+        self.assertEqual(reason, "admission_receipt_missing_or_stale")
+
+    def test_admission_receipt_stale_and_revoked_fail_closed(self):
+        module = self.load_controller_module()
+        title = "Ship JOV-9"
+        description = "Bounded admitted work."
+        stale = admission_comment("JOV-9", title, description, stale=True)
+        ok, reason = module.admission_decision(
+            "JOV",
+            "JOV-9",
+            set(),
+            title=title,
+            description=description,
+            comments=[{"body": stale}],
+        )
+        self.assertFalse(ok)
+        self.assertEqual(reason, "admission_receipt_missing_or_stale")
+        current = admission_comment("JOV-9", title, description)
+        ok, reason = module.admission_decision(
+            "JOV",
+            "JOV-9",
+            {"human-review-required"},
+            title=title,
+            description=description,
+            comments=[{"body": current}],
+        )
+        self.assertFalse(ok)
+        self.assertEqual(reason, "blocked")
+        recovered, reason = module.admission_decision(
+            "JOV",
+            "JOV-9",
+            set(),
+            title=title,
+            description=description,
+            comments=[{"body": current}],
+        )
+        self.assertTrue(recovered, reason)
 
     def test_check_admission_verdicts_match_single_predicate(self):
         url = self.linear_url()
@@ -1417,11 +1539,13 @@ class FallbackTests(unittest.TestCase):
 
     def _admitted_issue(self, identifier="JOV-1", state="Todo"):
         team = identifier.split("-", 1)[0]
+        title = f"Ship {identifier}"
+        description = ""
         return {
             "id": f"uuid-{identifier}",
             "identifier": identifier,
-            "title": f"Ship {identifier}",
-            "description": "",
+            "title": title,
+            "description": description,
             "url": f"https://linear.example/{identifier}",
             "updatedAt": "2026-08-19T18:46:00Z",
             "state": {"id": f"{team}-state", "name": state},
@@ -1435,6 +1559,9 @@ class FallbackTests(unittest.TestCase):
                 },
             },
             "labels": {"nodes": [{"name": "symphony"}]},
+            "comments": {
+                "nodes": [{"body": admission_comment(identifier, title, description)}]
+            },
         }
 
     def test_in_review_is_admitted_so_ci_red_heads_can_remount(self):

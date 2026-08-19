@@ -680,8 +680,7 @@ export async function fetchTeamSymphonyIssues(teamId, maxResults = 100) {
             first: 50,
             after: $cursor,
             filter: {
-              state: { name: { in: ["Todo", "In Progress", "In Review"] } },
-              labels: { some: { name: { eq: "symphony" } } }
+              state: { name: { in: ["Todo", "In Progress", "In Review"] } }
             }
           ) {
             nodes {

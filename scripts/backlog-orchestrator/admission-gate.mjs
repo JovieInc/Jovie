@@ -2,8 +2,8 @@
 
 import { createHash } from 'node:crypto';
 import { hasProtectedAdmissionLabel } from './admission-policy.mjs';
-import { contextGateReceipt } from './context-gate.mjs';
-import { PLAN_APPROVED_LABEL, planGateReceipt } from './plan-gate.mjs';
+import { contextGateReceipt, issueContentHash } from './context-gate.mjs';
+import { planGateReceipt } from './plan-gate.mjs';
 import { researchGateReceipt } from './research-gate.mjs';
 
 export const ADMISSION_GATE_SCHEMA = 'admission-gate/v1';
@@ -55,10 +55,13 @@ export function validateAdmissionCandidate(
     return 'context-receipt-missing-or-invalid';
   if (!researchGateReceipt(issue, { now }))
     return 'research-receipt-missing-or-invalid';
-  if (!hasLabel(issue, PLAN_APPROVED_LABEL)) return 'plan-label-missing';
   if (!planGateReceipt(issue, { now }))
     return 'plan-receipt-missing-or-invalid';
   return null;
+}
+
+export function admissionIssueRevision(issue) {
+  return issueContentHash(issue);
 }
 
 export function admissionGateFingerprint(issue, options = {}) {
@@ -67,7 +70,7 @@ export function admissionGateFingerprint(issue, options = {}) {
   const research = researchGateReceipt(issue, options);
   return createHash('sha256')
     .update(
-      `${issue.identifier}|${plan?.payload?.fingerprint || ''}|${context?.payload?.fingerprint || ''}|${research?.payload?.fingerprint || ''}`
+      `${issue.identifier}|${admissionIssueRevision(issue)}|${plan?.payload?.fingerprint || ''}|${context?.payload?.fingerprint || ''}|${research?.payload?.fingerprint || ''}`
     )
     .digest('hex')
     .slice(0, 24);
@@ -78,6 +81,7 @@ export function buildAdmissionGateReceipt(issue, options = {}) {
   const payload = {
     schema: ADMISSION_GATE_SCHEMA,
     issue: issue.identifier,
+    issueRevision: admissionIssueRevision(issue),
     fingerprint: admissionGateFingerprint(issue, options),
     planFingerprint: plan?.payload?.fingerprint || '',
     contextFingerprint:
@@ -108,6 +112,7 @@ export function admissionGateReceipt(issue, options = {}) {
     if (
       payload?.schema !== ADMISSION_GATE_SCHEMA ||
       payload?.issue !== issue?.identifier ||
+      payload?.issueRevision !== admissionIssueRevision(issue) ||
       !payload?.fingerprint ||
       payload?.decision !== 'approved' ||
       validateAdmissionCandidate(issue, options) ||
@@ -151,7 +156,30 @@ export async function approveAdmission({
   if (reason) return { status: 'rejected', reason };
 
   const receipt = buildAdmissionGateReceipt(issue, { now });
-  if (hasReceipt(issue, receipt) && hasLabel(issue, ADMISSION_APPROVED_LABEL)) {
+  if (hasReceipt(issue, receipt)) {
+    if (!hasLabel(issue, ADMISSION_APPROVED_LABEL)) {
+      const label = await client.fetchTeamLabel?.(
+        teamId,
+        ADMISSION_APPROVED_LABEL
+      );
+      if (label?.id) {
+        const result = await client.setIssueLabels(
+          issue.id,
+          labelIds(issue, label.id)
+        );
+        if (mutationSucceeded(result)) {
+          const labeled = await client.fetchIssue(issue.identifier);
+          if (labeled && hasLabel(labeled, ADMISSION_APPROVED_LABEL)) {
+            return {
+              status: 'already-approved',
+              identifier: labeled.identifier,
+              fingerprint: admissionGateFingerprint(labeled, { now }),
+              receipt,
+            };
+          }
+        }
+      }
+    }
     return {
       status: 'already-approved',
       identifier: issue.identifier,
