@@ -32,7 +32,11 @@ test('nested adapter copies do not create a second catalog name', () => {
       '.agents/skills/gstack/.factory/skills/gstack-browse/SKILL.md',
       'adapter\n'
     );
-    write(root, '.claude/skills/RESOLVER.md', '- **browse**: .claude/skills/browse\n');
+    write(
+      root,
+      '.claude/skills/RESOLVER.md',
+      '- **browse**: .claude/skills/browse\n'
+    );
     const catalog = collectCatalogVisibleSkills({ root });
     assert.deepEqual(
       catalog.map(entry => entry.name),
