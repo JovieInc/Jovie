@@ -53,7 +53,7 @@ Everyone else is burst or personal:
 - **Eve / Aria / specialists** — keep if cheap. No heartbeat. Revive only when Summer names the packet they uniquely own.
 - **iOS / Mac / content walkers** — burst after a web ship lands there, or after web is sellable.
 - **Grok bot** — a channel, not the runtime. Fail over when Grok quota dies. Do not move souls into Grok-only.
-- **Ovie** — the ops screen. Telegram/Grok show the same state.
+- **Ovie** — the ops screen and talk door. Telegram is a fallback channel to the same Ovie Eve identity when Jovie cannot carry the request. Grok can show the same state. It is not a second soul.
 
 Summer owns the company bottleneck. Gem owns the engineering bottleneck. If Symphony is down, Gem fixes it. If Gem is down, Symphony fixes it. Tim is not Gem.
 

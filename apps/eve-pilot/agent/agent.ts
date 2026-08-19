@@ -2,6 +2,7 @@ import { defineAgent } from 'eve';
 import {
   assertEvePilotFactoryLock,
   bindEvePilotIdentity,
+  eveIdentityForChannel,
   eveIdentityForRuntime,
 } from './select-identity';
 
@@ -11,6 +12,7 @@ export const evePilotIdentity = eveIdentityForRuntime();
 export {
   assertEvePilotFactoryLock,
   bindEvePilotIdentity,
+  eveIdentityForChannel,
   eveIdentityForRuntime,
 };
 
