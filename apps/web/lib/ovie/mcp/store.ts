@@ -123,9 +123,9 @@ export function redisRecordBackend(redis: {
     value: unknown,
     opts?: { ex?: number }
   ) => Promise<unknown>;
-  lpush: (key: string, ...values: string[]) => Promise<unknown>;
+  lpush: (key: string, value: string) => Promise<unknown>;
   lrange: (key: string, start: number, stop: number) => Promise<unknown>;
-  ltrim?: (key: string, start: number, stop: number) => Promise<unknown>;
+  ltrim: (key: string, start: number, stop: number) => Promise<unknown>;
 }): RecordBackend {
   return {
     async get(key) {
@@ -136,7 +136,7 @@ export function redisRecordBackend(redis: {
     },
     async lpush(key, value) {
       await redis.lpush(key, value);
-      await redis.ltrim?.(key, 0, INDEX_CAP - 1);
+      await redis.ltrim(key, 0, INDEX_CAP - 1);
     },
     async lrange(key, start, stop) {
       const rows = await redis.lrange(key, start, stop);

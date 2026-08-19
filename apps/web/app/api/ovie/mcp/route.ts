@@ -56,9 +56,16 @@ async function resolvePrincipal(request: Request): Promise<OvieMcpPrincipal> {
 
 function operatingStore() {
   const redis = getRedis();
-  return redis
-    ? new DurableOperatingStore(redisRecordBackend(redis))
-    : getDefaultOperatingStore();
+  if (!redis) return getDefaultOperatingStore();
+  return new DurableOperatingStore(
+    redisRecordBackend({
+      get: key => redis.get(key),
+      set: (key, value, opts) => redis.set(key, value, opts),
+      lpush: (key, value) => redis.lpush(key, value),
+      lrange: (key, start, stop) => redis.lrange(key, start, stop),
+      ltrim: (key, start, stop) => redis.ltrim(key, start, stop),
+    })
+  );
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
