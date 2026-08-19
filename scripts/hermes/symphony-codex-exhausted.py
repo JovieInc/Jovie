@@ -692,9 +692,16 @@ def _fetch_single_issue(identifier: str) -> dict | None:
     return issue
 
 
-def _issue_meta(issue: dict, identifier: str) -> tuple[bool, str, dict | None]:
+def _issue_meta(
+    issue: dict, identifier: str, *, require_receipt: bool = True
+) -> tuple[bool, str, dict | None]:
     """Validate one issue against the shared admission predicate and, when
     admitted, produce the meta record grok-ship-one needs to run.
+
+    Remount of an existing DIRTY/BEHIND/CI-red autonomous PR skips the
+    admission-gate/v1 receipt: that work already left Linear and is sitting
+    on GitHub. New pickup still requires a current receipt. Blocked/human
+    labels still refuse both paths.
     """
     team = issue.get("team")
     label_connection = issue.get("labels")
@@ -716,16 +723,24 @@ def _issue_meta(issue: dict, identifier: str) -> tuple[bool, str, dict | None]:
     }
     title = issue.get("title") if isinstance(issue.get("title"), str) else ""
     description = issue.get("description") if isinstance(issue.get("description"), str) else ""
-    ok, reason = admission_decision(
-        team_key,
-        identifier,
-        labels,
-        title=title,
-        description=description,
-        comments=issue.get("comments"),
-    )
-    if not ok:
-        return False, reason, None
+    if require_receipt:
+        ok, reason = admission_decision(
+            team_key,
+            identifier,
+            labels,
+            title=title,
+            description=description,
+            comments=issue.get("comments"),
+        )
+        if not ok:
+            return False, reason, None
+    else:
+        if not IDENTIFIER.fullmatch(identifier):
+            return False, "invalid_identifier", None
+        if team_key.upper() not in SUPPORTED_TEAMS:
+            return False, "unsupported_team", None
+        if not BLOCKED_ADMISSION_LABELS.isdisjoint(labels):
+            return False, "blocked", None
     if issue["identifier"] != identifier:
         return False, "identifier_mismatch", None
     state_name = str(state.get("name") or "").strip().lower()
@@ -756,17 +771,20 @@ def _issue_meta(issue: dict, identifier: str) -> tuple[bool, str, dict | None]:
     return True, "admitted", meta
 
 
-def check_admission(identifier: str) -> int:
+def check_admission(identifier: str, *, remount: bool = False) -> int:
     """Standalone admission gate: exit 0 + meta JSON on stdout when the issue
     passes the SAME predicate reconcile uses; exit 1 when not admitted; exit 2
     when the verdict cannot be verified (auth/transport). grok-ship-one
     delegates to this so there is exactly one admission source of truth.
+
+    remount=True skips the admission-gate/v1 receipt so a DIRTY/CI-red
+    autonomous head can continue after the receipt list went empty.
     """
     issue = _fetch_single_issue(identifier)
     if issue is None:
         print("not admitted:admission_unverifiable", file=sys.stderr)
         return 2
-    ok, reason, meta = _issue_meta(issue, identifier)
+    ok, reason, meta = _issue_meta(issue, identifier, require_receipt=not remount)
     if not ok:
         print(f"not admitted:{reason}", file=sys.stderr)
         return 1
@@ -797,9 +815,11 @@ def _gh_json(command: list[str]) -> object | None:
         return None
 
 
-def _autonomous_open_pr_index(identifiers: list[str]) -> dict[str, dict]:
+def _autonomous_open_pr_index(identifiers: list[str] | None = None) -> dict[str, dict]:
     """Map identifier -> {number, head, repo} for open autonomous heads.
 
+    identifiers=None lists every matching symphony/grok/fallback head so a
+    remount scan can find DIRTY work even when Linear's receipt list is empty.
     Listing failure is fail-open (empty): better to risk a duplicate than to
     starve leftover Todo work because `gh` blipped.
     """
@@ -807,8 +827,13 @@ def _autonomous_open_pr_index(identifiers: list[str]) -> dict[str, dict]:
     if os.environ.get("SYMPHONY_OPEN_PR_INDEX") == "empty":
         return {}
     index: dict[str, dict] = {}
-    wanted = set(identifiers)
-    repos = {repo for ident in identifiers if (repo := _repo_for_identifier(ident))}
+    wanted = set(identifiers) if identifiers is not None else None
+    if wanted is not None:
+        repos = {repo for ident in identifiers if (repo := _repo_for_identifier(ident))}
+        if not repos:
+            return {}
+    else:
+        repos = {JOV_REPO, LYB_REPO}
     for repo in repos:
         payload = _gh_json(
             [
@@ -837,7 +862,9 @@ def _autonomous_open_pr_index(identifiers: list[str]) -> dict[str, dict]:
             if match is None:
                 continue
             ident = match.group(1)
-            if ident in wanted and ident not in index:
+            if wanted is not None and ident not in wanted:
+                continue
+            if ident not in index:
                 index[ident] = {
                     "number": pr.get("number"),
                     "head": head,
@@ -845,6 +872,37 @@ def _autonomous_open_pr_index(identifiers: list[str]) -> dict[str, dict]:
                     "mergeStateStatus": pr.get("mergeStateStatus"),
                 }
     return index
+
+
+def _github_remount_identifiers() -> list[str]:
+    """Identifiers whose open autonomous PR is DIRTY, BEHIND, or product-CI red."""
+    index = _autonomous_open_pr_index(None)
+    remounts: list[str] = []
+    for ident in index:
+        verdict, _pr = _open_pr_verdict(ident, index)
+        if verdict == "remount" and ident not in remounts:
+            remounts.append(ident)
+    return remounts
+
+
+def _admitted_or_remount_identifiers() -> list[str] | None:
+    """Union Linear receipt-admitted issues with GitHub remount heads.
+
+    After #16212, a fleet with no current admission-gate/v1 receipts returns
+    an empty Linear list even while DIRTY grok/JOV PRs still need remount
+    (live: no_admitted_work while #16211 sat DIRTY). Remount identifiers
+    recover that work. Linear query failure with zero remounts stays
+    fail-closed.
+    """
+    identifiers = _linear_identifiers()
+    remounts = _github_remount_identifiers()
+    if identifiers is None and not remounts:
+        return None
+    combined: list[str] = []
+    for ident in remounts + (identifiers or []):
+        if ident not in combined:
+            combined.append(ident)
+    return combined
 
 
 _REMOUNT_IGNORE_FAILURES = frozenset({"enroll", "PR Ready"})
@@ -946,7 +1004,9 @@ def _launch_fallback_workers(
         if issue is None:
             print(f"fallback skip {identifier} admission_unverifiable", file=sys.stderr)
             continue
-        ok, _reason, meta = _issue_meta(issue, identifier)
+        ok, _reason, meta = _issue_meta(
+            issue, identifier, require_receipt=(verdict != "remount")
+        )
         if not ok:
             print(f"fallback skip {identifier} not admitted", file=sys.stderr)
             continue
@@ -1032,7 +1092,7 @@ def _drain_included_pools(active: list[str]) -> str:
     bundle_revision = _bundle_revision()
     if bundle_revision is None:
         return "drain_skipped=bundle_revision_unavailable"
-    identifiers = _linear_identifiers()
+    identifiers = _admitted_or_remount_identifiers()
     if identifiers is None:
         return "drain_skipped=linear_query_failed"
     if not identifiers:
@@ -1070,7 +1130,7 @@ def _continue_exhausted_reconcile(reason: str) -> int:
             file=sys.stderr,
         )
         return EXIT_SAFE_FAIL_CLOSED
-    identifiers = _linear_identifiers()
+    identifiers = _admitted_or_remount_identifiers()
     if identifiers is None:
         print(
             "codex_exhausted linear_query_failed symphony_unchanged",
@@ -1409,6 +1469,11 @@ def main() -> int:
     )
     parser.add_argument("identifier", nargs="?")
     parser.add_argument("--destination-root")
+    parser.add_argument(
+        "--remount",
+        action="store_true",
+        help="Skip admission-gate/v1 receipt (DIRTY/CI-red remount only)",
+    )
     args = parser.parse_args()
     if args.command == "install":
         return install(args.destination_root)
@@ -1418,7 +1483,7 @@ def main() -> int:
         if not args.identifier:
             print("check-admission requires an issue identifier", file=sys.stderr)
             return 2
-        return check_admission(args.identifier)
+        return check_admission(args.identifier, remount=args.remount)
     if args.command == "open-pr-verdict":
         if not args.identifier:
             print("open-pr-verdict requires an issue identifier", file=sys.stderr)

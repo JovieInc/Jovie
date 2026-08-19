@@ -81,8 +81,15 @@ fi
 # Single admission source of truth: delegate the admission decision to the
 # controller's check-admission command, which uses the SAME predicate as the
 # reconcile selector (current admission-gate/v1 receipt, no blocked/human hold).
+# Remount of an existing DIRTY/CI-red head skips the receipt so leftover
+# GitHub work is not starved after Linear's receipt list goes empty.
 # exit 0 = admitted (meta JSON on stdout); 1 = not admitted; 2 = unverifiable.
-if ADMISSION_OUT="$(symphony-codex-exhausted check-admission "$ID" 2>&1)"; then
+if [ "$REMOUNT" = 1 ]; then
+  admission_args=(check-admission "$ID" --remount)
+else
+  admission_args=(check-admission "$ID")
+fi
+if ADMISSION_OUT="$(symphony-codex-exhausted "${admission_args[@]}" 2>&1)"; then
   META="$ADMISSION_OUT"
 else
   admission_rc=$?
@@ -144,7 +151,14 @@ fi
 if [ "$REMOUNT" = 1 ]; then
   # Depth-1 fetches of main and the PR head do not share a merge-base, so
   # `git merge origin/main` fails with unrelated histories and the PR stays DIRTY.
-  git -C "$WS" fetch origin "refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}"
+  # Leftover merge/rebase index from a prior remount blocks `git fetch origin main`
+  # (live JOV-5041: CHANGELOG.md needs merge). Force-update the remote-tracking
+  # PR ref: remounts rewrite history, so a non-plus fetch rejects non-fast-forward
+  # (live JOV-4894 on #16211).
+  git -C "$WS" merge --abort >/dev/null 2>&1 || true
+  git -C "$WS" rebase --abort >/dev/null 2>&1 || true
+  git -C "$WS" reset --hard HEAD
+  git -C "$WS" fetch origin "+refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}"
   git -C "$WS" fetch origin main
   git -C "$WS" checkout -B "$BRANCH" "origin/$BRANCH"
   git -C "$WS" reset --hard "origin/$BRANCH"
@@ -154,7 +168,14 @@ if [ "$REMOUNT" = 1 ]; then
   if ! git -C "$WS" merge-base HEAD origin/main >/dev/null 2>&1; then
     git -C "$WS" fetch --deepen=500 origin
   fi
-  git -C "$WS" merge --no-edit origin/main
+  if ! git -C "$WS" merge --no-edit origin/main; then
+    if [ -n "$(git -C "$WS" ls-files -u)" ]; then
+      echo "$(date -u +%FT%TZ) $ID remount_merge_conflicts" >> "$LOG"
+    else
+      echo "merge origin/main failed without conflicts: $WS" >&2
+      exit 2
+    fi
+  fi
 else
   git -C "$WS" fetch --depth 1 origin main
   git -C "$WS" checkout -B "$BRANCH" origin/main
