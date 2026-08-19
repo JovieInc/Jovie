@@ -7,6 +7,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+### Fixed
+
+- [internal] **Sentry autofix now closes the loop:** a scheduled recurrence check resolves quiet issues and reopens ones still firing after the post-deploy soak. It never runs on source PRs.
+
 ### Added
 
 - **iPhone Library is Catalog, Collections, and Ideas:** Catalog is releases, merch, and docs. Collections auto-bundles a vlog with its script, takes, and B-roll. Ideas is the untagged third home.
