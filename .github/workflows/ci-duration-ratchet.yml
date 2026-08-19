@@ -30,6 +30,8 @@ jobs:
     name: Measure p95 gate duration + check ratchet
     runs-on: ubuntu-latest
     timeout-minutes: 8
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -146,3 +148,32 @@ jobs:
         run: |
           echo "::error title=CI Duration SLO Breached::p95 gate wall-clock exceeds baseline + 20% margin. See job summary for details and remediation steps."
           exit 1
+
+      - name: Slack alert on failure
+        if: ${{ failure() && env.SLACK_WEBHOOK_URL != '' }}
+        env:
+          P95_SECONDS: ${{ steps.measure.outputs.p95_seconds }}
+          SAMPLE_SIZE: ${{ steps.measure.outputs.sample_size }}
+        run: |
+          set -euo pipefail
+          PAYLOAD=$(cat <<EOF
+          {
+            "text": "CI duration ratchet SLO breached",
+            "attachments": [
+              {
+                "color": "danger",
+                "fields": [
+                  { "title": "Workflow", "value": "CI Duration Ratchet", "short": true },
+                  { "title": "Measured p95", "value": "${P95_SECONDS:-n/a}s", "short": true },
+                  { "title": "Sample size", "value": "${SAMPLE_SIZE:-0}", "short": true },
+                  { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
+                ]
+              }
+            ]
+          }
+          EOF
+          )
+          curl -sS -X POST \
+            -H 'Content-type: application/json' \
+            --data "$PAYLOAD" \
+            "$SLACK_WEBHOOK_URL"
