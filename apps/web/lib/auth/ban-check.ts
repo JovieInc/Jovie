@@ -53,9 +53,8 @@ async function readCachedBanStatus(
 
     return { isBanned: entry.isBanned };
   } catch (error) {
-    captureWarning('[ban-check] Redis cache read failed', {
+    captureWarning('[ban-check] Redis cache read failed', error, {
       clerkUserId,
-      error,
     });
     return null;
   }
@@ -75,9 +74,8 @@ function writeBanStatusCache(clerkUserId: string, status: BanStatus): void {
       ex: getBanStatusCacheTtlSeconds(status.isBanned),
     })
     .catch(error => {
-      captureWarning('[ban-check] Redis cache write failed', {
+      captureWarning('[ban-check] Redis cache write failed', error, {
         clerkUserId,
-        error,
       });
     });
 }
@@ -93,10 +91,13 @@ function recordFailOpenTelemetry(clerkUserId: string, error: unknown): void {
     },
   });
 
-  captureWarning('Ban status check failed open after DB and cache miss', {
-    clerkUserId,
+  captureWarning(
+    'Ban status check failed open after DB and cache miss',
     error,
-  });
+    {
+      clerkUserId,
+    }
+  );
 }
 
 /**
@@ -115,9 +116,8 @@ export async function invalidateBanStatusCache(
   try {
     await redis.del(getBanStatusCacheKey(clerkUserId));
   } catch (error) {
-    captureWarning('[ban-check] Failed to invalidate cache', {
+    captureWarning('[ban-check] Failed to invalidate cache', error, {
       clerkUserId,
-      error,
     });
   }
 }

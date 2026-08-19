@@ -61,9 +61,7 @@ export const isAdmin = cache(async function isAdmin(
     } catch (error) {
       captureWarning(
         '[admin/roles] Redis cache failed, falling back to database query',
-        {
-          error,
-        }
+        error
       );
     }
   }
@@ -73,8 +71,8 @@ export const isAdmin = cache(async function isAdmin(
   } catch (error) {
     captureWarning(
       '[admin/roles] Database query failed, treating as non-admin',
+      error,
       {
-        error,
         userId,
       }
     );
@@ -88,9 +86,7 @@ export function invalidateAdminCache(userId: string): void {
 
   const cacheKey = `${REDIS_KEY_PREFIX}${userId}`;
   redis.del(cacheKey).catch(error => {
-    captureWarning('[admin/roles] Failed to invalidate Redis cache', {
-      error,
-    });
+    captureWarning('[admin/roles] Failed to invalidate Redis cache', error);
   });
 }
 

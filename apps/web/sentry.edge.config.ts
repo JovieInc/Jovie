@@ -9,7 +9,11 @@ import {
   getBaseServerConfig,
   isNonProductionServerNoise,
 } from '@/lib/sentry/config';
-import { isTransientInfraHttpTransaction } from '@/lib/sentry/non-actionable-issues';
+import {
+  isTransientInfraHttpTransaction,
+  isUpstashQuotaSentryEvent,
+  UPSTASH_QUOTA_IGNORE_ERRORS,
+} from '@/lib/sentry/non-actionable-issues';
 
 const baseConfig = getBaseServerConfig();
 
@@ -28,11 +32,15 @@ Sentry.init({
     if (isNonProductionServerNoise(event)) {
       return null;
     }
+    if (isUpstashQuotaSentryEvent(event)) {
+      return null;
+    }
     return event;
   }),
 
   // Suppress known non-actionable errors
   ignoreErrors: [
+    ...UPSTASH_QUOTA_IGNORE_ERRORS,
     // Clerk SSR race condition: auth()/currentUser() called before request
     // context is available during edge/serverless cold starts. Not a code bug —
     // all usages are correctly in server components/actions/API routes.
