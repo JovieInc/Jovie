@@ -81,8 +81,15 @@ fi
 # Single admission source of truth: delegate the admission decision to the
 # controller's check-admission command, which uses the SAME predicate as the
 # reconcile selector (current admission-gate/v1 receipt, no blocked/human hold).
+# Remount of an existing DIRTY/CI-red head skips the receipt so leftover
+# GitHub work is not starved after Linear's receipt list goes empty.
 # exit 0 = admitted (meta JSON on stdout); 1 = not admitted; 2 = unverifiable.
-if ADMISSION_OUT="$(symphony-codex-exhausted check-admission "$ID" 2>&1)"; then
+if [ "$REMOUNT" = 1 ]; then
+  admission_args=(check-admission "$ID" --remount)
+else
+  admission_args=(check-admission "$ID")
+fi
+if ADMISSION_OUT="$(symphony-codex-exhausted "${admission_args[@]}" 2>&1)"; then
   META="$ADMISSION_OUT"
 else
   admission_rc=$?

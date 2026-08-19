@@ -197,6 +197,7 @@ class LinearHandler(http.server.BaseHTTPRequestHandler):
 class GrokLinearHandler(http.server.BaseHTTPRequestHandler):
     requests: list[dict] = []
     labels: dict[str, list[str]] = {}
+    omit_receipt: set[str] = set()
 
     def do_POST(self):  # noqa: N802 - stdlib handler API
         payload = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
@@ -209,9 +210,15 @@ class GrokLinearHandler(http.server.BaseHTTPRequestHandler):
             title = f"Ship {identifier}"
             description = "Bounded admitted work."
             labels = self.__class__.labels.get(identifier) or []
-            comments = [
-                {"body": admission_comment(identifier, title, description)}
-            ] if "needs-human" not in labels and "blocked" not in labels else []
+            comments = (
+                []
+                if (
+                    "needs-human" in labels
+                    or "blocked" in labels
+                    or identifier in self.__class__.omit_receipt
+                )
+                else [{"body": admission_comment(identifier, title, description)}]
+            )
             response = {
                 "data": {
                     "issue": {
@@ -428,6 +435,7 @@ class FallbackTests(unittest.TestCase):
     def grok_linear_url(self):
         GrokLinearHandler.requests = []
         GrokLinearHandler.labels = {}
+        GrokLinearHandler.omit_receipt = set()
         server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), GrokLinearHandler)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.addCleanup(server.shutdown)
@@ -1587,6 +1595,157 @@ class FallbackTests(unittest.TestCase):
             self.assertEqual(module._open_pr_verdict("JOV-4", index)[0], "skip")
             self.assertEqual(module._open_pr_verdict("JOV-5", index)[0], "remount")
 
+    def test_github_remount_identifiers_find_dirty_heads_without_linear(self):
+        module = self.load_controller_module()
+        listed = [
+            {
+                "number": 16211,
+                "headRefName": "grok/JOV-4894-fix",
+                "mergeStateStatus": "DIRTY",
+            },
+            {
+                "number": 16220,
+                "headRefName": "grok/JOV-4905-fix",
+                "mergeStateStatus": "CLEAN",
+            },
+            {"number": 1, "headRefName": "tim/manual", "mergeStateStatus": "DIRTY"},
+        ]
+        with (
+            mock.patch.dict(os.environ, {"SYMPHONY_OPEN_PR_INDEX": "live"}),
+            mock.patch.object(module, "_gh_json", return_value=listed),
+            mock.patch.object(module, "_linear_identifiers", return_value=[]),
+        ):
+            remounts = module._github_remount_identifiers()
+            combined = module._admitted_or_remount_identifiers()
+        self.assertEqual(remounts, ["JOV-4894"])
+        self.assertEqual(combined, ["JOV-4894"])
+
+    def test_admitted_or_remount_keeps_linear_fail_closed_without_github_heads(self):
+        module = self.load_controller_module()
+        with (
+            mock.patch.object(module, "_linear_identifiers", return_value=None),
+            mock.patch.object(module, "_github_remount_identifiers", return_value=[]),
+        ):
+            self.assertIsNone(module._admitted_or_remount_identifiers())
+        with (
+            mock.patch.object(module, "_linear_identifiers", return_value=None),
+            mock.patch.object(module, "_github_remount_identifiers", return_value=["JOV-4894"]),
+        ):
+            self.assertEqual(module._admitted_or_remount_identifiers(), ["JOV-4894"])
+        with (
+            mock.patch.object(module, "_linear_identifiers", return_value=[]),
+            mock.patch.object(module, "_github_remount_identifiers", return_value=["JOV-4894"]),
+        ):
+            self.assertEqual(module._admitted_or_remount_identifiers(), ["JOV-4894"])
+
+    def test_issue_meta_remount_skips_receipt_but_still_blocks_human_hold(self):
+        module = self.load_controller_module()
+        issue = self._admitted_issue("JOV-4894", "In Review")
+        issue["comments"] = {"nodes": []}
+        ok, reason, meta = module._issue_meta(issue, "JOV-4894", require_receipt=False)
+        self.assertTrue(ok, reason)
+        self.assertEqual(meta["original_state_name"], "In Review")
+        refused, default_reason, _ = module._issue_meta(issue, "JOV-4894")
+        self.assertFalse(refused)
+        self.assertEqual(default_reason, "admission_receipt_missing_or_stale")
+        blocked = self._admitted_issue("JOV-4894", "In Review")
+        blocked["comments"] = {"nodes": []}
+        blocked["labels"] = {"nodes": [{"name": "blocked"}]}
+        ok, reason, _ = module._issue_meta(blocked, "JOV-4894", require_receipt=False)
+        self.assertFalse(ok)
+        self.assertEqual(reason, "blocked")
+
+    def test_launch_remounts_dirty_head_without_admission_receipt(self):
+        """Live stall after #16212: Linear receipts empty, #16211 DIRTY."""
+        module = self.load_controller_module()
+        launches: list[list[str]] = []
+        issue = self._admitted_issue("JOV-4894", "In Review")
+        issue["comments"] = {"nodes": []}
+        index = {
+            "JOV-4894": {
+                "number": 16211,
+                "head": "grok/JOV-4894-fix",
+                "repo": "JovieInc/Jovie",
+                "mergeStateStatus": "DIRTY",
+            }
+        }
+        with (
+            mock.patch.object(module, "_autonomous_open_pr_index", return_value=index),
+            mock.patch.object(module, "_fetch_single_issue", return_value=issue),
+            mock.patch.object(
+                module, "_control", side_effect=lambda command: launches.append(command) or True
+            ),
+        ):
+            launched, used = module._launch_fallback_workers(
+                ["JOV-4894"],
+                [],
+                "/bin/true",
+                "a" * 64,
+                {"selected": {"id": "grok"}},
+                2,
+            )
+        self.assertEqual(used, 1)
+        self.assertEqual(len(launched), 1)
+        self.assertTrue(any("JOV-4894" in arg for command in launches for arg in command), launches)
+
+    def test_launch_still_requires_receipt_for_new_work(self):
+        module = self.load_controller_module()
+        launches: list[list[str]] = []
+        issue = self._admitted_issue("JOV-5003", "Todo")
+        issue["comments"] = {"nodes": []}
+        with (
+            mock.patch.object(module, "_autonomous_open_pr_index", return_value={}),
+            mock.patch.object(module, "_fetch_single_issue", return_value=issue),
+            mock.patch.object(
+                module, "_control", side_effect=lambda command: launches.append(command) or True
+            ),
+        ):
+            launched, used = module._launch_fallback_workers(
+                ["JOV-5003"],
+                [],
+                "/bin/true",
+                "a" * 64,
+                {"selected": {"id": "grok"}},
+                2,
+            )
+        self.assertEqual(used, 0)
+        self.assertEqual(list(launched), [])
+        self.assertEqual(launches, [])
+
+    def test_exhausted_remounts_github_dirty_head_when_linear_has_no_receipts(self):
+        module = self.load_controller_module()
+        launches: list[list[str]] = []
+        unit = "fallback-ship-JOV-4894.service"
+        active: list[str] = []
+
+        def launch(identifiers, *_args, **_kwargs):
+            launches.append(list(identifiers))
+            active.append(unit)
+            return {unit}, 1
+
+        with (
+            mock.patch.object(
+                module, "codex_canary_ready", return_value=(False, "all_accounts_cooldown")
+            ),
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_linear_identifiers", return_value=[]),
+            mock.patch.object(module, "_github_remount_identifiers", return_value=["JOV-4894"]),
+            mock.patch.object(module, "_active_grok_units", side_effect=lambda: list(active)),
+            mock.patch.object(module, "_fleet_gate_allows_isolated", return_value=(True, "fleet_gate_amber")),
+            mock.patch.object(
+                module,
+                "_model_router_selection",
+                return_value=({"selected": {"id": "grok", "pool": "grok"}}, "ok"),
+            ),
+            mock.patch.object(module, "_bundle_revision", return_value="a" * 64),
+            mock.patch.object(module, "_launch_fallback_workers", side_effect=launch),
+            mock.patch.object(module, "_grok_units_after_survival_window", return_value=[unit]),
+            mock.patch.object(module, "_jov_active", return_value=True),
+            mock.patch.object(module, "_control", return_value=True),
+        ):
+            self.assertEqual(module.reconcile(), 0)
+        self.assertEqual(launches, [["JOV-4894"]])
+
     def test_enroll_failure_does_not_count_as_product_ci_red(self):
         module = self.load_controller_module()
         with mock.patch.object(
@@ -1729,6 +1888,84 @@ class FallbackTests(unittest.TestCase):
         self.assertNotIn("fetch --depth 1 origin refs/heads/grok/JOV-7-fix", events)
         self.assertNotIn("checkout -B fallback/JOV-7-fix origin/main", events)
         self.assertIn("failing CI", events)
+
+    def test_grok_ship_one_remounts_dirty_head_without_admission_receipt(self):
+        created = self.root / "pr-created"
+        GrokLinearHandler.omit_receipt = {"JOV-7"}
+        self.command(
+            "gh",
+            'case "$*" in\n'
+            '  *headRefName*) echo \'[{"number":16211,"headRefName":"grok/JOV-7-fix","mergeStateStatus":"DIRTY"}]\';;\n'
+            '  *statusCheckRollup*) echo \'{"statusCheckRollup":[{"conclusion":"SUCCESS"}]}\';;\n'
+            '  *) [ ! -f "$GROK_CREATED" ] && echo 0 || echo 1;;\n'
+            'esac\n',
+        )
+        self.command(
+            "git",
+            'printf "git %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            '[ "$1" != clone ] || mkdir -p "$5/.git"\n'
+            'case "$*" in\n'
+            '  *"rev-parse HEAD") printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";;\n'
+            '  *"rev-parse --is-shallow-repository") printf "true\\n";;\n'
+            '  *"merge-base HEAD origin/main") exit 1;;\n'
+            'esac\n',
+        )
+        self.command(
+            "grok",
+            'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            'touch "$GROK_CREATED"\n',
+        )
+        result = subprocess.run(
+            [self.install_runtime() / GROK_SHIP.name, "JOV-7"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_EVENTS=self.events,
+                GROK_CREATED=created,
+                GROK_SHIP_WS_ROOT=self.root / "workspaces",
+                GROK_SHIP_LOG_DIR=self.root / "logs",
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.grok_linear_url(),
+                SYMPHONY_OPEN_PR_INDEX="live",
+            ),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("issue is not admitted", result.stderr)
+        log = (self.root / "logs/JOV-7.log").read_text()
+        self.assertIn("remount_ci_red", log)
+        events = self.events.read_text()
+        self.assertIn("checkout -B grok/JOV-7-fix origin/grok/JOV-7-fix", events)
+        self.assertIn("merge --no-edit origin/main", events)
+
+    def test_check_admission_remount_skips_receipt(self):
+        url = self.linear_url()
+        original_nodes = LinearHandler.nodes
+        LinearHandler.nodes = [
+            {
+                "identifier": "JOV-4894",
+                "title": "Ship JOV-4894",
+                "description": "",
+                "team": {"key": "JOV"},
+                "labels": {"nodes": [{"name": "symphony"}]},
+                "comments": {"nodes": []},
+            }
+        ]
+        self.addCleanup(lambda: setattr(LinearHandler, "nodes", original_nodes))
+        refused = self.run_controller(
+            "check-admission", "JOV-4894", LINEAR_API_KEY="linear-secret", LINEAR_API_URL=url
+        )
+        self.assertEqual(refused.returncode, 1, refused.stderr)
+        self.assertIn("admission_receipt_missing_or_stale", refused.stderr)
+        remounted = self.run_controller(
+            "check-admission",
+            "JOV-4894",
+            "--remount",
+            LINEAR_API_KEY="linear-secret",
+            LINEAR_API_URL=url,
+        )
+        self.assertEqual(remounted.returncode, 0, remounted.stderr)
+        self.assertEqual(json.loads(remounted.stdout)["title"], "Ship JOV-4894")
 
     def test_grok_ship_one_delegates_admission_and_respects_blocked(self):
         # grok-ship-one must not keep its own copy of the admission predicate:
