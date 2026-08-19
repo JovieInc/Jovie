@@ -1873,6 +1873,13 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(used, 2)
         self.assertEqual(len(launched), 2)
 
+    def test_grok_ship_one_new_work_does_not_request_queue_deferred(self):
+        """Live fallback PRs still got queue-deferred because the prompt asked for it."""
+        text = GROK_SHIP.read_text()
+        self.assertNotIn("and the queue-deferred hold", text)
+        self.assertIn("Do not add the queue-deferred label", text)
+        self.assertIn("Native merge-queue autoenroll is the hold", text)
+
     def test_grok_ship_one_skips_existing_grok_prefix_pr(self):
         self.command(
             "gh",
