@@ -17,6 +17,15 @@ const PROC_STAT_STIME_INDEX = 12;
 const PROC_STAT_STARTTIME_INDEX = 19;
 
 /**
+ * Injectable filesystem readers used by tests and production diagnostics.
+ * Intentionally narrower than `fs.readFileSync` / `fs.statSync` so mocks
+ * do not have to implement the full Node overloads.
+ *
+ * @typedef {(path: string, encoding?: string) => string} DiagnosticReadFile
+ * @typedef {(path: string) => { mtimeMs: number; size: number }} DiagnosticStat
+ */
+
+/**
  * @typedef {object} TsBuildInfoStats
  * @property {string | null} path
  * @property {number | null} ageMs
@@ -52,7 +61,7 @@ const PROC_STAT_STARTTIME_INDEX = 19;
 /**
  * @param {string[]} command
  * @param {string} cwd
- * @param {{ readonly readFile?: typeof readFileSync }} [options]
+ * @param {{ readonly readFile?: DiagnosticReadFile }} [options]
  * @returns {string | null}
  */
 export function resolveTsBuildInfoPath(command, cwd, options = {}) {
@@ -89,7 +98,7 @@ export function resolveTsBuildInfoPath(command, cwd, options = {}) {
  * @param {string | null} path
  * @param {{
  *   readonly nowMs?: number;
- *   readonly stat?: typeof statSync;
+ *   readonly stat?: DiagnosticStat;
  * }} [options]
  * @returns {TsBuildInfoStats}
  */
@@ -115,7 +124,7 @@ export function readTsBuildInfoStats(path, options = {}) {
 /**
  * @param {number | null | undefined} pid
  * @param {{
- *   readonly readFile?: typeof readFileSync;
+ *   readonly readFile?: DiagnosticReadFile;
  *   readonly clkTck?: number;
  *   readonly nowMs?: number;
  * }} [options]
@@ -137,7 +146,7 @@ export function readChildResourceStats(pid, options = {}) {
  *
  * @param {number | null | undefined} pid
  * @param {{
- *   readonly readFile?: typeof readFileSync;
+ *   readonly readFile?: DiagnosticReadFile;
  *   readonly clkTck?: number;
  * }} [options]
  * @returns {ChildResourceStats | null}
@@ -217,8 +226,8 @@ export function parseProcStatCpu(stat) {
  *   readonly cwd: string;
  *   readonly pid?: number | null;
  *   readonly exitCode?: number | null;
- *   readonly readFile?: typeof readFileSync;
- *   readonly stat?: typeof statSync;
+ *   readonly readFile?: DiagnosticReadFile;
+ *   readonly stat?: DiagnosticStat;
  *   readonly clkTck?: number;
  * }} input
  * @returns {TypecheckDiagnostic}
@@ -428,13 +437,14 @@ function roundOrNull(value) {
 }
 
 /**
- * @param {number | null | undefined} value
+ * @param {number | string | boolean | null | undefined} value
  * @returns {string}
  */
 function formatNa(value) {
-  return value === null || value === undefined || value === ''
-    ? 'n/a'
-    : String(value);
+  if (value === null || value === undefined || value === '') {
+    return 'n/a';
+  }
+  return String(value);
 }
 
 /**

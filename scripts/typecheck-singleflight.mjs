@@ -229,7 +229,12 @@ async function runAsOwner() {
   }
 }
 
-function runCommand([executable, ...args], { startedAtMs } = {}) {
+/**
+ * @param {[string, ...string[]]} commandParts
+ * @param {{ readonly startedAtMs?: number }} [options]
+ */
+function runCommand([executable, ...args], options = {}) {
+  const { startedAtMs } = options;
   return new Promise(resolveRun => {
     const child = spawn(executable, args, {
       cwd,
