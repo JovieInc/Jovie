@@ -20,6 +20,9 @@ export const ADAPTER_SKILL_SEGMENTS = Object.freeze([
   '.factory',
 ]);
 
+/** Checkout guts — never catalog these as skills. */
+export const NON_SKILL_SEGMENTS = Object.freeze(['src', 'test', 'bin']);
+
 export const APPROVED_VERCEL_SKILLS = Object.freeze({
   'ai-sdk': Object.freeze({
     ref: 'baee8388b935746407dd7091b2403b66c979a6d7',
@@ -91,6 +94,9 @@ function walkSkillTree(absolute, relative, hits) {
   const underAdapter = ADAPTER_SKILL_SEGMENTS.some(segment =>
     parts.includes(segment)
   );
+  const underCheckoutGuts = NON_SKILL_SEGMENTS.some(segment =>
+    parts.includes(segment)
+  );
   for (const entry of entries) {
     if (entry.name === '.git' || entry.name === 'node_modules') continue;
     const childAbsolute = resolve(absolute, entry.name);
@@ -99,7 +105,10 @@ function walkSkillTree(absolute, relative, hits) {
       walkSkillTree(childAbsolute, childRelative, hits);
       continue;
     }
-    if (underAdapter && /^SKILL\.md$/i.test(entry.name)) {
+    if (
+      (underAdapter || underCheckoutGuts) &&
+      /^SKILL\.md$/i.test(entry.name)
+    ) {
       hits.push(childRelative);
     }
   }
@@ -169,7 +178,7 @@ export function evaluateSkillGovernance({ root = process.cwd() } = {}) {
   const errors = [];
   for (const adapterPath of collectAdapterSkillMarkdown(root)) {
     errors.push(
-      `${adapterPath}: adapter SKILL.md under .bak/.cursor/.factory must not be catalog-visible`
+      `${adapterPath}: SKILL.md under .bak/.cursor/.factory or src/test/bin must not be catalog-visible`
     );
   }
   const lockText = readText(root, 'skills-lock.json', errors);
