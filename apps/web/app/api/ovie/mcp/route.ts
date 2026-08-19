@@ -9,7 +9,14 @@ import {
   getOvieOAuthIssuer,
   ovieIssuerSecret,
 } from '@/lib/ovie/mcp/oauth';
+import {
+  DurableOperatingStore,
+  getDefaultOperatingStore,
+  OVIE_MCP_INDEX_CAP,
+  OVIE_MCP_RECORD_TTL_SECONDS,
+} from '@/lib/ovie/mcp/store';
 import type { OvieMcpPrincipal } from '@/lib/ovie/mcp/types';
+import { getRedis } from '@/lib/redis';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,11 +55,31 @@ async function resolvePrincipal(request: Request): Promise<OvieMcpPrincipal> {
   };
 }
 
+function operatingStore() {
+  const redis = getRedis();
+  if (!redis) return getDefaultOperatingStore();
+  return new DurableOperatingStore({
+    get: async key => redis.get(key),
+    set: async (key, value) => {
+      await redis.set(key, value, { ex: OVIE_MCP_RECORD_TTL_SECONDS });
+    },
+    lpush: async (key, value) => {
+      await redis.lpush(key, value);
+      await redis.ltrim(key, 0, OVIE_MCP_INDEX_CAP - 1);
+    },
+    lrange: async (key, start, stop) => {
+      const rows = await redis.lrange(key, start, stop);
+      return Array.isArray(rows) ? rows.map(String) : [];
+    },
+  });
+}
+
 export async function POST(request: Request): Promise<NextResponse> {
   const body: unknown = await request.json().catch(() => null);
   const result = await handleOvieMcpRequest({
     body,
     principal: await resolvePrincipal(request),
+    store: operatingStore(),
   });
   if (result.body === null) {
     return new NextResponse(null, { status: result.status, headers: CORS });
