@@ -885,19 +885,31 @@ describe('entrypoint contract', () => {
 });
 
 describe('deterministic Symphony admission boundary', () => {
+  /**
+   * @param {{
+   *   skipReceipts?: boolean
+   *   id?: string
+   *   identifier?: string
+   *   title?: string
+   *   state?: string
+   *   labels?: string[]
+   *   assignee?: { id?: string, name?: string } | null
+   *   comments?: Array<{ body?: string, createdAt?: string }>
+   * }} [overrides]
+   */
   function admissionIssue(overrides = {}) {
-    const { skipReceipts = false, ...rest } = overrides;
+    const skipReceipts = Boolean(overrides.skipReceipts);
+    const identifier = overrides.identifier || 'JOV-900';
     const issue = makeIssue({
-      id: rest.id || `${rest.identifier || 'JOV-900'}-id`,
-      identifier: rest.identifier || 'JOV-900',
-      title: rest.title || 'Fix the real thing',
-      state: rest.state || 'Triage',
-      labels: rest.labels || [],
-      assignee: rest.assignee || null,
-      comments: rest.comments || [],
-      ...rest,
+      id: overrides.id || `${identifier}-id`,
+      identifier,
+      title: overrides.title || 'Fix the real thing',
+      state: overrides.state || 'Triage',
+      labels: overrides.labels || [],
+      assignee: overrides.assignee || null,
+      comments: overrides.comments || [],
     });
-    if (skipReceipts || rest.comments) return issue;
+    if (skipReceipts || overrides.comments) return issue;
     return withFullGateReceipts(issue);
   }
 
