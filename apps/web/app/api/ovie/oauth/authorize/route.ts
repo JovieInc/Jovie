@@ -16,7 +16,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   const entitlements = await getCurrentUserEntitlements();
-  if (!entitlements.isAuthenticated) {
+  if (!entitlements.isAuthenticated || !entitlements.isAdmin) {
     const next = encodeURIComponent(`${url.pathname}${url.search}`);
     return NextResponse.redirect(new URL(`/identity?next=${next}`, url.origin));
   }

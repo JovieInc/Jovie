@@ -19,11 +19,11 @@ export type OvieMcpHandleResult = {
   readonly headers?: Record<string, string>;
 };
 
-export function handleOvieMcpRequest(input: {
+export async function handleOvieMcpRequest(input: {
   readonly body: unknown;
   readonly principal: OvieMcpPrincipal;
   readonly store?: OperatingStore;
-}): OvieMcpHandleResult {
+}): Promise<OvieMcpHandleResult> {
   const store = input.store ?? getDefaultOperatingStore();
   const parsed = parseJsonRpc(input.body);
   if (!parsed || !parsed.method) {
@@ -39,18 +39,18 @@ export function handleOvieMcpRequest(input: {
   }
 
   try {
-    return dispatchAuthenticated(parsed, input.principal, store);
+    return await dispatchAuthenticated(parsed, input.principal, store);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'internal error';
     return { status: 200, body: rpcError(parsed.id, -32602, message) };
   }
 }
 
-function dispatchAuthenticated(
+async function dispatchAuthenticated(
   request: JsonRpcRequest,
   principal: OvieMcpPrincipal,
   store: OperatingStore
-): OvieMcpHandleResult {
+): Promise<OvieMcpHandleResult> {
   const id = request.id;
   switch (request.method) {
     case 'initialize':
@@ -80,7 +80,7 @@ function dispatchAuthenticated(
         params.arguments && typeof params.arguments === 'object'
           ? (params.arguments as Record<string, unknown>)
           : {};
-      const called = callOvieMcpTool(store, principal, name, args);
+      const called = await callOvieMcpTool(store, principal, name, args);
       if (!called.ok) {
         if (called.status === 401 || called.status === 403) {
           return {

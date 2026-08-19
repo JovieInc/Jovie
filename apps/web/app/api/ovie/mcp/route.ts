@@ -50,7 +50,7 @@ async function resolvePrincipal(request: Request): Promise<OvieMcpPrincipal> {
 
 export async function POST(request: Request): Promise<NextResponse> {
   const body: unknown = await request.json().catch(() => null);
-  const result = handleOvieMcpRequest({
+  const result = await handleOvieMcpRequest({
     body,
     principal: await resolvePrincipal(request),
   });
