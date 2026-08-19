@@ -15,6 +15,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - [internal] **Canonical Actions now have one contract package:** `@jovie/action-contracts` owns the four stable IDs, and authenticated `GET /api/v1/actions` can list what a profile can do. Nothing is created yet.
 
+- [internal] **Design governance is now a standing audit, not a one-off sweep:** `pnpm design:governance:audit` fails closed on dangling skill links, stale token exports, DESIGN.md Noir Ion rgb drift, and unwired enforcement commands. It runs locally and weekly (informational / issue-only), not as a `ci-fast` merge gate.
+
 - **iPhone Library is Catalog, Collections, and Ideas:** Catalog is releases, merch, and docs. Collections auto-bundles a vlog with its script, takes, and B-roll. Ideas is the untagged third home.
 - **iPhone chat is home:** Ask Jovie is the first signed-in surface. There is no bottom tab bar. Swipe from the leading edge for the sidebar and from the trailing edge for the right rail.
 - **iPhone chat home can introduce what’s new:** An empty chat highlights one feature or lists up to three recent changes. Dismiss stays dismissed. More than three changes ends on And more, which opens the changelog.

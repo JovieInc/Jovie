@@ -123,7 +123,8 @@ describe('ci-fast bounded parallel workflow', () => {
   it('locks the existing lane command manifest', () => {
     expect(LANE_COMMANDS).toEqual({
       biome: 'pnpm run biome:check',
-      'design-conformance': 'pnpm design:conformance:gate',
+      'design-conformance':
+        'pnpm design:conformance:gate && pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit',
       'eslint-server-boundaries':
         'pnpm --filter=@jovie/web run lint:server-boundaries',
       typecheck: 'pnpm run typecheck',
@@ -133,7 +134,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'profile-admission':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts',
       structural:
-        'pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm component-ship-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
+        'pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm --filter=@jovie/web run lint:touch-target && pnpm component-ship-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
     });
   });
 
@@ -149,7 +150,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
     expect(LANE_GROUPS.remaining).toContain('design-conformance');
     expect(LANE_COMMANDS['design-conformance']).toBe(
-      'pnpm design:conformance:gate'
+      'pnpm design:conformance:gate && pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit'
     );
     expect(LANE_COMMANDS['design-conformance']).not.toMatch(
       /backlog|hermes|symphony|systemd/i

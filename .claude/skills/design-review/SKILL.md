@@ -1,1 +1,1 @@
-../gstack/design-review/SKILL.md
+../../../.agents/skills/gstack/design-review/SKILL.md

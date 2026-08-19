@@ -218,7 +218,7 @@ useQuery({
 
 ## Custom ESLint Rules
 
-12 custom rules in `apps/web/eslint-rules/` run via `pnpm --filter web lint:eslint`. Violations block CI.
+20 custom rules in `apps/web/eslint-rules/` run via `pnpm --filter web lint:eslint`; enforced in CI.
 
 | Rule | What It Blocks | Fix |
 |------|---------------|-----|
@@ -235,6 +235,13 @@ useQuery({
 | `edge-runtime-node-imports` | `node:fs`, `crypto`, `stripe`, `path`, `stream` in files with `export const runtime = 'edge'` | Remove the Node-only import or remove the Edge runtime declaration |
 | `no-direct-electron-bridge` | Direct `window.electronAPI` access (or via `globalThis`/`self`/TS cast) outside `apps/web/lib/desktop/electron-bridge.ts` | Import the guarded wrapper: `import { useDesktopUpdate, isDesktopEnvironment } from '@/lib/desktop/electron-bridge'`. Stale installed binaries may expose a partial bridge — wrappers handle missing methods gracefully + capture Sentry warning. |
 | `no-ad-hoc-currency` | Template literals like `$${x.toFixed(2)}` or `$${(x/100).toFixed(2)}` | Import `formatAmount` from `@/lib/utils/format-number` for cent values; `formatUsd` from `@/lib/admin/format` for admin USD values |
+| `no-raw-motion-values` | Raw `duration-300`, `ease-in`, `cubic-bezier(...)`, or `transition: all` that bypass System B motion tokens | Use `duration-subtle` / `duration-cinematic` and `--ease-*` tokens; see `.claude/rules/motion.md` |
+| `no-banned-marketing-copy` | Placeholder or off-brand copy (`lorem ipsum`, `John Doe`) on marketing pages | Use verified product copy; allowlist a term only with `copy-lint-allow` |
+| `no-raw-focus-ring` | `focus:ring-*` / `focus:outline-*` on interactive elements (mouse-and-keyboard focus) | Use `focus-ring-themed` or `focus-visible:*` |
+| `clerk-oauth-options-must-include-prompt` | `<SignIn>` / `<SignUp>` without `CLERK_COMPONENT_OPTIONS` or `oidcPrompt='select_account'` | Spread `CLERK_COMPONENT_OPTIONS` from `@/lib/auth/clerk-options` |
+| `chat-tool-schema-strict` | Bare `z.object()` chat tool input schemas | Wrap with `chatToolSchema()` |
+| `canonical-ui-label-casing` | Title Case / sentence-case violations on UI labels | Follow `DESIGN.md` casing; allowlist with `ui-casing-allow` |
+| `no-hardcoded-theme-colors` | Bare `text-black`/`bg-white` or `text-[#hex]` that bypass semantic tokens | Use token utilities (`text-primary-token`) or pair light/dark classes |
 
 **Run:** `pnpm --filter web lint:eslint` (all rules) or `pnpm --filter web lint:server-boundaries` (boundary rules only).
 

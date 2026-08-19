@@ -66,7 +66,8 @@ const LANES = [
   {
     id: 'design-conformance',
     name: 'Design Conformance',
-    nextLocalCommand: 'pnpm design:conformance:gate',
+    nextLocalCommand:
+      'pnpm design:conformance:gate && pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit',
     run: runDesignConformance,
   },
   {
@@ -86,7 +87,7 @@ const LANES = [
     id: 'structural',
     name: 'Structural Contract',
     nextLocalCommand:
-      'pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm component-ship-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
+      'pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm --filter=@jovie/web run lint:touch-target && pnpm component-ship-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
     run: runStructural,
   },
 ];
@@ -394,6 +395,7 @@ function runStructural() {
     'pnpm --filter=@jovie/web run lint:no-native-dialogs',
     'pnpm --filter=@jovie/web run lint:seo',
     'pnpm --filter=@jovie/web run lint:contrast-ratchet',
+    'pnpm --filter=@jovie/web run lint:touch-target',
     // JOV-4421: hard ship gate — tests + matching stories for shippable UI.
     'pnpm component-ship-gate',
     'pnpm doc:freshness:check',
