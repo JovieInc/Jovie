@@ -9,7 +9,10 @@ export type OvieTalkKind = 'ingest-ack' | 'drive-jovie' | 'admit-build';
 
 export type OvieTalkRoute =
   | { readonly kind: 'ingest-ack' }
-  | { readonly kind: 'drive-jovie'; readonly reason: 'creator-work' | 'dogfood' }
+  | {
+      readonly kind: 'drive-jovie';
+      readonly reason: 'creator-work' | 'dogfood';
+    }
   | {
       readonly kind: 'admit-build';
       readonly missing: 'jovie-capability' | 'extension';

@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
 import type { TelegramMessage } from 'eve/channels/telegram';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { onOvieTelegramMessage } from '../agent/channels/telegram';
 import {

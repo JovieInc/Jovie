@@ -1,7 +1,7 @@
 import {
-  photonIMessageChannel,
   type PhotonInboundMessageContext,
   type PhotonInboundResult,
+  photonIMessageChannel,
 } from 'eve/channels/photon';
 
 import { admitOvieIMessage } from '../lib/imessage-allowlist';

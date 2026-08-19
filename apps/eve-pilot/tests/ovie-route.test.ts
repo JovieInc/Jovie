@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { routeOvieTalk } from '../agent/lib/ovie-route';
 import {
   admitOvieIMessage,
   parseOvieIMessageAllowedSenders,
 } from '../agent/lib/imessage-allowlist';
+import { routeOvieTalk } from '../agent/lib/ovie-route';
 import { eveIdentityForChannel } from '../agent/select-identity';
 
 describe('Ovie talk split', () => {

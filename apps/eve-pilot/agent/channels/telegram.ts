@@ -1,9 +1,9 @@
 import {
   defaultTelegramAuth,
-  telegramChannel,
   type TelegramContext,
   type TelegramInboundResult,
   type TelegramMessage,
+  telegramChannel,
 } from 'eve/channels/telegram';
 
 import { admitOvieTelegramMessage } from '../lib/telegram-allowlist';
