@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     const userRecord = userId
       ? await db.query.users.findFirst({
           where: eq(users.clerkId, userId),
-          columns: { id: true, name: true, email: true },
+          columns: { id: true, name: true },
         })
       : null;
 
@@ -90,7 +90,6 @@ export async function POST(request: Request) {
     notifySlackFeedbackSubmission({
       message,
       name: userRecord?.name ?? 'Jovie user',
-      email: userRecord?.email,
       source,
       pathname,
     }).catch(err => {

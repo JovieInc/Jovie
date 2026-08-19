@@ -36,6 +36,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- [internal] **Ovie online scoring no longer invents review or rubric results:** eval review only reports enqueued after a durable row exists, missing judges stay `judge:absent`, and word count is a signal instead of a global fail. Chat Slack feedback no longer includes email addresses.
 - [internal] **Long typechecks now report phase timing instead of looking stuck:** singleflight logs elapsed time, tsbuildinfo age/size, and child CPU/RSS while the live compiler keeps ownership.
 - [internal] **Symphony admits from one receipt, not three labels:** a current `admission-gate/v1` receipt is the admission authority. The `plan-approved`, `admission-approved`, and `symphony` labels stay as derived audit. Protected and human-review work stays excluded.
 - [internal] **Merge-queue Path Changes no longer rejects coalesced heads:** an empty event-base diff now recomputes against live `main` before a typed no-op, so green combined heads can land.

@@ -10,6 +10,7 @@
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
+import { buildSlackFeedbackNotification } from './slack-feedback-message';
 
 export interface SlackMessage {
   text: string;
@@ -329,47 +330,10 @@ export async function notifySlackWaitlist(
 export async function notifySlackFeedbackSubmission(params: {
   message: string;
   name: string;
-  email?: string | null;
   source: string;
   pathname?: string | null;
 }): Promise<SlackNotificationResult> {
-  const text = `💬 ${params.name} submitted feedback`;
-  const contextLine = [
-    params.email ? `📧 ${params.email}` : null,
-    `Source: ${params.source}`,
-    params.pathname ? `Path: ${params.pathname}` : null,
-  ]
-    .filter(Boolean)
-    .join('  •  ');
-
-  const message: SlackMessage = {
-    text,
-    blocks: [
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `💬 *${params.name}* submitted feedback`,
-        },
-      },
-      {
-        type: 'context',
-        elements: [
-          {
-            type: 'mrkdwn',
-            text: contextLine,
-          },
-        ],
-      },
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `> ${params.message}`,
-        },
-      },
-    ],
-  };
+  const message = buildSlackFeedbackNotification(params);
 
   const result = await sendSlackMessage(message);
   if (result.status === 'sent') {

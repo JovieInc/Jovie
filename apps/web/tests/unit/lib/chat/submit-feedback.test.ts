@@ -45,6 +45,15 @@ describe('submitChatFeedback', () => {
     });
 
     expect(result).toEqual({ success: true });
+    expect(mockNotifySlackFeedbackSubmission).toHaveBeenCalledWith({
+      message: 'Please add richer collaboration tools',
+      name: 'Test User',
+      source: 'chat',
+      pathname: '/app',
+    });
+    expect(
+      mockNotifySlackFeedbackSubmission.mock.calls[0]?.[0]
+    ).not.toHaveProperty('email');
   });
 
   it('returns failure when persistence fails', async () => {
