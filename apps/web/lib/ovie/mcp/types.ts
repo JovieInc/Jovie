@@ -32,6 +32,10 @@ export type CertLevel =
   | 'broadly-rolled-out'
   | 'trusted';
 
+export const INITIATIVE_CONFIDENCE = ['high', 'medium', 'low'] as const;
+
+export type InitiativeConfidence = (typeof INITIATIVE_CONFIDENCE)[number];
+
 export type InitiativeStatus =
   | 'proposed'
   | 'accepted'
@@ -77,6 +81,7 @@ export type OvieInitiative = {
   readonly id: string;
   readonly kind: 'initiative';
   readonly status: InitiativeStatus;
+  readonly confidence: InitiativeConfidence;
   readonly handoff: OvieHandoff;
   readonly lane: OvieLane;
   readonly destination: OvieReceipt['destination'];
@@ -86,6 +91,18 @@ export type OvieInitiative = {
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly evidence: readonly OvieEvidence[];
+};
+
+export type CertificationPassName =
+  | 'author'
+  | 'adversary'
+  | 'execute'
+  | 'backfill';
+
+export type CertificationPass = {
+  readonly n: 1 | 2 | 3 | 4;
+  readonly name: CertificationPassName;
+  readonly job: string;
 };
 
 export type OvieEvidence = {
