@@ -222,6 +222,61 @@ class RegistryTests(unittest.TestCase):
             self.assertEqual(selected["id"], "grok-4.6")
             self.assertEqual(selected["pool"], "grok-build")
 
+    def test_grok_bin_alias_selects_included_grok_when_executable_env_unset(self):
+        """Live sidecar exported GEM_GROK_BIN but the router only read
+        GEM_GROK_EXECUTABLE, so grok-4.6 was executable_missing and workers
+        fell through to hermes/OpenRouter (HTTP 402 max_tokens 65536).
+        """
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
+            grok = self._ready(root, "grok", "echo grok-4.6\n")
+            result = self.run_router(
+                "choose", "--workflow", "new_pr", "--capability", "code",
+                env={
+                    "GEM_MODEL_ROUTER_STATE": str(root / "state.json"),
+                    "GEM_CURSOR_EXECUTABLE": "/missing",
+                    "GEM_GROK_EXECUTABLE": "",
+                    "GEM_GROK_BIN": str(grok),
+                    "GEM_KIMI_EXECUTABLE": "/missing",
+                    "GEM_CLAUDE_EXECUTABLE": "/missing",
+                    "GEM_DEEPSEEK_EXECUTABLE": "/missing",
+                    "GEM_PR_DRAIN_QWEN": "/missing",
+                    "GEM_PR_DRAIN_CODEX": "/missing",
+                },
+            )
+            selected = json.loads(result.stdout)["selected"]
+            self.assertEqual(selected["id"], "grok-4.6")
+            self.assertEqual(selected["executor"]["executable"], str(grok))
+            self.assertIn("--always-approve", selected["executor"]["argv"])
+            self.assertNotIn("agent", selected["executor"]["argv"])
+
+    def test_openrouter_max_tokens_402_marks_the_pool_exhausted(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
+            grok = self._ready(
+                root,
+                "grok",
+                "echo 'HTTP 402: You requested up to 65536 tokens, but can only afford 687' >&2\nexit 1\n",
+            )
+            kimi = self._ready(root, "kimi", "echo 0.34.0\n")
+            state_path = root / "state.json"
+            first = self.run_router(
+                "choose", "--workflow", "new_pr", "--capability", "code",
+                env={
+                    "GEM_MODEL_ROUTER_STATE": str(state_path),
+                    "GEM_CURSOR_EXECUTABLE": "/missing",
+                    "GEM_GROK_EXECUTABLE": str(grok),
+                    "GEM_KIMI_EXECUTABLE": str(kimi),
+                    "GEM_CLAUDE_EXECUTABLE": "/missing",
+                    "GEM_DEEPSEEK_EXECUTABLE": "/missing",
+                    "GEM_PR_DRAIN_QWEN": "/missing",
+                    "GEM_PR_DRAIN_CODEX": "/missing",
+                },
+            )
+            self.assertEqual(json.loads(first.stdout)["selected"]["id"], "kimi-k3")
+            persisted = json.loads(state_path.read_text())
+            self.assertGreater(persisted["pools"]["grok-build"]["exhausted_until"], time.time())
+
     def test_quota_probe_marks_the_pool_exhausted(self):
         with tempfile.TemporaryDirectory() as td:
             root = pathlib.Path(td)

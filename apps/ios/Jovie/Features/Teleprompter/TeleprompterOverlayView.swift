@@ -17,6 +17,7 @@ private struct TeleprompterCameraPreview: UIViewRepresentable {
     if uiView.previewLayer.session !== session {
       uiView.previewLayer.session = session
     }
+    uiView.applyCurrentOrientation()
   }
 }
 
@@ -28,6 +29,26 @@ private final class TeleprompterPreviewUIView: UIView {
   var previewLayer: AVCaptureVideoPreviewLayer {
     // Safe: `layerClass` pins the backing layer type.
     layer as! AVCaptureVideoPreviewLayer // swiftlint:disable:this force_cast
+  }
+
+  override func didMoveToWindow() {
+    super.didMoveToWindow()
+    applyCurrentOrientation()
+  }
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    applyCurrentOrientation()
+  }
+
+  func applyCurrentOrientation() {
+    guard let connection = previewLayer.connection else { return }
+    TeleprompterCaptureOrientation.apply(
+      to: connection,
+      orientation: TeleprompterCaptureOrientation.resolvedDeviceOrientation(
+        UIDevice.current.orientation
+      )
+    )
   }
 }
 
@@ -192,6 +213,7 @@ private struct TeleprompterScriptScrollView: View {
 struct TeleprompterOverlayView: View {
   @State private var viewModel: TeleprompterViewModel
   @State private var userScrollLocked = false
+  @Environment(\.verticalSizeClass) private var verticalSizeClass
   let onClose: () -> Void
 
   init(viewModel: TeleprompterViewModel, onClose: @escaping () -> Void) {
@@ -199,14 +221,23 @@ struct TeleprompterOverlayView: View {
     self.onClose = onClose
   }
 
+  private var isLandscape: Bool {
+    verticalSizeClass == .compact
+  }
+
   private var scriptFontSize: CGFloat {
-    viewModel.presentationMode == .notch ? 17 : 26
+    if isLandscape { return 16 }
+    return viewModel.presentationMode == .notch ? 17 : 26
   }
 
   /// Fixed script region heights per mode — the region never resizes within
   /// a mode, so recording state transitions cannot shift the layout.
+  /// Landscape stays compact so header + record controls remain on screen.
   private var scriptRegionHeight: CGFloat {
-    viewModel.presentationMode == .notch ? 120 : 320
+    TeleprompterCaptureOrientation.scriptRegionHeight(
+      isLandscape: isLandscape,
+      presentationMode: viewModel.presentationMode
+    )
   }
 
   private var isLockedWhileLive: Bool {
@@ -291,21 +322,30 @@ struct TeleprompterOverlayView: View {
         }
 
         if viewModel.contentMode == .script, viewModel.overlayVisibility == .visible {
-          speedControls
           controlBar
             .padding(.horizontal, JovieSpacing.large)
-            .padding(.bottom, JovieSpacing.xxLarge)
+            .padding(.bottom, isLandscape ? JovieSpacing.small : JovieSpacing.xxLarge)
         } else {
           promptRecordControl
-            .padding(.bottom, JovieSpacing.xxLarge)
+            .padding(.bottom, isLandscape ? JovieSpacing.small : JovieSpacing.xxLarge)
         }
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     .task {
+      UIDevice.current.beginGeneratingDeviceOrientationNotifications()
       await viewModel.startPreview()
     }
+    .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
+      let orientation = UIDevice.current.orientation
+      viewModel.captureController.applyDeviceOrientation(orientation)
+    }
+    .onChange(of: viewModel.speechRevision) {
+      guard viewModel.isRecording else { return }
+      userScrollLocked = false
+    }
     .onDisappear {
+      UIDevice.current.endGeneratingDeviceOrientationNotifications()
       Task { await viewModel.cancelRecording() }
     }
   }
@@ -578,59 +618,6 @@ struct TeleprompterOverlayView: View {
       }
     }
     .animation(JovieMotion.subtle, value: isLockedWhileLive)
-  }
-
-  /// Speed override row. Fixed height in both modes. The slider retunes the
-  /// rate applied the next time "Auto" engages.
-  private var speedControls: some View {
-    HStack(spacing: JovieSpacing.medium) {
-      Image(systemName: "tortoise.fill")
-        .font(.system(size: 12))
-        .foregroundStyle(JovieColor.textTertiary)
-        .accessibilityHidden(true)
-
-      Slider(
-        value: $viewModel.speedWordsPerMinute,
-        in: TeleprompterAutoScroller.minimumWordsPerMinute
-          ... TeleprompterAutoScroller.maximumWordsPerMinute,
-        step: 5
-      )
-      .tint(JovieColor.accent)
-      .accessibilityIdentifier("teleprompter-speed-slider")
-      .accessibilityLabel("Prompt speed, words per minute")
-
-      Image(systemName: "hare.fill")
-        .font(.system(size: 12))
-        .foregroundStyle(JovieColor.textTertiary)
-        .accessibilityHidden(true)
-
-      Button {
-        if viewModel.followMode == .auto {
-          viewModel.resumeVoiceFollow()
-        } else {
-          viewModel.engageSpeedOverride()
-        }
-      } label: {
-        Text(viewModel.followMode == .auto ? "Voice" : "Auto")
-          .font(JovieFont.body(size: 13, weight: .semibold))
-          .foregroundStyle(
-            viewModel.followMode == .auto
-              ? JovieColor.backgroundBase
-              : JovieColor.textPrimary
-          )
-          .frame(width: 56)
-          .padding(.vertical, 6)
-          .background(
-            viewModel.followMode == .auto ? JovieColor.accent : JovieColor.surface1,
-            in: Capsule()
-          )
-      }
-      .buttonStyle(.plain)
-      .accessibilityIdentifier("teleprompter-follow-toggle")
-    }
-    .padding(.horizontal, JovieSpacing.large)
-    .padding(.bottom, JovieSpacing.medium)
-    .frame(height: 44)
   }
 
   private var controlBar: some View {

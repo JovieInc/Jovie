@@ -41,6 +41,23 @@ jobs:
           # A later main commit cannot invalidate this immutable successful
           # Production Controller receipt. The exact checkout and installer
           # revision fence remain the activation authority.
+      - name: Establish lingering user-systemd session
+        run: |
+          set -euo pipefail
+          uid="$(id -u)"
+          export XDG_RUNTIME_DIR="/run/user/${uid}"
+          export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
+          test -S "${XDG_RUNTIME_DIR}/bus" || {
+            printf 'user bus missing at %s; enable linger for this uid\n' \
+              "${XDG_RUNTIME_DIR}/bus" >&2
+            exit 4
+          }
+          systemctl --user show-environment >/dev/null
+          {
+            printf 'XDG_RUNTIME_DIR=%s\n' "${XDG_RUNTIME_DIR}"
+            printf 'DBUS_SESSION_BUS_ADDRESS=%s\n' "${DBUS_SESSION_BUS_ADDRESS}"
+            printf 'GEM_SYSTEMD_REQUIRE_BUS_SOCKET=1\n'
+          } >> "${GITHUB_ENV}"
       - name: Install and attest the exact controller configuration
         env:
           GEM_CONTROLLER_EXPECTED_REVISION: ${{ github.event.workflow_run.head_sha }}

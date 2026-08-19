@@ -148,6 +148,8 @@ import {
   showMerchSales,
   updateMerchCardDetails,
 } from '@/lib/merch/service';
+import { prepareOvieChatTurn } from '@/lib/ovie/chat-entry';
+import { getOvieOperatingStore } from '@/lib/ovie/mcp/runtime-store';
 import {
   albumArtGenerationBurstLimiter,
   albumArtGenerationLimiter,
@@ -671,6 +673,12 @@ function buildChatTurnMetadata(input: {
   readonly model?: string;
   /** OV operator chat mode tag (JOV-4810); omitted for customer turns. */
   readonly chatMode?: 'ov' | null;
+  readonly eveIdentity?: 'jovie' | 'ovie';
+  readonly ovieIngest?: ReadonlyArray<{
+    readonly lane: string;
+    readonly destination: string;
+    readonly ack: string;
+  }>;
 }) {
   return {
     conversationId: input.conversationId,
@@ -678,6 +686,10 @@ function buildChatTurnMetadata(input: {
     requestId: input.requestId,
     ...(input.model ? { model: input.model } : {}),
     ...(input.chatMode ? { chatMode: input.chatMode } : {}),
+    ...(input.eveIdentity ? { eveIdentity: input.eveIdentity } : {}),
+    ...(input.ovieIngest && input.ovieIngest.length > 0
+      ? { ovieIngest: input.ovieIngest }
+      : {}),
     ...(input.toolStepCapExhausted
       ? { toolStepCapExhausted: true as const }
       : {}),
@@ -2437,6 +2449,12 @@ export async function POST(req: Request) {
     );
   }
   const userText = extractLastUserText(uiMessages);
+  // JOV-5215/5216: bind Eve pack + persist/Linear-route dump before model.
+  const { eveTurn, receipts: ovieIngestReceipts } = await prepareOvieChatTurn(
+    chatMode,
+    userText,
+    { store: getOvieOperatingStore() }
+  );
   const clientTurnId = normalizeClientId(body.clientTurnId);
   const clientMessageId = normalizeClientId(body.clientMessageId);
   const source = normalizeChatTurnSource(body.source);
@@ -2893,6 +2911,8 @@ export async function POST(req: Request) {
         await Sentry.flush(SENTRY_FLUSH_TIMEOUT_MS).catch(() => null);
       },
     };
+    telemetry.setExtra?.('eve_identity', eveTurn.pack.id);
+    telemetry.setExtra?.('ovie_ingest_receipts', ovieIngestReceipts);
     let streamFailurePersisted = false;
     const persistStreamFailure = async (error: unknown) => {
       if (!reservedTurn || streamFailurePersisted) {
@@ -2978,6 +2998,12 @@ export async function POST(req: Request) {
               requestId,
               model: turn.selectedModel,
               chatMode,
+              eveIdentity: eveTurn.pack.id,
+              ovieIngest: ovieIngestReceipts.map(receipt => ({
+                lane: receipt.lane,
+                destination: receipt.destination,
+                ack: receipt.ack,
+              })),
               toolStepCapExhausted: turn.turnSignals.toolStepCapExhausted,
             })
           : undefined,

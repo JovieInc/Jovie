@@ -32,7 +32,7 @@ interface EveInfo {
 const pilotRoot = process.cwd();
 
 describe('Eve framework smoke', () => {
-  it('discovers the local read-only pilot without credentials or schedules', () => {
+  it('discovers Eve with Ovie Telegram and iMessage channels', () => {
     const isolatedRoot = mkdtempSync(join(tmpdir(), 'jovie-eve-smoke-'));
     const networkSentinel = join(isolatedRoot, 'network-blocked');
 
@@ -40,6 +40,12 @@ describe('Eve framework smoke', () => {
       cpSync(resolve(pilotRoot, 'agent'), join(isolatedRoot, 'agent'), {
         recursive: true,
       });
+      const identities = resolve(pilotRoot, 'identities');
+      if (existsSync(identities)) {
+        cpSync(identities, join(isolatedRoot, 'identities'), {
+          recursive: true,
+        });
+      }
       symlinkSync(
         resolve(pilotRoot, 'node_modules'),
         join(isolatedRoot, 'node_modules'),
@@ -89,12 +95,6 @@ describe('Eve framework smoke', () => {
             name: 'eve',
             kind: 'http',
             method: 'POST',
-            urlPath: '/eve/v1/session/reset',
-          },
-          {
-            name: 'eve',
-            kind: 'http',
-            method: 'POST',
             urlPath: '/eve/v1/session/:sessionId',
           },
           {
@@ -106,12 +106,57 @@ describe('Eve framework smoke', () => {
           {
             name: 'eve',
             kind: 'http',
+            method: 'POST',
+            urlPath: '/eve/v1/session/:sessionId/compact',
+          },
+          {
+            name: 'eve',
+            kind: 'http',
+            method: 'POST',
+            urlPath: '/eve/v1/session/:sessionId/clear',
+          },
+          {
+            name: 'eve',
+            kind: 'http',
+            method: 'POST',
+            urlPath: '/eve/v1/session/:sessionId/reset',
+          },
+          {
+            name: 'eve',
+            kind: 'http',
             method: 'GET',
             urlPath: '/eve/v1/session/:sessionId/stream',
           },
+          {
+            name: 'eve',
+            kind: 'http',
+            method: 'GET',
+            urlPath:
+              '/eve/v1/session/:parentSessionId/subagents/:callId/:childSessionId/stream',
+          },
+          {
+            name: 'photon',
+            kind: 'chat-sdk',
+            method: 'GET',
+            urlPath: '/eve/v1/photon',
+          },
+          {
+            name: 'photon',
+            kind: 'chat-sdk',
+            method: 'POST',
+            urlPath: '/eve/v1/photon',
+          },
+          {
+            name: 'telegram',
+            kind: 'telegram',
+            method: 'POST',
+            urlPath: '/eve/v1/telegram',
+          },
         ],
       });
-      expect(existsSync(networkSentinel)).toBe(true);
+      // Eve 0.39 discovery is offline. The hook would write this file if
+      // fetch ran; a missing sentinel means no network attempt.
+      expect(existsSync(networkSentinel)).toBe(false);
     } finally {
       rmSync(isolatedRoot, { force: true, recursive: true });
     }

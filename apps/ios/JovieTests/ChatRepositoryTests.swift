@@ -490,6 +490,18 @@ struct ChatRepositoryTests {
     #expect(repository.sessionExpired == true)
     #expect(repository.lastErrorMessage == nil)
     #expect(repository.timeline.last?.status == .failed)
+    let assistant = repository.timeline.last { $0.role == .assistant }
+    #expect(assistant?.status == .failed)
+    #expect(assistant?.status != .completed)
+    #expect(assistant?.content.contains("Jovie") == false)
+  }
+
+  @Test func terminalAuthFailureIsFailClosedFor401AndMissingToken() {
+    #expect(isTerminalChatAuthFailure(APIClientError.missingToken))
+    #expect(isTerminalChatAuthFailure(APIClientError.requestFailed(statusCode: 401)))
+    #expect(isTerminalChatAuthFailure(MobileChatClientError.requestFailed(statusCode: 401)))
+    #expect(isTerminalChatAuthFailure(MobileChatClientError.requestFailed(statusCode: 500)) == false)
+    #expect(isTerminalChatAuthFailure(APIClientError.requestFailed(statusCode: 503)) == false)
   }
 
   @Test func retryOn401SetsSessionExpiredNotOffline() async {
@@ -529,6 +541,29 @@ struct ChatRepositoryTests {
 
     #expect(repository.isOffline == true)
     #expect(repository.sessionExpired == false)
+  }
+
+  @Test func seedAllComponentsFixtureKeepsWireContentAndSkipsNetworkRefresh() async {
+    let repository = ChatRepository(
+      client: FailingChatClient(),
+      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-all-components")!),
+      userID: "user_repo_all_components",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+
+    repository.seedTimelineForUITesting(
+      MobileChatAllComponentsFixture.default,
+      activeConversationID: MobileChatAllComponentsFixture.conversationID
+    )
+    await repository.refreshConversations()
+
+    #expect(repository.activeConversationID == MobileChatAllComponentsFixture.conversationID)
+    #expect(repository.timeline.count == MobileChatAllComponentsFixture.default.count)
+    #expect(repository.timeline.contains { $0.content.contains("<tool_call>") })
+    #expect(repository.timeline.contains { $0.status == .streaming && $0.content.isEmpty })
+    #expect(repository.timeline.contains { $0.status == .failed })
+    #expect(repository.timeline.contains { $0.requiresWebHandoff && $0.handoffURL != nil })
+    #expect(repository.isOffline == false)
   }
 
   @Test func sendOnTransportFailureMarksOfflineAndDoesNotExpireSession() async {

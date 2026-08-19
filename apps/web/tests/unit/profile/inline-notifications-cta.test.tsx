@@ -351,21 +351,23 @@ describe('ProfileInlineNotificationsCTA flow', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders nothing while notification hydration is checking', async () => {
+  it('shows the subscribe skeleton immediately while notification hydration is checking', async () => {
     mockUseSubscriptionForm.mockReturnValue(
       buildFormState({
         hydrationStatus: 'checking',
       })
     );
 
-    const { container } = render(
+    render(
       <ProfileInlineNotificationsCTA
         artist={makeArtist()}
         presentation='inline'
       />
     );
 
-    expect(container).toBeEmptyDOMElement();
+    expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByText('Loading subscription form')).toBeInTheDocument();
+    expect(screen.queryByText('Get Updates')).not.toBeInTheDocument();
   });
 
   // JOV-1986: alert mode consistency across all three entry points.

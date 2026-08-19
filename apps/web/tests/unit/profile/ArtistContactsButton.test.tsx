@@ -126,6 +126,7 @@ describe('ArtistContactsButton', () => {
     const channelActions = screen.getAllByTestId(
       'contact-drawer-channel-action'
     );
+    expect(channelActions[0]).toHaveAccessibleName('Email Bookings');
     expect(channelActions[0]).toHaveAttribute(
       'href',
       'mailto:agent@example.com?subject=Booking%20-%20Test%20Artist'
@@ -179,5 +180,29 @@ describe('ArtistContactsButton', () => {
     const contactItems = screen.getAllByTestId('contact-drawer-item');
     expect(within(contactItems[0]).getByText('Bookings')).toBeInTheDocument();
     expect(within(contactItems[1]).getByText('Press')).toBeInTheDocument();
+  }, 15_000);
+
+  it('names compact email icon buttons with the person name', () => {
+    render(
+      <ArtistContactsButton
+        contacts={[
+          makeContact({
+            roleLabel: 'Management',
+            contactName: 'Kelly Strickland',
+            primaryContactLabel: 'Kelly Strickland',
+          }),
+        ]}
+        artistHandle='test'
+        artistName='Test Artist'
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('contacts-trigger'));
+
+    expect(
+      screen.getByRole('link', {
+        name: 'Email Management, Kelly Strickland',
+      })
+    ).toBeInTheDocument();
   }, 15_000);
 });

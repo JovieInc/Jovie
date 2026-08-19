@@ -716,14 +716,7 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
   const verified = await linear.fetchIssue(selected.identifier);
   const evidence = admitter.hasAdmissionEvidence(verified);
   const load = deterministicGates.admissionIntentLoad([verified]);
-  if (
-    verified.state?.name !== 'Todo' ||
-    !evidence.eligible ||
-    !verified.labels.nodes.some(
-      label => label.name === admitter.SYMPHONY_LABEL
-    ) ||
-    load.count !== 1
-  )
+  if (verified.state?.name !== 'Todo' || !evidence.eligible || load.count !== 1)
     throw new Error('final gate-and-lease verification failed');
 
   return {

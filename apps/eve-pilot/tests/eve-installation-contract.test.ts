@@ -12,12 +12,18 @@ describe('Eve installation contract', () => {
       dependencies?: { eve?: string };
     };
 
-    expect(packageJson.dependencies?.eve).toBe('0.27.8');
+    expect(packageJson.dependencies?.eve).toBe('0.39.0');
     expect(
       existsSync(resolve(pilotRoot, 'node_modules/eve/docs/README.md'))
     ).toBe(true);
     expect(existsSync(resolve(pilotRoot, 'agent/instructions.md'))).toBe(true);
     expect(existsSync(resolve(pilotRoot, 'agent/channels/eve.ts'))).toBe(true);
+    expect(existsSync(resolve(pilotRoot, 'agent/channels/telegram.ts'))).toBe(
+      true
+    );
+    expect(existsSync(resolve(pilotRoot, 'agent/channels/photon.ts'))).toBe(
+      true
+    );
     expect(
       readFileSync(
         resolve(pilotRoot, 'agent/tools/jovie_capability_manifest.ts'),

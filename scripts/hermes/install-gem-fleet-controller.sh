@@ -16,29 +16,21 @@ readonly BACKUP_DIR="${GEM_ROOT}/state/backups/fleet-controller-${STAMP}"
 readonly GATE_SOURCE="${SOURCE_ROOT}/scripts/hermes/gem-priority-gate.py"
 readonly CONTRACT_SOURCE="${SOURCE_ROOT}/scripts/hermes/gem_gate_contract.py"
 readonly CONSUMER_SOURCE="${SOURCE_ROOT}/scripts/hermes/gem-pr-drain.py"
+readonly REGISTRY_MODULE_SOURCE="${SOURCE_ROOT}/scripts/hermes/gem_repo_registry.py"
+readonly REGISTRY_CONFIG_SOURCE="${SOURCE_ROOT}/scripts/hermes/config/gem-repo-registry.json"
 readonly POLICY_SOURCE="${SOURCE_ROOT}/scripts/hermes/gem_rehabilitation_policy.py"
 readonly WORKFLOW_SOURCE="${SOURCE_ROOT}/scripts/hermes/WORKFLOW.jovie-ui-pilot.md"
 readonly SERVICE_UNIT_SOURCE="${SOURCE_ROOT}/scripts/hermes/systemd/symphony-ui-pilot.service"
 readonly GATE_TARGET="${GEM_ROOT}/scripts/gem-priority-gate.py"
 readonly CONTRACT_TARGET="${GEM_ROOT}/scripts/gem_gate_contract.py"
 readonly CONSUMER_TARGET="${GEM_ROOT}/scripts/gem-pr-drain.py"
+readonly REGISTRY_MODULE_TARGET="${GEM_ROOT}/scripts/gem_repo_registry.py"
+readonly REGISTRY_CONFIG_TARGET="${GEM_ROOT}/config/gem-repo-registry.json"
 readonly POLICY_TARGET="${GEM_ROOT}/scripts/gem_rehabilitation_policy.py"
 readonly WORKFLOW_TARGET="${SYMPHONY_ROOT}/WORKFLOW.jovie-ui-pilot.md"
 readonly SERVICE_UNIT_TARGET="${HOME}/.config/systemd/user/symphony-ui-pilot.service"
-
-prepare_user_systemd_context() {
-  if [[ -z "${XDG_RUNTIME_DIR:-}" ]]; then
-    XDG_RUNTIME_DIR="/run/user/$(id -u)"
-    export XDG_RUNTIME_DIR
-  fi
-  DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
-  export DBUS_SESSION_BUS_ADDRESS
-  if ! systemctl --user show-environment >/dev/null; then
-    printf 'Gem user systemd preflight failed; refusing controller writes (XDG_RUNTIME_DIR=%s)\n' \
-      "${XDG_RUNTIME_DIR}" >&2
-    return 4
-  fi
-}
+# shellcheck source=lib/user-systemd-context.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/user-systemd-context.sh"
 
 smoke_consumer_import() {
   local consumer="$1" module_root
@@ -71,6 +63,8 @@ for source in \
   "${GATE_SOURCE}" \
   "${CONTRACT_SOURCE}" \
   "${CONSUMER_SOURCE}" \
+  "${REGISTRY_MODULE_SOURCE}" \
+  "${REGISTRY_CONFIG_SOURCE}" \
   "${POLICY_SOURCE}" \
   "${WORKFLOW_SOURCE}" \
   "${SERVICE_UNIT_SOURCE}"
@@ -82,14 +76,20 @@ git -C "${SOURCE_ROOT}" diff --quiet -- \
   scripts/hermes/gem-priority-gate.py \
   scripts/hermes/gem_gate_contract.py \
   scripts/hermes/gem-pr-drain.py \
+  scripts/hermes/gem_repo_registry.py \
+  scripts/hermes/config/gem-repo-registry.json \
   scripts/hermes/gem_rehabilitation_policy.py \
   scripts/hermes/WORKFLOW.jovie-ui-pilot.md \
-  scripts/hermes/systemd/symphony-ui-pilot.service
+  scripts/hermes/systemd/symphony-ui-pilot.service \
+  scripts/hermes/lib/user-systemd-context.sh
 git -C "${SOURCE_ROOT}" diff --cached --quiet -- \
   scripts/hermes/gem-priority-gate.py \
   scripts/hermes/gem_gate_contract.py \
   scripts/hermes/gem-pr-drain.py \
+  scripts/hermes/gem_repo_registry.py \
+  scripts/hermes/config/gem-repo-registry.json \
   scripts/hermes/gem_rehabilitation_policy.py \
+  scripts/hermes/lib/user-systemd-context.sh \
   scripts/hermes/WORKFLOW.jovie-ui-pilot.md
 
 SOURCE_REVISION="$(git -C "${SOURCE_ROOT}" rev-parse HEAD)"
@@ -105,7 +105,13 @@ if [[ -n "${EXPECTED_SOURCE_REVISION}" ]]; then
   }
 fi
 
-python3 -m py_compile "${GATE_SOURCE}" "${CONTRACT_SOURCE}" "${CONSUMER_SOURCE}" "${POLICY_SOURCE}"
+python3 -m py_compile \
+  "${GATE_SOURCE}" \
+  "${CONTRACT_SOURCE}" \
+  "${CONSUMER_SOURCE}" \
+  "${REGISTRY_MODULE_SOURCE}" \
+  "${POLICY_SOURCE}"
+python3 -m json.tool "${REGISTRY_CONFIG_SOURCE}" >/dev/null
 smoke_consumer_import "${CONSUMER_SOURCE}"
 if [[ "${VERIFY_ONLY}" == true ]]; then
   printf 'fleet controller install sources verified\n'
@@ -113,16 +119,22 @@ if [[ "${VERIFY_ONLY}" == true ]]; then
     "${GATE_SOURCE}" \
     "${CONTRACT_SOURCE}" \
     "${CONSUMER_SOURCE}" \
+    "${REGISTRY_MODULE_SOURCE}" \
+    "${REGISTRY_CONFIG_SOURCE}" \
     "${POLICY_SOURCE}" \
     "${WORKFLOW_SOURCE}" \
     "${SERVICE_UNIT_SOURCE}"
   exit 0
 fi
 prepare_user_systemd_context
-mkdir -p "${BACKUP_DIR}"
+mkdir -p "${BACKUP_DIR}" "${GEM_ROOT}/scripts" "${GEM_ROOT}/config"
 cp -p "${GATE_TARGET}" "${BACKUP_DIR}/gem-priority-gate.py"
 cp -p "${CONSUMER_TARGET}" "${BACKUP_DIR}/gem-pr-drain.py"
 [[ ! -e "${CONTRACT_TARGET}" ]] || cp -p "${CONTRACT_TARGET}" "${BACKUP_DIR}/gem_gate_contract.py"
+[[ ! -e "${REGISTRY_MODULE_TARGET}" ]] || \
+  cp -p "${REGISTRY_MODULE_TARGET}" "${BACKUP_DIR}/gem_repo_registry.py"
+[[ ! -e "${REGISTRY_CONFIG_TARGET}" ]] || \
+  cp -p "${REGISTRY_CONFIG_TARGET}" "${BACKUP_DIR}/gem-repo-registry.json"
 [[ ! -e "${POLICY_TARGET}" ]] || \
   cp -p "${POLICY_TARGET}" "${BACKUP_DIR}/gem_rehabilitation_policy.py"
 cp -p "${WORKFLOW_TARGET}" "${BACKUP_DIR}/WORKFLOW.jovie-ui-pilot.md"
@@ -130,11 +142,15 @@ cp -p "${WORKFLOW_TARGET}" "${BACKUP_DIR}/WORKFLOW.jovie-ui-pilot.md"
 
 timer_was_active=false
 contract_existed=false
+registry_module_existed=false
+registry_config_existed=false
 policy_existed=false
 service_unit_existed=false
 install_started=false
 install_complete=false
 [[ ! -e "${CONTRACT_TARGET}" ]] || contract_existed=true
+[[ ! -e "${REGISTRY_MODULE_TARGET}" ]] || registry_module_existed=true
+[[ ! -e "${REGISTRY_CONFIG_TARGET}" ]] || registry_config_existed=true
 [[ ! -e "${POLICY_TARGET}" ]] || policy_existed=true
 [[ ! -e "${SERVICE_UNIT_TARGET}" ]] || service_unit_existed=true
 
@@ -157,6 +173,16 @@ finish_or_rollback() {
         restore_atomic "${BACKUP_DIR}/gem_gate_contract.py" "${CONTRACT_TARGET}"
       else
         rm -f "${CONTRACT_TARGET}"
+      fi
+      if [[ "${registry_module_existed}" == true ]]; then
+        restore_atomic "${BACKUP_DIR}/gem_repo_registry.py" "${REGISTRY_MODULE_TARGET}"
+      else
+        rm -f "${REGISTRY_MODULE_TARGET}"
+      fi
+      if [[ "${registry_config_existed}" == true ]]; then
+        restore_atomic "${BACKUP_DIR}/gem-repo-registry.json" "${REGISTRY_CONFIG_TARGET}"
+      else
+        rm -f "${REGISTRY_CONFIG_TARGET}"
       fi
       if [[ "${policy_existed}" == true ]]; then
         restore_atomic "${BACKUP_DIR}/gem_rehabilitation_policy.py" "${POLICY_TARGET}"
@@ -204,11 +230,19 @@ install_started=true
 install_atomic "${GATE_SOURCE}" "${GATE_TARGET}" 0755
 install_atomic "${CONTRACT_SOURCE}" "${CONTRACT_TARGET}" 0644
 install_atomic "${CONSUMER_SOURCE}" "${CONSUMER_TARGET}" 0755
+install_atomic "${REGISTRY_MODULE_SOURCE}" "${REGISTRY_MODULE_TARGET}" 0755
+install_atomic "${REGISTRY_CONFIG_SOURCE}" "${REGISTRY_CONFIG_TARGET}" 0644
 install_atomic "${POLICY_SOURCE}" "${POLICY_TARGET}" 0644
 install_atomic "${WORKFLOW_SOURCE}" "${WORKFLOW_TARGET}" 0644
 mkdir -p "$(dirname "${SERVICE_UNIT_TARGET}")"
 install_atomic "${SERVICE_UNIT_SOURCE}" "${SERVICE_UNIT_TARGET}" 0644
-python3 -m py_compile "${GATE_TARGET}" "${CONTRACT_TARGET}" "${CONSUMER_TARGET}" "${POLICY_TARGET}"
+python3 -m py_compile \
+  "${GATE_TARGET}" \
+  "${CONTRACT_TARGET}" \
+  "${CONSUMER_TARGET}" \
+  "${REGISTRY_MODULE_TARGET}" \
+  "${POLICY_TARGET}"
+python3 -m json.tool "${REGISTRY_CONFIG_TARGET}" >/dev/null
 smoke_consumer_import "${CONSUMER_TARGET}"
 
 systemctl --user daemon-reload
@@ -293,6 +327,8 @@ sha256sum \
   "${GATE_TARGET}" \
   "${CONTRACT_TARGET}" \
   "${CONSUMER_TARGET}" \
+  "${REGISTRY_MODULE_TARGET}" \
+  "${REGISTRY_CONFIG_TARGET}" \
   "${POLICY_TARGET}" \
   "${WORKFLOW_TARGET}" \
   "${SERVICE_UNIT_TARGET}"

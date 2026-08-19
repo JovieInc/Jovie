@@ -28,6 +28,7 @@ import {
 import {
   noFontSynthesisStyle,
   profilePrimaryPillClassName,
+  SubscriptionFormSkeleton,
   subscriptionPrimaryActionClassName,
   subscriptionPrimaryLinkClassName,
 } from './shared';
@@ -836,6 +837,9 @@ export function ProfileInlineNotificationsCTA({
   }
 
   if (hydrationStatus === 'checking') {
+    if (isInline) {
+      return <SubscriptionFormSkeleton />;
+    }
     return null;
   }
 

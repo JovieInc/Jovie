@@ -12,6 +12,7 @@ enum LaunchMode: Equatable {
   case uiTestingChat
   case uiTestingChatOffline
   case uiTestingChatEntityFixture
+  case uiTestingChatAllComponents
   case uiTestingSettings
   case uiTestingVenueMode
   case uiTestingQRUnavailable
@@ -28,6 +29,7 @@ enum LaunchMode: Equatable {
   case uiTestingCalendar
   case uiTestingCalendarOffline
   case uiTestingCalendarLoading
+  case uiTestingWhatsNew
 
   var usesLiveAuth: Bool {
     switch self {
@@ -41,6 +43,7 @@ enum LaunchMode: Equatable {
          .uiTestingChat,
          .uiTestingChatOffline,
          .uiTestingChatEntityFixture,
+         .uiTestingChatAllComponents,
          .uiTestingSettings,
          .uiTestingVenueMode,
          .uiTestingQRUnavailable,
@@ -56,7 +59,8 @@ enum LaunchMode: Equatable {
          .uiTestingInboxLoading,
          .uiTestingCalendar,
          .uiTestingCalendarOffline,
-         .uiTestingCalendarLoading:
+         .uiTestingCalendarLoading,
+         .uiTestingWhatsNew:
       return false
     }
   }
@@ -66,14 +70,36 @@ enum LaunchMode: Equatable {
   }
 
   var opensChatOnLaunch: Bool {
-    self == .uiTestingChat || self == .uiTestingChatOffline || self == .uiTestingChatEntityFixture
+    self == .uiTestingChat
+      || self == .uiTestingChatOffline
+      || self == .uiTestingChatEntityFixture
+      || self == .uiTestingChatAllComponents
+      || self == .uiTestingWhatsNew
   }
 
   /// When set, `RootView` seeds `ChatRepository` with a deterministic
   /// fixture timeline for this launch mode instead of hitting the network or
   /// cache. `nil` for launch modes that don't need seeded chat content.
   var chatEntityFixture: [MobileChatTimelineItem]? {
-    self == .uiTestingChatEntityFixture ? MobileChatEntityFixture.default : nil
+    switch self {
+    case .uiTestingChatEntityFixture:
+      return MobileChatEntityFixture.default
+    case .uiTestingChatAllComponents:
+      return MobileChatAllComponentsFixture.default
+    default:
+      return nil
+    }
+  }
+
+  var chatFixtureConversationID: String? {
+    switch self {
+    case .uiTestingChatEntityFixture:
+      return MobileChatEntityFixture.conversationID
+    case .uiTestingChatAllComponents:
+      return MobileChatAllComponentsFixture.conversationID
+    default:
+      return nil
+    }
   }
 
   /// Live auth and chat fixtures need a repository. Other deterministic UI
@@ -128,6 +154,10 @@ enum LaunchMode: Equatable {
     self == .uiTestingProfileError
   }
 
+  var presentsWhatsNew: Bool {
+    self == .live || self == .uiTestingWhatsNew
+  }
+
   static func current(processInfo: ProcessInfo = .processInfo) -> LaunchMode {
     resolving(
       arguments: processInfo.arguments,
@@ -172,6 +202,10 @@ enum LaunchMode: Equatable {
 
     if arguments.contains("-ui-testing-chat-entity-fixture") {
       return .uiTestingChatEntityFixture
+    }
+
+    if arguments.contains("-ui-testing-chat-all-components") {
+      return .uiTestingChatAllComponents
     }
 
     if arguments.contains("-ui-testing-settings") {
@@ -236,6 +270,10 @@ enum LaunchMode: Equatable {
 
     if arguments.contains("-ui-testing-calendar") {
       return .uiTestingCalendar
+    }
+
+    if arguments.contains("-ui-testing-whats-new") {
+      return .uiTestingWhatsNew
     }
 
     if isXCTest {

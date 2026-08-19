@@ -218,6 +218,40 @@ def excluded(pr):
     )
 
 
+AUTONOMOUS_HEAD_PREFIXES = ("symphony/", "grok/JOV-", "grok/LYB-", "fallback/")
+
+
+def autonomous_head(pr):
+    ref = pr.get("head", {}).get("ref") or ""
+    return any(ref.startswith(prefix) for prefix in AUTONOMOUS_HEAD_PREFIXES)
+
+
+def ready_autonomous_draft(pr):
+    """Mark sidecar/Symphony drafts ready so merge-queue autoenroll can see them.
+
+    Older grok-ship-one prompts opened drafts. Drain previously excluded every
+    draft, so those PRs never entered the queue.
+    """
+    result = {
+        "number": pr["number"],
+        "head": pr.get("head", {}).get("ref"),
+        "before_state": pr.get("mergeable_state"),
+        "priority_class": pr.get("priority_class") or priority_class(pr),
+        "action": "ready_autonomous_draft",
+    }
+    if not pr.get("draft") or not autonomous_head(pr):
+        return {**result, "result": "skipped", "reason": "not_autonomous_draft"}
+    if "big-pr" in labels(pr):
+        return {**result, "result": "skipped", "reason": "too_large_for_queue"}
+    if pr.get("mergeable_state") == "dirty":
+        return {**result, "result": "skipped", "reason": "conflicting"}
+    try:
+        run("gh", "pr", "ready", str(pr["number"]), "--repo", REPO, timeout=60)
+    except Exception as error:
+        return {**result, "result": "error", "error": type(error).__name__}
+    return {**result, "result": "ok"}
+
+
 def priority_class(pr):
     if labels(pr) & EXCLUDED:
         return "taste_or_human"
@@ -242,6 +276,18 @@ def priority_class(pr):
         if any(token in haystack for token in MAIN_GREEN_TOKENS)
         else "existing_pr_remediation"
     )
+
+
+# Drain can currently mutate only behind heads (exact-head update-branch).
+# Dirty conflicted heads are classified for replant and skipped. Counting those
+# skip-only PRs as intake backlog paused Linear admission while workers spent
+# their bound selecting work they then discarded.
+DRAIN_ACTIONABLE_STATES = frozenset({"behind"})
+
+
+def intake_backlog_count(prs):
+    """Count open PRs that still occupy drain/intake capacity."""
+    return sum(1 for pr in prs if pr.get("mergeable_state") != "dirty")
 
 
 def policy_decision(*, main_green, queue_count, target, worker_capacity):
@@ -273,11 +319,15 @@ def select_prs(prs, *, main_green, worker_capacity):
     ]
     for pr in eligible:
         pr["priority_class"] = priority_class(pr)
-    eligible.sort(key=lambda pr: (pr.get("created_at", ""), pr.get("number", 0)))
+    actionable = [
+        pr for pr in eligible if pr.get("mergeable_state") in DRAIN_ACTIONABLE_STATES
+    ]
+    pool = actionable
+    pool.sort(key=lambda pr: (pr.get("created_at", ""), pr.get("number", 0)))
     if main_green:
-        return bounded_selection(eligible, max(0, worker_capacity))
-    main_repairs = [pr for pr in eligible if pr["priority_class"] == "main_green_fix"]
-    others = [pr for pr in eligible if pr["priority_class"] != "main_green_fix"]
+        return bounded_selection(pool, max(0, worker_capacity))
+    main_repairs = [pr for pr in pool if pr["priority_class"] == "main_green_fix"]
+    others = [pr for pr in pool if pr["priority_class"] != "main_green_fix"]
     return bounded_selection(main_repairs + others, max(0, worker_capacity))
 
 
@@ -460,7 +510,7 @@ def main():
         main_green = gate["signals"]["main"]["status"] == "green"
         decision = policy_decision(
             main_green=main_green,
-            queue_count=len(eligible),
+            queue_count=intake_backlog_count(eligible),
             target=TARGET,
             worker_capacity=worker_capacity,
         )
@@ -494,10 +544,17 @@ def main():
                 for pr in selected
             ]
         else:
+            ready_results = [
+                ready_autonomous_draft(pr)
+                for pr in all_open
+                if pr.get("draft") and autonomous_head(pr)
+            ]
             with concurrent.futures.ThreadPoolExecutor(
                 max_workers=max(1, len(selected))
             ) as executor:
-                document["processed"] = list(executor.map(update_one, selected))
+                document["processed"] = ready_results + list(
+                    executor.map(update_one, selected)
+                )
     except Exception as error:
         document["errors"].append(f"{type(error).__name__}:{error}")
         document["status"] = "error"

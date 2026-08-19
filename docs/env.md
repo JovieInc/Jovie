@@ -119,6 +119,55 @@ development auth. Non-loopback hosts must use HTTPS and require
 Optional server-only bearer token for the Eve route. Keep it in the deployment
 secret manager, never in git or request bodies.
 
+## Eve Telegram fallback (Ovie)
+
+Telegram is a Tim-only fallback to the same Ovie Eve identity when Jovie
+cannot carry the request. Use a dedicated bot. Do not reuse
+`HERMES_TELEGRAM_BOT_TOKEN`. Do not use Vercel Connect.
+
+### `TELEGRAM_BOT_TOKEN`
+
+Eve Telegram Bot API token. Required for webhook replies.
+
+### `TELEGRAM_WEBHOOK_SECRET_TOKEN`
+
+Must match the `secret_token` passed to Telegram `setWebhook`. Eve checks
+`X-Telegram-Bot-Api-Secret-Token` before trusting an update.
+
+### `OVIE_TELEGRAM_ALLOWED_USER_IDS`
+
+Comma- or whitespace-separated Telegram user ids that may talk to Ovie.
+Empty or unset fails closed (every update is dropped).
+
+### `OVIE_TELEGRAM_BOT_USERNAME`
+
+Bot username without `@`. Optional for private-chat-only admission.
+
+## Eve iMessage fallback (Ovie, portable Photon)
+
+iMessage is an Ovie channel. Jovie-on-iMessage is later. Use portable
+Photon credentials, not Vercel Connect.
+
+### `IMESSAGE_PROJECT_ID`
+
+Photon project id.
+
+### `IMESSAGE_PROJECT_SECRET`
+
+Photon project secret.
+
+### `IMESSAGE_WEBHOOK_SECRET`
+
+Photon webhook signing secret. Must match the registered webhook.
+
+### `OVIE_IMESSAGE_ALLOWED_SENDERS`
+
+Comma- or whitespace-separated phone numbers / handles. Empty fails closed.
+
+## Private Ovie MCP (ChatGPT)
+
+`/api/ovie/mcp` Streamable HTTP. OAuth at `/api/ovie/oauth`. Mac lander: `GET /api/ovie/pending` + `POST /api/ovie/landed` with founder session or lander bearer. See `docs/OVIE_MCP.md`.
+
 ## Feature Flags (Statsig)
 
 ### `STATSIG_SERVER_SECRET`

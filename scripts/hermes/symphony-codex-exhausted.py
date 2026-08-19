@@ -33,7 +33,9 @@ MAX_GROK_SURVIVAL_SECONDS = 120.0
 CONTROL_TIMEOUT_SECONDS = 10.0
 DEFAULT_GROK_MAX = 4  # Gem 16c/62GB safely runs 4 concurrent grok-ship workers (per-unit idempotent, active units skipped)
 MAX_GROK_MAX = 10  # hard ceiling; 10 only via explicit SYMPHONY_GROK_MAX (free-tier Build quota / dispatch risk above 4)
-SERVICES = ("symphony-ui-pilot.service", "symphony-lyb.service")
+PRIMARY_SERVICE = "symphony-ui-pilot.service"
+OPTIONAL_SERVICES = ("symphony-lyb.service",)
+SERVICES = (PRIMARY_SERVICE, *OPTIONAL_SERVICES)
 LINEAR_API = "https://api.linear.app/graphql"
 LINEAR_ENV_PATH = "~/.config/symphony/linear.env"
 IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
@@ -51,10 +53,12 @@ RUNTIME_NAMES = (
     "model-registry.json",
 )
 LAUNCHER_NAMES = (*LEGACY_RUNTIME_NAMES, "grok-ship-one")
-# `symphony` is the routing lease. Plan/admission labels are advisory evidence,
-# not a second waitlist: RED and explicit human/blocked labels remain the hard
-# integrity gates.
-REQUIRED_ADMISSION_LABELS = frozenset(("symphony",))
+# Labels are derived audit evidence, never independent admission blockers.
+# The machine-written admission-gate/v1 receipt is the source of truth.
+REQUIRED_ADMISSION_LABELS = frozenset()
+ADMISSION_GATE_PREFIX = "<!-- admission-gate/v1 -->"
+ADMISSION_GATE_SUFFIX = "<!--/admission-gate-->"
+ADMISSION_GATE_SCHEMA = "admission-gate/v1"
 # Single source of truth for the Grok sidecar admission predicate. `blocked` is
 # included because human-review flags (needs-human / needs:human / blocked / hold)
 # must gate out of auto-ship; reconcile and grok-ship-one both use this set.
@@ -100,14 +104,14 @@ query($first: Int!, $after: String) {
     first: $first
     after: $after
     filter: {
-      labels: { name: { eq: "symphony" } }
-      state: { name: { in: ["Todo", "In Progress"] } }
+      state: { name: { in: ["Todo", "In Progress", "In Review"] } }
     }
   ) {
     nodes {
-      identifier updatedAt
+      identifier title description updatedAt
       team { key }
       labels { nodes { name } }
+      comments { nodes { body } }
     }
     pageInfo {
       hasNextPage
@@ -124,13 +128,18 @@ query($id: String!) {
     state { id name }
     team { key states { nodes { id name } } }
     labels { nodes { name } }
+    comments { nodes { body } }
   }
 }
 """
 
-# Admission must mirror the list query: only Todo / In Progress issues are
-# eligible for pipe through the Grok sidecar.
-ADMITTED_STATES = frozenset(("todo", "in progress"))
+# Admission must mirror the list query. In Review stays eligible so a CI-red
+# autonomous PR can be remounted; launch still skips inflight green/pending PRs.
+ADMITTED_STATES = frozenset(("todo", "in progress", "in review"))
+AUTONOMOUS_HEAD_RE = re.compile(r"^(?:symphony|grok|fallback)/((?:JOV|LYB)-\d+)-fix$")
+GH_TIMEOUT_SECONDS = 20.0
+JOV_REPO = "JovieInc/Jovie"
+LYB_REPO = "JovieInc/LogYourBody"
 
 
 def _state_path() -> pathlib.Path:
@@ -249,6 +258,12 @@ def _model_router_selection() -> tuple[dict | None, str]:
         return None, "model_router_bundle_missing"
     env = os.environ.copy()
     env["GEM_MODEL_REGISTRY"] = str(registry)
+    local_bin = str(pathlib.Path.home() / ".local/bin")
+    env["PATH"] = f"{local_bin}:{env.get('PATH', '/usr/bin:/bin')}"
+    grok_exe = _grok_executable()
+    if grok_exe:
+        env.setdefault("GEM_GROK_EXECUTABLE", grok_exe)
+        env.setdefault("GEM_GROK_BIN", grok_exe)
     try:
         result = subprocess.run(
             [sys.executable, str(router), "choose", "--workflow", "new_pr", "--capability", "code", "--exclude-pool", "codex"],
@@ -402,9 +417,21 @@ def _control(command: list[str]) -> bool:
     return result is not None and result.returncode == 0
 
 
+def _jov_active() -> bool:
+    """JOV dispatch does not depend on the optional LYB worker remaining up."""
+    return _control(_systemctl("is-active", "--quiet", PRIMARY_SERVICE))
+
+
+def _start_jov_primary() -> bool:
+    started = _control(_systemctl("start", PRIMARY_SERVICE))
+    for service in OPTIONAL_SERVICES:
+        _control(_systemctl("start", service))
+    return started
+
+
 def _services_active() -> bool:
-    """Require every primary service to be active, not merely one of them."""
-    return all(_control(_systemctl("is-active", "--quiet", service)) for service in SERVICES)
+    """JOV Symphony UI is the required owner. LYB is best-effort."""
+    return _jov_active()
 
 
 def _active_grok_units() -> list[str] | None:
@@ -481,21 +508,79 @@ def _linear_api_key_from_file() -> str | None:
     return key
 
 
-def admission_decision(team_key: str, identifier: str, labels: set[str]) -> tuple[bool, str]:
+def _issue_revision(identifier: str, title: str, description: str) -> str:
+    canonical = f"{identifier or ''}\n{(title or '').strip()}\n{(description or '').strip()}"
+    return hashlib.sha256(canonical.encode()).hexdigest()[:24]
+
+
+def _comment_bodies(comments: object) -> list[str]:
+    if isinstance(comments, list):
+        nodes = comments
+    elif isinstance(comments, dict):
+        nodes = comments.get("nodes")
+        if not isinstance(nodes, list):
+            return []
+    else:
+        return []
+    bodies: list[str] = []
+    for comment in nodes:
+        if isinstance(comment, str):
+            bodies.append(comment)
+        elif isinstance(comment, dict) and isinstance(comment.get("body"), str):
+            bodies.append(comment["body"])
+    return bodies
+
+
+def admission_receipt(identifier: str, title: str, description: str, comments: object) -> dict | None:
+    """Return the current revision-scoped admission-gate/v1 receipt, or None."""
+    prefix = f"{ADMISSION_GATE_PREFIX}\n"
+    suffix = f"\n{ADMISSION_GATE_SUFFIX}"
+    for body in reversed(_comment_bodies(comments)):
+        if not (body.startswith(prefix) and body.endswith(suffix)):
+            continue
+        try:
+            payload = json.loads(body[len(prefix) : -len(suffix)])
+        except (TypeError, ValueError):
+            return None
+        if (
+            not isinstance(payload, dict)
+            or payload.get("schema") != ADMISSION_GATE_SCHEMA
+            or payload.get("issue") != identifier
+            or payload.get("decision") != "approved"
+            or not isinstance(payload.get("fingerprint"), str)
+            or not payload.get("fingerprint")
+            or payload.get("issueRevision") != _issue_revision(identifier, title, description)
+        ):
+            return None
+        return payload
+    return None
+
+
+def admission_decision(
+    team_key: str,
+    identifier: str,
+    labels: set[str],
+    title: str = "",
+    description: str = "",
+    comments: object = None,
+) -> tuple[bool, str]:
     """Single admission predicate shared by reconcile listing, reconcile
     pre-launch verification, and grok-ship-one's check-admission command.
 
-    An issue is admitted only when it is a supported-team identifier carrying
-    every required admission label and no blocked/human-review label.
+    An issue is admitted only when a current admission-gate/v1 receipt matches
+    this revision and no blocked/human-review label is present. Labels are
+    derived audit evidence, never a second waitlist.
     """
     if not IDENTIFIER.fullmatch(identifier):
         return False, "invalid_identifier"
     if team_key.upper() not in SUPPORTED_TEAMS:
         return False, "unsupported_team"
-    if not REQUIRED_ADMISSION_LABELS.issubset(labels):
+    if REQUIRED_ADMISSION_LABELS and not REQUIRED_ADMISSION_LABELS.issubset(labels):
         return False, "missing_admission_labels"
     if not BLOCKED_ADMISSION_LABELS.isdisjoint(labels):
         return False, "blocked"
+    if admission_receipt(identifier, title, description, comments) is None:
+        return False, "admission_receipt_missing_or_stale"
     return True, "admitted"
 
 
@@ -540,7 +625,16 @@ def _admitted_issue_identifier(node: object) -> str | None:
             raise ValueError("malformed issue node")
         labels.add(label["name"].strip().lower())
     identifier = node["identifier"]
-    ok, _reason = admission_decision(team_key, identifier, labels)
+    title = node.get("title") if isinstance(node.get("title"), str) else ""
+    description = node.get("description") if isinstance(node.get("description"), str) else ""
+    ok, _reason = admission_decision(
+        team_key,
+        identifier,
+        labels,
+        title=title,
+        description=description,
+        comments=node.get("comments"),
+    )
     return identifier if ok else None
 
 
@@ -620,7 +714,16 @@ def _issue_meta(issue: dict, identifier: str) -> tuple[bool, str, dict | None]:
         for node in label_connection.get("nodes", [])
         if isinstance(node, dict)
     }
-    ok, reason = admission_decision(team_key, identifier, labels)
+    title = issue.get("title") if isinstance(issue.get("title"), str) else ""
+    description = issue.get("description") if isinstance(issue.get("description"), str) else ""
+    ok, reason = admission_decision(
+        team_key,
+        identifier,
+        labels,
+        title=title,
+        description=description,
+        comments=issue.get("comments"),
+    )
     if not ok:
         return False, reason, None
     if issue["identifier"] != identifier:
@@ -676,6 +779,145 @@ def _fallback_unit(identifier: str, issue_revision: str) -> str:
     return f"fallback-ship-{identifier}-{revision}"
 
 
+def _repo_for_identifier(identifier: str) -> str | None:
+    if identifier.startswith("JOV-"):
+        return JOV_REPO
+    if identifier.startswith("LYB-"):
+        return LYB_REPO
+    return None
+
+
+def _gh_json(command: list[str]) -> object | None:
+    result = _captured(command, GH_TIMEOUT_SECONDS)
+    if result is None or result.returncode != 0:
+        return None
+    try:
+        return json.loads(result.stdout.decode())
+    except ValueError:
+        return None
+
+
+def _autonomous_open_pr_index(identifiers: list[str]) -> dict[str, dict]:
+    """Map identifier -> {number, head, repo} for open autonomous heads.
+
+    Listing failure is fail-open (empty): better to risk a duplicate than to
+    starve leftover Todo work because `gh` blipped.
+    """
+    # Unit tests set SYMPHONY_OPEN_PR_INDEX=empty so reconcile never calls live gh.
+    if os.environ.get("SYMPHONY_OPEN_PR_INDEX") == "empty":
+        return {}
+    index: dict[str, dict] = {}
+    wanted = set(identifiers)
+    repos = {repo for ident in identifiers if (repo := _repo_for_identifier(ident))}
+    for repo in repos:
+        payload = _gh_json(
+            [
+                "gh",
+                "pr",
+                "list",
+                "--repo",
+                repo,
+                "--state",
+                "open",
+                "--limit",
+                "100",
+                "--json",
+                "number,headRefName,mergeStateStatus",
+            ]
+        )
+        if not isinstance(payload, list):
+            continue
+        for pr in payload:
+            if not isinstance(pr, dict):
+                continue
+            head = pr.get("headRefName") or ""
+            if not isinstance(head, str):
+                continue
+            match = AUTONOMOUS_HEAD_RE.fullmatch(head)
+            if match is None:
+                continue
+            ident = match.group(1)
+            if ident in wanted and ident not in index:
+                index[ident] = {
+                    "number": pr.get("number"),
+                    "head": head,
+                    "repo": repo,
+                    "mergeStateStatus": pr.get("mergeStateStatus"),
+                }
+    return index
+
+
+_REMOUNT_IGNORE_FAILURES = frozenset({"enroll", "PR Ready"})
+
+
+def _pr_has_failing_check(repo: str, number: int) -> bool:
+    payload = _gh_json(
+        ["gh", "pr", "view", str(number), "--repo", repo, "--json", "statusCheckRollup"]
+    )
+    if not isinstance(payload, dict):
+        return False
+    checks = payload.get("statusCheckRollup") or []
+    if not isinstance(checks, list):
+        return False
+    pending = False
+    failing = False
+    for check in checks:
+        if not isinstance(check, dict):
+            continue
+        name = str(check.get("name") or "")
+        status = str(check.get("status") or "").upper()
+        if status in {"IN_PROGRESS", "QUEUED", "PENDING"}:
+            pending = True
+            continue
+        if name in _REMOUNT_IGNORE_FAILURES:
+            continue
+        if check.get("conclusion") == "FAILURE" or check.get("state") == "FAILURE":
+            failing = True
+    # Pending CI after a remount push is not a product failure. Remounting
+    # again fights the in-flight checks (live #16211 at 20:17).
+    return failing and not pending
+
+
+def _open_pr_verdict(identifier: str, index: dict[str, dict]) -> tuple[str, dict | None]:
+    """Return (none|skip|remount, pr). skip = inflight green/pending open PR."""
+    pr = index.get(identifier)
+    if pr is None:
+        return "none", None
+    repo = pr.get("repo")
+    number = pr.get("number")
+    if not isinstance(repo, str) or not isinstance(number, int):
+        return "skip", pr
+    status = str(pr.get("mergeStateStatus") or "").upper()
+    # CLEAN heads are already merge-queue eligible. Remounting them fights
+    # github-merge-queue and can knock a green autonomous PR out of the queue.
+    if status == "CLEAN":
+        return "skip", pr
+    # DIRTY/BEHIND after a sibling merge is not product-CI-red, but the head
+    # cannot enroll until it merges main. Live #16211 was skipped as inflight
+    # after #16212 landed (sidecar: open_pr_inflight).
+    if status in {"DIRTY", "BEHIND"}:
+        return "remount", pr
+    if _pr_has_failing_check(repo, number):
+        return "remount", pr
+    return "skip", pr
+
+
+def open_pr_verdict_command(identifier: str) -> int:
+    """CLI for grok-ship-one: JSON {verdict, number?, head?} on stdout."""
+    if not IDENTIFIER.fullmatch(identifier):
+        print("open-pr-verdict:malformed_identifier", file=sys.stderr)
+        return 2
+    index = _autonomous_open_pr_index([identifier])
+    verdict, pr = _open_pr_verdict(identifier, index)
+    payload: dict = {"verdict": verdict}
+    if pr is not None:
+        payload["number"] = pr.get("number")
+        payload["head"] = pr.get("head")
+        payload["repo"] = pr.get("repo")
+    print(json.dumps(payload))
+    return 0
+
+
 def _launch_fallback_workers(
     identifiers: list[str],
     active: list[str],
@@ -688,12 +930,17 @@ def _launch_fallback_workers(
     active_units = set(active)
     capacity_used = len(active_units)
     launched_units: set[str] = set()
+    open_prs = _autonomous_open_pr_index(identifiers)
     for identifier in identifiers:
         if capacity_used >= limit:
             break
         legacy_unit = f"grok-ship-{identifier}.service"
         fallback_prefix = f"fallback-ship-{identifier}-"
         if legacy_unit in active_units or any(unit.startswith(fallback_prefix) for unit in active_units):
+            continue
+        verdict, _pr = _open_pr_verdict(identifier, open_prs)
+        if verdict == "skip":
+            print(f"fallback skip {identifier} open_pr_inflight", file=sys.stderr)
             continue
         issue = _fetch_single_issue(identifier)
         if issue is None:
@@ -727,9 +974,12 @@ def _grok_command(
 ) -> list[str]:
     encoded = base64.b64encode(json.dumps(selection, separators=(",", ":")).encode()).decode()
     unit = _fallback_unit(identifier, issue_revision)
+    grok_exe = _grok_executable() or str(pathlib.Path.home() / ".local/bin/grok")
     return [
         "systemd-run", "--user", f"--unit={unit}", "--collect",
         "-p", "Type=exec", "-p", f"Environment=PATH={pathlib.Path.home()}/.local/bin:/usr/bin:/bin",
+        "-p", f"Environment=GEM_GROK_EXECUTABLE={grok_exe}",
+        "-p", f"Environment=GEM_GROK_BIN={grok_exe}",
         "-p", f"Environment=SYMPHONY_FALLBACK_SELECTION_B64={encoded}",
         "-p", f"Environment=SYMPHONY_FALLBACK_ISSUE_REVISION={issue_revision}",
         "-p", f"Environment=SYMPHONY_FALLBACK_BUNDLE_REVISION={bundle_revision}",
@@ -748,7 +998,7 @@ def reconcile() -> int:
         if active:
             print("codex_not_exhausted recovery_deferred grok_ship_active", file=sys.stderr)
             return 0
-        if not _control(_systemctl("start", *SERVICES)):
+        if not _start_jov_primary():
             print("codex_not_exhausted symphony_start_failed", file=sys.stderr)
             return EXIT_DEGRADED
         if not _services_active():
@@ -835,8 +1085,20 @@ def _continue_exhausted_reconcile(reason: str) -> int:
         )
         return EXIT_SAFE_FAIL_CLOSED
     if not identifiers and not active:
+        if _jov_active():
+            print(
+                f"codex_exhausted {reason} no_admitted_work symphony_unchanged",
+                file=sys.stderr,
+            )
+            return 0
+        if not _start_jov_primary():
+            print(
+                f"codex_exhausted {reason} no_admitted_work symphony_restore_failed",
+                file=sys.stderr,
+            )
+            return EXIT_DEGRADED
         print(
-            f"codex_exhausted {reason} no_admitted_work symphony_unchanged",
+            f"codex_exhausted {reason} no_admitted_work symphony_restored",
             file=sys.stderr,
         )
         return 0
@@ -871,17 +1133,9 @@ def _continue_exhausted_reconcile(reason: str) -> int:
         )
         return EXIT_SAFE_FAIL_CLOSED
 
-    # The canonical router probe above makes the fallback available before Symphony is
-    # released. Symphony remains the sole implementation owner until its
-    # scheduler is stopped, so Todo/In Progress work can never have two owners.
-    # This handoff is reversible: if no Grok worker survives the bounded launch
-    # batch and stability window, restore and verify Symphony before returning.
-    # systemctl stop is synchronous, so success proves the old owner has
-    # released its scheduler before a new implementation owner starts.
-    if not _control(_systemctl("stop", *SERVICES)):
-        print("codex_exhausted symphony_stop_failed grok_unchanged", file=sys.stderr)
-        return EXIT_SAFE_FAIL_CLOSED
-
+    # Exclusive implementation is the fallback lease flock; the Codex launcher
+    # exits 78 when that lock is held. Do not stop JOV: fleet-gate observes
+    # :4041 on Gem, and a stopped UI freezes promotion (zero merge-queue slots).
     launched_units, _capacity_used = _launch_fallback_workers(
         identifiers, active, executable, bundle_revision, selection, limit
     )
@@ -907,6 +1161,12 @@ def _continue_exhausted_reconcile(reason: str) -> int:
             return EXIT_DEGRADED
         if survived:
             started = len(launched_units.intersection(survived))
+            if not _jov_active() and not _start_jov_primary():
+                print(
+                    f"codex_exhausted {reason} grok_started={started} grok_survived={len(survived)} symphony_api_restore_failed",
+                    file=sys.stderr,
+                )
+                return EXIT_DEGRADED
             print(
                 f"codex_exhausted {reason} grok_started={started} grok_survived={len(survived)}",
                 file=sys.stderr,
@@ -941,7 +1201,7 @@ def _continue_exhausted_reconcile(reason: str) -> int:
     # No fallback owner survived the handoff. Restore the primary owner and
     # verify it is active so this failure path self-heals instead of stranding a
     # zero-worker runtime.
-    if not _control(_systemctl("start", *SERVICES)):
+    if not _start_jov_primary():
         print(
             f"codex_exhausted {reason} grok_started=0 symphony_restore_failed",
             file=sys.stderr,
@@ -1144,7 +1404,7 @@ def main() -> int:
     parser.add_argument(
         "command",
         nargs="?",
-        choices=("probe", "reconcile", "install", "check-admission"),
+        choices=("probe", "reconcile", "install", "check-admission", "open-pr-verdict"),
         default=default,
     )
     parser.add_argument("identifier", nargs="?")
@@ -1159,6 +1419,11 @@ def main() -> int:
             print("check-admission requires an issue identifier", file=sys.stderr)
             return 2
         return check_admission(args.identifier)
+    if args.command == "open-pr-verdict":
+        if not args.identifier:
+            print("open-pr-verdict requires an issue identifier", file=sys.stderr)
+            return 2
+        return open_pr_verdict_command(args.identifier)
     ready, _ = codex_canary_ready()
     print("no" if ready else "yes")
     return 1 if ready else 0

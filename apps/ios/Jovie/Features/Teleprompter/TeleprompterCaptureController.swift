@@ -2,6 +2,7 @@
 import Foundation
 import Observation
 import Speech
+import UIKit
 
 enum TeleprompterCaptureError: LocalizedError, Equatable {
   case cameraDenied
@@ -365,11 +366,12 @@ final class TeleprompterCaptureController {
           }
           captureSession.addOutput(movieOutput)
           if let connection = movieOutput.connection(with: .video) {
-            // Portrait capture (rotation angle replaces deprecated
-            // `videoOrientation` on iOS 17+).
-            if connection.isVideoRotationAngleSupported(90) {
-              connection.videoRotationAngle = 90
-            }
+            TeleprompterCaptureOrientation.apply(
+              to: connection,
+              orientation: TeleprompterCaptureOrientation.resolvedDeviceOrientation(
+                UIDevice.current.orientation
+              )
+            )
             if connection.isVideoMirroringSupported {
               connection.automaticallyAdjustsVideoMirroring = true
             }
@@ -461,6 +463,14 @@ final class TeleprompterCaptureController {
         captureSession.commitConfiguration()
         continuation.resume()
       }
+    }
+  }
+
+  func applyDeviceOrientation(_ orientation: UIDeviceOrientation) {
+    let resolved = TeleprompterCaptureOrientation.resolvedDeviceOrientation(orientation)
+    sessionQueue.async { [movieOutput] in
+      guard let connection = movieOutput?.connection(with: .video) else { return }
+      TeleprompterCaptureOrientation.apply(to: connection, orientation: resolved)
     }
   }
 }

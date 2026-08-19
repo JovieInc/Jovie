@@ -20,6 +20,7 @@ import {
 } from '@/lib/chat/model-rotation-store';
 import { consumePendingChatPrompt } from '@/lib/chat/open-chat-with-prompt';
 import { trimMessagesForChatRequest } from '@/lib/chat/request-validation';
+import { buildChatThreadRoute } from '@/lib/chat/sync-chat-thread-url';
 import { isRecoverableToolErrorCode } from '@/lib/chat/tool-errors';
 import { recordUxLatency } from '@/lib/monitoring/interaction-latency';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
@@ -389,16 +390,14 @@ export function useJovieChat({
       }
 
       const isNewConversation = nextConversationId !== activeConversationId;
-      // Reserving a server conversation updates browser history only. Switching
-      // the hook's chat id before the AI SDK stream finishes recreates the
-      // internal chat instance and drops in-flight tokens.
+      // Reserving a server conversation updates the address bar only.
+      // Switching the hook's chat id before the AI SDK stream finishes
+      // recreates the internal chat instance and drops in-flight tokens.
       if (isNewConversation && phase === 'completed') {
         setActiveConversationId(nextConversationId);
       }
 
-      if (phase === 'completed') {
-        onConversationCreate?.(nextConversationId, phase);
-      }
+      onConversationCreate?.(nextConversationId, phase);
     },
     [activeConversationId, onConversationCreate, setActiveConversationId]
   );
@@ -919,10 +918,29 @@ export function useJovieChat({
     }
 
     if (activeConversationId && nextConversationId === null) {
-      const reservedPath = `/app/chat/${encodeURIComponent(activeConversationId)}`;
+      const reservedPath = buildChatThreadRoute(activeConversationId);
       if (globalThis.location?.pathname === reservedPath) {
         return;
       }
+      // The new-chat page does not pass an id until Next notices the reserved
+      // URL. Do not treat that stale prop as "switch back to empty".
+      if (
+        timelineStateRef.current.conversationId === activeConversationId ||
+        timelineStateRef.current.messages.length > 0
+      ) {
+        return;
+      }
+    }
+
+    // The parent route catching up to the already-acknowledged server id is
+    // not a thread switch. Wiping here drops the in-flight transcript.
+    if (
+      !activeConversationId &&
+      nextConversationId &&
+      timelineStateRef.current.conversationId === nextConversationId
+    ) {
+      setActiveConversationId(nextConversationId);
+      return;
     }
 
     saveComposerDraft(activeConversationId, inputDraftRef.current);
