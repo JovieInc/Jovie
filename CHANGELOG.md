@@ -23,6 +23,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- **iPhone sign-in can open the browser when SwiftUI has no key window (JOV-5198):** Continue in Browser now presents from a visible or scene-backed window, and a failed session start is no longer reported as `invalidAuthURL`.
 - [internal] **Ovie eval review persists a durable row and records `judge:absent` as a verdict:** enqueue reports success only after `ovie_operating_kv` write, missing rubric judges are not scored as pass, word count is a `word-count:N` signal unless a verbosity budget is set, and Slack feedback redacts emails in the message body.
 - [internal] **Touch-target lint accepts the 44px hit container:** compact controls stay visually small (`h-7`/`h-8`/`h-9`); the prescribed rescue is `before:h-11`, not enlarging the item. `min-h-11` on the control still counts so the ratchet does not jump.
 - [internal] **Production monitors page again:** post-deploy probe failures Slack `#alerts-production`, golden-path probes add claim/billing/Stripe liveness, observability and synthetics file Linear, and the canary `/api/chat` auth-gate retries then fails closed.

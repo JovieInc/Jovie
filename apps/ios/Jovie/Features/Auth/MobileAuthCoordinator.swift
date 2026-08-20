@@ -29,6 +29,14 @@ enum MobileBrowserAuthURLBuilder {
       return nil
     }
 
+    guard isSupportedBrowserAuthURL(baseURL) else {
+      MobileAuthDiagnostics.record(
+        "auth_url_rejected",
+        detail: "browser auth requires https or localhost http"
+      )
+      return nil
+    }
+
     guard var components = URLComponents(
       url: baseURL.appending(path: authPath),
       resolvingAgainstBaseURL: false
@@ -60,7 +68,33 @@ enum MobileBrowserAuthURLBuilder {
       }
     }
 
-    return components.url
+    guard let url = components.url, isSupportedBrowserAuthURL(url) else {
+      return nil
+    }
+
+    return url
+  }
+
+  static func isSupportedBrowserAuthURL(_ url: URL) -> Bool {
+    guard let scheme = url.scheme?.lowercased(),
+          let host = url.host?.lowercased(),
+          !host.isEmpty
+    else {
+      return false
+    }
+
+    if scheme == "https" {
+      return true
+    }
+
+    if scheme == "http" {
+      return host == "localhost"
+        || host == "127.0.0.1"
+        || host == "::1"
+        || host.hasSuffix(".localhost")
+    }
+
+    return false
   }
 
   private static func sanitizeReturnRoute(_ route: String) -> String? {
@@ -84,10 +118,69 @@ enum MobileBrowserAuthURLBuilder {
   }
 }
 
-enum MobileAuthCoordinatorError: Error {
+enum MobileAuthCoordinatorError: Error, CustomNSError {
   case invalidAuthURL
+  case sessionStartFailed
   case missingCallbackURL
   case providerError(MobileAuthProviderError)
+
+  static var errorDomain: String { "Jovie.MobileAuthCoordinatorError" }
+
+  var errorCode: Int {
+    switch self {
+    case .invalidAuthURL:
+      return 1
+    case .sessionStartFailed:
+      return 2
+    case .missingCallbackURL:
+      return 3
+    case .providerError:
+      return 4
+    }
+  }
+}
+
+struct MobileAuthWindowSnapshot: Equatable {
+  let isKey: Bool
+  let isHidden: Bool
+}
+
+enum MobileAuthPresentationAnchor {
+  static func preferredWindowIndex(
+    in windows: [MobileAuthWindowSnapshot]
+  ) -> Int? {
+    if let keyIndex = windows.firstIndex(where: \.isKey) {
+      return keyIndex
+    }
+
+    return windows.firstIndex { !$0.isHidden }
+  }
+
+  static func current() -> ASPresentationAnchor? {
+    let scenes = UIApplication.shared.connectedScenes
+      .compactMap { $0 as? UIWindowScene }
+    let windows = scenes.flatMap(\.windows)
+    let snapshots = windows.map {
+      MobileAuthWindowSnapshot(isKey: $0.isKeyWindow, isHidden: $0.isHidden)
+    }
+
+    if let index = preferredWindowIndex(in: snapshots) {
+      return windows[index]
+    }
+
+    let fallbackScene = scenes.first { $0.activationState == .foregroundActive }
+      ?? scenes.first { $0.activationState == .foregroundInactive }
+      ?? scenes.first
+    guard let fallbackScene else {
+      return nil
+    }
+
+    if let sceneWindow = fallbackScene.windows.first {
+      return sceneWindow
+    }
+
+    return ASPresentationAnchor(windowScene: fallbackScene)
+  }
 }
 
 @MainActor
@@ -138,7 +231,7 @@ final class MobileAuthCoordinator: NSObject, ASWebAuthenticationPresentationCont
 
     let session = ASWebAuthenticationSession(
       url: authURL,
-      callbackURLScheme: "ie.jov.jovie"
+      callback: .customScheme("ie.jov.jovie")
     ) { callbackURL, error in
       Task { @MainActor in
         self.session = nil
@@ -221,6 +314,22 @@ final class MobileAuthCoordinator: NSObject, ASWebAuthenticationPresentationCont
     session.prefersEphemeralWebBrowserSession = false
     self.session = session
 
+    guard MobileAuthPresentationAnchor.current() != nil else {
+      self.session = nil
+      Observability.addBreadcrumb(
+        .authSessionClosed,
+        level: .warning,
+        context: ["reason": "missing_presentation_anchor"]
+      )
+      pendingStore.clear()
+      MobileAuthDiagnostics.record(
+        "auth_session_start_failed",
+        detail: "missing_presentation_anchor"
+      )
+      completion(.failure(MobileAuthCoordinatorError.sessionStartFailed))
+      return
+    }
+
     if !session.start() {
       self.session = nil
       Observability.addBreadcrumb(
@@ -230,7 +339,7 @@ final class MobileAuthCoordinator: NSObject, ASWebAuthenticationPresentationCont
       )
       pendingStore.clear()
       MobileAuthDiagnostics.record("auth_session_start_failed")
-      completion(.failure(MobileAuthCoordinatorError.invalidAuthURL))
+      completion(.failure(MobileAuthCoordinatorError.sessionStartFailed))
     } else {
       MobileAuthDiagnostics.record("auth_session_opened")
     }
@@ -239,10 +348,7 @@ final class MobileAuthCoordinator: NSObject, ASWebAuthenticationPresentationCont
   func presentationAnchor(
     for session: ASWebAuthenticationSession
   ) -> ASPresentationAnchor {
-    UIApplication.shared.connectedScenes
-      .compactMap { $0 as? UIWindowScene }
-      .flatMap(\.windows)
-      .first { $0.isKeyWindow } ?? ASPresentationAnchor()
+    MobileAuthPresentationAnchor.current() ?? ASPresentationAnchor()
   }
 
   private static func makeCodeVerifier() -> String {
