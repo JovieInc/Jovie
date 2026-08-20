@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { prepareOvieChatTurn } from '@/lib/ovie/chat-entry';
 import {
-  DEST_LINEAR,
+  ackOvieDumpBeforeModel,
+  DEST_KANBAN,
   DEST_PERSONAL,
   OVIE_QUEUED_ACK,
   readOvieLinearRoutes,
@@ -10,6 +11,7 @@ import {
 } from '@/lib/ovie/ingest';
 import { MemoryOperatingStore } from '@/lib/ovie/mcp/store';
 import { applyOvieDump } from '@/lib/ovie/persist';
+import { listSummerKanban } from '@/lib/ovie/summer-kanban';
 
 const MIXED = [
   'post this tweet',
@@ -26,8 +28,9 @@ describe('Ovie dump ingest (JOV-5215)', () => {
 
   it('acks a mixed dump without spawning workers', async () => {
     const spawned: string[] = [];
+    const store = new MemoryOperatingStore();
     const receipts = await applyOvieDump(MIXED, {
-      store: new MemoryOperatingStore(),
+      store,
       spawn: goal => {
         spawned.push(goal);
       },
@@ -42,16 +45,23 @@ describe('Ovie dump ingest (JOV-5215)', () => {
       'personal',
       'taste',
     ]);
-    expect(receipts[2]?.destination).toBe(DEST_LINEAR);
+    expect(receipts[2]?.destination).toBe(DEST_KANBAN);
     expect(receipts[3]?.destination).toBe(DEST_PERSONAL);
-    expect(receipts[3]?.destination).not.toBe(DEST_LINEAR);
+    expect(receipts[3]?.destination).not.toBe(DEST_KANBAN);
     for (const receipt of receipts) {
       expect(receipt.ack).toBe(OVIE_QUEUED_ACK);
       expect(receipt.destinationHandle).toBeNull();
       expect(receipt.workerSpawned).toBe(false);
     }
     expect(readOvieReceiptLog()).toEqual(receipts);
-    expect(readOvieLinearRoutes()).toEqual([receipts[2]]);
+    expect(readOvieLinearRoutes()).toEqual([]);
+    const board = await listSummerKanban(store);
+    expect(board.map(card => card.workId)).toEqual(
+      receipts
+        .filter(receipt => receipt.destination === DEST_KANBAN)
+        .map(receipt => receipt.workId)
+    );
+    expect(board.some(card => card.lane === 'personal')).toBe(false);
   });
 
   it('persists mixed dump on the shipped chat entry and skips spawn', async () => {
@@ -66,9 +76,9 @@ describe('Ovie dump ingest (JOV-5215)', () => {
     expect(spawned).toEqual([]);
     expect(receipts).toHaveLength(1);
     expect(receipts[0]?.lane).toBe('engineering');
-    expect(receipts[0]?.destination).toBe(DEST_LINEAR);
+    expect(receipts[0]?.destination).toBe(DEST_KANBAN);
     expect(readOvieReceiptLog()).toEqual(receipts);
-    expect(readOvieLinearRoutes()).toEqual(receipts);
+    expect(readOvieLinearRoutes()).toEqual([]);
   });
 
   it('does not ingest on the Jovie artist chat entry', async () => {
@@ -81,5 +91,16 @@ describe('Ovie dump ingest (JOV-5215)', () => {
     expect(receipts).toEqual([]);
     expect(readOvieReceiptLog()).toEqual([]);
     expect(readOvieLinearRoutes()).toEqual([]);
+  });
+
+  it('classifies a dump without persisting when the chat hook is used', () => {
+    expect(ackOvieDumpBeforeModel(null)).toEqual([]);
+    expect(ackOvieDumpBeforeModel('   ')).toEqual([]);
+    const classified = ackOvieDumpBeforeModel(
+      'Jovie signup returns 500 on /start'
+    );
+    expect(classified).toHaveLength(1);
+    expect(classified[0]?.lane).toBe('engineering');
+    expect(classified[0]?.destination).toBe(DEST_KANBAN);
   });
 });

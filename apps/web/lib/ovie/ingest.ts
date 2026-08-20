@@ -1,10 +1,14 @@
 /**
- * Ovie dump-path classify + ack (JOV-5215).
+ * Ovie dump-path classify (JOV-5215).
  *
- * One durable receipt per item. Never spawn a worker per item. Engineering
- * goes Linear→Symphony. Personal never goes to Linear. Taste stays Taste.
- * Destination writer is ovie-intake-to-kanban.py.
+ * One durable receipt per item. Never spawn a worker per item. Company
+ * work (flash/heavy/engineering) goes to the Summer-owned Kanban. Personal
+ * never goes to company Kanban or Linear. Taste stays Taste. Eve does not
+ * route Linear→Symphony. Destination writer is ovie-intake-to-kanban.py.
  */
+
+import { denyEveAction } from '@/lib/ovie/eve-authority';
+import type { OvieRoutingState } from '@/lib/ovie/mcp/types';
 
 export const OVIE_LANES = [
   'flash',
@@ -31,6 +35,8 @@ export type SpawnFn = (goal: string) => void;
 
 /** Incomplete until the Mac lander writes a Kanban task id or Linear identifier. */
 export const OVIE_QUEUED_ACK = 'stored and queued for Summer lander';
+export const OVIE_UNAVAILABLE_ACK = 'stored; routing unavailable (fail-closed)';
+export const OVIE_BLOCKED_ACK = 'stored; routing blocked';
 
 export function ovieAckForHandle(handle: string | null | undefined): string {
   const id = handle?.trim();
@@ -44,6 +50,10 @@ export type OvieReceipt = {
   readonly ack: string;
   readonly destinationHandle: string | null;
   readonly workerSpawned: false;
+  readonly workId?: string;
+  readonly idempotencyKey?: string;
+  readonly persistToAckMs?: number;
+  readonly routingState?: OvieRoutingState;
 };
 
 const PERSONAL = [
@@ -116,7 +126,6 @@ export function classifyOvieItem(text: string): OvieLane {
 }
 
 export function destinationForOvieLane(lane: OvieLane): OvieDestination {
-  if (lane === 'engineering') return DEST_LINEAR;
   if (lane === 'personal') return DEST_PERSONAL;
   if (lane === 'taste') return DEST_TASTE;
   return DEST_KANBAN;
@@ -153,33 +162,55 @@ export function ackOvieDumpBeforeModel(userText: string | null): OvieReceipt[] {
   return ingestOvieDump([userText]);
 }
 
-/** Process-local only. Not completeness proof. Lost on deploy. */
-const receiptLog: OvieReceipt[] = [];
-const linearRoutes: OvieReceipt[] = [];
+const receiptLog = new Map<string, OvieReceipt>();
+const ackLatencies: number[] = [];
+
+export type OvieIntakeMode = 'normal' | 'receipt-only';
+
+let intakeMode: OvieIntakeMode = 'normal';
+
+export function getOvieIntakeMode(): OvieIntakeMode {
+  return intakeMode;
+}
+
+export function setOvieIntakeMode(mode: OvieIntakeMode): void {
+  intakeMode = mode;
+}
+
+function receiptLogKey(receipt: OvieReceipt): string {
+  return receipt.workId ?? `${receipt.destination}:${receipt.text}`;
+}
 
 /** In-process receipt log. Durable persist is applyOvieDump → OperatingStore. */
 export function persistOvieReceipt(receipt: OvieReceipt): void {
-  receiptLog.push(receipt);
+  receiptLog.set(receiptLogKey(receipt), receipt);
 }
 
 /**
- * Engineering land path. Only Linear-destination receipts are recorded.
- * Personal/taste/kanban never enter this log. Never spawns a worker.
+ * Eve must not send engineering to Linear/Symphony. Summer admits that path.
  */
-export function routeEngineeringToLinear(receipt: OvieReceipt): void {
-  if (receipt.destination !== DEST_LINEAR) return;
-  linearRoutes.push(receipt);
+export function routeEngineeringToLinear(_receipt: OvieReceipt): never {
+  denyEveAction('symphony-dispatch');
 }
 
 export function readOvieReceiptLog(): readonly OvieReceipt[] {
-  return receiptLog;
+  return [...receiptLog.values()];
 }
 
 export function readOvieLinearRoutes(): readonly OvieReceipt[] {
-  return linearRoutes;
+  return [];
+}
+
+export function recordOvieAckLatency(ms: number): void {
+  ackLatencies.push(ms);
+}
+
+export function readOvieAckLatencies(): readonly number[] {
+  return ackLatencies;
 }
 
 export function resetOvieIngestLog(): void {
-  receiptLog.length = 0;
-  linearRoutes.length = 0;
+  receiptLog.clear();
+  ackLatencies.length = 0;
+  intakeMode = 'normal';
 }
