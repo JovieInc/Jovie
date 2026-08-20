@@ -27,6 +27,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
+- **Web chat home can introduce what’s new (JOV-5206):** Empty chat highlights one feature or lists up to three recent changes on the same System B card as iOS. Dismiss stays dismissed. More than three changes ends on And more, which opens `/changelog`.
 - [internal] **Live merge-queue ruleset verify pages Slack:** the scheduled observer still fails the run and now posts to the existing webhook.
 - [internal] **Critical-surface vitest coverage floors are non-zero:** entitlements, Stripe webhooks, webhook signatures, and test-auth globs ratchet from the last measured snapshot minus 3pp on `vitest --coverage`. Merge-queue unit shards stay coverage-off.
 - [internal] **Canonical Actions now have one contract package:** `@jovie/action-contracts` owns the four stable IDs, and authenticated `GET /api/v1/actions` can list what a profile can do. Nothing is created yet.

@@ -26,6 +26,7 @@ import { ChatPinnedOpportunityHeader } from './components/ChatPinnedOpportunityH
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
 import { ChatStarterActionsRail } from './components/ChatStarterActionsRail';
 import { EntityResolutionProvider } from './components/EntityResolutionProvider';
+import { FeatureIntroHost } from './components/FeatureIntroCard';
 import {
   FEATURED_SKILL_SUGGESTIONS,
   SuggestedPrompts,
@@ -727,8 +728,9 @@ export function JovieChat({
         />
 
         {/* Persistent scroll viewport (flex-1) + morphing upper content.
-            Empty chat intentionally renders only the composer. Thread state
-            owns the message viewport and the persistent bottom dock. */}
+            Empty chat docks the composer; the feature-intro card sits above
+            it. Thread state owns the message viewport and the persistent
+            bottom dock. */}
         <div className='relative flex flex-1 flex-col overflow-hidden'>
           <div
             ref={scrollContainerRef}
@@ -794,6 +796,13 @@ export function JovieChat({
                     ) : undefined
                   }
                 >
+                  {!composerHasIntent ? (
+                    <FeatureIntroHost
+                      onHighlightCTA={() => {
+                        inputRef.current?.focus();
+                      }}
+                    />
+                  ) : null}
                   {composerSurface}
                   {inlineChatError ? (
                     <div className='mt-3 w-full'>{inlineChatError}</div>
