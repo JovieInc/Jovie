@@ -1,6 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { track } from '@/lib/analytics';
 import type { ProviderKey } from '@/lib/discography/types';
 import type {

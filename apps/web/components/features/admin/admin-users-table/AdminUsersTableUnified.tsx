@@ -17,10 +17,9 @@ import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { Copy, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLatestRef } from '@/lib/hooks/useLatestRef';
-import { TableErrorFallback } from '@/components/features/feedback/TableErrorFallback';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { useAdminPeopleRightPanel } from '@/components/features/admin/AdminPeopleRightPanelProvider';
+import { TableErrorFallback } from '@/components/features/feedback/TableErrorFallback';
 import { toast } from '@/components/feedback';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
@@ -52,6 +51,7 @@ import {
 } from '@/lib/admin/csv-configs/users';
 import type { AdminUserRow } from '@/lib/admin/types';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
+import { useLatestRef } from '@/lib/hooks/useLatestRef';
 import { QueryErrorBoundary, useAdminUsersInfiniteQuery } from '@/lib/queries';
 import { AdminUserDetailDrawer } from './AdminUserDetailDrawer';
 import {
@@ -229,8 +229,6 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
   const rowSelection = useMemo(() => {
     return Object.fromEntries(Array.from(selectedIds).map(id => [id, true]));
   }, [selectedIds]);
-
-
 
   // Ban dialog state
   const [banTarget, setBanTarget] = useState<AdminUserRow | null>(null);

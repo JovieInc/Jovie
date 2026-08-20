@@ -10,7 +10,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useLatestRef } from '@/lib/hooks/useLatestRef';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   type PreviewPanelData,
@@ -33,6 +32,7 @@ import { useEmailSignatureMenuAction } from '@/features/dashboard/molecules/useE
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { buildSignatureInputFromProfile } from '@/lib/email-signature/profile-input';
+import { useLatestRef } from '@/lib/hooks/useLatestRef';
 import {
   beginPreviewPanelEdit,
   endPreviewPanelEdit,

@@ -284,8 +284,6 @@ export function VisualQaReviewPanel() {
     );
   }
 
-
-
   return (
     <ContentSurfaceCard
       surface='details'
@@ -318,7 +316,10 @@ export function VisualQaReviewPanel() {
                   const surfaceIndex =
                     runs
                       .slice(0, runIndex)
-                      .reduce((count, item) => count + item.surfaces.length, 0) +
+                      .reduce(
+                        (count, item) => count + item.surfaces.length,
+                        0
+                      ) +
                     surfaceOffset +
                     1;
                   const referenceId = `HUD-VQA-${String(surfaceIndex).padStart(3, '0')}`;

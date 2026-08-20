@@ -12,8 +12,8 @@ import {
   useTransition,
 } from 'react';
 import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { UpdateAvailablePill } from '@/components/molecules/UpdateAvailablePill';
 import { ComposerFocusProvider } from '@/components/features/chat/Composer';
+import { UpdateAvailablePill } from '@/components/molecules/UpdateAvailablePill';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { ArtistProfileRailToggle } from '@/components/shell/ArtistProfileRailToggle';
 import { APP_ROUTES } from '@/constants/routes';

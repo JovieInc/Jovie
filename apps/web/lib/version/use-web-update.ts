@@ -27,8 +27,7 @@ export function useWebUpdate(): WebUpdateState {
   const initialBuildId = useRef<string | null>(null);
 
   // In Electron, skip web polling — desktop path handles updates
-  const isElectron =
-    typeof window !== 'undefined' && isDesktopEnvironment();
+  const isElectron = typeof window !== 'undefined' && isDesktopEnvironment();
 
   const { data: buildInfo } = useBuildInfoQuery({ enabled: !isElectron });
 

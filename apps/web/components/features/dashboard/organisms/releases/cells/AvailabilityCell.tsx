@@ -18,8 +18,8 @@ import {
   DrawerInlineIconButton,
 } from '@/components/molecules/drawer';
 import { PROVIDER_DOMAINS } from '@/lib/discography/provider-domains';
-import { useLatestRef } from '@/lib/hooks/useLatestRef';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import { useLatestRef } from '@/lib/hooks/useLatestRef';
 import { cn } from '@/lib/utils';
 
 interface ProviderConfig {

@@ -4,7 +4,6 @@ import type { UIMessage } from 'ai';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { track } from '@/lib/analytics';
-import { useLatestRef } from '@/lib/hooks/useLatestRef';
 import {
   createJankMonitor,
   type JankEventName,
@@ -14,6 +13,7 @@ import {
   type MessageSnapshot,
   type PartSnapshot,
 } from '@/lib/chat/jank-monitor';
+import { useLatestRef } from '@/lib/hooks/useLatestRef';
 import { logger } from '@/lib/utils/logger';
 
 /** Client-local id prefixes (anything else is treated as server-assigned). */

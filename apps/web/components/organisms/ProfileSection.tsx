@@ -1,5 +1,5 @@
-import { ArtistInfo } from '@/components/organisms/ArtistInfo';
 import { FrostedContainer } from '@/components/molecules/FrostedContainer';
+import { ArtistInfo } from '@/components/organisms/ArtistInfo';
 import { Container } from '@/components/site/Container';
 import { Artist } from '@/types/db';
 

@@ -1,11 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLatestRef } from '@/lib/hooks/useLatestRef';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
+import { useLatestRef } from '@/lib/hooks/useLatestRef';
 import {
   useFormatReleaseLyricsMutation,
   useRefreshReleaseMutation,

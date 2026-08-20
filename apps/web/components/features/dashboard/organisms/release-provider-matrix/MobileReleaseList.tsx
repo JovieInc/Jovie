@@ -2,11 +2,11 @@
 
 import { memo, useCallback, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { TruncatedText } from '@/components/atoms/TruncatedText';
 import {
   SwipeToReveal,
   SwipeToRevealGroup,
 } from '@/components/molecules/SwipeToReveal';
-import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { ShellListRowButton } from '@/components/organisms/table';
 import { TypeBadge } from '@/components/shell/TypeBadge';
 import { mobileReleaseTokens } from '@/features/dashboard/tokens';

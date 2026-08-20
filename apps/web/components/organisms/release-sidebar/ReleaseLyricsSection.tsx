@@ -18,9 +18,9 @@ import {
   useState,
 } from 'react';
 import { toast } from '@/components/feedback';
-import { useLatestRef } from '@/lib/hooks/useLatestRef';
 import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
+import { useLatestRef } from '@/lib/hooks/useLatestRef';
 import { LYRICS_FORMAT_LABELS, type LyricsFormat } from '@/lib/lyrics/types';
 import { cn } from '@/lib/utils';
 import { ReleaseSaveStatusRow } from './ReleaseSaveStatusRow';

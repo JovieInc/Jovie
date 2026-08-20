@@ -37,6 +37,7 @@ const PAGE_TOOLBAR_ACTION_ACTIVE_CLASS =
   'border-transparent bg-transparent text-primary-token shadow-none';
 const PAGE_TOOLBAR_ICON_CLASS = 'h-3.5 w-3.5';
 const PAGE_TOOLBAR_ICON_STROKE_WIDTH = 2;
+
 import { FilterCheckboxItem } from './FilterCheckboxItem';
 import { FilterSearchInput } from './FilterSearchInput';
 

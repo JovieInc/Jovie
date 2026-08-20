@@ -4,7 +4,6 @@
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Check, Copy, ExternalLink, Pause, Play, VolumeX } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { SeekBar } from '@/components/molecules/SeekBar';
 import { toast } from '@/components/feedback';
 import {
   DrawerBackButton,
@@ -17,6 +16,7 @@ import {
 } from '@/components/molecules/drawer';
 import { EntityHeaderCard } from '@/components/molecules/drawer/EntityHeaderCard';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { SeekBar } from '@/components/molecules/SeekBar';
 import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import type {
   PreviewSource,
