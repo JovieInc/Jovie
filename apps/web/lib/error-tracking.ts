@@ -282,17 +282,18 @@ export async function captureError(
     sentryMode,
   });
 
-  // Best-effort Redis quota warnings already degrade in-process. The hourly
+  // Best-effort Redis quota failures already degrade in-process. The hourly
   // operability canary owns the standing alert (JOV-5086); per-request
   // captureException of the JSON bag flooded Linear as JOV-5183 / JOV-5221 /
-  // JOV-5228 / JOV-5229. Opaque bags are never actionable at any severity. Real quota
-  // command failures still report at error/critical (JOV-5220 / JOV-5199).
+  // JOV-5228 / JOV-5229, and the real command-failure title filed as JOV-5184.
+  // Opaque bags and quota command failures are never actionable at any
+  // severity — do not re-file them per route.
   const capturedText = `${quotaNoiseText(resolvedError)} ${errorData.message}`;
   const opaqueBag =
     isOpaqueUpstashErrorJsonBag(capturedText) ||
     isOpaqueUpstashErrorJsonBag(resolvedError);
   const quotaNoise =
-    severity === 'warning' &&
+    isRedisQuotaFailure(resolvedError) ||
     isUpstashQuotaNoise(quotaNoiseText(resolvedError));
 
   if (!opaqueBag && !quotaNoise) {

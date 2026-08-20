@@ -56,8 +56,10 @@ import type * as Sentry from '@sentry/nextjs';
 import {
   isNonActionableUpstashErrorBagEvent,
   isOpaqueUpstashErrorJsonBag,
+  isUpstashQuotaSentryEvent,
   UPSTASH_QUOTA_IGNORE_ERRORS,
 } from '@/lib/sentry/non-actionable-issues';
+import { isRedisQuotaFailure } from '@/lib/utils/errors';
 
 /**
  * Sentry Event type alias for cleaner code
@@ -434,6 +436,17 @@ export function scrubPii(
     return null;
   }
 
+  // Real `UpstashError: ERR max requests limit exceeded` events (JOV-5184)
+  // are one Redis-quota incident. Server/edge already drop them; client
+  // `beforeSend` is this function, so drop here too. The hourly canary
+  // owns the standing alert.
+  if (
+    isRedisQuotaFailure(hint?.originalException) ||
+    isUpstashQuotaSentryEvent(event)
+  ) {
+    return null;
+  }
+
   if (isNonProductionServerNoise(event)) {
     return null;
   }
@@ -448,9 +461,9 @@ export function scrubPii(
     return null;
   }
 
-  // Filter captureWarning/captureError JSON bags (JOV-5183, JOV-5187,
-  // JOV-5209, JOV-5218, JOV-5228). Real Upstash quota exceptions keep their
-  // command-failure title.
+  // Filter captureWarning/captureError JSON bags kept on extra/logentry
+  // (JOV-5183, JOV-5187, JOV-5209, JOV-5218, JOV-5228). Quota command
+  // failures (JOV-5184) are already dropped above.
   if (isNonActionableUpstashErrorBagEvent(event)) {
     return null;
   }
