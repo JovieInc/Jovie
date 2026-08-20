@@ -6,6 +6,7 @@ import contextlib
 import base64
 import hashlib
 import http.server
+import importlib.machinery
 import importlib.util
 import io
 import json
@@ -28,11 +29,12 @@ CONTROLLER = SOURCE_DIR / "symphony-codex-exhausted.py"
 WRAPPER = SOURCE_DIR / "symphony-codex-exhausted"
 SIDECAR = SOURCE_DIR / "symphony-grok-sidecar"
 GROK_SHIP = SOURCE_DIR / "grok-ship-one"
+CURSOR_STD = SOURCE_DIR / "cursor-agent-std"
 MODEL_ROUTER = SOURCE_DIR / "model-router.py"
 MODEL_REGISTRY = SOURCE_DIR / "config/model-registry.json"
-RUNTIME_ARTIFACTS = (WRAPPER, CONTROLLER, SIDECAR, GROK_SHIP, MODEL_ROUTER, MODEL_REGISTRY)
+RUNTIME_ARTIFACTS = (WRAPPER, CONTROLLER, SIDECAR, GROK_SHIP, CURSOR_STD, MODEL_ROUTER, MODEL_REGISTRY)
 RUNTIME_NAMES = tuple(path.name for path in RUNTIME_ARTIFACTS)
-LAUNCHER_NAMES = (WRAPPER.name, CONTROLLER.name, SIDECAR.name, GROK_SHIP.name)
+LAUNCHER_NAMES = (WRAPPER.name, CONTROLLER.name, SIDECAR.name, GROK_SHIP.name, CURSOR_STD.name)
 
 
 def issue_revision(identifier, title="", description=""):
@@ -2025,6 +2027,81 @@ class FallbackTests(unittest.TestCase):
 
         with mock.patch.object(module, "_captured", side_effect=captured):
             self.assertIsNone(module._unit_age_seconds("fallback-ship-JOV-5220-770fa184873a.service"))
+
+    def test_cursor_agent_std_does_not_inject_fast_false(self):
+        """Live JOV-5235: wrapper turned cursor-grok-4.6-high-fast into [fast=false]."""
+        loader = importlib.machinery.SourceFileLoader("cursor_agent_std", str(CURSOR_STD))
+        module = loader.load_module()
+        self.assertEqual(module.lock_model("cursor-grok-4.6-high-fast"), "cursor-grok-4.6-high")
+        self.assertEqual(module.lock_model("cursor-grok-4.6-high"), "cursor-grok-4.6-high")
+        self.assertEqual(module.lock_model("grok-4.6[fast=true]"), "grok-4.6")
+        self.assertEqual(
+            module.lock_model("claude-opus-4-8[context=1m,fast=true]"),
+            "claude-opus-4-8[context=1m]",
+        )
+        self.assertEqual(
+            module.rewrite(["-p", "--force", "--model", "cursor-grok-4.6-high-fast", "fix it"]),
+            ["-p", "--force", "--model", "cursor-grok-4.6-high", "fix it"],
+        )
+
+    def test_grok_ship_one_changelog_push_failure_still_invokes_grok(self):
+        """Live JOV-5238: changelog autoresolve then pre-push typecheck failed, no END."""
+        created = self.root / "pr-created"
+        self.command(
+            "gh",
+            'case "$*" in\n'
+            '  *headRefName*) echo \'[{"number":16241,"headRefName":"fallback/JOV-7-fix","mergeStateStatus":"DIRTY"}]\';;\n'
+            '  *statusCheckRollup*) echo \'{"statusCheckRollup":[{"conclusion":"SUCCESS"}]}\';;\n'
+            '  *isDraft*) echo false;;\n'
+            '  *) echo 1;;\n'
+            'esac\n',
+        )
+        self.command(
+            "git",
+            'printf "git %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            '[ "$1" != clone ] || mkdir -p "$5/.git"\n'
+            'case "$*" in\n'
+            '  *"rev-parse HEAD") printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";;\n'
+            '  *"rev-parse --is-shallow-repository") printf "false\\n";;\n'
+            '  *"merge-base HEAD origin/main") exit 0;;\n'
+            '  *"merge --no-edit origin/main") echo "CONFLICT (content): Merge conflict in CHANGELOG.md" >&2; exit 1;;\n'
+            '  *"diff --name-only --diff-filter=U") printf "CHANGELOG.md\\n";;\n'
+            '  *"show :2:CHANGELOG.md") printf -- "- **ours unique JOV-7**\\n";;\n'
+            '  *"show :3:CHANGELOG.md") printf "# Changelog\\n\\n## [Unreleased]\\n\\n### Fixed\\n\\n- **theirs**\\n";;\n'
+            '  *"ls-files"*) if [ -f "$GEM_EVENTS.changelog-added" ]; then exit 0; fi; printf "100644 abc CHANGELOG.md\\n";;\n'
+            '  *"add CHANGELOG.md") : > "$GEM_EVENTS.changelog-added";;\n'
+            '  *"commit --no-edit") ;;\n'
+            '  *"push origin"*) echo "pre-push typecheck failed" >&2; exit 1;;\n'
+            'esac\n',
+        )
+        self.command(
+            "grok",
+            'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            'touch "$GROK_CREATED"\n',
+        )
+        result = subprocess.run(
+            [self.install_runtime() / GROK_SHIP.name, "JOV-7"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_EVENTS=self.events,
+                GROK_CREATED=created,
+                GROK_SHIP_WS_ROOT=self.root / "workspaces",
+                GROK_SHIP_LOG_DIR=self.root / "logs",
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.grok_linear_url(),
+                SYMPHONY_OPEN_PR_INDEX="live",
+            ),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        log = (self.root / "logs/JOV-7.log").read_text()
+        self.assertIn("remount_changelog_autoresolved", log)
+        self.assertIn("remount_changelog_push_failed", log)
+        self.assertIn("START JOV-7", log)
+        events = self.events.read_text()
+        self.assertIn("grok -", events)
+        self.assertTrue(created.exists())
 
     def test_grok_ship_one_path_includes_pnpm_dirs(self):
         """Live changelog remount commit died: husky pre-commit `pnpm: not found`."""

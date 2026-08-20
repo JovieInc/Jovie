@@ -51,10 +51,11 @@ LEGACY_RUNTIME_NAMES = (
 RUNTIME_NAMES = (
     *LEGACY_RUNTIME_NAMES,
     "grok-ship-one",
+    "cursor-agent-std",
     "model-router.py",
     "model-registry.json",
 )
-LAUNCHER_NAMES = (*LEGACY_RUNTIME_NAMES, "grok-ship-one")
+LAUNCHER_NAMES = (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std")
 # Labels are derived audit evidence, never independent admission blockers.
 # The machine-written admission-gate/v1 receipt is the source of truth.
 REQUIRED_ADMISSION_LABELS = frozenset()
@@ -1427,7 +1428,7 @@ def _artifacts() -> dict[str, pathlib.Path]:
     if not registry.is_file():
         registry = root / "config" / "model-registry.json"
     return {
-        **{name: root / name for name in (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "model-router.py")},
+        **{name: root / name for name in (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std", "model-router.py")},
         "model-registry.json": registry,
     }
 
