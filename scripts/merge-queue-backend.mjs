@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import {
   buildNativeQueuePolicyReadback,
@@ -51,6 +52,18 @@ const HARD_HOLD_LABELS = new Set([
   'queue-deferred',
   'needs-conflict-resolution',
   'fast',
+]);
+const SELECTOR_BLOCKING_LABELS = new Set([
+  'needs-human',
+  'hold',
+  'gated',
+  'needs-conflict-resolution',
+  'fast',
+]);
+const CLEAN_ADMITTING_PROMOTION_MODES = new Set([
+  'normal',
+  'hold-intake',
+  'draft-only',
 ]);
 const PULL_REQUEST_STATE_QUERY = `query MergeQueuePullRequestState($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){${PULL_REQUEST_STATE_FIELDS}}}}`;
 const OPEN_PULL_REQUEST_STATES_QUERY = `query MergeQueueOpenPullRequestStates($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){pullRequests(first:100,after:$endCursor,states:OPEN){nodes{${PULL_REQUEST_STATE_FIELDS}} pageInfo{hasNextPage endCursor}}}}`;
@@ -600,16 +613,276 @@ export async function listPullRequestQueueStates({
   return states;
 }
 
-export function enrollmentPostcondition(state, expectedHeadOid) {
+/**
+ * Authoritative GitHub-native membership for one exact PR head.
+ * Auto-merge intent (`autoMergeRequest`) is never treated as a queue receipt.
+ *
+ * @param {object | null | undefined} state
+ * @param {string} expectedHeadOid
+ */
+export function hasAuthoritativeExactHeadQueueReceipt(state, expectedHeadOid) {
+  const expected =
+    typeof expectedHeadOid === 'string' ? expectedHeadOid.toLowerCase() : '';
+  const head =
+    typeof state?.headRefOid === 'string' ? state.headRefOid.toLowerCase() : '';
   return Boolean(
-    state?.state === 'OPEN' &&
+    /^[0-9a-f]{40}$/.test(expected) &&
+      state?.state === 'OPEN' &&
       state?.isDraft === false &&
-      state?.headRefOid?.toLowerCase() === expectedHeadOid.toLowerCase() &&
-      state?.queued === true &&
-      NATIVE_QUEUE_ENTRY_STATES.has(state?.mergeQueueEntry?.state) &&
+      head === expected &&
+      state?.isInMergeQueue === true &&
+      state?.mergeQueueEntry != null &&
+      typeof state.mergeQueueEntry.id === 'string' &&
+      NATIVE_QUEUE_ENTRY_STATES.has(state.mergeQueueEntry.state) &&
       Number.isInteger(state.mergeQueueEntry.position) &&
       state.mergeQueueEntry.position > 0
   );
+}
+
+export function enrollmentPostcondition(state, expectedHeadOid) {
+  return hasAuthoritativeExactHeadQueueReceipt(state, expectedHeadOid);
+}
+
+/**
+ * Deterministic reason a native exact-head read is not an authoritative receipt.
+ *
+ * @param {object | null | undefined} state
+ * @param {string} expectedHeadOid
+ */
+export function explainExactHeadQueueReceipt(state, expectedHeadOid) {
+  if (hasAuthoritativeExactHeadQueueReceipt(state, expectedHeadOid)) {
+    return { ok: true, reason: 'queued' };
+  }
+  const expected =
+    typeof expectedHeadOid === 'string' ? expectedHeadOid.toLowerCase() : '';
+  const parts = [];
+  if (!state || typeof state !== 'object') {
+    return { ok: false, reason: 'missing-state' };
+  }
+  const head =
+    typeof state.headRefOid === 'string' ? state.headRefOid.toLowerCase() : '';
+  if (head !== expected) {
+    parts.push(`head=${state.headRefOid ?? 'missing'}`);
+  }
+  if (state.isInMergeQueue !== true) {
+    parts.push('isInMergeQueue=false');
+  }
+  if (state.mergeQueueEntry == null) {
+    parts.push('mergeQueueEntry=null');
+  } else {
+    if (typeof state.mergeQueueEntry.id !== 'string') {
+      parts.push('mergeQueueEntry.id=missing');
+    }
+    if (!NATIVE_QUEUE_ENTRY_STATES.has(state.mergeQueueEntry.state)) {
+      parts.push(
+        `mergeQueueEntry.state=${state.mergeQueueEntry.state ?? 'missing'}`
+      );
+    }
+    if (
+      !Number.isInteger(state.mergeQueueEntry.position) ||
+      state.mergeQueueEntry.position < 1
+    ) {
+      parts.push(
+        `mergeQueueEntry.position=${String(state.mergeQueueEntry.position ?? 'missing')}`
+      );
+    }
+  }
+  if (state.autoMergeRequest != null) {
+    parts.push(
+      'autoMergeRequest=present (auto-merge intent is not membership)'
+    );
+  }
+  return {
+    ok: false,
+    reason: parts.join(' ') || 'missing-receipt',
+  };
+}
+
+/**
+ * Classify why the drain enroll selector would skip one exact PR/head.
+ * `q` must already be authoritative native membership, never auto-merge intent.
+ *
+ * @param {{
+ *   snapshot?: object[],
+ *   admissionPr?: string | number,
+ *   admissionHead?: string,
+ *   promotionMode?: string,
+ *   enrollSlots?: number,
+ * }} [input]
+ */
+export function explainExactHeadAdmissionSelector({
+  snapshot,
+  admissionPr,
+  admissionHead,
+  promotionMode,
+  enrollSlots,
+} = {}) {
+  if (!Array.isArray(snapshot)) {
+    throw backendError(
+      'invalid_snapshot',
+      'Admission snapshot must be an array'
+    );
+  }
+  const pr = String(admissionPr ?? '');
+  const head =
+    typeof admissionHead === 'string' ? admissionHead.toLowerCase() : '';
+  const row = snapshot.find(
+    item =>
+      String(item?.n) === pr &&
+      typeof item?.headOid === 'string' &&
+      item.headOid.toLowerCase() === head
+  );
+  if (!row) {
+    return {
+      observed: false,
+      queued: false,
+      eligible: false,
+      reason: 'not-observed',
+    };
+  }
+  if (row.q === true) {
+    return {
+      observed: true,
+      queued: true,
+      eligible: false,
+      reason: 'already-queued',
+    };
+  }
+  const reasons = [];
+  const mode = typeof promotionMode === 'string' ? promotionMode : '';
+  const modeAllows =
+    CLEAN_ADMITTING_PROMOTION_MODES.has(mode) ||
+    (mode === 'isolated-only' && row.iso === true);
+  if (!modeAllows) {
+    reasons.push(`promotion-mode=${mode || 'missing'}`);
+  }
+  if (row.draft === true) reasons.push('draft');
+  if (row.base !== 'main') reasons.push(`base=${row.base ?? 'missing'}`);
+  if (row.m !== 'MERGEABLE') {
+    reasons.push(`mergeable=${row.m ?? 'missing'}`);
+  }
+  const fails = Array.isArray(row.fail)
+    ? row.fail.filter(value => typeof value === 'string' && value.length > 0)
+    : [];
+  if (fails.length > 0) {
+    reasons.push(`failing-checks=${fails.join(',')}`);
+  }
+  const labels = Array.isArray(row.L)
+    ? row.L.filter(value => typeof value === 'string')
+    : [];
+  const held = labels.filter(name => SELECTOR_BLOCKING_LABELS.has(name));
+  if (held.length > 0) reasons.push(`held-by=${held.join(',')}`);
+  const slots = Number(enrollSlots);
+  if (!Number.isInteger(slots) || slots <= 0) {
+    reasons.push('queue-depth-cap');
+  }
+  if (reasons.length > 0) {
+    return {
+      observed: true,
+      queued: false,
+      eligible: false,
+      reason: reasons.join('; '),
+    };
+  }
+  return {
+    observed: true,
+    queued: false,
+    eligible: true,
+    reason: 'eligible',
+  };
+}
+
+function readStdinJson() {
+  try {
+    return JSON.parse(readFileSync(0, 'utf8'));
+  } catch (error) {
+    throw backendError(
+      'invalid_snapshot',
+      'Admission snapshot stdin must be JSON',
+      { cause: error instanceof Error ? error.message : String(error) }
+    );
+  }
+}
+
+/**
+ * Read-only poll for a persisted exact-head native queue receipt.
+ * Does not enable auto-merge or treat auto-merge intent as membership.
+ *
+ * @param {{
+ *   backend?: string,
+ *   repository?: string,
+ *   number?: string | number,
+ *   expectedHeadOid?: string,
+ *   runner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
+ *   postconditionAttempts?: number,
+ *   postconditionDelayMs?: number,
+ *   wait?: (milliseconds: number) => Promise<void>,
+ * }} [input]
+ */
+export async function proveExactHeadQueueReceipt({
+  backend,
+  repository = DEFAULT_REPOSITORY,
+  number,
+  expectedHeadOid,
+  runner = createGhRunner(),
+  postconditionAttempts = DEFAULT_ENROLLMENT_POSTCONDITION_ATTEMPTS,
+  postconditionDelayMs = DEFAULT_ENROLLMENT_POSTCONDITION_DELAY_MS,
+  wait = sleep,
+} = {}) {
+  requireNativeBackend(backend);
+  const parsedNumber = parsePullRequestNumber(number);
+  const expectedHead = parseExpectedHeadOid(expectedHeadOid);
+  const attempts = Number(postconditionAttempts);
+  const delayMs = Number(postconditionDelayMs);
+  if (!Number.isInteger(attempts) || attempts < 1) {
+    throw backendError(
+      'invalid_postcondition_attempts',
+      'Receipt proof attempts must be a positive integer'
+    );
+  }
+  if (!Number.isInteger(delayMs) || delayMs < 0) {
+    throw backendError(
+      'invalid_postcondition_delay',
+      'Receipt proof delay must be a non-negative integer'
+    );
+  }
+  const stateOptions = {
+    backend: 'native',
+    repository,
+    number: parsedNumber,
+    runner,
+  };
+  let state;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    state = await readPullRequestQueueState(stateOptions);
+    if (hasAuthoritativeExactHeadQueueReceipt(state, expectedHead)) {
+      return {
+        ok: true,
+        attempts: attempt,
+        state,
+        explanation: explainExactHeadQueueReceipt(state, expectedHead),
+      };
+    }
+    const head =
+      typeof state.headRefOid === 'string'
+        ? state.headRefOid.toLowerCase()
+        : '';
+    if (head && head !== expectedHead) {
+      return {
+        ok: false,
+        attempts: attempt,
+        state,
+        explanation: explainExactHeadQueueReceipt(state, expectedHead),
+      };
+    }
+    if (attempt < attempts) await wait(delayMs);
+  }
+  return {
+    ok: false,
+    attempts,
+    state,
+    explanation: explainExactHeadQueueReceipt(state, expectedHead),
+  };
 }
 
 export function dequeuePostcondition(state) {
@@ -858,6 +1131,20 @@ export async function runCli(
   const commands = {
     preflight: () => preflightMergeQueue(preflightOptions),
     'list-state': () => listPullRequestQueueStates(options),
+    'explain-selector': () =>
+      explainExactHeadAdmissionSelector({
+        snapshot: readStdinJson(),
+        admissionPr: args[0],
+        admissionHead: args[1],
+        promotionMode: args[2],
+        enrollSlots: Number.parseInt(String(args[3]), 10),
+      }),
+    'prove-receipt': () =>
+      proveExactHeadQueueReceipt({
+        ...options,
+        number: args[0],
+        expectedHeadOid: args[1],
+      }),
     enroll: () =>
       enrollPullRequest({
         ...preflightOptions,
@@ -869,13 +1156,18 @@ export async function runCli(
   const usage = {
     preflight: [0, 'preflight takes no arguments'],
     'list-state': [0, 'list-state takes no arguments'],
+    'explain-selector': [
+      4,
+      'explain-selector requires <number> <headSha> <promotionMode> <enrollSlots>',
+    ],
+    'prove-receipt': [2, 'prove-receipt requires <number> <headSha>'],
     enroll: [2, 'enroll requires <number> <headSha>'],
     dequeue: [1, 'dequeue requires <number>'],
   };
   if (!Object.hasOwn(commands, command)) {
     throw backendError(
       'usage',
-      'Usage: merge-queue-backend.mjs <preflight|list-state|enroll|dequeue>'
+      'Usage: merge-queue-backend.mjs <preflight|list-state|explain-selector|prove-receipt|enroll|dequeue>'
     );
   }
   const [argumentCount, usageMessage] = usage[command];

@@ -1514,41 +1514,42 @@ done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" --arg pro
 # Fail with a classified machine-owned condition so Delivery Control Receipts
 # emits a durable Gem repair task; it still cannot merge or bypass any gate.
 if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 ]]; then
-  ADMISSION_TARGET_OBSERVED="$(echo "$SNAP" | jq -r \
-    --arg admission_pr "$DRAIN_ADMISSION_PR" \
-    --arg admission_head "$DRAIN_ADMISSION_HEAD" '
-      any(.[];
-        ((.n | tostring) == $admission_pr)
-        and ((.headOid // "") | ascii_downcase == $admission_head)
-      )
-    ')"
-  ADMISSION_ALREADY_QUEUED="$(echo "$SNAP" | jq -r \
-    --arg admission_pr "$DRAIN_ADMISSION_PR" \
-    --arg admission_head "$DRAIN_ADMISSION_HEAD" '
-      any(.[];
-        ((.n | tostring) == $admission_pr)
-        and ((.headOid // "") | ascii_downcase == $admission_head)
-        and (.q == true)
-      )
-    ')"
+  ADMISSION_DISPOSITION="$(echo "$SNAP" | node scripts/merge-queue-backend.mjs explain-selector \
+    "$DRAIN_ADMISSION_PR" "$DRAIN_ADMISSION_HEAD" "$DRAIN_PROMOTION_MODE" "$ENROLL_SLOTS")"
+  ADMISSION_TARGET_OBSERVED="$(jq -r '.observed' <<<"$ADMISSION_DISPOSITION")"
+  ADMISSION_ALREADY_QUEUED="$(jq -r '.queued' <<<"$ADMISSION_DISPOSITION")"
+  ADMISSION_ELIGIBLE="$(jq -r '.eligible' <<<"$ADMISSION_DISPOSITION")"
+  ADMISSION_SELECTOR_REASON="$(jq -r '.reason' <<<"$ADMISSION_DISPOSITION")"
   # A changed head has invalidated the event scope. It must never inherit this
   # event's queue intent; the newer head's own event creates its receipt.
   # The pre-enrollment snapshot can race GitHub's native queue write. Before
-  # publishing a terminal queue-noop, re-read the authoritative native state.
-  # Only a valid exact-head receipt suppresses the error; unknown state stays
-  # fail-closed and cannot manufacture a hold-clearing success.
+  # publishing a terminal queue-noop, poll the authoritative native state for
+  # isInMergeQueue plus a positioned mergeQueueEntry. Auto-merge intent is
+  # never membership. Only a valid exact-head receipt suppresses the error.
   if [[ "$MERGE_QUEUE_BACKEND" == "native" && "$DRY_RUN" != "1" \
     && "$ADMISSION_TARGET_OBSERVED" == "true" && "$ADMISSION_ALREADY_QUEUED" != "true" ]]; then
-    LIVE_NATIVE_QUEUE_STATE="$(node scripts/merge-queue-backend.mjs list-state)"
-    ADMISSION_ALREADY_QUEUED="$(jq -r --arg pr "$DRAIN_ADMISSION_PR" --arg head "$DRAIN_ADMISSION_HEAD" '
-      ($ARGS.named.pr as $pr | $ARGS.named.head as $head
-       | .[$pr] // null
-       | (.queued == true)
-       and ((.headRefOid // "") | ascii_downcase) == $head)
-    ' <<<"$LIVE_NATIVE_QUEUE_STATE")"
+    LIVE_NATIVE_RECEIPT="$(node scripts/merge-queue-backend.mjs prove-receipt \
+      "$DRAIN_ADMISSION_PR" "$DRAIN_ADMISSION_HEAD")"
+    if jq -e '
+      .ok == true
+      and .state.isInMergeQueue == true
+      and .state.queued == true
+      and (.state.mergeQueueEntry.state | IN("QUEUED", "AWAITING_CHECKS", "MERGEABLE", "UNMERGEABLE", "LOCKED"))
+      and (.state.mergeQueueEntry.position | type == "number" and floor == . and . > 0)
+      and ((.state.headRefOid // "") | ascii_downcase) == $head
+    ' --arg head "$DRAIN_ADMISSION_HEAD" <<<"$LIVE_NATIVE_RECEIPT" >/dev/null; then
+      ADMISSION_ALREADY_QUEUED="true"
+      echo "  #$DRAIN_ADMISSION_PR  ~ delayed native receipt at $DRAIN_ADMISSION_HEAD (state $(jq -r '.state.mergeQueueEntry.state' <<<"$LIVE_NATIVE_RECEIPT"), position $(jq -r '.state.mergeQueueEntry.position' <<<"$LIVE_NATIVE_RECEIPT"))"
+    else
+      ADMISSION_MISSING_REASON="$(jq -r '.explanation.reason // "missing-receipt"' <<<"$LIVE_NATIVE_RECEIPT")"
+    fi
   fi
-if [[ "$DRY_RUN" != "1" && "$ADMISSION_TARGET_OBSERVED" == "true" && "$ADMISSION_ALREADY_QUEUED" != "true" ]]; then
-    echo "::error::queue-noop: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD has no native queue receipt" >&2
+  if [[ "$DRY_RUN" != "1" && "$ADMISSION_TARGET_OBSERVED" == "true" && "$ADMISSION_ALREADY_QUEUED" != "true" ]]; then
+    if [[ "$ADMISSION_ELIGIBLE" == "true" ]]; then
+      echo "::error::queue-noop: missing receipt: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD (${ADMISSION_MISSING_REASON:-missing-receipt})" >&2
+    else
+      echo "::error::queue-noop: selector: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD ($ADMISSION_SELECTOR_REASON)" >&2
+    fi
     exit 3
   fi
 fi

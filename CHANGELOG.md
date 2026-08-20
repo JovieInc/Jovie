@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Native auto-enroll produces or explains an exact-head queue receipt (JOV-5174):** admission requires persisted `isInMergeQueue` plus a positioned `mergeQueueEntry`, delayed GitHub reads are reconciled, and a selector no-op or missing receipt fails with the exact reason. Auto-merge intent is not membership.
+
 - [internal] **Opaque `Error: {"clerkUserId":...,"error":{"name":"UpstashError"}}` bags no longer file (JOV-5185):** Sentry drops the clerkUserId-wrapped JSON bag, `beforeSend` / `onRequestError` / `captureError` skip it, and the autofix webhook classifies it as the same Upstash JSON bag. Real quota command failures still report.
 - [internal] **Upstash quota command failures no longer file Linear issues (JOV-5181):** `onRequestError`, `captureError`, and shared `beforeSend` drop `ERR max requests limit exceeded`. The hourly Redis operability canary still pages via `redis_operability_quota_exceeded`.
 - [internal] **Opaque `Error: {"error":{"name":"UpstashError"}}` bags no longer file from reconstructed client Sentry.init (JOV-5182):** lite and full client configs now spread the shared base, so `ignoreErrors` and `release` reach the browser SDK. Real quota command failures still report.
