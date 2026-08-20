@@ -1,9 +1,10 @@
 /**
- * Eve identity pack selection (JOV-5216).
+ * Eve identity pack selection (JOV-5216 / JOV-5214).
  *
- * Identity is an explicit pack, not a chatMode prompt flag. executeChatTurn
- * remains the generation fallback. Chat and Eve entries must go through
- * bindEveIdentityForTurn so capability flags are enforced at runtime.
+ * `ovie` is a door/surface id, not a persona or model identity. Artist
+ * Jovie generation is forbidden on the Ovie door (see summer-transport).
+ * Chat and Eve entries must go through bindEveIdentityForTurn so
+ * capability flags are enforced at runtime.
  */
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -19,6 +20,9 @@ export type EveCapability =
 
 export type EveIdentityPack = {
   readonly id: EveIdentityId;
+  readonly surface: 'door' | 'artist';
+  readonly conversationalAuthority: 'summer' | 'jovie-artist';
+  readonly isPersona: boolean;
   readonly role: 'artist' | 'founder';
   readonly canPrivilegedWriteGbrain: boolean;
   readonly canHealSymphony: boolean;
@@ -39,6 +43,9 @@ export class EveCapabilityDeniedError extends Error {
 
 const JOVIE_PACK: EveIdentityPack = {
   id: 'jovie',
+  surface: 'artist',
+  conversationalAuthority: 'jovie-artist',
+  isPersona: true,
   role: 'artist',
   canPrivilegedWriteGbrain: false,
   canHealSymphony: false,
@@ -49,6 +56,9 @@ const JOVIE_PACK: EveIdentityPack = {
 
 const OVIE_PACK: EveIdentityPack = {
   id: 'ovie',
+  surface: 'door',
+  conversationalAuthority: 'summer',
+  isPersona: false,
   role: 'founder',
   canPrivilegedWriteGbrain: false,
   canHealSymphony: false,
@@ -61,7 +71,7 @@ export function selectEveIdentity(id: EveIdentityId): EveIdentityPack {
   return id === 'ovie' ? OVIE_PACK : JOVIE_PACK;
 }
 
-/** Map the existing OV chat surface onto the Ovie pack. */
+/** Map the existing OV chat surface onto the Ovie door pack. */
 export function eveIdentityForChatMode(
   chatMode: 'ov' | null | undefined
 ): EveIdentityPack {

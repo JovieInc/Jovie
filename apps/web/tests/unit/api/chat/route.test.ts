@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatAccountContext } from '@/lib/chat/account-context';
 import { getEntitlements } from '@/lib/entitlements/registry';
+import { MemoryOperatingStore } from '@/lib/ovie/mcp/store';
 
 const hoisted = vi.hoisted(() => ({
   tryHandleAnonymousOnboardingChatMock: vi.fn(),
@@ -13,6 +14,8 @@ const hoisted = vi.hoisted(() => ({
   executeChatTurnMock: vi.fn(),
   reserveChatTurnMock: vi.fn(),
   persistTerminalAssistantMessageMock: vi.fn(),
+  isAdminMock: vi.fn(),
+  getOvieOperatingStoreMock: vi.fn(),
 }));
 
 vi.mock('@/app/api/chat/onboarding-handler', () => ({
@@ -23,6 +26,14 @@ vi.mock('@/app/api/chat/onboarding-handler', () => ({
 vi.mock('@/lib/auth/cached', () => ({
   getOptionalAuth: hoisted.getOptionalAuthMock,
   getCachedAuth: vi.fn(),
+}));
+
+vi.mock('@/lib/admin/roles', () => ({
+  isAdmin: hoisted.isAdminMock,
+}));
+
+vi.mock('@/lib/ovie/mcp/runtime-store', () => ({
+  getOvieOperatingStore: hoisted.getOvieOperatingStoreMock,
 }));
 
 vi.mock('@/lib/auth/session', () => ({
@@ -334,6 +345,10 @@ describe('POST /api/chat guard wiring', () => {
       remaining: 99,
       reset: new Date(Date.now() + 60_000),
     });
+    hoisted.isAdminMock.mockResolvedValue(false);
+    hoisted.getOvieOperatingStoreMock.mockReturnValue(
+      new MemoryOperatingStore()
+    );
   });
 
   it('returns 401 for unauthenticated requests without touching billing, rate limits, or the LLM', async () => {
@@ -445,5 +460,44 @@ describe('POST /api/chat guard wiring', () => {
     ]);
     expect(hoisted.checkAiChatRateLimitForPlanMock).not.toHaveBeenCalled();
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses OV chat without admin before Eve intake or artist Jovie generation', async () => {
+    const response = await POST(chatRequest(validBody({ chatMode: 'ov' })));
+
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.error).toBe('Admin role required for OV chat mode');
+    expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+    expect(hoisted.checkAiChatRateLimitForPlanMock).not.toHaveBeenCalled();
+  });
+
+  it('transports entitled OV turns to Summer without artist Jovie generation or Ovie self-id', async () => {
+    hoisted.isAdminMock.mockResolvedValue(true);
+
+    const response = await POST(
+      chatRequest(
+        validBody({
+          chatMode: 'ov',
+          messages: [
+            {
+              id: 'm1',
+              role: 'user',
+              parts: [{ type: 'text', text: 'research eval dogfood' }],
+            },
+          ],
+        })
+      )
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-ovie-door')).toBe('1');
+    expect(response.headers.get('x-ovie-summer-state')).toBe('unavailable');
+    expect(response.headers.get('x-ovie-m1')).toBe('not-passed');
+    const body = await response.text();
+    expect(body).toMatch(/unavailable/i);
+    expect(body.toLowerCase()).not.toMatch(/i am ovie/);
+    expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+    expect(hoisted.checkAiChatRateLimitForPlanMock).not.toHaveBeenCalled();
   });
 });

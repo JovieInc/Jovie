@@ -48,6 +48,9 @@ describe('Eve identity packs (JOV-5216)', () => {
       store: new MemoryOperatingStore(),
     });
     expect(eveTurn.pack.id).toBe('ovie');
+    expect(eveTurn.pack.surface).toBe('door');
+    expect(eveTurn.pack.isPersona).toBe(false);
+    expect(eveTurn.pack.conversationalAuthority).toBe('summer');
     expect(() => eveTurn.require('ingest-ack')).not.toThrow();
     expect(() => eveTurn.require('gbrain-read')).not.toThrow();
     expect(() => eveTurn.require('privileged-gbrain-write')).toThrow(

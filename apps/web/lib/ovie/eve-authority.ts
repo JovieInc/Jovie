@@ -1,8 +1,8 @@
 /**
- * Eve authority bounds (JOV-5215).
+ * Eve authority bounds (JOV-5215 / JOV-5214).
  *
  * Eve may classify and ack. It cannot choose priority, answer as Summer,
- * dispatch Symphony, execute code, or promote itself.
+ * dispatch Symphony, execute code, promote itself, or broaden permissions.
  */
 
 export const EVE_FORBIDDEN_ACTIONS = [
@@ -11,6 +11,7 @@ export const EVE_FORBIDDEN_ACTIONS = [
   'execute-code',
   'self-promote',
   'summer-answer',
+  'broaden-permissions',
 ] as const;
 
 export type EveForbiddenAction = (typeof EVE_FORBIDDEN_ACTIONS)[number];
@@ -48,4 +49,8 @@ export function assertEveCannotSelfPromote(): never {
 
 export function assertEveCannotAnswerAsSummer(): never {
   denyEveAction('summer-answer');
+}
+
+export function assertEveCannotBroadenPermissions(): never {
+  denyEveAction('broaden-permissions');
 }
