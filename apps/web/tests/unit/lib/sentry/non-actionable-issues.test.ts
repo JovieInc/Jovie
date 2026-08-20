@@ -155,6 +155,32 @@ describe('non-actionable Sentry issues', () => {
         })
       ).toBe(true);
     });
+
+    it('matches a JOV-5187 extra.__serialized__ object capture', () => {
+      expect(
+        isNonActionableUpstashErrorBagEvent({
+          exception: {
+            values: [
+              {
+                type: 'Error',
+                value: 'Non-Error exception captured with keys: error',
+              },
+            ],
+          },
+          extra: { __serialized__: { error: { name: 'UpstashError' } } },
+        })
+      ).toBe(true);
+    });
+
+    it('matches a JOV-5187 logentry.formatted Linear title', () => {
+      expect(
+        isNonActionableUpstashErrorBagEvent({
+          logentry: {
+            formatted: `Error: ${UPSTASH_ERROR_JSON_BAG}`,
+          },
+        })
+      ).toBe(true);
+    });
   });
 
   describe('isOpaqueUpstashErrorJsonBag', () => {

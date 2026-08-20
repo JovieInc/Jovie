@@ -8,6 +8,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ## [Unreleased]
 
 - [internal] **Opaque `Error: {"clerkUserId":...,"error":{"name":"UpstashError"}}` bags no longer file (JOV-5185):** Sentry drops the clerkUserId-wrapped JSON bag, `beforeSend` / `onRequestError` / `captureError` skip it, and the autofix webhook classifies it as the same Upstash JSON bag. Real quota command failures still report.
+- [internal] **Opaque `Error: {"error":{"name":"UpstashError"}}` bags no longer file from client object-captures (JOV-5187):** client `beforeSend` now drops `hint.originalException` bags, and events that only keep the bag on `extra.__serialized__` or `logentry.formatted` are dropped. Real quota command failures still report.
 
 - [internal] **Opaque `Error: {"error":{"name":"UpstashError"}}` bags no longer file from wrapped request errors (JOV-5209):** `beforeSend` drops `hint.originalException` bags and `onRequestError` walks `Error.cause`. Real quota command failures still report.
 

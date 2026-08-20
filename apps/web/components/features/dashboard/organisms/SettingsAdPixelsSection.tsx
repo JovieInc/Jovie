@@ -68,7 +68,7 @@ function PlatformSection({
 
   return (
     <ContentSurfaceCard className='space-y-4 bg-surface-0 p-4'>
-      <div className='flex items-start justify-between gap-3'>
+      <div className='flex flex-col items-start justify-between gap-3 sm:flex-row'>
         <div className='min-w-0'>
           <h4 className='text-app font-caption text-primary-token'>
             {platform}
@@ -77,7 +77,7 @@ function PlatformSection({
             {description}
           </p>
         </div>
-        <div className='flex shrink-0 items-center gap-2'>
+        <div className='flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0 sm:justify-end'>
           <Badge variant='outline'>
             {isConfigured ? 'Configured' : 'Not configured'}
           </Badge>
@@ -153,6 +153,12 @@ function PlatformSection({
 
 // Token placeholder shown when a token is configured but not revealed
 const TOKEN_PLACEHOLDER = '••••••••';
+const PIXEL_TRACKING_DESCRIPTION =
+  'Integrate Facebook, Google, and TikTok conversion tracking pixels.'; // ui-casing-allow: product names
+const PIXEL_ENABLE_DESCRIPTION =
+  'Route fan actions to your Facebook, Google, and TikTok pixels for conversion tracking.'; // ui-casing-allow: product names
+const FACEBOOK_PIXEL_DESCRIPTION =
+  'Track profile views and link clicks in Meta Ads Manager.'; // ui-casing-allow: product names
 
 type HealthStatus = 'healthy' | 'degraded' | 'unhealthy' | 'inactive';
 
@@ -240,12 +246,12 @@ function TestEventButton({
         {status === 'loading' ? 'Testing...' : 'Test'}
       </Button>
       {status === 'success' && (
-        <span className='text-2xs font-caption text-green-500'>
+        <span role='status' className='text-2xs font-caption text-green-500'>
           Event received
         </span>
       )}
       {status === 'error' && errorMessage && (
-        <span className='text-2xs font-caption text-red-500'>
+        <span role='alert' className='text-2xs font-caption text-red-500'>
           {errorMessage}
         </span>
       )}
@@ -414,16 +420,15 @@ export function SettingsAdPixelsSection({
     return (
       <SettingsPanel
         title='Pixel tracking'
-        description='Integrate Facebook, Google, and TikTok conversion tracking pixels.' // ui-casing-allow: product names
+        description={PIXEL_TRACKING_DESCRIPTION}
+        bodyClassName='px-4 py-4 sm:px-5'
       >
-        <div className='px-4 py-4 sm:px-5'>
-          <SettingsToggleRow
-            gated
-            title='Enable pixel tracking'
-            description='Route fan actions to your Facebook, Google, and TikTok pixels for conversion tracking.' // ui-casing-allow: product names
-            gateFeatureContext='Pixel tracking'
-          />
-        </div>
+        <SettingsToggleRow
+          gated
+          title='Enable pixel tracking'
+          description={PIXEL_ENABLE_DESCRIPTION}
+          gateFeatureContext='Pixel tracking'
+        />
       </SettingsPanel>
     );
   }
@@ -432,11 +437,10 @@ export function SettingsAdPixelsSection({
     return (
       <SettingsPanel
         title='Pixel tracking'
-        description='Integrate Facebook, Google, and TikTok conversion tracking pixels.' // ui-casing-allow: product names
+        description={PIXEL_TRACKING_DESCRIPTION}
+        bodyClassName='px-4 py-4 sm:px-5'
       >
-        <div className='px-4 py-4 sm:px-5'>
-          <PixelsSectionSkeleton />
-        </div>
+        <PixelsSectionSkeleton />
       </SettingsPanel>
     );
   }
@@ -454,124 +458,119 @@ export function SettingsAdPixelsSection({
     <form onSubmit={handlePixelSubmit} className='space-y-4'>
       <SettingsPanel
         title='Pixel tracking'
-        description='Integrate Facebook, Google, and TikTok conversion tracking pixels.' // ui-casing-allow: product names
+        description={PIXEL_TRACKING_DESCRIPTION}
+        bodyClassName='space-y-3 px-4 py-4 sm:px-5'
       >
-        <div className='space-y-3 px-4 py-4 sm:px-5'>
-          <SettingsToggleRow
-            title='Enable pixel tracking'
-            description='Route fan actions to your Facebook, Google, and TikTok pixels for conversion tracking.' // ui-casing-allow: product names
-            checked={pixelData.enabled}
-            onCheckedChange={checked => handleInputChange('enabled', checked)}
-            ariaLabel='Enable pixel tracking'
-          />
+        <SettingsToggleRow
+          title='Enable pixel tracking'
+          description={PIXEL_ENABLE_DESCRIPTION}
+          checked={pixelData.enabled}
+          onCheckedChange={checked => handleInputChange('enabled', checked)}
+          ariaLabel='Enable pixel tracking'
+        />
 
+        <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
+          <p className='text-app leading-[18px] text-secondary-token'>
+            Configure each retargeting destination independently.
+          </p>
+        </ContentSurfaceCard>
+
+        {healthData && healthData.aggregate.totalEventsThisWeek > 0 && (
           <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
-            <p className='text-app leading-[18px] text-secondary-token'>
-              Configure each retargeting destination independently.
+            <p className='text-app font-caption leading-[18px] text-primary-token'>
+              {healthData.aggregate.totalEventsThisWeek.toLocaleString()} events
+              forwarded this week &middot;{' '}
+              {healthData.aggregate.overallSuccessRate}% success rate
             </p>
           </ContentSurfaceCard>
+        )}
 
-          {healthData && healthData.aggregate.totalEventsThisWeek > 0 && (
-            <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
-              <p className='text-app font-caption leading-[18px] text-primary-token'>
-                {healthData.aggregate.totalEventsThisWeek.toLocaleString()}{' '}
-                events forwarded this week &middot;{' '}
-                {healthData.aggregate.overallSuccessRate}% success rate
-              </p>
-            </ContentSurfaceCard>
-          )}
+        <PlatformSection
+          platform='Facebook Conversions API'
+          platformKey='facebook'
+          description={FACEBOOK_PIXEL_DESCRIPTION}
+          pixelIdLabel='Pixel ID'
+          pixelIdPlaceholder='1234567890123456'
+          pixelIdName='facebookPixelId'
+          pixelIdValue={pixelData.facebookPixelId}
+          tokenLabel='Access Token'
+          tokenPlaceholder='EAAxxxxxxx...'
+          tokenName='facebookAccessToken'
+          tokenValue={pixelData.facebookAccessToken}
+          helpUrl='https://www.facebook.com/business/help/952192354843755'
+          helpText='Get credentials'
+          isConfigured={
+            !!(
+              existingSettings?.pixels?.facebookPixelId &&
+              existingSettings?.hasTokens?.facebook
+            )
+          }
+          health={healthData?.platforms.facebook}
+          onPixelIdChange={value => handleInputChange('facebookPixelId', value)}
+          onTokenChange={value =>
+            handleInputChange('facebookAccessToken', value)
+          }
+        />
 
-          <PlatformSection
-            platform='Facebook Conversions API'
-            platformKey='facebook'
-            description='Track profile views and link clicks in Meta Ads Manager.' // ui-casing-allow: product names
-            pixelIdLabel='Pixel ID'
-            pixelIdPlaceholder='1234567890123456'
-            pixelIdName='facebookPixelId'
-            pixelIdValue={pixelData.facebookPixelId}
-            tokenLabel='Access Token'
-            tokenPlaceholder='EAAxxxxxxx...'
-            tokenName='facebookAccessToken'
-            tokenValue={pixelData.facebookAccessToken}
-            helpUrl='https://www.facebook.com/business/help/952192354843755'
-            helpText='Get credentials'
-            isConfigured={
-              !!(
-                existingSettings?.pixels?.facebookPixelId &&
-                existingSettings?.hasTokens?.facebook
-              )
-            }
-            health={healthData?.platforms.facebook}
-            onPixelIdChange={value =>
-              handleInputChange('facebookPixelId', value)
-            }
-            onTokenChange={value =>
-              handleInputChange('facebookAccessToken', value)
-            }
-          />
+        <PlatformSection
+          platform='Google Analytics 4 (Measurement Protocol)'
+          platformKey='google'
+          description='Send conversion events directly to your GA4 property.'
+          pixelIdLabel='Measurement ID'
+          pixelIdPlaceholder='G-XXXXXXXXXX'
+          pixelIdName='googleMeasurementId'
+          pixelIdValue={pixelData.googleMeasurementId}
+          tokenLabel='API Secret'
+          tokenPlaceholder='xxxxxxxxxx'
+          tokenName='googleApiSecret'
+          tokenValue={pixelData.googleApiSecret}
+          helpUrl='https://developers.google.com/analytics/devguides/collection/protocol/ga4'
+          helpText='Get credentials'
+          isConfigured={
+            !!(
+              existingSettings?.pixels?.googleMeasurementId &&
+              existingSettings?.hasTokens?.google
+            )
+          }
+          health={healthData?.platforms.google}
+          onPixelIdChange={value =>
+            handleInputChange('googleMeasurementId', value)
+          }
+          onTokenChange={value => handleInputChange('googleApiSecret', value)}
+        />
 
-          <PlatformSection
-            platform='Google Analytics 4 (Measurement Protocol)'
-            platformKey='google'
-            description='Send conversion events directly to your GA4 property.'
-            pixelIdLabel='Measurement ID'
-            pixelIdPlaceholder='G-XXXXXXXXXX'
-            pixelIdName='googleMeasurementId'
-            pixelIdValue={pixelData.googleMeasurementId}
-            tokenLabel='API Secret'
-            tokenPlaceholder='xxxxxxxxxx'
-            tokenName='googleApiSecret'
-            tokenValue={pixelData.googleApiSecret}
-            helpUrl='https://developers.google.com/analytics/devguides/collection/protocol/ga4'
-            helpText='Get credentials'
-            isConfigured={
-              !!(
-                existingSettings?.pixels?.googleMeasurementId &&
-                existingSettings?.hasTokens?.google
-              )
-            }
-            health={healthData?.platforms.google}
-            onPixelIdChange={value =>
-              handleInputChange('googleMeasurementId', value)
-            }
-            onTokenChange={value => handleInputChange('googleApiSecret', value)}
-          />
+        <PlatformSection
+          platform='TikTok Events API'
+          platformKey='tiktok'
+          description='Measure profile engagement and optimize TikTok campaigns.'
+          pixelIdLabel='Pixel Code'
+          pixelIdPlaceholder='CXXXXXXXXXX'
+          pixelIdName='tiktokPixelId'
+          pixelIdValue={pixelData.tiktokPixelId}
+          tokenLabel='Access Token'
+          tokenPlaceholder='xxxxxxxxxx'
+          tokenName='tiktokAccessToken'
+          tokenValue={pixelData.tiktokAccessToken}
+          helpUrl='https://ads.tiktok.com/marketing_api/docs?id=1771101027431425'
+          helpText='Get credentials'
+          isConfigured={
+            !!(
+              existingSettings?.pixels?.tiktokPixelId &&
+              existingSettings?.hasTokens?.tiktok
+            )
+          }
+          health={healthData?.platforms.tiktok}
+          onPixelIdChange={value => handleInputChange('tiktokPixelId', value)}
+          onTokenChange={value => handleInputChange('tiktokAccessToken', value)}
+        />
 
-          <PlatformSection
-            platform='TikTok Events API'
-            platformKey='tiktok'
-            description='Measure profile engagement and optimize TikTok campaigns.'
-            pixelIdLabel='Pixel Code'
-            pixelIdPlaceholder='CXXXXXXXXXX'
-            pixelIdName='tiktokPixelId'
-            pixelIdValue={pixelData.tiktokPixelId}
-            tokenLabel='Access Token'
-            tokenPlaceholder='xxxxxxxxxx'
-            tokenName='tiktokAccessToken'
-            tokenValue={pixelData.tiktokAccessToken}
-            helpUrl='https://ads.tiktok.com/marketing_api/docs?id=1771101027431425'
-            helpText='Get credentials'
-            isConfigured={
-              !!(
-                existingSettings?.pixels?.tiktokPixelId &&
-                existingSettings?.hasTokens?.tiktok
-              )
-            }
-            health={healthData?.platforms.tiktok}
-            onPixelIdChange={value => handleInputChange('tiktokPixelId', value)}
-            onTokenChange={value =>
-              handleInputChange('tiktokAccessToken', value)
-            }
-          />
-
-          <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
-            <p className='text-app leading-[18px] text-secondary-token'>
-              Events are sent server-side for better accuracy. No third-party
-              JavaScript is injected on your profile, and credentials are
-              encrypted.
-            </p>
-          </ContentSurfaceCard>
-        </div>
+        <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
+          <p className='text-app leading-[18px] text-secondary-token'>
+            Events are sent server-side for better accuracy. No third-party
+            JavaScript is injected on your profile, and credentials are
+            encrypted.
+          </p>
+        </ContentSurfaceCard>
       </SettingsPanel>
 
       <div className='flex items-center justify-end gap-3 pt-2'>

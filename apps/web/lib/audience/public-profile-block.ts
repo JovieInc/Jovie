@@ -3,6 +3,7 @@ import 'server-only';
 import { createFingerprintEdge } from '@/lib/audience/fingerprint';
 import { withTimeout } from '@/lib/db/query-timeout';
 import { getRedis } from '@/lib/redis';
+import { isRedisQuotaFailure } from '@/lib/utils/errors';
 
 // Timeout for audience-block DB queries. Matches proxy-state.ts budget — kept
 // below the Neon p99 cold-start budget (~3 s) so a cache-miss does not stall
@@ -197,6 +198,9 @@ function captureAudienceBlockWarning(
   message: string,
   context: Record<string, unknown>
 ): void {
+  if (isRedisQuotaFailure(context.error)) {
+    return;
+  }
   console.warn(message, context);
   if (shouldSkipAudienceBlockTelemetry()) return;
 
