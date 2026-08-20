@@ -13,6 +13,7 @@ describe('AudienceEngagementCell', () => {
       <AudienceEngagementCell visits={12} intentLevel='high' />
     );
     expect(screen.getByText('12')).toBeInTheDocument();
+    expect(document.querySelector('.lucide-flame')).toBeInTheDocument();
   });
 
   it('renders visit count for medium intent', () => {

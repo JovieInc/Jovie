@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/audience-table/AudienceEngagementCell.test.tsx
 import { SimpleTooltip } from '@jovie/ui';
 import { Flame, Minus, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
