@@ -58,7 +58,7 @@ Gate evidence names are stable strings:
 - `gstack.review`
 - `gstack.ship`
 - `github.ci`
-- `github.scope-judge` (retired producer; historical name only — workflow deleted in #14484)
+- `github.scope-judge` (retired producer; historical artifact name only, never a passed live gate — workflow deleted in #14484)
 - `github.coderabbit`
 - `github.greptile`
 - `github.branch-protection`

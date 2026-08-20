@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Agent QC wires no longer advertise dead gates (JOV-5235):** Scope Judge is retired, Slop Gate stays post-merge informational, auto-approve ignores self-attested GStack comments, needs-human autoclose notifies Slack/Linear first, and the agent-pipeline branch check uses the shared allowlist.
+
 - [internal] **Redis quota JSON bags no longer auto-file as `Error: {"error":{"name":"UpstashError"}}` (JOV-5218):** Sentry drops that exact capture-bag title and the autofix webhook skips it, while real Upstash quota exceptions stay visible.
 - [internal] **Redis quota errors no longer file opaque `UpstashError` Sentry issues (JOV-5220):** wrapped `{ error }` capture payloads keep the inner message, quota events fingerprint as one class, and autofix skips the name-only JSON titles.
 

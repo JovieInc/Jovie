@@ -309,6 +309,8 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   // LLM / advisory checks — never pin as branch-protection required contexts
   'scope-judge',
   'Scope Alignment Check',
+  'Slop Gate',
+  'Slop Gate (advisory)',
   'Claude Review',
   'Seer Code Review',
   'Storybook A11y Checks',

@@ -8,7 +8,7 @@
 #
 # TRIGGERS:
 # 1. CI failure on agent branches → fix job (Claude Code fixes)
-# 2. CI success on agent branches → approve job (auto-approve + queue handoff)
+# 2. CI PR Ready succeeds → approve job (auto-approve + queue handoff)
 #
 # NOTE: CodeRabbit blocking review trigger (pull_request_review) was removed
 # because bot-submitted reviews create action_required runs that clog the
@@ -16,7 +16,7 @@
 # when @claude is mentioned in a CodeRabbit review thread.
 #
 # SAFETY:
-# - Agent branches only (allowlist matches scripts/lib/agent-branch-pattern.mjs)
+# - Runs only on the agent-branch allowlist in scripts/lib/agent-branch-pattern.mjs
 # - Max 5 fix attempts per SHA to prevent infinite loops
 # - Escalates to 'needs-human' label after exhaustion, then Slack/Linear
 #   before the 48h stale close. The label is an automation stop, not a
@@ -30,7 +30,7 @@
 name: Agent Pipeline
 
 on:
-  # Trigger when CI completes on a pull_request run
+  # Trigger when CI completes. Scope Judge is retired and is not a producer.
   workflow_run:
     workflows: ["CI"]
     types: [completed]
@@ -175,6 +175,21 @@ jobs:
             write_output "should_continue=true"
           fi
 
+      - name: Checkout agent branch classifier
+        if: steps.trigger.outputs.should_continue == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            .nvmrc
+            scripts/lib/agent-branch-pattern.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Node for branch classifier
+        if: steps.trigger.outputs.should_continue == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
+
       - name: Check agent branch pattern
         id: branch-check
         if: steps.trigger.outputs.should_continue == 'true'
@@ -183,16 +198,15 @@ jobs:
         run: |
           echo "Branch: $BRANCH"
 
-          # Allowlist — keep aligned with scripts/lib/agent-branch-pattern.mjs.
+          # Allowlist is scripts/lib/agent-branch-pattern.mjs --match
+          # (^(codex|codegen-bot|linear|claude)/ or ^[^/]+/jov-[0-9]+([_-].+)?$).
           # Concrete non-agent inputs that the old denylist misclassified:
           # hotfix/prod-outage, feat/billing-copy, fix/quality-agent-qc.
-          BRANCH_LC=$(printf '%s' "$BRANCH" | tr '[:upper:]' '[:lower:]')
-          if [[ "$BRANCH_LC" =~ ^(codex|codegen-bot|linear|claude)/ ]] || \
-             [[ "$BRANCH_LC" =~ ^[^/]+/jov-[0-9]+([_-].+)?$ ]]; then
+          if node scripts/lib/agent-branch-pattern.mjs --match "$BRANCH"; then
             echo "Agent branch detected"
             echo "is_agent_branch=true" >> "$GITHUB_OUTPUT"
           else
-            echo "Not an agent branch. Skipping."
+            echo "Not an allowlisted agent branch. Skipping."
             echo "is_agent_branch=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -868,7 +882,6 @@ jobs:
           SENSITIVE_SAFE="${{ steps.sensitive-check.outputs.is_safe }}"
           BLOCKING="${{ steps.check-statuses.outputs.blocking_reason }}"
           SENSITIVE_FILES="${{ steps.sensitive-check.outputs.sensitive_files }}"
-
           echo "Auto-approve skipped:"
           if [[ "$STATUSES_PASSED" != "true" ]]; then
             echo "  - Status checks not all passing: $BLOCKING"
@@ -984,90 +997,24 @@ jobs:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
 
+      - name: Checkout autoclose policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            .nvmrc
+            scripts/lib/agent-branch-pattern.mjs
+            scripts/lib/needs-human-autoclose.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
+
       - name: Notify then close stale needs-human agent PRs
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           GH_REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          # Allowlist matches scripts/lib/agent-branch-pattern.mjs.
-          STALE_PRS=$(gh pr list --state open --label needs-human --json number,headRefName,updatedAt,title --limit 50 \
-            | jq -c --arg cutoff "$(date -u -d '48 hours ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-48H +%Y-%m-%dT%H:%M:%SZ)" \
-            '[.[] | select(.headRefName | test("^(codex|codegen-bot|linear|claude)/") or test("^[^/]+/jov-[0-9]+([_-].+)?$"; "i")) | select(.updatedAt < $cutoff)] | .[]')
-
-          if [[ -z "$STALE_PRS" ]]; then
-            echo "No stale agent PRs found"
-            exit 0
-          fi
-
-          echo "$STALE_PRS" | while read -r PR_OBJ; do
-            PR_NUMBER=$(echo "$PR_OBJ" | jq -r '.number')
-            TITLE=$(echo "$PR_OBJ" | jq -r '.title')
-            BRANCH=$(echo "$PR_OBJ" | jq -r '.headRefName')
-            PR_URL="https://github.com/$GH_REPO/pull/$PR_NUMBER"
-            echo "Closing stale PR #$PR_NUMBER: $TITLE (branch: $BRANCH)"
-
-            LINEAR_ID=$(printf '%s\n%s\n' "$BRANCH" "$TITLE" | grep -oiE 'jov-[0-9]+' | head -1 | tr '[:lower:]' '[:upper:]' || true)
-            LINEAR_NOTE=""
-            if [[ -n "$LINEAR_ID" ]]; then
-              LINEAR_NOTE="Original Linear issue: $LINEAR_ID — re-create from fresh main if still needed."
-            fi
-
-            ROUTED="false"
-            if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
-              PAYLOAD=$(jq -n --arg pr "$PR_URL" --arg branch "$BRANCH" --arg title "$TITLE" '{
-                text: "Auto-closing stale needs-human agent PR",
-                attachments: [{
-                  color: "warning",
-                  fields: [
-                    { title: "PR", value: $pr, short: false },
-                    { title: "Branch", value: $branch, short: true },
-                    { title: "Title", value: $title, short: false },
-                    { title: "Reason", value: "needs-human idle >48h. Label is not a merge blocker; close is queue hygiene.", short: false }
-                  ]
-                }]
-              }')
-              if curl -sS -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK_URL"; then
-                ROUTED="true"
-              fi
-            fi
-
-            if [ -n "${LINEAR_API_KEY:-}" ] && [ -n "$LINEAR_ID" ]; then
-              ISSUE_ID=$(curl -sS https://api.linear.app/graphql \
-                -H "Authorization: $LINEAR_API_KEY" \
-                -H "Content-Type: application/json" \
-                -d "$(jq -n --arg issueId "$LINEAR_ID" '{
-                  query: "query($issueId: String!) { issue(id: $issueId) { id identifier } }",
-                  variables: { issueId: $issueId }
-                }')" | jq -r '.data.issue.id // empty')
-              if [ -n "$ISSUE_ID" ]; then
-                BODY="Auto-closing stale agent PR [$TITLE]($PR_URL) (\`$BRANCH\`) after 48h idle on \`needs-human\`. Branch is retained. This is queue hygiene, not a merge-gate failure."
-                if curl -sS https://api.linear.app/graphql \
-                  -H "Authorization: $LINEAR_API_KEY" \
-                  -H "Content-Type: application/json" \
-                  -d "$(jq -n --arg issueId "$ISSUE_ID" --arg body "$BODY" '{
-                    query: "mutation($issueId: String!, $body: String!) { commentCreate(input: { issueId: $issueId, body: $body }) { success } }",
-                    variables: { issueId: $issueId, body: $body }
-                  }')" >/dev/null; then
-                  ROUTED="true"
-                fi
-              fi
-            fi
-
-            if [ "$ROUTED" != "true" ]; then
-              echo "No Slack/Linear route succeeded for #$PR_NUMBER; leaving open."
-              continue
-            fi
-
-            gh pr close "$PR_NUMBER" --comment "## Auto-Closed: Stale Agent PR
-
-          This PR has been labeled \`needs-human\` for over 48 hours with no activity.
-
-          Slack or Linear was notified before close. The branch has not been deleted. \`needs-human\` remains an automation stop, not a required merge check.
-
-          $LINEAR_NOTE
-
-          To reopen: \`gh pr reopen $PR_NUMBER\` or create a fresh PR from main."
-          done
+        run: node scripts/lib/needs-human-autoclose.mjs

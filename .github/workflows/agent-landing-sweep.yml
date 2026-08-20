@@ -10,7 +10,7 @@
 # that passed CI before the pipeline was listening, workflows that fired but
 # silently failed, or GitHub Actions delivery delays can leave eligible PRs
 # stuck in "approved but not yet auto-merged" limbo. This sweep is a safety
-# net that catches those cases.
+# net that catches those cases. Scope Judge is retired and is not a landing gate.
 #
 # GUARDRAILS (same as agent-pipeline.yml approve job):
 # 1. Only agent branches (linear/*, claude/*, codegen-bot/*, codex/*, */jov-*)
