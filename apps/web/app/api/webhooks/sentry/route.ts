@@ -19,6 +19,7 @@ import { captureCriticalError } from '@/lib/error-tracking';
 import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import {
   isNonActionableUpstashErrorBag,
+  isNonActionableUpstashIssue,
   isTransientInfraHttpIssue,
 } from '@/lib/sentry/non-actionable-issues';
 import { logger } from '@/lib/utils/logger';
@@ -245,6 +246,17 @@ export async function POST(request: NextRequest) {
       );
       return NextResponse.json(
         { received: true, skipped: true, reason: 'upstash-error-json-bag' },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (isNonActionableUpstashIssue({ title, culprit })) {
+      logger.info(
+        '[Sentry Webhook] Skipping autofix for non-actionable Upstash issue',
+        { issueId, title, culprit }
+      );
+      return NextResponse.json(
+        { received: true, skipped: true, reason: 'non-actionable-upstash' },
         { headers: NO_STORE_HEADERS }
       );
     }

@@ -26,8 +26,9 @@ import {
  *
  * Counts interactive elements (`<button>`, `<a>`, role="button") declaring
  * explicit sub-44px heights (`h-4`…`h-10`, `size-*`, `h-[Npx]` < 44) without
- * a ≥44px height/min-height rescue on the same element. The count may only
- * go DOWN — new sub-44px hit areas fail CI.
+ * a ≥44px hit-container rescue on the same element. The count may only
+ * go DOWN — new sub-44px hit areas fail CI. Prescribed fix: enlarge the
+ * touch-target container (`before:h-11`), not the visible control.
  *
  * Baseline: touch-target-ratchet.baseline.json (repo root of apps/web).
  * CLI: `pnpm --filter web run lint:touch-target -- [--list|--update]`.
@@ -67,7 +68,7 @@ describe('touch-target ratchet', () => {
       current,
       `Touch-target regression: ${current} sub-44px interactive elements > baseline ${baseline.count}.\n` +
         'Interactive controls need a 44px minimum hit area (WCAG 2.5.5).\n' +
-        'Fix: h-11+ (44px), min-h-11, or padding to expand the hit area.\n' +
+        'Fix: enlarge the hit container (`before:absolute before:h-11`), not the visible item.\n' +
         'Locate them: pnpm --filter web run lint:touch-target -- --list'
     ).toBeLessThanOrEqual(baseline.count);
   });
@@ -220,7 +221,23 @@ describe('touch-target detection — violations are caught (red→green proof)',
     ).toHaveLength(0);
   });
 
-  it('GREEN: min-h-11 rescues a compact visual height', () => {
+  it('GREEN: 44px hit container rescues a compact visual (prescribed fix)', () => {
+    expect(
+      findViolationsInSource(
+        '<button className="relative h-8 w-8 before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[\'\']">x</button>'
+      )
+    ).toHaveLength(0);
+  });
+
+  it('GREEN: before:min-h-11 is a hit-container rescue', () => {
+    expect(
+      tagHasSub44Height(
+        '<button className="h-8 before:absolute before:min-h-11 before:min-w-11">'
+      )
+    ).toBe(false);
+  });
+
+  it('GREEN: min-h-11 on the control still counts (legacy, not the prescribed fix)', () => {
     expect(
       findViolationsInSource('<button className="h-8 min-h-11 w-8">x</button>')
     ).toHaveLength(0);
@@ -259,5 +276,8 @@ describe('touch-target detection — violations are caught (red→green proof)',
     expect(tagHasSub44Height('<button className="h-11">')).toBe(false); // 44px
     expect(tagHasSub44Height('<button className="h-[43px]">')).toBe(true);
     expect(tagHasSub44Height('<button className="h-[44px]">')).toBe(false);
+    expect(
+      tagHasSub44Height('<button className="h-8 before:h-11 before:w-11">')
+    ).toBe(false);
   });
 });

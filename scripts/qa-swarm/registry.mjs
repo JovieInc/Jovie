@@ -34,9 +34,9 @@ export const QA_SWARM_RECIPES = [
     skillInvocation: '/qa-swarm-explore',
     title: 'Exploratory test swarm',
     description:
-      'Goal-driven exploratory QA across web (/browse, /qa) and iOS (XCUITest driver on real builds).',
+      'Goal-driven exploratory QA across web (Playwright /qa) and iOS (XCUITest driver on real builds).',
     labels: ['testing', 'qa:perf'],
-    gstackSkills: ['/qa', '/browse', '/ios-qa'],
+    gstackSkills: ['/qa', '/ios-qa'],
     verificationCommands: ['pnpm run test:web:smoke'],
   },
   {
@@ -47,7 +47,7 @@ export const QA_SWARM_RECIPES = [
     description:
       'Screenshot surfaces and score polish 1-10. Flags broken or janky UI with evidence paths.',
     labels: ['testing', 'ux', 'ui'],
-    gstackSkills: ['/design-review', '/browse'],
+    gstackSkills: ['/design-review'],
     verificationCommands: [
       'pnpm --filter @jovie/web run test:lighthouse:public:launch',
     ],

@@ -18,8 +18,9 @@ test('the current repository has unique catalog-visible leaf names', () => {
   assert.deepEqual(evaluateSkillCatalog(), []);
   const names = collectCatalogVisibleSkills().map(entry => entry.name);
   assert.equal(new Set(names).size, names.length);
-  assert.ok(names.includes('browse'));
+  assert.equal(names.includes('browse'), false);
   assert.ok(names.includes('ship'));
+  assert.ok(names.includes('qa'));
 });
 
 test('nested adapter copies do not create a second catalog name', () => {

@@ -4,7 +4,13 @@
  * Static JSX lint: finds interactive elements (`<button>`, `<a>`,
  * role="button") declaring explicit sub-44px height utilities
  * (`h-4`…`h-10`, `size-4`…`size-10`, `h-[Npx]` with N < 44) that are not
- * rescued by a ≥44px height/min-height utility on the same element.
+ * rescued by a ≥44px *hit container* on the same element.
+ *
+ * The correct rescue is an enlarged touch-target container, not a larger
+ * visible control: `before:absolute before:h-11 before:min-w-11` (see
+ * packages/ui/atoms/button.tsx). `min-h-11` / `h-11` on the control itself
+ * still count as rescue so existing markup does not regress the ratchet,
+ * but they are not the prescribed fix.
  *
  * Consumed by:
  *   - scripts/lint-touch-target.ts (CLI ratchet)
@@ -49,13 +55,22 @@ const SUB_44_UTILITY = new RegExp(
 );
 const SUB_44_ARBITRARY = /(?:^|[\s"'`])(?:h|size)-\[(\d+(?:\.\d+)?)px\]/;
 
-// A ≥44px height/min-height utility rescues the element.
+// A ≥44px height/min-height utility on the element still counts (legacy
+// rescue) so the ratchet does not jump. Prefer HIT_CONTAINER_RESCUE.
 const RESCUE_SCALE =
   '(?:11|12|13|14|15|16|20|24|28|32|36|40|44|48|52|56|60|64|72|80|96|full|screen)';
 const RESCUE_UTILITY = new RegExp(
   `(?:^|[\\s"'\`])(?:h|size|min-h)-${RESCUE_SCALE}(?:$|[\\s"'\`])`
 );
 const RESCUE_ARBITRARY = /(?:^|[\s"'`])(?:h|size|min-h)-\[(\d+(?:\.\d+)?)px\]/g;
+
+// Canonical hit-area: invisible 44px ::before/::after container around a
+// smaller visual (founder: enlarge the touch target, not the item).
+const HIT_CONTAINER_RESCUE = new RegExp(
+  `(?:^|[\\s"'\`])(?:before|after):(?:h|size|min-h)-${RESCUE_SCALE}(?:$|[\\s"'\`])`
+);
+const HIT_CONTAINER_ARBITRARY =
+  /(?:^|[\s"'`])(?:before|after):(?:h|size|min-h)-\[(\d+(?:\.\d+)?)px\]/g;
 
 const INTERACTIVE_OPENING =
   /<(?:button|a)(?=[\s/>])|role\s*=\s*["']button["']/g;
@@ -270,7 +285,13 @@ export function tagHasSub44Height(tagText: string): boolean {
   }
   if (!hasSub44) return false;
 
-  // Rescued by an explicit ≥44px height/min-height on the same element?
+  // Preferred: 44px hit container (::before / ::after), visual size unchanged.
+  if (HIT_CONTAINER_RESCUE.test(tagText)) return false;
+  for (const m of tagText.matchAll(HIT_CONTAINER_ARBITRARY)) {
+    if (Number.parseFloat(m[1]) >= 44) return false;
+  }
+
+  // Legacy: ≥44px height/min-height on the same element still counts.
   if (RESCUE_UTILITY.test(tagText)) return false;
   for (const m of tagText.matchAll(RESCUE_ARBITRARY)) {
     if (Number.parseFloat(m[1]) >= 44) return false;

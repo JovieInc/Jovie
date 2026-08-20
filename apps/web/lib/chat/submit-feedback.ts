@@ -12,7 +12,7 @@ export async function submitChatFeedback(params: {
   try {
     const userRecord = await db.query.users.findFirst({
       where: eq(users.clerkId, params.clerkUserId),
-      columns: { id: true, name: true, email: true },
+      columns: { id: true, name: true },
     });
 
     await createFeedbackItem({
@@ -29,7 +29,6 @@ export async function submitChatFeedback(params: {
     await notifySlackFeedbackSubmission({
       message: params.message,
       name: userRecord?.name ?? 'Jovie user',
-      email: userRecord?.email,
       source: 'chat',
       pathname: '/app',
     });

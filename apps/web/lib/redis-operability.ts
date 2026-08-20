@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { getRedis } from '@/lib/redis';
+import { isRedisQuotaFailure } from '@/lib/utils/errors';
 
 const PROBE_TTL_SECONDS = 60;
 
@@ -40,12 +41,10 @@ function serializeRedisFailure(error: unknown): string {
 }
 
 export function classifyRedisFailure(error: unknown): RedisFailureKind {
-  const message = serializeRedisFailure(error);
-  if (
-    /max requests limit|quota exceeded|request limit exceeded/i.test(message)
-  ) {
+  if (isRedisQuotaFailure(error)) {
     return 'quota_exceeded';
   }
+  const message = serializeRedisFailure(error);
   // captureWarning({ error: UpstashError }) JSON.stringifies to
   // {"error":{"name":"UpstashError"}} because message/stack are
   // non-enumerable. That payload is the quota cluster (JOV-5221).

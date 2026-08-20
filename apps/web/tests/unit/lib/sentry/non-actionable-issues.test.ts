@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isNonActionableUpstashErrorBag,
   isNonActionableUpstashErrorBagEvent,
+  isNonActionableUpstashIssue,
   isTransientInfraHttpIssue,
   isTransientInfraHttpTransaction,
   isUpstashQuotaNoise,
@@ -151,6 +152,43 @@ describe('non-actionable Sentry issues', () => {
       expect(
         isUpstashQuotaSentryEvent({
           exception: { values: [{ value: 'Unauthorized' }] },
+        })
+      ).toBe(false);
+    });
+  });
+
+  describe('isNonActionableUpstashIssue', () => {
+    it('matches the opaque JSON.stringify UpstashError title', () => {
+      expect(
+        isNonActionableUpstashIssue({
+          title: 'Error: {"error":{"name":"UpstashError"}}',
+        })
+      ).toBe(true);
+    });
+
+    it('matches clerkUserId-wrapped opaque UpstashError titles', () => {
+      expect(
+        isNonActionableUpstashIssue({
+          title:
+            'Error: {"clerkUserId":"af5b9ee0-ecec-4508-86e0-4f364c2e349d","error":{"name":"UpstashError"}}',
+        })
+      ).toBe(true);
+    });
+
+    it('matches quota-exhausted UpstashError titles', () => {
+      expect(
+        isNonActionableUpstashIssue({
+          title:
+            'UpstashError: Command failed: ERR max requests limit exceeded. Limit: 500000, Usage: 500099',
+        })
+      ).toBe(true);
+    });
+
+    it('does not match unrelated auth failures', () => {
+      expect(
+        isNonActionableUpstashIssue({
+          title:
+            'UpstashError: WRONGPASS invalid or missing auth token. See https://docs.upstash.com/redis/troubleshooting/http_unauthorized for details.',
         })
       ).toBe(false);
     });

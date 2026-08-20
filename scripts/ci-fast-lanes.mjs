@@ -282,6 +282,26 @@ function runEslintServerBoundaries() {
 
 function runTypecheck() {
   // --force is mandatory (JOV-3499). Gate guard scans this file + ci.yml.
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (event === 'pull_request') {
+    const files = changedFiles([
+      '**/*.ts',
+      '**/*.tsx',
+      '**/*.mts',
+      '**/*.cts',
+      '**/tsconfig*.json',
+      'turbo.json',
+      'package.json',
+      'pnpm-lock.yaml',
+    ]);
+    if (files && files.length === 0) {
+      return {
+        code: 0,
+        output: 'No TypeScript graph files changed\n',
+        skipped: true,
+      };
+    }
+  }
   return shell('pnpm turbo typecheck --affected --force');
 }
 

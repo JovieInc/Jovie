@@ -258,9 +258,9 @@ doppler run -p jovie-web -c dev -- pnpm --filter web screenshots:seed
 
 Screenshots are saved to `apps/web/public/product-screenshots/` and used by homepage components (`ReleasesSection`, `PhoneProfileDemo`, `AudienceCRMSection`).
 
-### Local Browse Auth Bootstrap
+### Local Playwright Auth Bootstrap
 
-Local `/browse` and `/qa` runs should use the app's dev auth bootstrap, not manual Clerk login.
+Local Playwright `/qa` runs should use the app's dev auth bootstrap, not manual Clerk login. `/browse` is removed.
 
 Start the local browse-compatible server:
 
@@ -303,8 +303,8 @@ The helper now prefers the local dev auth route on loopback/private hosts and on
 | Product screenshot missing | Catalog scenario failed or its registry export was removed | Run `pnpm --filter web screenshots:capture` and inspect the failing `catalog.spec.ts` scenario |
 | `CLERK_SETUP_FAILED` | Real Clerk keys not in env | Run via Doppler, not bare `pnpm` |
 | `Failed to load Clerk JS` on localhost | Clerk proxy forces HTTPS, localhost has no SSL | The app now auto-disables the Clerk proxy on insecure local/private HTTP origins. If you are reusing an already-running dev server, restart it so the new runtime path is active. You can still force the old behavior with `NEXT_PUBLIC_CLERK_PROXY_DISABLED=1` when needed for test pipelines. |
-| Local `/browse` still looks signed out | Dev server was not started in browse mode | Restart with `pnpm run dev:web:browse` |
-| Local `/browse` hits `/signin` | Dev auth bootstrap route was not used | Open `/api/dev/test-auth/enter?persona=creator&redirect=/app/dashboard/earnings` first |
+| Local Playwright QA still looks signed out | Dev server was not started with auth bypass | Restart with `pnpm run dev:web:browse` |
+| Local Playwright QA hits `/signin` | Dev auth bootstrap route was not used | Open `/api/dev/test-auth/enter?persona=creator&redirect=/app/dashboard/earnings` first |
 | OTP input not visible | Testing token not set before navigation | Only relevant for non-loopback fallback; check `setupClerkTestingToken()` runs in `auth.setup.ts` |
 | `Couldn't find your account` on staging | Staging uses live Clerk instance, test user is in test instance | Always run screenshots against localhost (dev server), not staging |
 

@@ -8,9 +8,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ## [Unreleased]
 
 - [internal] **Redis quota JSON bags no longer auto-file as `Error: {"error":{"name":"UpstashError"}}` (JOV-5218):** Sentry drops that exact capture-bag title and the autofix webhook skips it, while real Upstash quota exceptions stay visible.
+- [internal] **Redis quota errors no longer file opaque `UpstashError` Sentry issues (JOV-5220):** wrapped `{ error }` capture payloads keep the inner message, quota events fingerprint as one class, and autofix skips the name-only JSON titles.
 
 ### Fixed
 
+- [internal] **Touch-target lint accepts the 44px hit container:** compact controls stay visually small (`h-7`/`h-8`/`h-9`); the prescribed rescue is `before:h-11`, not enlarging the item. `min-h-11` on the control still counts so the ratchet does not jump.
 - [internal] **Production monitors page again:** post-deploy probe failures Slack `#alerts-production`, golden-path probes add claim/billing/Stripe liveness, observability and synthetics file Linear, and the canary `/api/chat` auth-gate retries then fails closed.
 
 ### Added
@@ -49,6 +51,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- [internal] **Online scoring no longer fakes reviews or rubric scores (JOV-5238):** missing judges record `judge:absent`, word count is not a global fail, enqueue cannot report success without a durable queue, and Slack feedback drops email.
 - [internal] **Stale grok remount units no longer block a fresh rebase:** sidecar stops a DIRTY/CONFLICTING fallback-ship older than 15 minutes so changelog remounts can run after a sibling lands. Merge-queue UNMERGEABLE (`CONFLICTING`) counts as remount, not inflight skip.
 - [internal] **DIRTY remounts that only conflict on CHANGELOG.md merge and push without waiting on grok:** Unreleased bullets from the branch are unioned onto main so sibling ships stop parking CLEAN-except-changelog heads for an hour.
 - [internal] **Hold-intake missed-admission recovery now enrolls CLEAN `queue-deferred` heads:** exact admission already strips that label, but a main-push recovery used to skip it and left CI-green Symphony PRs parked off the merge queue.
