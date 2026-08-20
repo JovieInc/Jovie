@@ -178,6 +178,7 @@
     "ci:typecheck-gate-guard": "node scripts/ci-typecheck-gate-guard.mjs",
     "skill-governance:check": "node scripts/skill-governance-guard.mjs",
     "skill-governance:test": "node --test scripts/skill-governance-guard.test.mjs",
+    "agent-web:test": "node --test scripts/agent-web-contract.test.mjs",
     "ci:taste-guard": "node scripts/taste-label-guard.mjs",
     "ci:taste-guard:sweep": "node scripts/taste-label-guard.mjs sweep",
     "pr:conflict:dry-run": "node scripts/pr-conflict-handler.mjs --dry-run",
