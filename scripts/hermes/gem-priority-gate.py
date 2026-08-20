@@ -32,6 +32,8 @@ INDEPENDENT_REVIEWER = "Gem"
 INDEPENDENT_REVIEW_SCOPE = "exact-main-head"
 QUEUE_SNAPSHOT_SCHEMA = "jovie-queue-snapshot/v1"
 QUEUE_SNAPSHOT_TTL = timedelta(minutes=10)
+CONTROLLER_SNAPSHOT_SCHEMA = "jovie-controller-snapshot/v1"
+CONTROLLER_SNAPSHOT_TTL = timedelta(minutes=10)
 # Schema-padding sentinel for evaluation-failed receipts. Auto-Enroll jq
 # requires a 40-hex main SHA; this value never authorizes promotion.
 UNKNOWN_MAIN_SHA = "0" * 40
@@ -184,25 +186,74 @@ def observe_main(repo: str) -> dict[str, Any]:
         return {"status": "unknown", "error": f"github-observation-failed: {error}"}
 
 
-def observe_controller(url: str) -> dict[str, Any]:
+def observe_controller(
+    url: str,
+    snapshot_path: Path | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Observe Symphony :4041. Connection blips must not flip hold-intake to blocked.
+
+    Live #16187 was CLEAN/PR-Ready, then autoenroll ran with promotionMode=blocked
+    because urlopen hit connection refused during a symphony-ui-pilot restart.
+    Reuse a fresh last-known green snapshot for the same transient class as
+    queue observation (connection refused / timeout).
+    """
+    observed_at = now or utc_now()
     try:
         with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310 - fixed local URL by default
             value = json.loads(response.read().decode("utf-8"))
         if not isinstance(value, dict):
             raise ValueError("controller state was not an object")
-        return {
+        observed = {
             "status": "green",
             "kind": "symphony",
             "url": url,
             "activeRuns": len(value.get("running", [])),
+            "source": "live",
+            "observedAt": isoformat(observed_at),
         }
+        if snapshot_path is not None:
+            write_queue_snapshot(
+                snapshot_path,
+                {"schema": CONTROLLER_SNAPSHOT_SCHEMA, **observed},
+            )
+        return observed
     except (OSError, ValueError, json.JSONDecodeError, urllib.error.URLError) as error:
+        if snapshot_path is not None and transient_gh_observation_error(error):
+            cached = load_last_known_controller(snapshot_path, observed_at)
+            if cached is not None:
+                return {
+                    **cached,
+                    "error": f"controller-observation-failed-used-last-known: {error}",
+                }
         return {
             "status": "failed",
             "kind": "symphony",
             "url": url,
             "error": f"controller-observation-failed: {error}",
         }
+
+
+def load_last_known_controller(path: Path, now: datetime) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    try:
+        data = read_json(path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
+    if data.get("schema") != CONTROLLER_SNAPSHOT_SCHEMA or data.get("status") != "green":
+        return None
+    observed_at = parse_time(data.get("observedAt"))
+    if observed_at is None or now - observed_at > CONTROLLER_SNAPSHOT_TTL:
+        return None
+    return {
+        "status": "green",
+        "kind": "symphony",
+        "url": data.get("url"),
+        "activeRuns": data.get("activeRuns"),
+        "source": "last-known",
+        "observedAt": data.get("observedAt"),
+    }
 
 
 def observe_build_info(build_info_url: str) -> dict[str, Any]:
@@ -548,28 +599,34 @@ def observe_independent_review(
     }
 
 
+_TRANSIENT_OBSERVATION_MARKERS = (
+    "http 502",
+    "http 503",
+    "http 504",
+    "gateway timeout",
+    "timed out",
+    "connection reset",
+    "connection refused",
+    "temporarily unavailable",
+)
+
+
 def transient_gh_observation_error(error: BaseException) -> bool:
-    """Whether a GitHub CLI failure is worth a bounded observer retry."""
+    """Whether an observer failure is a blip worth last-known reuse.
+
+    GitHub CLI 5xx/timeouts and Symphony :4041 connection refused during a
+    UI restart (live #16187 autoenroll) must not flip hold-intake to blocked.
+    """
     if isinstance(error, subprocess.TimeoutExpired):
         return True
-    if not isinstance(error, subprocess.CalledProcessError):
-        return False
-    detail = " ".join(
-        str(value or "") for value in (error.stdout, error.stderr)
-    ).lower()
-    return any(
-        marker in detail
-        for marker in (
-            "http 502",
-            "http 503",
-            "http 504",
-            "gateway timeout",
-            "timed out",
-            "connection reset",
-            "connection refused",
-            "temporarily unavailable",
-        )
-    )
+    if isinstance(error, subprocess.CalledProcessError):
+        detail = " ".join(
+            str(value or "") for value in (error.stdout, error.stderr)
+        ).lower()
+        return any(marker in detail for marker in _TRANSIENT_OBSERVATION_MARKERS)
+    if isinstance(error, (OSError, urllib.error.URLError)):
+        return any(marker in str(error).lower() for marker in _TRANSIENT_OBSERVATION_MARKERS)
+    return False
 
 
 def run_gh_queue_snapshot(repo: str) -> subprocess.CompletedProcess[str]:
@@ -1333,7 +1390,11 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
     return {
         "main": main,
         "production": observe_production(args.production_url),
-        "controller": observe_controller(args.symphony_url),
+        "controller": observe_controller(
+            args.symphony_url,
+            snapshot_path=args.state_dir.parent / "controller-snapshot.json",
+            now=now,
+        ),
         "integrity": observe_integrity(integrity_path),
         "queue": observe_queue(
             args.repo,

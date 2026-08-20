@@ -30,6 +30,9 @@ describe('agent-branch-pattern (open-agent-PR capacity)', () => {
   it('rejects non-agent branches', () => {
     expect(isOpenAgentPrBranch('feature/foo')).toBe(false);
     expect(isOpenAgentPrBranch('hotfix/prod')).toBe(false);
+    expect(isOpenAgentPrBranch('hotfix/prod-outage')).toBe(false);
+    expect(isOpenAgentPrBranch('feat/billing-copy')).toBe(false);
+    expect(isOpenAgentPrBranch('fix/quality-agent-qc')).toBe(false);
     expect(isOpenAgentPrBranch('main')).toBe(false);
     expect(isOpenAgentPrBranch('tim/not-a-ticket')).toBe(false);
     expect(isOpenAgentPrBranch('')).toBe(false);
@@ -68,6 +71,23 @@ describe('agent-branch-pattern (open-agent-PR capacity)', () => {
       'codex|codegen-bot|linear|claude'
     );
     expect(AGENT_OPEN_PR_BRANCH_JQ_TEST).toContain('jov-[0-9]+([_-].+)?');
+  });
+
+  it('agent-pipeline uses the shared allowlist, not an infra denylist', () => {
+    const text = readFileSync(
+      `${repoRoot}/.github/workflows/agent-pipeline.yml`,
+      'utf8'
+    );
+    expect(text).toContain('scripts/lib/agent-branch-pattern.mjs');
+    expect(text).toMatch(/\^\(codex\|codegen-bot\|linear\|claude\)\//);
+    expect(text).toContain('^[^/]+/jov-[0-9]+([_-].+)?$');
+    expect(text).not.toMatch(
+      /\^\(main\|dependabot\/\|gh-readonly-queue\/\|renovate\/\)/
+    );
+    expect(text).not.toContain('"Scope Judge"');
+    expect(text).not.toContain('AGENT_RUN_SOURCE_RUN_ID');
+    expect(text).toContain('SLACK_WEBHOOK_URL');
+    expect(text).toContain('LINEAR_API_KEY');
   });
 
   it('workflows consume the shared module (no divergent inline capacity regex)', () => {

@@ -27,7 +27,7 @@ export async function getCachedHandleAvailability(
     if (value === null) return null;
     return value === '1';
   } catch (error) {
-    captureWarning('[handle-availability] Redis read failed', { error });
+    captureWarning('[handle-availability] Redis read failed', error);
     return null;
   }
 }
@@ -58,7 +58,7 @@ export async function cacheHandleAvailability(
         : HANDLE_UNAVAILABLE_TTL_SECONDS,
     });
   } catch (error) {
-    captureWarning('[handle-availability] Redis write failed', { error });
+    captureWarning('[handle-availability] Redis write failed', error);
   }
 }
 
@@ -74,8 +74,6 @@ export async function invalidateHandleCache(handle: string): Promise<void> {
   try {
     await redis.del(getHandleCacheKey(handle));
   } catch (error) {
-    captureWarning('[handle-availability] Redis invalidation failed', {
-      error,
-    });
+    captureWarning('[handle-availability] Redis invalidation failed', error);
   }
 }

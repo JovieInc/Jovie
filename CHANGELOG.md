@@ -37,6 +37,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Fixed
 
 - [internal] **Redis quota JSON bags no longer auto-file as `Error: {"error":{"name":"UpstashError"}}` (JOV-5218):** Sentry drops that exact capture-bag title and the autofix webhook skips it, while real Upstash quota exceptions stay visible.
+- [internal] **Agent QC wires now match autonomous-shipping doctrine:** Scope Judge is retired instead of advertised, Slop Gate stays a weekly post-merge smell report, GStack PR comments are no longer auto-approve evidence, exhausted `needs-human` PRs ping Slack/Linear before the 48h close, agent-pipeline classifies branches with the shared allowlist so `hotfix/` and `feat/` stop looking like agent PRs, and live merge-queue ruleset verify runs on a schedule instead of only in docs.
 - [internal] **Long typechecks now report phase timing instead of looking stuck:** singleflight logs elapsed time, tsbuildinfo age/size, and child CPU/RSS while the live compiler keeps ownership.
 - [internal] **Symphony admits from one receipt, not three labels:** a current `admission-gate/v1` receipt is the admission authority. The `plan-approved`, `admission-approved`, and `symphony` labels stay as derived audit. Protected and human-review work stays excluded.
 - [internal] **Merge-queue Path Changes no longer rejects coalesced heads:** an empty event-base diff now recomputes against live `main` before a typed no-op, so green combined heads can land.
@@ -44,6 +45,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - **Vlog capture matches how you hold the phone:** portrait, landscape left, and landscape right record the right way up. Landscape keeps record controls on screen.
 - **Expired iPhone chat sessions fail closed:** a 401 ends the turn as a failed reply and asks you to sign in again, instead of inventing an answer.
 - **Mobile chat uses the signed-in artist:** the second claims check that blocked a valid session profile is gone.
+- [internal] **Redis quota warnings no longer file as `Error: {"error":{"name":"UpstashError"}}` (JOV-5221):** captureWarning unwraps `{ error }` bags, classifies the opaque JSON payload as quota exhaustion, and drops that noise from Sentry. The hourly Redis canary still owns the standing alert.
 - [internal] **Public profile block checks fail open on a bad Redis pipeline payload (JOV-5196):** a non-array Upstash response is treated as a cache miss instead of throwing `res.map is not a function`.
 - **iPhone chat bubbles wrap like Messages:** The first word stays in the same sentence instead of sitting alone on the left.
 - **Public profiles keep names, places, and last songs readable:** Contact drawers show the person before the company, compact heroes keep the full city, Music’s last row clears the tab bar, and AEO mention links use the profile text token instead of browser purple.

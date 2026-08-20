@@ -1,9 +1,13 @@
-# Deterministic slop gate for AI-generated copy (JOV-#11098).
+# Deterministic slop check for AI-generated copy (JOV-#11098).
 #
-# Runs slopcheck.py on changed .md / .mdx / marketing-copy files.
-# Currently advisory (continue-on-error: true). Flip to blocking after
-# a tuning week by removing continue-on-error and adding the job to
-# the merge gate list in ci-harness/manifest.json.
+# Post-merge informational only. Autonomous shipping + taste classifier
+# keep copy/UX taste off the required PR path (humans review production).
+# This job is schedule/dispatch on main, never pull_request, and must not
+# be added to ci-harness/manifest.json or PR Ready.
+#
+# Weekly window: last 7 days of .md/.mdx on main (a one-commit window
+# missed every commit except the tip). continue-on-error stays on so a
+# smell never reds a scheduled Actions run.
 #
 # Zero cost: pure Python, no API keys, no network calls.
 name: Slop Gate
@@ -24,7 +28,8 @@ jobs:
   slopcheck:
     name: Slop Gate (advisory)
     runs-on: ubuntu-latest
-    # ponytail: advisory until tuning week ends — flip to blocking by removing continue-on-error
+    # Informational post-merge lane — do not remove continue-on-error to
+    # invent a merge blocker. Taste ships; this is a weekly smell report.
     continue-on-error: true
     steps:
       - name: Checkout repository
@@ -46,7 +51,13 @@ jobs:
           # whole-file slop score only ever grows and always fails regardless of the
           # new entry's quality. Changelog copy quality is governed by the changelog
           # format rules in .claude/rules/release.md, not this marketing-copy gate.
-          git diff --name-only --diff-filter=d HEAD~1 HEAD \
+          BASE=$(git rev-list -n 1 --before='7 days ago' HEAD || true)
+          if [ -z "$BASE" ]; then
+            BASE=$(git rev-list --max-parents=0 HEAD | tail -1)
+          fi
+          echo "Diffing copy files since $BASE"
+          echo "diff_base=$BASE" >> "$GITHUB_OUTPUT"
+          git diff --name-only --diff-filter=d "$BASE" HEAD \
             | grep -E '\.(md|mdx)$' \
             | grep -v -E '^(node_modules|\.cache|drizzle/migrations|DESIGN\.md)' \
             | grep -v -E '(^|/)CHANGELOG\.md$' \
@@ -65,7 +76,7 @@ jobs:
         if: steps.changed.outputs.has_files == 'true'
         run: |
           mapfile -t files < /tmp/changed_copy_files.txt
-          python3 scripts/slopcheck.py --max 3.0 --diff-base HEAD~1 "${files[@]}"
+          python3 scripts/slopcheck.py --max 3.0 --diff-base "${{ steps.changed.outputs.diff_base }}" "${files[@]}"
 
       - name: No copy files changed — skip
         if: steps.changed.outputs.has_files == 'false'
