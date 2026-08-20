@@ -154,9 +154,12 @@ describe('non-actionable Sentry issues', () => {
       ).toBe(true);
     });
 
-    it('matches a thrown { error: UpstashError } object', () => {
-      const inner = new Error('ERR max requests limit exceeded');
+    it('matches a thrown { error: UpstashError } object (JOV-5218)', () => {
+      const inner = new Error(
+        'Command failed: ERR max requests limit exceeded. Limit: 500000'
+      );
       inner.name = 'UpstashError';
+      expect(JSON.stringify({ error: inner })).toBe(UPSTASH_ERROR_JSON_BAG);
       expect(isOpaqueUpstashErrorJsonBag({ error: inner })).toBe(true);
     });
 

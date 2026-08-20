@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Thrown `{ error: UpstashError }` request errors no longer file as `Error: {"error":{"name":"UpstashError"}}` (JOV-5218):** `onRequestError` skips the JSON-stringified object bag, not only an already-stringified Error message. Real quota command failures still report.
+
 - [internal] **Summer dump-ack is the first promoted Eve/Vercel workflow (JOV-5217):** inventory rejects discretionary Summer candidates, Eve cannot mutate the frozen contract, executions carry stable work/workflow/version ids plus a redacted Summer receipt, and disablement keeps durable intake and Summer authority.
 
 - [internal] **Billing health warnings no longer file as `Error: Billing health check warning` (JOV-5242):** warning-level `/api/billing/health` results stay in the JSON monitors already poll. Sentry still captures thrown failures and critical status.
