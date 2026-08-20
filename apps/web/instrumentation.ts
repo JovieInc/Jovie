@@ -318,8 +318,8 @@ export async function onRequestError(...args: unknown[]) {
   }
 
   // Next.js request-error capture bypasses captureError unwrap. A thrown
-  // `{ error: UpstashError }` JSON-stringifies to the JOV-5218 / JOV-5228
-  // Linear title.
+  // `{ error: UpstashError }` JSON-stringifies to the JOV-5209 / JOV-5218
+  // Linear title. Nested wrappers keep the bag on `cause`.
   const { isOpaqueUpstashErrorJsonBag } = await import(
     '@/lib/sentry/non-actionable-issues'
   );

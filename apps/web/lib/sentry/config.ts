@@ -55,6 +55,7 @@
 import type * as Sentry from '@sentry/nextjs';
 import {
   isNonActionableUpstashErrorBagEvent,
+  isOpaqueUpstashErrorJsonBag,
   UPSTASH_QUOTA_IGNORE_ERRORS,
 } from '@/lib/sentry/non-actionable-issues';
 
@@ -436,7 +437,7 @@ export function scrubPii(event: SentryEvent): SentryEvent | null {
     return null;
   }
 
-  // Filter captureWarning/captureError JSON bags (JOV-5218, JOV-5228, JOV-5229).
+  // Filter captureWarning/captureError JSON bags (JOV-5209, JOV-5218, JOV-5228).
   // Real Upstash quota exceptions keep their command-failure title.
   if (isNonActionableUpstashErrorBagEvent(event)) {
     return null;
@@ -500,6 +501,13 @@ export function createBeforeSendHook(
   ) => SentryEvent | null
 ): (event: SentryEvent, hint?: SentryEventHint) => SentryEvent | null {
   return (event: SentryEvent, hint?: SentryEventHint): SentryEvent | null => {
+    // Direct captureException({ error: UpstashError }) keeps the bag on
+    // hint.originalException while the event value is a generic object
+    // capture (JOV-5209).
+    if (isOpaqueUpstashErrorJsonBag(hint?.originalException)) {
+      return null;
+    }
+
     // First apply PII scrubbing
     const scrubbedEvent = scrubPii(event);
 

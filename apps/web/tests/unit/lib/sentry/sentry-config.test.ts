@@ -440,6 +440,50 @@ describe('createBeforeSendHook', () => {
     beforeSend(event as any, hint as any);
     expect(customProcessor).toHaveBeenCalledWith(expect.anything(), hint);
   });
+
+  it('drops a generic object-capture whose originalException is the JOV-5209 bag', () => {
+    const beforeSend = createBeforeSendHook();
+    const inner = new Error(
+      'Command failed: ERR max requests limit exceeded. Limit: 500000'
+    );
+    inner.name = 'UpstashError';
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value: 'Non-Error exception captured with keys: error',
+          },
+        ],
+      },
+    };
+    const hint = { originalException: { error: inner } };
+
+    expect(beforeSend(event as any, hint as any)).toBeNull();
+  });
+
+  it('keeps a real quota UpstashError on hint.originalException', () => {
+    const beforeSend = createBeforeSendHook();
+    const error = new Error(
+      'Command failed: ERR max requests limit exceeded. Limit: 500000'
+    );
+    error.name = 'UpstashError';
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'UpstashError',
+            value:
+              'Command failed: ERR max requests limit exceeded. Limit: 500000',
+          },
+        ],
+      },
+    };
+
+    expect(
+      beforeSend(event as any, { originalException: error } as any)
+    ).not.toBeNull();
+  });
 });
 
 // ============================================================================

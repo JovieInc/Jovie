@@ -6,9 +6,9 @@
  * It is not an application defect and should not trigger autofix or performance alerts.
  *
  * Opaque `{"error":{"name":"UpstashError"}}` titles are the JSON-stringified
- * form of an UpstashError whose `message` is non-enumerable (JOV-5218,
- * JOV-5220, JOV-5221, JOV-5228, JOV-5229). The standing Redis operability
- * canary already pages on quota exhaustion.
+ * form of an UpstashError whose `message` is non-enumerable (JOV-5209,
+ * JOV-5218, JOV-5220, JOV-5221, JOV-5228, JOV-5229). The standing Redis
+ * operability canary already pages on quota exhaustion.
  */
 
 export interface SentryIssueSummary {
@@ -74,11 +74,28 @@ function isUpstashErrorJsonBagText(value: string | null | undefined): boolean {
 
 /**
  * True when a captured value would Sentry-title as
- * `Error: {"error":{"name":"UpstashError"}}` (JOV-5218 / JOV-5228 / JOV-5229).
+ * `Error: {"error":{"name":"UpstashError"}}` (JOV-5209 / JOV-5218 / JOV-5228).
  * Error instances are matched on `message` so a real
  * `UpstashError: ERR max requests…` exception stays visible.
+ * Next.js request wrappers keep the bag on `cause`; walk a bounded chain.
  */
 export function isOpaqueUpstashErrorJsonBag(value: unknown): boolean {
+  return isOpaqueUpstashErrorJsonBagInner(value, new Set());
+}
+
+function isOpaqueUpstashErrorJsonBagInner(
+  value: unknown,
+  seen: Set<unknown>
+): boolean {
+  if (value === null || value === undefined) {
+    return false;
+  }
+  if (typeof value === 'object') {
+    if (seen.has(value)) {
+      return false;
+    }
+    seen.add(value);
+  }
   if (typeof value === 'string') {
     return (
       isUpstashErrorJsonBagText(value) ||
@@ -86,11 +103,14 @@ export function isOpaqueUpstashErrorJsonBag(value: unknown): boolean {
     );
   }
   if (value instanceof Error) {
-    return isOpaqueUpstashErrorJsonBag(value.message);
+    return (
+      isOpaqueUpstashErrorJsonBagInner(value.message, seen) ||
+      isOpaqueUpstashErrorJsonBagInner(value.cause, seen)
+    );
   }
-  if (value && typeof value === 'object') {
+  if (typeof value === 'object') {
     try {
-      return isOpaqueUpstashErrorJsonBag(JSON.stringify(value));
+      return isOpaqueUpstashErrorJsonBagInner(JSON.stringify(value), seen);
     } catch {
       return false;
     }
