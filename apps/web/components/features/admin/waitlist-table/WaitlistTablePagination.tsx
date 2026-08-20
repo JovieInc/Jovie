@@ -36,7 +36,7 @@ export function WaitlistTablePagination({
             variant='ghost'
             className='h-9 w-9 p-0 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5'
           >
-            <Link href={prevHref} aria-label='Previous page'>
+            <Link href={prevHref} aria-label='Previous Page'>
               <ChevronLeft className='h-3.5 w-3.5 sm:hidden' />
               <span className='max-sm:hidden sm:inline'>Previous</span>
             </Link>
@@ -47,7 +47,7 @@ export function WaitlistTablePagination({
             variant='ghost'
             disabled
             className='h-9 w-9 p-0 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5'
-            aria-label='Previous page'
+            aria-label='Previous Page'
           >
             <ChevronLeft className='h-3.5 w-3.5 sm:hidden' />
             <span className='max-sm:hidden sm:inline'>Previous</span>
@@ -60,7 +60,7 @@ export function WaitlistTablePagination({
             variant='ghost'
             className='h-9 w-9 p-0 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5'
           >
-            <Link href={nextHref} aria-label='Next page'>
+            <Link href={nextHref} aria-label='Next Page'>
               <ChevronRight className='h-3.5 w-3.5 sm:hidden' />
               <span className='max-sm:hidden sm:inline'>Next</span>
             </Link>
@@ -71,7 +71,7 @@ export function WaitlistTablePagination({
             variant='ghost'
             disabled
             className='h-9 w-9 p-0 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5'
-            aria-label='Next page'
+            aria-label='Next Page'
           >
             <ChevronRight className='h-3.5 w-3.5 sm:hidden' />
             <span className='max-sm:hidden sm:inline'>Next</span>

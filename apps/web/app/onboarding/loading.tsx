@@ -12,7 +12,7 @@ const SIDEBAR_STEPS = [
 
 function SidebarLoadingState() {
   return (
-    <nav aria-label='Onboarding steps'>
+    <nav aria-label='Onboarding Steps'>
       <ul className='space-y-1.5'>
         {SIDEBAR_STEPS.map(step => (
           <li key={step}>
@@ -55,7 +55,7 @@ export default function OnboardingLoading() {
         <div className='flex w-full max-w-md flex-col items-center text-center'>
           <div className='mb-8 space-y-2'>
             <h1 className='text-3xl font-semibold leading-[1.05] tracking-[-0.03em] text-primary-token sm:text-4xl'>
-              Preparing your setup
+              Preparing Your Setup
             </h1>
             <p className='text-mid leading-6 text-secondary-token'>
               Loading your handle step and profile context.

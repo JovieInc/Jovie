@@ -64,6 +64,7 @@ export function UnifiedUrlIntake({ onSubmitted }: UnifiedUrlIntakeProps) {
           ) : (
             <Upload className='mr-2 h-4 w-4' />
           )}
+          {/* ui-casing-allow: URL abbreviation */}
           Queue URLs
         </Button>
       </div>

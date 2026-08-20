@@ -15,6 +15,7 @@ export function PricingPreview() {
             className='text-3xl sm:text-4xl font-medium tracking-tight text-primary-token'
             style={FONT_SYNTHESIS_STYLE}
           >
+            {/* ui-casing-allow: marketing display headline */}
             Simple, transparent pricing
           </h2>
           <p className='mt-4 text-lg text-tertiary-token'>

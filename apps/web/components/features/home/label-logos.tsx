@@ -155,7 +155,7 @@ export function DiscoWaxLogo({
   return (
     <span
       role='img'
-      aria-label='disco:wax'
+      aria-label='disco:wax' // ui-casing-allow: brand lockup
       className={cn(
         'inline-flex items-center justify-center select-none text-white/92',
         className
@@ -176,7 +176,7 @@ export function BlancoYNegroLogo({
   return (
     <span
       role='img'
-      aria-label='Blanco y Negro'
+      aria-label='Blanco y Negro' // ui-casing-allow: brand lockup
       className={cn(
         'inline-flex items-center justify-center select-none text-white/92',
         className
@@ -197,7 +197,7 @@ export function RecPlayLogo({
   return (
     <span
       role='img'
-      aria-label='rec play'
+      aria-label='rec play' // ui-casing-allow: brand lockup
       className={cn(
         'inline-flex items-center justify-center select-none text-white/92',
         className

@@ -102,7 +102,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
               <div className='space-y-2'>
                 <h3 className='heading-linear text-lg text-primary-token'>
-                  Something went wrong
+                  Something Went Wrong
                 </h3>
                 <p className='text-linear text-sm text-secondary-token'>
                   We encountered an unexpected error. Please try refreshing the

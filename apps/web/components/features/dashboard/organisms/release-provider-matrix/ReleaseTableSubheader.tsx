@@ -93,7 +93,7 @@ function ReleaseViewButtons({
       surface='muted'
       className={cn('w-auto', className)}
       triggerClassName='min-w-18 px-3'
-      aria-label='Choose releases view'
+      aria-label='Choose Releases View'
     />
   );
 }
@@ -140,7 +140,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
                   PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
                   'h-7 rounded-full px-1.5 [&_svg]:h-3 [&_svg]:w-3'
                 )}
-                aria-label='Loading filters'
+                aria-label='Loading Filters'
                 disabled
               >
                 <Icon name='Filter' className='h-3.5 w-3.5' strokeWidth={2} />

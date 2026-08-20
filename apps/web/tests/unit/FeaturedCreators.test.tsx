@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('@/features/home/FeaturedArtists', () => ({
   FeaturedArtists: () => {
     const MockFeaturedCreatorsSection = () => (
-      <section aria-label='Featured creators' data-testid='featured-creators'>
+      <section aria-label='Featured Creators' data-testid='featured-creators'>
         <div className='container mx-auto px-4'>
           <h2>Featured Creators</h2>
           <div className='hidden md:block'>
@@ -118,7 +118,7 @@ describe('FeaturedCreators Component', () => {
     const { container } = render(<FeaturedArtists />);
 
     const section = container.querySelector(
-      'section[aria-label="Featured creators"]'
+      'section[aria-label="Featured Creators"]'
     );
     expect(section).toBeInTheDocument();
   });

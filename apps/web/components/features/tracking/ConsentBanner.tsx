@@ -96,7 +96,7 @@ export function ConsentBanner({ className }: ConsentBannerProps) {
         borderTop: '1px solid var(--linear-border-subtle)',
         boxShadow: 'var(--linear-shadow-card)',
       }}
-      aria-label='Cookie consent'
+      aria-label='Cookie Consent'
     >
       <div
         className='max-w-screen-lg mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between'

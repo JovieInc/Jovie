@@ -168,12 +168,12 @@ function HealthIndicator({ health }: { readonly health?: PlatformHealth }) {
     unhealthy: {
       dot: '\u25CF',
       color: 'text-red-500',
-      label: 'Check credentials',
+      label: 'Check Credentials',
     },
     inactive: {
       dot: '\u25CB',
       color: 'text-tertiary-token',
-      label: 'No events',
+      label: 'No Events',
     },
   };
 
@@ -414,13 +414,13 @@ export function SettingsAdPixelsSection({
     return (
       <SettingsPanel
         title='Pixel tracking'
-        description='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
+        description='Integrate Facebook, Google, and TikTok conversion tracking pixels.' // ui-casing-allow: product names
       >
         <div className='px-4 py-4 sm:px-5'>
           <SettingsToggleRow
             gated
             title='Enable pixel tracking'
-            description='Route fan actions to your Facebook, Google, and TikTok pixels for conversion tracking.'
+            description='Route fan actions to your Facebook, Google, and TikTok pixels for conversion tracking.' // ui-casing-allow: product names
             gateFeatureContext='Pixel tracking'
           />
         </div>
@@ -432,7 +432,7 @@ export function SettingsAdPixelsSection({
     return (
       <SettingsPanel
         title='Pixel tracking'
-        description='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
+        description='Integrate Facebook, Google, and TikTok conversion tracking pixels.' // ui-casing-allow: product names
       >
         <div className='px-4 py-4 sm:px-5'>
           <PixelsSectionSkeleton />
@@ -454,12 +454,12 @@ export function SettingsAdPixelsSection({
     <form onSubmit={handlePixelSubmit} className='space-y-4'>
       <SettingsPanel
         title='Pixel tracking'
-        description='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
+        description='Integrate Facebook, Google, and TikTok conversion tracking pixels.' // ui-casing-allow: product names
       >
         <div className='space-y-3 px-4 py-4 sm:px-5'>
           <SettingsToggleRow
             title='Enable pixel tracking'
-            description='Route fan actions to your Facebook, Google, and TikTok pixels for conversion tracking.'
+            description='Route fan actions to your Facebook, Google, and TikTok pixels for conversion tracking.' // ui-casing-allow: product names
             checked={pixelData.enabled}
             onCheckedChange={checked => handleInputChange('enabled', checked)}
             ariaLabel='Enable pixel tracking'
@@ -484,7 +484,7 @@ export function SettingsAdPixelsSection({
           <PlatformSection
             platform='Facebook Conversions API'
             platformKey='facebook'
-            description='Track profile views and link clicks in Meta Ads Manager.'
+            description='Track profile views and link clicks in Meta Ads Manager.' // ui-casing-allow: product names
             pixelIdLabel='Pixel ID'
             pixelIdPlaceholder='1234567890123456'
             pixelIdName='facebookPixelId'
@@ -582,7 +582,7 @@ export function SettingsAdPixelsSection({
           disabled={isPixelSaving || !hasUnsavedChanges}
           className={SETTINGS_BUTTON_CLASS}
         >
-          Save pixel settings
+          Save Pixel Settings
         </Button>
       </div>
     </form>

@@ -33,7 +33,7 @@ export function GrowthStatusPanel() {
         enabled ? 'Growth automation enabled' : 'Growth automation paused'
       );
     } catch {
-      toast.error('Failed to update Growth automation');
+      toast.error('Failed to update Growth automation'); // ui-casing-allow: product name
     }
   }
 
@@ -54,7 +54,7 @@ export function GrowthStatusPanel() {
               void togglePipeline(checked);
             });
           }}
-          aria-label='Toggle Growth automation'
+          aria-label='Toggle Growth Automation'
         />
       </div>
     );
@@ -89,7 +89,7 @@ export function GrowthStatusPanel() {
               className='h-full'
             />
             <ContentMetricCard
-              label='Auto-Ingested'
+              label='Auto-ingested'
               value={settings.autoIngestedToday}
               subtitle={`Limit ${settings.autoIngestDailyLimit} per day`}
               className='h-full'

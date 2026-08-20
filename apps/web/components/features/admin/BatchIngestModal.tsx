@@ -73,7 +73,7 @@ export function BatchIngestModal({
 
   return (
     <Dialog open={open} onClose={() => onOpenChange(false)} size='md'>
-      <DialogTitle>Batch URL import</DialogTitle>
+      <DialogTitle>Batch URL Import</DialogTitle>
       <DialogBody className='space-y-3'>
         <p className='text-xs text-tertiary-token'>
           Paste URLs one per line or comma-separated. Linktree, Spotify, Apple

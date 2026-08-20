@@ -25,7 +25,7 @@ function baseInput() {
   return {
     finalPrompt: 'Plan a release for my next single',
     pillId: 'plan_a_release' as const,
-    pillLabel: 'Plan a release',
+    pillLabel: 'Plan A Release',
     insertedPrompt: 'Plan a release for ',
   };
 }

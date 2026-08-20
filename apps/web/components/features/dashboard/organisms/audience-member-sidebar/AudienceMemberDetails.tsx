@@ -73,7 +73,7 @@ export function AudienceMemberDetails({ member }: AudienceMemberDetailsProps) {
       />
       <DrawerPropertyRow label='Visits' value={String(member.visits)} />
       <DrawerPropertyRow
-        label='Last seen'
+        label='Last Seen'
         value={formatLongDate(member.lastSeenAt)}
       />
       <DrawerPropertyRow

@@ -16,7 +16,7 @@ interface ReliabilityCardProps {
 }
 
 type HealthTone = {
-  label: 'Healthy' | 'Needs attention' | 'Critical';
+  label: 'Healthy' | 'Needs Attention' | 'Critical';
   labelClassName: string;
   iconClassName: string;
 };
@@ -43,7 +43,7 @@ function getHealthTone(summary: AdminReliabilitySummary): HealthTone {
     summary.deploymentState === 'in_progress'
   ) {
     return {
-      label: 'Needs attention',
+      label: 'Needs Attention',
       labelClassName: 'text-warning',
       iconClassName: 'text-warning',
     };
@@ -99,19 +99,19 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
       />
       <div className='space-y-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) text-xs leading-[17px] text-secondary-token'>
         <ContentMetricRow
-          label='Error rate'
+          label='Error Rate'
           value={errorRateLabel}
           icon={CheckCircle2}
           iconClassName={tone.iconClassName}
         />
         <ContentMetricRow
-          label='p95 latency'
+          label='P95 Latency'
           value={latencyLabel}
           icon={Clock3}
           iconClassName={tone.iconClassName}
         />
         <ContentMetricRow
-          label='Incidents (24h)'
+          label='Incidents (24h)' // ui-casing-allow: duration abbreviation
           value={incidentsLabel}
           icon={summary.incidents24h > 0 ? AlertTriangle : CheckCircle2}
           iconClassName={
@@ -119,7 +119,7 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
           }
         />
         <ContentMetricRow
-          label='Sentry issues'
+          label='Sentry Issues'
           value={sentryIssuesLabel}
           icon={summary.unresolvedSentryIssues24h > 0 ? Siren : CheckCircle2}
           iconClassName={

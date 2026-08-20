@@ -30,7 +30,7 @@ export function TourDatesEmptyState({
 
   const handleSaveApiKey = useCallback(async () => {
     if (!apiKey.trim()) {
-      toast.error('Please enter your Bandsintown API key');
+      toast.error('Please enter your Bandsintown API key'); // ui-casing-allow: product name
       return;
     }
 
@@ -53,7 +53,7 @@ export function TourDatesEmptyState({
 
   const handleConnect = useCallback(async () => {
     if (!artistName.trim()) {
-      toast.error('Please enter your Bandsintown artist name');
+      toast.error('Please enter your Bandsintown artist name'); // ui-casing-allow: product name
       return;
     }
 
@@ -69,7 +69,7 @@ export function TourDatesEmptyState({
         toast.error(result.message);
       }
     } catch {
-      toast.error('Failed to connect Bandsintown');
+      toast.error('Failed to connect Bandsintown'); // ui-casing-allow: product name
     }
   }, [artistName, connectMutation, onConnected]);
 
@@ -85,7 +85,7 @@ export function TourDatesEmptyState({
           />
         </div>
         <h3 className='mt-4 text-app font-caption text-secondary-token'>
-          Set up Bandsintown Integration
+          Set Up Bandsintown Integration
         </h3>
         <p className='mt-1 max-w-md text-app text-secondary-token'>
           To sync your tour dates, you&apos;ll need a free Bandsintown API key.
@@ -113,7 +113,7 @@ export function TourDatesEmptyState({
             <Input
               type='password'
               inputSize='lg'
-              placeholder='Your Bandsintown API key'
+              placeholder='Your Bandsintown API key' // ui-casing-allow: product name
               value={apiKey}
               onChange={e => setApiKey(e.target.value)}
               disabled={saveApiKeyMutation.isPending}
@@ -170,7 +170,7 @@ export function TourDatesEmptyState({
         />
       </div>
       <h3 className='mt-4 text-app font-caption text-secondary-token'>
-        Connect your tour dates
+        Connect Your Tour Dates
       </h3>
       <p className='mt-1 max-w-sm text-app text-secondary-token'>
         Enter your Bandsintown artist name to sync your upcoming shows.
@@ -181,7 +181,7 @@ export function TourDatesEmptyState({
           <Input
             type='text'
             inputSize='lg'
-            placeholder='Your artist name on Bandsintown'
+            placeholder='Your artist name on Bandsintown' // ui-casing-allow: product name
             value={artistName}
             onChange={e => setArtistName(e.target.value)}
             disabled={connectMutation.isPending}

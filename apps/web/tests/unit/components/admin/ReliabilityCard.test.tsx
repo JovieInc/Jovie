@@ -23,7 +23,7 @@ describe('ReliabilityCard', () => {
     expect(screen.getByText('Available')).toBeInTheDocument();
   });
 
-  it('shows Needs attention for moderate reliability degradation', () => {
+  it('shows Needs Attention for moderate reliability degradation', () => {
     render(
       <ReliabilityCard
         summary={{
@@ -39,7 +39,7 @@ describe('ReliabilityCard', () => {
       />
     );
 
-    expect(screen.getByText('Needs attention')).toBeInTheDocument();
+    expect(screen.getByText('Needs Attention')).toBeInTheDocument();
     expect(screen.getByText('In progress')).toBeInTheDocument();
   });
 

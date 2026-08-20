@@ -25,11 +25,11 @@ describe('homepage intent constants', () => {
       'analyze_momentum',
     ]);
     expect(PILLS.map(p => p.label)).toEqual([
-      'Plan a release',
-      'Generate album art',
-      'Generate pitch',
-      'Build artist profile',
-      'Analyze momentum',
+      'Plan A Release',
+      'Generate Album Art',
+      'Generate Pitch',
+      'Build Artist Profile',
+      'Analyze Momentum',
     ]);
     expect(PILLS.map(p => p.insertedPrompt)).toEqual([
       'Plan a release for ',

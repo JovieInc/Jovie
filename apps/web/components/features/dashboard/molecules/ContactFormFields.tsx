@@ -27,14 +27,14 @@ export function ContactFormFields({
     <>
       <div className='grid gap-3 md:grid-cols-2'>
         <Input
-          label='Person name'
-          placeholder='Sarah Lee'
+          label='Person Name'
+          placeholder='Sarah Lee' // ui-casing-allow: proper name
           value={personName ?? ''}
           onChange={event => onPersonNameChange(event.target.value)}
         />
         <Input
-          label='Company / agency'
-          placeholder='XYZ Agency'
+          label='Company / Agency'
+          placeholder='XYZ Agency' // ui-casing-allow: proper name
           value={companyName ?? ''}
           onChange={event => onCompanyNameChange(event.target.value)}
         />
@@ -44,7 +44,7 @@ export function ContactFormFields({
         <Input
           label='Email'
           type='email'
-          placeholder='bookings@agency.com'
+          placeholder='bookings@agency.com' // ui-casing-allow: example email
           value={email ?? ''}
           onChange={event => onEmailChange(event.target.value)}
         />
