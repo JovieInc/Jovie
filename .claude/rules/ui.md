@@ -97,6 +97,11 @@ remain available even when a keyboard accelerator is useful.
 - Web targets WCAG 2.2 AA. Test semantic names/roles, keyboard operation,
   focus order, contrast, non-color state cues, text zoom, and touch targets.
   Test native accessibility, Dynamic Type, and input conventions on iOS.
+  A 44px touch target is the **hit container**, not a larger visible control:
+  keep the visual size (`h-7` / `h-8` / `h-9` / icon) and expand the
+  invisible target (`before:absolute before:h-11 before:min-w-11`, see
+  `packages/ui/atoms/button.tsx`). Do not bump the control to `h-11` to
+  satisfy the lint.
 - Respect user text scaling and reduced-motion preferences. Never encode status
   in color alone, rely on hover alone, or require precise pointer movement.
 - Reuse the canonical component family before composing a new control. A
