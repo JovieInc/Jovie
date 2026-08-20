@@ -28,17 +28,16 @@ const INVESTOR_LINKS_MANAGER = findSourceFile(
   )
 );
 
-const INVESTOR_TABLE_PRIMITIVES = findSourceFile(
+const INVESTOR_PIPELINE_TABLE = findSourceFile(
   resolve(
     process.cwd(),
-    'app/app/(shell)/admin/investors/_components/InvestorTablePrimitives.tsx'
+    'app/app/(shell)/admin/investors/_components/InvestorPipelineTable.tsx'
   ),
   resolve(
     process.cwd(),
-    'apps/web/app/app/(shell)/admin/investors/_components/InvestorTablePrimitives.tsx'
+    'apps/web/app/app/(shell)/admin/investors/_components/InvestorPipelineTable.tsx'
   )
 );
-
 const INVESTOR_SETTINGS_PAGE = findSourceFile(
   resolve(process.cwd(), 'app/app/(shell)/admin/investors/settings/page.tsx'),
   resolve(
@@ -59,19 +58,13 @@ const INVESTOR_SETTINGS_FORM = findSourceFile(
 );
 
 describe('admin investor shell normalization', () => {
-  it('keeps investor tables on the local shared table primitives', () => {
+  it('keeps the investor pipeline on the canonical UnifiedTable contract', () => {
     const pageSource = readFileSync(INVESTORS_PAGE, 'utf8');
-    const managerSource = readFileSync(INVESTOR_LINKS_MANAGER, 'utf8');
-    const primitivesSource = readFileSync(INVESTOR_TABLE_PRIMITIVES, 'utf8');
+    const pipelineSource = readFileSync(INVESTOR_PIPELINE_TABLE, 'utf8');
 
-    expect(pageSource).toContain(
-      "from './_components/InvestorTablePrimitives'"
-    );
-    expect(managerSource).toContain(
-      "from '../_components/InvestorTablePrimitives'"
-    );
-    expect(primitivesSource).toContain('export function InvestorTable');
-    expect(primitivesSource).toContain('export function InvestorTableRow');
+    expect(pageSource).toContain("from './_components/InvestorPipelineTable'");
+    expect(pipelineSource).toContain('<UnifiedTable');
+    expect(pipelineSource).toContain('<TableEmptyState');
   });
 
   it('keeps investor route data outside the page module', () => {
@@ -97,7 +90,7 @@ describe('admin investor shell normalization', () => {
     const sources = [
       readFileSync(INVESTORS_PAGE, 'utf8'),
       readFileSync(INVESTOR_LINKS_MANAGER, 'utf8'),
-      readFileSync(INVESTOR_TABLE_PRIMITIVES, 'utf8'),
+      readFileSync(INVESTOR_PIPELINE_TABLE, 'utf8'),
     ].join('\n');
 
     expect(sources).not.toMatch(/uppercase\s+tracking-/);

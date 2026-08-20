@@ -1,6 +1,6 @@
-import { Badge, Button } from '@jovie/ui';
+import { Button } from '@jovie/ui';
 import type { ColumnDef } from '@tanstack/react-table';
-import { CheckCircle2, CircleSlash, Plus, Settings2 } from 'lucide-react';
+import { Plus, Settings2 } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
@@ -9,18 +9,8 @@ import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { UnifiedTableSkeleton } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
-import { cn } from '@/lib/utils';
-import {
-  InvestorTable,
-  InvestorTableBody,
-  InvestorTableCell,
-  InvestorTableHead,
-  InvestorTableHeaderCell,
-  InvestorTableHeaderRow,
-  InvestorTableRow,
-} from './_components/InvestorTablePrimitives';
+import { InvestorPipelineTable } from './_components/InvestorPipelineTable';
 import { loadAdminInvestorPipelineData } from './investors-data';
-import { TokenCopyButton } from './TokenCopyButton';
 
 export const metadata: Metadata = {
   title: 'Investor Pipeline',
@@ -121,157 +111,15 @@ export default async function InvestorPipelinePage() {
       }
     >
       <Suspense fallback={<TableSkeleton />}>
-        <InvestorPipelineTable />
+        <InvestorPipelineTableData />
       </Suspense>
     </AdminPage>
   );
 }
 
-async function InvestorPipelineTable() {
+async function InvestorPipelineTableData() {
   const links = await loadAdminInvestorPipelineData();
-
-  if (links.length === 0) {
-    return (
-      <ContentSurfaceCard className='overflow-hidden p-0'>
-        <div className='px-(--linear-app-header-padding-x) py-6 text-app text-secondary-token'>
-          No investor links yet.
-        </div>
-      </ContentSurfaceCard>
-    );
-  }
-
-  return (
-    <ContentSurfaceCard
-      className='overflow-hidden p-0'
-      data-testid='admin-investors-table'
-    >
-      <InvestorTable minWidth='min-w-investor-table'>
-        <InvestorTableHead>
-          <InvestorTableHeaderRow>
-            <InvestorTableHeaderCell className='w-investor-label'>
-              Label
-            </InvestorTableHeaderCell>
-            <InvestorTableHeaderCell className='w-investor-name'>
-              Investor
-            </InvestorTableHeaderCell>
-            <InvestorTableHeaderCell className='w-investor-stage'>
-              Stage
-            </InvestorTableHeaderCell>
-            <InvestorTableHeaderCell className='w-16'>
-              Score
-            </InvestorTableHeaderCell>
-            <InvestorTableHeaderCell className='w-16'>
-              Views
-            </InvestorTableHeaderCell>
-            <InvestorTableHeaderCell className='w-investor-date'>
-              Last viewed
-            </InvestorTableHeaderCell>
-            <InvestorTableHeaderCell className='w-investor-status'>
-              Status
-            </InvestorTableHeaderCell>
-          </InvestorTableHeaderRow>
-        </InvestorTableHead>
-        <InvestorTableBody>
-          {links.map(link => (
-            <InvestorTableRow key={link.id}>
-              <InvestorTableCell className='w-investor-label'>
-                <div className='flex min-w-0 flex-col gap-0.5'>
-                  <span className='truncate font-semibold text-primary-token'>
-                    {link.label}
-                  </span>
-                  <TokenDisplay token={link.token} />
-                </div>
-              </InvestorTableCell>
-              <InvestorTableCell className='w-investor-name'>
-                {link.investorName || 'Unknown investor'}
-              </InvestorTableCell>
-              <InvestorTableCell className='w-investor-stage'>
-                <StageBadge stage={link.stage} />
-              </InvestorTableCell>
-              <InvestorTableCell className='w-16'>
-                <ScoreBadge score={link.engagementScore} />
-              </InvestorTableCell>
-              <InvestorTableCell className='w-16'>
-                {link.viewCount}
-              </InvestorTableCell>
-              <InvestorTableCell className='w-investor-date'>
-                {link.lastViewed
-                  ? new Date(link.lastViewed).toLocaleDateString()
-                  : 'No views yet'}
-              </InvestorTableCell>
-              <InvestorTableCell className='w-investor-status'>
-                <StatusBadge isActive={link.isActive} />
-              </InvestorTableCell>
-            </InvestorTableRow>
-          ))}
-        </InvestorTableBody>
-      </InvestorTable>
-    </ContentSurfaceCard>
-  );
-}
-
-function StageBadge({ stage }: Readonly<{ stage: string }>) {
-  const styles: Record<
-    string,
-    {
-      label: string;
-      variant: 'default' | 'secondary' | 'warning' | 'success' | 'destructive';
-    }
-  > = {
-    shared: { label: 'Shared', variant: 'secondary' },
-    viewed: { label: 'Viewed', variant: 'default' },
-    engaged: { label: 'Engaged', variant: 'warning' },
-    meeting_booked: { label: 'Meeting Booked', variant: 'default' },
-    committed: { label: 'Committed', variant: 'success' },
-    wired: { label: 'Wired', variant: 'success' },
-    passed: { label: 'Passed', variant: 'destructive' },
-    declined: { label: 'Declined', variant: 'destructive' },
-  };
-  const style = styles[stage] ?? {
-    label: stage.replaceAll('_', ' '),
-    variant: 'secondary' as const,
-  };
-
-  return (
-    <Badge variant={style.variant} size='sm'>
-      {style.label}
-    </Badge>
-  );
-}
-
-function ScoreBadge({ score }: Readonly<{ score: number }>) {
-  let toneClassName = 'text-secondary-token';
-
-  if (score >= 50) {
-    toneClassName = 'text-success';
-  } else if (score >= 25) {
-    toneClassName = 'text-warning';
-  }
-
-  return (
-    <span
-      className={cn(
-        'inline-flex min-w-[2.5rem] items-center justify-end font-mono text-xs font-semibold tabular-nums',
-        toneClassName
-      )}
-    >
-      {score}
-    </span>
-  );
-}
-
-function StatusBadge({ isActive }: { readonly isActive: boolean }) {
-  return isActive ? (
-    <span className='inline-flex items-center gap-1.5 text-xs text-secondary-token'>
-      <CheckCircle2 className='h-3.5 w-3.5 text-success' />
-      Active
-    </span>
-  ) : (
-    <span className='inline-flex items-center gap-1.5 text-xs text-secondary-token'>
-      <CircleSlash className='h-3.5 w-3.5 text-tertiary-token' />
-      Disabled
-    </span>
-  );
+  return <InvestorPipelineTable links={links} />;
 }
 
 function CreateLinkButton() {
@@ -283,10 +131,6 @@ function CreateLinkButton() {
       </Link>
     </Button>
   );
-}
-
-function TokenDisplay({ token }: { readonly token: string }) {
-  return <TokenCopyButton token={token} />;
 }
 
 function TableSkeleton() {
