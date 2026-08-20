@@ -1560,6 +1560,9 @@ fi
 # the same fresh positive source gates as normal admission. Every candidate is
 # re-read by enroll_if_still_eligible and the event-scoped candidate plus all
 # reconciliation sources share one total cap.
+# Hold-intake/normal missed admission also considers CLEAN queue-deferred
+# heads: exact admission already strips that label, but a main-push recovery
+# used to filter them out and left CI-green Symphony heads (#16187) parked.
 if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" || "$DRAIN_RECONCILE_MISSED_ADMISSION" == "1" ]]; then
   echo "=== RECOVER (bounded exact-head native admission) ==="
   while read -r pr; do
@@ -1601,14 +1604,25 @@ if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" || "$DRAIN_RECONCILE_MISSED_ADMISS
         exit 1
       fi
     fi
-  done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" '[ .[]
+  done < <(echo "$SNAP" | jq -c \
+    --arg admission_pr "$DRAIN_ADMISSION_PR" \
+    --arg promotion_mode "$DRAIN_PROMOTION_MODE" \
+    --arg missed "$DRAIN_RECONCILE_MISSED_ADMISSION" \
+    '[ .[]
     | select((.n | tostring) != $admission_pr)
     | select(.q | not)
     | select(.draft | not)
     | select(.m == "MERGEABLE")
     | select(.base == "main")
     | select(.fail | length == 0)
-    | select([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast") | not)
+    | select([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "needs-conflict-resolution" or . == "fast") | not)
+    | select(
+        ([.L[]] | index("queue-deferred") == null)
+        or (
+          $missed == "1"
+          and ($promotion_mode == "hold-intake" or $promotion_mode == "normal")
+        )
+      )
     | select((.headOid // "") | test("^[0-9a-f]{40}$"))
     | {n, t, headOid}
   ] | sort_by(.n)[]')
