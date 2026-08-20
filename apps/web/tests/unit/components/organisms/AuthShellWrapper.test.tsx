@@ -1,6 +1,9 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
+import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { useFounderDoor } from '@/contexts/FounderDoorContext';
 
 // Short-circuit heavy import chains that this test doesn't exercise.
 
@@ -141,6 +144,11 @@ import {
   AuthShellWrapper,
   usePendingShell,
 } from '@/components/organisms/AuthShellWrapper';
+
+function FounderDoorProbe() {
+  const { canUse } = useFounderDoor();
+  return <div data-testid='founder-door' data-can-use={String(canUse)} />;
+}
 
 function PendingShellControls() {
   const { clearPendingShell, showPendingShell } = usePendingShell();
@@ -392,5 +400,20 @@ describe('AuthShellWrapper', () => {
 
     expect(screen.queryByText('Opening Releases')).not.toBeInTheDocument();
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('exposes founder-door context so entitled Cmd+O can toggle', () => {
+    render(
+      <DashboardDataContext.Provider value={{ isAdmin: true } as DashboardData}>
+        <AuthShellWrapper>
+          <FounderDoorProbe />
+        </AuthShellWrapper>
+      </DashboardDataContext.Provider>
+    );
+
+    expect(screen.getByTestId('founder-door')).toHaveAttribute(
+      'data-can-use',
+      'true'
+    );
   });
 });
