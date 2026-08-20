@@ -314,6 +314,55 @@ describe('scrubPii', () => {
     expect(scrubPii(event as any)).toBeNull();
   });
 
+  it('should drop a JOV-5187 object-capture whose originalException is the bag', () => {
+    const inner = new Error(
+      'Command failed: ERR max requests limit exceeded. Limit: 500000'
+    );
+    inner.name = 'UpstashError';
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value: 'Non-Error exception captured with keys: error',
+          },
+        ],
+      },
+    };
+
+    expect(
+      scrubPii(event as any, { originalException: { error: inner } } as any)
+    ).toBeNull();
+  });
+
+  it('should drop a JOV-5187 bag kept on extra.__serialized__', () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value: 'Non-Error exception captured with keys: error',
+          },
+        ],
+      },
+      extra: {
+        __serialized__: { error: { name: 'UpstashError' } },
+      },
+    };
+
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
+  it('should drop a JOV-5187 logentry.formatted Linear title', () => {
+    const event = {
+      logentry: {
+        formatted: 'Error: {"error":{"name":"UpstashError"}}',
+      },
+    };
+
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
   it('should keep real Upstash quota exceptions', () => {
     const event = {
       exception: {
@@ -460,6 +509,28 @@ describe('createBeforeSendHook', () => {
     const hint = { originalException: { error: inner } };
 
     expect(beforeSend(event as any, hint as any)).toBeNull();
+  });
+
+  it('drops the JOV-5187 bag on the client beforeSend path', () => {
+    const { beforeSend } = getBaseClientConfig();
+    const inner = new Error(
+      'Command failed: ERR max requests limit exceeded. Limit: 500000'
+    );
+    inner.name = 'UpstashError';
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value: 'Non-Error exception captured with keys: error',
+          },
+        ],
+      },
+    };
+
+    expect(
+      beforeSend(event as any, { originalException: { error: inner } } as any)
+    ).toBeNull();
   });
 
   it('keeps a real quota UpstashError on hint.originalException', () => {
