@@ -353,19 +353,21 @@ export function gatePlaylistTargets(input: {
   const kept = eligible.slice(0, PLAYLIST_RECOMMEND_MAX);
   const keptIndexes = new Set(kept.map(item => item.indexInReviewed));
 
-  const finalized = reviewed.map((target, indexInReviewed) => {
-    if (keptIndexes.has(indexInReviewed)) {
-      return { ...target, recommended: true, dropReason: null };
+  const finalized: GatedPlaylistTarget[] = reviewed.map(
+    (target, indexInReviewed) => {
+      if (keptIndexes.has(indexInReviewed)) {
+        return { ...target, recommended: true, dropReason: null };
+      }
+      if (
+        target.dropReason == null &&
+        (target.activityStatus === 'fresh_90d' ||
+          target.activityStatus === 'active_12m')
+      ) {
+        return { ...target, recommended: false, dropReason: 'cap' };
+      }
+      return target;
     }
-    if (
-      target.dropReason == null &&
-      (target.activityStatus === 'fresh_90d' ||
-        target.activityStatus === 'active_12m')
-    ) {
-      return { ...target, recommended: false, dropReason: 'cap' };
-    }
-    return target;
-  });
+  );
 
   const recommended = finalized.filter(target => target.recommended);
   const unknownCount = finalized.filter(
