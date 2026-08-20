@@ -313,6 +313,15 @@ describe('non-actionable Sentry issues', () => {
         })
       ).toBe(false);
     });
+
+    it('matches the JOV-5181 Linear/Sentry quota title', () => {
+      expect(
+        isUpstashQuotaSentryEvent({
+          title:
+            'UpstashError: Command failed: ERR max requests limit exceeded. Limit: 500000, Usage: 500099. See https://upstash.com/docs/redis/troubleshooting/max_requests_limit for details',
+        })
+      ).toBe(true);
+    });
   });
 
   describe('isNonActionableUpstashIssue', () => {
