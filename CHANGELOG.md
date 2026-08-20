@@ -13,6 +13,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
+- [internal] **Live merge-queue ruleset verify pages Slack:** the scheduled observer still fails the run and now posts to the existing webhook.
+- [internal] **Critical-surface vitest coverage floors are non-zero:** entitlements, Stripe webhooks, webhook signatures, and test-auth globs ratchet from the last measured snapshot minus 3pp on `vitest --coverage`. Merge-queue unit shards stay coverage-off.
 - [internal] **Canonical Actions now have one contract package:** `@jovie/action-contracts` owns the four stable IDs, and authenticated `GET /api/v1/actions` can list what a profile can do. Nothing is created yet.
 
 - **iPhone Library is Catalog, Collections, and Ideas:** Catalog is releases, merch, and docs. Collections auto-bundles a vlog with its script, takes, and B-roll. Ideas is the untagged third home.
@@ -46,6 +48,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] **DIRTY remounts that only conflict on CHANGELOG.md merge and push without waiting on grok:** Unreleased bullets from the branch are unioned onto main so sibling ships stop parking CLEAN-except-changelog heads for an hour.
 - [internal] **Hold-intake missed-admission recovery now enrolls CLEAN `queue-deferred` heads:** exact admission already strips that label, but a main-push recovery used to skip it and left CI-green Symphony PRs parked off the merge queue.
 - [internal] **Agent QC wires now match autonomous-shipping doctrine:** Scope Judge is retired instead of advertised, Slop Gate stays a weekly post-merge smell report, GStack PR comments are no longer auto-approve evidence, exhausted `needs-human` PRs ping Slack/Linear before the 48h close, agent-pipeline classifies branches with the shared allowlist so `hotfix/` and `feat/` stop looking like agent PRs, and live merge-queue ruleset verify runs on a schedule instead of only in docs.
+- [internal] **Nightly coverage audit publishes again and pages Slack:** coverage skips the Chromium-launching artifact-secret spec that was failing the heatmap for months, RED-surface ≥3pp drops fail the job, and failures notify the existing Slack webhook instead of a retired GitHub Issue writer.
+- [internal] **CI duration SLO breaches notify Slack:** the nightly p95 ratchet still fails the run and now posts to the existing webhook.
 - [internal] **Long typechecks now report phase timing instead of looking stuck:** singleflight logs elapsed time, tsbuildinfo age/size, and child CPU/RSS while the live compiler keeps ownership.
 - [internal] **Symphony admits from one receipt, not three labels:** a current `admission-gate/v1` receipt is the admission authority. The `plan-approved`, `admission-approved`, and `symphony` labels stay as derived audit. Protected and human-review work stays excluded.
 - [internal] **Merge-queue Path Changes no longer rejects coalesced heads:** an empty event-base diff now recomputes against live `main` before a typed no-op, so green combined heads can land.

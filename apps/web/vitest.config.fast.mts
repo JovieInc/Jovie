@@ -24,6 +24,7 @@ dotenv.config({ path: path.resolve(realRoot, '.env.test') });
 // Detect CI environment
 const isCI = process.env.CI === 'true';
 const isChangedRun = process.argv.includes('--changed');
+const isCoverageRun = process.argv.includes('--coverage');
 
 // Changed-suite runs can fan out many short-lived workers on parity branches,
 // which increases startup churn and causes timeout cascades under aggregate load.
@@ -87,9 +88,16 @@ export default defineConfig({
       'tests/**/*.nightly.test.ts',
       'tests/product-screenshots/**',
       'tests/visual-qa/**',
+      // Temp Playwright comparison trees created by the artifact-secret guard.
+      '.artifact-comparison-*/**',
       'node_modules/**',
       '.next/**',
       '.stryker-tmp/**',
+      // Coverage runs instrument product code; this spec launches Chromium and
+      // was failing the nightly heatmap for months (no browsers on that job).
+      ...(isCoverageRun
+        ? ['tests/unit/ci/playwright-artifact-secrets.test.ts']
+        : []),
     ],
 
     // Performance optimizations
@@ -112,13 +120,11 @@ export default defineConfig({
 
     ...changedSuiteStabilityConfig,
 
-    // Coverage disabled by default for speed (enable with --coverage flag)
-    //
-    // Thresholds are part of the risk-based testing strategy. See
-    // docs/TEST_RISK_REGISTER.md for the surface taxonomy and target_coverage
-    // values. Phase 0 sets thresholds at current baselines (warnings via the
-    // heatmap, not vitest errors). Phase 2 ratchets per-glob thresholds to the
-    // register targets and lets vitest --coverage fail CI on regression.
+    // Coverage disabled by default for speed (enable with --coverage flag).
+    // Merge-queue unit shards stay coverage-off; the nightly heatmap is the
+    // collection lane. Per-glob floors are last measured snapshot (2026-05-10)
+    // minus 3pp so `vitest --coverage` can fail closed on critical-surface
+    // decay. Register targets (90/95/85) remain the ratchet destination.
     coverage: {
       enabled: false,
       provider: 'v8',
@@ -138,22 +144,20 @@ export default defineConfig({
         'app/**/loading.tsx',
         'app/**/not-found.tsx',
       ],
-      // Global thresholds are intentionally low — the heatmap is the
-      // enforcement mechanism in Phase 0. Per-glob thresholds below track
-      // critical surfaces (raised in Phase 2).
+      // Global floors stay 0: the fast config is the merge-queue unit path
+      // and must not collect coverage. Per-glob floors apply when `--coverage`
+      // is passed (nightly `test:coverage`).
       thresholds: {
         lines: 0,
         branches: 0,
         functions: 0,
         statements: 0,
         perFile: false,
-        // Critical surfaces — Phase 2 will raise these to the targets in
-        // docs/TEST_RISK_REGISTER.md (90, 95, 85, etc.).
-        'lib/entitlements/**/*.ts': { branches: 0, lines: 0 },
-        'app/api/stripe/webhooks/**/*.ts': { branches: 0, lines: 0 },
-        'app/api/webhooks/**/*.ts': { branches: 0, lines: 0 },
-        'app/api/dev/test-auth/**/*.ts': { branches: 0, lines: 0 },
-        'lib/auth/test-mode.ts': { branches: 0, lines: 0 },
+        'lib/entitlements/**/*.ts': { branches: 68, lines: 71 },
+        'app/api/stripe/webhooks/**/*.ts': { branches: 79, lines: 79 },
+        'app/api/webhooks/**/*.ts': { branches: 42, lines: 48 },
+        'app/api/dev/test-auth/**/*.ts': { branches: 74, lines: 85 },
+        'lib/auth/test-mode.ts': { branches: 74, lines: 85 },
       },
     },
 

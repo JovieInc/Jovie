@@ -30,6 +30,8 @@ jobs:
     name: Live ruleset parity
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -39,3 +41,28 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/ci-merge-queue-check.mjs verify
+
+      - name: Slack alert on failure
+        if: ${{ failure() && env.SLACK_WEBHOOK_URL != '' }}
+        run: |
+          set -euo pipefail
+          PAYLOAD=$(cat <<EOF
+          {
+            "text": "Live merge-queue ruleset drifted from source",
+            "attachments": [
+              {
+                "color": "danger",
+                "fields": [
+                  { "title": "Workflow", "value": "Merge Queue Ruleset Verify", "short": true },
+                  { "title": "Command", "value": "pnpm ci:merge-queue:verify", "short": true },
+                  { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
+                ]
+              }
+            ]
+          }
+          EOF
+          )
+          curl -sS -X POST \
+            -H 'Content-type: application/json' \
+            --data "$PAYLOAD" \
+            "$SLACK_WEBHOOK_URL"

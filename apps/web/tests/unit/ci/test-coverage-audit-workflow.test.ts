@@ -50,16 +50,41 @@ describe('test coverage audit workflow', () => {
     }
   });
 
-  it('keeps the historical GitHub Issue notifier behind an impossible guard', () => {
+  it('gates RED-surface decay against the committed snapshot before rewriting it', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
-    const notifyStep = getStepBlock(workflow, 'Notify on failure');
+    const checkStep = getStepBlock(
+      workflow,
+      'Check RED-surface coverage drift'
+    );
+    const generateIndex = workflow.indexOf('- name: Generate heatmap');
+    const checkIndex = workflow.indexOf(
+      '- name: Check RED-surface coverage drift'
+    );
 
-    expect(notifyStep).toContain(
-      "if: ${{ github.event_name == '__retired_linear_only__' }}"
+    expect(checkStep).toContain('pnpm run test:coverage:diff');
+    expect(checkIndex).toBeGreaterThan(-1);
+    expect(generateIndex).toBeGreaterThan(checkIndex);
+  });
+
+  it('does not put coverage collection on the merge-queue unit path', () => {
+    const ciWorkflow = readFileSync(
+      resolve(repoRoot, '.github/workflows/ci.yml'),
+      'utf8'
     );
-    expect(notifyStep).toContain(
-      'Historical writer retained behind the impossible retirement guard.'
-    );
+
+    expect(ciWorkflow).not.toContain('test:coverage:diff');
+    expect(ciWorkflow).not.toContain('test:coverage');
+  });
+
+  it('alerts Slack on failure and does not file GitHub issues', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const notifyStep = getStepBlock(workflow, 'Slack alert on failure');
+
+    expect(notifyStep).toContain('SLACK_WEBHOOK_URL');
+    expect(notifyStep).toContain('failure()');
+    expect(notifyStep).toContain('curl -sS -X POST');
     expect(workflow).not.toContain('issues: write');
+    expect(workflow).not.toContain('gh issue create');
+    expect(workflow).not.toContain('__retired_linear_only__');
   });
 });
