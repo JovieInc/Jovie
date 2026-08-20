@@ -436,6 +436,17 @@ export function scrubPii(
     return null;
   }
 
+  // Real `UpstashError: ERR max requests limit exceeded` events (JOV-5181 /
+  // JOV-5184) are one Redis-quota incident. Server/edge already drop them;
+  // client `beforeSend` is this function, so drop here too. The hourly
+  // canary owns the standing alert.
+  if (
+    isRedisQuotaFailure(hint?.originalException) ||
+    isUpstashQuotaSentryEvent(event)
+  ) {
+    return null;
+  }
+
   if (isNonProductionServerNoise(event)) {
     return null;
   }
@@ -450,16 +461,10 @@ export function scrubPii(
     return null;
   }
 
-  // Filter captureWarning/captureError JSON bags (JOV-5183, JOV-5187,
-  // JOV-5209, JOV-5218, JOV-5228) and real quota command failures (JOV-5181).
-  // The hourly Redis operability canary owns paging.
+  // Filter captureWarning/captureError JSON bags kept on extra/logentry
+  // (JOV-5182, JOV-5183, JOV-5187, JOV-5209, JOV-5218, JOV-5228). Quota
+  // command failures (JOV-5181 / JOV-5184) are already dropped above.
   if (isNonActionableUpstashErrorBagEvent(event)) {
-    return null;
-  }
-  if (
-    isUpstashQuotaSentryEvent(event) ||
-    isRedisQuotaFailure(hint?.originalException)
-  ) {
     return null;
   }
 

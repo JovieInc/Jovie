@@ -399,6 +399,22 @@ describe('scrubPii', () => {
     expect(scrubPii(event as any)).toBeNull();
   });
 
+  it('should keep unrelated Upstash auth failures', () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'UpstashError',
+            value:
+              'WRONGPASS invalid or missing auth token. See https://docs.upstash.com/redis/troubleshooting/http_unauthorized for details.',
+          },
+        ],
+      },
+    };
+
+    expect(scrubPii(event as any)).not.toBeNull();
+  });
+
   it('should filter framework internal errors', () => {
     const event = {
       exception: {

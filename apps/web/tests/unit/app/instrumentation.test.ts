@@ -109,6 +109,44 @@ describe('server instrumentation guard', () => {
     expect(Sentry.captureRequestError).not.toHaveBeenCalled();
   });
 
+  it('skips request-error capture for the JOV-5184 quota command failure', async () => {
+    process.env.CI = 'false';
+    process.env.NODE_ENV = 'production';
+    process.env.NEXT_RUNTIME = 'nodejs';
+    delete process.env.NEXT_PUBLIC_E2E_MODE;
+    delete process.env.E2E_USE_TEST_AUTH_BYPASS;
+
+    const Sentry = await import('@sentry/nextjs');
+    const { onRequestError } = await import('@/instrumentation');
+    const error = new Error(
+      'Command failed: ERR max requests limit exceeded. Limit: 500000, Usage: 500099'
+    );
+    error.name = 'UpstashError';
+
+    await onRequestError(error);
+
+    expect(Sentry.captureRequestError).not.toHaveBeenCalled();
+  });
+
+  it('captures unrelated Upstash auth request errors', async () => {
+    process.env.CI = 'false';
+    process.env.NODE_ENV = 'production';
+    process.env.NEXT_RUNTIME = 'nodejs';
+    delete process.env.NEXT_PUBLIC_E2E_MODE;
+    delete process.env.E2E_USE_TEST_AUTH_BYPASS;
+
+    const Sentry = await import('@sentry/nextjs');
+    const { onRequestError } = await import('@/instrumentation');
+    const error = new Error(
+      'WRONGPASS invalid or missing auth token. See https://docs.upstash.com/redis/troubleshooting/http_unauthorized for details.'
+    );
+    error.name = 'UpstashError';
+
+    await onRequestError(error);
+
+    expect(Sentry.captureRequestError).toHaveBeenCalledWith(error);
+  });
+
   it('skips request-error capture when Next.js wraps the JOV-5209 bag on cause', async () => {
     process.env.CI = 'false';
     process.env.NODE_ENV = 'production';

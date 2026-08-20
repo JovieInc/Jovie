@@ -118,6 +118,19 @@ describe('captureError wrapped UpstashError (JOV-5220)', () => {
     expect(captureException).not.toHaveBeenCalled();
   });
 
+  it('does not send a clerkUserId-wrapped quota failure at error severity', async () => {
+    const inner = new UpstashError(
+      'ERR max requests limit exceeded. Limit: 500000, Usage: 500099'
+    );
+
+    await captureError('[ban-check] Redis cache read failed', {
+      clerkUserId: 'af5b9ee0-ecec-4508-86e0-4f364c2e349d',
+      error: inner,
+    });
+
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
   it('moves clerkUserId from the wrapper into Sentry extra, not the title', async () => {
     const inner = new UpstashError('WRONGPASS invalid or missing auth token');
 
@@ -134,6 +147,17 @@ describe('captureError wrapped UpstashError (JOV-5220)', () => {
     expect(options.extra?.clerkUserId).toBe(
       'af5b9ee0-ecec-4508-86e0-4f364c2e349d'
     );
+  });
+
+  it('still sends unrelated Redis auth failures at error severity', async () => {
+    const inner = new UpstashError(
+      'WRONGPASS invalid or missing auth token. See https://docs.upstash.com/redis/troubleshooting/http_unauthorized for details.'
+    );
+
+    await captureError('[ban-check] Redis cache read failed', inner);
+
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(captureException.mock.calls[0]?.[0]).toBe(inner);
   });
 
   it('does not send an already-stringified JSON bag at error severity (JOV-5228)', async () => {
