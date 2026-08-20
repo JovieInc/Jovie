@@ -91,6 +91,8 @@ export function getLiteClientConfig(
     enableLogs: baseConfig.enableLogs,
     sendDefaultPii: baseConfig.sendDefaultPii,
     beforeSend: baseConfig.beforeSend,
+    // getBaseClientConfig().ignoreErrors never reached Sentry.init (JOV-5183).
+    ignoreErrors: baseConfig.ignoreErrors,
 
     // Lite-specific: preserve core error capture (GlobalHandlers,
     // BrowserApiErrors, LinkedErrors, Dedupe, and PII filtering) while dropping
