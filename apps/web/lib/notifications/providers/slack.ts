@@ -12,6 +12,11 @@ import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { buildSlackFeedbackNotification } from './slack-feedback-message';
 
+export {
+  FEEDBACK_SLACK_MAX_CHARS,
+  redactFeedbackMessageForSlack,
+} from './slack-feedback-message';
+
 export interface SlackMessage {
   text: string;
   blocks?: SlackBlock[];

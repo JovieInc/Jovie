@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import calendar
 import hashlib
 import json
 import math
@@ -479,18 +480,65 @@ def _identifier_from_unit(unit: str) -> str | None:
     return match.group(1) if match else None
 
 
+def _parse_systemd_wall_clock(raw: str) -> float | None:
+    """Parse `systemctl show` ExecMainStartTimestamp.
+
+    Live Gem user systemd prints `Wed 2026-08-19 23:23:53 UTC` and does not
+    expose ExecMainStartTimestampUSec. USec-only age was always None, so
+    stale remount recycle never stopped JOV-5220 (held 2h+).
+    """
+    raw = raw.strip()
+    if not raw or raw in {"n/a", "0"}:
+        return None
+    parts = raw.split()
+    if len(parts) >= 4 and parts[0][:1].isalpha():
+        stamp, zone = f"{parts[1]} {parts[2]}", parts[3]
+    elif len(parts) >= 3:
+        stamp, zone = f"{parts[0]} {parts[1]}", parts[2]
+    else:
+        return None
+    if zone not in {"UTC", "GMT", "Z"}:
+        return None
+    try:
+        parsed = time.strptime(stamp, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return None
+    return float(calendar.timegm(parsed))
+
+
 def _unit_age_seconds(unit: str) -> float | None:
     result = _captured(
-        _systemctl("show", "--property=ExecMainStartTimestampUSec", "--value", unit),
+        _systemctl(
+            "show",
+            "--property=ExecMainStartTimestampUSec,ExecMainStartTimestamp",
+            unit,
+        ),
         CONTROL_TIMEOUT_SECONDS,
     )
     if result is None or result.returncode != 0:
         return None
-    raw = result.stdout.decode(errors="replace").strip()
-    if not raw.isdigit():
-        return None
-    age = time.time() - int(raw) / 1_000_000
-    return age if age >= 0 else None
+    usec: int | None = None
+    wall: str | None = None
+    for line in result.stdout.decode(errors="replace").splitlines():
+        if "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        value = value.strip()
+        if key == "ExecMainStartTimestampUSec" and value.isdigit():
+            usec = int(value)
+        elif key == "ExecMainStartTimestamp" and value:
+            wall = value
+    now = time.time()
+    if usec is not None:
+        age = now - usec / 1_000_000
+        return age if age >= 0 else None
+    if wall:
+        started = _parse_systemd_wall_clock(wall)
+        if started is None:
+            return None
+        age = now - started
+        return age if age >= 0 else None
+    return None
 
 
 def _recycle_stale_remount_units(
@@ -1085,11 +1133,11 @@ def _launch_fallback_workers(
             continue
         verdict, _pr = _open_pr_verdict(identifier, open_prs)
         if verdict == "skip":
-            print(f"fallback skip {identifier} open_pr_inflight", file=sys.stderr)
+            print(f"fallback skip {identifier} open_pr_inflight", file=sys.stderr, flush=True)
             continue
         issue = _fetch_single_issue(identifier)
         if issue is None:
-            print(f"fallback skip {identifier} admission_unverifiable", file=sys.stderr)
+            print(f"fallback skip {identifier} admission_unverifiable", file=sys.stderr, flush=True)
             continue
         ok, _reason, meta = _issue_meta(
             issue,
@@ -1097,7 +1145,7 @@ def _launch_fallback_workers(
             require_receipt=(verdict != "remount" and not _continue_without_receipt(issue)),
         )
         if not ok:
-            print(f"fallback skip {identifier} not admitted", file=sys.stderr)
+            print(f"fallback skip {identifier} not admitted", file=sys.stderr, flush=True)
             continue
         command = _grok_command(
             identifier,
@@ -1107,7 +1155,7 @@ def _launch_fallback_workers(
             bundle_revision,
         )
         if not _control(command):
-            print(f"fallback skip {identifier} grok_launch_failed", file=sys.stderr)
+            print(f"fallback skip {identifier} grok_launch_failed", file=sys.stderr, flush=True)
             continue
         launched_units.add(next(arg.removeprefix("--unit=") + ".service" for arg in command if arg.startswith("--unit=")))
         capacity_used += 1
@@ -1126,7 +1174,7 @@ def _grok_command(
     grok_exe = _grok_executable() or str(pathlib.Path.home() / ".local/bin/grok")
     return [
         "systemd-run", "--user", f"--unit={unit}", "--collect",
-        "-p", "Type=exec", "-p", f"Environment=PATH={pathlib.Path.home()}/.local/bin:/usr/bin:/bin",
+        "-p", "Type=exec", "-p", f"Environment=PATH={pathlib.Path.home()}/.local/bin:{pathlib.Path.home()}/.npm-global/bin:/usr/local/bin:/usr/bin:/bin",
         "-p", f"Environment=GEM_GROK_EXECUTABLE={grok_exe}",
         "-p", f"Environment=GEM_GROK_BIN={grok_exe}",
         "-p", f"Environment=SYMPHONY_FALLBACK_SELECTION_B64={encoded}",

@@ -137,6 +137,13 @@ describe('shared deterministic scorers', () => {
         assistantResponse: longResponse,
       }).passed
     ).toBe(true);
+    expect(
+      runDeterministicScorers({
+        ...baseInput,
+        assistantResponse: longResponse,
+        verbosityBudgetWords: 150,
+      }).passed
+    ).toBe(false);
   });
 });
 

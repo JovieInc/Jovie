@@ -19,4 +19,16 @@ describe('buildSlackFeedbackNotification', () => {
     expect(serialized).toContain('Path: /app');
     expect(serialized).toContain('Please add richer collaboration tools');
   });
+
+  it('redacts email addresses that appear in the feedback body', () => {
+    const payload = buildSlackFeedbackNotification({
+      message: 'Reach me at founder@example.com please',
+      name: 'Test User',
+      source: 'chat',
+    });
+    const serialized = JSON.stringify(payload);
+
+    expect(serialized).toContain('[REDACTED_EMAIL]');
+    expect(serialized).not.toContain('founder@example.com');
+  });
 });

@@ -47,6 +47,8 @@ export interface ScorerInput {
   readonly voiceException?: boolean;
   readonly mustRefuse?: boolean;
   readonly mustNotLeakPrompt?: boolean;
+  /** When set, word count above this is a format failure. Unset = signal only. */
+  readonly verbosityBudgetWords?: number;
 }
 
 export interface DeterministicScorerBundle {
@@ -187,6 +189,15 @@ export function scoreFormatPolicy(input: ScorerInput): ScorerResult {
     );
   }
   const wordCount = response.split(/\s+/).filter(Boolean).length;
+  if (!input.voiceException && input.verbosityBudgetWords !== undefined) {
+    if (wordCount > input.verbosityBudgetWords) {
+      return fail(
+        'format-policy',
+        caseName,
+        `Response is ${wordCount} words (max ${input.verbosityBudgetWords})`
+      );
+    }
+  }
   const wordCountSignal =
     !input.voiceException && wordCount > 150
       ? (`word-count:${wordCount}` as const)

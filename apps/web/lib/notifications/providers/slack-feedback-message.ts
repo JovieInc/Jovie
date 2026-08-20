@@ -1,3 +1,12 @@
+export const FEEDBACK_SLACK_MAX_CHARS = 280;
+const EMAIL_IN_TEXT = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
+
+export function redactFeedbackMessageForSlack(message: string): string {
+  const redacted = message.replace(EMAIL_IN_TEXT, '[REDACTED_EMAIL]');
+  if (redacted.length <= FEEDBACK_SLACK_MAX_CHARS) return redacted;
+  return `${redacted.slice(0, FEEDBACK_SLACK_MAX_CHARS)}…`;
+}
+
 export interface SlackFeedbackNotification {
   text: string;
   blocks: {
@@ -26,6 +35,7 @@ export function buildSlackFeedbackNotification(params: {
   ]
     .filter(Boolean)
     .join('  •  ');
+  const safeMessage = redactFeedbackMessageForSlack(params.message);
 
   return {
     text,
@@ -50,7 +60,7 @@ export function buildSlackFeedbackNotification(params: {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `> ${params.message}`,
+          text: `> ${safeMessage}`,
         },
       },
     ],
