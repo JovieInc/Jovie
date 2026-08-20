@@ -4,7 +4,7 @@ import { APP_ROUTES } from '@/constants/routes';
 type SearchParams = Record<string, string | string[] | undefined>;
 
 /**
- * Legacy TV URL. Ovie is one HUD at /hud. Preserve the kiosk token.
+ * Legacy TV URL. Canonical Ops lives at /hud. Preserve the kiosk token.
  */
 export default async function HudTvRedirectPage({
   searchParams,

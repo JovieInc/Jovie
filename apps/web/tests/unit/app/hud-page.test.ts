@@ -8,6 +8,7 @@ const {
   authorizeHudMock,
   getCurrentAdminPageAccessMock,
   getHudMetricsMock,
+  getFounderFunnelDataMock,
 } = vi.hoisted(() => ({
   redirectMock: vi.fn((url: string) => {
     throw new Error(`NEXT_REDIRECT:${url}`);
@@ -26,6 +27,7 @@ const {
   authorizeHudMock: vi.fn(),
   getCurrentAdminPageAccessMock: vi.fn(),
   getHudMetricsMock: vi.fn(),
+  getFounderFunnelDataMock: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -44,6 +46,10 @@ vi.mock('@/lib/auth/hud', () => ({
 
 vi.mock('@/lib/hud/metrics', () => ({
   getHudMetrics: getHudMetricsMock,
+}));
+
+vi.mock('@/lib/admin/founder-funnel', () => ({
+  getFounderFunnelData: getFounderFunnelDataMock,
 }));
 
 vi.mock('@/lib/hud/source-trust', () => ({
@@ -96,6 +102,7 @@ describe('/hud page auth', () => {
     vi.clearAllMocks();
     authorizeHudMock.mockResolvedValue({ ok: false, reason: 'unauthorized' });
     getHudMetricsMock.mockResolvedValue({ accessMode: 'admin' });
+    getFounderFunnelDataMock.mockResolvedValue(null);
   });
 
   it('renders kiosk HUD when the token is valid', async () => {
@@ -118,6 +125,9 @@ describe('/hud page auth', () => {
     const dashboardElement = findElementByName(result, 'HudDashboardClient');
     expect(dashboardElement).not.toBeNull();
     expect(dashboardElement?.props?.initialMetrics).toEqual(metrics);
+    expect(dashboardElement?.props?.density).toBe('kiosk');
+    expect(dashboardElement?.props?.presentationMode).toBe('token');
+    expect(getFounderFunnelDataMock).not.toHaveBeenCalled();
   });
 
   it('calls unauthorized for signed-out users', async () => {
@@ -183,6 +193,34 @@ describe('/hud page auth', () => {
     // dashboard) rather than an integration test of dashboard internals.
     const dashboardElement = findElementByName(result, 'HudDashboardClient');
     expect(dashboardElement).not.toBeNull();
+    expect(dashboardElement?.props?.initialMetrics).toEqual(metrics);
+    expect(dashboardElement?.props?.density).toBe('shell');
+    expect(dashboardElement?.props?.presentationMode).toBe('shell');
+    expect(getFounderFunnelDataMock).toHaveBeenCalledWith('30d');
+  });
+
+  it('uses kiosk density for fullscreen on the same HudDashboardClient', async () => {
+    getCurrentAdminPageAccessMock.mockResolvedValue({
+      isAuthenticated: true,
+      hasAdminRole: true,
+      userId: 'admin_1',
+    });
+    const metrics = {
+      accessMode: 'admin' as const,
+      generatedAt: 'now',
+      sources: { stripe: { available: false }, mercury: { available: false } },
+      overview: { mrrUsd: 0, balanceUsd: 0, defaultStatusDetail: 'unknown' },
+    };
+    getHudMetricsMock.mockResolvedValue(metrics);
+
+    const result = await HudPage({
+      searchParams: Promise.resolve({ fs: '1' }),
+    });
+
+    const dashboardElement = findElementByName(result, 'HudDashboardClient');
+    expect(dashboardElement).not.toBeNull();
+    expect(dashboardElement?.props?.density).toBe('kiosk');
+    expect(dashboardElement?.props?.presentationMode).toBe('shell');
     expect(dashboardElement?.props?.initialMetrics).toEqual(metrics);
   });
 });

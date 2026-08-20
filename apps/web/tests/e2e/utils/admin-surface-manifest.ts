@@ -60,11 +60,11 @@ function getRedirectName(path: string): string {
 
 export const ADMIN_RENDER_SURFACES: readonly AdminSurfaceDescriptor[] = [
   {
-    id: 'overview',
-    name: 'Admin Overview',
-    path: APP_ROUTES.ADMIN,
-    rootTestId: 'admin-overview-page',
-    snapshotSlug: 'admin-overview',
+    id: 'ops',
+    name: 'Admin Ops',
+    path: APP_ROUTES.HUD,
+    rootTestId: 'hud-admin-page',
+    snapshotSlug: 'admin-ops',
     primaryWorkspace: true,
     utilityRoot: false,
     includeInFastHealth: true,

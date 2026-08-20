@@ -4,7 +4,7 @@ import { APP_ROUTES } from '@/constants/routes';
 type SearchParams = Record<string, string | string[] | undefined>;
 
 /**
- * Legacy Ops URL. Ovie is one HUD at /hud.
+ * Legacy Ops URL. Canonical Ops lives at /hud.
  */
 export default async function AdminOpsRedirectPage({
   searchParams,

@@ -351,9 +351,9 @@ describe('UnifiedSidebar library route', () => {
     ).toBeInTheDocument();
   });
 
-  it('marks only the nested operator destination current', () => {
+  it('marks only the exact Ops destination current', () => {
     renderUnifiedSidebar({
-      pathname: `${APP_ROUTES.ADMIN_OPS}/agents`,
+      pathname: APP_ROUTES.ADMIN_OPS,
       section: 'ov',
     });
 
@@ -361,10 +361,10 @@ describe('UnifiedSidebar library route', () => {
       name: 'OV Navigation',
     });
     expect(
-      within(operatorNavigation).getByRole('link', { name: 'Overview' })
+      within(operatorNavigation).getByRole('link', { name: 'Chat' })
     ).not.toHaveAttribute('aria-current');
     expect(
-      within(operatorNavigation).getByRole('link', { name: 'Ovie' })
+      within(operatorNavigation).getByRole('link', { name: 'Ops' })
     ).toHaveAttribute('aria-current', 'page');
     expect(
       operatorNavigation.querySelectorAll('[aria-current="page"]')

@@ -697,14 +697,16 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
       try {
         await ensureSignedInUser(adminPage, getAdminCredentials());
 
-        await adminPage.goto(APP_ROUTES.ADMIN, {
+        await adminPage.goto(APP_ROUTES.HUD, {
           waitUntil: 'domcontentloaded',
           timeout: 30_000,
         });
         await expect(
-          adminPage.locator('[data-testid="admin-overview-page"]')
+          adminPage.locator('[data-testid="hud-admin-page"]')
         ).toBeVisible({ timeout: 30_000 });
-        await expect(adminPage.getByText(/scoreboard/i).first()).toBeVisible({
+        await expect(
+          adminPage.locator('[data-testid="tim-action-required"]')
+        ).toBeVisible({
           timeout: 30_000,
         });
 

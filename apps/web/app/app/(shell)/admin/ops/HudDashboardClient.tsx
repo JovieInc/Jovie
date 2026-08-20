@@ -22,9 +22,12 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { AgentOsRunsPanel } from '@/components/features/admin/agent-os';
 import { DesignProposalReviewPanel } from '@/components/features/admin/design-lab';
+import { FounderConversionHud } from '@/components/features/admin/hud/FounderConversionHud';
 import { FounderMorningWalkCard } from '@/components/features/admin/hud/FounderMorningWalkCard';
 import { HudCashMrrBand } from '@/components/features/admin/hud/HudCashMrrBand';
 import { HudKpiSubgrid } from '@/components/features/admin/hud/HudKpiSubgrid';
+import { HudNoiseDisclosure } from '@/components/features/admin/hud/HudNoiseDisclosure';
+import { HudObservationStatus } from '@/components/features/admin/hud/HudObservationStatus';
 import {
   HudGithubBudgetPanel,
   HudShipperNeedPanel,
@@ -40,6 +43,7 @@ import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { QRCode } from '@/components/molecules/QRCode';
 import { ShellListRowFrame } from '@/components/organisms/table';
+import type { FounderFunnelData } from '@/lib/admin/types';
 import type { AgentRunArtifact } from '@/lib/agent-os/artifact';
 import { AGENT_OS_ADMIN_FIXTURE_ARTIFACTS } from '@/lib/agent-os/fixtures';
 import {
@@ -47,10 +51,7 @@ import {
   type HudComposedSection,
   type HudPresentation,
 } from '@/lib/hud/compose-hud-bands';
-import {
-  getDefaultStatusTone,
-  type HudTone,
-} from '@/lib/hud/tone-determination';
+import type { HudTone } from '@/lib/hud/tone-determination';
 import type { HermesCliRuntime, HermesDispatchRequest } from '@/types/ai-ops';
 import type {
   HudDeploymentRun,
@@ -210,14 +211,6 @@ function HudDeploymentsSurfaceCard({
       <HudMetricSourceTrust source={githubSource} onRetry={handleSourceRetry} />
     </ContentSurfaceCard>
   );
-}
-
-function formatDefaultStatusLabel(
-  status: HudMetrics['overview']['defaultStatus']
-): string {
-  if (status === 'alive') return 'Alive';
-  if (status === 'dead') return 'Dead';
-  return 'Unknown';
 }
 
 const DEPLOYMENT_STATE_LABELS: Record<HudDeploymentState, string> = {
@@ -652,7 +645,7 @@ export type HudPresentationMode = 'shell' | 'admin-kiosk' | 'token';
 
 export interface HudDashboardClientProps {
   readonly initialMetrics: HudMetrics;
-  /** Visual scale: shell-density matches Overview KPIs; kiosk uses TV-scale typography. */
+  /** Visual scale: shell-density matches Ops KPIs; kiosk uses TV-scale typography. */
   readonly density?: HudDensity;
   /**
    * Auth/access context. Independent of `density` — admin-kiosk keeps full
@@ -670,6 +663,8 @@ export interface HudDashboardClientProps {
   readonly initialShippingCachedAt?: string;
   /** When true and agentRuns empty, show dev fixtures on Agent OS panel. */
   readonly useFixtureAgentRuns?: boolean;
+  /** Prefetched founder funnel for the signed-in Ops need band. */
+  readonly initialFunnel?: FounderFunnelData | null;
 }
 
 function resolveAgentOsArtifacts(
@@ -720,6 +715,7 @@ export function HudDashboardClient({
   initialShippingData,
   initialShippingCachedAt,
   useFixtureAgentRuns = false,
+  initialFunnel = null,
 }: HudDashboardClientProps) {
   const { data: metrics, refetch } = useHudMetricsQuery(
     initialMetrics,
@@ -744,7 +740,6 @@ export function HudDashboardClient({
     });
   }
 
-  const defaultTone = getDefaultStatusTone(metrics.overview.defaultStatus);
   const deploymentDetail = getDeploymentDetail(metrics.deployments);
   const aiOpsTone = getAiOpsTone(metrics.aiOps);
   const aiOpsLabel = getAiOpsLabel(metrics.aiOps);
@@ -785,32 +780,63 @@ export function HudDashboardClient({
     </span>
   );
 
-  function renderSection(section: HudComposedSection) {
+  function renderSectionBody(section: HudComposedSection) {
     switch (section.id) {
-      case 'morning-walk':
+      case 'action-required':
         return (
-          <FounderMorningWalkCard
-            key={section.id}
-            defaultStatus={metrics.overview.defaultStatusDetail}
-          />
+          <div data-testid={section.testId}>
+            <TimActionRequiredSection />
+          </div>
         );
       case 'cash-mrr':
         return (
           <HudCashMrrBand
-            key={section.id}
             metrics={metrics}
             mrrValueClass={mrrValueClass}
             runwayValueClass={secondaryValueClass}
             onRetry={handleSourceRetry}
           />
         );
+      case 'bottleneck':
+        return presentation === 'token' ? (
+          <ContentSurfaceCard
+            surface='details'
+            className='space-y-3 p-3'
+            data-testid={section.testId}
+          >
+            <SectionLabel>Bottleneck</SectionLabel>
+            <p className='text-app text-secondary-token'>
+              Customer funnel stays on the signed-in operator path.
+            </p>
+          </ContentSurfaceCard>
+        ) : (
+          <div data-testid={section.testId}>
+            {initialFunnel ? (
+              <FounderConversionHud
+                mrrUsd={null}
+                initialFunnel={initialFunnel}
+              />
+            ) : (
+              <HudObservationStatus
+                state='not_configured'
+                message='Funnel data is not configured.'
+                testId='hud-bottleneck-observation'
+              />
+            )}
+          </div>
+        );
       case 'factory-health':
-        return <HudSystemHealthStrip key={section.id} metrics={metrics} />;
+        return <HudSystemHealthStrip metrics={metrics} />;
       case 'shipper':
         return (
           <HudShipperNeedPanel
-            key={section.id}
             source={presentation === 'token' ? 'kiosk-token' : 'admin-session'}
+          />
+        );
+      case 'morning-walk':
+        return (
+          <FounderMorningWalkCard
+            defaultStatus={metrics.overview.defaultStatusDetail}
           />
         );
       case 'design-jury':
@@ -929,13 +955,7 @@ export function HudDashboardClient({
           </div>
         );
       case 'what-shipped':
-        return <WhatShipped key={section.id} kioskToken={kioskToken} />;
-      case 'action-required':
-        return (
-          <div key={section.id} data-testid={section.testId}>
-            <TimActionRequiredSection />
-          </div>
-        );
+        return <WhatShipped kioskToken={kioskToken} />;
       case 'dispatch-details':
         return (
           <div
@@ -995,41 +1015,6 @@ export function HudDashboardClient({
                 handleSourceRetry={handleSourceRetry}
               />
             </div>
-            <ContentSurfaceCard
-              surface='details'
-              className='p-3'
-              data-testid='hud-bottom-marker'
-            >
-              <div className='flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between'>
-                <div className='space-y-2'>
-                  <SectionLabel>Default status</SectionLabel>
-                  <p
-                    className={
-                      isShell
-                        ? 'text-2xl font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-3xl'
-                        : 'text-4xl font-[620] leading-none tracking-[-0.045em] text-primary-token sm:text-5xl'
-                    }
-                  >
-                    {formatDefaultStatusLabel(metrics.overview.defaultStatus)}
-                  </p>
-                  <p
-                    className={
-                      isShell
-                        ? 'max-w-4xl text-app leading-6 text-secondary-token'
-                        : 'max-w-4xl text-mid leading-7 text-secondary-token'
-                    }
-                  >
-                    {metrics.overview.defaultStatusDetail}
-                  </p>
-                </div>
-                <HudStatusPill
-                  label={formatDefaultStatusLabel(
-                    metrics.overview.defaultStatus
-                  )}
-                  tone={defaultTone}
-                />
-              </div>
-            </ContentSurfaceCard>
           </div>
         );
       default: {
@@ -1037,6 +1022,22 @@ export function HudDashboardClient({
         return _exhaustive;
       }
     }
+  }
+
+  function renderSection(section: HudComposedSection) {
+    const body = renderSectionBody(section);
+    if (section.band === 'noise') {
+      return (
+        <HudNoiseDisclosure
+          key={section.id}
+          id={section.id}
+          label={section.label}
+        >
+          {body}
+        </HudNoiseDisclosure>
+      );
+    }
+    return <div key={section.id}>{body}</div>;
   }
 
   return (
@@ -1058,7 +1059,7 @@ export function HudDashboardClient({
               />
             </div>
             <div className='min-w-0'>
-              <SectionLabel>HUD</SectionLabel>
+              <SectionLabel>Ops</SectionLabel>
               <h1 className='mt-1 truncate text-xl font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-2xl'>
                 {metrics.branding.startupName}
               </h1>
@@ -1075,6 +1076,11 @@ export function HudDashboardClient({
         </ContentSurfaceCard>
       )}
       {sections.map(section => renderSection(section))}
+      <div
+        data-testid='hud-bottom-marker'
+        className='h-px w-full'
+        aria-hidden
+      />
     </div>
   );
 }

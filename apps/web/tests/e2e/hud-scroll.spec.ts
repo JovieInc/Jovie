@@ -128,10 +128,10 @@ test.describe('App-shell scroll-pane regression', () => {
 
   const adminRoutes = [
     {
-      label: 'admin overview',
-      bypass: `/api/dev/test-auth/enter?persona=admin&redirect=${APP_ROUTES.OV}`,
-      expectedPath: /\/app\/ov/,
-      scrollSelector: '[data-testid="admin-overview-page"]',
+      label: 'admin ops',
+      bypass: `/api/dev/test-auth/enter?persona=admin&redirect=${APP_ROUTES.HUD}`,
+      expectedPath: /\/hud(?:\?|$)/,
+      scrollSelector: '[data-testid="hud-admin-page"]',
     },
     {
       label: 'dashboard earnings',

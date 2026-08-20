@@ -2,20 +2,23 @@ import type { Metadata } from 'next';
 import { forbidden, unauthorized } from 'next/navigation';
 import { HudDashboardClient } from '@/app/app/(shell)/admin/ops/HudDashboardClient';
 import { HudFullscreenControl } from '@/components/features/admin/hud/HudFullscreenControl';
+import { HudNoiseDisclosure } from '@/components/features/admin/hud/HudNoiseDisclosure';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { OperationalControlPanel } from '@/components/features/admin/OperationalControlPanel';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
+import { getFounderFunnelData } from '@/lib/admin/founder-funnel';
 import { getCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { authorizeHud } from '@/lib/auth/hud';
 import { env } from '@/lib/env-server';
 import { getHudMetrics } from '@/lib/hud/metrics';
+import { OVIE_OPS_PRODUCT_NAME } from '@/lib/ovie/ops-entrypoint';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
-  title: 'Ovie',
-  description: 'One operator HUD.',
+  title: OVIE_OPS_PRODUCT_NAME,
+  description: 'Scan-first company operations.',
   robots: NOINDEX_ROBOTS,
 };
 
@@ -26,9 +29,10 @@ function firstString(value: string | string[] | undefined): string | null {
 }
 
 /**
- * Ovie is one screen: /hud.
+ * Canonical Ops screen: /hud.
  * ?fs=1 is fullscreen for a signed-in admin.
  * ?kiosk=TOKEN is the unattended TV path.
+ * Both are presentation modes of HudDashboardClient, not separate products.
  */
 export default async function HudPage({
   searchParams,
@@ -51,7 +55,12 @@ export default async function HudPage({
     if (!adminAccess.hasAdminRole) forbidden();
   }
 
-  const metrics = await getHudMetrics(tokenOk ? 'kiosk' : 'admin');
+  const [metrics, funnel] = await Promise.all([
+    getHudMetrics(tokenOk ? 'kiosk' : 'admin'),
+    tokenOk
+      ? Promise.resolve(null)
+      : getFounderFunnelData('30d').catch(() => null),
+  ]);
   const dashboard = (
     <HudDashboardClient
       initialMetrics={metrics}
@@ -59,6 +68,7 @@ export default async function HudPage({
       presentationMode={tokenOk ? 'token' : 'shell'}
       kioskToken={tokenOk ? kioskToken : null}
       useFixtureAgentRuns={env.HUD_AGENT_RUNS_FIXTURES === '1'}
+      initialFunnel={funnel}
     />
   );
 
@@ -73,13 +83,15 @@ export default async function HudPage({
   return (
     <StandaloneProductPage width='xl' className='hud-admin-viewport'>
       <AdminPage
-        title='Ovie'
-        description='Need, then noise.'
+        title={OVIE_OPS_PRODUCT_NAME}
+        description='Decisions, survival, bottleneck, delivery, operating chain.'
         testId='hud-admin-page'
         actions={<HudFullscreenControl />}
       >
         {dashboard}
-        <OperationalControlPanel />
+        <HudNoiseDisclosure id='developer-controls' label='Developer Controls'>
+          <OperationalControlPanel />
+        </HudNoiseDisclosure>
       </AdminPage>
     </StandaloneProductPage>
   );

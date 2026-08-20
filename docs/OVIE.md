@@ -7,24 +7,48 @@ Canonical program: [`docs/OVIE_PROGRAM.md`](OVIE_PROGRAM.md) (JOV-5214).
 
 `Tim -> Ovie -> Eve intake/ack -> durable Kanban -> Summer -> Symphony -> identified coding worker on Gem Ubuntu`
 
+## Canonical Ops contract (JOV-5256)
+
+Packaged-app M1 consumes this exact contract. Do not add a second dashboard,
+shell, or Overview/HUD/TV product.
+
+| Field | Value |
+|---|---|
+| Product name | Ops |
+| Route | `/hud` (`APP_ROUTES.HUD`) |
+| Component | `HudDashboardClient` |
+| Module | `apps/web/lib/ovie/ops-entrypoint.ts` |
+| Packaged default | `/hud` (zero extra clicks; no `/app/chat` fallback) |
+
+Presentation modes of the same component and metrics contract:
+
+| Mode | Input | Density | Presentation |
+|---|---|---|---|
+| Shell | `/hud` | `shell` | `shell` |
+| Fullscreen | `/hud?fs=1` | `kiosk` | `shell` |
+| Kiosk | `/hud?kiosk=<token>` | `kiosk` | `token` |
+
+Compatibility aliases, never independent screens:
+
+| Old URL | Now |
+|---|---|
+| `/app/ov` | Redirects to `/hud` |
+| `/app/ov/ops` | Redirects to `/hud` (`?mode=kiosk` → `/hud?fs=1`) |
+| `/hud-tv` | Redirects to `/hud` (keeps `?kiosk=`, otherwise `?fs=1`) |
+
+Scan-first need band: Needs Tim, survival (cash/MRR), customer bottleneck,
+delivery proof, operating chain. Velocity, activity, agent runs, design jury,
+walk capture, dispatch, and developer controls stay in disclosure.
+
 ## Presentation surfaces
 
 | Surface | Role |
 |---|---|
-| Packaged Mac/iOS door | Talk + ops presentation. Conversational authority is Summer, after Eve intake. |
-| `/hud` | One morning ops screen (brief, walk, shipper, dashboard). Fullscreen `?fs=1`. Unattended TV `?kiosk=TOKEN`. |
+| Packaged Mac/iOS door | Talk + ops presentation. Conversational authority is Summer, after Eve intake. Default installed entry is `/hud`. |
+| `/hud` | One Ops screen. Fullscreen `?fs=1`. Unattended TV `?kiosk=TOKEN`. |
 | `/app/ov/chat` | Entitled operator door. Must not fall through to artist Jovie chat or self-identify as Ovie. |
 
 If you are already signed in as admin, Fullscreen fetches `/api/hud/kiosk-session` and writes the token onto the URL so the same tab can be bookmarked or thrown on a display.
-
-## Aliases
-
-| Old URL | Now |
-|---|---|
-| `/app/ov/ops` | Redirects to `/hud` (`?mode=kiosk` → `/hud?fs=1`) |
-| `/hud-tv` | Redirects to `/hud` (keeps `?kiosk=`) |
-
-Admin Overview stays a health launchpad. Its Ops tile opens `/hud`.
 
 ## History
 
@@ -36,3 +60,4 @@ only**, and the repo is **archived (read-only)** on GitHub.
 - Deprecation issue: [#12894](https://github.com/JovieInc/Jovie/issues/12894)
 - HUD surface: `apps/web/app/hud/page.tsx`
 - Program contract: `apps/web/lib/ovie/program.ts`
+- Ops entry contract: `apps/web/lib/ovie/ops-entrypoint.ts`
