@@ -34,7 +34,7 @@ MAX_GROK_SURVIVAL_SECONDS = 120.0
 CONTROL_TIMEOUT_SECONDS = 10.0
 DEFAULT_GROK_MAX = 4  # Gem 16c/62GB safely runs 4 concurrent grok-ship workers (per-unit idempotent, active units skipped)
 MAX_GROK_MAX = 10  # hard ceiling; 10 only via explicit SYMPHONY_GROK_MAX (free-tier Build quota / dispatch risk above 4)
-STALE_REMOUNT_SECONDS = 15 * 60  # live JOV-5220 held DIRTY remount 90+ min and blocked a fresh changelog remount
+STALE_REMOUNT_SECONDS = 45 * 60  # pre-push affected tests take 20–40 min; 15 min recycled live JOV-5220 mid-push
 PRIMARY_SERVICE = "symphony-ui-pilot.service"
 OPTIONAL_SERVICES = ("symphony-lyb.service",)
 SERVICES = (PRIMARY_SERVICE, *OPTIONAL_SERVICES)
@@ -51,10 +51,11 @@ LEGACY_RUNTIME_NAMES = (
 RUNTIME_NAMES = (
     *LEGACY_RUNTIME_NAMES,
     "grok-ship-one",
+    "cursor-agent-std",
     "model-router.py",
     "model-registry.json",
 )
-LAUNCHER_NAMES = (*LEGACY_RUNTIME_NAMES, "grok-ship-one")
+LAUNCHER_NAMES = (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std")
 # Labels are derived audit evidence, never independent admission blockers.
 # The machine-written admission-gate/v1 receipt is the source of truth.
 REQUIRED_ADMISSION_LABELS = frozenset()
@@ -1175,6 +1176,8 @@ def _grok_command(
     return [
         "systemd-run", "--user", f"--unit={unit}", "--collect",
         "-p", "Type=exec", "-p", f"Environment=PATH={pathlib.Path.home()}/.local/bin:{pathlib.Path.home()}/.npm-global/bin:/usr/local/bin:/usr/bin:/bin",
+        "-p", "Environment=AUTOMATION_VERIFY_MAX_WORKERS=4",
+        "-p", "Environment=AUTOMATION_VERIFY_SHARD_CONCURRENCY=2",
         "-p", f"Environment=GEM_GROK_EXECUTABLE={grok_exe}",
         "-p", f"Environment=GEM_GROK_BIN={grok_exe}",
         "-p", f"Environment=SYMPHONY_FALLBACK_SELECTION_B64={encoded}",
@@ -1427,7 +1430,7 @@ def _artifacts() -> dict[str, pathlib.Path]:
     if not registry.is_file():
         registry = root / "config" / "model-registry.json"
     return {
-        **{name: root / name for name in (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "model-router.py")},
+        **{name: root / name for name in (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std", "model-router.py")},
         "model-registry.json": registry,
     }
 

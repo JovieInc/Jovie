@@ -6,8 +6,8 @@
  * It is not an application defect and should not trigger autofix or performance alerts.
  *
  * Opaque `{"error":{"name":"UpstashError"}}` titles are the JSON-stringified
- * form of an UpstashError whose `message` is non-enumerable (JOV-5221). The
- * standing Redis operability canary already pages on quota exhaustion.
+ * form of an UpstashError whose `message` is non-enumerable (JOV-5220, JOV-5221).
+ * The standing Redis operability canary already pages on quota exhaustion.
  */
 
 export interface SentryIssueSummary {
@@ -95,4 +95,15 @@ export function isUpstashQuotaSentryEvent(event: SentryEventLike): boolean {
     ]),
   ];
   return parts.some(part => isUpstashQuotaNoise(part));
+}
+
+/**
+ * Opaque `{error:{name:"UpstashError"}}` titles and quota-exhausted
+ * UpstashError events are one Redis-quota incident, not per-route bugs.
+ * The health canary owns the paging class (`redis_operability_quota_exceeded`).
+ */
+export function isNonActionableUpstashIssue(
+  issue: SentryIssueSummary
+): boolean {
+  return isUpstashQuotaNoise(issue.title);
 }

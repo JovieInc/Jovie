@@ -73,6 +73,12 @@ describe('ci-fast bounded parallel workflow', () => {
     ).toThrow(/unknown/);
   });
 
+  it('skips forced typecheck on source PRs with no TypeScript graph files', () => {
+    expect(CI_FAST_SOURCE).toContain('No TypeScript graph files changed');
+    expect(CI_FAST_SOURCE).toContain('pnpm turbo typecheck --affected --force');
+    expect(CI_FAST_SOURCE).toContain('**/tsconfig*.json');
+  });
+
   it('maps the exact hosted selector set to dedicated parallel jobs', () => {
     const hostedSelectors = HOSTED_GROUP_JOBS.map(({ jobId, nextJobId }) => {
       const block = jobBlock(jobId, nextJobId);
@@ -328,7 +334,17 @@ describe('ci-fast bounded parallel workflow', () => {
     // suite. They must not boot a public-profile runtime server and browser
     // unless a profile surface or its selector changed.
     expect(browser).not.toContain("'.github/workflows/ci.yml'");
+    expect(browser).not.toContain("'scripts/ci-fast-lanes.mjs'");
     expect(CI_FAST_SOURCE).not.toContain("    '.github/workflows/ci.yml',");
+    const selectIdx = browser.indexOf('id: profile-browser');
+    const installIdx = browser.indexOf(
+      'uses: ./.github/actions/setup-node-pnpm'
+    );
+    expect(selectIdx).toBeGreaterThan(0);
+    expect(installIdx).toBeGreaterThan(selectIdx);
+    expect(browser).toMatch(
+      /uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+if: steps\.profile-browser\.outputs\.run == 'true'/
+    );
     for (const requiredPath of [
       'apps/web/app/(marketing)/renders/profile-admission/**',
       'apps/web/components/features/release/SmartLinkProviderButton.tsx',
@@ -378,6 +394,10 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(
       selectsStructural.test('scripts/lib/__tests__/merge-queue-guard.test.mjs')
     ).toBe(false);
+    expect(selectsStructural.test('.github/workflows/ci.yml')).toBe(true);
+    expect(selectsStructural.test('.claude/rules/ci-branching.md')).toBe(true);
+    expect(selectsStructural.test('.claude/skills/qa/SKILL.md')).toBe(false);
+    expect(selectsStructural.test('.claude/rules/auth.md')).toBe(false);
   });
 
   it('skips the aggregate when the original ci-fast eligibility is skipped', () => {
