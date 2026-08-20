@@ -46,10 +46,19 @@ describe('AccountSettingsSection', () => {
 
     render(<AccountSettingsSection />);
 
-    expect(screen.getByTestId('account-identity-summary')).toBeTruthy();
-    expect(screen.getByTestId('account-identity-summary')).toHaveClass(
-      'min-h-32'
-    );
+    const identitySummary = screen.getByTestId('account-identity-summary');
+    expect(identitySummary).toHaveClass('min-h-32');
+
+    const bodyWrapper = identitySummary.parentElement;
+    expect(bodyWrapper).not.toBeNull();
+    expect(bodyWrapper).toHaveClass('px-4', 'py-4', 'sm:px-5');
+
+    const outerPanel = bodyWrapper?.parentElement;
+    expect(outerPanel).not.toBeNull();
+    expect(outerPanel).toHaveClass('rounded-xl', 'border', 'bg-surface-1');
+    expect(outerPanel).not.toHaveClass('px-4', 'py-4', 'sm:px-5');
+    expect(outerPanel?.children).toHaveLength(1);
+
     expect(screen.getByTestId('account-identity-email').textContent).toBe(
       'artist@example.com'
     );

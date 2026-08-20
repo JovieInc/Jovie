@@ -68,77 +68,76 @@ export function SettingsAppearanceSection() {
     <SettingsPanel
       title='Appearance'
       description='Theme and contrast preferences for your workspace.'
+      bodyClassName='space-y-4 px-4 py-4 sm:px-5'
     >
-      <div className='space-y-4 px-4 py-4 sm:px-5'>
-        <div className='grid gap-1.5 sm:grid-cols-3'>
-          {THEME_OPTIONS.map(option => {
-            const isSelected = selectedTheme === option.value;
-            const Icon = option.icon;
+      <div className='grid gap-1.5 sm:grid-cols-3'>
+        {THEME_OPTIONS.map(option => {
+          const isSelected = selectedTheme === option.value;
+          const Icon = option.icon;
 
-            return (
-              <Button
-                key={option.value}
-                type='button'
-                variant='ghost'
-                onClick={() => handleThemeChange(option.value)}
-                disabled={isThemePending || !selectedProfileId}
-                className={cn(
-                  'h-auto justify-start rounded-lg border px-3 py-2.5 text-left',
-                  'focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-0',
-                  isSelected
-                    ? 'border-accent/45 bg-accent/6 text-primary-token'
-                    : 'border-subtle bg-surface-0 text-secondary-token hover:bg-surface-1'
-                )}
-                aria-pressed={isSelected}
-                data-testid={`theme-option-${option.value}`}
-              >
-                <span className='flex w-full items-start gap-2'>
-                  <span className='mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center'>
-                    <Icon className='h-4 w-4' aria-hidden='true' />
-                  </span>
-                  <span className='min-w-0 flex-1'>
-                    <span className='flex items-center gap-1 text-app font-caption text-primary-token'>
-                      {option.label}
-                      {option.value === 'system' && resolvedThemeLabel ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className='inline-flex cursor-help rounded text-2xs text-tertiary-token underline decoration-dotted underline-offset-2'>
-                              {resolvedThemeLabel}
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent side='top'>
-                            {/* ui-casing-allow: System is a theme option label */}
-                            Your device currently resolves System to{' '}
-                            {resolvedThemeLabel}.
-                          </TooltipContent>
-                        </Tooltip>
-                      ) : null}
-                    </span>
-                    <span className='mt-0.5 block text-2xs leading-normal text-tertiary-token'>
-                      {option.description}
-                    </span>
-                  </span>
-                  <span className='mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center'>
-                    {isSelected ? (
-                      <Check className='h-4 w-4 text-accent' />
+          return (
+            <Button
+              key={option.value}
+              type='button'
+              variant='ghost'
+              onClick={() => handleThemeChange(option.value)}
+              disabled={isThemePending || !selectedProfileId}
+              className={cn(
+                'h-auto justify-start rounded-lg border px-3 py-2.5 text-left',
+                'focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-0',
+                isSelected
+                  ? 'border-accent/45 bg-accent/6 text-primary-token'
+                  : 'border-subtle bg-surface-0 text-secondary-token hover:bg-surface-1'
+              )}
+              aria-pressed={isSelected}
+              data-testid={`theme-option-${option.value}`}
+            >
+              <span className='flex w-full items-start gap-2'>
+                <span className='mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center'>
+                  <Icon className='h-4 w-4' aria-hidden='true' />
+                </span>
+                <span className='min-w-0 flex-1'>
+                  <span className='flex items-center gap-1 text-app font-caption text-primary-token'>
+                    {option.label}
+                    {option.value === 'system' && resolvedThemeLabel ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className='inline-flex cursor-help rounded text-2xs text-tertiary-token underline decoration-dotted underline-offset-2'>
+                            {resolvedThemeLabel}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side='top'>
+                          {/* ui-casing-allow: System is a theme option label */}
+                          Your device currently resolves System to{' '}
+                          {resolvedThemeLabel}.
+                        </TooltipContent>
+                      </Tooltip>
                     ) : null}
                   </span>
+                  <span className='mt-0.5 block text-2xs leading-normal text-tertiary-token'>
+                    {option.description}
+                  </span>
                 </span>
-              </Button>
-            );
-          })}
-        </div>
+                <span className='mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center'>
+                  {isSelected ? (
+                    <Check className='h-4 w-4 text-accent' />
+                  ) : null}
+                </span>
+              </span>
+            </Button>
+          );
+        })}
+      </div>
 
-        <div className='border-t border-subtle pt-4'>
-          <SettingsToggleRow
-            title='High Contrast'
-            description='Increase contrast for text, borders, and surfaces.'
-            checked={isHighContrast}
-            onCheckedChange={handleHighContrastChange}
-            disabled={isContrastPending || !selectedProfileId}
-            ariaLabel='Toggle high contrast mode'
-          />
-        </div>
+      <div className='border-t border-subtle pt-4'>
+        <SettingsToggleRow
+          title='High Contrast'
+          description='Increase contrast for text, borders, and surfaces.'
+          checked={isHighContrast}
+          onCheckedChange={handleHighContrastChange}
+          disabled={isContrastPending || !selectedProfileId}
+          ariaLabel='Toggle high contrast mode'
+        />
       </div>
     </SettingsPanel>
   );

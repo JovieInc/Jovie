@@ -26,14 +26,10 @@ export function SettingsSection({
   descriptionClassName,
   headerAction,
 }: SettingsSectionProps) {
-  const headingId = `${id}-heading`;
-  const descriptionId = description ? `${id}-description` : undefined;
-
   return (
     <section
       id={id}
-      aria-labelledby={headingId}
-      aria-describedby={descriptionId}
+      aria-label={title}
       className={cn('scroll-mt-6', className)}
     >
       <NavigationDestinationReady destination='settings' />

@@ -1,18 +1,18 @@
 'use client';
 
-import { ConfirmDialog } from '@jovie/ui';
+import { ConfirmDialog, Skeleton } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, Music } from 'lucide-react';
+import { AlertCircle, Music } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import {
   connectAppleMusicArtist,
   connectSpotifyArtist,
 } from '@/app/app/(shell)/dashboard/releases/actions';
 import { toast } from '@/components/feedback';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { EmptyState } from '@/components/molecules/EmptyState';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
-import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
 import { DspConnectionPill } from '@/features/dashboard/atoms/DspConnectionPill';
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 import { env } from '@/lib/env-client';
@@ -112,6 +112,7 @@ export function ConnectedDspList({
     data: matches,
     isLoading,
     error,
+    refetch,
   } = useDspMatchesQuery({
     profileId,
     status: 'all',
@@ -242,56 +243,47 @@ export function ConnectedDspList({
 
   if (isLoading) {
     return (
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
+      <SettingsPanel
+        title='Streaming profiles'
+        description='Connect and sync your primary artist profiles across streaming platforms.'
+        bodyClassName='min-h-80 space-y-3 px-4 py-3'
       >
-        <ContentSectionHeader
-          title='Streaming profiles'
-          subtitle='Connect and sync your primary artist profiles across streaming platforms.'
-          className='min-h-0 px-4 py-3'
-        />
-        <div className='px-4 py-3'>
-          <ContentSurfaceCard className='flex items-center justify-center gap-2 bg-surface-0 px-6 py-8 text-center'>
-            <Loader2
-              className='h-5 w-5 animate-spin text-secondary-token'
-              aria-hidden
-            />
-            <span className='text-app text-secondary-token'>
-              Loading platform connections...
-            </span>
-          </ContentSurfaceCard>
+        <div
+          className='space-y-3'
+          role='status'
+          aria-label='Loading Platform Connections'
+        >
+          <Skeleton className='h-16 w-full' rounded='lg' />
+          <Skeleton className='h-20 w-full' rounded='lg' />
         </div>
-      </DashboardCard>
+      </SettingsPanel>
     );
   }
 
   if (error) {
     return (
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
+      <SettingsPanel
+        title='Streaming profiles'
+        description='Connect and sync your primary artist profiles across streaming platforms.'
+        bodyClassName='min-h-80 px-4 py-3'
       >
-        <ContentSectionHeader
-          title='Streaming profiles'
-          subtitle='Connect and sync your primary artist profiles across streaming platforms.'
-          className='min-h-0 px-4 py-3'
+        <EmptyState
+          variant='error'
+          icon={<AlertCircle className='h-5 w-5' aria-hidden />}
+          heading='Unable to load streaming profiles'
+          description='Failed to load platform connections. Please try again.'
+          action={{ label: 'Try Again', onClick: () => void refetch() }}
         />
-        <div className='px-4 py-3'>
-          <ContentSurfaceCard className='px-6 py-8 text-center bg-surface-0'>
-            <p className='text-app text-secondary-token'>
-              Failed to load platform connections. Please try again.
-            </p>
-          </ContentSurfaceCard>
-        </div>
-      </DashboardCard>
+      </SettingsPanel>
     );
   }
 
   const isSpotifyConnected = !!spotifyId || !!spotifyMatch;
-  const hasNoConnections = !spotifyId && !spotifyMatch && !appleMusicMatch;
+  const hasNoConnections =
+    !spotifyId &&
+    !spotifyMatch &&
+    !appleMusicMatch &&
+    nonPrimaryMatches.length === 0;
 
   return (
     <>
@@ -404,17 +396,12 @@ function ConnectedDspListContent({
   );
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='overflow-hidden'
-    >
-      <ContentSectionHeader
+    <>
+      <SettingsPanel
         title='Streaming profiles'
-        subtitle='Connect and sync your primary artist profiles across streaming platforms.'
-        className='min-h-0 px-4 py-3'
-      />
-      <div className='space-y-3 px-4 py-3'>
+        description='Connect and sync your primary artist profiles across streaming platforms.'
+        bodyClassName='min-h-80 space-y-3 px-4 py-3'
+      >
         <ContentSurfaceCard className='space-y-3 bg-surface-0 p-4'>
           <div className='space-y-1'>
             <p className='text-app font-caption tracking-tight text-primary-token'>
@@ -431,12 +418,11 @@ function ConnectedDspListContent({
         </ContentSurfaceCard>
 
         {hasNoConnections ? (
-          <ContentSurfaceCard className='flex flex-col items-center justify-center gap-2 bg-surface-0 px-6 py-10 text-center'>
-            <Music className='h-8 w-8 text-tertiary-token' aria-hidden />
-            <p className='text-app text-secondary-token'>
-              Click a platform above to connect your streaming profiles.
-            </p>
-          </ContentSurfaceCard>
+          <EmptyState
+            icon={<Music className='h-5 w-5' aria-hidden />}
+            heading='No streaming profiles connected'
+            description='Click a platform above to connect your streaming profiles.'
+          />
         ) : null}
 
         {nonPrimaryMatches.length > 0 ? (
@@ -465,13 +451,13 @@ function ConnectedDspListContent({
             </div>
           </ContentSurfaceCard>
         ) : null}
-      </div>
+      </SettingsPanel>
       <ArtistSearchCommandPalette
         open={paletteOpen}
         onOpenChange={setPaletteOpen}
         provider={paletteProvider}
         onArtistSelect={handlePaletteSelect}
       />
-    </DashboardCard>
+    </>
   );
 }
