@@ -6,6 +6,9 @@ import {
   classifyChannelIntelligenceIntent,
   computeChannelCorrelations,
   ctrTimesAvgViewDurationMinutes,
+  evaluateAllChannelIntelPlaylistCases,
+  evaluateChannelIntelPlaylistCase,
+  gatePlaylistTargets,
   rankVideosByWatchMinutesPerImpression,
   watchMinutesPerImpression,
 } from '@/lib/services/channel-intelligence';
@@ -186,6 +189,7 @@ describe('buildChannelIntelligenceReport + answers', () => {
     ['what are my worst videos', 'worst_videos'],
     ["what's working?", 'whats_working'],
     ["what's declining?", 'whats_declining'],
+    ['which playlists should I target?', 'playlist_targets'],
     ['hello', 'unknown'],
   ] as const)('classifies %s → %s', (q, intent) => {
     expect(classifyChannelIntelligenceIntent(q)).toBe(intent);
@@ -213,5 +217,110 @@ describe('buildChannelIntelligenceReport + answers', () => {
       report,
     });
     expect(declining.rankedVideos.some(v => v.videoId === 'weak')).toBe(true);
+  });
+
+  it('answers playlist questions from fetched rows only', () => {
+    const empty = answerChannelIntelligenceQuery({
+      question: 'which playlists should I target?',
+      report,
+    });
+    expect(empty.intent).toBe('playlist_targets');
+    expect(empty.summary.toLowerCase()).toContain('empty');
+    expect(empty.playlistTargets).toEqual([]);
+
+    const withLists = buildChannelIntelligenceReport({
+      channelId: 'UC_test',
+      videos: [makeVideoWithWmpi('best', 'Hit Single', 0.6, 8_000)],
+      nowIso: '2026-08-20T00:00:00.000Z',
+      playlists: [
+        {
+          name: 'Late Night Indie',
+          followerCount: 1200,
+          lastAddAt: '2026-08-01T00:00:00.000Z',
+        },
+        {
+          name: 'Graveyard Vibes',
+          followerCount: 50_000,
+          lastAddAt: '2025-01-01T00:00:00.000Z',
+        },
+      ],
+      proposedPlaylists: [
+        {
+          name: "Today's Top Hits",
+          followerCount: 30_000_000,
+        },
+      ],
+    });
+    const playlists = answerChannelIntelligenceQuery({
+      question: 'which playlists should I target?',
+      report: withLists,
+    });
+    expect(playlists.playlistTargets?.map(row => row.name)).toEqual([
+      'Late Night Indie',
+    ]);
+    expect(playlists.summary).not.toMatch(
+      /Today's Top Hits|30000000|30,000,000/
+    );
+    expect(playlists.summary).not.toMatch(/Graveyard Vibes/);
+  });
+});
+
+describe('playlist freshness + no-invent gate', () => {
+  it('encodes the PlaylistMap / Recoup rule cases', () => {
+    for (const result of evaluateAllChannelIntelPlaylistCases()) {
+      expect(result.passed, result.reason).toBe(true);
+    }
+    expect(
+      evaluateChannelIntelPlaylistCase('invented-playlist-refused').passed
+    ).toBe(true);
+    expect(evaluateChannelIntelPlaylistCase('dormant-12m-dropped').passed).toBe(
+      true
+    );
+    expect(
+      evaluateChannelIntelPlaylistCase('missing-activity-unknown').passed
+    ).toBe(true);
+    expect(evaluateChannelIntelPlaylistCase('empty-fetch-empty').passed).toBe(
+      true
+    );
+    expect(evaluateChannelIntelPlaylistCase('recommend-cap-15-25').passed).toBe(
+      true
+    );
+  });
+
+  it('prefers peer-warm lists when placement data exists and skips when it does not', () => {
+    const nowIso = '2026-08-20T00:00:00.000Z';
+    const withoutPeers = gatePlaylistTargets({
+      nowIso,
+      fetched: [
+        {
+          name: 'Solo Fresh',
+          lastAddAt: '2026-08-01T00:00:00.000Z',
+        },
+      ],
+    });
+    expect(withoutPeers.recommended[0]?.peerWarmth).toBe('skipped');
+
+    const withPeers = gatePlaylistTargets({
+      nowIso,
+      fetched: [
+        {
+          name: 'Peer Warm',
+          lastAddAt: '2026-07-01T00:00:00.000Z',
+          peerPlacementCount: 3,
+          artistIsOnList: false,
+        },
+        {
+          name: 'Also Fresh',
+          lastAddAt: '2026-08-10T00:00:00.000Z',
+          peerPlacementCount: 0,
+          artistIsOnList: false,
+        },
+      ],
+    });
+    expect(withPeers.recommended.map(row => row.name)).toEqual([
+      'Peer Warm',
+      'Also Fresh',
+    ]);
+    expect(withPeers.recommended[0]?.peerWarmth).toBe('warm');
   });
 });

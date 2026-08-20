@@ -3636,6 +3636,24 @@ function assertSkillPromptContractCovered(output) {
     );
   }
 
+  const channelIntel = payload.channelIntel ?? {};
+  if (!channelIntel || typeof channelIntel !== 'object') {
+    return fail('skill prompt contract missing channelIntel payload');
+  }
+  if (channelIntel.skillId !== 'channelIntelligenceReport') {
+    return fail(
+      'channelIntel payload is not tied to channelIntelligenceReport'
+    );
+  }
+  const missingChannelIntelFacts = Array.isArray(channelIntel.missingFacts)
+    ? channelIntel.missingFacts
+    : [];
+  if (missingChannelIntelFacts.length > 0) {
+    return fail(
+      `channel intel prompt missing facts: ${missingChannelIntelFacts.join(', ')}`
+    );
+  }
+
   return pass();
 }
 
@@ -3648,6 +3666,22 @@ function assertPackagingFormatSplitCase(output) {
   if (packaging.ruleCasePassed !== true) {
     return fail(
       `packaging rule case failed: ${String(packaging.ruleCase)} ${String(packaging.ruleCaseReason)}`
+    );
+  }
+  return pass();
+}
+
+function assertChannelIntelPlaylistFreshnessCase(output) {
+  const payload = parseOutput(output);
+  const channelIntel = payload.channelIntel ?? {};
+  if (channelIntel.skillId !== 'channelIntelligenceReport') {
+    return fail(
+      'channel intel playlist case is not tied to channelIntelligenceReport'
+    );
+  }
+  if (channelIntel.ruleCasePassed !== true) {
+    return fail(
+      `channel intel playlist case failed: ${String(channelIntel.ruleCase)} ${String(channelIntel.ruleCaseReason)}`
     );
   }
   return pass();
@@ -5143,6 +5177,7 @@ module.exports = {
   assertSkillCommandContractCovered,
   assertSkillPromptContractCovered,
   assertPackagingFormatSplitCase,
+  assertChannelIntelPlaylistFreshnessCase,
   assertAlbumArtProviderContractCovered,
   assertAiToolPromptContractCovered,
   assertChatTitleContractCovered,

@@ -12,6 +12,7 @@ import {
   rankVideosByWatchMinutesPerImpression,
   rankWorstVideosByWatchMinutesPerImpression,
 } from './metrics';
+import { gatePlaylistTargets } from './playlist-freshness';
 import type {
   BuildChannelIntelligenceReportInput,
   ChannelChangePlanItem,
@@ -177,6 +178,20 @@ export function buildChannelIntelligenceReport(
     });
   }
 
+  const playlistGate = gatePlaylistTargets({
+    fetched: input.playlists ?? [],
+    ...(input.proposedPlaylists ? { proposed: input.proposedPlaylists } : {}),
+    nowIso: generatedAt,
+  });
+
+  if (input.playlists !== undefined) {
+    sources.push({
+      kind: 'derived',
+      label: 'Playlist freshness gate (fetched rows only)',
+      metricKeys: ['playlist_last_add', 'playlist_followers'],
+    });
+  }
+
   return {
     channelId: input.channelId,
     generatedAt,
@@ -197,5 +212,7 @@ export function buildChannelIntelligenceReport(
       sources,
     }),
     sources,
+    playlistTargets: playlistGate.recommended,
+    playlistGate,
   };
 }

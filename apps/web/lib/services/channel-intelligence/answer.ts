@@ -5,6 +5,10 @@
  * Every answer carries MetricSource citations from Reporting-API data.
  */
 
+import {
+  formatPlaylistActivity,
+  formatPlaylistFollowerCount,
+} from './playlist-freshness';
 import type {
   AnswerChannelIntelligenceQueryInput,
   ChannelIntelligenceAnswer,
@@ -23,6 +27,8 @@ const WORKING_PATTERN =
   /\bwhat('?s| is) working\b|\bwhat works\b|\bcorrelat|\bface vs\b|\bpackaging\b|\bwhat (drives|wins)\b/i;
 const DECLINING_PATTERN =
   /\bdeclin|\bdropping|\bfalling|\blosing (reach|views|impressions)\b|\bwhat('?s| is) (getting )?worse\b/i;
+const PLAYLIST_PATTERN =
+  /\b(playlist|playlists|target lists|which lists|where (should|to) pitch|playlist targets?)\b/i;
 
 /**
  * Classify a free-text question into a channel-intelligence intent.
@@ -34,6 +40,7 @@ export function classifyChannelIntelligenceIntent(
   if (!q) return 'unknown';
 
   // More specific patterns first
+  if (PLAYLIST_PATTERN.test(q)) return 'playlist_targets';
   if (DECLINING_PATTERN.test(q)) return 'whats_declining';
   if (WORKING_PATTERN.test(q)) return 'whats_working';
   if (WORST_PATTERN.test(q)) return 'worst_videos';
@@ -173,6 +180,38 @@ function summarizeWorking(
   };
 }
 
+function summarizePlaylists(
+  report: ChannelIntelligenceReport
+): ChannelIntelligenceAnswer {
+  const gate = report.playlistGate;
+  if (gate.empty || gate.recommended.length === 0) {
+    return {
+      intent: 'playlist_targets',
+      summary: gate.empty
+        ? gate.summary
+        : `${gate.summary} No recommendable lists after the freshness + no-invent gate.`,
+      rankedVideos: [],
+      winSignals: [],
+      sources: report.sources,
+      playlistTargets: [],
+    };
+  }
+
+  const lines = gate.recommended.map((row, i) => {
+    const label = row.name ?? row.url ?? 'unknown';
+    return `${i + 1}. “${label}” — followers ${formatPlaylistFollowerCount(row.followerCount)}, ${formatPlaylistActivity(row.activityStatus)}`;
+  });
+
+  return {
+    intent: 'playlist_targets',
+    summary: `${gate.summary}\n${lines.join('\n')}`,
+    rankedVideos: [],
+    winSignals: [],
+    sources: report.sources,
+    playlistTargets: gate.recommended,
+  };
+}
+
 function summarizeDeclining(
   report: ChannelIntelligenceReport,
   limit: number
@@ -225,6 +264,8 @@ export function answerChannelIntelligenceQuery(
       return summarizeWorking(input.report);
     case 'whats_declining':
       return summarizeDeclining(input.report, limit);
+    case 'playlist_targets':
+      return summarizePlaylists(input.report);
     default:
       return {
         intent: 'unknown',
