@@ -6,7 +6,7 @@ This repo vendors [gstack](https://github.com/garrytan/gstack) at `.agents/skill
 
 **Conflict rule:** gstack commands are canonical. If a gstack skill conflicts with any other command or workflow, the gstack version takes precedence.
 
-**Web browsing:** Always use the `/browse` skill from gstack for all web browsing. Never use `mcp__claude-in-chrome__*` tools.
+**Web browsing:** Default to Playwright MCP or in-repo Playwright (`pnpm exec playwright`) for agent web tasks. `/browse` is optional when a session already has the gstack daemon, or the user asks for it. Never use `mcp__claude-in-chrome__*` tools. Do not treat the browse daemon as a required runtime.
 
 ## Available Skills
 
@@ -16,7 +16,7 @@ This repo vendors [gstack](https://github.com/garrytan/gstack) at `.agents/skill
 | Review | `/review` | Pre-landing PR review for SQL safety, trust boundary violations, side effects |
 | Plan (CEO) | `/plan-ceo-review` | Founder mode: rethink problems from first principles, find the 10-star product |
 | Plan (Eng) | `/plan-eng-review` | Eng manager mode: lock in execution plans with architecture and edge cases |
-| Browse | `/browse` | Fast headless browser (~100ms/cmd) for QA testing and site verification |
+| Browse | `/browse` | Optional gstack headless browser for QA/dogfood when Playwright is not the better fit |
 | QA | `/qa` | Systematic QA with diff-aware, full, quick, and regression modes |
 | Retro | `/retro` | Weekly retrospective analyzing commit history and code quality metrics |
 | Browser Cookies | `/setup-browser-cookies` | Import authenticated sessions for testing |

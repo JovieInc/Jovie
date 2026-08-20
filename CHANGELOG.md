@@ -7,7 +7,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+### Fixed
+
+- [internal] **Production monitors page again:** post-deploy probe failures Slack `#alerts-production`, golden-path probes add claim/billing/Stripe liveness, observability and synthetics file Linear, and the canary `/api/chat` auth-gate retries then fails closed.
+
 ### Added
+
+- [internal] **Canonical Actions now have one contract package:** `@jovie/action-contracts` owns the four stable IDs, and authenticated `GET /api/v1/actions` can list what a profile can do. Nothing is created yet.
 
 - **iPhone Library is Catalog, Collections, and Ideas:** Catalog is releases, merch, and docs. Collections auto-bundles a vlog with its script, takes, and B-roll. Ideas is the untagged third home.
 - **iPhone chat is home:** Ask Jovie is the first signed-in surface. There is no bottom tab bar. Swipe from the leading edge for the sidebar and from the trailing edge for the right rail.
@@ -17,6 +23,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - **Screen walks reuse one account-video store:** founder walks and later creator screen recordings upload through `lib/capture` into the Jovie account blob. The walk is stored and not admitted until Summer classifies it.
 
 ### Changed
+- [internal] **Removed unused `/exp` fake-UI fixtures:** deleted admin-only `auth-v1`, `home-v1`, `profile-v1`, and `onboarding-v1` playgrounds plus their style-guard tests, and lowered the raw-button, arbitrary-value, and `--linear-*` ratchet floors to match.
 - **Saving a vlog opens Collections:** the new clip lands with its shoot instead of in Catalog.
 - **Empty chat Talk lives inside the composer pill:** typing swaps Talk for Send without moving the bar. Tap, drag, or Done dismisses the keyboard.
 - **Drawer Profile stays Dashboard:** tapping the account name opens the public profile when a URL exists. Venue QR stays in the sidebar.

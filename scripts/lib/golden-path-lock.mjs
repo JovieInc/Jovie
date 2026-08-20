@@ -28,6 +28,9 @@ export const GOLDEN_PATH_LOCK_SELF_TEST =
 export const GOLDEN_PATH_PATH_PREFIXES = Object.freeze([
   'apps/web/app/api/chat/',
   'apps/web/app/api/waitlist/',
+  'apps/web/app/api/onboarding/claim/',
+  'apps/web/app/api/billing/health/',
+  'apps/web/app/api/stripe/webhooks/',
   'apps/web/app/start/',
   'apps/web/app/(auth)/',
   'apps/web/app/signin/',
@@ -166,17 +169,77 @@ export function evaluateWaitlistUnauth({ status } = {}) {
   };
 }
 
-/** @param {{ homepageHtml?: string, chatStatus?: number, chatBody?: unknown, waitlistStatus?: number }} [input] @returns {{ ok: boolean, checks: GoldenPathCheck[] }} */
+/** @param {{ status?: number }} [input] @returns {GoldenPathCheck} */
+export function evaluateClaimUnauth({ status } = {}) {
+  if (status === 401) {
+    return {
+      id: 'claim-unauth',
+      ok: true,
+      reason: 'unauthenticated onboarding claim rejected with 401',
+    };
+  }
+  return {
+    id: 'claim-unauth',
+    ok: false,
+    reason: `unauthenticated onboarding claim must 401 (got ${status ?? 'missing'})`,
+  };
+}
+
+/** @param {{ status?: number, body?: unknown }} [input] @returns {GoldenPathCheck} */
+export function evaluateBillingHealth({ status, body } = {}) {
+  const healthy =
+    body && typeof body === 'object' && !Array.isArray(body)
+      ? /** @type {{ healthy?: unknown }} */ (body).healthy
+      : undefined;
+  if (status === 200 && healthy === true) {
+    return {
+      id: 'billing-health',
+      ok: true,
+      reason: 'billing health endpoint is live and healthy',
+    };
+  }
+  return {
+    id: 'billing-health',
+    ok: false,
+    reason: `billing health must 200 healthy:true (got ${status ?? 'missing'}, healthy=${String(healthy)})`,
+  };
+}
+
+/** @param {{ status?: number }} [input] @returns {GoldenPathCheck} */
+export function evaluateStripeWebhookLiveness({ status } = {}) {
+  if (status === 400) {
+    return {
+      id: 'stripe-webhook-liveness',
+      ok: true,
+      reason:
+        'unsigned Stripe webhook rejected with 400 (route live, signature required)',
+    };
+  }
+  return {
+    id: 'stripe-webhook-liveness',
+    ok: false,
+    reason: `unsigned Stripe webhook must 400 (got ${status ?? 'missing'})`,
+  };
+}
+
+/** @param {{ homepageHtml?: string, chatStatus?: number, chatBody?: unknown, waitlistStatus?: number, claimStatus?: number, billingStatus?: number, billingBody?: unknown, stripeWebhookStatus?: number }} [input] @returns {{ ok: boolean, checks: GoldenPathCheck[] }} */
 export function evaluateProdProbe({
   homepageHtml,
   chatStatus,
   chatBody,
   waitlistStatus,
+  claimStatus,
+  billingStatus,
+  billingBody,
+  stripeWebhookStatus,
 } = {}) {
   const checks = [
     evaluateHomepageHtml(homepageHtml),
     evaluateChatFirstMessage({ status: chatStatus, body: chatBody }),
     evaluateWaitlistUnauth({ status: waitlistStatus }),
+    evaluateClaimUnauth({ status: claimStatus }),
+    evaluateBillingHealth({ status: billingStatus, body: billingBody }),
+    evaluateStripeWebhookLiveness({ status: stripeWebhookStatus }),
   ];
   return {
     ok: checks.every(check => check.ok),
@@ -321,6 +384,9 @@ export function buildAutofixPrompt({ fingerprint, checks, origin, receipt }) {
     `- GET ${origin ?? GOLDEN_PATH_PROD_ORIGIN} and require Get started → /start`,
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/chat with {"messages":[{"role":"user","content":"hi"}]} — must not 401 and must not say "Too many messages"`,
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/waitlist unauthenticated — must 401`,
+    `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/onboarding/claim unauthenticated — must 401`,
+    `- GET ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/billing/health — must 200 { healthy: true }`,
+    `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/stripe/webhooks unsigned — must 400`,
     '',
     'Fix the product regression. Add or update a regression test. Do not skip because secrets are missing.',
     'Do not merge. Do not deploy. Tell Gem she missed this after the lock was on.',

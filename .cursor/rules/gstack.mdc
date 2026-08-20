@@ -4,7 +4,9 @@ description: gstack workflow skills available in this repo
 
 # gstack Skills
 
-This repo includes [gstack](https://github.com/garrytan/gstack) — a workflow toolkit providing specialized AI agent skills. These are installed as a git submodule at `.claude/skills/gstack/`.
+This repo vendors [gstack](https://github.com/garrytan/gstack) at `.agents/skills/gstack/`. `.claude/skills/gstack` is a symlink overlay, not a git submodule.
+
+**Web browsing:** Default to Playwright MCP or `pnpm exec playwright`. `/browse` is optional. Never use `mcp__claude-in-chrome__*` tools.
 
 ## Available Skills
 
@@ -29,5 +31,5 @@ gstack commands are **canonical** — if a gstack skill conflicts with any other
 gstack requires Bun (v1.0+). The session-start hook installs Bun and runs gstack setup automatically. For manual setup:
 
 ```bash
-cd .claude/skills/gstack && ./setup
+cd .agents/skills/gstack && ./setup
 ```
