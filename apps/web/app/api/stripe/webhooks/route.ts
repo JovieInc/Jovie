@@ -70,11 +70,10 @@ export async function POST(request: NextRequest) {
     const signature = request.headers.get('stripe-signature');
 
     if (!signature) {
-      await captureCriticalError(
-        'Missing Stripe webhook signature',
-        new Error('Missing signature header'),
-        { route: '/api/stripe/webhooks' }
-      );
+      // Unsigned POSTs are expected probe/scanner noise on a public webhook.
+      // Reject them, but do not page Sentry. Stripe always sends
+      // `stripe-signature`. Invalid signatures below remain critical.
+      logger.warn('[Stripe Webhook] Missing stripe-signature header');
       return NextResponse.json(
         { error: 'Missing signature' },
         { status: 400, headers: NO_STORE_HEADERS }
