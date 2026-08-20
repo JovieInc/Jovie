@@ -87,7 +87,7 @@ export function ProfileMockup({
 
   return (
     <figure
-      aria-label='Profile preview showing adaptive CTA behavior'
+      aria-label='Profile Preview Showing Adaptive CTA Behavior'
       className='rounded-t-xl rounded-b-none overflow-hidden bg-surface-0 shadow-panel-ring font-sans'
     >
       <style>{`
@@ -196,7 +196,7 @@ export function ProfileMockup({
             key={isListen ? 'listen' : 'subscribe'}
             value={0}
             max={100}
-            aria-label='Time until CTA switches'
+            aria-label='Time Until CTA Switches'
             className={cn(
               'profile-mockup-cta-progress absolute bottom-0 left-0 h-1 opacity-60 appearance-none [&::-moz-progress-bar]:bg-current [&::-webkit-progress-bar]:bg-transparent [&::-webkit-progress-value]:bg-current',
               isListen ? 'text-primary-token' : 'text-tertiary-token',

@@ -94,7 +94,7 @@ function CrawlerRows({
   return (
     <ul
       className='min-h-49 space-y-2'
-      aria-label='AI crawlers by request count'
+      aria-label='AI Crawlers By Request Count'
     >
       {crawlers.map((crawler, index) => {
         const widthPct = (crawler.requests / maxRequests) * 100;
@@ -173,7 +173,7 @@ export function AiCrawlerDetailPanel({
                 className='grid grid-cols-2 gap-2 p-2'
               >
                 <StatTile
-                  label='30-Day Reads'
+                  label='30-day Reads' // ui-casing-allow: numeric hyphenated period
                   value={
                     isLoading ? '' : (data?.totalRequests ?? 0).toLocaleString()
                   }

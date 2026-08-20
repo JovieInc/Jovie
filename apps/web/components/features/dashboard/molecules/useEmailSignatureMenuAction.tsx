@@ -27,7 +27,7 @@ export function useEmailSignatureMenuAction(
   const action = useMemo<DrawerHeaderAction>(
     () => ({
       id: 'email-signature',
-      label: 'Email signature',
+      label: 'Email Signature',
       icon: Mail,
       disabled: input === null,
       onClick: open,

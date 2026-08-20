@@ -14,7 +14,7 @@ describe('OnboardingChatEmptyIntro', () => {
     expect(screen.getByText(ONBOARDING_ENTRY_TITLE)).toBeTruthy();
     expect(screen.queryByTestId('onboarding-sign-in-skip')).toBeNull();
     expect(screen.queryByText('Find My Spotify Artist')).toBeNull();
-    expect(screen.queryByText('Plan a Release')).toBeNull();
+    expect(screen.queryByText('Plan A Release')).toBeNull();
     expect(screen.queryByText('Build Artist Profile')).toBeNull();
     expect(screen.queryByText('Set Up My Link Page')).toBeNull();
     expect(screen.queryByTestId('onboarding-start-ambient-mark')).toBeNull();

@@ -11,9 +11,9 @@ export function BlogRelatedPosts({ posts, authors }: BlogRelatedPostsProps) {
   if (posts.length === 0) return null;
 
   return (
-    <section aria-label='Related posts'>
+    <section aria-label='Related Posts'>
       <h2 className='text-xl font-semibold tracking-tight text-primary-token mb-6'>
-        Keep reading
+        Keep Reading
       </h2>
       <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
         {posts.map(post => {

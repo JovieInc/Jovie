@@ -72,7 +72,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
           onClick={onClose}
           className='mt-5 rounded-lg px-4 text-2xs font-medium'
         >
-          Back to chat
+          Back To Chat
         </Button>
       </div>
     );
@@ -85,7 +85,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
           Share feedback
         </p>
         <h3 className='text-sm font-semibold text-primary-token'>
-          Help shape this workspace
+          Help Shape This Workspace
         </h3>
         <p className='text-xs text-secondary-token'>
           Tell us what feels off, what should exist, or what slowed you down.

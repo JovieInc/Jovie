@@ -58,7 +58,7 @@ export function AdminCreatorsTableHeader({
       <tr className='text-app font-medium tracking-normal text-secondary-token'>
         <th className={cn(headerCellClass, 'w-14')} style={stickyStyle}>
           <Checkbox
-            aria-label='Select all creators'
+            aria-label='Select All Creators'
             checked={headerCheckboxState}
             onCheckedChange={onToggleSelectAll}
           />
@@ -69,7 +69,7 @@ export function AdminCreatorsTableHeader({
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant='secondary' size='sm' className='normal-case'>
-                    Bulk actions
+                    Bulk Actions
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align='start'>

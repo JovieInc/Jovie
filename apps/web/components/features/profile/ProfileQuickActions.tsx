@@ -37,7 +37,7 @@ export function ProfileQuickActions({
     <div className='px-3 pt-3'>
       <nav
         className='flex items-center justify-center gap-2'
-        aria-label='Profile actions'
+        aria-label='Profile Actions'
       >
         {QUICK_ACTIONS.map(item => {
           const Icon = item.icon;

@@ -28,7 +28,7 @@ export const CHAT_STARTER_ACTIONS: Readonly<
 > = {
   'plan-release': {
     id: 'plan-release',
-    label: 'Plan a Release',
+    label: 'Plan A Release',
     description: 'Map your next release timeline, assets, and launch moments.',
     actionLabel: 'Start Planning',
     prompt: 'Help me plan my next release.',

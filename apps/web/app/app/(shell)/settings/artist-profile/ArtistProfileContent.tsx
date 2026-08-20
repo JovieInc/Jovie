@@ -17,7 +17,7 @@ function MobileProfilePanelTrigger() {
     <button
       type='button'
       onClick={open}
-      aria-label='Open links and music preview panel'
+      aria-label='Open Links And Music Preview Panel'
       className='flex w-full items-center justify-between rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3 py-3 text-left transition-colors hover:bg-surface-0 active:bg-surface-1 lg:hidden'
     >
       <div>

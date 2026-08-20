@@ -52,7 +52,7 @@ describe('SuggestedPrompts', () => {
     );
 
     expect(getByTestId('suggested-prompts-rail')).toBeTruthy();
-    expect(getByText('Plan a Release')).toBeTruthy();
+    expect(getByText('Plan A Release')).toBeTruthy();
     const generateAlbumArt = getByText('Generate Album Art').closest('button');
     expect(generateAlbumArt).toBeTruthy();
     expect(generateAlbumArt).toBeDisabled();
@@ -97,7 +97,7 @@ describe('SuggestedPrompts', () => {
     );
 
     expect(queryByText('Generate Album Art')).toBeNull();
-    expect(queryByText('Plan a Release')).toBeNull();
+    expect(queryByText('Plan A Release')).toBeNull();
     expect(getByText('Review Signals')).toBeTruthy();
   });
 
@@ -106,7 +106,7 @@ describe('SuggestedPrompts', () => {
     const { getByRole } = fastRender(<SuggestedPrompts onSelect={onSelect} />);
 
     const iconShell = getByRole('button', {
-      name: 'Plan a Release',
+      name: 'Plan A Release',
     }).firstElementChild;
 
     expect(iconShell?.className).toContain('text-tertiary-token');
@@ -211,7 +211,7 @@ describe('SuggestedPrompts', () => {
       />
     );
 
-    expect(getByRole('button', { name: 'Plan a Release' })).toBeTruthy();
+    expect(getByRole('button', { name: 'Plan A Release' })).toBeTruthy();
     expect(getByRole('button', { name: 'Generate Album Art' })).toBeDisabled();
     expect(getByRole('button', { name: 'Build Artist Profile' })).toBeTruthy();
     expect(getByRole('button', { name: 'Review Signals' })).toBeTruthy();
@@ -220,7 +220,7 @@ describe('SuggestedPrompts', () => {
   it('calls onSelect with the full prompt when clicked', () => {
     const onSelect = vi.fn();
     const { getByText } = fastRender(<SuggestedPrompts onSelect={onSelect} />);
-    getByText('Plan a Release').closest('button')?.click();
+    getByText('Plan A Release').closest('button')?.click();
     expect(onSelect).toHaveBeenCalledWith('Help me plan my next release.');
   });
 
@@ -232,7 +232,7 @@ describe('SuggestedPrompts', () => {
     });
 
     const { getByRole } = fastRender(<SuggestedPrompts onSelect={vi.fn()} />);
-    getByRole('button', { name: 'Plan a Release' }).click();
+    getByRole('button', { name: 'Plan A Release' }).click();
 
     expect(gtag).toHaveBeenCalledWith(
       'event',

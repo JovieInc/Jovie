@@ -64,7 +64,7 @@ export function GrowthAccessRequestModal({
           <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400'>
             <CheckCircle className='h-6 w-6' />
           </div>
-          <DialogTitle className='text-center'>Request received</DialogTitle>
+          <DialogTitle className='text-center'>Request Received</DialogTitle>
           <DialogDescription className='text-center'>
             We&apos;ll review your request and reach out soon to learn more
             about your needs.
@@ -85,7 +85,7 @@ export function GrowthAccessRequestModal({
             <Sparkles className='h-6 w-6' />
           </div>
           <DialogTitle className='text-center'>
-            Growth is in early access
+            Growth Is In Early Access
           </DialogTitle>
           <DialogDescription className='text-center'>
             Growth is coming soon. What matters most to you?
@@ -94,11 +94,11 @@ export function GrowthAccessRequestModal({
           <DialogBody>
             <ContentSurfaceCard className='space-y-2 p-2.5'>
               <Label htmlFor='growth-reason'>
-                What feature are you most excited about?
+                What Feature Are You Most Excited About?
               </Label>
               <Textarea
                 id='growth-reason'
-                placeholder='e.g., A/B testing for my pre-save pages, Meta pixel for ad retargeting...'
+                placeholder='E.g., A/B testing for my pre-save pages, Meta pixel for ad retargeting...' // ui-casing-allow: A/B and Meta proper nouns in sentence copy
                 value={reason}
                 onChange={e => setReason(e.target.value)}
                 rows={3}

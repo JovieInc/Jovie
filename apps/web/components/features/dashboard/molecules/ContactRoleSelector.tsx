@@ -82,8 +82,8 @@ export function ContactRoleSelector({
       </div>
       {selectedRole === 'other' && (
         <Input
-          label='Contact label'
-          placeholder='Sync & Licensing'
+          label='Contact Label'
+          placeholder='Sync & Licensing' // ui-casing-allow: example proper-noun placeholder
           value={customLabel ?? ''}
           onChange={handleCustomLabelChange}
         />

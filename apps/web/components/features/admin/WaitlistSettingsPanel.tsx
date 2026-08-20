@@ -166,7 +166,7 @@ export function WaitlistSettingsPanel() {
                 size='sm'
                 className='w-24 text-right tabular-nums'
                 disabled={saving}
-                aria-label='Auto-accept after days'
+                aria-label='Auto-accept After Days'
               />
             }
           />
@@ -197,7 +197,7 @@ export function WaitlistSettingsPanel() {
                 size='sm'
                 className='w-24 text-right tabular-nums'
                 disabled={saving}
-                aria-label='Daily auto-accept limit'
+                aria-label='Daily Auto-accept Limit'
               />
             }
           />

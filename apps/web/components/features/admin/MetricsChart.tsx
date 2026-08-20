@@ -102,7 +102,7 @@ export function MetricsChart({ points }: Readonly<MetricsChartProps>) {
       <div className='space-y-3'>
         <div>
           <h3 className='text-sm font-medium text-primary-token'>
-            Daily active users
+            Daily Active Users
           </h3>
           <p className='text-2xs text-tertiary-token'>Last 14 days</p>
         </div>
@@ -118,7 +118,7 @@ export function MetricsChart({ points }: Readonly<MetricsChartProps>) {
       <div className='flex items-start justify-between'>
         <div>
           <h3 className='text-sm font-medium text-primary-token'>
-            Daily active users
+            Daily Active Users
           </h3>
           <p className='text-2xs text-tertiary-token'>Last 14 days</p>
         </div>

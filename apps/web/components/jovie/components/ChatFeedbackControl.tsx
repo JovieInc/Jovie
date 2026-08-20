@@ -138,7 +138,7 @@ export function ChatFeedbackControl({
           size='icon'
           onClick={() => handleVote('up')}
           className='h-7 w-7 shadow-none'
-          aria-label='Good response'
+          aria-label='Good Response'
           aria-pressed={vote === 'up'}
           data-testid='chat-feedback-thumbs-up'
         >
@@ -160,7 +160,7 @@ export function ChatFeedbackControl({
           size='icon'
           onClick={() => handleVote('down')}
           className='h-7 w-7 shadow-none'
-          aria-label='Bad response'
+          aria-label='Bad Response'
           aria-pressed={vote === 'down'}
           data-testid='chat-feedback-thumbs-down'
         >

@@ -119,7 +119,7 @@ function buildPrimaryCopySmartLinkItem(
 
   return {
     id: 'copy-smart-link',
-    label: 'Copy smart link',
+    label: 'Copy Smart Link',
     icon: menuIcon('Copy'),
     onClick: () => {
       void onCopy(
@@ -227,7 +227,7 @@ function buildShareItems(
   if (release.hasVideoLinks) {
     items.push({
       id: 'copy-sounds-link',
-      label: 'Copy Use Sound link',
+      label: 'Copy Use Sound Link',
       icon: menuIcon('Music'),
       onClick: () => {
         void onCopy(
@@ -242,7 +242,7 @@ function buildShareItems(
   if (onCopyQrCode) {
     items.push({
       id: 'copy-qr-code',
-      label: 'Copy QR code',
+      label: 'Copy QR Code',
       icon: qrCodeIcon,
       onClick: onCopyQrCode,
     });
@@ -308,7 +308,7 @@ export function buildReleaseActions({
   const items: ContextMenuItemType[] = [
     {
       id: 'edit',
-      label: 'Edit release links',
+      label: 'Edit Release Links',
       icon: menuIcon('PencilLine'),
       onClick: () => onEdit(release),
     },
@@ -326,7 +326,7 @@ export function buildReleaseActions({
       ? [
           {
             id: 'generate-pitch',
-            label: 'Generate pitch',
+            label: 'Generate Pitch',
             icon: menuIcon('Sparkles'),
             onClick: () => onGeneratePitch(release),
           } satisfies ContextMenuItemType,
@@ -342,7 +342,7 @@ export function buildReleaseActions({
   if (shareItems.length > 0) {
     items.push({
       id: 'share-link',
-      label: 'Share link',
+      label: 'Share Link',
       icon: menuIcon('Link2'),
       items: shareItems,
     });
@@ -350,7 +350,7 @@ export function buildReleaseActions({
 
   items.push({
     id: 'copy-metadata',
-    label: 'Copy metadata',
+    label: 'Copy Metadata',
     icon: menuIcon('Hash'),
     items: metadataItems,
   });
@@ -409,7 +409,7 @@ export function buildReleaseActions({
   } else if (externalProviders.length > 1) {
     items.push({
       id: 'open-release',
-      label: 'Open in',
+      label: 'Open In',
       icon: menuIcon('ExternalLink'),
       items: externalProviders.map(provider => ({
         id: `open-${provider.key}`,
@@ -428,7 +428,7 @@ export function buildReleaseActions({
       { type: 'separator' },
       {
         id: 'delete',
-        label: 'Delete release',
+        label: 'Delete Release',
         icon: menuIcon('Trash2'),
         destructive: true,
         onClick: () => onDelete(release.id),

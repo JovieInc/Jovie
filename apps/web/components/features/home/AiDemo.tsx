@@ -219,7 +219,7 @@ export function AiDemo({
   return (
     <figure
       ref={containerRef}
-      aria-label='AI writing demo'
+      aria-label='AI Writing Demo'
       className={cn(
         'overflow-hidden font-sans',
         isPremium

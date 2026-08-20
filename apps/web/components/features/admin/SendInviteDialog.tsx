@@ -148,7 +148,7 @@ export function SendInviteDialog({
             <Input
               id='invite-email'
               type='email'
-              placeholder='creator@example.com'
+              placeholder='creator@example.com' // ui-casing-allow: example email placeholder
               value={email}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 setEmail(e.target.value)

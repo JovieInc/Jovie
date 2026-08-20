@@ -106,7 +106,7 @@ export const QuickAddSuggestions = React.memo(function QuickAddSuggestions({
 
   return (
     <section
-      aria-label='Quick link suggestions'
+      aria-label='Quick Link Suggestions'
       className={`relative ${className ?? ''}`}
       data-testid='quick-add-suggestions'
     >
