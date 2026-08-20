@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { getRedis } from '@/lib/redis';
+import { closeRedisQuotaCircuit, getRedis } from '@/lib/redis';
 import { isRedisQuotaFailure } from '@/lib/utils/errors';
 
 const PROBE_TTL_SECONDS = 60;
@@ -61,7 +61,10 @@ export function classifyRedisFailure(error: unknown): RedisFailureKind {
  * service health. The short TTL makes cleanup automatic even if the read fails.
  */
 export async function probeRedisOperability(): Promise<RedisOperabilityResult> {
-  const redis = getRedis({ signal: AbortSignal.timeout(2_000) });
+  const redis = getRedis({
+    signal: AbortSignal.timeout(2_000),
+    bypassQuotaCircuit: true,
+  });
   if (!redis) {
     throw new RedisOperabilityError('not_configured');
   }
@@ -76,6 +79,7 @@ export async function probeRedisOperability(): Promise<RedisOperabilityResult> {
     if (stored !== nonce) {
       throw new RedisOperabilityError('read_after_write_mismatch');
     }
+    closeRedisQuotaCircuit();
     return { status: 'healthy', latencyMs: Date.now() - start };
   } catch (error) {
     if (error instanceof RedisOperabilityError) throw error;

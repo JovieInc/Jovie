@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/nextjs';
 import { Redis } from '@upstash/redis';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
+import { isRedisQuotaFailure } from '@/lib/utils/errors';
 
 // Lazy initialization with retry capability
 // This prevents permanent null state if Redis is briefly unavailable during deployment
@@ -10,6 +11,12 @@ let _redisInitAttempted = false;
 let _redisLastAttempt = 0;
 let _redisMissingConfigWarned = false;
 const REDIS_RETRY_INTERVAL_MS = 30000; // 30 seconds between retry attempts
+const REDIS_QUOTA_CIRCUIT_OPEN_MS = 15 * 60_000;
+let redisQuotaCircuitOpenUntil = 0;
+
+type RedisCommandClient = Redis & {
+  request?: (...args: unknown[]) => Promise<unknown>;
+};
 
 function isValidUpstashRestUrl(url: string | undefined | null): url is string {
   if (!url) return false;
@@ -30,6 +37,55 @@ function getUpstashConfig(): { url: string; token: string } | null {
 
 export interface GetRedisOptions {
   signal?: AbortSignal;
+  /**
+   * Issue commands even while the quota circuit is open so the hourly
+   * operability canary can detect recovery without spending fleet traffic.
+   */
+  bypassQuotaCircuit?: boolean;
+}
+
+export function isRedisQuotaCircuitOpen(): boolean {
+  return Date.now() < redisQuotaCircuitOpenUntil;
+}
+
+export function closeRedisQuotaCircuit(): void {
+  redisQuotaCircuitOpenUntil = 0;
+}
+
+export function noteRedisCommandFailure(error: unknown): void {
+  if (!isRedisQuotaFailure(error)) return;
+  redisQuotaCircuitOpenUntil = Date.now() + REDIS_QUOTA_CIRCUIT_OPEN_MS;
+}
+
+function createQuotaCircuitError(): Error {
+  const error = new Error('ERR max requests limit exceeded. Limit: 500000');
+  error.name = 'UpstashError';
+  return error;
+}
+
+function wrapRedisForQuotaCircuit(
+  redis: Redis,
+  options?: { bypassQuotaCircuit?: boolean }
+): Redis {
+  const client = redis as RedisCommandClient;
+  const originalRequest = client.request;
+  if (typeof originalRequest !== 'function') {
+    return redis;
+  }
+
+  client.request = async (...args: unknown[]) => {
+    if (!options?.bypassQuotaCircuit && isRedisQuotaCircuitOpen()) {
+      throw createQuotaCircuitError();
+    }
+    try {
+      return await originalRequest.apply(redis, args);
+    } catch (error) {
+      noteRedisCommandFailure(error);
+      throw error;
+    }
+  };
+
+  return redis;
 }
 
 function captureMissingRedisConfigWarningOnce(): void {
@@ -50,7 +106,11 @@ function captureMissingRedisConfigWarningOnce(): void {
  * initialization periodically (every 30s) to recover from transient failures.
  */
 export function getRedis(options?: GetRedisOptions): Redis | null {
-  if (options?.signal) {
+  if (!options?.bypassQuotaCircuit && isRedisQuotaCircuitOpen()) {
+    return null;
+  }
+
+  if (options?.signal || options?.bypassQuotaCircuit) {
     const cfg = getUpstashConfig();
     if (!cfg) {
       captureMissingRedisConfigWarningOnce();
@@ -58,11 +118,14 @@ export function getRedis(options?: GetRedisOptions): Redis | null {
     }
 
     try {
-      return new Redis({
-        url: cfg.url,
-        token: cfg.token,
-        signal: options.signal,
-      });
+      return wrapRedisForQuotaCircuit(
+        new Redis({
+          url: cfg.url,
+          token: cfg.token,
+          signal: options.signal,
+        }),
+        { bypassQuotaCircuit: options.bypassQuotaCircuit }
+      );
     } catch (error) {
       captureError('Redis initialization failed', error, {
         context: 'redis_init',
@@ -95,10 +158,12 @@ export function getRedis(options?: GetRedisOptions): Redis | null {
   }
 
   try {
-    _redis = new Redis({
-      url: cfg.url,
-      token: cfg.token,
-    });
+    _redis = wrapRedisForQuotaCircuit(
+      new Redis({
+        url: cfg.url,
+        token: cfg.token,
+      })
+    );
     Sentry.addBreadcrumb({
       category: 'redis',
       message: 'Redis client initialized',
@@ -124,3 +189,12 @@ const _initialRedis = getRedis();
 export const redis = _initialRedis;
 
 export type RedisClient = Redis | null;
+
+/** Test-only helper to clear the singleton client and quota circuit. */
+export function resetRedisStateForTests(): void {
+  _redis = null;
+  _redisInitAttempted = false;
+  _redisLastAttempt = 0;
+  _redisMissingConfigWarned = false;
+  redisQuotaCircuitOpenUntil = 0;
+}

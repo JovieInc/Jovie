@@ -1,14 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockDel, mockGetdel, mockGetRedis, mockSet } = vi.hoisted(() => ({
+const {
+  mockDel,
+  mockGetdel,
+  mockGetRedis,
+  mockSet,
+  mockCloseRedisQuotaCircuit,
+} = vi.hoisted(() => ({
   mockDel: vi.fn(),
   mockGetdel: vi.fn(),
   mockGetRedis: vi.fn(),
   mockSet: vi.fn(),
+  mockCloseRedisQuotaCircuit: vi.fn(),
 }));
 
 vi.mock('@/lib/redis', () => ({
   getRedis: mockGetRedis,
+  closeRedisQuotaCircuit: mockCloseRedisQuotaCircuit,
 }));
 
 import {
@@ -44,13 +52,17 @@ describe('Redis operability', () => {
       { ex: 60 }
     );
     expect(timeoutSpy).toHaveBeenCalledWith(2_000);
-    expect(mockGetRedis).toHaveBeenCalledWith({ signal });
+    expect(mockGetRedis).toHaveBeenCalledWith({
+      signal,
+      bypassQuotaCircuit: true,
+    });
     expect(mockGetdel).toHaveBeenCalledWith(
       expect.stringMatching(/^health:operability:/)
     );
     expect(mockDel).toHaveBeenCalledWith(
       expect.stringMatching(/^health:operability:/)
     );
+    expect(mockCloseRedisQuotaCircuit).toHaveBeenCalledTimes(1);
     timeoutSpy.mockRestore();
   });
 
@@ -64,6 +76,7 @@ describe('Redis operability', () => {
       kind: 'quota_exceeded',
     });
     expect(mockDel).toHaveBeenCalledTimes(1);
+    expect(mockCloseRedisQuotaCircuit).not.toHaveBeenCalled();
     expect(
       classifyRedisFailure(new Error('ERR max requests limit exceeded'))
     ).toBe('quota_exceeded');

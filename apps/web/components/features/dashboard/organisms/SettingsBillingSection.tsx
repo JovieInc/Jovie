@@ -107,55 +107,53 @@ export function SettingsBillingSection() {
   };
 
   return (
-    <SettingsPanel>
-      <div className='px-4 sm:px-5'>
-        <SettingsActionRow
-          icon={
-            canOpenPortal ? (
-              <CreditCard className='h-4 w-4' aria-hidden />
-            ) : (
-              <Sparkles className='h-4 w-4' aria-hidden />
-            )
-          }
-          title={
-            <span className='flex flex-wrap items-center gap-1.5'>
-              <span>{summaryTitle}</span>
-              <Badge
-                variant={badgeVariant}
-                size='sm'
-                className={cn(
-                  'rounded-md px-1.5 text-3xs',
-                  badgeVariant === 'secondary' &&
-                    'border border-subtle bg-surface-0 text-secondary-token',
-                  badgeVariant === 'warning' &&
-                    'border border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300',
-                  badgeVariant === 'success' &&
-                    'border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-                )}
-              >
-                {badgeLabel}
-              </Badge>
-            </span>
-          }
-          description={summaryDescription}
-          action={
-            <Button
-              onClick={handleBilling}
-              loading={portalMutation.isPending || billingLoading || undefined}
-              variant='secondary'
+    <SettingsPanel bodyClassName='px-4 sm:px-5'>
+      <SettingsActionRow
+        icon={
+          canOpenPortal ? (
+            <CreditCard className='h-4 w-4' aria-hidden />
+          ) : (
+            <Sparkles className='h-4 w-4' aria-hidden />
+          )
+        }
+        title={
+          <span className='flex flex-wrap items-center gap-1.5'>
+            <span>{summaryTitle}</span>
+            <Badge
+              variant={badgeVariant}
               size='sm'
-            >
-              {primaryActionLabel}
-              {billingLoading ? null : (
-                <ArrowUpRight className='h-3.5 w-3.5' aria-hidden />
+              className={cn(
+                'rounded-md px-1.5 text-3xs',
+                badgeVariant === 'secondary' &&
+                  'border border-subtle bg-surface-0 text-secondary-token',
+                badgeVariant === 'warning' &&
+                  'border border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+                badgeVariant === 'success' &&
+                  'border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
               )}
-            </Button>
-          }
-        />
-      </div>
+            >
+              {badgeLabel}
+            </Badge>
+          </span>
+        }
+        description={summaryDescription}
+        action={
+          <Button
+            onClick={handleBilling}
+            loading={portalMutation.isPending || billingLoading || undefined}
+            variant='secondary'
+            size='sm'
+          >
+            {primaryActionLabel}
+            {billingLoading ? null : (
+              <ArrowUpRight className='h-3.5 w-3.5' aria-hidden />
+            )}
+          </Button>
+        }
+      />
 
       {isStale && billingData?.staleReason ? (
-        <div className='border-t border-subtle px-4 py-3.5 sm:px-5'>
+        <div className='-mx-4 border-t border-subtle px-4 py-3.5 sm:-mx-5 sm:px-5'>
           <div className='flex items-start gap-2 text-amber-700 dark:text-amber-300'>
             <AlertTriangle className='mt-0.5 h-4 w-4 shrink-0' aria-hidden />
             <p className='text-app leading-[18px]'>{billingData.staleReason}</p>
@@ -164,7 +162,7 @@ export function SettingsBillingSection() {
       ) : null}
 
       {portalMutation.error ? (
-        <div className='border-t border-subtle px-4 py-3.5 sm:px-5'>
+        <div className='-mx-4 border-t border-subtle px-4 py-3.5 sm:-mx-5 sm:px-5'>
           <p className='text-app leading-[18px] text-destructive'>
             {portalMutation.error instanceof Error
               ? portalMutation.error.message

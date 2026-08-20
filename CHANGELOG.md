@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Opaque `Error: {"error":{"name":"UpstashError"}}` bags no longer file from client object-captures (JOV-5187):** client `beforeSend` now drops `hint.originalException` bags, and events that only keep the bag on `extra.__serialized__` or `logentry.formatted` are dropped. Real quota command failures still report.
+
 - [internal] **Opaque `Error: {"error":{"name":"UpstashError"}}` bags no longer file from wrapped request errors (JOV-5209):** `beforeSend` drops `hint.originalException` bags and `onRequestError` walks `Error.cause`. Real quota command failures still report.
 
 - [internal] **Thrown `{ error: UpstashError }` request errors no longer file as `Error: {"error":{"name":"UpstashError"}}` (JOV-5218):** `onRequestError` skips the JSON-stringified object bag, not only an already-stringified Error message. Real quota command failures still report.
@@ -23,7 +25,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-- **iPhone sign-in can open the browser when SwiftUI has no key window (JOV-5198):** Continue in Browser now presents from a visible or scene-backed window, and a failed session start is no longer reported as `invalidAuthURL`.
+- **iPhone sign-in can open the browser when SwiftUI has no key window (JOV-5198):** Continue in Browser waits for a foreground-active window, presents from a visible or scene-backed window when needed, and a failed session start is no longer reported as `invalidAuthURL`.
 - [internal] **Ovie eval review persists a durable row and records `judge:absent` as a verdict:** enqueue reports success only after `ovie_operating_kv` write, missing rubric judges are not scored as pass, word count is a `word-count:N` signal unless a verbosity budget is set, and Slack feedback redacts emails in the message body.
 - [internal] **Touch-target lint accepts the 44px hit container:** compact controls stay visually small (`h-7`/`h-8`/`h-9`); the prescribed rescue is `before:h-11`, not enlarging the item. `min-h-11` on the control still counts so the ratchet does not jump.
 - [internal] **Production monitors page again:** post-deploy probe failures Slack `#alerts-production`, golden-path probes add claim/billing/Stripe liveness, observability and synthetics file Linear, and the canary `/api/chat` auth-gate retries then fails closed.
@@ -79,6 +81,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - **Mac chat stays on screen once the answer starts:** reserving the thread URL no longer remounts the live composer and transcript.
 - **Vlog capture matches how you hold the phone:** portrait, landscape left, and landscape right record the right way up. Landscape keeps record controls on screen.
 - **Expired iPhone chat sessions fail closed:** a 401 ends the turn as a failed reply and asks you to sign in again, instead of inventing an answer.
+- **iPhone chat answers with the signed-in artist:** a missed extra artist-context lookup no longer replaces the reply with “could not load your artist context.”
 - **Mobile chat uses the signed-in artist:** the second claims check that blocked a valid session profile is gone.
 - [internal] **Redis quota warnings no longer file as `Error: {"error":{"name":"UpstashError"}}` (JOV-5221):** captureWarning unwraps `{ error }` bags, classifies the opaque JSON payload as quota exhaustion, and drops that noise from Sentry. The hourly Redis canary still owns the standing alert.
 - [internal] **Public profile block checks fail open on a bad Redis pipeline payload (JOV-5196):** a non-array Upstash response is treated as a cache miss instead of throwing `res.map is not a function`.

@@ -1,3 +1,4 @@
+import AuthenticationServices
 import Foundation
 import Testing
 @testable import Jovie
@@ -1006,6 +1007,58 @@ struct AppStateTests {
     #expect(!canStartMobileAuth(isMock: false, isOpening: true))
     #expect(
       mobileAuthButtonIsDisabled(isDisabled: false, isOpening: true)
+    )
+  }
+
+  @Test func presentationAnchorPrefersForegroundActiveWindowOverInactiveKeyWindow() {
+    let candidates = [
+      MobileAuthPresentationWindowCandidate(isForegroundActive: false, isKeyWindow: true),
+      MobileAuthPresentationWindowCandidate(isForegroundActive: true, isKeyWindow: false),
+    ]
+
+    #expect(MobileAuthPresentationWindowSelector.selectedIndex(from: candidates) == 1)
+  }
+
+  @Test func presentationAnchorPrefersKeyWindowWhenSceneIsForegroundActive() {
+    let candidates = [
+      MobileAuthPresentationWindowCandidate(isForegroundActive: true, isKeyWindow: false),
+      MobileAuthPresentationWindowCandidate(isForegroundActive: true, isKeyWindow: true),
+    ]
+
+    #expect(MobileAuthPresentationWindowSelector.selectedIndex(from: candidates) == 1)
+  }
+
+  @Test func presentationAnchorDoesNotInventAWindowWhenNoSceneIsForegroundActive() {
+    let candidates = [
+      MobileAuthPresentationWindowCandidate(isForegroundActive: false, isKeyWindow: true),
+      MobileAuthPresentationWindowCandidate(isForegroundActive: false, isKeyWindow: false),
+    ]
+
+    #expect(MobileAuthPresentationWindowSelector.selectedIndex(from: candidates) == nil)
+  }
+
+  @Test func presentationContextInvalidRetriesOnceThenSurfaces() {
+    let error = NSError(
+      domain: ASWebAuthenticationSessionErrorDomain,
+      code: ASWebAuthenticationSessionError.Code.presentationContextInvalid.rawValue,
+      userInfo: [
+        NSDebugDescriptionErrorKey:
+          "The UIWindowScene for the returned window was not in the foreground active state.",
+      ]
+    )
+
+    #expect(isAuthSessionPresentationContextInvalid(error))
+    #expect(
+      MobileAuthPresentationContextRetryPolicy.shouldRetry(error: error, attempt: 1)
+    )
+    #expect(
+      !MobileAuthPresentationContextRetryPolicy.shouldRetry(error: error, attempt: 2)
+    )
+    #expect(
+      !MobileAuthPresentationContextRetryPolicy.shouldRetry(
+        error: CancellationError(),
+        attempt: 1
+      )
     )
   }
 
