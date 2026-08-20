@@ -7,13 +7,11 @@
  */
 
 import {
-  DEST_LINEAR,
   ingestOvieDump,
   type OvieDestination,
   type OvieLane,
   type OvieReceipt,
   persistOvieReceipt,
-  routeEngineeringToLinear,
 } from '@/lib/ovie/ingest';
 
 export const PROMOTED_DUMP_ACK_WORKFLOW_ID = 'summer.ovie-dump-ack' as const;
@@ -85,7 +83,7 @@ export const SUMMER_WORKFLOW_INVENTORY: readonly SummerWorkflowCandidate[] =
       title: 'Ovie dump classify + ack',
       decision: 'promote',
       reason:
-        'Proven JOV-5215 dump path: typed receipts, no worker spawn, Linear→Symphony for engineering.',
+        'Proven JOV-5215 dump path: typed receipts, no worker spawn, Kanban for company work. Linear→Symphony stays Summer-admitted.',
       owner: 'summer',
       typedIo: true,
       deterministic: true,
@@ -248,12 +246,12 @@ function redactText(text: string): string {
     .replace(SECRET_RE, '[redacted-secret]');
 }
 
-function defaultPersist(receipts: readonly OvieReceipt[]): void {
+/** In-process ack log only. Eve must not Linear-route or dispatch Symphony. */
+export function persistPromotedDumpAckReceipts(
+  receipts: readonly OvieReceipt[]
+): void {
   for (const receipt of receipts) {
     persistOvieReceipt(receipt);
-    if (receipt.destination === DEST_LINEAR) {
-      routeEngineeringToLinear(receipt);
-    }
   }
 }
 
@@ -478,7 +476,7 @@ export function executePromotedDumpAck(
   }
 
   try {
-    (options?.persist ?? defaultPersist)(ovieReceipts);
+    (options?.persist ?? persistPromotedDumpAckReceipts)(ovieReceipts);
   } catch {
     const compensated = buildReceipt({
       workId: input.workId,
