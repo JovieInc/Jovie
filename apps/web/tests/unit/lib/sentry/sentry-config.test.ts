@@ -291,6 +291,21 @@ describe('scrubPii', () => {
     expect(scrubPii(event as any)).toBeNull();
   });
 
+  it('should drop a prefixed JOV-5228 UpstashError JSON bag', () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value: 'Unhandled {"error":{"name":"UpstashError"}}',
+          },
+        ],
+      },
+    };
+
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
   it('should keep real Upstash quota exceptions', () => {
     const event = {
       exception: {
@@ -453,6 +468,17 @@ describe('getBaseClientConfig', () => {
   it('should have tracesSampleRate as a number', () => {
     const config = getBaseClientConfig();
     expect(typeof config.tracesSampleRate).toBe('number');
+  });
+
+  it('ignores the opaque UpstashError JSON bag on the client (JOV-5228)', () => {
+    const config = getBaseClientConfig();
+    expect(
+      config.ignoreErrors?.some(
+        pattern =>
+          pattern instanceof RegExp &&
+          pattern.test('{"error":{"name":"UpstashError"}}')
+      )
+    ).toBe(true);
   });
 
   it('tags events with the exact public production release when provided', async () => {

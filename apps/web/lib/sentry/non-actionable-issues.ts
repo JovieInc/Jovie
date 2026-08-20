@@ -6,8 +6,9 @@
  * It is not an application defect and should not trigger autofix or performance alerts.
  *
  * Opaque `{"error":{"name":"UpstashError"}}` titles are the JSON-stringified
- * form of an UpstashError whose `message` is non-enumerable (JOV-5220, JOV-5221).
- * The standing Redis operability canary already pages on quota exhaustion.
+ * form of an UpstashError whose `message` is non-enumerable (JOV-5220,
+ * JOV-5221, JOV-5228). The standing Redis operability canary already pages
+ * on quota exhaustion.
  */
 
 export interface SentryIssueSummary {
@@ -26,10 +27,17 @@ export interface SentryEventLike {
   } | null;
 }
 
+/**
+ * JSON.stringify({ error: UpstashError }) because `message` is non-enumerable.
+ * Substring match so prefixed Sentry titles still drop (JOV-5228).
+ */
+export const UPSTASH_ERROR_JSON_BAG_PATTERN =
+  /\{\s*"error"\s*:\s*\{\s*"name"\s*:\s*"UpstashError"\s*\}\s*\}/;
+
 /** Drop these in server/edge `ignoreErrors` so quota noise never files issues. */
 export const UPSTASH_QUOTA_IGNORE_ERRORS: ReadonlyArray<RegExp> = [
   /ERR max requests limit exceeded/i,
-  /\{\s*"error"\s*:\s*\{\s*"name"\s*:\s*"UpstashError"\s*\}\s*\}/,
+  UPSTASH_ERROR_JSON_BAG_PATTERN,
   /\{\s*"name"\s*:\s*"UpstashError"\s*\}/,
 ];
 
@@ -54,11 +62,35 @@ function normalize(value: string | null | undefined): string {
 }
 
 function isUpstashErrorJsonBagText(value: string | null | undefined): boolean {
+  if (!value) return false;
   const normalized = normalize(value);
   return (
     normalized === normalize(UPSTASH_ERROR_JSON_BAG) ||
-    normalized === normalize(UPSTASH_ERROR_JSON_BAG_TITLE)
+    normalized === normalize(UPSTASH_ERROR_JSON_BAG_TITLE) ||
+    UPSTASH_ERROR_JSON_BAG_PATTERN.test(value)
   );
+}
+
+/**
+ * True when a captured value would Sentry-title as
+ * `Error: {"error":{"name":"UpstashError"}}` (JOV-5228).
+ * Does not match a real `UpstashError: ERR max requests…` exception.
+ */
+export function isOpaqueUpstashErrorJsonBag(value: unknown): boolean {
+  if (typeof value === 'string') {
+    return isUpstashErrorJsonBagText(value);
+  }
+  if (value instanceof Error) {
+    return isUpstashErrorJsonBagText(value.message);
+  }
+  if (value && typeof value === 'object') {
+    try {
+      return isUpstashErrorJsonBagText(JSON.stringify(value));
+    } catch {
+      return false;
+    }
+  }
+  return false;
 }
 
 export interface SentryExceptionLike {

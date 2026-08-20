@@ -30,7 +30,10 @@ import {
   isSentryInitialized,
   type SentryMode,
 } from '@/lib/sentry/init';
-import { isUpstashQuotaNoise } from '@/lib/sentry/non-actionable-issues';
+import {
+  isOpaqueUpstashErrorJsonBag,
+  isUpstashQuotaNoise,
+} from '@/lib/sentry/non-actionable-issues';
 import {
   errorJsonReplacer,
   isRedisQuotaFailure,
@@ -281,10 +284,12 @@ export async function captureError(
 
   // Best-effort Redis quota warnings already degrade in-process. The hourly
   // operability canary owns the standing alert (JOV-5086); per-request
-  // captureException of the JSON bag flooded Linear as JOV-5221.
+  // captureException of the JSON bag flooded Linear as JOV-5221 / JOV-5228.
   const quotaNoise =
-    severity === 'warning' &&
-    isUpstashQuotaNoise(quotaNoiseText(resolvedError));
+    (severity === 'warning' &&
+      isUpstashQuotaNoise(quotaNoiseText(resolvedError))) ||
+    isOpaqueUpstashErrorJsonBag(resolvedError) ||
+    isOpaqueUpstashErrorJsonBag(errorData.message);
 
   if (!quotaNoise) {
     sendToSentry({

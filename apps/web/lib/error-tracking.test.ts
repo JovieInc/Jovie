@@ -137,4 +137,12 @@ describe('captureError wrapped UpstashError (JOV-5220)', () => {
       'af5b9ee0-ecec-4508-86e0-4f364c2e349d'
     );
   });
+
+  it('does not send an already-stringified JSON bag at error severity (JOV-5228)', async () => {
+    await captureError(
+      '[onRequestError] Redis failed',
+      new Error('{"error":{"name":"UpstashError"}}')
+    );
+    expect(captureException).not.toHaveBeenCalled();
+  });
 });
