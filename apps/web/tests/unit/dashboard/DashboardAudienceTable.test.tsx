@@ -290,6 +290,17 @@ describe('DashboardAudienceTable', () => {
   it('renders the table container with test id', () => {
     renderWithProviders(<DashboardAudienceTable {...defaultProps} rows={[]} />);
     expect(screen.getByTestId('dashboard-audience-table')).toBeInTheDocument();
+    expect(screen.getByTestId('audience-ai-visibility-strip')).toHaveClass(
+      'shrink-0',
+      'border-b',
+      'px-4',
+      'py-2'
+    );
+    expect(screen.getByTestId('audience-table-scroll-region')).toHaveClass(
+      'flex-1',
+      'min-h-0',
+      'overflow-hidden'
+    );
   });
 
   it('shows empty state with correct testId when no rows provided', () => {
@@ -320,6 +331,9 @@ describe('DashboardAudienceTable', () => {
     );
 
     expect(screen.getByTestId('unified-table')).toBeInTheDocument();
+    const region = screen.getByTestId('audience-table-scroll-region');
+    expect(region.children[0]).toHaveClass('md:hidden', 'overflow-auto');
+    expect(region.children[1]).toHaveClass('max-md:hidden', 'h-full');
   });
 
   it('passes all rows to UnifiedTable', () => {

@@ -2,7 +2,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { AiCrawlerIntelligenceCard } from '@/components/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard';
+import {
+  AiCrawlerIntelligenceCard,
+  AiCrawlerIntelligenceCardSkeleton,
+} from '@/components/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard';
 import type { AiCrawlerAnalyticsResponse } from '@/types/ai-crawler-analytics';
 
 function createTestQueryClient() {
@@ -79,6 +82,46 @@ const teaserAnalytics: AiCrawlerAnalyticsResponse = {
 };
 
 describe('AiCrawlerIntelligenceCard', () => {
+  it('exposes the same canonical row geometry to route loading shells', () => {
+    const { rerender } = renderWithQueryClient(
+      <AiCrawlerIntelligenceCardSkeleton />
+    );
+    const loadingClassName = screen.getByTestId(
+      'ai-crawler-card-skeleton'
+    ).className;
+
+    hoisted.useAiCrawlerAnalyticsQueryMock.mockReturnValue({
+      data: proAnalytics,
+      isLoading: false,
+      isError: false,
+    });
+    rerender(
+      <QueryClientProvider client={createTestQueryClient()}>
+        <AiCrawlerIntelligenceCard />
+      </QueryClientProvider>
+    );
+
+    expect(
+      screen.getByTestId('ai-crawler-intelligence-card').className
+    ).toContain('min-h-12');
+    for (const geometryClass of [
+      'flex',
+      'min-h-12',
+      'w-full',
+      'items-center',
+      'gap-3',
+      'rounded-xl',
+      'border',
+      'px-3',
+      'py-2',
+    ]) {
+      expect(loadingClassName).toContain(geometryClass);
+      expect(
+        screen.getByTestId('ai-crawler-intelligence-card').className
+      ).toContain(geometryClass);
+    }
+  });
+
   it('reserves compact row height while loading', () => {
     hoisted.useAiCrawlerAnalyticsQueryMock.mockReturnValue({
       data: undefined,

@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertCircle, MessageSquare, RefreshCw } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Suspense } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -8,7 +8,7 @@ import { ChatWorkspaceSurface } from '@/components/jovie/ChatWorkspaceSurface';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
-import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
+import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { RECOVERY_COPY } from '@/features/feedback/recovery-contract';
 
 function ProfilePageChatFallback() {
@@ -17,20 +17,14 @@ function ProfilePageChatFallback() {
   return (
     <ChatWorkspaceSurface>
       <div className='flex h-full items-center justify-center p-6'>
-        <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
-          <div className='flex h-10 w-10 items-center justify-center rounded-xl border border-subtle bg-surface-0'>
-            <AlertCircle className='h-5 w-5 text-tertiary-token' />
-          </div>
-          <p className='text-sm text-secondary-token'>
-            Something went wrong loading the conversation. Please try again.
-          </p>
-          <DashboardHeaderActionButton
-            ariaLabel='Reload Chat'
-            onClick={() => router.refresh()}
-            icon={<RefreshCw className='h-4 w-4' />}
-            label='Reload'
-          />
-        </ContentSurfaceCard>
+        <PageErrorState
+          title="Conversation couldn't load"
+          message='Something went wrong loading the conversation. Please try again.'
+          actionLabel='Reload'
+          actionAriaLabel='Reload Chat'
+          onRetry={() => router.refresh()}
+          extraContext={{ Context: 'Profile Chat' }}
+        />
       </div>
     </ChatWorkspaceSurface>
   );
@@ -47,20 +41,14 @@ function ProfilePageChatInner() {
       return (
         <ChatWorkspaceSurface>
           <div className='flex h-full items-center justify-center p-6'>
-            <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
-              <div className='flex h-10 w-10 items-center justify-center rounded-xl border border-subtle bg-surface-0'>
-                <AlertCircle className='h-5 w-5 text-tertiary-token' />
-              </div>
-              <p className='text-sm text-secondary-token'>
-                We hit a problem loading your profile. Please retry in a moment.
-              </p>
-              <DashboardHeaderActionButton
-                ariaLabel='Retry Loading Profile Chat'
-                onClick={() => router.refresh()}
-                icon={<RefreshCw className='h-4 w-4' />}
-                label={RECOVERY_COPY.retryLabel}
-              />
-            </ContentSurfaceCard>
+            <PageErrorState
+              title="Profile couldn't load"
+              message='We hit a problem loading your profile. Please retry in a moment.'
+              actionLabel={RECOVERY_COPY.retryLabel}
+              actionAriaLabel='Retry Loading Profile Chat'
+              onRetry={() => router.refresh()}
+              extraContext={{ Context: 'Profile Chat' }}
+            />
           </div>
         </ChatWorkspaceSurface>
       );

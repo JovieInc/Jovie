@@ -139,11 +139,19 @@ describe('ProfilePageChat', () => {
     expect(container.textContent).toContain(
       'We hit a problem loading your profile. Please retry in a moment.'
     );
+    expect(
+      container.querySelector('[data-testid="page-error-state"]')
+    ).not.toBeNull();
+    expect(
+      container.querySelector('[data-content-state="error"]')
+    ).not.toBeNull();
 
     // Should have a retry button
     const retryButton = container.querySelector('button');
     expect(retryButton).not.toBeNull();
     expect(retryButton?.textContent).toContain('Try again');
+    fireEvent.click(retryButton!);
+    expect(mockRouterRefresh).toHaveBeenCalledOnce();
   });
 
   it('refreshes the app route instead of reloading the document from the error fallback', () => {

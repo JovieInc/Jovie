@@ -60,9 +60,9 @@ describe('TableErrorFallback', () => {
     ).toBeInTheDocument();
   });
 
-  it('has role=alert on the container', () => {
+  it('uses the canonical status role', () => {
     render(<TableErrorFallback {...defaultProps} />);
-    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toBeInTheDocument();
   });
 
   it('displays error digest when present', () => {

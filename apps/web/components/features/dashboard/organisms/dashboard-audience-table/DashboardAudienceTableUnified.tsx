@@ -872,7 +872,10 @@ export const DashboardAudienceTableUnified = memo(
               <p className='sr-only'>{getSrDescription(rows.length === 0)}</p>
 
               <div className='flex-1 min-h-0 flex flex-col'>
-                <div className='shrink-0 border-b border-subtle px-4 py-2'>
+                <div
+                  className='shrink-0 border-b border-subtle px-4 py-2'
+                  data-testid='audience-ai-visibility-strip'
+                >
                   <AiCrawlerIntelligenceCard
                     onOpenDetail={() => {
                       openPanel('ai-crawlers');
@@ -880,7 +883,10 @@ export const DashboardAudienceTableUnified = memo(
                   />
                 </div>
                 {/* Scrollable content area */}
-                <div className='flex-1 min-h-0 overflow-auto'>
+                <div
+                  className='flex-1 min-h-0 overflow-hidden'
+                  data-testid='audience-table-scroll-region'
+                >
                   {rows.length === 0 ? (
                     <EmptyState
                       icon={emptyStateIcon}

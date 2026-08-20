@@ -1,9 +1,14 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { PageErrorState } from './PageErrorState';
 
 describe('PageErrorState', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('keeps the initial fatal-error view to one retry action and collapsed details', async () => {
     const user = userEvent.setup();
     render(
@@ -16,9 +21,18 @@ describe('PageErrorState', () => {
       />
     );
 
-    expect(screen.getByRole('alert')).toHaveClass('min-h-64');
+    expect(screen.getByTestId('page-error-state')).toHaveClass('min-h-64');
+    expect(screen.getAllByRole('status')).toHaveLength(1);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveAttribute(
+      'aria-labelledby',
+      expect.stringMatching(/^_r_/)
+    );
     expect(
-      screen.getByRole('heading', { name: 'Unable to Load Dashboard' })
+      screen.getByRole('heading', {
+        level: 1,
+        name: 'Unable to Load Dashboard',
+      })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Try again' })
@@ -55,6 +69,43 @@ describe('PageErrorState', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it('preserves a contextual accessible action label without changing visible copy', () => {
+    render(
+      <PageErrorState
+        message='The conversation failed to load.'
+        actionLabel='Reload'
+        actionAriaLabel='Reload Chat'
+        onRetry={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Reload Chat' })
+    ).toHaveTextContent('Reload');
+  });
+
+  it('uses browser reload as the default recovery behavior', () => {
+    const reload = vi.fn();
+    vi.stubGlobal('location', { reload });
+    render(<PageErrorState message='The route failed to load.' />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
+  it('has no automated accessibility violations in its collapsed recovery state', async () => {
+    const { container } = render(
+      <PageErrorState
+        message='The route failed to load.'
+        error={new Error('Network request failed')}
+        onRetry={vi.fn()}
+      />
+    );
+
+    await expectNoA11yViolations(container);
   });
 
   it('keeps a repeated error message out of the diagnostic disclosure', () => {

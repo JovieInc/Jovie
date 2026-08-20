@@ -104,7 +104,7 @@ describe('JovieWorkFeed', () => {
 
     render(<JovieWorkFeed profileId='profile-123' />);
 
-    expect(screen.getByRole('alert')).toHaveTextContent(
+    expect(screen.getByRole('status')).toHaveTextContent(
       'Failed to load Jovie work feed'
     );
     fireEvent.click(screen.getByRole('button', { name: 'Retry load' }));

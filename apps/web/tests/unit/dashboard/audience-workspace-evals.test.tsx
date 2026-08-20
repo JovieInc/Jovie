@@ -17,6 +17,23 @@ describe('Audience workspace evals on the Contacts page', () => {
 
     expect(screen.getByTestId('dashboard-audience-loading')).toBeVisible();
     expect(screen.getByLabelText('Loading Audience')).toBeVisible();
+    expect(screen.getByTestId('audience-ai-visibility-strip')).toHaveClass(
+      'shrink-0',
+      'border-b',
+      'px-4',
+      'py-2'
+    );
+    expect(screen.getByTestId('ai-crawler-card-skeleton')).toHaveClass(
+      'min-h-12'
+    );
+    expect(screen.getByTestId('audience-table-scroll-region')).toHaveClass(
+      'flex-1',
+      'min-h-0',
+      'overflow-hidden'
+    );
+    const region = screen.getByTestId('audience-table-scroll-region');
+    expect(region.children[0]).toHaveClass('overflow-auto', 'md:hidden');
+    expect(region.children[1]).toHaveClass('max-md:hidden', 'h-full');
   });
 
   it('keeps the Contacts page Audience tab on the shared audience client', () => {

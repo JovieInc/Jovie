@@ -27,6 +27,7 @@ describe('EmptyState (canonical molecule API)', () => {
     render(
       <EmptyState
         heading='No Data Yet'
+        headingAs='h1'
         description='Add content to see insights'
         icon={<span data-testid='test-icon'>*</span>}
       />
@@ -34,7 +35,7 @@ describe('EmptyState (canonical molecule API)', () => {
 
     expect(screen.getByRole('status')).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: /no data yet/i })
+      screen.getByRole('heading', { level: 1, name: /no data yet/i })
     ).toBeInTheDocument();
     expect(screen.getByText(/add content/i)).toBeInTheDocument();
     expect(screen.getByTestId('test-icon')).toBeInTheDocument();

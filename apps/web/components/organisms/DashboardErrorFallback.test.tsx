@@ -23,11 +23,31 @@ describe('DashboardErrorFallback', () => {
     expect(
       screen.getByRole('button', { name: RECOVERY_COPY.retryLabel })
     ).toBeInTheDocument();
+    expect(screen.getByRole('status')).toBeInTheDocument();
 
     // Digest is support-path data: present only inside the opt-in disclosure.
     const digest = screen.getByText('Error ID: dashboard-timeout');
     const disclosure = digest.closest('details');
     expect(disclosure).not.toBeNull();
     expect(disclosure).not.toHaveAttribute('open');
+  });
+
+  it('keeps an empty diagnostic message behind safe dashboard recovery copy', () => {
+    const resetErrorBoundary = vi.fn();
+
+    render(
+      <DashboardErrorFallback
+        error={new Error('')}
+        resetErrorBoundary={resetErrorBoundary}
+      />
+    );
+
+    expect(
+      screen.getByText(
+        'An unexpected error occurred while loading your dashboard.'
+      )
+    ).toBeInTheDocument();
+    screen.getByRole('button', { name: RECOVERY_COPY.retryLabel }).click();
+    expect(resetErrorBoundary).toHaveBeenCalledOnce();
   });
 });
