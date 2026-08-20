@@ -6,9 +6,9 @@
  * It is not an application defect and should not trigger autofix or performance alerts.
  *
  * Opaque `{"error":{"name":"UpstashError"}}` titles are the JSON-stringified
- * form of an UpstashError whose `message` is non-enumerable (JOV-5187,
- * JOV-5209, JOV-5218, JOV-5220, JOV-5221, JOV-5228, JOV-5229). The standing
- * Redis operability canary already pages on quota exhaustion.
+ * form of an UpstashError whose `message` is non-enumerable (JOV-5182,
+ * JOV-5187, JOV-5209, JOV-5218, JOV-5220, JOV-5221, JOV-5228, JOV-5229). The
+ * standing Redis operability canary already pages on quota exhaustion.
  */
 
 export interface SentryIssueSummary {

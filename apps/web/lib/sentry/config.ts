@@ -448,8 +448,8 @@ export function scrubPii(
     return null;
   }
 
-  // Filter captureWarning/captureError JSON bags (JOV-5187, JOV-5209,
-  // JOV-5218, JOV-5228). Real Upstash quota exceptions keep their
+  // Filter captureWarning/captureError JSON bags (JOV-5182, JOV-5187,
+  // JOV-5209, JOV-5218, JOV-5228). Real Upstash quota exceptions keep their
   // command-failure title.
   if (isNonActionableUpstashErrorBagEvent(event)) {
     return null;

@@ -136,11 +136,10 @@ export function getFullClientConfig(
   integrations.push(...additionalIntegrations);
 
   return {
-    dsn: baseConfig.dsn,
+    // Reconstructing field-by-field dropped ignoreErrors/release, so the
+    // JOV-5182 JSON bag never hit InboundFilters on dashboard routes.
+    ...baseConfig,
     tracesSampleRate,
-    enableLogs: baseConfig.enableLogs,
-    sendDefaultPii: baseConfig.sendDefaultPii,
-    beforeSend: baseConfig.beforeSend,
 
     // Full integrations including Replay
     integrations,
