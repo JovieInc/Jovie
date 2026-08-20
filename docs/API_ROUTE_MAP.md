@@ -26,6 +26,12 @@
 | `/api/account/email` | GET | `auth` | Get user email |
 | `/api/account/export` | GET | `auth` | Export user data |
 
+### Actions
+
+| Route | Methods | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/v1/actions` | GET | `auth` | Read-only canonical Actions discovery. Resolves advisory capabilities for the four stable action IDs against an owned profile. No writes. |
+
 ### Admin
 
 | Route | Methods | Auth | Description |

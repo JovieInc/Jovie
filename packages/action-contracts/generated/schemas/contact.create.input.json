@@ -1,0 +1,63 @@
+{
+  "title": "contact.create input v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "bookings",
+        "management",
+        "press_pr",
+        "brand_partnerships",
+        "music_collaboration",
+        "fan_general",
+        "other"
+      ]
+    },
+    "customLabel": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "personName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "companyName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "territories": {
+      "maxItems": 8,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "email": {
+      "type": "string",
+      "maxLength": 254,
+      "format": "email",
+      "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+    },
+    "phone": {
+      "type": "string",
+      "pattern": "^\\+[1-9]\\d{6,14}$"
+    },
+    "preferredChannel": {
+      "type": "string",
+      "enum": [
+        "email",
+        "phone"
+      ]
+    }
+  },
+  "required": [
+    "role"
+  ],
+  "additionalProperties": false
+}

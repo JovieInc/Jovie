@@ -93,7 +93,7 @@ Read the relevant `.claude/rules/*` file before touching that area: environment,
 
 ## Skill Routing
 
-Match a skill → invoke it first. Full routing table: [`.claude/rules/gstack.md`](.claude/rules/gstack.md). Web browsing: `/browse` only (never `mcp__claude-in-chrome__*`). Key flows: `/ship`, `/review`, `/qa`, `/investigate`, `/autoplan`, `/perf-loop`.
+Match a skill → invoke it first. Full routing table: [`.claude/rules/gstack.md`](.claude/rules/gstack.md). Web browsing: Playwright MCP or `pnpm exec playwright` by default; `/browse` is optional (never `mcp__claude-in-chrome__*`). Key flows: `/ship`, `/review`, `/qa`, `/investigate`, `/autoplan`, `/perf-loop`. CLAUDE.md stays a router — do not collapse CEO / QA / ship personas into this file.
 
 ## Documentation Map
 

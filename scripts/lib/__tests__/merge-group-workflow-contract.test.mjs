@@ -899,6 +899,8 @@ ${heavyGateScript}`,
     );
     // The skip signal keys on this exact job name; drift must fail here.
     expect(controllerLighthouse).toContain('name: Lighthouse CI (Production)');
+    expect(POSTDEPLOY_PROBES_WORKFLOW).toContain('notify-failure:');
+    expect(POSTDEPLOY_PROBES_WORKFLOW).toContain('#alerts-production');
   });
 
   it('revalidates submitted and dismissed reviews for main-bound forks', () => {

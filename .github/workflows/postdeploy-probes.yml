@@ -11,9 +11,9 @@ name: Post-Deploy Probes
 # probes already produced exact evidence.
 #
 # Hard boundaries (do not relax):
-# - Read-only evidence. No production mutation, no marker writes, no
-#   notification, no rollback. It must never join the `production-mutation`
-#   FIFO lease, so deploys never wait on it.
+# - Read-only evidence. No production mutation, no marker writes, no rollback.
+#   Slack on probe failure is allowed and is not a production mutation.
+#   It must never join the `production-mutation` FIFO lease.
 # - It changes nothing about release authorization: the controller's exact
 #   CI-attempt + Main Release Ready contract is untouched.
 
@@ -566,3 +566,62 @@ jobs:
       - name: Remove Lighthouse sensitive probe state
         if: ${{ always() }}
         run: rm -f "$RUNNER_TEMP/lighthouse-sensitive-values"
+
+  notify-failure:
+    name: Alert on post-deploy probe failure
+    needs: [resolve-target, smoke, auth-smoke, lighthouse]
+    if: ${{ always() && needs.resolve-target.outputs.should_probe == 'true' && (needs.smoke.result == 'failure' || needs.lighthouse.result == 'failure' || needs.auth-smoke.result == 'failure') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    steps:
+      - name: Slack alert
+        if: ${{ env.SLACK_WEBHOOK_URL != '' }}
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
+        with:
+          status: custom
+          channel: '#alerts-production'
+          author_name: 'Post-Deploy Probes'
+          custom_payload: |
+            {
+              "text": "Landed production post-deploy probes failed",
+              "attachments": [
+                {
+                  "color": "danger",
+                  "fields": [
+                    {
+                      "title": "Smoke",
+                      "value": "${{ needs.smoke.result }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Auth smoke",
+                      "value": "${{ needs.auth-smoke.result }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Lighthouse",
+                      "value": "${{ needs.lighthouse.result }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Action",
+                      "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>",
+                      "short": false
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      - name: Fail closed when Slack is not configured
+        if: ${{ env.SLACK_WEBHOOK_URL == '' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          echo "::error::Post-deploy probes failed and SLACK_WEBHOOK_URL is unset; nobody was paged."
+          exit 1

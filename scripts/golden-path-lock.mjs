@@ -204,6 +204,10 @@ async function runProdProbe(args) {
   let chatStatus;
   let chatBody = '';
   let waitlistStatus;
+  let claimStatus;
+  let billingStatus;
+  let billingBody;
+  let stripeWebhookStatus;
 
   try {
     const homepage = await fetch(origin, { headers, redirect: 'follow' });
@@ -245,11 +249,59 @@ async function runProdProbe(args) {
     );
   }
 
+  try {
+    const claim = await fetch(`${origin}/api/onboarding/claim`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    claimStatus = claim.status;
+  } catch (error) {
+    claimStatus = 0;
+    console.error(
+      `claim fetch failed: ${error instanceof Error ? error.message : error}`
+    );
+  }
+
+  try {
+    const billing = await fetch(`${origin}/api/billing/health`, {
+      headers,
+      redirect: 'follow',
+    });
+    billingStatus = billing.status;
+    const parsed = await fetchJsonSafe(billing);
+    billingBody = parsed.json ?? parsed.text;
+  } catch (error) {
+    billingStatus = 0;
+    billingBody = error instanceof Error ? error.message : String(error);
+    console.error(
+      `billing health fetch failed: ${error instanceof Error ? error.message : error}`
+    );
+  }
+
+  try {
+    const webhook = await fetch(`${origin}/api/stripe/webhooks`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    stripeWebhookStatus = webhook.status;
+  } catch (error) {
+    stripeWebhookStatus = 0;
+    console.error(
+      `stripe webhook fetch failed: ${error instanceof Error ? error.message : error}`
+    );
+  }
+
   const evaluated = evaluateProdProbe({
     homepageHtml,
     chatStatus,
     chatBody,
     waitlistStatus,
+    claimStatus,
+    billingStatus,
+    billingBody,
+    stripeWebhookStatus,
   });
   const receipt = buildProdProbeReceipt({
     ok: evaluated.ok,
