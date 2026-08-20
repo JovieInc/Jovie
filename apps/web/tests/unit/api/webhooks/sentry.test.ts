@@ -135,7 +135,7 @@ describe('POST /api/webhooks/sentry', () => {
     expect(mockServerFetch).not.toHaveBeenCalled();
   });
 
-  it('skips autofix for the JOV-5187 UpstashError JSON bag', async () => {
+  it('skips autofix for the JOV-5186 / JOV-5187 UpstashError JSON bag', async () => {
     mockAcquireRecentDispatch.mockResolvedValue({
       acquired: true,
       reason: 'acquired',

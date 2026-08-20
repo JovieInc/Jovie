@@ -431,7 +431,7 @@ export function scrubPii(
   // Client `beforeSend` is this function directly, so hint must be read here.
   // `captureException({ error: UpstashError })` keeps the bag on
   // originalException while the event value is a generic object capture
-  // (JOV-5187 / JOV-5209).
+  // (JOV-5186 / JOV-5187 / JOV-5209).
   if (isOpaqueUpstashErrorJsonBag(hint?.originalException)) {
     return null;
   }
@@ -462,7 +462,7 @@ export function scrubPii(
   }
 
   // Filter captureWarning/captureError JSON bags kept on extra/logentry
-  // (JOV-5182, JOV-5183, JOV-5185, JOV-5187, JOV-5209, JOV-5218, JOV-5228).
+  // (JOV-5182, JOV-5183, JOV-5185, JOV-5186, JOV-5187, JOV-5209, JOV-5218, JOV-5228).
   // Quota command failures (JOV-5181 / JOV-5184) are already dropped above.
   if (isNonActionableUpstashErrorBagEvent(event)) {
     return null;
@@ -584,7 +584,8 @@ export interface BaseSentryClientConfig {
  * - **Trace Sampling**: Uses the shared `TRACES_SAMPLE_RATE` constant
  * - **Log Enablement**: Always enabled for error breadcrumbs
  * - **PII Handling**: `sendDefaultPii` disabled; user context set server-side only
- * - **Before Send**: Applies `scrubPii` to filter sensitive data
+ * - **Before Send**: Applies `scrubPii` to filter sensitive data and drop
+ *   client object-capture UpstashError bags (JOV-5186 / JOV-5187)
  *
  * ## Lazy Loading Integration
  *
