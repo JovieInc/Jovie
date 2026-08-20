@@ -34,7 +34,7 @@ test.describe('Homepage chat intake — ID-keyed intent store + /start handoff',
   }) => {
     const input = await openHomepageIntentInput(page);
 
-    await page.getByRole('button', { name: 'Plan a release' }).click();
+    await page.getByRole('button', { name: 'Plan A Release' }).click();
     await expect(input).toHaveValue('Plan a release for ');
 
     await input.pressSequentially('my new EP');
@@ -188,7 +188,7 @@ test.describe('Homepage chat intake — ID-keyed intent store + /start handoff',
     await page.goto('/');
 
     const pills = page.getByRole('button', {
-      name: /Plan a release|Generate album art|Generate pitch|Build artist profile|Analyze momentum/,
+      name: /Plan A Release|Generate Album Art|Generate Pitch|Build Artist Profile|Analyze Momentum/,
     });
     const pillCount = await pills.count();
     test.skip(

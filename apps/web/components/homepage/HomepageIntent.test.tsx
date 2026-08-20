@@ -58,16 +58,16 @@ describe('HomepageIntent', () => {
       )
     ).toBeTruthy();
     expect(getInput()).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Plan a release' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Plan A Release' })).toBeTruthy();
     expect(
-      screen.getByRole('button', { name: 'Generate album art' })
+      screen.getByRole('button', { name: 'Generate Album Art' })
     ).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Generate pitch' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Generate Pitch' })).toBeTruthy();
     expect(
-      screen.getByRole('button', { name: 'Build artist profile' })
+      screen.getByRole('button', { name: 'Build Artist Profile' })
     ).toBeTruthy();
     expect(
-      screen.getByRole('button', { name: 'Analyze momentum' })
+      screen.getByRole('button', { name: 'Analyze Momentum' })
     ).toBeTruthy();
   });
 
@@ -77,7 +77,7 @@ describe('HomepageIntent', () => {
     const setSelectionRange = vi.spyOn(input, 'setSelectionRange');
     const focusSpy = vi.spyOn(input, 'focus');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Plan a release' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Plan A Release' }));
 
     expect(input.value).toBe('Plan a release for ');
     expect(focusSpy).toHaveBeenCalled();
@@ -129,7 +129,7 @@ describe('HomepageIntent', () => {
 
   it('5. submit fires homepage_prompt_submitted with expected shape', () => {
     render(<HomepageIntent />);
-    fireEvent.click(screen.getByRole('button', { name: 'Plan a release' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Plan A Release' }));
     const input = getInput();
     fireEvent.change(input, {
       target: { value: 'Plan a release for my EP' },

@@ -80,34 +80,34 @@ const smallText = 'system-b-brand-small';
 const DOWNLOADS = [
   // Marks (light/dark)
   {
-    label: 'SVG Mark — Ink (dark)',
+    label: 'SVG Mark — Ink (Dark)',
     file: 'Jovie-Logo-Mark-Black.svg',
     href: '/brand/Jovie-Logo-Mark-Black.svg',
   },
   {
-    label: 'SVG Mark — Cream (light)',
+    label: 'SVG Mark — Cream (Light)',
     file: 'Jovie-Logo-Mark-Cream.svg',
     href: '/brand/Jovie-Logo-Mark-Cream.svg',
   },
   // Wordmarks (light/dark)
   {
-    label: 'SVG Wordmark — Ink (dark)',
+    label: 'SVG Wordmark — Ink (Dark)',
     file: 'Jovie-Wordmark-Black.svg',
     href: '/brand/Jovie-Wordmark-Black.svg',
   },
   {
-    label: 'SVG Wordmark — Cream (light)',
+    label: 'SVG Wordmark — Cream (Light)',
     file: 'Jovie-Wordmark-Cream.svg',
     href: '/brand/Jovie-Wordmark-Cream.svg',
   },
   // Lockups (light/dark)
   {
-    label: 'SVG Lockup — Ink (dark)',
+    label: 'SVG Lockup — Ink (Dark)',
     file: 'Jovie-Lockup-Black.svg',
     href: '/brand/Jovie-Lockup-Black.svg',
   },
   {
-    label: 'SVG Lockup — Cream (light)',
+    label: 'SVG Lockup — Cream (Light)',
     file: 'Jovie-Lockup-Cream.svg',
     href: '/brand/Jovie-Lockup-Cream.svg',
   },
@@ -166,6 +166,7 @@ function HeroSection() {
     <section id='hero' className='system-b-brand-hero'>
       <div className='system-b-brand-hero-grid'>
         <div className='system-b-brand-hero-copy'>
+          {/* ui-casing-allow: marketing display headline */}
           <h1 className='system-b-brand-title'>One loop. Every release.</h1>
           <div className='system-b-brand-hero-body'>
             <p className={proseStrong}>
@@ -207,6 +208,7 @@ function ThesisSection() {
   return (
     <section id='thesis' className={firstSectionShell}>
       <div>
+        {/* ui-casing-allow: marketing display headline */}
         <h2 className={sectionHeading}>The artist is the company.</h2>
       </div>
       <div className='system-b-brand-copy-stack'>
@@ -265,6 +267,7 @@ function MarkSection() {
   return (
     <section id='mark' className={sectionShell}>
       <div>
+        {/* ui-casing-allow: marketing display headline */}
         <h2 className={sectionHeading}>A loop with a dot.</h2>
         <div className='system-b-brand-mark-stage'>
           <Mark size={180} title='Jovie loop mark' />
@@ -349,6 +352,7 @@ function LockupsSection() {
   return (
     <section id='lockups' className={sectionShell}>
       <div>
+        {/* ui-casing-allow: marketing display headline */}
         <h2 className={sectionHeading}>One system. Many surfaces.</h2>
       </div>
       <div className='system-b-brand-copy-stack'>
@@ -380,6 +384,7 @@ function UsageSection() {
   return (
     <section id='usage' className={sectionShell}>
       <div>
+        {/* ui-casing-allow: marketing display headline */}
         <h2 className={sectionHeading}>Quiet system. Loud artist.</h2>
       </div>
       <div className='system-b-brand-copy-stack'>
@@ -412,6 +417,7 @@ function ColorSection() {
   return (
     <section id='color' className={sectionShell}>
       <div>
+        {/* ui-casing-allow: marketing display headline */}
         <h2 className={sectionHeading}>No brand color.</h2>
       </div>
       <div className='system-b-brand-copy-stack'>
@@ -449,6 +455,7 @@ function TypeSection() {
   return (
     <section id='type' className={sectionShell}>
       <div>
+        {/* ui-casing-allow: marketing display headline */}
         <h2 className={sectionHeading}>Type as interface.</h2>
       </div>
       <div className='system-b-brand-copy-stack'>
@@ -485,6 +492,7 @@ function IconPackSection() {
   return (
     <section id='icons' className={sectionShell}>
       <div>
+        {/* ui-casing-allow: marketing display headline */}
         <h2 className={sectionHeading}>The loop travels.</h2>
       </div>
       <div className='system-b-brand-copy-stack'>
@@ -511,6 +519,7 @@ function DownloadsSection() {
   return (
     <section id='downloads' className={sectionShell}>
       <div>
+        {/* ui-casing-allow: marketing display headline */}
         <h2 className={sectionHeading}>Take the system.</h2>
       </div>
       <div className='system-b-brand-copy-stack'>
@@ -549,6 +558,7 @@ function FinalCta() {
   return (
     <section className='system-b-brand-final'>
       <div className='system-b-brand-final-inner'>
+        {/* ui-casing-allow: marketing display headline */}
         <h2 className='system-b-brand-final-title'>
           Build the loop your career runs on.
         </h2>

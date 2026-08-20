@@ -45,6 +45,7 @@ export function WhatYouGetSection() {
               letterSpacing: 'var(--linear-h2-tracking)',
             }}
           >
+            {/* ui-casing-allow: marketing display headline */}
             What you get
           </h2>
 

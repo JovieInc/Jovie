@@ -308,7 +308,7 @@ export function EntityPreviewPane({
   const eyebrow = eyebrowFor(entity);
   return (
     <section
-      aria-label='Selected entity preview'
+      aria-label='Selected Entity Preview'
       className={cn('system-b-entity-preview-pane', className)}
       data-testid='entity-preview-pane'
     >

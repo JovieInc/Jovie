@@ -98,6 +98,7 @@ export function HomeLiveProofSection({
               id='homepage-live-proof-heading'
               className='marketing-h2-linear text-primary-token'
             >
+              {/* ui-casing-allow: marketing display headline */}
               See it live.
             </h2>
             <p className='mt-4 max-w-[31rem] text-mid leading-[1.7] text-secondary-token sm:text-base'>

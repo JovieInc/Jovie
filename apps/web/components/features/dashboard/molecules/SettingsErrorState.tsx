@@ -24,7 +24,7 @@ export function SettingsErrorState({
           <p className='text-app text-secondary-token'>{message}</p>
           {onRetry ? (
             <Button variant='ghost' size='sm' onClick={onRetry}>
-              Try again
+              Try Again
             </Button>
           ) : null}
         </ContentSurfaceCard>

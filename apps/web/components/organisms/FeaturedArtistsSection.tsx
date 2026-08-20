@@ -145,7 +145,7 @@ export const FeaturedCreatorsSection = memo(function FeaturedCreatorsSection({
 }: FeaturedCreatorsSectionProps) {
   return (
     <section
-      aria-label='Featured creators'
+      aria-label='Featured Creators'
       className={`relative py-6 md:py-10 max-w-full overflow-hidden ${className}`}
       data-testid='featured-creators'
     >

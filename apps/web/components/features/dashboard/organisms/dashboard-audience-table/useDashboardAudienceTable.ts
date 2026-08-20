@@ -141,7 +141,7 @@ export function useDashboardAudienceTable({
   const bulkActions: BulkAction[] = React.useMemo(
     () => [
       {
-        label: 'Copy emails',
+        label: 'Copy Emails',
         onClick: () => {
           copySelectedEmails().catch(error => {
             console.error('[AudienceTable] Failed to copy emails:', error);
@@ -150,7 +150,7 @@ export function useDashboardAudienceTable({
         disabled: selectedCount === 0,
       },
       {
-        label: 'Copy phone numbers',
+        label: 'Copy Phone Numbers',
         onClick: () => {
           copySelectedPhones().catch(error => {
             console.error('[AudienceTable] Failed to copy phones:', error);
@@ -159,7 +159,7 @@ export function useDashboardAudienceTable({
         disabled: selectedCount === 0,
       },
       {
-        label: 'Clear selection',
+        label: 'Clear Selection',
         onClick: () => clearSelection(),
         disabled: selectedCount === 0,
       },

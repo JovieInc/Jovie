@@ -125,7 +125,7 @@ export function AdminTablePagination({
                   disabled={!canPrev}
                   onClick={onPrevClick}
                   className={paginationButtonClassName}
-                  aria-label='Previous page'
+                  aria-label='Previous Page'
                 >
                   <ChevronLeft
                     className='h-3.5 w-3.5 sm:hidden'
@@ -143,7 +143,7 @@ export function AdminTablePagination({
                   variant='ghost'
                   className={paginationButtonClassName}
                 >
-                  <Link href={prevHref} aria-label='Previous page'>
+                  <Link href={prevHref} aria-label='Previous Page'>
                     <ChevronLeft
                       className='h-3.5 w-3.5 sm:hidden'
                       aria-hidden='true'
@@ -159,7 +159,7 @@ export function AdminTablePagination({
                 variant='ghost'
                 disabled
                 className={paginationButtonClassName}
-                aria-label='Previous page'
+                aria-label='Previous Page'
               >
                 <ChevronLeft
                   className='h-3.5 w-3.5 sm:hidden'
@@ -179,7 +179,7 @@ export function AdminTablePagination({
                   disabled={!canNext}
                   onClick={onNextClick}
                   className={paginationButtonClassName}
-                  aria-label='Next page'
+                  aria-label='Next Page'
                 >
                   <ChevronRight
                     className='h-3.5 w-3.5 sm:hidden'
@@ -197,7 +197,7 @@ export function AdminTablePagination({
                   variant='ghost'
                   className={paginationButtonClassName}
                 >
-                  <Link href={nextHref} aria-label='Next page'>
+                  <Link href={nextHref} aria-label='Next Page'>
                     <ChevronRight
                       className='h-3.5 w-3.5 sm:hidden'
                       aria-hidden='true'
@@ -213,7 +213,7 @@ export function AdminTablePagination({
                 variant='ghost'
                 disabled
                 className={paginationButtonClassName}
-                aria-label='Next page'
+                aria-label='Next Page'
               >
                 <ChevronRight
                   className='h-3.5 w-3.5 sm:hidden'

@@ -121,7 +121,7 @@ export function CatalogTaskBuilderDialog({
 
   return (
     <Dialog open={open} onClose={onClose} size='2xl'>
-      <DialogTitle>Add from catalog</DialogTitle>
+      <DialogTitle>Add From Catalog</DialogTitle>
       <DialogDescription>
         Browse the canonical release-task catalog and add anything the wizard
         did not pick.
@@ -133,7 +133,7 @@ export function CatalogTaskBuilderDialog({
             value={query}
             onChange={e => startTransition(() => setQuery(e.target.value))}
             placeholder='Search tasks'
-            aria-label='Search tasks'
+            aria-label='Search Tasks'
             data-testid='catalog-search'
             className='w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm'
           />

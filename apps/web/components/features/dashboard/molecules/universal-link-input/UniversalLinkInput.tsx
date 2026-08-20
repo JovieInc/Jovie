@@ -594,7 +594,7 @@ export const UniversalLinkInput = forwardRef<
               id={autosuggestListId}
               className='sr-only'
               size={Math.max(Math.min(flatSuggestions.length, 8), 1)}
-              aria-label='Platform suggestions'
+              aria-label='Platform Suggestions'
               value={
                 activeSuggestionIndex >= 0 &&
                 flatSuggestions[activeSuggestionIndex]

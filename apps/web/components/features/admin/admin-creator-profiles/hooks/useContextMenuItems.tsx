@@ -68,7 +68,7 @@ export function useContextMenuItems({
         items.push(
           {
             id: 'refresh-ingest',
-            label: 'Refresh ingest',
+            label: 'Refresh Ingest',
             icon: <RefreshCw className='h-3.5 w-3.5' />,
             onClick: () => refreshIngest(profile.id),
             disabled: refreshIngestStatus === 'loading',
@@ -82,7 +82,7 @@ export function useContextMenuItems({
         profile.isVerified
           ? {
               id: 'unverify',
-              label: 'Unverify creator',
+              label: 'Unverify Creator',
               icon: <XCircle className='h-3.5 w-3.5' />,
               onClick: () => {
                 void (async () => {
@@ -97,7 +97,7 @@ export function useContextMenuItems({
             }
           : {
               id: 'verify',
-              label: 'Verify creator',
+              label: 'Verify Creator',
               icon: <CheckCircle className='h-3.5 w-3.5' />,
               onClick: () => {
                 void (async () => {
@@ -166,7 +166,7 @@ export function useContextMenuItems({
         },
         {
           id: 'view-profile',
-          label: 'View profile',
+          label: 'View Profile',
           icon: <ExternalLink className='h-3.5 w-3.5' />,
           onClick: () => {
             globalThis.open(`${BASE_URL}/${profile.username}`, '_blank');
@@ -179,7 +179,7 @@ export function useContextMenuItems({
         { type: 'separator' as const },
         {
           id: 'copy-email-signature',
-          label: 'Copy email signature',
+          label: 'Copy Email Signature',
           icon: <Copy className='h-3.5 w-3.5' />,
           onClick: () => {
             void (async () => {
@@ -215,7 +215,7 @@ export function useContextMenuItems({
       if (openEmailSignatureDialog) {
         items.push({
           id: 'preview-email-signature',
-          label: 'Email signature…',
+          label: 'Email Signature…',
           icon: <FileSignature className='h-3.5 w-3.5' />,
           onClick: () => {
             openEmailSignatureDialog(profile);
@@ -230,7 +230,7 @@ export function useContextMenuItems({
           { type: 'separator' as const },
           {
             id: 'copy-claim-link',
-            label: 'Copy claim link',
+            label: 'Copy Claim Link',
             icon: <Copy className='h-3.5 w-3.5' />,
             onClick: () => {
               void (async () => {
@@ -246,7 +246,7 @@ export function useContextMenuItems({
           },
           {
             id: 'send-invite',
-            label: 'Send invite',
+            label: 'Send Invite',
             icon: <Send className='h-3.5 w-3.5' />,
             onClick: () => {
               openInviteDialog(profile);

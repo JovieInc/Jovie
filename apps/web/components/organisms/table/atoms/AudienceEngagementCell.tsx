@@ -15,13 +15,13 @@ const INTENT_ICONS: Record<
   AudienceIntentLevel,
   { icon: typeof Flame; color: string; label: string }
 > = {
-  high: { icon: Flame, color: 'text-emerald-500', label: 'High intent' },
+  high: { icon: Flame, color: 'text-emerald-500', label: 'High Intent' },
   medium: {
     icon: TrendingUp,
     color: 'text-amber-400',
-    label: 'Medium intent',
+    label: 'Medium Intent',
   },
-  low: { icon: Minus, color: 'text-tertiary-token', label: 'Low intent' },
+  low: { icon: Minus, color: 'text-tertiary-token', label: 'Low Intent' },
 };
 
 export function AudienceEngagementCell({

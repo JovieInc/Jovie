@@ -21,27 +21,27 @@ export interface HomepagePill {
 export const PILLS: readonly HomepagePill[] = [
   {
     id: 'plan_a_release',
-    label: 'Plan a release',
+    label: 'Plan A Release',
     insertedPrompt: 'Plan a release for ',
   },
   {
     id: 'generate_album_art',
-    label: 'Generate album art',
+    label: 'Generate Album Art',
     insertedPrompt: 'Generate album art for ',
   },
   {
     id: 'pitch_playlists',
-    label: 'Generate pitch',
+    label: 'Generate Pitch',
     insertedPrompt: 'Generate a pitch for ',
   },
   {
     id: 'build_artist_profile',
-    label: 'Build artist profile',
+    label: 'Build Artist Profile',
     insertedPrompt: 'Build artist profile for ',
   },
   {
     id: 'analyze_momentum',
-    label: 'Analyze momentum',
+    label: 'Analyze Momentum',
     insertedPrompt: 'Analyze momentum for ',
   },
 ] as const;

@@ -115,7 +115,7 @@ function FanNotificationPreview({ moment }: { readonly moment: DemoMoment }) {
     >
       <div className='flex items-center justify-between'>
         <h3 className='text-xs font-semibold uppercase tracking-wide text-(--linear-text-secondary)'>
-          Fan notification
+          Fan Notification
         </h3>
         <span className='rounded-full bg-emerald-500/15 px-2 py-0.5 text-3xs font-semibold uppercase text-emerald-300'>
           {notif.channel}

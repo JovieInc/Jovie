@@ -45,7 +45,7 @@ function CellValue({
   }
 
   return (
-    <Minus aria-label='Not included' className='system-b-pricing-minus-icon' />
+    <Minus aria-label='Not Included' className='system-b-pricing-minus-icon' />
   );
 }
 
@@ -161,7 +161,7 @@ export function PricingComparisonChart() {
           type='button'
           role='switch'
           aria-checked={isAnnual}
-          aria-label='Toggle annual billing'
+          aria-label='Toggle Annual Billing'
           onClick={() => setIsAnnual(value => !value)}
           className='system-b-pricing-switch'
           data-state={isAnnual ? 'annual' : 'monthly'}
@@ -181,7 +181,7 @@ export function PricingComparisonChart() {
 
       <div className='system-b-pricing-mobile-selector'>
         <select
-          aria-label='Select plan to compare'
+          aria-label='Select Plan To Compare'
           value={selectedPlan}
           onChange={event => {
             const value = event.target.value;

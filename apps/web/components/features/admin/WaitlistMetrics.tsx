@@ -65,14 +65,14 @@ export function WaitlistMetrics({ metrics }: WaitlistMetricsProps) {
         bgClass='bg-secondary/10'
       />
       <MetricCard
-        label='Signed up'
+        label='Signed Up'
         value={metrics.signedUp}
         icon={CheckCircle2}
         colorClass='text-success-token'
         bgClass='bg-success/10'
       />
       <MetricCard
-        label='Email failures'
+        label='Email Failures'
         value={metrics.emailFailures}
         icon={AlertCircle}
         colorClass='text-destructive'

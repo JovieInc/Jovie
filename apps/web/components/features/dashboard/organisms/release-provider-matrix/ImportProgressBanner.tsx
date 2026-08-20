@@ -96,7 +96,7 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
           <Spinner
             size='sm'
             tone='muted'
-            label='Finding music across streaming platforms'
+            label='Finding Music Across Streaming Platforms'
           />
           <div className='flex min-w-0 flex-1 flex-col gap-1'>
             <span className='text-app text-primary-token'>

@@ -5,6 +5,7 @@ export function DifferentiationSection() {
     <section className='py-16 sm:py-20 lg:py-24 bg-surface-0'>
       <Container size='homepage'>
         <div className='max-w-3xl mx-auto text-center mb-12'>
+          {/* ui-casing-allow: marketing display headline */}
           <h2 className='text-3xl sm:text-4xl font-medium tracking-tight text-primary-token'>
             Not another link list
           </h2>
@@ -13,6 +14,7 @@ export function DifferentiationSection() {
         <div className='grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-16 max-w-4xl mx-auto'>
           {/* Left Column - Traditional link pages */}
           <div className='space-y-4'>
+            {/* ui-casing-allow: marketing display headline */}
             <h3 className='text-xl font-medium text-primary-token mb-6'>
               Traditional link pages
             </h3>

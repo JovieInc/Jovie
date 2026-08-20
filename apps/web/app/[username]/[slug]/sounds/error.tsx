@@ -28,7 +28,7 @@ export default function SoundsErrorBoundary({
           className='mx-auto h-10 w-10 text-muted-foreground'
           aria-hidden='true'
         />
-        <h1 className='mt-4 text-lg font-semibold'>Something went wrong</h1>
+        <h1 className='mt-4 text-lg font-semibold'>Something Went Wrong</h1>
         <p className='text-muted-foreground mt-2 text-sm'>
           We couldn&apos;t load this page. Please try again.
         </p>

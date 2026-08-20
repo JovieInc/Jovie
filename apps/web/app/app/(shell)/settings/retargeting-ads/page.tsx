@@ -162,25 +162,25 @@ const AD_VARIANTS: AdVariant[] = [
   {
     type: 'fan',
     size: 'feed',
-    label: 'Fan feed',
+    label: 'Fan Feed',
     dimensions: '1080 x 1080',
   },
   {
     type: 'fan',
     size: 'story',
-    label: 'Fan story',
+    label: 'Fan Story',
     dimensions: '1080 x 1920',
   },
   {
     type: 'claim',
     size: 'feed',
-    label: 'Claim feed',
+    label: 'Claim Feed',
     dimensions: '1080 x 1080',
   },
   {
     type: 'claim',
     size: 'story',
-    label: 'Claim story',
+    label: 'Claim Story',
     dimensions: '1080 x 1920',
   },
 ];
@@ -330,11 +330,11 @@ export default function RetargetingAdsPage() {
     <SettingsSection
       id='retargeting-ads'
       title='Retargeting ads'
-      description='Download ready-to-run creatives for Meta retargeting campaigns.'
+      description='Download ready-to-run creatives for Meta retargeting campaigns.' // ui-casing-allow: product names
     >
       <SettingsPanel
         title='Campaign kit'
-        description='Ready-to-run assets for Meta Ads Manager.'
+        description='Ready-to-run assets for Meta Ads Manager.' // ui-casing-allow: product names
         cardClassName='p-4'
       >
         <div className='grid grid-cols-1 gap-3 sm:grid-cols-3'>
@@ -351,7 +351,7 @@ export default function RetargetingAdsPage() {
           <SummaryCard
             value='Meta'
             label='Destination'
-            description='Upload these PNG assets directly to Ads Manager for Instagram and Facebook placements.'
+            description='Upload these PNG assets directly to Ads Manager for Instagram and Facebook placements.' // ui-casing-allow: product names
           />
         </div>
       </SettingsPanel>
@@ -372,7 +372,7 @@ export default function RetargetingAdsPage() {
 
       <SettingsPanel
         title='How to use these ads'
-        description='Upload the feed and story assets directly to Meta Ads Manager.'
+        description='Upload the feed and story assets directly to Meta Ads Manager.' // ui-casing-allow: product names
         cardClassName='p-5'
       >
         <ol className='list-decimal space-y-2 pl-5 text-app text-secondary-token'>
