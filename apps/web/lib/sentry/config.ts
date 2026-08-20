@@ -462,7 +462,7 @@ export function scrubPii(
   }
 
   // Filter captureWarning/captureError JSON bags kept on extra/logentry
-  // (JOV-5183, JOV-5186, JOV-5187, JOV-5209, JOV-5218, JOV-5228). Quota
+  // (JOV-5182, JOV-5183, JOV-5186, JOV-5187, JOV-5209, JOV-5218, JOV-5228). Quota
   // command failures (JOV-5184) are already dropped above.
   if (isNonActionableUpstashErrorBagEvent(event)) {
     return null;
