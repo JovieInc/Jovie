@@ -1982,6 +1982,48 @@ class FallbackTests(unittest.TestCase):
         self.assertTrue(any("JOV-5238" in unit for unit in units), units)
         self.assertEqual(used, 3)
 
+    def test_launch_keeps_remount_during_pre_push_window(self):
+        """Live JOV-5220 changelog remount was in pre-push at 15 min; recycle would kill it."""
+        module = self.load_controller_module()
+        self.assertGreater(module.STALE_REMOUNT_SECONDS, 20 * 60)
+        stopped: list[str] = []
+        pushing = "fallback-ship-JOV-5220-aaaaaaaaaaaa.service"
+
+        def verdict(identifier, _index):
+            if identifier == "JOV-5220":
+                return "remount", {"number": 16229, "head": "fallback/JOV-5220-fix"}
+            return "none", None
+
+        def control(command):
+            if len(command) >= 4 and command[0] == "systemctl" and command[2] == "stop":
+                stopped.append(command[-1])
+                return True
+            return True
+
+        with (
+            mock.patch.object(module, "_autonomous_open_pr_index", return_value={}),
+            mock.patch.object(module, "_open_pr_verdict", side_effect=verdict),
+            mock.patch.object(module, "_unit_age_seconds", return_value=20 * 60),
+            mock.patch.object(module, "_fetch_single_issue", return_value=self._admitted_issue()),
+            mock.patch.object(
+                module,
+                "_issue_meta",
+                return_value=(True, "admitted", {"issue_revision": "2026-08-19T18:46:00Z"}),
+            ),
+            mock.patch.object(module, "_control", side_effect=control),
+        ):
+            launched, used = module._launch_fallback_workers(
+                ["JOV-5220"],
+                [pushing],
+                "/bin/true",
+                "a" * 64,
+                {"selected": {"id": "grok"}},
+                4,
+            )
+        self.assertEqual(stopped, [])
+        self.assertEqual(launched, set())
+        self.assertEqual(used, 1)
+
     def test_unit_age_seconds_parses_wall_clock_when_usec_missing(self):
         """Gem user systemd has ExecMainStartTimestamp but not USec (live JOV-5220)."""
         module = self.load_controller_module()
