@@ -128,7 +128,16 @@ describe('composeHudForPresentation', () => {
     expect(walk).not.toContain('Cash {');
     expect(kpi).not.toContain("label: 'Cash'");
     expect(kpi).not.toContain('hud-kpi-cash');
+    expect(kpi).toContain('isSuccessfulHudObservation');
     expect(health).not.toContain("name: 'Shipper'");
     expect(shipper).not.toContain("data-testid='hud-what-shipped-panel'");
+  });
+
+  it('keeps the bottleneck band funnel-only in HudDashboardClient', () => {
+    const source = readFileSync(HUD_DASHBOARD_CLIENT, 'utf8');
+    expect(source).toContain('FounderFunnelBand');
+    expect(source).not.toContain('FounderConversionHud');
+    expect(source).not.toContain('founder-hud-mrr');
+    expect(source).not.toContain('founder-hud-shipping-velocity');
   });
 });

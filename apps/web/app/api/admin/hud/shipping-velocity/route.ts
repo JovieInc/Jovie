@@ -5,6 +5,7 @@ import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { medianNumber } from '@/lib/hud/number-series';
+import type { HudObservationState } from '@/lib/hud/observation';
 import { getRedis } from '@/lib/redis';
 import { logger } from '@/lib/utils/logger';
 
@@ -29,10 +30,17 @@ export interface DailyBucket {
   mergeP50Hours?: number | null;
 }
 
+export type ShippingVelocityObservation = Extract<
+  HudObservationState,
+  'fresh' | 'empty' | 'not_configured'
+>;
+
 export interface ShippingVelocityResponse {
   data: DailyBucket[];
   range: ValidRange;
   cachedAt: string; // ISO
+  observation: ShippingVelocityObservation;
+  errorMessage?: string | null;
 }
 
 interface GitHubPrNode {
@@ -260,13 +268,50 @@ async function authorizeAdmin(): Promise<Response | null> {
   return null;
 }
 
+function bucketsAreEmpty(data: readonly DailyBucket[]): boolean {
+  return (
+    data.length === 0 ||
+    data.every(
+      bucket =>
+        bucket.merged === 0 && bucket.opened === 0 && bucket.closed === 0
+    )
+  );
+}
+
+function observationFromBuckets(
+  data: readonly DailyBucket[]
+): Extract<HudObservationState, 'fresh' | 'empty'> {
+  return bucketsAreEmpty(data) ? 'empty' : 'fresh';
+}
+
+function normalizeVelocityResponse(
+  result: ShippingVelocityResponse
+): ShippingVelocityResponse {
+  if (result.observation === 'not_configured') {
+    return {
+      ...result,
+      data: [],
+      observation: 'not_configured',
+      errorMessage:
+        result.errorMessage ??
+        'GitHub is not configured for shipping velocity.',
+    };
+  }
+  return {
+    ...result,
+    observation: observationFromBuckets(result.data),
+    errorMessage: result.errorMessage ?? null,
+  };
+}
+
 async function readCachedVelocity(
   redis: ReturnType<typeof getRedis>,
   cacheKey: string
 ): Promise<ShippingVelocityResponse | null> {
   if (!redis) return null;
   try {
-    return (await redis.get<ShippingVelocityResponse>(cacheKey)) ?? null;
+    const cached = await redis.get<ShippingVelocityResponse>(cacheKey);
+    return cached ? normalizeVelocityResponse(cached) : null;
   } catch (redisError) {
     logger.error('[hud/shipping-velocity] Redis get failed', redisError);
     return null;
@@ -286,14 +331,15 @@ async function cacheVelocity(
   }
 }
 
-function emptyVelocityResponse(
-  days: number,
+function notConfiguredVelocityResponse(
   range: ValidRange
 ): ShippingVelocityResponse {
   return {
-    data: Array.from(buildEmptyBuckets(days).values()),
+    data: [],
     range,
     cachedAt: new Date().toISOString(),
+    observation: 'not_configured',
+    errorMessage: 'GitHub is not configured for shipping velocity.',
   };
 }
 
@@ -306,7 +352,7 @@ export async function GET(request: Request): Promise<Response> {
     const days = RANGE_DAYS[range] ?? 7;
 
     const redis = getRedis();
-    const cacheKey = `hud:shipping-velocity:${range}`;
+    const cacheKey = `hud:shipping-velocity:v2:${range}`;
     const cached = await readCachedVelocity(redis, cacheKey);
     if (cached) {
       return NextResponse.json(cached, {
@@ -320,8 +366,7 @@ export async function GET(request: Request): Promise<Response> {
     const repo = env.HUD_GITHUB_REPO;
 
     if (!token || !owner || !repo) {
-      const emptyResponse = emptyVelocityResponse(days, range);
-      return NextResponse.json(emptyResponse, {
+      return NextResponse.json(notConfiguredVelocityResponse(range), {
         status: 200,
         headers: NO_STORE_HEADERS,
       });
@@ -344,6 +389,7 @@ export async function GET(request: Request): Promise<Response> {
       data: buckets,
       range,
       cachedAt: new Date().toISOString(),
+      observation: observationFromBuckets(buckets),
     };
 
     await cacheVelocity(redis, cacheKey, result);
