@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Billing health warnings no longer file as `Error: Billing health check warning` (JOV-5242):** warning-level `/api/billing/health` results stay in the JSON monitors already poll. Sentry still captures thrown failures and critical status.
+
 - [internal] **Agent QC wires no longer advertise dead gates (JOV-5235):** Scope Judge is retired, Slop Gate stays post-merge informational, auto-approve ignores self-attested GStack comments, needs-human autoclose notifies Slack/Linear first, and the agent-pipeline branch check uses the shared allowlist.
 
 - [internal] **Opaque `UpstashError` JSON bags no longer file at error severity (JOV-5229):** `captureError` drops `Error: {"error":{"name":"UpstashError"}}` at every severity, and Sentry `beforeSend` drops title-only events of that bag. Real quota command failures still report.
