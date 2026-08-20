@@ -8,6 +8,10 @@ import {
   PR_SIZE_GUARD_CHECK_NAME,
   SIZE_GUARD_OPT_OUT_LABELS,
 } from '../pr-size-guard-label-override.mjs';
+import {
+  evaluateSizeGuardLabelProvenance,
+  TRUSTED_SIZE_GUARD_LABEL_BOTS,
+} from '../pr-size-guard-label-provenance.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const SIZE_GUARD_WORKFLOW = resolve(
@@ -173,15 +177,85 @@ describe('pr-size-guard workflow invariants (JOV-3580 + label override)', () => 
     expect(jobHeader).not.toMatch(/^\s+if:/m);
     expect(
       privilegedSteps.match(/github\.event\.label\.name == 'big-pr'/g)
-    ).toHaveLength(2);
+    ).toHaveLength(3);
     expect(
       privilegedSteps.match(/github\.event\.label\.name == 'codemod'/g)
-    ).toHaveLength(2);
+    ).toHaveLength(3);
     expect(
       privilegedSteps.match(
         /github\.event\.label\.name == 'integration-train'/g
       )
-    ).toHaveLength(4);
-    expect(privilegedSteps.match(/^\s+if:/gm)).toHaveLength(3);
+    ).toHaveLength(5);
+    expect(privilegedSteps.match(/^\s+if:/gm)).toHaveLength(4);
+  });
+
+  it('requires trusted sender provenance before posting the override', () => {
+    const workflow = readFileSync(OVERRIDE_WORKFLOW, 'utf8');
+
+    expect(workflow).toContain('id: provenance');
+    expect(workflow).toContain(
+      'node scripts/lib/pr-size-guard-label-provenance.mjs'
+    );
+    expect(workflow).toContain('ACTOR: ${{ github.event.sender.login }}');
+    expect(workflow).toContain("steps.provenance.outputs.allowed == 'true'");
+    expect(workflow.indexOf('id: provenance')).toBeLessThan(
+      workflow.indexOf('node scripts/lib/pr-size-guard-policy.mjs')
+    );
+    expect(workflow.indexOf('id: provenance')).toBeLessThan(
+      workflow.indexOf('node scripts/pr-size-guard-label-override.mjs')
+    );
+  });
+});
+
+describe('pr-size-guard label provenance', () => {
+  it('allowlists only the mechanical bot actors that apply real codemod labels', () => {
+    expect(TRUSTED_SIZE_GUARD_LABEL_BOTS).toEqual([
+      'jovie-bot[bot]',
+      'claude[bot]',
+    ]);
+  });
+
+  it('honors trusted bots and write-capable collaborators', () => {
+    expect(
+      evaluateSizeGuardLabelProvenance({ actor: 'jovie-bot[bot]' })
+    ).toEqual({ allowed: true, reason: 'trusted-bot' });
+    expect(evaluateSizeGuardLabelProvenance({ actor: 'Claude[bot]' })).toEqual({
+      allowed: true,
+      reason: 'trusted-bot',
+    });
+    expect(
+      evaluateSizeGuardLabelProvenance({
+        actor: 'timwhite',
+        permission: 'write',
+      })
+    ).toEqual({ allowed: true, reason: 'trusted-collaborator' });
+    expect(
+      evaluateSizeGuardLabelProvenance({
+        actor: 'timwhite',
+        permission: 'admin',
+      })
+    ).toEqual({ allowed: true, reason: 'trusted-collaborator' });
+  });
+
+  it('refuses missing actors, triage-only humans, and unknown bots', () => {
+    expect(evaluateSizeGuardLabelProvenance({ actor: '' })).toEqual({
+      allowed: false,
+      reason: 'missing-actor',
+    });
+    expect(
+      evaluateSizeGuardLabelProvenance({
+        actor: 'random-user',
+        permission: 'triage',
+      })
+    ).toEqual({ allowed: false, reason: 'untrusted-actor' });
+    expect(
+      evaluateSizeGuardLabelProvenance({ actor: 'dependabot[bot]' })
+    ).toEqual({ allowed: false, reason: 'untrusted-actor' });
+    expect(
+      evaluateSizeGuardLabelProvenance({ actor: 'coderabbitai[bot]' })
+    ).toEqual({ allowed: false, reason: 'untrusted-actor' });
+    expect(
+      evaluateSizeGuardLabelProvenance({ actor: 'github-actions[bot]' })
+    ).toEqual({ allowed: false, reason: 'untrusted-actor' });
   });
 });

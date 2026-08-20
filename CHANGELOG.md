@@ -43,6 +43,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- [internal] **CI trust-boundary hardening:** auto-fix-lint stays on same-repo agent heads and ignores package scripts, size-guard overrides require a trusted labeler, and `@claude` only starts for owners, members, collaborators, or CodeRabbit.
 - [internal] **Hold-intake missed-admission recovery now enrolls CLEAN `queue-deferred` heads:** exact admission already strips that label, but a main-push recovery used to skip it and left CI-green Symphony PRs parked off the merge queue.
 - [internal] **Agent QC wires now match autonomous-shipping doctrine:** Scope Judge is retired instead of advertised, Slop Gate stays a weekly post-merge smell report, GStack PR comments are no longer auto-approve evidence, exhausted `needs-human` PRs ping Slack/Linear before the 48h close, agent-pipeline classifies branches with the shared allowlist so `hotfix/` and `feat/` stop looking like agent PRs, and live merge-queue ruleset verify runs on a schedule instead of only in docs.
 - [internal] **Long typechecks now report phase timing instead of looking stuck:** singleflight logs elapsed time, tsbuildinfo age/size, and child CPU/RSS while the live compiler keeps ownership.

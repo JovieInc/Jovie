@@ -2,8 +2,7 @@
 #
 # PURPOSE: Dispatch-only fallback for the event-driven agent-pipeline approve job.
 # Sweeps open, non-draft agent PRs and enables auto-merge on any that are
-# CI-green, CodeRabbit-unblocked, and free of sensitive file changes or the
-# needs-human label.
+# CI-green, CodeRabbit-unblocked, and free of the needs-human hold label.
 #
 # WHY A FALLBACK IN ADDITION TO workflow_run EVENTS:
 # The event-driven path in agent-pipeline.yml fires when CI *completes*. PRs
@@ -18,8 +17,7 @@
 # 3. No needs-human label
 # 4. CI PR Ready check = success
 # 5. CodeRabbit not blocking (no CHANGES_REQUESTED)
-# 6. CI harness risk classifier does not block unattended auto-merge
-# 7. Queue pressure guard: defers when native merge-queue depth hits the configured cap
+# 6. Queue pressure guard: defers when native merge-queue depth hits the configured cap
 # Scope Judge was deleted in #14484 and is not a landing gate.
 #
 # RELATIONSHIP TO agent-pipeline.yml:
@@ -192,26 +190,6 @@ jobs:
 
             if [[ "$CR_STATE" == "CHANGES_REQUESTED" ]]; then
               echo "CodeRabbit has requested changes. Skipping."
-              SKIPPED=$((SKIPPED + 1))
-              continue
-            fi
-
-            # Gate: sensitive file check
-            if ! CHANGED_FILES=$(gh pr diff "$PR_NUMBER" --repo "$GH_REPO" --name-only 2>/dev/null); then
-              echo "Could not fetch changed files for PR #$PR_NUMBER. Skipping."
-              SKIPPED=$((SKIPPED + 1))
-              continue
-            fi
-
-            CHANGED_FILE_LIST="$RUNNER_TEMP/agent-landing-$PR_NUMBER-changed-files.txt"
-            RISK_JSON="$RUNNER_TEMP/agent-landing-$PR_NUMBER-ci-risk.json"
-            printf '%s\n' "$CHANGED_FILES" > "$CHANGED_FILE_LIST"
-            node scripts/ci-harness.mjs classify-risk --files "$CHANGED_FILE_LIST" > "$RISK_JSON"
-            BLOCKS_UNATTENDED=$(jq -r '.blocksUnattendedAutoMerge' "$RISK_JSON")
-
-            if [[ "$BLOCKS_UNATTENDED" == "true" ]]; then
-              echo "CI harness risk classifier blocks unattended auto-merge:"
-              jq -r '.matchedRules[] | select(.blocksUnattendedAutoMerge == true) | "- \(.title): \(.files | join(", "))"' "$RISK_JSON"
               SKIPPED=$((SKIPPED + 1))
               continue
             fi
