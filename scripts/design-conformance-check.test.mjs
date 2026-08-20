@@ -146,7 +146,7 @@ test('ordinary iOS UI changes select the design gate without Ubuntu operations',
   assert.ok(LANE_GROUPS.remaining.includes('design-conformance'));
   assert.equal(
     LANE_COMMANDS['design-conformance'],
-    'pnpm design:conformance:gate && pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit'
+    'pnpm design:conformance:gate'
   );
   assert.doesNotMatch(
     LANE_COMMANDS['design-conformance'],

@@ -1,9 +1,8 @@
 name: Design Governance
 
 # Standing design-governance audit (docs/design-system/GOVERNANCE.md).
-# Source PRs already run this check inside ci-fast (design-conformance lane).
-# This workflow is the weekly safety net + on-demand dispatch — it is not a
-# required merge-gate and must not grow into a heavy PR lane.
+# Weekly + workflow_dispatch only. Not a ci-fast / PR Ready merge gate.
+# Informational / standing-issue only — must not grow into a heavy PR lane.
 
 on:
   schedule:

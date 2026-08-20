@@ -7,7 +7,8 @@
  *   2. .claude/skills/gstack is a symlink to the vendored fork.
  *   3. design.tokens.json freshness vs design-system.css (export --check).
  *   4. DESIGN.md Noir Ion sidebar rgb agrees with linear-tokens.css.
- *   5. Enforcement commands exist in package.json and ci-fast-lanes.mjs.
+ *   5. Enforcement commands exist in package.json. Absence from
+ *      ci-fast-lanes.mjs is WARN-only (weekly + local; not a merge gate).
  *   6. code-style.md custom-rule count matches eslint.config.js.
  *   7. DESIGN_COMPLETE.md carries a superseded banner.
  *
@@ -323,8 +324,8 @@ export function runDesignGovernanceAudit(repoRoot = DEFAULT_REPO_ROOT) {
     if (missing.length > 0) {
       report(
         'enforcement-wiring',
-        'FAIL',
-        `${CI_FAST_LANES_PATH} does not run: ${missing.join(', ')}`
+        'WARN',
+        `${CI_FAST_LANES_PATH} does not run: ${missing.join(', ')} (weekly + local ratchet; not a ci-fast merge gate)`
       );
     } else {
       report(
