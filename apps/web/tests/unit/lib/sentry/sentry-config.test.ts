@@ -533,6 +533,33 @@ describe('getBaseClientConfig', () => {
     ).toBe(true);
   });
 
+  it('drops a client object-capture whose originalException is the JOV-5186 bag', () => {
+    const config = getBaseClientConfig();
+    const inner = new Error(
+      'Command failed: ERR max requests limit exceeded. Limit: 500000'
+    );
+    inner.name = 'UpstashError';
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value: 'Non-Error exception captured with keys: error',
+          },
+        ],
+      },
+    };
+
+    expect(
+      config.beforeSend(
+        event as never,
+        {
+          originalException: { error: inner },
+        } as never
+      )
+    ).toBeNull();
+  });
+
   it('tags events with the exact public production release when provided', async () => {
     const release = 'a'.repeat(40);
     vi.stubEnv('NEXT_PUBLIC_SENTRY_RELEASE', release);

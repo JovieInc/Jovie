@@ -6,8 +6,8 @@
  * It is not an application defect and should not trigger autofix or performance alerts.
  *
  * Opaque `{"error":{"name":"UpstashError"}}` titles are the JSON-stringified
- * form of an UpstashError whose `message` is non-enumerable (JOV-5209,
- * JOV-5218, JOV-5220, JOV-5221, JOV-5228, JOV-5229). The standing Redis
+ * form of an UpstashError whose `message` is non-enumerable (JOV-5186,
+ * JOV-5209, JOV-5218, JOV-5220, JOV-5221, JOV-5228, JOV-5229). The standing Redis
  * operability canary already pages on quota exhaustion.
  */
 
@@ -74,7 +74,7 @@ function isUpstashErrorJsonBagText(value: string | null | undefined): boolean {
 
 /**
  * True when a captured value would Sentry-title as
- * `Error: {"error":{"name":"UpstashError"}}` (JOV-5209 / JOV-5218 / JOV-5228).
+ * `Error: {"error":{"name":"UpstashError"}}` (JOV-5186 / JOV-5209 / JOV-5218 / JOV-5228).
  * Error instances are matched on `message` so a real
  * `UpstashError: ERR max requests…` exception stays visible.
  * Next.js request wrappers keep the bag on `cause`; walk a bounded chain.

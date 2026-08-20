@@ -98,7 +98,7 @@ describe('POST /api/webhooks/sentry', () => {
     );
   });
 
-  it('skips autofix for the JOV-5218 UpstashError JSON bag', async () => {
+  it('skips autofix for the JOV-5186 / JOV-5218 UpstashError JSON bag', async () => {
     mockAcquireRecentDispatch.mockResolvedValue({
       acquired: true,
       reason: 'acquired',

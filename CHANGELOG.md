@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Opaque `Error: {"error":{"name":"UpstashError"}}` bags no longer file from the client SDK (JOV-5186):** client `beforeSend` uses the same `hint.originalException` drop as server, so object-captures whose event value is `Non-Error exception captured with keys: error` never become Linear issues. Real quota command failures still report.
+
 - [internal] **Opaque `Error: {"error":{"name":"UpstashError"}}` bags no longer file from wrapped request errors (JOV-5209):** `beforeSend` drops `hint.originalException` bags and `onRequestError` walks `Error.cause`. Real quota command failures still report.
 
 - [internal] **Thrown `{ error: UpstashError }` request errors no longer file as `Error: {"error":{"name":"UpstashError"}}` (JOV-5218):** `onRequestError` skips the JSON-stringified object bag, not only an already-stringified Error message. Real quota command failures still report.

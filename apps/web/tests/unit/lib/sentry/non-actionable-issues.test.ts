@@ -52,6 +52,14 @@ describe('non-actionable Sentry issues', () => {
   });
 
   describe('isNonActionableUpstashErrorBag', () => {
+    it('matches the JOV-5186 Linear/Sentry title', () => {
+      expect(
+        isNonActionableUpstashErrorBag({
+          title: `Error: ${UPSTASH_ERROR_JSON_BAG}`,
+        })
+      ).toBe(true);
+    });
+
     it('matches the JOV-5209 Linear/Sentry title', () => {
       expect(
         isNonActionableUpstashErrorBag({
