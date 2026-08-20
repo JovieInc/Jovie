@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Summer dump-ack is the first promoted Eve/Vercel workflow (JOV-5217):** inventory rejects discretionary Summer candidates, Eve cannot mutate the frozen contract, executions carry stable work/workflow/version ids plus a redacted Summer receipt, and disablement keeps durable intake and Summer authority.
+
 - [internal] **Billing health warnings no longer file as `Error: Billing health check warning` (JOV-5242):** warning-level `/api/billing/health` results stay in the JSON monitors already poll. Sentry still captures thrown failures and critical status.
 
 - [internal] **Agent QC wires no longer advertise dead gates (JOV-5235):** Scope Judge is retired, Slop Gate stays post-merge informational, auto-approve ignores self-attested GStack comments, needs-human autoclose notifies Slack/Linear first, and the agent-pipeline branch check uses the shared allowlist.
