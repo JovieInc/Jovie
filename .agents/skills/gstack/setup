@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gstack setup — build browser binary + register skills with Claude Code / Codex
+# gstack setup — register skills with Claude Code / Codex. Browse daemon is removed.
 set -e
 
 if ! command -v bun >/dev/null 2>&1; then
@@ -166,35 +166,9 @@ ensure_playwright_browser() {
   fi
 }
 
-# 1. Build browse binary if needed (smart rebuild: stale sources, package.json, lock)
+# 1. Browse daemon removed. Agent web is Playwright (`pnpm exec playwright`).
 NEEDS_BUILD=0
-if [ ! -x "$BROWSE_BIN" ]; then
-  NEEDS_BUILD=1
-elif [ -n "$(find "$SOURCE_GSTACK_DIR/browse/src" -type f -newer "$BROWSE_BIN" -print -quit 2>/dev/null)" ]; then
-  NEEDS_BUILD=1
-elif [ "$SOURCE_GSTACK_DIR/package.json" -nt "$BROWSE_BIN" ]; then
-  NEEDS_BUILD=1
-elif [ -f "$SOURCE_GSTACK_DIR/bun.lock" ] && [ "$SOURCE_GSTACK_DIR/bun.lock" -nt "$BROWSE_BIN" ]; then
-  NEEDS_BUILD=1
-fi
-
-if [ "$NEEDS_BUILD" -eq 1 ]; then
-  echo "Building browse binary..."
-  (
-    cd "$SOURCE_GSTACK_DIR"
-    bun install
-    bun run build
-  )
-  # Safety net: write .version if build script didn't (e.g., git not available during build)
-  if [ ! -f "$SOURCE_GSTACK_DIR/browse/dist/.version" ]; then
-    git -C "$SOURCE_GSTACK_DIR" rev-parse HEAD > "$SOURCE_GSTACK_DIR/browse/dist/.version" 2>/dev/null || true
-  fi
-fi
-
-if [ ! -x "$BROWSE_BIN" ]; then
-  echo "gstack setup failed: browse binary missing at $BROWSE_BIN" >&2
-  exit 1
-fi
+echo "Skipping gstack browse binary (removed)."
 
 # 1b. Generate .agents/ Codex skill docs — always regenerate to prevent stale descriptions.
 # .agents/ is no longer committed — generated at setup time from .tmpl templates.
@@ -580,10 +554,10 @@ if [ "$INSTALL_CLAUDE" -eq 1 ]; then
     else
       echo "gstack ready (claude)."
     fi
-    echo "  browse: $BROWSE_BIN"
+    echo "  web: pnpm exec playwright"
   else
     echo "gstack ready (claude)."
-    echo "  browse: $BROWSE_BIN"
+    echo "  web: pnpm exec playwright"
     echo "  (skipped skill symlinks — not inside .claude/skills/)"
   fi
 fi
@@ -605,7 +579,7 @@ if [ "$INSTALL_CODEX" -eq 1 ]; then
   link_codex_skill_dirs "$SOURCE_GSTACK_DIR" "$CODEX_SKILLS"
 
   echo "gstack ready (codex)."
-  echo "  browse: $BROWSE_BIN"
+  echo "  web: pnpm exec playwright"
   echo "  codex skills: $CODEX_SKILLS"
 fi
 
@@ -621,8 +595,12 @@ if [ "$INSTALL_KIRO" -eq 1 ]; then
   [ -L "$KIRO_GSTACK" ] && rm -f "$KIRO_GSTACK"
   mkdir -p "$KIRO_GSTACK" "$KIRO_GSTACK/browse" "$KIRO_GSTACK/gstack-upgrade" "$KIRO_GSTACK/review"
   ln -snf "$SOURCE_GSTACK_DIR/bin" "$KIRO_GSTACK/bin"
-  ln -snf "$SOURCE_GSTACK_DIR/browse/dist" "$KIRO_GSTACK/browse/dist"
-  ln -snf "$SOURCE_GSTACK_DIR/browse/bin" "$KIRO_GSTACK/browse/bin"
+  if [ -d "$SOURCE_GSTACK_DIR/browse/dist" ]; then
+    ln -snf "$SOURCE_GSTACK_DIR/browse/dist" "$KIRO_GSTACK/browse/dist"
+  fi
+  if [ -d "$SOURCE_GSTACK_DIR/browse/bin" ]; then
+    ln -snf "$SOURCE_GSTACK_DIR/browse/bin" "$KIRO_GSTACK/browse/bin"
+  fi
   # ETHOS.md — referenced by "Search Before Building" in all skill preambles
   if [ -f "$SOURCE_GSTACK_DIR/ETHOS.md" ]; then
     ln -snf "$SOURCE_GSTACK_DIR/ETHOS.md" "$KIRO_GSTACK/ETHOS.md"
@@ -660,7 +638,7 @@ if [ "$INSTALL_KIRO" -eq 1 ]; then
           "$skill_dir/SKILL.md" > "$target_dir/SKILL.md"
     done
     echo "gstack ready (kiro)."
-    echo "  browse: $BROWSE_BIN"
+    echo "  web: pnpm exec playwright"
     echo "  kiro skills: $KIRO_SKILLS"
   fi
 fi
@@ -671,7 +649,7 @@ if [ "$INSTALL_FACTORY" -eq 1 ]; then
   create_factory_runtime_root "$SOURCE_GSTACK_DIR" "$FACTORY_GSTACK"
   link_factory_skill_dirs "$SOURCE_GSTACK_DIR" "$FACTORY_SKILLS"
   echo "gstack ready (factory)."
-  echo "  browse: $BROWSE_BIN"
+  echo "  web: pnpm exec playwright"
   echo "  factory skills: $FACTORY_SKILLS"
 fi
 

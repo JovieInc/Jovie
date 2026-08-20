@@ -9,7 +9,6 @@ Nested `.bak` / `.cursor` / `.factory` / `src` / `test` / `bin` copies are not c
 - **autoplan**: .claude/skills/autoplan/SKILL.md | .agents/skills/gstack/autoplan/SKILL.md
 - **benchmark**: .agents/skills/gstack/benchmark/SKILL.md
 - **brand-deals**: .claude/skills/brand-deals/SKILL.md | .agents/skills/brand-deals/SKILL.md
-- **browse**: .agents/skills/gstack/browse/SKILL.md
 - **canary**: .agents/skills/gstack/canary/SKILL.md
 - **careful**: .agents/skills/gstack/careful/SKILL.md
 - **clerk-cli**: .claude/skills/clerk-cli/SKILL.md
@@ -42,12 +41,11 @@ Nested `.bak` / `.cursor` / `.factory` / `src` / `test` / `bin` copies are not c
 - **plan-ceo-review**: .agents/skills/gstack/plan-ceo-review/SKILL.md
 - **plan-design-review**: .agents/skills/gstack/plan-design-review/SKILL.md
 - **plan-eng-review**: .agents/skills/gstack/plan-eng-review/SKILL.md
-- **qa**: .agents/skills/gstack/qa/SKILL.md
+- **qa**: .claude/skills/qa/SKILL.md | .agents/skills/gstack/qa/SKILL.md
 - **qa-only**: .agents/skills/gstack/qa-only/SKILL.md
 - **qa-swarm**: .claude/skills/qa-swarm/SKILL.md
 - **retro**: .agents/skills/gstack/retro/SKILL.md
 - **review**: .agents/skills/gstack/review/SKILL.md
-- **setup-browser-cookies**: .agents/skills/gstack/setup-browser-cookies/SKILL.md
 - **setup-deploy**: .agents/skills/gstack/setup-deploy/SKILL.md
 - **setup-gbrain**: .claude/skills/setup-gbrain/SKILL.md
 - **ship**: .agents/skills/gstack/ship/SKILL.md

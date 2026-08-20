@@ -6,7 +6,7 @@ description: gstack workflow skills available in this repo
 
 This repo vendors [gstack](https://github.com/garrytan/gstack) at `.agents/skills/gstack/`. `.claude/skills/gstack` is a symlink overlay, not a git submodule.
 
-**Web browsing:** Default to Playwright MCP or `pnpm exec playwright`. `/browse` is optional. Never use `mcp__claude-in-chrome__*` tools.
+**Web browsing:** Playwright only (`pnpm exec playwright` or Playwright MCP). `/browse` is removed. Never use `mcp__claude-in-chrome__*` tools.
 
 ## Available Skills
 
@@ -16,10 +16,8 @@ This repo vendors [gstack](https://github.com/garrytan/gstack) at `.agents/skill
 | `/review` | Pre-landing PR review analyzing diffs for SQL safety, trust boundary violations, side effects |
 | `/plan-ceo-review` | Founder/CEO mode: rethink problems from first principles, find the 10-star product |
 | `/plan-eng-review` | Engineering manager mode: lock in execution plans with architecture and edge cases |
-| `/browse` | Fast headless browser (~100ms/cmd) for QA testing and site verification |
-| `/qa` | Systematic QA testing with diff-aware, full, quick, and regression modes |
+| `/qa` | Playwright QA against `apps/web/tests/e2e` |
 | `/retro` | Weekly engineering retrospective analyzing commit history and code quality |
-| `/setup-browser-cookies` | Import authenticated browser sessions for testing |
 | `/gstack-upgrade` | Upgrade gstack to latest version |
 
 ## When gstack conflicts with other commands
