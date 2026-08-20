@@ -127,7 +127,7 @@ vi.mock('@/features/dashboard/atoms/DrawerToggleButton', () => ({
   DrawerToggleButton: () => null,
 }));
 
-vi.mock('@/components/atoms/UpdateAvailablePill', () => ({
+vi.mock('@/components/molecules/UpdateAvailablePill', () => ({
   UpdateAvailablePill: () => null,
 }));
 

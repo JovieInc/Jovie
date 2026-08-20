@@ -85,7 +85,7 @@ vi.mock('@/components/atoms/TruncatedText', () => ({
   ),
 }));
 
-vi.mock('@/components/atoms/SeekBar', () => ({
+vi.mock('@/components/molecules/SeekBar', () => ({
   SeekBar: (props: { disabled?: boolean }) => (
     <input type='range' data-testid='seek-bar' disabled={props.disabled} />
   ),

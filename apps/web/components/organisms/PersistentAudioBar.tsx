@@ -5,7 +5,7 @@ import { AudioLines, Pause, Play, X } from 'lucide-react';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { SeekBar } from '@/components/atoms/SeekBar';
+import { SeekBar } from '@/components/molecules/SeekBar';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { toast } from '@/components/feedback';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';

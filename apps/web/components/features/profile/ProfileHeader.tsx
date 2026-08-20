@@ -1,4 +1,4 @@
-import { ArtistInfo } from '@/components/molecules/ArtistInfo';
+import { ArtistInfo } from '@/components/organisms/ArtistInfo';
 import { Artist } from '@/types/db';
 
 interface ProfileHeaderProps {

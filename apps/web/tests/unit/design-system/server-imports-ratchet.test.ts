@@ -56,7 +56,7 @@ const SERVER_ONLY_PATH_PATTERNS: RegExp[] = [
   /^@\/lib\/auth\/gate$/,
   /^@\/lib\/env-server/,
   /^@\/lib\/stripe\/client$/,
-  /^@\/lib\/admin\/(?!types$|csv-configs\/)/, // @/lib/admin/* (except types.ts and csv-configs/)
+  /^@\/lib\/admin\/(?!types$|csv-configs\/|format$)/, // @/lib/admin/* (except types, csv-configs, format)
   /\.server$/, // *.server.ts files
 ];
 

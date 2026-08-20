@@ -1,7 +1,6 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
 import { ArtworkFallbackTile } from '@/components/atoms/ArtworkFallbackTile';
 import { ArtworkFrame } from '@/components/atoms/ArtworkFrame';
 import { cn } from '@/lib/utils';
@@ -30,11 +29,13 @@ export function ReleaseArtworkThumb({
   className,
   fallbackIconClass = 'h-5 w-5',
 }: ReleaseArtworkThumbProps) {
-  const [imgError, setImgError] = useState(false);
-
-  useEffect(() => {
-    setImgError(false);
-  }, [src]);
+  const fallback = (
+    <ArtworkFallbackTile
+      seed={alt}
+      label={alt}
+      iconClassName={fallbackIconClass}
+    />
+  );
 
   return (
     <ArtworkFrame
@@ -42,21 +43,29 @@ export function ReleaseArtworkThumb({
       className={cn('bg-surface-2', className)}
       style={{ width: size, height: size }}
     >
-      {src && !imgError ? (
-        <Image
-          src={src}
-          alt={alt}
-          fill
-          className='object-cover'
-          sizes={`${size}px`}
-          onError={() => setImgError(true)}
-        />
+      {src ? (
+        <>
+          <Image
+            key={src}
+            src={src}
+            alt={alt}
+            fill
+            className='object-cover'
+            sizes={`${size}px`}
+            onError={event => {
+              event.currentTarget.style.display = 'none';
+              const sibling = event.currentTarget.nextElementSibling;
+              if (sibling instanceof HTMLElement) {
+                sibling.hidden = false;
+              }
+            }}
+          />
+          <div className='absolute inset-0' hidden>
+            {fallback}
+          </div>
+        </>
       ) : (
-        <ArtworkFallbackTile
-          seed={alt}
-          label={alt}
-          iconClassName={fallbackIconClass}
-        />
+        fallback
       )}
     </ArtworkFrame>
   );

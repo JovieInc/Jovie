@@ -127,12 +127,12 @@ async function main(): Promise<void> {
   printSection(
     'Fully-loaded $/min (USD)',
     [
-      `${costs.xai.label}: $${costs.xai.fullyLoadedPerMin.toFixed(3)}/min`,
-      `  voice $${costs.xai.voiceAgentPerMin} + telephony $${costs.xai.telephonyPerMin}`,
-      `${costs.elevenLabsTwilio.label}: $${costs.elevenLabsTwilio.fullyLoadedPerMin.toFixed(3)}/min`,
-      `  agent $${costs.elevenLabsTwilio.voiceAgentPerMin} + telephony $${costs.elevenLabsTwilio.telephonyPerMin.toFixed(4)} + LLM est $${costs.elevenLabsTwilio.llmPassThroughPerMin}`,
-      `${costs.elevenLabsVapi.label}: $${costs.elevenLabsVapi.fullyLoadedPerMin.toFixed(3)}/min`,
-      `xAI savings vs ElevenLabs+Twilio: $${costs.savingsVsElevenLabsTwilio.toFixed(3)}/min (~${Math.round((costs.savingsVsElevenLabsTwilio / costs.elevenLabsTwilio.fullyLoadedPerMin) * 100)}%)`,
+      `${costs.xai.label}: USD ${costs.xai.fullyLoadedPerMin.toFixed(3)}/min`,
+      `  voice USD ${costs.xai.voiceAgentPerMin} + telephony USD ${costs.xai.telephonyPerMin}`,
+      `${costs.elevenLabsTwilio.label}: USD ${costs.elevenLabsTwilio.fullyLoadedPerMin.toFixed(3)}/min`,
+      `  agent USD ${costs.elevenLabsTwilio.voiceAgentPerMin} + telephony USD ${costs.elevenLabsTwilio.telephonyPerMin.toFixed(4)} + LLM est USD ${costs.elevenLabsTwilio.llmPassThroughPerMin}`,
+      `${costs.elevenLabsVapi.label}: USD ${costs.elevenLabsVapi.fullyLoadedPerMin.toFixed(3)}/min`,
+      `xAI savings vs ElevenLabs+Twilio: USD ${costs.savingsVsElevenLabsTwilio.toFixed(3)}/min (~${Math.round((costs.savingsVsElevenLabsTwilio / costs.elevenLabsTwilio.fullyLoadedPerMin) * 100)}%)`,
     ].join('\n')
   );
 

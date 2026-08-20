@@ -16,8 +16,9 @@ import {
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { Copy, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLatestRef } from '@/lib/hooks/useLatestRef';
+import { TableErrorFallback } from '@/components/features/feedback/TableErrorFallback';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { useAdminPeopleRightPanel } from '@/components/features/admin/AdminPeopleRightPanelProvider';
 import { toast } from '@/components/feedback';
@@ -171,8 +172,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
   const [selectedUser, setSelectedUser] = useState<AdminUserRow | null>(null);
   const { setTableMeta } = useTableMeta();
   const { setHeaderActions } = useSetHeaderActions();
-  const usersRef = useRef(users);
-  usersRef.current = users;
+  const usersRef = useLatestRef(users);
 
   const handleRowClick = useCallback((user: AdminUserRow) => {
     setSelectedUser(prev => (prev?.id === user.id ? null : user));
@@ -230,11 +230,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
     return Object.fromEntries(Array.from(selectedIds).map(id => [id, true]));
   }, [selectedIds]);
 
-  // Refs for selection state to avoid column recreation on every selection change
-  const selectedIdsRef = useRef(selectedIds);
-  selectedIdsRef.current = selectedIds;
-  const headerCheckboxStateRef = useRef(headerCheckboxState);
-  headerCheckboxStateRef.current = headerCheckboxState;
+
 
   // Ban dialog state
   const [banTarget, setBanTarget] = useState<AdminUserRow | null>(null);
@@ -439,13 +435,13 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
 
   // Create memoized cell renderers using refs to avoid column recreation on selection change
   const SelectHeader = useMemo(
-    () => createSelectHeaderRenderer(headerCheckboxStateRef, toggleSelectAll),
-    [toggleSelectAll]
+    () => createSelectHeaderRenderer(headerCheckboxState, toggleSelectAll),
+    [headerCheckboxState, toggleSelectAll]
   );
 
   const SelectCell = useMemo(
-    () => createSelectCellRenderer(selectedIdsRef, toggleSelect),
-    [toggleSelect]
+    () => createSelectCellRenderer(selectedIds, toggleSelect),
+    [selectedIds, toggleSelect]
   );
 
   const ActionsCell = useMemo(

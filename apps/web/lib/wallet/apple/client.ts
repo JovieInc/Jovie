@@ -10,5 +10,8 @@ export function isAppleWalletPassSupportedClient(): boolean {
 }
 
 export function openAppleWalletProfilePass(): void {
-  globalThis.location.assign(APPLE_WALLET_PROFILE_PASS_DOWNLOAD_URL);
+  globalThis.location.assign(
+    new URL(APPLE_WALLET_PROFILE_PASS_DOWNLOAD_URL, globalThis.location.origin)
+      .href
+  );
 }

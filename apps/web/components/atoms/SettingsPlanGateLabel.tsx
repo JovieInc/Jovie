@@ -3,7 +3,6 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { Lock } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useRef } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 
@@ -16,18 +15,6 @@ export function SettingsPlanGateLabel({
   planName = 'Pro',
   featureContext,
 }: Readonly<SettingsPlanGateLabelProps>) {
-  const hasTrackedRef = useRef(false);
-
-  useEffect(() => {
-    if (!hasTrackedRef.current && featureContext) {
-      track('upgrade_nudge_shown', {
-        feature: featureContext,
-        plan_required: planName,
-      });
-      hasTrackedRef.current = true;
-    }
-  }, [featureContext, planName]);
-
   const handleUpgradeClick = () => {
     track('upgrade_nudge_clicked', {
       feature: featureContext ?? 'unknown',

@@ -18,6 +18,7 @@ import {
   DrawerInlineIconButton,
 } from '@/components/molecules/drawer';
 import { PROVIDER_DOMAINS } from '@/lib/discography/provider-domains';
+import { useLatestRef } from '@/lib/hooks/useLatestRef';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 
@@ -75,8 +76,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   // Ref for urlInput to avoid recreating handleAddUrl on every keystroke
-  const urlInputRef = useRef(urlInput);
-  urlInputRef.current = urlInput;
+  const urlInputRef = useLatestRef(urlInput);
 
   // Create provider Map for O(1) lookups instead of O(n) .find() operations
   const providerMap = useMemo(() => {
@@ -169,7 +169,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
         // Error toast is shown by parent
       }
     },
-    [addingProvider, onAddUrl, release.id]
+    [addingProvider, onAddUrl, release.id, urlInputRef]
   );
 
   // Get status for a provider

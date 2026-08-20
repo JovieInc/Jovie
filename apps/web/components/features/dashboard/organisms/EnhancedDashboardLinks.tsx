@@ -181,7 +181,7 @@ export function EnhancedDashboardLinks({
           debouncedSave.cancel();
           enqueueSave(mapped);
         } else {
-          debouncedSave(mapped);
+          debouncedSave.save(mapped);
         }
       }
     },

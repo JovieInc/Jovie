@@ -9,7 +9,7 @@
 
 import { Check, Hash, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from '@/components/feedback';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 
@@ -41,13 +41,14 @@ export function useReleaseHeaderParts({
   const router = useRouter();
   const showActions = hasRelease && release?.smartLinkPath;
   const [isIdCopied, setIsIdCopied] = useState(false);
-  const idCopyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    if (!isIdCopied) return;
+    const timeoutId = setTimeout(() => setIsIdCopied(false), 2000);
     return () => {
-      if (idCopyTimeoutRef.current) clearTimeout(idCopyTimeoutRef.current);
+      clearTimeout(timeoutId);
     };
-  }, []);
+  }, [isIdCopied]);
 
   const handleRefreshClick = useCallback(() => {
     if (isRefreshing) return;
@@ -71,8 +72,6 @@ export function useReleaseHeaderParts({
       }
       await clipboard.writeText(releaseId);
       setIsIdCopied(true);
-      if (idCopyTimeoutRef.current) clearTimeout(idCopyTimeoutRef.current);
-      idCopyTimeoutRef.current = setTimeout(() => setIsIdCopied(false), 2000);
     } catch {
       toast.error(
         'Failed to copy the release ID. Your browser may not allow clipboard access.'

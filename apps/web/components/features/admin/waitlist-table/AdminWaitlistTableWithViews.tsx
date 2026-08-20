@@ -3,7 +3,7 @@
 import { AlertTriangle, CheckCircle, Copy, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
+import { TableErrorFallback } from '@/components/features/feedback/TableErrorFallback';
 import { toast } from '@/components/feedback';
 import {
   DisplayMenuDropdown,

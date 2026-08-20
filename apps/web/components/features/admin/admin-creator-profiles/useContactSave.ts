@@ -1,7 +1,8 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useRef } from 'react';
+import { useCallback } from 'react';
+import { useLatestRef } from '@/lib/hooks/useLatestRef';
 import { toast } from '@/components/feedback';
 import { FetchError, fetchWithTimeout, queryKeys } from '@/lib/queries';
 import type { Contact } from '@/types';
@@ -30,8 +31,7 @@ export function useContactSave({
   const queryClient = useQueryClient();
 
   // Ref to avoid recreating callbacks when onSaveSuccess changes
-  const onSaveSuccessRef = useRef(onSaveSuccess);
-  onSaveSuccessRef.current = onSaveSuccess;
+  const onSaveSuccessRef = useLatestRef(onSaveSuccess);
 
   const { mutateAsync, isPending: isSaving } = useMutation({
     mutationKey: ['admin-contact-save'],
@@ -119,7 +119,7 @@ export function useContactSave({
         return false;
       }
     },
-    [mutateAsync]
+    [mutateAsync, onSaveSuccessRef]
   );
 
   return {

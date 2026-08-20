@@ -39,7 +39,7 @@ describe('Billing Components', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (global.fetch as any).mockClear();
-    window.location.href = '';
+    window.location.href = 'http://localhost/';
     pushMock.mockClear();
   });
 

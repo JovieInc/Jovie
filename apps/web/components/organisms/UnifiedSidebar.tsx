@@ -25,6 +25,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from '@/components/organisms/Sidebar';
 import { UserButton } from '@/components/organisms/user-button';
 import { getVersionUpdateTitle } from '@/components/shell/getVersionUpdateTitle';
@@ -251,6 +252,7 @@ function SidebarHeaderNav({
   routeBackLabel?: string;
 }>) {
   const isDesktop = useIsElectronRuntime();
+  const { toggleSidebar, state: sidebarState } = useSidebar();
 
   return (
     <div className='flex w-full items-center'>
@@ -333,7 +335,11 @@ function SidebarHeaderNav({
       })()}
 
       {!isDesktop ? (
-        <SidebarCollapseButton className='ml-auto shrink-0' />
+        <SidebarCollapseButton
+          className='ml-auto shrink-0'
+          open={sidebarState !== 'closed'}
+          onToggle={toggleSidebar}
+        />
       ) : null}
     </div>
   );

@@ -7,8 +7,7 @@
  */
 
 import { CircleHelp } from 'lucide-react';
-import { useTheme } from 'next-themes';
-import { useEffect, useMemo, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
@@ -59,30 +58,25 @@ export function ProviderIcon({
   className = 'h-5 w-5',
   'aria-label': ariaLabel,
 }: ProviderIconProps) {
-  const { resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   const providerConfig = PROVIDER_CONFIG[provider];
   const platform = PROVIDER_PLATFORM_MAP[provider];
   const brandColor = providerConfig?.accent ?? 'currentColor';
-  const isDark = mounted ? resolvedTheme === 'dark' : false;
-  const color = useMemo(
-    () => getContrastSafeIconColor(brandColor, isDark),
-    [brandColor, isDark]
-  );
+  const lightColor = getContrastSafeIconColor(brandColor, false);
+  const darkColor = getContrastSafeIconColor(brandColor, true);
+  const colorStyle = {
+    '--provider-icon-light': lightColor,
+    '--provider-icon-dark': darkColor,
+    color: 'var(--provider-icon-light)',
+  } as CSSProperties;
 
   if (!providerConfig || !platform) {
     return (
       <span
         className={cn(
-          'inline-flex shrink-0 items-center justify-center',
+          'inline-flex shrink-0 items-center justify-center dark:[color:var(--provider-icon-dark)]',
           className
         )}
-        style={{ color }}
+        style={colorStyle}
       >
         <CircleHelp
           className='h-full w-full'
@@ -96,10 +90,10 @@ export function ProviderIcon({
   return (
     <span
       className={cn(
-        'inline-flex shrink-0 items-center justify-center',
+        'inline-flex shrink-0 items-center justify-center dark:[color:var(--provider-icon-dark)]',
         className
       )}
-      style={{ color }}
+      style={colorStyle}
     >
       <SocialIcon
         platform={platform}

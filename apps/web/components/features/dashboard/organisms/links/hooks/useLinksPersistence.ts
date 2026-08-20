@@ -305,9 +305,9 @@ export interface UseLinksPersistenceReturn {
   autoRefreshUntilMs: number | null;
   /** Set auto-refresh deadline */
   setAutoRefreshUntilMs: React.Dispatch<React.SetStateAction<number | null>>;
-  /** Debounced save function */
+  /** Debounced save helpers */
   debouncedSave: {
-    (input: LinkItem[]): void;
+    save: (input: LinkItem[]) => void;
     flush: () => Promise<void>;
     cancel: () => void;
   };
@@ -497,28 +497,27 @@ export function useLinksPersistence({
     maxRetries: 1,
   });
 
-  // Debounced save function with cancel and flush methods
+  const saveDebounced = useCallback(
+    (input: LinkItem[]) => {
+      lastInputRef.current = input;
+      scheduleSave(input);
+    },
+    [scheduleSave]
+  );
+  const flushPendingSave = useCallback(async () => {
+    const pending = lastInputRef.current;
+    if (!pending) return;
+    cancelPendingSave();
+    lastInputRef.current = null;
+    enqueueSave(pending);
+  }, [cancelPendingSave, enqueueSave]);
   const debouncedSave = useMemo(
-    () =>
-      Object.assign(
-        (input: LinkItem[]) => {
-          lastInputRef.current = input;
-          scheduleSave(input);
-        },
-        {
-          flush: async () => {
-            const pending = lastInputRef.current;
-            if (!pending) return;
-            cancelPendingSave();
-            lastInputRef.current = null;
-            enqueueSave(pending);
-          },
-          cancel: () => {
-            cancelPendingSave();
-          },
-        }
-      ),
-    [scheduleSave, cancelPendingSave, enqueueSave]
+    () => ({
+      save: saveDebounced,
+      flush: flushPendingSave,
+      cancel: cancelPendingSave,
+    }),
+    [saveDebounced, flushPendingSave, cancelPendingSave]
   );
 
   // Cancel pending saves when profileId changes

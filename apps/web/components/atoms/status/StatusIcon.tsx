@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useId } from 'react';
+import { memo } from 'react';
 
 export type ReleaseStatus =
   | 'live'
@@ -27,7 +27,6 @@ export const StatusIcon = memo(function StatusIcon({
   readonly className?: string;
 }) {
   const { color, label } = STATUS_CONFIG[status];
-  const titleId = useId();
 
   return (
     <svg
@@ -35,10 +34,9 @@ export const StatusIcon = memo(function StatusIcon({
       height={SIZE}
       viewBox='0 0 14 14'
       fill='none'
-      aria-labelledby={titleId}
       className={`shrink-0 ${className ?? ''}`}
     >
-      <title id={titleId}>{label}</title>
+      <title>{label}</title>
       {status === 'live' && (
         <g>
           <circle cx='7' cy='7' r='5' fill={color} />

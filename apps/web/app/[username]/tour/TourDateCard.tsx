@@ -29,7 +29,9 @@ export function TourDateCard({
   );
 
   const handleAddToCalendar = () => {
-    globalThis.location.href = `/api/calendar/${tourDate.id}`;
+    globalThis.location.assign(
+      new URL(`/api/calendar/${tourDate.id}`, globalThis.location.origin).href
+    );
   };
 
   const baseModel = tourDateToEntityCard(tourDate, { isNearYou, distanceKm });

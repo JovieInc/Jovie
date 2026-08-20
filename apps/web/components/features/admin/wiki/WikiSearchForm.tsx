@@ -1,5 +1,5 @@
 interface Props {
-  initialQuery?: string;
+  readonly initialQuery?: string;
 }
 
 export function WikiSearchForm({ initialQuery }: Props) {

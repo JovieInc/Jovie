@@ -1,4 +1,4 @@
-import { ArtistInfo } from '@/components/molecules/ArtistInfo';
+import { ArtistInfo } from '@/components/organisms/ArtistInfo';
 import { FrostedContainer } from '@/components/molecules/FrostedContainer';
 import { Container } from '@/components/site/Container';
 import { Artist } from '@/types/db';

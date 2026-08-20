@@ -15,18 +15,11 @@ vi.mock('@jovie/ui', () => ({
     children,
 }));
 
-vi.mock('@/components/organisms/Sidebar', () => ({
-  useSidebar: () => ({
-    toggleSidebar: vi.fn(),
-    state: 'open' as const,
-  }),
-}));
-
 import { SidebarCollapseButton } from './SidebarCollapseButton';
 
 describe('SidebarCollapseButton', () => {
   it('renders a borderless circular System B icon control (JOV-3959)', () => {
-    render(<SidebarCollapseButton />);
+    render(<SidebarCollapseButton open onToggle={vi.fn()} />);
 
     const button = screen.getByRole('button', { name: /collapse sidebar/i });
 

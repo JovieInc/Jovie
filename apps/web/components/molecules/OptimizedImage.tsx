@@ -222,8 +222,6 @@ export const OptimizedImage = React.memo(function OptimizedImage({
   const [hasError, setHasError] = useState(false);
   const renderCount = useRef(0);
 
-  renderCount.current += 1;
-
   // Memoize the image source to prevent unnecessary re-renders
   const imageSrc = useOptimizedImageSource({
     src,
@@ -319,6 +317,7 @@ export const OptimizedImage = React.memo(function OptimizedImage({
   );
 
   useEffect(() => {
+    renderCount.current += 1;
     if (
       process.env.NODE_ENV !== 'production' &&
       process.env.NEXT_PUBLIC_IMAGE_RENDER_DEBUG === 'true'

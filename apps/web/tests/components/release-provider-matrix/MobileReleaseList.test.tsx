@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MobileReleaseList } from '@/features/dashboard/organisms/release-provider-matrix/MobileReleaseList';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
-vi.mock('@/components/atoms/SwipeToReveal', () => ({
+vi.mock('@/components/molecules/SwipeToReveal', () => ({
   SwipeToReveal: ({
     children,
     actions,

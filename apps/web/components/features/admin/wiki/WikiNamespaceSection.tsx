@@ -2,7 +2,7 @@ import { slugToHref, titleFromSlug } from '@/lib/wiki/format';
 import type { NamespaceGroup } from '@/lib/wiki/namespace';
 
 interface Props {
-  group: NamespaceGroup;
+  readonly group: NamespaceGroup;
 }
 
 export function WikiNamespaceSection({ group }: Props) {

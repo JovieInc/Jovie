@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
 import type { ProviderKey } from '@/lib/discography/types';
 import type {
@@ -132,6 +132,11 @@ export function useReleaseSidebar({
     [handleFieldChange]
   );
 
+  const handleAddLinkRef = useRef<() => Promise<void>>(async () => {});
+  const handleRemoveLinkRef = useRef<(provider: ProviderKey) => Promise<void>>(
+    async () => {}
+  );
+
   const handleAddLink = useCallback(async () => {
     if (!release || !onAddDspLink || !selectedProvider) return;
     const trimmedUrl = newLinkUrl.trim();
@@ -154,13 +159,17 @@ export function useReleaseSidebar({
         message:
           'The link was not saved. Your draft is still here, so you can retry or adjust the URL.',
         actionLabel: 'Try again',
-        onRetry: createVoidRetryHandler(handleAddLink),
+        onRetry: createVoidRetryHandler(() => handleAddLinkRef.current()),
       });
       console.error('Failed to add DSP link', error);
     } finally {
       setIsAddingDspLink(false);
     }
   }, [release, onAddDspLink, newLinkUrl, selectedProvider]);
+
+  useLayoutEffect(() => {
+    handleAddLinkRef.current = handleAddLink;
+  });
 
   const handleRemoveLink = useCallback(
     async (provider: ProviderKey) => {
@@ -179,7 +188,9 @@ export function useReleaseSidebar({
           message:
             'The link is still available. Try the action again if you want to remove it.',
           actionLabel: 'Try again',
-          onRetry: createVoidRetryHandler(() => handleRemoveLink(provider)),
+          onRetry: createVoidRetryHandler(() =>
+            handleRemoveLinkRef.current(provider)
+          ),
         });
         console.error('Failed to remove DSP link', error);
       } finally {
@@ -188,6 +199,10 @@ export function useReleaseSidebar({
     },
     [release, onRemoveDspLink]
   );
+
+  useLayoutEffect(() => {
+    handleRemoveLinkRef.current = handleRemoveLink;
+  });
 
   const handleNewLinkKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {

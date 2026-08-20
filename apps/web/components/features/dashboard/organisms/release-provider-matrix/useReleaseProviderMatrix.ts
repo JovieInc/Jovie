@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLatestRef } from '@/lib/hooks/useLatestRef';
 import { toast } from '@/components/feedback';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
@@ -90,12 +91,9 @@ export function useReleaseProviderMatrix({
   const isSyncing = syncMutation.isPending;
 
   // Refs for stable callback access (prevents recreation on state changes)
-  const rawRowsRef = useRef(rawRows);
-  rawRowsRef.current = rawRows;
-  const providerConfigRef = useRef(providerConfig);
-  providerConfigRef.current = providerConfig;
-  const saveProviderMutateRef = useRef(saveProviderMutation.mutate);
-  saveProviderMutateRef.current = saveProviderMutation.mutate;
+  const rawRowsRef = useLatestRef(rawRows);
+  const providerConfigRef = useLatestRef(providerConfig);
+  const saveProviderMutateRef = useLatestRef(saveProviderMutation.mutate);
 
   // No custom sorting needed - UnifiedTable handles this
   const rows = rawRows;
@@ -277,7 +275,7 @@ export function useReleaseProviderMatrix({
         throw error;
       }
     },
-    [updateRow]
+    [providerConfigRef, rawRowsRef, saveProviderMutateRef, updateRow]
   );
 
   const handleReset = (provider: ProviderKey) => {
@@ -312,8 +310,7 @@ export function useReleaseProviderMatrix({
   };
 
   // Use ref for profileId to avoid recreation when it changes
-  const profileIdRef = useRef(profileId);
-  profileIdRef.current = profileId;
+  const profileIdRef = useLatestRef(profileId);
 
   // CRITICAL: Use syncMutation.mutate directly (it's stable from TanStack Query)
   // Don't depend on the whole syncMutation object which changes every render
@@ -449,7 +446,7 @@ export function useReleaseProviderMatrix({
         toast.error('Unable to update canvas status');
       }
     },
-    [saveCanvasStatusMutation, updateRow]
+    [rawRowsRef, saveCanvasStatusMutation, updateRow]
   );
 
   const handleSaveLyrics = useCallback(
@@ -464,7 +461,7 @@ export function useReleaseProviderMatrix({
       });
       toast.success('Lyrics saved');
     },
-    [saveLyricsMutation]
+    [rawRowsRef, saveLyricsMutation]
   );
 
   const handleSaveStatus = useCallback(
@@ -508,7 +505,7 @@ export function useReleaseProviderMatrix({
       });
       updateRow(updated);
     },
-    [saveReleaseMetadataMutation, updateRow]
+    [rawRowsRef, saveReleaseMetadataMutation, updateRow]
   );
 
   const handleSavePrimaryIsrc = useCallback(
@@ -523,7 +520,7 @@ export function useReleaseProviderMatrix({
       });
       updateRow(updated);
     },
-    [savePrimaryIsrcMutation, updateRow]
+    [rawRowsRef, savePrimaryIsrcMutation, updateRow]
   );
 
   const handleFormatLyrics = useCallback(
@@ -550,7 +547,7 @@ export function useReleaseProviderMatrix({
       toast.success(`Lyrics formatted for ${labels[format] ?? format}`);
       return result.changesSummary;
     },
-    [formatLyricsMutation]
+    [formatLyricsMutation, rawRowsRef]
   );
 
   const totalReleases = rows.length;

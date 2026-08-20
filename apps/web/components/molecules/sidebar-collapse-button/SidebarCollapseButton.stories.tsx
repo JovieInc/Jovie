@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { SidebarCollapseButton } from '.';
 
 const meta: Meta<typeof SidebarCollapseButton> = {
@@ -14,16 +13,18 @@ const meta: Meta<typeof SidebarCollapseButton> = {
       },
     },
   },
+  args: {
+    open: true,
+    onToggle: () => undefined,
+  },
   decorators: [
     Story => (
-      <SidebarProvider>
-        <div className='flex items-center gap-4 bg-surface-1 p-6'>
-          <Story />
-          <span className='text-xs text-secondary-token'>
-            Hover for circular highlight · no border
-          </span>
-        </div>
-      </SidebarProvider>
+      <div className='flex items-center gap-4 bg-surface-1 p-6'>
+        <Story />
+        <span className='text-xs text-secondary-token'>
+          Hover for circular highlight · no border
+        </span>
+      </div>
     ),
   ],
 };
@@ -36,11 +37,9 @@ export const Default: Story = {};
 export const OnContentSurface: Story = {
   decorators: [
     Story => (
-      <SidebarProvider>
-        <div className='flex items-center gap-3 bg-(--app-shell-content-surface) p-4'>
-          <Story />
-        </div>
-      </SidebarProvider>
+      <div className='flex items-center gap-3 bg-(--app-shell-content-surface) p-4'>
+        <Story />
+      </div>
     ),
   ],
 };
