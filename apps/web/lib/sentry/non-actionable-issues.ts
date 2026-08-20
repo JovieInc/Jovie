@@ -6,9 +6,9 @@
  * It is not an application defect and should not trigger autofix or performance alerts.
  *
  * Opaque `{"error":{"name":"UpstashError"}}` titles are the JSON-stringified
- * form of an UpstashError whose `message` is non-enumerable (JOV-5220,
- * JOV-5221, JOV-5228, JOV-5229). The standing Redis operability canary already
- * pages on quota exhaustion.
+ * form of an UpstashError whose `message` is non-enumerable (JOV-5218,
+ * JOV-5220, JOV-5221, JOV-5228, JOV-5229). The standing Redis operability
+ * canary already pages on quota exhaustion.
  */
 
 export interface SentryIssueSummary {
@@ -74,8 +74,9 @@ function isUpstashErrorJsonBagText(value: string | null | undefined): boolean {
 
 /**
  * True when a captured value would Sentry-title as
- * `Error: {"error":{"name":"UpstashError"}}` (JOV-5228 / JOV-5229).
- * Does not match a real `UpstashError: ERR max requests…` exception.
+ * `Error: {"error":{"name":"UpstashError"}}` (JOV-5218 / JOV-5228 / JOV-5229).
+ * Error instances are matched on `message` so a real
+ * `UpstashError: ERR max requests…` exception stays visible.
  */
 export function isOpaqueUpstashErrorJsonBag(value: unknown): boolean {
   if (typeof value === 'string') {

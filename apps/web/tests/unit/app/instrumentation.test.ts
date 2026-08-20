@@ -89,6 +89,25 @@ describe('server instrumentation guard', () => {
 
     expect(Sentry.captureRequestError).not.toHaveBeenCalled();
   });
+
+  it('skips request-error capture for a thrown { error: UpstashError } object (JOV-5218)', async () => {
+    process.env.CI = 'false';
+    process.env.NODE_ENV = 'production';
+    process.env.NEXT_RUNTIME = 'nodejs';
+    delete process.env.NEXT_PUBLIC_E2E_MODE;
+    delete process.env.E2E_USE_TEST_AUTH_BYPASS;
+
+    const Sentry = await import('@sentry/nextjs');
+    const { onRequestError } = await import('@/instrumentation');
+    const inner = new Error(
+      'Command failed: ERR max requests limit exceeded. Limit: 500000'
+    );
+    inner.name = 'UpstashError';
+
+    await onRequestError({ error: inner });
+
+    expect(Sentry.captureRequestError).not.toHaveBeenCalled();
+  });
 });
 
 describe('client instrumentation bundle isolation', () => {
