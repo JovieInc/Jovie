@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   answerChannelIntelligenceQuery,
   buildChannelIntelligenceReport,
+  CHANNEL_PLAYLIST_TARGET_RULES,
   type ChannelVideoMetrics,
   classifyChannelIntelligenceIntent,
   computeChannelCorrelations,
   ctrTimesAvgViewDurationMinutes,
+  evaluateAllChannelPlaylistRuleCases,
+  evaluateChannelPlaylistRuleCase,
   rankVideosByWatchMinutesPerImpression,
   watchMinutesPerImpression,
 } from '@/lib/services/channel-intelligence';
@@ -179,6 +182,9 @@ describe('buildChannelIntelligenceReport + answers', () => {
     expect(report.changePlan.every(item => item.observation.length > 0)).toBe(
       true
     );
+    expect(report.playlistGate.empty).toBe(true);
+    expect(report.playlists).toEqual([]);
+    expect(report.playlistGate.emptyReason).toMatch(/empty|fetched/i);
   });
 
   it.each([
@@ -213,5 +219,80 @@ describe('buildChannelIntelligenceReport + answers', () => {
       report,
     });
     expect(declining.rankedVideos.some(v => v.videoId === 'weak')).toBe(true);
+  });
+});
+
+describe('channel playlist freshness + no-invent gate', () => {
+  it('encodes playlist-target rule cases', () => {
+    for (const result of evaluateAllChannelPlaylistRuleCases()) {
+      expect(result.passed, result.reason).toBe(true);
+    }
+    expect(evaluateChannelPlaylistRuleCase('invented-refused').passed).toBe(
+      true
+    );
+    expect(evaluateChannelPlaylistRuleCase('dormant-dropped').passed).toBe(
+      true
+    );
+    expect(
+      evaluateChannelPlaylistRuleCase('missing-activity-unknown').passed
+    ).toBe(true);
+    expect(evaluateChannelPlaylistRuleCase('empty-fetch-empty').passed).toBe(
+      true
+    );
+    expect(evaluateChannelPlaylistRuleCase('cap-15-25').passed).toBe(true);
+  });
+
+  it('never invents playlist fields and drops dormant lists on the report', () => {
+    const report = buildChannelIntelligenceReport({
+      channelId: 'UC_test',
+      videos: [makeVideoWithWmpi('best', 'Hit Single', 0.6, 8_000)],
+      nowIso: '2026-08-20T00:00:00.000Z',
+      playlists: [
+        {
+          id: 'pl_warm',
+          name: 'Late Night Indie',
+          url: 'https://open.spotify.com/playlist/pl_warm',
+          followerCount: 1200,
+          lastActivityAt: '2026-07-01T00:00:00.000Z',
+          peerCount: 3,
+          artistIsOnList: false,
+        },
+        {
+          id: 'pl_dormant',
+          name: 'Abandoned 2019 Mix',
+          lastActivityAt: '2025-07-01T00:00:00.000Z',
+        },
+        {
+          id: 'pl_unknown',
+          name: 'Undated Editorial',
+        },
+      ],
+      proposedPlaylists: [
+        {
+          id: 'invented',
+          name: 'New Music Friday',
+          followerCount: 9_000_000,
+        },
+        {
+          id: 'pl_warm',
+          name: 'Late Night Indie',
+          followerCount: 9_000_000,
+        },
+      ],
+    });
+
+    expect(report.playlists.map(row => row.id)).toEqual([
+      'pl_warm',
+      'pl_unknown',
+    ]);
+    expect(report.playlists[0]?.followerCount).toBe(1200);
+    expect(report.playlists[0]?.peerWarmth).toBe(true);
+    expect(report.playlists[1]?.freshness).toBe('unknown');
+    expect(JSON.stringify(report.playlists)).not.toContain('New Music Friday');
+    expect(JSON.stringify(report.playlists).toLowerCase()).not.toContain(
+      'active'
+    );
+    expect(CHANNEL_PLAYLIST_TARGET_RULES).toContain('No invented placements');
+    expect(CHANNEL_PLAYLIST_TARGET_RULES).toContain('never claim "active"');
   });
 });

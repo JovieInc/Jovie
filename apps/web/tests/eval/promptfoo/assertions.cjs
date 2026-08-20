@@ -3636,6 +3636,26 @@ function assertSkillPromptContractCovered(output) {
     );
   }
 
+  const channelIntelligence = payload.channelIntelligence ?? {};
+  if (!channelIntelligence || typeof channelIntelligence !== 'object') {
+    return fail('skill prompt contract missing channelIntelligence payload');
+  }
+  if (channelIntelligence.skillId !== 'channelIntelligenceReport') {
+    return fail(
+      'channelIntelligence payload is not tied to channelIntelligenceReport'
+    );
+  }
+  const missingChannelIntelligenceFacts = Array.isArray(
+    channelIntelligence.missingFacts
+  )
+    ? channelIntelligence.missingFacts
+    : [];
+  if (missingChannelIntelligenceFacts.length > 0) {
+    return fail(
+      `channel intelligence playlist gate missing facts: ${missingChannelIntelligenceFacts.join(', ')}`
+    );
+  }
+
   return pass();
 }
 
@@ -3648,6 +3668,22 @@ function assertPackagingFormatSplitCase(output) {
   if (packaging.ruleCasePassed !== true) {
     return fail(
       `packaging rule case failed: ${String(packaging.ruleCase)} ${String(packaging.ruleCaseReason)}`
+    );
+  }
+  return pass();
+}
+
+function assertChannelPlaylistRuleCase(output) {
+  const payload = parseOutput(output);
+  const channelIntelligence = payload.channelIntelligence ?? {};
+  if (channelIntelligence.skillId !== 'channelIntelligenceReport') {
+    return fail(
+      'channel playlist rule case is not tied to channelIntelligenceReport'
+    );
+  }
+  if (channelIntelligence.ruleCasePassed !== true) {
+    return fail(
+      `channel playlist rule case failed: ${String(channelIntelligence.ruleCase)} ${String(channelIntelligence.ruleCaseReason)}`
     );
   }
   return pass();
@@ -5143,6 +5179,7 @@ module.exports = {
   assertSkillCommandContractCovered,
   assertSkillPromptContractCovered,
   assertPackagingFormatSplitCase,
+  assertChannelPlaylistRuleCase,
   assertAlbumArtProviderContractCovered,
   assertAiToolPromptContractCovered,
   assertChatTitleContractCovered,

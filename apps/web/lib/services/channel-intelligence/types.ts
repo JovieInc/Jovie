@@ -99,6 +99,43 @@ export interface ChannelChangePlanItem {
   readonly sources: readonly MetricSource[];
 }
 
+export type PlaylistFreshness = '90d' | '12m' | 'unknown';
+export type PlaylistPlacementStatus = 'current' | 'past' | 'unknown';
+
+/**
+ * A playlist row as fetched this run. Missing fields stay missing —
+ * the gate never invents a name, URL, or follower count.
+ */
+export interface FetchedPlaylistRow {
+  readonly id: string;
+  readonly name?: string | null;
+  readonly url?: string | null;
+  readonly followerCount?: number | null;
+  /** Last add or other list activity, ISO-8601 when known. */
+  readonly lastActivityAt?: string | null;
+  readonly placementStatus?: PlaylistPlacementStatus | null;
+  /** Peers currently on this list, when peer-placement data exists. */
+  readonly peerCount?: number | null;
+  readonly artistIsOnList?: boolean | null;
+}
+
+export interface GatedPlaylistRecommendation {
+  readonly id: string;
+  readonly name?: string;
+  readonly url?: string;
+  readonly followerCount?: number;
+  readonly freshness: PlaylistFreshness;
+  readonly placementStatus: PlaylistPlacementStatus;
+  /** True only when peer data exists: 2+ peers and the artist is not on the list. */
+  readonly peerWarmth: boolean;
+}
+
+export interface ChannelPlaylistGateResult {
+  readonly recommendations: readonly GatedPlaylistRecommendation[];
+  readonly empty: boolean;
+  readonly emptyReason: string | null;
+}
+
 export interface ChannelIntelligenceReport {
   readonly channelId: string;
   readonly generatedAt: string;
@@ -112,6 +149,11 @@ export interface ChannelIntelligenceReport {
   readonly winSignals: readonly ChannelWinSignal[];
   readonly changePlan: readonly ChannelChangePlanItem[];
   readonly sources: readonly MetricSource[];
+  readonly playlists: readonly GatedPlaylistRecommendation[];
+  readonly playlistGate: {
+    readonly empty: boolean;
+    readonly emptyReason: string | null;
+  };
 }
 
 export type ChannelIntelligenceIntent =
@@ -137,6 +179,13 @@ export interface BuildChannelIntelligenceReportInput {
   readonly nowIso?: string;
   readonly listLimit?: number;
   readonly learningLayerSummaries?: readonly LearningLayerWinAnnotation[];
+  /** Playlist rows fetched this run. Omitted/empty → report says empty; never invent. */
+  readonly playlists?: readonly FetchedPlaylistRow[] | null;
+  /**
+   * Optional draft recommendations to reconcile against fetched rows.
+   * IDs not in the fetch are refused; fields come from the fetched row only.
+   */
+  readonly proposedPlaylists?: readonly FetchedPlaylistRow[] | null;
 }
 
 export interface LearningLayerWinAnnotation {

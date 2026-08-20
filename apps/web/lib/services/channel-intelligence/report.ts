@@ -12,6 +12,7 @@ import {
   rankVideosByWatchMinutesPerImpression,
   rankWorstVideosByWatchMinutesPerImpression,
 } from './metrics';
+import { gateChannelPlaylists } from './playlist-rules';
 import type {
   BuildChannelIntelligenceReportInput,
   ChannelChangePlanItem,
@@ -177,6 +178,12 @@ export function buildChannelIntelligenceReport(
     });
   }
 
+  const playlistGate = gateChannelPlaylists({
+    fetched: input.playlists,
+    proposed: input.proposedPlaylists,
+    nowIso: generatedAt,
+  });
+
   return {
     channelId: input.channelId,
     generatedAt,
@@ -197,5 +204,10 @@ export function buildChannelIntelligenceReport(
       sources,
     }),
     sources,
+    playlists: playlistGate.recommendations,
+    playlistGate: {
+      empty: playlistGate.empty,
+      emptyReason: playlistGate.emptyReason,
+    },
   };
 }

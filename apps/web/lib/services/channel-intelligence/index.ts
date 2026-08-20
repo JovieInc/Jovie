@@ -30,6 +30,22 @@ export {
   titleLengthBucket,
   watchMinutesPerImpression,
 } from './metrics';
+export type {
+  ChannelPlaylistRuleCaseId,
+  ChannelPlaylistRuleCaseResult,
+  GateChannelPlaylistsInput,
+} from './playlist-rules';
+export {
+  CHANNEL_PLAYLIST_RULE_CASE_IDS,
+  CHANNEL_PLAYLIST_TARGET_RULES,
+  evaluateAllChannelPlaylistRuleCases,
+  evaluateChannelPlaylistRuleCase,
+  gateChannelPlaylists,
+  PLAYLIST_DORMANT_MS,
+  PLAYLIST_FRESH_90D_MS,
+  PLAYLIST_RECOMMENDATION_CAP_MAX,
+  PLAYLIST_RECOMMENDATION_CAP_MIN,
+} from './playlist-rules';
 export {
   buildChannelChangePlan,
   buildChannelIntelligenceReport,
@@ -42,14 +58,19 @@ export type {
   ChannelIntelligenceAnswer,
   ChannelIntelligenceIntent,
   ChannelIntelligenceReport,
+  ChannelPlaylistGateResult,
   ChannelVideoMetrics,
   ChannelWinSignal,
   CorrelationDimension,
   CorrelationGroup,
   DurationBucket,
+  FetchedPlaylistRow,
+  GatedPlaylistRecommendation,
   LearningLayerWinAnnotation,
   MetricSource,
   MetricSourceKind,
+  PlaylistFreshness,
+  PlaylistPlacementStatus,
   RankedVideo,
   TitleLengthBucket,
 } from './types';
