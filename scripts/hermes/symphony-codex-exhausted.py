@@ -1174,7 +1174,7 @@ def _grok_command(
     grok_exe = _grok_executable() or str(pathlib.Path.home() / ".local/bin/grok")
     return [
         "systemd-run", "--user", f"--unit={unit}", "--collect",
-        "-p", "Type=exec", "-p", f"Environment=PATH={pathlib.Path.home()}/.local/bin:/usr/bin:/bin",
+        "-p", "Type=exec", "-p", f"Environment=PATH={pathlib.Path.home()}/.local/bin:{pathlib.Path.home()}/.npm-global/bin:/usr/local/bin:/usr/bin:/bin",
         "-p", f"Environment=GEM_GROK_EXECUTABLE={grok_exe}",
         "-p", f"Environment=GEM_GROK_BIN={grok_exe}",
         "-p", f"Environment=SYMPHONY_FALLBACK_SELECTION_B64={encoded}",

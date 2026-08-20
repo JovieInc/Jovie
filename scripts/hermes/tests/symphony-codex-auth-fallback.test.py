@@ -2026,6 +2026,23 @@ class FallbackTests(unittest.TestCase):
         with mock.patch.object(module, "_captured", side_effect=captured):
             self.assertIsNone(module._unit_age_seconds("fallback-ship-JOV-5220-770fa184873a.service"))
 
+    def test_grok_ship_one_path_includes_pnpm_dirs(self):
+        """Live changelog remount commit died: husky pre-commit `pnpm: not found`."""
+        text = GROK_SHIP.read_text()
+        self.assertIn("/usr/local/bin", text)
+        self.assertIn(".npm-global/bin", text)
+        command = self.load_controller_module()._grok_command(
+            "JOV-7",
+            "/bin/true",
+            {"schema_version": 1, "selected": {"id": "x"}},
+            "rev",
+            "a" * 64,
+        )
+        path_args = [arg for arg in command if arg.startswith("Environment=PATH=")]
+        self.assertTrue(path_args)
+        self.assertIn("/usr/local/bin", path_args[0])
+        self.assertIn(".npm-global/bin", path_args[0])
+
     def test_grok_ship_one_new_work_does_not_request_queue_deferred(self):
         """Live fallback PRs still got queue-deferred because the prompt asked for it."""
         text = GROK_SHIP.read_text()
@@ -2267,7 +2284,7 @@ class FallbackTests(unittest.TestCase):
             '  *" -m grok-4.6 "*)\n'
             '    echo "Cannot use this model: grok-4.6[fast=false]. Available models: auto, cursor-grok-4.6-high, cursor-grok-4.6-high-fast" >&2\n'
             '    exit 1;;\n'
-            '  *" -m cursor-grok-4.6-high "*)\n'
+            '  *" -m cursor-grok-4.6-high-fast "*)\n'
             '    touch "$GROK_CREATED"\n'
             '    exit 0;;\n'
             'esac\n'
@@ -2308,10 +2325,10 @@ class FallbackTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         log = (self.root / "logs/JOV-7.log").read_text()
-        self.assertIn("retry_cursor_grok_model cursor-grok-4.6-high", log)
+        self.assertIn("retry_cursor_grok_model cursor-grok-4.6-high-fast", log)
         events = self.events.read_text()
         self.assertIn("-m grok-4.6", events)
-        self.assertIn("-m cursor-grok-4.6-high", events)
+        self.assertIn("-m cursor-grok-4.6-high-fast", events)
         self.assertNotIn("hermes should not run", events)
         self.assertTrue(created.exists())
 
@@ -2323,9 +2340,9 @@ class FallbackTests(unittest.TestCase):
             'printf "cursor %s\\n" "$*" >> "$GEM_EVENTS"\n'
             'case " $* " in\n'
             '  *" --model grok-4.6 "*)\n'
-            '    echo "Cannot use this model: grok-4.6[fast=false]. Available models: auto, cursor-grok-4.6-high" >&2\n'
+            '    echo "Cannot use this model: grok-4.6[fast=false]. Available models: auto, cursor-grok-4.6-high, cursor-grok-4.6-high-fast" >&2\n'
             '    exit 1;;\n'
-            '  *" --model cursor-grok-4.6-high "*)\n'
+            '  *" --model cursor-grok-4.6-high-fast "*)\n'
             '    touch "$GROK_CREATED"\n'
             '    exit 0;;\n'
             'esac\n'
@@ -2385,10 +2402,10 @@ class FallbackTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         log = (self.root / "logs/JOV-7.log").read_text()
-        self.assertIn("retry_cursor_grok_model cursor-grok-4.6-high", log)
+        self.assertIn("retry_cursor_grok_model cursor-grok-4.6-high-fast", log)
         events = self.events.read_text()
         self.assertIn("--model grok-4.6", events)
-        self.assertIn("--model cursor-grok-4.6-high", events)
+        self.assertIn("--model cursor-grok-4.6-high-fast", events)
         self.assertTrue(created.exists())
 
     def test_grok_ship_one_changelog_union_failure_still_invokes_grok(self):
