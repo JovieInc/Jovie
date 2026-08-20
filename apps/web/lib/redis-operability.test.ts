@@ -67,6 +67,9 @@ describe('Redis operability', () => {
     expect(
       classifyRedisFailure(new Error('ERR max requests limit exceeded'))
     ).toBe('quota_exceeded');
+    const wrapped = new Error('ERR max requests limit exceeded');
+    wrapped.name = 'UpstashError';
+    expect(classifyRedisFailure({ error: wrapped })).toBe('quota_exceeded');
   });
 
   it('classifies the opaque JSON UpstashError bag as quota exhaustion (JOV-5221)', () => {

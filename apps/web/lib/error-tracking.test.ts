@@ -20,7 +20,11 @@ vi.mock('@/lib/analytics/runtime-aware', () => ({
   trackEvent: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { captureWarning, splitCapturedErrorBag } from './error-tracking';
+import {
+  captureError,
+  captureWarning,
+  splitCapturedErrorBag,
+} from './error-tracking';
 
 class UpstashError extends Error {
   constructor(message: string) {
@@ -84,6 +88,53 @@ describe('captureWarning quota noise (JOV-5221)', () => {
     expect(captureException).toHaveBeenCalledWith(
       expect.objectContaining({ message: 'db' }),
       expect.objectContaining({ level: 'warning' })
+    );
+  });
+});
+
+describe('captureError wrapped UpstashError (JOV-5220)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getClient.mockReturnValue({});
+  });
+
+  it('captures the inner UpstashError and fingerprints quota as one class', async () => {
+    const inner = new UpstashError(
+      'ERR max requests limit exceeded. Limit: 500000, Usage: 500099'
+    );
+
+    await captureError('[waitlist-gate] Redis cache read failed', {
+      error: inner,
+    });
+
+    expect(captureException).toHaveBeenCalledTimes(1);
+    const [captured, options] = captureException.mock.calls[0] as [
+      Error,
+      { fingerprint?: string[]; tags?: Record<string, string> },
+    ];
+    expect(captured).toBe(inner);
+    expect(captured.message).toContain('max requests limit exceeded');
+    expect(options.fingerprint).toEqual(['redis-quota-exceeded']);
+    expect(options.tags?.error_class).toBe('redis_quota_exceeded');
+  });
+
+  it('moves clerkUserId from the wrapper into Sentry extra, not the title', async () => {
+    const inner = new UpstashError(
+      'ERR max requests limit exceeded. Limit: 500000, Usage: 500099'
+    );
+
+    await captureError('[ban-check] Redis cache read failed', {
+      clerkUserId: 'af5b9ee0-ecec-4508-86e0-4f364c2e349d',
+      error: inner,
+    });
+
+    const [captured, options] = captureException.mock.calls[0] as [
+      Error,
+      { extra?: Record<string, unknown> },
+    ];
+    expect(captured).toBe(inner);
+    expect(options.extra?.clerkUserId).toBe(
+      'af5b9ee0-ecec-4508-86e0-4f364c2e349d'
     );
   });
 });
