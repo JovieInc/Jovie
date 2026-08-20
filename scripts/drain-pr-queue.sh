@@ -1096,6 +1096,9 @@ if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
 fi
 
 # front_churn_action <num> <head_oid> → prints allow|block|unknown.
+# Annotate recent failed fronts, not only the latest run. A single-run
+# failedSteps payload never reaches MERGE_GROUP_CHURN_FAILURE_THRESHOLD=2, so
+# unit-test merge_group failures re-enrolled forever as main moved (#16238).
 front_churn_action() {
   local n="$1" head_oid="$2" committed run_id jobs_json runs_json
   if [[ "$MERGE_QUEUE_BACKEND" != "native" || ! "$MAIN_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
@@ -1104,16 +1107,13 @@ front_churn_action() {
   fi
   committed="$(gh_retry api "repos/${REPO}/commits/${head_oid}" --jq '.commit.committer.date // empty' 2>/dev/null || true)"
   runs_json="$MERGE_GROUP_RUNS_JSON"
-  run_id="$(jq -r --arg prefix "gh-readonly-queue/main/pr-${n}-" '
-    [.[]
-      | select((.headBranch // "") | startswith($prefix))
-      | select(.status == "completed")
-      | select(.conclusion == "failure" or .conclusion == "timed_out"
-        or .conclusion == "action_required" or .conclusion == "startup_failure"
-        or .conclusion == "stale")]
-    | sort_by(.createdAt) | reverse | .[0].id // empty
-  ' <<<"$runs_json")"
-  if [[ "$run_id" =~ ^[1-9][0-9]*$ ]]; then
+  while IFS= read -r run_id; do
+    [[ "$run_id" =~ ^[1-9][0-9]*$ ]] || continue
+    if jq -e --argjson run_id "$run_id" '
+      any(.[]; .id == $run_id and (.failedSteps | type == "array"))
+    ' <<<"$runs_json" >/dev/null; then
+      continue
+    fi
     jobs_json="$(gh_retry api "repos/${REPO}/actions/runs/${run_id}/jobs?per_page=100" --paginate \
       --jq '[.jobs[]? | .steps[]? | select(.conclusion == "failure") | .name]' 2>/dev/null || echo '[]')"
     if jq -e 'type == "array" and all(.[]; type == "string")' <<<"$jobs_json" >/dev/null; then
@@ -1121,7 +1121,16 @@ front_churn_action() {
         map(if .id == $run_id then . + {failedSteps: $failed_steps} else . end)
       ' <<<"$runs_json")"
     fi
-  fi
+  done < <(jq -r --arg prefix "gh-readonly-queue/main/pr-${n}-" '
+    [.[]
+      | select((.headBranch // "") | startswith($prefix))
+      | select(.status == "completed")
+      | select(.conclusion == "failure" or .conclusion == "timed_out"
+        or .conclusion == "action_required" or .conclusion == "startup_failure"
+        or .conclusion == "stale")]
+    | sort_by(.createdAt) | reverse | .[0:8][]? | .id
+  ' <<<"$runs_json")
+  MERGE_GROUP_RUNS_JSON="$runs_json"
   MERGE_GROUP_RUNS_JSON="$runs_json" node scripts/ci-merge-queue-check.mjs front-churn \
     --pr="$n" --base="$MAIN_HEAD_SHA" --head-committed-at="$committed" 2>/dev/null \
     | jq -r '.action // "unknown"'
