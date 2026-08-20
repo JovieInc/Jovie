@@ -203,6 +203,11 @@ describe('LeadTable', () => {
     const user = userEvent.setup();
     await user.click(screen.getByText('Qualified'));
 
+    expect(screen.getByRole('button', { name: 'Qualified' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+
     // The query should have been called with the status filter
     const lastCall =
       mockLeadsInfiniteQuery.mock.calls[

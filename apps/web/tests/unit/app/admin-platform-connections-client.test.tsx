@@ -1,11 +1,20 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PlatformConnectionsClient } from '@/app/app/(shell)/admin/platform-connections/PlatformConnectionsClient';
 
-const { mockGenerateTestPlaylist, mockUseUserSafe } = vi.hoisted(() => ({
+const {
+  mockGenerateTestPlaylist,
+  mockRefresh,
+  mockSetCurrentAdminAsPlaylistSpotifyPublisher,
+  mockUpdatePlaylistEngineSettings,
+  mockUseUserSafe,
+} = vi.hoisted(() => ({
   mockGenerateTestPlaylist: vi.fn(),
+  mockRefresh: vi.fn(),
+  mockSetCurrentAdminAsPlaylistSpotifyPublisher: vi.fn(),
+  mockUpdatePlaylistEngineSettings: vi.fn(),
   mockUseUserSafe: vi.fn(),
 }));
 
@@ -14,7 +23,7 @@ vi.mock('@/hooks/useClerkSafe', () => ({
 }));
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ refresh: vi.fn() }),
+  useRouter: () => ({ refresh: mockRefresh }),
 }));
 
 vi.mock('@jovie/ui', () => ({
@@ -29,6 +38,18 @@ vi.mock('@jovie/ui', () => ({
       {children}
     </button>
   ),
+  Card: ({
+    children,
+    className,
+  }: {
+    children: React.ReactElement<{ className?: string }>;
+    className?: string;
+  }) =>
+    React.cloneElement(children, {
+      className: [className, children.props.className]
+        .filter(Boolean)
+        .join(' '),
+    }),
   ConfirmDialog: ({
     open,
     title,
@@ -72,8 +93,9 @@ vi.mock('@jovie/ui', () => ({
 
 vi.mock('@/app/app/(shell)/admin/platform-connections/actions', () => ({
   generateTestPlaylist: mockGenerateTestPlaylist,
-  setCurrentAdminAsPlaylistSpotifyPublisher: vi.fn(),
-  updatePlaylistEngineSettings: vi.fn(),
+  setCurrentAdminAsPlaylistSpotifyPublisher:
+    mockSetCurrentAdminAsPlaylistSpotifyPublisher,
+  updatePlaylistEngineSettings: mockUpdatePlaylistEngineSettings,
 }));
 
 const healthySpotifyStatus = {
@@ -104,6 +126,14 @@ describe('PlatformConnectionsClient', () => {
       success: true,
       message: 'Test playlist generated and queued for review.',
     });
+    mockSetCurrentAdminAsPlaylistSpotifyPublisher.mockResolvedValue({
+      success: true,
+      message: 'Publisher updated.',
+    });
+    mockUpdatePlaylistEngineSettings.mockResolvedValue({
+      success: true,
+      message: 'Engine settings updated.',
+    });
   });
 
   it('renders the disconnected Spotify state and disabled action', () => {
@@ -133,6 +163,9 @@ describe('PlatformConnectionsClient', () => {
     expect(
       screen.getByRole('button', { name: /Use This Account/i })
     ).toBeDisabled();
+    expect(
+      screen.getByTestId('platform-connections-spotify-surface')
+    ).toHaveClass('overflow-hidden');
   });
 
   it('opens the generate confirmation dialog from the engine tab', async () => {
@@ -151,6 +184,9 @@ describe('PlatformConnectionsClient', () => {
     );
 
     expect(screen.getByText('Paused')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('platform-connections-engine-surface')
+    ).toHaveClass('overflow-hidden');
     await user.click(
       screen.getByRole('button', { name: 'Generate Test Playlist' })
     );
@@ -161,5 +197,126 @@ describe('PlatformConnectionsClient', () => {
     expect(
       screen.getByText(/It will not publish to Spotify/i)
     ).toBeInTheDocument();
+  });
+
+  it('surfaces the temporary OAuth migration error for a connected admin', async () => {
+    const user = userEvent.setup();
+    mockUseUserSafe.mockReturnValue({ user: { id: 'user_1' } });
+
+    render(
+      <PlatformConnectionsClient
+        currentTab='spotify'
+        spotifyStatus={healthySpotifyStatus}
+        engineSettings={engineSettings}
+        currentUser={{
+          hasSpotify: true,
+          label: 'Jovie',
+          missingScopes: [],
+        }}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Reconnect Spotify' }));
+
+    expect(
+      await screen.findByText(/temporarily unavailable/i)
+    ).toBeInTheDocument();
+  });
+
+  it('selects the current admin as publisher and refreshes successful state', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <PlatformConnectionsClient
+        currentTab='spotify'
+        spotifyStatus={healthySpotifyStatus}
+        engineSettings={engineSettings}
+        currentUser={{
+          hasSpotify: true,
+          label: 'Jovie',
+          missingScopes: [],
+        }}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /Use This Account/i }));
+
+    await waitFor(() => {
+      expect(
+        mockSetCurrentAdminAsPlaylistSpotifyPublisher
+      ).toHaveBeenCalledOnce();
+      expect(mockRefresh).toHaveBeenCalledOnce();
+    });
+    expect(screen.getByText('Publisher updated.')).toBeInTheDocument();
+  });
+
+  it('persists edited engine settings and refreshes the successful result', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <PlatformConnectionsClient
+        currentTab='engine'
+        spotifyStatus={healthySpotifyStatus}
+        engineSettings={engineSettings}
+        currentUser={{
+          hasSpotify: true,
+          label: 'Jovie',
+          missingScopes: [],
+        }}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Playlist Engine' }));
+    const intervalInput = screen.getByLabelText('Eligible every');
+    await user.clear(intervalInput);
+    await user.type(intervalInput, '5');
+    await user.selectOptions(
+      screen.getByRole('combobox', {
+        name: 'Playlist Generation Interval Unit',
+      }),
+      'weeks'
+    );
+    await user.click(screen.getByRole('button', { name: 'Save Settings' }));
+
+    await waitFor(() => {
+      expect(mockUpdatePlaylistEngineSettings).toHaveBeenCalledWith({
+        enabled: true,
+        intervalValue: 5,
+        intervalUnit: 'weeks',
+      });
+      expect(mockRefresh).toHaveBeenCalledOnce();
+    });
+    expect(screen.getByText('Engine settings updated.')).toBeInTheDocument();
+  });
+
+  it('runs confirmed generation and reports action failures without refreshing', async () => {
+    const user = userEvent.setup();
+    mockGenerateTestPlaylist.mockRejectedValueOnce(
+      new Error('Playlist service unavailable.')
+    );
+
+    render(
+      <PlatformConnectionsClient
+        currentTab='engine'
+        spotifyStatus={healthySpotifyStatus}
+        engineSettings={engineSettings}
+        currentUser={{
+          hasSpotify: true,
+          label: 'Jovie',
+          missingScopes: [],
+        }}
+      />
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Generate Test Playlist' })
+    );
+    await user.click(screen.getByRole('button', { name: 'Generate' }));
+
+    expect(
+      await screen.findByText('Playlist service unavailable.')
+    ).toBeInTheDocument();
+    expect(mockGenerateTestPlaylist).toHaveBeenCalledOnce();
+    expect(mockRefresh).not.toHaveBeenCalled();
   });
 });
