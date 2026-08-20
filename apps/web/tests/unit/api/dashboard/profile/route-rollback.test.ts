@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   withDbSessionTx: vi.fn(),
   buildThemeWithProfileAccent: vi.fn(),
   getProfileUpdatePreflight: vi.fn(),
+  getCurrentUserEntitlements: vi.fn(),
   parseJsonBody: vi.fn(),
   validateUpdatesPayload: vi.fn(),
   parseProfileUpdates: vi.fn(),
@@ -26,6 +27,9 @@ vi.mock('@/lib/http/parse-json', () => ({
   parseJsonBody: mocks.parseJsonBody,
 }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: mocks.captureError }));
+vi.mock('@/lib/entitlements/server', () => ({
+  getCurrentUserEntitlements: mocks.getCurrentUserEntitlements,
+}));
 vi.mock('@/lib/db', () => ({ db: {} }));
 vi.mock('@/lib/db/query-timeout', () => ({ dashboardQuery: vi.fn() }));
 vi.mock('@/lib/db/social-links-sync', () => ({
@@ -62,6 +66,7 @@ describe('PUT /api/dashboard/profile exact transaction', () => {
       avatarUrl: 'https://example.com/old-avatar.png',
       profileEditVersion: 3,
     });
+    mocks.getCurrentUserEntitlements.mockResolvedValue({ plan: 'max' });
     const tx = { marker: 'transaction' };
     mocks.withDbSessionTx.mockImplementation(callback =>
       callback(tx, APP_USER_ID)
@@ -135,6 +140,46 @@ describe('PUT /api/dashboard/profile exact transaction', () => {
 
     expect(response.status).toBe(400);
     expect(mocks.updateProfileRecords).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { plan: 'free', allowed: false },
+    { plan: 'pro', allowed: false },
+    { plan: 'max', allowed: true },
+    { plan: 'growth', allowed: true },
+  ])('enforces double opt-in authority for $plan', async ({
+    plan,
+    allowed,
+  }) => {
+    mocks.parseJsonBody.mockResolvedValue({
+      ok: true,
+      data: {
+        profileId: PROFILE_ID,
+        updates: { settings: { require_double_opt_in: false } },
+      },
+    });
+    mocks.validateUpdatesPayload.mockReturnValue({
+      ok: true,
+      updates: { settings: { require_double_opt_in: false } },
+    });
+    mocks.parseProfileUpdates.mockReturnValue({
+      ok: true,
+      parsed: { settings: { require_double_opt_in: false } },
+    });
+    mocks.getCurrentUserEntitlements.mockResolvedValue({ plan });
+
+    const { PUT } = await import('@/app/api/dashboard/profile/route');
+    const response = await PUT(
+      new Request('http://localhost/api/dashboard/profile', { method: 'PUT' })
+    );
+
+    expect(response.status).toBe(allowed ? 200 : 403);
+    if (allowed) {
+      expect(mocks.updateProfileRecords).toHaveBeenCalledOnce();
+    } else {
+      expect(mocks.withDbSessionTx).not.toHaveBeenCalled();
+      expect(mocks.updateProfileRecords).not.toHaveBeenCalled();
+    }
   });
 
   it('returns the transaction CAS conflict without post-commit effects', async () => {
