@@ -65,7 +65,6 @@ function gradientCard(headline: string, subtitle: string) {
         fontFamily: 'Inter, sans-serif',
       }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element -- Satori requires standard img */}
       <img
         src={`${BASE_URL}/Jovie-logo.png`}
         alt='Jovie'
@@ -135,7 +134,6 @@ function heroImage(
         fontFamily: 'Inter, sans-serif',
       }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element -- Satori requires standard img */}
       <img
         src={photoDataUrl}
         alt={`${name} profile`}
@@ -160,7 +158,6 @@ function heroImage(
       />
 
       {/* Jovie logo */}
-      {/* eslint-disable-next-line @next/next/no-img-element -- Satori requires standard img */}
       <img
         src={`${BASE_URL}/Jovie-logo.png`}
         alt='Jovie'
