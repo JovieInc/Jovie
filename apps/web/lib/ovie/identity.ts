@@ -131,6 +131,26 @@ export function bindEveIdentityForChatMode(
   return bindEveIdentityForTurn(chatMode === 'ov' ? 'ovie' : 'jovie');
 }
 
+/**
+ * Selected door owns self-id. Ovie instructions prepend and override any
+ * later "You are Jovie" product copy. Jovie keeps the existing system prompt.
+ */
+export function applyEveIdentityToSystemPrompt(
+  systemPrompt: string,
+  identity: {
+    readonly id: EveIdentityId;
+    readonly instructions: string;
+  }
+): string {
+  if (identity.id !== 'ovie') return systemPrompt;
+  const instructions = identity.instructions.trim();
+  const identityBlock =
+    instructions.length > 0
+      ? instructions
+      : 'You are Ovie, the founder door. You are not Jovie.';
+  return `${identityBlock}\n\nThe following artist-product context is available when you drive Jovie tools. Do not identify as Jovie.\n\n${systemPrompt}`;
+}
+
 /** Fail closed if this turn is armed with factory-only capabilities. */
 export function assertEveChatFactoryLock(turn: EveBoundTurn): void {
   if (authorizeEveCapability(turn.pack, 'privileged-gbrain-write').allowed) {

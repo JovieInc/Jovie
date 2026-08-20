@@ -7,6 +7,17 @@
 export const CHAT_COMPOSER_EMPTY_PLACEHOLDER =
   'Ask Jovie to plan your next release...';
 
+/** Ovie door placeholder — founder talk door, not artist-release copy. */
+export const CHAT_COMPOSER_OVIE_EMPTY_PLACEHOLDER = 'Ask Ovie...';
+
+export function composerPlaceholderForChatMode(
+  chatMode: 'ov' | null | undefined
+): string {
+  return chatMode === 'ov'
+    ? CHAT_COMPOSER_OVIE_EMPTY_PLACEHOLDER
+    : CHAT_COMPOSER_EMPTY_PLACEHOLDER;
+}
+
 /** Form region accessible name (Title Case product UI). */
 export const CHAT_COMPOSER_FORM_ARIA_LABEL =
   'Compose A Message — Type / For Skills And References';

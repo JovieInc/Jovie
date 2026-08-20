@@ -2958,6 +2958,10 @@ export async function POST(req: Request) {
       requestId,
       telemetry,
       onStreamError: persistStreamFailure,
+      identity: {
+        id: eveTurn.pack.id,
+        instructions: eveTurn.instructions,
+      },
     });
 
     // Record the producing model on the turn row (fire-and-forget) so 👍/👎

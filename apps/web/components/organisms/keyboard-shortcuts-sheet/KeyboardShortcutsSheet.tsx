@@ -11,12 +11,13 @@ import {
 } from '@jovie/ui';
 import { ChevronLeft, Search, X } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { useFounderDoor } from '@/contexts/FounderDoorContext';
 import { useKeyboardShortcuts } from '@/contexts/KeyboardShortcutsContext';
 import {
-  KEYBOARD_SHORTCUTS,
   type KeyboardShortcut,
   SHORTCUT_CATEGORY_LABELS,
   type ShortcutCategory,
+  shortcutsForHelpSheet,
 } from '@/lib/keyboard-shortcuts';
 
 /**
@@ -105,23 +106,28 @@ function ShortcutCategorySection({
  */
 export function KeyboardShortcutsSheet() {
   const { isOpen, close } = useKeyboardShortcuts();
+  const { canUse: canUseFounderDoor } = useFounderDoor();
   const [searchQuery, setSearchQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const catalogShortcuts = useMemo(
+    () => shortcutsForHelpSheet({ canUseFounderDoor }),
+    [canUseFounderDoor]
+  );
 
   // Filter shortcuts based on search query
   const filteredShortcuts = useMemo(() => {
     if (!searchQuery.trim()) {
-      return KEYBOARD_SHORTCUTS;
+      return catalogShortcuts;
     }
 
     const query = searchQuery.toLowerCase();
-    return KEYBOARD_SHORTCUTS.filter(
+    return catalogShortcuts.filter(
       shortcut =>
         shortcut.label.toLowerCase().includes(query) ||
         shortcut.keys.toLowerCase().includes(query) ||
         shortcut.description?.toLowerCase().includes(query)
     );
-  }, [searchQuery]);
+  }, [catalogShortcuts, searchQuery]);
 
   // Group filtered shortcuts by category
   const groupedShortcuts = useMemo(() => {

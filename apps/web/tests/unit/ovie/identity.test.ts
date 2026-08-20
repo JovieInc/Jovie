@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { prepareOvieChatTurn } from '@/lib/ovie/chat-entry';
 import {
+  applyEveIdentityToSystemPrompt,
   assertEveChatFactoryLock,
   bindEveIdentityForChatMode,
   bindEveIdentityForTurn,
@@ -75,5 +76,20 @@ describe('Eve identity packs (JOV-5216)', () => {
         })
       ).eveTurn.pack.id
     ).toBe('jovie');
+  });
+
+  it('prepends Ovie self-id and does not leave Jovie copy in charge of the door', () => {
+    const prompt = applyEveIdentityToSystemPrompt(
+      'You are Jovie, an AI music career assistant.',
+      { id: 'ovie', instructions: "You are Ovie, Tim's only talk door." }
+    );
+    expect(prompt.startsWith("You are Ovie, Tim's only talk door.")).toBe(true);
+    expect(prompt).toContain('Do not identify as Jovie.');
+    expect(
+      applyEveIdentityToSystemPrompt('You are Jovie.', {
+        id: 'jovie',
+        instructions: 'You are Jovie, the artist-facing product agent.',
+      })
+    ).toBe('You are Jovie.');
   });
 });

@@ -649,6 +649,7 @@ export function JovieChat({
   const composerSurface = (
     <ChatComposerSurface
       chatInputProps={chatInputProps}
+      chatMode={chatMode}
       showThreadView={showThreadView}
       isRateLimited={isRateLimited}
       showManifest={showManifest}

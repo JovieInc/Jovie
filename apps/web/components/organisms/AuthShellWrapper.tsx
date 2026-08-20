@@ -17,6 +17,7 @@ import { ComposerFocusProvider } from '@/components/features/chat/Composer';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { ArtistProfileRailToggle } from '@/components/shell/ArtistProfileRailToggle';
 import { APP_ROUTES } from '@/constants/routes';
+import { FounderDoorProvider } from '@/contexts/FounderDoorContext';
 import {
   HeaderActionsProvider,
   useHeaderActions,
@@ -302,20 +303,22 @@ export function AuthShellWrapper({
   return (
     <TooltipProvider delayDuration={120} skipDelayDuration={40}>
       <KeyboardShortcutsProvider>
-        <HeaderActionsProvider>
-          <ShellSidebarOverrideProvider>
-            <AuthShellWrapperInner
-              mode={mode}
-              persistSidebarCollapsed={persistSidebarCollapsed}
-              sidebarDefaultOpen={sidebarDefaultOpen}
-              previewPanelDefaultOpen={previewPanelDefaultOpen}
-            >
-              {children}
-            </AuthShellWrapperInner>
-            <KeyboardShortcutsHandler />
-            <CommandPalette />
-          </ShellSidebarOverrideProvider>
-        </HeaderActionsProvider>
+        <FounderDoorProvider>
+          <HeaderActionsProvider>
+            <ShellSidebarOverrideProvider>
+              <AuthShellWrapperInner
+                mode={mode}
+                persistSidebarCollapsed={persistSidebarCollapsed}
+                sidebarDefaultOpen={sidebarDefaultOpen}
+                previewPanelDefaultOpen={previewPanelDefaultOpen}
+              >
+                {children}
+              </AuthShellWrapperInner>
+              <KeyboardShortcutsHandler />
+              <CommandPalette />
+            </ShellSidebarOverrideProvider>
+          </HeaderActionsProvider>
+        </FounderDoorProvider>
       </KeyboardShortcutsProvider>
     </TooltipProvider>
   );
