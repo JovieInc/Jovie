@@ -1,0 +1,123 @@
+{
+  "title": "contact.create invocation v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "idempotencyKey": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128
+    },
+    "context": {
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "channel": {
+          "type": "string",
+          "enum": [
+            "web",
+            "ios",
+            "electron",
+            "app_intent",
+            "widget",
+            "cli",
+            "mcp",
+            "chat_tool",
+            "extension"
+          ]
+        },
+        "clientVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "profileId",
+        "channel"
+      ],
+      "additionalProperties": false
+    },
+    "input": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": [
+            "bookings",
+            "management",
+            "press_pr",
+            "brand_partnerships",
+            "music_collaboration",
+            "fan_general",
+            "other"
+          ]
+        },
+        "customLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "personName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "companyName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "territories": {
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 254,
+          "format": "email",
+          "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+        },
+        "phone": {
+          "type": "string",
+          "pattern": "^\\+[1-9]\\d{6,14}$"
+        },
+        "preferredChannel": {
+          "type": "string",
+          "enum": [
+            "email",
+            "phone"
+          ]
+        }
+      },
+      "required": [
+        "role"
+      ],
+      "additionalProperties": false
+    },
+    "confirmationToken": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "idempotencyKey",
+    "context",
+    "input"
+  ],
+  "additionalProperties": false
+}

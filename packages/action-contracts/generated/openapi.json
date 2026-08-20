@@ -1,0 +1,184 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Jovie Canonical Actions",
+    "version": "1.0.0",
+    "description": "Generated from the @jovie/action-contracts manifest. Discovery is live; invoke paths are phase-3 contract definitions."
+  },
+  "paths": {
+    "/api/v1/actions": {
+      "get": {
+        "operationId": "resolveActionCapabilities",
+        "summary": "Resolve action capabilities",
+        "description": "Authenticated, read-only discovery. Advisory UX only — never authorization; every invocation repeats all checks server-side.",
+        "parameters": [
+          {
+            "name": "profileId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Owned creator profile to resolve against."
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "./manifest.json#/channels"
+            }
+          },
+          {
+            "name": "clientVersion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resolved capabilities for every manifest action.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "./schemas/shared.capability.json"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/actions/chat.start/invoke": {
+      "post": {
+        "operationId": "invoke_chat_start",
+        "summary": "Invoke chat.start",
+        "description": "Canonical invocation endpoint. Phase 3 (dispatcher); not implemented in the foundation slice.",
+        "x-jovie-phase": "dispatcher",
+        "x-jovie-implemented": false,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/chat.start.invocation.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Canonical action result union.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/chat.start.result.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/actions/contact.create/invoke": {
+      "post": {
+        "operationId": "invoke_contact_create",
+        "summary": "Invoke contact.create",
+        "description": "Canonical invocation endpoint. Phase 3 (dispatcher); not implemented in the foundation slice.",
+        "x-jovie-phase": "dispatcher",
+        "x-jovie-implemented": false,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/contact.create.invocation.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Canonical action result union.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/contact.create.result.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/actions/release.create/invoke": {
+      "post": {
+        "operationId": "invoke_release_create",
+        "summary": "Invoke release.create",
+        "description": "Canonical invocation endpoint. Phase 3 (dispatcher); not implemented in the foundation slice.",
+        "x-jovie-phase": "dispatcher",
+        "x-jovie-implemented": false,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/release.create.invocation.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Canonical action result union.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/release.create.result.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/actions/task.create/invoke": {
+      "post": {
+        "operationId": "invoke_task_create",
+        "summary": "Invoke task.create",
+        "description": "Canonical invocation endpoint. Phase 3 (dispatcher); not implemented in the foundation slice.",
+        "x-jovie-phase": "dispatcher",
+        "x-jovie-implemented": false,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/task.create.invocation.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Canonical action result union.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/task.create.result.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
