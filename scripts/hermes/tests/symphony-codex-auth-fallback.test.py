@@ -1662,6 +1662,16 @@ class FallbackTests(unittest.TestCase):
             self.assertEqual(module._open_pr_verdict("JOV-3", index)[0], "none")
             self.assertEqual(module._open_pr_verdict("JOV-4", index)[0], "skip")
             self.assertEqual(module._open_pr_verdict("JOV-5", index)[0], "remount")
+        conflicting = {
+            "JOV-6": {
+                "number": 16229,
+                "head": "fallback/JOV-5220-fix",
+                "repo": "JovieInc/Jovie",
+                "mergeStateStatus": "UNKNOWN",
+                "mergeable": "CONFLICTING",
+            }
+        }
+        self.assertEqual(module._open_pr_verdict("JOV-6", conflicting)[0], "remount")
 
     def test_github_remount_identifiers_find_dirty_heads_without_linear(self):
         module = self.load_controller_module()
@@ -1872,6 +1882,103 @@ class FallbackTests(unittest.TestCase):
         self.assertFalse(any("JOV-1" in unit for unit in units), units)
         self.assertEqual(used, 2)
         self.assertEqual(len(launched), 2)
+
+    def test_launch_recycles_stale_remount_unit_and_relaunches(self):
+        """Live JOV-5220 held a remount unit 90+ min after main moved."""
+        module = self.load_controller_module()
+        launches: list[list[str]] = []
+        stopped: list[str] = []
+        stale = "fallback-ship-JOV-5220-aaaaaaaaaaaa.service"
+
+        def verdict(identifier, _index):
+            if identifier in {"JOV-5220", "JOV-5238"}:
+                return "remount", {
+                    "number": 16229,
+                    "head": f"fallback/{identifier}-fix",
+                    "mergeable": "CONFLICTING",
+                }
+            return "none", None
+
+        def control(command):
+            if len(command) >= 4 and command[0] == "systemctl" and command[2] == "stop":
+                stopped.append(command[-1])
+                return True
+            launches.append(command)
+            return True
+
+        with (
+            mock.patch.object(module, "_autonomous_open_pr_index", return_value={}),
+            mock.patch.object(module, "_open_pr_verdict", side_effect=verdict),
+            mock.patch.object(module, "_unit_age_seconds", return_value=3600.0),
+            mock.patch.object(module, "_fetch_single_issue", return_value=self._admitted_issue()),
+            mock.patch.object(
+                module,
+                "_issue_meta",
+                return_value=(True, "admitted", {"issue_revision": "2026-08-19T18:46:00Z"}),
+            ),
+            mock.patch.object(module, "_control", side_effect=control),
+        ):
+            launched, used = module._launch_fallback_workers(
+                ["JOV-5220", "JOV-5238"],
+                [stale],
+                "/bin/true",
+                "a" * 64,
+                {"selected": {"id": "grok"}},
+                2,
+            )
+        self.assertEqual(stopped, [stale])
+        units = [arg for command in launches if command[0] == "systemd-run" for arg in command if arg.startswith("--unit=")]
+        self.assertTrue(any("JOV-5220" in unit for unit in units), units)
+        self.assertTrue(any("JOV-5238" in unit for unit in units), units)
+        self.assertEqual(used, 2)
+        self.assertEqual(len(launched), 2)
+
+    def test_launch_keeps_fresh_remount_and_clean_units(self):
+        module = self.load_controller_module()
+        stopped: list[str] = []
+        launches: list[list[str]] = []
+        fresh = "fallback-ship-JOV-5218-bbbbbbbbbbbb.service"
+        clean = "fallback-ship-JOV-4905-cccccccccccc.service"
+
+        def verdict(identifier, _index):
+            if identifier == "JOV-5218":
+                return "remount", {"number": 16234, "head": "fallback/JOV-5218-fix"}
+            if identifier == "JOV-4905":
+                return "skip", {"number": 16214, "head": "grok/JOV-4905-fix"}
+            return "none", None
+
+        def control(command):
+            if len(command) >= 4 and command[0] == "systemctl" and command[2] == "stop":
+                stopped.append(command[-1])
+                return True
+            launches.append(command)
+            return True
+
+        with (
+            mock.patch.object(module, "_autonomous_open_pr_index", return_value={}),
+            mock.patch.object(module, "_open_pr_verdict", side_effect=verdict),
+            mock.patch.object(module, "_unit_age_seconds", return_value=60.0),
+            mock.patch.object(module, "_fetch_single_issue", return_value=self._admitted_issue()),
+            mock.patch.object(
+                module,
+                "_issue_meta",
+                return_value=(True, "admitted", {"issue_revision": "2026-08-19T18:46:00Z"}),
+            ),
+            mock.patch.object(module, "_control", side_effect=control),
+        ):
+            launched, used = module._launch_fallback_workers(
+                ["JOV-5218", "JOV-5238"],
+                [fresh, clean],
+                "/bin/true",
+                "a" * 64,
+                {"selected": {"id": "grok"}},
+                4,
+            )
+        self.assertEqual(stopped, [])
+        units = [arg for command in launches if command[0] == "systemd-run" for arg in command if arg.startswith("--unit=")]
+        self.assertFalse(any("JOV-5218" in unit for unit in units), units)
+        self.assertTrue(any("JOV-5238" in unit for unit in units), units)
+        self.assertEqual(used, 3)
 
     def test_grok_ship_one_new_work_does_not_request_queue_deferred(self):
         """Live fallback PRs still got queue-deferred because the prompt asked for it."""

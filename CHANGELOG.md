@@ -47,6 +47,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- [internal] **Stale grok remount units no longer block a fresh rebase:** sidecar stops a DIRTY/CONFLICTING fallback-ship older than 15 minutes so changelog remounts can run after a sibling lands. Merge-queue UNMERGEABLE (`CONFLICTING`) counts as remount, not inflight skip.
 - [internal] **DIRTY remounts that only conflict on CHANGELOG.md merge and push without waiting on grok:** Unreleased bullets from the branch are unioned onto main so sibling ships stop parking CLEAN-except-changelog heads for an hour.
 - [internal] **Hold-intake missed-admission recovery now enrolls CLEAN `queue-deferred` heads:** exact admission already strips that label, but a main-push recovery used to skip it and left CI-green Symphony PRs parked off the merge queue.
 - [internal] **Agent QC wires now match autonomous-shipping doctrine:** Scope Judge is retired instead of advertised, Slop Gate stays a weekly post-merge smell report, GStack PR comments are no longer auto-approve evidence, exhausted `needs-human` PRs ping Slack/Linear before the 48h close, agent-pipeline classifies branches with the shared allowlist so `hotfix/` and `feat/` stop looking like agent PRs, and live merge-queue ruleset verify runs on a schedule instead of only in docs.
