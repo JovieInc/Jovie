@@ -107,6 +107,14 @@ describe('non-actionable Sentry issues', () => {
       ).toBe(true);
     });
 
+    it('matches a title-only JOV-5229 Linear/Sentry event', () => {
+      expect(
+        isNonActionableUpstashErrorBagEvent({
+          title: `Error: ${UPSTASH_ERROR_JSON_BAG}`,
+        })
+      ).toBe(true);
+    });
+
     it('does not match a quota-exceeded UpstashError', () => {
       expect(
         isNonActionableUpstashErrorBagEvent({
@@ -152,12 +160,26 @@ describe('non-actionable Sentry issues', () => {
       expect(isOpaqueUpstashErrorJsonBag({ error: inner })).toBe(true);
     });
 
+    it('matches the JOV-5229 Linear title', () => {
+      expect(
+        isOpaqueUpstashErrorJsonBag(`Error: ${UPSTASH_ERROR_JSON_BAG}`)
+      ).toBe(true);
+    });
+
     it('does not match a real quota UpstashError instance', () => {
       const error = new Error(
         'Command failed: ERR max requests limit exceeded. Limit: 500000'
       );
       error.name = 'UpstashError';
       expect(isOpaqueUpstashErrorJsonBag(error)).toBe(false);
+    });
+
+    it('does not match a real Upstash quota exception', () => {
+      expect(
+        isOpaqueUpstashErrorJsonBag(
+          'UpstashError: Command failed: ERR max requests limit exceeded. Limit: 500000'
+        )
+      ).toBe(false);
     });
   });
 
