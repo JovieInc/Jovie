@@ -1911,7 +1911,7 @@ class FallbackTests(unittest.TestCase):
         with (
             mock.patch.object(module, "_autonomous_open_pr_index", return_value={}),
             mock.patch.object(module, "_open_pr_verdict", side_effect=verdict),
-            mock.patch.object(module, "_unit_age_seconds", return_value=3600.0),
+            mock.patch.object(module, "_unit_age_seconds", return_value=2 * 60 * 60),
             mock.patch.object(module, "_fetch_single_issue", return_value=self._admitted_issue()),
             mock.patch.object(
                 module,
@@ -1985,7 +1985,7 @@ class FallbackTests(unittest.TestCase):
     def test_launch_keeps_remount_during_pre_push_window(self):
         """Live JOV-5220 changelog remount was in pre-push at 15 min; recycle would kill it."""
         module = self.load_controller_module()
-        self.assertGreater(module.STALE_REMOUNT_SECONDS, 20 * 60)
+        self.assertGreater(module.STALE_REMOUNT_SECONDS, 60 * 60)
         stopped: list[str] = []
         pushing = "fallback-ship-JOV-5220-aaaaaaaaaaaa.service"
 
@@ -2003,7 +2003,7 @@ class FallbackTests(unittest.TestCase):
         with (
             mock.patch.object(module, "_autonomous_open_pr_index", return_value={}),
             mock.patch.object(module, "_open_pr_verdict", side_effect=verdict),
-            mock.patch.object(module, "_unit_age_seconds", return_value=20 * 60),
+            mock.patch.object(module, "_unit_age_seconds", return_value=54 * 60),
             mock.patch.object(module, "_fetch_single_issue", return_value=self._admitted_issue()),
             mock.patch.object(
                 module,

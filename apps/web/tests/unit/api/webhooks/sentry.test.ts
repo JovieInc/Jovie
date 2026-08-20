@@ -98,7 +98,51 @@ describe('POST /api/webhooks/sentry', () => {
     );
   });
 
-  it('skips autofix for opaque UpstashError JSON titles', async () => {
+  it('skips autofix for the JOV-5218 UpstashError JSON bag', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+
+    const { POST } = await import('@/app/api/webhooks/sentry/route');
+    const payload = {
+      data: {
+        issue: {
+          id: '7679403920',
+          title: 'Error: {"error":{"name":"UpstashError"}}',
+          culprit: 'captureWarning',
+        },
+      },
+    };
+    const body = JSON.stringify(payload);
+    const request = new Request('https://example.com/api/webhooks/sentry', {
+      method: 'POST',
+      headers: {
+        'sentry-hook-signature': sign(body),
+      },
+      body,
+    });
+
+    const response = await POST(request as never);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({
+      received: true,
+      skipped: true,
+      reason: 'upstash-error-json-bag',
+    });
+    expect(mockServerFetch).not.toHaveBeenCalled();
+    expect(mockLoggerInfo).toHaveBeenCalledWith(
+      '[Sentry Webhook] Skipping autofix for UpstashError JSON bag',
+      expect.objectContaining({
+        issueId: '7679403920',
+        title: 'Error: {"error":{"name":"UpstashError"}}',
+      })
+    );
+  });
+
+  it('skips autofix for quota-exhausted UpstashError titles', async () => {
     mockAcquireRecentDispatch.mockResolvedValue({
       acquired: true,
       reason: 'acquired',
@@ -109,7 +153,8 @@ describe('POST /api/webhooks/sentry', () => {
       data: {
         issue: {
           id: '5220',
-          title: 'Error: {"error":{"name":"UpstashError"}}',
+          title:
+            'UpstashError: Command failed: ERR max requests limit exceeded. Limit: 500000, Usage: 500099',
           culprit: 'GET /api/health',
         },
       },

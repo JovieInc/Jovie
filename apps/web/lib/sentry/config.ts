@@ -53,6 +53,7 @@
  */
 
 import type * as Sentry from '@sentry/nextjs';
+import { isNonActionableUpstashErrorBagEvent } from '@/lib/sentry/non-actionable-issues';
 
 /**
  * Sentry Event type alias for cleaner code
@@ -429,6 +430,12 @@ export function scrubPii(event: SentryEvent): SentryEvent | null {
 
   // Filter React/Next.js framework internal errors (not actionable)
   if (isFrameworkInternalError(event)) {
+    return null;
+  }
+
+  // Filter captureWarning({ error: UpstashError }) JSON bags (JOV-5218).
+  // Real Upstash quota exceptions keep their command-failure title.
+  if (isNonActionableUpstashErrorBagEvent(event)) {
     return null;
   }
 
