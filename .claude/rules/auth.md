@@ -52,13 +52,13 @@ unification moved prod FAPI to `clerk.jov.ie` while the consoles still had the
 old `meetjovie` / `jov.ie/__clerk` callbacks).
 
 - **Single source of truth:** `apps/web/lib/auth/oauth-redirect-uris.expected.json`. Print/verify with `pnpm tsx scripts/auth-redirect-uris.ts [--verify prod|staging]`.
-- **These consoles have NO CLI/API.** To register/update redirect URIs, run the **`/auth-console-sync`** skill — it drives a logged-in browser (claude-in-chrome, not headless `/browse`). Do not ask the user to do it manually.
+- **These consoles have NO CLI/API.** To register/update redirect URIs, run the **`/auth-console-sync`** skill — it drives a logged-in browser. Do not ask the user to do it manually.
 - **If you change a Clerk instance / FAPI host** (unification, key rotation, new instance): update the snapshot JSON AND re-run `/auth-console-sync` **before shipping**. `apps/web/tests/unit/auth/fapi-host-snapshot.test.ts` fails on host drift to force this.
 - **Guardrails:** `apps/web/tests/e2e/oauth-providers.spec.ts` (`@production-smoke`) probes the Google/Apple authorize endpoints with the real redirect_uri. It runs in the canary (staging, pre-promote) and the `production-oauth-gate` (post-promote, **auto-rolls-back prod** on a confirmed rejection). Don't verify OAuth by clicking the in-app button — Clerk's invisible bot-protection gates automated clicks.
 
 ## Local Auth Bypass For Perf and E2E
 
-Local `/browse` auth is bypass-first, not Clerk-form-first.
+Local Playwright QA auth is bypass-first, not Clerk-form-first.
 
 When local perf or E2E work needs an authenticated session on loopback/private hosts, prefer the repo's dev auth bypass before assuming Clerk bootstrap is required or broken.
 
@@ -73,19 +73,19 @@ When local perf or E2E work needs an authenticated session on loopback/private h
 
 This path sets bypass cookies directly and does **not** require `NEXT_PUBLIC_E2E_MODE=1`.
 
-## QA & Browse Authentication (Jovie-Specific)
+## QA Authentication (Jovie-Specific)
 
-When running `/qa` or `/browse` against local Jovie, agents **MUST** use the built-in dev auth bootstrap. **Do NOT prompt the user for credentials. Do NOT ask for cookie import help.**
+When running Playwright `/qa` against local Jovie, agents **MUST** use the built-in dev auth bootstrap. **Do NOT prompt the user for credentials.** `/browse` is removed.
 
 ### Local default flow (`localhost`, `127.0.0.1`, private dev IPs)
 
-1. Start the browse-compatible dev server:
+1. Start the auth-bypass dev server if a live app is required:
 
    ```bash
    pnpm run dev:web:browse
    ```
 
-2. Authenticate the browse session by opening:
+2. Authenticate via the bypass route or Clerk Playwright helpers:
 
    ```text
    /api/dev/test-auth/enter?persona=creator&redirect=/app/dashboard/earnings
@@ -100,24 +100,23 @@ When running `/qa` or `/browse` against local Jovie, agents **MUST** use the bui
 ### What this does
 
 - sets the local auth-bypass cookies automatically
-- provisions a stable creator browse persona by default
+- provisions a stable creator persona by default
 - avoids Clerk sign-in, OTP entry, and cookie handoff
 - works without `NEXT_PUBLIC_E2E_MODE=1`
 
 ### Agent rules
 
-- `/browse` on local Jovie means: use the dev auth bootstrap route above
+- local Playwright QA uses the dev auth bootstrap route above
 - default persona is `creator`; `admin` is opt-in
-- if auth is needed on local browse QA, solve it yourself with this flow
-- only use `scripts/browse-auth.ts` as a fallback helper for non-loopback hosts
-- only use `/setup-browser-cookies` for importing a real human session when a human explicitly wants that path
+- solve auth yourself with this flow or `setupClerkTestingToken`
+- `scripts/browse-auth.ts` is a Playwright cookie helper for non-loopback hosts only
 
 ### Do NOT
 
 - prompt the user for credentials
 - fill the Clerk sign-in form manually for local QA
-- claim auth is blocked on local `/browse` without trying `/api/dev/test-auth/enter?...`
-- enable `NEXT_PUBLIC_E2E_MODE=1` just to make browse auth work
+- invoke `/browse` or `$B`
+- enable `NEXT_PUBLIC_E2E_MODE=1` just to make local QA auth work
 
 ## E2E Authentication with Clerk
 
