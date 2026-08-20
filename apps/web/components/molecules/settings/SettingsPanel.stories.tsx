@@ -11,8 +11,9 @@ const meta: Meta<typeof SettingsPanel> = {
   args: {
     title: 'Appearance',
     description: 'Theme and contrast preferences for your workspace.',
+    bodyClassName: 'px-4 py-4 sm:px-5',
     children: (
-      <div className='w-160 px-4 py-4 text-app text-secondary-token'>
+      <div className='w-160 text-app text-secondary-token'>
         Compact settings content
       </div>
     ),

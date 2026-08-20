@@ -71,6 +71,9 @@ describe('SettingsAppearanceSection', () => {
     expect(
       screen.getByLabelText('Toggle high contrast mode')
     ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('theme-option-light').closest('.px-4')
+    ).toHaveClass('px-4', 'py-4', 'sm:px-5');
   });
 
   it('updates persisted theme when an option is selected', () => {

@@ -14,6 +14,11 @@ export interface SettingsPanelProps {
   readonly descriptionClassName?: string;
   readonly actionsClassName?: string;
   readonly cardClassName?: string;
+  /**
+   * Optional canonical body wrapper. Use this instead of recreating the
+   * settings card's responsive inset in every consumer.
+   */
+  readonly bodyClassName?: string;
 }
 
 export function SettingsPanel({
@@ -27,6 +32,7 @@ export function SettingsPanel({
   descriptionClassName,
   actionsClassName,
   cardClassName,
+  bodyClassName,
 }: Readonly<SettingsPanelProps>) {
   const hasHeader = Boolean(title || description || actions);
 
@@ -80,7 +86,11 @@ export function SettingsPanel({
         surface='settings'
         className={cn('overflow-hidden', cardClassName)}
       >
-        {children}
+        {bodyClassName ? (
+          <div className={bodyClassName}>{children}</div>
+        ) : (
+          children
+        )}
       </ContentSurfaceCard>
     </div>
   );
