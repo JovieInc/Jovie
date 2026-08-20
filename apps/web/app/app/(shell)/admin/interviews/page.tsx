@@ -2,6 +2,7 @@ import { Badge } from '@jovie/ui';
 import type { Metadata } from 'next';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 import { loadAdminInterviewRows } from './interviews-data';
@@ -43,11 +44,12 @@ export default async function AdminInterviewsPage() {
       description='Mom Test interviews captured after onboarding.'
       testId='admin-interviews-page'
     >
-      <ContentSurfaceCard className='overflow-hidden p-0'>
+      <ContentSurfaceCard surface='table' className='overflow-hidden p-0'>
         {rows.length === 0 ? (
-          <div className='px-(--linear-app-header-padding-x) py-6 text-app text-secondary-token'>
-            No interviews yet.
-          </div>
+          <EmptyState
+            heading='No interviews yet'
+            description='Completed onboarding interviews will appear here.'
+          />
         ) : (
           <div className='divide-y divide-subtle'>
             {rows.map(row => {
@@ -91,7 +93,10 @@ export default async function AdminInterviewsPage() {
                       {capitalizeFirst(row.status)}
                     </Badge>
                   </summary>
-                  <div className='mt-3 space-y-3 rounded-md bg-surface-0 p-3 text-app'>
+                  <ContentSurfaceCard
+                    surface='nested'
+                    className='mt-3 space-y-3 p-3 text-app'
+                  >
                     {transcript.map((entry, idx) => (
                       <div key={`${row.id}-${entry.questionId}`}>
                         <div className='font-caption text-primary-token'>
@@ -106,7 +111,7 @@ export default async function AdminInterviewsPage() {
                         </div>
                       </div>
                     ))}
-                  </div>
+                  </ContentSurfaceCard>
                 </details>
               );
             })}

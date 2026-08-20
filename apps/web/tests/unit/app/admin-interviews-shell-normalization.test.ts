@@ -29,7 +29,8 @@ describe('admin interviews shell normalization', () => {
 
     expect(source).toContain("import { Badge } from '@jovie/ui';");
     expect(source).toContain('divide-y divide-subtle');
-    expect(source).toContain('bg-surface-0');
+    expect(source).toContain("surface='nested'");
+    expect(source).toContain('<EmptyState');
     expect(source).not.toContain('divide-white/[0.06]');
     expect(source).not.toContain('bg-white/[0.03]');
     expect(source).not.toContain('bg-white/[0.05]');

@@ -148,8 +148,9 @@ function DebugSection({
       as='section'
       surface='details'
       className='overflow-hidden p-0'
+      aria-label={title}
     >
-      <ContentSectionHeader title={title} density='compact' />
+      <ContentSectionHeader title={title} headingLevel='h2' density='compact' />
       <div className='space-y-2 p-3.5'>{children}</div>
     </ContentSurfaceCard>
   );

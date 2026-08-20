@@ -27,4 +27,13 @@ describe('Admin Share Studio route loader boundary', () => {
     expect(pageSource).not.toContain("from '@/lib/services/profile'");
     expect(pageSource).not.toContain("from '@/lib/share/context'");
   });
+
+  it('uses canonical actions and nested content states', () => {
+    const pageSource = readShareStudioSource('page.tsx');
+
+    expect(pageSource).toContain("import { Button } from '@jovie/ui';");
+    expect(pageSource).toContain("surface='nested'");
+    expect(pageSource).toContain('<EmptyState');
+    expect(pageSource).not.toContain('rounded-full border px-3');
+  });
 });

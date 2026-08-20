@@ -1,8 +1,10 @@
+import { Button } from '@jovie/ui';
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import { APP_ROUTES } from '@/constants/routes';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import {
@@ -103,28 +105,30 @@ function SamplePicker(
   }>
 ) {
   return (
-    <ContentSurfaceCard className='space-y-2.5 rounded-xl p-3.5'>
+    <ContentSurfaceCard className='space-y-2.5 p-3.5'>
       <p className='text-xs font-semibold text-primary-token'>{props.label}</p>
       <div className='flex flex-wrap gap-2'>
         {props.items.map(item => {
           const isSelected = item.key === props.selectedKey;
 
           return (
-            <Link
+            <Button
               key={item.key}
-              href={buildPickerHref(
-                props.searchParams,
-                props.paramKey,
-                item.key
-              )}
-              className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                isSelected
-                  ? 'border-primary-token bg-primary-token/10 text-primary-token'
-                  : 'border-subtle text-secondary-token hover:text-primary-token'
-              }`}
+              asChild
+              size='sm'
+              variant={isSelected ? 'secondary' : 'ghost'}
+              aria-pressed={isSelected}
             >
-              {item.label}
-            </Link>
+              <Link
+                href={buildPickerHref(
+                  props.searchParams,
+                  props.paramKey,
+                  item.key
+                )}
+              >
+                {item.label}
+              </Link>
+            </Button>
           );
         })}
       </div>
@@ -154,7 +158,7 @@ function PayloadCard(
   });
 
   return (
-    <ContentSurfaceCard className='space-y-4 rounded-xl p-4'>
+    <ContentSurfaceCard className='space-y-4 p-4'>
       <div className='flex items-center justify-between gap-3'>
         <div>
           <p className='text-sm font-semibold text-primary-token'>
@@ -164,13 +168,14 @@ function PayloadCard(
             {buildDisplayUrl(new URL(props.context.canonicalUrl).pathname)}
           </p>
         </div>
-        <a
-          href={props.context.asset.url}
-          download={props.context.asset.fileName}
-          className='text-xs text-secondary-token hover:text-primary-token'
-        >
-          Download Asset
-        </a>
+        <Button asChild variant='link' size='sm'>
+          <a
+            href={props.context.asset.url}
+            download={props.context.asset.fileName}
+          >
+            Download Asset
+          </a>
+        </Button>
       </div>
 
       <div className='grid gap-4 lg:grid-cols-[320px_1fr]'>
@@ -216,12 +221,12 @@ function PayloadCard(
 
 function PayloadBlock(props: Readonly<{ label: string; value: string }>) {
   return (
-    <div className='space-y-1.5'>
+    <ContentSurfaceCard surface='nested' className='space-y-1.5 p-3'>
       <p className='text-xs font-semibold text-primary-token'>{props.label}</p>
-      <pre className='overflow-x-auto rounded-xl border border-subtle bg-surface-0 px-3 py-2 text-2xs leading-normal text-secondary-token whitespace-pre-wrap'>
+      <pre className='overflow-x-auto whitespace-pre-wrap text-2xs leading-normal text-secondary-token'>
         {props.value}
       </pre>
-    </div>
+    </ContentSurfaceCard>
   );
 }
 
@@ -240,10 +245,10 @@ export default async function AdminShareStudioPage({
         description='Preview share payloads once blog, profile, release, and playlist content exists.'
         testId='admin-share-studio-page'
       >
-        <ContentSurfaceCard className='rounded-xl p-5 text-app text-secondary-token'>
-          Share Studio needs at least one real blog post, public profile,
-          release, and published playlist to render previews.
-        </ContentSurfaceCard>
+        <EmptyState
+          heading='Share Studio needs source content'
+          description='Add at least one real blog post, public profile, release, and published playlist to render previews.'
+        />
       </AdminPage>
     );
   }

@@ -1,15 +1,12 @@
-import { Skeleton } from '@jovie/ui';
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { getScreenshots } from '@/lib/admin/screenshots';
 import { CANONICAL_SURFACES } from '@/lib/canonical-surfaces';
 import { captureError } from '@/lib/error-tracking';
-
-const SKELETON_KEYS = Array.from({ length: 8 }, (_, i) => `ss-skel-${i}`);
+import { ScreenshotGallerySkeleton } from './ScreenshotGallerySkeleton';
 
 const ScreenshotGallery = dynamic(
   () =>
@@ -17,17 +14,7 @@ const ScreenshotGallery = dynamic(
       default: mod.ScreenshotGallery,
     })),
   {
-    loading: () => (
-      <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
-        {SKELETON_KEYS.map(key => (
-          <ContentSurfaceCard key={key} className='space-y-3 rounded-xl p-3.5'>
-            <Skeleton className='aspect-video w-full' rounded='lg' />
-            <Skeleton className='h-4 w-3/4' />
-            <Skeleton className='h-8 w-24' rounded='md' />
-          </ContentSurfaceCard>
-        ))}
-      </div>
-    ),
+    loading: () => <ScreenshotGallerySkeleton />,
   }
 );
 

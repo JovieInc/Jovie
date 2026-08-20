@@ -41,6 +41,8 @@ describe('admin agent run detail shell normalization', () => {
     );
     expect(source).toContain('<ContentSurfaceCard');
     expect(source).toContain("surface='details'");
+    expect(source).toContain("headingLevel='h2'");
+    expect(source).toContain('aria-label={title}');
     expect(source).toContain('bg-surface-0');
     expect(source).not.toMatch(
       /bg-white\/\[|divide-white\/\[|border-white\/\[/
