@@ -1,4 +1,7 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { requireCreatorDocumentAccess } from '@/lib/creator-documents/access';
+import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
+import { listCreatorDocuments } from '@/lib/db/creator-documents/store';
 import { captureError } from '@/lib/error-tracking';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
 import {
@@ -20,7 +23,15 @@ import { LibraryPageClient } from './LibraryPageClient';
 
 export const runtime = 'nodejs';
 
-export default async function LibraryPage() {
+export default async function LibraryPage({
+  searchParams,
+}: {
+  readonly searchParams: Promise<{
+    readonly section?: string | string[] | undefined;
+  }>;
+}) {
+  const section = (await searchParams).section;
+  const showCreatorDocuments = section === 'documents';
   const routeContext = await loadAppShellRouteContext({
     route: APP_ROUTES.LIBRARY,
     authFailure: 'notFound',
@@ -45,78 +56,104 @@ export default async function LibraryPage() {
   let approvalStatusByAssetId: Record<string, string> = {};
   let profileVisibilityByAssetId: Record<string, LibraryProfileVisibility> = {};
   let assetShareByAssetId: Record<string, LibraryAssetShareViewModel> = {};
+  let creatorDocuments: CreatorDocumentListItem[] = [];
+  let creatorDocumentsNextCursor: string | null = null;
+  let creatorDocumentsLoadFailed = false;
   if (profileId && selectedProfile) {
-    const queryClient = getQueryClient();
-    try {
-      const assetSharesPromise = loadArtistHandleForProfile(profileId).then(
-        artistHandle =>
-          artistHandle
-            ? getLibraryAssetShareMapForProfile(profileId, artistHandle)
-            : new Map()
-      );
-      const profileContext = {
-        userId: routeContext.userId,
-        profileId,
-        profileHandle:
-          selectedProfile.usernameNormalized ?? selectedProfile.username,
-        spotifyId: selectedProfile.spotifyId ?? null,
-        appleMusicId: selectedProfile.appleMusicId ?? null,
-        settings: selectedProfile.settings ?? null,
-      };
-      const [
-        _releases,
-        archivedReleaseRows,
-        merch,
-        archivedMerch,
-        profileStates,
-        assetShares,
-      ] = await Promise.all([
-        queryClient.fetchQuery({
-          queryKey: queryKeys.releases.matrix(profileId),
-          queryFn: () => loadReleaseMatrixForProfile(profileContext),
-        }),
-        loadArchivedReleaseMatrixForProfile(profileContext),
-        getLibraryMerchCardsForProfile(profileId),
-        getLibraryMerchCardsForProfile(profileId, { lifecycle: 'archived' }),
-        getLibraryProfileStateMapForProfile(profileId),
-        assetSharesPromise,
-      ]);
-      merchCards = merch;
-      archivedMerchCards = archivedMerch;
-      archivedReleases = archivedReleaseRows;
-      approvalStatusByAssetId = Object.fromEntries(
-        [...profileStates].map(([assetId, state]) => [
-          assetId,
-          state.approvalStatus,
-        ])
-      );
-      profileVisibilityByAssetId = Object.fromEntries(
-        [...profileStates].map(([assetId, state]) => [
-          assetId,
-          state.profileVisibility,
-        ])
-      );
-      assetShareByAssetId = Object.fromEntries(assetShares);
-    } catch (error) {
-      void captureError(
-        'Release matrix prefetch failed on library page',
-        error,
-        {
-          route: APP_ROUTES.LIBRARY,
-        }
-      );
+    if (showCreatorDocuments) {
+      try {
+        await requireCreatorDocumentAccess({
+          userId: routeContext.userId,
+          profileId,
+        });
+        const privateDocuments = await listCreatorDocuments(profileId);
+        creatorDocuments = [...privateDocuments.documents];
+        creatorDocumentsNextCursor = privateDocuments.nextCursor;
+      } catch (error) {
+        void captureError(
+          'Private creator documents load failed on library page',
+          error,
+          { route: APP_ROUTES.LIBRARY }
+        );
+        creatorDocumentsLoadFailed = true;
+      }
+    } else {
+      const queryClient = getQueryClient();
+      try {
+        const assetSharesPromise = loadArtistHandleForProfile(profileId).then(
+          artistHandle =>
+            artistHandle
+              ? getLibraryAssetShareMapForProfile(profileId, artistHandle)
+              : new Map()
+        );
+        const profileContext = {
+          userId: routeContext.userId,
+          profileId,
+          profileHandle:
+            selectedProfile.usernameNormalized ?? selectedProfile.username,
+          spotifyId: selectedProfile.spotifyId ?? null,
+          appleMusicId: selectedProfile.appleMusicId ?? null,
+          settings: selectedProfile.settings ?? null,
+        };
+        const [
+          _releases,
+          archivedReleaseRows,
+          merch,
+          archivedMerch,
+          profileStates,
+          assetShares,
+        ] = await Promise.all([
+          queryClient.fetchQuery({
+            queryKey: queryKeys.releases.matrix(profileId),
+            queryFn: () => loadReleaseMatrixForProfile(profileContext),
+          }),
+          loadArchivedReleaseMatrixForProfile(profileContext),
+          getLibraryMerchCardsForProfile(profileId),
+          getLibraryMerchCardsForProfile(profileId, { lifecycle: 'archived' }),
+          getLibraryProfileStateMapForProfile(profileId),
+          assetSharesPromise,
+        ]);
+        merchCards = merch;
+        archivedMerchCards = archivedMerch;
+        archivedReleases = archivedReleaseRows;
+        approvalStatusByAssetId = Object.fromEntries(
+          [...profileStates].map(([assetId, state]) => [
+            assetId,
+            state.approvalStatus,
+          ])
+        );
+        profileVisibilityByAssetId = Object.fromEntries(
+          [...profileStates].map(([assetId, state]) => [
+            assetId,
+            state.profileVisibility,
+          ])
+        );
+        assetShareByAssetId = Object.fromEntries(assetShares);
+      } catch (error) {
+        void captureError(
+          'Release matrix prefetch failed on library page',
+          error,
+          {
+            route: APP_ROUTES.LIBRARY,
+          }
+        );
+      }
     }
   }
 
   return (
     <HydrateClient state={getDehydratedState()}>
       <LibraryPageClient
+        creatorProfileId={profileId ?? 'unavailable'}
         merchCards={merchCards}
         archivedMerchCards={archivedMerchCards}
         archivedReleases={archivedReleases}
         approvalStatusByAssetId={approvalStatusByAssetId}
         profileVisibilityByAssetId={profileVisibilityByAssetId}
         assetShareByAssetId={assetShareByAssetId}
+        creatorDocuments={creatorDocuments}
+        creatorDocumentsNextCursor={creatorDocumentsNextCursor}
+        creatorDocumentsLoadFailed={creatorDocumentsLoadFailed}
       />
     </HydrateClient>
   );
