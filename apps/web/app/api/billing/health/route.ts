@@ -23,6 +23,8 @@ import { RETRY_AFTER_HEALTH } from '@/lib/http/headers';
 import { withTimeout } from '@/lib/resilience/primitives';
 import { stripe } from '@/lib/stripe/client';
 import { getActivePriceIds, validateStripeConfig } from '@/lib/stripe/config';
+import { toISOStringOrNull } from '@/lib/utils/date';
+import { parseDate } from '@/lib/utils/date-formatting';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -129,7 +131,9 @@ export async function GET() {
       // Get most recent billing event timestamp
       db
         .select({
-          lastBillingEventAt: drizzleSql<Date>`MAX(${users.lastBillingEventAt})`,
+          lastBillingEventAt: drizzleSql<
+            Date | string | null
+          >`MAX(${users.lastBillingEventAt})`,
         })
         .from(users),
     ]);
@@ -180,8 +184,8 @@ export async function GET() {
         activeSubscriptionsInStripe: stripeSubscriptionCount,
         recentWebhookCount,
         unprocessedWebhookCount,
-        lastReconciliationAt: lastReconciliationAt?.toISOString() ?? null,
-        lastBillingEventAt: lastBillingEventAt?.toISOString() ?? null,
+        lastReconciliationAt: toISOStringOrNull(lastReconciliationAt),
+        lastBillingEventAt: toISOStringOrNull(lastBillingEventAt),
       },
     };
 
@@ -379,10 +383,11 @@ function checkNoStuckWebhooks(stuckCount: number): HealthCheck {
  * Check if reconciliation ran recently
  */
 function checkRecentReconciliation(
-  lastRun: Date | null,
+  lastRun: Date | string | null,
   threshold: Date
 ): HealthCheck {
-  if (!lastRun) {
+  const lastRunDate = parseDate(lastRun);
+  if (!lastRunDate) {
     return {
       status: 'warning',
       message: 'No reconciliation events found',
@@ -390,20 +395,20 @@ function checkRecentReconciliation(
     };
   }
 
-  if (lastRun < threshold) {
+  if (lastRunDate < threshold) {
     return {
       status: 'warning',
       message: `Last reconciliation was ${Math.round(
-        (Date.now() - lastRun.getTime()) / (60 * 60 * 1000)
+        (Date.now() - lastRunDate.getTime()) / (60 * 60 * 1000)
       )} hours ago`,
-      details: { lastRun: lastRun.toISOString() },
+      details: { lastRun: lastRunDate.toISOString() },
     };
   }
 
   return {
     status: 'healthy',
     message: 'Reconciliation ran recently',
-    details: { lastRun: lastRun.toISOString() },
+    details: { lastRun: lastRunDate.toISOString() },
   };
 }
 

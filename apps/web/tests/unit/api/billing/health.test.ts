@@ -38,6 +38,32 @@ vi.mock('@/lib/error-tracking', () => ({
   captureWarning: mockCaptureWarning,
 }));
 
+function mockHealthQueries(queryResults: unknown[]) {
+  let queryIndex = 0;
+
+  mockDbSelect.mockImplementation(() => {
+    const result = queryResults[queryIndex] ?? [];
+    queryIndex += 1;
+    const resolved = Promise.resolve(result);
+
+    return {
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          orderBy: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue(result),
+          }),
+          then: resolved.then.bind(resolved),
+          catch: resolved.catch.bind(resolved),
+          finally: resolved.finally.bind(resolved),
+        }),
+        then: resolved.then.bind(resolved),
+        catch: resolved.catch.bind(resolved),
+        finally: resolved.finally.bind(resolved),
+      }),
+    };
+  });
+}
+
 describe('GET /api/billing/health', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -47,38 +73,14 @@ describe('GET /api/billing/health', () => {
   it('returns healthy status when all checks pass', async () => {
     const lastReconciliationAt = new Date();
     const lastBillingEventAt = new Date();
-    const queryResults = [
+    mockHealthQueries([
       [{ count: 1 }],
       [{ count: 0 }],
       [{ createdAt: lastReconciliationAt }],
       [{ count: 1 }],
       [{ lastBillingEventAt }],
-    ];
-    let queryIndex = 0;
+    ]);
 
-    mockDbSelect.mockImplementation(() => {
-      const result = queryResults[queryIndex] ?? [];
-      queryIndex += 1;
-      const resolved = Promise.resolve(result);
-
-      return {
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            orderBy: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue(result),
-            }),
-            then: resolved.then.bind(resolved),
-            catch: resolved.catch.bind(resolved),
-            finally: resolved.finally.bind(resolved),
-          }),
-          then: resolved.then.bind(resolved),
-          catch: resolved.catch.bind(resolved),
-          finally: resolved.finally.bind(resolved),
-        }),
-      };
-    });
-
-    // Mock Stripe subscription list
     mockStripeSubscriptionsList.mockResolvedValue({
       data: [{ id: 'sub_1' }],
       has_more: false,
@@ -93,6 +95,67 @@ describe('GET /api/billing/health', () => {
     expect(data).toHaveProperty('timestamp');
     expect(data).toHaveProperty('checks');
     expect(data).toHaveProperty('metrics');
+    expect(data.metrics.lastReconciliationAt).toBe(
+      lastReconciliationAt.toISOString()
+    );
+    expect(data.metrics.lastBillingEventAt).toBe(
+      lastBillingEventAt.toISOString()
+    );
+  });
+
+  it('serializes neon-http string timestamps without throwing', async () => {
+    const lastReconciliationAt = new Date().toISOString();
+    const lastBillingEventAt = new Date(Date.now() - 60_000).toISOString();
+    mockHealthQueries([
+      [{ count: 1 }],
+      [{ count: 0 }],
+      [{ createdAt: lastReconciliationAt }],
+      [{ count: 1 }],
+      [{ lastBillingEventAt }],
+    ]);
+
+    mockStripeSubscriptionsList.mockResolvedValue({
+      data: [{ id: 'sub_1' }],
+      has_more: false,
+    });
+
+    const { GET } = await import('@/app/api/billing/health/route');
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.metrics.lastReconciliationAt).toBe(lastReconciliationAt);
+    expect(data.metrics.lastBillingEventAt).toBe(lastBillingEventAt);
+    expect(data.checks.recentReconciliation.status).toBe('healthy');
+    expect(data.checks.recentReconciliation.details.lastRun).toBe(
+      lastReconciliationAt
+    );
+  });
+
+  it('warns when a string reconciliation timestamp is stale', async () => {
+    const lastReconciliationAt = new Date(
+      Date.now() - 5 * 60 * 60 * 1000
+    ).toISOString();
+    mockHealthQueries([
+      [{ count: 1 }],
+      [{ count: 0 }],
+      [{ createdAt: lastReconciliationAt }],
+      [{ count: 1 }],
+      [{ lastBillingEventAt: lastReconciliationAt }],
+    ]);
+
+    mockStripeSubscriptionsList.mockResolvedValue({
+      data: [{ id: 'sub_1' }],
+      has_more: false,
+    });
+
+    const { GET } = await import('@/app/api/billing/health/route');
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.checks.recentReconciliation.status).toBe('warning');
+    expect(data.metrics.lastReconciliationAt).toBe(lastReconciliationAt);
   });
 
   it('returns 503 on critical failure', async () => {
