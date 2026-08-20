@@ -1176,6 +1176,8 @@ def _grok_command(
     return [
         "systemd-run", "--user", f"--unit={unit}", "--collect",
         "-p", "Type=exec", "-p", f"Environment=PATH={pathlib.Path.home()}/.local/bin:{pathlib.Path.home()}/.npm-global/bin:/usr/local/bin:/usr/bin:/bin",
+        "-p", "Environment=AUTOMATION_VERIFY_MAX_WORKERS=4",
+        "-p", "Environment=AUTOMATION_VERIFY_SHARD_CONCURRENCY=2",
         "-p", f"Environment=GEM_GROK_EXECUTABLE={grok_exe}",
         "-p", f"Environment=GEM_GROK_BIN={grok_exe}",
         "-p", f"Environment=SYMPHONY_FALLBACK_SELECTION_B64={encoded}",

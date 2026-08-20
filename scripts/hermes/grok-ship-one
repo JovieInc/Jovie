@@ -10,6 +10,10 @@ case "$ID" in
 esac
 
 export PATH="$HOME/.local/bin:$HOME/.npm-global/bin:/usr/local/bin:$PATH:/usr/bin:/bin"
+# Husky pre-push defaults to 1 vitest worker (laptop). Gem remounts then take
+# 20–40 min (live JOV-5220). Override without skipping the gate.
+export AUTOMATION_VERIFY_MAX_WORKERS="${AUTOMATION_VERIFY_MAX_WORKERS:-4}"
+export AUTOMATION_VERIFY_SHARD_CONCURRENCY="${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-2}"
 set -a
 # shellcheck disable=SC1091
 [ -f "$HOME/.config/symphony/linear.env" ] && . "$HOME/.config/symphony/linear.env"

@@ -2161,6 +2161,10 @@ class FallbackTests(unittest.TestCase):
         self.assertTrue(path_args)
         self.assertIn("/usr/local/bin", path_args[0])
         self.assertIn(".npm-global/bin", path_args[0])
+        self.assertIn("Environment=AUTOMATION_VERIFY_MAX_WORKERS=4", command)
+        self.assertIn("Environment=AUTOMATION_VERIFY_SHARD_CONCURRENCY=2", command)
+        ship = GROK_SHIP.read_text()
+        self.assertIn('AUTOMATION_VERIFY_MAX_WORKERS="${AUTOMATION_VERIFY_MAX_WORKERS:-4}"', ship)
 
     def test_grok_ship_one_new_work_does_not_request_queue_deferred(self):
         """Live fallback PRs still got queue-deferred because the prompt asked for it."""
