@@ -1,1 +1,1 @@
-../gstack/design-canonical/SKILL.md
+../../../.agents/skills/gstack/design-canonical/SKILL.md

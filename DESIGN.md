@@ -153,7 +153,7 @@ poster composition; Inter at 80px reads narrow and tech-y in this context.
 | semibold | 590 | Section headings, emphasis |
 | bold | 680 | Strong emphasis, rare |
 
-### Type Scale — Marketing (System A)
+### Type Scale — Marketing
 
 | Level | Size | Weight | Letter-spacing | Line-height | Usage |
 |-------|------|--------|----------------|-------------|-------|
@@ -452,7 +452,7 @@ accent title text as ornament, or put a decorative icon on a colored square.
 
 Specimen: Storybook `Design System/Noir Ion Specimen`.
 
-### Marketing Colors (System A — Dark by Default)
+### Marketing Colors (Dark by Default)
 
 **No brand color.** Black, white, and gray are the brand. The restraint is the identity.
 
@@ -811,7 +811,7 @@ Do not change the generic app scale to reproduce that marketing geometry.
 | Token | Light | Dark |
 |-------|-------|------|
 | Width | 244px | 244px |
-| Background RGB | `247 248 248` | `15 16 17` |
+| Background RGB | `247 248 248` | `6 8 13` |
 | Foreground RGB | `18 18 20` | `227 228 229` |
 | Border RGB | `0 0 0 / 0.06` | `255 255 255 / 0.06` |
 | Accent RGB | `242 243 245` | `255 255 255 / 0.03` |
@@ -923,7 +923,7 @@ All full-screen takeover screens (offline, global error, root error, public erro
 
 | Property | Value | Notes |
 |----------|-------|-------|
-| Background | `#08090a` | Dark `--color-bg-base` |
+| Background | `#0a0a0a` | Shipped status-screen black (e.g. `apps/web/public/offline.html`); intentionally distinct from the app canvas `--color-bg-base` (`#030407`) |
 | Text primary | `#ffffff` | |
 | Text secondary | `#969799` | Descriptions |
 | Text quaternary | `#62666d` | Error IDs |
