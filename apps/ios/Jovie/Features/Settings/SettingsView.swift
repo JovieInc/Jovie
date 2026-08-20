@@ -12,6 +12,13 @@ struct AppBuildInfo: Equatable {
   }
 }
 
+/// Settings uses system grouped List + toolbar chrome (JOV-5201). Liquid Glass
+/// comes from the system materials on iOS 26+, not custom cards.
+enum SettingsChromePolicy {
+  static func usesSystemGroupedList() -> Bool { true }
+  static func usesNativeNavigationChrome() -> Bool { true }
+}
+
 struct SettingsView: View {
   let profile: AppShellProfile
   let buildInfo: AppBuildInfo
@@ -25,20 +32,25 @@ struct SettingsView: View {
   @State private var isShowingLogoutConfirmation = false
 
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: JovieSpacing.xLarge) {
-        header
-        accountSection
-        linksSection
-        buildSection
-        logoutButton
-      }
-      .padding(JovieSpacing.large)
+    List {
+      accountSection
+      linksSection
+      buildSection
+      logoutSection
     }
-    .scrollIndicators(.hidden)
+    .listStyle(.insetGrouped)
     .scrollDismissesKeyboard(.interactively)
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .background(JovieColor.backgroundBase)
+    .navigationTitle("Settings")
+    .navigationBarTitleDisplayMode(.large)
+    .toolbar {
+      if let onClose {
+        ToolbarItem(placement: .topBarTrailing) {
+          Button("Done", action: onClose)
+            .accessibilityLabel("Close Settings")
+        }
+      }
+    }
+    .toolbarBackground(.automatic, for: .navigationBar)
     .accessibilityIdentifier("settings-view")
     .confirmationDialog(
       "Log out of Jovie?",
@@ -56,28 +68,8 @@ struct SettingsView: View {
     }
   }
 
-  private var header: some View {
-    HStack(spacing: JovieSpacing.medium) {
-      Text("Settings")
-        .font(JovieFont.display(size: 22))
-        .foregroundStyle(JovieColor.textPrimary)
-
-      Spacer()
-
-      if let onClose {
-        Button(action: onClose) {
-          Image(systemName: "xmark")
-        }
-        .buttonStyle(JovieIconButtonStyle())
-        .accessibilityLabel("Close Settings")
-      }
-    }
-  }
-
   private var accountSection: some View {
-    VStack(alignment: .leading, spacing: JovieSpacing.medium) {
-      SettingsSectionTitle("Account")
-
+    Section("Account") {
       HStack(spacing: JovieSpacing.medium) {
         DashboardAvatarView(
           name: profile.displayName,
@@ -99,87 +91,74 @@ struct SettingsView: View {
 
         Spacer(minLength: 0)
       }
-      .padding(JovieSpacing.medium)
-      .background(JovieColor.surface0, in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
+      .accessibilityElement(children: .combine)
 
-      SettingsLinkRow(title: "Manage Account", systemImage: "person.crop.circle") {
+      Button {
         openURL(accountURL)
+      } label: {
+        Label("Manage Account", systemImage: "person.crop.circle")
       }
-      .padding(.vertical, JovieSpacing.xSmall)
-      .background(JovieColor.surface0, in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
     }
   }
 
   private var linksSection: some View {
-    VStack(alignment: .leading, spacing: JovieSpacing.medium) {
-      SettingsSectionTitle("Jovie")
-
-      VStack(spacing: 0) {
-        SettingsLinkRow(title: "Support", systemImage: "questionmark.circle") {
-          openURL(URL(string: "https://jov.ie/support")!)
-        }
-
-        SettingsDivider()
-
-        SettingsLinkRow(title: "Billing", systemImage: "creditcard") {
-          openURL(billingURL)
-        }
-
-        SettingsDivider()
-
-        SettingsLinkRow(title: "Privacy", systemImage: "hand.raised") {
-          openURL(URL(string: "https://jov.ie/legal/privacy")!)
-        }
-
-        SettingsDivider()
-
-        SettingsLinkRow(title: "Terms", systemImage: "doc.text") {
-          openURL(URL(string: "https://jov.ie/legal/terms")!)
-        }
+    Section("Jovie") {
+      Button {
+        openURL(URL(string: "https://jov.ie/support")!)
+      } label: {
+        Label("Support", systemImage: "questionmark.circle")
       }
-      .padding(.vertical, JovieSpacing.xSmall)
-      .background(JovieColor.surface0, in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
+
+      Button {
+        openURL(billingURL)
+      } label: {
+        Label("Billing", systemImage: "creditcard")
+      }
+
+      Button {
+        openURL(URL(string: "https://jov.ie/legal/privacy")!)
+      } label: {
+        Label("Privacy", systemImage: "hand.raised")
+      }
+
+      Button {
+        openURL(URL(string: "https://jov.ie/legal/terms")!)
+      } label: {
+        Label("Terms", systemImage: "doc.text")
+      }
     }
   }
 
   private var buildSection: some View {
-    VStack(alignment: .leading, spacing: JovieSpacing.medium) {
-      SettingsSectionTitle("App")
-
-      VStack(spacing: 0) {
-        SettingsValueRow(title: "Version", value: buildInfo.version)
-        SettingsDivider()
-        SettingsValueRow(title: "Build", value: buildInfo.build)
-      }
-      .padding(.vertical, JovieSpacing.xSmall)
-      .background(JovieColor.surface0, in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
+    Section("App") {
+      LabeledContent("Version", value: buildInfo.version)
+      LabeledContent("Build", value: buildInfo.build)
     }
   }
 
-  private var logoutButton: some View {
-    Button {
-      guard !isLoggingOut else { return }
-      isShowingLogoutConfirmation = true
-    } label: {
-      // Reserve a stable footprint across the Log Out / Logging Out states:
-      // fixed-height spinner slot + single-line, non-wrapping label so the
-      // pill's content never reflows (layout-shift prevention, .claude/rules/ui.md).
-      HStack(spacing: JovieSpacing.small) {
-        if isLoggingOut {
-          ProgressView()
-            .controlSize(.small)
-            .tint(JovieColor.textPrimary)
-        }
+  private var logoutSection: some View {
+    Section {
+      Button(role: .destructive) {
+        guard !isLoggingOut else { return }
+        isShowingLogoutConfirmation = true
+      } label: {
+        // Reserve a stable footprint across Log Out / Logging Out so the
+        // row never reflows (layout-shift prevention).
+        HStack(spacing: JovieSpacing.small) {
+          if isLoggingOut {
+            ProgressView()
+              .controlSize(.small)
+          }
 
-        Label(isLoggingOut ? "Logging Out" : "Log Out", systemImage: "rectangle.portrait.and.arrow.right")
-          .lineLimit(1)
-          .minimumScaleFactor(0.85)
+          Text(isLoggingOut ? "Logging Out" : "Log Out")
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
+        }
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
       }
-      .frame(maxWidth: .infinity)
+      .disabled(isLoggingOut)
+      .accessibilityLabel("Log Out")
     }
-    .buttonStyle(JoviePillButtonStyle(filled: false))
-    .disabled(isLoggingOut)
-    .accessibilityLabel("Log Out")
   }
 
   private func performLogout() {
@@ -190,89 +169,5 @@ struct SettingsView: View {
       await onLogout()
       isLoggingOut = false
     }
-  }
-}
-
-private struct SettingsSectionTitle: View {
-  let title: String
-
-  init(_ title: String) {
-    self.title = title
-  }
-
-  var body: some View {
-    Text(title)
-      .font(JovieFont.body(size: 12, weight: .semibold))
-      .foregroundStyle(JovieColor.textTertiary)
-      .textCase(.uppercase)
-  }
-}
-
-private struct SettingsLinkRow: View {
-  let title: String
-  let systemImage: String
-  let action: () -> Void
-
-  var body: some View {
-    Button(action: action) {
-      HStack(spacing: JovieSpacing.medium) {
-        Image(systemName: systemImage)
-          .frame(width: 20)
-
-        Text(title)
-
-        Spacer()
-
-        Image(systemName: "arrow.up.right")
-          .font(.system(size: 12, weight: .semibold))
-          .foregroundStyle(JovieColor.textTertiary)
-      }
-      .font(JovieFont.body(size: 14, weight: .medium))
-      .foregroundStyle(JovieColor.textPrimary)
-      .padding(.horizontal, JovieSpacing.medium)
-      .padding(.vertical, 12)
-    }
-    .buttonStyle(SettingsRowButtonStyle())
-  }
-}
-
-/// Subtle tactile press feedback for tappable settings rows: opacity + the
-/// canonical 0.96 press scale on the SUBTLE (150ms) curve. Interruptible via
-/// SwiftUI's isPressed-driven animation (.claude/rules/motion.md section 4).
-private struct SettingsRowButtonStyle: ButtonStyle {
-  func makeBody(configuration: Configuration) -> some View {
-    configuration.label
-      .opacity(configuration.isPressed ? 0.7 : 1)
-      .scaleEffect(configuration.isPressed ? JovieMotion.pressScale : 1)
-      .animation(JovieMotion.subtle, value: configuration.isPressed)
-  }
-}
-
-private struct SettingsValueRow: View {
-  let title: String
-  let value: String
-
-  var body: some View {
-    HStack {
-      Text(title)
-        .foregroundStyle(JovieColor.textSecondary)
-
-      Spacer()
-
-      Text(value)
-        .foregroundStyle(JovieColor.textTertiary)
-    }
-    .font(JovieFont.body(size: 14, weight: .medium))
-    .padding(.horizontal, JovieSpacing.medium)
-    .padding(.vertical, 12)
-  }
-}
-
-private struct SettingsDivider: View {
-  var body: some View {
-    Rectangle()
-      .fill(JovieColor.borderSubtle)
-      .frame(height: 1)
-      .padding(.leading, JovieSpacing.medium)
   }
 }

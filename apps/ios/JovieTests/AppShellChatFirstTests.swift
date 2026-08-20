@@ -153,5 +153,6 @@ struct AppShellChatFirstTests {
     #expect(appShellHomeSurface(chatEnabled: true) == .chat)
     #expect(AppShellPanePolicy.showsBottomTabBar() == false)
     #expect(AppShellGesturePolicy.shouldSwitchTabFromHorizontalSwipe() == false)
+    #expect(AppShellGesturePolicy.allowsFullWidthRailSwipe(selectedTab: .chat))
   }
 }

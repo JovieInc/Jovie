@@ -87,6 +87,80 @@ struct AppShellTabBarTests {
     )
   }
 
+  @Test func chatHomeLeadingPanOpensSidebarFromTheCenter() {
+    #expect(AppShellGesturePolicy.allowsFullWidthRailSwipe(selectedTab: .chat))
+    #expect(AppShellGesturePolicy.allowsFullWidthRailSwipe(selectedTab: .inbox) == false)
+    #expect(
+      AppShellGesturePolicy.isLeadingSwipeOpen(
+        selectedTab: .chat,
+        startX: 200,
+        translationX: 90,
+        predictedX: 130,
+        translationY: 8
+      )
+    )
+    #expect(
+      AppShellGesturePolicy.isLeadingSwipeOpen(
+        selectedTab: .inbox,
+        startX: 200,
+        translationX: 90,
+        predictedX: 130,
+        translationY: 8
+      ) == false
+    )
+    #expect(
+      AppShellGesturePolicy.isLeadingSwipeOpen(
+        selectedTab: .chat,
+        startX: 200,
+        translationX: 90,
+        predictedX: 130,
+        translationY: 140
+      ) == false
+    )
+  }
+
+  @Test func chatHomeTrailingPanOpensRightRailFromTheCenter() {
+    #expect(
+      AppShellGesturePolicy.isTrailingSwipeOpen(
+        selectedTab: .chat,
+        startX: 200,
+        containerWidth: 400,
+        translationX: -90,
+        predictedX: -130,
+        translationY: 6
+      )
+    )
+    #expect(
+      AppShellGesturePolicy.isTrailingSwipeOpen(
+        selectedTab: .library,
+        startX: 200,
+        containerWidth: 400,
+        translationX: -90,
+        predictedX: -130,
+        translationY: 6
+      ) == false
+    )
+  }
+
+  @Test func inboxKeepsEdgeOnlyRailDrags() {
+    #expect(
+      AppShellGesturePolicy.shouldFollowLeadingDrag(
+        selectedTab: .inbox,
+        startX: 12,
+        translationX: 40,
+        translationY: 4
+      )
+    )
+    #expect(
+      AppShellGesturePolicy.shouldFollowLeadingDrag(
+        selectedTab: .inbox,
+        startX: 80,
+        translationX: 40,
+        translationY: 4
+      ) == false
+    )
+  }
+
   @Test func rightEdgeOpenRecognizesTrailingEdgeDrag() {
     #expect(
       AppShellGesturePolicy.isRightEdgeOpen(

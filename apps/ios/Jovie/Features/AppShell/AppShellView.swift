@@ -89,10 +89,6 @@ func appShellHomeSurface(chatEnabled: Bool) -> AppShellTab {
   AppShellPanePolicy.homeSurface(chatEnabled: chatEnabled)
 }
 
-private enum AppShellRoute: Hashable {
-  case settings
-}
-
 struct AppShellProfile: Equatable {
   let displayName: String
   let username: String?
@@ -117,8 +113,8 @@ struct AppShellProfile: Equatable {
   }
 }
 
-/// 4-layer chat-first shell (JOV-3632):
-/// home content → tab bar → rails (drawer / entity sheet) → overlays (Talk).
+/// Chat-first shell (JOV-5201): home content → swipe rails → overlays.
+/// No bottom tab bar. Leading pan = sidebar, trailing pan = right rail.
 struct AppShellView<
   ProfileContent: View,
   AudienceContent: View,
@@ -158,7 +154,7 @@ struct AppShellView<
   ) -> ChatContent
 
   @State private var selectedTab: AppShellTab
-  @State private var navigationPath: [AppShellRoute] = []
+  @State private var isShowingSettings = false
   @State private var isShowingDrawer = false
   @State private var drawerDragOffset: CGFloat = 0
   @State private var isShowingRightRail = false
@@ -254,12 +250,11 @@ struct AppShellView<
   }
 
   var body: some View {
-    NavigationStack(path: $navigationPath) {
-      GeometryReader { proxy in
+    GeometryReader { proxy in
         let openOffset = drawerOpenOffset(safeAreaLeading: proxy.safeAreaInsets.leading)
         let isDrawerBasePlaneVisible = isShowingDrawer || drawerDragOffset != 0
 
-        // Layer stack (bottom → top): drawer rail → home+tab bar → Talk overlay.
+        // Layer stack (bottom → top): drawer rail → home → right rail → overlays.
         ZStack(alignment: .leading) {
           AppShellLeftDrawer(
             isPresented: isShowingDrawer,
@@ -285,7 +280,7 @@ struct AppShellView<
             },
             onOpenSettings: {
               closeDrawer()
-              navigationPath.append(.settings)
+              isShowingSettings = true
             },
             onTalk: {
               closeDrawer()
@@ -376,7 +371,6 @@ struct AppShellView<
             containerWidth: proxy.size.width
           )
         )
-      }
     }
     .background(JovieColor.backgroundBase)
     .sheet(item: $entityContext) { item in
@@ -411,11 +405,24 @@ struct AppShellView<
         )
       }
     }
+    .fullScreenCover(isPresented: $isShowingSettings) {
+      NavigationStack {
+        SettingsView(
+          profile: profile,
+          buildInfo: .current(),
+          accountURL: accountURL,
+          billingURL: billingURL,
+          onClose: { isShowingSettings = false },
+          onLogout: onLogout
+        )
+        .navigationBarBackButtonHidden()
+      }
+    }
     .task(id: opensSettingsOnLaunch) {
       guard opensSettingsOnLaunch, didOpenLaunchSettings == false else { return }
       didOpenLaunchSettings = true
       await Task.yield()
-      navigationPath.append(.settings)
+      isShowingSettings = true
     }
     .task {
       applyPendingIntentNavigation()
@@ -441,8 +448,8 @@ struct AppShellView<
     }
   }
 
-  // Elevated content plane: toolbar + page + tab bar ride together so the
-  // drawer transform reads as one spatial move.
+  // Elevated content plane: toolbar + page ride together so the drawer
+  // transform reads as one spatial move. No bottom tab bar (JOV-5201).
   private var shellContent: some View {
     let isElevated = isShowingDrawer || drawerDragOffset != 0
       || isShowingRightRail || railDragOffset != 0
@@ -468,21 +475,6 @@ struct AppShellView<
             },
             onTalk: openTalkOverlay
           )
-        }
-      }
-      .navigationBarHidden(true)
-      .navigationDestination(for: AppShellRoute.self) { route in
-        switch route {
-        case .settings:
-          SettingsView(
-            profile: profile,
-            buildInfo: .current(),
-            accountURL: accountURL,
-            billingURL: billingURL,
-            onClose: { navigationPath.removeLast() },
-            onLogout: onLogout
-          )
-          .navigationBarBackButtonHidden()
         }
       }
       .allowsHitTesting(!isElevated && !isShowingTalkOverlay && teleprompterProposal == nil)
@@ -787,7 +779,8 @@ struct AppShellView<
     .opacity
   }
 
-  /// Edge swipes own rails only (JOV-3635). No horizontal tab paging.
+  /// Chat-home pans open rails (JOV-5201). Other surfaces keep edge drags.
+  /// Horizontal pans never page between tabs.
   private func edgeRailGesture(openOffset: CGFloat, containerWidth: CGFloat) -> some Gesture {
     DragGesture(minimumDistance: 8, coordinateSpace: .global)
       .onChanged { value in
@@ -802,13 +795,20 @@ struct AppShellView<
           drawerDragOffset = min(0, value.translation.width)
         } else if isShowingRightRail {
           railDragOffset = max(0, value.translation.width)
-        } else if value.startLocation.x < AppShellGesturePolicy.leftEdgeOpenWidth,
-                  value.translation.width > 0
-        {
+        } else if AppShellGesturePolicy.shouldFollowLeadingDrag(
+          selectedTab: selectedTab,
+          startX: value.startLocation.x,
+          translationX: value.translation.width,
+          translationY: value.translation.height
+        ) {
           drawerDragOffset = min(value.translation.width, openOffset)
-        } else if value.startLocation.x > containerWidth - AppShellGesturePolicy.rightEdgeOpenWidth,
-                  value.translation.width < 0
-        {
+        } else if AppShellGesturePolicy.shouldFollowTrailingDrag(
+          selectedTab: selectedTab,
+          startX: value.startLocation.x,
+          containerWidth: containerWidth,
+          translationX: value.translation.width,
+          translationY: value.translation.height
+        ) {
           railDragOffset = max(value.translation.width, -railWidth)
         }
       }
@@ -845,20 +845,24 @@ struct AppShellView<
           return
         }
 
-        if AppShellGesturePolicy.isLeftEdgeOpen(
+        if AppShellGesturePolicy.isLeadingSwipeOpen(
+          selectedTab: selectedTab,
           startX: value.startLocation.x,
           translationX: value.translation.width,
-          predictedX: predicted
+          predictedX: predicted,
+          translationY: value.translation.height
         ) {
           applyOpenPane(AppShellPanePolicy.paneAfterLeadingSwipe(current: .none))
           return
         }
 
-        if AppShellGesturePolicy.isRightEdgeOpen(
+        if AppShellGesturePolicy.isTrailingSwipeOpen(
+          selectedTab: selectedTab,
           startX: value.startLocation.x,
           containerWidth: containerWidth,
           translationX: value.translation.width,
-          predictedX: predicted
+          predictedX: predicted,
+          translationY: value.translation.height
         ) {
           applyOpenPane(AppShellPanePolicy.paneAfterTrailingSwipe(current: .none))
           return
@@ -915,7 +919,7 @@ struct AppShellView<
       }
 
       Button {
-        navigationPath.append(.settings)
+        isShowingSettings = true
       } label: {
         Image(systemName: "gearshape")
       }
