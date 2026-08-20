@@ -383,14 +383,30 @@ describe('scrubPii', () => {
     expect(scrubPii(event as any)).toBeNull();
   });
 
-  it('should keep real Upstash quota exceptions', () => {
+  it('should drop the JOV-5184 quota command failure', () => {
     const event = {
       exception: {
         values: [
           {
             type: 'UpstashError',
             value:
-              'Command failed: ERR max requests limit exceeded. Limit: 500000',
+              'Command failed: ERR max requests limit exceeded. Limit: 500000, Usage: 500099',
+          },
+        ],
+      },
+    };
+
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
+  it('should keep unrelated Upstash auth failures', () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'UpstashError',
+            value:
+              'WRONGPASS invalid or missing auth token. See https://docs.upstash.com/redis/troubleshooting/http_unauthorized for details.',
           },
         ],
       },
@@ -553,10 +569,10 @@ describe('createBeforeSendHook', () => {
     ).toBeNull();
   });
 
-  it('keeps a real quota UpstashError on hint.originalException', () => {
+  it('drops the JOV-5184 quota UpstashError on hint.originalException', () => {
     const beforeSend = createBeforeSendHook();
     const error = new Error(
-      'Command failed: ERR max requests limit exceeded. Limit: 500000'
+      'Command failed: ERR max requests limit exceeded. Limit: 500000, Usage: 500099'
     );
     error.name = 'UpstashError';
     const event = {
@@ -565,7 +581,7 @@ describe('createBeforeSendHook', () => {
           {
             type: 'UpstashError',
             value:
-              'Command failed: ERR max requests limit exceeded. Limit: 500000',
+              'Command failed: ERR max requests limit exceeded. Limit: 500000, Usage: 500099',
           },
         ],
       },
@@ -573,7 +589,7 @@ describe('createBeforeSendHook', () => {
 
     expect(
       beforeSend(event as any, { originalException: error } as any)
-    ).not.toBeNull();
+    ).toBeNull();
   });
 });
 

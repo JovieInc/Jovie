@@ -7,7 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
-- [internal] **Opaque `Error: {"error":{"name":"UpstashError"}}` bags no longer file from the client SDK (JOV-5186):** client `beforeSend` uses the same `hint.originalException` drop as server, so object-captures whose event value is `Non-Error exception captured with keys: error` never become Linear issues. Real quota command failures still report.
+- [internal] **Opaque `Error: {"error":{"name":"UpstashError"}}` bags no longer file from the client SDK (JOV-5186):** client `beforeSend` uses the same `hint.originalException` drop as server, so object-captures whose event value is `Non-Error exception captured with keys: error` never become Linear issues. Quota command failures are dropped separately (JOV-5184).
+- [internal] **Redis quota command failures no longer file Linear issues per route (JOV-5184):** `captureError`, Next.js `onRequestError`, and shared Sentry `beforeSend` drop `ERR max requests limit exceeded`. The hourly Redis canary still owns the standing alert. Unrelated Upstash errors such as `WRONGPASS` still report.
 - [internal] **Opaque `Error: {"error":{"name":"UpstashError"}}` bags no longer file from the browser SDK (JOV-5183):** lite and full client `Sentry.init` now receive the shared `ignoreErrors` bag patterns, and `beforeSend` drops the bag on any `extra` key. Real quota command failures still report.
 - [internal] **Opaque `Error: {"error":{"name":"UpstashError"}}` bags no longer file from client object-captures (JOV-5187):** client `beforeSend` now drops `hint.originalException` bags, and events that only keep the bag on `extra.__serialized__` or `logentry.formatted` are dropped. Real quota command failures still report.
 
@@ -27,6 +28,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- **iPhone sign-in can open the browser when SwiftUI has no key window (JOV-5198):** Continue in Browser waits for a foreground-active window, presents from a visible or scene-backed window when needed, and a failed session start is no longer reported as `invalidAuthURL`.
 - [internal] **Ovie eval review persists a durable row and records `judge:absent` as a verdict:** enqueue reports success only after `ovie_operating_kv` write, missing rubric judges are not scored as pass, word count is a `word-count:N` signal unless a verbosity budget is set, and Slack feedback redacts emails in the message body.
 - [internal] **Touch-target lint accepts the 44px hit container:** compact controls stay visually small (`h-7`/`h-8`/`h-9`); the prescribed rescue is `before:h-11`, not enlarging the item. `min-h-11` on the control still counts so the ratchet does not jump.
 - [internal] **Production monitors page again:** post-deploy probe failures Slack `#alerts-production`, golden-path probes add claim/billing/Stripe liveness, observability and synthetics file Linear, and the canary `/api/chat` auth-gate retries then fails closed.
