@@ -276,6 +276,37 @@ describe('scrubPii', () => {
 
     expect(scrubPii(event as any)).toBeNull();
   });
+  it('should drop the JOV-5218 UpstashError JSON bag', () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value: '{"error":{"name":"UpstashError"}}',
+          },
+        ],
+      },
+    };
+
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
+  it('should keep real Upstash quota exceptions', () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'UpstashError',
+            value:
+              'Command failed: ERR max requests limit exceeded. Limit: 500000',
+          },
+        ],
+      },
+    };
+
+    expect(scrubPii(event as any)).not.toBeNull();
+  });
+
   it('should filter framework internal errors', () => {
     const event = {
       exception: {

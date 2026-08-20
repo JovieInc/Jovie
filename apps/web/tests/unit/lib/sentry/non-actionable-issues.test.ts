@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  isNonActionableUpstashErrorBag,
+  isNonActionableUpstashErrorBagEvent,
   isNonActionableUpstashIssue,
   isTransientInfraHttpIssue,
   isTransientInfraHttpTransaction,
   isUpstashQuotaNoise,
   isUpstashQuotaSentryEvent,
+  UPSTASH_ERROR_JSON_BAG,
 } from '@/lib/sentry/non-actionable-issues';
 
 describe('non-actionable Sentry issues', () => {
@@ -42,6 +45,71 @@ describe('non-actionable Sentry issues', () => {
         isTransientInfraHttpIssue({
           title: 'TypeError: Cannot read properties of undefined',
           culprit: 'POST /pipeline',
+        })
+      ).toBe(false);
+    });
+  });
+
+  describe('isNonActionableUpstashErrorBag', () => {
+    it('matches the JOV-5218 Linear/Sentry title', () => {
+      expect(
+        isNonActionableUpstashErrorBag({
+          title: `Error: ${UPSTASH_ERROR_JSON_BAG}`,
+          culprit: 'captureWarning',
+        })
+      ).toBe(true);
+    });
+
+    it('matches the raw JSON bag as the exception value', () => {
+      expect(
+        isNonActionableUpstashErrorBag({
+          title: UPSTASH_ERROR_JSON_BAG,
+        })
+      ).toBe(true);
+    });
+
+    it('does not match a real Upstash quota exception (JOV-5199)', () => {
+      expect(
+        isNonActionableUpstashErrorBag({
+          title:
+            'UpstashError: Command failed: ERR max requests limit exceeded. Limit: 500000, Usage: 500099',
+        })
+      ).toBe(false);
+    });
+
+    it('does not match the clerkUserId bag owned by JOV-5185', () => {
+      expect(
+        isNonActionableUpstashErrorBag({
+          title:
+            'Error: {"clerkUserId":"af5b9ee0-ecec-4508-86e0-4f364c2e349d","error":{"name":"UpstashError"}}',
+        })
+      ).toBe(false);
+    });
+  });
+
+  describe('isNonActionableUpstashErrorBagEvent', () => {
+    it('matches an Error whose value is the JSON bag', () => {
+      expect(
+        isNonActionableUpstashErrorBagEvent({
+          exception: {
+            values: [{ type: 'Error', value: UPSTASH_ERROR_JSON_BAG }],
+          },
+        })
+      ).toBe(true);
+    });
+
+    it('does not match a quota-exceeded UpstashError', () => {
+      expect(
+        isNonActionableUpstashErrorBagEvent({
+          exception: {
+            values: [
+              {
+                type: 'UpstashError',
+                value:
+                  'Command failed: ERR max requests limit exceeded. Limit: 500000',
+              },
+            ],
+          },
         })
       ).toBe(false);
     });
