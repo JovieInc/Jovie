@@ -291,6 +291,14 @@ describe('scrubPii', () => {
     expect(scrubPii(event as any)).toBeNull();
   });
 
+  it('should drop the JOV-5229 title-only UpstashError JSON bag', () => {
+    const event = {
+      title: 'Error: {"error":{"name":"UpstashError"}}',
+    };
+
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
   it('should keep real Upstash quota exceptions', () => {
     const event = {
       exception: {
