@@ -77,12 +77,14 @@ export interface AdminMercuryMetrics {
 const NON_REPORTABLE_MERCURY_API_ERROR_MARKERS = [
   '(401)',
   '(403)',
+  '(404)',
   '(429)',
   '(502)',
   '(503)',
   '(504)',
   'ipNotWhitelisted',
   'ip not whitelisted',
+  'notFound',
 ] as const;
 
 function isNonReportableMercuryApiError(message: string): boolean {
@@ -188,7 +190,7 @@ async function fetchMercury<T>(
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`Mercury API error (${response.status}): ${body}`);
+    throw new Error(`Mercury API error (${response.status}) ${path}: ${body}`);
   }
 
   return (await response.json()) as T;
@@ -220,8 +222,10 @@ async function getCheckingBalanceUsd(): Promise<number> {
   const mercuryEnv = getMercuryEnv();
   if (!mercuryEnv) return 0;
 
+  // Mercury's current API uses singular `/account/{id}` (list-all remains
+  // `/accounts`). Plural `/accounts/{id}` 404s with errors.notFound.
   const account = await fetchMercury<MercuryAccountResponse>(
-    `/accounts/${mercuryEnv.checkingAccountId}`
+    `/account/${mercuryEnv.checkingAccountId}`
   );
 
   const balanceUsd = Number(
@@ -250,7 +254,7 @@ async function getCheckingTransactions(
     pageCount++;
 
     const response = await fetchMercury<MercuryTransactionsResponse>(
-      `/accounts/${mercuryEnv.checkingAccountId}/transactions`,
+      `/account/${mercuryEnv.checkingAccountId}/transactions`,
       {
         start: startDate.toISOString(),
         end: endDate.toISOString(),
