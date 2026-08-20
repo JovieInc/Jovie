@@ -1,8 +1,9 @@
 /**
- * How Ovie should handle one Tim message after ingest.
+ * How the Ovie door should handle one Tim message after Eve ingest.
  *
- * Tim always talks to Ovie. Ovie drives Jovie for creator/dogfood work.
- * Missing product capability becomes an admit-build, not a second chat.
+ * Tim always talks through Ovie. The door drives Jovie for creator/dogfood
+ * work. Missing product capability becomes an admit-build, not a second chat.
+ * Company work is Eve ingest/ack onto Summer's Kanban — not a persona answer.
  */
 
 export type OvieTalkKind = 'ingest-ack' | 'drive-jovie' | 'admit-build';

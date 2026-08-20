@@ -151,6 +151,11 @@ import {
 import { prepareOvieChatTurn } from '@/lib/ovie/chat-entry';
 import { getOvieOperatingStore } from '@/lib/ovie/mcp/runtime-store';
 import {
+  assertModelMustNotSelfIdentifyAsOvie,
+  assertOvieDoorDoesNotUseArtistJovieGeneration,
+  OVIE_PROGRAM,
+} from '@/lib/ovie/program';
+import {
   albumArtGenerationBurstLimiter,
   albumArtGenerationLimiter,
   checkAiChatRateLimitForPlan,
@@ -2449,12 +2454,16 @@ export async function POST(req: Request) {
     );
   }
   const userText = extractLastUserText(uiMessages);
-  // JOV-5215/5216: bind Eve pack + persist/ack dump to Summer Kanban before model.
-  const { eveTurn, receipts: ovieIngestReceipts } = await prepareOvieChatTurn(
-    chatMode,
-    userText,
-    { store: getOvieOperatingStore() }
-  );
+  // JOV-5215/5216/5214: bind Eve pack + persist/ack dump to Summer Kanban
+  // before any model. OV door must not fall through to artist Jovie chat.
+  const {
+    eveTurn,
+    receipts: ovieIngestReceipts,
+    generation,
+  } = await prepareOvieChatTurn(chatMode, userText, {
+    store: getOvieOperatingStore(),
+  });
+  assertOvieDoorDoesNotUseArtistJovieGeneration(chatMode, generation.kind);
   const clientTurnId = normalizeClientId(body.clientTurnId);
   const clientMessageId = normalizeClientId(body.clientMessageId);
   const source = normalizeChatTurnSource(body.source);
@@ -2709,6 +2718,49 @@ export async function POST(req: Request) {
         },
       });
     }
+  }
+
+  if (generation.kind === 'summer-transport') {
+    const replyText = generation.text;
+    assertModelMustNotSelfIdentifyAsOvie(replyText);
+    if (reservedTurn) {
+      await persistTerminalAssistantMessage({
+        conversationId: reservedTurn.conversationId,
+        turnId: reservedTurn.turnId,
+        status: 'completed',
+        content: replyText,
+      });
+    }
+    return createAssistantTextStreamResponse({
+      text: replyText,
+      requestId,
+      corsHeaders,
+      headers: {
+        'x-ovie-door': '1',
+        'x-ovie-summer-state': generation.state,
+        'x-ovie-m1': OVIE_PROGRAM.m1Status,
+        ...(reservedTurn
+          ? {
+              'x-conversation-id': reservedTurn.conversationId,
+              'x-chat-turn-id': reservedTurn.turnId,
+            }
+          : {}),
+      },
+      metadata: reservedTurn
+        ? buildChatTurnMetadata({
+            conversationId: reservedTurn.conversationId,
+            turnId: reservedTurn.turnId,
+            requestId,
+            chatMode: 'ov',
+            eveIdentity: eveTurn.pack.id,
+            ovieIngest: ovieIngestReceipts.map(receipt => ({
+              lane: receipt.lane,
+              destination: receipt.destination,
+              ack: receipt.ack,
+            })),
+          })
+        : undefined,
+    });
   }
 
   // Rate limiting - plan-aware daily quota + burst protection. For clients

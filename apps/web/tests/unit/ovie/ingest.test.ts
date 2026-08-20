@@ -66,13 +66,18 @@ describe('Ovie dump ingest (JOV-5215)', () => {
 
   it('persists mixed dump on the shipped chat entry and skips spawn', async () => {
     const spawned: string[] = [];
-    const { eveTurn, receipts } = await prepareOvieChatTurn('ov', MIXED[2], {
-      store: new MemoryOperatingStore(),
-      spawn: goal => {
-        spawned.push(goal);
-      },
-    });
+    const { eveTurn, receipts, generation } = await prepareOvieChatTurn(
+      'ov',
+      MIXED[2],
+      {
+        store: new MemoryOperatingStore(),
+        spawn: goal => {
+          spawned.push(goal);
+        },
+      }
+    );
     expect(eveTurn.pack.id).toBe('ovie');
+    expect(generation.kind).toBe('summer-transport');
     expect(spawned).toEqual([]);
     expect(receipts).toHaveLength(1);
     expect(receipts[0]?.lane).toBe('engineering');
@@ -82,12 +87,13 @@ describe('Ovie dump ingest (JOV-5215)', () => {
   });
 
   it('does not ingest on the Jovie artist chat entry', async () => {
-    const { eveTurn, receipts } = await prepareOvieChatTurn(
+    const { eveTurn, receipts, generation } = await prepareOvieChatTurn(
       null,
       'Jovie signup returns 500 on /start',
       { store: new MemoryOperatingStore() }
     );
     expect(eveTurn.pack.id).toBe('jovie');
+    expect(generation.kind).toBe('artist-jovie');
     expect(receipts).toEqual([]);
     expect(readOvieReceiptLog()).toEqual([]);
     expect(readOvieLinearRoutes()).toEqual([]);

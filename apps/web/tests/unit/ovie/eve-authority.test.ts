@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   assertEveCannotAnswerAsSummer,
+  assertEveCannotBroadenPermissions,
   assertEveCannotChoosePriority,
   assertEveCannotDispatchSymphony,
   assertEveCannotExecuteCode,
@@ -12,13 +13,14 @@ import {
 import { routeEngineeringToLinear } from '@/lib/ovie/ingest';
 
 describe('Eve authority (JOV-5215)', () => {
-  it('denies priority, Symphony, code, self-promote, and Summer answers', () => {
+  it('denies priority, Symphony, code, self-promote, Summer answers, and permission broadening', () => {
     expect(EVE_FORBIDDEN_ACTIONS).toEqual([
       'choose-priority',
       'symphony-dispatch',
       'execute-code',
       'self-promote',
       'summer-answer',
+      'broaden-permissions',
     ]);
     for (const action of EVE_FORBIDDEN_ACTIONS) {
       expect(eveActionAllowed(action)).toBe(false);
@@ -28,6 +30,9 @@ describe('Eve authority (JOV-5215)', () => {
     expect(() => assertEveCannotExecuteCode()).toThrow(EveAuthorityError);
     expect(() => assertEveCannotSelfPromote()).toThrow(EveAuthorityError);
     expect(() => assertEveCannotAnswerAsSummer()).toThrow(EveAuthorityError);
+    expect(() => assertEveCannotBroadenPermissions()).toThrow(
+      EveAuthorityError
+    );
   });
 
   it('refuses Linear/Symphony dispatch from Eve ingest', () => {

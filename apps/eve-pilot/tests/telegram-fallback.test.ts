@@ -90,9 +90,10 @@ describe('Ovie Telegram fallback identity', () => {
     delete process.env.EVE_IDENTITY;
     expect(eveIdentityForChannel('telegram').pack.id).toBe('ovie');
     expect(eveIdentityForChannel('jovie-core-chat').pack.id).toBe('jovie');
-    expect(bindEvePilotIdentity('ovie').instructions).toContain(
-      'only talk door'
-    );
+    const instructions = bindEvePilotIdentity('ovie').instructions;
+    expect(instructions).toContain("You are Eve on Tim's Ovie door");
+    expect(instructions).toContain('Do not self-identify as Ovie');
+    expect(instructions.toLowerCase()).not.toMatch(/you are ovie/);
   });
 
   it('dispatches allowlisted Telegram mail as Ovie, not Jovie', () => {
@@ -113,8 +114,10 @@ describe('Ovie Telegram fallback identity', () => {
         fallback: 'true',
       },
     });
-    expect(admitted?.context?.[0]).toContain('only talk door');
+    expect(admitted?.context?.[0]).toContain("You are Eve on Tim's Ovie door");
+    expect(admitted?.context?.[0]).toContain('Do not self-identify as Ovie');
     expect(admitted?.context?.[0]).toContain('ingest and ack');
+    expect(admitted?.context?.[0]?.toLowerCase()).not.toMatch(/you are ovie/);
 
     expect(
       onOvieTelegramMessage(

@@ -1,24 +1,31 @@
 # Eve (Jovie + Ovie)
 
-Eve is the talk runtime. Ovie is Tim's door. Jovie is the artist identity.
-Summer on Gem is the factory behind the door.
+Eve is the talk runtime. Ovie is Tim's door and operations presentation,
+not a persona. Jovie is the artist identity. Summer is Chief of Staff
+behind the door. Symphony orchestrates code on Gem Ubuntu.
+
+Canonical program: [`docs/OVIE_PROGRAM.md`](../../docs/OVIE_PROGRAM.md)
+(JOV-5214).
+
+`Tim -> Ovie -> Eve intake/ack -> durable Kanban -> Summer -> Symphony -> identified coding worker on Gem Ubuntu`
 
 ## Split
 
-Tim always talks to Ovie.
+Tim always talks through Ovie.
 
-- Creator work and dogfood → Ovie drives Jovie on the same product path.
-- Jovie cannot do it → Ovie admits a build (engineering). No second chat.
+- Creator work and dogfood → this door drives Jovie on the same product path.
+- Jovie cannot do it → Eve admits a build (engineering). No second chat.
 - Feeling the product → Tim opens the Jovie app. That is taste, not talk.
+- Conversational authority is Summer. Eve does not answer as Summer or as Ovie.
 - Jovie-on-iMessage is later.
 
 ## Channels
 
 | Channel | Identity | Notes |
 |---|---|---|
-| iOS / Mac / OV chat | Ovie when `chatMode=ov` | App is still the primary surface |
-| Telegram | Ovie | Dedicated bot. Do not reuse Hermes |
-| iMessage (Photon) | Ovie | Portable Photon creds. No Vercel Connect |
+| iOS / Mac / OV chat | Ovie door when `chatMode=ov` | Eve intake, then Summer. Not artist Jovie chat |
+| Telegram | Ovie door | Dedicated bot. Do not reuse Hermes |
+| iMessage (Photon) | Ovie door | Portable Photon creds. No Vercel Connect |
 | Jovie product chat | Jovie | Artist identity only |
 
 Telegram and iMessage fail closed without an allowlist. Groups and unknown
@@ -49,7 +56,7 @@ After the Eve host is public HTTPS:
       -d '{"url":"https://<eve-host>/eve/v1/telegram","secret_token":"'"$TELEGRAM_WEBHOOK_SECRET_TOKEN"'","allowed_updates":["message","callback_query"]}'
 
 Point Photon's webhook at `https://<eve-host>/eve/v1/photon`. Then take
-Summer off Photon talk so iMessage is Ovie, not the factory.
+Summer off Photon talk so iMessage is the Ovie door, not the factory.
 
 ## Local verification
 
@@ -63,5 +70,7 @@ Node 24 or later. Isolated from the monorepo Node 22 CI runner.
 ## What this unit does not do
 
 - It does not replace `executeChatTurn` as Jovie web's generation path.
+- It does not fall through OV turns to ordinary artist Jovie chat.
 - It does not privileged-write gbrain or heal Symphony.
 - It does not join LYB Eve.
+- It does not revive the retired Gem OpenClaw agent.
