@@ -7,6 +7,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Upstash quota command failures no longer file Linear issues (JOV-5181):** `onRequestError`, `captureError`, and shared `beforeSend` drop `ERR max requests limit exceeded`. The hourly Redis operability canary still pages via `redis_operability_quota_exceeded`.
 - [internal] **Opaque `Error: {"error":{"name":"UpstashError"}}` bags no longer file from reconstructed client Sentry.init (JOV-5182):** lite and full client configs now spread the shared base, so `ignoreErrors` and `release` reach the browser SDK. Real quota command failures still report.
 - [internal] **Redis quota command failures no longer file Linear issues per route (JOV-5184):** `captureError`, Next.js `onRequestError`, and shared Sentry `beforeSend` drop `ERR max requests limit exceeded`. The hourly Redis canary still owns the standing alert. Unrelated Upstash errors such as `WRONGPASS` still report.
 - [internal] **Opaque `Error: {"error":{"name":"UpstashError"}}` bags no longer file from the browser SDK (JOV-5183):** lite and full client `Sentry.init` now receive the shared `ignoreErrors` bag patterns, and `beforeSend` drops the bag on any `extra` key. Real quota command failures still report.

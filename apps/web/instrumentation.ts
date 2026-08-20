@@ -319,18 +319,15 @@ export async function onRequestError(...args: unknown[]) {
 
   // Next.js request-error capture bypasses captureError unwrap. A thrown
   // `{ error: UpstashError }` JSON-stringifies to the JOV-5209 / JOV-5218
-  // Linear title. Nested wrappers keep the bag on `cause`. Real quota
-  // command failures (JOV-5184) are the same Redis incident — the hourly
-  // operability canary owns the standing alert.
-  const { isOpaqueUpstashErrorJsonBag } = await import(
-    '@/lib/sentry/non-actionable-issues'
-  );
-  if (isOpaqueUpstashErrorJsonBag(args[0])) {
-    return;
-  }
-
-  const { isRedisQuotaFailure } = await import('@/lib/utils/errors');
-  if (isRedisQuotaFailure(args[0])) {
+  // Linear title. Nested wrappers keep the bag on `cause`. A raw quota
+  // `UpstashError` (JOV-5181 / JOV-5184) files as `ERR max requests limit
+  // exceeded` — the hourly operability canary owns the standing alert.
+  const [{ isOpaqueUpstashErrorJsonBag }, { isRedisQuotaFailure }] =
+    await Promise.all([
+      import('@/lib/sentry/non-actionable-issues'),
+      import('@/lib/utils/errors'),
+    ]);
+  if (isOpaqueUpstashErrorJsonBag(args[0]) || isRedisQuotaFailure(args[0])) {
     return;
   }
 
