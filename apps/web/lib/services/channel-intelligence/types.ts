@@ -1,7 +1,20 @@
 /**
  * Channel-intelligence report types (JOV-3193).
  * Pure types — connector hydrates YouTube Reporting / Analytics API rows.
+ * Playlist rows, when present, pass the freshness + no-invent gate.
  */
+
+import type {
+  FetchedPlaylistRow,
+  GatedPlaylistTarget,
+  PlaylistFreshnessGateResult,
+} from './playlist-freshness';
+
+export type {
+  FetchedPlaylistRow,
+  GatedPlaylistTarget,
+  PlaylistFreshnessGateResult,
+} from './playlist-freshness';
 
 export type TitleLengthBucket = 'short' | 'medium' | 'long';
 export type DurationBucket = 'short' | 'medium' | 'long';
@@ -112,6 +125,8 @@ export interface ChannelIntelligenceReport {
   readonly winSignals: readonly ChannelWinSignal[];
   readonly changePlan: readonly ChannelChangePlanItem[];
   readonly sources: readonly MetricSource[];
+  readonly playlistTargets: readonly GatedPlaylistTarget[];
+  readonly playlistGate: PlaylistFreshnessGateResult;
 }
 
 export type ChannelIntelligenceIntent =
@@ -119,6 +134,7 @@ export type ChannelIntelligenceIntent =
   | 'worst_videos'
   | 'whats_working'
   | 'whats_declining'
+  | 'playlist_targets'
   | 'unknown';
 
 export interface ChannelIntelligenceAnswer {
@@ -127,6 +143,7 @@ export interface ChannelIntelligenceAnswer {
   readonly rankedVideos: readonly RankedVideo[];
   readonly winSignals: readonly ChannelWinSignal[];
   readonly sources: readonly MetricSource[];
+  readonly playlistTargets?: readonly GatedPlaylistTarget[];
 }
 
 export interface BuildChannelIntelligenceReportInput {
@@ -137,6 +154,10 @@ export interface BuildChannelIntelligenceReportInput {
   readonly nowIso?: string;
   readonly listLimit?: number;
   readonly learningLayerSummaries?: readonly LearningLayerWinAnnotation[];
+  /** Fetched playlist rows only. Never invent names, URLs, or follower counts. */
+  readonly playlists?: readonly FetchedPlaylistRow[];
+  /** Optional proposed rows; names/URLs/counts not in `playlists` are refused. */
+  readonly proposedPlaylists?: readonly FetchedPlaylistRow[];
 }
 
 export interface LearningLayerWinAnnotation {

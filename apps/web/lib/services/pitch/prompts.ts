@@ -45,6 +45,7 @@ function checklistInputFromPitch(
   };
 }
 
+// Channel-intel freshness gate owns playlist name/count invention; this draft path still refuses invented names (HARD RULES).
 export function buildSystemPrompt(): string {
   return `You write playlist pitches in the artist's own voice (first person). These are submitted to editorial curators at streaming platforms who scan hundreds of pitches daily. Your job is to make the artist's pitch stand out through specificity, vivid storytelling, and easy-to-scan structure.
 

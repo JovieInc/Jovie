@@ -30,6 +30,29 @@ export {
   titleLengthBucket,
   watchMinutesPerImpression,
 } from './metrics';
+export type {
+  ChannelIntelPlaylistCaseId,
+  ChannelIntelPlaylistCaseResult,
+  FetchedPlaylistRow,
+  GatedPlaylistTarget,
+  PlaylistActivityStatus,
+  PlaylistDropReason,
+  PlaylistFreshnessGateResult,
+  PlaylistPeerWarmth,
+} from './playlist-freshness';
+export {
+  CHANNEL_INTEL_PLAYLIST_CASE_IDS,
+  CHANNEL_INTEL_PLAYLIST_FRESHNESS_RULES,
+  evaluateAllChannelIntelPlaylistCases,
+  evaluateChannelIntelPlaylistCase,
+  formatPlaylistActivity,
+  formatPlaylistFollowerCount,
+  gatePlaylistTargets,
+  PLAYLIST_DORMANT_DAYS,
+  PLAYLIST_FRESH_DAYS,
+  PLAYLIST_RECOMMEND_MAX,
+  PLAYLIST_RECOMMEND_MIN,
+} from './playlist-freshness';
 export {
   buildChannelChangePlan,
   buildChannelIntelligenceReport,

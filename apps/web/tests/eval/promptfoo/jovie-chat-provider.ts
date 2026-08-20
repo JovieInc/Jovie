@@ -106,6 +106,13 @@ import {
 import type { CanvasGenerationInput } from '@/lib/services/canvas/types';
 import { buildChannelIntelligenceReport } from '@/lib/services/channel-intelligence';
 import {
+  CHANNEL_INTEL_PLAYLIST_CASE_IDS,
+  CHANNEL_INTEL_PLAYLIST_FRESHNESS_RULES,
+  type ChannelIntelPlaylistCaseId,
+  evaluateAllChannelIntelPlaylistCases,
+  evaluateChannelIntelPlaylistCase,
+} from '@/lib/services/channel-intelligence/playlist-freshness';
+import {
   buildSystemPrompt as buildInsightSystemPrompt,
   buildUserPrompt as buildInsightUserPrompt,
 } from '@/lib/services/insights/prompts';
@@ -5799,6 +5806,17 @@ function evaluateSkillPromptContract(vars: EvalVars) {
     whyText: null,
     instructions: null,
   });
+  const channelIntelPlaylistCases = evaluateAllChannelIntelPlaylistCases();
+  const requestedChannelIntelPlaylistCase =
+    typeof vars.channelIntelPlaylistCase === 'string' &&
+    (CHANNEL_INTEL_PLAYLIST_CASE_IDS as readonly string[]).includes(
+      vars.channelIntelPlaylistCase
+    )
+      ? (vars.channelIntelPlaylistCase as ChannelIntelPlaylistCaseId)
+      : null;
+  const requestedChannelIntelPlaylist = requestedChannelIntelPlaylistCase
+    ? evaluateChannelIntelPlaylistCase(requestedChannelIntelPlaylistCase)
+    : null;
   const packagingChangePlan = buildChannelIntelligenceReport({
     channelId: 'UC_eval',
     videos: [
@@ -5944,6 +5962,65 @@ function evaluateSkillPromptContract(vars: EvalVars) {
       packagingChangePlan.changePlan[0]?.priority === 1 &&
       packagingChangePlan.changePlan.every(item => item.observation.length > 0),
   };
+  const emptyPlaylistReport = buildChannelIntelligenceReport({
+    channelId: 'UC_eval',
+    videos: [
+      {
+        videoId: 'best',
+        title: 'Hit Single',
+        publishedAt: '2026-06-01T00:00:00Z',
+        impressions: 8000,
+        views: 400,
+        watchMinutes: 4800,
+        ctr: 0.08,
+        avgViewDurationSeconds: 180,
+        reachTrend: 0.2,
+        hasFace: true,
+        hasText: false,
+        topic: 'music',
+        titleWordCount: 2,
+        durationSeconds: 210,
+      },
+    ],
+    nowIso: '2026-08-20T00:00:00.000Z',
+    playlists: [],
+  });
+  const channelIntelPromptFacts = {
+    freshnessGatePresent: textIncludesAll(
+      CHANNEL_INTEL_PLAYLIST_FRESHNESS_RULES,
+      [
+        'Never emit a playlist name',
+        'Empty fetch',
+        '12 months',
+        '90 days',
+        '15–25',
+        'unknown',
+        'do not claim "active."',
+      ]
+    ),
+    inventedPlaylistRefused:
+      channelIntelPlaylistCases.find(
+        item => item.id === 'invented-playlist-refused'
+      )?.passed === true,
+    dormant12mDropped:
+      channelIntelPlaylistCases.find(item => item.id === 'dormant-12m-dropped')
+        ?.passed === true,
+    missingActivityUnknown:
+      channelIntelPlaylistCases.find(
+        item => item.id === 'missing-activity-unknown'
+      )?.passed === true,
+    emptyFetchEmpty:
+      channelIntelPlaylistCases.find(item => item.id === 'empty-fetch-empty')
+        ?.passed === true &&
+      emptyPlaylistReport.playlistGate.empty &&
+      emptyPlaylistReport.playlistTargets.length === 0,
+    recommendCap15to25:
+      channelIntelPlaylistCases.find(item => item.id === 'recommend-cap-15-25')
+        ?.passed === true,
+  };
+  const missingChannelIntelPromptFacts = Object.entries(channelIntelPromptFacts)
+    .filter(([, passed]) => !passed)
+    .map(([name]) => name);
   const retouchGuardrails = [
     "Preserve the person's identity",
     'Do not change protected or sensitive attributes',
@@ -6030,6 +6107,18 @@ function evaluateSkillPromptContract(vars: EvalVars) {
         ? requestedPackagingRule.passed
         : packagingRuleCases.every(item => item.passed),
       ruleCaseReason: requestedPackagingRule?.reason ?? null,
+    },
+    channelIntel: {
+      skillId: 'channelIntelligenceReport',
+      facts: channelIntelPromptFacts,
+      missingFacts: missingChannelIntelPromptFacts,
+      ruleCases: channelIntelPlaylistCases,
+      ruleCase: requestedChannelIntelPlaylist?.id ?? null,
+      ruleCasePassed: requestedChannelIntelPlaylist
+        ? requestedChannelIntelPlaylist.passed
+        : channelIntelPlaylistCases.every(item => item.passed),
+      ruleCaseReason: requestedChannelIntelPlaylist?.reason ?? null,
+      emptyFetch: emptyPlaylistReport.playlistGate.empty,
     },
     retouch: {
       skillId: 'retouch',
