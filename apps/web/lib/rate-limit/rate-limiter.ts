@@ -9,6 +9,11 @@ import * as Sentry from '@sentry/nextjs';
 import type { Ratelimit } from '@upstash/ratelimit';
 import { after } from 'next/server';
 import { env } from '@/lib/env-server';
+import {
+  closeRedisQuotaCircuit,
+  isRedisQuotaCircuitOpen,
+  noteRedisCommandFailure,
+} from '@/lib/redis';
 import { classifyRedisFailure } from '@/lib/redis-operability';
 import { withTimeout } from '@/lib/resilience/primitives';
 import { parseWindowToMs } from './config';
@@ -37,7 +42,6 @@ const REDIS_RATE_LIMIT_TIMEOUT_MS = 750;
  * failure signal applies to the shared Redis backend, not a single limiter.
  */
 const REDIS_CIRCUIT_OPEN_MS = 30_000;
-const REDIS_QUOTA_CIRCUIT_OPEN_MS = 15 * 60_000;
 let redisCircuitOpenUntil = 0;
 
 function countRedisMetric(
@@ -57,20 +61,19 @@ export function estimateRateLimitCommandUpperBound(
 }
 
 function isRedisCircuitOpen(): boolean {
-  return Date.now() < redisCircuitOpenUntil;
+  return Date.now() < redisCircuitOpenUntil || isRedisQuotaCircuitOpen();
 }
 
 function openRedisCircuit(error: unknown): void {
-  const duration =
-    classifyRedisFailure(error) === 'quota_exceeded'
-      ? REDIS_QUOTA_CIRCUIT_OPEN_MS
-      : REDIS_CIRCUIT_OPEN_MS;
-  redisCircuitOpenUntil = Date.now() + duration;
+  noteRedisCommandFailure(error);
+  if (classifyRedisFailure(error) === 'quota_exceeded') return;
+  redisCircuitOpenUntil = Date.now() + REDIS_CIRCUIT_OPEN_MS;
 }
 
 /** Test-only helper to reset the shared Redis circuit breaker. */
 export function resetRedisCircuitBreaker(): void {
   redisCircuitOpenUntil = 0;
+  closeRedisQuotaCircuit();
 }
 
 /**

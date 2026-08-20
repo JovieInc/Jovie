@@ -209,6 +209,20 @@ describe('Rate Limit Config', () => {
         expect(RATE_LIMITERS.health.analytics).toBe(false);
       });
 
+      it('keeps high-volume authenticated shells on the 3-command fixed-window diet', () => {
+        const highVolume = [
+          RATE_LIMITERS.navigationTelemetry,
+          RATE_LIMITERS.dashboardLinks,
+          RATE_LIMITERS.headerSearch,
+          RATE_LIMITERS.spotifySearch,
+        ];
+
+        for (const limiter of highVolume) {
+          expect(limiter.analytics).toBe(false);
+          expect(limiter.algorithm).toBe('fixed-window');
+        }
+      });
+
       it('keeps anonymous traffic on the lower-command fixed-window policy', () => {
         const anonymousLimiters = Object.values(RATE_LIMITERS).filter(
           limiter => limiter.trafficClass === 'anonymous'

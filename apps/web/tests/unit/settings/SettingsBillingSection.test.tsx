@@ -78,6 +78,9 @@ describe('SettingsBillingSection', () => {
     expect(
       screen.getByRole('button', { name: /manage in stripe/i })
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /manage in stripe/i }).closest('.px-4')
+    ).toHaveClass('sm:px-5');
   });
 
   it('opens the billing portal for users who still have a Stripe customer record', () => {

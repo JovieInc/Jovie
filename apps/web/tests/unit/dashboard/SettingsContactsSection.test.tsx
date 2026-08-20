@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   RightPanelProvider,
   useRightPanel,
@@ -25,6 +25,15 @@ const mockContacts = vi.hoisted(() => [
   },
 ]);
 
+const { mockContactsQueryState, refetch } = vi.hoisted(() => ({
+  mockContactsQueryState: {
+    data: null as null | typeof mockContacts,
+    isLoading: false,
+    isError: false,
+  },
+  refetch: vi.fn(),
+}));
+
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   DashboardDataContext: {
     Provider: ({ children }: { children: React.ReactNode }) => children,
@@ -41,10 +50,8 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
 
 vi.mock('@/lib/queries/useContactsQuery', () => ({
   useContactsQuery: () => ({
-    data: mockContacts,
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
+    ...mockContactsQueryState,
+    refetch,
   }),
 }));
 
@@ -76,6 +83,13 @@ const mockArtist: Artist = {
 };
 
 describe('SettingsContactsSection', () => {
+  beforeEach(() => {
+    mockContactsQueryState.data = mockContacts;
+    mockContactsQueryState.isLoading = false;
+    mockContactsQueryState.isError = false;
+    refetch.mockReset();
+  });
+
   it('registers the contact sidebar in the right panel', async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -113,5 +127,56 @@ describe('SettingsContactsSection', () => {
         'true'
       );
     });
+  });
+
+  it('uses the canonical panel body for its loading state', () => {
+    mockContactsQueryState.data = null;
+    mockContactsQueryState.isLoading = true;
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <RightPanelProvider>
+          <SettingsContactsSection artist={mockArtist} />
+        </RightPanelProvider>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText('Team Contacts')).toBeInTheDocument();
+    expect(document.querySelector('.px-4.py-4')).toHaveClass('sm:px-5');
+  });
+
+  it('keeps contact load errors recoverable without a nested card', () => {
+    mockContactsQueryState.data = null;
+    mockContactsQueryState.isError = true;
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <RightPanelProvider>
+          <SettingsContactsSection artist={mockArtist} />
+        </RightPanelProvider>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText('Unable To Load Contacts')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Try Again' }));
+    expect(refetch).toHaveBeenCalledOnce();
+    expect(screen.getAllByText('Unable To Load Contacts')).toHaveLength(1);
+  });
+
+  it('uses the canonical empty-state hierarchy when no contacts exist', () => {
+    mockContactsQueryState.data = [];
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <RightPanelProvider>
+          <SettingsContactsSection artist={mockArtist} />
+        </RightPanelProvider>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText('No contacts yet')).toBeInTheDocument();
+    expect(
+      screen.getByText('Add your first contact to get started.')
+    ).toBeInTheDocument();
   });
 });

@@ -420,6 +420,28 @@ describe('public profile audience block helper', () => {
     }
   });
 
+  it('does not emit audience-block warnings for Redis quota exhaustion', async () => {
+    process.env.NODE_ENV = 'production';
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mocks.getRedis.mockReturnValue({
+      get: vi.fn(async () => {
+        throw new Error('ERR max requests limit exceeded. Limit: 500000');
+      }),
+      set: vi.fn(),
+      del: vi.fn(),
+    });
+    mockAudienceBlockRows([]);
+
+    try {
+      await expect(
+        checkProfileVisitorBlocked('tim', '1.2.3.4', 'Mozilla')
+      ).resolves.toBe(false);
+      expect(warning).not.toHaveBeenCalled();
+    } finally {
+      warning.mockRestore();
+    }
+  });
+
   it('marks profiles with no active blocks as negative-cache safe', async () => {
     process.env.NODE_ENV = 'production';
     await markProfileHasNoAudienceBlocks('tim');
