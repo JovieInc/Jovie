@@ -153,6 +153,7 @@ export function ackOvieDumpBeforeModel(userText: string | null): OvieReceipt[] {
   return ingestOvieDump([userText]);
 }
 
+/** Process-local only. Not completeness proof. Lost on deploy. */
 const receiptLog: OvieReceipt[] = [];
 const linearRoutes: OvieReceipt[] = [];
 

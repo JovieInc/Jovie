@@ -8,7 +8,10 @@ import { runAllScorers } from './core';
 
 export const EVAL_REVIEW_LABEL = 'needs:eval-review' as const;
 const DEFAULT_SAMPLE_RATE = 0.05;
+/** Process-local only. Not an incident store. Lost on deploy. */
 const softFailureCounts = new Map<string, number>();
+export const EVAL_REVIEW_NOT_PROVISIONED =
+  'durable-queue-not-provisioned' as const;
 
 export function resetOnlineScorerState(): void {
   softFailureCounts.clear();
@@ -74,14 +77,29 @@ const partitionSoftFailures = (
   return { forRecording, forReview };
 };
 
+export type EvalReviewEnqueueResult = {
+  readonly enqueued: false;
+  readonly label: typeof EVAL_REVIEW_LABEL;
+  readonly reason: typeof EVAL_REVIEW_NOT_PROVISIONED;
+};
+
+/**
+ * Review enqueue is not provisioned. Never reports success without a durable
+ * incident row (JOV-5238). Failure modes are recorded on the scoring result.
+ */
 export function enqueueEvalReview(input: {
   readonly traceId: string;
   readonly caseName: string;
   readonly userPrompt: string;
   readonly assistantResponse: string;
   readonly failureModes: readonly OnlineScoringResult['failureModes'][number][];
-}) {
-  return { enqueued: input.failureModes.length > 0, label: EVAL_REVIEW_LABEL };
+}): EvalReviewEnqueueResult {
+  void input;
+  return {
+    enqueued: false,
+    label: EVAL_REVIEW_LABEL,
+    reason: EVAL_REVIEW_NOT_PROVISIONED,
+  };
 }
 
 async function recordScoresInLangfuse(
@@ -151,7 +169,11 @@ export async function runOnlineScoring(
         assistantResponse: input.assistantResponse,
         failureModes,
       })
-    : { enqueued: false, label: EVAL_REVIEW_LABEL };
+    : {
+        enqueued: false as const,
+        label: EVAL_REVIEW_LABEL,
+        reason: EVAL_REVIEW_NOT_PROVISIONED,
+      };
   void recordScoresInLangfuse(input.traceId, partitioned.forRecording);
   return {
     sampled: true,

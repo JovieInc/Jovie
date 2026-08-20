@@ -6,6 +6,7 @@ import {
 import { runAllScorers, runDeterministicScorers } from './core';
 import {
   EVAL_REVIEW_LABEL,
+  EVAL_REVIEW_NOT_PROVISIONED,
   enqueueEvalReview,
   resetOnlineScorerState,
   runOnlineScoring,
@@ -55,7 +56,35 @@ describe('shared deterministic scorers', () => {
         mustRefuse: true,
       }).results.find(r => r.criterion === 'policy-adherence')?.verdict
     ).toBe('pass');
-    expect(runAllScorers(baseInput).rubric).toHaveLength(4);
+    const absent = runAllScorers(baseInput).rubric;
+    expect(absent).toHaveLength(4);
+    expect(absent.every(item => item.reason.includes('judge:absent'))).toBe(
+      true
+    );
+    expect(absent.every(item => item.flagged === false)).toBe(true);
+    expect(
+      runAllScorers({
+        ...baseInput,
+        rubricScores: { 'rubric-helpfulness': 5, 'rubric-accuracy': 2 },
+      }).rubric.find(item => item.criterion === 'rubric-accuracy')
+    ).toMatchObject({ verdict: 'fail', flagged: true });
+  });
+
+  it('does not fail format-policy on length unless a verbosity budget is set', () => {
+    const longAnswer = Array.from({ length: 160 }, () => 'word').join(' ');
+    expect(
+      runDeterministicScorers({
+        ...baseInput,
+        assistantResponse: `${longAnswer} Friday`,
+      }).passed
+    ).toBe(true);
+    expect(
+      runDeterministicScorers({
+        ...baseInput,
+        assistantResponse: `${longAnswer} Friday`,
+        verbosityBudgetWords: 150,
+      }).passed
+    ).toBe(false);
   });
 });
 
@@ -105,7 +134,7 @@ describe('online scoring lane', () => {
     expect(result).toMatchObject({
       sampled: true,
       flagged: true,
-      reviewEnqueued: true,
+      reviewEnqueued: false,
     });
     expect(
       enqueueEvalReview({
@@ -115,6 +144,10 @@ describe('online scoring lane', () => {
         assistantResponse: 'No.',
         failureModes: ['prompt-leak'],
       })
-    ).toEqual({ enqueued: true, label: EVAL_REVIEW_LABEL });
+    ).toEqual({
+      enqueued: false,
+      label: EVAL_REVIEW_LABEL,
+      reason: EVAL_REVIEW_NOT_PROVISIONED,
+    });
   });
 });
