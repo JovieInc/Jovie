@@ -33,6 +33,7 @@ MAX_GROK_SURVIVAL_SECONDS = 120.0
 CONTROL_TIMEOUT_SECONDS = 10.0
 DEFAULT_GROK_MAX = 4  # Gem 16c/62GB safely runs 4 concurrent grok-ship workers (per-unit idempotent, active units skipped)
 MAX_GROK_MAX = 10  # hard ceiling; 10 only via explicit SYMPHONY_GROK_MAX (free-tier Build quota / dispatch risk above 4)
+STALE_REMOUNT_SECONDS = 15 * 60  # live JOV-5220 held DIRTY remount 90+ min and blocked a fresh changelog remount
 PRIMARY_SERVICE = "symphony-ui-pilot.service"
 OPTIONAL_SERVICES = ("symphony-lyb.service",)
 SERVICES = (PRIMARY_SERVICE, *OPTIONAL_SERVICES)
@@ -142,6 +143,9 @@ ADMITTED_STATES = frozenset(("todo", "in progress", "in review"))
 # Todo still requires a current admission-gate/v1 receipt.
 CONTINUE_WITHOUT_RECEIPT_STATES = frozenset(("in progress", "in review"))
 AUTONOMOUS_HEAD_RE = re.compile(r"^(?:symphony|grok|fallback)/((?:JOV|LYB)-\d+)-fix$")
+FALLBACK_UNIT_RE = re.compile(
+    r"^(?:fallback-ship|grok-ship)-((?:JOV|LYB)-\d+)(?:-[0-9a-f]{12})?\.service$"
+)
 GH_TIMEOUT_SECONDS = 20.0
 JOV_REPO = "JovieInc/Jovie"
 LYB_REPO = "JovieInc/LogYourBody"
@@ -468,6 +472,63 @@ def _unit_not_loaded(unit: str) -> bool:
         and result.returncode == 0
         and result.stdout.decode(errors="replace").strip() == "not-found"
     )
+
+
+def _identifier_from_unit(unit: str) -> str | None:
+    match = FALLBACK_UNIT_RE.fullmatch(unit)
+    return match.group(1) if match else None
+
+
+def _unit_age_seconds(unit: str) -> float | None:
+    result = _captured(
+        _systemctl("show", "--property=ExecMainStartTimestampUSec", "--value", unit),
+        CONTROL_TIMEOUT_SECONDS,
+    )
+    if result is None or result.returncode != 0:
+        return None
+    raw = result.stdout.decode(errors="replace").strip()
+    if not raw.isdigit():
+        return None
+    age = time.time() - int(raw) / 1_000_000
+    return age if age >= 0 else None
+
+
+def _recycle_stale_remount_units(
+    active: list[str], open_prs: dict[str, dict]
+) -> list[str]:
+    """Stop leftover remount units that still have a DIRTY/CONFLICTING head.
+
+    Live JOV-5220 held fallback-ship for 90+ min after main moved, so sidecar
+    skipped a fresh changelog remount (`grok_started=0 grok_survived=2`).
+    """
+    kept: list[str] = []
+    for unit in active:
+        ident = _identifier_from_unit(unit)
+        if ident is None:
+            kept.append(unit)
+            continue
+        verdict, _pr = _open_pr_verdict(ident, open_prs)
+        if verdict != "remount":
+            kept.append(unit)
+            continue
+        age = _unit_age_seconds(unit)
+        if age is None or age < STALE_REMOUNT_SECONDS:
+            kept.append(unit)
+            continue
+        if not _control(_systemctl("stop", unit)):
+            print(
+                f"fallback skip {ident} stale_remount_stop_failed",
+                file=sys.stderr,
+                flush=True,
+            )
+            kept.append(unit)
+            continue
+        print(
+            f"fallback stop {ident} stale_remount age_s={int(age)}",
+            file=sys.stderr,
+            flush=True,
+        )
+    return kept
 
 
 def _grok_ship_one_executable() -> str | None:
@@ -868,7 +929,7 @@ def _autonomous_open_pr_index(identifiers: list[str] | None = None) -> dict[str,
                 "--limit",
                 "100",
                 "--json",
-                "number,headRefName,mergeStateStatus",
+                "number,headRefName,mergeStateStatus,mergeable",
             ]
         )
         if not isinstance(payload, list):
@@ -891,6 +952,7 @@ def _autonomous_open_pr_index(identifiers: list[str] | None = None) -> dict[str,
                     "head": head,
                     "repo": repo,
                     "mergeStateStatus": pr.get("mergeStateStatus"),
+                    "mergeable": pr.get("mergeable"),
                 }
     return index
 
@@ -967,14 +1029,17 @@ def _open_pr_verdict(identifier: str, index: dict[str, dict]) -> tuple[str, dict
     if not isinstance(repo, str) or not isinstance(number, int):
         return "skip", pr
     status = str(pr.get("mergeStateStatus") or "").upper()
+    mergeable = str(pr.get("mergeable") or "").upper()
     # CLEAN heads are already merge-queue eligible. Remounting them fights
     # github-merge-queue and can knock a green autonomous PR out of the queue.
-    if status == "CLEAN":
+    if status == "CLEAN" and mergeable != "CONFLICTING":
         return "skip", pr
     # DIRTY/BEHIND after a sibling merge is not product-CI-red, but the head
     # cannot enroll until it merges main. Live #16211 was skipped as inflight
-    # after #16212 landed (sidecar: open_pr_inflight).
-    if status in {"DIRTY", "BEHIND"}:
+    # after #16212 landed (sidecar: open_pr_inflight). CONFLICTING covers
+    # merge-queue UNMERGEABLE (mergeStateStatus often UNKNOWN) after a
+    # sibling CHANGELOG land (#16229 vs #16243).
+    if status in {"DIRTY", "BEHIND"} or mergeable == "CONFLICTING":
         return "remount", pr
     if _pr_has_failing_check(repo, number):
         return "remount", pr
@@ -1007,10 +1072,10 @@ def _launch_fallback_workers(
     limit: int,
 ) -> tuple[set[str], int]:
     """Start isolated fallback units up to *limit*. Never stops Symphony."""
-    active_units = set(active)
+    open_prs = _autonomous_open_pr_index(None)
+    active_units = set(_recycle_stale_remount_units(active, open_prs))
     capacity_used = len(active_units)
     launched_units: set[str] = set()
-    open_prs = _autonomous_open_pr_index(identifiers)
     for identifier in identifiers:
         if capacity_used >= limit:
             break
