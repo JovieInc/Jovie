@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   AnalyticsSidebar,
+  AnalyticsSidebarView,
   calculateConversionRate,
   FUNNEL_STAGE_METRIC_ROW_CLASS,
   FUNNEL_STAGE_OUTER_CLASS,
@@ -35,7 +36,11 @@ vi.mock('@/components/molecules/drawer', () => ({
   }: {
     children?: ReactNode;
     variant?: 'card' | 'flush';
-  }) => <div data-surface-variant={variant}>{children}</div>,
+  }) => (
+    <div data-surface-variant={variant === 'card' ? 'card' : 'flat'}>
+      {children}
+    </div>
+  ),
   DrawerSurfaceCard: ({
     children,
     variant,
@@ -43,55 +48,41 @@ vi.mock('@/components/molecules/drawer', () => ({
     children?: ReactNode;
     variant?: 'card' | 'flat';
   }) => <div data-surface-variant={variant}>{children}</div>,
-  DrawerTabbedCard: ({
+  EntityTabbedRail: ({
     children,
-    tabs,
+    entityHeader,
+    tabOptions,
+    activeTab,
+    onTabChange,
+    tabbedCardTestId,
     testId,
   }: {
     children?: ReactNode;
-    tabs?: ReactNode;
+    entityHeader?: ReactNode;
+    tabOptions: Array<{ value: string; label: string }>;
+    activeTab: string;
+    onTabChange: (value: string) => void;
+    tabbedCardTestId?: string;
     testId?: string;
   }) => (
-    <div data-testid={testId} data-surface-variant='card'>
-      {tabs}
-      {children}
-    </div>
-  ),
-  DrawerTabs: ({
-    options,
-    value,
-    onValueChange,
-  }: {
-    options: Array<{ value: string; label: string }>;
-    value: string;
-    onValueChange: (value: string) => void;
-  }) => (
-    <div>
-      {options.map(option => (
-        <button
-          key={option.value}
-          type='button'
-          role='tab'
-          aria-selected={value === option.value}
-          onClick={() => onValueChange(option.value)}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
-  ),
-  EntitySidebarShell: ({
-    children,
-    entityHeader,
-    'data-testid': testId,
-  }: {
-    children?: ReactNode;
-    entityHeader?: ReactNode;
-    'data-testid'?: string;
-  }) => (
-    <div data-testid={testId}>
+    <div data-testid={testId} data-surface-variant='flat'>
       {entityHeader}
-      {children}
+      <div data-testid={tabbedCardTestId} data-surface-variant='flat'>
+        <div role='tablist' aria-label='Analytics data tabs'>
+          {tabOptions.map(option => (
+            <button
+              key={option.value}
+              type='button'
+              role='tab'
+              aria-selected={activeTab === option.value}
+              onClick={() => onTabChange(option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        {children}
+      </div>
     </div>
   ),
   StatTile: ({ label, value }: { label: string; value: string }) => (
@@ -144,15 +135,79 @@ describe('calculateConversionRate', () => {
 });
 
 describe('AnalyticsSidebar', () => {
-  it('renders the sidebar with card surface variant', () => {
-    render(<AnalyticsSidebar isOpen onClose={vi.fn()} />);
+  it('renders the canonical tabbed rail without nested raised surfaces', () => {
+    const { container } = render(<AnalyticsSidebar isOpen onClose={vi.fn()} />);
 
     expect(screen.getByTestId('analytics-sidebar-tabbed-card')).toHaveAttribute(
       'data-surface-variant',
-      'card'
+      'flat'
     );
+    expect(
+      container.querySelectorAll('[data-surface-variant="card"]')
+    ).toHaveLength(0);
     expect(screen.getByText('Audience funnel')).toBeInTheDocument();
     expect(screen.getByText('Link Clicks')).toBeInTheDocument();
+  });
+
+  it('keeps tab selection and ranked content in one accessible rail', async () => {
+    const { fireEvent } = await import('@testing-library/react');
+    render(<AnalyticsSidebar isOpen onClose={vi.fn()} />);
+
+    const sourcesTab = screen.getByRole('tab', { name: 'Sources' });
+    fireEvent.click(sourcesTab);
+
+    expect(sourcesTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('Instagram')).toBeInTheDocument();
+  });
+
+  it('keeps the flat rail stable across loading, refresh, and loaded metric states', () => {
+    const onRangeChange = vi.fn();
+    const onActiveTabChange = vi.fn();
+    const { container, rerender } = render(
+      <AnalyticsSidebarView
+        isOpen
+        onClose={vi.fn()}
+        data={undefined}
+        loading
+        range='30d'
+        onRangeChange={onRangeChange}
+        activeTab='links'
+        onActiveTabChange={onActiveTabChange}
+      />
+    );
+
+    expect(
+      container.querySelectorAll('[data-surface-variant="card"]')
+    ).toHaveLength(0);
+    expect(screen.queryByText('Tip Link Visits')).not.toBeInTheDocument();
+
+    rerender(
+      <AnalyticsSidebarView
+        isOpen
+        onClose={vi.fn()}
+        data={{
+          profile_views: 120,
+          unique_users: 48,
+          subscribers: 12,
+          total_clicks: 22,
+          listen_clicks: 9,
+          tip_link_visits: 4,
+          top_cities: [],
+          top_countries: [],
+          top_referrers: [],
+          top_links: [{ id: 'spotify', url: 'Spotify', clicks: 5 }],
+        }}
+        loading={false}
+        isFetching
+        range='30d'
+        onRangeChange={onRangeChange}
+        activeTab='links'
+        onActiveTabChange={onActiveTabChange}
+      />
+    );
+
+    expect(screen.getByText('Tip Link Visits')).toBeInTheDocument();
+    expect(container.querySelector('.opacity-70')).not.toBeNull();
   });
 });
 

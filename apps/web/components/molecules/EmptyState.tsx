@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/EmptyState.test.tsx
 import { Button, type ButtonProps, Kbd } from '@jovie/ui';
 import Link from 'next/link';
 import React from 'react';
@@ -73,6 +74,7 @@ interface EmptyStateBaseProps {
    * removing spacing reserved for actions when none are present.
    */
   readonly presentation?: 'default' | 'workspace';
+  readonly headingAs?: 'h1' | 'h2' | 'h3';
   readonly className?: string;
   readonly testId?: string;
 }
@@ -159,6 +161,7 @@ export function EmptyState({
   variant = 'default',
   size = 'sm',
   presentation = 'default',
+  headingAs,
   className,
   testId,
 }: EmptyStateProps) {
@@ -168,6 +171,7 @@ export function EmptyState({
   const buttonSize = size === 'sm' ? 'sm' : 'default';
   const hasActions = Boolean(actionSlot || action || secondaryAction);
   const isWorkspacePresentation = presentation === 'workspace';
+  const Heading = headingAs ?? 'h3';
 
   const renderPrimaryAction = (): React.ReactNode => {
     if (!action) return null;
@@ -276,7 +280,7 @@ export function EmptyState({
         </div>
       )}
 
-      <h3
+      <Heading
         id={headingId}
         className={cn(
           'mb-1 text-app font-caption',
@@ -286,7 +290,7 @@ export function EmptyState({
         )}
       >
         {heading}
-      </h3>
+      </Heading>
 
       {description && (
         <p

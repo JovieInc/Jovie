@@ -1,4 +1,4 @@
 {
-  "$comment": "Shrink-only floor for --linear-* namespace usage (JOV #12009). Lower this when you migrate consumers; never raise it. 1675→1618 after deleting unused /exp auth-v1, home-v1, profile-v1, and onboarding-v1 fake-UI fixtures; 1618→1616 after converging OV data workspaces; 1616→1612 after converging Artist Profile settings (measured remainder on current main).",
-  "count": 1612
+  "$comment": "Shrink-only floor for --linear-* namespace usage (JOV #12009). Lower this when you migrate consumers; never raise it. 1675→1618 after deleting unused /exp auth-v1, home-v1, profile-v1, and onboarding-v1 fake-UI fixtures; 1618→1616 after converging OV data workspaces; 1616→1612 after converging Artist Profile settings; 1612→1611 after converging Audience rail and route-error anatomy (measured remainder on current main).",
+  "count": 1611
 }

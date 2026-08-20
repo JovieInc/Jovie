@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import { ErrorDetails } from './ErrorDetails';
 import { RECOVERY_COPY } from './recovery-contract';
 
@@ -10,6 +10,8 @@ interface PageErrorStateProps {
   readonly error?: Error & { digest?: string };
   /** Label for the primary action button (default: "Try again") */
   readonly actionLabel?: string;
+  /** Accessible label when it needs more context than the visible action copy. */
+  readonly actionAriaLabel?: string;
   /** Custom handler for the primary action (default: reload page) */
   readonly onRetry?: () => void;
   /** Extra context passed to ErrorDetails (e.g., { Context: 'Dashboard' }) */
@@ -17,8 +19,9 @@ interface PageErrorStateProps {
 }
 
 /**
- * Canonical error state component for pages, sections, and error boundaries.
- * Keeps recovery focused on one retry action, with diagnostic information disclosed on demand.
+ * Route-scaffold adapter for the canonical EmptyState error anatomy.
+ * The surrounding route keeps ownership of its PageShell, table, or ambient
+ * workspace plane; this component only owns recovery hierarchy and diagnostics.
  *
  * @example
  * // Server-side page error
@@ -41,6 +44,7 @@ export function PageErrorState({
   message,
   error,
   actionLabel = RECOVERY_COPY.retryLabel,
+  actionAriaLabel,
   onRetry,
   extraContext,
 }: PageErrorStateProps) {
@@ -53,31 +57,31 @@ export function PageErrorState({
   return (
     <div
       className='flex min-h-64 flex-1 flex-col items-center justify-center px-4 py-10 text-center'
-      role='alert'
-      aria-live='polite'
+      data-content-state='error'
+      data-testid='page-error-state'
     >
-      <div className='w-full max-w-sm space-y-3'>
-        <div className='space-y-1'>
-          <h1 className='text-app font-medium text-primary-token'>{title}</h1>
-          <p className='text-app text-tertiary-token'>{message}</p>
-        </div>
-
-        <div className='flex justify-center'>
-          <Button
-            variant='primary'
-            size='sm'
-            onClick={onRetry ?? (() => globalThis.location.reload())}
-          >
-            {actionLabel}
-          </Button>
-        </div>
-
-        <ErrorDetails
-          error={error}
-          extraContext={mergedContext}
-          collapsible={true}
-          showMessage={Boolean(error?.message && error.message !== message)}
+      <div className='flex w-full max-w-md flex-col items-center gap-3'>
+        <EmptyState
+          heading={title}
+          description={message}
+          variant='error'
+          presentation='workspace'
+          headingAs='h1'
+          className='w-full flex-none px-0 py-0'
+          action={{
+            label: actionLabel,
+            ariaLabel: actionAriaLabel,
+            onClick: onRetry ?? (() => globalThis.location.reload()),
+          }}
         />
+        <div className='w-full max-w-sm'>
+          <ErrorDetails
+            error={error}
+            extraContext={mergedContext}
+            collapsible={true}
+            showMessage={Boolean(error?.message && error.message !== message)}
+          />
+        </div>
       </div>
     </div>
   );

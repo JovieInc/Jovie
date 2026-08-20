@@ -97,7 +97,7 @@ describe('InsightsPanelView', () => {
       </TooltipProvider>
     );
 
-    expect(screen.getByRole('alert')).toHaveTextContent(
+    expect(screen.getByRole('status')).toHaveTextContent(
       'Failed to load insights.'
     );
     fireEvent.click(screen.getByRole('button', { name: 'Retry load' }));

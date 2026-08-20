@@ -21,7 +21,11 @@ interface AiCrawlerIntelligenceCardProps {
 const ROW_CLASS =
   'flex min-h-12 w-full items-center gap-3 rounded-xl border border-subtle bg-surface-1 px-3 py-2';
 
-function RowSkeleton({ className }: { readonly className?: string }) {
+export function AiCrawlerIntelligenceCardSkeleton({
+  className,
+}: {
+  readonly className?: string;
+}) {
   return (
     <div
       className={cn(ROW_CLASS, className)}
@@ -57,7 +61,7 @@ export function AiCrawlerIntelligenceCard({
   }, [data]);
 
   if (isLoading) {
-    return <RowSkeleton className={className} />;
+    return <AiCrawlerIntelligenceCardSkeleton className={className} />;
   }
 
   if (isError || !data) {

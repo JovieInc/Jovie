@@ -6,6 +6,7 @@ import {
   PageToolbar,
   UnifiedTableSkeleton,
 } from '@/components/organisms/table';
+import { AiCrawlerIntelligenceCardSkeleton } from '@/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard';
 import { SKELETON_ROW_COUNT, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import {
   AUDIENCE_TABLE_CONTAINER_CLASS,
@@ -52,9 +53,18 @@ export function AudienceTableLoadingShell() {
         />
       }
     >
-      <div className='flex-1 min-h-0 overflow-hidden bg-(--linear-app-content-surface)'>
-        <div className='flex h-full min-h-0 flex-col'>
-          <div className='flex-1 min-h-0 overflow-hidden sm:hidden'>
+      <div className='flex-1 min-h-0 flex flex-col'>
+        <div
+          className='shrink-0 border-b border-subtle px-4 py-2'
+          data-testid='audience-ai-visibility-strip'
+        >
+          <AiCrawlerIntelligenceCardSkeleton />
+        </div>
+        <div
+          className='flex-1 min-h-0 overflow-hidden'
+          data-testid='audience-table-scroll-region'
+        >
+          <div className='flex-1 min-h-0 overflow-auto md:hidden'>
             <div className='divide-y divide-subtle'>
               {AUDIENCE_MOBILE_ROW_KEYS.map(key => (
                 <div key={key} className='flex items-center gap-3 px-4 py-3'>
@@ -79,7 +89,7 @@ export function AudienceTableLoadingShell() {
             </div>
           </div>
 
-          <div className='max-sm:hidden flex-1 min-h-0 overflow-hidden'>
+          <div className='max-md:hidden h-full'>
             <UnifiedTableSkeleton
               columns={AUDIENCE_LOADING_COLUMNS}
               skeletonRows={SKELETON_ROW_COUNT.TABLE}
