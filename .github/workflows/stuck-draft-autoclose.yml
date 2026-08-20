@@ -6,6 +6,7 @@ name: Stuck Draft Auto-Close
 #
 # Opt out per-PR with any of: needs-human, hold, gated.
 # Human-owned branches are never touched.
+# 48h needs-human close is owned by agent-pipeline.yml (Slack/Linear first).
 
 on:
   workflow_dispatch:

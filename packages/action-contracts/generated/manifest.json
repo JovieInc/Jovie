@@ -1,0 +1,170 @@
+{
+  "contract": "jovie-actions",
+  "transport": {
+    "major": "v1",
+    "discoveryPath": "/api/v1/actions",
+    "invokePathTemplate": "/api/v1/actions/{actionId}/invoke"
+  },
+  "channels": [
+    "web",
+    "ios",
+    "electron",
+    "app_intent",
+    "widget",
+    "cli",
+    "mcp",
+    "chat_tool",
+    "extension"
+  ],
+  "errorCodes": [
+    "AUTH_REQUIRED",
+    "PROFILE_REQUIRED",
+    "FORBIDDEN",
+    "ENTITLEMENT_REQUIRED",
+    "ENTITLEMENT_UNVERIFIED",
+    "QUOTA_EXHAUSTED",
+    "FEATURE_DISABLED",
+    "PROVIDER_UNAVAILABLE",
+    "CLIENT_UPGRADE_REQUIRED",
+    "VALIDATION_FAILED",
+    "REQUIRES_INPUT",
+    "CONFIRMATION_REQUIRED",
+    "CONFLICT",
+    "IN_PROGRESS",
+    "RATE_LIMITED",
+    "TEMPORARILY_UNAVAILABLE",
+    "INTERNAL"
+  ],
+  "actions": [
+    {
+      "id": "chat.start",
+      "schemaVersion": 1,
+      "titleKey": "actions.chat.start.title",
+      "descriptionKey": "actions.chat.start.description",
+      "effect": "navigation",
+      "confirmation": "none",
+      "supportedChannels": [
+        "web",
+        "ios",
+        "electron",
+        "app_intent",
+        "widget"
+      ],
+      "requirements": [
+        {
+          "type": "auth"
+        },
+        {
+          "type": "profile_ownership"
+        }
+      ],
+      "schemas": {
+        "input": "schemas/chat.start.input.json",
+        "output": "schemas/chat.start.output.json",
+        "invocation": "schemas/chat.start.invocation.json",
+        "result": "schemas/chat.start.result.json"
+      }
+    },
+    {
+      "id": "contact.create",
+      "schemaVersion": 1,
+      "titleKey": "actions.contact.create.title",
+      "descriptionKey": "actions.contact.create.description",
+      "effect": "internal_write",
+      "confirmation": "none",
+      "supportedChannels": [
+        "web",
+        "ios",
+        "app_intent",
+        "chat_tool",
+        "mcp",
+        "cli"
+      ],
+      "requirements": [
+        {
+          "type": "auth"
+        },
+        {
+          "type": "profile_ownership"
+        },
+        {
+          "type": "entitlement",
+          "key": "contactsLimit"
+        }
+      ],
+      "schemas": {
+        "input": "schemas/contact.create.input.json",
+        "output": "schemas/contact.create.output.json",
+        "invocation": "schemas/contact.create.invocation.json",
+        "result": "schemas/contact.create.result.json"
+      }
+    },
+    {
+      "id": "release.create",
+      "schemaVersion": 1,
+      "titleKey": "actions.release.create.title",
+      "descriptionKey": "actions.release.create.description",
+      "effect": "internal_write",
+      "confirmation": "none",
+      "supportedChannels": [
+        "web",
+        "ios",
+        "chat_tool",
+        "mcp",
+        "cli"
+      ],
+      "requirements": [
+        {
+          "type": "auth"
+        },
+        {
+          "type": "profile_ownership"
+        },
+        {
+          "type": "entitlement",
+          "key": "canCreateManualReleases"
+        }
+      ],
+      "schemas": {
+        "input": "schemas/release.create.input.json",
+        "output": "schemas/release.create.output.json",
+        "invocation": "schemas/release.create.invocation.json",
+        "result": "schemas/release.create.result.json"
+      }
+    },
+    {
+      "id": "task.create",
+      "schemaVersion": 1,
+      "titleKey": "actions.task.create.title",
+      "descriptionKey": "actions.task.create.description",
+      "effect": "internal_write",
+      "confirmation": "none",
+      "supportedChannels": [
+        "web",
+        "ios",
+        "app_intent",
+        "chat_tool",
+        "mcp",
+        "cli"
+      ],
+      "requirements": [
+        {
+          "type": "auth"
+        },
+        {
+          "type": "profile_ownership"
+        },
+        {
+          "type": "entitlement",
+          "key": "canAccessTasksWorkspace"
+        }
+      ],
+      "schemas": {
+        "input": "schemas/task.create.input.json",
+        "output": "schemas/task.create.output.json",
+        "invocation": "schemas/task.create.invocation.json",
+        "result": "schemas/task.create.result.json"
+      }
+    }
+  ]
+}

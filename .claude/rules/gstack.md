@@ -1,12 +1,12 @@
 # gstack (Workflow Toolkit) + Skill Routing
 
-This repo vendors [gstack](https://github.com/garrytan/gstack) at `.agents/skills/gstack/` (scripts, tests, and leaf `SKILL.md` files). Executable Jovie copies of those leaves also live under `.claude/skills/<name>/`. `.claude/skills/gstack/` is only the small Jovie overlay (`design-canonical`), not a git submodule.
+This repo vendors a Jovie-customized fork of [gstack](https://github.com/garrytan/gstack) at `.agents/skills/gstack/` (see its `VERSION` and `CHANGELOG.md`). It is **not** a git submodule. `.claude/skills/gstack` is a symlink to that fork, and each `.claude/skills/<name>/SKILL.md` symlinks to `gstack/<name>/SKILL.md`, so the fork is the single source of truth for every gstack skill. Generated `SKILL.md` files come from `SKILL.md.tmpl` templates — edit the template, then regenerate (see "Updating gstack" below). Never hand-edit a generated `SKILL.md`.
 
 `src/`, `test/`, and `bin/` inside the gstack checkout are implementation, not skills. Do not treat files there as catalog entries.
 
 **Conflict rule:** gstack commands are canonical. If a gstack skill conflicts with any other command or workflow, the gstack version takes precedence.
 
-**Web browsing:** Always use the `/browse` skill from gstack for all web browsing. Never use `mcp__claude-in-chrome__*` tools.
+**Web browsing:** Default to Playwright MCP or in-repo Playwright (`pnpm exec playwright`) for agent web tasks. `/browse` is optional when a session already has the gstack daemon, or the user asks for it. Never use `mcp__claude-in-chrome__*` tools. Do not treat the browse daemon as a required runtime.
 
 ## Available Skills
 
@@ -16,7 +16,7 @@ This repo vendors [gstack](https://github.com/garrytan/gstack) at `.agents/skill
 | Review | `/review` | Pre-landing PR review for SQL safety, trust boundary violations, side effects |
 | Plan (CEO) | `/plan-ceo-review` | Founder mode: rethink problems from first principles, find the 10-star product |
 | Plan (Eng) | `/plan-eng-review` | Eng manager mode: lock in execution plans with architecture and edge cases |
-| Browse | `/browse` | Fast headless browser (~100ms/cmd) for QA testing and site verification |
+| Browse | `/browse` | Optional gstack headless browser for QA/dogfood when Playwright is not the better fit |
 | QA | `/qa` | Systematic QA with diff-aware, full, quick, and regression modes |
 | Retro | `/retro` | Weekly retrospective analyzing commit history and code quality metrics |
 | Browser Cookies | `/setup-browser-cookies` | Import authenticated sessions for testing |
@@ -38,16 +38,18 @@ This repo vendors [gstack](https://github.com/garrytan/gstack) at `.agents/skill
 gstack requires **Bun v1.0+**. The session-start hook installs Bun and runs setup automatically. For manual setup:
 
 ```bash
-cd .agents/skills/gstack && ./setup
+cd .claude/skills/gstack && ./setup   # symlink to .agents/skills/gstack; either path works
 ```
 
 ## Updating gstack
 
+The fork is plain files in this repo — there is no submodule to `git pull`. To change a skill, edit its `SKILL.md.tmpl` (or generator code) in `.agents/skills/gstack/`, then regenerate and re-run the size ratchet:
+
 ```bash
-cd .agents/skills/gstack && git pull origin main && ./setup
+cd .agents/skills/gstack && bun run gen:skill-docs && bun run skill:size-check
 ```
 
-Or use `/gstack-upgrade` from within Claude Code.
+To pull upstream garrytan/gstack changes, sync them into `.agents/skills/gstack/` manually and regenerate. `/gstack-upgrade` only applies to a global `~/.claude/skills/gstack` install, not this vendored fork.
 
 ## Skill Routing
 

@@ -1,0 +1,7 @@
+{
+  "title": "chat.start input v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}

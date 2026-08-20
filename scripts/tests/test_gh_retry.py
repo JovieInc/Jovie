@@ -993,6 +993,96 @@ JSON
         assert "would -queue-deferred on #16211" in result.stdout
         assert "[dry-run] would +merge-queue on #16211" in result.stdout
 
+    def test_hold_intake_missed_admission_recovers_queue_deferred_clean_head(
+        self, tmp_path: Path
+    ) -> None:
+        """Live #16187 stayed CLEAN+queue-deferred off merge-queue because
+        main-push missed-admission recovery filtered queue-deferred even
+        though hold-intake exact admission already strips that label.
+        """
+        head = "564bcf770f353f0c8a9e6c1d2b3a4e5f67890123"
+        receipt = {
+            "schema": "jovie-fleet-gate/v1",
+            "state": "AMBER",
+            "promotionMode": "hold-intake",
+            "observedAt": datetime.now(timezone.utc).isoformat(),
+            "signals": {
+                "main": {"status": "green", "sha": "a" * 40},
+                "production": {"status": "green", "deployedSha": "b" * 40},
+                "controller": {"status": "green"},
+                "queue": {
+                    "status": "known",
+                    "eligiblePrs": 1,
+                    "greenReadyPrs": 1,
+                    "target": 15,
+                },
+                "integrity": {"status": "clear"},
+            },
+            "promotionAdmission": {"allowed": False},
+            "isolatedPromotionAdmission": {
+                "allowed": False,
+                "deploymentsAllowed": False,
+            },
+            "productionUnboundRepairAdmission": {
+                "allowed": True,
+                "condition": "production-deployment-unbound",
+                "mainSha": "a" * 40,
+                "deployedSha": "b" * 40,
+                "maxConcurrent": 1,
+                "deploymentsAllowed": False,
+            },
+            "alreadyAdmittedCohort": {
+                "preserve": True,
+                "newIntakeAllowed": True,
+                "semantics": "preserve-cohort-and-continue-isolated-implementation",
+            },
+        }
+        encoded = base64.b64encode(json.dumps(receipt).encode()).decode()
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":16186,"t":"Human hold","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/human","headOid":"{"c" * 40}","base":"main","L":["needs-human"],"fail":[],"q":false}},{{"n":16187,"t":"Grok CLEAN deferred","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"grok/JOV-5041-fix","headOid":"{head}","base":"main","L":["queue-deferred","big-pr"],"fail":[],"q":false}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[{{"name":"queue-deferred"}},{{"name":"big-pr"}}],"headRefOid":"{head}","baseRefName":"main","body":"Fixes JOV-5041"}}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(
+            fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRY_RUN=1 DRAIN_PROMOTION_MODE=hold-intake "
+                    "DRAIN_RECONCILE_MISSED_ADMISSION=1 "
+                    f"DRAIN_FLEET_GATE_B64={encoded}"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "exact missed admission at " + head in result.stdout
+        assert "would -queue-deferred on #16187" in result.stdout
+        assert "[dry-run] would +merge-queue on #16187" in result.stdout
+        assert "would +merge-queue on #16186" not in result.stdout
+
     def test_draft_only_enrolls_clean_unrelated_pr(self, tmp_path: Path) -> None:
         head = "c" * 40
         receipt = {

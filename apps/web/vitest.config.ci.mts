@@ -58,6 +58,12 @@ export default defineConfig({
         lines: 58,
         functions: 55,
         branches: 50,
+        // Same critical-surface floors as vitest.config.fast.mts (`--coverage`).
+        'lib/entitlements/**/*.ts': { branches: 68, lines: 71 },
+        'app/api/stripe/webhooks/**/*.ts': { branches: 79, lines: 79 },
+        'app/api/webhooks/**/*.ts': { branches: 42, lines: 48 },
+        'app/api/dev/test-auth/**/*.ts': { branches: 74, lines: 85 },
+        'lib/auth/test-mode.ts': { branches: 74, lines: 85 },
       },
     },
     // Test timeout - 5s safety net (tests target <200ms)

@@ -51,7 +51,10 @@ def test_workflow_issue_writers_are_removed_or_hard_retired() -> None:
         assert all(RETIRED in step(workflow, item) for item in steps)
     observability = read(WF / "observability-issue.yml")
     assert "issues: write" not in observability
-    assert RETIRED in block(observability, 2, "sync-issue")
+    assert "observability-issue-linear.mjs" in observability
+    assert "observability-issue-github.mjs" not in observability
+    assert "LINEAR_API_KEY" in observability
+    assert RETIRED not in block(observability, 2, "sync-issue")
     cost = read(WF / "cost-anomaly-gate.yml")
     assert "issues: write" not in cost and "Prepare Linear-only anomaly receipt" in cost
     assert RETIRED in step(cost, "Create one open cost-anomaly incident")
@@ -76,6 +79,12 @@ def test_active_facades_are_linear_only_and_fail_closed() -> None:
     intake = read(ROOT / "scripts/lib/golden-path-intake.mjs")
     assert intake.count("mutation CreateGoldenPathLockIssue") == 1
     assert "createGoldenPathLinearIssue" in golden and "createGithubIssue" not in golden
+    observability_linear = read(ROOT / "scripts/observability-issue-linear.mjs")
+    assert "upsertLinearIssueByTitleFingerprint" in observability_linear
+    assert "api.github.com" not in observability_linear
+    synthetic = read(ROOT / "scripts/synthetic-monitoring-intake.mjs")
+    assert "upsertLinearIssueByTitleFingerprint" in synthetic
+    assert "api.github.com" not in synthetic
     autofix = golden.split("async function runAutofix", 1)[1]
     assert autofix.index("createGoldenPathLinearIssue") < autofix.index("if (!linear.ok)")
     gate = autofix.index("if (!linear.ok)")

@@ -1,1 +1,1 @@
-../gstack/design-shotgun/SKILL.md
+../../../.agents/skills/gstack/design-shotgun/SKILL.md

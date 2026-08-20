@@ -1,0 +1,331 @@
+{
+  "title": "Resolved action capability",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "action": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schemaVersion": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "titleKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "descriptionKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "effect": {
+          "type": "string",
+          "enum": [
+            "navigation",
+            "internal_write",
+            "external_write",
+            "destructive"
+          ]
+        },
+        "confirmation": {
+          "type": "string",
+          "enum": [
+            "none",
+            "required"
+          ]
+        },
+        "supportedChannels": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "web",
+              "ios",
+              "electron",
+              "app_intent",
+              "widget",
+              "cli",
+              "mcp",
+              "chat_tool",
+              "extension"
+            ]
+          }
+        },
+        "requirements": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "auth"
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "profile_ownership"
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "entitlement"
+                  },
+                  "key": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "type",
+                  "key"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "minimumClientVersions": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "deprecatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+        },
+        "sunsetAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+        },
+        "inputSchema": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "outputSchema": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "id",
+        "schemaVersion",
+        "titleKey",
+        "descriptionKey",
+        "effect",
+        "confirmation",
+        "supportedChannels",
+        "requirements",
+        "inputSchema",
+        "outputSchema"
+      ],
+      "additionalProperties": false
+    },
+    "available": {
+      "type": "boolean"
+    },
+    "visibility": {
+      "type": "string",
+      "enum": [
+        "visible",
+        "hidden"
+      ]
+    },
+    "reasonCode": {
+      "type": "string",
+      "enum": [
+        "AUTH_REQUIRED",
+        "PROFILE_REQUIRED",
+        "FORBIDDEN",
+        "ENTITLEMENT_REQUIRED",
+        "ENTITLEMENT_UNVERIFIED",
+        "QUOTA_EXHAUSTED",
+        "FEATURE_DISABLED",
+        "PROVIDER_UNAVAILABLE",
+        "CLIENT_UPGRADE_REQUIRED",
+        "VALIDATION_FAILED",
+        "REQUIRES_INPUT",
+        "CONFIRMATION_REQUIRED",
+        "CONFLICT",
+        "IN_PROGRESS",
+        "RATE_LIMITED",
+        "TEMPORARILY_UNAVAILABLE",
+        "INTERNAL"
+      ]
+    },
+    "retryable": {
+      "type": "boolean"
+    },
+    "requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "requirement": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "auth"
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "profile_ownership"
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "entitlement"
+                  },
+                  "key": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "type",
+                  "key"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "satisfied": {
+            "type": "boolean"
+          },
+          "reasonCode": {
+            "type": "string",
+            "enum": [
+              "AUTH_REQUIRED",
+              "PROFILE_REQUIRED",
+              "FORBIDDEN",
+              "ENTITLEMENT_REQUIRED",
+              "ENTITLEMENT_UNVERIFIED",
+              "QUOTA_EXHAUSTED",
+              "FEATURE_DISABLED",
+              "PROVIDER_UNAVAILABLE",
+              "CLIENT_UPGRADE_REQUIRED",
+              "VALIDATION_FAILED",
+              "REQUIRES_INPUT",
+              "CONFIRMATION_REQUIRED",
+              "CONFLICT",
+              "IN_PROGRESS",
+              "RATE_LIMITED",
+              "TEMPORARILY_UNAVAILABLE",
+              "INTERNAL"
+            ]
+          }
+        },
+        "required": [
+          "requirement",
+          "satisfied"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "quota": {
+      "type": "object",
+      "properties": {
+        "used": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "used",
+        "limit"
+      ],
+      "additionalProperties": false
+    },
+    "upgrade": {
+      "type": "object",
+      "properties": {
+        "eligible": {
+          "type": "boolean"
+        },
+        "routeRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "eligible"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "action",
+    "available",
+    "visibility",
+    "retryable"
+  ],
+  "additionalProperties": false
+}

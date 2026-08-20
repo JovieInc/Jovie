@@ -1,8 +1,8 @@
 name: Golden Path Prod Autofix
 
 # JOV-5085: event-driven live-path probe + Cursor-direct autofix.
-# Separate from Post-Deploy Probes, which are read-only and must not notify
-# or mutate. Detect without a ship lock is a hole.
+# Separate from Post-Deploy Probes, which are read-only and must not mutate.
+# Detect without a ship lock is a hole.
 #
 # Does not read signup-account secrets. Missing CURSOR_API_KEY fails closed.
 
