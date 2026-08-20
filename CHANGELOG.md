@@ -7,6 +7,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+### Fixed
+
+- [internal] **Production monitors page again:** post-deploy probe failures Slack `#alerts-production`, golden-path probes add claim/billing/Stripe liveness, observability and synthetics file Linear, and the canary `/api/chat` auth-gate retries then fails closed.
+
 ### Added
 
 - **iPhone Library is Catalog, Collections, and Ideas:** Catalog is releases, merch, and docs. Collections auto-bundles a vlog with its script, takes, and B-roll. Ideas is the untagged third home.
