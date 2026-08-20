@@ -42,34 +42,37 @@ export function SettingsAnalyticsSection({
     saveStatus,
   } = useOptimisticToggle({
     initialValue: artist.settings?.exclude_self_from_analytics ?? false,
+    syncKey: artist.id,
     mutateAsync: updateAnalyticsFilterAsync,
     onOptimisticUpdate: handleOptimisticUpdate,
     errorMessage: 'Failed to update analytics filter.',
+    showErrorToast: false,
   });
 
   return (
-    <SettingsPanel actions={<SettingsStatusPill status={saveStatus} />}>
-      <div className='px-4 py-4 sm:px-5'>
-        {isPro ? (
-          <SettingsToggleRow
-            icon={<BarChart3 className='h-4 w-4' aria-hidden />}
-            title='Traffic Quality Filtering'
-            description={excludeSelf ? 'High quality only' : 'All traffic'}
-            checked={excludeSelf}
-            onCheckedChange={handleToggle}
-            disabled={isPending}
-            ariaLabel='Toggle Traffic Quality Filtering'
-          />
-        ) : (
-          <SettingsToggleRow
-            gated
-            icon={<BarChart3 className='h-4 w-4' aria-hidden />}
-            title='Traffic Quality Filtering'
-            description='All traffic'
-            gateFeatureContext='Traffic Quality Filtering'
-          />
-        )}
-      </div>
+    <SettingsPanel
+      actions={<SettingsStatusPill status={saveStatus} />}
+      bodyClassName='px-4 py-4 sm:px-5'
+    >
+      {isPro ? (
+        <SettingsToggleRow
+          icon={<BarChart3 className='h-4 w-4' aria-hidden />}
+          title='Traffic Quality Filtering'
+          description={excludeSelf ? 'High quality only' : 'All traffic'}
+          checked={excludeSelf}
+          onCheckedChange={handleToggle}
+          disabled={isPending}
+          ariaLabel='Toggle Traffic Quality Filtering'
+        />
+      ) : (
+        <SettingsToggleRow
+          gated
+          icon={<BarChart3 className='h-4 w-4' aria-hidden />}
+          title='Traffic Quality Filtering'
+          description='All traffic'
+          gateFeatureContext='Traffic Quality Filtering'
+        />
+      )}
     </SettingsPanel>
   );
 }
