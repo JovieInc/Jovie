@@ -2449,7 +2449,7 @@ export async function POST(req: Request) {
     );
   }
   const userText = extractLastUserText(uiMessages);
-  // JOV-5215/5216: bind Eve pack + persist/Linear-route dump before model.
+  // JOV-5215/5216: bind Eve pack + persist/ack dump to Summer Kanban before model.
   const { eveTurn, receipts: ovieIngestReceipts } = await prepareOvieChatTurn(
     chatMode,
     userText,
