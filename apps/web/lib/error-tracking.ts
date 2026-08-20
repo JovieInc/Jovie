@@ -30,10 +30,7 @@ import {
   isSentryInitialized,
   type SentryMode,
 } from '@/lib/sentry/init';
-import {
-  isOpaqueUpstashErrorJsonBag,
-  isUpstashQuotaNoise,
-} from '@/lib/sentry/non-actionable-issues';
+import { isOpaqueUpstashErrorJsonBag } from '@/lib/sentry/non-actionable-issues';
 import {
   errorJsonReplacer,
   isRedisQuotaFailure,
@@ -282,18 +279,16 @@ export async function captureError(
     sentryMode,
   });
 
-  // Best-effort Redis quota warnings already degrade in-process. The hourly
+  // Best-effort Redis quota failures already degrade in-process. The hourly
   // operability canary owns the standing alert (JOV-5086); per-request
-  // captureException of the JSON bag flooded Linear as JOV-5183 / JOV-5221 /
-  // JOV-5228 / JOV-5229. Opaque bags are never actionable at any severity. Real quota
-  // command failures still report at error/critical (JOV-5220 / JOV-5199).
+  // captureException flooded Linear as JOV-5181 (quota command text) and
+  // JOV-5183 / JOV-5221 / JOV-5228 / JOV-5229 (opaque JSON bags). Neither
+  // shape is actionable at any severity.
   const capturedText = `${quotaNoiseText(resolvedError)} ${errorData.message}`;
   const opaqueBag =
     isOpaqueUpstashErrorJsonBag(capturedText) ||
     isOpaqueUpstashErrorJsonBag(resolvedError);
-  const quotaNoise =
-    severity === 'warning' &&
-    isUpstashQuotaNoise(quotaNoiseText(resolvedError));
+  const quotaNoise = isRedisQuotaFailure(resolvedError);
 
   if (!opaqueBag && !quotaNoise) {
     sendToSentry({

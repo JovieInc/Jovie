@@ -383,20 +383,20 @@ describe('scrubPii', () => {
     expect(scrubPii(event as any)).toBeNull();
   });
 
-  it('should keep real Upstash quota exceptions', () => {
+  it('should drop real Upstash quota exceptions (JOV-5181)', () => {
     const event = {
       exception: {
         values: [
           {
             type: 'UpstashError',
             value:
-              'Command failed: ERR max requests limit exceeded. Limit: 500000',
+              'Command failed: ERR max requests limit exceeded. Limit: 500000, Usage: 500099. See https://upstash.com/docs/redis/troubleshooting/max_requests_limit for details',
           },
         ],
       },
     };
 
-    expect(scrubPii(event as any)).not.toBeNull();
+    expect(scrubPii(event as any)).toBeNull();
   });
 
   it('should filter framework internal errors', () => {
@@ -553,19 +553,18 @@ describe('createBeforeSendHook', () => {
     ).toBeNull();
   });
 
-  it('keeps a real quota UpstashError on hint.originalException', () => {
+  it('drops a real quota UpstashError on hint.originalException (JOV-5181)', () => {
     const beforeSend = createBeforeSendHook();
     const error = new Error(
-      'Command failed: ERR max requests limit exceeded. Limit: 500000'
+      'Command failed: ERR max requests limit exceeded. Limit: 500000, Usage: 500099. See https://upstash.com/docs/redis/troubleshooting/max_requests_limit for details'
     );
     error.name = 'UpstashError';
     const event = {
       exception: {
         values: [
           {
-            type: 'UpstashError',
-            value:
-              'Command failed: ERR max requests limit exceeded. Limit: 500000',
+            type: 'Error',
+            value: 'An error occurred in the Server Components render',
           },
         ],
       },
@@ -573,7 +572,7 @@ describe('createBeforeSendHook', () => {
 
     expect(
       beforeSend(event as any, { originalException: error } as any)
-    ).not.toBeNull();
+    ).toBeNull();
   });
 });
 

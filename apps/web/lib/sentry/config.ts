@@ -56,8 +56,10 @@ import type * as Sentry from '@sentry/nextjs';
 import {
   isNonActionableUpstashErrorBagEvent,
   isOpaqueUpstashErrorJsonBag,
+  isUpstashQuotaSentryEvent,
   UPSTASH_QUOTA_IGNORE_ERRORS,
 } from '@/lib/sentry/non-actionable-issues';
+import { isRedisQuotaFailure } from '@/lib/utils/errors';
 
 /**
  * Sentry Event type alias for cleaner code
@@ -449,9 +451,15 @@ export function scrubPii(
   }
 
   // Filter captureWarning/captureError JSON bags (JOV-5183, JOV-5187,
-  // JOV-5209, JOV-5218, JOV-5228). Real Upstash quota exceptions keep their
-  // command-failure title.
+  // JOV-5209, JOV-5218, JOV-5228) and real quota command failures (JOV-5181).
+  // The hourly Redis operability canary owns paging.
   if (isNonActionableUpstashErrorBagEvent(event)) {
+    return null;
+  }
+  if (
+    isUpstashQuotaSentryEvent(event) ||
+    isRedisQuotaFailure(hint?.originalException)
+  ) {
     return null;
   }
 
