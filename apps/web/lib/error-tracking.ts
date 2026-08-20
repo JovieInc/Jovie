@@ -31,6 +31,12 @@ import {
   type SentryMode,
 } from '@/lib/sentry/init';
 import { isUpstashQuotaNoise } from '@/lib/sentry/non-actionable-issues';
+import {
+  errorJsonReplacer,
+  isRedisQuotaFailure,
+  unwrapCapturedContext,
+  unwrapCapturedError,
+} from '@/lib/utils/errors';
 
 // NOTE: This module is used in both server and client contexts, so we read
 // NODE_ENV directly from process.env rather than importing from env-server.ts
@@ -44,33 +50,15 @@ type ErrorContext = Record<string, unknown>;
  * Call sites historically passed `{ error }` or `{ clerkUserId, error }` as
  * the error argument. `JSON.stringify` of an `UpstashError` only enumerates
  * `name`, so Sentry titles become `Error: {"error":{"name":"UpstashError"}}`
- * (JOV-5221). Unwrap the inner value and keep sibling fields as context.
+ * (JOV-5220, JOV-5221). Unwrap the inner value and keep sibling fields as context.
  */
 export function splitCapturedErrorBag(error: unknown): {
   readonly error: unknown;
   readonly context?: ErrorContext;
 } {
-  if (
-    error === null ||
-    typeof error !== 'object' ||
-    Array.isArray(error) ||
-    error instanceof Error
-  ) {
-    return { error };
-  }
-
-  if (!('error' in error)) {
-    return { error };
-  }
-
-  const { error: inner, ...rest } = error as {
-    error: unknown;
-    readonly [key: string]: unknown;
-  };
-  return {
-    error: inner,
-    context: Object.keys(rest).length > 0 ? rest : undefined,
-  };
+  const inner = unwrapCapturedError(error);
+  const leftover = unwrapCapturedContext(error);
+  return leftover ? { error: inner, context: leftover } : { error: inner };
 }
 
 /**
@@ -179,12 +167,20 @@ function sendToSentry(params: {
       tags.error_class = context.error_class;
     }
 
+    const quotaFailure = isRedisQuotaFailure(error);
+    if (quotaFailure && !tags.error_class) {
+      tags.error_class = 'redis_quota_exceeded';
+    }
+
     // Stable fingerprint overrides default grouping so distinct failure classes
     // (e.g. RLS set_config) never merge into generic "Failed query" issues.
+    // Quota exhaustion is one incident (JOV-5199), not one Linear issue per route.
     const fingerprint =
       typeof context?.fingerprint === 'string' && context.fingerprint
         ? [context.fingerprint]
-        : undefined;
+        : quotaFailure
+          ? ['redis-quota-exceeded']
+          : undefined;
 
     Sentry.captureException(errorInstance, {
       extra: {
@@ -212,7 +208,7 @@ function quotaNoiseText(error: unknown): string {
     return error;
   }
   try {
-    return JSON.stringify(error) ?? String(error);
+    return JSON.stringify(error, errorJsonReplacer) ?? String(error);
   } catch {
     return String(error);
   }
@@ -239,7 +235,7 @@ function formatError(error: unknown): {
   }
 
   return {
-    message: JSON.stringify(error),
+    message: JSON.stringify(error, errorJsonReplacer),
     type: 'UnknownError',
   };
 }
@@ -270,10 +266,8 @@ export async function captureError(
   context?: ErrorContext,
   severity: ErrorSeverity = 'error'
 ): Promise<void> {
-  const split = splitCapturedErrorBag(error);
-  const resolvedError = split.error;
-  const resolvedContext =
-    split.context || context ? { ...split.context, ...context } : undefined;
+  const resolvedError = unwrapCapturedError(error);
+  const resolvedContext = unwrapCapturedContext(error, context);
   const errorData = formatError(resolvedError);
   const sentryMode = getSentryMode();
   const environment = getEnvironment();

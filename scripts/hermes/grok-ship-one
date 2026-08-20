@@ -9,7 +9,11 @@ case "$ID" in
   *) echo "unsupported issue identifier" >&2; exit 2 ;;
 esac
 
-export PATH="$HOME/.local/bin:$PATH:/usr/bin:/bin"
+export PATH="$HOME/.local/bin:$HOME/.npm-global/bin:/usr/local/bin:$PATH:/usr/bin:/bin"
+# Husky pre-push defaults to 1 vitest worker (laptop). Gem remounts then take
+# 20–40 min (live JOV-5220). Override without skipping the gate.
+export AUTOMATION_VERIFY_MAX_WORKERS="${AUTOMATION_VERIFY_MAX_WORKERS:-4}"
+export AUTOMATION_VERIFY_SHARD_CONCURRENCY="${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-2}"
 set -a
 # shellcheck disable=SC1091
 [ -f "$HOME/.config/symphony/linear.env" ] && . "$HOME/.config/symphony/linear.env"
@@ -180,10 +184,14 @@ if [ "$REMOUNT" = 1 ]; then
     fi
     echo "$(date -u +%FT%TZ) $ID remount_merge_conflicts" >> "$LOG"
     unmerged="$(git -C "$WS" diff --name-only --diff-filter=U | sort -u)"
-    if printf '%s\n' "$unmerged" | grep -qx 'CHANGELOG.md'; then
-      git -C "$WS" show :2:CHANGELOG.md > "$WS/.changelog.ours"
-      git -C "$WS" show :3:CHANGELOG.md > "$WS/.changelog.theirs"
-      python3 - "$WS/.changelog.ours" "$WS/.changelog.theirs" "$WS/CHANGELOG.md" <<'PY'
+    # Exact-only: mixed product+CHANGELOG conflicts still go to grok. Union
+    # failure must not abort the remount (live JOV-5238 died after
+    # remount_merge_conflicts with no START).
+    if [ "$unmerged" = "CHANGELOG.md" ]; then
+      union_ok=0
+      if git -C "$WS" show :2:CHANGELOG.md > "$WS/.changelog.ours" \
+        && git -C "$WS" show :3:CHANGELOG.md > "$WS/.changelog.theirs" \
+        && python3 - "$WS/.changelog.ours" "$WS/.changelog.theirs" "$WS/CHANGELOG.md" <<'PY'
 import pathlib, sys
 
 def unreleased_bullets(text: str) -> list[str]:
@@ -217,13 +225,22 @@ for line in lines:
         inserted = True
 pathlib.Path(sys.argv[3]).write_text("".join(out))
 PY
-      git -C "$WS" add CHANGELOG.md
+      then
+        git -C "$WS" add CHANGELOG.md
+        union_ok=1
+      else
+        echo "$(date -u +%FT%TZ) $ID remount_changelog_union_failed" >> "$LOG"
+      fi
       rm -f "$WS/.changelog.ours" "$WS/.changelog.theirs"
-    fi
-    if [ -z "$(git -C "$WS" ls-files -u)" ]; then
-      git -C "$WS" commit --no-edit
-      echo "$(date -u +%FT%TZ) $ID remount_changelog_autoresolved" >> "$LOG"
-      CHANGELOG_ONLY_REMOUNT=1
+      if [ "$union_ok" = 1 ] && [ -z "$(git -C "$WS" ls-files -u)" ]; then
+        if GIT_EDITOR=true git -C "$WS" commit --no-edit >"$WS/.changelog.commit.err" 2>&1; then
+          echo "$(date -u +%FT%TZ) $ID remount_changelog_autoresolved" >> "$LOG"
+          CHANGELOG_ONLY_REMOUNT=1
+        else
+          echo "$(date -u +%FT%TZ) $ID remount_changelog_commit_failed $(tr '\n' ' ' < "$WS/.changelog.commit.err")" >> "$LOG"
+        fi
+        rm -f "$WS/.changelog.commit.err"
+      fi
     fi
   fi
 else
@@ -331,9 +348,14 @@ PY
 if [ "$CHANGELOG_ONLY_REMOUNT" = 1 ]; then
   merge_state="$(printf '%s' "$EXISTING_MERGE_STATE" | tr '[:lower:]' '[:upper:]')"
   if [ -z "$merge_state" ] || [ "$merge_state" = "DIRTY" ] || [ "$merge_state" = "BEHIND" ]; then
-    git -C "$WS" push origin "$BRANCH"
-    echo "$(date -u +%FT%TZ) $ID remount_changelog_pushed" >> "$LOG"
-    SKIP_GROK=1
+    # Live JOV-5238: set -e abort after autoresolve left no END and no grok
+    # when package.json pre-push typecheck failed on the merge.
+    if git -C "$WS" push origin "$BRANCH"; then
+      echo "$(date -u +%FT%TZ) $ID remount_changelog_pushed" >> "$LOG"
+      SKIP_GROK=1
+    else
+      echo "$(date -u +%FT%TZ) $ID remount_changelog_push_failed" >> "$LOG"
+    fi
   fi
 fi
 
@@ -376,16 +398,53 @@ elif hermes:
     if "--max-tokens" not in argv:
         argv = ["--max-tokens", cap, *argv]
         print(f"hermes_max_tokens={cap}", flush=True)
-result = subprocess.run(
-    [executable, *argv],
-    cwd=pathlib.Path(values["cwd"]),
-    env=env,
-    check=False,
-    capture_output=True,
-    text=True,
-)
+def run_executor(run_argv):
+    return subprocess.run(
+        [executable, *run_argv],
+        cwd=pathlib.Path(values["cwd"]),
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+def with_model(run_argv, model):
+    mapped = list(run_argv)
+    for flag in ("--model", "-m"):
+        if flag in mapped:
+            idx = mapped.index(flag)
+            if idx + 1 < len(mapped):
+                mapped[idx + 1] = model
+                return mapped
+    return ["--model", model, *mapped]
+
+def available_models(text):
+    if "Available models:" not in text:
+        return []
+    rest = text.split("Available models:", 1)[1].replace("\n", " ")
+    return [part.strip().rstrip(".") for part in rest.split(",") if part.strip()]
+
+result = run_executor(argv)
 sys_out = (result.stdout or "") + (result.stderr or "")
 print(sys_out, end="")
+cursor_model = os.environ.get("GEM_CURSOR_GROK_MODEL", "cursor-grok-4.6-high")
+tried = set()
+for _ in range(2):
+    if result.returncode == 0 or "Cannot use this model" not in sys_out:
+        break
+    names = available_models(sys_out)
+    nxt = None
+    for cand in (cursor_model + "-fast", cursor_model, "cursor-grok-4.6-high-fast"):
+        if cand in names and cand not in tried:
+            nxt = cand
+            break
+    if nxt is None:
+        break
+    tried.add(nxt)
+    print(f"retry_cursor_grok_model {nxt}", flush=True)
+    result = run_executor(with_model(argv, nxt))
+    sys_out = (result.stdout or "") + (result.stderr or "")
+    print(sys_out, end="")
 if "402" in sys_out and ("max_tokens" in sys_out or "can only afford" in sys_out):
     raise SystemExit(2)
 raise SystemExit(result.returncode)

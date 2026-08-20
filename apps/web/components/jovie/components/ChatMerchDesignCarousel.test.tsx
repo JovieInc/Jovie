@@ -184,7 +184,7 @@ describe('ChatMerchDesignCarousel', () => {
   it('reserves a quiet three-concept area while image generation runs', () => {
     const { container } = render(<ChatMerchDesignCarouselLoading />);
 
-    expect(screen.getByLabelText('Preparing merch concepts')).toHaveAttribute(
+    expect(screen.getByLabelText('Preparing Merch Concepts')).toHaveAttribute(
       'aria-busy',
       'true'
     );

@@ -245,7 +245,7 @@ export function ProfileNotificationsMenu({
         <DropdownMenuContent align='end' className='w-72' sideOffset={8}>
           {/* ── Channels ─────────────────────────────── */}
           <DropdownMenuLabel className='text-sm font-semibold text-primary-token'>
-            How you get notified
+            How You Get Notified
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           {smsEnabled && renderChannelMenuItem('sms', 'Text')}
@@ -269,7 +269,7 @@ export function ProfileNotificationsMenu({
           {/* ── Listening preference ───────────────────── */}
           <DropdownMenuSeparator />
           <DropdownMenuLabel className='text-sm font-semibold text-primary-token'>
-            Listening preference
+            Listening Preference
           </DropdownMenuLabel>
           <div className='px-2 pb-1.5'>
             <label htmlFor='preferred-dsp-select' className='sr-only'>
@@ -296,7 +296,7 @@ export function ProfileNotificationsMenu({
           {/* ── Content types ────────────────────────── */}
           <DropdownMenuSeparator />
           <DropdownMenuLabel className='text-sm font-semibold text-primary-token'>
-            What you hear about
+            What You Hear About
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           {NOTIFICATION_CONTENT_TYPES.map(({ key, label, description }) => (

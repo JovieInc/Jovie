@@ -54,7 +54,7 @@
     {
       "id": "cursor-grok-4.6",
       "provider": "cursor",
-      "model": "grok-4.6",
+      "model": "cursor-grok-4.6-high",
       "family": "grok-4.6",
       "channel": "subscription",
       "pool": "cursor-models",

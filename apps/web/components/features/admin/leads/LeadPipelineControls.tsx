@@ -41,7 +41,7 @@ function DiagnosticPanel({
   return (
     <ContentSurfaceCard className='mt-4 border-info/20 bg-[color-mix(in_oklab,var(--color-info)_8%,var(--linear-app-content-surface))] p-4'>
       <h3 className='mb-2 text-sm font-semibold text-primary-token'>
-        Discovery diagnostics
+        Discovery Diagnostics
       </h3>
 
       {/* Summary row */}
@@ -248,7 +248,7 @@ export function LeadPipelineControls({
             onCheckedChange={checked =>
               setSettings(s => (s ? { ...s, enabled: checked } : s))
             }
-            aria-label='Toggle pipeline'
+            aria-label='Toggle Pipeline'
             disabled={saveSettingsMutation.isPending}
           />
         </div>
@@ -266,7 +266,7 @@ export function LeadPipelineControls({
           onCheckedChange={checked =>
             setSettings(s => (s ? { ...s, discoveryEnabled: checked } : s))
           }
-          aria-label='Toggle discovery'
+          aria-label='Toggle Discovery'
           disabled={saveSettingsMutation.isPending}
         />
       </div>
@@ -283,7 +283,7 @@ export function LeadPipelineControls({
           onCheckedChange={checked =>
             setSettings(s => (s ? { ...s, autoIngestEnabled: checked } : s))
           }
-          aria-label='Toggle auto-ingest'
+          aria-label='Toggle Auto-ingest'
           disabled={saveSettingsMutation.isPending}
         />
       </div>
@@ -300,7 +300,7 @@ export function LeadPipelineControls({
           onCheckedChange={checked =>
             setSettings(s => (s ? { ...s, guardrailsEnabled: checked } : s))
           }
-          aria-label='Toggle guardrails'
+          aria-label='Toggle Guardrails'
           disabled={saveSettingsMutation.isPending}
         />
       </div>
@@ -471,7 +471,7 @@ export function LeadPipelineControls({
           {saveSettingsMutation.isPending && (
             <Loader2 className='mr-2 h-4 w-4 animate-spin' />
           )}
-          Save settings
+          Save Settings
         </Button>
 
         <Button
@@ -485,7 +485,7 @@ export function LeadPipelineControls({
           ) : (
             <Play className='mr-2 h-4 w-4' />
           )}
-          Run discovery
+          Run Discovery
         </Button>
 
         <Button
@@ -499,7 +499,7 @@ export function LeadPipelineControls({
           ) : (
             <Zap className='mr-2 h-4 w-4' />
           )}
-          Qualify discovered
+          Qualify Discovered
         </Button>
       </div>
     </div>

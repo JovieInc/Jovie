@@ -37,6 +37,7 @@ export function NewHowItWorks() {
       <Container size='md'>
         <div className='text-center mb-16'>
           <h2 className='text-2xl sm:text-3xl font-medium tracking-tight text-primary-token'>
+            {/* ui-casing-allow: marketing display headline */}
             How it works
           </h2>
         </div>

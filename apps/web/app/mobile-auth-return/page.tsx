@@ -9,7 +9,7 @@ function MobileAuthReturnContent() {
       <section className='w-full max-w-sm px-6 py-7 text-center'>
         <p className='text-sm leading-5 text-tertiary-token'>Jovie</p>
         <h1 className='mt-2 text-xl font-semibold leading-7'>
-          Start again in the app
+          Start Again In The App
         </h1>
         <p className='mt-3 text-sm leading-5 text-secondary-token'>
           Jovie now completes mobile sign-in from the native app session. Open

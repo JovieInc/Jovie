@@ -151,7 +151,7 @@ export function AiCrawlerIntelligenceCard({
         className
       )}
       data-testid='ai-crawler-intelligence-card'
-      aria-label='View AI visibility details'
+      aria-label='View AI Visibility Details'
     >
       {rowContent}
       <ChevronRight

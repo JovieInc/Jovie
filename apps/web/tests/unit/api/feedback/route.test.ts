@@ -92,6 +92,12 @@ describe('POST /api/feedback', () => {
       ok: true,
       id: 'feedback_1',
     });
+    expect(mockNotifySlackFeedbackSubmission).toHaveBeenCalledWith({
+      message: 'Excellent product direction',
+      name: 'Test User',
+      source: 'dashboard',
+      pathname: null,
+    });
   });
 
   it('persists opportunity inbox rating metadata in feedback context', {

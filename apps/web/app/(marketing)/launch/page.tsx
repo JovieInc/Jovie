@@ -166,16 +166,19 @@ const PLATFORM_LOGOS = [
 
 const PILLARS = [
   {
+    // ui-casing-allow: figure index (Found === Expected)
     label: 'Fig 0.1',
     title: 'One-click import',
     body: 'Paste a Spotify URL. Jovie imports your discography, matches every release, and builds the profile automatically.',
   },
   {
+    // ui-casing-allow: figure index (Found === Expected)
     label: 'Fig 0.2',
     title: 'AI-native workspace',
     body: 'The assistant is grounded in your catalog, links, streaming context, and fan activity from the first session.',
   },
   {
+    // ui-casing-allow: figure index (Found === Expected)
     label: 'Fig 0.3',
     title: 'Owned fan conversion',
     body: 'Every surface pushes toward the useful action: subscribe, listen, pay, book, or contact without extra brand noise.',
@@ -342,7 +345,7 @@ const AUDIENCE_ROWS = [
 const STATS = [
   {
     value: '7M',
-    label: 'tracks generated per day on Suno alone',
+    label: 'Tracks Generated Per Day On Suno Alone',
     source: 'Source: Suno, 2025',
   },
   {
@@ -352,14 +355,14 @@ const STATS = [
   },
   {
     value: '$100',
-    label: 'estimated lifetime value for each owned fan relationship',
+    label: 'Estimated Lifetime Value For Each Owned Fan Relationship',
     source: 'Internal direct-to-fan estimate',
   },
 ] as const;
 
 const COMPARISON = [
   {
-    label: 'Static link stack',
+    label: 'Static Link Stack',
     icon: X,
     items: [
       'Same list for every visitor',
@@ -369,7 +372,7 @@ const COMPARISON = [
     ],
   },
   {
-    label: 'Jovie free',
+    label: 'Jovie Free',
     icon: Check,
     items: [
       'Adaptive subscribe or listen CTA',
@@ -450,6 +453,7 @@ export default function LaunchPage() {
               <div className='system-b-launch-hero-copy'>
                 <p className='system-b-launch-kicker'>Launch</p>
                 <h1 id='hero-heading' className='system-b-launch-hero-title'>
+                  {/* ui-casing-allow: marketing display headline */}
                   Your entire music career. One intelligent link.
                 </h1>
                 <p className='system-b-launch-hero-lead'>
@@ -487,7 +491,7 @@ export default function LaunchPage() {
 
         <section
           className='system-b-launch-logo-strip'
-          aria-label='Supported platforms'
+          aria-label='Supported Platforms'
         >
           <MarketingContainer width='page'>
             <ul>
@@ -506,6 +510,7 @@ export default function LaunchPage() {
           <MarketingContainer width='page'>
             <div className='system-b-launch-thesis'>
               <h2 id='thesis-heading' className='system-b-launch-thesis-title'>
+                {/* ui-casing-allow: marketing display headline */}
                 Paste one Spotify link. Get smart links, fan notifications, and
                 a link-in-bio that converts in seconds.
               </h2>
@@ -840,6 +845,7 @@ export default function LaunchPage() {
         >
           <MarketingContainer width='page'>
             <h2 id='cta-heading'>
+              {/* ui-casing-allow: marketing display headline */}
               Your music deserves better than a stack of links.
             </h2>
             <div>

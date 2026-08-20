@@ -82,7 +82,7 @@ export function DashboardFeedbackModal({
             <CheckCircle2 className='h-6 w-6' aria-hidden='true' />
           </div>
           <DialogTitle className='mt-4 text-balance text-lg font-semibold text-primary-token'>
-            Thank you!
+            Thank You!
           </DialogTitle>
           <DialogDescription className='mt-2 text-app text-secondary-token'>
             Sent — thanks for the feedback.
@@ -92,7 +92,7 @@ export function DashboardFeedbackModal({
         <>
           <div className='flex items-start justify-between gap-4'>
             <div>
-              <DialogTitle className='text-balance'>Send feedback</DialogTitle>
+              <DialogTitle className='text-balance'>Send Feedback</DialogTitle>
               <DialogDescription className='mt-1 text-app text-secondary-token'>
                 Tell us where the experience feels delightful, where it falls
                 short, or what you&apos;d love us to build next.
@@ -113,7 +113,7 @@ export function DashboardFeedbackModal({
 
           <DialogBody className='space-y-4'>
             <FormField
-              label='What should we improve next?'
+              label='What Should We Improve Next?'
               required
               helpText={`Press ${GLYPH_CMD} + Enter to send instantly`}
             >
@@ -145,7 +145,7 @@ export function DashboardFeedbackModal({
               loading={isSubmitting}
               className='font-caption'
             >
-              Send feedback
+              Send Feedback
             </Button>
           </DialogActions>
         </>

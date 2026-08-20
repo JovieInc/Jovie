@@ -7,8 +7,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Agent QC wires no longer advertise dead gates (JOV-5235):** Scope Judge is retired, Slop Gate stays post-merge informational, auto-approve ignores self-attested GStack comments, needs-human autoclose notifies Slack/Linear first, and the agent-pipeline branch check uses the shared allowlist.
+
+- [internal] **Redis quota errors no longer file opaque `UpstashError` Sentry issues (JOV-5220):** wrapped `{ error }` capture payloads keep the inner message, quota events fingerprint as one class, and autofix skips the name-only JSON titles.
+
 ### Fixed
 
+- [internal] **Touch-target lint accepts the 44px hit container:** compact controls stay visually small (`h-7`/`h-8`/`h-9`); the prescribed rescue is `before:h-11`, not enlarging the item. `min-h-11` on the control still counts so the ratchet does not jump.
 - [internal] **Production monitors page again:** post-deploy probe failures Slack `#alerts-production`, golden-path probes add claim/billing/Stripe liveness, observability and synthetics file Linear, and the canary `/api/chat` auth-gate retries then fails closed.
 
 ### Added
@@ -27,6 +32,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - **Screen walks reuse one account-video store:** founder walks and later creator screen recordings upload through `lib/capture` into the Jovie account blob. The walk is stored and not admitted until Summer classifies it.
 
 ### Changed
+- [internal] **Canonical UI Title Case on batch C labels:** buttons, headings, aria-labels, and table headers now match DESIGN.md. Marketing display headlines stay sentence case with allow comments.
 - [internal] **Removed unused `/exp` fake-UI fixtures:** deleted admin-only `auth-v1`, `home-v1`, `profile-v1`, and `onboarding-v1` playgrounds plus their style-guard tests, and lowered the raw-button, arbitrary-value, and `--linear-*` ratchet floors to match.
 - **Saving a vlog opens Collections:** the new clip lands with its shoot instead of in Catalog.
 - **Empty chat Talk lives inside the composer pill:** typing swaps Talk for Send without moving the bar. Tap, drag, or Done dismisses the keyboard.
@@ -47,7 +53,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-- [internal] **Agent QC wires no longer advertise dead gates (JOV-5235):** Scope Judge is retired, Slop Gate stays post-merge informational, auto-approve ignores self-attested GStack comments, needs-human autoclose notifies Slack/Linear first, and the agent-pipeline branch check uses the shared allowlist.
+- [internal] **Online scoring no longer fakes reviews or rubric scores (JOV-5238):** missing judges record `judge:absent`, word count is not a global fail, enqueue cannot report success without a durable queue, and Slack feedback drops email.
 - [internal] **Stale grok remount units no longer block a fresh rebase:** sidecar stops a DIRTY/CONFLICTING fallback-ship older than 15 minutes so changelog remounts can run after a sibling lands. Merge-queue UNMERGEABLE (`CONFLICTING`) counts as remount, not inflight skip.
 - [internal] **DIRTY remounts that only conflict on CHANGELOG.md merge and push without waiting on grok:** Unreleased bullets from the branch are unioned onto main so sibling ships stop parking CLEAN-except-changelog heads for an hour.
 - [internal] **Hold-intake missed-admission recovery now enrolls CLEAN `queue-deferred` heads:** exact admission already strips that label, but a main-push recovery used to skip it and left CI-green Symphony PRs parked off the merge queue.

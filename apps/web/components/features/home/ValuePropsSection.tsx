@@ -10,6 +10,7 @@ export function ValuePropsSection() {
             <div>
               <p className='marketing-kicker'>Why artists switch</p>
               <h2 className='marketing-h2-linear mt-6 max-w-[12ch] text-primary-token'>
+                {/* ui-casing-allow: marketing display headline */}
                 Built for releases, not just links.
               </h2>
             </div>

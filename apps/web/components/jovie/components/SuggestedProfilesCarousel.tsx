@@ -134,7 +134,7 @@ function CarouselCardHeader({
                 'hover:bg-surface-0 hover:text-secondary-token',
                 'disabled:opacity-30 disabled:cursor-not-allowed'
               )}
-              aria-label='Previous suggestion'
+              aria-label='Previous Suggestion'
             >
               <ChevronLeft className='h-5 w-5' />
             </button>
@@ -148,7 +148,7 @@ function CarouselCardHeader({
                 'hover:bg-surface-0 hover:text-secondary-token',
                 'disabled:opacity-30 disabled:cursor-not-allowed'
               )}
-              aria-label='Next suggestion'
+              aria-label='Next Suggestion'
             >
               <ChevronRight className='h-5 w-5' />
             </button>

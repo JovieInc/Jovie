@@ -4,7 +4,7 @@
  *
  * Counts interactive elements (`<button>`, `<a>`, role="button") in
  * components/ and app/ declaring explicit sub-44px height utilities
- * without a ≥44px rescue on the same element
+ * without a ≥44px hit-container rescue on the same element
  * (engine: lib/a11y-gates/touch-target-engine.ts).
  *
  * Baseline ratchet: the count in touch-target-ratchet.baseline.json may
@@ -51,7 +51,7 @@ function main(): void {
       `${JSON.stringify(
         {
           _comment:
-            'Touch-target ratchet baseline — interactive elements with explicit sub-44px heights (scripts/lint-touch-target.ts). Ratchet only goes down: fix elements (min 44px hit area, WCAG 2.5.5), then run `pnpm --filter web run lint:touch-target -- --update`.',
+            'Touch-target ratchet baseline — interactive elements with explicit sub-44px visual heights and no 44px hit container (scripts/lint-touch-target.ts). Ratchet only goes down. Fix by enlarging the touch-target container (before:absolute before:h-11 before:min-w-11), not the visible control. Then `pnpm --filter web run lint:touch-target -- --update`.',
           count,
         },
         null,
@@ -76,7 +76,9 @@ function main(): void {
       `[touch-target] ✗ Regression: ${count} > baseline ${baseline.count}\n` +
         '  New interactive elements with sub-44px hit areas introduced.\n' +
         '  Interactive controls need a minimum 44px touch target (WCAG 2.5.5).\n' +
-        '  Fix: use h-11+ (44px), add min-h-11, or expand the hit area with padding.\n' +
+        '  Fix: enlarge the hit container, not the visible item — e.g.\n' +
+        '  `relative` + `before:absolute before:h-11 before:min-w-11 before:content-[""]`\n' +
+        '  (see packages/ui/atoms/button.tsx). Do not bump h-8 → h-11 on the control.\n' +
         '  Run `tsx scripts/lint-touch-target.ts --list` to locate them.'
     );
     process.exit(1);

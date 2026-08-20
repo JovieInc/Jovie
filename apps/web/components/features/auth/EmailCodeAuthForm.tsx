@@ -386,7 +386,7 @@ export function EmailCodeAuthForm({
               type='button'
               onClick={handleResendCode}
               disabled={isPending}
-              aria-label='Resend verification code'
+              aria-label='Resend Verification Code'
               className='focus-ring-themed max-w-full rounded-md text-app text-secondary-token underline underline-offset-2 disabled:opacity-50'
             >
               Resend code

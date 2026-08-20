@@ -333,7 +333,7 @@ export function HeroSpotifySearch() {
               id='hero-spotify-results'
               className='sr-only'
               size={Math.min(totalItems, 6)}
-              aria-label='Spotify artist results'
+              aria-label='Spotify Artist Results'
               value={
                 activeIndex === pasteUrlIndex
                   ? '__paste__'

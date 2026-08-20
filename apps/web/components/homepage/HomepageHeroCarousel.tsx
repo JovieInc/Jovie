@@ -169,7 +169,7 @@ export function HomepageHeroMockupCarousel() {
   return (
     <section
       className='homepage-hero-showcase'
-      aria-label='Jovie product screenshots'
+      aria-label='Jovie Product Screenshots'
       data-testid='homepage-hero-carousel'
       data-reduced-motion={prefersReducedMotion ? 'true' : undefined}
     >
@@ -198,14 +198,14 @@ export function HomepageHeroMockupCarousel() {
           <button
             type='button'
             className='homepage-hero-carousel__button focus-ring-themed'
-            aria-label='Go to previous slide'
+            aria-label='Go To Previous Slide'
             onClick={() => advance(-1)}
           >
             <ChevronLeft aria-hidden='true' strokeWidth={1.8} />
           </button>
           <div
             className='homepage-hero-carousel__dots'
-            aria-label='Product screenshot slides'
+            aria-label='Product Screenshot Slides'
             role='tablist'
           >
             {HOMEPAGE_HERO_CAROUSEL_SLIDES.map((slide, index) => (
@@ -224,7 +224,7 @@ export function HomepageHeroMockupCarousel() {
           <button
             type='button'
             className='homepage-hero-carousel__button focus-ring-themed'
-            aria-label='Go to next slide'
+            aria-label='Go To Next Slide'
             onClick={() => advance(1)}
           >
             <ChevronRight aria-hidden='true' strokeWidth={1.8} />

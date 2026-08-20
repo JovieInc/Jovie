@@ -58,7 +58,7 @@ export function LyricsTimeline({
           type='button'
           onClick={handleScrub}
           className='relative flex-1 h-6 rounded-full grid focus:outline-none'
-          aria-label='Lyric timeline'
+          aria-label='Lyric Timeline'
         >
           <span className='pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-(--linear-app-shell-border)' />
           <span
