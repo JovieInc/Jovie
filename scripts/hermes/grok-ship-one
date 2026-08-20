@@ -60,13 +60,18 @@ PY
 
 REMOUNT=0
 EXISTING_NUMBER=""
+EXISTING_MERGE_STATE=""
+CHANGELOG_ONLY_REMOUNT=0
+SKIP_GROK=0
 if VERDICT_JSON="$(symphony-codex-exhausted open-pr-verdict "$ID" 2>/dev/null)"; then
   VERDICT="$(python3 -c 'import json,sys; print((json.loads(sys.argv[1]) or {}).get("verdict") or "none")' "$VERDICT_JSON")"
   EXISTING_HEAD="$(python3 -c 'import json,sys; print((json.loads(sys.argv[1]) or {}).get("head") or "")' "$VERDICT_JSON")"
   EXISTING_NUMBER="$(python3 -c 'import json,sys; print((json.loads(sys.argv[1]) or {}).get("number") or "")' "$VERDICT_JSON")"
+  EXISTING_MERGE_STATE="$(python3 -c 'import json,sys; print((json.loads(sys.argv[1]) or {}).get("mergeStateStatus") or "")' "$VERDICT_JSON")"
 else
   VERDICT=none
   EXISTING_HEAD=""
+  EXISTING_MERGE_STATE=""
 fi
 if [ "$VERDICT" = skip ]; then
   echo "$(date -u +%FT%TZ) $ID open_pr_exists" >> "$LOG"
@@ -169,11 +174,56 @@ if [ "$REMOUNT" = 1 ]; then
     git -C "$WS" fetch --deepen=500 origin
   fi
   if ! git -C "$WS" merge --no-edit origin/main; then
-    if [ -n "$(git -C "$WS" ls-files -u)" ]; then
-      echo "$(date -u +%FT%TZ) $ID remount_merge_conflicts" >> "$LOG"
-    else
+    if [ -z "$(git -C "$WS" ls-files -u)" ]; then
       echo "merge origin/main failed without conflicts: $WS" >&2
       exit 2
+    fi
+    echo "$(date -u +%FT%TZ) $ID remount_merge_conflicts" >> "$LOG"
+    unmerged="$(git -C "$WS" diff --name-only --diff-filter=U | sort -u)"
+    if printf '%s\n' "$unmerged" | grep -qx 'CHANGELOG.md'; then
+      git -C "$WS" show :2:CHANGELOG.md > "$WS/.changelog.ours"
+      git -C "$WS" show :3:CHANGELOG.md > "$WS/.changelog.theirs"
+      python3 - "$WS/.changelog.ours" "$WS/.changelog.theirs" "$WS/CHANGELOG.md" <<'PY'
+import pathlib, sys
+
+def unreleased_bullets(text: str) -> list[str]:
+    bullets: list[str] = []
+    in_unreleased = False
+    for line in text.splitlines():
+        if line.startswith("## [Unreleased]"):
+            in_unreleased = True
+            continue
+        if in_unreleased and line.startswith("## ["):
+            break
+        if in_unreleased and line.startswith("- "):
+            bullets.append(line)
+    return bullets
+
+ours = pathlib.Path(sys.argv[1]).read_text()
+theirs = pathlib.Path(sys.argv[2]).read_text()
+missing = [bullet for bullet in unreleased_bullets(ours) if bullet not in theirs]
+if not missing:
+    pathlib.Path(sys.argv[3]).write_text(theirs)
+    raise SystemExit(0)
+lines = theirs.splitlines(keepends=True)
+out: list[str] = []
+inserted = False
+for line in lines:
+    out.append(line)
+    if not inserted and line.startswith("## [Unreleased]"):
+        out.append("\n")
+        for bullet in missing:
+            out.append(bullet + "\n")
+        inserted = True
+pathlib.Path(sys.argv[3]).write_text("".join(out))
+PY
+      git -C "$WS" add CHANGELOG.md
+      rm -f "$WS/.changelog.ours" "$WS/.changelog.theirs"
+    fi
+    if [ -z "$(git -C "$WS" ls-files -u)" ]; then
+      git -C "$WS" commit --no-edit
+      echo "$(date -u +%FT%TZ) $ID remount_changelog_autoresolved" >> "$LOG"
+      CHANGELOG_ONLY_REMOUNT=1
     fi
   fi
 else
@@ -278,10 +328,22 @@ finally:
         os.unlink(temporary)
 PY
 
+if [ "$CHANGELOG_ONLY_REMOUNT" = 1 ]; then
+  merge_state="$(printf '%s' "$EXISTING_MERGE_STATE" | tr '[:lower:]' '[:upper:]')"
+  if [ -z "$merge_state" ] || [ "$merge_state" = "DIRTY" ] || [ "$merge_state" = "BEHIND" ]; then
+    git -C "$WS" push origin "$BRANCH"
+    echo "$(date -u +%FT%TZ) $ID remount_changelog_pushed" >> "$LOG"
+    SKIP_GROK=1
+  fi
+fi
+
 attempt_log="$(mktemp "$LOG_DIR/.${ID}.attempt.XXXXXX")"
 trap 'rm -f "$attempt_log"' EXIT
 echo "START $ID $(date -u +%FT%TZ) repo=$REPO" | tee -a "$LOG"
 set +e
+if [ "$SKIP_GROK" = 1 ]; then
+  rc=0
+else
 SELECTION_JSON="$SELECTION_JSON" FALLBACK_PROMPT="$PROMPT" FALLBACK_CWD="$WS" python3 - <<'PY' 2>&1 | tee -a "$LOG" "$attempt_log"
 import json, os, pathlib, subprocess
 selected = json.loads(os.environ["SELECTION_JSON"])["selected"]
@@ -329,6 +391,7 @@ if "402" in sys_out and ("max_tokens" in sys_out or "can only afford" in sys_out
 raise SystemExit(result.returncode)
 PY
 rc=${PIPESTATUS[0]}
+fi
 set -e
 
 pr_count="$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number --jq 'length' 2>/dev/null || printf 0)"
