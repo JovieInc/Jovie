@@ -1,5 +1,12 @@
 # Design — Carbon Palette Sync Complete
 
+> **HISTORICAL — superseded by Noir Ion (JOV-4635), see DESIGN.md.** The Carbon
+> palette (`#06070a` etc.) described below was replaced by the Noir Ion dark
+> palette; the canonical anchors are the `--noir-ion-*` vars in
+> `apps/web/styles/design-system.css`, guarded by
+> `apps/web/tests/unit/design-system/noir-ion-tokens.test.ts`. This document is
+> kept for provenance only — do not implement from it.
+
 App pages now match `/exp/shell-v1` at the source level via `linear-tokens.css :root.dark` and supporting design tokens.
 
 ## Source of truth

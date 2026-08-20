@@ -1,6 +1,6 @@
 # gstack (Workflow Toolkit) + Skill Routing
 
-This repo vendors [gstack](https://github.com/garrytan/gstack) at `.agents/skills/gstack/` (scripts, tests, and leaf `SKILL.md` files). Executable Jovie copies of those leaves also live under `.claude/skills/<name>/`. `.claude/skills/gstack/` is only the small Jovie overlay (`design-canonical`), not a git submodule.
+This repo vendors a Jovie-customized fork of [gstack](https://github.com/garrytan/gstack) at `.agents/skills/gstack/` (see its `VERSION` and `CHANGELOG.md`). It is **not** a git submodule. `.claude/skills/gstack` is a symlink to that fork, and each `.claude/skills/<name>/SKILL.md` symlinks to `gstack/<name>/SKILL.md`, so the fork is the single source of truth for every gstack skill. Generated `SKILL.md` files come from `SKILL.md.tmpl` templates — edit the template, then regenerate (see "Updating gstack" below). Never hand-edit a generated `SKILL.md`.
 
 `src/`, `test/`, and `bin/` inside the gstack checkout are implementation, not skills. Do not treat files there as catalog entries.
 
@@ -38,16 +38,18 @@ This repo vendors [gstack](https://github.com/garrytan/gstack) at `.agents/skill
 gstack requires **Bun v1.0+**. The session-start hook installs Bun and runs setup automatically. For manual setup:
 
 ```bash
-cd .agents/skills/gstack && ./setup
+cd .claude/skills/gstack && ./setup   # symlink to .agents/skills/gstack; either path works
 ```
 
 ## Updating gstack
 
+The fork is plain files in this repo — there is no submodule to `git pull`. To change a skill, edit its `SKILL.md.tmpl` (or generator code) in `.agents/skills/gstack/`, then regenerate and re-run the size ratchet:
+
 ```bash
-cd .agents/skills/gstack && git pull origin main && ./setup
+cd .agents/skills/gstack && bun run gen:skill-docs && bun run skill:size-check
 ```
 
-Or use `/gstack-upgrade` from within Claude Code.
+To pull upstream garrytan/gstack changes, sync them into `.agents/skills/gstack/` manually and regenerate. `/gstack-upgrade` only applies to a global `~/.claude/skills/gstack` install, not this vendored fork.
 
 ## Skill Routing
 

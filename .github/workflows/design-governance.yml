@@ -1,0 +1,86 @@
+name: Design Governance
+
+# Standing design-governance audit (docs/design-system/GOVERNANCE.md).
+# Weekly + workflow_dispatch only. Not a ci-fast / PR Ready merge gate.
+# Informational / standing-issue only — must not grow into a heavy PR lane.
+
+on:
+  schedule:
+    # Monday 08:17 UTC, offset from the :00/:30 scheduled-suite pileup.
+    - cron: '17 8 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: design-governance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Design Governance Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Run design governance audit
+        id: audit
+        # Pure node + git — no pnpm install. Capture the report for the
+        # standing issue without failing this step.
+        run: |
+          set +e
+          node scripts/design-governance-audit.mjs 2>&1 | tee design-governance-audit.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Open or update standing drift issue
+        if: ${{ github.event_name == 'schedule' && steps.audit.outputs.exit_code != '0' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          TITLE="Design governance drift detected"
+          BODY=$(cat <<EOF
+          The weekly design governance audit failed.
+
+          Run: $RUN_URL
+
+          \`\`\`
+          $(cat design-governance-audit.txt)
+          \`\`\`
+
+          Remediation: docs/design-system/GOVERNANCE.md — run \`pnpm design:governance:audit\` locally.
+          EOF
+          )
+          EXISTING=$(gh issue list --state open --search "in:title \"$TITLE\"" --json number,title \
+            --jq '.[] | select(.title == "Design governance drift detected") | .number' | head -1)
+          if [ -n "$EXISTING" ]; then
+            gh issue edit "$EXISTING" --body "$BODY"
+            echo "Updated standing issue #$EXISTING"
+          else
+            gh issue create --title "$TITLE" --body "$BODY" --label "design-governance" \
+              || gh issue create --title "$TITLE" --body "$BODY"
+          fi
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: design-governance-audit-${{ github.run_id }}
+          path: design-governance-audit.txt
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Fail on audit failure
+        if: ${{ steps.audit.outputs.exit_code != '0' }}
+        run: exit 1
