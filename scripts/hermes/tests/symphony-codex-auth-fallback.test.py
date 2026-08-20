@@ -1980,6 +1980,69 @@ class FallbackTests(unittest.TestCase):
         self.assertTrue(any("JOV-5238" in unit for unit in units), units)
         self.assertEqual(used, 3)
 
+    def test_unit_age_seconds_parses_wall_clock_when_usec_missing(self):
+        """Gem user systemd has ExecMainStartTimestamp but not USec (live JOV-5220)."""
+        module = self.load_controller_module()
+        started = time.time() - 7200
+        wall = time.strftime("%a %Y-%m-%d %H:%M:%S UTC", time.gmtime(started))
+        payload = (
+            f"ExecMainStartTimestampUSec=\nExecMainStartTimestamp={wall}\n"
+        ).encode()
+
+        def captured(command, _timeout):
+            self.assertIn("--property=ExecMainStartTimestampUSec,ExecMainStartTimestamp", command)
+            return subprocess.CompletedProcess(command, 0, stdout=payload, stderr=b"")
+
+        with mock.patch.object(module, "_captured", side_effect=captured):
+            age = module._unit_age_seconds("fallback-ship-JOV-5220-770fa184873a.service")
+        self.assertIsNotNone(age)
+        self.assertGreater(age, 7000)
+        self.assertLess(age, 7400)
+
+    def test_unit_age_seconds_prefers_usec_when_present(self):
+        module = self.load_controller_module()
+        usec = int((time.time() - 3600) * 1_000_000)
+        payload = (
+            f"ExecMainStartTimestampUSec={usec}\n"
+            "ExecMainStartTimestamp=Wed 2020-01-01 00:00:00 UTC\n"
+        ).encode()
+
+        def captured(command, _timeout):
+            return subprocess.CompletedProcess(command, 0, stdout=payload, stderr=b"")
+
+        with mock.patch.object(module, "_captured", side_effect=captured):
+            age = module._unit_age_seconds("fallback-ship-JOV-5220-770fa184873a.service")
+        self.assertIsNotNone(age)
+        self.assertGreater(age, 3500)
+        self.assertLess(age, 3700)
+
+    def test_unit_age_seconds_missing_both_returns_none(self):
+        module = self.load_controller_module()
+        payload = b"ExecMainStartTimestampUSec=\nExecMainStartTimestamp=\n"
+
+        def captured(command, _timeout):
+            return subprocess.CompletedProcess(command, 0, stdout=payload, stderr=b"")
+
+        with mock.patch.object(module, "_captured", side_effect=captured):
+            self.assertIsNone(module._unit_age_seconds("fallback-ship-JOV-5220-770fa184873a.service"))
+
+    def test_grok_ship_one_path_includes_pnpm_dirs(self):
+        """Live changelog remount commit died: husky pre-commit `pnpm: not found`."""
+        text = GROK_SHIP.read_text()
+        self.assertIn("/usr/local/bin", text)
+        self.assertIn(".npm-global/bin", text)
+        command = self.load_controller_module()._grok_command(
+            "JOV-7",
+            "/bin/true",
+            {"schema_version": 1, "selected": {"id": "x"}},
+            "rev",
+            "a" * 64,
+        )
+        path_args = [arg for arg in command if arg.startswith("Environment=PATH=")]
+        self.assertTrue(path_args)
+        self.assertIn("/usr/local/bin", path_args[0])
+        self.assertIn(".npm-global/bin", path_args[0])
+
     def test_grok_ship_one_new_work_does_not_request_queue_deferred(self):
         """Live fallback PRs still got queue-deferred because the prompt asked for it."""
         text = GROK_SHIP.read_text()
@@ -2188,6 +2251,216 @@ class FallbackTests(unittest.TestCase):
         events = self.events.read_text()
         self.assertIn("grok -", events)
         self.assertNotIn("push origin", events)
+
+    def test_grok_ship_one_retries_cursor_grok_model_when_grok_46_rejected(self):
+        """Live JOV-5235 remount: grok TUI rejected grok-4.6 with cursor model list."""
+        created = self.root / "pr-created"
+        self.command("hermes", "printf 'hermes should not run\\n' >> \"$GEM_EVENTS\"; exit 99")
+        self.command(
+            "gh",
+            'case "$*" in\n'
+            '  *headRefName*) echo \'[{"number":16240,"headRefName":"fallback/JOV-7-fix","mergeStateStatus":"DIRTY"}]\';;\n'
+            '  *statusCheckRollup*) echo \'{"statusCheckRollup":[{"conclusion":"FAILURE"}]}\';;\n'
+            '  *) [ ! -f "$GROK_CREATED" ] && echo 0 || echo 1;;\n'
+            'esac\n',
+        )
+        self.command(
+            "git",
+            'printf "git %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            '[ "$1" != clone ] || mkdir -p "$5/.git"\n'
+            'case "$*" in\n'
+            '  *"rev-parse HEAD") printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";;\n'
+            '  *"rev-parse --is-shallow-repository") printf "false\\n";;\n'
+            '  *"merge-base HEAD origin/main") exit 0;;\n'
+            '  *"merge --no-edit origin/main") echo "CONFLICT (content): Merge conflict in apps/web/x.ts" >&2; exit 1;;\n'
+            '  *"diff --name-only --diff-filter=U") printf "apps/web/x.ts\\n";;\n'
+            '  *"ls-files -u") printf "100644 def apps/web/x.ts\\n";;\n'
+            'esac\n',
+        )
+        self.command(
+            "grok",
+            'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            'case " $* " in\n'
+            '  *" -m grok-4.6 "*)\n'
+            '    echo "Cannot use this model: grok-4.6[fast=false]. Available models: auto, cursor-grok-4.6-high, cursor-grok-4.6-high-fast" >&2\n'
+            '    exit 1;;\n'
+            '  *" -m cursor-grok-4.6-high-fast "*)\n'
+            '    touch "$GROK_CREATED"\n'
+            '    exit 0;;\n'
+            'esac\n'
+            'exit 3\n',
+        )
+        selection = {
+            "schema_version": 1,
+            "deterministic_first": True,
+            "selected": {
+                "id": "hermes-openrouter",
+                "provider": "openrouter",
+                "model": "grok-4.6",
+                "executor": {
+                    "executable": str(self.bin / "hermes"),
+                    "argv": ["-m", "{model}", "-p", "{prompt}"],
+                },
+            },
+        }
+        result = subprocess.run(
+            [self.install_runtime() / GROK_SHIP.name, "JOV-7"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_EVENTS=self.events,
+                GROK_CREATED=created,
+                GROK_SHIP_WS_ROOT=self.root / "workspaces",
+                GROK_SHIP_LOG_DIR=self.root / "logs",
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.grok_linear_url(),
+                SYMPHONY_OPEN_PR_INDEX="live",
+                GEM_GROK_EXECUTABLE=str(self.bin / "grok"),
+                GEM_GROK_BIN=str(self.bin / "grok"),
+                SYMPHONY_FALLBACK_SELECTION_B64=base64.b64encode(
+                    json.dumps(selection).encode()
+                ).decode(),
+            ),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        log = (self.root / "logs/JOV-7.log").read_text()
+        self.assertIn("retry_cursor_grok_model cursor-grok-4.6-high-fast", log)
+        events = self.events.read_text()
+        self.assertIn("-m grok-4.6", events)
+        self.assertIn("-m cursor-grok-4.6-high-fast", events)
+        self.assertNotIn("hermes should not run", events)
+        self.assertTrue(created.exists())
+
+    def test_grok_ship_one_retries_cursor_model_flag_when_grok_46_rejected(self):
+        """Live JOV-5220: cursor argv uses --model grok-4.6, not -m."""
+        created = self.root / "pr-created"
+        self.command(
+            "cursor-agent",
+            'printf "cursor %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            'case " $* " in\n'
+            '  *" --model grok-4.6 "*)\n'
+            '    echo "Cannot use this model: grok-4.6[fast=false]. Available models: auto, cursor-grok-4.6-high, cursor-grok-4.6-high-fast" >&2\n'
+            '    exit 1;;\n'
+            '  *" --model cursor-grok-4.6-high-fast "*)\n'
+            '    touch "$GROK_CREATED"\n'
+            '    exit 0;;\n'
+            'esac\n'
+            'exit 3\n',
+        )
+        self.command(
+            "gh",
+            'case "$*" in\n'
+            '  *headRefName*) echo \'[{"number":16229,"headRefName":"fallback/JOV-7-fix","mergeStateStatus":"DIRTY"}]\';;\n'
+            '  *statusCheckRollup*) echo \'{"statusCheckRollup":[{"conclusion":"FAILURE"}]}\';;\n'
+            '  *) [ ! -f "$GROK_CREATED" ] && echo 0 || echo 1;;\n'
+            'esac\n',
+        )
+        self.command(
+            "git",
+            'printf "git %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            '[ "$1" != clone ] || mkdir -p "$5/.git"\n'
+            'case "$*" in\n'
+            '  *"rev-parse HEAD") printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";;\n'
+            '  *"rev-parse --is-shallow-repository") printf "false\\n";;\n'
+            '  *"merge-base HEAD origin/main") exit 0;;\n'
+            '  *"merge --no-edit origin/main") echo "CONFLICT (content): Merge conflict in apps/web/x.ts" >&2; exit 1;;\n'
+            '  *"diff --name-only --diff-filter=U") printf "apps/web/x.ts\\n";;\n'
+            '  *"ls-files -u") printf "100644 def apps/web/x.ts\\n";;\n'
+            'esac\n',
+        )
+        selection = {
+            "schema_version": 1,
+            "deterministic_first": True,
+            "selected": {
+                "id": "cursor-grok-4.6",
+                "provider": "cursor",
+                "model": "grok-4.6",
+                "executor": {
+                    "executable": str(self.bin / "cursor-agent"),
+                    "argv": ["-p", "--force", "--model", "{model}", "{prompt}"],
+                },
+            },
+        }
+        result = subprocess.run(
+            [self.install_runtime() / GROK_SHIP.name, "JOV-7"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_EVENTS=self.events,
+                GROK_CREATED=created,
+                GROK_SHIP_WS_ROOT=self.root / "workspaces",
+                GROK_SHIP_LOG_DIR=self.root / "logs",
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.grok_linear_url(),
+                SYMPHONY_OPEN_PR_INDEX="live",
+                SYMPHONY_FALLBACK_SELECTION_B64=base64.b64encode(
+                    json.dumps(selection).encode()
+                ).decode(),
+            ),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        log = (self.root / "logs/JOV-7.log").read_text()
+        self.assertIn("retry_cursor_grok_model cursor-grok-4.6-high-fast", log)
+        events = self.events.read_text()
+        self.assertIn("--model grok-4.6", events)
+        self.assertIn("--model cursor-grok-4.6-high-fast", events)
+        self.assertTrue(created.exists())
+
+    def test_grok_ship_one_changelog_union_failure_still_invokes_grok(self):
+        """Live JOV-5238: changelog union crashed and remount exited before START."""
+        created = self.root / "pr-created"
+        self.command(
+            "gh",
+            'case "$*" in\n'
+            '  *headRefName*) echo \'[{"number":16241,"headRefName":"fallback/JOV-7-fix","mergeStateStatus":"DIRTY"}]\';;\n'
+            '  *statusCheckRollup*) echo \'{"statusCheckRollup":[{"conclusion":"SUCCESS"}]}\';;\n'
+            '  *) [ ! -f "$GROK_CREATED" ] && echo 0 || echo 1;;\n'
+            'esac\n',
+        )
+        self.command(
+            "git",
+            'printf "git %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            '[ "$1" != clone ] || mkdir -p "$5/.git"\n'
+            'case "$*" in\n'
+            '  *"rev-parse HEAD") printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";;\n'
+            '  *"rev-parse --is-shallow-repository") printf "false\\n";;\n'
+            '  *"merge-base HEAD origin/main") exit 0;;\n'
+            '  *"merge --no-edit origin/main") echo "CONFLICT (content): Merge conflict in CHANGELOG.md" >&2; exit 1;;\n'
+            '  *"diff --name-only --diff-filter=U") printf "CHANGELOG.md\\n";;\n'
+            '  *"show :2:CHANGELOG.md") echo "missing stage" >&2; exit 128;;\n'
+            '  *"ls-files -u") printf "100644 abc CHANGELOG.md\\n";;\n'
+            'esac\n',
+        )
+        self.command(
+            "grok",
+            'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            'touch "$GROK_CREATED"\n',
+        )
+        result = subprocess.run(
+            [self.install_runtime() / GROK_SHIP.name, "JOV-7"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_EVENTS=self.events,
+                GROK_CREATED=created,
+                GROK_SHIP_WS_ROOT=self.root / "workspaces",
+                GROK_SHIP_LOG_DIR=self.root / "logs",
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.grok_linear_url(),
+                SYMPHONY_OPEN_PR_INDEX="live",
+            ),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        log = (self.root / "logs/JOV-7.log").read_text()
+        self.assertIn("remount_merge_conflicts", log)
+        self.assertIn("remount_changelog_union_failed", log)
+        self.assertNotIn("remount_changelog_autoresolved", log)
+        self.assertIn("START JOV-7", log)
+        events = self.events.read_text()
+        self.assertIn("grok -", events)
 
     def test_grok_ship_one_remounts_dirty_head_without_admission_receipt(self):
         created = self.root / "pr-created"
