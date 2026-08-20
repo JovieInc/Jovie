@@ -60,6 +60,7 @@ apps/web/lib/workflows/memory/*           # product workflow entrypoints
 apps/web/app/api/memory/*                 # creator-scoped read APIs
 
 apps/web/workflows/agent-os-dry-run.ts    # internal WDK proof only
+apps/web/workflows/ovie-dump-ack.ts       # Summer dump-ack promotion (JOV-5217)
 apps/web/lib/agent-os/*                   # artifacts, gates, admin fixtures
 apps/web/app/api/admin/agent-os/*         # operator workflow APIs
 ```
@@ -81,14 +82,14 @@ Planned implementations:
 - `WDKWorkflowRunner` — internal AgentOS experiments only
 - `TriggerWorkflowRunner` — production product memory workflows
 
-`AgentHarness` selects the runner from configuration; product call sites must not import `@/workflows/agent-os-dry-run` or `workflow` directives directly.
+`AgentHarness` selects the runner from configuration; product call sites must not import `@/workflows/agent-os-dry-run`, `@/workflows/ovie-dump-ack`, or `workflow` directives directly.
 
 ## Forbidden couplings
 
 | From | Must not import |
 | --- | --- |
-| `lib/memory/*`, `lib/workflows/memory/*`, `lib/agents/agent-harness.ts`, `app/api/memory/*` | `@/workflows/agent-os-dry-run`, `@/lib/agent-os/workflows`, `workflow` package |
-| `workflows/agent-os-dry-run.ts`, `lib/agent-os/workflows.ts` | `@/lib/memory/*`, `@/lib/workflows/memory/*`, `@/lib/agents/agent-harness` |
+| `lib/memory/*`, `lib/workflows/memory/*`, `lib/agents/agent-harness.ts`, `app/api/memory/*` | `@/workflows/agent-os-dry-run`, `@/workflows/ovie-dump-ack`, `@/lib/agent-os/workflows`, `workflow` package |
+| `workflows/agent-os-dry-run.ts`, `workflows/ovie-dump-ack.ts`, `lib/agent-os/workflows.ts` | `@/lib/memory/*`, `@/lib/workflows/memory/*`, `@/lib/agents/agent-harness` |
 
 ## Configuration
 

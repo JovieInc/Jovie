@@ -45,6 +45,15 @@ export type InitiativeStatus =
   | 'failed'
   | 'cancelled';
 
+export type OvieRoutingState =
+  | 'queued'
+  | 'accepted'
+  | 'in_progress'
+  | 'blocked'
+  | 'unavailable'
+  | 'landed'
+  | 'done';
+
 export type OvieHandoff = {
   readonly title: string;
   readonly intent: string;
@@ -85,6 +94,9 @@ export type OvieInitiative = {
   readonly workerSpawned: false;
   /** Kanban task id or Linear identifier. Null until ovie-intake-to-kanban.py lands. */
   readonly destinationHandle?: string | null;
+  readonly idempotencyKey?: string;
+  readonly routingState?: OvieRoutingState;
+  readonly routingReason?: string;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly evidence: readonly OvieEvidence[];

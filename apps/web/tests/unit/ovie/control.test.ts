@@ -31,5 +31,7 @@ describe('Summer-drives-Jovie control (JOV-5217)', () => {
     expect(SUMMER_CONTROL_PROMOTION.lybHealthNeverEntersJovieOrOvieMemory).toBe(
       true
     );
+    expect(SUMMER_CONTROL_PROMOTION.promotedWorkflowEveCannotMutate).toBe(true);
+    expect(SUMMER_CONTROL_PROMOTION.codeWorkRoutesSummerSymphonyGem).toBe(true);
   });
 });

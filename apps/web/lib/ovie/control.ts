@@ -29,4 +29,6 @@ export function authorizeSummerControl(
 export const SUMMER_CONTROL_PROMOTION = {
   customerFacingRequiresEvalGreen: true,
   lybHealthNeverEntersJovieOrOvieMemory: true,
+  promotedWorkflowEveCannotMutate: true,
+  codeWorkRoutesSummerSymphonyGem: true,
 } as const;
