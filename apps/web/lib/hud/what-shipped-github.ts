@@ -120,8 +120,8 @@ async function fetchRecentlyMergedPulls(
 /**
  * Build the What Shipped feed from GitHub with humanized titles.
  *
- * Returns the empty payload when HUD GitHub credentials are not configured or
- * the GitHub call fails — the feed degrades, it never throws to the route.
+ * Returns not-configured when HUD GitHub credentials are missing.
+ * Returns unavailable when the GitHub call fails. Never throws to the route.
  */
 export async function readWhatShippedFromGitHub(): Promise<WhatShippedResponse> {
   const token = env.HUD_GITHUB_TOKEN;
@@ -160,6 +160,8 @@ export async function readWhatShippedFromGitHub(): Promise<WhatShippedResponse> 
       generatedAt: new Date().toISOString(),
       items,
       available: true,
+      observation: items.length === 0 ? 'empty' : 'ok',
+      errorMessage: null,
     };
 
     await writeCachedFeed(feed);
@@ -172,6 +174,15 @@ export async function readWhatShippedFromGitHub(): Promise<WhatShippedResponse> 
     await captureError('What shipped GitHub fallback failed', error, {
       context: 'hud_what_shipped_github',
     });
-    return EMPTY_WHAT_SHIPPED_RESPONSE;
+    return {
+      generatedAt: null,
+      items: [],
+      available: false,
+      observation: 'unavailable',
+      errorMessage:
+        error instanceof Error
+          ? error.message
+          : 'What shipped GitHub fallback failed.',
+    };
   }
 }

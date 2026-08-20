@@ -17,6 +17,13 @@ export type {
   AdminCreatorProfilesSort,
 } from './creator-profiles';
 
+// founder-funnel
+export type {
+  FounderFunnelData,
+  FounderFunnelStage,
+  FounderFunnelTimeRange,
+} from './founder-funnel';
+
 // funnel-metrics
 export type { AdminFunnelMetrics } from './funnel-metrics';
 

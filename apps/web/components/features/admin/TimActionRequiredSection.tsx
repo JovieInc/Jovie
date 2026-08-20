@@ -3,6 +3,7 @@
 import { Button } from '@jovie/ui';
 import { Check, ExternalLink } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { HudObservationStatus } from '@/components/features/admin/hud/HudObservationStatus';
 import { toast } from '@/components/feedback';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ShellListRowFrame } from '@/components/organisms/table';
@@ -10,6 +11,7 @@ import type {
   TimActionIssue,
   TimActionsResponse,
 } from '@/lib/hud/linear-actions';
+import type { HudObservationState } from '@/lib/hud/observation';
 import { STANDARD_CACHE } from '@/lib/queries/cache-strategies';
 
 const FETCH_URL = '/api/admin/hud/tim-actions';
@@ -121,6 +123,7 @@ export function TimActionRequiredSection() {
   // isInitialLoad tracks whether we've ever received data — only show skeleton on first load
   const isInitialLoadRef = useRef(true);
   const [isLoading, setIsLoading] = useState(true);
+  const [fetchFailed, setFetchFailed] = useState(false);
   const [closingIds, setClosingIds] = useState<Set<string>>(new Set());
   const [optimisticallyClosedIds, setOptimisticallyClosedIds] = useState<
     Set<string>
@@ -138,9 +141,10 @@ export function TimActionRequiredSection() {
       }
       const result = (await response.json()) as TimActionsResponse;
       setData(result);
+      setFetchFailed(false);
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') return;
-      // Silently fail — the HUD should not break if Linear is unavailable
+      setFetchFailed(true);
     } finally {
       isInitialLoadRef.current = false;
       setIsLoading(false);
@@ -204,32 +208,25 @@ export function TimActionRequiredSection() {
     }
   }
 
-  // Don't render the section at all if Linear is not configured and loading is done
-  if (!isLoading && data && !data.available) {
-    return null;
-  }
-
   const visibleIssues = (data?.issues ?? []).filter(
     issue => !optimisticallyClosedIds.has(issue.id)
   );
-
-  if (!isLoading && visibleIssues.length === 0) {
-    return null;
-  }
+  const observation = resolveTimActionsObservation({
+    isLoading,
+    fetchFailed,
+    data,
+    visibleCount: visibleIssues.length,
+  });
 
   return (
     <ContentSurfaceCard surface='details' className='p-3'>
       <div className='space-y-2.5'>
-        {/* Section header */}
         <div className='flex items-center gap-2'>
-          {/* Warning accent dot for Tim action-required state. */}
           <span
             className='h-2 w-2 shrink-0 rounded-full bg-warning'
             aria-hidden='true'
           />
-          <p className='text-xs font-caption text-tertiary-token'>
-            Tim Action Required
-          </p>
+          <p className='text-xs font-caption text-tertiary-token'>Needs Tim</p>
           {!isLoading && visibleIssues.length > 0 ? (
             <span className='ml-auto text-2xs tabular-nums text-tertiary-token'>
               {visibleIssues.length}
@@ -237,8 +234,7 @@ export function TimActionRequiredSection() {
           ) : null}
         </div>
 
-        {/* Content */}
-        {isLoading ? (
+        {isLoading && !data ? (
           <div className='grid gap-2'>
             {[1, 2].map(i => (
               <div
@@ -248,7 +244,7 @@ export function TimActionRequiredSection() {
               />
             ))}
           </div>
-        ) : (
+        ) : visibleIssues.length > 0 ? (
           <div className='grid gap-2'>
             {visibleIssues.map(issue => (
               <ActionRow
@@ -259,8 +255,84 @@ export function TimActionRequiredSection() {
               />
             ))}
           </div>
+        ) : (
+          <HudObservationStatus
+            state={observation}
+            message={timActionsMessage(observation, data)}
+            freshnessLabel={
+              data?.fetchedAt
+                ? `Updated ${formatFetchedAt(data.fetchedAt)}`
+                : null
+            }
+            onRetry={
+              observation === 'unavailable' || observation === 'stale'
+                ? () => {
+                    fetchData().catch(() => {});
+                  }
+                : undefined
+            }
+            testId='tim-action-observation'
+          />
         )}
+        {visibleIssues.length > 0 && observation === 'unavailable' ? (
+          <HudObservationStatus
+            state='unavailable'
+            message='Showing last known decisions. Retry to refresh.'
+            onRetry={() => {
+              fetchData().catch(() => {});
+            }}
+            testId='tim-action-last-known'
+          />
+        ) : null}
       </div>
     </ContentSurfaceCard>
   );
+}
+
+function resolveTimActionsObservation({
+  isLoading,
+  fetchFailed,
+  data,
+  visibleCount,
+}: {
+  readonly isLoading: boolean;
+  readonly fetchFailed: boolean;
+  readonly data: TimActionsResponse | null;
+  readonly visibleCount: number;
+}): HudObservationState {
+  if (isLoading && !data) return 'loading';
+  if (data?.observation === 'not_configured') return 'not_configured';
+  if (fetchFailed || data?.observation === 'unavailable') return 'unavailable';
+  if (visibleCount === 0) return 'empty';
+  return 'fresh';
+}
+
+function timActionsMessage(
+  observation: HudObservationState,
+  data: TimActionsResponse | null
+): string {
+  if (observation === 'not_configured') {
+    return (
+      data?.errorMessage ??
+      'Linear is not configured. Add LINEAR_API_KEY to load decisions.'
+    );
+  }
+  if (observation === 'unavailable') {
+    return data?.errorMessage ?? 'Linear actions are unavailable.';
+  }
+  if (observation === 'empty') {
+    return 'Nothing needs Tim.';
+  }
+  return '';
+}
+
+function formatFetchedAt(value: string): string {
+  const diff = Date.now() - new Date(value).getTime();
+  if (!Number.isFinite(diff) || diff < 60_000) return 'just now';
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes === 1) return '1 min ago';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours === 1) return '1 hr ago';
+  return `${hours} hrs ago`;
 }

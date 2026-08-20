@@ -55,7 +55,6 @@ export interface AdminNavRegistryItem {
 }
 
 export const ADMIN_PRIMARY_WORKSPACE_IDS = [
-  'overview',
   'ops',
   'people',
   'growth',
@@ -75,14 +74,6 @@ export const ADMIN_SETTINGS_TOOL_IDS = [
 
 export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
   {
-    id: 'overview',
-    label: 'Overview',
-    href: APP_ROUTES.ADMIN,
-    description:
-      'Health dashboard — one signal per area linking to detail screens',
-    section: 'workspaces',
-  },
-  {
     id: 'chat',
     label: 'Chat',
     href: APP_ROUTES.ADMIN_CHAT,
@@ -91,9 +82,10 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
   },
   {
     id: 'ops',
-    label: 'Ovie',
+    label: 'Ops',
     href: APP_ROUTES.ADMIN_OPS,
-    description: 'One operator HUD — need first, noise below',
+    description:
+      'Canonical company Ops — decisions, survival, bottleneck, delivery',
     section: 'workspaces',
   },
   {
@@ -333,8 +325,8 @@ export const ADMIN_LEGACY_REDIRECT_MAP = {
     href: buildAdminGrowthHref('ingest'),
   },
   [APP_ROUTES.ADMIN_GROWTH_YC_METRICS]: {
-    workspace: 'overview',
-    href: APP_ROUTES.ADMIN,
+    workspace: 'ops',
+    href: APP_ROUTES.HUD,
   },
 } as const;
 

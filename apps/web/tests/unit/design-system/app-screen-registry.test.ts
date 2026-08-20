@@ -83,13 +83,14 @@ describe('authenticated app screen registry', () => {
     }
   });
 
-  it('assigns exactly 46 unique deterministic browser-safe story IDs', () => {
+  it('assigns exactly 45 unique deterministic browser-safe story IDs', () => {
     const references = APP_SCREEN_REGISTRY.filter(
       entry => entry.designReference
     );
     // Source-of-truth pin: the Pen lane must derive this count from the
-    // export receipt, never hardcode it. /app/ov/ops is a redirect to /hud.
-    expect(references).toHaveLength(46);
+    // export receipt, never hardcode it. /app/ov/ops and /app/admin redirect
+    // to /hud.
+    expect(references).toHaveLength(45);
     const storyIds = references.map(entry => {
       expect(entry.story, entry.route).not.toBeNull();
       return entry.story?.id as string;
@@ -159,7 +160,7 @@ describe('authenticated app screen registry', () => {
     expect(receipt.schema).toBe(APP_SCREEN_PEN_EXPORT_SCHEMA);
     expect(receipt.counts).toEqual({
       screens: APP_SCREEN_REGISTRY.length,
-      designReferences: 46,
+      designReferences: 45,
       components: APP_SCREEN_COMPONENT_REGISTRY.length,
       recipes: APP_SCREEN_RECIPE_REGISTRY.length,
     });

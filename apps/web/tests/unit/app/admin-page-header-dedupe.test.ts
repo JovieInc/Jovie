@@ -37,13 +37,13 @@ describe('admin page header dedupe (JOV-3527)', () => {
     expect(source).toContain('DashboardHeader');
   });
 
-  it('keeps Ovie inside AdminPage without a second page-title block', () => {
+  it('keeps Ops inside AdminPage without a second page-title block', () => {
     const source = read(HUD_PAGE);
 
     expect(source).toContain('<AdminPage');
-    expect(source).toContain("title='Ovie'");
+    expect(source).toContain('title={OVIE_OPS_PRODUCT_NAME}');
     expect(source).not.toMatch(
-      /ContentSectionHeader[\s\S]{0,120}title=['"]Ovie['"]/
+      /ContentSectionHeader[\s\S]{0,120}title=['"]Ops['"]/
     );
   });
 

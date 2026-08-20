@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockAuthorizeHud = vi.hoisted(() => vi.fn());
 const mockReadWhatShippedFromDisk = vi.hoisted(() => vi.fn());
+const mockReadWhatShippedFromGitHub = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
 const mockLoggerError = vi.hoisted(() => vi.fn());
 
@@ -17,6 +18,10 @@ vi.mock('@/lib/hud/what-shipped', async importOriginal => {
     readWhatShippedFromDisk: mockReadWhatShippedFromDisk,
   };
 });
+
+vi.mock('@/lib/hud/what-shipped-github', () => ({
+  readWhatShippedFromGitHub: mockReadWhatShippedFromGitHub,
+}));
 
 vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
@@ -83,23 +88,32 @@ describe('GET /api/ops/what-shipped', () => {
     });
   });
 
-  it('returns an empty payload when disk read throws', async () => {
+  it('returns 503 unavailable when disk throws and GitHub is not configured', async () => {
     mockAuthorizeHud.mockResolvedValue({ ok: true, mode: 'admin' });
     mockReadWhatShippedFromDisk.mockRejectedValue(
       new Error('disk read failed')
     );
+    mockReadWhatShippedFromGitHub.mockResolvedValue({
+      generatedAt: null,
+      items: [],
+      available: false,
+      observation: 'not_configured',
+      errorMessage: 'What shipped source is not configured.',
+    });
 
     const { GET } = await import('@/app/api/ops/what-shipped/route');
     const response = await GET(
       new Request('http://localhost:3000/api/ops/what-shipped')
     );
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({
       generatedAt: null,
       items: [],
       available: false,
+      observation: 'unavailable',
+      errorMessage: 'disk read failed',
     });
-    expect(mockCaptureError).toHaveBeenCalled();
+    expect(mockCaptureError).not.toHaveBeenCalled();
   });
 });

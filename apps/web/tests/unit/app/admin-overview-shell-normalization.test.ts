@@ -22,13 +22,13 @@ const ADMIN_LOADING_ROUTE = join(
 );
 const ADMIN_NAV = join(TEST_DIR, '../../../constants/admin-navigation.ts');
 
-describe('admin overview shell normalization (JOV-2525 + JOV-2098)', () => {
-  it('keeps the overview route inside the canonical AdminPage shell', () => {
+describe('admin overview shell normalization (JOV-5256)', () => {
+  it('folds the overview index into canonical Ops at /hud', () => {
     const source = readFileSync(ADMIN_OVERVIEW_ROUTE, 'utf8');
 
-    expect(source).toContain('import { AdminPage }');
-    expect(source).toContain('<AdminPage');
-    expect(source).toContain("testId='admin-overview-page'");
+    expect(source).toContain('redirect(APP_ROUTES.HUD)');
+    expect(source).not.toContain('<AdminPage');
+    expect(source).not.toContain("testId='admin-overview-page'");
   });
 
   it('removes the legacy overview tab toggle and workspace card duplication', () => {
@@ -49,10 +49,10 @@ describe('admin overview shell normalization (JOV-2525 + JOV-2098)', () => {
     expect(source).not.toContain('PageShell');
   });
 
-  it('renders Overview as a health dashboard only (JOV-2098)', () => {
+  it('does not keep a second metrics product on the overview redirect', () => {
     const source = readFileSync(ADMIN_OVERVIEW_ROUTE, 'utf8');
 
-    expect(source).toContain('AdminHealthDashboard');
+    expect(source).not.toContain('AdminHealthDashboard');
     expect(source).not.toContain('AdminScoreboardSection');
     expect(source).not.toContain('AdminKpiSection');
     expect(source).not.toContain('AdminOutreachSection');
@@ -82,9 +82,12 @@ describe('admin nav IA copy (JOV-2098)', () => {
     const source = readFileSync(ADMIN_NAV, 'utf8');
 
     expect(source).toContain(
+      'Canonical company Ops — decisions, survival, bottleneck, delivery'
+    );
+    expect(source).not.toContain(
       'Health dashboard — one signal per area linking to detail screens'
     );
-    expect(source).toContain('One operator HUD — need first, noise below');
+    expect(source).not.toContain('One operator HUD — need first, noise below');
     expect(source).toContain(
       'Acquisition funnel, referral, outreach, and conversion'
     );

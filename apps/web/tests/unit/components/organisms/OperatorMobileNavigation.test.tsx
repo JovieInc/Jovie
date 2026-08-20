@@ -99,13 +99,13 @@ describe('OperatorMobileNavigation', () => {
     const menu = screen.getByRole('navigation', {
       name: 'OV Navigation Menu',
     });
-    expect(within(menu).getByRole('link', { name: 'Overview' })).toHaveFocus();
-
-    await user.tab();
     expect(within(menu).getByRole('link', { name: 'Chat' })).toHaveFocus();
 
     await user.tab();
-    expect(within(menu).getByRole('link', { name: 'Ovie' })).toHaveFocus();
+    expect(within(menu).getByRole('link', { name: 'Ops' })).toHaveFocus();
+
+    await user.tab();
+    expect(within(menu).getByRole('link', { name: 'People' })).toHaveFocus();
 
     await user.keyboard('{Escape}');
     expect(
@@ -131,7 +131,7 @@ describe('OperatorMobileNavigation', () => {
     expect(
       within(
         screen.getByRole('navigation', { name: 'OV Navigation Menu' })
-      ).getByRole('link', { name: 'Overview' })
+      ).getByRole('link', { name: 'Chat' })
     ).toHaveFocus();
 
     pathnameMock.mockReturnValue('/app/ov/ops');
@@ -145,8 +145,8 @@ describe('OperatorMobileNavigation', () => {
     expect(more).not.toHaveFocus();
   });
 
-  it('marks only the nested OV destination current while keeping the root exact-match', async () => {
-    pathnameMock.mockReturnValue(`${APP_ROUTES.ADMIN_OPS}/agents`);
+  it('marks only the exact Ops destination current while keeping Chat nested', async () => {
+    pathnameMock.mockReturnValue(APP_ROUTES.ADMIN_OPS);
     const user = userEvent.setup();
     render(<OperatorMobileNavigation />);
 
@@ -154,10 +154,10 @@ describe('OperatorMobileNavigation', () => {
       name: 'OV Mobile Navigation',
     });
     expect(
-      within(primaryNavigation).getByRole('link', { name: 'Overview' })
+      within(primaryNavigation).getByRole('link', { name: 'Chat' })
     ).not.toHaveAttribute('aria-current');
     expect(
-      within(primaryNavigation).getByRole('link', { name: 'Ovie' })
+      within(primaryNavigation).getByRole('link', { name: 'Ops' })
     ).toHaveAttribute('aria-current', 'page');
     expect(
       primaryNavigation.querySelectorAll('[aria-current="page"]')
@@ -168,10 +168,10 @@ describe('OperatorMobileNavigation', () => {
       name: 'OV Navigation Menu',
     });
     expect(
-      within(expandedNavigation).getByRole('link', { name: 'Overview' })
+      within(expandedNavigation).getByRole('link', { name: 'Chat' })
     ).not.toHaveAttribute('aria-current');
     expect(
-      within(expandedNavigation).getByRole('link', { name: 'Ovie' })
+      within(expandedNavigation).getByRole('link', { name: 'Ops' })
     ).toHaveAttribute('aria-current', 'page');
     expect(
       expandedNavigation.querySelectorAll('[aria-current="page"]')

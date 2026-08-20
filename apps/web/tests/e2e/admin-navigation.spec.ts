@@ -36,7 +36,7 @@ import {
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 
 const ADMIN_PAGES = FAST_ITERATION
-  ? [getAdminSurfaceById('overview')]
+  ? [getAdminSurfaceById('ops')]
   : ADMIN_PRIMARY_NAV_SURFACES;
 
 /**
@@ -261,7 +261,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
   }) => {
     test.setTimeout(120_000);
 
-    await smokeNavigateWithRetry(page, APP_ROUTES.ADMIN, {
+    await smokeNavigateWithRetry(page, APP_ROUTES.ADMIN_PEOPLE, {
       timeout: FAST_ITERATION ? 90_000 : SMOKE_TIMEOUTS.NAVIGATION,
       retries: FAST_ITERATION ? 3 : 2,
     });
@@ -272,7 +272,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
 
-    for (const label of ['Overview', 'People', 'Growth', 'Activity']) {
+    for (const label of ['Chat', 'Ops', 'People', 'Growth', 'Activity']) {
       await expect(
         adminNavSection.getByText(label, { exact: true })
       ).toBeVisible();

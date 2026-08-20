@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   EMPTY_WHAT_SHIPPED_RESPONSE,
   readWhatShippedFromDisk,
+  UNAVAILABLE_WHAT_SHIPPED_RESPONSE,
 } from '@/lib/hud/what-shipped';
 
 describe('readWhatShippedFromDisk', () => {
@@ -56,10 +57,12 @@ describe('readWhatShippedFromDisk', () => {
         },
       ],
       available: true,
+      observation: 'ok',
+      errorMessage: null,
     });
   });
 
-  it('returns empty payload for invalid JSON shape', async () => {
+  it('returns unavailable payload for invalid JSON shape', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'what-shipped-invalid-'));
     const filePath = join(tempDir, 'what_shipped.json');
 
@@ -69,8 +72,9 @@ describe('readWhatShippedFromDisk', () => {
       'utf8'
     );
 
-    await expect(readWhatShippedFromDisk(filePath)).resolves.toEqual(
-      EMPTY_WHAT_SHIPPED_RESPONSE
-    );
+    await expect(readWhatShippedFromDisk(filePath)).resolves.toEqual({
+      ...UNAVAILABLE_WHAT_SHIPPED_RESPONSE,
+      errorMessage: 'What shipped cache is invalid.',
+    });
   });
 });
