@@ -24,6 +24,7 @@ export function TouringContent() {
     <SettingsSection
       id='touring'
       title='Touring'
+      // ui-casing-allow: Bandsintown brand in sentence copy
       description='Connect Bandsintown to display tour dates on your profile.'
     >
       <SettingsTouringSection profileId={artist.id} />

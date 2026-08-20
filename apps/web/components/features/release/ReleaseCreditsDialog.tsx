@@ -76,12 +76,12 @@ export function ReleaseCreditsDialog({
       type='button'
       tone='ghost'
       size='sm'
-      aria-label='View credits'
+      aria-label='View Credits'
       onClick={() => setOpen(true)}
       className='inline-flex w-auto items-center justify-center gap-1.5 px-3.5 text-foreground/80 hover:text-foreground'
     >
       <Icon name='Users' className='h-3.5 w-3.5' aria-hidden='true' />
-      <span>View credits</span>
+      <span>View Credits</span>
     </FrostedButton>
   );
 

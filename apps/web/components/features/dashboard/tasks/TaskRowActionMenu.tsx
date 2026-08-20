@@ -48,7 +48,7 @@ export function TaskRowActionMenu({
         onClick={event => event.stopPropagation()}
         onPointerDown={event => event.stopPropagation()}
         onKeyDown={event => event.stopPropagation()}
-        aria-label='Open task actions'
+        aria-label='Open Task Actions'
         className={getTaskRowActionTriggerClassName({
           visibility,
           selected,

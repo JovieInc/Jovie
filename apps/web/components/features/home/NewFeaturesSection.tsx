@@ -50,7 +50,7 @@ const featureDetails = [
   {
     title: 'Smart deep links',
     description:
-      "Intuitive /listen, /tip paths that work with Instagram's multiple links for seamless navigation.",
+      "Intuitive /listen, /tip paths that work with Instagram's multiple links for seamless navigation.", // ui-casing-allow: Instagram brand in sentence copy
     color: 'teal' as keyof typeof accentColors,
   },
   {
@@ -83,7 +83,7 @@ export function NewFeaturesSection() {
         {/* Section header */}
         <div className='text-center mb-12 sm:mb-16'>
           <h2 className='text-3xl md:text-4xl font-medium tracking-tight text-primary-token'>
-            Sharable profile{' '}
+            Sharable Profile{' '}
             <span className='text-accent-token'>built to convert</span>
           </h2>
           <p className='mt-4 text-base text-secondary-token max-w-xl mx-auto'>

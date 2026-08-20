@@ -1,6 +1,6 @@
 export const USER_SORTABLE_COLUMNS = {
   created: {
-    label: 'Sign up',
+    label: 'Sign Up',
     asc: 'created_asc',
     desc: 'created_desc',
   },

@@ -33,7 +33,7 @@ export function ProblemSection() {
               letterSpacing: 'var(--linear-h2-tracking)',
             }}
           >
-            Built for growth with discipline.{' '}
+            Built For Growth With Discipline.{' '}
             <span className='text-tertiary-token'>Clear value. No fluff.</span>
           </h2>
 

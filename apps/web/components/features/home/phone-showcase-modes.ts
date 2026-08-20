@@ -21,7 +21,7 @@ export const PHONE_SHOWCASE_MODES: readonly PhoneShowcaseModeData[] = [
     id: 'tour',
     headline: 'Show the closest show first.',
     description:
-      'A fan in Los Angeles should not scroll through 30 cities. Jovie surfaces the nearest date and ticket button first.',
+      'A fan in Los Angeles should not scroll through 30 cities. Jovie surfaces the nearest date and ticket button first.', // ui-casing-allow: Los Angeles proper noun in sentence copy
     outcome: 'Sell tickets',
     summary: 'Show the nearest date.',
   },

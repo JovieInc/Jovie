@@ -32,10 +32,10 @@ describe('ChatFeedbackControl', () => {
 
     expect(screen.getByTestId('chat-feedback-control')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Good response' })
+      screen.getByRole('button', { name: 'Good Response' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Bad response' })
+      screen.getByRole('button', { name: 'Bad Response' })
     ).toBeInTheDocument();
   });
 
@@ -53,7 +53,7 @@ describe('ChatFeedbackControl', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Good response' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Good Response' }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     const [url, init] = fetchMock.mock.calls[0];
@@ -79,7 +79,7 @@ describe('ChatFeedbackControl', () => {
 
     renderWithProvider(<ChatFeedbackControl messageId='msg-2' />);
 
-    const downButton = screen.getByRole('button', { name: 'Bad response' });
+    const downButton = screen.getByRole('button', { name: 'Bad Response' });
     fireEvent.click(downButton);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
@@ -100,9 +100,9 @@ describe('ChatFeedbackControl', () => {
 
     renderWithProvider(<ChatFeedbackControl messageId='msg-3' />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Good response' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Good Response' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    fireEvent.click(screen.getByRole('button', { name: 'Bad response' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Bad Response' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
 
     const secondBody = JSON.parse(
@@ -121,7 +121,7 @@ describe('ChatFeedbackControl', () => {
 
     renderWithProvider(<ChatFeedbackControl messageId='msg-4' />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Good response' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Good Response' }));
 
     await waitFor(() =>
       expect(screen.getByTestId('chat-feedback-control')).not.toHaveAttribute(

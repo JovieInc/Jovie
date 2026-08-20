@@ -99,7 +99,7 @@ export function createStatusActionMenuItems(
   if (canResendInvite && resendInvite) {
     items.push({
       id: 'resend-invite',
-      label: 'Resend invite',
+      label: 'Resend Invite',
       icon: <Mail className='h-3.5 w-3.5' />,
       onClick: () => {
         void resendInvite({ id: entry.id });

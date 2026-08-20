@@ -21,7 +21,7 @@ export function NewUpgradeTeaser() {
 
             {/* Heading */}
             <h3 className='text-center text-lg sm:text-xl font-semibold tracking-tight text-primary-token'>
-              Upgrade your release workflow
+              Upgrade Your Release Workflow
             </h3>
 
             {/* Pricing */}

@@ -10,7 +10,7 @@ const LYRIC_LINES = [
 export function LyricsRouteSkeleton() {
   return (
     <section
-      aria-label='Loading lyrics'
+      aria-label='Loading Lyrics'
       aria-busy='true'
       aria-live='polite'
       className='flex h-full min-h-0 flex-col bg-(--linear-app-content-surface)'

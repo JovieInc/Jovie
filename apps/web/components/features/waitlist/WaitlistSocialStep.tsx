@@ -65,7 +65,7 @@ export function WaitlistSocialStep({
   return (
     <>
       <div className={FORM_LAYOUT.headerSection}>
-        <h1 className={FORM_LAYOUT.title}>Where do fans find you?</h1>
+        <h1 className={FORM_LAYOUT.title}>Where Do Fans Find You?</h1>
       </div>
 
       <div>
@@ -149,7 +149,7 @@ export function WaitlistSocialStep({
               onChange={e => onUrlChange(e.target.value)}
               maxLength={2048}
               required
-              aria-label='Social profile username'
+              aria-label='Social Profile Username'
               aria-invalid={Boolean(fieldErrors.primarySocialUrl)}
               aria-describedby={
                 fieldErrors.primarySocialUrl
@@ -157,7 +157,7 @@ export function WaitlistSocialStep({
                   : undefined
               }
               className={AUTH_SURFACE.fieldInput}
-              placeholder='yourusername'
+              placeholder='yourusername' // ui-casing-allow: example username placeholder
               disabled={isSubmitting}
               onKeyDown={handleKeyDown}
             />

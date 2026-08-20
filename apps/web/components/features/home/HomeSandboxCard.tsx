@@ -5,14 +5,14 @@ import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 
 const STATES = [
   {
-    label: 'Tour date',
+    label: 'Tour Date',
     url: 'jov.ie/tim',
     status: 'live',
     detail: 'The Novo, Los Angeles \u00B7 May 17',
     output: '\u2192 Show nearest date, ticket link, full run',
   },
   {
-    label: 'New release',
+    label: 'New Release',
     url: 'jov.ie/tim',
     status: 'live',
     detail: 'Take Me Over \u00B7 Out now',

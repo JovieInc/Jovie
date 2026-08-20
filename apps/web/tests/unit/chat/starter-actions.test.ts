@@ -17,7 +17,7 @@ describe('chat starter action catalog', () => {
     expect(
       CHAT_STARTER_ACTION_ORDER.map(id => CHAT_STARTER_ACTIONS[id].label)
     ).toEqual([
-      'Plan a Release',
+      'Plan A Release',
       'Generate Album Art',
       'Build Artist Profile',
       'Review Signals',

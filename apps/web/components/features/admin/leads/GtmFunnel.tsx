@@ -133,9 +133,9 @@ export async function GtmFunnel({ counts }: GtmFunnelProps) {
         <FunnelStage label='Ingested' count={ingested} isLast />
       </div>
       <div className='mt-1.5 flex flex-wrap gap-4'>
-        <DropOff label='disqualified' count={disqualified} total={discovered} />
+        <DropOff label='Disqualified' count={disqualified} total={discovered} />
         <DropOff
-          label='rejected'
+          label='Rejected'
           count={rejected}
           total={approved + rejected}
         />

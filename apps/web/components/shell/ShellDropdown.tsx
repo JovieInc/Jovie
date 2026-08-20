@@ -386,14 +386,14 @@ function FilterInput({
             }
           }}
           placeholder={placeholder}
-          aria-label='Filter dropdown items'
+          aria-label='Filter Dropdown Items'
           className='system-b-shell-dropdown-filter-input'
         />
         {value ? (
           <button
             type='button'
             onClick={() => onChange('')}
-            aria-label='Clear filter'
+            aria-label='Clear Filter'
             className='system-b-shell-dropdown-filter-clear'
           >
             <X className='h-3 w-3' strokeWidth={2.25} />

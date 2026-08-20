@@ -68,6 +68,7 @@ export function CampaignSettingsPanel() {
     return (
       <SettingsPanel
         title='Growth Defaults'
+        // ui-casing-allow: Admin Growth product name in sentence copy
         description='Set campaign qualification and send pacing defaults. Day-to-day operation lives in Admin Growth.'
       >
         <div className='flex items-center gap-2 px-4 py-4 text-app text-secondary-token sm:px-5'>
@@ -82,6 +83,7 @@ export function CampaignSettingsPanel() {
     return (
       <SettingsPanel
         title='Growth Defaults'
+        // ui-casing-allow: Admin Growth product name in sentence copy
         description='Set campaign qualification and send pacing defaults. Day-to-day operation lives in Admin Growth.'
       >
         <div className='px-4 py-4 text-app text-destructive sm:px-5'>
@@ -101,6 +103,7 @@ export function CampaignSettingsPanel() {
   return (
     <SettingsPanel
       title='Growth Defaults'
+      // ui-casing-allow: Admin Growth product name in sentence copy
       description='Set campaign qualification and send pacing defaults. Day-to-day operation lives in Admin Growth.'
       actions={
         <div className='flex flex-wrap items-center gap-3'>

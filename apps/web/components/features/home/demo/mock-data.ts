@@ -426,7 +426,7 @@ export const SMARTLINK_THREAD: SmartlinkThreadItem[] = [
     id: 'connect',
     iconType: 'link',
     iconColor: '#1DB954',
-    label: 'Spotify connected',
+    label: 'Spotify Connected',
     detail: 'Artist profile linked · 4 releases synced',
     time: '2m ago',
   },
@@ -434,7 +434,7 @@ export const SMARTLINK_THREAD: SmartlinkThreadItem[] = [
     id: 'detect',
     iconType: 'disc',
     iconColor: '#6C7AFF',
-    label: 'New release detected: The Deep End',
+    label: 'New Release Detected: The Deep End',
     detail: 'ISRC matched · artwork downloaded · 14 tracks',
     time: '1m ago',
   },
@@ -442,7 +442,7 @@ export const SMARTLINK_THREAD: SmartlinkThreadItem[] = [
     id: 'generate',
     iconType: 'zap',
     iconColor: '#F5A623',
-    label: 'Smartlink generated — 4 platforms verified',
+    label: 'Smartlink Generated — 4 Platforms Verified', // ui-casing-allow: numeral in title
     detail: 'Spotify · Apple Music · YouTube Music · Amazon Music',
     time: '45s ago',
   },
@@ -450,7 +450,7 @@ export const SMARTLINK_THREAD: SmartlinkThreadItem[] = [
     id: 'publish',
     iconType: 'check',
     iconColor: '#4EC98C',
-    label: 'Links published to jov.ie/novalane/afterglow',
+    label: 'Links Published To Jov.ie/novalane/afterglow', // ui-casing-allow: URL path in title
     time: '32s ago',
   },
 ];
