@@ -39,7 +39,9 @@ async function loadRouteModule() {
 
 describe('GET /api/billing/status', () => {
   beforeEach(() => {
-    vi.resetModules();
+    // Do not resetModules: the route graph (error-tracking + Sentry) takes
+    // multiple seconds to re-evaluate, and the first test times out at 5s
+    // under pre-push shard load. Hoisted mocks are applied at call time.
     vi.clearAllMocks();
     mockGetRedis.mockReturnValue(null);
   });

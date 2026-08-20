@@ -55,6 +55,14 @@ describe('non-actionable Sentry issues', () => {
   });
 
   describe('isNonActionableUpstashErrorBag', () => {
+    it('matches the JOV-5183 Linear/Sentry title', () => {
+      expect(
+        isNonActionableUpstashErrorBag({
+          title: `Error: ${UPSTASH_ERROR_JSON_BAG}`,
+        })
+      ).toBe(true);
+    });
+
     it('matches the JOV-5209 Linear/Sentry title', () => {
       expect(
         isNonActionableUpstashErrorBag({
@@ -152,6 +160,22 @@ describe('non-actionable Sentry issues', () => {
       expect(
         isNonActionableUpstashErrorBagEvent({
           title: JOV_5185_TITLE,
+        })
+      ).toBe(true);
+    });
+
+    it('matches a JOV-5183 extra bag stored under a non-standard key', () => {
+      expect(
+        isNonActionableUpstashErrorBagEvent({
+          exception: {
+            values: [
+              {
+                type: 'Error',
+                value: 'Non-Error exception captured with keys: error',
+              },
+            ],
+          },
+          extra: { ctx: { error: { name: 'UpstashError' } } },
         })
       ).toBe(true);
     });
