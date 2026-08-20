@@ -10,6 +10,12 @@
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
+import { buildSlackFeedbackNotification } from './slack-feedback-message';
+
+export {
+  FEEDBACK_SLACK_MAX_CHARS,
+  redactFeedbackMessageForSlack,
+} from './slack-feedback-message';
 
 export interface SlackMessage {
   text: string;
@@ -323,18 +329,8 @@ export async function notifySlackWaitlist(
   return result;
 }
 
-export const FEEDBACK_SLACK_MAX_CHARS = 280;
-const EMAIL_IN_TEXT = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
-
-export function redactFeedbackMessageForSlack(message: string): string {
-  const redacted = message.replace(EMAIL_IN_TEXT, '[REDACTED_EMAIL]');
-  if (redacted.length <= FEEDBACK_SLACK_MAX_CHARS) return redacted;
-  return `${redacted.slice(0, FEEDBACK_SLACK_MAX_CHARS)}…`;
-}
-
 /**
  * Send a feedback submission notification to Slack.
- * Email and other raw identifiers stay out of this sink (JOV-5238).
  */
 export async function notifySlackFeedbackSubmission(params: {
   message: string;
@@ -342,43 +338,7 @@ export async function notifySlackFeedbackSubmission(params: {
   source: string;
   pathname?: string | null;
 }): Promise<SlackNotificationResult> {
-  const text = `💬 ${params.name} submitted feedback`;
-  const contextLine = [
-    `Source: ${params.source}`,
-    params.pathname ? `Path: ${params.pathname}` : null,
-  ]
-    .filter(Boolean)
-    .join('  •  ');
-  const safeMessage = redactFeedbackMessageForSlack(params.message);
-
-  const message: SlackMessage = {
-    text,
-    blocks: [
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `💬 *${params.name}* submitted feedback`,
-        },
-      },
-      {
-        type: 'context',
-        elements: [
-          {
-            type: 'mrkdwn',
-            text: contextLine,
-          },
-        ],
-      },
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `> ${safeMessage}`,
-        },
-      },
-    ],
-  };
+  const message = buildSlackFeedbackNotification(params);
 
   const result = await sendSlackMessage(message);
   if (result.status === 'sent') {

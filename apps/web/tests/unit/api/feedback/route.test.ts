@@ -98,6 +98,9 @@ describe('POST /api/feedback', () => {
       source: 'dashboard',
       pathname: null,
     });
+    expect(
+      mockNotifySlackFeedbackSubmission.mock.calls[0]?.[0]
+    ).not.toHaveProperty('email');
   });
 
   it('persists opportunity inbox rating metadata in feedback context', {

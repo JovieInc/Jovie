@@ -51,6 +51,9 @@ describe('submitChatFeedback', () => {
       source: 'chat',
       pathname: '/app',
     });
+    expect(
+      mockNotifySlackFeedbackSubmission.mock.calls[0]?.[0]
+    ).not.toHaveProperty('email');
   });
 
   it('returns failure when persistence fails', async () => {
