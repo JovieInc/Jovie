@@ -3,9 +3,20 @@
  * Keep loading skeleton, ChatInput defaults, and live surface in lockstep.
  */
 
+import {
+  CHAT_DOOR_COMPOSER_PLACEHOLDER,
+  composerPlaceholderForChatDoor,
+} from '@/lib/chat/ovie-door';
+
 /** Empty-state placeholder — product voice, brand casing allowed. */
 export const CHAT_COMPOSER_EMPTY_PLACEHOLDER =
-  'Ask Jovie to plan your next release...';
+  CHAT_DOOR_COMPOSER_PLACEHOLDER.jovie;
+
+/** OV talk-door placeholder — never leak Jovie copy onto Ovie chrome. */
+export const CHAT_COMPOSER_OV_EMPTY_PLACEHOLDER =
+  CHAT_DOOR_COMPOSER_PLACEHOLDER.ovie;
+
+export { composerPlaceholderForChatDoor };
 
 /** Form region accessible name (Title Case product UI). */
 export const CHAT_COMPOSER_FORM_ARIA_LABEL =

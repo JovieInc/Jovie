@@ -33,6 +33,8 @@ export const GLYPH_SHIFT = String.fromCodePoint(0x21e7);
 export const GLYPH_ARROW_RIGHT = String.fromCodePoint(0x2192);
 export const WORKSPACE_SWITCH_KEY = 'w';
 export const WORKSPACE_SWITCH_SHORTCUT_KEY = 'Alt+Shift+w';
+export const OVIE_DOOR_TOGGLE_KEY = 'o';
+export const OVIE_DOOR_TOGGLE_SHORTCUT_KEY = 'Meta+o';
 
 /**
  * Shipping gate — every shortcut must declare its status before merge.
@@ -98,6 +100,21 @@ export const WORKSPACE_SWITCH_SHORTCUT: KeyboardShortcut = {
   description: 'Switch the active workspace',
   category: 'actions',
   shortcutKey: WORKSPACE_SWITCH_SHORTCUT_KEY,
+  decision: { status: 'required', binding: 'useGlobalShortcutActions' },
+};
+
+/**
+ * Admin-only Ovie/Jovie talk-door binding. Stays outside the public catalog
+ * so customer help surfaces cannot reveal Ovie.
+ */
+export const OVIE_DOOR_TOGGLE_SHORTCUT: KeyboardShortcut = {
+  id: 'toggle-ovie-door',
+  label: 'Switch Ovie / Jovie',
+  keys: `${GLYPH_CMD} O`,
+  description: 'Toggle the founder chat door',
+  category: 'actions',
+  icon: MessageCircle,
+  shortcutKey: OVIE_DOOR_TOGGLE_SHORTCUT_KEY,
   decision: { status: 'required', binding: 'useGlobalShortcutActions' },
 };
 
@@ -374,6 +391,14 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     decision: { status: 'required', binding: 'ContextMenuOverlay' },
   },
 ];
+
+export function getDiscoverableShortcuts(
+  entitled: boolean
+): readonly KeyboardShortcut[] {
+  return entitled
+    ? [...KEYBOARD_SHORTCUTS, OVIE_DOOR_TOGGLE_SHORTCUT]
+    : KEYBOARD_SHORTCUTS;
+}
 
 /**
  * Map from nav item ID to shortcut for quick lookup

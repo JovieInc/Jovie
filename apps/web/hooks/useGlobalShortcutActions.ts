@@ -6,6 +6,7 @@
  *
  *   - Alt+T        → cycle theme (next-themes via useThemeToggle)
  *   - Alt+Shift+Q  → Clerk sign-out
+ *   - Cmd/Ctrl+O   → toggle Ovie/Jovie talk door (entitled only)
  *
  * Sequential nav (G then X), Cmd+/, Cmd+B, Cmd+K all live in their own
  * hooks. This hook is mounted once inside `KeyboardShortcutsHandler` so the
@@ -24,7 +25,11 @@ import {
   getCurrentAppShellWorkspace,
   getNextAppShellWorkspace,
 } from '@/lib/app-shell/workspaces';
-import { WORKSPACE_SWITCH_KEY } from '@/lib/keyboard-shortcuts';
+import { resolveEntitledOvieDoorHref } from '@/lib/chat/ovie-door';
+import {
+  OVIE_DOOR_TOGGLE_KEY,
+  WORKSPACE_SWITCH_KEY,
+} from '@/lib/keyboard-shortcuts';
 import { isFormElement } from '@/lib/utils/keyboard';
 
 export function useGlobalShortcutActions() {
@@ -83,6 +88,30 @@ export function useGlobalShortcutActions() {
       if (!nextWorkspace) return;
       e.preventDefault();
       router.push(nextWorkspace.href);
+    }
+    globalThis.addEventListener('keydown', onKey);
+    return () => globalThis.removeEventListener('keydown', onKey);
+  }, [isAdmin, pathname, router]);
+
+  // Cmd/Ctrl+O → toggle Ovie/Jovie talk door. Entitled app-shell only so
+  // customer Cmd+O (Open) is left alone. Modifier chords may fire in the
+  // composer; a label-only switch is not a door flip.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.isComposing) return;
+      const hasPrimaryModifier = e.metaKey || e.ctrlKey;
+      if (!hasPrimaryModifier || e.altKey || e.shiftKey) return;
+      if (e.metaKey && e.ctrlKey) return;
+      if (e.code !== 'KeyO' && e.key.toLowerCase() !== OVIE_DOOR_TOGGLE_KEY) {
+        return;
+      }
+      const href = resolveEntitledOvieDoorHref({
+        entitled: isAdmin,
+        pathname,
+      });
+      if (!href) return;
+      e.preventDefault();
+      router.push(href);
     }
     globalThis.addEventListener('keydown', onKey);
     return () => globalThis.removeEventListener('keydown', onKey);

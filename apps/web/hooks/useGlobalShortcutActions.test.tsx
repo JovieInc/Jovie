@@ -215,4 +215,80 @@ describe('useGlobalShortcutActions (JOV-1827)', () => {
 
     expect(push).not.toHaveBeenCalled();
   });
+
+  it('toggles an entitled user from Jovie chat to Ovie chat on Cmd+O', () => {
+    shortcutState.isAdmin = true;
+    shortcutState.pathname = '/app/chat';
+    push.mockClear();
+    render(<Probe />);
+
+    fireEvent.keyDown(window, { key: 'o', code: 'KeyO', metaKey: true });
+
+    expect(push).toHaveBeenCalledWith('/app/ov/chat');
+  });
+
+  it('toggles an entitled user from Ovie chat back to Jovie chat on Ctrl+O', () => {
+    shortcutState.isAdmin = true;
+    shortcutState.pathname = '/app/ov/chat';
+    push.mockClear();
+    render(<Probe />);
+
+    fireEvent.keyDown(window, { key: 'o', code: 'KeyO', ctrlKey: true });
+
+    expect(push).toHaveBeenCalledWith('/app/chat');
+  });
+
+  it('does not expose the Ovie door to users who are not entitled', () => {
+    shortcutState.isAdmin = false;
+    shortcutState.pathname = '/app/chat';
+    push.mockClear();
+    render(<Probe />);
+
+    fireEvent.keyDown(window, {
+      key: 'o',
+      code: 'KeyO',
+      metaKey: true,
+    });
+
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('toggles the Ovie door from the composer for entitled users', () => {
+    shortcutState.isAdmin = true;
+    shortcutState.pathname = '/app/chat';
+    push.mockClear();
+    const { container } = render(
+      <>
+        <textarea />
+        <Probe />
+      </>
+    );
+    const composer = container.querySelector('textarea')!;
+    composer.focus();
+    fireEvent.keyDown(composer, { key: 'o', code: 'KeyO', metaKey: true });
+
+    expect(push).toHaveBeenCalledWith('/app/ov/chat');
+  });
+
+  it('does not toggle the Ovie door with extra modifiers', () => {
+    shortcutState.isAdmin = true;
+    shortcutState.pathname = '/app/chat';
+    push.mockClear();
+    render(<Probe />);
+
+    fireEvent.keyDown(window, {
+      key: 'o',
+      code: 'KeyO',
+      metaKey: true,
+      shiftKey: true,
+    });
+    fireEvent.keyDown(window, {
+      key: 'o',
+      code: 'KeyO',
+      metaKey: true,
+      altKey: true,
+    });
+
+    expect(push).not.toHaveBeenCalled();
+  });
 });

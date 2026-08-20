@@ -5,6 +5,7 @@
  * bound here; factory gbrain-write / Symphony heal fail closed.
  */
 
+import { assertChatDoorOwnsPack, chatDoorFromMode } from '@/lib/chat/ovie-door';
 import {
   assertEveChatFactoryLock,
   bindEveIdentityForChatMode,
@@ -27,6 +28,7 @@ export async function prepareOvieChatTurn(
 }> {
   const eveTurn = bindEveIdentityForChatMode(chatMode);
   assertEveChatFactoryLock(eveTurn);
+  assertChatDoorOwnsPack(chatDoorFromMode(chatMode), eveTurn.pack.id);
   const receipts = eveTurn.pack.canIngestAck
     ? await applyOvieDumpBeforeModel(userText, {
         spawn: options?.spawn,

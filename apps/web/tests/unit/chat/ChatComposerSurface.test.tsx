@@ -101,11 +101,13 @@ function renderComposer({
   pendingFiles = [],
   onSubmit = vi.fn(),
   onFileAttach = vi.fn(),
+  placeholder,
 }: {
   readonly value?: string;
   readonly pendingFiles?: PendingFile[];
   readonly onSubmit?: ReturnType<typeof vi.fn>;
   readonly onFileAttach?: ReturnType<typeof vi.fn>;
+  readonly placeholder?: string;
 } = {}) {
   const client = new QueryClient({
     defaultOptions: {
@@ -129,6 +131,7 @@ function renderComposer({
       <TooltipProvider>
         <ChatComposerSurface
           chatInputProps={chatInputProps}
+          placeholder={placeholder}
           showThreadView={false}
           isRateLimited={false}
           showManifest={false}
@@ -166,6 +169,14 @@ describe('ChatComposerSurface accessibility states', () => {
     expect(
       screen.getByRole('textbox', { name: 'Chat Message Input' })
     ).toHaveAttribute('placeholder', 'Ask Jovie to plan your next release...');
+  });
+
+  it('does not leave Jovie composer copy on the Ovie door', () => {
+    renderComposer({ placeholder: 'Ask Ovie...' });
+
+    expect(
+      screen.getByRole('textbox', { name: 'Chat Message Input' })
+    ).toHaveAttribute('placeholder', 'Ask Ovie...');
   });
 
   it('renders stable empty-state controls with an attach tooltip', async () => {

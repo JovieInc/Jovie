@@ -13,10 +13,12 @@ import {
 import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import { ChatThreadNavigationRail } from '@/components/features/chat/navigation-rail';
 import { track } from '@/lib/analytics';
+import { chatDoorFromMode } from '@/lib/chat/ovie-door';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 import { useAppFlag } from '@/lib/flags/client';
 import { usePendingOpportunityCardsQuery, usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import { composerPlaceholderForChatDoor } from './chat-composer-copy';
 import { deriveChatRailContextTargets } from './chat-context-rail';
 import { resolveChatEmptyStateAffordance } from './chat-empty-state-contract';
 import { ChatDropZoneOverlay } from './components/ChatDropZoneOverlay';
@@ -649,6 +651,7 @@ export function JovieChat({
   const composerSurface = (
     <ChatComposerSurface
       chatInputProps={chatInputProps}
+      placeholder={composerPlaceholderForChatDoor(chatDoorFromMode(chatMode))}
       showThreadView={showThreadView}
       isRateLimited={isRateLimited}
       showManifest={showManifest}

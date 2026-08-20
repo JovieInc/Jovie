@@ -28,6 +28,7 @@ import type { ChatError, MessagePart } from './types';
 
 interface ChatComposerSurfaceProps {
   readonly chatInputProps: ChatInputProps;
+  readonly placeholder?: string;
   readonly showThreadView: boolean;
   readonly isRateLimited: boolean;
   readonly showManifest: boolean;
@@ -51,6 +52,7 @@ interface ChatComposerSurfaceProps {
 
 export function ChatComposerSurface({
   chatInputProps,
+  placeholder = CHAT_COMPOSER_EMPTY_PLACEHOLDER,
   showThreadView,
   isRateLimited,
   showManifest,
@@ -111,7 +113,7 @@ export function ChatComposerSurface({
 
       <ChatInput
         {...chatInputProps}
-        placeholder={CHAT_COMPOSER_EMPTY_PLACEHOLDER} // ui-casing-allow: brand placeholder
+        placeholder={placeholder} // ui-casing-allow: brand placeholder
         variant={showThreadView ? 'compact' : 'hero'}
       />
     </div>

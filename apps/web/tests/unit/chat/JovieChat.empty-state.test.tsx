@@ -241,6 +241,19 @@ describe('JovieChat empty state', () => {
     expect(queryByText('Release link')).toBeNull();
   });
 
+  it('does not leave Jovie composer copy on the Ovie door', () => {
+    const { getByTestId } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' chatMode='ov' />
+    );
+
+    expect(getByTestId('chat-input').getAttribute('data-placeholder')).toBe(
+      'Ask Ovie...'
+    );
+    expect(
+      getByTestId('chat-input').getAttribute('data-placeholder')
+    ).not.toMatch(/Jovie/i);
+  });
+
   it('renders the canonical starter-actions rail without the legacy card map', () => {
     renderWithQueryClient(
       <JovieChat

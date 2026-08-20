@@ -10,10 +10,11 @@ import {
   SheetTitle,
 } from '@jovie/ui';
 import { ChevronLeft, Search, X } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useMemo, useRef, useState } from 'react';
+import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { useKeyboardShortcuts } from '@/contexts/KeyboardShortcutsContext';
 import {
-  KEYBOARD_SHORTCUTS,
+  getDiscoverableShortcuts,
   type KeyboardShortcut,
   SHORTCUT_CATEGORY_LABELS,
   type ShortcutCategory,
@@ -105,23 +106,26 @@ function ShortcutCategorySection({
  */
 export function KeyboardShortcutsSheet() {
   const { isOpen, close } = useKeyboardShortcuts();
+  const dashboardData = useContext(DashboardDataContext);
+  const isAdmin = dashboardData?.isAdmin ?? false;
   const [searchQuery, setSearchQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const catalog = useMemo(() => getDiscoverableShortcuts(isAdmin), [isAdmin]);
 
   // Filter shortcuts based on search query
   const filteredShortcuts = useMemo(() => {
     if (!searchQuery.trim()) {
-      return KEYBOARD_SHORTCUTS;
+      return catalog;
     }
 
     const query = searchQuery.toLowerCase();
-    return KEYBOARD_SHORTCUTS.filter(
+    return catalog.filter(
       shortcut =>
         shortcut.label.toLowerCase().includes(query) ||
         shortcut.keys.toLowerCase().includes(query) ||
         shortcut.description?.toLowerCase().includes(query)
     );
-  }, [searchQuery]);
+  }, [catalog, searchQuery]);
 
   // Group filtered shortcuts by category
   const groupedShortcuts = useMemo(() => {

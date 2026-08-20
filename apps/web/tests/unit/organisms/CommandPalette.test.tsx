@@ -375,6 +375,48 @@ describe('CommandPalette', () => {
 
     expect(screen.queryByText('Switch to OV')).not.toBeInTheDocument();
     expect(screen.queryByText('Switch to Jovie')).not.toBeInTheDocument();
+    expect(screen.queryByText('Switch to Ovie chat')).not.toBeInTheDocument();
+    expect(screen.queryByText('Switch to Jovie chat')).not.toBeInTheDocument();
+  });
+
+  it('shows the entitled Ovie door action and its shortcut', () => {
+    pathnameMock.mockReturnValue('/app/chat');
+    render(withDashboard(<CommandPalette />, true));
+    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+
+    const action = screen
+      .getAllByRole('option')
+      .find(el => el.textContent?.includes('Switch to Ovie chat'));
+    expect(action).toBeDefined();
+    expect(action).toHaveTextContent('⌘ O');
+  });
+
+  it('routes the entitled Ovie door action to OV chat', () => {
+    pushMock.mockClear();
+    pathnameMock.mockReturnValue('/app/chat');
+    render(withDashboard(<CommandPalette />, true));
+    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+
+    const action = screen
+      .getAllByRole('option')
+      .find(el => el.textContent?.includes('Switch to Ovie chat'));
+    fireEvent.mouseDown(action!);
+
+    expect(pushMock).toHaveBeenCalledWith('/app/ov/chat');
+  });
+
+  it('routes the entitled Ovie door action from OV chat back to Jovie chat', () => {
+    pushMock.mockClear();
+    pathnameMock.mockReturnValue('/app/ov/chat');
+    render(withDashboard(<CommandPalette />, true));
+    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+
+    const action = screen
+      .getAllByRole('option')
+      .find(el => el.textContent?.includes('Switch to Jovie chat'));
+    fireEvent.mouseDown(action!);
+
+    expect(pushMock).toHaveBeenCalledWith('/app/chat');
   });
 
   it('routes a recent-chat commit to the chat route', () => {

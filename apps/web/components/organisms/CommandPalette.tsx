@@ -35,13 +35,21 @@ import {
   getCurrentAppShellWorkspace,
   getNextAppShellWorkspace,
 } from '@/lib/app-shell/workspaces';
+import {
+  hrefForChatDoor,
+  resolveChatDoorFromPathname,
+  toggleEntitledChatDoor,
+} from '@/lib/chat/ovie-door';
 import type { EntityRef } from '@/lib/commands/entities';
 import {
   getPaletteConversationSubtitle,
   rankPaletteConversations,
 } from '@/lib/commands/palette-ranking';
 import type { NavCommand } from '@/lib/commands/registry';
-import { WORKSPACE_SWITCH_SHORTCUT } from '@/lib/keyboard-shortcuts';
+import {
+  OVIE_DOOR_TOGGLE_SHORTCUT,
+  WORKSPACE_SWITCH_SHORTCUT,
+} from '@/lib/keyboard-shortcuts';
 import { useChatConversationsQuery } from '@/lib/queries';
 import { isFormElement } from '@/lib/utils/keyboard';
 import { OPEN_COMMAND_PALETTE_EVENT } from './command-palette-events';
@@ -171,6 +179,31 @@ function CommandPaletteInner({
           items: [{ kind: 'nav', nav }],
         });
       }
+      const currentDoor = resolveChatDoorFromPathname(pathname);
+      const nextDoor = toggleEntitledChatDoor({
+        entitled: true,
+        current: currentDoor,
+      });
+      if (nextDoor) {
+        const nav: NavCommand = {
+          kind: 'nav',
+          id: 'toggle-ovie-door',
+          label:
+            nextDoor === 'ovie'
+              ? 'Switch to Ovie chat'
+              : 'Switch to Jovie chat',
+          description: 'Toggle the founder chat door.',
+          iconName: 'MessageCircle',
+          surfaces: ['cmdk'],
+          href: hrefForChatDoor(nextDoor),
+          shortcutLabel: OVIE_DOOR_TOGGLE_SHORTCUT.keys,
+        };
+        sections.push({
+          id: 'ovie-door-actions',
+          label: 'Chat',
+          items: [{ kind: 'nav', nav }],
+        });
+      }
     }
     if (conversations && conversations.length > 0) {
       const currentConversationId = getCurrentConversationId(pathname);
@@ -217,6 +250,14 @@ function CommandPaletteInner({
           currentWorkspace.id
         );
         if (nextWorkspace) router.push(nextWorkspace.href);
+        return;
+      }
+      if (id === 'toggle-ovie-door') {
+        const nextDoor = toggleEntitledChatDoor({
+          entitled: true,
+          current: resolveChatDoorFromPathname(pathname),
+        });
+        if (nextDoor) router.push(hrefForChatDoor(nextDoor));
       }
     },
     [pathname, router]

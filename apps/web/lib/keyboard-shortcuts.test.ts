@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  getDiscoverableShortcuts,
   KEYBOARD_SHORTCUTS,
   NAV_SHORTCUTS,
+  OVIE_DOOR_TOGGLE_SHORTCUT,
   SHORTCUT_CATEGORY_LABELS,
   type ShortcutCategory,
   WORKSPACE_SWITCH_SHORTCUT,
@@ -196,6 +198,23 @@ describe('keyboard-shortcuts definitions', () => {
       );
       expect(WORKSPACE_SWITCH_SHORTCUT.shortcutKey).toBe('Alt+Shift+w');
       expect(WORKSPACE_SWITCH_SHORTCUT.decision).toEqual({
+        status: 'required',
+        binding: 'useGlobalShortcutActions',
+      });
+    });
+
+    it('keeps the Ovie door binding out of the public catalog and in entitled help', () => {
+      expect(KEYBOARD_SHORTCUTS.some(s => s.id === 'toggle-ovie-door')).toBe(
+        false
+      );
+      expect(
+        getDiscoverableShortcuts(false).some(s => s.id === 'toggle-ovie-door')
+      ).toBe(false);
+      expect(getDiscoverableShortcuts(true)).toContain(
+        OVIE_DOOR_TOGGLE_SHORTCUT
+      );
+      expect(OVIE_DOOR_TOGGLE_SHORTCUT.shortcutKey).toBe('Meta+o');
+      expect(OVIE_DOOR_TOGGLE_SHORTCUT.decision).toEqual({
         status: 'required',
         binding: 'useGlobalShortcutActions',
       });

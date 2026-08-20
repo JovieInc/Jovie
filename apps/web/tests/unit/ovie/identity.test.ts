@@ -61,6 +61,7 @@ describe('Eve identity packs (JOV-5216)', () => {
   it('binds ov chat mode through the same entry as the chat route', async () => {
     expect(bindEveIdentityForChatMode('ov').pack.id).toBe('ovie');
     expect(bindEveIdentityForChatMode(null).pack.id).toBe('jovie');
+    expect(bindEveIdentityForChatMode('ov').pack.id).not.toBe('jovie');
     expect(
       (
         await prepareOvieChatTurn('ov', null, {
