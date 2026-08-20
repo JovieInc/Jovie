@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { readOvieReceiptLog, resetOvieIngestLog } from '@/lib/ovie/ingest';
+import {
+  DEST_LINEAR,
+  OVIE_QUEUED_ACK,
+  readOvieLinearRoutes,
+  readOvieReceiptLog,
+  resetOvieIngestLog,
+} from '@/lib/ovie/ingest';
 import { MemoryOperatingStore } from '@/lib/ovie/mcp/store';
 import { applyOvieDump } from '@/lib/ovie/persist';
 import {
@@ -16,6 +22,7 @@ import {
   PROMOTED_DUMP_ACK_CONTRACT,
   PROMOTED_DUMP_ACK_VERSION_ID,
   PROMOTED_DUMP_ACK_WORKFLOW_ID,
+  persistPromotedDumpAckReceipts,
   resetPromotedDumpAckRuntime,
   SUMMER_WORKFLOW_INVENTORY,
 } from '@/lib/ovie/promoted-workflows';
@@ -124,7 +131,31 @@ describe('Summer workflow promotion (JOV-5217)', () => {
     ).toBe(true);
     expect(receipt.items.some(item => item.lane === 'engineering')).toBe(true);
     expect(readOvieReceiptLog()).toHaveLength(2);
+    expect(readOvieLinearRoutes()).toEqual([]);
     expect(listPromotedDumpAckReceipts()[0]).toEqual(receipt);
+  });
+
+  it('does not Linear-route or dispatch Symphony for engineering persist', () => {
+    const linearReceipt = {
+      text: 'Jovie signup returns 500 on /start',
+      lane: 'engineering' as const,
+      destination: DEST_LINEAR,
+      ack: OVIE_QUEUED_ACK,
+      destinationHandle: null,
+      workerSpawned: false as const,
+    };
+
+    expect(() => persistPromotedDumpAckReceipts([linearReceipt])).not.toThrow();
+    expect(readOvieLinearRoutes()).toEqual([]);
+    expect(readOvieReceiptLog()).toEqual([linearReceipt]);
+
+    const receipt = executePromotedDumpAck({
+      workId: 'work_eng_linear',
+      items: ['Jovie signup returns 500 on /start'],
+    });
+    expect(receipt.status).toBe('completed');
+    expect(receipt.eveInvokedSymphony).toBe(false);
+    expect(readOvieLinearRoutes()).toEqual([]);
   });
 
   it('is idempotent on duplicate work/sequence and ignores out-of-order replay', () => {
