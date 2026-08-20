@@ -1,21 +1,13 @@
 'use client';
 
 import {
-  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  AlertCircle,
-  Archive,
-  Check,
-  Copy,
-  Ellipsis,
-  RefreshCw,
-} from 'lucide-react';
+import { Archive, Check, Copy, Ellipsis } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChatEntityPanelProvider } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
@@ -37,12 +29,18 @@ import {
 } from '@/components/jovie/starter-actions';
 import type { ChatActionCard } from '@/components/jovie/types';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { RECOVERY_COPY } from '@/features/feedback/recovery-contract';
 import { useClipboard } from '@/hooks/useClipboard';
+import {
+  buildChatThreadRoute,
+  isChatThreadSurfacePath,
+  syncChatThreadUrlWithoutNavigation,
+} from '@/lib/chat/sync-chat-thread-url';
 import { env } from '@/lib/env-client';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
@@ -233,7 +231,7 @@ function ChatTitleBadge({ title }: { readonly title: string }) {
   );
 }
 
-interface ChatProfileFallbackProps {
+export interface ChatProfileFallbackProps {
   readonly needsOnboarding: boolean;
   readonly dashboardLoadError: unknown;
   readonly isProfileSetupRace: boolean;
@@ -242,7 +240,7 @@ interface ChatProfileFallbackProps {
   readonly onRetry: () => void;
 }
 
-function ChatProfileFallback({
+export function ChatProfileFallback({
   needsOnboarding,
   dashboardLoadError,
   isProfileSetupRace,
@@ -273,43 +271,42 @@ function ChatProfileFallback({
     ? 'Finishing your dashboard setup…'
     : 'We hit a problem loading your profile. Please retry in a moment.';
 
+  if (!isProfileSetupRace) {
+    return (
+      <ChatWorkspaceSurface>
+        <div className='flex h-full items-center justify-center p-6'>
+          <EmptyState
+            heading={profileMessage}
+            variant='error'
+            action={{
+              label: RECOVERY_COPY.retryLabel,
+              onClick: onRetry,
+              variant: 'secondary',
+            }}
+            testId='chat-profile-error-state'
+          />
+        </div>
+      </ChatWorkspaceSurface>
+    );
+  }
+
   return (
     <ChatWorkspaceSurface>
       <div className='flex h-full items-center justify-center p-6'>
         <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
-          {isProfileSetupRace ? (
-            <>
-              <div
-                className='h-8 w-8 rounded-full skeleton motion-reduce:animate-none'
-                aria-hidden='true'
-              />
-              <div
-                className='h-4 w-48 rounded skeleton motion-reduce:animate-none'
-                aria-hidden='true'
-              />
-              {canAutoRetry && (
-                <div
-                  className='h-3 w-60 rounded skeleton motion-reduce:animate-none'
-                  aria-hidden='true'
-                />
-              )}
-            </>
-          ) : (
-            <AlertCircle className='h-8 w-8 text-tertiary-token' />
-          )}
-          {!isProfileSetupRace && (
-            <>
-              <p className='text-sm text-secondary-token'>{profileMessage}</p>
-              <Button
-                onClick={onRetry}
-                variant='secondary'
-                size='sm'
-                className='gap-2'
-              >
-                <RefreshCw className='h-4 w-4' />
-                {RECOVERY_COPY.retryLabel}
-              </Button>
-            </>
+          <div
+            className='h-8 w-8 rounded-full skeleton motion-reduce:animate-none'
+            aria-hidden='true'
+          />
+          <div
+            className='h-4 w-48 rounded skeleton motion-reduce:animate-none'
+            aria-hidden='true'
+          />
+          {canAutoRetry && (
+            <div
+              className='h-3 w-60 rounded skeleton motion-reduce:animate-none'
+              aria-hidden='true'
+            />
           )}
         </ContentSurfaceCard>
       </div>
@@ -557,26 +554,18 @@ export function ChatPageClient({
       newConversationId: string,
       phase: 'reserved' | 'completed' = 'completed'
     ) => {
-      const nextRoute = `${APP_ROUTES.CHAT}/${encodeURIComponent(newConversationId)}`;
+      const nextRoute = buildChatThreadRoute(newConversationId);
       const currentPath = globalThis.location?.pathname;
 
-      if (currentPath === APP_ROUTES.CHAT) {
-        globalThis.history?.replaceState(
-          globalThis.history.state,
-          '',
-          nextRoute
-        );
+      // Stay on the live chat tree. Next's patched history.replaceState treats
+      // `/app/chat` → `/app/chat/{id}` as navigation and remounts the page;
+      // Electron then drops the composer/transcript once the answer starts.
+      if (isChatThreadSurfacePath(currentPath)) {
+        syncChatThreadUrlWithoutNavigation(newConversationId, currentPath);
+        return;
       }
 
-      // New chats reserve the final URL with history.replaceState as soon as
-      // the server acknowledges the turn. A second router.replace on stream
-      // completion remounts the chat surface and can let stale refetch data
-      // replace the settled local timeline.
-      if (
-        phase === 'completed' &&
-        currentPath !== APP_ROUTES.CHAT &&
-        currentPath !== nextRoute
-      ) {
+      if (phase === 'completed' && currentPath !== nextRoute) {
         router.replace(nextRoute, {
           scroll: false,
         });
@@ -957,21 +946,16 @@ export function ChatPageClient({
         fallback={
           <ChatWorkspaceSurface>
             <div className='flex h-full items-center justify-center p-6'>
-              <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
-                <AlertCircle className='h-8 w-8 text-tertiary-token' />
-                <p className='text-sm text-secondary-token'>
-                  Something went wrong loading chat. Please try again.
-                </p>
-                <Button
-                  onClick={() => router.refresh()}
-                  variant='secondary'
-                  size='sm'
-                  className='gap-2'
-                >
-                  <RefreshCw className='h-4 w-4' />
-                  Retry
-                </Button>
-              </ContentSurfaceCard>
+              <EmptyState
+                heading='Something went wrong loading chat. Please try again.'
+                variant='error'
+                action={{
+                  label: 'Retry',
+                  onClick: () => router.refresh(),
+                  variant: 'secondary',
+                }}
+                testId='chat-error-state'
+              />
             </div>
           </ChatWorkspaceSurface>
         }

@@ -11,6 +11,9 @@ describe('Spinner', () => {
     expect(spinner).toHaveAttribute('aria-label', 'Loading');
     expect(spinner).toHaveAttribute('data-size', 'md');
     expect(spinner).toHaveAttribute('data-tone', 'primary');
+    expect(spinner).toHaveAttribute('data-state', 'loading');
+    expect(spinner).toHaveAttribute('aria-live', 'polite');
+    expect(spinner.tagName).toBe('SPAN');
   });
 
   it('applies size classes', () => {
@@ -31,6 +34,8 @@ describe('Spinner', () => {
     const spinner = screen.getByRole('status');
     const animated = spinner.querySelector('.border-t-transparent');
     expect(animated).toHaveClass('animate-spin');
+    expect(animated).toHaveAttribute('data-part', 'indicator');
+    expect(spinner.querySelector('[data-part="track"]')).toBeInTheDocument();
   });
 
   it('renders a static ring under reduced motion', () => {

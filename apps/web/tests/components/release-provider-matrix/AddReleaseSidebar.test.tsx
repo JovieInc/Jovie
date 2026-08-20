@@ -18,7 +18,7 @@ vi.mock('sonner', () => ({
   toast: mockToast,
 }));
 
-vi.mock('@/components/organisms/RightDrawer', () => ({
+vi.mock('@/components/molecules/drawer/RightDrawer', () => ({
   RightDrawer: ({
     children,
     'data-testid': testId,
@@ -224,10 +224,6 @@ vi.mock('@/components/atoms/Calendar', () => ({
   ),
 }));
 
-vi.mock('@/components/atoms/LoadingSpinner', () => ({
-  LoadingSpinner: () => <span data-testid='loading-spinner' />,
-}));
-
 vi.mock('@jovie/ui', () => ({
   Button: ({
     children,
@@ -284,6 +280,7 @@ vi.mock('@jovie/ui', () => ({
   SelectValue: ({ children }: { children?: ReactNode }) => (
     <span>{children}</span>
   ),
+  Spinner: () => <span data-testid='loading-spinner' />,
 }));
 
 vi.mock('@jovie/ui/atoms/popover', () => ({

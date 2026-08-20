@@ -63,6 +63,23 @@ vi.mock('@/lib/db/schema/promo-downloads', () => ({
   },
 }));
 
+vi.mock('@/lib/audio/blob-verifier', () => ({
+  AudioBlobVerificationError: class AudioBlobVerificationError extends Error {},
+  verifyAudioBlob: vi.fn().mockImplementation(({ fileName }) => {
+    const wav = fileName.endsWith('.wav');
+    return Promise.resolve({
+      pathname: `jovie/audio/promo_download/clerk_user_123/file.${wav ? 'wav' : 'mp3'}`,
+      url: `https://cdn.example.com/track.${wav ? 'wav' : 'mp3'}`,
+      sizeBytes: 1024,
+      contentType: wav ? 'audio/wav' : 'audio/mpeg',
+      formatId: wav ? 'wav' : 'mp3',
+      canonicalMimeType: wav ? 'audio/wav' : 'audio/mpeg',
+      bytesInspected: 1024,
+      latencyMs: 1,
+    });
+  }),
+}));
+
 vi.mock('drizzle-orm', () => ({
   and: vi.fn(),
   eq: vi.fn(),
@@ -131,7 +148,9 @@ describe('promo downloads API', () => {
 
     expect(response.status).toBe(200);
     const options = hoisted.handleUploadMock.mock.calls[0][0];
-    const token = await options.onBeforeGenerateToken('track.mp3');
+    const token = await options.onBeforeGenerateToken(
+      'jovie/audio/promo_download/clerk_user_123/track.mp3'
+    );
     expect(token.maximumSizeInBytes).toBe(
       AUDIO_UPLOAD_POLICIES.promo_download.maxFileSizeBytes
     );

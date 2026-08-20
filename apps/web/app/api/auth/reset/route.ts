@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 
 export const runtime = 'nodejs';
 
@@ -25,16 +26,16 @@ export function isBetterAuthCookieName(name: string): boolean {
 }
 
 /**
- * Derive the parent cookie scope (e.g. `.jov.ie` for `staging.jov.ie`) so
- * we can delete cookies set on the parent domain by a sibling environment.
- * Returns null for apex hostnames and localhost — nothing to strip.
+ * Parent cookie scope so we can delete Domain=.jov.ie cookies.
+ * Apex (`jov.ie`) still sets that Domain; skipping it left ChatGPT
+ * OAuth trapped on a Hide-My-Email waitlist session.
  */
 function parentDomainScope(hostname: string): string | null {
   if (!hostname || hostname === 'localhost') return null;
   if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)) return null;
 
   const parts = hostname.split('.');
-  if (parts.length < 3) return null;
+  if (parts.length < 2) return null;
 
   return `.${parts.slice(-2).join('.')}`;
 }
@@ -53,10 +54,12 @@ function parentDomainScope(hostname: string): string | null {
 async function handleReset(req: NextRequest): Promise<NextResponse> {
   const hostname = req.nextUrl.hostname;
   const parentScope = parentDomainScope(hostname);
-  const response = NextResponse.redirect(
-    new URL('/signin?reset=1', req.url),
-    303
+  const dest = new URL('/signin?reset=1', req.url);
+  const after = sanitizeRedirectUrl(
+    req.nextUrl.searchParams.get('redirect_url')
   );
+  if (after) dest.searchParams.set('redirect_url', after);
+  const response = NextResponse.redirect(dest, 303);
   response.headers.set('Cache-Control', 'no-store');
 
   const incomingCookies = req.cookies.getAll();

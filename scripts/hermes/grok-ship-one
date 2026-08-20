@@ -9,7 +9,7 @@ case "$ID" in
   *) echo "unsupported issue identifier" >&2; exit 2 ;;
 esac
 
-export PATH="$HOME/.local/bin:$PATH:/usr/bin:/bin"
+export PATH="$HOME/.local/bin:$HOME/.npm-global/bin:/usr/local/bin:$PATH:/usr/bin:/bin"
 set -a
 # shellcheck disable=SC1091
 [ -f "$HOME/.config/symphony/linear.env" ] && . "$HOME/.config/symphony/linear.env"
@@ -58,16 +58,43 @@ print(json.dumps(payload, separators=(",", ":")))
 PY
 )"
 
-if [ "$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number --jq 'length' 2>/dev/null || printf 0)" -gt 0 ]; then
+REMOUNT=0
+EXISTING_NUMBER=""
+EXISTING_MERGE_STATE=""
+CHANGELOG_ONLY_REMOUNT=0
+SKIP_GROK=0
+if VERDICT_JSON="$(symphony-codex-exhausted open-pr-verdict "$ID" 2>/dev/null)"; then
+  VERDICT="$(python3 -c 'import json,sys; print((json.loads(sys.argv[1]) or {}).get("verdict") or "none")' "$VERDICT_JSON")"
+  EXISTING_HEAD="$(python3 -c 'import json,sys; print((json.loads(sys.argv[1]) or {}).get("head") or "")' "$VERDICT_JSON")"
+  EXISTING_NUMBER="$(python3 -c 'import json,sys; print((json.loads(sys.argv[1]) or {}).get("number") or "")' "$VERDICT_JSON")"
+  EXISTING_MERGE_STATE="$(python3 -c 'import json,sys; print((json.loads(sys.argv[1]) or {}).get("mergeStateStatus") or "")' "$VERDICT_JSON")"
+else
+  VERDICT=none
+  EXISTING_HEAD=""
+  EXISTING_MERGE_STATE=""
+fi
+if [ "$VERDICT" = skip ]; then
   echo "$(date -u +%FT%TZ) $ID open_pr_exists" >> "$LOG"
   exit 0
+fi
+if [ "$VERDICT" = remount ] && [ -n "$EXISTING_HEAD" ]; then
+  BRANCH="$EXISTING_HEAD"
+  REMOUNT=1
+  echo "$(date -u +%FT%TZ) $ID remount_ci_red pr=$EXISTING_NUMBER head=$BRANCH" >> "$LOG"
 fi
 
 # Single admission source of truth: delegate the admission decision to the
 # controller's check-admission command, which uses the SAME predicate as the
-# reconcile selector (required labels present, no blocked/needs-human/hold).
+# reconcile selector (current admission-gate/v1 receipt, no blocked/human hold).
+# Remount of an existing DIRTY/CI-red head skips the receipt so leftover
+# GitHub work is not starved after Linear's receipt list goes empty.
 # exit 0 = admitted (meta JSON on stdout); 1 = not admitted; 2 = unverifiable.
-if ADMISSION_OUT="$(symphony-codex-exhausted check-admission "$ID" 2>&1)"; then
+if [ "$REMOUNT" = 1 ]; then
+  admission_args=(check-admission "$ID" --remount)
+else
+  admission_args=(check-admission "$ID")
+fi
+if ADMISSION_OUT="$(symphony-codex-exhausted "${admission_args[@]}" 2>&1)"; then
   META="$ADMISSION_OUT"
 else
   admission_rc=$?
@@ -122,12 +149,100 @@ if [ ! -d "$WS/.git" ]; then
   fi
   git clone --depth 1 "https://github.com/$REPO.git" "$WS"
 fi
-if [ -n "$(git -C "$WS" status --porcelain)" ]; then
+if [ "$REMOUNT" != 1 ] && [ -n "$(git -C "$WS" status --porcelain)" ]; then
   echo "workspace has uncommitted changes: $WS" >&2
   exit 2
 fi
-git -C "$WS" fetch --depth 1 origin main
-git -C "$WS" checkout -B "$BRANCH" origin/main
+if [ "$REMOUNT" = 1 ]; then
+  # Depth-1 fetches of main and the PR head do not share a merge-base, so
+  # `git merge origin/main` fails with unrelated histories and the PR stays DIRTY.
+  # Leftover merge/rebase index from a prior remount blocks `git fetch origin main`
+  # (live JOV-5041: CHANGELOG.md needs merge). Force-update the remote-tracking
+  # PR ref: remounts rewrite history, so a non-plus fetch rejects non-fast-forward
+  # (live JOV-4894 on #16211).
+  git -C "$WS" merge --abort >/dev/null 2>&1 || true
+  git -C "$WS" rebase --abort >/dev/null 2>&1 || true
+  git -C "$WS" reset --hard HEAD
+  git -C "$WS" fetch origin "+refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}"
+  git -C "$WS" fetch origin main
+  git -C "$WS" checkout -B "$BRANCH" "origin/$BRANCH"
+  git -C "$WS" reset --hard "origin/$BRANCH"
+  if [ "$(git -C "$WS" rev-parse --is-shallow-repository 2>/dev/null || printf true)" = "true" ]; then
+    git -C "$WS" fetch --unshallow origin || git -C "$WS" fetch --deepen=200 origin
+  fi
+  if ! git -C "$WS" merge-base HEAD origin/main >/dev/null 2>&1; then
+    git -C "$WS" fetch --deepen=500 origin
+  fi
+  if ! git -C "$WS" merge --no-edit origin/main; then
+    if [ -z "$(git -C "$WS" ls-files -u)" ]; then
+      echo "merge origin/main failed without conflicts: $WS" >&2
+      exit 2
+    fi
+    echo "$(date -u +%FT%TZ) $ID remount_merge_conflicts" >> "$LOG"
+    unmerged="$(git -C "$WS" diff --name-only --diff-filter=U | sort -u)"
+    # Exact-only: mixed product+CHANGELOG conflicts still go to grok. Union
+    # failure must not abort the remount (live JOV-5238 died after
+    # remount_merge_conflicts with no START).
+    if [ "$unmerged" = "CHANGELOG.md" ]; then
+      union_ok=0
+      if git -C "$WS" show :2:CHANGELOG.md > "$WS/.changelog.ours" \
+        && git -C "$WS" show :3:CHANGELOG.md > "$WS/.changelog.theirs" \
+        && python3 - "$WS/.changelog.ours" "$WS/.changelog.theirs" "$WS/CHANGELOG.md" <<'PY'
+import pathlib, sys
+
+def unreleased_bullets(text: str) -> list[str]:
+    bullets: list[str] = []
+    in_unreleased = False
+    for line in text.splitlines():
+        if line.startswith("## [Unreleased]"):
+            in_unreleased = True
+            continue
+        if in_unreleased and line.startswith("## ["):
+            break
+        if in_unreleased and line.startswith("- "):
+            bullets.append(line)
+    return bullets
+
+ours = pathlib.Path(sys.argv[1]).read_text()
+theirs = pathlib.Path(sys.argv[2]).read_text()
+missing = [bullet for bullet in unreleased_bullets(ours) if bullet not in theirs]
+if not missing:
+    pathlib.Path(sys.argv[3]).write_text(theirs)
+    raise SystemExit(0)
+lines = theirs.splitlines(keepends=True)
+out: list[str] = []
+inserted = False
+for line in lines:
+    out.append(line)
+    if not inserted and line.startswith("## [Unreleased]"):
+        out.append("\n")
+        for bullet in missing:
+            out.append(bullet + "\n")
+        inserted = True
+pathlib.Path(sys.argv[3]).write_text("".join(out))
+PY
+      then
+        git -C "$WS" add CHANGELOG.md
+        union_ok=1
+      else
+        echo "$(date -u +%FT%TZ) $ID remount_changelog_union_failed" >> "$LOG"
+      fi
+      rm -f "$WS/.changelog.ours" "$WS/.changelog.theirs"
+      if [ "$union_ok" = 1 ] && [ -z "$(git -C "$WS" ls-files -u)" ]; then
+        if GIT_EDITOR=true git -C "$WS" commit --no-edit >"$WS/.changelog.commit.err" 2>&1; then
+          echo "$(date -u +%FT%TZ) $ID remount_changelog_autoresolved" >> "$LOG"
+          CHANGELOG_ONLY_REMOUNT=1
+        else
+          echo "$(date -u +%FT%TZ) $ID remount_changelog_commit_failed $(tr '\n' ' ' < "$WS/.changelog.commit.err")" >> "$LOG"
+        fi
+        rm -f "$WS/.changelog.commit.err"
+      fi
+    fi
+  fi
+else
+  git -C "$WS" fetch --depth 1 origin main
+  git -C "$WS" checkout -B "$BRANCH" origin/main
+fi
 
 update_state() {
   local state_id="$1"
@@ -153,7 +268,20 @@ if [ "$original_state_lower" != "in progress" ]; then
   changed_state=1
 fi
 
-PROMPT="You are implementing admitted Linear issue $ID in $REPO under a revision-scoped fallback lease.
+if [ "$REMOUNT" = 1 ]; then
+  PROMPT="You are fixing failing CI on existing PR ${EXISTING_NUMBER:-unknown} ($BRANCH) for Linear issue $ID in $REPO.
+
+Title: $TITLE
+URL: $URL
+
+Description:
+$DESC
+
+Work only in this checkout of $BRANCH. Do not open a second PR. Do not reset to main. If the branch is behind or conflicting with origin/main, finish the merge/rebase onto origin/main, then push to the existing head.
+Fix the failing checks. If scripts-typecheck exceeds the baseline, fix the new TypeScript errors; do not regenerate the baseline unless the errors are genuinely pre-existing on main.
+Do not weaken or skip gates. Do not merge, deploy, promote, or remove queue-deferred. If blocked, write BLOCKER.md with the exact reason and exit. Start now."
+else
+  PROMPT="You are implementing admitted Linear issue $ID in $REPO under a revision-scoped fallback lease.
 
 Title: $TITLE
 URL: $URL
@@ -162,8 +290,11 @@ Description:
 $DESC
 
 Work only in this checkout. Make the smallest correct issue-scoped change. Do not weaken or skip gates.
-Create commits on $BRANCH, push normally, and open a ready PR to main with validation evidence, Fixes $ID, and the queue-deferred hold.
-Do not merge, deploy, promote, or remove queue-deferred. If blocked, write BLOCKER.md with the exact reason and exit. Start now."
+If scripts-typecheck exceeds the baseline, fix the new TypeScript errors; do not regenerate the baseline unless the errors are genuinely pre-existing on main.
+Create commits on $BRANCH, push normally, and open a ready (non-draft) PR to main with validation evidence and Fixes $ID.
+Do not add the queue-deferred label. Native merge-queue autoenroll is the hold during hold-intake.
+Do not merge, deploy, or promote. If blocked, write BLOCKER.md with the exact reason and exit. Start now."
+fi
 
 RECEIPT="$RECEIPT_DIR/$ID.json"
 RECEIPT_PATH="$RECEIPT" RECEIPT_ID="$ID" RECEIPT_ISSUE_REVISION="$ISSUE_REVISION" \
@@ -210,10 +341,22 @@ finally:
         os.unlink(temporary)
 PY
 
+if [ "$CHANGELOG_ONLY_REMOUNT" = 1 ]; then
+  merge_state="$(printf '%s' "$EXISTING_MERGE_STATE" | tr '[:lower:]' '[:upper:]')"
+  if [ -z "$merge_state" ] || [ "$merge_state" = "DIRTY" ] || [ "$merge_state" = "BEHIND" ]; then
+    git -C "$WS" push origin "$BRANCH"
+    echo "$(date -u +%FT%TZ) $ID remount_changelog_pushed" >> "$LOG"
+    SKIP_GROK=1
+  fi
+fi
+
 attempt_log="$(mktemp "$LOG_DIR/.${ID}.attempt.XXXXXX")"
 trap 'rm -f "$attempt_log"' EXIT
 echo "START $ID $(date -u +%FT%TZ) repo=$REPO" | tee -a "$LOG"
 set +e
+if [ "$SKIP_GROK" = 1 ]; then
+  rc=0
+else
 SELECTION_JSON="$SELECTION_JSON" FALLBACK_PROMPT="$PROMPT" FALLBACK_CWD="$WS" python3 - <<'PY' 2>&1 | tee -a "$LOG" "$attempt_log"
 import json, os, pathlib, subprocess
 selected = json.loads(os.environ["SELECTION_JSON"])["selected"]
@@ -224,17 +367,95 @@ values = {
     "prompt": os.environ["FALLBACK_PROMPT"],
 }
 argv = [value.format(**values) for value in executor["argv"]]
-raise SystemExit(subprocess.run([executor["executable"], *argv], cwd=pathlib.Path(values["cwd"]), check=False).returncode)
+executable = executor["executable"]
+env = os.environ.copy()
+grok = os.environ.get("GEM_GROK_EXECUTABLE") or os.environ.get("GEM_GROK_BIN") or ""
+hermes = pathlib.Path(executable).name == "hermes"
+if hermes and grok and os.access(grok, os.X_OK):
+    # Hermes on Gem uses OpenRouter (max_tokens 65536) and 402s. Prefer included grok.
+    print("rewrite_hermes_openrouter_to_grok", grok, flush=True)
+    executable = grok
+    argv = [
+        "-m", "grok-4.6",
+        "--always-approve",
+        "--cwd", values["cwd"],
+        "--disable-web-search",
+        "--no-subagents",
+        "-p", values["prompt"],
+    ]
+elif hermes:
+    cap = os.environ.get("SYMPHONY_HERMES_MAX_TOKENS", "512")
+    env["HERMES_MAX_TOKENS"] = cap
+    if "--max-tokens" not in argv:
+        argv = ["--max-tokens", cap, *argv]
+        print(f"hermes_max_tokens={cap}", flush=True)
+def run_executor(run_argv):
+    return subprocess.run(
+        [executable, *run_argv],
+        cwd=pathlib.Path(values["cwd"]),
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+def with_model(run_argv, model):
+    mapped = list(run_argv)
+    for flag in ("--model", "-m"):
+        if flag in mapped:
+            idx = mapped.index(flag)
+            if idx + 1 < len(mapped):
+                mapped[idx + 1] = model
+                return mapped
+    return ["--model", model, *mapped]
+
+def available_models(text):
+    if "Available models:" not in text:
+        return []
+    rest = text.split("Available models:", 1)[1].replace("\n", " ")
+    return [part.strip().rstrip(".") for part in rest.split(",") if part.strip()]
+
+result = run_executor(argv)
+sys_out = (result.stdout or "") + (result.stderr or "")
+print(sys_out, end="")
+cursor_model = os.environ.get("GEM_CURSOR_GROK_MODEL", "cursor-grok-4.6-high")
+tried = set()
+for _ in range(2):
+    if result.returncode == 0 or "Cannot use this model" not in sys_out:
+        break
+    names = available_models(sys_out)
+    nxt = None
+    for cand in (cursor_model + "-fast", cursor_model, "cursor-grok-4.6-high-fast"):
+        if cand in names and cand not in tried:
+            nxt = cand
+            break
+    if nxt is None:
+        break
+    tried.add(nxt)
+    print(f"retry_cursor_grok_model {nxt}", flush=True)
+    result = run_executor(with_model(argv, nxt))
+    sys_out = (result.stdout or "") + (result.stderr or "")
+    print(sys_out, end="")
+if "402" in sys_out and ("max_tokens" in sys_out or "can only afford" in sys_out):
+    raise SystemExit(2)
+raise SystemExit(result.returncode)
 PY
 rc=${PIPESTATUS[0]}
+fi
 set -e
 
 pr_count="$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number --jq 'length' 2>/dev/null || printf 0)"
 if [ "$pr_count" -gt 0 ]; then
   pr_number="$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number --jq '.[0].number' 2>/dev/null || true)"
-  if [ -z "$pr_number" ] || ! gh pr edit "$pr_number" --repo "$REPO" --add-label queue-deferred >/dev/null; then
-    echo "PR exists but queue-deferred hold could not be proven" >&2
+  if [ -z "$pr_number" ]; then
+    echo "PR exists but number could not be proven" >&2
     exit 2
+  fi
+  # Do not add queue-deferred. That label hard-gates native autoenroll during
+  # hold-intake (production-unbound), which is the common AMBER lane while
+  # Production Controller FIFO catches up. Native MQ is the hold.
+  if [ "$(gh pr view "$pr_number" --repo "$REPO" --json isDraft --jq '.isDraft')" = "true" ]; then
+    gh pr ready "$pr_number" --repo "$REPO"
   fi
   update_state "$IN_REVIEW_STATE_ID"
   echo "END $ID rc=$rc pr=open $(date -u +%FT%TZ)" | tee -a "$LOG"

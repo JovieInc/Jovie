@@ -1,25 +1,21 @@
 'use client';
 
-import { Badge, Button } from '@jovie/ui';
+import { Button } from '@jovie/ui';
 import { Plus, UserPlus } from 'lucide-react';
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ContactsSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
 import { UsageLimitUpgradePrompt } from '@/components/molecules/UsageLimitUpgradePrompt';
-import {
-  type EditableContact,
-  useContactsManager,
-} from '@/features/dashboard/hooks/useContactsManager';
+import { useContactsManager } from '@/features/dashboard/hooks/useContactsManager';
+import { ContactDeleteConfirmDialog } from '@/features/dashboard/molecules/ContactDeleteConfirmDialog';
+import { ContactListRow } from '@/features/dashboard/molecules/ContactListRow';
+import { SettingsErrorState } from '@/features/dashboard/molecules/SettingsErrorState';
 import { ContactDetailSidebar } from '@/features/dashboard/organisms/contacts-table/ContactDetailSidebar';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
-import {
-  getContactRoleLabel,
-  summarizeTerritories,
-} from '@/lib/contacts/constants';
 import { useContactsQuery, usePlanGate } from '@/lib/queries';
+import type { EditableContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 
 interface SettingsContactsSectionProps {
@@ -43,7 +39,7 @@ export function SettingsContactsSection({
   if (isLoading) {
     return (
       <SettingsPanel
-        title='Team contacts'
+        title='Team Contacts'
         description={`Manage bookings, management, and press contacts for ${artist.name}.`}
       >
         <div className='px-4 py-4 sm:px-5'>
@@ -56,19 +52,17 @@ export function SettingsContactsSection({
   if (isError) {
     return (
       <SettingsPanel
-        title='Team contacts'
+        title='Team Contacts'
         description={`Manage bookings, management, and press contacts for ${artist.name}.`}
       >
         <div className='px-4 py-4 sm:px-5'>
-          <ContentSurfaceCard className='flex flex-col items-center justify-center gap-2 bg-surface-0 px-6 py-8 text-center'>
-            <UserPlus className='h-8 w-8 text-tertiary-token' aria-hidden />
-            <p className='text-app text-secondary-token'>
-              Failed to load contacts.
-            </p>
-            <Button variant='ghost' size='sm' onClick={() => refetch()}>
-              Try Again
-            </Button>
-          </ContentSurfaceCard>
+          <SettingsErrorState
+            title='Unable To Load Contacts'
+            message='Failed to load contacts.'
+            onRetry={() => {
+              void refetch();
+            }}
+          />
         </div>
       </SettingsPanel>
     );
@@ -161,13 +155,6 @@ function ContactsListInner({
     }
   }, [newContactId, selectedContactId]);
 
-  const deleteLabel = pendingDeleteContact
-    ? getContactRoleLabel(
-        pendingDeleteContact.role,
-        pendingDeleteContact.customLabel
-      )
-    : '';
-
   const { contactsLimit } = usePlanGate();
   const isEmpty = contacts.length === 0;
   const isSidebarOpen = Boolean(selectedContact);
@@ -198,7 +185,7 @@ function ContactsListInner({
   return (
     <>
       <SettingsPanel
-        title='Team contacts'
+        title='Team Contacts'
         description={`Manage bookings, management, and press contacts for ${artistName}.`}
         actions={
           <Button
@@ -223,7 +210,7 @@ function ContactsListInner({
           ) : (
             <div className='space-y-1'>
               {contacts.map(contact => (
-                <ContactRow
+                <ContactListRow
                   key={contact.id}
                   contact={contact}
                   isSelected={selectedContactId === contact.id}
@@ -244,70 +231,11 @@ function ContactsListInner({
         </div>
       </SettingsPanel>
 
-      <ConfirmDialog
-        open={Boolean(pendingDeleteContact)}
-        onOpenChange={open => {
-          if (!open) cancelDelete();
-        }}
-        title='Delete contact'
-        description={`Remove the "${deleteLabel}" contact from your profile? This action cannot be undone.`}
-        confirmLabel='Delete'
-        variant='destructive'
+      <ContactDeleteConfirmDialog
+        contact={pendingDeleteContact}
         onConfirm={confirmDelete}
+        onCancel={cancelDelete}
       />
     </>
   );
 }
-
-const ContactRow = memo(function ContactRow({
-  contact,
-  isSelected,
-  onClick,
-}: {
-  readonly contact: EditableContact;
-  readonly isSelected: boolean;
-  readonly onClick: () => void;
-}) {
-  const roleLabel = getContactRoleLabel(contact.role, contact.customLabel);
-  const { summary: territorySummary } = summarizeTerritories(
-    contact.territories
-  );
-
-  return (
-    <button
-      type='button'
-      onClick={onClick}
-      aria-pressed={isSelected}
-      className={`flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition-[background-color,border-color,box-shadow] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-base ${
-        isSelected
-          ? 'border-subtle bg-surface-0'
-          : 'border-transparent hover:bg-surface-0'
-      }`}
-    >
-      <div className='min-w-0 flex-1'>
-        <div className='flex items-center gap-2'>
-          <span className='text-app font-caption text-secondary-token tracking-normal'>
-            {roleLabel}
-          </span>
-        </div>
-        <div className='flex items-center gap-2 mt-0.5'>
-          {contact.personName && (
-            <span className='text-app text-primary-token truncate'>
-              {contact.personName}
-            </span>
-          )}
-          {contact.email && (
-            <span className='text-2xs text-secondary-token truncate'>
-              {contact.email}
-            </span>
-          )}
-        </div>
-      </div>
-      {territorySummary && (
-        <Badge size='sm' className='shrink-0'>
-          {territorySummary}
-        </Badge>
-      )}
-    </button>
-  );
-});

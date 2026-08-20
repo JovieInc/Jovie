@@ -71,6 +71,27 @@ function MainPlaneHarness({
   );
 }
 
+function MainPlaneReopenHarness() {
+  const [header, setHeader] = useState<ReactNode>(null);
+  const [open, setOpen] = useState(true);
+
+  return (
+    <>
+      <header>{header}</header>
+      <button type='button' onClick={() => setOpen(true)}>
+        Reopen
+      </button>
+      <CmdKPalette
+        profileId='profile-1'
+        open={open}
+        onOpenChange={setOpen}
+        presentation='main'
+        onHeaderChange={setHeader}
+      />
+    </>
+  );
+}
+
 describe('CmdKPalette', () => {
   it('commits the currently filtered main-plane result with Enter', () => {
     pushMock.mockClear();
@@ -142,5 +163,27 @@ describe('CmdKPalette', () => {
         name: 'Presence Monitor artist profiles, public pages, and search visibility. ⌘2',
       })
     ).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('resets and refocuses the controlled main search after close and reopen', () => {
+    render(<MainPlaneReopenHarness />);
+
+    const input = screen.getByRole('combobox', {
+      name: 'Command Palette Search',
+    });
+    fireEvent.change(input, { target: { value: 'Settings' } });
+    expect(input).toHaveValue('Settings');
+
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(
+      screen.queryByRole('combobox', { name: 'Command Palette Search' })
+    ).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen' }));
+    const reopenedInput = screen.getByRole('combobox', {
+      name: 'Command Palette Search',
+    });
+    expect(reopenedInput).toHaveValue('');
+    expect(reopenedInput).toHaveFocus();
   });
 });

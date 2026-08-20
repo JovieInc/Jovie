@@ -17,6 +17,7 @@ import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { resolveUserState } from '@/lib/auth/gate';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL } from '@/lib/cache/tags';
+import { isMissingConnectorSchemaError } from '@/lib/connectors/schema-errors';
 import { type DbOrTransaction, doesTableExist } from '@/lib/db';
 import { getAvatarQualityForProfile } from '@/lib/db/queries/avatar-quality';
 import {
@@ -53,6 +54,7 @@ import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
   type InboxNavigationAvailability,
+  PENDING_SUGGESTED_ACTION_STATUS,
   resolveInboxNavigationAvailability,
   UNKNOWN_INBOX_NAVIGATION_AVAILABILITY,
 } from '@/lib/inbox/navigation-availability';
@@ -63,6 +65,7 @@ import {
 } from '@/lib/profile/avatar-quality';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
+import { isMissingTourDatesConfirmationStatusError } from '@/lib/tour-dates/queries';
 import { mapSocialLinkExistence } from './social-link-utils';
 
 const { logger } = Sentry;
@@ -492,7 +495,7 @@ async function loadInboxNavigationAvailability(
           .where(
             and(
               eq(suggestedActions.userId, userId),
-              eq(suggestedActions.status, 'pending')
+              eq(suggestedActions.status, PENDING_SUGGESTED_ACTION_STATUS)
             )
           ),
       'Inbox navigation suggested actions count query',
@@ -511,13 +514,37 @@ async function loadInboxNavigationAvailability(
           ),
       'Inbox navigation tour dates count query',
       { db: tx, timeoutMs: QUERY_TIMEOUTS.api }
-    );
+    ).catch((error: unknown) => {
+      // Migration drift (JOV-4857): migration 0042 (tour_dates
+      // .confirmation_status) not yet applied on prod. Degrade to 0 pending
+      // so the dashboard still renders and the 'Failed query' Sentry alert
+      // stops firing. Any other error still throws to the outer catch.
+      if (!isMissingTourDatesConfirmationStatusError(error)) {
+        throw error;
+      }
+      Sentry.logger.warn(
+        '[Dashboard] tour_dates.confirmation_status missing (migration drift); treating pending tour-date count as 0',
+        { profileId }
+      );
+      return [{ count: 0 }];
+    });
 
     return resolveInboxNavigationAvailability(
       Number(pendingSuggestedActions[0]?.count ?? 0),
       Number(pendingTourDates[0]?.count ?? 0)
     );
   } catch (error) {
+    // Fail-soft: the Inbox count read must never take down the shell. Known
+    // connector-schema drift (prod predates migration 0048) is expected during
+    // deploy windows — log-only, no Sentry error event (JOV-5160). Anything
+    // else is still reported. `unknown` fails open so the Inbox nav item is
+    // never hidden by a transient data failure.
+    if (isMissingConnectorSchemaError(error)) {
+      logger.warn(
+        '[inbox-navigation] suggested_actions schema drift; degrading to unknown availability'
+      );
+      return UNKNOWN_INBOX_NAVIGATION_AVAILABILITY;
+    }
     Sentry.captureException(error, {
       level: 'warning',
       tags: { context: 'inbox_navigation_availability' },

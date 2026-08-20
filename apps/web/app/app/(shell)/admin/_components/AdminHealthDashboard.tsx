@@ -165,10 +165,7 @@ export function AdminHealthDashboardSkeleton() {
       aria-hidden='true'
     >
       {['business', 'growth', 'ops', 'people'].map(key => (
-        <div
-          key={key}
-          className='min-h-28 rounded-xl border border-subtle bg-surface-1 skeleton'
-        />
+        <ContentSurfaceCard key={key} className='min-h-28 skeleton' />
       ))}
     </section>
   );

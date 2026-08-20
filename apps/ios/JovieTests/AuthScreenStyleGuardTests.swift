@@ -1,7 +1,52 @@
 import Foundation
 import Testing
+@testable import Jovie
 
 struct AuthScreenStyleGuardTests {
+  @Test func waitlistPendingUsesStandaloneAccountSwitchInsteadOfAppShell() throws {
+    let sourceURL = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("Jovie/App/RootView.swift")
+    let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+    let routeStart = try #require(source.range(of: "case .waitlistPending:"))
+    let readyStart = try #require(
+      source.range(of: "case .ready:", range: routeStart.upperBound..<source.endIndex)
+    )
+    let routeSource = source[routeStart.lowerBound..<readyStart.lowerBound]
+
+    #expect(routeSource.contains("WaitlistPendingView(onUseDifferentAccount: onLogout)"))
+    #expect(source.contains("accessibilityIdentifier(\"waitlist-use-different-account\")"))
+    #expect(source.contains("accessibilityIdentifier(\"waitlist-pending\")"))
+    #expect(source.contains(".disabled(isSwitchingAccount)"))
+    #expect(source.contains("ScrollView"))
+    #expect(source.contains("WaitlistPendingLayout.reservedActionMinHeight"))
+    #expect(source.contains(".opacity(isSwitchingAccount ? 1 : 0)"))
+    #expect(!source.contains("if isSwitchingAccount {\n                ProgressView()"))
+    #expect(source.contains("WaitlistPendingLayout.contentMinHeight"))
+    #expect(source.contains("alignment: .center"))
+    #expect(source.contains(".scrollBounceBehavior(.basedOnSize)"))
+  }
+
+  @Test func waitlistActionCopyStaysStableAcrossSwitchingState() {
+    #expect(
+      WaitlistPendingLayout.actionTitle(isSwitchingAccount: false) == "Use a Different Account"
+    )
+    #expect(
+      WaitlistPendingLayout.actionTitle(isSwitchingAccount: true) == "Switching Account…"
+    )
+    #expect(WaitlistPendingLayout.maxContentWidth == 420)
+    #expect(WaitlistPendingLayout.reservedActionMinHeight == 48)
+  }
+
+  @Test func waitlistPendingCentersShortContentInTheSafeAreaViewport() {
+    #expect(WaitlistPendingLayout.contentMaxWidth == 420)
+    #expect(WaitlistPendingLayout.contentMinHeight(viewportHeight: 812) == 812)
+    #expect(WaitlistPendingLayout.contentMinHeight(viewportHeight: 0) == 0)
+    #expect(WaitlistPendingLayout.contentMinHeight(viewportHeight: -20) == 0)
+  }
+
   @Test func continueInBrowserLoadingSpinnerUsesNeutralForeground() throws {
     let sourceURL = URL(fileURLWithPath: #filePath)
       .deletingLastPathComponent()

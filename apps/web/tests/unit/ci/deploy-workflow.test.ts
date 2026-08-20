@@ -4253,6 +4253,7 @@ describe('production promotion exact-artifact contract', () => {
     expect(sentryJob).toContain(
       'sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}'
     );
+    expect(sentryJob).toContain('expected_sha: ${{ inputs.expected_sha }}');
     expect(sentryJob).not.toContain(
       'uses: ./.github/workflows/sentry-error-gate.yml'
     );
@@ -4271,6 +4272,8 @@ describe('production promotion exact-artifact contract', () => {
     expect(sentryAction).toContain(
       'START_EPOCH=$((END_EPOCH - WINDOW_MINUTES * 60))'
     );
+    expect(sentryAction).toContain('expected_sha="${{ inputs.expected_sha }}"');
+    expect(sentryAction).toContain('candidate_release=$expected_sha');
     expect(sentryAction).toContain(
       'POST_RATE_SCALED=$((POST_DEPLOY * BASELINE_MINUTES))'
     );
@@ -4278,15 +4281,18 @@ describe('production promotion exact-artifact contract', () => {
       'BASELINE_RATE_LIMIT_SCALED=$((BASELINE * THRESHOLD * POST_MINUTES))'
     );
     const statsRequests = getSentryStatsRequests(sentryAction);
-    expect(statsRequests).toHaveLength(2);
+    expect(statsRequests).toHaveLength(3);
     const exactProductionErrorQuery =
       '--data-urlencode "query=event.type:error environment:vercel-production"';
-    for (const request of statsRequests) {
+    for (const request of statsRequests.slice(0, 2)) {
       expect(request).toContain('curl --fail --silent --show-error --get');
       expect(request.match(/--data-urlencode "query=[^"]+"/g)).toEqual([
         exactProductionErrorQuery,
       ]);
     }
+    expect(statsRequests[2]).toContain(
+      '--data-urlencode "query=event.type:error environment:vercel-production release:$CANDIDATE_RELEASE"'
+    );
     expect(sentryAction).not.toContain('events-stats/?project=');
     expect(sentryAction).not.toContain('SENTRY_ORG:\n        required: true');
   });
@@ -4311,16 +4317,17 @@ describe('production promotion exact-artifact contract', () => {
     // A genuine error-rate increase remains blocking after filtering.
     expect(isRateSpike(6, 4)).toBe(true);
     const statsRequests = getSentryStatsRequests(sentryAction);
-    expect(statsRequests).toHaveLength(2);
-    for (const request of statsRequests) {
+    expect(statsRequests).toHaveLength(3);
+    for (const request of statsRequests.slice(0, 2)) {
       expect(request).toContain(
         '--data-urlencode "query=event.type:error environment:vercel-production"'
       );
     }
+    expect(statsRequests[2]).toContain('release:$CANDIDATE_RELEASE');
     expect(sentryAction).toContain('echo "gate_status=failed"');
   });
 
-  it('keeps cost and main-health observers strict, deduplicated, and bounded', () => {
+  it('keeps cost and main-health observers strict and bounded without GitHub Issue intake', () => {
     const cost = readFileSync(costAnomalyWorkflowPath, 'utf8');
     const monitor = readFileSync(mainHealthWorkflowPath, 'utf8');
     const evaluator = readFileSync(mainHealthActionPath, 'utf8');
@@ -4328,10 +4335,16 @@ describe('production promotion exact-artifact contract', () => {
     expect(cost).toContain("cron: '*/15 * * * *'");
     expect(cost).toContain('name: Production – jovie');
     expect(cost).toContain('curl --fail --silent --show-error');
-    expect(cost).toContain('gh label create cost-monitoring --force');
-    expect(cost).toContain('GH_REPO: ${{ github.repository }}');
-    expect(cost).toContain('INCIDENT_TITLE="[Cost Anomaly]');
-    expect(cost).toContain('should_notify=false');
+    expect(cost).toContain('name: Prepare Linear-only anomaly receipt');
+    expect(cost).toContain(
+      'Linear is canonical; GitHub Issue creation is retired.'
+    );
+    expect(cost).toContain('echo "should_notify=true"');
+    expect(cost).not.toContain('gh issue');
+    expect(cost).not.toContain('gh label');
+    expect(cost).not.toContain('GH_REPO:');
+    expect(cost).not.toContain('INCIDENT_TITLE=');
+    expect(cost).not.toContain('issues: write');
     expect(cost).not.toContain('DRY_RUN');
     expect(monitor).toContain('group: main-ci-health-monitor');
     expect(monitor).toContain('main-ci-health-alert-$ALERT_KEY');
@@ -4348,6 +4361,10 @@ describe('production promotion exact-artifact contract', () => {
     const healthEvaluation = getStepBlock(
       health,
       'Evaluate exact current production controller'
+    );
+    const manualIncident = getStepBlock(
+      health,
+      'Open one manual-recovery incident'
     );
     const reusable = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const controller = readFileSync(productionControllerWorkflowPath, 'utf8');
@@ -4426,9 +4443,13 @@ describe('production promotion exact-artifact contract', () => {
     expect(healthEvaluation).toContain(
       'incident controller_completed_without_marker'
     );
-    expect(health).toContain(
+    expect(manualIncident).toContain(
+      "if: ${{ github.event_name == '__retired_linear_only__' }}"
+    );
+    expect(manualIncident).not.toContain(
       "always() && steps.evaluate.outputs.needs_manual == 'true'"
     );
+    expect(health).not.toContain('issues: write');
     expect(health).not.toContain('exit 1');
     expect(health.indexOf('exact_attempt="$(gh api')).toBeLessThan(
       health.indexOf('gh run rerun "$run_id"')

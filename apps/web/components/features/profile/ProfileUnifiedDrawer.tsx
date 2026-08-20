@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { toast } from '@/components/feedback';
 import { PaySelector } from '@/components/molecules/PaySelector';
 import { ChannelIcon } from '@/features/profile/artist-contacts-button/ContactIcons';
+import { formatPublicContactChannelAriaLabel } from '@/features/profile/artist-contacts-button/contact-channel-label';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
 import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
 import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
@@ -18,6 +19,7 @@ import {
 } from '@/features/profile/utils/venmo';
 import { PublicShareActionList } from '@/features/share/PublicShareMenu';
 import { track } from '@/lib/analytics';
+import { formatPublicContactSubtitle } from '@/lib/contacts/format-public-contact';
 import type { AvailableDSP } from '@/lib/dsp';
 import type { ShareContext } from '@/lib/share/types';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
@@ -154,6 +156,7 @@ function ContactList({
       {contacts.map(contact => {
         const primary = primaryChannel(contact);
         const primaryHref = getActionHref(primary);
+        const subtitle = formatPublicContactSubtitle(contact);
 
         return (
           <div key={contact.id} className={PROFILE_DRAWER_TOGGLE_ROW_CLASS}>
@@ -166,9 +169,12 @@ function ContactList({
                 <span className={PROFILE_DRAWER_TITLE_CLASS}>
                   {contact.roleLabel}
                 </span>
-                {contact.secondaryLabel ? (
-                  <span className={PROFILE_DRAWER_META_CLASS}>
-                    {contact.secondaryLabel}
+                {subtitle ? (
+                  <span
+                    className={PROFILE_DRAWER_META_CLASS}
+                    data-testid='profile-mode-drawer-contact-meta'
+                  >
+                    {subtitle}
                   </span>
                 ) : null}
               </a>
@@ -177,17 +183,17 @@ function ContactList({
               {contact.channels.map(channel => {
                 const channelHref = getActionHref(channel);
                 if (!channelHref) return null;
-                const labels: Record<string, string> = {
-                  email: 'Email',
-                  sms: 'Text',
-                };
                 return (
                   <a
                     key={`${contact.id}-${channel.type}`}
                     href={channelHref}
                     className='flex h-8 w-8 items-center justify-center rounded-full text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-interactive-active hover:text-primary-token'
-                    aria-label={`${labels[channel.type] ?? 'Call'} ${contact.roleLabel}`}
+                    aria-label={formatPublicContactChannelAriaLabel(
+                      channel.type,
+                      contact
+                    )}
                     onClick={() => trackAction(channel, contact)}
+                    data-testid='contact-drawer-channel-action'
                   >
                     <ChannelIcon type={channel.type} />
                   </a>

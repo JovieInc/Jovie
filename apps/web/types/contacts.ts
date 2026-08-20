@@ -2,9 +2,34 @@ import type { ContactChannel, ContactRole } from './db';
 
 export type { ContactChannel, ContactRole };
 
+export interface ContactResponsibilityAssignment {
+  id: string;
+  role: ContactRole;
+  customLabel?: string | null;
+  territories: string[];
+  isActive: boolean;
+  isPrimary: boolean;
+  sortOrder: number;
+  startedAt?: string | null;
+  endedAt?: string | null;
+}
+
+export interface ContactResponsibilityAssignmentInput {
+  id?: string;
+  role: ContactRole;
+  customLabel?: string | null;
+  territories?: string[];
+  isActive?: boolean;
+  isPrimary?: boolean;
+  sortOrder?: number;
+  startedAt?: string | null;
+  endedAt?: string | null;
+}
+
 export interface DashboardContact {
   id: string;
   creatorProfileId: string;
+  /** Legacy-compatible projection of the selected responsibility. */
   role: ContactRole;
   customLabel?: string | null;
   personName?: string | null;
@@ -15,6 +40,19 @@ export interface DashboardContact {
   preferredChannel?: ContactChannel | null;
   isActive: boolean;
   sortOrder: number;
+  responsibilities?: ContactResponsibilityAssignment[];
+  /** A visible in-product fallback, never a persisted user person. */
+  isSystemDefault?: boolean;
+}
+
+/** Presentation + local editor state layered onto a persisted contact. */
+export interface EditableContact extends DashboardContact {
+  isExpanded?: boolean;
+  isSaving?: boolean;
+  isDeleting?: boolean;
+  error?: string | null;
+  customTerritory?: string;
+  isNew?: boolean;
 }
 
 export interface DashboardContactInput {
@@ -30,6 +68,7 @@ export interface DashboardContactInput {
   preferredChannel?: ContactChannel | null;
   isActive?: boolean;
   sortOrder?: number;
+  responsibilities?: ContactResponsibilityAssignmentInput[];
 }
 
 export interface PublicContactChannel {

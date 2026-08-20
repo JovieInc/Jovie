@@ -34,6 +34,25 @@ struct AppShellChatFirstTests {
     #expect(LaunchMode.uiTestingChat.defaultInitialTab == .chat)
   }
 
+  @Test func uiTestingChatAllComponentsYieldsChatDefaultAndResolvesArg() {
+    #expect(LaunchMode.uiTestingChatAllComponents.defaultInitialTab == .chat)
+    #expect(LaunchMode.uiTestingChatAllComponents.opensChatOnLaunch)
+    #expect(LaunchMode.uiTestingChatAllComponents.usesLiveAuth == false)
+    #expect(LaunchMode.uiTestingChatAllComponents.needsChatRepository)
+    #expect(
+      LaunchMode.resolving(arguments: ["-ui-testing-chat-all-components"], isXCTest: false)
+        == .uiTestingChatAllComponents
+    )
+    #expect(
+      LaunchMode.uiTestingChatAllComponents.chatEntityFixture
+        == MobileChatAllComponentsFixture.default
+    )
+    #expect(
+      LaunchMode.uiTestingChatAllComponents.chatFixtureConversationID
+        == MobileChatAllComponentsFixture.conversationID
+    )
+  }
+
   @Test func uiTestingAudienceYieldsChatDefault() {
     #expect(LaunchMode.uiTestingAudience.defaultInitialTab == .chat)
   }
@@ -60,6 +79,20 @@ struct AppShellChatFirstTests {
     #expect(MobileChatKeyboardPolicy.shouldDismissOnStreamingStart(userEditedSinceSend: true) == false)
   }
 
+  @Test func keyboardDismissesOnDownwardDragPastThreshold() {
+    #expect(MobileChatKeyboardPolicy.shouldDismissOnDownwardDrag(translationHeight: 41))
+    #expect(MobileChatKeyboardPolicy.shouldDismissOnDownwardDrag(translationHeight: 40) == false)
+  }
+
+  @Test func composerTrailingSlotIsMicWhenEmptyAndSendWhenTyped() {
+    #expect(ChatComposerTrailingAction.action(draftIsEmpty: true) == .mic)
+    #expect(ChatComposerTrailingAction.action(draftIsEmpty: false) == .send)
+    #expect(ChatComposerTrailingAction.mic.accessibilityIdentifier == "chat-composer-mic")
+    #expect(ChatComposerTrailingAction.send.accessibilityIdentifier == "chat-composer-send")
+    #expect(ChatComposerTrailingAction.mic.accessibilityLabel == "Talk")
+    #expect(ChatComposerTrailingAction.send.accessibilityLabel == "Send")
+  }
+
   @Test func keepsChatMountedAcrossTabs() {
     #expect(appShellKeepsChatMountedAcrossTabs())
   }
@@ -76,5 +109,49 @@ struct AppShellChatFirstTests {
   @Test func hidesChatUnderlayWhenChatDisabled() {
     #expect(appShellShowsChatUnderlay(selectedTab: .chat, chatEnabled: false) == false)
     #expect(appShellShowsChatUnderlay(selectedTab: .library, chatEnabled: false) == false)
+  }
+
+  @Test func autoScrollsOnlyWhilePinnedToLatest() {
+    #expect(MobileChatScrollPolicy.shouldAutoScrollToLatest(isAtBottom: true))
+    #expect(MobileChatScrollPolicy.shouldAutoScrollToLatest(isAtBottom: false) == false)
+  }
+
+  @Test func jumpToLatestAppearsOnlyAfterUserScrollsAway() {
+    #expect(MobileChatScrollPolicy.shouldShowJumpToLatest(isAtBottom: false))
+    #expect(MobileChatScrollPolicy.shouldShowJumpToLatest(isAtBottom: true) == false)
+  }
+
+  @Test func composerSendStaysDisabledForEmptyOrInFlightDrafts() {
+    #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "", isSending: false) == false)
+    #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "Ask Jovie", isSending: true) == false)
+    #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "Ask Jovie", isSending: false))
+  }
+
+  @Test func composerPlusDisablesWhileSending() {
+    #expect(ChatComposerMetrics.isPlusEnabled(isSending: false))
+    #expect(ChatComposerMetrics.isPlusEnabled(isSending: true) == false)
+  }
+
+  @Test func composerGeometryReservesSendSlotWithoutGrowingTheBar() {
+    #expect(ChatComposerMetrics.barHeight == 52)
+    #expect(ChatComposerMetrics.sendSlotSize == 36)
+    #expect(ChatComposerMetrics.plusButtonSize == 36)
+    #expect(ChatComposerMetrics.sendSlotSize <= ChatComposerMetrics.barHeight)
+  }
+
+  @Test func waitlistLaunchStaysOffTheAppShell() {
+    #expect(
+      LaunchMode.resolving(arguments: ["-ui-testing-waitlist-pending"], isXCTest: false)
+        == .uiTestingWaitlistPending
+    )
+    #expect(LaunchMode.uiTestingWaitlistPending.usesLiveAuth == false)
+    #expect(LaunchMode.uiTestingWaitlistPending.opensChatOnLaunch == false)
+    #expect(LaunchMode.uiTestingWaitlistPending.needsChatRepository == false)
+  }
+
+  @Test func chatFirstHomeDoesNotUseBottomTabs() {
+    #expect(appShellHomeSurface(chatEnabled: true) == .chat)
+    #expect(AppShellPanePolicy.showsBottomTabBar() == false)
+    #expect(AppShellGesturePolicy.shouldSwitchTabFromHorizontalSwipe() == false)
   }
 }

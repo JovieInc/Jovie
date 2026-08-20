@@ -390,6 +390,7 @@ describe('LibrarySurface', () => {
   it('renders an empty read-only library state with a releases escape hatch', () => {
     renderLibrary([]);
 
+    const emptyState = screen.getByTestId('library-workspace-empty-state');
     expect(screen.getByText('No Library Items')).toBeDefined();
     expect(
       screen.getByText(
@@ -400,6 +401,10 @@ describe('LibrarySurface', () => {
       'href',
       APP_ROUTES.RELEASES
     );
+    expect(emptyState).toHaveClass('py-16', 'min-h-90');
+    expect(
+      screen.getByRole('heading', { name: 'No Library Items' })
+    ).toHaveClass('text-2xl', 'font-semibold', 'text-primary-token');
   });
 
   it('defaults to grid view on first load', () => {
@@ -1699,10 +1704,10 @@ describe('LibrarySurface', () => {
     const before = contentFrame.getBoundingClientRect();
     const trigger = screen.getByRole('button', { name: 'Show filters' });
     expect(trigger).toHaveClass('h-7', 'w-7');
-    expect(trigger.className).toContain('before:h-10');
-    expect(trigger.className).toContain('before:min-w-10');
-    expect(trigger.className).not.toContain('min-h-11');
-    expect(trigger.className).not.toContain('min-w-11');
+    expect(trigger.className).toContain('before:h-11');
+    expect(trigger.className).toContain('before:min-w-11');
+    expect(trigger.className).not.toMatch(/(?:^|\s)min-h-11(?:\s|$)/);
+    expect(trigger.className).not.toMatch(/(?:^|\s)min-w-11(?:\s|$)/);
 
     await user.click(trigger);
 

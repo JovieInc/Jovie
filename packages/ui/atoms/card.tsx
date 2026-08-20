@@ -6,13 +6,13 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 
 const cardVariants = cva(
-  'rounded-(--system-b-radius-card) border border-subtle bg-surface-1 text-primary-token shadow-card transition-colors duration-normal ease-interactive',
+  'rounded-(--system-b-radius-card) border border-subtle bg-surface-1 text-primary-token shadow-card transition-[background-color,border-color,box-shadow] duration-subtle ease-subtle motion-reduce:transition-none',
   {
     variants: {
       variant: {
         default: '',
         hoverable:
-          'hover:bg-surface-2 hover:shadow-card-elevated cursor-pointer motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)/30 focus-visible:ring-offset-1',
+          'cursor-pointer hover:border-default hover:bg-surface-2 hover:shadow-card-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/55 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page',
       },
     },
     defaultVariants: {
@@ -28,6 +28,12 @@ export interface CardProps
     VariantProps<typeof cardVariants> {
   readonly asChild?: boolean;
   /**
+   * Compose Card's polymorphic root without applying canonical chrome.
+   * Reserved for compatibility adapters that already own a stable visual
+   * contract and are migrating to the canonical Card substrate incrementally.
+   */
+  readonly unstyled?: boolean;
+  /**
    * Async/partial content state for data-backed cards.
    */
   readonly contentState?: CardContentState;
@@ -35,23 +41,38 @@ export interface CardProps
 
 const Card = React.forwardRef<HTMLDivElement, CardProps>(
   (
-    { className, variant, asChild = false, contentState = 'default', ...props },
+    {
+      className,
+      variant,
+      asChild = false,
+      unstyled = false,
+      contentState = 'default',
+      'aria-busy': ariaBusy,
+      ...props
+    },
     ref
   ) => {
     const Comp = asChild ? Slot : 'div';
+    const resolvedVariant = variant ?? 'default';
 
     return (
       <Comp
+        {...props}
         ref={ref}
         data-content-state={
           contentState === 'default' ? undefined : contentState
         }
-        className={cn(
-          cardVariants({ variant, className }),
-          contentState === 'partial' &&
-            'opacity-[var(--state-partial-opacity)] saturate-75'
-        )}
-        {...props}
+        data-variant={unstyled ? undefined : resolvedVariant}
+        aria-busy={contentState === 'partial' ? true : ariaBusy}
+        className={
+          unstyled
+            ? className
+            : cn(
+                cardVariants({ variant: resolvedVariant, className }),
+                contentState === 'partial' &&
+                  'opacity-[var(--state-partial-opacity)] saturate-75'
+              )
+        }
       />
     );
   }

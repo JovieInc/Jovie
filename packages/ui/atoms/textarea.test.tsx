@@ -23,8 +23,9 @@ describe('Textarea', () => {
       expect(source).toContain(
         'transition-[background-color,border-color,box-shadow,color,opacity]'
       );
-      expect(source).toContain('duration-normal');
-      expect(source).toContain('ease-interactive');
+      expect(source).toContain('duration-subtle');
+      expect(source).toContain('ease-subtle');
+      expect(source).toContain('motion-reduce:transition-none');
     });
   });
 
@@ -69,39 +70,35 @@ describe('Textarea', () => {
     it('applies default variant classes', () => {
       render(<Textarea data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
-      expect(textarea.className).toContain('border-(--linear-border-subtle)');
-      expect(textarea.className).toContain('bg-(--linear-bg-surface-1)');
+      expect(textarea.className).toContain('border-subtle');
+      expect(textarea.className).toContain('bg-surface-1');
     });
 
     it('applies hover border class', () => {
       render(<Textarea data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
-      expect(textarea.className).toContain(
-        'hover:border-(--linear-border-default)'
-      );
+      expect(textarea.className).toContain('hover:border-default');
     });
 
     it('applies Jovie focus token classes', () => {
       render(<Textarea data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
-      expect(textarea.className).toContain(
-        'focus-visible:border-(--linear-border-focus)'
-      );
-      expect(textarea.className).toContain(
-        'focus-visible:ring-(--linear-border-focus)'
-      );
+      expect(textarea.className).toContain('focus-visible:border-focus');
+      expect(textarea.className).toContain('focus-visible:ring-focus/25');
     });
 
     it('applies error variant classes', () => {
       render(<Textarea variant='error' data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
-      expect(textarea.className).toContain('border-(--linear-error)');
+      expect(textarea.className).toContain('border-error');
+      expect(textarea.className).toContain('focus-visible:ring-error/25');
     });
 
     it('applies success variant classes', () => {
       render(<Textarea variant='success' data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
       expect(textarea.className).toContain('border-success');
+      expect(textarea.className).toContain('focus-visible:ring-success/25');
     });
 
     it('applies sm size classes', () => {
@@ -129,7 +126,7 @@ describe('Textarea', () => {
       render(<Textarea className='custom-class' data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
       expect(textarea.className).toContain('custom-class');
-      expect(textarea.className).toContain('border-(--linear-border-subtle)');
+      expect(textarea.className).toContain('border-subtle');
     });
   });
 
@@ -194,7 +191,7 @@ describe('Textarea', () => {
     it('applies error variant when error prop is provided', () => {
       render(<Textarea error='Error message' data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
-      expect(textarea.className).toContain('border-(--linear-error)');
+      expect(textarea.className).toContain('border-error');
     });
 
     it('sets aria-invalid when error is present', () => {
@@ -205,10 +202,33 @@ describe('Textarea', () => {
       );
     });
 
-    it('hides help text when error is present', () => {
+    it('honors boolean aria-invalid from form libraries', () => {
+      render(<Textarea aria-invalid={true} data-testid='textarea' />);
+      const textarea = screen.getByTestId('textarea');
+
+      expect(textarea).toHaveAttribute('aria-invalid', 'true');
+      expect(textarea.className).toContain('border-error');
+    });
+
+    it.each([
+      'grammar',
+      'spelling',
+    ] as const)('preserves the %s aria-invalid reason', reason => {
+      render(<Textarea aria-invalid={reason} data-testid='textarea' />);
+      const textarea = screen.getByTestId('textarea');
+
+      expect(textarea).toHaveAttribute('aria-invalid', reason);
+      expect(textarea.className).toContain('border-error');
+    });
+
+    it('preserves help text alongside an error', () => {
       render(<Textarea helpText='Help text' error='Error message' />);
-      expect(screen.queryByText('Help text')).not.toBeInTheDocument();
+      expect(screen.getByText('Help text')).toBeInTheDocument();
       expect(screen.getByText('Error message')).toBeInTheDocument();
+      const describedBy = screen
+        .getByRole('textbox')
+        .getAttribute('aria-describedby');
+      expect(describedBy?.split(' ')).toHaveLength(2);
     });
   });
 
@@ -216,7 +236,7 @@ describe('Textarea', () => {
     it('applies invalid validation state', () => {
       render(<Textarea validationState='invalid' data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
-      expect(textarea.className).toContain('border-(--linear-error)');
+      expect(textarea.className).toContain('border-error');
       expect(textarea).toHaveAttribute('aria-invalid', 'true');
     });
 
@@ -224,6 +244,48 @@ describe('Textarea', () => {
       render(<Textarea validationState='valid' data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
       expect(textarea.className).toContain('border-success');
+    });
+
+    it('announces pending validation work', () => {
+      render(<Textarea validationState='pending' data-testid='textarea' />);
+      expect(screen.getByTestId('textarea')).toHaveAttribute(
+        'aria-busy',
+        'true'
+      );
+    });
+
+    it('lets pending state override aria-busy=false', () => {
+      render(
+        <Textarea
+          validationState='pending'
+          aria-busy={false}
+          data-testid='textarea'
+        />
+      );
+      expect(screen.getByTestId('textarea')).toHaveAttribute(
+        'aria-busy',
+        'true'
+      );
+    });
+  });
+
+  describe('Layout stability', () => {
+    it('reserves feedback space before and after an error appears', () => {
+      const { container, rerender } = render(
+        <Textarea label='Bio' helpText='Tell fans about yourself.' />
+      );
+      expect(container.querySelector('.min-h-5')).toBeInTheDocument();
+
+      rerender(
+        <Textarea
+          label='Bio'
+          helpText='Tell fans about yourself.'
+          error='Bio is too short.'
+        />
+      );
+      expect(container.querySelector('.min-h-5')).toBeInTheDocument();
+      expect(screen.getByText('Tell fans about yourself.')).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent('Bio is too short.');
     });
   });
 

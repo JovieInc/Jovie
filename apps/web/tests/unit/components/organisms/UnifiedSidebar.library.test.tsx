@@ -364,7 +364,7 @@ describe('UnifiedSidebar library route', () => {
       within(operatorNavigation).getByRole('link', { name: 'Overview' })
     ).not.toHaveAttribute('aria-current');
     expect(
-      within(operatorNavigation).getByRole('link', { name: 'Ops' })
+      within(operatorNavigation).getByRole('link', { name: 'Ovie' })
     ).toHaveAttribute('aria-current', 'page');
     expect(
       operatorNavigation.querySelectorAll('[aria-current="page"]')

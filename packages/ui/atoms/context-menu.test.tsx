@@ -451,6 +451,7 @@ describe('ContextMenu', () => {
       await waitFor(() => {
         const menu = screen.getByRole('menu');
         expect(menu.className).toContain('custom-content');
+        expect(menu.className).toContain('rounded-(--system-b-radius-overlay)');
       });
     });
 
@@ -470,6 +471,8 @@ describe('ContextMenu', () => {
       await waitFor(() => {
         const item = screen.getByRole('menuitem');
         expect(item.className).toContain('custom-item');
+        expect(item.className).toContain('min-h-8');
+        expect(item.className).toContain('focus-visible:ring-inset');
       });
     });
 

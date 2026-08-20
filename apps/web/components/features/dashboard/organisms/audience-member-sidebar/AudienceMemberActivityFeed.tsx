@@ -17,10 +17,7 @@ export function AudienceMemberActivityFeed({
 
   if (actions.length === 0) {
     return (
-      <DrawerInlineNote
-        className='min-h-26'
-        message='Activity will appear here as this contact interacts with your profile.'
-      />
+      <DrawerInlineNote message='Activity will appear here as this contact interacts with your profile.' />
     );
   }
 

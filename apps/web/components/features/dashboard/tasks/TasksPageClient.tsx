@@ -2,6 +2,7 @@
 
 import {
   Button,
+  ConfirmDialog,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuSeparator,
@@ -49,7 +50,6 @@ import {
   HIDDEN_DIV_STYLES,
   useTextareaAutosize,
 } from '@/components/jovie/hooks/useTextareaAutosize';
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { EntitySidebarShell } from '@/components/molecules/drawer';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import {

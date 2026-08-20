@@ -2,7 +2,9 @@
 
 import { Badge, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import { ChannelIcon } from '@/features/profile/artist-contacts-button/ContactIcons';
+import { formatPublicContactChannelAriaLabel } from '@/features/profile/artist-contacts-button/contact-channel-label';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
+import { formatPublicContactSubtitle } from '@/lib/contacts/format-public-contact';
 import type { PublicContact, PublicContactChannel } from '@/types/contacts';
 
 interface ProfileContactDrawerContentProps {
@@ -82,16 +84,7 @@ export function ProfileContactDrawerContent({
       data-testid='profile-contact-drawer-content'
     >
       {contacts.map(contact => {
-        const metadata = [
-          contact.companyLabel ?? contact.secondaryLabel,
-          contact.contactName ?? contact.primaryContactLabel,
-        ]
-          .filter(Boolean)
-          .join(' · ');
-        const channelLabels: Record<string, string> = {
-          email: 'Email',
-          sms: 'Text',
-        };
+        const metadata = formatPublicContactSubtitle(contact);
 
         return (
           <div
@@ -133,7 +126,10 @@ export function ProfileContactDrawerContent({
                     key={`${contact.id}-${channel.type}`}
                     href={channelHref}
                     className='flex h-9 w-9 items-center justify-center rounded-full text-white/50 transition-colors duration-subtle hover:bg-white/[0.08] hover:text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
-                    aria-label={`${channelLabels[channel.type] ?? 'Call'} ${contact.roleLabel}`}
+                    aria-label={formatPublicContactChannelAriaLabel(
+                      channel.type,
+                      contact
+                    )}
                     onClick={() => trackAction(channel, contact)}
                     data-testid='contact-drawer-channel-action'
                   >

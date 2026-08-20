@@ -1,43 +1,14 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
   getDeploymentLabel,
   getDeploymentTone,
   type HudTone,
 } from '@/lib/hud/tone-determination';
-import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
 import { getAccentCssVars, HUD_TONE_ACCENT } from '@/lib/ui/accent-palette';
 import { cn } from '@/lib/utils';
 import type { HudMetrics } from '@/types/hud';
-import type {
-  HudShipperState,
-  HudShipperStatusPayload,
-} from '@/types/hud-shipper';
-
-function shipperTone(state: HudShipperState): HudTone {
-  if (state === 'running') return 'good';
-  if (state === 'paused') return 'warning';
-  if (state === 'error') return 'bad';
-  return 'neutral';
-}
-
-function shipperLabel(state: HudShipperState): string {
-  if (state === 'running') return 'Running';
-  if (state === 'paused') return 'Paused';
-  if (state === 'error') return 'Error';
-  if (state === 'idle') return 'Idle';
-  return 'Not Running';
-}
-
-async function fetchJson<T>(path: string, signal: AbortSignal): Promise<T> {
-  const response = await fetch(path, { signal, cache: 'no-store' });
-  if (!response.ok) {
-    throw new Error(`Request failed (${response.status})`);
-  }
-  return (await response.json()) as T;
-}
 
 function StatusPill({
   label,
@@ -69,43 +40,21 @@ interface HealthEntry {
   readonly tone: HudTone;
 }
 
-function shipperHealth(
-  shipper: HudShipperStatusPayload | undefined
-): Pick<HealthEntry, 'label' | 'tone'> {
-  if (shipper === undefined || shipper.availability === 'unavailable') {
-    return {
-      label: shipper === undefined ? '—' : 'No signal',
-      tone: 'neutral',
-    };
-  }
-  return {
-    label: shipperLabel(shipper.state),
-    tone: shipperTone(shipper.state),
-  };
-}
+const GBRAIN_NO_SIGNAL_LABEL = 'No Signal';
 
 function ledgerTone(quarantine: HudMetrics['testing']['quarantine']): HudTone {
   if (!quarantine.isValid) return 'bad';
   return quarantine.withinRetryBudget ? 'good' : 'warning';
 }
 
-function buildHealthEntries(
-  metrics: HudMetrics,
-  shipper: HudShipperStatusPayload | undefined
-): HealthEntry[] {
+function buildHealthEntries(metrics: HudMetrics): HealthEntry[] {
   const quarantine = metrics.testing.quarantine;
-  const jobsRunning =
-    metrics.aiOps.counts.running + (shipper?.inFlightCount ?? 0);
-  const shipperStatus = shipperHealth(shipper);
+  const jobsRunning = metrics.aiOps.counts.running;
 
   return [
-    {
-      name: 'Shipper',
-      ...shipperStatus,
-    },
     // No gbrain health source is wired into the HUD yet — render an honest
     // neutral pill rather than a fabricated status. Wire when a source lands.
-    { name: 'gbrain', label: 'No signal', tone: 'neutral' },
+    { name: 'gbrain', label: GBRAIN_NO_SIGNAL_LABEL, tone: 'neutral' },
     {
       name: 'CI',
       label: getDeploymentLabel(metrics.deployments),
@@ -127,24 +76,13 @@ function buildHealthEntries(
 }
 
 /**
- * Single-row system health strip for the operator HUD (#12887): shipper,
- * gbrain, CI, quarantine ledger, and jobs running. Pills reuse the HUD
- * tone accent tokens; shipper status shares the existing
- * ['hud', 'shipper'] query cache with HudShipperPanels.
+ * Factory-health strip: gbrain, CI, quarantine ledger, and jobs running.
+ * Shipper status lives once in the need-band shipper panel.
  */
 export function HudSystemHealthStrip({
   metrics,
 }: Readonly<{ readonly metrics: HudMetrics }>) {
-  const shipperQuery = useQuery({
-    queryKey: ['hud', 'shipper'],
-    queryFn: ({ signal }) =>
-      fetchJson<HudShipperStatusPayload>('/api/admin/hud/shipper', signal),
-    ...FREQUENT_CACHE,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
-  });
-
-  const entries = buildHealthEntries(metrics, shipperQuery.data);
+  const entries = buildHealthEntries(metrics);
 
   return (
     <ContentSurfaceCard

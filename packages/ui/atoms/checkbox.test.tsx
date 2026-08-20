@@ -183,27 +183,27 @@ describe('Checkbox', () => {
   });
 
   describe('Styling', () => {
-    it('applies hover styles on checkbox indicator', () => {
+    it('applies semantic hover styles on checkbox indicator', () => {
       render(<Checkbox aria-label='Test' data-testid='checkbox' />);
       const checkbox = screen.getByTestId('checkbox');
-      expect(checkbox.className).toContain('hover:border-(--color-accent)');
-      expect(checkbox.className).toContain('hover:bg-(--linear-bg-surface-1)');
+      expect(checkbox.className).toContain('hover:border-default');
+      expect(checkbox.className).toContain('hover:bg-surface-1');
     });
 
     it('applies focus-visible ring styles', () => {
       render(<Checkbox aria-label='Test' data-testid='checkbox' />);
       const checkbox = screen.getByTestId('checkbox');
       expect(checkbox.className).toContain('focus-visible:ring-2');
-      expect(checkbox.className).toContain(
-        'focus-visible:ring-(--color-accent)'
-      );
+      expect(checkbox.className).toContain('focus-visible:ring-focus/55');
     });
 
     it('applies disabled styling', () => {
       render(<Checkbox disabled aria-label='Test' data-testid='checkbox' />);
       const checkbox = screen.getByTestId('checkbox');
       expect(checkbox.className).toContain('disabled:cursor-not-allowed');
-      expect(checkbox.className).toContain('disabled:opacity-50');
+      expect(checkbox.className).toContain(
+        'disabled:opacity-[var(--state-disabled-opacity)]'
+      );
     });
 
     it('applies checked state styling', () => {
@@ -212,7 +212,24 @@ describe('Checkbox', () => {
       );
       const checkbox = screen.getByTestId('checkbox');
       expect(checkbox.className).toContain(
-        'data-[state=checked]:bg-(--linear-btn-primary-bg)'
+        'data-[state=checked]:bg-btn-primary'
+      );
+    });
+
+    it('provides a 44px pointer target without changing visual size', () => {
+      render(<Checkbox aria-label='Test' data-testid='checkbox' />);
+      const checkbox = screen.getByTestId('checkbox');
+
+      expect(checkbox.className).toContain('h-4');
+      expect(checkbox.className).toContain('w-4');
+      expect(checkbox.className).toContain('before:h-11');
+      expect(checkbox.className).toContain('before:w-11');
+    });
+
+    it('disables transitions when reduced motion is requested', () => {
+      render(<Checkbox aria-label='Test' data-testid='checkbox' />);
+      expect(screen.getByTestId('checkbox').className).toContain(
+        'motion-reduce:transition-none'
       );
     });
 

@@ -9,9 +9,10 @@ import { getMobileSessionUserId } from '@/lib/mobile/session-auth';
 import { isAppleWalletProfilePassAvailable } from '@/lib/wallet/apple/profile-pass';
 
 export const runtime = 'nodejs';
+const WAITLIST_PENDING_CAPABILITY = 'waitlist_pending';
 
 export interface MobileMeResponse {
-  state: 'ready' | 'needs_onboarding';
+  state: 'ready' | 'needs_onboarding' | 'waitlist_pending';
   displayName: string | null;
   username: string | null;
   publicProfileUrl: string | null;
@@ -20,6 +21,25 @@ export interface MobileMeResponse {
   continueOnWebUrl: string;
   appleWalletProfilePassAvailable: boolean;
   chatEnabled: boolean;
+}
+
+function buildWaitlistPendingResponse(): NextResponse {
+  const payload: MobileMeResponse = {
+    state: 'waitlist_pending',
+    displayName: null,
+    username: null,
+    publicProfileUrl: null,
+    qrPayload: null,
+    avatarUrl: null,
+    continueOnWebUrl: getAppUrl(),
+    appleWalletProfilePassAvailable: false,
+    chatEnabled: false,
+  };
+
+  return NextResponse.json(payload, {
+    status: 200,
+    headers: NO_STORE_HEADERS,
+  });
 }
 
 function buildNeedsOnboardingResponse(profile?: {
@@ -79,6 +99,19 @@ export async function GET(request: Request) {
         { error: 'Forbidden' },
         { status: 403, headers: NO_STORE_HEADERS }
       );
+    }
+
+    if (session.user.userStatus === 'waitlist_pending') {
+      const capabilities =
+        request.headers.get('x-jovie-mobile-capabilities')?.split(',') ?? [];
+      if (
+        capabilities.some(
+          capability => capability.trim() === WAITLIST_PENDING_CAPABILITY
+        )
+      ) {
+        return buildWaitlistPendingResponse();
+      }
+      return buildNeedsOnboardingResponse();
     }
 
     const { profile } = session;

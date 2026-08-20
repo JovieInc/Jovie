@@ -730,6 +730,7 @@ export function ProfileDesktopSurface({
                   alt={latestVisibleRelease?.title ?? artist.name}
                   fill
                   sizes='320px'
+                  priority
                   className='object-cover'
                   fallbackVariant='release'
                 />

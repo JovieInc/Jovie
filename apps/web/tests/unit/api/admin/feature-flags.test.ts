@@ -3,8 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockRequireAdmin = vi.hoisted(() => vi.fn());
 const mockAuth = vi.hoisted(() => vi.fn());
-const mockOnConflictDoUpdate = vi.hoisted(() => vi.fn());
-const mockRevalidate = vi.hoisted(() => vi.fn());
+const mockWriteFlagOverride = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/admin/middleware', () => ({ requireAdmin: mockRequireAdmin }));
 vi.mock('@/lib/auth/cached', () => ({
@@ -12,18 +11,8 @@ vi.mock('@/lib/auth/cached', () => ({
   getOptionalAuth: mockAuth,
   getCachedSessionTokenAuth: mockAuth,
 }));
-vi.mock('@/lib/db', () => ({
-  db: {
-    insert: () => ({
-      values: () => ({ onConflictDoUpdate: mockOnConflictDoUpdate }),
-    }),
-  },
-}));
-vi.mock('@/lib/db/schema/feature-flags', () => ({
-  featureFlagOverrides: { flagKey: 'flag_key' },
-}));
-vi.mock('@/lib/flags/overrides-store.server', () => ({
-  revalidateFeatureFlags: mockRevalidate,
+vi.mock('@/lib/flags/write-override.server', () => ({
+  writeFlagOverride: mockWriteFlagOverride,
 }));
 
 import { POST } from '@/app/api/admin/feature-flags/route';
@@ -41,7 +30,7 @@ describe('POST /api/admin/feature-flags', () => {
     vi.clearAllMocks();
     mockRequireAdmin.mockResolvedValue(null); // authorized
     mockAuth.mockResolvedValue({ userId: 'admin_123' });
-    mockOnConflictDoUpdate.mockResolvedValue(undefined);
+    mockWriteFlagOverride.mockResolvedValue({ previousValue: null });
   });
 
   it('blocks non-admins before any write', async () => {
@@ -54,8 +43,7 @@ describe('POST /api/admin/feature-flags', () => {
     );
 
     expect(res.status).toBe(403);
-    expect(mockOnConflictDoUpdate).not.toHaveBeenCalled();
-    expect(mockRevalidate).not.toHaveBeenCalled();
+    expect(mockWriteFlagOverride).not.toHaveBeenCalled();
   });
 
   it('rejects an unknown flag key', async () => {
@@ -63,7 +51,7 @@ describe('POST /api/admin/feature-flags', () => {
       request({ flagKey: 'NOT_A_FLAG', envTier: 'prod', enabled: true })
     );
     expect(res.status).toBe(400);
-    expect(mockOnConflictDoUpdate).not.toHaveBeenCalled();
+    expect(mockWriteFlagOverride).not.toHaveBeenCalled();
   });
 
   it('rejects an invalid env tier', async () => {
@@ -71,11 +59,30 @@ describe('POST /api/admin/feature-flags', () => {
       request({ flagKey: 'SPOTIFY_OAUTH', envTier: 'qa', enabled: true })
     );
     expect(res.status).toBe(400);
+    expect(mockWriteFlagOverride).not.toHaveBeenCalled();
   });
 
-  it('upserts the cell and revalidates on a valid write', async () => {
+  it('rejects an over-long reason', async () => {
     const res = await POST(
-      request({ flagKey: 'SPOTIFY_OAUTH', envTier: 'staging', enabled: false })
+      request({
+        flagKey: 'SPOTIFY_OAUTH',
+        envTier: 'prod',
+        enabled: true,
+        reason: 'x'.repeat(501),
+      })
+    );
+    expect(res.status).toBe(400);
+    expect(mockWriteFlagOverride).not.toHaveBeenCalled();
+  });
+
+  it('writes the override with actor and reason on a valid write', async () => {
+    const res = await POST(
+      request({
+        flagKey: 'SPOTIFY_OAUTH',
+        envTier: 'prod',
+        enabled: false,
+        reason: 'Investigating elevated Spotify errors',
+      })
     );
     const data = await res.json();
 
@@ -83,11 +90,16 @@ describe('POST /api/admin/feature-flags', () => {
     expect(data).toMatchObject({
       ok: true,
       flagKey: 'SPOTIFY_OAUTH',
-      envTier: 'staging',
+      envTier: 'prod',
       enabled: false,
     });
-    expect(mockOnConflictDoUpdate).toHaveBeenCalledTimes(1);
-    expect(mockRevalidate).toHaveBeenCalledTimes(1);
+    expect(mockWriteFlagOverride).toHaveBeenCalledWith({
+      flagKey: 'SPOTIFY_OAUTH',
+      envTier: 'prod',
+      enabled: false,
+      actor: 'admin_123',
+      reason: 'Investigating elevated Spotify errors',
+    });
   });
 
   it('accepts null to clear a cell back to the code default', async () => {
@@ -95,6 +107,21 @@ describe('POST /api/admin/feature-flags', () => {
       request({ flagKey: 'SPOTIFY_OAUTH', envTier: 'dev', enabled: null })
     );
     expect(res.status).toBe(200);
-    expect(mockOnConflictDoUpdate).toHaveBeenCalledTimes(1);
+    expect(mockWriteFlagOverride).toHaveBeenCalledWith(
+      expect.objectContaining({
+        flagKey: 'SPOTIFY_OAUTH',
+        envTier: 'dev',
+        enabled: null,
+        reason: undefined,
+      })
+    );
+  });
+
+  it('returns 500 when the write fails so the UI can revert', async () => {
+    mockWriteFlagOverride.mockRejectedValue(new Error('db down'));
+    const res = await POST(
+      request({ flagKey: 'SPOTIFY_OAUTH', envTier: 'prod', enabled: true })
+    );
+    expect(res.status).toBe(500);
   });
 });

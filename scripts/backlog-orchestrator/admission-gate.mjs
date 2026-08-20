@@ -2,7 +2,9 @@
 
 import { createHash } from 'node:crypto';
 import { hasProtectedAdmissionLabel } from './admission-policy.mjs';
-import { PLAN_APPROVED_LABEL, planGateReceipt } from './plan-gate.mjs';
+import { contextGateReceipt, issueContentHash } from './context-gate.mjs';
+import { planGateReceipt } from './plan-gate.mjs';
+import { researchGateReceipt } from './research-gate.mjs';
 
 export const ADMISSION_GATE_SCHEMA = 'admission-gate/v1';
 export const ADMISSION_GATE_PREFIX = '<!-- admission-gate/v1 -->';
@@ -39,36 +41,88 @@ function isTimOwned(issue) {
   );
 }
 
-export function validateAdmissionCandidate(issue) {
+export function validateAdmissionCandidate(
+  issue,
+  { now = new Date().toISOString() } = {}
+) {
   if (!issue?.id || !/^(?:JOV|LYB)-\d+$/.test(issue.identifier || ''))
     return 'not-concrete-routed-issue';
   if (!ALLOWED_STATES.has(issue.state?.name || issue.state))
     return 'ambiguous-or-active-state';
   if (isTimOwned(issue)) return 'tim-owned';
   if (hasProtectedAdmissionLabel(issue)) return 'protected-or-human-review';
-  if (!hasLabel(issue, PLAN_APPROVED_LABEL)) return 'plan-label-missing';
-  if (!planGateReceipt(issue)) return 'plan-receipt-missing-or-invalid';
+  if (!contextGateReceipt(issue, { now }))
+    return 'context-receipt-missing-or-invalid';
+  if (!researchGateReceipt(issue, { now }))
+    return 'research-receipt-missing-or-invalid';
+  if (!planGateReceipt(issue, { now }))
+    return 'plan-receipt-missing-or-invalid';
   return null;
 }
 
-export function admissionGateFingerprint(issue) {
-  const plan = planGateReceipt(issue);
+export function admissionIssueRevision(issue) {
+  return issueContentHash(issue);
+}
+
+export function admissionGateFingerprint(issue, options = {}) {
+  const plan = planGateReceipt(issue, options);
+  const context = contextGateReceipt(issue, options);
+  const research = researchGateReceipt(issue, options);
   return createHash('sha256')
-    .update(`${issue.identifier}|${plan?.payload?.fingerprint || ''}`)
+    .update(
+      `${issue.identifier}|${admissionIssueRevision(issue)}|${plan?.payload?.fingerprint || ''}|${context?.payload?.fingerprint || ''}|${research?.payload?.fingerprint || ''}`
+    )
     .digest('hex')
     .slice(0, 24);
 }
 
-export function buildAdmissionGateReceipt(issue) {
-  const plan = planGateReceipt(issue);
+export function buildAdmissionGateReceipt(issue, options = {}) {
+  const plan = planGateReceipt(issue, options);
   const payload = {
     schema: ADMISSION_GATE_SCHEMA,
     issue: issue.identifier,
-    fingerprint: admissionGateFingerprint(issue),
+    issueRevision: admissionIssueRevision(issue),
+    fingerprint: admissionGateFingerprint(issue, options),
     planFingerprint: plan?.payload?.fingerprint || '',
+    contextFingerprint:
+      contextGateReceipt(issue, options)?.payload?.fingerprint || '',
+    researchFingerprint:
+      researchGateReceipt(issue, options)?.payload?.fingerprint || '',
     decision: 'approved',
   };
   return `${ADMISSION_GATE_PREFIX}\n${JSON.stringify(payload)}\n${ADMISSION_GATE_SUFFIX}`;
+}
+
+export function admissionGateReceipt(issue, options = {}) {
+  const body = commentsOf(issue)
+    .map(commentBody)
+    .findLast(
+      value =>
+        value.startsWith(`${ADMISSION_GATE_PREFIX}\n`) &&
+        value.endsWith(`\n${ADMISSION_GATE_SUFFIX}`)
+    );
+  if (!body) return null;
+  try {
+    const payload = JSON.parse(
+      body.slice(
+        `${ADMISSION_GATE_PREFIX}\n`.length,
+        -`\n${ADMISSION_GATE_SUFFIX}`.length
+      )
+    );
+    if (
+      payload?.schema !== ADMISSION_GATE_SCHEMA ||
+      payload?.issue !== issue?.identifier ||
+      payload?.issueRevision !== admissionIssueRevision(issue) ||
+      !payload?.fingerprint ||
+      payload?.decision !== 'approved' ||
+      validateAdmissionCandidate(issue, options) ||
+      admissionGateFingerprint(issue, options) !== payload.fingerprint
+    )
+      return null;
+    return { body, payload };
+  } catch {
+    return null;
+  }
 }
 
 function hasReceipt(issue, receipt) {
@@ -92,16 +146,44 @@ function labelIds(issue, labelId) {
   ];
 }
 
-export async function approveAdmission({ issue, client, teamId = null }) {
-  const reason = validateAdmissionCandidate(issue);
+export async function approveAdmission({
+  issue,
+  client,
+  teamId = null,
+  now = new Date().toISOString(),
+}) {
+  const reason = validateAdmissionCandidate(issue, { now });
   if (reason) return { status: 'rejected', reason };
 
-  const receipt = buildAdmissionGateReceipt(issue);
-  if (hasReceipt(issue, receipt) && hasLabel(issue, ADMISSION_APPROVED_LABEL)) {
+  const receipt = buildAdmissionGateReceipt(issue, { now });
+  if (hasReceipt(issue, receipt)) {
+    if (!hasLabel(issue, ADMISSION_APPROVED_LABEL)) {
+      const label = await client.fetchTeamLabel?.(
+        teamId,
+        ADMISSION_APPROVED_LABEL
+      );
+      if (label?.id) {
+        const result = await client.setIssueLabels(
+          issue.id,
+          labelIds(issue, label.id)
+        );
+        if (mutationSucceeded(result)) {
+          const labeled = await client.fetchIssue(issue.identifier);
+          if (labeled && hasLabel(labeled, ADMISSION_APPROVED_LABEL)) {
+            return {
+              status: 'already-approved',
+              identifier: labeled.identifier,
+              fingerprint: admissionGateFingerprint(labeled, { now }),
+              receipt,
+            };
+          }
+        }
+      }
+    }
     return {
       status: 'already-approved',
       identifier: issue.identifier,
-      fingerprint: admissionGateFingerprint(issue),
+      fingerprint: admissionGateFingerprint(issue, { now }),
       receipt,
     };
   }
@@ -138,14 +220,14 @@ export async function approveAdmission({ issue, client, teamId = null }) {
     !reread ||
     !hasReceipt(reread, receipt) ||
     !hasLabel(reread, ADMISSION_APPROVED_LABEL) ||
-    validateAdmissionCandidate(reread)
+    validateAdmissionCandidate(reread, { now })
   )
     throw new Error('admission-gate-final-verification-failed');
 
   return {
     status: 'approved',
     identifier: reread.identifier,
-    fingerprint: admissionGateFingerprint(reread),
+    fingerprint: admissionGateFingerprint(reread, { now }),
     receipt,
   };
 }

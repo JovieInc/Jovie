@@ -25,10 +25,37 @@ struct MobileChatVideoProposalPayload: Equatable, Identifiable, Sendable {
   let kind: MobileChatVideoKind
   let title: String
   let script: String
+  let prompt: String?
+  let initialContentMode: TeleprompterContentMode
+
+  init(
+    kind: MobileChatVideoKind,
+    title: String,
+    script: String,
+    prompt: String? = nil,
+    initialContentMode: TeleprompterContentMode = .script
+  ) {
+    self.kind = kind
+    self.title = title
+    self.script = script
+    self.prompt = prompt
+    self.initialContentMode = initialContentMode
+  }
 
   var id: String {
     "video-proposal:\(kind.rawValue):\(title)"
   }
+
+  /// One-tap, network-free entry for founder dogfooding. Chat proposals keep
+  /// their script-first default; a quick vlog opens on the canonical Prompt
+  /// composition so the creator can start from one concise question.
+  static let quickVlog = MobileChatVideoProposalPayload(
+    kind: .bts,
+    title: "Quick Vlog",
+    script: "What do you want to share?",
+    prompt: "What do you want to share?",
+    initialContentMode: .prompt
+  )
 }
 
 extension MobileChatContentParser {

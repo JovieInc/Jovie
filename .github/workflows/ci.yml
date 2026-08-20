@@ -541,17 +541,26 @@ jobs:
               echo "::error::merge_group base_sha/head_sha are not usable exact SHAs"
               exit 1
             fi
-            git cat-file -e "${MERGE_GROUP_BASE_SHA}^{commit}"
-            git cat-file -e "${MERGE_GROUP_HEAD_SHA}^{commit}"
-            CHANGED_FILES=$(git diff --name-only "$MERGE_GROUP_BASE_SHA...$MERGE_GROUP_HEAD_SHA")
-            if [[ -z "${CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
-              # A valid native merge-group can be a tree no-op when another PR
-              # has already landed the same patch. Treat that state explicitly:
+            # JOV-4905: a coalesced/re-resolved head can make the event
+            # base...head range empty even when the combined tree still
+            # differs from live main. The helper retries against the live
+            # refs/heads/main merge-base and only then emits a typed no-op.
+            # A valid head never hard-fails on an empty event-base diff.
+            PATH_DIFF_DIR="$RUNNER_TEMP/merge-group-path-diff"
+            mkdir -p "$PATH_DIFF_DIR"
+            node scripts/lib/resolve-merge-group-path-diff.mjs \
+              --base "$MERGE_GROUP_BASE_SHA" \
+              --head "$MERGE_GROUP_HEAD_SHA" \
+              --files-out "$PATH_DIFF_DIR/files.txt" \
+              --meta-out "$PATH_DIFF_DIR/meta.env"
+            # shellcheck disable=SC1091
+            source "$PATH_DIFF_DIR/meta.env"
+            CHANGED_FILES=$(cat "$PATH_DIFF_DIR/files.txt")
+            if [[ "${IS_NOOP:-}" == "true" ]]; then
               # Path Changes succeeds with every optional lane disabled, while
               # merge-group admission, ci-fast, secret, migration, and PR Ready
               # still validate the exact combined head. The typed no-op output
               # lets only unit and build/layout skip their expensive work.
-              echo "::notice::No tree changes vs merge_group base ${MERGE_GROUP_BASE_SHA}; continuing as an explicit no-op combined head."
               echo "is_noop_merge_group=true" >> "$GITHUB_OUTPUT"
               for output in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios has_code_changes; do
                 echo "$output=false" >> "$GITHUB_OUTPUT"

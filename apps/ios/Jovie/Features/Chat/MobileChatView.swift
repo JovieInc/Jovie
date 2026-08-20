@@ -5,6 +5,22 @@ enum MobileChatKeyboardPolicy {
   static func shouldDismissOnStreamingStart(userEditedSinceSend: Bool) -> Bool {
     !userEditedSinceSend
   }
+
+  static func shouldDismissOnDownwardDrag(translationHeight: CGFloat) -> Bool {
+    translationHeight > 40
+  }
+}
+
+enum MobileChatScrollPolicy {
+  /// Auto-stick to the latest message only while the user is still pinned.
+  static func shouldAutoScrollToLatest(isAtBottom: Bool) -> Bool {
+    isAtBottom
+  }
+
+  /// Jump control appears only after the user has scrolled away from latest.
+  static func shouldShowJumpToLatest(isAtBottom: Bool) -> Bool {
+    !isAtBottom
+  }
 }
 
 struct MobileChatView: View {
@@ -13,6 +29,7 @@ struct MobileChatView: View {
   @Binding var voiceCaptureTrigger: Int
   let webBaseURL: URL
   let onEntityTap: (EntityContextItem) -> Void
+  let onRecordVideo: (MobileChatVideoProposalPayload) -> Void
 
   @FocusState private var isComposerFocused: Bool
   @State private var isAtBottom = true
@@ -23,13 +40,15 @@ struct MobileChatView: View {
     draft: Binding<String>,
     voiceCaptureTrigger: Binding<Int>,
     webBaseURL: URL,
-    onEntityTap: @escaping (EntityContextItem) -> Void = { _ in }
+    onEntityTap: @escaping (EntityContextItem) -> Void = { _ in },
+    onRecordVideo: @escaping (MobileChatVideoProposalPayload) -> Void = { _ in }
   ) {
     self.repository = repository
     _draft = draft
     _voiceCaptureTrigger = voiceCaptureTrigger
     self.webBaseURL = webBaseURL
     self.onEntityTap = onEntityTap
+    self.onRecordVideo = onRecordVideo
   }
 
   var body: some View {
@@ -44,10 +63,44 @@ struct MobileChatView: View {
         }
       }
       .safeAreaInset(edge: .bottom, spacing: 0) {
-        composerChrome
+        VStack(spacing: JovieSpacing.medium) {
+          if repository.timeline.isEmpty {
+            FeatureIntroHost(
+              catalog: .current,
+              changelogURL: FeatureIntroCatalog.changelogURL(from: webBaseURL),
+              onHighlightCTA: { isComposerFocused = true }
+            )
+            .padding(.horizontal, JovieSpacing.large)
+          }
+
+          composerChrome
+        }
       }
     }
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier("mobile-chat")
+    .contentShape(Rectangle())
+    .onTapGesture {
+      isComposerFocused = false
+    }
+    .simultaneousGesture(
+      DragGesture(minimumDistance: 24)
+        .onChanged { value in
+          guard MobileChatKeyboardPolicy.shouldDismissOnDownwardDrag(
+            translationHeight: value.translation.height
+          ) else { return }
+          isComposerFocused = false
+        }
+    )
+    .toolbar {
+      ToolbarItemGroup(placement: .keyboard) {
+        Spacer()
+        Button("Done") {
+          isComposerFocused = false
+        }
+        .accessibilityIdentifier("chat-keyboard-done")
+      }
+    }
     .task {
       await repository.refreshConversations()
     }
@@ -72,7 +125,8 @@ struct MobileChatView: View {
               onSubmitPrompt: { prompt in
                 Task { await repository.send(text: prompt) }
               },
-              onEntityTap: onEntityTap
+              onEntityTap: onEntityTap,
+              onRecordVideo: onRecordVideo
             )
             .transition(.opacity.combined(with: .offset(y: 6)))
           }
@@ -115,7 +169,7 @@ struct MobileChatView: View {
         scrollToBottomIfPinned(using: proxy, animated: true)
       }
       .overlay(alignment: .bottom) {
-        if !isAtBottom {
+        if MobileChatScrollPolicy.shouldShowJumpToLatest(isAtBottom: isAtBottom) {
           Button {
             isAtBottom = true
             withAnimation(.easeOut(duration: 0.25)) {
@@ -129,6 +183,7 @@ struct MobileChatView: View {
           .transition(.opacity.combined(with: .scale(scale: 0.85)))
           .animation(.spring(duration: 0.2), value: isAtBottom)
           .accessibilityLabel("Scroll to latest message")
+          .accessibilityIdentifier("chat-scroll-to-latest")
         }
       }
     }
@@ -154,7 +209,12 @@ struct MobileChatView: View {
           let text = draft
           draft = ""
           userEditedSinceSend = false
+          isComposerFocused = false
           Task { await repository.send(text: text) }
+        },
+        onMic: {
+          isComposerFocused = false
+          voiceCaptureTrigger += 1
         },
         onSelectWorkflow: { action in
           draft = action.prompt
@@ -174,7 +234,7 @@ struct MobileChatView: View {
     using proxy: ScrollViewProxy,
     animated: Bool
   ) {
-    guard isAtBottom else { return }
+    guard MobileChatScrollPolicy.shouldAutoScrollToLatest(isAtBottom: isAtBottom) else { return }
     if animated {
       withAnimation(.easeOut(duration: 0.25)) {
         proxy.scrollTo("chat-bottom", anchor: .bottom)
@@ -185,33 +245,41 @@ struct MobileChatView: View {
   }
 
   private var emptyState: some View {
-    VStack(spacing: JovieSpacing.large) {
-      Spacer(minLength: 120)
-
+    ScrollView {
       VStack(spacing: JovieSpacing.large) {
-        JovieLogoMark(size: 34)
+        Spacer(minLength: 120)
 
-        VStack(spacing: JovieSpacing.small) {
-          Text("Ask Jovie")
-            .font(JovieFont.display(size: 28))
-            .foregroundStyle(JovieColor.textPrimary)
+        VStack(spacing: JovieSpacing.large) {
+          JovieLogoMark(size: 34)
+
+          VStack(spacing: JovieSpacing.small) {
+            Text("Ask Jovie")
+              .font(JovieFont.display(size: 28))
+              .foregroundStyle(JovieColor.textPrimary)
+              .multilineTextAlignment(.center)
+
+            Text(
+              repository.isOffline
+                ? "Offline. Drafts stay on this device and cached history remains available."
+                : "Ask Jovie about your profile, releases, and next moves."
+            )
+            .font(JovieFont.body(size: 15))
+            .foregroundStyle(JovieColor.textTertiary)
             .multilineTextAlignment(.center)
-
-          Text(
-            repository.isOffline
-              ? "Offline. Drafts stay on this device and cached history remains available."
-              : "Ask Jovie about your profile, releases, and next moves."
-          )
-          .font(JovieFont.body(size: 15))
-          .foregroundStyle(JovieColor.textTertiary)
-          .multilineTextAlignment(.center)
-          .fixedSize(horizontal: false, vertical: true)
+            .fixedSize(horizontal: false, vertical: true)
+          }
         }
-      }
-      .frame(maxWidth: 330)
-      .padding(.horizontal, JovieSpacing.xLarge)
+        .frame(maxWidth: 330)
+        .padding(.horizontal, JovieSpacing.xLarge)
 
-      Spacer(minLength: 48)
+        Spacer(minLength: 48)
+      }
+      .frame(maxWidth: .infinity)
+    }
+    .scrollDismissesKeyboard(.interactively)
+    .contentShape(Rectangle())
+    .onTapGesture {
+      isComposerFocused = false
     }
   }
 

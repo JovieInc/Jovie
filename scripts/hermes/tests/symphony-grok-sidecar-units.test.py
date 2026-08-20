@@ -106,6 +106,11 @@ class ExitClassificationTests(unittest.TestCase):
             "GEM_FLEET_GATE_RECEIPT": str(gate),
             "GEM_PR_DRAIN_QWEN": str(probe),
             "GEM_QWEN_AGENT_EXECUTABLE": str(agent),
+            "GEM_CURSOR_EXECUTABLE": "/missing",
+            "GEM_KIMI_EXECUTABLE": "/missing",
+            "GEM_GROK_EXECUTABLE": "/missing",
+            "GEM_CLAUDE_EXECUTABLE": "/missing",
+            "GEM_DEEPSEEK_EXECUTABLE": "/missing",
         })
         environment.start()
         self.addCleanup(environment.stop)
@@ -154,6 +159,49 @@ class ExitClassificationTests(unittest.TestCase):
                     mock.patch.object(module, "_control", side_effect=control),
                 ):
                     self.assertEqual(module.reconcile(), module.EXIT_DEGRADED)
+
+    def test_ready_codex_drains_included_pools_without_stopping_symphony(self):
+        module = self.module
+        controls: list[list[str]] = []
+        selection = {
+            "schema_version": 1,
+            "deterministic_first": True,
+            "selected": {
+                "id": "cursor-grok-4.6",
+                "provider": "cursor",
+                "model": "grok-4.6",
+                "pool": "cursor-models",
+                "executor": {"executable": "/bin/true", "argv": ["{prompt}"]},
+            },
+        }
+        with (
+            mock.patch.object(module, "codex_canary_ready", return_value=(True, "ready")),
+            mock.patch.object(module, "_active_grok_units", return_value=[]),
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_linear_identifiers", return_value=["JOV-1"]),
+            mock.patch.object(module, "_model_router_selection", return_value=(selection, "model_router_ready")),
+            mock.patch.object(module, "_bundle_revision", return_value="a" * 64),
+            mock.patch.object(module, "_fetch_single_issue", return_value={"identifier": "JOV-1"}),
+            mock.patch.object(
+                module,
+                "_issue_meta",
+                return_value=(True, "admitted", {"issue_revision": "2026-08-17T00:00:00Z"}),
+            ),
+            mock.patch.object(
+                module,
+                "_control",
+                side_effect=lambda command: controls.append(command) or True,
+            ),
+            mock.patch("sys.stderr", new_callable=lambda: __import__("io").StringIO()) as stderr,
+        ):
+            self.assertEqual(module.reconcile(), 0)
+        self.assertTrue(any(command[:3] == ["systemctl", "--user", "start"] for command in controls))
+        self.assertTrue(any(command[0] == "systemd-run" for command in controls))
+        self.assertFalse(
+            any(command[:3] == ["systemctl", "--user", "stop"] for command in controls)
+        )
+        self.assertIn("drain_started=1", stderr.getvalue())
+        self.assertIn("pool=cursor-models", stderr.getvalue())
 
     def test_degraded_handoffs_exit_distinctly_from_safe_fail_closed(self):
         module = self.module

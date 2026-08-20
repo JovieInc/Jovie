@@ -722,6 +722,9 @@ describe('UserButton billing actions', () => {
       'title',
       longDisplayName
     );
+    const proBadge = within(profileItem).getByText('Pro');
+    expect(proBadge).toHaveAttribute('data-variant', 'secondary');
+    expect(proBadge).toHaveAttribute('data-size', 'sm');
 
     // The responsive max width protects the row contract on 390px screens,
     // while the wider default keeps ordinary names from clipping.

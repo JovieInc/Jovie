@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { Button } from './button';
 import {
   Card,
   CardContent,
@@ -17,7 +18,7 @@ const meta: Meta<typeof Card> = {
     docs: {
       description: {
         component:
-          'A flexible card component with shadcn-aligned primitives. Supports asChild for semantic variants and optional hoverable interactions.',
+          'A flexible surface primitive with semantic state hooks, concentric System B radii, and an optional hoverable treatment. Use asChild with a native link or button when the whole card is interactive.',
       },
     },
   },
@@ -28,6 +29,9 @@ const meta: Meta<typeof Card> = {
       options: ['default', 'hoverable'],
     },
     asChild: {
+      control: { type: 'boolean' },
+    },
+    unstyled: {
       control: { type: 'boolean' },
     },
   },
@@ -100,12 +104,7 @@ export const WithFooter: Story = {
           <p>Your account settings need to be updated to continue.</p>
         </CardContent>
         <CardFooter>
-          <button
-            type='button'
-            className='px-4 py-2 bg-primary-token text-base rounded-md hover:bg-blue-700'
-          >
-            Update Settings
-          </button>
+          <Button>Update settings</Button>
         </CardFooter>
       </>
     ),
@@ -175,6 +174,32 @@ export const AsSection: Story = {
   },
 };
 
+export const CompatibilityComposition: Story = {
+  args: {
+    asChild: true,
+    unstyled: true,
+    className:
+      'max-w-md rounded-lg border border-subtle bg-surface-1 p-4 shadow-none',
+    children: (
+      <section>
+        <p className='text-sm font-medium'>Legacy surface adapter</p>
+        <p className='mt-1 text-sm text-secondary-token'>
+          Canonical Card owns the polymorphic root while the compatibility
+          adapter preserves its established chrome.
+        </p>
+      </section>
+    ),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Migration-only composition mode for established adapters that must retain exact visual and DOM parity.',
+      },
+    },
+  },
+};
+
 export const DarkTheme: Story = {
   parameters: {
     backgrounds: { default: 'dark' },
@@ -199,19 +224,19 @@ export const DarkTheme: Story = {
 export const HoverableInteractive: Story = {
   args: {
     variant: 'hoverable',
-    onClick: () => alert('Card clicked!'),
+    asChild: true,
     children: (
-      <>
+      <a href='#card-destination' className='block max-w-md'>
         <CardHeader>
           <CardTitle>Clickable Card</CardTitle>
           <CardDescription>
-            This card is both hoverable and clickable.
+            This card uses a native link for keyboard and pointer interaction.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <p>Click anywhere on this card to trigger an action.</p>
+          <p>Tab to the card to inspect the semantic focus treatment.</p>
         </CardContent>
-      </>
+      </a>
     ),
   },
 };
@@ -281,6 +306,7 @@ export const LongContent: Story = {
 
 export const InlineOffline: Story = {
   args: {
+    contentState: 'offline',
     className: 'max-w-md',
     children: (
       <>

@@ -244,8 +244,10 @@ describe('bounded PR visual review contract', () => {
     expect(workflow).toContain('pull_request_target:');
     expect(workflow).toContain('cancel-in-progress: true');
     expect(workflow).toContain('retention-days: 14');
-    expect(workflow).toContain('VISUAL_REVIEW_AUTOFIX_ENABLED');
-    expect(workflow).toContain('Do not alter subjective/taste findings.');
+    expect(workflow).not.toContain('VISUAL_REVIEW_AUTOFIX_ENABLED');
+    expect(workflow).not.toContain('gh issue create');
+    expect(workflow).not.toContain('gh issue list');
+    expect(workflow).not.toContain('github-ai-orchestrator.yml');
     expect(workflow).toContain('review_status');
     expect(workflow).toContain(
       'Capture changed UI (desktop + mobile) (advisory)'

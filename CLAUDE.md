@@ -23,11 +23,13 @@ Set `JOVIE_AGENT_PROFILE` before editing. Non-coding profiles (`default`, Chief,
 
 ## Agent Coordination Preflight
 
-Before starting any task, agents must query gbrain for both the org chart and existing work in the area. Fetch `gbrain:agent-org-chart` when available, read `shared-skills/coordination-basics/SKILL.md` when present, and run a targeted ownership/current-priorities query for the task. If another agent owns the area, delegate through the coordination inbox instead of starting overlapping work. If gbrain is unreachable, stop and alert with a `system-blocker`; do not proceed without the coordination check.
+Before starting any task, query gbrain for the org chart and existing work (`gbrain:agent-org-chart` when available, plus a targeted ownership query). If another agent owns the area, delegate instead of overlapping. If gbrain is unreachable, continue with repo tools and record `gbrain-unavailable` — do not invent coordination state. Tools: MCP `gbrain__search` / `gbrain__recall`; CLI `gbrain search` / `gbrain query`.
 
 ## Pen Workspace File Lock
 
 If the target canvas is open, attach to the live desktop canvas. Dirty/unsaved is not a bail. Persist is mtime moving on the locked canonical path — `save()` printing Saved is not persist. Full contract: [`.claude/rules/pen.md`](.claude/rules/pen.md).
+
+Registry status is singular and machine-recomputed: `metadataStatus` on each registry root is the only authoritative status field, and visible ledger rows are generated, never hand-written. Audit any ledger export with [`scripts/agent/pen-registry-audit.mjs`](scripts/agent/PEN_REGISTRY_LEDGER.md) before and after registry mutations; it fails closed on visible/metadata contradiction, duplicate authoritative records, unentitled SAFE, silently retained stale proof, and denominator drift.
 
 ## Instruction Architecture
 
@@ -91,7 +93,7 @@ Read the relevant `.claude/rules/*` file before touching that area: environment,
 
 ## Skill Routing
 
-Match a skill → invoke it first. Full routing table: [`.claude/rules/gstack.md`](.claude/rules/gstack.md). Web browsing: `/browse` only (never `mcp__claude-in-chrome__*`). Key flows: `/ship`, `/review`, `/qa`, `/investigate`, `/autoplan`, `/perf-loop`.
+Match a skill → invoke it first. Full routing table: [`.claude/rules/gstack.md`](.claude/rules/gstack.md). Web browsing: Playwright only (`pnpm exec playwright` or Playwright MCP). Never `/browse`, `$B`, or `mcp__claude-in-chrome__*`. Key flows: `/ship`, `/review`, `/qa`, `/investigate`, `/autoplan`, `/perf-loop`. CLAUDE.md stays a router — do not collapse CEO / QA / ship personas into this file.
 
 ## Documentation Map
 
@@ -99,6 +101,7 @@ Match a skill → invoke it first. Full routing table: [`.claude/rules/gstack.md
 |-----|----------|
 | `canon/README.md` | Root decision hierarchy: operating system + domain canon |
 | `DESIGN.md` | Operational design-system execution |
+| `docs/design-system/GOVERNANCE.md` | Design drift audit, standing initiative |
 | `docs/PR_FLOW.md` | Shipping, CI tiers, taste gate |
 | `docs/marketing/AGENT_GUIDE.md` | Generating or editing any marketing/landing page |
 | `docs/AI_AGENT_GUIDE.md` | API routes, cron, webhooks inventory |

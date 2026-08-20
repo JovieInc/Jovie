@@ -202,6 +202,27 @@ export const Positions: Story = {
   },
 };
 
+export const EdgeCollision: Story = {
+  parameters: { layout: 'fullscreen' },
+  render: () => (
+    <div className='flex min-h-64 items-start justify-end p-2'>
+      <Popover defaultOpen>
+        <PopoverTrigger asChild>
+          <Button variant='outline'>Edge popover</Button>
+        </PopoverTrigger>
+        <PopoverContent align='end' className='w-64'>
+          <div className='space-y-2'>
+            <h4 className='font-medium leading-none'>Audience filters</h4>
+            <p className='text-sm text-secondary-token'>
+              Collision padding keeps this surface inside the viewport.
+            </p>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  ),
+};
+
 // Controlled state example
 export const Controlled: Story = {
   render: function ControlledStory() {

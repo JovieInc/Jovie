@@ -4,6 +4,13 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { Octokit } from 'octokit';
 
+const GITHUB_ISSUE_INTAKE_RETIRED = true;
+if (GITHUB_ISSUE_INTAKE_RETIRED) {
+  throw new Error(
+    'GitHub Issue intake is retired; create canonical work in Linear.'
+  );
+}
+
 // Config
 const planPath = process.env.PLAN_PATH || 'windsurf.plan.md';
 const copilotAssignee = process.env.COPILOT_ASSIGNEE || 'github-copilot';

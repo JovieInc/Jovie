@@ -205,8 +205,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      issues: write
-      actions: write
     env:
       GH_TOKEN: ${{ github.token }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -288,21 +286,3 @@ jobs:
           if [ "$EXISTING" = "true" ]; then echo "Exact visual review already exists; idempotent no-op."; exit 0; fi
           jq -n --arg body "$BODY" '{body:$body,event:"COMMENT"}' > review-payload.json
           gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" --method POST --input review-payload.json >/dev/null
-
-      - name: Bounded objective follow-up through coder path (opt-in)
-        if: steps.routed.outputs.review == 'true' && vars.VISUAL_REVIEW_AUTOFIX_ENABLED == 'true'
-        run: |
-          set -euo pipefail
-          ELIGIBLE=$(node --input-type=module - <<'NODE'
-          import { readFile } from 'node:fs/promises';
-          const result = JSON.parse(await readFile('review-result.json', 'utf8'));
-          const findings = result.status === 'completed' ? (result.review?.findings ?? []) : [];
-          const ok = findings.length > 0 && findings.length <= 1 && findings.every(f => !/^(taste|preference|brand|identity|composition|copy-tone)$/i.test(f.category) && ['high','medium'].includes(String(f.severity).toLowerCase()));
-          process.stdout.write(ok ? 'true' : 'false');
-          NODE
-          )
-          [ "$ELIGIBLE" = true ] || { echo "No bounded objective finding eligible for follow-up."; exit 0; }
-          if gh issue list --state open --search "visual-review-pr:${PR_NUMBER}" --json number --jq 'length' | grep -qv '^0$'; then echo "Follow-up already exists; idempotent no-op."; exit 0; fi
-          BODY="visual-review-pr:${PR_NUMBER}\n\nBounded objective UI finding from PR #${PR_NUMBER}. Use the canonical GitHub AI coder path. Do not alter subjective/taste findings.\n\n$(jq -r '.review.findings[0] | "Title: \(.title)\nEvidence: \(.evidence)\nRecommendation: \(.recommendation)"' review-result.json)"
-          ISSUE=$(gh issue create --title "fix: objective UI finding from PR #${PR_NUMBER}" --body "$BODY" --label agent-ready)
-          gh workflow run github-ai-orchestrator.yml --ref main -f issue_number="${ISSUE##*/}"

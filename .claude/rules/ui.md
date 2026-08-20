@@ -7,6 +7,121 @@ artifacts, rendered specs, approval consoles, review pages, admin tools, and ops
 tools. Internal or generated output has no exemption and must not introduce a
 parallel design system or review standard.
 
+## Interaction Quality Contract
+
+Jovie is a focused work surface. Every feature must make its frequent work feel
+direct, quiet, and predictable for a power user without making keyboard use or
+accessibility a cleanup task. This contract governs behavior, not a visual
+redesign, and inherits the canonical components, tokens, and platform
+conventions in `DESIGN.md` and the frontend skill.
+
+### Feature Definition Gate
+
+Before implementation, write the following in the feature plan, issue, or PR
+description for every user-facing behavior change:
+
+1. **Primary task and direct action:** what the user is trying to finish, the
+   visible control that starts it, and the observable outcome. A frequent,
+   reversible action should complete from the current context in one direct
+   activation. An extra step needs a named reason, such as destructive impact,
+   missing information, or a platform-required permission.
+2. **Context contract:** what focus, selection, text/caret, scroll position,
+   and open context remain stable, and the explicit user action that may change
+   each one.
+3. **State contract:** idle, pending, empty, success, error, and offline or
+   recovery states when the feature can reach them. Name the user-visible
+   status and the next recovery action for each failure state.
+4. **Input matrix:** the pointer/touch path, keyboard path where the platform
+   has a hardware keyboard, and screen-reader/text-scaling/reduced-motion
+   behavior. iOS uses native input and accessibility conventions; web and Mac
+   may add power-user shortcuts. Semantic and behavioral parity matter, not
+   identical pixels or bindings.
+
+Do not hide a primary action behind hover, a gesture, a magic shortcut, or a
+second surface when a direct visible control fits. Touch and pointer controls
+remain available even when a keyboard accelerator is useful.
+
+### Input, Shortcuts, and Discoverability
+
+- Prefer semantic native controls. Use ARIA composite roles only when the
+  interaction actually implements that pattern. For example, a filter toolbar
+  uses pressed buttons and toolbar navigation, while tabs require tab/panel
+  semantics and conventional arrow-key behavior.
+- Every interactive control has an accessible name, visible focus treatment,
+  and native keyboard activation. Custom keyboard handling must not steal
+  Enter, Space, Escape, arrows, typing, or assistive-technology behavior from
+  a focused child control or editable field.
+- Add a keyboard accelerator only when it removes repeated work. Use a stable
+  platform convention where one exists, scope it to its surface, preserve
+  browser/OS shortcuts and text editing, and provide a visible or documented
+  discovery path. Global web/Mac shortcuts belong in the canonical keyboard
+  registry and shortcuts sheet, with a tested handler and collision check.
+- Gesture input accelerates a direct action; it never becomes the only way to
+  perform it. Keep an equivalent touch-safe visible control.
+
+### Focus, Selection, and Stability
+
+- A user-triggered update keeps focus on the initiating control when it still
+  exists. If it is removed, move focus to the next logical actionable item,
+  the updated result, or the originating control group, never silently to
+  `body`.
+- Preserve selection, caret, scroll position, filters, and surrounding context
+  through refreshes, optimistic updates, and recoverable errors unless a named
+  navigation or disclosure action intentionally changes them.
+- Use roving focus only for a true composite control and test its arrow/Home/End
+  behavior. Do not turn ordinary link or button collections into custom
+  keyboard widgets without a user benefit.
+- Follow the mandatory layout-shift contract below. Pending, success, error,
+  and recovery feedback must not shift unrelated content or move a target away
+  from the user's pointer or focus.
+
+### Feedback, Recovery, and Performance
+
+- A direct action gets immediate local acknowledgement: a controlled pending
+  state, stable status slot, or canonical toast as appropriate. Do not leave a
+  user guessing whether an action registered.
+- Errors explain what failed in user terms and leave the failed work, input,
+  and recovery path available whenever it is safe to retry. Offline/degraded
+  states say what remains available and how to recover; never silently discard
+  user input.
+- Reuse canonical loading, empty, error, toast, dialog, and motion primitives.
+  Feedback may change semantic content but must preserve stable geometry unless
+  the user explicitly opened, closed, navigated, or disclosed it.
+- Treat interaction latency as a product behavior. Do not invent a generic
+  millisecond target; use the route's existing performance budget or record a
+  same-method before/after measurement. Preserve the equivalent non-motion
+  outcome under reduced motion.
+
+### Inclusion and Component Ownership
+
+- Web targets WCAG 2.2 AA. Test semantic names/roles, keyboard operation,
+  focus order, contrast, non-color state cues, text zoom, and touch targets.
+  Test native accessibility, Dynamic Type, and input conventions on iOS.
+- Respect user text scaling and reduced-motion preferences. Never encode status
+  in color alone, rely on hover alone, or require precise pointer movement.
+- Reuse the canonical component family before composing a new control. A
+  shared correction belongs in its owner; a feature-specific interaction stays
+  local only when its behavior cannot be expressed by that owner.
+
+### Evidence and Enforcement Matrix
+
+Use the real check that can prove the rule. A green static check is not a claim
+that unautomatable behavior was manually verified.
+
+| Rule | Automated evidence when applicable | Manual/device or design-review evidence |
+|---|---|---|
+| Component ownership and changed interaction behavior | `pnpm component-ship-gate` requires a changed shared component's real test and story; focused Vitest asserts the user-visible transition for shared and feature components | Confirm the component belongs to the existing family, not a fork |
+| Semantic controls, names, and keyboard behavior | Focused Testing Library/Playwright behavior tests, `apps/web/tests/utils/a11y.ts`, and `pnpm --filter @jovie/web run a11y:ci` for affected routes | Screen-reader reading/order and hardware-keyboard pass |
+| Contrast and touch alternatives | `pnpm --filter @jovie/web run lint:contrast-ratchet` and `pnpm --filter @jovie/web run lint:touch-target` | Touch target usability at device scale and non-color cue review |
+| Focus, selection, layout, and state retention | Focus assertions plus the applicable Playwright bounding-box, visual, or layout-stability test | Real browser checks for scroll/caret/selection and unexpected movement |
+| Loading, error, offline, recovery, and reduced motion | Focused tests for every changed deterministic state; existing visual/performance route checks where configured | Failure/retry, offline/degraded, text scaling, and reduced-motion pass on the target platform |
+| Interaction responsiveness | Existing route performance budget or `pnpm --filter @jovie/web run perf:interactions` when the surface is in scope | Same-method before/after receipt when no route budget exists |
+
+Every UI or interaction PR records the exact focused commands and the manual
+evidence still required in the PR template. Do not claim comprehensive
+accessibility, device, performance, or release proof from an import test, a
+single screenshot, or CI alone.
+
 ## Component Architecture
 
 Components follow atomic design with feature-based grouping:
@@ -265,6 +380,7 @@ This is the subtraction principle applied specifically to container boundaries. 
   - **Confirmations (irreversible actions)** → `<ConfirmDialog>` from `@/components/molecules/ConfirmDialog`
   - **Notifications / async errors** → `toast.error()` / `toast.success()` from `@/components/feedback` (canonical feedback system; never import `sonner` directly)
   - **Reversible actions** → optimistic update + undo-toast (pattern not yet codified — file a Linear ticket if you need this)
+  - **One interrupt at a time** → toasts, sheets, OS push, and in-flow prompts (vlog, pairing, What’s New) share one bus. A feature may not ship its own stacked popup. See `docs/NOTIFICATION_GUIDELINES.md` → “One interrupt bus”.
 - See `DESIGN.md` → "Confirmations & Destructive Actions" for the full decision rule and copy guidance.
 - Storybook stories (`*.stories.tsx`) and CLI scripts (`apps/web/scripts/**`) are exempted via the Biome override; they may use `alert()` for handler-fired signals.
 

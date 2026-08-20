@@ -154,8 +154,9 @@ describe('shell route coverage', () => {
   const allowedRedirectStubs = new Set(redirectBaseline.routes);
 
   it('every nav destination resolves to a shell page', () => {
+    const standaloneNavRoutes = new Set([APP_ROUTES.HUD]);
     const missingRoutes = [...navRoutes].filter(
-      route => !pageByRoute.has(route)
+      route => !pageByRoute.has(route) && !standaloneNavRoutes.has(route)
     );
 
     expect(missingRoutes).toEqual([]);

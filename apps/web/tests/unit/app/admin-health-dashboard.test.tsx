@@ -82,7 +82,7 @@ describe('AdminHealthDashboard', () => {
     expect(growth).toHaveTextContent('12');
 
     const ops = screen.getByTestId('admin-health-ops');
-    expect(ops).toHaveAttribute('href', '/app/ov/ops');
+    expect(ops).toHaveAttribute('href', '/hud');
     expect(ops).toHaveTextContent('Healthy');
 
     const people = screen.getByTestId('admin-health-people');
@@ -98,5 +98,10 @@ describe('AdminHealthDashboard', () => {
     expect(
       screen.getByTestId('admin-health-dashboard-skeleton').children
     ).toHaveLength(4);
+    for (const tile of screen.getByTestId('admin-health-dashboard-skeleton')
+      .children) {
+      expect(tile).toHaveClass('rounded-xl', 'skeleton');
+      expect(tile.className).toContain('border-(--app-shell-border)');
+    }
   });
 });

@@ -206,11 +206,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
       trailingOverlay: Boolean(onThreadContextMenu),
     }),
     'text-left',
-    active
-      ? undefined
-      : unread
-        ? 'text-primary-token hover:bg-surface-1 focus-visible:bg-surface-1'
-        : 'text-secondary-token hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:text-primary-token'
+    active ? undefined : unread ? 'text-primary-token' : 'text-secondary-token'
   );
   const rowContent = (
     <>
@@ -264,7 +260,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
             onClick={() => onSelect?.(thread.id)}
             onContextMenu={e => onThreadContextMenu?.(e, thread)}
             aria-pressed={active}
-            className={cn(rowClasses, 'h-auto hover:bg-transparent')}
+            className={rowClasses}
           >
             {rowContent}
           </Button>
@@ -339,7 +335,7 @@ export function SidebarThreadsSection({
     <div className='space-y-1.5'>
       <div className='flex items-center justify-between px-2.5 pb-0.5 pt-2'>
         <span className='text-xs font-caption tracking-normal text-sidebar-muted/90'>
-          Chats
+          Recent
         </span>
         {unreadCount > 0 && (
           <NavBadge
@@ -370,8 +366,8 @@ export function SidebarThreadsSection({
         {state === 'error' && !hasThreads ? (
           <div
             className={cn(
-              'grid grid-cols-[minmax(0,1fr)_20px] items-center gap-2 rounded-full px-2.5 text-tertiary-token',
-              tight ? 'h-6 text-xs' : 'h-6.5 text-xs'
+              'grid grid-cols-[minmax(0,1fr)_20px] items-center gap-2 rounded-full px-2.5 text-xs text-tertiary-token',
+              tight ? 'h-6' : 'h-7'
             )}
           >
             <span className='min-w-0 flex-1 truncate'>
@@ -401,13 +397,11 @@ export function SidebarThreadsSection({
             type='button'
             variant='ghost'
             onClick={onNewThread}
-            className={cn(
-              getSidebarNavRowClassName({
-                tight,
-                tone: 'primary',
-              }),
-              'h-auto text-left hover:bg-transparent'
-            )}
+            className={getSidebarNavRowClassName({
+              tight,
+              tone: 'primary',
+              className: 'text-left',
+            })}
           >
             <Icon
               name='MessageSquarePlus'

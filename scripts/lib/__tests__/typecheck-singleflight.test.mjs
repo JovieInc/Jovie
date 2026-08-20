@@ -428,9 +428,117 @@ describe('typecheck singleflight process integration', () => {
     });
     expect(second.code).toBe(0);
     expect(second.stderr).toContain('reused completed');
+    expect(second.stderr).toContain('phase=reuse');
     // Reuse must not re-execute the owner command.
     expect(readFileSync(marker, 'utf8').trim().split('\n')).toEqual([
       'owner concurrent=1',
     ]);
+  });
+
+  it('emits owner phase and heartbeat diagnostics without killing the child', async () => {
+    const stateDir = makeStateDir();
+    const marker = resolve(stateDir, 'owners.txt');
+    const active = resolve(stateDir, 'active.txt');
+    writeFileSync(active, '0');
+    const tsbuildinfo = resolve(stateDir, 'cache.tsbuildinfo');
+    writeFileSync(tsbuildinfo, 'x'.repeat(1024));
+    const aged = (Date.now() - 8_000) / 1000;
+    utimesSync(tsbuildinfo, aged, aged);
+
+    const result = await new Promise(resolveRun => {
+      const child = spawn(
+        process.execPath,
+        [
+          wrapper,
+          '--',
+          process.execPath,
+          '-e',
+          ownerScript(220),
+          marker,
+          active,
+          '--tsBuildInfoFile',
+          tsbuildinfo,
+        ],
+        {
+          cwd: repoRoot,
+          env: wrapperEnv(stateDir, {
+            TYPECHECK_SINGLEFLIGHT_HEARTBEAT_MS: '40',
+          }),
+          stdio: ['ignore', 'pipe', 'pipe'],
+        }
+      );
+      childProcesses.push(child);
+      let stdout = '';
+      let stderr = '';
+      child.stdout.on('data', chunk => {
+        stdout += chunk.toString('utf8');
+      });
+      child.stderr.on('data', chunk => {
+        stderr += chunk.toString('utf8');
+      });
+      child.once('exit', code => resolveRun({ code, stdout, stderr }));
+    });
+
+    expect(result.code).toBe(0);
+    expect(result.stderr).toContain('phase=acquire');
+    expect(result.stderr).toContain('phase=child-start');
+    expect(result.stderr).toContain('phase=heartbeat');
+    expect(result.stderr).toContain('phase=child-complete');
+    expect(result.stderr).toMatch(/tsbuildinfoAgeMs=\d+/);
+    expect(result.stderr).toContain('tsbuildinfoBytes=1024');
+    expect(result.stderr).toMatch(/cpuPct=(?:n\/a|\d+\.\d+)/);
+    expect(result.stderr).toMatch(/rssKb=(?:n\/a|\d+)/);
+    expect(result.stderr).not.toContain('removing stale');
+    expect(maxConcurrentOwners(marker)).toBe(1);
+  });
+
+  it('heartbeats for a live owner without taking the lock or spawning a second compiler', async () => {
+    const stateDir = makeStateDir();
+    const marker = resolve(stateDir, 'owners.txt');
+    const active = resolve(stateDir, 'active.txt');
+    writeFileSync(active, '0');
+    const holder = holdLiveProcess(3_000);
+    writeLock(stateDir, {
+      pid: holder.pid,
+      startedAtMs: Date.now() - 60_000,
+      cwd: 'apps/web',
+      command: ['tsc', '--noEmit'],
+      repoRoot,
+      fingerprint: 'live-heartbeat-fixture',
+    });
+
+    const waiter = spawn(
+      process.execPath,
+      [wrapper, '--', process.execPath, '-e', ownerScript(50), marker, active],
+      {
+        cwd: repoRoot,
+        env: wrapperEnv(stateDir, {
+          TYPECHECK_SINGLEFLIGHT_HEARTBEAT_MS: '40',
+        }),
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }
+    );
+    childProcesses.push(waiter);
+    let stderr = '';
+    waiter.stderr.on('data', chunk => {
+      stderr += chunk.toString('utf8');
+    });
+
+    await new Promise(resolveWait => setTimeout(resolveWait, 160));
+    expect(existsSync(marker)).toBe(false);
+    expect(existsSync(resolve(stateDir, 'lock.json'))).toBe(true);
+    expect(stderr).toContain('phase=wait');
+    expect(stderr).toContain('role=waiter');
+    expect(stderr).toContain('ownerAlive=true');
+    expect(stderr).toContain(`ownerPid=${holder.pid}`);
+    expect(stderr).not.toContain('removing stale');
+    expect(stderr).not.toContain('phase=acquire');
+
+    holder.kill('SIGKILL');
+    const code = await new Promise(resolveExit =>
+      waiter.once('exit', resolveExit)
+    );
+    expect(code).toBe(0);
+    expect(maxConcurrentOwners(marker)).toBe(1);
   });
 });

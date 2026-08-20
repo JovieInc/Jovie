@@ -1,8 +1,8 @@
 'use client';
 
+import { Spinner as LoadingSpinner } from '@jovie/ui';
 import { ArrowRight, Check } from 'lucide-react';
 import React from 'react';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { AUTH_SURFACE } from '@/lib/auth/constants';
 import { cn } from '@/lib/utils';
 

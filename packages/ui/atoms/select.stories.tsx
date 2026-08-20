@@ -44,3 +44,22 @@ export const Disabled: Story = {
     </Select>
   ),
 };
+
+export const EdgeCollision: Story = {
+  parameters: { layout: 'fullscreen' },
+  render: () => (
+    <div className='flex min-h-64 items-start justify-end p-2'>
+      <Select defaultOpen defaultValue='north-america'>
+        <SelectTrigger className='w-48' aria-label='Coverage'>
+          <SelectValue placeholder='Pick coverage' />
+        </SelectTrigger>
+        <SelectContent align='end'>
+          <SelectItem value='worldwide'>Worldwide</SelectItem>
+          <SelectItem value='north-america'>North America</SelectItem>
+          <SelectItem value='europe'>Europe</SelectItem>
+          <SelectItem value='asia'>Asia</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  ),
+};

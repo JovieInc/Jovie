@@ -1,5 +1,10 @@
+import { Card } from '@jovie/ui';
 import { cva, type VariantProps } from 'class-variance-authority';
-import type { ComponentPropsWithoutRef, ElementType, ReactNode } from 'react';
+import {
+  type ComponentPropsWithoutRef,
+  type ElementType,
+  forwardRef,
+} from 'react';
 import { cn } from '@/lib/utils';
 
 const contentSurfaceCardVariants = cva(
@@ -26,34 +31,30 @@ export const CONTENT_SURFACE_CARD_CLASSNAME =
   'rounded-xl border border-(--app-shell-border) bg-surface-1 shadow-none';
 
 export interface ContentSurfaceCardProps
-  extends VariantProps<typeof contentSurfaceCardVariants> {
-  readonly children?: ReactNode;
+  extends Omit<ComponentPropsWithoutRef<'div'>, 'children'>,
+    VariantProps<typeof contentSurfaceCardVariants> {
+  readonly children?: ComponentPropsWithoutRef<'div'>['children'];
   readonly as?: ElementType;
-  readonly className?: string;
-  readonly id?: string;
-  readonly role?: string;
-  readonly 'data-testid'?: string;
-  readonly 'aria-hidden'?: ComponentPropsWithoutRef<'div'>['aria-hidden'];
-  readonly 'aria-live'?: ComponentPropsWithoutRef<'div'>['aria-live'];
-  readonly inert?: ComponentPropsWithoutRef<'div'>['inert'];
-  readonly style?: ComponentPropsWithoutRef<'div'>['style'];
 }
 
-export function ContentSurfaceCard({
-  children,
-  as: Component = 'div',
-  surface,
-  className,
-  ...props
-}: Readonly<ContentSurfaceCardProps>) {
+export const ContentSurfaceCard = forwardRef<
+  HTMLElement,
+  ContentSurfaceCardProps
+>(function ContentSurfaceCard(
+  { children, as: Component = 'div', surface, className, ...props },
+  ref
+) {
   return (
-    <Component
+    <Card
+      asChild
+      unstyled
       className={cn(contentSurfaceCardVariants({ surface }), className)}
-      {...props}
     >
-      {children}
-    </Component>
+      <Component ref={ref} {...props}>
+        {children}
+      </Component>
+    </Card>
   );
-}
+});
 
 export { contentSurfaceCardVariants };

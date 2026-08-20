@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { EntitySidebarShell } from '@/components/molecules/drawer/EntitySidebarShell';
 
-vi.mock('@/components/organisms/RightDrawer', () => ({
+vi.mock('@/components/molecules/drawer/RightDrawer', () => ({
   RightDrawer: ({ children }: { children: React.ReactNode }) => (
     <aside data-testid='right-drawer'>{children}</aside>
   ),

@@ -108,6 +108,9 @@ describe('Switch', () => {
       expect(switchElement.className).toContain(
         'data-[state=unchecked]:bg-surface-2'
       );
+      expect(switchElement.className).toContain(
+        'data-[state=unchecked]:ring-subtle'
+      );
     });
 
     it('applies hover state for unchecked track', () => {
@@ -140,14 +143,27 @@ describe('Switch', () => {
       render(<Switch aria-label='Toggle' data-testid='switch' />);
       const switchElement = screen.getByTestId('switch');
       expect(switchElement.className).toContain('focus-visible:ring-2');
-      expect(switchElement.className).toContain('focus-visible:ring-focus');
+      expect(switchElement.className).toContain('focus-visible:ring-focus/55');
     });
 
     it('applies disabled styling', () => {
       render(<Switch disabled aria-label='Toggle' data-testid='switch' />);
       const switchElement = screen.getByTestId('switch');
       expect(switchElement.className).toContain('disabled:cursor-not-allowed');
-      expect(switchElement.className).toContain('disabled:opacity-50');
+      expect(switchElement.className).toContain(
+        'disabled:opacity-[var(--state-disabled-opacity)]'
+      );
+    });
+
+    it('provides a 44px pointer target and reduced-motion fallback', () => {
+      render(<Switch aria-label='Toggle' data-testid='switch' />);
+      const switchElement = screen.getByTestId('switch');
+
+      expect(switchElement.className).toContain('before:h-11');
+      expect(switchElement.className).toContain('before:w-11');
+      expect(switchElement.className).toContain(
+        'motion-reduce:transition-none'
+      );
     });
 
     it('merges custom className', () => {
@@ -172,12 +188,15 @@ describe('Switch', () => {
       expect(thumb).toBeInTheDocument();
     });
 
-    it('thumb uses tokenized margin state when checked', () => {
+    it('thumb uses compositor-safe transform motion when checked', () => {
       render(<Switch defaultChecked aria-label='Toggle' />);
       const switchElement = screen.getByRole('switch');
       const thumb = switchElement.firstChild;
-      expect(thumb?.className || '').toContain('data-[state=checked]:ml-3');
-      expect(thumb?.className || '').not.toContain('translate');
+      expect(thumb?.className || '').toContain(
+        'data-[state=checked]:translate-x-3'
+      );
+      expect(thumb?.className || '').toContain('transition-transform');
+      expect(thumb?.className || '').not.toContain('transition-[margin]');
     });
 
     it('keeps fixed track and thumb dimensions across state changes', () => {
@@ -324,7 +343,9 @@ describe('Switch', () => {
     it('disabled switch is visually distinct via opacity', () => {
       render(<Switch disabled aria-label='Toggle' data-testid='switch' />);
       const switchElement = screen.getByTestId('switch');
-      expect(switchElement.className).toContain('disabled:opacity-50');
+      expect(switchElement.className).toContain(
+        'disabled:opacity-[var(--state-disabled-opacity)]'
+      );
       expect(switchElement).toBeDisabled();
     });
 

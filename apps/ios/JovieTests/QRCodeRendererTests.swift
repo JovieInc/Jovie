@@ -60,6 +60,11 @@ struct PublicProfileURLPolicyTests {
   @Test func rejectsInvalidConfiguredBaseURL() {
     #expect(PublicProfileURLPolicy(webBaseURL: URL(string: "http://jov.ie")!) == nil)
   }
+
+  @Test func acceptsPublicProfileURLHostEvenWhenAppBaseIsLAN() {
+    let policy = PublicProfileURLPolicy(publicProfileURL: "https://jov.ie/tim")
+    #expect(policy?.validatedURL(from: "https://jov.ie/tim") == URL(string: "https://jov.ie/tim"))
+  }
 }
 
 struct AvatarImageCacheTests {

@@ -1,11 +1,10 @@
 /**
- * GitHub Issues-first tracker client for Hermes-Air.
+ * Linear-only tracker client for Hermes-Air.
  *
- * Files issues via `gh issue create`. Linear remains an optional mirror while
- * TRACKER_GITHUB_ONLY is unset; set TRACKER_GITHUB_ONLY=1 to drop the mirror.
+ * GitHub Issues are historical/reporting-only. Any Linear failure is returned
+ * and queued for retry; there is no GitHub fallback or dual-write path.
  */
 
-import { execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
@@ -28,66 +27,8 @@ export interface FileIssueResult {
   readonly identifier?: string;
   readonly url?: string;
   readonly queued?: boolean;
-  readonly mirrored?: boolean;
+  readonly tracker?: 'linear';
   readonly error?: string;
-}
-
-function shouldMirrorLinear(): boolean {
-  return process.env.TRACKER_GITHUB_ONLY !== '1';
-}
-
-function ghExec(args: ReadonlyArray<string>, input?: string): string {
-  const repo = process.env.GH_REPO;
-  const withRepo = repo ? [...args, '--repo', repo] : [...args];
-  return execFileSync('gh', withRepo, {
-    encoding: 'utf8',
-    input,
-    timeout: 30_000,
-  }).trim();
-}
-
-function parseIssueNumber(url: string): number | null {
-  const match = /\/issues\/(\d+)\s*$/.exec(url);
-  return match ? Number(match[1]) : null;
-}
-
-function fileGithubIssue(input: FileIssueInput): FileIssueResult {
-  const labels = [...(input.labels ?? [])];
-  try {
-    let url: string;
-    try {
-      url = ghExec(
-        [
-          'issue',
-          'create',
-          '--title',
-          input.title,
-          '--body-file',
-          '-',
-          ...labels.flatMap(label => ['--label', label]),
-        ],
-        input.description
-      );
-    } catch {
-      if (labels.length === 0) throw new Error('gh issue create failed');
-      url = ghExec(
-        ['issue', 'create', '--title', input.title, '--body-file', '-'],
-        input.description
-      );
-    }
-    const number = parseIssueNumber(url);
-    return {
-      success: true,
-      id: number ? String(number) : url,
-      identifier: number ? `#${number}` : url,
-      url,
-    };
-  } catch (err) {
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : String(err),
-    };
-  }
 }
 
 function queueForRetry(input: FileIssueInput, error: string): boolean {
@@ -95,7 +36,7 @@ function queueForRetry(input: FileIssueInput, error: string): boolean {
     mkdirSync(dirname(HERMES_PATHS.linearQueue), { recursive: true });
     appendFileSync(
       HERMES_PATHS.linearQueue,
-      `${JSON.stringify({ input, error, ts: new Date().toISOString(), tracker: 'github' })}\n`
+      `${JSON.stringify({ input, error, ts: new Date().toISOString(), tracker: 'linear' })}\n`
     );
     return true;
   } catch {
@@ -121,7 +62,12 @@ async function gql<T>(
         body: JSON.stringify({ query, variables }),
         signal: AbortSignal.timeout(15_000),
       });
-      if (response.status === 429 || response.status >= 500) {
+      if (response.status === 429) {
+        const err = new Error('Linear 429');
+        (err as Error & { permanent?: boolean }).permanent = true;
+        throw err;
+      }
+      if (response.status >= 500) {
         throw new Error(`Linear ${response.status}`);
       }
       if (!response.ok) {
@@ -146,10 +92,9 @@ async function gql<T>(
   );
 }
 
-async function mirrorLinearIssue(
+async function fileLinearIssue(
   input: FileIssueInput
-): Promise<FileIssueResult | null> {
-  if (!shouldMirrorLinear()) return null;
+): Promise<FileIssueResult> {
   const teamKey = input.teamKey ?? 'JOV';
   try {
     const teamData = await gql<{
@@ -202,29 +147,23 @@ async function mirrorLinearIssue(
       id: data.issueCreate.issue.id,
       identifier: data.issueCreate.issue.identifier,
       url: data.issueCreate.issue.url,
-      mirrored: true,
+      tracker: 'linear',
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return { success: false, error: msg, mirrored: true };
+    return { success: false, error: msg, tracker: 'linear' };
   }
 }
 
 export async function fileIssue(
   input: FileIssueInput
 ): Promise<FileIssueResult> {
-  const github = fileGithubIssue(input);
-  if (!github.success) {
-    const queued = queueForRetry(input, github.error ?? 'github create failed');
-    return { ...github, queued };
+  const linear = await fileLinearIssue(input);
+  if (!linear.success) {
+    const queued = queueForRetry(input, linear.error ?? 'Linear create failed');
+    return { ...linear, queued };
   }
-
-  const mirror = await mirrorLinearIssue(input);
-  return {
-    ...github,
-    mirrored: mirror?.success === true,
-    error: mirror && !mirror.success ? mirror.error : undefined,
-  };
+  return linear;
 }
 
 /**

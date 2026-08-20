@@ -18,6 +18,11 @@ export interface AppSegmentControlProps<T extends string>
   readonly surface?: 'muted' | 'ghost';
 }
 
+/**
+ * App-surface adapter for the canonical @jovie/ui SegmentControl.
+ * It maps semantic surface names only; geometry, state, focus, keyboard, and
+ * touch-target behavior remain owned by the package atom.
+ */
 export function AppSegmentControl<T extends string>({
   value,
   onValueChange,

@@ -2,6 +2,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import {
+  composeHudForPresentation,
+  HUD_NEED_SECTION_IDS,
+  type HudPresentation,
+} from '@/lib/hud/compose-hud-bands';
 
 const TEST_DIR = dirname(
   import.meta.url.startsWith('file:')
@@ -11,6 +16,7 @@ const TEST_DIR = dirname(
 
 const OPS_ROUTE_DIR = join(TEST_DIR, '../../../app/app/(shell)/admin/ops');
 const OPS_PAGE = join(OPS_ROUTE_DIR, 'page.tsx');
+const HUD_PAGE = join(TEST_DIR, '../../../app/hud/page.tsx');
 const HUD_DASHBOARD_CLIENT = join(OPS_ROUTE_DIR, 'HudDashboardClient.tsx');
 const HUD_STATUS_PILL = join(OPS_ROUTE_DIR, 'HudStatusPill.tsx');
 const TIM_ACTION_REQUIRED_SECTION = join(
@@ -41,30 +47,32 @@ function readSource(filePath: string): string {
 }
 
 describe('admin ops shell normalization', () => {
-  it('keeps the ops route inside AdminPage while preserving kiosk mode', () => {
-    const source = readSource(OPS_PAGE);
+  it('keeps Ovie inside AdminPage and treats ops as a redirect', () => {
+    const hud = readSource(HUD_PAGE);
+    const ops = readSource(OPS_PAGE);
 
-    expect(source).toContain('import { AdminPage }');
-    expect(source).toContain('<AdminPage');
-    expect(source).toContain("value === 'kiosk' ? 'admin-kiosk' : 'shell'");
-    expect(source).toContain("presentationMode='admin-kiosk'");
-    expect(source).toContain("density='kiosk'");
+    expect(hud).toContain('import { AdminPage }');
+    expect(hud).toContain('<AdminPage');
+    expect(hud).toContain("tokenOk ? 'token' : 'shell'");
+    expect(hud).toContain(
+      "density={tokenOk || fullscreen ? 'kiosk' : 'shell'}"
+    );
+    expect(ops).toContain('redirect(APP_ROUTES.HUD)');
+    expect(ops).not.toContain('<AdminPage');
   });
 
-  it('mounts the consolidated operational control panel on the shell ops surface', () => {
-    const source = readSource(OPS_PAGE);
+  it('mounts the consolidated operational control panel below the HUD dashboard', () => {
+    const source = readSource(HUD_PAGE);
 
     expect(source).toContain('OperationalControlPanel');
     expect(source).toContain('<OperationalControlPanel');
   });
 
-  it('surfaces nightly testing agent health on the shell ops page', () => {
+  it('does not keep nightly testing agent chrome on the ops redirect', () => {
     const source = readSource(OPS_PAGE);
 
-    expect(source).toContain('getNightlyTestingAgentStatus');
-    expect(source).toContain("data-testid='nightly-testing-agent-status'");
-    expect(source).toContain('NIGHTLY_AGENT_REPORT_DOC_PATH');
-    expect(source).toContain('Daily report');
+    expect(source).not.toContain('getNightlyTestingAgentStatus');
+    expect(source).not.toContain("data-testid='nightly-testing-agent-status'");
   });
 
   it('does not reintroduce uppercase tracked SectionEyebrow styling', () => {
@@ -76,13 +84,52 @@ describe('admin ops shell normalization', () => {
     );
   });
 
-  it('mounts WhatShipped as the first HUD card', () => {
+  it('mounts system health before WhatShipped', () => {
     const hudSource = readSource(HUD_DASHBOARD_CLIENT);
 
     expect(hudSource).toContain('import { WhatShipped }');
-    expect(hudSource).toContain('<WhatShipped kioskToken={kioskToken} />');
-    expect(hudSource.indexOf('<WhatShipped')).toBeLessThan(
-      hudSource.indexOf('<TimActionRequiredSection')
+    expect(hudSource).toContain(
+      '<WhatShipped key={section.id} kioskToken={kioskToken} />'
+    );
+    expect(hudSource.indexOf("case 'factory-health'")).toBeLessThan(
+      hudSource.indexOf("case 'what-shipped'")
+    );
+    expect(hudSource.indexOf('<HudSystemHealthStrip')).toBeLessThan(
+      hudSource.indexOf('<WhatShipped')
+    );
+  });
+
+  it('does not mount WhatShipped or ShippingVelocityChart above the need band', () => {
+    const presentations: readonly HudPresentation[] = [
+      'shell',
+      'kiosk',
+      'token',
+    ];
+    for (const presentation of presentations) {
+      const sections = composeHudForPresentation(presentation);
+      const ids = sections.map(section => section.id);
+      const lastNeedIndex = Math.max(
+        ...HUD_NEED_SECTION_IDS.map(id => ids.indexOf(id))
+      );
+      expect(ids.indexOf('what-shipped')).toBeGreaterThan(lastNeedIndex);
+      expect(ids.indexOf('velocity')).toBeGreaterThan(lastNeedIndex);
+      expect(ids.indexOf('what-shipped')).toBeGreaterThan(
+        ids.indexOf('morning-walk')
+      );
+      expect(ids.indexOf('velocity')).toBeGreaterThan(ids.indexOf('cash-mrr'));
+    }
+
+    const hudSource = readSource(HUD_DASHBOARD_CLIENT);
+    expect(hudSource).toContain('composeHudForPresentation(presentation)');
+    expect(hudSource).not.toMatch(/if \(isShell\) \{/);
+    expect(hudSource.indexOf("case 'morning-walk'")).toBeLessThan(
+      hudSource.indexOf("case 'what-shipped'")
+    );
+    expect(hudSource.indexOf("case 'cash-mrr'")).toBeLessThan(
+      hudSource.indexOf("case 'velocity'")
+    );
+    expect(hudSource.indexOf("case 'factory-health'")).toBeLessThan(
+      hudSource.indexOf('<ShippingVelocityChart')
     );
   });
 

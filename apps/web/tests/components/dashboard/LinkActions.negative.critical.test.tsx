@@ -15,9 +15,18 @@ vi.mock('@/components/organisms/table', () => ({
   ),
 }));
 
-// Use real ConfirmDialog wiring via @jovie/ui AlertDialog
-// ConfirmDialog is a local component that uses @jovie/ui primitives
-vi.mock('@/components/molecules/ConfirmDialog', () => ({
+// Mock @jovie/ui to avoid Radix rendering issues in jsdom
+vi.mock('@jovie/ui', () => ({
+  Button: ({
+    children,
+    className,
+    onClick,
+    ...props
+  }: React.ComponentProps<'button'>) => (
+    <button className={className} onClick={onClick} {...props}>
+      {children}
+    </button>
+  ),
   ConfirmDialog: ({
     open,
     onOpenChange,
@@ -46,20 +55,6 @@ vi.mock('@/components/molecules/ConfirmDialog', () => ({
         </button>
       </div>
     ) : null,
-}));
-
-// Mock @jovie/ui to avoid Radix rendering issues in jsdom
-vi.mock('@jovie/ui', () => ({
-  Button: ({
-    children,
-    className,
-    onClick,
-    ...props
-  }: React.ComponentProps<'button'>) => (
-    <button className={className} onClick={onClick} {...props}>
-      {children}
-    </button>
-  ),
   Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   TooltipTrigger: ({ children }: { children: React.ReactNode }) => (
     <>{children}</>

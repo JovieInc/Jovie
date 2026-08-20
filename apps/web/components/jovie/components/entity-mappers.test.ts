@@ -4,6 +4,7 @@ import {
   formatLongDate,
   ownGraphArtistToEntityRef,
   rankRecentsFirst,
+  releaseRowToEntityRef,
   shortMonthDay,
 } from './entity-mappers';
 
@@ -129,6 +130,36 @@ describe('ownGraphArtistToEntityRef', () => {
         isClaimedSelf: false,
       }).meta
     ).toMatchObject({ subtitle: 'Catalog', isYou: false });
+  });
+});
+
+describe('releaseRowToEntityRef', () => {
+  const draftRelease = {
+    id: 'release-1',
+    title: 'First Light',
+    status: 'draft' as const,
+    releaseDate: '2026-03-14',
+    releaseType: 'single',
+  };
+
+  it('keeps workflow state out of generic entity rows', () => {
+    expect(releaseRowToEntityRef(draftRelease).meta?.subtitle).toBe(
+      'Single · Mar 14'
+    );
+  });
+
+  it('makes unfinished workflow state visible in palette rows', () => {
+    expect(
+      releaseRowToEntityRef(draftRelease, { includeWorkflowStatus: true }).meta
+        ?.subtitle
+    ).toBe('Draft · Single · Mar 14');
+
+    expect(
+      releaseRowToEntityRef(
+        { ...draftRelease, status: 'scheduled' },
+        { includeWorkflowStatus: true }
+      ).meta?.subtitle
+    ).toBe('Scheduled · Single · Mar 14');
   });
 });
 

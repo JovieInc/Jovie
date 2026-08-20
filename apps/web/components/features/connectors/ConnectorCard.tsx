@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Badge, Button } from '@jovie/ui';
 import {
   AlertCircle,
   Calendar,
@@ -9,7 +9,6 @@ import {
   Mail,
   RefreshCw,
 } from 'lucide-react';
-import { Badge } from '@/components/atoms/Badge';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import {
   type ConnectorIconKey,

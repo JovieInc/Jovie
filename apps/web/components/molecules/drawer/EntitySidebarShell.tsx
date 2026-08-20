@@ -4,8 +4,8 @@
 
 import type { CommonDropdownItem } from '@jovie/ui';
 import type { ReactNode } from 'react';
+import { RightDrawer } from '@/components/molecules/drawer/RightDrawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
-import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
 import { DrawerHeader } from './DrawerHeader';
@@ -25,6 +25,8 @@ export interface EntitySidebarShellProps {
   readonly contextMenuItems?: CommonDropdownItem[];
   /** Test ID for the drawer */
   readonly 'data-testid'?: string;
+  /** Optional surface override applied to the outer RightDrawer. */
+  readonly drawerClassName?: string;
 
   /** Header title — string or ReactNode */
   readonly title?: ReactNode;
@@ -42,7 +44,10 @@ export interface EntitySidebarShellProps {
    * their content insets when enabled.
    */
   readonly contentBleed?: boolean;
-  /** A shared, border-free elevation treatment for entity inspector workspaces. */
+  /**
+   * Controls whether the rail workspace contains card surfaces or stays one
+   * uninterrupted flat surface. The outer RightDrawer remains the surface owner.
+   */
   readonly workspaceSurface?: 'flat' | 'raised';
 
   /**
@@ -115,6 +120,7 @@ export function EntitySidebarShell({
   onKeyDown,
   contextMenuItems,
   'data-testid': testId,
+  drawerClassName,
   title,
   onClose,
   headerActions,
@@ -203,6 +209,7 @@ export function EntitySidebarShell({
     scrollStrategy === 'shell'
       ? 'space-y-2.5'
       : 'flex min-h-0 flex-1 flex-col space-y-2.5';
+  const workspaceContentSurface = workspaceSurface === 'flat' ? 'flat' : 'card';
   return (
     <RightDrawer
       isOpen={isOpen}
@@ -211,6 +218,7 @@ export function EntitySidebarShell({
       onKeyDown={onKeyDown}
       contextMenuItems={contextMenuItems}
       data-testid={testId}
+      className={drawerClassName}
     >
       <div
         data-right-rail-workspace
@@ -228,7 +236,10 @@ export function EntitySidebarShell({
         {hasTopRailContent || minimalEntityHeaderContent ? (
           <div className='shrink-0 space-y-2.5'>
             {hasTopRailContent ? (
-              <DrawerSurfaceCard variant='card' className='overflow-hidden'>
+              <DrawerSurfaceCard
+                variant={workspaceContentSurface}
+                className='overflow-hidden'
+              >
                 <div className='border-b border-transparent bg-transparent backdrop-blur-[12px]'>
                   {showMinimalHeaderBar ? (
                     <DrawerHeader
@@ -287,7 +298,10 @@ export function EntitySidebarShell({
 
         {isEmpty ? (
           <div className={bodyClassName} data-scroll-strategy={scrollStrategy}>
-            <DrawerSurfaceCard variant='card' className='p-4'>
+            <DrawerSurfaceCard
+              variant={workspaceContentSurface}
+              className='p-4'
+            >
               <DrawerInlineNote message={emptyMessage} />
             </DrawerSurfaceCard>
           </div>

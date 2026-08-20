@@ -20,9 +20,9 @@ import { Spinner } from './spinner';
 
 const BUTTON_VARIANT_CLASSES: Record<ButtonVariant, string> = {
   primary:
-    'border border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--linear-btn-primary-hover) hover:bg-(--linear-btn-primary-hover)',
+    'border border-btn-primary bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-btn-primary-hover hover:bg-btn-primary-hover',
   secondary:
-    'border border-(--linear-border-subtle) bg-btn-secondary text-btn-secondary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_1px_rgba(0,0,0,0.08)] hover:border-(--linear-border-default) hover:bg-(--linear-btn-secondary-hover)',
+    'border border-subtle bg-btn-secondary text-btn-secondary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_1px_rgba(0,0,0,0.08)] hover:border-default hover:bg-(--color-btn-secondary-hover)',
   tertiary:
     'border border-transparent bg-transparent text-secondary-token shadow-none hover:bg-interactive-hover hover:text-primary-token active:bg-interactive-active',
   ghost:
@@ -36,7 +36,7 @@ const ICON_HIT_TARGET_44 =
   'before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]';
 
 const BUTTON_SIZE_CLASSES: Record<ButtonSize, string> = {
-  sm: 'h-7 px-2.5 text-xs before:absolute before:left-1/2 before:top-1/2 before:h-10 before:min-w-10 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
+  sm: 'h-7 px-2.5 text-xs before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
   // Founder-approved marketing text contract: 32px visible control inside a
   // 44px minimum hit target without changing surrounding layout.
   marketing:
@@ -53,7 +53,7 @@ const BUTTON_SIZE_CLASSES: Record<ButtonSize, string> = {
 };
 
 const buttonVariants = cva(
-  'relative inline-flex items-center justify-center rounded-full text-[13px] font-[510] tracking-normal transition-[background-color,border-color,color,box-shadow,opacity,transform] duration-normal ease-interactive motion-reduce:!transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) disabled:pointer-events-none disabled:opacity-[var(--state-disabled-opacity)] disabled:text-(--color-text-disabled-token)',
+  'relative inline-flex items-center justify-center rounded-full text-[13px] font-[510] tracking-normal transition-[background-color,border-color,color,box-shadow,opacity,transform] duration-subtle ease-subtle motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/55 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page disabled:pointer-events-none disabled:opacity-[var(--state-disabled-opacity)] disabled:text-(--color-text-disabled-token)',
   {
     variants: {
       variant: {
@@ -209,6 +209,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       static: isStatic = false,
       destructive = false,
       disabled,
+      'aria-busy': ariaBusy,
+      'aria-disabled': ariaDisabled,
       children,
       ...props
     },
@@ -249,8 +251,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           'active:scale-[var(--scale-press)] motion-reduce:active:scale-100',
         isDisabled && 'pointer-events-none'
       ),
-      'aria-disabled': isDisabled || undefined,
-      'aria-busy': loading || undefined,
+      'aria-disabled': isDisabled ? true : ariaDisabled,
+      'aria-busy': loading ? true : ariaBusy,
       'data-state': dataState,
       'data-variant': normalizedVariant.variant,
       'data-size': normalizedSize,
@@ -274,7 +276,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           : children;
 
       return (
-        <Comp {...sharedProps} {...props} {...penContractProps}>
+        <Comp {...props} {...sharedProps} {...penContractProps}>
           {contractChild}
         </Comp>
       );
@@ -289,7 +291,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     };
 
     return (
-      <Comp {...sharedProps} {...buttonProps} {...props} {...penContractProps}>
+      <Comp {...props} {...sharedProps} {...buttonProps} {...penContractProps}>
         {loading && <ButtonLoadingSpinner />}
         <ButtonContent loading={loading}>{children}</ButtonContent>
       </Comp>

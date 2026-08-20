@@ -205,8 +205,8 @@ describe('RadioGroup', () => {
         </RadioGroup>
       );
       const radio = screen.getByTestId('radio');
-      expect(radio.className).toContain('hover:border-(--color-accent)');
-      expect(radio.className).toContain('hover:bg-(--linear-bg-surface-1)');
+      expect(radio.className).toContain('hover:border-default');
+      expect(radio.className).toContain('hover:bg-surface-1');
     });
 
     it('applies focus-visible ring styles', () => {
@@ -217,7 +217,7 @@ describe('RadioGroup', () => {
       );
       const radio = screen.getByTestId('radio');
       expect(radio.className).toContain('focus-visible:ring-2');
-      expect(radio.className).toContain('focus-visible:ring-ring');
+      expect(radio.className).toContain('focus-visible:ring-focus/55');
     });
 
     it('applies disabled styling', () => {
@@ -228,7 +228,37 @@ describe('RadioGroup', () => {
       );
       const radio = screen.getByTestId('radio');
       expect(radio.className).toContain('disabled:cursor-not-allowed');
-      expect(radio.className).toContain('disabled:opacity-50');
+      expect(radio.className).toContain(
+        'disabled:opacity-[var(--state-disabled-opacity)]'
+      );
+    });
+
+    it('provides a 44px pointer target without changing visual size', () => {
+      render(
+        <RadioGroup>
+          <RadioGroupItem value='test' data-testid='radio' />
+        </RadioGroup>
+      );
+      const radio = screen.getByTestId('radio');
+
+      expect(radio.className).toContain('h-4');
+      expect(radio.className).toContain('w-4');
+      expect(radio.className).toContain('before:h-11');
+      expect(radio.className).toContain('before:w-11');
+    });
+
+    it('uses semantic selected styling and reduced-motion fallback', () => {
+      render(
+        <RadioGroup defaultValue='test'>
+          <RadioGroupItem value='test' data-testid='radio' />
+        </RadioGroup>
+      );
+      const radio = screen.getByTestId('radio');
+
+      expect(radio.className).toContain(
+        'data-[state=checked]:border-btn-primary'
+      );
+      expect(radio.className).toContain('motion-reduce:transition-none');
     });
 
     it('keeps hover feedback free of transform motion', () => {

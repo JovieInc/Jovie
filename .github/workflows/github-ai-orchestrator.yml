@@ -1,8 +1,6 @@
-name: GitHub AI Orchestrator
+name: GitHub AI Orchestrator (retired)
 
 on:
-  issues:
-    types: [labeled]
   workflow_dispatch:
     inputs:
       issue_number:
@@ -26,20 +24,19 @@ env:
 
 jobs:
   guard:
-    name: Guard + Deduplicate
+    name: Retired — GitHub Issues cannot select work
     # Trigger hygiene (#13349): `issues: labeled` fires for EVERY label event on
     # every issue repo-wide, and GitHub cannot filter label names at the `on:`
     # level. Gate at the job level so non-agent-ready label events conclude
     # `skipped` without ever provisioning a runner — previously this job booted
     # a runner just to echo "Label is not agent-ready; skipping".
     # Keep in sync with env.AGENT_READY_LABEL (job-level `if:` cannot read env).
-    if: github.event_name != 'issues' || github.event.label.name == 'agent-ready'
+    if: ${{ github.event_name == '__retired_linear_only__' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: read
-      issues: read
     outputs:
       should_run: ${{ steps.gather.outputs.should_run }}
       issue_number: ${{ steps.gather.outputs.issue_number }}
@@ -227,11 +224,11 @@ jobs:
   claim_issue:
     name: Claim GitHub issue
     needs: guard
-    if: needs.guard.outputs.should_run == 'true'
+    if: ${{ github.event_name == '__retired_linear_only__' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      issues: write
+      contents: read
     steps:
       - name: Checkout tracker helpers
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -265,14 +262,13 @@ jobs:
   implement_and_open_pr:
     name: Implement + Open PR
     needs: [guard, claim_issue]
-    if: needs.guard.outputs.should_run == 'true'
+    if: ${{ github.event_name == '__retired_linear_only__' }}
     # Long-running model implementation cannot occupy fixed CI capacity.
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
       contents: write
       pull-requests: write
-      issues: write
       id-token: write
     steps:
       - name: Generate Jovie Bot token
@@ -298,7 +294,7 @@ jobs:
         run: git checkout -b "$BRANCH_NAME"
 
       - name: Run Claude Code for implementation
-        uses: anthropics/claude-code-action@1623c36729ac1cd5895198cded705a287de7db79 # v1
+        uses: anthropics/claude-code-action@9d7150bc8a3dae8149739a88019d192b579ad90c # v1
         env:
           JOVIE_AGENT_PROFILE: coder
         with:
@@ -388,11 +384,11 @@ jobs:
   finalize_claim:
     name: Finalize GitHub issue claim
     needs: [guard, claim_issue, implement_and_open_pr]
-    if: ${{ always() && needs.guard.outputs.should_run == 'true' }}
+    if: ${{ github.event_name == '__retired_linear_only__' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      issues: write
+      contents: read
       pull-requests: read
     steps:
       - name: Checkout tracker helpers

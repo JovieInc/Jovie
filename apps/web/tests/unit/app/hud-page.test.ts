@@ -5,6 +5,7 @@ const {
   redirectMock,
   unauthorizedMock,
   forbiddenMock,
+  authorizeHudMock,
   getCurrentAdminPageAccessMock,
   getHudMetricsMock,
 } = vi.hoisted(() => ({
@@ -22,6 +23,7 @@ const {
   forbiddenMock: vi.fn(() => {
     throw new Error('NEXT_FORBIDDEN');
   }),
+  authorizeHudMock: vi.fn(),
   getCurrentAdminPageAccessMock: vi.fn(),
   getHudMetricsMock: vi.fn(),
 }));
@@ -36,8 +38,16 @@ vi.mock('@/lib/admin/page-access', () => ({
   getCurrentAdminPageAccess: getCurrentAdminPageAccessMock,
 }));
 
+vi.mock('@/lib/auth/hud', () => ({
+  authorizeHud: authorizeHudMock,
+}));
+
 vi.mock('@/lib/hud/metrics', () => ({
   getHudMetrics: getHudMetricsMock,
+}));
+
+vi.mock('@/lib/hud/source-trust', () => ({
+  isHudMetricValueAvailable: () => false,
 }));
 
 vi.mock('@/lib/env-server', () => ({
@@ -84,16 +94,30 @@ function findElementByName(
 describe('/hud page auth', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    authorizeHudMock.mockResolvedValue({ ok: false, reason: 'unauthorized' });
     getHudMetricsMock.mockResolvedValue({ accessMode: 'admin' });
   });
 
-  it('redirects kiosk bookmarks to /hud-tv', async () => {
-    await expect(
-      HudPage({
-        searchParams: Promise.resolve({ kiosk: 'test-token' }),
-      })
-    ).rejects.toThrow('NEXT_REDIRECT:/hud-tv?kiosk=test-token');
+  it('renders kiosk HUD when the token is valid', async () => {
+    authorizeHudMock.mockResolvedValue({ ok: true, mode: 'kiosk' });
+    const metrics = {
+      accessMode: 'kiosk' as const,
+      generatedAt: 'now',
+      sources: { stripe: { available: false }, mercury: { available: false } },
+      overview: { mrrUsd: 0, balanceUsd: 0, defaultStatusDetail: 'unknown' },
+    };
+    getHudMetricsMock.mockResolvedValue(metrics);
+
+    const result = await HudPage({
+      searchParams: Promise.resolve({ kiosk: 'test-token' }),
+    });
+
+    expect(authorizeHudMock).toHaveBeenCalledWith('test-token');
     expect(getCurrentAdminPageAccessMock).not.toHaveBeenCalled();
+    expect(getHudMetricsMock).toHaveBeenCalledWith('kiosk');
+    const dashboardElement = findElementByName(result, 'HudDashboardClient');
+    expect(dashboardElement).not.toBeNull();
+    expect(dashboardElement?.props?.initialMetrics).toEqual(metrics);
   });
 
   it('calls unauthorized for signed-out users', async () => {
@@ -134,7 +158,12 @@ describe('/hud page auth', () => {
       hasAdminRole: true,
       userId: 'admin_1',
     });
-    const metrics = { accessMode: 'admin' as const, generatedAt: 'now' };
+    const metrics = {
+      accessMode: 'admin' as const,
+      generatedAt: 'now',
+      sources: { stripe: { available: false }, mercury: { available: false } },
+      overview: { mrrUsd: 0, balanceUsd: 0, defaultStatusDetail: 'unknown' },
+    };
     getHudMetricsMock.mockResolvedValue(metrics);
 
     const result = await HudPage({ searchParams: Promise.resolve({}) });

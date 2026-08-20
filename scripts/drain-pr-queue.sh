@@ -23,6 +23,9 @@
 #     evaluator process (default 45)
 #   DRAIN_ADMISSION_PR / DRAIN_ADMISSION_HEAD  optional exact new-admission
 #     scope; when both are empty this run is maintenance-only
+#   DRAIN_RECONCILE_MISSED_ADMISSION  permit one bounded exact-green recovery
+#     pass for admission events replaced while pending in the workflow mutex
+#   DRAIN_QUEUE_REENTRY_MAX_PER_RUN  total event + recovery admission cap (1-2)
 #   DRAIN_PROMOTION_MODE  normal, isolated-only, draft-only, hold-intake, or blocked
 #   DRAIN_FLEET_GATE_B64  fresh typed fleet receipt; mandatory outside normal
 #   DRAIN_RECOVER_FLEET_HOLDS  exact production-controller recovery event only
@@ -99,9 +102,12 @@ FLEET_HOLD_TTL_SECONDS="${FLEET_HOLD_TTL_SECONDS:-720}"
 # A successful native enrollment leaves a bot-authored, exact-head receipt.
 # A completed CI merge_group has no source PR head to admit, but it is the
 # authoritative signal that GitHub may just have ejected unmerged cohort
-# members while main advanced. The controller may reconcile only these
-# receipts, never the whole clean backlog.
+# members while main advanced. Separately, GitHub may replace an older pending
+# admission run in this workflow's one mutex. A surviving pass may recover a
+# tiny exact-green cohort without requiring a prior receipt; both recovery
+# sources share one cap and the same exact-head enrollment gate.
 DRAIN_RECONCILE_QUEUE_REENTRY="${DRAIN_RECONCILE_QUEUE_REENTRY:-0}"
+DRAIN_RECONCILE_MISSED_ADMISSION="${DRAIN_RECONCILE_MISSED_ADMISSION:-0}"
 DRAIN_QUEUE_REENTRY_MAX_PER_RUN="${DRAIN_QUEUE_REENTRY_MAX_PER_RUN:-2}"
 QUEUE_REENTRY_CONTEXT="jovie-queue-reentry/v1"
 QUEUE_DEFERRED_RELEASE_LIB="$(dirname "${BASH_SOURCE[0]}")/lib/queue-deferred-release-admission.mjs"
@@ -204,9 +210,22 @@ if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" && "$DRAIN_PROMOTION_MODE" != "nor
   echo "::error::Queue re-entry recovery may run only under normal GREEN promotion" >&2
   exit 2
 fi
+if [[ "$DRAIN_RECONCILE_MISSED_ADMISSION" != "0" && "$DRAIN_RECONCILE_MISSED_ADMISSION" != "1" ]]; then
+  echo "::error::DRAIN_RECONCILE_MISSED_ADMISSION must be 0 or 1" >&2
+  exit 2
+fi
+if [[ "$DRAIN_RECONCILE_MISSED_ADMISSION" == "1" ]]; then
+  case "$DRAIN_PROMOTION_MODE" in
+    normal | hold-intake | draft-only) ;;
+    *)
+      echo "::error::Missed admission recovery requires a clean-admitting fleet mode" >&2
+      exit 2
+      ;;
+  esac
+fi
 if [[ ! "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" =~ ^[1-9][0-9]*$ ]] \
-  || (( DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 3 )); then
-  echo "::error::DRAIN_QUEUE_REENTRY_MAX_PER_RUN must be an integer from 1 through 3" >&2
+  || (( DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 2 )); then
+  echo "::error::DRAIN_QUEUE_REENTRY_MAX_PER_RUN must be an integer from 1 through 2" >&2
   exit 2
 fi
 if [[ -z "$DRAIN_ADMISSION_PR" && -z "$DRAIN_ADMISSION_HEAD" ]]; then
@@ -674,12 +693,31 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     and .baseRefName == "main"
     and ([.labels[].name] | any(
       . == "needs-human" or . == "hold" or . == "gated"
-      or . == "queue-deferred" or . == "needs-conflict-resolution"
+      or . == "needs-conflict-resolution"
       or . == "fast" or ($backend == "test-label-fixture" and . == "merge-queue")
     ) | not)
   ' <<<"$current" >/dev/null; then
     echo "    ⏸ eligibility changed; refusing enrollment for #$n"
     return 2
+  fi
+  if jq -e '[.labels[].name] | index("queue-deferred")' <<<"$current" >/dev/null; then
+    if [[ "$DRAIN_PROMOTION_MODE" != "hold-intake" && "$DRAIN_PROMOTION_MODE" != "normal" ]]; then
+      echo "    ⏸ queue-deferred hold still applies for #$n"
+      return 2
+    fi
+    if [[ "$DRY_RUN" == "1" ]]; then
+      echo "    [dry-run] would -queue-deferred on #$n (exact admission)"
+    else
+      if ! gh_retry pr edit "$n" -R "$REPO" --remove-label queue-deferred >/dev/null 2>&1; then
+        echo "    !! failed to remove queue-deferred on #$n" >&2
+        return 1
+      fi
+      echo "    -queue-deferred on #$n (exact admission under $DRAIN_PROMOTION_MODE)"
+      if ! current="$(gh_retry pr view "$n" -R "$REPO" --json "$json_fields" 2>/dev/null)"; then
+        echo "    !! could not refresh #$n after releasing queue-deferred" >&2
+        return 1
+      fi
+    fi
   fi
   head_oid="$(jq -r '.headRefOid // empty' <<<"$current")"
   if [[ ! "$head_oid" =~ ^[0-9a-fA-F]{40}$ ]]; then
@@ -1145,11 +1183,17 @@ while IFS= read -r pr; do
   stop_if_budget_exhausted && break
   n="$(jq -r '.n' <<<"$pr")"
   fail="[]"
-  if jq -e '
+  if jq -e --arg admission_pr "$DRAIN_ADMISSION_PR" '
     (.draft | not)
     and (.base == "main")
     and (.m == "MERGEABLE")
-    and (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "fast")) | not)
+    and (
+      (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "fast")) | not)
+      and (
+        (([.L[]] | index("queue-deferred")) == null)
+        or ((.n | tostring) == $admission_pr)
+      )
+    )
   ' <<<"$pr" >/dev/null; then
     fail="$(check_failures_for_pr "$n")"
   fi
@@ -1362,7 +1406,11 @@ fi
 [[ "$ENROLL_SLOTS" -lt 0 ]] && ENROLL_SLOTS=0
 echo "  queue depth: $QUEUED_NOW/$MAX_QUEUE_DEPTH ($ENROLL_SLOTS slots)"
 if [[ -z "$DRAIN_ADMISSION_PR" ]]; then
-  echo "  admission scope: maintenance-only (no new enrollment)"
+  if [[ "$DRAIN_RECONCILE_MISSED_ADMISSION" == "1" ]]; then
+    echo "  admission scope: no primary target (bounded missed-admission recovery enabled)"
+  else
+    echo "  admission scope: maintenance-only (no new enrollment)"
+  fi
 else
   echo "  admission scope: #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD"
 fi
@@ -1454,7 +1502,11 @@ done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" --arg pro
   | select(.base=="main")
   | select(.fail|length==0)
   | select(.q | not)
-  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or .=="needs-conflict-resolution" or .=="fast") | not)')
+  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="needs-conflict-resolution" or .=="fast") | not)
+  | select(
+      ([.L[]] | index("queue-deferred") == null)
+      or ((.n | tostring) == $admission_pr)
+    )')
 
 # A scoped CI-completion event that reaches this point without an exact-head
 # native queue receipt is not a successful controller pass. Previously this
@@ -1502,30 +1554,37 @@ if [[ "$DRY_RUN" != "1" && "$ADMISSION_TARGET_OBSERVED" == "true" && "$ADMISSION
 fi
 
 # A completed merge_group CI run is not attributable to an individual source
-# PR: GitHub reports its synthetic composite SHA. If it completes after main
-# moved, GitHub can leave previously admitted members unqueued with no future
-# PR-head event to re-trigger admission. Reconcile only a tiny, exact-head
-# cohort which this controller itself recorded after a prior native admission.
-# This is not a clean-backlog sweep: no receipt, changed head, red source gate,
-# hard hold, or non-normal fleet policy is a no-op. The cap protects the queue
-# from one composite event fanning out into a full cohort rebuild.
-if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" ]]; then
-  echo "=== RECOVER (bounded exact-head native re-entry after composite CI) ==="
-  REENTRY_RECOVERED=0
+# PR, while GitHub's one pending mutex slot can discard an initial exact-head
+# admission event before it starts. Reconcile both losses in one loop. A prior
+# native receipt authorizes re-entry; the missed-admission path instead requires
+# the same fresh positive source gates as normal admission. Every candidate is
+# re-read by enroll_if_still_eligible and the event-scoped candidate plus all
+# reconciliation sources share one total cap.
+# Hold-intake/normal missed admission also considers CLEAN queue-deferred
+# heads: exact admission already strips that label, but a main-push recovery
+# used to filter them out and left CI-green Symphony heads (#16187) parked.
+if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" || "$DRAIN_RECONCILE_MISSED_ADMISSION" == "1" ]]; then
+  echo "=== RECOVER (bounded exact-head native admission) ==="
   while read -r pr; do
     stop_if_budget_exhausted && break
-    if [[ "$REENTRY_RECOVERED" -ge "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" ]]; then
-      echo "  ~ reached exact re-entry cap ($DRAIN_QUEUE_REENTRY_MAX_PER_RUN)"
+    if [[ "$ENROLLED_THIS_RUN" -ge "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" ]]; then
+      echo "  ~ reached total exact admission cap ($DRAIN_QUEUE_REENTRY_MAX_PER_RUN)"
       break
     fi
     if [[ "$ENROLLED_THIS_RUN" -ge "$ENROLL_SLOTS" ]]; then
-      echo "  ~ queue depth cap reached before re-entry recovery"
+      echo "  ~ queue depth cap reached before exact admission recovery"
       break
     fi
     n="$(jq -r '.n' <<<"$pr")"
     t="$(jq -r '.t' <<<"$pr")"
     head_oid="$(jq -r '.headOid // ""' <<<"$pr" | tr '[:upper:]' '[:lower:]')"
-    if ! queue_reentry_receipt_is_recoverable "$head_oid"; then
+    recovery_kind=""
+    if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" ]] \
+      && queue_reentry_receipt_is_recoverable "$head_oid"; then
+      recovery_kind="native re-entry"
+    elif [[ "$DRAIN_RECONCILE_MISSED_ADMISSION" == "1" ]]; then
+      recovery_kind="missed admission"
+    else
       continue
     fi
     # The snapshot's check result can be stale. This is an exact-current-head
@@ -1535,24 +1594,35 @@ if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" ]]; then
       echo "  #$n  $t  ⏸ current exact-head checks are not green"
       continue
     fi
-    echo "  #$n  $t  ↻ exact native re-entry at $head_oid"
+    echo "  #$n  $t  ↻ exact $recovery_kind at $head_oid"
     if enroll_if_still_eligible "$n" "$n" "$head_oid"; then
-      REENTRY_RECOVERED=$((REENTRY_RECOVERED + 1))
       ENROLLED_THIS_RUN=$((ENROLLED_THIS_RUN + 1))
     else
-      reentry_result=$?
-      if [[ "$reentry_result" -ne 2 ]]; then
-        echo "::error::Failed exact native re-entry recovery for #$n" >&2
+      recovery_result=$?
+      if [[ "$recovery_result" -ne 2 ]]; then
+        echo "::error::Failed exact native admission recovery for #$n" >&2
         exit 1
       fi
     fi
-  done < <(echo "$SNAP" | jq -c '[ .[]
+  done < <(echo "$SNAP" | jq -c \
+    --arg admission_pr "$DRAIN_ADMISSION_PR" \
+    --arg promotion_mode "$DRAIN_PROMOTION_MODE" \
+    --arg missed "$DRAIN_RECONCILE_MISSED_ADMISSION" \
+    '[ .[]
+    | select((.n | tostring) != $admission_pr)
     | select(.q | not)
     | select(.draft | not)
     | select(.m == "MERGEABLE")
     | select(.base == "main")
     | select(.fail | length == 0)
-    | select([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast") | not)
+    | select([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "needs-conflict-resolution" or . == "fast") | not)
+    | select(
+        ([.L[]] | index("queue-deferred") == null)
+        or (
+          $missed == "1"
+          and ($promotion_mode == "hold-intake" or $promotion_mode == "normal")
+        )
+      )
     | select((.headOid // "") | test("^[0-9a-f]{40}$"))
     | {n, t, headOid}
   ] | sort_by(.n)[]')

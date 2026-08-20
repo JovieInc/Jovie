@@ -15,6 +15,8 @@ import { Icon } from '@/components/atoms/Icon';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
+import { useAuthSafe } from '@/hooks/useJovieAuth';
+import { buildAudioBlobPath } from '@/lib/audio/blob-path';
 import {
   AUDIO_FILE_ACCEPT,
   AUDIO_UPLOAD_POLICIES,
@@ -30,6 +32,7 @@ import {
 const MAX_FILE_SIZE = AUDIO_UPLOAD_POLICIES.promo_download.maxFileSizeBytes;
 
 export default function PromoDownloadsPage() {
+  const { userId } = useAuthSafe();
   const { releaseId } = useParams<{ releaseId: string }>();
   const [files, setFiles] = useState<PromoDownloadFile[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -94,11 +97,15 @@ export default function PromoDownloadsPage() {
 
       try {
         // Client-side upload to Vercel Blob
-        const blob = await upload(file.name, file, {
-          access: 'public',
-          handleUploadUrl: '/api/promo-downloads/upload-token',
-          contentType: uploadMime,
-        });
+        const blob = await upload(
+          buildAudioBlobPath('promo_download', userId ?? 'unknown', file.name),
+          file,
+          {
+            access: 'public',
+            handleUploadUrl: '/api/promo-downloads/upload-token',
+            contentType: uploadMime,
+          }
+        );
 
         // Confirm upload and create DB record
         const title = file.name.replace(/\.[^.]+$/, ''); // Strip extension
@@ -136,7 +143,7 @@ export default function PromoDownloadsPage() {
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
     },
-    [releaseId]
+    [releaseId, userId]
   );
 
   const handleFileSelect = useCallback(

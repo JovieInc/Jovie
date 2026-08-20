@@ -9,6 +9,7 @@ import {
   footerStyles,
   headerStyles,
   overlayClassName,
+  sheetSurfaceStyles,
   titleStyles,
 } from '../lib/overlay-styles';
 import { cn } from '../lib/utils';
@@ -26,6 +27,7 @@ export const SheetOverlay = React.forwardRef<
   <SheetPrimitive.Overlay
     ref={ref}
     className={cn(overlayClassName, className)}
+    data-slot='sheet-overlay'
     data-testid='sheet-overlay'
     {...props}
   />
@@ -34,7 +36,7 @@ SheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
 
 const sheetVariants = cva(
   [
-    'fixed z-[65] gap-4 bg-(--linear-bg-surface-0) p-5 text-(--linear-text-primary) shadow-(--linear-shadow-card-elevated)',
+    sheetSurfaceStyles,
     'transition ease-in-out',
     'data-[state=open]:animate-in data-[state=closed]:animate-out',
     'data-[state=closed]:duration-300 data-[state=open]:duration-500',
@@ -44,19 +46,19 @@ const sheetVariants = cva(
     variants: {
       side: {
         top: [
-          'inset-x-0 top-0 border-b border-(--linear-border-subtle)',
+          'inset-x-0 top-0 max-h-[calc(100dvh-1rem)] border-b',
           'data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top',
         ].join(' '),
         bottom: [
-          'inset-x-0 bottom-0 border-t border-(--linear-border-subtle)',
+          'inset-x-0 bottom-0 max-h-[calc(100dvh-1rem)] border-t',
           'data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
         ].join(' '),
         left: [
-          'inset-y-0 left-0 h-full w-3/4 max-w-[calc(100vw-2rem)] border-r border-(--linear-border-subtle) sm:max-w-sm',
+          'inset-y-0 left-0 h-full w-[min(26rem,calc(100vw-1rem))] border-r',
           'data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left',
         ].join(' '),
         right: [
-          'inset-y-0 right-0 h-full w-3/4 max-w-[calc(100vw-2rem)] border-l border-(--linear-border-subtle) sm:max-w-sm',
+          'inset-y-0 right-0 h-full w-[min(26rem,calc(100vw-1rem))] border-l',
           'data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right',
         ].join(' '),
       },
@@ -75,6 +77,13 @@ export interface SheetContentProps
    * @default false
    */
   readonly hideClose?: boolean;
+  readonly portalProps?: React.ComponentPropsWithoutRef<
+    typeof SheetPrimitive.Portal
+  >;
+  readonly overlayProps?: React.ComponentPropsWithoutRef<
+    typeof SheetPrimitive.Overlay
+  >;
+  readonly disablePortal?: boolean;
   /**
    * Test ID for the sheet content.
    * @default "sheet-content"
@@ -92,16 +101,20 @@ export const SheetContent = React.forwardRef<
       className,
       children,
       hideClose = false,
+      portalProps,
+      overlayProps,
+      disablePortal = false,
       testId = 'sheet-content',
       ...props
     },
     ref
-  ) => (
-    <SheetPortal>
-      <SheetOverlay />
+  ) => {
+    const content = (
       <SheetPrimitive.Content
         ref={ref}
         className={cn(sheetVariants({ side }), className)}
+        data-side={side}
+        data-slot='sheet-content'
         data-testid={testId}
         {...props}
       >
@@ -109,14 +122,31 @@ export const SheetContent = React.forwardRef<
         {!hideClose && (
           <SheetPrimitive.Close
             className={closeButtonClassName}
+            data-slot='sheet-close'
             data-testid='sheet-close-button'
           >
             <CloseButtonIcon />
           </SheetPrimitive.Close>
         )}
       </SheetPrimitive.Content>
-    </SheetPortal>
-  )
+    );
+
+    if (disablePortal) {
+      return (
+        <>
+          <SheetOverlay {...overlayProps} />
+          {content}
+        </>
+      );
+    }
+
+    return (
+      <SheetPortal {...portalProps}>
+        <SheetOverlay {...overlayProps} />
+        {content}
+      </SheetPortal>
+    );
+  }
 );
 SheetContent.displayName = SheetPrimitive.Content.displayName;
 
@@ -135,6 +165,7 @@ export const SheetHeader = ({
 }: SheetHeaderProps) => (
   <div
     className={cn(headerStyles.base, className)}
+    data-slot='sheet-header'
     data-testid={testId}
     {...props}
   />
@@ -156,6 +187,7 @@ export const SheetFooter = ({
 }: SheetFooterProps) => (
   <div
     className={cn(footerStyles.base, className)}
+    data-slot='sheet-footer'
     data-testid={testId}
     {...props}
   />
@@ -169,6 +201,7 @@ export const SheetTitle = React.forwardRef<
   <SheetPrimitive.Title
     ref={ref}
     className={cn(titleStyles.base, className)}
+    data-slot='sheet-title'
     data-testid='sheet-title'
     {...props}
   />
@@ -182,6 +215,7 @@ export const SheetDescription = React.forwardRef<
   <SheetPrimitive.Description
     ref={ref}
     className={cn(descriptionStyles.base, className)}
+    data-slot='sheet-description'
     data-testid='sheet-description'
     {...props}
   />

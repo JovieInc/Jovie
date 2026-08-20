@@ -25,6 +25,7 @@
     "/app/ov/growth/yc-metrics",
     "/app/ov/ingest",
     "/app/ov/leads",
+    "/app/ov/ops",
     "/app/ov/outreach",
     "/app/ov/outreach/dm",
     "/app/ov/outreach/email",
@@ -44,5 +45,5 @@
     "/app/tipping",
     "/app/tracks"
   ],
-  "note": "Existing compatibility redirects at JOV-3772. This allowlist may shrink but no new page-level redirect stub may be added. Exception: /app/tracks (JOV-4846) folds the retired Tracks surface into Library with table mode + audio tab preselected, mirroring the /app/dashboard/library fold-in. Canonical routes render their page in the unified shell."
+  "note": "Existing compatibility redirects at JOV-3772. This allowlist may shrink but no new page-level redirect stub may be added. Exception: /app/tracks (JOV-4846) folds the retired Tracks surface into Library with table mode + audio tab preselected, mirroring the /app/dashboard/library fold-in. Exception: /app/ov/ops folds the duplicate Ops HUD into /hud. Canonical routes render their page in the unified shell."
 }

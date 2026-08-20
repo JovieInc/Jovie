@@ -4,7 +4,10 @@ import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import * as React from 'react';
 
 import {
+  DROPDOWN_TRANSITIONS,
+  OVERLAY_COLLISION_PADDING,
   OVERLAY_CONTENT_RADIUS,
+  OVERLAY_SIDE_OFFSET,
   TOOLTIP_SURFACE_BASE,
 } from '../lib/dropdown-styles';
 import { cn } from '../lib/utils';
@@ -86,8 +89,8 @@ const TooltipContent = React.forwardRef<
   (
     {
       className,
-      sideOffset = 4,
-      collisionPadding = 8,
+      sideOffset = OVERLAY_SIDE_OFFSET,
+      collisionPadding = OVERLAY_COLLISION_PADDING,
       showArrow = false,
       contentVariant = 'rich',
       children,
@@ -115,10 +118,8 @@ const TooltipContent = React.forwardRef<
           // Pure opacity reveal (fade only) — subtract decorative zoom + slide-ins.
           // Matches parallel support work on shell Tooltip / Dsp for visual parity.
           // No layout shift; cursor-near friendly.
-          'animate-in fade-in-0',
-          'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
-          // Reduced motion override (already present; strengthened for parity)
-          'motion-reduce:animate-none motion-reduce:data-[state=closed]:animate-none',
+          DROPDOWN_TRANSITIONS,
+          // Reduced motion keeps the opacity transition legible without spatial motion.
           'motion-reduce:transition-opacity motion-reduce:duration-150',
           className
         )}

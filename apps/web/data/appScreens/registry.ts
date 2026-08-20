@@ -133,9 +133,9 @@ export const APP_SCREEN_COMPONENT_REGISTRY = [
   },
   {
     id: 'component.empty-state',
-    source: 'apps/web/components/organisms/EmptyState.tsx',
-    storySource: 'apps/web/components/organisms/EmptyState.stories.tsx',
-    storybookTitle: 'UI/EmptyState',
+    source: 'apps/web/components/molecules/EmptyState.tsx',
+    storySource: 'apps/web/components/molecules/EmptyState.stories.tsx',
+    storybookTitle: 'UI/Molecules/EmptyState',
     penRootId: null,
     penReferenceEligible: false,
     penIdentityReason:
@@ -329,6 +329,7 @@ const NON_REFERENCE_SOURCES = new Set<string>([
   'apps/web/app/app/(shell)/admin/growth/yc-metrics/page.tsx',
   'apps/web/app/app/(shell)/admin/ingest/page.tsx',
   'apps/web/app/app/(shell)/admin/leads/page.tsx',
+  'apps/web/app/app/(shell)/admin/ops/page.tsx',
   'apps/web/app/app/(shell)/admin/outreach/dm/page.tsx',
   'apps/web/app/app/(shell)/admin/outreach/email/page.tsx',
   'apps/web/app/app/(shell)/admin/outreach/page.tsx',

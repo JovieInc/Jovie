@@ -1,20 +1,33 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-
+import {
+  CloseButtonIcon as RootCloseButtonIcon,
+  closeButtonClassName as rootCloseButtonClassName,
+  closeButtonStyles as rootCloseButtonStyles,
+} from '../index';
 import {
   CloseButtonIcon,
   closeButtonClassName,
   closeButtonStyles,
 } from './close-button';
 
+describe('@jovie/ui root close-button exports', () => {
+  it('resolve to the canonical close-button contract', () => {
+    expect(RootCloseButtonIcon).toBe(CloseButtonIcon);
+    expect(rootCloseButtonClassName).toBe(closeButtonClassName);
+    expect(rootCloseButtonStyles).toBe(closeButtonStyles);
+  });
+});
+
 describe('CloseButtonIcon', () => {
   describe('Basic Rendering', () => {
     it('renders X icon', () => {
       render(<CloseButtonIcon />);
-      // The icon is rendered with aria-hidden
       const icon = document.querySelector('svg');
       expect(icon).toBeInTheDocument();
       expect(icon).toHaveAttribute('aria-hidden', 'true');
+      expect(icon).toHaveAttribute('data-slot', 'close-icon');
+      expect(document.querySelectorAll('svg')).toHaveLength(1);
     });
 
     it('renders screen reader text', () => {
@@ -37,17 +50,16 @@ describe('CloseButtonIcon', () => {
     it('uses default size of 4', () => {
       render(<CloseButtonIcon />);
       const icon = document.querySelector('svg');
-      // Check that the icon has size classes applied (includes h-4 w-4)
-      expect(icon?.getAttribute('class')).toContain('h-4');
-      expect(icon?.getAttribute('class')).toContain('w-4');
+      expect(icon).toHaveAttribute('width', '16');
+      expect(icon).toHaveAttribute('height', '16');
+      expect(icon).toHaveClass('shrink-0');
     });
 
     it('supports custom size', () => {
       render(<CloseButtonIcon size={6} />);
       const icon = document.querySelector('svg');
-      // Check that the icon has size classes applied (includes h-6 w-6)
-      expect(icon?.getAttribute('class')).toContain('h-6');
-      expect(icon?.getAttribute('class')).toContain('w-6');
+      expect(icon).toHaveAttribute('width', '24');
+      expect(icon).toHaveAttribute('height', '24');
     });
   });
 
@@ -68,7 +80,8 @@ describe('closeButtonStyles', () => {
   });
 
   it('has hover styles', () => {
-    expect(closeButtonStyles.hover).toContain('hover:opacity-100');
+    expect(closeButtonStyles.hover).toContain('hover:bg-interactive-hover');
+    expect(closeButtonStyles.hover).toContain('hover:text-primary-token');
   });
 
   it('has focus styles', () => {
@@ -83,6 +96,9 @@ describe('closeButtonStyles', () => {
     expect(closeButtonStyles.disabled).toContain(
       'disabled:pointer-events-none'
     );
+    expect(closeButtonStyles.disabled).toContain(
+      'disabled:opacity-[var(--state-disabled-opacity)]'
+    );
   });
 
   it('has offset styles', () => {
@@ -95,7 +111,7 @@ describe('closeButtonStyles', () => {
 describe('closeButtonClassName', () => {
   it('combines all style classes', () => {
     expect(closeButtonClassName).toContain('absolute');
-    expect(closeButtonClassName).toContain('hover:opacity-100');
+    expect(closeButtonClassName).toContain('hover:bg-interactive-hover');
     expect(closeButtonClassName).toContain('focus-visible:ring-2');
     expect(closeButtonClassName).toContain('disabled:pointer-events-none');
     expect(closeButtonClassName).toContain('ring-offset-(--linear-bg-page)');
@@ -103,8 +119,7 @@ describe('closeButtonClassName', () => {
 
   it('uses the shared pill close button shape', () => {
     expect(closeButtonClassName).toContain('rounded-full');
-    expect(closeButtonClassName).toContain('h-12');
-    expect(closeButtonClassName).toContain('w-12');
+    expect(closeButtonClassName).toContain('size-12');
     expect(closeButtonClassName).not.toContain(
       'rounded-(--linear-app-radius-item)'
     );

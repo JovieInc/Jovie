@@ -7,6 +7,7 @@
 
 import { type HandleUploadBody, handleUpload } from '@vercel/blob/client';
 import { NextRequest, NextResponse } from 'next/server';
+import { getAudioBlobPathPrefix } from '@/lib/audio/blob-path';
 import {
   ALLOWED_AUDIO_MIME_TYPES,
   AUDIO_MAX_FILE_SIZE_BYTES,
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
     const jsonResponse = await handleUpload({
       body,
       request,
-      onBeforeGenerateToken: async _pathname => {
+      onBeforeGenerateToken: async pathname => {
         const { profile } = await getSessionContext({
           clerkUserId,
           requireUser: true,
@@ -36,6 +37,14 @@ export async function POST(request: NextRequest) {
 
         if (!profile) {
           throw new Error('Creator profile not found');
+        }
+        if (
+          !pathname.startsWith(
+            getAudioBlobPathPrefix('library', clerkUserId)
+          ) &&
+          !pathname.startsWith(getAudioBlobPathPrefix('chat', clerkUserId))
+        ) {
+          throw new Error('Invalid audio upload pathname');
         }
 
         return {

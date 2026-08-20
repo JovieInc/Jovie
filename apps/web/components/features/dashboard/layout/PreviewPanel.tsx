@@ -22,10 +22,10 @@ import {
   DrawerHeader,
   DrawerInlineNote,
 } from '@/components/molecules/drawer';
+import { RightDrawer } from '@/components/molecules/drawer/RightDrawer';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { getQrCodeUrl } from '@/components/molecules/QRCode';
-import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { BASE_URL } from '@/constants/domains';
 import { CopyLinkInput } from '@/features/dashboard/atoms/CopyLinkInput';
 import { ProfilePreview } from '@/features/dashboard/molecules/ProfilePreview';

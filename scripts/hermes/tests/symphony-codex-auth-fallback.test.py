@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import base64
+import hashlib
 import http.server
 import importlib.util
 import io
@@ -34,20 +35,59 @@ RUNTIME_NAMES = tuple(path.name for path in RUNTIME_ARTIFACTS)
 LAUNCHER_NAMES = (WRAPPER.name, CONTROLLER.name, SIDECAR.name, GROK_SHIP.name)
 
 
+def issue_revision(identifier, title="", description=""):
+    canonical = f"{identifier}\n{title.strip()}\n{description.strip()}"
+    return hashlib.sha256(canonical.encode()).hexdigest()[:24]
+
+
+def admission_comment(identifier, title="", description="", *, stale=False):
+    revision = "0" * 24 if stale else issue_revision(identifier, title, description)
+    payload = {
+        "schema": "admission-gate/v1",
+        "issue": identifier,
+        "issueRevision": revision,
+        "fingerprint": "a" * 24,
+        "decision": "approved",
+    }
+    return (
+        "<!-- admission-gate/v1 -->\n"
+        + json.dumps(payload)
+        + "\n<!--/admission-gate-->"
+    )
+
+
 class LinearHandler(http.server.BaseHTTPRequestHandler):
     requests: list[tuple[str | None, str]] = []
     nodes = [
         {
             "identifier": identifier,
+            "title": f"Ship {identifier}",
+            "description": "Bounded admitted work.",
             "team": {"key": identifier.split("-", 1)[0]},
+            "state": {"name": "Todo"},
             "labels": {"nodes": [{"name": name} for name in labels]},
+            "comments": {
+                "nodes": (
+                    []
+                    if blocked
+                    else [
+                        {
+                            "body": admission_comment(
+                                identifier,
+                                f"Ship {identifier}",
+                                "Bounded admitted work.",
+                            )
+                        }
+                    ]
+                )
+            },
         }
-        for identifier, labels in (
-            ("JOV-1", ("symphony", "plan-approved", "admission-approved")),
-            ("JOV-2", ("symphony", "plan-approved", "admission-approved")),
-            ("LYB-3", ("symphony", "plan-approved", "admission-approved")),
-            ("JOV-4", ("symphony", "needs:human")),
-            ("LYB-5", ("symphony", "hold")),
+        for identifier, labels, blocked in (
+            ("JOV-1", ("symphony", "plan-approved", "admission-approved"), False),
+            ("JOV-2", (), False),
+            ("LYB-3", ("symphony",), False),
+            ("JOV-4", ("symphony", "needs:human"), True),
+            ("LYB-5", ("symphony", "hold"), True),
         )
     ]
     # Override for single-issue admission re-checks (simulates a label guard
@@ -125,11 +165,14 @@ class LinearHandler(http.server.BaseHTTPRequestHandler):
                         "issue": {
                             "id": f"uuid-{identifier}",
                             "identifier": identifier,
-                            "title": f"Ship {identifier}",
-                            "description": "Bounded admitted work.",
+                            "title": node.get("title") or f"Ship {identifier}",
+                            "description": node.get("description") or "Bounded admitted work.",
                             "url": f"https://linear.example/{identifier}",
                             "updatedAt": "2026-08-14T19:00:00Z",
-                            "state": {"id": f"{team}-todo", "name": "Todo"},
+                            "state": node.get("state")
+                            if isinstance(node.get("state"), dict)
+                            and isinstance(node.get("state", {}).get("name"), str)
+                            else {"id": f"{team}-todo", "name": "Todo"},
                             "team": {
                                 "key": team,
                                 "states": {
@@ -140,6 +183,7 @@ class LinearHandler(http.server.BaseHTTPRequestHandler):
                                 },
                             },
                             "labels": {"nodes": [{"name": name} for name in labels]},
+                            "comments": node.get("comments") or {"nodes": []},
                         }
                     }
                 }
@@ -157,6 +201,8 @@ class LinearHandler(http.server.BaseHTTPRequestHandler):
 class GrokLinearHandler(http.server.BaseHTTPRequestHandler):
     requests: list[dict] = []
     labels: dict[str, list[str]] = {}
+    omit_receipt: set[str] = set()
+    states: dict[str, str] = {}
 
     def do_POST(self):  # noqa: N802 - stdlib handler API
         payload = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
@@ -166,21 +212,31 @@ class GrokLinearHandler(http.server.BaseHTTPRequestHandler):
         else:
             identifier = payload["variables"]["id"]
             team = identifier.split("-", 1)[0]
-            labels = self.__class__.labels.get(identifier) or [
-                "symphony",
-                "plan-approved",
-                "admission-approved",
-            ]
+            title = f"Ship {identifier}"
+            description = "Bounded admitted work."
+            labels = self.__class__.labels.get(identifier) or []
+            comments = (
+                []
+                if (
+                    "needs-human" in labels
+                    or "blocked" in labels
+                    or identifier in self.__class__.omit_receipt
+                )
+                else [{"body": admission_comment(identifier, title, description)}]
+            )
             response = {
                 "data": {
                     "issue": {
                         "id": f"uuid-{identifier}",
                         "identifier": identifier,
-                        "title": f"Ship {identifier}",
-                        "description": "Bounded admitted work.",
+                        "title": title,
+                        "description": description,
                         "url": f"https://linear.example/{identifier}",
                         "updatedAt": "2026-08-14T19:00:00Z",
-                        "state": {"id": f"{team}-todo", "name": "Todo"},
+                        "state": {
+                            "id": f"{team}-state",
+                            "name": self.__class__.states.get(identifier) or "Todo",
+                        },
                         "team": {
                             "key": team,
                             "states": {
@@ -191,6 +247,7 @@ class GrokLinearHandler(http.server.BaseHTTPRequestHandler):
                             },
                         },
                         "labels": {"nodes": [{"name": name} for name in labels]},
+                        "comments": {"nodes": comments},
                     }
                 }
             }
@@ -217,6 +274,14 @@ class FallbackTests(unittest.TestCase):
         python.write_text("#!/bin/sh\nexec /usr/bin/python3 \"$@\"\n")
         python.chmod(0o755)
         self.command("grok", "printf 'GROK_MODEL_READY\\n'")
+        self.command(
+            "gh",
+            'case "$*" in\n'
+            '  *headRefName*) echo "[]";;\n'
+            '  *statusCheckRollup*) echo \'{"statusCheckRollup":[]}\';;\n'
+            '  *) echo 0;;\n'
+            'esac\n',
+        )
         self.model_probe = self.command("model-probe", "echo qwen3-coder:30b")
         self.model_agent = self.command("model-agent", "exit 0")
         self.command("flock", "exit 0")
@@ -227,9 +292,15 @@ class FallbackTests(unittest.TestCase):
             "workAdmission": {"allowed": True, "newIssueLeaseAllowed": False},
         }))
         self.environment = mock.patch.dict(os.environ, {
+            "SYMPHONY_OPEN_PR_INDEX": "empty",
             "GEM_FLEET_GATE_RECEIPT": str(self.gate),
             "GEM_PR_DRAIN_QWEN": str(self.model_probe),
             "GEM_QWEN_AGENT_EXECUTABLE": str(self.model_agent),
+            "GEM_CURSOR_EXECUTABLE": "/missing",
+            "GEM_KIMI_EXECUTABLE": "/missing",
+            "GEM_GROK_EXECUTABLE": "/missing",
+            "GEM_CLAUDE_EXECUTABLE": "/missing",
+            "GEM_DEEPSEEK_EXECUTABLE": "/missing",
         })
         self.environment.start()
         self.addCleanup(self.environment.stop)
@@ -259,6 +330,11 @@ class FallbackTests(unittest.TestCase):
             "GEM_FLEET_GATE_RECEIPT": str(self.gate),
             "GEM_PR_DRAIN_QWEN": str(self.model_probe),
             "GEM_QWEN_AGENT_EXECUTABLE": str(self.model_agent),
+            "GEM_CURSOR_EXECUTABLE": "/missing",
+            "GEM_KIMI_EXECUTABLE": "/missing",
+            "GEM_GROK_EXECUTABLE": "/missing",
+            "GEM_CLAUDE_EXECUTABLE": "/missing",
+            "GEM_DEEPSEEK_EXECUTABLE": "/missing",
             "SYMPHONY_FALLBACK_SELECTION_B64": base64.b64encode(json.dumps({
                 "schema_version": 1,
                 "deterministic_first": True,
@@ -367,6 +443,8 @@ class FallbackTests(unittest.TestCase):
     def grok_linear_url(self):
         GrokLinearHandler.requests = []
         GrokLinearHandler.labels = {}
+        GrokLinearHandler.omit_receipt = set()
+        GrokLinearHandler.states = {}
         server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), GrokLinearHandler)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.addCleanup(server.shutdown)
@@ -429,8 +507,11 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         events = self.events.read_text().splitlines()
         launch_index = next(i for i, line in enumerate(events) if line.startswith("systemd-run"))
-        stop_index = events.index("systemctl --user stop symphony-ui-pilot.service symphony-lyb.service")
-        self.assertLess(stop_index, launch_index, events)
+        self.assertNotIn(
+            "systemctl --user stop symphony-ui-pilot.service symphony-lyb.service",
+            events,
+        )
+        self.assertGreaterEqual(launch_index, 0, events)
         self.assertIn("codex_exhausted", result.stderr)
         self.assertNotIn("codex_not_exhausted", result.stderr)
 
@@ -585,7 +666,54 @@ class FallbackTests(unittest.TestCase):
                 ):
                     expected_rc = 0 if expected == "no_admitted_work" else 2
                     self.assertEqual(module.reconcile(), expected_rc)
-                self.assertEqual(controls, [])
+                if expected == "no_admitted_work":
+                    # Stopped JOV must be restored even when Linear has no
+                    # sidecar-admitted issues; leaving it down is a permanent hold.
+                    self.assertTrue(
+                        any(
+                            command[:4] == ["systemctl", "--user", "is-active", "--quiet"]
+                            and "symphony-ui-pilot.service" in command
+                            for command in controls
+                        ),
+                        controls,
+                    )
+                else:
+                    self.assertEqual(controls, [])
+
+    def test_exhausted_no_admitted_work_starts_stopped_jov(self):
+        module = self.load_controller_module()
+        controls: list[list[str]] = []
+        jov_started = {"value": False}
+
+        def control(command):
+            controls.append(command)
+            if command[:3] == ["systemctl", "--user", "start"] and module.PRIMARY_SERVICE in command:
+                jov_started["value"] = True
+                return True
+            if (
+                command[:4] == ["systemctl", "--user", "is-active", "--quiet"]
+                and module.PRIMARY_SERVICE in command
+            ):
+                return jov_started["value"]
+            return True
+
+        with (
+            mock.patch.object(
+                module,
+                "codex_canary_ready",
+                return_value=(False, "all_accounts_cooldown"),
+            ),
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_linear_identifiers", return_value=[]),
+            mock.patch.object(module, "_active_grok_units", return_value=[]),
+            mock.patch.object(module, "_control", side_effect=control),
+        ):
+            self.assertEqual(module.reconcile(), 0)
+        self.assertTrue(jov_started["value"], controls)
+        self.assertIn(
+            ["systemctl", "--user", "start", module.PRIMARY_SERVICE],
+            controls,
+        )
 
     def test_model_router_failure_preserves_symphony(self):
         module = self.load_controller_module()
@@ -663,8 +791,8 @@ class FallbackTests(unittest.TestCase):
         ):
             self.assertEqual(module.reconcile(), module.EXIT_SAFE_FAIL_CLOSED)
 
-        stop = "systemctl --user stop symphony-ui-pilot.service symphony-lyb.service"
-        self.assertLess(events.index("model-router"), events.index(stop))
+        self.assertIn("model-router", events)
+        self.assertNotIn("systemctl --user stop symphony-ui-pilot.service symphony-lyb.service", events)
 
     def test_live_canary_requires_luna_and_exact_marker(self):
         canary = self.command("codex-rotate", "printf '%s\\n' \"$*\" > \"$GEM_EVENTS\"; printf 'GEM_MODEL_READY\\n'")
@@ -704,13 +832,13 @@ class FallbackTests(unittest.TestCase):
         canary = self.command("codex-rotate", "echo GEM_MODEL_READY")
         self.command("systemctl", "printf 'systemctl %s\\n' \"$*\" >> \"$GEM_EVENTS\"; [ \"$2\" != is-active ] || exit \"${GEM_ACTIVE_RC:-0}\"")
         destination = self.install_runtime()
-        result = subprocess.run([destination / "symphony-grok-sidecar"], capture_output=True, text=True, env=self.env(GEM_CODEX_ROTATE_BIN=canary, GEM_EVENTS=self.events), check=False)
+        result = subprocess.run([destination / "symphony-grok-sidecar"], capture_output=True, text=True, env=self.env(GEM_CODEX_ROTATE_BIN=canary, GEM_EVENTS=self.events, GEM_CODEX_CANARY_TIMEOUT_SECONDS="5"), check=False)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.events.read_text().splitlines(), [
             "systemctl --user list-units --type=service --state=active grok-ship-*.service fallback-ship-*.service --no-legend --no-pager",
-            "systemctl --user start symphony-ui-pilot.service symphony-lyb.service",
+            "systemctl --user start symphony-ui-pilot.service",
+            "systemctl --user start symphony-lyb.service",
             "systemctl --user is-active --quiet symphony-ui-pilot.service",
-            "systemctl --user is-active --quiet symphony-lyb.service",
         ])
         self.assertIn("idle", result.stderr)
 
@@ -725,10 +853,20 @@ class FallbackTests(unittest.TestCase):
 
     def test_usable_recovery_defers_while_grok_ship_is_active(self):
         canary = self.command("codex-rotate", "echo GEM_MODEL_READY")
-        self.command("systemctl", "[ \"$2\" = list-units ] && printf 'grok-ship-JOV-1.service loaded active running\\n'; exit 0")
+        self.command(
+            "systemctl",
+            """
+            case "$*" in
+              *list-units*)
+                printf 'grok-ship-JOV-1.service loaded active running\\n'
+                ;;
+            esac
+            exit 0
+            """,
+        )
         destination = self.install_runtime()
         result = subprocess.run([destination / "symphony-grok-sidecar"], capture_output=True, text=True, env=self.env(GEM_CODEX_ROTATE_BIN=canary), check=False)
-        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("recovery_deferred", result.stderr)
 
     def test_exhausted_recovery_stops_symphony_and_bounds_grok_launches(self):
@@ -749,8 +887,11 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         events = self.events.read_text().splitlines()
         first_launch = next(i for i, line in enumerate(events) if line.startswith("systemd-run"))
-        stop_index = events.index("systemctl --user stop symphony-ui-pilot.service symphony-lyb.service")
-        self.assertLess(stop_index, first_launch, events)
+        self.assertGreaterEqual(first_launch, 0, events)
+        self.assertNotIn(
+            "systemctl --user stop symphony-ui-pilot.service symphony-lyb.service",
+            events,
+        )
         self.assertEqual(len([line for line in events if line.startswith("systemd-run")]), 2)
         self.assertTrue(any("fallback-ship-LYB-3" in line for line in events))
         self.assertFalse(any("fallback-ship-JOV-4" in line or "fallback-ship-LYB-5" in line for line in events))
@@ -761,11 +902,31 @@ class FallbackTests(unittest.TestCase):
         self.assertIn("hasNextPage", request_body)
         self.assertNotIn("first: 20", request_body)
 
-    def _issue_node(self, identifier, *labels):
+    def _issue_node(self, identifier, *labels, receipt=None, title=None, description=None, state="Todo"):
+        title = title if title is not None else f"Ship {identifier}"
+        description = description if description is not None else "Bounded admitted work."
+        blocked = any(
+            label.lower() in {"needs:human", "needs-human", "hold", "blocked", "human-review-required"}
+            for label in labels
+        )
+        include_receipt = receipt if receipt is not None else not blocked
+        comments = []
+        if include_receipt:
+            comments.append(
+                {
+                    "body": admission_comment(identifier, title, description)
+                    if include_receipt is True
+                    else include_receipt
+                }
+            )
         return {
             "identifier": identifier,
+            "title": title,
+            "description": description,
+            "state": {"name": state},
             "team": {"key": identifier.split("-", 1)[0]},
             "labels": {"nodes": [{"name": name} for name in labels]},
+            "comments": {"nodes": comments},
         }
 
     def test_linear_identifiers_paginates_until_no_next_page(self):
@@ -795,7 +956,67 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(second["variables"]["after"], "cursor-0")
         self.assertGreater(module.LINEAR_PAGE_SIZE, 20)
         self.assertNotIn("first: 20", first["query"])
-        self.assertEqual(module.REQUIRED_ADMISSION_LABELS, frozenset(("symphony",)))
+        self.assertNotIn('labels: { name: { eq: "symphony" } }', first["query"])
+        self.assertIn('"In Review"', first["query"])
+        self.assertIn("state { name }", first["query"])
+        self.assertEqual(module.REQUIRED_ADMISSION_LABELS, frozenset())
+
+    def test_linear_identifiers_continues_in_review_without_receipt(self):
+        """Live :4041 retrying In Review issues after #16212 emptied receipts."""
+        module = self.load_controller_module()
+        url = self.linear_url()
+        LinearHandler.pages = [
+            [
+                self._issue_node("JOV-5015", "symphony", receipt=False, state="In Review"),
+                self._issue_node("JOV-5000", "symphony", receipt=False, state="Todo"),
+                self._issue_node(
+                    "JOV-4998", "symphony", "blocked", receipt=False, state="In Review"
+                ),
+            ]
+        ]
+        with mock.patch.dict(os.environ, {"LINEAR_API_KEY": "linear-secret", "LINEAR_API_URL": url}):
+            identifiers = module._linear_identifiers()
+        self.assertEqual(identifiers, ["JOV-5015"])
+
+    def test_launch_continues_in_review_head_without_receipt(self):
+        module = self.load_controller_module()
+        launches: list[list[str]] = []
+        issue = self._admitted_issue("JOV-5015", "In Review")
+        issue["comments"] = {"nodes": []}
+        with (
+            mock.patch.object(module, "_autonomous_open_pr_index", return_value={}),
+            mock.patch.object(module, "_fetch_single_issue", return_value=issue),
+            mock.patch.object(
+                module, "_control", side_effect=lambda command: launches.append(command) or True
+            ),
+        ):
+            launched, used = module._launch_fallback_workers(
+                ["JOV-5015"],
+                [],
+                "/bin/true",
+                "a" * 64,
+                {"selected": {"id": "grok"}},
+                2,
+            )
+        self.assertEqual(used, 1)
+        self.assertEqual(len(launched), 1)
+        self.assertTrue(any("JOV-5015" in arg for command in launches for arg in command), launches)
+
+    def test_check_admission_continues_in_review_without_receipt(self):
+        url = self.linear_url()
+        original_nodes = LinearHandler.nodes
+        LinearHandler.nodes = [
+            self._issue_node("JOV-5015", "symphony", receipt=False, state="In Review")
+        ]
+        self.addCleanup(lambda: setattr(LinearHandler, "nodes", original_nodes))
+        result = self.run_controller(
+            "check-admission",
+            "JOV-5015",
+            LINEAR_API_KEY="linear-secret",
+            LINEAR_API_URL=url,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["original_state_name"], "In Review")
 
     def test_linear_identifiers_fails_closed_on_malformed_page_info(self):
         module = self.load_controller_module()
@@ -831,24 +1052,83 @@ class FallbackTests(unittest.TestCase):
         for label in ("held", "decision-required", "manual-incident"):
             self.assertIn(label, module.BLOCKED_ADMISSION_LABELS)
         # admission_decision is one predicate shared front-to-back.
+        comment = admission_comment("JOV-1", "Ship JOV-1", "Bounded admitted work.")
         ok, _reason = module.admission_decision(
-            "JOV", "JOV-1", {"symphony", "plan-approved", "admission-approved"}
+            "JOV",
+            "JOV-1",
+            set(),
+            title="Ship JOV-1",
+            description="Bounded admitted work.",
+            comments=[{"body": comment}],
         )
         self.assertTrue(ok)
         ok, reason = module.admission_decision(
-            "JOV", "JOV-1",
-            {"symphony", "plan-approved", "admission-approved", "blocked", "needs-human"},
+            "JOV",
+            "JOV-1",
+            {"blocked", "needs-human"},
+            title="Ship JOV-1",
+            description="Bounded admitted work.",
+            comments=[{"body": comment}],
         )
         self.assertFalse(ok)
         self.assertEqual(reason, "blocked")
         for label in ("held", "decision-required", "manual-incident"):
             ok, reason = module.admission_decision(
-                "JOV", "JOV-1", {"symphony", "plan-approved", "admission-approved", label}
+                "JOV",
+                "JOV-1",
+                {label},
+                title="Ship JOV-1",
+                description="Bounded admitted work.",
+                comments=[{"body": comment}],
             )
             self.assertFalse(ok)
             self.assertEqual(reason, "blocked")
-        symphony_only, reason = module.admission_decision("JOV", "JOV-2", {"symphony"})
-        self.assertTrue(symphony_only, reason)
+        labels_only, reason = module.admission_decision(
+            "JOV",
+            "JOV-2",
+            {"symphony", "plan-approved", "admission-approved"},
+            title="Ship JOV-2",
+            description="Bounded admitted work.",
+            comments=[],
+        )
+        self.assertFalse(labels_only)
+        self.assertEqual(reason, "admission_receipt_missing_or_stale")
+
+    def test_admission_receipt_stale_and_revoked_fail_closed(self):
+        module = self.load_controller_module()
+        title = "Ship JOV-9"
+        description = "Bounded admitted work."
+        stale = admission_comment("JOV-9", title, description, stale=True)
+        ok, reason = module.admission_decision(
+            "JOV",
+            "JOV-9",
+            set(),
+            title=title,
+            description=description,
+            comments=[{"body": stale}],
+        )
+        self.assertFalse(ok)
+        self.assertEqual(reason, "admission_receipt_missing_or_stale")
+        current = admission_comment("JOV-9", title, description)
+        ok, reason = module.admission_decision(
+            "JOV",
+            "JOV-9",
+            {"human-review-required"},
+            title=title,
+            description=description,
+            comments=[{"body": current}],
+        )
+        self.assertFalse(ok)
+        self.assertEqual(reason, "blocked")
+        recovered, reason = module.admission_decision(
+            "JOV",
+            "JOV-9",
+            set(),
+            title=title,
+            description=description,
+            comments=[{"body": current}],
+        )
+        self.assertTrue(recovered, reason)
 
     def test_check_admission_verdicts_match_single_predicate(self):
         url = self.linear_url()
@@ -900,9 +1180,8 @@ class FallbackTests(unittest.TestCase):
         self.assertIn("not admitted", result.stderr)
         events = self.events.read_text() if self.events.exists() else ""
         self.assertNotIn("systemd-run", events)
-        stop_index = events.index("systemctl --user stop")
-        restore_index = events.index("systemctl --user start")
-        self.assertLess(stop_index, restore_index)
+        self.assertNotIn("systemctl --user stop", events)
+        self.assertIn("systemctl --user start symphony-ui-pilot.service", events)
         self.assertIn("symphony_restored", result.stderr)
 
     def test_zero_grok_capacity_preserves_symphony(self):
@@ -993,7 +1272,6 @@ class FallbackTests(unittest.TestCase):
 
         launches = [command for command in controls if command[0] == "systemd-run"]
         self.assertEqual(len(launches), 2)
-        stop_index = next(i for i, command in enumerate(controls) if "stop" in command)
         first_launch = next(i for i, command in enumerate(controls) if command[0] == "systemd-run")
         restore_index = next(i for i, command in enumerate(controls) if "start" in command)
         cleanup_index = next(
@@ -1001,9 +1279,15 @@ class FallbackTests(unittest.TestCase):
             if command[:3] == ["systemctl", "--user", "stop"]
             and any(str(item).startswith("fallback-ship-") for item in command)
         )
-        self.assertLess(stop_index, first_launch)
         self.assertLess(first_launch, cleanup_index)
         self.assertLess(cleanup_index, restore_index)
+        self.assertFalse(
+            any(
+                command[:3] == ["systemctl", "--user", "stop"]
+                and "symphony-ui-pilot.service" in command
+                for command in controls
+            )
+        )
 
     def test_grok_worker_collapse_during_survival_window_restores_symphony(self):
         module = self.load_controller_module()
@@ -1142,8 +1426,14 @@ class FallbackTests(unittest.TestCase):
         ):
             self.assertEqual(module.reconcile(), 2)
 
-        self.assertTrue(any("stop" in command for command in controls))
         self.assertTrue(any("start" in command for command in controls))
+        self.assertFalse(
+            any(
+                command[:3] == ["systemctl", "--user", "stop"]
+                and "symphony-ui-pilot.service" in command
+                for command in controls
+            )
+        )
 
     def test_unknown_final_grok_state_never_restarts_competing_owner(self):
         module = self.load_controller_module()
@@ -1164,9 +1454,15 @@ class FallbackTests(unittest.TestCase):
         ):
             self.assertEqual(module.reconcile(), module.EXIT_DEGRADED)
 
-        self.assertTrue(any("stop" in command for command in controls))
         self.assertTrue(any(command[0] == "systemd-run" for command in controls))
         self.assertFalse(any("start" in command for command in controls))
+        self.assertFalse(
+            any(
+                command[:3] == ["systemctl", "--user", "stop"]
+                and "symphony-ui-pilot.service" in command
+                for command in controls
+            )
+        )
 
     def test_delayed_unit_seen_after_cleanup_blocks_primary_restore(self):
         module = self.load_controller_module()
@@ -1194,7 +1490,7 @@ class FallbackTests(unittest.TestCase):
         self.assertTrue(any(command[0] == "systemd-run" for command in controls))
         self.assertFalse(any("start" in command for command in controls))
 
-    def test_restore_requires_every_symphony_service_active(self):
+    def test_restore_jov_even_when_lyb_is_down(self):
         module = self.load_controller_module()
         controls: list[list[str]] = []
 
@@ -1214,13 +1510,22 @@ class FallbackTests(unittest.TestCase):
             mock.patch.object(module, "_issue_meta", return_value=(False, "blocked", None)),
             mock.patch.object(module, "_control", side_effect=control),
         ):
-            self.assertEqual(module.reconcile(), module.EXIT_DEGRADED)
+            self.assertEqual(module.reconcile(), module.EXIT_SAFE_FAIL_CLOSED)
 
-        primary_checks = [
-            command for command in controls
-            if "is-active" in command and any(service in command for service in module.SERVICES)
-        ]
-        self.assertEqual(len(primary_checks), 2)
+        self.assertTrue(
+            any(
+                "is-active" in command and "symphony-ui-pilot.service" in command
+                for command in controls
+            ),
+            controls,
+        )
+        self.assertFalse(
+            any(
+                "is-active" in command and "symphony-lyb.service" in command
+                for command in controls
+            ),
+            controls,
+        )
 
     def test_managed_grok_worker_routes_jov_and_lyb_and_updates_team_states(self):
         created = self.root / "pr-created"
@@ -1307,6 +1612,935 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(first, module._fallback_unit("JOV-1", "revision-a"))
         self.assertNotEqual(first, module._fallback_unit("JOV-1", "revision-b"))
         self.assertTrue(first.startswith("fallback-ship-JOV-1-"))
+
+    def _admitted_issue(self, identifier="JOV-1", state="Todo"):
+        team = identifier.split("-", 1)[0]
+        title = f"Ship {identifier}"
+        description = ""
+        return {
+            "id": f"uuid-{identifier}",
+            "identifier": identifier,
+            "title": title,
+            "description": description,
+            "url": f"https://linear.example/{identifier}",
+            "updatedAt": "2026-08-19T18:46:00Z",
+            "state": {"id": f"{team}-state", "name": state},
+            "team": {
+                "key": team,
+                "states": {
+                    "nodes": [
+                        {"id": f"{team}-progress", "name": "In Progress"},
+                        {"id": f"{team}-review", "name": "In Review"},
+                    ]
+                },
+            },
+            "labels": {"nodes": [{"name": "symphony"}]},
+            "comments": {
+                "nodes": [{"body": admission_comment(identifier, title, description)}]
+            },
+        }
+
+    def test_in_review_is_admitted_so_ci_red_heads_can_remount(self):
+        module = self.load_controller_module()
+        ok, reason, meta = module._issue_meta(
+            self._admitted_issue("JOV-4894", "In Review"), "JOV-4894"
+        )
+        self.assertTrue(ok, reason)
+        self.assertEqual(meta["original_state_name"], "In Review")
+
+    def test_open_pr_verdict_skips_inflight_and_remounts_failure(self):
+        module = self.load_controller_module()
+        index = {
+            "JOV-1": {"number": 16211, "head": "grok/JOV-1-fix", "repo": "JovieInc/Jovie", "mergeStateStatus": "BLOCKED"},
+            "JOV-2": {"number": 16212, "head": "grok/JOV-2-fix", "repo": "JovieInc/Jovie", "mergeStateStatus": "BLOCKED"},
+            "JOV-4": {"number": 16214, "head": "grok/JOV-4-fix", "repo": "JovieInc/Jovie", "mergeStateStatus": "CLEAN"},
+            "JOV-5": {"number": 16211, "head": "grok/JOV-5-fix", "repo": "JovieInc/Jovie", "mergeStateStatus": "DIRTY"},
+        }
+        with mock.patch.object(module, "_pr_has_failing_check", side_effect=lambda repo, number: number in (16212, 16214)):
+            self.assertEqual(module._open_pr_verdict("JOV-1", index)[0], "skip")
+            self.assertEqual(module._open_pr_verdict("JOV-2", index)[0], "remount")
+            self.assertEqual(module._open_pr_verdict("JOV-3", index)[0], "none")
+            self.assertEqual(module._open_pr_verdict("JOV-4", index)[0], "skip")
+            self.assertEqual(module._open_pr_verdict("JOV-5", index)[0], "remount")
+        conflicting = {
+            "JOV-6": {
+                "number": 16229,
+                "head": "fallback/JOV-5220-fix",
+                "repo": "JovieInc/Jovie",
+                "mergeStateStatus": "UNKNOWN",
+                "mergeable": "CONFLICTING",
+            }
+        }
+        self.assertEqual(module._open_pr_verdict("JOV-6", conflicting)[0], "remount")
+
+    def test_github_remount_identifiers_find_dirty_heads_without_linear(self):
+        module = self.load_controller_module()
+        listed = [
+            {
+                "number": 16211,
+                "headRefName": "grok/JOV-4894-fix",
+                "mergeStateStatus": "DIRTY",
+            },
+            {
+                "number": 16220,
+                "headRefName": "grok/JOV-4905-fix",
+                "mergeStateStatus": "CLEAN",
+            },
+            {"number": 1, "headRefName": "tim/manual", "mergeStateStatus": "DIRTY"},
+        ]
+        with (
+            mock.patch.dict(os.environ, {"SYMPHONY_OPEN_PR_INDEX": "live"}),
+            mock.patch.object(module, "_gh_json", return_value=listed),
+            mock.patch.object(module, "_linear_identifiers", return_value=[]),
+        ):
+            remounts = module._github_remount_identifiers()
+            combined = module._admitted_or_remount_identifiers()
+        self.assertEqual(remounts, ["JOV-4894"])
+        self.assertEqual(combined, ["JOV-4894"])
+
+    def test_admitted_or_remount_keeps_linear_fail_closed_without_github_heads(self):
+        module = self.load_controller_module()
+        with (
+            mock.patch.object(module, "_linear_identifiers", return_value=None),
+            mock.patch.object(module, "_github_remount_identifiers", return_value=[]),
+        ):
+            self.assertIsNone(module._admitted_or_remount_identifiers())
+        with (
+            mock.patch.object(module, "_linear_identifiers", return_value=None),
+            mock.patch.object(module, "_github_remount_identifiers", return_value=["JOV-4894"]),
+        ):
+            self.assertEqual(module._admitted_or_remount_identifiers(), ["JOV-4894"])
+        with (
+            mock.patch.object(module, "_linear_identifiers", return_value=[]),
+            mock.patch.object(module, "_github_remount_identifiers", return_value=["JOV-4894"]),
+        ):
+            self.assertEqual(module._admitted_or_remount_identifiers(), ["JOV-4894"])
+
+    def test_issue_meta_remount_skips_receipt_but_still_blocks_human_hold(self):
+        module = self.load_controller_module()
+        issue = self._admitted_issue("JOV-4894", "In Review")
+        issue["comments"] = {"nodes": []}
+        ok, reason, meta = module._issue_meta(issue, "JOV-4894", require_receipt=False)
+        self.assertTrue(ok, reason)
+        self.assertEqual(meta["original_state_name"], "In Review")
+        refused, default_reason, _ = module._issue_meta(issue, "JOV-4894")
+        self.assertFalse(refused)
+        self.assertEqual(default_reason, "admission_receipt_missing_or_stale")
+        blocked = self._admitted_issue("JOV-4894", "In Review")
+        blocked["comments"] = {"nodes": []}
+        blocked["labels"] = {"nodes": [{"name": "blocked"}]}
+        ok, reason, _ = module._issue_meta(blocked, "JOV-4894", require_receipt=False)
+        self.assertFalse(ok)
+        self.assertEqual(reason, "blocked")
+
+    def test_launch_remounts_dirty_head_without_admission_receipt(self):
+        """Live stall after #16212: Linear receipts empty, #16211 DIRTY."""
+        module = self.load_controller_module()
+        launches: list[list[str]] = []
+        issue = self._admitted_issue("JOV-4894", "In Review")
+        issue["comments"] = {"nodes": []}
+        index = {
+            "JOV-4894": {
+                "number": 16211,
+                "head": "grok/JOV-4894-fix",
+                "repo": "JovieInc/Jovie",
+                "mergeStateStatus": "DIRTY",
+            }
+        }
+        with (
+            mock.patch.object(module, "_autonomous_open_pr_index", return_value=index),
+            mock.patch.object(module, "_fetch_single_issue", return_value=issue),
+            mock.patch.object(
+                module, "_control", side_effect=lambda command: launches.append(command) or True
+            ),
+        ):
+            launched, used = module._launch_fallback_workers(
+                ["JOV-4894"],
+                [],
+                "/bin/true",
+                "a" * 64,
+                {"selected": {"id": "grok"}},
+                2,
+            )
+        self.assertEqual(used, 1)
+        self.assertEqual(len(launched), 1)
+        self.assertTrue(any("JOV-4894" in arg for command in launches for arg in command), launches)
+
+    def test_launch_still_requires_receipt_for_new_work(self):
+        module = self.load_controller_module()
+        launches: list[list[str]] = []
+        issue = self._admitted_issue("JOV-5003", "Todo")
+        issue["comments"] = {"nodes": []}
+        with (
+            mock.patch.object(module, "_autonomous_open_pr_index", return_value={}),
+            mock.patch.object(module, "_fetch_single_issue", return_value=issue),
+            mock.patch.object(
+                module, "_control", side_effect=lambda command: launches.append(command) or True
+            ),
+        ):
+            launched, used = module._launch_fallback_workers(
+                ["JOV-5003"],
+                [],
+                "/bin/true",
+                "a" * 64,
+                {"selected": {"id": "grok"}},
+                2,
+            )
+        self.assertEqual(used, 0)
+        self.assertEqual(list(launched), [])
+        self.assertEqual(launches, [])
+
+    def test_exhausted_remounts_github_dirty_head_when_linear_has_no_receipts(self):
+        module = self.load_controller_module()
+        launches: list[list[str]] = []
+        unit = "fallback-ship-JOV-4894.service"
+        active: list[str] = []
+
+        def launch(identifiers, *_args, **_kwargs):
+            launches.append(list(identifiers))
+            active.append(unit)
+            return {unit}, 1
+
+        with (
+            mock.patch.object(
+                module, "codex_canary_ready", return_value=(False, "all_accounts_cooldown")
+            ),
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_linear_identifiers", return_value=[]),
+            mock.patch.object(module, "_github_remount_identifiers", return_value=["JOV-4894"]),
+            mock.patch.object(module, "_active_grok_units", side_effect=lambda: list(active)),
+            mock.patch.object(module, "_fleet_gate_allows_isolated", return_value=(True, "fleet_gate_amber")),
+            mock.patch.object(
+                module,
+                "_model_router_selection",
+                return_value=({"selected": {"id": "grok", "pool": "grok"}}, "ok"),
+            ),
+            mock.patch.object(module, "_bundle_revision", return_value="a" * 64),
+            mock.patch.object(module, "_launch_fallback_workers", side_effect=launch),
+            mock.patch.object(module, "_grok_units_after_survival_window", return_value=[unit]),
+            mock.patch.object(module, "_jov_active", return_value=True),
+            mock.patch.object(module, "_control", return_value=True),
+        ):
+            self.assertEqual(module.reconcile(), 0)
+        self.assertEqual(launches, [["JOV-4894"]])
+
+    def test_enroll_failure_does_not_count_as_product_ci_red(self):
+        module = self.load_controller_module()
+        with mock.patch.object(
+            module,
+            "_gh_json",
+            return_value={
+                "statusCheckRollup": [
+                    {"name": "ci-fast", "conclusion": "SUCCESS", "status": "COMPLETED"},
+                    {"name": "enroll", "conclusion": "FAILURE", "status": "COMPLETED"},
+                    {"name": "PR Ready", "conclusion": "FAILURE", "status": "COMPLETED"},
+                ]
+            },
+        ):
+            self.assertFalse(module._pr_has_failing_check("JovieInc/Jovie", 16211))
+
+    def test_launch_skips_inflight_open_prs_and_fills_capacity_with_unblocked(self):
+        """Live sidecar launched identifiers that already had grok/JOV PRs; units
+        exited immediately and leftover Todo work never got a slot."""
+        module = self.load_controller_module()
+        launches: list[list[str]] = []
+
+        def verdict(identifier, _index):
+            if identifier == "JOV-1":
+                return "skip", {"number": 16211, "head": "grok/JOV-1-fix"}
+            if identifier == "JOV-2":
+                return "remount", {"number": 16212, "head": "grok/JOV-2-fix"}
+            return "none", None
+
+        def control(command):
+            launches.append(command)
+            return True
+
+        with (
+            mock.patch.object(module, "_autonomous_open_pr_index", return_value={}),
+            mock.patch.object(module, "_open_pr_verdict", side_effect=verdict),
+            mock.patch.object(module, "_fetch_single_issue", return_value=self._admitted_issue()),
+            mock.patch.object(
+                module,
+                "_issue_meta",
+                return_value=(True, "admitted", {"issue_revision": "2026-08-19T18:46:00Z"}),
+            ),
+            mock.patch.object(module, "_control", side_effect=control),
+        ):
+            launched, used = module._launch_fallback_workers(
+                ["JOV-1", "JOV-2", "JOV-3"],
+                [],
+                "/bin/true",
+                "a" * 64,
+                {"selected": {"id": "grok"}},
+                2,
+            )
+        units = [arg for command in launches if command[0] == "systemd-run" for arg in command if arg.startswith("--unit=")]
+        self.assertEqual(len(units), 2)
+        self.assertTrue(any("JOV-2" in unit for unit in units), units)
+        self.assertTrue(any("JOV-3" in unit for unit in units), units)
+        self.assertFalse(any("JOV-1" in unit for unit in units), units)
+        self.assertEqual(used, 2)
+        self.assertEqual(len(launched), 2)
+
+    def test_launch_recycles_stale_remount_unit_and_relaunches(self):
+        """Live JOV-5220 held a remount unit 90+ min after main moved."""
+        module = self.load_controller_module()
+        launches: list[list[str]] = []
+        stopped: list[str] = []
+        stale = "fallback-ship-JOV-5220-aaaaaaaaaaaa.service"
+
+        def verdict(identifier, _index):
+            if identifier in {"JOV-5220", "JOV-5238"}:
+                return "remount", {
+                    "number": 16229,
+                    "head": f"fallback/{identifier}-fix",
+                    "mergeable": "CONFLICTING",
+                }
+            return "none", None
+
+        def control(command):
+            if len(command) >= 4 and command[0] == "systemctl" and command[2] == "stop":
+                stopped.append(command[-1])
+                return True
+            launches.append(command)
+            return True
+
+        with (
+            mock.patch.object(module, "_autonomous_open_pr_index", return_value={}),
+            mock.patch.object(module, "_open_pr_verdict", side_effect=verdict),
+            mock.patch.object(module, "_unit_age_seconds", return_value=3600.0),
+            mock.patch.object(module, "_fetch_single_issue", return_value=self._admitted_issue()),
+            mock.patch.object(
+                module,
+                "_issue_meta",
+                return_value=(True, "admitted", {"issue_revision": "2026-08-19T18:46:00Z"}),
+            ),
+            mock.patch.object(module, "_control", side_effect=control),
+        ):
+            launched, used = module._launch_fallback_workers(
+                ["JOV-5220", "JOV-5238"],
+                [stale],
+                "/bin/true",
+                "a" * 64,
+                {"selected": {"id": "grok"}},
+                2,
+            )
+        self.assertEqual(stopped, [stale])
+        units = [arg for command in launches if command[0] == "systemd-run" for arg in command if arg.startswith("--unit=")]
+        self.assertTrue(any("JOV-5220" in unit for unit in units), units)
+        self.assertTrue(any("JOV-5238" in unit for unit in units), units)
+        self.assertEqual(used, 2)
+        self.assertEqual(len(launched), 2)
+
+    def test_launch_keeps_fresh_remount_and_clean_units(self):
+        module = self.load_controller_module()
+        stopped: list[str] = []
+        launches: list[list[str]] = []
+        fresh = "fallback-ship-JOV-5218-bbbbbbbbbbbb.service"
+        clean = "fallback-ship-JOV-4905-cccccccccccc.service"
+
+        def verdict(identifier, _index):
+            if identifier == "JOV-5218":
+                return "remount", {"number": 16234, "head": "fallback/JOV-5218-fix"}
+            if identifier == "JOV-4905":
+                return "skip", {"number": 16214, "head": "grok/JOV-4905-fix"}
+            return "none", None
+
+        def control(command):
+            if len(command) >= 4 and command[0] == "systemctl" and command[2] == "stop":
+                stopped.append(command[-1])
+                return True
+            launches.append(command)
+            return True
+
+        with (
+            mock.patch.object(module, "_autonomous_open_pr_index", return_value={}),
+            mock.patch.object(module, "_open_pr_verdict", side_effect=verdict),
+            mock.patch.object(module, "_unit_age_seconds", return_value=60.0),
+            mock.patch.object(module, "_fetch_single_issue", return_value=self._admitted_issue()),
+            mock.patch.object(
+                module,
+                "_issue_meta",
+                return_value=(True, "admitted", {"issue_revision": "2026-08-19T18:46:00Z"}),
+            ),
+            mock.patch.object(module, "_control", side_effect=control),
+        ):
+            launched, used = module._launch_fallback_workers(
+                ["JOV-5218", "JOV-5238"],
+                [fresh, clean],
+                "/bin/true",
+                "a" * 64,
+                {"selected": {"id": "grok"}},
+                4,
+            )
+        self.assertEqual(stopped, [])
+        units = [arg for command in launches if command[0] == "systemd-run" for arg in command if arg.startswith("--unit=")]
+        self.assertFalse(any("JOV-5218" in unit for unit in units), units)
+        self.assertTrue(any("JOV-5238" in unit for unit in units), units)
+        self.assertEqual(used, 3)
+
+    def test_unit_age_seconds_parses_wall_clock_when_usec_missing(self):
+        """Gem user systemd has ExecMainStartTimestamp but not USec (live JOV-5220)."""
+        module = self.load_controller_module()
+        started = time.time() - 7200
+        wall = time.strftime("%a %Y-%m-%d %H:%M:%S UTC", time.gmtime(started))
+        payload = (
+            f"ExecMainStartTimestampUSec=\nExecMainStartTimestamp={wall}\n"
+        ).encode()
+
+        def captured(command, _timeout):
+            self.assertIn("--property=ExecMainStartTimestampUSec,ExecMainStartTimestamp", command)
+            return subprocess.CompletedProcess(command, 0, stdout=payload, stderr=b"")
+
+        with mock.patch.object(module, "_captured", side_effect=captured):
+            age = module._unit_age_seconds("fallback-ship-JOV-5220-770fa184873a.service")
+        self.assertIsNotNone(age)
+        self.assertGreater(age, 7000)
+        self.assertLess(age, 7400)
+
+    def test_unit_age_seconds_prefers_usec_when_present(self):
+        module = self.load_controller_module()
+        usec = int((time.time() - 3600) * 1_000_000)
+        payload = (
+            f"ExecMainStartTimestampUSec={usec}\n"
+            "ExecMainStartTimestamp=Wed 2020-01-01 00:00:00 UTC\n"
+        ).encode()
+
+        def captured(command, _timeout):
+            return subprocess.CompletedProcess(command, 0, stdout=payload, stderr=b"")
+
+        with mock.patch.object(module, "_captured", side_effect=captured):
+            age = module._unit_age_seconds("fallback-ship-JOV-5220-770fa184873a.service")
+        self.assertIsNotNone(age)
+        self.assertGreater(age, 3500)
+        self.assertLess(age, 3700)
+
+    def test_unit_age_seconds_missing_both_returns_none(self):
+        module = self.load_controller_module()
+        payload = b"ExecMainStartTimestampUSec=\nExecMainStartTimestamp=\n"
+
+        def captured(command, _timeout):
+            return subprocess.CompletedProcess(command, 0, stdout=payload, stderr=b"")
+
+        with mock.patch.object(module, "_captured", side_effect=captured):
+            self.assertIsNone(module._unit_age_seconds("fallback-ship-JOV-5220-770fa184873a.service"))
+
+    def test_grok_ship_one_path_includes_pnpm_dirs(self):
+        """Live changelog remount commit died: husky pre-commit `pnpm: not found`."""
+        text = GROK_SHIP.read_text()
+        self.assertIn("/usr/local/bin", text)
+        self.assertIn(".npm-global/bin", text)
+        command = self.load_controller_module()._grok_command(
+            "JOV-7",
+            "/bin/true",
+            {"schema_version": 1, "selected": {"id": "x"}},
+            "rev",
+            "a" * 64,
+        )
+        path_args = [arg for arg in command if arg.startswith("Environment=PATH=")]
+        self.assertTrue(path_args)
+        self.assertIn("/usr/local/bin", path_args[0])
+        self.assertIn(".npm-global/bin", path_args[0])
+
+    def test_grok_ship_one_new_work_does_not_request_queue_deferred(self):
+        """Live fallback PRs still got queue-deferred because the prompt asked for it."""
+        text = GROK_SHIP.read_text()
+        self.assertNotIn("and the queue-deferred hold", text)
+        self.assertIn("Do not add the queue-deferred label", text)
+        self.assertIn("Native merge-queue autoenroll is the hold", text)
+
+    def test_grok_ship_one_skips_existing_grok_prefix_pr(self):
+        self.command(
+            "gh",
+            'case "$*" in\n'
+            '  *headRefName*) echo \'[{"number":16211,"headRefName":"grok/JOV-7-fix"}]\';;\n'
+            '  *statusCheckRollup*) echo \'{"statusCheckRollup":[{"conclusion":"SUCCESS"}]}\';;\n'
+            '  *) echo 0;;\n'
+            'esac\n',
+        )
+        self.command("git", 'printf "git %s\\n" "$*" >> "$GEM_EVENTS"')
+        self.command("grok", 'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"')
+        result = subprocess.run(
+            [self.install_runtime() / GROK_SHIP.name, "JOV-7"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_EVENTS=self.events,
+                GROK_SHIP_WS_ROOT=self.root / "workspaces",
+                GROK_SHIP_LOG_DIR=self.root / "logs",
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.grok_linear_url(),
+            ),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("open_pr_exists", (self.root / "logs/JOV-7.log").read_text())
+        events = self.events.read_text() if self.events.exists() else ""
+        self.assertNotIn("git clone", events)
+        self.assertNotIn("grok -", events)
+
+    def test_grok_ship_one_remounts_ci_red_existing_head(self):
+        created = self.root / "pr-created"
+        self.command(
+            "gh",
+            'case "$*" in\n'
+            '  *headRefName*) echo \'[{"number":16211,"headRefName":"grok/JOV-7-fix"}]\';;\n'
+            '  *statusCheckRollup*) echo \'{"statusCheckRollup":[{"conclusion":"FAILURE"}]}\';;\n'
+            '  *) [ ! -f "$GROK_CREATED" ] && echo 0 || echo 1;;\n'
+            'esac\n',
+        )
+        self.command(
+            "git",
+            'printf "git %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            '[ "$1" != clone ] || mkdir -p "$5/.git"\n'
+            'case "$*" in\n'
+            '  *"rev-parse HEAD") printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";;\n'
+            '  *"rev-parse --is-shallow-repository") printf "true\\n";;\n'
+            '  *"merge-base HEAD origin/main") exit 1;;\n'
+            'esac\n',
+        )
+        self.command(
+            "grok",
+            'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            'touch "$GROK_CREATED"\n',
+        )
+        result = subprocess.run(
+            [self.install_runtime() / GROK_SHIP.name, "JOV-7"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_EVENTS=self.events,
+                GROK_CREATED=created,
+                GROK_SHIP_WS_ROOT=self.root / "workspaces",
+                GROK_SHIP_LOG_DIR=self.root / "logs",
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.grok_linear_url(),
+            ),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        log = (self.root / "logs/JOV-7.log").read_text()
+        self.assertIn("remount_ci_red", log)
+        events = self.events.read_text()
+        self.assertIn("fetch origin +refs/heads/grok/JOV-7-fix:refs/remotes/origin/grok/JOV-7-fix", events)
+        self.assertIn("merge --abort", events)
+        self.assertIn("reset --hard HEAD", events)
+        self.assertIn("fetch origin main", events)
+        self.assertIn("fetch --unshallow origin", events)
+        self.assertIn("fetch --deepen=500 origin", events)
+        self.assertIn("checkout -B grok/JOV-7-fix origin/grok/JOV-7-fix", events)
+        self.assertIn("reset --hard origin/grok/JOV-7-fix", events)
+        self.assertIn("merge --no-edit origin/main", events)
+        self.assertNotIn("fetch --depth 1 origin refs/heads/grok/JOV-7-fix", events)
+        self.assertNotIn("checkout -B fallback/JOV-7-fix origin/main", events)
+        self.assertIn("failing CI", events)
+
+    def test_grok_ship_one_remount_autoresolves_changelog_only_conflict(self):
+        """Live #16229: DIRTY vs main was CHANGELOG-only; grok sat for an hour."""
+        created = self.root / "pr-created"
+        self.command(
+            "gh",
+            'case "$*" in\n'
+            '  *headRefName*) echo \'[{"number":16229,"headRefName":"fallback/JOV-7-fix","mergeStateStatus":"DIRTY"}]\';;\n'
+            '  *statusCheckRollup*) echo \'{"statusCheckRollup":[{"conclusion":"SUCCESS"}]}\';;\n'
+            '  *isDraft*) echo false;;\n'
+            '  *) echo 1;;\n'
+            'esac\n',
+        )
+        self.command(
+            "git",
+            'printf "git %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            '[ "$1" != clone ] || mkdir -p "$5/.git"\n'
+            'case "$*" in\n'
+            '  *"rev-parse HEAD") printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";;\n'
+            '  *"rev-parse --is-shallow-repository") printf "false\\n";;\n'
+            '  *"merge-base HEAD origin/main") exit 0;;\n'
+            '  *"merge --no-edit origin/main") echo "CONFLICT (content): Merge conflict in CHANGELOG.md" >&2; exit 1;;\n'
+            '  *"diff --name-only --diff-filter=U") printf "CHANGELOG.md\\n";;\n'
+            '  *"show :2:CHANGELOG.md") printf -- "- **ours unique JOV-7**\\n";;\n'
+            '  *"show :3:CHANGELOG.md") printf "# Changelog\\n\\n## [Unreleased]\\n\\n### Fixed\\n\\n- **theirs**\\n";;\n'
+            '  *"ls-files"*) if [ -f "$GEM_EVENTS.changelog-added" ]; then exit 0; fi; printf "100644 abc CHANGELOG.md\\n";;\n'
+            '  *"add CHANGELOG.md") : > "$GEM_EVENTS.changelog-added";;\n'
+            '  *"commit --no-edit") ;;\n'
+            '  *"push origin"*) printf "pushed\\n" >> "$GEM_EVENTS";;\n'
+            'esac\n',
+        )
+        self.command(
+            "grok",
+            'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            'touch "$GROK_CREATED"\n',
+        )
+        result = subprocess.run(
+            [self.install_runtime() / GROK_SHIP.name, "JOV-7"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_EVENTS=self.events,
+                GROK_CREATED=created,
+                GROK_SHIP_WS_ROOT=self.root / "workspaces",
+                GROK_SHIP_LOG_DIR=self.root / "logs",
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.grok_linear_url(),
+                SYMPHONY_OPEN_PR_INDEX="live",
+            ),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        log = (self.root / "logs/JOV-7.log").read_text()
+        self.assertIn("remount_merge_conflicts", log)
+        self.assertIn("remount_changelog_autoresolved", log)
+        self.assertIn("remount_changelog_pushed", log)
+        events = self.events.read_text()
+        self.assertIn("merge --no-edit origin/main", events)
+        self.assertIn("add CHANGELOG.md", events)
+        self.assertIn("commit --no-edit", events)
+        self.assertIn("push origin", events)
+        self.assertNotIn("grok -", events)
+        self.assertFalse(created.exists(), "changelog-only DIRTY remount must not wait on grok")
+
+    def test_grok_ship_one_remount_still_invokes_grok_for_product_conflicts(self):
+        created = self.root / "pr-created"
+        self.command(
+            "gh",
+            'case "$*" in\n'
+            '  *headRefName*) echo \'[{"number":16234,"headRefName":"fallback/JOV-7-fix","mergeStateStatus":"DIRTY"}]\';;\n'
+            '  *statusCheckRollup*) echo \'{"statusCheckRollup":[{"conclusion":"SUCCESS"}]}\';;\n'
+            '  *) [ ! -f "$GROK_CREATED" ] && echo 0 || echo 1;;\n'
+            'esac\n',
+        )
+        self.command(
+            "git",
+            'printf "git %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            '[ "$1" != clone ] || mkdir -p "$5/.git"\n'
+            'case "$*" in\n'
+            '  *"rev-parse HEAD") printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";;\n'
+            '  *"rev-parse --is-shallow-repository") printf "false\\n";;\n'
+            '  *"merge-base HEAD origin/main") exit 0;;\n'
+            '  *"merge --no-edit origin/main") echo "CONFLICT (content): Merge conflict in apps/web/x.ts" >&2; exit 1;;\n'
+            '  *"diff --name-only --diff-filter=U") printf "CHANGELOG.md\\napps/web/x.ts\\n";;\n'
+            '  *"show :2:CHANGELOG.md") printf -- "- **ours**\\n";;\n'
+            '  *"show :3:CHANGELOG.md") printf "# Changelog\\n\\n## [Unreleased]\\n\\n- **theirs**\\n";;\n'
+            '  *"ls-files -u") printf "100644 abc CHANGELOG.md\\n100644 def apps/web/x.ts\\n";;\n'
+            'esac\n',
+        )
+        self.command(
+            "grok",
+            'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            'touch "$GROK_CREATED"\n',
+        )
+        result = subprocess.run(
+            [self.install_runtime() / GROK_SHIP.name, "JOV-7"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_EVENTS=self.events,
+                GROK_CREATED=created,
+                GROK_SHIP_WS_ROOT=self.root / "workspaces",
+                GROK_SHIP_LOG_DIR=self.root / "logs",
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.grok_linear_url(),
+                SYMPHONY_OPEN_PR_INDEX="live",
+            ),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        log = (self.root / "logs/JOV-7.log").read_text()
+        self.assertIn("remount_merge_conflicts", log)
+        self.assertNotIn("remount_changelog_autoresolved", log)
+        events = self.events.read_text()
+        self.assertIn("grok -", events)
+        self.assertNotIn("push origin", events)
+
+    def test_grok_ship_one_retries_cursor_grok_model_when_grok_46_rejected(self):
+        """Live JOV-5235 remount: grok TUI rejected grok-4.6 with cursor model list."""
+        created = self.root / "pr-created"
+        self.command("hermes", "printf 'hermes should not run\\n' >> \"$GEM_EVENTS\"; exit 99")
+        self.command(
+            "gh",
+            'case "$*" in\n'
+            '  *headRefName*) echo \'[{"number":16240,"headRefName":"fallback/JOV-7-fix","mergeStateStatus":"DIRTY"}]\';;\n'
+            '  *statusCheckRollup*) echo \'{"statusCheckRollup":[{"conclusion":"FAILURE"}]}\';;\n'
+            '  *) [ ! -f "$GROK_CREATED" ] && echo 0 || echo 1;;\n'
+            'esac\n',
+        )
+        self.command(
+            "git",
+            'printf "git %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            '[ "$1" != clone ] || mkdir -p "$5/.git"\n'
+            'case "$*" in\n'
+            '  *"rev-parse HEAD") printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";;\n'
+            '  *"rev-parse --is-shallow-repository") printf "false\\n";;\n'
+            '  *"merge-base HEAD origin/main") exit 0;;\n'
+            '  *"merge --no-edit origin/main") echo "CONFLICT (content): Merge conflict in apps/web/x.ts" >&2; exit 1;;\n'
+            '  *"diff --name-only --diff-filter=U") printf "apps/web/x.ts\\n";;\n'
+            '  *"ls-files -u") printf "100644 def apps/web/x.ts\\n";;\n'
+            'esac\n',
+        )
+        self.command(
+            "grok",
+            'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            'case " $* " in\n'
+            '  *" -m grok-4.6 "*)\n'
+            '    echo "Cannot use this model: grok-4.6[fast=false]. Available models: auto, cursor-grok-4.6-high, cursor-grok-4.6-high-fast" >&2\n'
+            '    exit 1;;\n'
+            '  *" -m cursor-grok-4.6-high-fast "*)\n'
+            '    touch "$GROK_CREATED"\n'
+            '    exit 0;;\n'
+            'esac\n'
+            'exit 3\n',
+        )
+        selection = {
+            "schema_version": 1,
+            "deterministic_first": True,
+            "selected": {
+                "id": "hermes-openrouter",
+                "provider": "openrouter",
+                "model": "grok-4.6",
+                "executor": {
+                    "executable": str(self.bin / "hermes"),
+                    "argv": ["-m", "{model}", "-p", "{prompt}"],
+                },
+            },
+        }
+        result = subprocess.run(
+            [self.install_runtime() / GROK_SHIP.name, "JOV-7"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_EVENTS=self.events,
+                GROK_CREATED=created,
+                GROK_SHIP_WS_ROOT=self.root / "workspaces",
+                GROK_SHIP_LOG_DIR=self.root / "logs",
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.grok_linear_url(),
+                SYMPHONY_OPEN_PR_INDEX="live",
+                GEM_GROK_EXECUTABLE=str(self.bin / "grok"),
+                GEM_GROK_BIN=str(self.bin / "grok"),
+                SYMPHONY_FALLBACK_SELECTION_B64=base64.b64encode(
+                    json.dumps(selection).encode()
+                ).decode(),
+            ),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        log = (self.root / "logs/JOV-7.log").read_text()
+        self.assertIn("retry_cursor_grok_model cursor-grok-4.6-high-fast", log)
+        events = self.events.read_text()
+        self.assertIn("-m grok-4.6", events)
+        self.assertIn("-m cursor-grok-4.6-high-fast", events)
+        self.assertNotIn("hermes should not run", events)
+        self.assertTrue(created.exists())
+
+    def test_grok_ship_one_retries_cursor_model_flag_when_grok_46_rejected(self):
+        """Live JOV-5220: cursor argv uses --model grok-4.6, not -m."""
+        created = self.root / "pr-created"
+        self.command(
+            "cursor-agent",
+            'printf "cursor %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            'case " $* " in\n'
+            '  *" --model grok-4.6 "*)\n'
+            '    echo "Cannot use this model: grok-4.6[fast=false]. Available models: auto, cursor-grok-4.6-high, cursor-grok-4.6-high-fast" >&2\n'
+            '    exit 1;;\n'
+            '  *" --model cursor-grok-4.6-high-fast "*)\n'
+            '    touch "$GROK_CREATED"\n'
+            '    exit 0;;\n'
+            'esac\n'
+            'exit 3\n',
+        )
+        self.command(
+            "gh",
+            'case "$*" in\n'
+            '  *headRefName*) echo \'[{"number":16229,"headRefName":"fallback/JOV-7-fix","mergeStateStatus":"DIRTY"}]\';;\n'
+            '  *statusCheckRollup*) echo \'{"statusCheckRollup":[{"conclusion":"FAILURE"}]}\';;\n'
+            '  *) [ ! -f "$GROK_CREATED" ] && echo 0 || echo 1;;\n'
+            'esac\n',
+        )
+        self.command(
+            "git",
+            'printf "git %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            '[ "$1" != clone ] || mkdir -p "$5/.git"\n'
+            'case "$*" in\n'
+            '  *"rev-parse HEAD") printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";;\n'
+            '  *"rev-parse --is-shallow-repository") printf "false\\n";;\n'
+            '  *"merge-base HEAD origin/main") exit 0;;\n'
+            '  *"merge --no-edit origin/main") echo "CONFLICT (content): Merge conflict in apps/web/x.ts" >&2; exit 1;;\n'
+            '  *"diff --name-only --diff-filter=U") printf "apps/web/x.ts\\n";;\n'
+            '  *"ls-files -u") printf "100644 def apps/web/x.ts\\n";;\n'
+            'esac\n',
+        )
+        selection = {
+            "schema_version": 1,
+            "deterministic_first": True,
+            "selected": {
+                "id": "cursor-grok-4.6",
+                "provider": "cursor",
+                "model": "grok-4.6",
+                "executor": {
+                    "executable": str(self.bin / "cursor-agent"),
+                    "argv": ["-p", "--force", "--model", "{model}", "{prompt}"],
+                },
+            },
+        }
+        result = subprocess.run(
+            [self.install_runtime() / GROK_SHIP.name, "JOV-7"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_EVENTS=self.events,
+                GROK_CREATED=created,
+                GROK_SHIP_WS_ROOT=self.root / "workspaces",
+                GROK_SHIP_LOG_DIR=self.root / "logs",
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.grok_linear_url(),
+                SYMPHONY_OPEN_PR_INDEX="live",
+                SYMPHONY_FALLBACK_SELECTION_B64=base64.b64encode(
+                    json.dumps(selection).encode()
+                ).decode(),
+            ),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        log = (self.root / "logs/JOV-7.log").read_text()
+        self.assertIn("retry_cursor_grok_model cursor-grok-4.6-high-fast", log)
+        events = self.events.read_text()
+        self.assertIn("--model grok-4.6", events)
+        self.assertIn("--model cursor-grok-4.6-high-fast", events)
+        self.assertTrue(created.exists())
+
+    def test_grok_ship_one_changelog_union_failure_still_invokes_grok(self):
+        """Live JOV-5238: changelog union crashed and remount exited before START."""
+        created = self.root / "pr-created"
+        self.command(
+            "gh",
+            'case "$*" in\n'
+            '  *headRefName*) echo \'[{"number":16241,"headRefName":"fallback/JOV-7-fix","mergeStateStatus":"DIRTY"}]\';;\n'
+            '  *statusCheckRollup*) echo \'{"statusCheckRollup":[{"conclusion":"SUCCESS"}]}\';;\n'
+            '  *) [ ! -f "$GROK_CREATED" ] && echo 0 || echo 1;;\n'
+            'esac\n',
+        )
+        self.command(
+            "git",
+            'printf "git %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            '[ "$1" != clone ] || mkdir -p "$5/.git"\n'
+            'case "$*" in\n'
+            '  *"rev-parse HEAD") printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";;\n'
+            '  *"rev-parse --is-shallow-repository") printf "false\\n";;\n'
+            '  *"merge-base HEAD origin/main") exit 0;;\n'
+            '  *"merge --no-edit origin/main") echo "CONFLICT (content): Merge conflict in CHANGELOG.md" >&2; exit 1;;\n'
+            '  *"diff --name-only --diff-filter=U") printf "CHANGELOG.md\\n";;\n'
+            '  *"show :2:CHANGELOG.md") echo "missing stage" >&2; exit 128;;\n'
+            '  *"ls-files -u") printf "100644 abc CHANGELOG.md\\n";;\n'
+            'esac\n',
+        )
+        self.command(
+            "grok",
+            'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            'touch "$GROK_CREATED"\n',
+        )
+        result = subprocess.run(
+            [self.install_runtime() / GROK_SHIP.name, "JOV-7"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_EVENTS=self.events,
+                GROK_CREATED=created,
+                GROK_SHIP_WS_ROOT=self.root / "workspaces",
+                GROK_SHIP_LOG_DIR=self.root / "logs",
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.grok_linear_url(),
+                SYMPHONY_OPEN_PR_INDEX="live",
+            ),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        log = (self.root / "logs/JOV-7.log").read_text()
+        self.assertIn("remount_merge_conflicts", log)
+        self.assertIn("remount_changelog_union_failed", log)
+        self.assertNotIn("remount_changelog_autoresolved", log)
+        self.assertIn("START JOV-7", log)
+        events = self.events.read_text()
+        self.assertIn("grok -", events)
+
+    def test_grok_ship_one_remounts_dirty_head_without_admission_receipt(self):
+        created = self.root / "pr-created"
+        GrokLinearHandler.omit_receipt = {"JOV-7"}
+        self.command(
+            "gh",
+            'case "$*" in\n'
+            '  *headRefName*) echo \'[{"number":16211,"headRefName":"grok/JOV-7-fix","mergeStateStatus":"DIRTY"}]\';;\n'
+            '  *statusCheckRollup*) echo \'{"statusCheckRollup":[{"conclusion":"SUCCESS"}]}\';;\n'
+            '  *) [ ! -f "$GROK_CREATED" ] && echo 0 || echo 1;;\n'
+            'esac\n',
+        )
+        self.command(
+            "git",
+            'printf "git %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            '[ "$1" != clone ] || mkdir -p "$5/.git"\n'
+            'case "$*" in\n'
+            '  *"rev-parse HEAD") printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";;\n'
+            '  *"rev-parse --is-shallow-repository") printf "true\\n";;\n'
+            '  *"merge-base HEAD origin/main") exit 1;;\n'
+            'esac\n',
+        )
+        self.command(
+            "grok",
+            'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            'touch "$GROK_CREATED"\n',
+        )
+        result = subprocess.run(
+            [self.install_runtime() / GROK_SHIP.name, "JOV-7"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_EVENTS=self.events,
+                GROK_CREATED=created,
+                GROK_SHIP_WS_ROOT=self.root / "workspaces",
+                GROK_SHIP_LOG_DIR=self.root / "logs",
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.grok_linear_url(),
+                SYMPHONY_OPEN_PR_INDEX="live",
+            ),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("issue is not admitted", result.stderr)
+        log = (self.root / "logs/JOV-7.log").read_text()
+        self.assertIn("remount_ci_red", log)
+        events = self.events.read_text()
+        self.assertIn("checkout -B grok/JOV-7-fix origin/grok/JOV-7-fix", events)
+        self.assertIn("fetch origin +refs/heads/grok/JOV-7-fix:refs/remotes/origin/grok/JOV-7-fix", events)
+        self.assertIn("merge --abort", events)
+        self.assertIn("merge --no-edit origin/main", events)
+
+    def test_check_admission_remount_skips_receipt(self):
+        url = self.linear_url()
+        original_nodes = LinearHandler.nodes
+        LinearHandler.nodes = [
+            {
+                "identifier": "JOV-4894",
+                "title": "Ship JOV-4894",
+                "description": "",
+                "team": {"key": "JOV"},
+                "labels": {"nodes": [{"name": "symphony"}]},
+                "comments": {"nodes": []},
+            }
+        ]
+        self.addCleanup(lambda: setattr(LinearHandler, "nodes", original_nodes))
+        refused = self.run_controller(
+            "check-admission", "JOV-4894", LINEAR_API_KEY="linear-secret", LINEAR_API_URL=url
+        )
+        self.assertEqual(refused.returncode, 1, refused.stderr)
+        self.assertIn("admission_receipt_missing_or_stale", refused.stderr)
+        remounted = self.run_controller(
+            "check-admission",
+            "JOV-4894",
+            "--remount",
+            LINEAR_API_KEY="linear-secret",
+            LINEAR_API_URL=url,
+        )
+        self.assertEqual(remounted.returncode, 0, remounted.stderr)
+        self.assertEqual(json.loads(remounted.stdout)["title"], "Ship JOV-4894")
 
     def test_grok_ship_one_delegates_admission_and_respects_blocked(self):
         # grok-ship-one must not keep its own copy of the admission predicate:

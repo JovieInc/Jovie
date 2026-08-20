@@ -46,7 +46,7 @@ const REQUIRED_DESTRUCTIVE_FLOWS = [
   },
   {
     name: 'remove contact',
-    file: 'components/features/dashboard/organisms/ContactsManager.tsx',
+    file: 'components/features/dashboard/molecules/ContactDeleteConfirmDialog.tsx',
   },
   {
     name: 'disconnect platform',
@@ -182,7 +182,38 @@ function findDirectDestructiveAlertDialogActions(
   });
 }
 
+function findNonCanonicalConfirmDialogImports(webRoot = WEB_ROOT): string[] {
+  const files: string[] = [];
+  for (const dir of SCAN_DIRS) walk(join(webRoot, dir), files);
+
+  return files
+    .sort((a, b) => a.localeCompare(b))
+    .flatMap(file => {
+      const repoRelative = relative(webRoot, file).split('\\').join('/');
+      if (/\.(?:stories|test)\.[jt]sx?$/.test(repoRelative)) return [];
+
+      const source = readFileSync(file, 'utf8');
+      if (!/<ConfirmDialog\b/.test(source)) return [];
+
+      const importsCanonicalOwner =
+        /import\s*\{[^}]*\bConfirmDialog\b[^}]*\}\s*from\s*['"]@jovie\/ui['"]/m.test(
+          source
+        );
+      return importsCanonicalOwner ? [] : [repoRelative];
+    });
+}
+
 describe('destructive action ConfirmDialog audit', () => {
+  it('keeps app consumers on the canonical package owner without a local re-export', () => {
+    expect(
+      existsSync(join(WEB_ROOT, 'components/molecules/ConfirmDialog.tsx'))
+    ).toBe(false);
+    expect(
+      findNonCanonicalConfirmDialogImports(),
+      'ConfirmDialog consumers must import directly from @jovie/ui.'
+    ).toEqual([]);
+  });
+
   it('keeps the required destructive flows on the canonical ConfirmDialog', () => {
     const missing = REQUIRED_DESTRUCTIVE_FLOWS.flatMap(({ name, file }) => {
       const source = readFileSync(join(WEB_ROOT, file), 'utf8');

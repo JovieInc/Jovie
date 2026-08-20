@@ -1,8 +1,10 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OpportunityInboxPageClient } from './OpportunityInboxPageClient';
 
 const mutateMock = vi.fn();
+let inboxHomeEnabled = false;
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/app',
@@ -14,7 +16,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/lib/flags/client', () => ({
-  useAppFlag: () => false,
+  useAppFlag: () => inboxHomeEnabled,
 }));
 
 vi.mock('@/features/dashboard/organisms/PreviewDataHydrator', () => ({
@@ -89,6 +91,12 @@ const pendingTourDate = {
 };
 
 describe('OpportunityInboxPageClient', () => {
+  afterEach(() => {
+    inboxHomeEnabled = false;
+    mutateMock.mockReset();
+    tourDateMutateMock.mockReset();
+  });
+
   it('hydrates the artist-profile rail with the inbox profile data', async () => {
     render(
       <OpportunityInboxPageClient
@@ -118,6 +126,12 @@ describe('OpportunityInboxPageClient', () => {
     expect(await screen.findByTestId('preview-data-hydrator')).toHaveAttribute(
       'data-initial-link-count',
       '1'
+    );
+    expect(screen.getByTestId('opportunity-inbox-page').tagName).toBe(
+      'SECTION'
+    );
+    expect(screen.getByTestId('opportunity-inbox-content')).toHaveClass(
+      'system-b-opportunity-inbox-page'
     );
   });
 
@@ -283,6 +297,145 @@ describe('OpportunityInboxPageClient', () => {
     expect(screen.getByText('New single detected on Spotify')).toBeVisible();
   });
 
+  it('keeps filter selection stable while conventional toolbar keys move focus', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <OpportunityInboxPageClient
+        inbox={{
+          cards: [
+            {
+              id: 'song-1',
+              signalType: 'new_song' as const,
+              typeLabel: 'New Song',
+              createdAt: '2026-06-28T10:00:00.000Z',
+              title: 'New single detected on Spotify',
+              why: 'Fresh release found on your catalog.',
+              primaryActionLabel: 'Set up release',
+              status: 'pending' as const,
+              category: 'suggestion' as const,
+            },
+            {
+              id: 'event-1',
+              signalType: 'new_event' as const,
+              typeLabel: 'New Event',
+              createdAt: '2026-06-28T10:00:00.000Z',
+              title: 'Detroit listeners up 340% — book a show',
+              why: 'Promoter email matched your Detroit growth spike.',
+              primaryActionLabel: 'Add to calendar',
+              status: 'pending' as const,
+              category: 'suggestion' as const,
+            },
+          ],
+          emptyActionCards: [],
+        }}
+      />
+    );
+
+    const all = screen.getByRole('button', { name: 'All' });
+    const newSong = screen.getByRole('button', { name: 'Songs' });
+    const brandDeals = screen.getByRole('button', { name: 'Brand Deals' });
+
+    all.focus();
+    await user.keyboard('{ArrowRight}');
+
+    expect(newSong).toHaveFocus();
+    expect(all).toHaveAttribute('aria-pressed', 'true');
+    expect(newSong).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByText('New single detected on Spotify')).toBeVisible();
+
+    await user.keyboard(' ');
+    expect(newSong).toHaveAttribute('aria-pressed', 'true');
+    expect(all).toHaveAttribute('aria-pressed', 'false');
+    expect(
+      screen.queryByText('Detroit listeners up 340% — book a show')
+    ).not.toBeInTheDocument();
+
+    await user.keyboard('{End}');
+    expect(brandDeals).toHaveFocus();
+    expect(newSong).toHaveAttribute('aria-pressed', 'true');
+
+    await user.keyboard('{Home}');
+    expect(all).toHaveFocus();
+    expect(newSong).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(brandDeals);
+    expect(brandDeals).toHaveAttribute('aria-pressed', 'true');
+    expect(brandDeals).toHaveAttribute('tabindex', '0');
+    expect(all).toHaveAttribute('tabindex', '-1');
+  });
+
+  it.each([
+    ['Meta', { metaKey: true }],
+    ['Control', { ctrlKey: true }],
+    ['Alt', { altKey: true }],
+    ['Shift', { shiftKey: true }],
+  ])('does not claim %s+ArrowRight from the filter toolbar', (_name, keys) => {
+    render(
+      <OpportunityInboxPageClient
+        inbox={{
+          cards: [
+            {
+              id: 'card-1',
+              signalType: 'other' as const,
+              typeLabel: 'Suggestion',
+              createdAt: '2026-06-28T10:00:00.000Z',
+              title: 'Detroit listeners up 340% — book a show',
+              why: 'Promoter email matched your Detroit growth spike.',
+              primaryActionLabel: 'Review pitch',
+              status: 'pending' as const,
+              category: 'suggestion' as const,
+            },
+          ],
+          emptyActionCards: [],
+        }}
+      />
+    );
+
+    const all = screen.getByRole('button', { name: 'All' });
+    const newSong = screen.getByRole('button', { name: 'Songs' });
+    all.focus();
+
+    expect(fireEvent.keyDown(all, { key: 'ArrowRight', ...keys })).toBe(true);
+    expect(all).toHaveFocus();
+    expect(all).toHaveAttribute('aria-pressed', 'true');
+    expect(newSong).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('respects a filter key event already handled by an ancestor', () => {
+    render(
+      <div onKeyDownCapture={event => event.preventDefault()}>
+        <OpportunityInboxPageClient
+          inbox={{
+            cards: [
+              {
+                id: 'card-1',
+                signalType: 'other' as const,
+                typeLabel: 'Suggestion',
+                createdAt: '2026-06-28T10:00:00.000Z',
+                title: 'Detroit listeners up 340% — book a show',
+                why: 'Promoter email matched your Detroit growth spike.',
+                primaryActionLabel: 'Review pitch',
+                status: 'pending' as const,
+                category: 'suggestion' as const,
+              },
+            ],
+            emptyActionCards: [],
+          }}
+        />
+      </div>
+    );
+
+    const all = screen.getByRole('button', { name: 'All' });
+    const newSong = screen.getByRole('button', { name: 'Songs' });
+    all.focus();
+
+    expect(fireEvent.keyDown(all, { key: 'ArrowRight' })).toBe(false);
+    expect(all).toHaveFocus();
+    expect(all).toHaveAttribute('aria-pressed', 'true');
+    expect(newSong).toHaveAttribute('aria-pressed', 'false');
+  });
+
   it('removes a card optimistically after approve', () => {
     mutateMock.mockImplementation((_id, options) => {
       options?.onSuccess?.();
@@ -313,6 +466,266 @@ describe('OpportunityInboxPageClient', () => {
     expect(
       screen.getByTestId('opportunity-inbox-empty-state')
     ).toBeInTheDocument();
+  });
+
+  it('returns focus to the active filter after clearing its stack', async () => {
+    const user = userEvent.setup();
+    inboxHomeEnabled = true;
+
+    render(
+      <OpportunityInboxPageClient
+        inbox={{
+          cards: [
+            {
+              id: 'song-1',
+              signalType: 'new_song' as const,
+              typeLabel: 'New Song',
+              createdAt: '2026-06-28T10:00:00.000Z',
+              title: 'New single detected',
+              why: 'Fresh release found on your catalog.',
+              primaryActionLabel: 'Set up release',
+              status: 'pending' as const,
+              category: 'suggestion' as const,
+            },
+            {
+              id: 'event-1',
+              signalType: 'new_event' as const,
+              typeLabel: 'New Event',
+              createdAt: '2026-06-28T10:00:00.000Z',
+              title: 'Detroit listeners up 340%',
+              why: 'Promoter email matched your Detroit growth spike.',
+              primaryActionLabel: 'Add to calendar',
+              status: 'pending' as const,
+              category: 'suggestion' as const,
+            },
+          ],
+          emptyActionCards: [],
+        }}
+      />
+    );
+
+    const songs = screen.getByRole('button', { name: 'Songs' });
+    await user.click(songs);
+    screen.getByRole('button', { name: 'Review Current Opportunity' }).focus();
+
+    await user.keyboard('{ArrowRight}');
+
+    expect(screen.getByTestId('opportunity-inbox-filter-empty')).toBeVisible();
+    expect(songs).toHaveFocus();
+  });
+
+  it('returns focus to the empty-state recovery action after clearing Inbox', async () => {
+    const user = userEvent.setup();
+    inboxHomeEnabled = true;
+
+    render(
+      <OpportunityInboxPageClient
+        inbox={{
+          cards: [
+            {
+              id: 'card-1',
+              signalType: 'other' as const,
+              typeLabel: 'Suggestion',
+              createdAt: '2026-06-28T10:00:00.000Z',
+              title: 'Detroit listeners up 340%',
+              why: 'Promoter email matched your Detroit growth spike.',
+              primaryActionLabel: 'Review pitch',
+              status: 'pending' as const,
+              category: 'suggestion' as const,
+            },
+          ],
+          emptyActionCards: [],
+        }}
+      />
+    );
+
+    screen.getByRole('button', { name: 'Review Current Opportunity' }).focus();
+    await user.keyboard('{ArrowRight}');
+
+    expect(
+      screen.getByTestId('opportunity-inbox-empty-state')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Start A Chat' })).toHaveFocus();
+  });
+
+  it('returns focus to recovery after completing the last report next step', async () => {
+    const user = userEvent.setup();
+    inboxHomeEnabled = true;
+    mutateMock.mockImplementation((_id, options) => {
+      options?.onSuccess?.();
+    });
+
+    render(
+      <OpportunityInboxPageClient
+        inbox={{
+          cards: [
+            {
+              id: 'report-1',
+              signalType: 'other' as const,
+              typeLabel: 'Report',
+              createdAt: '2026-07-04T10:00:00.000Z',
+              title: 'Thumbnail experiment finished',
+              why: 'Jovie measured the results of your experiment.',
+              primaryActionLabel: 'Run on 3 more videos',
+              status: 'pending' as const,
+              category: 'report' as const,
+              report: {
+                metricLabel: 'views',
+                deltaPercent: 5.4,
+                deltaDisplay: '+5.4%',
+                direction: 'up' as const,
+                series: [120, 132],
+                items: [],
+                experimentId: 'exp-42',
+                nextStep: {
+                  label: 'Run on 3 more videos',
+                  kind: 'experiment.start',
+                },
+              },
+            },
+          ],
+          emptyActionCards: [],
+        }}
+      />
+    );
+
+    await user.click(screen.getByTestId('opportunity-inbox-report-next-step'));
+
+    expect(
+      screen.getByTestId('opportunity-inbox-empty-state')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Start A Chat' })).toHaveFocus();
+  });
+
+  it('does not restore stack focus after a failed report next step', async () => {
+    const user = userEvent.setup();
+    inboxHomeEnabled = true;
+    mutateMock.mockImplementation((_id, options) => {
+      options?.onError?.();
+    });
+
+    render(
+      <OpportunityInboxPageClient
+        inbox={{
+          cards: [
+            {
+              id: 'report-1',
+              signalType: 'other' as const,
+              typeLabel: 'Report',
+              createdAt: '2026-07-04T10:00:00.000Z',
+              title: 'Thumbnail experiment finished',
+              why: 'Jovie measured the results of your experiment.',
+              primaryActionLabel: 'Run on 3 more videos',
+              status: 'pending' as const,
+              category: 'report' as const,
+              report: {
+                metricLabel: 'views',
+                deltaPercent: 5.4,
+                deltaDisplay: '+5.4%',
+                direction: 'up' as const,
+                series: [120, 132],
+                items: [],
+                experimentId: 'exp-42',
+                nextStep: {
+                  label: 'Run on 3 more videos',
+                  kind: 'experiment.start',
+                },
+              },
+            },
+          ],
+          emptyActionCards: [],
+        }}
+      />
+    );
+
+    await user.click(screen.getByTestId('opportunity-inbox-report-next-step'));
+    const songs = screen.getByRole('button', { name: 'Songs' });
+    await user.click(songs);
+
+    expect(songs).toHaveFocus();
+    expect(screen.getByTestId('opportunity-inbox-filter-empty')).toBeVisible();
+  });
+
+  it.each([
+    '{ArrowRight}',
+    '{ArrowLeft}',
+  ])('does not restore stack focus after a failed %s action', async key => {
+    const user = userEvent.setup();
+    inboxHomeEnabled = true;
+    mutateMock.mockImplementation((_id, options) => {
+      options?.onError?.();
+    });
+
+    render(
+      <OpportunityInboxPageClient
+        inbox={{
+          cards: [
+            {
+              id: 'card-1',
+              signalType: 'other' as const,
+              typeLabel: 'Suggestion',
+              createdAt: '2026-06-28T10:00:00.000Z',
+              title: 'Detroit listeners up 340%',
+              why: 'Promoter email matched your Detroit growth spike.',
+              primaryActionLabel: 'Review pitch',
+              status: 'pending' as const,
+              category: 'suggestion' as const,
+            },
+          ],
+          emptyActionCards: [],
+        }}
+      />
+    );
+
+    screen.getByRole('button', { name: 'Review Current Opportunity' }).focus();
+    await user.keyboard(key);
+    const songs = screen.getByRole('button', { name: 'Songs' });
+    await user.click(songs);
+
+    expect(songs).toHaveFocus();
+    expect(screen.getByTestId('opportunity-inbox-filter-empty')).toBeVisible();
+  });
+
+  it('returns focus to a queue item restored after an asynchronous failure', async () => {
+    const user = userEvent.setup();
+    inboxHomeEnabled = true;
+    let rejectAction: (() => void) | undefined;
+    mutateMock.mockImplementation((_id, options) => {
+      rejectAction = options?.onError;
+    });
+
+    render(
+      <OpportunityInboxPageClient
+        inbox={{
+          cards: [
+            {
+              id: 'card-1',
+              signalType: 'other' as const,
+              typeLabel: 'Suggestion',
+              createdAt: '2026-06-28T10:00:00.000Z',
+              title: 'Detroit listeners up 340%',
+              why: 'Promoter email matched your Detroit growth spike.',
+              primaryActionLabel: 'Review pitch',
+              status: 'pending' as const,
+              category: 'suggestion' as const,
+            },
+          ],
+          emptyActionCards: [],
+        }}
+      />
+    );
+
+    screen.getByRole('button', { name: 'Review Current Opportunity' }).focus();
+    await user.keyboard('{ArrowRight}');
+    expect(screen.getByRole('link', { name: 'Start A Chat' })).toHaveFocus();
+
+    act(() => {
+      rejectAction?.();
+    });
+
+    expect(
+      screen.getByRole('button', { name: 'Review Current Opportunity' })
+    ).toHaveFocus();
   });
 
   it('renders pending tour-date cards and confirms optimistically', () => {

@@ -141,4 +141,50 @@ struct ComposerSlashPaletteTests {
     let sorted = labels.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     #expect(labels == sorted)
   }
+
+  @Test func paletteHeightReservesHeaderAndRowsThenCaps() {
+    let oneSection = ComposerSlashPaletteMetrics.estimatedHeight(workflowCount: 2, skillCount: 0)
+    #expect(oneSection == JovieSpacing.small * 2 + 24 + 44 * 2)
+
+    let twoSections = ComposerSlashPaletteMetrics.estimatedHeight(workflowCount: 2, skillCount: 3)
+    #expect(
+      twoSections
+        == JovieSpacing.small * 2 + 24 + 44 * 2 + 24 + 44 * 3 + JovieSpacing.small
+    )
+
+    let capped = ComposerSlashPaletteMetrics.estimatedHeight(workflowCount: 20, skillCount: 20)
+    #expect(capped == ComposerSlashPaletteMetrics.maxHeight)
+  }
+
+  @Test func emptyPaletteHasOnlyPaddingHeight() {
+    #expect(ComposerSlashPaletteMetrics.estimatedHeight(workflowCount: 0, skillCount: 0) == JovieSpacing.small * 2)
+  }
+}
+
+struct ChatComposerAccessibilityGuardTests {
+  @Test func composerBarExposesAStableContainerIdentifier() throws {
+    let sourceURL = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("Jovie/Features/Chat/ChatComposerBar.swift")
+    let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+    #expect(source.contains(".accessibilityElement(children: .contain)"))
+    #expect(source.contains("accessibilityIdentifier(\"chat-composer\")"))
+    #expect(source.contains("chat-composer-send"))
+    #expect(source.contains("accessibilityIdentifier(\"chat-composer-plus\")"))
+    #expect(source.contains("chat-composer-mic"))
+  }
+
+  @Test func mobileChatContainerDoesNotSwallowChildIdentifiers() throws {
+    let sourceURL = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("Jovie/Features/Chat/MobileChatView.swift")
+    let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+    #expect(source.contains(".accessibilityElement(children: .contain)"))
+    #expect(source.contains("accessibilityIdentifier(\"mobile-chat\")"))
+    #expect(source.contains("accessibilityIdentifier(\"chat-scroll-to-latest\")"))
+  }
 }

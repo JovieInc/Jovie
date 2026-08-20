@@ -33,6 +33,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(overlayClassName, className)}
+    data-slot='dialog-overlay'
     data-testid='dialog-overlay'
     {...props}
   />
@@ -85,6 +86,7 @@ const DialogContent = React.forwardRef<
       <DialogPrimitive.Content
         ref={ref}
         className={contentClassName}
+        data-slot='dialog-content'
         data-testid={testId}
         {...props}
       >
@@ -92,6 +94,7 @@ const DialogContent = React.forwardRef<
         {!hideClose && (
           <DialogPrimitive.Close
             className={closeButtonClassName}
+            data-slot='dialog-close'
             data-testid='dialog-close-button'
           >
             <CloseButtonIcon />
@@ -134,6 +137,7 @@ const DialogHeader = ({
 }: DialogHeaderProps) => (
   <div
     className={cn(headerStyles.base, className)}
+    data-slot='dialog-header'
     data-testid={testId}
     {...props}
   />
@@ -155,6 +159,7 @@ const DialogFooter = ({
 }: DialogFooterProps) => (
   <div
     className={cn(footerStyles.base, className)}
+    data-slot='dialog-footer'
     data-testid={testId}
     {...props}
   />
@@ -168,6 +173,7 @@ const DialogTitle = React.forwardRef<
   <DialogPrimitive.Title
     ref={ref}
     className={cn(titleStyles.base, className)}
+    data-slot='dialog-title'
     data-testid='dialog-title'
     {...props}
   />
@@ -181,6 +187,7 @@ const DialogDescription = React.forwardRef<
   <DialogPrimitive.Description
     ref={ref}
     className={cn(descriptionStyles.base, className)}
+    data-slot='dialog-description'
     data-testid='dialog-description'
     {...props}
   />

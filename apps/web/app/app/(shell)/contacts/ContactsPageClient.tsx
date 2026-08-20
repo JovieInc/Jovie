@@ -1,5 +1,9 @@
 'use client';
 
+import {
+  PAGE_TOOLBAR_META_TEXT_CLASS,
+  PageToolbar,
+} from '@/components/organisms/table';
 import { ContactsManager } from '@/features/dashboard/organisms/ContactsManager';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { useContactsQuery } from '@/lib/queries';
@@ -21,10 +25,17 @@ export function ContactsPageClient({
   if (isError && !data) {
     return (
       <div
-        className='flex h-full min-h-0 items-center justify-center'
+        className='flex h-full min-h-0 flex-col'
         data-testid='contacts-table'
       >
-        <PageErrorState message='Failed to load contacts. Please refresh the page.' />
+        <PageToolbar
+          start={
+            <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>0 contacts</span>
+          }
+        />
+        <div className='flex min-h-0 flex-1 items-center justify-center'>
+          <PageErrorState message='Failed to load contacts. Please refresh the page.' />
+        </div>
       </div>
     );
   }

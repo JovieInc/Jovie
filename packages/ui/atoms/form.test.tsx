@@ -12,6 +12,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  useFormField,
 } from './form';
 
 // Helper: wraps form fields in a full Form context using react-hook-form
@@ -93,7 +94,7 @@ describe('Form', () => {
       expect(screen.getByPlaceholderText('Enter username')).toBeInTheDocument();
     });
 
-    it('applies space-y-2 base class', () => {
+    it('applies the shared grid rhythm', () => {
       render(
         <TestForm>
           <FormField
@@ -110,7 +111,8 @@ describe('Form', () => {
         </TestForm>
       );
       const formItem = screen.getByTestId('form-item');
-      expect(formItem.className).toContain('space-y-1.5');
+      expect(formItem).toHaveClass('grid', 'gap-1.5');
+      expect(formItem).toHaveAttribute('data-slot', 'form-item');
     });
 
     it('merges custom className', () => {
@@ -198,10 +200,10 @@ describe('Form', () => {
       expect(input.getAttribute('aria-describedby')).toBeTruthy();
     });
 
-    it('sets aria-invalid to false when no error', () => {
+    it('omits aria-invalid when no error exists', () => {
       render(<TestForm />);
       const input = screen.getByPlaceholderText('Enter username');
-      expect(input).toHaveAttribute('aria-invalid', 'false');
+      expect(input).not.toHaveAttribute('aria-invalid');
     });
 
     it('sets aria-invalid to true when field has error', async () => {
@@ -313,6 +315,10 @@ describe('Form', () => {
       expect(message.className).toContain('text-destructive');
       expect(message.className).toContain('text-[13px]');
       expect(message.className).toContain('font-medium');
+      expect(message).toHaveAttribute('role', 'alert');
+      expect(message).toHaveAttribute('aria-live', 'polite');
+      expect(message).toHaveAttribute('aria-atomic', 'true');
+      expect(message).toHaveAttribute('data-slot', 'form-message');
     });
 
     it('renders children as body when no error', () => {
@@ -380,6 +386,32 @@ describe('Form', () => {
   });
 
   describe('FormField', () => {
+    it('fails clearly outside a FormField context', () => {
+      function OrphanFieldProbe() {
+        useFormField();
+        return null;
+      }
+
+      expect(() => render(<OrphanFieldProbe />)).toThrow(
+        'useFormField should be used within <FormField>'
+      );
+    });
+
+    it('fails clearly outside a FormItem context', () => {
+      function ItemProbe() {
+        useFormField();
+        return null;
+      }
+
+      expect(() =>
+        render(
+          <TestForm>
+            <FormField name='username' render={() => <ItemProbe />} />
+          </TestForm>
+        )
+      ).toThrow('useFormField should be used within <FormItem>');
+    });
+
     it('provides field context for child components', () => {
       render(<TestForm />);
       // The form renders correctly with field context

@@ -870,6 +870,7 @@ export function ProfilesWorkspace({
           icon={<UserRound className='h-5 w-5' aria-hidden />}
           heading='No Artist Profile Selected'
           description='Set up an artist profile to monitor its presence.'
+          presentation='workspace'
           action={{
             label: 'Set Up Artist Profile',
             href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,

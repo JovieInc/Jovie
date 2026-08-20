@@ -3,7 +3,11 @@
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import * as React from 'react';
 
-import { popoverContentClasses } from '../lib/dropdown-styles';
+import {
+  OVERLAY_COLLISION_PADDING,
+  OVERLAY_SIDE_OFFSET,
+  popoverContentClasses,
+} from '../lib/dropdown-styles';
 import { cn } from '../lib/utils';
 
 const Popover = PopoverPrimitive.Root;
@@ -32,7 +36,8 @@ const PopoverContent = React.forwardRef<
     {
       className,
       align = 'center',
-      sideOffset = 8,
+      sideOffset = OVERLAY_SIDE_OFFSET,
+      collisionPadding = OVERLAY_COLLISION_PADDING,
       showArrow = false,
       children,
       portalProps,
@@ -47,7 +52,7 @@ const PopoverContent = React.forwardRef<
         ref={ref}
         align={align}
         sideOffset={sideOffset}
-        collisionPadding={8}
+        collisionPadding={collisionPadding}
         className={cn(popoverContentClasses, className)}
         data-testid={testId}
         {...props}
@@ -55,7 +60,7 @@ const PopoverContent = React.forwardRef<
         {children}
         {showArrow && (
           <PopoverPrimitive.Arrow
-            className='fill-surface-1 drop-shadow-sm'
+            className='fill-surface-elevated drop-shadow-sm'
             data-testid='popover-arrow'
           />
         )}

@@ -1,0 +1,68 @@
+# Live GitHub ruleset parity for native merge queue (ruleset 10512119).
+#
+# `pnpm ci:merge-queue:check` (validate, no live API) already runs in ci-fast.
+# `pnpm ci:merge-queue:verify` reads the live ruleset via `gh api` and is the
+# only check that would catch a GitHub-UI edit weakening the merge gate.
+# It is a scheduled/main-push observer, not a source PR Ready context.
+name: Merge Queue Ruleset Verify
+
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  push:
+    branches: [main]
+    paths:
+      - '.github/rulesets/branch-protection.yml'
+      - '.github/workflows/merge-queue-ruleset-verify.yml'
+      - 'scripts/ci-merge-queue-check.mjs'
+      - 'scripts/lib/merge-queue-guard.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: merge-queue-ruleset-verify
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Live ruleset parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Verify live merge-queue ruleset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci-merge-queue-check.mjs verify
+
+      - name: Slack alert on failure
+        if: ${{ failure() && env.SLACK_WEBHOOK_URL != '' }}
+        run: |
+          set -euo pipefail
+          PAYLOAD=$(cat <<EOF
+          {
+            "text": "Live merge-queue ruleset drifted from source",
+            "attachments": [
+              {
+                "color": "danger",
+                "fields": [
+                  { "title": "Workflow", "value": "Merge Queue Ruleset Verify", "short": true },
+                  { "title": "Command", "value": "pnpm ci:merge-queue:verify", "short": true },
+                  { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
+                ]
+              }
+            ]
+          }
+          EOF
+          )
+          curl -sS -X POST \
+            -H 'Content-type: application/json' \
+            --data "$PAYLOAD" \
+            "$SLACK_WEBHOOK_URL"

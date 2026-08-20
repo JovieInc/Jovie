@@ -1,36 +1,31 @@
-/**
- * Tests for the admin system map page + registry-driven data display.
- * Verifies that Skills, Connectors, Tools, and Memory tabs render
- * without errors and that the Skills tab shows registered skills.
- */
-
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// ---------------------------------------------------------------------------
-// Hoisted mocks
-// ---------------------------------------------------------------------------
-
-const { mockAdminSystemMap, mockAdminSystemMapSkillsTab, mockSkillDocCard } =
-  vi.hoisted(() => ({
-    mockAdminSystemMap: vi.fn(),
-    mockAdminSystemMapSkillsTab: vi.fn(),
-    mockSkillDocCard: vi.fn(),
-  }));
+const { mockAdminSystemMap, mockRequireAccess } = vi.hoisted(() => ({
+  mockAdminSystemMap: vi.fn(({ activeTab }: { activeTab: string }) => (
+    <div data-testid='system-map-probe'>{activeTab}</div>
+  )),
+  mockRequireAccess: vi.fn().mockResolvedValue('user_admin'),
+}));
 
 vi.mock('@/components/features/admin/layout/AdminPage', () => ({
   AdminPage: ({
     children,
     title,
     testId,
+    tabs,
   }: {
     children: ReactNode;
     title: string;
     testId: string;
+    tabs: { value: string };
   }) => (
-    <section data-testid={testId}>
-      <h1>{title}</h1>
+    <section
+      data-testid={testId}
+      data-page-title={title}
+      data-active-tab={tabs.value}
+    >
       {children}
     </section>
   ),
@@ -39,171 +34,71 @@ vi.mock('@/components/features/admin/layout/AdminPage', () => ({
 vi.mock('@/components/features/admin/system-map/AdminSystemMap', () => ({
   AdminSystemMap: mockAdminSystemMap,
 }));
-
-vi.mock(
-  '@/components/features/admin/system-map/AdminSystemMapSkillsTab',
-  () => ({
-    AdminSystemMapSkillsTab: mockAdminSystemMapSkillsTab,
-  })
-);
-
-vi.mock('@/components/features/admin/system-map/SkillDocCard', () => ({
-  SkillDocCard: mockSkillDocCard,
+vi.mock('@/lib/admin/page-access', () => ({
+  requireCurrentAdminPageAccess: mockRequireAccess,
 }));
-
-vi.mock('@/lib/agents/registry', () => ({
-  SKILL_REGISTRY: {
-    testSkill: {
-      id: 'testSkill',
-      name: 'Test Skill',
-      description: 'A test skill',
-      kind: 'vertical_agent',
-      version: '1.0.0',
-      entitlement: 'canAccessAiRetouching',
-      model: 'test/model',
-      promptPath: 'apps/web/lib/services/retouching/styles/white-space.md',
-      metadata: {},
-    },
-    testTool: {
-      id: 'testTool',
-      name: 'Test Tool',
-      description: 'A test tool',
-      kind: 'tool',
-      version: '1.0.0',
-      entitlement: 'aiCanUseTools',
-      model: 'test/model',
-      metadata: {},
-    },
-  },
-}));
-
-vi.mock('@/lib/connectors/registry', () => ({
-  getConnectorDefinitions: () => [
-    {
-      id: 'gmail',
-      label: 'Gmail',
-      description: 'Scan booking emails.',
-      iconKey: 'mail',
-      oauthBundle: 'google',
-      displayOrder: 1,
-    },
-  ],
-}));
-
 vi.mock('@/lib/seo/noindex-metadata', () => ({
   NOINDEX_ROBOTS: { index: false, follow: false },
 }));
 
-// ---------------------------------------------------------------------------
-// Tests for AdminSystemMap (the tab router)
-// ---------------------------------------------------------------------------
+describe('AdminSystemPage', () => {
+  beforeEach(() => vi.clearAllMocks());
 
-describe('AdminSystemMap tab routing', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('renders the skills tab when activeTab=skills', () => {
-    mockAdminSystemMapSkillsTab.mockReturnValue(
-      <div data-testid='skills-tab-probe'>skills content</div>
+  it('defaults unknown tabs to skills without rendering a duplicate title', async () => {
+    const { default: AdminSystemPage } = await import(
+      '@/app/app/(shell)/admin/system/page'
     );
-
-    const result = render(
-      <div data-testid='skills-tab-probe'>skills content</div>
-    );
-    expect(result.getByTestId('skills-tab-probe')).toBeTruthy();
-  });
-
-  it('renders connectors tab with connector definitions', async () => {
-    const { getConnectorDefinitions } = await import(
-      '@/lib/connectors/registry'
-    );
-    const connectors = getConnectorDefinitions();
-    expect(connectors).toHaveLength(1);
-    expect(connectors[0].label).toBe('Gmail');
-  });
-
-  it('filters tools to kind=tool entries from SKILL_REGISTRY', async () => {
-    const { SKILL_REGISTRY } = await import('@/lib/agents/registry');
-    const tools = Object.values(SKILL_REGISTRY).filter(s => s.kind === 'tool');
-    expect(tools).toHaveLength(1);
-    expect(tools[0].id).toBe('testTool');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Tests for SKILL_REGISTRY shape
-// ---------------------------------------------------------------------------
-
-describe('SKILL_REGISTRY entries', () => {
-  it('all entries have required fields', async () => {
-    const { SKILL_REGISTRY } = await import('@/lib/agents/registry');
-    for (const skill of Object.values(SKILL_REGISTRY)) {
-      expect(typeof skill.id).toBe('string');
-      expect(typeof skill.name).toBe('string');
-      expect(typeof skill.description).toBe('string');
-      expect(typeof skill.kind).toBe('string');
-      expect(typeof skill.model).toBe('string');
-      expect(typeof skill.version).toBe('string');
-    }
-  });
-
-  it('skills tab renders a SkillDocCard for each skill', () => {
-    mockSkillDocCard.mockImplementation(({ id }: { id: string }) => (
-      <div data-testid={`skill-card-${id}`} />
-    ));
-
     render(
-      <>
-        <div data-testid='skill-card-testSkill' />
-        <div data-testid='skill-card-testTool' />
-      </>
+      await AdminSystemPage({ searchParams: Promise.resolve({ tab: 'bad' }) })
     );
 
-    expect(screen.getByTestId('skill-card-testSkill')).toBeTruthy();
-    expect(screen.getByTestId('skill-card-testTool')).toBeTruthy();
+    expect(mockRequireAccess).toHaveBeenCalledOnce();
+    expect(screen.getByTestId('admin-system-page')).toHaveAttribute(
+      'data-page-title',
+      'System Map'
+    );
+    expect(screen.getByTestId('admin-system-page')).toHaveAttribute(
+      'data-active-tab',
+      'skills'
+    );
+    expect(mockAdminSystemMap).toHaveBeenCalledWith(
+      expect.objectContaining({ activeTab: 'skills' }),
+      undefined
+    );
+    expect(
+      screen.queryByRole('heading', { name: 'System Map' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('preserves an explicit tab from array search params', async () => {
+    const { default: AdminSystemPage } = await import(
+      '@/app/app/(shell)/admin/system/page'
+    );
+    render(
+      await AdminSystemPage({
+        searchParams: Promise.resolve({ tab: ['memory', 'tools'] }),
+      })
+    );
+
+    expect(screen.getByTestId('system-map-probe')).toHaveTextContent('memory');
+    expect(mockAdminSystemMap).toHaveBeenCalledWith(
+      expect.objectContaining({ activeTab: 'memory' }),
+      undefined
+    );
   });
 });
 
-// ---------------------------------------------------------------------------
-// Tests for resolveTab helper (page.tsx)
-// ---------------------------------------------------------------------------
-
-describe('resolveTab helper', () => {
-  it('returns skills for unknown input', async () => {
-    // Import the module to access resolveTab logic by verifying the page route
-    // The logic is: unknown → 'skills'; valid values stay as-is.
-    const validTabs = ['skills', 'connectors', 'tools', 'memory'];
-    const resolveTab = (value: string | undefined): string => {
-      return validTabs.includes(value ?? '') ? (value as string) : 'skills';
-    };
-
-    expect(resolveTab(undefined)).toBe('skills');
-    expect(resolveTab('unknown')).toBe('skills');
-    expect(resolveTab('connectors')).toBe('connectors');
-    expect(resolveTab('tools')).toBe('tools');
-    expect(resolveTab('memory')).toBe('memory');
-    expect(resolveTab('skills')).toBe('skills');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Tests for admin navigation constants
-// ---------------------------------------------------------------------------
-
-describe('admin-navigation constants include system_map', () => {
-  it('ADMIN_NAV_REGISTRY has system_map entry', async () => {
+describe('admin system navigation contract', () => {
+  it('keeps the canonical system route and registry entry', async () => {
     const { ADMIN_NAV_REGISTRY, ADMIN_SETTINGS_TOOL_IDS } = await import(
       '@/constants/admin-navigation'
     );
-    const entry = ADMIN_NAV_REGISTRY.find(e => e.id === 'system_map');
-    expect(entry).toBeDefined();
-    expect(entry?.label).toBe('System Map');
-    expect(ADMIN_SETTINGS_TOOL_IDS).toContain('system_map');
-  });
-
-  it('ADMIN_SYSTEM route is defined in APP_ROUTES', async () => {
     const { APP_ROUTES } = await import('@/constants/routes');
+
+    expect(
+      ADMIN_NAV_REGISTRY.find(entry => entry.id === 'system_map')?.label
+    ).toBe('System Map');
+    expect(ADMIN_SETTINGS_TOOL_IDS).toContain('system_map');
     expect(APP_ROUTES.ADMIN_SYSTEM).toBe('/app/ov/system');
   });
 });

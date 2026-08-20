@@ -80,11 +80,11 @@ When auth tests fail:
 - confirm whether the failing spec should be signed in or signed out
 - remember that `/signin` and `/signup` will redirect when a valid session is already present
 
-## Manual Browser QA With gstack
+## Manual Browser QA With Playwright
 
 ### Signed-out auth pages
 
-No cookie import is needed. Open `/signin` or `/signup` directly in `/browse`.
+No cookie import is needed. Open `/signin` or `/signup` with Playwright. Do not use `/browse`.
 
 Recommended checks:
 
@@ -99,15 +99,15 @@ Local signed-in QA should use the dev auth bootstrap route, not manual cookie im
 
 Recommended flow:
 
-1. Start the local browse server from the repo root:
+1. Start the local auth-bypass server from the repo root:
    `pnpm run dev:web:browse`
-2. In `/browse`, open:
+2. In Playwright, open:
    `/api/dev/test-auth/enter?persona=creator&redirect=/app/dashboard/earnings`
 3. Use `persona=admin` only for admin flows:
    `/api/dev/test-auth/enter?persona=admin&redirect=/app/admin`
 4. Verify `/app`, `/onboarding`, or other authenticated routes from that authenticated session.
 
-Use `/setup-browser-cookies` only when you explicitly need to import a real human browser session. For non-loopback hosts, `scripts/browse-auth.ts` is the fallback helper for cookie export.
+For non-loopback hosts, `scripts/browse-auth.ts` is a Playwright cookie helper.
 
 ## Visual And Full-Suite Notes
 

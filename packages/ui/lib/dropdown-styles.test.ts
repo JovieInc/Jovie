@@ -29,7 +29,10 @@ import {
   MENU_SEARCH_INPUT_BASE,
   MENU_SEPARATOR_BASE,
   MENU_SHORTCUT_BASE,
+  OVERLAY_COLLISION_PADDING,
   OVERLAY_CONTENT_RADIUS,
+  OVERLAY_ITEM_FOCUS,
+  OVERLAY_SIDE_OFFSET,
   OVERLAY_SURFACE_BASE,
   POPOVER_TRANSFORM_ORIGIN,
   popoverContentClasses,
@@ -59,6 +62,11 @@ describe('dropdown-styles', () => {
   });
 
   describe('content base styles', () => {
+    it('shares one trigger gap and viewport collision contract', () => {
+      expect(OVERLAY_SIDE_OFFSET).toBe(4);
+      expect(OVERLAY_COLLISION_PADDING).toBe(8);
+    });
+
     it('DROPDOWN_CONTENT_BASE includes z-index, border, and background', () => {
       expect(DROPDOWN_CONTENT_BASE).toContain('z-50');
       expect(DROPDOWN_CONTENT_BASE).toContain('border');
@@ -167,9 +175,12 @@ describe('dropdown-styles', () => {
     });
 
     it('menu rows use tokenized focus-visible rings', () => {
-      expect(MENU_ITEM_BASE).toContain('focus-visible:ring-focus');
-      expect(MENU_ITEM_COMPACT).toContain('focus-visible:ring-focus');
-      expect(CHECKBOX_RADIO_ITEM_BASE).toContain('focus-visible:ring-focus');
+      expect(OVERLAY_ITEM_FOCUS).toContain('focus-visible:ring-focus');
+      expect(OVERLAY_ITEM_FOCUS).toContain('focus-visible:ring-inset');
+      expect(MENU_ITEM_BASE).toContain(OVERLAY_ITEM_FOCUS);
+      expect(MENU_ITEM_COMPACT).toContain(OVERLAY_ITEM_FOCUS);
+      expect(CHECKBOX_RADIO_ITEM_BASE).toContain(OVERLAY_ITEM_FOCUS);
+      expect(SELECT_ITEM_BASE).toContain(OVERLAY_ITEM_FOCUS);
     });
 
     it('MENU_ITEM_COMPACT uses smaller sizing', () => {
@@ -191,11 +202,13 @@ describe('dropdown-styles', () => {
     it('CHECKBOX_RADIO_ITEM_BASE has left padding for indicator', () => {
       expect(CHECKBOX_RADIO_ITEM_BASE).toContain('pl-7');
       expect(CHECKBOX_RADIO_ITEM_BASE).toContain('leading-4');
+      expect(CHECKBOX_RADIO_ITEM_BASE).toContain('min-h-8');
     });
 
     it('SELECT_ITEM_BASE has left padding for check indicator', () => {
       expect(SELECT_ITEM_BASE).toContain('pl-8');
       expect(SELECT_ITEM_BASE).toContain('w-full');
+      expect(SELECT_ITEM_BASE).toContain('min-h-8');
     });
   });
 

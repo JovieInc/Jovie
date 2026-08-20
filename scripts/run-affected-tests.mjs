@@ -142,6 +142,20 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = new Set([
 const AFFECTED_TEST_SELECTOR_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const SAFE_PR_REMEDIATION_PRIMARY_INPUTS = new Set([
+  '.github/workflows/safe-pr-remediation.yml',
+  'scripts/lib/safe-pr-remediation.mjs',
+  'scripts/lib/__tests__/safe-pr-remediation.test.mjs',
+]);
+const SAFE_PR_REMEDIATION_LANE = new Set([
+  ...SAFE_PR_REMEDIATION_PRIMARY_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+const SAFE_PR_REMEDIATION_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/safe-pr-remediation.test.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+];
+const SAFE_PR_REMEDIATION_NODE_TESTS = ['scripts/typecheck-scripts.mjs'];
 const CI_UI_DRIFT_GUARDRAIL_INPUTS = new Set([
   '.github/workflows/ci.yml',
   'apps/desktop/scripts/desktop-shell-contract.test.mjs',
@@ -201,9 +215,11 @@ const CI_CONTROL_SCRIPT_TESTS = [
 ];
 const MERGE_QUEUE_CONTROLLER_INPUTS = new Set([
   '.github/workflows/merge-queue-autoenroll.yml',
+  'docs/PR_FLOW.md',
   'scripts/ci-merge-queue-check.mjs',
   'scripts/drain-pr-queue.sh',
   'scripts/lib/merge-queue-guard.mjs',
+  'scripts/lib/resolve-merge-group-path-diff.mjs',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
@@ -297,6 +313,7 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   'scripts/hermes/gem_gate_contract.py',
   'scripts/hermes/gem_repo_registry.py',
   'scripts/hermes/gem_rehabilitation_policy.py',
+  'scripts/hermes/install-gem-fleet-controller.sh',
   'scripts/hermes/install-gem-pr-rehabilitation.sh',
   'scripts/hermes/model-router.py',
   'scripts/hermes/systemd/gem-pr-drain.service',
@@ -328,6 +345,7 @@ const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/hermes/gem-repo-drain-cycle.py',
   'scripts/hermes/gem_repo_registry.py',
   'scripts/hermes/gem_rehabilitation_policy.py',
+  'scripts/hermes/install-gem-fleet-controller.sh',
   'scripts/hermes/install-gem-pr-rehabilitation.sh',
   'scripts/hermes/systemd/gem-pr-drain.service',
   'scripts/hermes/systemd/gem-pr-drain.timer',
@@ -620,6 +638,22 @@ export function buildAffectedTestPlan(
       pythonUnittestTests: SYMPHONY_THROUGHPUT_PYTHON_TESTS,
       scriptVitestTests: SYMPHONY_THROUGHPUT_SCRIPT_TESTS,
       nodeTests: SYMPHONY_THROUGHPUT_NODE_TESTS,
+    };
+  }
+  const isBoundedSafePrRemediationChange =
+    files.some(file => SAFE_PR_REMEDIATION_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => SAFE_PR_REMEDIATION_LANE.has(file));
+  if (isBoundedSafePrRemediationChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: SAFE_PR_REMEDIATION_SCRIPT_TESTS,
+      nodeTests: SAFE_PR_REMEDIATION_NODE_TESTS,
     };
   }
   const isBoundedGemPrRehabilitationChange =

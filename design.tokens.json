@@ -2,7 +2,7 @@
   "$schema": "https://design-tokens.github.io/community-group/format/",
   "$version": 1,
   "name": "Jovie System B (Noir Ion)",
-  "$description": "Canonical Jovie design tokens, dark-first. Source of truth: apps/web/styles/design-system.css. Export generated 2026-08-07. Used by importers (e.g. Magic Patterns) instead of scraping raw repo colors.",
+  "$description": "Canonical Jovie design tokens, dark-first. Generated from the Noir Ion anchors (--noir-ion-*) in apps/web/styles/design-system.css by scripts/generate-design-tokens-export.mjs — do not edit by hand. Rebuild: pnpm design:tokens:export. Used by importers (e.g. Magic Patterns) instead of scraping raw repo colors.",
   "color": {
     "surface.canvas": {
       "$value": "#030407",
@@ -41,7 +41,7 @@
       "$type": "color"
     },
     "surface.surface1": {
-      "$value": "var(--linear-bg-surface-1)",
+      "$value": "#0f1420",
       "$type": "color"
     },
     "surface.surface2": {
@@ -53,35 +53,35 @@
       "$type": "color"
     },
     "text.primary": {
-      "$value": "#f7f8f8",
+      "$value": "#f5f7fb",
       "$type": "color"
     },
     "text.secondary": {
-      "$value": "#d0d6e0",
+      "$value": "#d7dce8",
       "$type": "color"
     },
     "text.tertiary": {
-      "$value": "#8a8f98",
+      "$value": "#a8b0c3",
       "$type": "color"
     },
     "text.quaternary": {
-      "$value": "#62666d",
+      "$value": "#7d879d",
       "$type": "color"
     },
     "text.disabled": {
-      "$value": "oklch(40% 0.006 282)",
+      "$value": "#525d75",
       "$type": "color"
     },
     "border.subtle": {
-      "$value": "oklch(100% 0 0 / 15%)",
+      "$value": "rgba(168, 176, 195, 0.1)",
       "$type": "color"
     },
     "border.default": {
-      "$value": "oklch(100% 0 0 / 25%)",
+      "$value": "rgba(168, 176, 195, 0.16)",
       "$type": "color"
     },
     "border.strong": {
-      "$value": "oklch(100% 0 0 / 40%)",
+      "$value": "rgba(199, 237, 255, 0.26)",
       "$type": "color"
     },
     "border.focus": {

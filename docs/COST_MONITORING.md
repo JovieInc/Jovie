@@ -128,9 +128,13 @@ This is a proxy metric, not a direct cost metric. If the runaway is in something
 
 | Input | Default | Purpose |
 |---|---|---|
-| `threshold_multiplier` | `5` | Anomaly = current > baseline × this. |
-| `absolute_floor` | `1000` | Anomaly requires current > this many events even if multiplier hits. Prevents low-traffic-hour false positives. |
+| `threshold_multiplier` | `5` | Anomaly when current > baseline × this. |
+| `absolute_floor` | `1000` | Independent anomaly threshold that catches high volume even when the baseline is elevated or unavailable. |
 | `lookback_minutes` | `60` | How much recent traffic to evaluate. |
+
+The multiplier and absolute floor are independent: crossing either threshold
+opens the incident. This preserves the standing 5×-baseline alert even during
+lower-traffic hours.
 
 ### Calibration procedure (run on initial setup)
 

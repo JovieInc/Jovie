@@ -62,3 +62,36 @@ export const EmptyError: Story = {
     if (button instanceof HTMLButtonElement) button.click();
   },
 };
+
+export const LongValidationMessage: Story = {
+  render: () => {
+    const form = useForm({ defaultValues: { handle: '' } });
+    return (
+      <Form {...form}>
+        <form className='w-64' onSubmit={event => event.preventDefault()}>
+          <FormField
+            control={form.control}
+            name='handle'
+            rules={{
+              required:
+                'Choose a public handle before continuing so listeners can find your profile.',
+            }}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Public handle</FormLabel>
+                <FormControl>
+                  <Input placeholder='artist' {...field} />
+                </FormControl>
+                <FormDescription>Letters, numbers, and dashes.</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <Button className='mt-3' type='submit'>
+            Continue
+          </Button>
+        </form>
+      </Form>
+    );
+  },
+};

@@ -216,23 +216,33 @@ jobs:
             exit 1
           fi
 
-          # Verify /api/chat is reachable and auth-gated.
-          #
-          # NOTE: This probe has shown intermittent false positives on staging
-          # (transient 5xx responses while the deployment is still warming). Keep
-          # this check informational so canary does not block healthy deployments.
-          echo "Checking /api/chat is reachable and auth-gated (informational)..."
+          # Verify authenticated-chat /api/chat is reachable and auth-gated.
+          # Locator-less envelopes are onboarding (covered above). A profileId
+          # keeps this on the 401 AUTH_REQUIRED path. Retry transient warmup 5xx
+          # the same way as the Playwright neighbors, then fail closed.
+          echo "Checking /api/chat is reachable and auth-gated..."
           chat_url="${deployment_url%/}/api/chat"
-          chat_response=$(curl -s --max-redirs 0 "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -X POST -H "Content-Type: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" -b "$COOKIE_JAR" -d '{"messages":[{"id":"1","role":"user","parts":[{"type":"text","text":"hi"}]}]}' -w "\n%{http_code}" "${chat_url}" || printf '\n000')
-          chat_code="${chat_response##*$'\n'}"
-
-          # The chat route checks auth before body parsing, so unauthenticated
-          # probes should return 401 when healthy.
-          if [ "$chat_code" = "401" ]; then
-            echo "✅ /api/chat reachable and auth-gated (HTTP 401)"
-          else
-            echo "⚠️ /api/chat probe returned HTTP $chat_code (expected 401). Continuing because this check is currently flaky on staging."
-          fi
+          chat_attempt=1
+          chat_max_attempts=3
+          until [ "$chat_attempt" -gt "$chat_max_attempts" ]; do
+            chat_response=$(curl -s --max-redirs 0 "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -X POST -H "Content-Type: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" -b "$COOKIE_JAR" -d '{"messages":[{"id":"1","role":"user","parts":[{"type":"text","text":"hi"}]}],"profileId":"00000000-0000-4000-8000-000000000001"}' -w "\n%{http_code}" "${chat_url}" || printf '\n000')
+            chat_code="${chat_response##*$'\n'}"
+            chat_body="${chat_response%$'\n'*}"
+            if [ "$chat_code" = "401" ] && echo "$chat_body" | grep -q '"errorCode":"AUTH_REQUIRED"'; then
+              echo "✅ /api/chat reachable and auth-gated (HTTP 401 AUTH_REQUIRED)"
+              break
+            fi
+            if [ "$chat_attempt" -ge "$chat_max_attempts" ]; then
+              echo "❌ Canary failed: /api/chat expected 401 AUTH_REQUIRED, got HTTP $chat_code"
+              echo "Response preview: ${chat_body:0:300}"
+              echo "canary_status=failed_chat_auth_gate" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
+            sleep_seconds=$((chat_attempt * 10))
+            echo "⚠ /api/chat probe returned HTTP $chat_code on attempt ${chat_attempt}/${chat_max_attempts}. Retrying in ${sleep_seconds}s..."
+            sleep "$sleep_seconds"
+            chat_attempt=$((chat_attempt + 1))
+          done
 
           echo "✅ HTTP canary passed: shared semantic surfaces and route-specific controls are healthy"
 

@@ -52,12 +52,15 @@ export const LongContent: Story = {
             lines
           </AlertDialogTitle>
           <AlertDialogDescription>
-            {Array.from({ length: 4 }, (_, i) => (
-              <span key={i}>
-                Additional context paragraph {i + 1}. Ensure narrow containers
-                still fit.
-              </span>
-            ))}
+            <span className='block'>
+              The release will be removed from Jovie.
+            </span>
+            <span className='mt-2 block'>
+              Existing public links will stop working.
+            </span>
+            <span className='mt-2 block'>
+              Analytics history will remain available.
+            </span>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -68,4 +71,25 @@ export const LongContent: Story = {
     </AlertDialog>
   ),
   parameters: { viewport: { defaultViewport: 'mobile1' } },
+};
+
+export const Destructive: Story = {
+  render: () => (
+    <AlertDialog defaultOpen>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Remove collaborator?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Maya will immediately lose access to this workspace.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Keep access</AlertDialogCancel>
+          <AlertDialogAction variant='destructive'>
+            Remove access
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  ),
 };

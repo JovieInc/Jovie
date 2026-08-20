@@ -1,8 +1,30 @@
 import { and, eq, gte } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { getDeepErrorMessage, unwrapPgError } from '@/lib/db/errors';
 import { tourDates } from '@/lib/db/schema/tour';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { mapTourDateToViewModel } from '@/lib/tour-dates/view-model';
+
+/**
+ * True when Postgres reports the tour-dates trust-gate column
+ * (`confirmation_status`, migration 0042) is missing — code shipped ahead of
+ * the prod migration (migration-drift class, JOV-4857). Drizzle surfaces
+ * these as "Failed query: ..." with the underlying PG error (42703
+ * undefined_column) on `.cause`.
+ */
+export function isMissingTourDatesConfirmationStatusError(
+  error: unknown
+): boolean {
+  const message = getDeepErrorMessage(error).toLowerCase();
+  if (
+    !message.includes('does not exist') &&
+    unwrapPgError(error).code !== '42703'
+  ) {
+    return false;
+  }
+
+  return message.includes('confirmation_status');
+}
 
 /**
  * Public-facing query: only confirmed tour events (eventType='tour' AND

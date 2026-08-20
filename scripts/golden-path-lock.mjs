@@ -9,6 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import process from 'node:process';
+import { createGoldenPathLinearIssue } from './lib/golden-path-intake.mjs';
 import {
   buildAutofixPrompt,
   buildMergeGateReceipt,
@@ -203,6 +204,10 @@ async function runProdProbe(args) {
   let chatStatus;
   let chatBody = '';
   let waitlistStatus;
+  let claimStatus;
+  let billingStatus;
+  let billingBody;
+  let stripeWebhookStatus;
 
   try {
     const homepage = await fetch(origin, { headers, redirect: 'follow' });
@@ -244,11 +249,59 @@ async function runProdProbe(args) {
     );
   }
 
+  try {
+    const claim = await fetch(`${origin}/api/onboarding/claim`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    claimStatus = claim.status;
+  } catch (error) {
+    claimStatus = 0;
+    console.error(
+      `claim fetch failed: ${error instanceof Error ? error.message : error}`
+    );
+  }
+
+  try {
+    const billing = await fetch(`${origin}/api/billing/health`, {
+      headers,
+      redirect: 'follow',
+    });
+    billingStatus = billing.status;
+    const parsed = await fetchJsonSafe(billing);
+    billingBody = parsed.json ?? parsed.text;
+  } catch (error) {
+    billingStatus = 0;
+    billingBody = error instanceof Error ? error.message : String(error);
+    console.error(
+      `billing health fetch failed: ${error instanceof Error ? error.message : error}`
+    );
+  }
+
+  try {
+    const webhook = await fetch(`${origin}/api/stripe/webhooks`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    stripeWebhookStatus = webhook.status;
+  } catch (error) {
+    stripeWebhookStatus = 0;
+    console.error(
+      `stripe webhook fetch failed: ${error instanceof Error ? error.message : error}`
+    );
+  }
+
   const evaluated = evaluateProdProbe({
     homepageHtml,
     chatStatus,
     chatBody,
     waitlistStatus,
+    claimStatus,
+    billingStatus,
+    billingBody,
+    stripeWebhookStatus,
   });
   const receipt = buildProdProbeReceipt({
     ok: evaluated.ok,
@@ -276,81 +329,6 @@ async function cursorRequest(apiKey, url, init = {}) {
     status: response.status,
     body: parsed.json ?? parsed.text,
   };
-}
-
-async function createGithubIssue({ fingerprint, prompt }) {
-  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
-  const repository = process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
-  if (!token) {
-    return { ok: false, reason: 'missing_github_token' };
-  }
-  const response = await fetch(
-    `https://api.github.com/repos/${repository}/issues`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-      },
-      body: JSON.stringify({
-        title: `[golden-path-lock] prod break: ${fingerprint}`,
-        body: prompt,
-        labels: ['p0', 'golden-path-lock'],
-      }),
-    }
-  );
-  const parsed = await fetchJsonSafe(response);
-  if (!response.ok) {
-    return {
-      ok: false,
-      reason: `github_issue_${response.status}`,
-      body: parsed.json ?? parsed.text,
-    };
-  }
-  return { ok: true, url: parsed.json?.html_url ?? null };
-}
-
-async function createLinearIssue({ fingerprint, prompt }) {
-  const apiKey = process.env.LINEAR_API_KEY;
-  if (!apiKey) {
-    return { ok: false, reason: 'missing_linear_api_key' };
-  }
-  const response = await fetch('https://api.linear.app/graphql', {
-    method: 'POST',
-    headers: {
-      Authorization: apiKey,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      query: `
-        mutation CreateGoldenPathLockIssue($title: String!, $description: String!) {
-          issueCreate(input: {
-            teamId: "bdc09edc-f91c-4a06-b308-74b4fcf093f8"
-            title: $title
-            description: $description
-            priority: 1
-          }) {
-            success
-            issue { id identifier url }
-          }
-        }
-      `,
-      variables: {
-        title: `P0: golden path broken in prod (${fingerprint})`,
-        description: `${prompt}\n\nGem missed this after the JOV-5085 lock was on.`,
-      },
-    }),
-  });
-  const parsed = await fetchJsonSafe(response);
-  if (!response.ok || !parsed.json?.data?.issueCreate?.success) {
-    return {
-      ok: false,
-      reason: 'linear_issue_failed',
-      body: parsed.json ?? parsed.text,
-    };
-  }
-  return { ok: true, url: parsed.json.data.issueCreate.issue?.url ?? null };
 }
 
 async function runAutofix(args) {
@@ -413,14 +391,16 @@ async function runAutofix(args) {
     origin: receipt.origin,
     receipt,
   });
-  const github = await createGithubIssue({
+  const linear = await createGoldenPathLinearIssue({
     fingerprint: receipt.fingerprint,
     prompt,
   });
-  const linear = await createLinearIssue({
-    fingerprint: receipt.fingerprint,
-    prompt,
-  });
+  if (!linear.ok) {
+    fail(
+      `Linear intake failed closed: ${linear.reason}. No GitHub fallback or Cursor dispatch was attempted.`,
+      JSON.stringify(linear.body ?? null)
+    );
+  }
 
   if (plan.action === 'launch') {
     const launched = await cursorRequest(apiKey, CURSOR_AGENTS_URL, {
@@ -440,13 +420,6 @@ async function runAutofix(args) {
     console.error(
       `Deduped Cursor-direct autofix fingerprint=${receipt.fingerprint} agents=${plan.existingAgentIds.join(',')}`
     );
-  }
-
-  if (!github.ok) {
-    console.error(`GitHub paper trail failed: ${github.reason}`);
-  }
-  if (!linear.ok) {
-    console.error(`Linear paper trail failed: ${linear.reason}`);
   }
 
   fail(

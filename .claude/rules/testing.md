@@ -21,6 +21,8 @@ Before adding a new test, check the heatmap to see which surface needs it most:
 - E2E tests: Playwright
 - Focus on user behavior, not implementation details
 
+Adversarial and product QA belong in Vitest, Playwright, and gated CI — not in GStack prompt checklists. Husky `.husky/pre-commit` is the JOV-3210 ladder (conflict markers, secrets, proxy, lint). Do not add Vitest or Playwright suites to pre-commit.
+
 ## New Test File Convention
 
 Co-locate with source: `{name}.test.ts` or `{name}.test.tsx` (not `__tests__/` directories unless shared fixtures are needed).

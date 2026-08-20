@@ -152,4 +152,22 @@ describe('UnifiedTable keyboard interaction', () => {
       Math.ceil(TABLE_EMPTY_STATE_MIN_HEIGHT_PX / rowHeight)
     );
   });
+
+  it('uses the canonical spinner while the next page is loading', () => {
+    render(
+      <UnifiedTable
+        data={data}
+        columns={columns}
+        hideHeader
+        enableVirtualization={false}
+        getRowId={row => row.id}
+        onLoadMore={vi.fn()}
+        isFetchingNextPage
+      />
+    );
+
+    const spinner = screen.getByRole('status', { name: 'Loading More' });
+    expect(spinner).toHaveAttribute('data-size', 'sm');
+    expect(spinner).toHaveAttribute('data-tone', 'muted');
+  });
 });

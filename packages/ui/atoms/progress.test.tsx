@@ -12,6 +12,7 @@ describe('ProgressBar', () => {
 
     const bar = screen.getByRole('progressbar');
     expect(bar).toHaveAttribute('aria-valuenow', '42');
+    expect(bar).toHaveAttribute('aria-valuetext', '42%');
     expect(bar).toHaveAttribute('aria-valuemin', '0');
     expect(bar).toHaveAttribute('aria-valuemax', '100');
   });
@@ -24,6 +25,8 @@ describe('ProgressBar', () => {
     expect(
       bar.querySelector('[data-state="indeterminate"]')
     ).toBeInTheDocument();
+    expect(bar).toHaveAttribute('data-state', 'indeterminate');
+    expect(bar).toHaveAttribute('data-part', 'track');
   });
 
   it('supports custom label slot via children', () => {
@@ -34,5 +37,48 @@ describe('ProgressBar', () => {
     );
 
     expect(screen.getByText('3 of 30 files')).toBeInTheDocument();
+  });
+
+  it('keeps aria values in the supplied range while displaying percent', () => {
+    render(<ProgressBar min={50} max={150} value={100} showValue />);
+
+    const bar = screen.getByRole('progressbar');
+    expect(bar).toHaveAttribute('aria-valuemin', '50');
+    expect(bar).toHaveAttribute('aria-valuemax', '150');
+    expect(bar).toHaveAttribute('aria-valuenow', '100');
+    expect(bar).toHaveAttribute('aria-valuetext', '50%');
+    expect(screen.getByText('50%')).toBeInTheDocument();
+    expect(bar.querySelector('[data-part="indicator"]')).toHaveStyle({
+      width: '50%',
+    });
+  });
+
+  it('clamps out-of-range values for visual and accessible parity', () => {
+    render(<ProgressBar value={140} />);
+
+    const bar = screen.getByRole('progressbar');
+    expect(bar).toHaveAttribute('aria-valuenow', '100');
+    expect(bar).toHaveAttribute('aria-valuetext', '100%');
+    expect(bar.querySelector('[data-part="indicator"]')).toHaveStyle({
+      width: '100%',
+    });
+  });
+
+  it('preserves fractional aria values while rounding display text', () => {
+    render(<ProgressBar value={42.5} showValue />);
+
+    const bar = screen.getByRole('progressbar');
+    expect(bar).toHaveAttribute('aria-valuenow', '42.5');
+    expect(bar).toHaveAttribute('aria-valuetext', '43%');
+    expect(screen.getByText('43%')).toBeInTheDocument();
+  });
+
+  it('falls back to indeterminate semantics for invalid values or ranges', () => {
+    render(<ProgressBar value={Number.NaN} min={10} max={10} />);
+
+    const bar = screen.getByRole('progressbar');
+    expect(bar).toHaveAttribute('data-state', 'indeterminate');
+    expect(bar).not.toHaveAttribute('aria-valuenow');
+    expect(bar).not.toHaveAttribute('aria-valuetext');
   });
 });

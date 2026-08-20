@@ -18,6 +18,9 @@ private struct AppContentView: View {
   @State private var isLoadingCalendar = false
   @State private var isLoadingInbox = false
   @State private var showWhatsNew = false
+#if DEBUG
+  @State private var didSendLiveChatProbe = false
+#endif
   @AppStorage("jovie.whatsNew.lastPresentedVersion") private var lastPresentedWhatsNewVersion: String?
 
   init(
@@ -41,6 +44,19 @@ private struct AppContentView: View {
     )
   }
 
+#if DEBUG
+  private func liveChatSendPrompt() -> String? {
+    if let value = ProcessInfo.processInfo.environment["JOVIE_IOS_LIVE_CHAT_PROMPT"] {
+      let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+      if !trimmed.isEmpty {
+        return trimmed
+      }
+    }
+
+    return nil
+  }
+#endif
+
   private static func previewAudienceHighlightsState(
     for launchMode: LaunchMode
   ) -> AudienceHighlightsLoadState {
@@ -49,6 +65,7 @@ private struct AppContentView: View {
          .uiTestingReady,
          .uiTestingChat,
          .uiTestingChatEntityFixture,
+         .uiTestingChatAllComponents,
          .uiTestingSettings,
          .uiTestingVenueMode,
          .uiTestingLibrary,
@@ -89,6 +106,7 @@ private struct AppContentView: View {
           isOffline: false,
           initialTab: .profile,
           opensSettingsOnLaunch: appState.launchMode.opensSettingsOnLaunch,
+          webBaseURL: appState.configuration.webBaseURL,
           accountURL: appState.accountURL,
           billingURL: appState.billingURL,
           chatEnabled: false,
@@ -139,13 +157,13 @@ private struct AppContentView: View {
           )
         } audienceContent: { _ in
           EmptyView()
-        } libraryContent: { _ in
+        } libraryContent: { _, _ in
           EmptyView()
         } calendarContent: { _ in
           EmptyView()
         } inboxContent: { _ in
           EmptyView()
-        } chatContent: { draft, voiceCaptureTrigger, _ in
+        } chatContent: { draft, voiceCaptureTrigger, _, _ in
           if let chatRepository {
             MobileChatView(
               repository: chatRepository,
@@ -158,6 +176,9 @@ private struct AppContentView: View {
           }
         }
         .transition(.opacity)
+      case .waitlistPending:
+        WaitlistPendingView(onUseDifferentAccount: onLogout)
+          .transition(.opacity)
       case .ready:
         AppShellView(
           profile: AppShellProfile(response: appState.loadedDashboardResponse),
@@ -166,6 +187,7 @@ private struct AppContentView: View {
             ? .audience
             : (appState.launchMode.opensChatOnLaunch ? .chat : appState.launchMode.defaultInitialTab),
           opensSettingsOnLaunch: appState.launchMode.opensSettingsOnLaunch,
+          webBaseURL: appState.configuration.webBaseURL,
           accountURL: appState.accountURL,
           billingURL: appState.billingURL,
           chatEnabled: appState.loadedDashboardResponse != nil,
@@ -201,9 +223,10 @@ private struct AppContentView: View {
             onRetry: { await reloadAudienceHighlights(for: appState.activeUserID) },
             onAskJovie: askJovie
           )
-        } libraryContent: { onSelectAsset in
+        } libraryContent: { onSelectAsset, home in
           LibrarySurfaceView(
             assets: Self.previewLibraryAssets(for: appState.launchMode),
+            home: home,
             onSelectAsset: onSelectAsset
           )
         } calendarContent: { askJovie in
@@ -222,14 +245,15 @@ private struct AppContentView: View {
             onRetry: { await reloadActionLoops(for: appState.activeUserID) },
             onAskJovie: askJovie
           )
-        } chatContent: { draft, voiceCaptureTrigger, onEntityTap in
+        } chatContent: { draft, voiceCaptureTrigger, onEntityTap, onRecordVideo in
           if let chatRepository {
             MobileChatView(
               repository: chatRepository,
               draft: draft,
               voiceCaptureTrigger: voiceCaptureTrigger,
               webBaseURL: appState.configuration.webBaseURL,
-              onEntityTap: onEntityTap
+              onEntityTap: onEntityTap,
+              onRecordVideo: onRecordVideo
             )
           } else {
             MobileChatPlaceholderView(isOffline: appState.isOffline, draft: draft)
@@ -243,15 +267,18 @@ private struct AppContentView: View {
     // no layout shift and no decorative spatial motion.
     .animation(JovieMotion.easeOut(duration: JovieMotion.slowDuration), value: appState.route)
     .sheet(isPresented: $showWhatsNew, onDismiss: markWhatsNewPresented) {
-      JovieWhatsNewView(version: currentAppVersion)
+      JovieWhatsNewView(
+        version: currentAppVersion,
+        items: WhatsNewCatalog.items(for: currentAppVersion)
+      )
     }
     .task(id: "\(appState.route)-\(appState.launchMode)-\(appState.activeUserID ?? "")") {
       guard appState.route == .ready else { return }
-      showWhatsNew = WhatsNewPresentationPolicy.shouldPresent(
-        currentVersion: currentAppVersion,
-        lastPresentedVersion: lastPresentedWhatsNewVersion,
-        isEligible: appState.activeUserID != nil
-      )
+      // Live What’s New is FeatureIntro in chat. The versioned sheet is the
+      // UITest fixture so chat-first cases can name what to tap.
+      if appState.launchMode == .uiTestingWhatsNew {
+        showWhatsNew = true
+      }
       await reloadAudienceHighlights(for: appState.activeUserID)
       await reloadActionLoops(for: appState.activeUserID)
     }
@@ -285,17 +312,30 @@ private struct AppContentView: View {
         chatRepository = repository
 
         if let fixtureTimeline = appState.launchMode.chatEntityFixture {
-          // Deterministic UI-testing fixture (JOV-3608): bypasses the network
-          // client/cache entirely so entity/skill chip rendering can be
-          // asserted without a mocked backend.
+          // Deterministic UI-testing fixture: bypasses the network
+          // client/cache entirely so parse→render can be asserted without a
+          // mocked backend.
           repository.seedTimelineForUITesting(
             fixtureTimeline,
-            activeConversationID: MobileChatEntityFixture.conversationID
+            activeConversationID: appState.launchMode.chatFixtureConversationID
+              ?? MobileChatEntityFixture.conversationID
           )
         } else {
           Task { await repository.bootstrap() }
         }
       }
+
+#if DEBUG
+      if appState.launchMode.usesLiveAuth,
+         appState.route == .ready,
+         didSendLiveChatProbe == false,
+         let prompt = liveChatSendPrompt(),
+         let repository = chatRepository
+      {
+        didSendLiveChatProbe = true
+        Task { await repository.send(text: prompt) }
+      }
+#endif
     }
     .task(id: chatRepository?.sessionExpired) {
       guard chatRepository?.sessionExpired == true else { return }
@@ -326,6 +366,7 @@ private struct AppContentView: View {
          .uiTestingChat,
          .uiTestingChatOffline,
          .uiTestingChatEntityFixture,
+         .uiTestingChatAllComponents,
          .uiTestingSettings,
          .uiTestingVenueMode,
          .uiTestingAuthCallback,
@@ -409,6 +450,7 @@ private struct AppContentView: View {
       || appState.launchMode == .uiTestingChat
       || appState.launchMode == .uiTestingAuthCallback
       || appState.launchMode == .uiTestingChatEntityFixture
+      || appState.launchMode == .uiTestingChatAllComponents
       || appState.launchMode == .uiTestingSettings
       || appState.launchMode == .uiTestingVenueMode
     {
@@ -444,6 +486,68 @@ private struct AppContentView: View {
       }
       audienceHighlightsState = .error("Couldn't load audience highlights.")
     }
+  }
+}
+
+private struct WaitlistPendingView: View {
+  let onUseDifferentAccount: @MainActor () async -> Void
+  @State private var isSwitchingAccount = false
+
+  var body: some View {
+    ZStack {
+      JovieColor.backgroundBase.ignoresSafeArea()
+
+      GeometryReader { proxy in
+        ScrollView {
+          VStack(alignment: .leading, spacing: JovieSpacing.large) {
+            VStack(alignment: .leading, spacing: JovieSpacing.small) {
+              Text("You're on the Waitlist")
+                .font(.title.bold())
+                .foregroundStyle(JovieColor.textPrimary)
+                .accessibilityAddTraits(.isHeader)
+
+              Text("This account doesn't have access yet. You can use a different account instead.")
+                .font(.body)
+                .foregroundStyle(JovieColor.textSecondary)
+            }
+
+            Button {
+              guard !isSwitchingAccount else { return }
+              isSwitchingAccount = true
+              Task { await onUseDifferentAccount() }
+            } label: {
+              ZStack {
+                Text(WaitlistPendingLayout.actionTitle(isSwitchingAccount: false))
+                  .opacity(isSwitchingAccount ? 0 : 1)
+                  .accessibilityHidden(isSwitchingAccount)
+
+                HStack(spacing: JovieSpacing.small) {
+                  ProgressView()
+                    .tint(JovieColor.backgroundBase)
+                  Text(WaitlistPendingLayout.actionTitle(isSwitchingAccount: true))
+                }
+                .opacity(isSwitchingAccount ? 1 : 0)
+                .accessibilityHidden(!isSwitchingAccount)
+              }
+              .frame(maxWidth: .infinity)
+              .frame(minHeight: WaitlistPendingLayout.reservedActionMinHeight)
+            }
+            .buttonStyle(JoviePillButtonStyle(filled: true))
+            .disabled(isSwitchingAccount)
+            .accessibilityIdentifier("waitlist-use-different-account")
+          }
+          .frame(maxWidth: WaitlistPendingLayout.maxContentWidth, alignment: .leading)
+          .padding(JovieSpacing.xLarge)
+          .frame(
+            maxWidth: .infinity,
+            minHeight: WaitlistPendingLayout.contentMinHeight(viewportHeight: proxy.size.height),
+            alignment: .center
+          )
+        }
+        .scrollBounceBehavior(.basedOnSize)
+      }
+    }
+    .accessibilityIdentifier("waitlist-pending")
   }
 }
 
@@ -610,8 +714,53 @@ struct WhatsNewPresentationPolicy {
   }
 }
 
-private struct JovieWhatsNewView: View {
+struct WhatsNewItem: Equatable, Identifiable {
+  let id: String
+  let title: String
+  let testHint: String
+}
+
+enum WhatsNewCatalog {
+  static func items(for version: String) -> [WhatsNewItem] {
+    switch version {
+    case "1.0":
+      return [
+        WhatsNewItem(
+          id: "chat-home",
+          title: "Chat is home",
+          testHint: "Open a signed-in session and confirm Ask Jovie is the first ready surface."
+        ),
+        WhatsNewItem(
+          id: "swipe-shell",
+          title: "Swipe sidebar and right rail",
+          testHint: "Swipe from the leading edge to open the sidebar and from the trailing edge to open the right rail. Confirm there is no bottom tab bar."
+        ),
+        WhatsNewItem(
+          id: "sidebar-destinations",
+          title: "Library, Calendar, and Inbox live in the sidebar",
+          testHint: "Open the sidebar and tap Library, Calendar, Inbox, Profile, Audience, and Talk. None of these should be bottom tabs."
+        ),
+        WhatsNewItem(
+          id: "chat-quality",
+          title: "Chat renders labels, not markup",
+          testHint: "Open a chat transcript and confirm entity/skill chips and tool cards show labels, not raw @kind:, /skill:, or <tool_call>."
+        ),
+      ]
+    default:
+      return [
+        WhatsNewItem(
+          id: "review-version",
+          title: "Review version \(version)",
+          testHint: "Open What’s New for \(version) and walk each listed change on a signed-in chat session."
+        ),
+      ]
+    }
+  }
+}
+
+struct JovieWhatsNewView: View {
   let version: String
+  let items: [WhatsNewItem]
   @Environment(\.dismiss) private var dismiss
 
   var body: some View {
@@ -633,11 +782,19 @@ private struct JovieWhatsNewView: View {
       }
 
       VStack(alignment: .leading, spacing: JovieSpacing.medium) {
-        Label("This update is shown once for this app version.", systemImage: "checkmark.circle")
-        Label("Dismiss it anytime with Done.", systemImage: "hand.tap")
+        ForEach(items) { item in
+          VStack(alignment: .leading, spacing: JovieSpacing.xSmall) {
+            Text(item.title)
+              .font(JovieFont.body(size: 16, weight: .semibold))
+              .foregroundStyle(JovieColor.textPrimary)
+            Text(item.testHint)
+              .font(JovieFont.body(size: 15))
+              .foregroundStyle(JovieColor.textSecondary)
+          }
+          .accessibilityElement(children: .combine)
+          .accessibilityIdentifier("whats-new-item-\(item.id)")
+        }
       }
-      .font(JovieFont.body(size: 16))
-      .foregroundStyle(JovieColor.textSecondary)
 
       Spacer(minLength: 0)
 
@@ -650,7 +807,7 @@ private struct JovieWhatsNewView: View {
     .padding(JovieSpacing.large)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .background(JovieColor.backgroundBase)
-    .presentationDetents([.medium])
+    .presentationDetents([.medium, .large])
     .presentationDragIndicator(.visible)
     .accessibilityElement(children: .contain)
     .accessibilityLabel("What’s New, version \(version)")

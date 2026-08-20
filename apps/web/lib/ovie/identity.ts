@@ -1,0 +1,142 @@
+/**
+ * Eve identity pack selection (JOV-5216).
+ *
+ * Identity is an explicit pack, not a chatMode prompt flag. executeChatTurn
+ * remains the generation fallback. Chat and Eve entries must go through
+ * bindEveIdentityForTurn so capability flags are enforced at runtime.
+ */
+
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+export type EveIdentityId = 'jovie' | 'ovie';
+
+export type EveCapability =
+  | 'privileged-gbrain-write'
+  | 'symphony-heal'
+  | 'gbrain-read'
+  | 'ingest-ack';
+
+export type EveIdentityPack = {
+  readonly id: EveIdentityId;
+  readonly role: 'artist' | 'founder';
+  readonly canPrivilegedWriteGbrain: boolean;
+  readonly canHealSymphony: boolean;
+  readonly canIngestAck: boolean;
+  readonly canReadGbrain: boolean;
+  readonly allowsLybHealthMemory: boolean;
+};
+
+export class EveCapabilityDeniedError extends Error {
+  constructor(
+    readonly identityId: EveIdentityId,
+    readonly capability: EveCapability
+  ) {
+    super(`${identityId} denied ${capability}`);
+    this.name = 'EveCapabilityDeniedError';
+  }
+}
+
+const JOVIE_PACK: EveIdentityPack = {
+  id: 'jovie',
+  role: 'artist',
+  canPrivilegedWriteGbrain: false,
+  canHealSymphony: false,
+  canIngestAck: false,
+  canReadGbrain: false,
+  allowsLybHealthMemory: false,
+};
+
+const OVIE_PACK: EveIdentityPack = {
+  id: 'ovie',
+  role: 'founder',
+  canPrivilegedWriteGbrain: false,
+  canHealSymphony: false,
+  canIngestAck: true,
+  canReadGbrain: true,
+  allowsLybHealthMemory: false,
+};
+
+export function selectEveIdentity(id: EveIdentityId): EveIdentityPack {
+  return id === 'ovie' ? OVIE_PACK : JOVIE_PACK;
+}
+
+/** Map the existing OV chat surface onto the Ovie pack. */
+export function eveIdentityForChatMode(
+  chatMode: 'ov' | null | undefined
+): EveIdentityPack {
+  return selectEveIdentity(chatMode === 'ov' ? 'ovie' : 'jovie');
+}
+
+/** ChatGPT / private founder MCP is always the Ovie pack. */
+export function eveIdentityForMcpDoor(): EveIdentityPack {
+  return selectEveIdentity('ovie');
+}
+
+export function authorizeEveCapability(
+  pack: EveIdentityPack,
+  capability: EveCapability
+): { allowed: boolean } {
+  switch (capability) {
+    case 'privileged-gbrain-write':
+      return { allowed: pack.canPrivilegedWriteGbrain };
+    case 'symphony-heal':
+      return { allowed: pack.canHealSymphony };
+    case 'gbrain-read':
+      return { allowed: pack.canReadGbrain };
+    case 'ingest-ack':
+      return { allowed: pack.canIngestAck };
+  }
+}
+
+function readIdentityInstructions(id: EveIdentityId): string {
+  const candidates = [
+    resolve(process.cwd(), '../eve-pilot/identities', id, 'instructions.md'),
+    resolve(process.cwd(), 'apps/eve-pilot/identities', id, 'instructions.md'),
+  ];
+  for (const path of candidates) {
+    if (existsSync(path)) {
+      return readFileSync(path, 'utf8');
+    }
+  }
+  return '';
+}
+
+export type EveBoundTurn = {
+  readonly pack: EveIdentityPack;
+  readonly instructions: string;
+  require(capability: EveCapability): void;
+};
+
+/**
+ * Chat/Eve entry. Capability checks go through `require` so a pack that
+ * still grants privileged gbrain write or Symphony heal fails closed.
+ */
+export function bindEveIdentityForTurn(id: EveIdentityId): EveBoundTurn {
+  const pack = selectEveIdentity(id);
+  return {
+    pack,
+    instructions: readIdentityInstructions(id),
+    require(capability: EveCapability) {
+      if (!authorizeEveCapability(pack, capability).allowed) {
+        throw new EveCapabilityDeniedError(pack.id, capability);
+      }
+    },
+  };
+}
+
+export function bindEveIdentityForChatMode(
+  chatMode: 'ov' | null | undefined
+): EveBoundTurn {
+  return bindEveIdentityForTurn(chatMode === 'ov' ? 'ovie' : 'jovie');
+}
+
+/** Fail closed if this turn is armed with factory-only capabilities. */
+export function assertEveChatFactoryLock(turn: EveBoundTurn): void {
+  if (authorizeEveCapability(turn.pack, 'privileged-gbrain-write').allowed) {
+    throw new EveCapabilityDeniedError(turn.pack.id, 'privileged-gbrain-write');
+  }
+  if (authorizeEveCapability(turn.pack, 'symphony-heal').allowed) {
+    throw new EveCapabilityDeniedError(turn.pack.id, 'symphony-heal');
+  }
+}

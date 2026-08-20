@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
 
@@ -119,6 +119,15 @@ describe('ReleaseTaskPage', () => {
     expect(screen.getByText('Up next')).toBeVisible();
     expect(screen.getByText('Pitch playlist editors')).toBeVisible();
     expect(screen.queryByText('Completed setup')).not.toBeInTheDocument();
+
+    expect(screen.getByTestId('release-task-up-next-card')).toHaveClass(
+      'rounded-lg',
+      'border',
+      'border-(--app-shell-border)',
+      'bg-surface-1',
+      'p-1',
+      'shadow-app-control'
+    );
   });
 
   it('keeps metadata agent and task toggles wired through the shell frame', () => {
@@ -145,12 +154,91 @@ describe('ReleaseTaskPage', () => {
     });
   });
 
+  it('keeps Up next ordered by due date, excludes cancelled tasks, and limits the list', () => {
+    mockUseReleaseTasksQuery.mockReturnValue({
+      data: [
+        createTask({
+          id: 'task_no_due_date',
+          title: 'No due date',
+          dueDate: null,
+          position: 0,
+        }),
+        createTask({
+          id: 'task_later',
+          title: 'Later task',
+          dueDate: new Date('2026-06-04T00:00:00.000Z'),
+        }),
+        createTask({
+          id: 'task_first',
+          title: 'First task',
+          dueDate: new Date('2026-06-01T00:00:00.000Z'),
+        }),
+        createTask({
+          id: 'task_middle',
+          title: 'Middle task',
+          dueDate: new Date('2026-06-02T00:00:00.000Z'),
+        }),
+        createTask({
+          id: 'task_cancelled',
+          title: 'Cancelled task',
+          status: 'cancelled',
+          dueDate: new Date('2026-05-01T00:00:00.000Z'),
+        }),
+      ],
+    });
+
+    render(
+      <ReleaseTaskPage
+        profileId='profile_1'
+        releaseId='release_1'
+        releaseTitle='The Deep End'
+      />
+    );
+
+    expect(
+      within(screen.getByTestId('release-task-up-next-card'))
+        .getAllByRole('button')
+        .map(button => button.textContent)
+    ).toEqual(['First task', 'Middle task', 'Later task']);
+    expect(screen.queryByText('Cancelled task')).not.toBeInTheDocument();
+    expect(screen.queryByText('No due date')).not.toBeInTheDocument();
+  });
+
+  it('omits Up next once every release task is complete', () => {
+    mockUseReleaseTasksQuery.mockReturnValue({
+      data: [createTask({ status: 'done' })],
+    });
+
+    render(
+      <ReleaseTaskPage
+        profileId='profile_1'
+        releaseId='release_1'
+        releaseTitle='The Deep End'
+      />
+    );
+
+    expect(
+      screen.queryByTestId('release-task-up-next-card')
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('release-task-checklist')).toBeVisible();
+  });
+
   it('renders the route skeleton with the same shell geometry', () => {
     render(<ReleaseTaskPageSkeleton />);
 
     expect(screen.getByLabelText('Loading release tasks')).toHaveAttribute(
       'aria-busy',
       'true'
+    );
+    expect(
+      screen.getByTestId('release-task-skeleton-summary-card')
+    ).toHaveClass(
+      'rounded-lg',
+      'border',
+      'border-(--app-shell-border)',
+      'bg-surface-1',
+      'p-3',
+      'shadow-app-control'
     );
   });
 });

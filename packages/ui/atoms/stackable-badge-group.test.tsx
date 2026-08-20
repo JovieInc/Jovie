@@ -31,7 +31,9 @@ describe('StackableBadgeGroup', () => {
     const group = screen.getByRole('group');
     expect(group).toHaveClass('h-5');
     expect(group).toHaveClass('w-32');
-    expect(group).toHaveClass('overflow-hidden');
+    expect(group).toHaveClass('overflow-visible');
+    expect(group).toHaveAttribute('data-density', 'dense');
+    expect(group).toHaveAttribute('data-width', 'compact');
     expect(screen.getByText(ITEMS[0].label)).toHaveClass('truncate');
   });
 
@@ -63,9 +65,10 @@ describe('StackableBadgeGroup', () => {
   it('caps visible entries and discloses the exact overflow count', () => {
     render(<StackableBadgeGroup items={ITEMS} maxVisible={2} />);
 
-    expect(
-      screen.getByRole('button', { name: 'Show 2 more badges' })
-    ).toHaveTextContent('+2 more');
+    const trigger = screen.getByRole('button', { name: 'Show 2 more badges' });
+    expect(trigger).toHaveTextContent('+2 more');
+    expect(trigger.className).toContain('before:h-11');
+    expect(trigger.className).toContain('before:min-w-11');
   });
 
   it('does not render a disclosure when every item is visible', () => {
@@ -96,6 +99,45 @@ describe('StackableBadgeGroup', () => {
 
     expect(screen.getByTitle('Selected')).toHaveClass('ring-1');
     expect(screen.getByTitle('Disabled')).toHaveClass('opacity-50');
+    expect(screen.getByTitle('Selected')).toHaveAttribute(
+      'data-selected',
+      'true'
+    );
+    expect(screen.getByTitle('Disabled')).toHaveAttribute(
+      'data-disabled',
+      'true'
+    );
+  });
+
+  it('falls back to a useful group label when item labels are blank', () => {
+    render(<StackableBadgeGroup items={[{ id: 'blank', label: '   ' }]} />);
+    expect(screen.getByRole('group', { name: 'Badges' })).toBeInTheDocument();
+  });
+
+  it('exposes selected and disabled semantics in the disclosed list', async () => {
+    const user = userEvent.setup();
+    render(
+      <StackableBadgeGroup
+        items={[
+          { id: 'first', label: 'First' },
+          { id: 'selected', label: 'Selected', selected: true },
+          { id: 'disabled', label: 'Disabled', disabled: true },
+        ]}
+        maxVisible={1}
+      />
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Show 2 more badges' })
+    );
+    expect(screen.getByText('Selected').closest('li')).toHaveAttribute(
+      'aria-current',
+      'true'
+    );
+    expect(screen.getByText('Disabled').closest('li')).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 
   it('opens a keyboard-accessible full list through the overflow control', async () => {

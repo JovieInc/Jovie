@@ -1,10 +1,8 @@
-import { Button, Input } from '@jovie/ui';
+import { Badge, Button, Input, Label } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Badge } from '@/components/atoms/Badge';
 import { DotBadge } from '@/components/atoms/DotBadge';
 import { Icon } from '@/components/atoms/Icon';
-import { Label } from '@/components/atoms/Label';
 import { NavLink } from '@/components/atoms/NavLink';
 import { StatusBadge } from '@/components/atoms/StatusBadge';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
@@ -71,7 +69,9 @@ describe('Atoms Integration Tests', () => {
       const label = screen.getByText('Username');
       const input = screen.getByRole('textbox');
 
-      expect(label.className).toContain("after:content-['*']");
+      expect(label).toHaveAttribute('data-required', 'true');
+      expect(screen.getByText('*')).toHaveAttribute('aria-hidden', 'true');
+      expect(screen.getByText('(required)')).toHaveClass('sr-only');
       expect(input).toBeRequired();
     });
 
@@ -197,7 +197,7 @@ describe('Atoms Integration Tests', () => {
         <div className='flex items-center gap-2'>
           <span>John Doe</span>
           <VerifiedBadge size='sm' />
-          <Badge emphasis='subtle'>Pro</Badge>
+          <Badge tone='neutral'>Pro</Badge>
         </div>
       );
 
@@ -318,8 +318,8 @@ describe('Atoms Integration Tests', () => {
         </form>
       );
 
-      expect(screen.getByLabelText('Username')).toBeInTheDocument();
-      expect(screen.getByLabelText('Email')).toBeInTheDocument();
+      expect(screen.getByLabelText(/^Username.*required/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/^Email.*required/i)).toBeInTheDocument();
       expect(
         screen.getByRole('button', { name: /Submit/ })
       ).toBeInTheDocument();

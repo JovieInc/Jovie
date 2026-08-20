@@ -20,6 +20,11 @@ describe('OpportunityInboxEmptyState', () => {
 
     const emptyState = screen.getByTestId('opportunity-inbox-empty-state');
     expect(emptyState).toHaveClass('flex-1', 'items-center', 'justify-center');
+    expect(screen.getByText('Your Inbox Is Clear')).toHaveClass(
+      'text-2xl',
+      'font-semibold',
+      'tracking-tight'
+    );
     expect(
       screen.getByRole('link', { name: 'Connect catalog' })
     ).toHaveAttribute('href', '/app/profiles');

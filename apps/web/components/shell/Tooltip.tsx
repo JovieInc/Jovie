@@ -180,6 +180,8 @@ export function Tooltip({
       <TooltipRoot open={open} defaultOpen={defaultOpen}>
         <TooltipTrigger asChild>{triggerChild}</TooltipTrigger>
         <TooltipContent
+          data-slot='shell-tooltip-content'
+          contentVariant='rich'
           side={side}
           sideOffset={sideOffset}
           style={{ zIndex: 'var(--jovie-shell-overlay-z-index)' }}

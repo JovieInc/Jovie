@@ -311,6 +311,64 @@ def test_stuck_draft_autoclose_is_manual_and_hosted_only() -> None:
     )
 
 
+def test_merge_queue_ruleset_verify_is_scheduled_not_pr_ready() -> None:
+    """Live ruleset parity must run; it must not become a source PR gate."""
+    workflow = (WORKFLOWS / "merge-queue-ruleset-verify.yml").read_text(
+        encoding="utf-8"
+    )
+    trigger_block = workflow.split("\non:\n", 1)[1].split(
+        "\npermissions:", 1
+    )[0]
+    assert "schedule:" in trigger_block
+    assert "workflow_dispatch:" in trigger_block
+    assert "pull_request" not in trigger_block
+    assert "node scripts/ci-merge-queue-check.mjs verify" in workflow
+    assert "ci-harness/manifest.json" not in workflow
+
+
+def test_slop_gate_is_post_merge_informational() -> None:
+    """Copy smell stays off PR Ready; taste is post-ship."""
+    workflow = (WORKFLOWS / "slop-gate.yml").read_text(encoding="utf-8")
+    trigger_block = workflow.split("\non:\n", 1)[1].split(
+        "\npermissions:", 1
+    )[0]
+    assert "schedule:" in trigger_block
+    assert "workflow_dispatch:" in trigger_block
+    assert "pull_request" not in trigger_block
+    assert "ci-harness/manifest.json" in workflow
+    assert "continue-on-error: true" in workflow
+    assert "HEAD~1" not in workflow
+    assert "--before='7 days ago'" in workflow
+
+
+def test_agent_pipeline_retires_dead_qc_wires() -> None:
+    """Scope Judge, self-attested GStack comments, and denylist classifier stay gone."""
+    workflow = (WORKFLOWS / "agent-pipeline.yml").read_text(encoding="utf-8")
+    trigger_block = workflow.split("\non:\n", 1)[1].split(
+        "\npermissions:", 1
+    )[0]
+    assert '"Scope Judge"' not in trigger_block
+    assert 'workflows: ["CI"]' in trigger_block
+    assert "AGENT_RUN_SOURCE_RUN_ID" not in workflow
+    assert "check-agent-gate-evidence.ts" not in workflow
+    assert "gstack-gates" not in workflow
+    assert 'Scope judge (diff aligns with ticket intent)' not in workflow
+    assert "retries_exhausted" in workflow
+    assert "SLACK_WEBHOOK_URL" in _job_block("agent-pipeline.yml", "exhaust")
+    assert "LINEAR_API_KEY" in _job_block("agent-pipeline.yml", "exhaust")
+    stale = _job_block("agent-pipeline.yml", "stale-cleanup")
+    assert "SLACK_WEBHOOK_URL" in stale
+    assert "LINEAR_API_KEY" in stale
+    assert (
+        'test("^(codex|codegen-bot|linear|claude)/") or test("^[^/]+/jov-[0-9]+([_-].+)?$"; "i")'
+        in stale
+    )
+    assert "gh pr close" in stale
+    landing = (WORKFLOWS / "agent-landing-sweep.yml").read_text(encoding="utf-8")
+    assert "scope-judge" not in landing
+    assert "Scope Judge" not in landing.split("\njobs:", 1)[1]
+
+
 def test_node_only_agent_jobs_do_not_write_to_system_corepack_dir() -> None:
     """Node scripts must not call corepack enable on locked-down runners."""
     for workflow_name in (
@@ -712,23 +770,21 @@ def test_scheduled_synthetic_alerts_before_preserving_failure() -> None:
     )
 
 
-def test_github_ai_orchestrator_always_finalizes_exact_owned_claim() -> None:
-    """Every claimed run must release for retry or transition its PR to review."""
-    block = _job_block("github-ai-orchestrator.yml", "finalize_claim")
-    claim = _job_block("github-ai-orchestrator.yml", "claim_issue")
-
-    assert "needs: [guard, claim_issue, implement_and_open_pr]" in block
-    assert "if: ${{ always() && needs.guard.outputs.should_run == 'true' }}" in block
-    assert "IMPLEMENT_RESULT: ${{ needs.implement_and_open_pr.result }}" in block
-    assert 'OUTCOME="retryable"' in block
-    assert 'OUTCOME="in-review"' in block
-    assert "github-finalize-issue-claim.mjs" in block
-    owner_token = (
-        "github-ai:${{ github.repository }}:${{ github.run_id }}:"
-        "${{ github.run_attempt }}"
+def test_github_ai_orchestrator_is_manual_only_and_hard_disabled() -> None:
+    """A workflow-state flip must not restore GitHub Issue intake."""
+    workflow = (WORKFLOWS / "github-ai-orchestrator.yml").read_text(
+        encoding="utf-8"
     )
-    assert owner_token in block
-    assert owner_token in claim
+    triggers = workflow.split("\njobs:", 1)[0]
+
+    assert "workflow_dispatch:" in triggers
+    assert "issues:" not in triggers
+    for job in ("guard", "claim_issue", "implement_and_open_pr", "finalize_claim"):
+        job_block = _job_block("github-ai-orchestrator.yml", job)
+        assert (
+            "if: ${{ github.event_name == '__retired_linear_only__' }}"
+            in job_block
+        )
 
 
 def test_live_model_work_never_fans_out_from_pull_requests() -> None:
@@ -809,6 +865,53 @@ def test_cost_monitoring_docs_match_activation_gated_observer() -> None:
     assert "vercel rollback" not in workflow
     assert "Cost Anomaly Gate" in audit
     assert "Keep activation-gated" in audit
+
+
+def test_cost_anomaly_alerts_on_ratio_or_absolute_floor(tmp_path: Path) -> None:
+    """Either standing threshold must independently open an incident."""
+    step = _step_block("cost-anomaly-gate.yml", "Evaluate anomaly")
+    script = textwrap.dedent(step.split("        run: |\n", 1)[1])
+    script = script.replace(
+        'CURRENT="${{ steps.current.outputs.count }}"',
+        'CURRENT="$TEST_CURRENT"',
+    ).replace(
+        'BASELINE="${{ steps.baseline.outputs.average }}"',
+        'BASELINE="$TEST_BASELINE"',
+    )
+
+    cases = (
+        # Regression: 695 is above 5 * 134, despite staying below the floor.
+        ("695", "134", "1000", "anomaly", "518% of baseline"),
+        # The floor remains independent when the ratio threshold is higher.
+        ("1100", "500", "1000", "anomaly", "absolute floor 1000 exceeded"),
+        ("600", "134", "1000", "normal", "Within normal range"),
+        ("1001", "0", "1000", "anomaly", "absolute floor 1000 exceeded"),
+    )
+    for index, (current, baseline, floor, status, reason) in enumerate(cases):
+        output = tmp_path / f"github-output-{index}"
+        env = os.environ.copy()
+        env.update(
+            {
+                "TEST_CURRENT": current,
+                "TEST_BASELINE": baseline,
+                "THRESHOLD_MULTIPLIER": "5",
+                "ABSOLUTE_FLOOR": floor,
+                "LOOKBACK_MINUTES": "60",
+                "GITHUB_OUTPUT": str(output),
+            }
+        )
+        result = subprocess.run(
+            ["bash", "-euo", "pipefail", "-c", script],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        assert result.returncode == 0, result.stderr
+        outputs = output.read_text(encoding="utf-8")
+        assert f"status={status}" in outputs
+        assert reason in outputs
 
 
 def test_auto_pr_compares_trigger_branch_without_executing_its_checkout() -> None:
@@ -959,17 +1062,16 @@ def test_fleet_controllers_share_one_evaluate_action() -> None:
     assert "expected-sha: ${{ github.event.workflow_run.head_sha }}" in production
 
 
-def test_github_ai_dispatcher_wakes_on_capacity_and_uses_idle_slots() -> None:
-    """Agent-ready work must not sit while org runner concurrency is idle."""
+def test_github_ai_dispatcher_is_manual_only_and_hard_disabled() -> None:
+    """GitHub Issues cannot select work even if the workflow is re-enabled."""
     workflow = (WORKFLOWS / "github-ai-dispatcher.yml").read_text(encoding="utf-8")
     block = _job_block("github-ai-dispatcher.yml", "dispatch")
+    triggers = workflow.split("\njobs:", 1)[0]
 
-    assert "workflow_run:" in workflow
-    assert "pull_request:" in workflow
-    assert "issues:" in workflow
-    assert "github.event.workflow_run.conclusion != 'cancelled'" in block
-    assert "github.event.label.name == 'agent-ready'" in block
-    assert "MAX_OPEN_AGENT_PRS: '24'" in block
-    assert "MAX_DISPATCH: ${{ inputs.max_dispatch || '8' }}" in block
-    assert "MAX_OPEN_AGENT_PRS: '5'" not in block
-    assert "schedule:" not in workflow.split("\njobs:", 1)[0]
+    assert "workflow_dispatch:" in triggers
+    assert "workflow_run:" not in triggers
+    assert "pull_request:" not in triggers
+    assert "issues:" not in triggers
+    assert (
+        "if: ${{ github.event_name == '__retired_linear_only__' }}" in block
+    )

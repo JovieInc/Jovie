@@ -12,30 +12,10 @@ export interface InputGroupProps extends React.ComponentPropsWithoutRef<'div'> {
 }
 
 const sizeClasses = {
-  sm: {
-    iconLeft: 'left-2',
-    iconRight: 'right-2',
-    iconSize: 'size-4',
-    // When icon is first child, add left padding to following input
-    inputPaddingLeft: '[&>[data-slot=icon]:first-child~input]:pl-8',
-    // When input has following icon sibling, add right padding
-    inputPaddingRight: '[&:has(>input~[data-slot=icon])>input]:pr-8',
-  },
-  md: {
-    iconLeft: 'left-3',
-    iconRight: 'right-3',
-    iconSize: 'size-3.5',
-    inputPaddingLeft: '[&>[data-slot=icon]:first-child~input]:pl-9',
-    inputPaddingRight: '[&:has(>input~[data-slot=icon])>input]:pr-9',
-  },
-  lg: {
-    iconLeft: 'left-3.5',
-    iconRight: 'right-3.5',
-    iconSize: 'size-5',
-    inputPaddingLeft: '[&>[data-slot=icon]:first-child~input]:pl-12',
-    inputPaddingRight: '[&:has(>input~[data-slot=icon])>input]:pr-12',
-  },
-};
+  sm: '[&>[data-slot=icon]]:size-4 [&>[data-slot=icon]:first-child]:left-2 [&>input~[data-slot=icon]]:right-2 [&>[data-slot=icon]:first-child~input]:pl-8 [&:has(>input~[data-slot=icon])>input]:pr-8',
+  md: '[&>[data-slot=icon]]:size-3.5 [&>[data-slot=icon]:first-child]:left-3 [&>input~[data-slot=icon]]:right-3 [&>[data-slot=icon]:first-child~input]:pl-9 [&:has(>input~[data-slot=icon])>input]:pr-9',
+  lg: '[&>[data-slot=icon]]:size-5 [&>[data-slot=icon]:first-child]:left-3.5 [&>input~[data-slot=icon]]:right-3.5 [&>[data-slot=icon]:first-child~input]:pl-12 [&:has(>input~[data-slot=icon])>input]:pr-12',
+} satisfies Record<NonNullable<InputGroupProps['size']>, string>;
 
 /**
  * InputGroup wraps an Input with leading/trailing icon slots.
@@ -66,26 +46,18 @@ export function InputGroup({
   size = 'md',
   ...props
 }: Readonly<InputGroupProps>) {
-  const sizeConfig = sizeClasses[size];
-
   return (
     <div
       data-slot='control'
+      data-component='input-group'
+      data-size={size}
       className={cn(
         'relative isolate block w-full',
-        // Input padding based on icon positions
-        sizeConfig.inputPaddingLeft,
-        sizeConfig.inputPaddingRight,
+        sizeClasses[size],
         // Position icons absolutely
         '[&>[data-slot=icon]]:pointer-events-none [&>[data-slot=icon]]:absolute [&>[data-slot=icon]]:top-1/2 [&>[data-slot=icon]]:-translate-y-1/2 [&>[data-slot=icon]]:z-10',
-        // Icon sizes
-        `[&>[data-slot=icon]]:${sizeConfig.iconSize}`,
-        // Icon positions - first child on left
-        `[&>[data-slot=icon]:first-child]:${sizeConfig.iconLeft}`,
-        // Icon after input goes on right
-        `[&>input~[data-slot=icon]]:${sizeConfig.iconRight}`,
         // Icon colors
-        '[&>[data-slot=icon]]:text-(--linear-text-tertiary)',
+        '[&>[data-slot=icon]]:text-tertiary-token',
         className
       )}
       {...props}

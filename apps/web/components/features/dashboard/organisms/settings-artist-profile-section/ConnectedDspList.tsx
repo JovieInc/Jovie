@@ -1,5 +1,6 @@
 'use client';
 
+import { ConfirmDialog } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Music } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -8,7 +9,6 @@ import {
   connectSpotifyArtist,
 } from '@/app/app/(shell)/dashboard/releases/actions';
 import { toast } from '@/components/feedback';
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';

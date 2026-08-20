@@ -1,5 +1,42 @@
 import SwiftUI
 
+enum ChatComposerMetrics {
+  static let barHeight: CGFloat = 52
+  static let sendSlotSize: CGFloat = 36
+  static let plusButtonSize: CGFloat = 36
+
+  static func isPlusEnabled(isSending: Bool) -> Bool {
+    !isSending
+  }
+
+  static func isSendEnabled(trimmedDraft: String, isSending: Bool) -> Bool {
+    !trimmedDraft.isEmpty && !isSending
+  }
+}
+
+enum ChatComposerTrailingAction: Equatable {
+  case mic
+  case send
+
+  static func action(draftIsEmpty: Bool) -> Self {
+    draftIsEmpty ? .mic : .send
+  }
+
+  var accessibilityIdentifier: String {
+    switch self {
+    case .mic: return "chat-composer-mic"
+    case .send: return "chat-composer-send"
+    }
+  }
+
+  var accessibilityLabel: String {
+    switch self {
+    case .mic: return "Talk"
+    case .send: return "Send"
+    }
+  }
+}
+
 struct ChatComposerBar: View {
   @Binding var draft: String
   @FocusState.Binding var isFocused: Bool
@@ -7,6 +44,7 @@ struct ChatComposerBar: View {
   let isSending: Bool
   let isPlusEnabled: Bool
   let onSend: () -> Void
+  var onMic: () -> Void = {}
   let onSelectWorkflow: (ComposerWorkflowAction) -> Void
   let onDraftEdited: () -> Void
 
@@ -15,25 +53,24 @@ struct ChatComposerBar: View {
 
   var body: some View {
     let trimmedDraft = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+    let trailing = ChatComposerTrailingAction.action(draftIsEmpty: trimmedDraft.isEmpty)
     let slashQuery = ComposerSlashPalette.query(from: draft)
     let slashItems = slashQuery.map {
       ComposerSlashPalette.items(matching: $0, skills: ComposerSlashPalette.defaultSkills)
     } ?? []
     let isSlashPaletteVisible = slashQuery != nil && !slashItems.isEmpty
 
-    // JOV-3636: composer is text-only. Voice is shell Talk FAB → full-screen
-    // overlay. OS keyboard mic still handles dictate-to-text.
-    HStack(spacing: JovieSpacing.medium) {
+    // Web hero pill: full capsule, plus left, mic/send inside the right.
+    HStack(spacing: JovieSpacing.small) {
       Button {
         isShowingWorkflowSheet = true
       } label: {
         Image(systemName: "plus")
-          .font(.system(size: 18, weight: .semibold))
+          .font(.system(size: 17, weight: .semibold))
           .foregroundStyle(
             isPlusEnabled ? JovieColor.textPrimary : JovieColor.textTertiary
           )
-          .frame(width: 36, height: 36)
-          .background(JovieColor.surface2, in: Circle())
+          .frame(width: ChatComposerMetrics.plusButtonSize, height: ChatComposerMetrics.plusButtonSize)
       }
       .buttonStyle(.plain)
       .disabled(!isPlusEnabled)
@@ -47,26 +84,31 @@ struct ChatComposerBar: View {
         .disableAutocorrection(false)
         .font(JovieFont.body(size: 16))
         .foregroundStyle(JovieColor.textPrimary)
-        .frame(height: 52)
         .onChange(of: draft) {
           onDraftEdited()
         }
 
-      // Reserve a stable trailing 52pt slot so empty → typed never shifts layout.
+      // Stable trailing slot: mic when empty, send when typed. No layout shift.
       ZStack {
-        if !trimmedDraft.isEmpty {
+        switch trailing {
+        case .mic:
+          micButton
+        case .send:
           sendButton(trimmedDraft: trimmedDraft)
         }
       }
-      .frame(width: 52, height: 52)
+      .frame(width: ChatComposerMetrics.sendSlotSize, height: ChatComposerMetrics.sendSlotSize)
     }
-    .padding(.horizontal, JovieSpacing.large)
-    .frame(height: 76)
-    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+    .padding(.leading, 10)
+    .padding(.trailing, 8)
+    .padding(.vertical, 8)
+    .frame(minHeight: ChatComposerMetrics.barHeight)
+    .background(.ultraThinMaterial, in: Capsule())
     .overlay {
-      RoundedRectangle(cornerRadius: 28, style: .continuous)
+      Capsule()
         .stroke(JovieColor.borderDefault, lineWidth: 1)
     }
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier("chat-composer")
     .overlay(alignment: .top) {
       // Anchored ABOVE the bar via alignmentGuide so the transcript and the
@@ -127,24 +169,40 @@ struct ChatComposerBar: View {
     }
   }
 
+  private var micButton: some View {
+    Button(action: onMic) {
+      Image(systemName: "mic.fill")
+        .font(.system(size: 15, weight: .semibold))
+        .foregroundStyle(JovieColor.textPrimary)
+        .frame(width: 36, height: 36)
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(ChatComposerTrailingAction.mic.accessibilityLabel)
+    .accessibilityIdentifier(ChatComposerTrailingAction.mic.accessibilityIdentifier)
+    .accessibilityHint("Opens voice capture")
+  }
+
   private func sendButton(trimmedDraft: String) -> some View {
     Button(action: onSend) {
       Image(systemName: isSending ? "ellipsis" : "arrow.up")
-        .font(.system(size: 16, weight: .bold))
+        .font(.system(size: 14, weight: .bold))
         .foregroundStyle(
-          trimmedDraft.isEmpty || isSending
-            ? JovieColor.textTertiary
-            : JovieColor.backgroundBase
+          ChatComposerMetrics.isSendEnabled(trimmedDraft: trimmedDraft, isSending: isSending)
+            ? JovieColor.backgroundBase
+            : JovieColor.textTertiary
         )
-        .frame(width: 52, height: 52)
+        .frame(width: ChatComposerMetrics.sendSlotSize, height: ChatComposerMetrics.sendSlotSize)
         .background(
-          trimmedDraft.isEmpty || isSending ? JovieColor.surface2 : Color.white,
+          ChatComposerMetrics.isSendEnabled(trimmedDraft: trimmedDraft, isSending: isSending)
+            ? Color.white
+            : JovieColor.surface2,
           in: Circle()
         )
     }
     .buttonStyle(.plain)
-    .disabled(trimmedDraft.isEmpty || isSending)
-    .accessibilityLabel("Send")
+    .disabled(!ChatComposerMetrics.isSendEnabled(trimmedDraft: trimmedDraft, isSending: isSending))
+    .accessibilityLabel(ChatComposerTrailingAction.send.accessibilityLabel)
+    .accessibilityIdentifier(ChatComposerTrailingAction.send.accessibilityIdentifier)
   }
 }
 
@@ -239,10 +297,29 @@ enum ComposerSlashPalette {
   }
 }
 
-private enum ComposerSlashPaletteMetrics {
+enum ComposerSlashPaletteMetrics {
   static let rowHeight: CGFloat = 44
   static let headerHeight: CGFloat = 24
   static let maxHeight: CGFloat = 320
+
+  static func estimatedHeight(workflowCount: Int, skillCount: Int) -> CGFloat {
+    var height = JovieSpacing.small * 2
+    var sectionCount = 0
+    if workflowCount > 0 {
+      sectionCount += 1
+      height += headerHeight
+      height += CGFloat(workflowCount) * rowHeight
+    }
+    if skillCount > 0 {
+      sectionCount += 1
+      height += headerHeight
+      height += CGFloat(skillCount) * rowHeight
+    }
+    if sectionCount == 2 {
+      height += JovieSpacing.small
+    }
+    return min(maxHeight, height)
+  }
 }
 
 private struct ComposerSlashPaletteView: View {
@@ -269,27 +346,18 @@ private struct ComposerSlashPaletteView: View {
       }
       .padding(JovieSpacing.small)
     }
-    .frame(height: min(ComposerSlashPaletteMetrics.maxHeight, estimatedContentHeight))
+    .frame(
+      height: ComposerSlashPaletteMetrics.estimatedHeight(
+        workflowCount: workflows.count,
+        skillCount: skills.count
+      )
+    )
     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: JovieRadius.xLarge, style: .continuous))
     .overlay {
       RoundedRectangle(cornerRadius: JovieRadius.xLarge, style: .continuous)
         .stroke(JovieColor.borderDefault, lineWidth: 1)
     }
     .accessibilityIdentifier("composer-slash-palette")
-  }
-
-  private var estimatedContentHeight: CGFloat {
-    var height = JovieSpacing.small * 2
-    var sectionCount = 0
-    for sectionItems in [workflows, skills] where !sectionItems.isEmpty {
-      sectionCount += 1
-      height += ComposerSlashPaletteMetrics.headerHeight
-      height += CGFloat(sectionItems.count) * ComposerSlashPaletteMetrics.rowHeight
-    }
-    if sectionCount == 2 {
-      height += JovieSpacing.small
-    }
-    return height
   }
 
   private func section(header: String, items: [ComposerSlashItem]) -> some View {

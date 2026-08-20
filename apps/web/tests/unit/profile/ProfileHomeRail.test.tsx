@@ -348,6 +348,50 @@ describe('ProfileHomeRail', () => {
     expect(screen.queryByRole('link', { name: 'Listen' })).toBeNull();
   });
 
+  it('names the heart/pay control Support when the PAC lands on tip', () => {
+    render(
+      <ProfileHomeRail
+        artist={makeArtist()}
+        latestRelease={null}
+        featuredPlaylistFallback={null}
+        tourDates={[]}
+        hasPlayableDestinations={false}
+        renderMode='preview'
+        showAlertsCard={false}
+        hasTip
+      />
+    );
+
+    const pacCard = screen.getByTestId('profile-pac');
+    expect(pacCard).toHaveAttribute('data-state', 'tip');
+    expect(pacCard).toHaveAccessibleName('Support Tim White');
+    expect(
+      screen.getByRole('link', { name: /Tip.*Support Tim White/ })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Listen' })).toBeNull();
+  });
+
+  it('eager-loads latest-release artwork even when it is not the hero LCP', () => {
+    render(
+      <ProfileHomeRail
+        artist={makeArtist()}
+        latestRelease={makeRelease()}
+        profileSettings={{ showOldReleases: true }}
+        featuredPlaylistFallback={null}
+        tourDates={[]}
+        hasPlayableDestinations
+        renderMode='preview'
+        showAlertsCard={false}
+        pacArtPriority={false}
+      />
+    );
+
+    const artwork = screen.getByRole('img', {
+      name: 'The Deep End artwork',
+    });
+    expect(artwork).toHaveAttribute('loading', 'eager');
+  });
+
   it('renders tip-only inventory as a support PAC instead of a blank Listen card', () => {
     render(
       <ProfileHomeRail
@@ -366,7 +410,9 @@ describe('ProfileHomeRail', () => {
       'data-state',
       'tip'
     );
-    expect(screen.getByRole('link', { name: 'Tip' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /Tip.*Support Tim White/ })
+    ).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Listen' })).toBeNull();
   });
 

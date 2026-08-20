@@ -72,6 +72,23 @@ If this is **not** a bug fix and no new test is required, say so explicitly (for
 - [ ] Focus indicators are visible
 - [ ] ARIA attributes used appropriately
 
+## Interaction Quality Contract
+
+*Complete this section for any UI or interaction behavior change. The canonical
+contract is [`.claude/rules/ui.md`](../.claude/rules/ui.md#interaction-quality-contract).*
+
+- [ ] Primary task, direct action, and observable outcome are stated below
+- [ ] Focus, selection, scroll/caret, and context behavior are stated below
+- [ ] Pending, empty, success, error, and offline/recovery states are covered or marked not applicable
+- [ ] Keyboard, pointer/touch, screen-reader, text-scaling, and reduced-motion paths are covered or marked not applicable
+- [ ] Exact automated checks and any required manual/device evidence are listed below
+
+**Interaction evidence:**
+<!-- action / outcome; context retention; state and recovery; exact automated commands; manual or device evidence still required -->
+
+If this PR has no UI or interaction behavior change, say
+`interaction-quality: not applicable — <reason>`.
+
 ## Browser Testing
 
 - [ ] Chrome

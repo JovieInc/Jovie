@@ -5,6 +5,7 @@ import * as admissionGate from '../admission-gate.mjs';
 import * as admitter from '../admitter.mjs';
 import * as deterministicGates from '../deterministic-gates.mjs';
 import * as planGate from '../plan-gate.mjs';
+import { withPreLeaseReceipts } from './pre-lease.mjs';
 
 function issue(overrides = {}) {
   return {
@@ -43,7 +44,7 @@ function plannedIssue(overrides = {}) {
   if (overrides.identifier !== undefined)
     seed.identifier = overrides.identifier;
   if (overrides.project !== undefined) seed.project = overrides.project;
-  const base = issue(seed);
+  const base = withPreLeaseReceipts(issue(seed));
   const { evidence } = deterministicGates.buildDeterministicPlanEvidence(base);
   const receipt = planGate.buildPlanGateReceipt(base, evidence);
   return issue({
@@ -54,7 +55,9 @@ function plannedIssue(overrides = {}) {
         { id: 'plan-id', name: planGate.PLAN_APPROVED_LABEL },
       ],
     },
-    comments: overrides.comments || { nodes: [{ body: receipt }] },
+    comments: overrides.comments || {
+      nodes: [...base.comments.nodes, { body: receipt }],
+    },
   });
 }
 
@@ -233,18 +236,12 @@ describe('deterministic no-model gates', () => {
     assert.deepEqual(calls, { comments: 1, labels: 1, reads: 3 });
   });
 
-  it('counts an admitted intent before Symphony starts work', () => {
+  it('counts an admitted intent from the receipt without the triple labels', () => {
     const base = plannedIssue();
     const gateReceipt = admissionGate.buildAdmissionGateReceipt(base);
     const admitted = plannedIssue({
       state: { name: 'Todo' },
-      labels: {
-        nodes: [
-          ...base.labels.nodes,
-          { id: 'admission-id', name: 'admission-approved' },
-          { id: 'symphony-id', name: 'symphony' },
-        ],
-      },
+      labels: { nodes: [] },
       comments: {
         nodes: [...base.comments.nodes, { body: gateReceipt }],
       },
@@ -253,5 +250,15 @@ describe('deterministic no-model gates', () => {
       count: 1,
       identifiers: ['JOV-4305'],
     });
+    assert.equal(
+      deterministicGates.validateDeterministicPlanCandidate(admitted),
+      'already-admitted'
+    );
+    assert.equal(
+      deterministicGates.validateDeterministicPlanCandidate(
+        issue({ labels: { nodes: [{ name: 'symphony' }] } })
+      ),
+      null
+    );
   });
 });

@@ -52,6 +52,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(new Set(laneIds).size).toBe(laneIds.length);
     expect([...laneIds].sort()).toEqual([
       'biome',
+      'design-conformance',
       'eslint-server-boundaries',
       'guardrails',
       'ios-fast',
@@ -104,6 +105,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'typecheck',
       'scripts-typecheck',
       'guardrails',
+      'design-conformance',
       'ios-fast',
       'profile-admission',
       'structural',
@@ -121,6 +123,7 @@ describe('ci-fast bounded parallel workflow', () => {
   it('locks the existing lane command manifest', () => {
     expect(LANE_COMMANDS).toEqual({
       biome: 'pnpm run biome:check',
+      'design-conformance': 'pnpm design:conformance:gate',
       'eslint-server-boundaries':
         'pnpm --filter=@jovie/web run lint:server-boundaries',
       typecheck: 'pnpm run typecheck',
@@ -132,6 +135,30 @@ describe('ci-fast bounded parallel workflow', () => {
       structural:
         'pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm component-ship-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
     });
+  });
+
+  it('keeps the iOS design gate independent from Ubuntu operations', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const structuralDecision = remaining.slice(
+      remaining.indexOf('- name: Decide structural lane'),
+      remaining.indexOf('- name: Install actionlint')
+    );
+
+    expect(LANE_GROUPS.remaining).toContain('design-conformance');
+    expect(LANE_COMMANDS['design-conformance']).toBe(
+      'pnpm design:conformance:gate'
+    );
+    expect(LANE_COMMANDS['design-conformance']).not.toMatch(
+      /backlog|hermes|symphony|systemd/i
+    );
+    expect(structuralDecision).not.toContain('apps/ios/');
+    expect(structuralDecision).toContain('echo "skip=true"');
+    expect(CI_FAST_SOURCE).toMatch(
+      /function runDesignConformance\(\)[\s\S]*LANE_COMMANDS\['design-conformance'\]/
+    );
   });
 
   it('runs the lockfile specifier preflight before expensive fast lanes', () => {

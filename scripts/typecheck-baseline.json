@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "tool": "scripts/typecheck-scripts.mjs",
-  "generatedAt": "2026-08-15T09:43:19.861Z",
-  "totalErrors": 180,
+  "generatedAt": "2026-08-18T03:22:07.664Z",
+  "totalErrors": 168,
   "files": {
     ".github/scripts/verify-main-release-readiness.mjs": {
       "TS2339": 3
@@ -105,10 +105,6 @@
     "scripts/lib/__tests__/ship-ledger.test.mjs": {
       "TS2339": 4
     },
-    "scripts/lib/__tests__/tracker-client.test.mjs": {
-      "TS2339": 2,
-      "TS2353": 3
-    },
     "scripts/lib/ci-duration-ratchet.mjs": {
       "TS2353": 1
     },
@@ -133,10 +129,6 @@
     "scripts/lib/pr-comment-analysis.mjs": {
       "TS2345": 1
     },
-    "scripts/lib/tracker.mjs": {
-      "TS2362": 1,
-      "TS2363": 1
-    },
     "scripts/linear-claim-issue.mjs": {
       "TS2339": 3
     },
@@ -151,10 +143,6 @@
       "TS2353": 3
     },
     "scripts/observability-issue-github.mjs": {
-      "TS2345": 1
-    },
-    "scripts/observability-issue-github.test.mjs": {
-      "TS2339": 4,
       "TS2345": 1
     },
     "scripts/pr-comment-retro.mjs": {

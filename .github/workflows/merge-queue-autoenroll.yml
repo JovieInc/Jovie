@@ -2,10 +2,12 @@ name: Merge Queue Auto-Enroll
 
 # Fully event-driven — zero polling crons.
 #
-# Every state change that affects enrollment eligibility fires exactly one
-# workflow run. This controller is native-only after cutover: a missing or
-# non-native repository variable fails closed before any queue/rebase mutation.
-# Existing labels are intent/audit evidence, never an alternate transport.
+# Eligibility changes wake one repo-wide writer mutex. GitHub may replace an
+# older pending run in that mutex, so every surviving clean-admitting pass also
+# performs one bounded exact-head reconciliation. This controller is native-only after
+# cutover: a missing or non-native repository variable fails closed before any
+# queue/rebase mutation. Existing labels are intent/audit evidence, never an
+# alternate transport.
 #
 # Triggers:
 #   pull_request      — PR label changes and reopen (maintenance only)
@@ -14,7 +16,8 @@ name: Merge Queue Auto-Enroll
 #   workflow_dispatch — maintenance-only unless exact PR + head are supplied
 #
 # Two jobs run (not at the same time — concurrency group serializes):
-#   enroll    — classify open PRs, enroll only the event-scoped exact head,
+#   enroll    — classify open PRs, enroll the event-scoped exact head plus at
+#               most one bounded missed-admission recovery head,
 #               dequeue broken ones,
 #               flag conflicts for the fix agent (no pytest/Python setup;
 #               drain regression tests run in CI Structural Contract instead)
@@ -199,7 +202,7 @@ jobs:
               ;;
             workflow_dispatch)
               if [[ -z "$MANUAL_PR" && -z "$MANUAL_HEAD" ]]; then
-                echo 'Untargeted manual dispatch; maintenance-only'
+                echo 'Untargeted manual dispatch; no primary target (bounded reconciliation remains enabled)'
               elif [[ "$MANUAL_PR" =~ ^[1-9][0-9]*$ && "${MANUAL_HEAD,,}" =~ ^[0-9a-f]{40}$ ]]; then
                 pr_number="$MANUAL_PR"
                 head_sha="${MANUAL_HEAD,,}"
@@ -209,7 +212,7 @@ jobs:
               fi
               ;;
             push)
-              echo 'Main push; maintenance-only'
+              echo 'Main push; no primary target (bounded reconciliation remains enabled)'
               ;;
             *)
               echo "::error::Unsupported admission event: $EVENT_NAME" >&2
@@ -233,9 +236,10 @@ jobs:
           MERGE_QUEUE_BACKEND: ${{ vars.MERGE_QUEUE_BACKEND }}
           DRAIN_MUTATION_AUTHORIZATION: merge-queue-autoenroll
           MERGE_QUEUE_NATIVE_AUTHORIZATION: merge-queue-autoenroll
-          # New admissions are event-scoped and pinned to the triggering
-          # published head. Main pushes and untargeted manual runs retain
-          # global dequeue/reconciliation authority but cannot admit a PR.
+          # Primary admission is event-scoped and pinned to the triggering
+          # published head. A surviving mutex owner may additionally recover a
+          # tiny exact-green cohort when GitHub replaced an older pending event;
+          # this is never an unbounded clean-backlog sweep.
           DRAIN_ADMISSION_PR: ${{ steps.admission.outputs.pr_number }}
           DRAIN_ADMISSION_HEAD: ${{ steps.admission.outputs.head_sha }}
           # A Jovie Bot queue-deferred release can proceed through the narrow
@@ -243,13 +247,24 @@ jobs:
           # The shared Bash pre-enqueue guard requires the bot-authored typed
           # release receipt plus green source/main/production evidence. It is
           # not a general AMBER admission path.
-          DRAIN_PROMOTION_MODE: ${{ steps.admission.outputs.deferred_release == '1' && 'deferred-release-only' || needs.fleet-policy.outputs.mode }}
+          # Live #16211: jovie-bot unlabeled queue-deferred, this chose
+          # deferred-release-only, and hold-intake fleet refused enrollment
+          # ("does not authorize the exact queue-deferred release fallback")
+          # while PR Ready was already green. Keep hold-intake as the AMBER
+          # exact-head mode; deferred-release-only is only for when the fleet
+          # policy itself is that fallback.
+          DRAIN_PROMOTION_MODE: ${{ steps.admission.outputs.deferred_release == '1' && needs.fleet-policy.outputs.mode != 'hold-intake' && 'deferred-release-only' || needs.fleet-policy.outputs.mode }}
           DRAIN_FLEET_GATE_B64: ${{ needs.fleet-policy.outputs.receipt_b64 }}
           DRAIN_RECOVER_FLEET_HOLDS: ${{ needs.fleet-policy.outputs.mode == 'normal' && steps.admission.outputs.recover_holds == '1' && '1' || '0' }}
           # Composite CI heads cannot map to source PRs. The drain consumes
           # only bot-authored exact-head native-admission receipts, with fresh
-          # checks and a cap of two re-entries; it is never a global sweep.
+          # checks and the shared total cap below; it is never a global sweep.
           DRAIN_RECONCILE_QUEUE_REENTRY: ${{ needs.fleet-policy.outputs.mode == 'normal' && steps.admission.outputs.reconcile_queue_reentry == '1' && '1' || '0' }}
+          # GitHub's single pending slot can replace an exact CI admission event
+          # even with cancel-in-progress=false. Reconcile only in the same fleet
+          # modes that already permit clean exact-head admission, sharing the
+          # total cap below with the event-scoped candidate and native re-entry.
+          DRAIN_RECONCILE_MISSED_ADMISSION: ${{ steps.admission.outputs.deferred_release != '1' && (needs.fleet-policy.outputs.mode == 'normal' || needs.fleet-policy.outputs.mode == 'hold-intake' || needs.fleet-policy.outputs.mode == 'draft-only') && '1' || '0' }}
           DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '2'
           # `queue-deferred` has no typed provenance separating a temporary
           # pressure deferral from an explicit repair/human hold. Main-push
@@ -302,6 +317,6 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
           DRAIN_REMEDIATE_APPLY: '1'
-          DRAIN_REMEDIATE_MAX_PER_RUN: '3'
+          DRAIN_REMEDIATE_MAX_PER_RUN: '24'
           DRAIN_REMEDIATE_COOLDOWN_HOURS: '4'
         run: node scripts/drain-pr-remediate.mjs --apply

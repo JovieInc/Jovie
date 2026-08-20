@@ -13,6 +13,8 @@ import {
   MENU_LABEL_BASE,
   MENU_SEPARATOR_BASE,
   MENU_SHORTCUT_BASE,
+  OVERLAY_COLLISION_PADDING,
+  OVERLAY_SIDE_OFFSET,
   subMenuContentClasses,
 } from '../lib/dropdown-styles';
 import { cn } from '../lib/utils';
@@ -61,8 +63,8 @@ const DropdownMenuSubContent = React.forwardRef<
       className,
       portalProps,
       disablePortal = false,
-      sideOffset = 6,
-      collisionPadding = 8,
+      sideOffset = OVERLAY_SIDE_OFFSET,
+      collisionPadding = OVERLAY_COLLISION_PADDING,
       ...props
     },
     ref
@@ -105,14 +107,21 @@ const DropdownMenuContent = React.forwardRef<
   }
 >(
   (
-    { className, sideOffset = 4, portalProps, disablePortal = false, ...props },
+    {
+      className,
+      sideOffset = OVERLAY_SIDE_OFFSET,
+      collisionPadding = OVERLAY_COLLISION_PADDING,
+      portalProps,
+      disablePortal = false,
+      ...props
+    },
     ref
   ) => {
     const content = (
       <DropdownMenuPrimitive.Content
         ref={ref}
         sideOffset={sideOffset}
-        collisionPadding={8}
+        collisionPadding={collisionPadding}
         className={cn(dropdownMenuContentClasses, className)}
         {...props}
       />

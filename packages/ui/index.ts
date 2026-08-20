@@ -87,6 +87,13 @@ export {
 // Checkbox
 export type { CheckboxProps } from './atoms/checkbox';
 export { Checkbox } from './atoms/checkbox';
+// Close Button
+export type { CloseButtonIconProps } from './atoms/close-button';
+export {
+  CloseButtonIcon,
+  closeButtonClassName,
+  closeButtonStyles,
+} from './atoms/close-button';
 export { CommonDropdown } from './atoms/common-dropdown';
 // Common Dropdown
 export type {
@@ -207,6 +214,12 @@ export { Label, labelVariants } from './atoms/label';
 // Link
 export type { LinkProps } from './atoms/link';
 export { Link, linkVariants } from './atoms/link';
+// Native Select
+export type {
+  NativeSelectOption,
+  NativeSelectProps,
+} from './atoms/native-select';
+export { NativeSelect } from './atoms/native-select';
 // Popover
 export {
   Popover,

@@ -12,7 +12,6 @@ concurrency:
 
 permissions:
   contents: read
-  issues: write
   actions: read
 
 jobs:
@@ -47,7 +46,7 @@ jobs:
 
       - name: Find or create tracking issue
         id: find-issue
-        if: always() && hashFiles('flakiness-report.md') != ''
+        if: ${{ github.event_name == '__retired_linear_only__' }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
@@ -67,7 +66,7 @@ jobs:
             }
 
       - name: Create or update tracking issue
-        if: always() && hashFiles('flakiness-report.md') != ''
+        if: ${{ github.event_name == '__retired_linear_only__' }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           FLAKY_COUNT: ${{ steps.analyze.outputs.flaky_count || '0' }}
@@ -122,7 +121,7 @@ jobs:
             }
 
       - name: Auto-file deflake issues for high-severity tests
-        if: always() && steps.analyze.outputs.high_severity != '0' && steps.analyze.outputs.high_severity != ''
+        if: ${{ github.event_name == '__retired_linear_only__' }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           QUARANTINE_CANDIDATES: ${{ steps.analyze.outputs.quarantine_candidates || '[]' }}

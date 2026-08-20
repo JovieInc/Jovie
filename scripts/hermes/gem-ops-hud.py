@@ -15,6 +15,7 @@ import sys
 import tempfile
 import termios
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -23,9 +24,23 @@ from typing import Any
 REPO = "JovieInc/Jovie"
 LOCAL_INTERVAL = max(10, int(os.environ.get("HUD_LOCAL_INTERVAL", "15")))
 REMOTE_INTERVAL = max(60, int(os.environ.get("HUD_REMOTE_INTERVAL", "120")))
-STALE_AFTER = {"symphony": LOCAL_INTERVAL * 3, "delivery": REMOTE_INTERVAL * 3}
+FLEET_RECEIPT_STALE_SECONDS = 10 * 60
+FLEET_RECEIPT_FUTURE_SKEW_SECONDS = 5
+STALE_AFTER = {
+    "symphony": LOCAL_INTERVAL * 3,
+    "fleet": FLEET_RECEIPT_STALE_SECONDS,
+    "delivery": REMOTE_INTERVAL * 3,
+    "issues": REMOTE_INTERVAL * 3,
+}
 STATE_DIR = Path(os.environ.get("HUD_STATE_DIR", "~/.local/state/gem-ops-hud")).expanduser()
 STATE_FILE = STATE_DIR / "state.json"
+FLEET_GATE_RECEIPT = Path(
+    os.environ.get(
+        "HUD_FLEET_GATE_RECEIPT",
+        "/home/timwhite/gem-workspace/state/gem-priority-gate/latest.json",
+    )
+).expanduser()
+FLEET_GATE_SCHEMA = "jovie-fleet-gate/v1"
 WORKFLOWS = {
     "CI",
     "Production Controller",
@@ -34,6 +49,14 @@ WORKFLOWS = {
     "Queue-Deferred Release",
     "Delivery Control Receipts",
 }
+LINEAR_API = "https://api.linear.app/graphql"
+LINEAR_TEAM_KEY = "JOV"
+GITHUB_READY_LABELS = {"agent-ready", "ready-for-intake"}
+GITHUB_ISSUE_FALLBACK_RETIRED = True
+
+
+class IssueSourceUnavailable(RuntimeError):
+    """Both read-only issue sources were unavailable."""
 
 
 def now() -> dt.datetime:
@@ -51,6 +74,200 @@ def parse_time(value: str | None) -> dt.datetime | None:
         return dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return None
+
+
+def _typed_bool(value: Any, name: str) -> bool:
+    if not isinstance(value, bool):
+        raise ValueError(f"{name} must be boolean")
+    return value
+
+
+def fetch_fleet_gate(path: Path | None = None) -> dict[str, Any]:
+    """Read the canonical typed fleet receipt without inventing lane state."""
+    source = path or FLEET_GATE_RECEIPT
+    receipt = json.loads(source.read_text(encoding="utf-8"))
+    if not isinstance(receipt, dict) or receipt.get("schema") != FLEET_GATE_SCHEMA:
+        raise ValueError("invalid fleet gate schema")
+    observed_at = receipt.get("observedAt")
+    observed_stamp = parse_time(observed_at) if isinstance(observed_at, str) else None
+    if (
+        observed_stamp is None
+        or observed_stamp.tzinfo is None
+        or observed_stamp.utcoffset() is None
+        or (observed_stamp - now()).total_seconds()
+        > FLEET_RECEIPT_FUTURE_SKEW_SECONDS
+    ):
+        raise ValueError("invalid fleet gate observedAt")
+    if receipt.get("state") not in {"GREEN", "AMBER", "RED"}:
+        raise ValueError("invalid fleet gate state")
+    if receipt.get("promotionMode") not in {
+        "normal",
+        "isolated-only",
+        "draft-only",
+        "hold-intake",
+        "blocked",
+    }:
+        raise ValueError("invalid fleet promotion mode")
+    if not isinstance(receipt.get("reasons"), list):
+        raise ValueError("invalid fleet gate reasons")
+
+    cohort = receipt.get("alreadyAdmittedCohort")
+    if not isinstance(cohort, dict):
+        raise ValueError("missing admitted cohort contract")
+    _typed_bool(cohort.get("newIntakeAllowed"), "alreadyAdmittedCohort.newIntakeAllowed")
+
+    required_admissions = {
+        "workAdmission": ("allowed", "newIssueLeaseAllowed"),
+        "promotionAdmission": ("allowed",),
+        "remediationAdmission": ("allowed", "localAllowed", "pushAllowed"),
+        "deploymentAdmission": ("allowed",),
+    }
+    for section_name, fields in required_admissions.items():
+        section = receipt.get(section_name)
+        if not isinstance(section, dict):
+            raise ValueError(f"missing {section_name}")
+        for field in fields:
+            _typed_bool(section.get(field), f"{section_name}.{field}")
+
+    result = dict(receipt)
+    result["updated"] = observed_at
+    result["error"] = None
+    return result
+
+
+def fleet_lane_statuses(receipt: dict[str, Any]) -> dict[str, tuple[str, str]]:
+    """Project independent fleet lanes; unknown input always fails closed."""
+    unknown = ("UNKNOWN", "typed fleet receipt unavailable; no authority inferred")
+    unknown_lanes = {
+        lane: unknown
+        for lane in (
+            "work",
+            "leases",
+            "remediation",
+            "queue",
+            "promotion",
+            "deployment",
+        )
+    }
+    try:
+        observed_at = receipt["observedAt"]
+        observed_stamp = parse_time(observed_at)
+        if (
+            receipt.get("error")
+            or observed_stamp is None
+            or observed_stamp.tzinfo is None
+            or observed_stamp.utcoffset() is None
+        ):
+            return unknown_lanes
+        age_seconds = (now() - observed_stamp).total_seconds()
+        if (
+            age_seconds > FLEET_RECEIPT_STALE_SECONDS
+            or age_seconds < -FLEET_RECEIPT_FUTURE_SKEW_SECONDS
+        ):
+            return unknown_lanes
+        work = _typed_bool(receipt["workAdmission"]["allowed"], "work")
+        leases = _typed_bool(
+            receipt["workAdmission"]["newIssueLeaseAllowed"], "leases"
+        )
+        remediation_local = _typed_bool(
+            receipt["remediationAdmission"]["localAllowed"], "remediation.local"
+        )
+        remediation_push = _typed_bool(
+            receipt["remediationAdmission"]["pushAllowed"], "remediation.push"
+        )
+        promotion = _typed_bool(
+            receipt["promotionAdmission"]["allowed"], "promotion"
+        )
+        deployment = _typed_bool(
+            receipt["deploymentAdmission"]["allowed"], "deployment"
+        )
+        cohort_intake = _typed_bool(
+            receipt["alreadyAdmittedCohort"]["newIntakeAllowed"], "cohort intake"
+        )
+        state = receipt["state"]
+        mode = receipt["promotionMode"]
+        reasons = {
+            reason.get("code")
+            for reason in receipt.get("reasons", [])
+            if isinstance(reason, dict)
+        }
+    except (KeyError, TypeError, ValueError):
+        return unknown_lanes
+
+    work_lane = (
+        ("ACTIVE", "implementation, tests, and review remain admitted")
+        if work
+        else ("BLOCKED", "fleet work admission is closed")
+    )
+    if leases:
+        lease_lane = ("ACTIVE", "approved issue leases may be claimed")
+    elif work:
+        queue = receipt.get("signals", {}).get("queue", {})
+        ready = queue.get("greenReadyPrs", "?") if isinstance(queue, dict) else "?"
+        target = queue.get("target", "?") if isinstance(queue, dict) else "?"
+        lease_lane = (
+            "BACKPRESSURE",
+            f"new issue leases paused at green-ready {ready}/{target}; total open is not used",
+        )
+    else:
+        lease_lane = ("BLOCKED", "fleet work admission is closed")
+
+    if remediation_local and remediation_push:
+        remediation_lane = (
+            "ACTIVE",
+            "bounded exact-head diagnosis, tests, repair, and push are admitted",
+        )
+    elif remediation_local:
+        remediation_lane = (
+            "LOCAL ONLY",
+            "diagnosis/tests allowed; remote PR head mutation is closed",
+        )
+    else:
+        remediation_lane = ("BLOCKED", "PR remediation admission is closed")
+
+    if state == "RED" or not work:
+        queue_lane = ("BLOCKED", "native queue controller is fail-closed")
+    elif mode == "normal":
+        queue_lane = (
+            "ACTIVE",
+            "exact-head checks, review, labels, conflicts, and dependencies still apply",
+        )
+    elif mode in {"hold-intake", "draft-only"} and cohort_intake:
+        queue_lane = (
+            "FLOWING",
+            "clean unrelated PRs continue; PR-specific dependency gates still apply",
+        )
+    elif mode == "isolated-only":
+        queue_lane = (
+            "BOUNDED",
+            "only exact-head semantically isolated admission is allowed",
+        )
+    else:
+        queue_lane = ("BLOCKED", "native queue admission is paused by fleet policy")
+
+    if promotion:
+        promotion_lane = ("ACTIVE", "release promotion authority is open")
+    elif mode == "hold-intake" and reasons == {"production-deployment-unbound"}:
+        promotion_lane = (
+            "PAUSED",
+            "exact-main release only; fleet work, remediation, and clean queue stay separate",
+        )
+    else:
+        promotion_lane = ("BLOCKED", "release promotion authority is closed")
+
+    deployment_lane = (
+        ("ACTIVE", "exact-main Production Controller catch-up is authorized")
+        if deployment
+        else ("BLOCKED", "production deployment authority is closed")
+    )
+    return {
+        "work": work_lane,
+        "leases": lease_lane,
+        "remediation": remediation_lane,
+        "queue": queue_lane,
+        "promotion": promotion_lane,
+        "deployment": deployment_lane,
+    }
 
 
 def age_text(value: str | None) -> str:
@@ -162,7 +379,7 @@ def colorize_line(line: str) -> str:
         return f"{bold}{green}{line}{reset}"
     if "| Ready queue" in line:
         return f"{bold}{cyan}{line}{reset}"
-    if "| Retrying" in line or "| ATTENTION" in line or "| AUTO RETRY" in line:
+    if "| Retrying" in line or "| ATTENTION" in line or "| AUTO RETRY" in line or "DEGRADED" in line:
         return f"{bold}{yellow}{line}{reset}"
     if "| Owner input" in line:
         return f"{bold}{magenta}{line}{reset}"
@@ -228,6 +445,152 @@ def run_json(command: list[str], timeout: float = 20.0) -> Any:
         env={**os.environ, "GH_PAGER": "cat", "PAGER": "cat"},
     )
     return json.loads(completed.stdout)
+
+
+def linear_graphql(
+    query: str, variables: dict[str, Any], timeout: float = 8.0
+) -> dict[str, Any]:
+    token = os.environ.get("LINEAR_API_KEY")
+    if not token:
+        raise RuntimeError("linear_unconfigured")
+    request = urllib.request.Request(
+        LINEAR_API,
+        data=json.dumps({"query": query, "variables": variables}).encode("utf-8"),
+        headers={
+            "Authorization": token,
+            "Content-Type": "application/json",
+            "User-Agent": "gem-ops-hud/1",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        payload = json.loads(response.read(1_000_000).decode("utf-8"))
+    if payload.get("errors") or not isinstance(payload.get("data"), dict):
+        raise RuntimeError("linear_invalid_response")
+    return payload["data"]
+
+
+def linear_error_kind(exc: Exception) -> str:
+    if isinstance(exc, urllib.error.HTTPError) and exc.code in {401, 403}:
+        return "unauthorized"
+    if str(exc) == "linear_unconfigured":
+        return "unconfigured"
+    if isinstance(exc, (TimeoutError, urllib.error.URLError)):
+        return "unavailable"
+    return "error"
+
+
+def fetch_linear_issues() -> dict[str, Any]:
+    team_payload = linear_graphql(
+        """
+        query HudTeam($key: String!) {
+          teams(first: 1, filter: {key: {eq: $key}}) { nodes { id } }
+        }
+        """,
+        {"key": LINEAR_TEAM_KEY},
+    )
+    teams = team_payload.get("teams", {}).get("nodes", [])
+    if len(teams) != 1 or not teams[0].get("id"):
+        raise RuntimeError("linear_team_missing")
+
+    state_types: list[str] = []
+    cursor: str | None = None
+    for _ in range(40):
+        payload = linear_graphql(
+            """
+            query HudIssues($teamId: ID!, $after: String) {
+              issues(
+                first: 250
+                after: $after
+                filter: {
+                  team: {id: {eq: $teamId}}
+                  state: {type: {nin: ["completed", "canceled"]}}
+                }
+              ) {
+                nodes { state { type } }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+            """,
+            {"teamId": teams[0]["id"], "after": cursor},
+        )
+        issues = payload.get("issues", {})
+        for issue in issues.get("nodes", []):
+            state_type = issue.get("state", {}).get("type")
+            if isinstance(state_type, str):
+                state_types.append(state_type)
+        page_info = issues.get("pageInfo", {})
+        if not page_info.get("hasNextPage"):
+            break
+        cursor = page_info.get("endCursor")
+        if not cursor:
+            raise RuntimeError("linear_invalid_cursor")
+    else:
+        raise RuntimeError("linear_page_limit")
+
+    return {
+        "open": len(state_types),
+        "backlog": sum(1 for state in state_types if state == "backlog"),
+        "ready": sum(1 for state in state_types if state == "unstarted"),
+    }
+
+
+def fetch_github_issues() -> dict[str, Any]:
+    if GITHUB_ISSUE_FALLBACK_RETIRED:
+        raise RuntimeError("GitHub Issue fallback retired; Linear is canonical")
+    pages = run_json(
+        ["gh", "api", "--paginate", "--slurp", f"repos/{REPO}/issues?state=open&per_page=100"]
+    )
+    issues = [
+        item for page in pages for item in page if not item.get("pull_request")
+    ]
+    ready = 0
+    for issue in issues:
+        labels = {
+            label.get("name", "").lower()
+            for label in issue.get("labels", [])
+            if isinstance(label, dict)
+        }
+        if labels & GITHUB_READY_LABELS:
+            ready += 1
+    return {"open": len(issues), "backlog": len(issues), "ready": ready}
+
+
+def fetch_issue_source() -> dict[str, Any]:
+    try:
+        counts = fetch_linear_issues()
+        return {
+            "updated": iso(),
+            "error": None,
+            "source": "linear",
+            "degraded": False,
+            **counts,
+        }
+    except Exception as exc:
+        linear_error = linear_error_kind(exc)
+
+    if GITHUB_ISSUE_FALLBACK_RETIRED:
+        return {
+            "updated": iso(),
+            "error": f"linear_{linear_error}",
+            "source": "linear",
+            "degraded": True,
+        }
+
+    try:
+        counts = fetch_github_issues()
+        return {
+            "updated": iso(),
+            "error": None,
+            "source": "github",
+            "degraded": True,
+            "linear_error": linear_error,
+            **counts,
+        }
+    except Exception as exc:
+        raise IssueSourceUnavailable(
+            f"linear_{linear_error};github_{type(exc).__name__}"
+        ) from None
 
 
 def process_count(needle: str) -> int:
@@ -489,7 +852,12 @@ def section_health(state: dict[str, Any], key: str) -> str:
     section = state.get(key) or {}
     age = age_text(section.get("updated"))
     stamp = parse_time(section.get("updated"))
-    stale = not stamp or (now() - stamp).total_seconds() > STALE_AFTER[key]
+    stale = (
+        not stamp
+        or stamp.tzinfo is None
+        or stamp.utcoffset() is None
+        or (now() - stamp).total_seconds() > STALE_AFTER[key]
+    )
     if section.get("error"):
         return f"ERROR last-good {age} ago ({compact(section['error'], 32)})"
     if stale:
@@ -499,7 +867,9 @@ def section_health(state: dict[str, Any], key: str) -> str:
 
 def render(state: dict[str, Any]) -> str:
     local = state.get("symphony") or {}
+    fleet = state.get("fleet") or {}
     delivery = state.get("delivery") or {}
+    issues = state.get("issues") or {}
     workers = local.get("workers") or {}
     counts = local.get("counts") or {}
     reasons = local.get("reason_buckets") or {}
@@ -514,6 +884,19 @@ def render(state: dict[str, Any]) -> str:
     main = compact(delivery.get("main_sha"), 8) or "????????"
     prod = compact(delivery.get("prod_sha"), 8) or "????????"
     exact = "EXACT" if delivery.get("exact") else "NOT PROVEN"
+    issue_source = str(issues.get("source") or "none").upper()
+    has_issue_counts = all(key in issues for key in ("backlog", "ready"))
+    issue_status = (
+        "AUTHORITATIVE"
+        if issue_source == "LINEAR"
+        else "DEGRADED"
+        if issue_source == "GITHUB"
+        else "NOT MEASURED"
+    )
+    if issues.get("error"):
+        issue_status = "LAST GOOD" if has_issue_counts else "UNAVAILABLE"
+    issue_count_status = issue_status if issues.get("error") else issue_source
+    fleet_lanes = fleet_lane_statuses(fleet)
     heartbeat = iso()
 
     rows = [
@@ -537,6 +920,15 @@ def render(state: dict[str, Any]) -> str:
 
     rows += [
         grid_bar(),
+        grid_title("[ FLEET POLICY ]"),
+        grid_row("Fleet receipt", fleet.get("state", "?"), section_health(state, "fleet"), f"promotion mode {fleet.get('promotionMode', 'unknown')}"),
+        grid_row("Fleet work", "", *fleet_lanes["work"]),
+        grid_row("Issue leasing", "", *fleet_lanes["leases"]),
+        grid_row("PR remediation", "", *fleet_lanes["remediation"]),
+        grid_row("Native queue", "", *fleet_lanes["queue"]),
+        grid_row("Production promotion", "", *fleet_lanes["promotion"]),
+        grid_row("Catch-up deploy", "", *fleet_lanes["deployment"]),
+        grid_bar(),
         grid_title("[ WAIT REASONS ]"),
         grid_row("Capacity", reasons.get("capacity", "?"), "AUTO RETRY" if reasons.get("capacity") else "CLEAR", f"slots busy/cooling; not code/CI; next {until_text(next_retry)}"),
         grid_row("Timeout", reasons.get("timeout", "?"), "AUTO RETRY" if reasons.get("timeout") else "CLEAR", "model/provider exceeded response window; inspect if persistent"),
@@ -547,8 +939,40 @@ def render(state: dict[str, Any]) -> str:
         grid_row("Other retry", reasons.get("other", "?"), "OWNER CHECK" if reasons.get("other") else "CLEAR", "unclassified safe bucket; inspect sanitized evidence"),
         grid_bar(),
         grid_title("[ DELIVERY FUNNEL ]"),
-        grid_row("Backlog", "?", "NOT MEASURED", "authoritative total unavailable; not shown as zero"),
-        grid_row("Ready / to do", "?", "NOT MEASURED", "authoritative total unavailable; not shown as zero"),
+        grid_row(
+            "Issue source",
+            issue_source,
+            issue_status,
+            (
+                f"last-known counts; {issues.get('error')}"
+                if issues.get("error") and has_issue_counts
+                else f"both read-only sources unavailable; {issues.get('error')}"
+                if issues.get("error")
+                else "Linear workflow states"
+                if issue_source == "LINEAR"
+                else f"historical GitHub counts; non-canonical; Linear {issues.get('linear_error', 'unavailable')}"
+            ),
+        ),
+        grid_row(
+            "Backlog",
+            issues.get("backlog", "?"),
+            issue_count_status,
+            (
+                "Linear Backlog state"
+                if issue_source == "LINEAR"
+                else "historical open GitHub issues; non-canonical"
+            ),
+        ),
+        grid_row(
+            "Ready / to do",
+            issues.get("ready", "?"),
+            issue_count_status,
+            (
+                "Linear unstarted state"
+                if issue_source == "LINEAR"
+                else "historical GitHub labels; never selectable"
+            ),
+        ),
         grid_row("In progress", counts.get("implementing", "?"), "RUNNING" if counts.get("implementing") else "IDLE", "local Symphony running status"),
         grid_row("Blocked / retry", f"{counts.get('blocked','?')}/{counts.get('retrying','?')}", "LIVE", "owner-input blocked / automatic retry wait"),
         grid_row("Review ready", prs.get("ready", "?"), "OPEN PRs", "GitHub non-draft open pull requests"),
@@ -586,7 +1010,12 @@ def render(state: dict[str, Any]) -> str:
         rows.append(grid_row("Longest-wait proxy", "none", "CLEAR", "no Symphony blocker reported"))
     rows += [
         grid_row("Next automatic retry", until_text(next_retry), "AUTO", next_retry or "time unknown"),
-        grid_row("Data freshness", age_text(local.get("updated")), section_health(state, "symphony"), f"delivery age {age_text(delivery.get('updated'))}"),
+        grid_row(
+            "Data freshness",
+            age_text(local.get("updated")),
+            section_health(state, "symphony"),
+            f"fleet {age_text(fleet.get('updated'))}; delivery {age_text(delivery.get('updated'))}; issues {age_text(issues.get('updated'))}",
+        ),
         grid_row("Refresh / fallback", "15s / 120s", "LOCAL / REMOTE", "last-known cache; ANSI auto; NO_COLOR plain text; errors sanitized"),
         grid_bar("="),
     ]
@@ -599,12 +1028,23 @@ def refresh(state: dict[str, Any], remote: bool) -> dict[str, Any]:
     except Exception as exc:
         section = state.setdefault("symphony", {})
         section["error"] = type(exc).__name__
+    try:
+        state["fleet"] = fetch_fleet_gate()
+    except Exception as exc:
+        section = state.setdefault("fleet", {})
+        section["error"] = type(exc).__name__
     if remote:
         try:
             state["delivery"] = fetch_delivery()
         except Exception as exc:
             section = state.setdefault("delivery", {})
             section["error"] = type(exc).__name__
+        try:
+            state["issues"] = fetch_issue_source()
+        except IssueSourceUnavailable as exc:
+            section = state.setdefault("issues", {})
+            section["error"] = str(exc)
+            section["degraded"] = True
     save_state(state)
     return state
 

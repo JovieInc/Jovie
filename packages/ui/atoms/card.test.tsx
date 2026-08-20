@@ -19,6 +19,13 @@ describe('Card', () => {
     expect(card.className).toContain('rounded-(--system-b-radius-card)');
     expect(card.className).toContain('border-subtle');
     expect(card.className).toContain('bg-surface-1');
+    expect(card).toHaveAttribute('data-variant', 'default');
+    expect(card.className).toContain(
+      'transition-[background-color,border-color,box-shadow]'
+    );
+    expect(card.className).toContain('duration-subtle');
+    expect(card.className).toContain('ease-subtle');
+    expect(card.className).toContain('motion-reduce:transition-none');
   });
 
   it('applies hoverable variant classes', () => {
@@ -31,7 +38,10 @@ describe('Card', () => {
     expect(card.className).toContain('hover:bg-surface-2');
     expect(card.className).toContain('hover:shadow-card-elevated');
     expect(card.className).toContain('cursor-pointer');
-    expect(card.className).toContain('motion-reduce:transition-none');
+    expect(card.className).toContain('hover:border-default');
+    expect(card.className).toContain('focus-visible:ring-focus/55');
+    expect(card.className).toContain('focus-visible:ring-offset-surface-page');
+    expect(card).toHaveAttribute('data-variant', 'hoverable');
   });
 
   it('forwards refs correctly', () => {
@@ -66,6 +76,21 @@ describe('Card', () => {
     expect(section.className).toContain('bg-surface-1');
   });
 
+  it('supports unstyled compatibility composition without leaking card chrome', () => {
+    render(
+      <Card asChild unstyled className='legacy-surface'>
+        <section data-testid='legacy-card'>Legacy content</section>
+      </Card>
+    );
+
+    const card = screen.getByTestId('legacy-card');
+    expect(card.tagName).toBe('SECTION');
+    expect(card).toHaveClass('legacy-surface');
+    expect(card).not.toHaveAttribute('data-variant');
+    expect(card.className).not.toContain('shadow-card');
+    expect(card.className).not.toContain('rounded-(--system-b-radius-card)');
+  });
+
   it('merges custom className with default classes', () => {
     render(
       <Card className='custom-class' data-testid='card'>
@@ -85,6 +110,22 @@ describe('Card', () => {
     );
     const card = screen.getByRole('region');
     expect(card).toHaveAttribute('id', 'test-id');
+  });
+
+  it('keeps canonical state hooks authoritative', () => {
+    render(
+      <Card
+        data-testid='card'
+        data-content-state='offline'
+        data-variant='hoverable'
+      >
+        Content
+      </Card>
+    );
+
+    const card = screen.getByTestId('card');
+    expect(card).not.toHaveAttribute('data-content-state');
+    expect(card).toHaveAttribute('data-variant', 'default');
   });
 });
 
@@ -333,7 +374,26 @@ describe('Card composition', () => {
 
     const card = screen.getByTestId('card');
     expect(card).toHaveAttribute('data-content-state', 'partial');
+    expect(card).toHaveAttribute('aria-busy', 'true');
     expect(card.className).toContain('opacity-[var(--state-partial-opacity)]');
+  });
+
+  it('preserves explicit busy semantics outside the partial state', () => {
+    const { rerender } = render(
+      <Card aria-busy='false' data-testid='card'>
+        Current
+      </Card>
+    );
+
+    expect(screen.getByTestId('card')).toHaveAttribute('aria-busy', 'false');
+
+    rerender(
+      <Card aria-busy='false' contentState='partial' data-testid='card'>
+        Updating
+      </Card>
+    );
+
+    expect(screen.getByTestId('card')).toHaveAttribute('aria-busy', 'true');
   });
 
   it('marks long-content titles', () => {

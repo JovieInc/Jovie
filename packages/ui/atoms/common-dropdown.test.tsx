@@ -185,7 +185,7 @@ describe('CommonDropdown', () => {
         },
       ];
       render(<CommonDropdown items={items} open={true} />);
-      expect(screen.getByText('⌘C')).toBeInTheDocument();
+      expect(screen.getByText('⌘C').tagName).toBe('KBD');
     });
 
     it('renders disabled items', () => {
@@ -587,6 +587,8 @@ describe('CommonDropdown', () => {
       );
       const menu = screen.getByRole('menu');
       expect(menu).toBeInTheDocument();
+      expect(menu).toHaveAttribute('data-slot', 'common-dropdown-content');
+      expect(menu).toHaveAttribute('aria-busy', 'true');
       expect(screen.getByRole('status')).toHaveTextContent(
         'Loading menu items'
       );
@@ -598,7 +600,7 @@ describe('CommonDropdown', () => {
   describe('Empty State', () => {
     it('shows empty message when no items', () => {
       render(<CommonDropdown items={[]} open={true} />);
-      expect(screen.getByText('No items found')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('No items found');
     });
 
     it('shows custom empty message', () => {

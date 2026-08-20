@@ -251,7 +251,9 @@ describe('Tooltip', () => {
     it('applies animation classes', () => {
       render(<TestTooltip open={true} />);
       const content = screen.getByTestId('tooltip-content');
-      expect(content.className).toContain('animate-in');
+      expect(content.className).toContain('data-[state=open]:animate-in');
+      expect(content.className).not.toContain('zoom');
+      expect(content.className).not.toContain('slide');
     });
 
     it('applies reduced motion classes', () => {

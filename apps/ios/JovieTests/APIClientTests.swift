@@ -80,6 +80,10 @@ struct APIClientTests {
     let tokenProvider = MockTokenProvider(tokens: ["token-1"])
     MockURLProtocol.requestHandler = { request in
       #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer token-1")
+      #expect(
+        request.value(forHTTPHeaderField: "X-Jovie-Mobile-Capabilities")
+          == "waitlist_pending"
+      )
       #expect(request.timeoutInterval == 12)
       let response = HTTPURLResponse(
         url: request.url!,

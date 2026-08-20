@@ -68,6 +68,57 @@ def urlopen_router(payloads: dict[str, object]):
     return _open
 
 
+class MainReleaseReadySelectionTests(unittest.TestCase):
+    def test_ignores_newer_skipped_check_when_a_success_exists(self):
+        latest = MODULE.select_main_release_ready(
+            [
+                {
+                    "conclusion": "skipped",
+                    "started_at": "2026-08-17T19:46:00Z",
+                    "completed_at": "2026-08-17T19:46:00Z",
+                },
+                {
+                    "conclusion": "success",
+                    "started_at": "2026-08-17T19:45:12Z",
+                    "completed_at": "2026-08-17T19:45:16Z",
+                },
+            ]
+        )
+        self.assertEqual(latest["conclusion"], "success")
+
+    def test_prefers_in_progress_over_stale_success(self):
+        latest = MODULE.select_main_release_ready(
+            [
+                {
+                    "conclusion": "success",
+                    "started_at": "2026-08-17T19:40:00Z",
+                    "completed_at": "2026-08-17T19:40:10Z",
+                },
+                {
+                    "conclusion": None,
+                    "status": "in_progress",
+                    "started_at": "2026-08-17T19:47:00Z",
+                },
+            ]
+        )
+        self.assertEqual(latest.get("status"), "in_progress")
+
+    def test_all_skipped_falls_back_to_latest_skip(self):
+        latest = MODULE.select_main_release_ready(
+            [
+                {
+                    "conclusion": "skipped",
+                    "started_at": "2026-08-17T19:40:00Z",
+                },
+                {
+                    "conclusion": "skipped",
+                    "started_at": "2026-08-17T19:41:00Z",
+                },
+            ]
+        )
+        self.assertEqual(latest["started_at"], "2026-08-17T19:41:00Z")
+
+
 class ProductionHealthTests(unittest.TestCase):
     def test_default_uses_the_dedicated_deploy_health_contract(self):
         with (
@@ -568,6 +619,82 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertEqual(cached["target"], 16)
         self.assertIn("queue-observation-failed-used-last-known", cached["error"])
 
+    def test_controller_observation_reuses_last_known_after_connection_refused(self):
+        now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self):
+                return b'{"running":[],"retrying":[]}'
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "controller-snapshot.json"
+            with mock.patch.object(MODULE.urllib.request, "urlopen", return_value=FakeResponse()):
+                live = MODULE.observe_controller(
+                    "http://127.0.0.1:4041/api/v1/state",
+                    snapshot_path=path,
+                    now=now,
+                )
+            with mock.patch.object(
+                MODULE.urllib.request,
+                "urlopen",
+                side_effect=ConnectionRefusedError("Connection refused"),
+            ):
+                cached = MODULE.observe_controller(
+                    "http://127.0.0.1:4041/api/v1/state",
+                    snapshot_path=path,
+                    now=now + MODULE.timedelta(minutes=2),
+                )
+            with mock.patch.object(
+                MODULE.urllib.request,
+                "urlopen",
+                side_effect=ConnectionRefusedError("Connection refused"),
+            ):
+                stale = MODULE.observe_controller(
+                    "http://127.0.0.1:4041/api/v1/state",
+                    snapshot_path=path,
+                    now=now + MODULE.timedelta(minutes=11),
+                )
+
+        self.assertEqual(live["status"], "green")
+        self.assertEqual(live["source"], "live")
+        self.assertEqual(cached["status"], "green")
+        self.assertEqual(cached["source"], "last-known")
+        self.assertIn("controller-observation-failed-used-last-known", cached["error"])
+        self.assertEqual(stale["status"], "failed")
+
+    def test_last_known_green_controller_keeps_hold_intake(self):
+        now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green", "deployedSha": "b" * 40}
+        signals["independentReview"] = {
+            **GREEN_SIGNALS["independentReview"],
+            "observedAt": MODULE.isoformat(now),
+        }
+        signals["controller"] = {"status": "green", "source": "last-known"}
+        receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+
+    def test_failed_controller_observation_blocks_hold_intake(self):
+        now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green", "deployedSha": "b" * 40}
+        signals["independentReview"] = {
+            **GREEN_SIGNALS["independentReview"],
+            "observedAt": MODULE.isoformat(now),
+        }
+        signals["controller"] = {
+            "status": "failed",
+            "error": "controller-observation-failed: Connection refused",
+        }
+        receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
+        self.assertEqual(receipt["promotionMode"], "blocked")
+
     def test_queue_observation_does_not_reuse_stale_or_auth_last_known(self):
         timeout = subprocess.CalledProcessError(
             1, ["gh"], stderr="HTTP 503: No server is currently available"
@@ -644,6 +771,31 @@ class DeploymentBindingTests(unittest.TestCase):
             "production-deployment-unbound",
             {reason["code"] for reason in receipt["reasons"]},
         )
+
+    def test_unbound_release_does_not_turn_total_open_prs_into_a_fleet_hold(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green", "deployedSha": "b" * 7}
+        signals["queue"] = {
+            "status": "known",
+            "eligiblePrs": 400,
+            "greenReadyPrs": 14,
+            "target": 15,
+        }
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertEqual(
+            {reason["layer"] for reason in receipt["reasons"]}, {"promotion"}
+        )
+        self.assertTrue(receipt["workAdmission"]["allowed"])
+        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
+        self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
+        self.assertTrue(receipt["alreadyAdmittedCohort"]["newIntakeAllowed"])
+        self.assertTrue(receipt["deploymentAdmission"]["allowed"])
+        self.assertFalse(receipt["promotionAdmission"]["allowed"])
 
     def test_same_prefix_different_commit_never_binds(self):
         signals = dict(GREEN_SIGNALS)

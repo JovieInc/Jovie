@@ -185,7 +185,7 @@ docs(readme): update setup instructions
 
 ## Ship Validation (CodeRabbit Issue Planner Instruction)
 
-When generating implementation plans for GitHub issues, the plan MUST include a final **"Ship Validation"** phase as the last step. This phase ensures all changes pass quality gates before a PR is opened.
+When generating implementation plans for Linear-tracked work, the plan MUST include a final **"Ship Validation"** phase as the last step. This phase ensures all changes pass quality gates before a PR is opened. GitHub Issues are not an intake fallback.
 
 The validation phase must instruct the coding agent to run:
 

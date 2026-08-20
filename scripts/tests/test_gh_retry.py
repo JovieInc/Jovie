@@ -399,11 +399,201 @@ JSON
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\\nstderr={result.stderr}"
-        assert "bounded exact-head native re-entry after composite CI" in result.stdout
+        assert "bounded exact-head native admission" in result.stdout
         assert "exact native re-entry at " + heads["1001"] in result.stdout
         assert "exact native re-entry at " + heads["1002"] in result.stdout
         assert heads["1003"] not in result.stdout
         assert enrolled.read_text(encoding="utf-8").splitlines() == ["1001", "1002"]
+
+    def test_surviving_mutex_run_recovers_one_missed_head_with_target_under_total_cap(
+        self, tmp_path: Path
+    ) -> None:
+        """One surviving pass recovers lost clean work without exceeding two admissions."""
+        heads = {"1001": "d" * 40, "1002": "e" * 40, "1003": "f" * 40}
+        enrolled = tmp_path / "enrolled"
+        enrolled.write_text("", encoding="utf-8")
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                case "${{2:-}}" in
+                  preflight) exit 0 ;;
+                  list-state)
+                    echo '{{"1001":{{"headRefOid":"{heads["1001"]}","queued":false}},"1002":{{"headRefOid":"{heads["1002"]}","queued":false}},"1003":{{"headRefOid":"{heads["1003"]}","queued":false}}}}'
+                    ;;
+                  enroll)
+                    echo "${{3:?}}" >>"{enrolled}"
+                    head_var="${{4:?}}"
+                    echo "{{\\"state\\":{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"headRefOid\\":\\"$head_var\\",\\"mergeQueueEntry\\":{{\\"id\\":\\"MQE_${{3}}\\",\\"state\\":\\"AWAITING_CHECKS\\",\\"position\\":1}}}}}}"
+                    ;;
+                  dequeue) echo '{{"state":{{"queued":false}}}}' ;;
+                  max-queue-depth) echo 16 ;;
+                  --classify-queue) echo '[]' ;;
+                  *) echo "unexpected node args: $*" >&2; exit 2 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  cat <<'JSON'
+                [{{"n":1001,"t":"Exact event target","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/event","headOid":"{heads["1001"]}","base":"main","body":"","L":[],"fail":[]}},{{"n":1002,"t":"Missed exact event","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/missed","headOid":"{heads["1002"]}","base":"main","body":"","L":[],"fail":[]}},{{"n":1003,"t":"Deferred by total cap","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/deferred","headOid":"{heads["1003"]}","base":"main","body":"","L":[],"fail":[]}}]
+JSON
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  case "$3" in
+                    1001) head="{heads["1001"]}" ;;
+                    1002) head="{heads["1002"]}" ;;
+                    1003) head="{heads["1003"]}" ;;
+                    *) echo "unexpected PR view: $*" >&2; exit 2 ;;
+                  esac
+                  echo "{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"mergeable\\":\\"MERGEABLE\\",\\"labels\\":[],\\"headRefOid\\":\\"$head\\",\\"baseRefName\\":\\"main\\",\\"body\\":\\"\\"}}"
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then
+                  if [[ "$2" == *"/commits/"*"/status"* ]]; then
+                    echo '{{"statuses":[]}}'
+                    exit 0
+                  fi
+                  if [[ " $* " == *" -X POST "* && " $* " == *"/statuses/"* ]]; then
+                    exit 0
+                  fi
+                  # Merge-group churn is unknown in this isolated admission test.
+                  exit 1
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    f"DRAIN_ADMISSION_PR=1001 DRAIN_ADMISSION_HEAD={heads['1001']} "
+                    "DRAIN_RECONCILE_MISSED_ADMISSION=1 "
+                    "DRAIN_QUEUE_REENTRY_MAX_PER_RUN=2 "
+                    "GITHUB_RUN_ID=78 GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\\nstderr={result.stderr}"
+        assert "bounded exact-head native admission" in result.stdout
+        assert "exact missed admission at " + heads["1002"] in result.stdout
+        assert "reached total exact admission cap (2)" in result.stdout
+        assert "exact missed admission at " + heads["1001"] not in result.stdout
+        assert "exact missed admission at " + heads["1003"] not in result.stdout
+        assert enrolled.read_text(encoding="utf-8").splitlines() == ["1001", "1002"]
+
+    def test_missed_admission_recovery_refuses_a_head_that_moved(
+        self, tmp_path: Path
+    ) -> None:
+        """A green snapshot cannot authorize the PR's newer untested head."""
+        snapshot_head = "1" * 40
+        live_head = "2" * 40
+        enrolled = tmp_path / "enrolled"
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                case "${{2:-}}" in
+                  preflight) exit 0 ;;
+                  list-state) echo '{{"1001":{{"headRefOid":"{snapshot_head}","queued":false}}}}' ;;
+                  enroll) touch "{enrolled}"; exit 99 ;;
+                  max-queue-depth) echo 16 ;;
+                  --classify-queue) echo '[]' ;;
+                  *) echo "unexpected node args: $*" >&2; exit 2 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":1001,"t":"Head moved","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/moved","headOid":"{snapshot_head}","base":"main","body":"","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{live_head}","baseRefName":"main","body":""}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then exit 1; fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env="DRAIN_RECONCILE_MISSED_ADMISSION=1",
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\\nstderr={result.stderr}"
+        assert "event admission scope no longer matches #1001" in result.stdout
+        assert not enrolled.exists(), "recovery mutated the newer PR head"
+
+    def test_missed_admission_recovery_rejects_an_unbounded_cap_before_gh(
+        self, tmp_path: Path
+    ) -> None:
+        called = tmp_path / "called"
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            f"#!/usr/bin/env bash\\ntouch '{called}'\\nexit 99\\n",
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "DRAIN_RECONCILE_MISSED_ADMISSION=1 "
+                    "DRAIN_QUEUE_REENTRY_MAX_PER_RUN=3"
+                ),
+            )
+        )
+
+        assert result.returncode == 2
+        assert "must be an integer from 1 through 2" in result.stderr
+        assert not called.exists(), "drain invoked gh before bounded-cap preflight"
 
     def test_constrained_mode_refuses_missing_receipt_before_calling_gh(
         self, tmp_path: Path
@@ -715,6 +905,183 @@ JSON
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert "[dry-run] would +merge-queue on #904" in result.stdout
         assert "would record jovie-fleet-queue-hold/v1 on #904" not in result.stdout
+
+    def test_hold_intake_enrolls_exact_admission_despite_queue_deferred(
+        self, tmp_path: Path
+    ) -> None:
+        """Live #16211 was CI-green under hold-intake but autoenroll no-op'd
+        because grok-ship-one had added queue-deferred (hard gate).
+        """
+        head = "a138997d50393a3f609e47c13fc6327bc22a8892"
+        receipt = {
+            "schema": "jovie-fleet-gate/v1",
+            "state": "AMBER",
+            "promotionMode": "hold-intake",
+            "observedAt": datetime.now(timezone.utc).isoformat(),
+            "signals": {
+                "main": {"status": "green", "sha": "a" * 40},
+                "production": {"status": "green", "deployedSha": "b" * 40},
+                "controller": {"status": "green"},
+                "queue": {
+                    "status": "known",
+                    "eligiblePrs": 1,
+                    "greenReadyPrs": 1,
+                    "target": 15,
+                },
+                "integrity": {"status": "clear"},
+            },
+            "promotionAdmission": {"allowed": False},
+            "isolatedPromotionAdmission": {
+                "allowed": False,
+                "deploymentsAllowed": False,
+            },
+            "productionUnboundRepairAdmission": {
+                "allowed": True,
+                "condition": "production-deployment-unbound",
+                "mainSha": "a" * 40,
+                "deployedSha": "b" * 40,
+                "maxConcurrent": 1,
+                "deploymentsAllowed": False,
+            },
+            "alreadyAdmittedCohort": {
+                "preserve": True,
+                "newIntakeAllowed": True,
+                "semantics": "preserve-cohort-and-continue-isolated-implementation",
+            },
+        }
+        encoded = base64.b64encode(json.dumps(receipt).encode()).decode()
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":16211,"t":"Grok remount","draft":false,"m":"MERGEABLE","head":"grok/JOV-4894-fix","headOid":"{head}","base":"main","L":["queue-deferred"],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"enroll","bucket":"fail","state":"FAILURE","workflow":"Merge Queue Auto-Enroll"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[{{"name":"queue-deferred"}}],"headRefOid":"{head}","baseRefName":"main","body":"Fixes JOV-4894"}}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(
+            fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRY_RUN=1 DRAIN_PROMOTION_MODE=hold-intake "
+                    "DRAIN_ADMISSION_PR=16211 "
+                    f"DRAIN_ADMISSION_HEAD={head} DRAIN_FLEET_GATE_B64={encoded}"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "would -queue-deferred on #16211" in result.stdout
+        assert "[dry-run] would +merge-queue on #16211" in result.stdout
+
+    def test_hold_intake_missed_admission_recovers_queue_deferred_clean_head(
+        self, tmp_path: Path
+    ) -> None:
+        """Live #16187 stayed CLEAN+queue-deferred off merge-queue because
+        main-push missed-admission recovery filtered queue-deferred even
+        though hold-intake exact admission already strips that label.
+        """
+        head = "564bcf770f353f0c8a9e6c1d2b3a4e5f67890123"
+        receipt = {
+            "schema": "jovie-fleet-gate/v1",
+            "state": "AMBER",
+            "promotionMode": "hold-intake",
+            "observedAt": datetime.now(timezone.utc).isoformat(),
+            "signals": {
+                "main": {"status": "green", "sha": "a" * 40},
+                "production": {"status": "green", "deployedSha": "b" * 40},
+                "controller": {"status": "green"},
+                "queue": {
+                    "status": "known",
+                    "eligiblePrs": 1,
+                    "greenReadyPrs": 1,
+                    "target": 15,
+                },
+                "integrity": {"status": "clear"},
+            },
+            "promotionAdmission": {"allowed": False},
+            "isolatedPromotionAdmission": {
+                "allowed": False,
+                "deploymentsAllowed": False,
+            },
+            "productionUnboundRepairAdmission": {
+                "allowed": True,
+                "condition": "production-deployment-unbound",
+                "mainSha": "a" * 40,
+                "deployedSha": "b" * 40,
+                "maxConcurrent": 1,
+                "deploymentsAllowed": False,
+            },
+            "alreadyAdmittedCohort": {
+                "preserve": True,
+                "newIntakeAllowed": True,
+                "semantics": "preserve-cohort-and-continue-isolated-implementation",
+            },
+        }
+        encoded = base64.b64encode(json.dumps(receipt).encode()).decode()
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":16186,"t":"Human hold","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/human","headOid":"{"c" * 40}","base":"main","L":["needs-human"],"fail":[],"q":false}},{{"n":16187,"t":"Grok CLEAN deferred","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"grok/JOV-5041-fix","headOid":"{head}","base":"main","L":["queue-deferred","big-pr"],"fail":[],"q":false}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[{{"name":"queue-deferred"}},{{"name":"big-pr"}}],"headRefOid":"{head}","baseRefName":"main","body":"Fixes JOV-5041"}}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(
+            fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRY_RUN=1 DRAIN_PROMOTION_MODE=hold-intake "
+                    "DRAIN_RECONCILE_MISSED_ADMISSION=1 "
+                    f"DRAIN_FLEET_GATE_B64={encoded}"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "exact missed admission at " + head in result.stdout
+        assert "would -queue-deferred on #16187" in result.stdout
+        assert "[dry-run] would +merge-queue on #16187" in result.stdout
+        assert "would +merge-queue on #16186" not in result.stdout
 
     def test_draft_only_enrolls_clean_unrelated_pr(self, tmp_path: Path) -> None:
         head = "c" * 40

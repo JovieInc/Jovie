@@ -128,6 +128,7 @@ describe('Sentry Config Module', () => {
       const config = getBaseClientConfig();
 
       expect(config).toHaveProperty('dsn');
+      expect(config).toHaveProperty('release');
       expect(config).toHaveProperty('tracesSampleRate');
       expect(config).toHaveProperty('enableLogs');
       expect(config).toHaveProperty('sendDefaultPii');
@@ -155,6 +156,7 @@ describe('Sentry Config Module', () => {
       const config = getBaseServerConfig();
 
       expect(config).toHaveProperty('dsn');
+      expect(config).toHaveProperty('release');
       expect(config).toHaveProperty('tracesSampleRate');
       expect(config).toHaveProperty('enableLogs');
       expect(config).toHaveProperty('sendDefaultPii');

@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { withPreLeaseReceipts } from './pre-lease.mjs';
+
 const planGate = await import('../plan-gate.mjs');
 
 function issue(overrides = {}) {
@@ -24,7 +26,7 @@ function evidence(overrides = {}) {
     bounded: true,
     repo: 'JovieInc/Jovie',
     project: 'Jovie',
-    owner: 'machine-agent',
+    owners: { implementation: 'Symphony', verification: 'Gem' },
     scope: 'Change one control-plane module and its focused tests',
     acceptance: ['The approved receipt is written exactly once'],
     test: [
@@ -61,11 +63,13 @@ function client({ rereads = [], addCommentError = null } = {}) {
 
 describe('plan-gate/v1', () => {
   it('approves a verified concrete bounded issue and verifies the receipt by reread', async () => {
-    const original = issue();
+    const original = withPreLeaseReceipts(issue());
     const receipt = planGate.buildPlanGateReceipt(original, evidence());
-    const afterReceipt = issue({ comments: { nodes: [{ body: receipt }] } });
+    const afterReceipt = issue({
+      comments: { nodes: [...original.comments.nodes, { body: receipt }] },
+    });
     const afterLabel = issue({
-      comments: { nodes: [{ body: receipt }] },
+      comments: afterReceipt.comments,
       labels: { nodes: [{ id: 'plan-approved-id', name: 'plan-approved' }] },
     });
     const fake = client({
@@ -87,12 +91,12 @@ describe('plan-gate/v1', () => {
   });
 
   it('is an idempotent no-op for the same stable receipt', async () => {
-    const original = issue();
+    const original = withPreLeaseReceipts(issue());
     const receipt = planGate.buildPlanGateReceipt(original, evidence());
     const fake = client();
     const result = await planGate.approvePlan({
       issue: issue({
-        comments: { nodes: [{ body: receipt }] },
+        comments: { nodes: [...original.comments.nodes, { body: receipt }] },
         labels: {
           nodes: [{ id: 'plan-approved-id', name: 'plan-approved' }],
         },
@@ -166,7 +170,7 @@ describe('plan-gate/v1', () => {
     const fake = client({ addCommentError: new Error('network down') });
     await assert.rejects(
       planGate.approvePlan({
-        issue: issue(),
+        issue: withPreLeaseReceipts(issue()),
         evidence: evidence(),
         client: fake,
       }),

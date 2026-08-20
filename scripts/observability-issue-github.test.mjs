@@ -13,7 +13,26 @@ const sampleReport = {
   stacktrace: 'AppState.swift:120 in completeLaunch',
 };
 
-test('syncObservabilityIssue creates one issue for a new fingerprint', async () => {
+test('syncObservabilityIssue is hard-retired before any GitHub request', async () => {
+  const calls = [];
+
+  await assert.rejects(
+    syncObservabilityIssue({
+      token: 'test-token',
+      owner: 'JovieInc',
+      repo: 'Jovie',
+      report: sampleReport,
+      fetchImpl: async (url, init) => {
+        calls.push({ url, init });
+        throw new Error('GitHub must not be called');
+      },
+    }),
+    /GitHub observability Issue sync is retired/
+  );
+  assert.equal(calls.length, 0);
+});
+
+test.skip('historical syncObservabilityIssue creates one issue for a new fingerprint', async () => {
   const calls = [];
 
   const result = await syncObservabilityIssue({
@@ -24,12 +43,12 @@ test('syncObservabilityIssue creates one issue for a new fingerprint', async () 
     fetchImpl: async (url, init) => {
       calls.push({ url, init });
 
-      if (url.includes('/search/issues')) {
+      if (String(url).includes('/search/issues')) {
         return new Response(JSON.stringify({ items: [] }), { status: 200 });
       }
 
       if (
-        url.endsWith('/repos/JovieInc/Jovie/issues') &&
+        String(url).endsWith('/repos/JovieInc/Jovie/issues') &&
         init?.method === 'POST'
       ) {
         return new Response(JSON.stringify({ number: 10936 }), { status: 201 });
@@ -45,7 +64,7 @@ test('syncObservabilityIssue creates one issue for a new fingerprint', async () 
   assert.equal(calls.length, 2);
 });
 
-test('syncObservabilityIssue bumps occurrence counter for duplicate fingerprint', async () => {
+test.skip('historical syncObservabilityIssue bumps occurrence counter for duplicate fingerprint', async () => {
   const fingerprintLabel =
     buildObservabilityIssuePayload(sampleReport).fingerprintLabel;
   const existingBody = '<!-- observability-occurrences:12 -->\nExisting body';
@@ -60,7 +79,7 @@ test('syncObservabilityIssue bumps occurrence counter for duplicate fingerprint'
     fetchImpl: async (url, init) => {
       calls.push({ url, init });
 
-      if (url.includes('/search/issues')) {
+      if (String(url).includes('/search/issues')) {
         return new Response(
           JSON.stringify({
             items: [
@@ -76,10 +95,10 @@ test('syncObservabilityIssue bumps occurrence counter for duplicate fingerprint'
       }
 
       if (
-        url.endsWith('/repos/JovieInc/Jovie/issues/10936') &&
+        String(url).endsWith('/repos/JovieInc/Jovie/issues/10936') &&
         init?.method === 'PATCH'
       ) {
-        const body = JSON.parse(init.body);
+        const body = JSON.parse(String(init.body));
         assert.match(body.body, /observability-occurrences:500/);
         return new Response(JSON.stringify({ number: 10936 }), { status: 200 });
       }

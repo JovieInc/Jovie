@@ -36,6 +36,7 @@ struct SettingsView: View {
       .padding(JovieSpacing.large)
     }
     .scrollIndicators(.hidden)
+    .scrollDismissesKeyboard(.interactively)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .background(JovieColor.backgroundBase)
     .accessibilityIdentifier("settings-view")

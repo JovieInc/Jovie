@@ -358,3 +358,22 @@ export const AllSizes: Story = {
     </div>
   ),
 };
+
+export const AllVariants: Story = {
+  render: () => (
+    <div className='grid grid-cols-3 gap-5 rounded-xl bg-surface-0 p-6'>
+      {ICON_BUTTON_VARIANT_NAMES.map(variant => (
+        <div className='flex flex-col items-center gap-2' key={variant}>
+          <IconButton
+            ariaLabel={`${variant} action`}
+            size='md'
+            variant={variant}
+          >
+            <PlaceholderIcon />
+          </IconButton>
+          <span className='text-xs text-tertiary-token'>{variant}</span>
+        </div>
+      ))}
+    </div>
+  ),
+};

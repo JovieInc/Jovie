@@ -22,7 +22,9 @@ Scheduled workflows in `.github/workflows/`. Not Vercel crons — these run on G
 |----------|----------|---------|--------|
 | `Nightly Tests` | `30 23 * * *` America/Los_Angeles | Full unit + E2E suite, Knip dead-code audit. Starts at least 90 minutes before the fixed 09:00 UTC screenshot/Tuesday harness lanes. Alerts on failure. | `.github/workflows/nightly-tests.yml` |
 | `Nightly Testing Agent` | `30 4 * * *` PT | Risk-ranked target selection, unit telemetry, Stryker mutation hotspots, daily report commit + Redis ops snapshot. LLM-free. | `.github/workflows/nightly-testing-agent.yml` |
-| `Test Coverage Audit` | `30 18 * * *` UTC | Regenerates [`docs/TEST_COVERAGE_HEATMAP.md`](TEST_COVERAGE_HEATMAP.md) from [`TEST_RISK_REGISTER.md`](TEST_RISK_REGISTER.md) + v8 coverage after the deterministic nightly lanes. Commits if changed. | `.github/workflows/test-coverage-audit.yml` |
+| `Test Coverage Audit` | `30 18 * * *` UTC | Regenerates [`docs/TEST_COVERAGE_HEATMAP.md`](TEST_COVERAGE_HEATMAP.md) from [`TEST_RISK_REGISTER.md`](TEST_RISK_REGISTER.md) + v8 coverage after the deterministic nightly lanes. Fails on RED-surface ≥3pp drops (`test:coverage:diff`), commits if changed, Slack on failure. | `.github/workflows/test-coverage-audit.yml` |
+| `CI Duration Ratchet` | `25 6 * * *` UTC | Measures rolling p95 of recent PR merge-gate CI runs and fails + Slack-alerts when p95 exceeds the committed baseline + margin. | `.github/workflows/ci-duration-ratchet.yml` |
+| `Merge Queue Ruleset Verify` | `17 6 * * *` UTC | Live GitHub ruleset 10512119 parity (`pnpm ci:merge-queue:verify`). Also runs on `main` pushes to the ruleset/source files. Slack on failure. Not a source-PR or merge-group gate. | `.github/workflows/merge-queue-ruleset-verify.yml` |
 | `Neon Ephemeral Branch Cleanup` | (see workflow) | Reaps Neon branches created by per-PR ephemeral DB tests. | `.github/workflows/neon-ephemeral-branch-cleanup.yml` |
 
 ## Local Hermes Launchd Schedule
@@ -31,7 +33,7 @@ These are machine-local Hermes jobs, not Vercel production crons. They run from 
 
 | Unit | Schedule | Purpose | Source |
 |------|----------|---------|--------|
-| `co.jovie.hermes.cron-pipeline-scoreboard` | every 60 min | Computes the daily codex shipping funnel from the authoritative, cursor-paginated merged-PR repository connection and exact local windows; writes the schema-v3 `pipeline-scoreboard-latest.json` + gbrain `ops/pipeline-scoreboard/latest`; attributes Symphony landings only from exact `symphony/JOV-N-fix` branches merged into `main`, includes zero-hour buckets, and alerts when the 5 landed PRs/hour reliability target fails; suppresses nullable conclusions when merge evidence is incomplete and also alerts on 12h shipper stalls. | `scripts/hermes/jobs/pipeline-scoreboard.ts` |
+| `co.jovie.hermes.cron-pipeline-scoreboard` | retired | Hard-exits with `retired_linear_only` before reading or publishing historical GitHub-Issue funnel counts. The Linear-primary Gem HUD retains PR/Actions delivery reporting and fails closed when Linear backlog data is unavailable. | `scripts/hermes/jobs/pipeline-scoreboard.ts` |
 | `co.jovie.hermes.cron-gbrain-health-summary` | 07:15 local daily | Verifies the Tailscale-bound HTTP health endpoint, source freshness, and that exactly one server is running; retains `gbrain doctor` as an advisory diagnostic, writes `ops/gbrain-health/latest`, and posts the summary to Telegram/Slack. | `scripts/hermes/jobs/gbrain-health-summary.ts` |
 
 ## Production Schedule
@@ -77,6 +79,8 @@ Source of truth: `apps/web/vercel.json`. The Vercel project's Root Directory is 
 | 8 | alphabetCache | `hour % 6 === 0 && minute < 15` | Warms Spotify alphabet cache |
 | 9 | ingestionFallback | If elapsed < 50s | Claims/processes up to 2 ingestion jobs as fallback for dedicated cron |
 | 10 | redisOperability | Hourly (`minute < 15`) | Runs a namespaced `SET` / `GETDEL` / `DEL` canary with a 60-second TTL; emits a stable Sentry failure class on quota exhaustion, mismatch, or unavailability |
+| 11 | workflowApprovalRecovery | Every invocation | Recovers accepted suggested_actions missing workflow_runs enqueue |
+| 12 | youtubeLibraryRefresh | Every invocation | JOV-5136: re-syncs YouTube channels stale >24h via `runScheduledRefreshes`. No-op (`provider: null`) until the OAuth connector lands with JOV-3189 |
 
 Source: `apps/web/app/api/cron/frequent/route.ts`
 

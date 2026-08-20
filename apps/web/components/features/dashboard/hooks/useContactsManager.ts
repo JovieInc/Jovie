@@ -14,7 +14,10 @@ import type {
   ContactRole,
   DashboardContact,
   DashboardContactInput,
+  EditableContact,
 } from '@/types/contacts';
+
+export type { EditableContact };
 
 /** UI state for a contact (separate from domain data) */
 interface ContactUIState {
@@ -24,15 +27,6 @@ interface ContactUIState {
   error: string | null;
   customTerritory: string;
   isNew: boolean;
-}
-
-export interface EditableContact extends DashboardContact {
-  isExpanded?: boolean;
-  isSaving?: boolean;
-  isDeleting?: boolean;
-  error?: string | null;
-  customTerritory?: string;
-  isNew?: boolean;
 }
 
 const DEFAULT_UI_STATE: ContactUIState = {

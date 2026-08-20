@@ -1,6 +1,6 @@
 'use client';
 
-import { Plus, UserPlus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import {
@@ -223,24 +223,29 @@ export const ContactsTable = memo(function ContactsTable({
           Manage bookings, management, and press contacts for {artistName}
         </p>
 
-        {isEmpty ? null : (
-          <PageToolbar
-            start={
-              <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
-                {contacts.length}{' '}
-                {contacts.length === 1 ? 'contact' : 'contacts'}
-              </span>
-            }
-          />
-        )}
+        <PageToolbar
+          start={
+            <span
+              className={PAGE_TOOLBAR_META_TEXT_CLASS}
+              data-testid='contacts-toolbar-count'
+            >
+              {isLoading && contacts.length === 0
+                ? 'Loading contacts'
+                : `${contacts.length} ${
+                    contacts.length === 1 ? 'contact' : 'contacts'
+                  }`}
+            </span>
+          }
+        />
 
         {/* Scrollable content area */}
-        <div className='flex-1 min-h-0 overflow-auto'>
+        <div className='flex min-h-0 flex-1 overflow-auto'>
           {isEmpty ? (
             <EmptyState
-              icon={<UserPlus className='h-6 w-6' aria-hidden='true' />}
               heading='No Contacts Yet'
               description='Add bookings, management, and press contacts.'
+              presentation='workspace'
+              className='min-h-full'
             />
           ) : (
             <UnifiedTable

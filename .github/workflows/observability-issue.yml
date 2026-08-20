@@ -1,4 +1,4 @@
-name: Observability Issue Sync
+name: Observability Report (Linear)
 
 on:
   repository_dispatch:
@@ -12,10 +12,14 @@ concurrency:
 
 jobs:
   sync-issue:
+    # Producer still dispatches observability-report. GitHub Issue writes stay
+    # retired; this job files a deduped Linear issue and fails closed without
+    # LINEAR_API_KEY. Never fall back to GitHub Issues.
+    if: ${{ github.event_name == 'repository_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      issues: write
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -25,16 +29,9 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      - name: Generate Jovie Bot token
-        id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
-
       - name: Sync deduped observability issue
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           OBSERVABILITY_PAYLOAD: ${{ toJson(github.event.client_payload) }}
           OCCURRENCE_DELTA: ${{ github.event.client_payload.occurrence_delta }}
-        run: node scripts/observability-issue-github.mjs
+        run: node scripts/observability-issue-linear.mjs

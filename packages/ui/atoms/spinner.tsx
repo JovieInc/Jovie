@@ -35,8 +35,12 @@ export function Spinner({
   label = 'Loading',
 }: SpinnerProps) {
   return (
-    <output
+    <span
+      role='status'
       aria-label={label}
+      aria-live='polite'
+      aria-atomic='true'
+      data-state='loading'
       data-testid='spinner'
       data-size={size}
       data-tone={tone}
@@ -48,14 +52,20 @@ export function Spinner({
         className
       )}
     >
-      <span className='relative block h-full w-full' aria-hidden='true'>
+      <span
+        className='relative block h-full w-full'
+        aria-hidden='true'
+        data-part='spinner-ring'
+      >
         <span
+          data-part='track'
           className={cn(
             'absolute inset-0 rounded-full border-2 border-current/20',
             'transition-transform duration-subtle ease-out motion-reduce:transition-none'
           )}
         />
         <span
+          data-part='indicator'
           className={cn(
             'absolute inset-0 rounded-full border-2 border-current border-t-transparent',
             'animate-spin motion-reduce:animate-none motion-reduce:transform-none',
@@ -63,6 +73,6 @@ export function Spinner({
           )}
         />
       </span>
-    </output>
+    </span>
   );
 }

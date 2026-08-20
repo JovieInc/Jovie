@@ -52,13 +52,16 @@ in the merge queue, while network/deploy/exhaustive depth runs later.
 | **Merge queue** | combined-head `ci-fast`, five affected unit shards, one hosted build + layout workspace, path-selected hosted Xcode build/test, path-selected model-free Promptfoo/golden evals, diff secret scan, Golden Path Lock, migration policy | GitHub `merge_group` synthetic head |
 | **Release (`main`)** | exact queue proof or fail-closed direct-main fallback, then successful exact CI-attempt authorization into one `production-mutation` FIFO spanning staging, promotion, one centralized rollback owner, and final verification | completed successful `CI` workflow run for `main`; one bounded controller retry |
 | **Post-deploy** | hosted public, homepage, and live Lighthouse probes against the immutable deployment URL while the controller retains its lease; authenticated smoke is explicit optional evidence until credentials exist; final current-main/canonical check; `Production Verified` marker; event-driven Golden Path Prod Autofix (Cursor-direct, fail-closed) | successful current production release |
-| **Deep / nightly** | CodeQL, Trivy, full-history secret scans, Scorecard, SonarCloud, full E2E matrix, exhaustive suites | schedule, event, or explicit manual dispatch |
+| **Deep / nightly** | CodeQL, Trivy, full-history secret scans, Scorecard, SonarCloud, full E2E matrix, exhaustive suites, weekly Slop Gate (advisory copy smell on main) | schedule, event, or explicit manual dispatch |
 
 Rules:
 - **Heavy scans never gate a source PR or a merge-queue batch.** Running CodeQL
   ×5 + the full security suite per-PR saturated the runner pool and made Graphite
   retry-storm itself into a 6-hour stall. CodeQL / Trivy / Scorecard scan the
-  *merged* code on `main` + nightly.
+  *merged* code on `main` + nightly. **Slop Gate** is the same class: a weekly
+  post-merge copy-smell report on `main`. Taste/copy judgment is post-ship
+  (`taste-classifier` + production walkthroughs). Do not add slopcheck to
+  `PR Ready` or `ci-harness/manifest.json`.
 - **Exception — secret scanning gates PRs.** A diff-scoped gitleaks + trufflehog
   runs on every PR (~10s, 1 slot): a leaked key on this **public** repo is scraped
   within seconds of hitting `main`, so it is EVENT-class and must be caught
@@ -96,12 +99,16 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
 
 ## 3. Merge: autonomous, per-PR, self-healing
 
-- **Enrollment is automatic and event-scoped.** `merge-queue-autoenroll`
-  revalidates only the PR associated with the triggering PR/CI event at that
-  event's exact published head. Main-push and untargeted manual runs retain
-  global dequeue/reconciliation authority but cannot create new admissions.
-  Enrollment uses GitHub's native queue; `merge-queue` remains intent/audit
-  evidence only. You don't merge by hand.
+- **Enrollment is automatic, exact-head, and bounded.**
+  `merge-queue-autoenroll` first revalidates the PR associated with the
+  triggering PR/CI event at that event's exact published head. Because GitHub's
+  shared concurrency group retains only one pending run, every surviving pass
+  may also recover a tiny deterministic cohort whose source-required checks are
+  freshly green. The event target, native re-entry, and missed-event recovery
+  share a hard cap of two admissions per run, the App-backed controller remains
+  the sole writer, and every mutation rechecks the live head, labels, base,
+  queue depth, and native postcondition. Enrollment uses GitHub's native queue;
+  `merge-queue` remains intent/audit evidence only. You don't merge by hand.
 - **The queue tolerates transient state.** A PR is only dequeued on a real merge
   conflict, `needs-conflict-resolution`, or a **terminal** failing check
   (`FAILURE`/`ERROR`/`TIMED_OUT`/`ACTION_REQUIRED`). A `pending`/`queued`/`cancelled`

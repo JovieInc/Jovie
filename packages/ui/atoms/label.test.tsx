@@ -29,6 +29,9 @@ describe('Label', () => {
       render(<Label data-testid='label'>Email</Label>);
       const label = screen.getByTestId('label');
       expect(label.className).toContain('text-primary-token');
+      expect(label).toHaveAttribute('data-variant', 'default');
+      expect(label).toHaveAttribute('data-required', 'false');
+      expect(label).toHaveAttribute('data-disabled', 'false');
     });
 
     it('applies muted variant classes', () => {
@@ -56,6 +59,10 @@ describe('Label', () => {
     it('shows required indicator when required is true', () => {
       render(<Label required>Email</Label>);
       expect(screen.getByText('*')).toBeInTheDocument();
+      expect(screen.getByText('Email')).toHaveAttribute(
+        'data-required',
+        'true'
+      );
     });
 
     it('includes screen reader text for required', () => {
@@ -80,6 +87,8 @@ describe('Label', () => {
       render(<Label data-testid='label'>Email</Label>);
       const label = screen.getByTestId('label');
       expect(label.className).toContain('text-[13px]');
+      expect(label.className).toContain('inline-flex');
+      expect(label.className).toContain('cursor-pointer');
       expect(label.className).toContain('font-medium');
       expect(label.className).toContain('leading-none');
     });
@@ -88,7 +97,24 @@ describe('Label', () => {
       render(<Label data-testid='label'>Email</Label>);
       const label = screen.getByTestId('label');
       expect(label.className).toContain('peer-disabled:cursor-not-allowed');
-      expect(label.className).toContain('peer-disabled:opacity-70');
+      expect(label.className).toContain(
+        'peer-disabled:opacity-[var(--state-disabled-opacity)]'
+      );
+    });
+
+    it('exposes an explicit accessible disabled state', () => {
+      render(
+        <Label disabled data-testid='label'>
+          Locked field
+        </Label>
+      );
+
+      const label = screen.getByTestId('label');
+      expect(label).toHaveAttribute('aria-disabled', 'true');
+      expect(label).toHaveAttribute('data-disabled', 'true');
+      expect(label.className).toContain(
+        'data-[disabled=true]:text-(--color-text-disabled-token)'
+      );
     });
 
     it('merges custom className', () => {

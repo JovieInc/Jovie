@@ -1,4 +1,4 @@
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { Spinner as LoadingSpinner } from '@jovie/ui';
 import { cn } from '@/lib/utils';
 
 interface FormStatusProps {

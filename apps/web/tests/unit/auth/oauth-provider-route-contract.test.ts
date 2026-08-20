@@ -35,4 +35,12 @@ describe('OAuth provider auth-page route contract', () => {
 
     expect(configuredPages).toEqual(['/identity', '/identity', '/identity']);
   });
+
+  it('requires explicit Google account selection', async () => {
+    const authSource = await readFile(betterAuthConfig, 'utf8');
+
+    expect(authSource).toMatch(
+      /providers\.google\s*=\s*\{[\s\S]*?prompt:\s*'select_account'/
+    );
+  });
 });

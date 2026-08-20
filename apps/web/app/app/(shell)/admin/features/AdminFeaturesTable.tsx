@@ -1,9 +1,9 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-import * as Switch from '@radix-ui/react-switch';
+import { Button, IconButton, Switch } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { RotateCcw } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
 import { PageToolbar, TableEmptyState } from '@/components/organisms/table';
@@ -11,6 +11,10 @@ import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { FlagEnvTier } from '@/lib/flags/env-tier';
+import {
+  FlagChangeConfirmDialog,
+  type FlagChangeConfirmRequest,
+} from './FlagChangeConfirmDialog';
 
 interface FeatureFlagRow {
   readonly flagKey: string;
@@ -87,26 +91,18 @@ function FlagEnvCell({
   return (
     <div className='flex flex-col items-center gap-1 py-0.5'>
       <div className='flex items-center justify-center gap-1.5'>
-        <Switch.Root
+        <Switch
           checked={effective}
           disabled={pending}
           onCheckedChange={onSet}
           aria-label={switchLabel}
-          className={`relative h-4 w-7 shrink-0 cursor-pointer rounded-full outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-            effective ? 'bg-accent' : 'bg-surface-3'
-          } ${overridden ? '' : 'opacity-70'}`}
-        >
-          <Switch.Thumb
-            className={`block h-3 w-3 rounded-full bg-white shadow-sm transition-transform dark:bg-white ${
-              effective ? 'translate-x-3.5' : 'translate-x-0.5'
-            }`}
-          />
-        </Switch.Root>
+          className={overridden ? undefined : 'opacity-70'}
+        />
         {/* Reserve the reset slot in every cell so toggling never shifts layout. */}
-        <Button
+        <IconButton
           type='button'
-          variant='ghost'
-          size='icon'
+          variant='inline'
+          size='xs'
           onClick={onClear}
           disabled={pending || !overridden}
           title={overridden ? 'Reset to default' : undefined}
@@ -119,12 +115,12 @@ function FlagEnvCell({
               : 'flag-reset-slot'
           }
           data-overridden={overridden ? 'true' : 'false'}
-          className={`h-auto w-auto shrink-0 p-0 text-quaternary-token transition-opacity hover:text-secondary-token ${
+          className={`shrink-0 transition-opacity ${
             overridden ? 'opacity-100' : 'pointer-events-none opacity-0'
           }`}
         >
           <RotateCcw size={11} aria-hidden />
-        </Button>
+        </IconButton>
       </div>
       <span
         className='whitespace-nowrap text-2xs leading-none text-secondary-token'
@@ -183,17 +179,32 @@ function FlagNameCell({
   );
 }
 
+interface PendingProdChange {
+  readonly flagKey: string;
+  readonly flagName: string;
+  readonly tier: FlagEnvTier;
+  readonly next: boolean | null;
+  readonly confirm: FlagChangeConfirmRequest;
+}
+
 export function AdminFeaturesTable({
   initialRows,
   currentTier,
 }: AdminFeaturesTableProps) {
+  const router = useRouter();
   const [rows, setRows] = useState<FeatureFlagRow[]>(() =>
     initialRows.map(row => ({ ...row }))
   );
   const [pending, setPending] = useState<ReadonlySet<string>>(new Set());
+  const [prodChange, setProdChange] = useState<PendingProdChange | null>(null);
 
   const writeCell = useCallback(
-    async (flagKey: string, tier: FlagEnvTier, next: boolean | null) => {
+    async (
+      flagKey: string,
+      tier: FlagEnvTier,
+      next: boolean | null,
+      reason?: string
+    ) => {
       const cellId = `${flagKey}:${tier}`;
       const previous = rows.find(r => r.flagKey === flagKey)?.[tier] ?? null;
 
@@ -207,9 +218,16 @@ export function AdminFeaturesTable({
         const res = await fetch('/api/admin/feature-flags', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ flagKey, envTier: tier, enabled: next }),
+          body: JSON.stringify({
+            flagKey,
+            envTier: tier,
+            enabled: next,
+            reason,
+          }),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        // Refresh so the audit section picks up the new event.
+        router.refresh();
       } catch {
         // Revert on failure.
         setRows(prev =>
@@ -218,6 +236,7 @@ export function AdminFeaturesTable({
           )
         );
         toast.error('Could not save flag. Try again.');
+        throw new Error('flag write failed');
       } finally {
         setPending(prev => {
           const nextSet = new Set(prev);
@@ -226,7 +245,35 @@ export function AdminFeaturesTable({
         });
       }
     },
-    [rows]
+    [rows, router]
+  );
+
+  /** Prod changes go through the confirmation dialog (reason required). */
+  const requestWrite = useCallback(
+    (
+      flagKey: string,
+      flagName: string,
+      tier: FlagEnvTier,
+      next: boolean | null
+    ) => {
+      if (tier !== 'prod') {
+        void writeCell(flagKey, tier, next).catch(() => undefined);
+        return;
+      }
+      const action =
+        next === null ? 'reset to its default' : next ? 'enable' : 'disable';
+      setProdChange({
+        flagKey,
+        flagName,
+        tier,
+        next,
+        confirm: {
+          title: `Confirm production change`,
+          description: `This will ${action} ${flagName} (${flagKey}) in production.`,
+        },
+      });
+    },
+    [writeCell]
   );
 
   const columns = useMemo(
@@ -264,10 +311,20 @@ export function AdminFeaturesTable({
                 envLabel={tier.label}
                 isCurrentTier={tier.key === currentTier}
                 onSet={next =>
-                  writeCell(info.row.original.flagKey, tier.key, next)
+                  requestWrite(
+                    info.row.original.flagKey,
+                    info.row.original.name,
+                    tier.key,
+                    next
+                  )
                 }
                 onClear={() =>
-                  writeCell(info.row.original.flagKey, tier.key, null)
+                  requestWrite(
+                    info.row.original.flagKey,
+                    info.row.original.name,
+                    tier.key,
+                    null
+                  )
                 }
               />
             ),
@@ -275,7 +332,7 @@ export function AdminFeaturesTable({
           })
         ),
       ] as ColumnDef<FeatureFlagRow, unknown>[],
-    [currentTier, pending, writeCell]
+    [currentTier, pending, requestWrite]
   );
 
   const toolbar = (
@@ -291,20 +348,38 @@ export function AdminFeaturesTable({
   );
 
   return (
-    <AdminTableShell testId='admin-features-table' toolbar={toolbar}>
-      {() => (
-        <AdminDataTable
-          data={rows}
-          columns={columns}
-          enableVirtualization={false}
-          emptyState={
-            <TableEmptyState
-              heading='No feature flags'
-              description='No runtime flags are registered.'
-            />
-          }
-        />
-      )}
-    </AdminTableShell>
+    <>
+      <AdminTableShell testId='admin-features-table' toolbar={toolbar}>
+        {() => (
+          <AdminDataTable
+            data={rows}
+            columns={columns}
+            enableVirtualization={false}
+            emptyState={
+              <TableEmptyState
+                heading='No feature flags'
+                description='No runtime flags are registered.'
+              />
+            }
+          />
+        )}
+      </AdminTableShell>
+      <FlagChangeConfirmDialog
+        request={prodChange?.confirm ?? null}
+        open={prodChange !== null}
+        onOpenChange={open => {
+          if (!open) setProdChange(null);
+        }}
+        onConfirm={async reason => {
+          if (!prodChange) return;
+          await writeCell(
+            prodChange.flagKey,
+            prodChange.tier,
+            prodChange.next,
+            reason
+          );
+        }}
+      />
+    </>
   );
 }

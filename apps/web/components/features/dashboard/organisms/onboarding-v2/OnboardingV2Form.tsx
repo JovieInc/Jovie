@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Spinner as LoadingSpinner } from '@jovie/ui';
 import { ArrowRight, Disc3, Lock, Music2, RefreshCw } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -15,7 +15,6 @@ import {
 } from 'react';
 import { connectOnboardingSpotifyArtist } from '@/app/onboarding/actions/connect-spotify';
 import { enrichProfileFromDsp } from '@/app/onboarding/actions/enrich-profile';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { OnboardingExperienceShell } from '@/components/features/onboarding/OnboardingExperienceShell';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { getProfileUrl } from '@/constants/domains';
@@ -132,6 +131,7 @@ const SIDEBAR_STEPS: ReadonlyArray<Readonly<{ id: StepId; label: string }>> = [
   { id: 'handle', label: 'Handle' },
   { id: 'spotify', label: 'Spotify' },
   { id: 'upgrade', label: 'Plan' },
+  // eslint-disable-next-line @jovie/canonical-ui-label-casing -- DSP is an industry-standard initialism.
   { id: 'dsp', label: 'DSPs' },
   { id: 'social', label: 'Social' },
   { id: 'releases', label: 'Releases' },
@@ -698,12 +698,12 @@ function OnboardingSidebar({
     SIDEBAR_STEPS[currentIndex]?.label ?? SIDEBAR_STEPS[0].label;
 
   return (
-    <nav aria-label='Onboarding steps'>
+    <nav aria-label='Onboarding Steps'>
       {onBack ? (
         <button
           type='button'
           onClick={onBack}
-          aria-label='Go back'
+          aria-label='Go Back'
           className='mb-3 flex h-7 w-7 items-center justify-center rounded-lg text-tertiary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
         >
           <ArrowRight className='h-4 w-4 rotate-180' />
@@ -925,6 +925,7 @@ export function OnboardingV2Form({
     onCompleted: result => {
       setProfileId(result.profileId);
     },
+    // eslint-disable-next-line react-hooks/refs -- This stable mount timestamp configures the hook and is never rendered.
     onboardingStartedAtMs: onboardingStartedAtRef.current,
     setProfileReadyHandle: setProfileHandle,
     shouldAutoSubmitHandle,
@@ -1820,7 +1821,7 @@ export function OnboardingV2Form({
                   onClick={advanceFromStep}
                   variant='secondary'
                 >
-                  Continue free
+                  Continue Free
                 </Button>
                 <Button
                   onClick={() => {
@@ -1831,7 +1832,7 @@ export function OnboardingV2Form({
                     );
                   }}
                 >
-                  Upgrade now
+                  Upgrade Now
                 </Button>
               </>
             }
@@ -2094,7 +2095,7 @@ export function OnboardingV2Form({
             prompt='Discovery kept running while you moved through onboarding.'
             actions={
               <Button onClick={advanceFromStep}>
-                Finish setup
+                Finish Setup
                 <ArrowRight className='ml-1 h-4 w-4' />
               </Button>
             }
@@ -2130,7 +2131,7 @@ export function OnboardingV2Form({
                   onClick={handleOpenDashboard}
                   variant='ghost'
                 >
-                  Open dashboard
+                  Open Dashboard
                   <ArrowRight className='ml-1 h-4 w-4' />
                 </Button>
               </>

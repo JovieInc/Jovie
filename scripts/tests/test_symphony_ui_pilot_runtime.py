@@ -39,6 +39,8 @@ RECONCILER_SERVICE = ROOT / "scripts/hermes/systemd/symphony-reconciler.service"
 RECONCILER_TIMER = ROOT / "scripts/hermes/systemd/symphony-reconciler.timer"
 INSTALLER = ROOT / "scripts/hermes/install-symphony-ui-pilot.sh"
 FLEET_INSTALLER = ROOT / "scripts/hermes/install-gem-fleet-controller.sh"
+REHAB_INSTALLER = ROOT / "scripts/hermes/install-gem-pr-rehabilitation.sh"
+USER_SYSTEMD_LIB = ROOT / "scripts/hermes/lib/user-systemd-context.sh"
 INTAKE_WORKFLOW = ROOT / ".github/workflows/jovie-intake-controller.yml"
 ACTIVATION_WORKFLOW = ROOT / ".github/workflows/gem-delivery-controller-activation.yml"
 ACTIONLINT_CONFIG = ROOT / ".github/actionlint.yaml"
@@ -237,6 +239,107 @@ def test_fleet_installer_fails_visible_before_writes_without_user_systemd(
     assert result.returncode == 4
     assert "Gem user systemd preflight failed; refusing controller writes" in result.stderr
     assert not (tmp_path / "gem-workspace/state/backups").exists()
+
+
+def _run_rehab_systemd_preflight(
+    tmp_path: Path, systemctl_returncode: int, *, require_socket: bool = False
+) -> tuple[subprocess.CompletedProcess[str], Path]:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    fake_id = bin_dir / "id"
+    fake_id.write_text(
+        "#!/usr/bin/env bash\n"
+        "if [[ \"${1:-}\" == -u ]]; then printf '4242\\n'; else /usr/bin/id \"$@\"; fi\n"
+    )
+    fake_id.chmod(0o755)
+    log = tmp_path / "systemctl.log"
+    fake_systemctl = bin_dir / "systemctl"
+    fake_systemctl.write_text(
+        "#!/usr/bin/env bash\n"
+        "printf 'command=%s\\n' \"$*\" > \"$FLEET_PREFLIGHT_LOG\"\n"
+        "printf 'XDG_RUNTIME_DIR=%s\\n' \"${XDG_RUNTIME_DIR:-}\" >> \"$FLEET_PREFLIGHT_LOG\"\n"
+        "printf 'DBUS_SESSION_BUS_ADDRESS=%s\\n' \"${DBUS_SESSION_BUS_ADDRESS:-}\" >> \"$FLEET_PREFLIGHT_LOG\"\n"
+        "exit \"$FLEET_SYSTEMCTL_RETURNCODE\"\n"
+    )
+    fake_systemctl.chmod(0o755)
+    env = dict(os.environ)
+    env.pop("XDG_RUNTIME_DIR", None)
+    env.pop("DBUS_SESSION_BUS_ADDRESS", None)
+    env.pop("GEM_SYSTEMD_REQUIRE_BUS_SOCKET", None)
+    env.update(
+        {
+            "GEM_REHABILITATION_PREFLIGHT_ONLY": "true",
+            "FLEET_PREFLIGHT_LOG": str(log),
+            "FLEET_SYSTEMCTL_RETURNCODE": str(systemctl_returncode),
+            "GEM_WORKSPACE": str(tmp_path / "gem-workspace"),
+            "PATH": f"{bin_dir}:{env['PATH']}",
+        }
+    )
+    if require_socket:
+        env["GEM_SYSTEMD_REQUIRE_BUS_SOCKET"] = "1"
+    result = subprocess.run(
+        ["bash", str(REHAB_INSTALLER)],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result, log
+
+
+def test_rehab_installer_establishes_user_systemd_context_before_writes(
+    tmp_path: Path,
+) -> None:
+    result, log = _run_rehab_systemd_preflight(tmp_path, 0)
+    assert result.returncode == 0, result.stderr
+    assert "Gem user systemd preflight passed" in result.stdout
+    assert log.read_text().splitlines() == [
+        "command=--user show-environment",
+        "XDG_RUNTIME_DIR=/run/user/4242",
+        "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/4242/bus",
+    ]
+    assert not (tmp_path / "gem-workspace/state/backups").exists()
+
+
+def test_rehab_installer_fails_visible_before_writes_without_user_systemd(
+    tmp_path: Path,
+) -> None:
+    result, _ = _run_rehab_systemd_preflight(tmp_path, 1)
+    assert result.returncode == 4
+    assert "Gem user systemd preflight failed; refusing controller writes" in result.stderr
+    assert not (tmp_path / "gem-workspace/state/backups").exists()
+
+
+def test_user_systemd_lib_fail_closes_on_missing_bus_socket(tmp_path: Path) -> None:
+    result, _ = _run_rehab_systemd_preflight(tmp_path, 0, require_socket=True)
+    assert result.returncode == 4
+    assert "missing bus socket" in result.stderr
+    assert not (tmp_path / "gem-workspace/state/backups").exists()
+
+
+def test_activation_exports_user_systemd_before_both_installers() -> None:
+    activation = ACTIVATION_WORKFLOW.read_text()
+    establish = activation.index("Establish lingering user-systemd session")
+    install = activation.index("bash scripts/hermes/install-gem-fleet-controller.sh")
+    rehab = activation.index("bash scripts/hermes/install-gem-pr-rehabilitation.sh")
+    assert establish < install < rehab
+    assert "GITHUB_ENV" in activation
+    assert "XDG_RUNTIME_DIR" in activation
+    assert "DBUS_SESSION_BUS_ADDRESS" in activation
+    assert "GEM_SYSTEMD_REQUIRE_BUS_SOCKET=1" in activation
+    assert "test -S" in activation
+    assert "systemctl --user show-environment" in activation
+    lib = USER_SYSTEMD_LIB.read_text()
+    assert "prepare_user_systemd_context" in lib
+    fleet = FLEET_INSTALLER.read_text()
+    rehab_src = REHAB_INSTALLER.read_text()
+    assert "lib/user-systemd-context.sh" in fleet
+    assert "lib/user-systemd-context.sh" in rehab_src
+    assert "prepare_user_systemd_context" in rehab_src
+    # 4041 health remains the post-install attestation, not a skipped stub.
+    assert "http://127.0.0.1:4041/api/v1/state" in activation
+    assert 'has("running") and has("retrying") and has("blocked")' in activation
 
 
 def test_workflow_server_and_workspace() -> None:

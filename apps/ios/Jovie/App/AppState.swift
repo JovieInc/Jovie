@@ -90,6 +90,7 @@ final class AppState {
       dashboardState = .idle
     case .uiTestingReady,
          .uiTestingChat,
+         .uiTestingWhatsNew,
          .uiTestingSettings,
          .uiTestingVenueMode,
          .uiTestingAudience,
@@ -102,19 +103,20 @@ final class AppState {
       route = .ready
       dashboardState = .loaded(.previewReady)
       isOffline = false
-    case .uiTestingChatEntityFixture:
-      // Unlike the other `.ready` UI-testing modes, this one needs a real
-      // `ChatRepository` instance so `RootView` can seed it with
-      // `MobileChatEntityFixture.default` -- that seeding only happens
-      // inside the `.task(id: appState.activeUserID)` block, which
-      // short-circuits to a nil repository (rendering the empty-state
-      // placeholder instead of the fixture transcript) unless
+    case .uiTestingChatEntityFixture, .uiTestingChatAllComponents:
+      // Unlike the other `.ready` UI-testing modes, fixture chat modes need a
+      // real `ChatRepository` instance so `RootView` can seed the timeline --
+      // that seeding only happens inside the `.task(id: appState.activeUserID)`
+      // block, which short-circuits to a nil repository (rendering the
+      // empty-state placeholder instead of the fixture transcript) unless
       // `activeUserID` is non-nil. Mirrors the synthetic id already used by
       // the auth-callback UI-testing path (`"user_ui_auth_callback"`).
       route = .ready
       dashboardState = .loaded(.previewReady)
       isOffline = false
-      activeUserID = "user_ui_testing_chat_entity_fixture"
+      activeUserID = launchMode == .uiTestingChatAllComponents
+        ? "user_ui_testing_chat_all_components"
+        : "user_ui_testing_chat_entity_fixture"
     case .uiTestingQRUnavailable:
       route = .ready
       dashboardState = .loaded(.previewReadyWithoutQR)
@@ -130,6 +132,10 @@ final class AppState {
     case .uiTestingNeedsOnboarding, .uiTestingNeedsOnboardingUnauthorized:
       route = .needsOnboarding
       dashboardState = .idle
+      isOffline = false
+    case .uiTestingWaitlistPending:
+      route = .waitlistPending
+      dashboardState = .loaded(.previewWaitlistPending)
       isOffline = false
     case .uiTestingSplash:
       route = .launching
@@ -210,6 +216,16 @@ final class AppState {
           "route_needs_onboarding",
           detail: "state=needs_onboarding"
         )
+      case .waitlistPending:
+        apply(response: result.response)
+        Observability.addBreadcrumb(
+          .appRouteAfterLogin,
+          context: ["route": "waitlist_pending"]
+        )
+        MobileAuthDiagnostics.record(
+          "route_waitlist_pending",
+          detail: "state=waitlist_pending"
+        )
       }
     } catch {
       guard activeUserID == userID, loadingUserID == userID else { return }
@@ -247,6 +263,9 @@ final class AppState {
       route = .needsOnboarding
       // Keep the resolved profile payload so continueOnWebURL and cache paint
       // stay instant — .idle forced a generic fallback URL and extra reload work.
+      dashboardState = .loaded(response)
+    case .waitlistPending:
+      route = .waitlistPending
       dashboardState = .loaded(response)
     }
   }

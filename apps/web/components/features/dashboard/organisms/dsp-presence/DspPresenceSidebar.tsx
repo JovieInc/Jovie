@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, ConfirmDialog } from '@jovie/ui';
 
 import Image from 'next/image';
 import { useCallback, useState } from 'react';
@@ -8,7 +8,6 @@ import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataConte
 import type { DspPresenceItem } from '@/app/app/(shell)/dashboard/presence/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { toast } from '@/components/feedback';
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
 import { EntityHeaderCard } from '@/components/molecules/drawer/EntityHeaderCard';
 import { EntitySidebarShell } from '@/components/molecules/drawer/EntitySidebarShell';

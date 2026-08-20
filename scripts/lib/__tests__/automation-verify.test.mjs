@@ -68,6 +68,7 @@ const GEM_PR_REHABILITATION_LANE = [
   'scripts/hermes/gem_gate_contract.py',
   'scripts/hermes/gem_repo_registry.py',
   'scripts/hermes/gem_rehabilitation_policy.py',
+  'scripts/hermes/install-gem-fleet-controller.sh',
   'scripts/hermes/install-gem-pr-rehabilitation.sh',
   'scripts/hermes/model-router.py',
   'scripts/hermes/systemd/gem-pr-drain.service',
@@ -86,9 +87,11 @@ const GEM_PR_REHABILITATION_LANE = [
 ];
 const MERGE_QUEUE_CONTROLLER_INPUTS = [
   '.github/workflows/merge-queue-autoenroll.yml',
+  'docs/PR_FLOW.md',
   'scripts/ci-merge-queue-check.mjs',
   'scripts/drain-pr-queue.sh',
   'scripts/lib/merge-queue-guard.mjs',
+  'scripts/lib/resolve-merge-group-path-diff.mjs',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
@@ -167,6 +170,12 @@ const VERCEL_CONGESTION_CONTROL_MANIFEST = [
 const AFFECTED_TEST_SELECTOR_MANIFEST = [
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
+];
+const SAFE_PR_REMEDIATION_LANE = [
+  '.github/workflows/safe-pr-remediation.yml',
+  'scripts/lib/safe-pr-remediation.mjs',
+  'scripts/lib/__tests__/safe-pr-remediation.test.mjs',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ];
 const EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST = [
   '.github/workflows/fleet-gate-refresh.yml',
@@ -655,6 +664,43 @@ describe('automation-verify affected scope', () => {
         'apps/ios/Jovie/RootView.swift',
       ]).mode
     ).toBe('full');
+  });
+
+  it('selects the bounded safe PR remediation contract and fails closed on unrelated files', () => {
+    expect(buildAffectedTestPlan(SAFE_PR_REMEDIATION_LANE)).toMatchObject({
+      mode: 'selected',
+      selectedTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: [
+        'scripts/lib/__tests__/safe-pr-remediation.test.mjs',
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+      ],
+      nodeTests: ['scripts/typecheck-scripts.mjs'],
+    });
+    expect(
+      buildAffectedTestPlan([
+        ...SAFE_PR_REMEDIATION_LANE,
+        'apps/web/lib/unknown-safe-remediation-peer.ts',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('routes fleet controller installer repairs to the Gem rehabilitation lane', () => {
+    expect(
+      buildAffectedTestPlan([
+        'scripts/hermes/install-gem-fleet-controller.sh',
+        'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
+      ])
+    ).toMatchObject({
+      mode: 'selected',
+      pythonUnittestTests: expect.arrayContaining([
+        'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
+      ]),
+      scriptVitestTests: expect.arrayContaining([
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+      ]),
+    });
   });
 
   it('fails closed on an unresolved base and retains mandatory risk policy', () => {

@@ -175,6 +175,28 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     });
   });
 
+  it('preserves central native auth state through OAuth success, error, and new-user callbacks', async () => {
+    const user = userEvent.setup();
+    const centralCallback = '/auth/callback?state=state_1234567890';
+    render(<AuthShell mode='sign-in' fallbackRedirectUrl={centralCallback} />);
+
+    const google = await screen.findByRole('button', { name: /google/i });
+    await waitFor(() => expect(google).toBeEnabled());
+    await user.click(google);
+
+    await waitFor(() => {
+      expect(signInSocialMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: 'google',
+          callbackURL: centralCallback,
+          errorCallbackURL:
+            '/signin?auth_state=state_1234567890&error=oauth_failed',
+          newUserCallbackURL: centralCallback,
+        })
+      );
+    });
+  });
+
   it('starts Apple sign-up through Better Auth social with sign-up callbacks', async () => {
     const user = userEvent.setup();
     render(<AuthShell mode='sign-up' />);

@@ -6,8 +6,9 @@
 # Output: commits an updated heatmap to main only when values change and uploads
 # daily unit coverage to Codecov.
 # Also commits apps/web/reports/test-coverage-snapshot.json (machine-readable
-# baseline) so any PR can run `pnpm run test:coverage:diff` and compare to
-# the canonical baseline from main.
+# baseline) so the nightly `pnpm run test:coverage:diff` check (and local
+# `test:coverage:diff`) can compare to the canonical baseline from main.
+# Failures notify Slack. GitHub Issues are not a backlog destination.
 #
 # Strategy spec: docs/TEST_RISK_REGISTER.md
 # Generator:    scripts/audit-test-coverage.ts
@@ -38,7 +39,8 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: write
-      issues: write
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -56,6 +58,12 @@ jobs:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
           CLERK_SECRET_KEY: sk_test_dummy_secret_for_coverage_run_only
         run: pnpm --filter @jovie/web test:coverage
+
+      - name: Check RED-surface coverage drift
+        # Compare the just-collected coverage against the committed snapshot
+        # before rewriting it. Exits 1 on RED-surface drops ≥3pp.
+        # Merge-queue unit shards stay coverage-off by PR_FLOW doctrine.
+        run: pnpm run test:coverage:diff
 
       - name: Generate heatmap
         run: pnpm exec tsx scripts/audit-test-coverage.ts
@@ -93,25 +101,32 @@ jobs:
             -m "Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
           git push
 
-      - name: Notify on failure
-        if: failure() || cancelled()
+      - name: Slack alert on failure
+        if: ${{ failure() && env.SLACK_WEBHOOK_URL != '' }}
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
-          # Surface cron failures as a Linear-trackable GitHub issue rather
-          # than silently letting the nightly heatmap go stale.
-          gh label create "test-coverage-audit-failure" \
-            --color "B60205" \
-            --description "Nightly test coverage audit failures" \
-            --force
-          gh issue list --label "test-coverage-audit-failure" --state open --json number --jq '.[].number' | head -1 | grep -q . && {
-            echo "Existing failure issue open — skipping new file."
-            exit 0
+          set -euo pipefail
+          PAYLOAD=$(cat <<EOF
+          {
+            "text": "Nightly test coverage audit failed",
+            "attachments": [
+              {
+                "color": "danger",
+                "fields": [
+                  { "title": "Workflow", "value": "Test Coverage Audit", "short": true },
+                  { "title": "Status", "value": "Failed", "short": true },
+                  { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
+                ]
+              }
+            ]
           }
-          gh issue create \
-            --title "Nightly test-coverage-audit failed ($(date -u +%Y-%m-%d))" \
-            --body "The nightly heatmap refresh failed. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --label "test-coverage-audit-failure"
+          EOF
+          )
+          curl -sS -X POST \
+            -H 'Content-type: application/json' \
+            --data "$PAYLOAD" \
+            "$SLACK_WEBHOOK_URL"
 
       - name: Upload artifacts
         if: always()

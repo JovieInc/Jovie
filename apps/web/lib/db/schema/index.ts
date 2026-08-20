@@ -456,7 +456,9 @@ export {
 } from './enums';
 // Feature flag per-environment overrides
 export {
+  type FeatureFlagAuditEventRow,
   type FeatureFlagOverrideRow,
+  featureFlagAuditEvents,
   featureFlagOverrides,
 } from './feature-flags';
 // Feedback
@@ -816,6 +818,11 @@ export {
   onboardingScriptLines,
   selectOnboardingScriptLineSchema,
 } from './onboarding-script';
+// Ovie MCP operating records (initiatives / decisions)
+export {
+  type OvieOperatingKvRow,
+  ovieOperatingKv,
+} from './ovie';
 // Pixel Tracking (Events, Creator Configs)
 export {
   type CreatorPixel,
@@ -892,12 +899,18 @@ export {
   type CreatorAvatarCandidate,
   type CreatorClaimInvite,
   type CreatorContact,
+  type CreatorContactAssignment,
+  type CreatorContactPerson,
+  type CreatorContactResponsibility,
   type CreatorDistributionEvent,
   type CreatorDistributionEventMetadata,
   type CreatorProfile,
   type CreatorProfileAttribute,
   creatorAvatarCandidates,
   creatorClaimInvites,
+  creatorContactAssignments,
+  creatorContactPeople,
+  creatorContactResponsibilities,
   creatorContacts,
   creatorDistributionEvents,
   creatorProfileAttributes,
@@ -905,6 +918,9 @@ export {
   type FitScoreBreakdown,
   insertCreatorAvatarCandidateSchema,
   insertCreatorClaimInviteSchema,
+  insertCreatorContactAssignmentSchema,
+  insertCreatorContactPersonSchema,
+  insertCreatorContactResponsibilitySchema,
   insertCreatorContactSchema,
   insertCreatorDistributionEventSchema,
   insertCreatorProfileAttributeSchema,
@@ -915,6 +931,9 @@ export {
   type NewCreatorAvatarCandidate,
   type NewCreatorClaimInvite,
   type NewCreatorContact,
+  type NewCreatorContactAssignment,
+  type NewCreatorContactPerson,
+  type NewCreatorContactResponsibility,
   type NewCreatorDistributionEvent,
   type NewCreatorProfile,
   type NewCreatorProfileAttribute,
@@ -929,6 +948,9 @@ export {
   profilePhotos,
   selectCreatorAvatarCandidateSchema,
   selectCreatorClaimInviteSchema,
+  selectCreatorContactAssignmentSchema,
+  selectCreatorContactPersonSchema,
+  selectCreatorContactResponsibilitySchema,
   selectCreatorContactSchema,
   selectCreatorDistributionEventSchema,
   selectCreatorProfileAttributeSchema,
@@ -1150,3 +1172,34 @@ export {
   selectAppleWalletPassRegistrationSchema,
   selectAppleWalletProfilePassSchema,
 } from './wallet';
+// YouTube Video Library (channel video sync, metrics, thumbnail history, ISRC links — JOV-5136)
+export {
+  insertYoutubeThumbnailVersionSchema,
+  insertYoutubeVideoMetricSnapshotSchema,
+  insertYoutubeVideoReleaseLinkSchema,
+  insertYoutubeVideoSchema,
+  type NewYoutubeThumbnailVersion,
+  type NewYoutubeVideo,
+  type NewYoutubeVideoMetricSnapshot,
+  type NewYoutubeVideoReleaseLink,
+  selectYoutubeThumbnailVersionSchema,
+  selectYoutubeVideoMetricSnapshotSchema,
+  selectYoutubeVideoReleaseLinkSchema,
+  selectYoutubeVideoSchema,
+  type YouTubeThumbnailProvenance,
+  type YouTubeThumbnailSet,
+  type YoutubeThumbnailVersion,
+  type YoutubeVideo,
+  type YoutubeVideoMetricSnapshot,
+  type YoutubeVideoReleaseLink,
+  youtubeMatchSourceEnum,
+  youtubeMetricWindowEnum,
+  youtubeReleaseLinkStatusEnum,
+  youtubeThumbnailApprovalEnum,
+  youtubeThumbnailKindEnum,
+  youtubeThumbnailVersions,
+  youtubeVideoContentTypeEnum,
+  youtubeVideoMetricSnapshots,
+  youtubeVideoReleaseLinks,
+  youtubeVideos,
+} from './youtube-library';

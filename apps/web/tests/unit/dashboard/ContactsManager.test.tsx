@@ -53,18 +53,18 @@ vi.mock('@/features/dashboard/organisms/contacts-table', () => ({
   ),
 }));
 
-vi.mock('@/components/molecules/ConfirmDialog', () => ({
-  ConfirmDialog: (props: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
+vi.mock('@/features/dashboard/molecules/ContactDeleteConfirmDialog', () => ({
+  ContactDeleteConfirmDialog: (props: {
+    contact: DashboardContact | null;
     onConfirm: () => void;
+    onCancel: () => void;
   }) =>
-    props.open ? (
+    props.contact ? (
       <div>
         <button type='button' onClick={() => props.onConfirm()}>
           Confirm delete
         </button>
-        <button type='button' onClick={() => props.onOpenChange(false)}>
+        <button type='button' onClick={() => props.onCancel()}>
           Cancel delete
         </button>
       </div>

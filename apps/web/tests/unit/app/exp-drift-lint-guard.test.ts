@@ -13,7 +13,6 @@ const webRoot = path.resolve(__dirname, '../../..');
 const repoRoot = path.resolve(webRoot, '..');
 
 const EXP_DRIFT_TARGETS = [
-  'apps/web/app/exp/home-v1/page.tsx',
   'apps/web/app/exp/library-v1/page.tsx',
   'apps/web/app/exp/shell-v1/page.tsx',
   'apps/web/app/exp/shell-v1/ShellV1ExperimentClient.tsx',

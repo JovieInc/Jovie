@@ -227,6 +227,26 @@ describe('Sheet', () => {
       );
       expect(screen.getByTestId('custom-sheet')).toBeInTheDocument();
     });
+
+    it('supports inline rendering and custom overlay props', () => {
+      const { container } = render(
+        <Sheet open={true}>
+          <SheetContent
+            disablePortal
+            overlayProps={{ className: 'custom-overlay' }}
+          >
+            Inline sheet
+          </SheetContent>
+        </Sheet>
+      );
+
+      expect(
+        container.querySelector('[data-slot="sheet-content"]')
+      ).toHaveAttribute('data-side', 'right');
+      expect(
+        container.querySelector('[data-slot="sheet-overlay"]')
+      ).toHaveClass('custom-overlay');
+    });
   });
 
   describe('SheetOverlay', () => {
@@ -270,7 +290,9 @@ describe('Sheet', () => {
       const content = screen.getByTestId('sheet-content');
       expect(content.className).toContain('fixed');
       expect(content.className).toContain('z-[65]');
-      expect(content.className).toContain('bg-(--linear-bg-surface-0)');
+      expect(content.className).toContain('bg-surface-elevated');
+      expect(content.className).toContain('border-default');
+      expect(content.className).toContain('shadow-popover');
     });
 
     it('applies animation classes', () => {

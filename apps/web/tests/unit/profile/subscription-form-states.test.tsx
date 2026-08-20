@@ -174,15 +174,16 @@ describe('ArtistNotificationsCTA full-screen alert flow states', () => {
     });
   });
 
-  it('renders nothing during hydration status checks to avoid SSR mismatch', async () => {
+  it('shows the subscribe skeleton during hydration instead of a blank panel', async () => {
     mockUseSubscriptionForm.mockReturnValue(
       buildFormState({ hydrationStatus: 'checking' })
     );
 
-    const { container } = await renderCTA();
+    await renderCTA();
 
-    expect(container).toBeEmptyDOMElement();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByText('Loading subscription form')).toBeInTheDocument();
+    expect(screen.queryByText('Get Updates')).not.toBeInTheDocument();
   });
 
   it('does not render the retired fallback CTA when notifications are disabled', async () => {

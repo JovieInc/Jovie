@@ -6,7 +6,11 @@
  * fail-closed on ownership, plan evidence, and mutation read-back.
  */
 
+import { admissionGateReceipt } from './admission-gate.mjs';
 import { preAdmissionDecision } from './admission-policy.mjs';
+import { contextGateReceipt } from './context-gate.mjs';
+import { planGateReceipt } from './plan-gate.mjs';
+import { researchGateReceipt } from './research-gate.mjs';
 import { scoreIssue } from './scorer.mjs';
 import { verifyRoutingReceipt } from './symphony-routing.mjs';
 
@@ -612,16 +616,6 @@ function commentsOf(issue) {
   return issue?.comments?.nodes || issue?.comments || [];
 }
 
-function commentText(issue) {
-  return commentsOf(issue)
-    .map(comment =>
-      typeof comment === 'string'
-        ? comment
-        : `${comment.body || ''} ${comment.event || ''}`
-    )
-    .join('\n');
-}
-
 export function isConcreteJovieIssue(issue) {
   return Boolean(issue?.id && /^(?:JOV|LYB)-\d+$/.test(issue.identifier || ''));
 }
@@ -636,17 +630,22 @@ function isTimOwned(issue) {
 
 export function hasAdmissionEvidence(issue, classification = issue) {
   const labels = new Set([...namesOf(issue), ...namesOf(classification)]);
-  const text = commentText(issue).toLowerCase();
+  const planReceipt = planGateReceipt(issue);
+  const admissionReceipt = admissionGateReceipt(issue);
   const planApproved =
-    [...PLAN_LABELS].some(label => labels.has(label)) ||
-    /plan[- ]approved|approved[- ]plan/.test(text);
+    Boolean(planReceipt) || [...PLAN_LABELS].some(label => labels.has(label));
   const admissionApproved =
-    [...ADMISSION_LABELS].some(label => labels.has(label)) ||
-    /admission[- ]approved|symphony[- ]admission[- ]approved/.test(text);
+    Boolean(admissionReceipt) ||
+    [...ADMISSION_LABELS].some(label => labels.has(label));
   return {
     planApproved,
     admissionApproved,
-    eligible: planApproved && admissionApproved,
+    eligible: Boolean(admissionReceipt),
+    derivedLabels: {
+      planApproved: [...PLAN_LABELS].some(label => labels.has(label)),
+      admissionApproved: [...ADMISSION_LABELS].some(label => labels.has(label)),
+      symphony: labels.has(SYMPHONY_LABEL),
+    },
   };
 }
 
@@ -654,7 +653,16 @@ export function buildAdmissionReceipt(
   issue,
   { now = new Date().toISOString(), fingerprint = '' } = {}
 ) {
-  return `${ADMISSION_RECEIPT_PREFIX}${JSON.stringify({ issue: issue.identifier, fingerprint, action: 'lease', at: now })} -->`;
+  return `${ADMISSION_RECEIPT_PREFIX}${JSON.stringify({
+    issue: issue.identifier,
+    fingerprint,
+    contextFingerprint:
+      contextGateReceipt(issue, { now })?.payload?.fingerprint || '',
+    researchFingerprint:
+      researchGateReceipt(issue, { now })?.payload?.fingerprint || '',
+    action: 'lease',
+    at: now,
+  })} -->`;
 }
 
 function hasReceipt(issue, receipt) {
@@ -802,9 +810,13 @@ export async function admitIssue({
       reason: preAdmission.reason.code,
       preAdmission,
     };
-  if (!hasAdmissionEvidence(issue, classification).eligible) {
-    return { status: 'rejected', reason: 'plan-or-admission-evidence-missing' };
-  }
+  if (!planGateReceipt(issue, { now }))
+    return { status: 'rejected', reason: 'plan-receipt-missing-or-invalid' };
+  if (!admissionGateReceipt(issue, { now }))
+    return {
+      status: 'rejected',
+      reason: 'admission-receipt-missing-or-invalid',
+    };
   const routing = verifyRoutingReceipt(issue);
   if (!routing)
     return { status: 'rejected', reason: 'routing-receipt-missing-or-invalid' };
@@ -822,6 +834,14 @@ export async function admitIssue({
   ) {
     return { status: 'already-admitted', identifier: issue.identifier };
   }
+
+  if (!contextGateReceipt(issue, { now }))
+    return { status: 'rejected', reason: 'context-receipt-missing-or-invalid' };
+  if (!researchGateReceipt(issue, { now }))
+    return {
+      status: 'rejected',
+      reason: 'research-receipt-missing-or-invalid',
+    };
 
   let current = issue;
   if (current.state?.name !== 'Todo') {

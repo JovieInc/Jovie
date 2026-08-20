@@ -10,7 +10,6 @@ permissions:
   contents: read
   actions: read
   pull-requests: read
-  issues: read
 
 concurrency:
   group: agent-harness-health-report
@@ -39,7 +38,6 @@ jobs:
           AGENT_PRS=$(echo "$PRS" | jq '[.[] | select((.headRefName | test("^(linear/|claude/|codegen-bot/|codex/)"; "i")) or (.headRefName | test("(^|/)jov-[0-9]+"; "i")))]')
           SYSTEMIC_PRS=$(gh pr list --repo "$GH_REPO" --state open --label systemic-blocker --limit 50 --json number,title,headRefName,updatedAt)
           NEEDS_HUMAN_PRS=$(gh pr list --repo "$GH_REPO" --state open --label needs-human --limit 50 --json number,title,headRefName,updatedAt)
-          FLAKINESS_ISSUES=$(gh issue list --repo "$GH_REPO" --state open --label test-flakiness --limit 20 --json number,title,updatedAt,url)
           CI_RUNS=$(gh run list --repo "$GH_REPO" --workflow CI --status completed --limit 30 --json databaseId,conclusion,createdAt,displayTitle,event,headBranch,url)
 
           {
@@ -52,8 +50,8 @@ jobs:
             echo "- Open agent PRs: $(echo "$AGENT_PRS" | jq 'length')"
             echo "- Systemic blocker PRs: $(echo "$SYSTEMIC_PRS" | jq 'length')"
             echo "- Needs-human PRs: $(echo "$NEEDS_HUMAN_PRS" | jq 'length')"
-            echo "- Open flakiness issues: $(echo "$FLAKINESS_ISSUES" | jq 'length')"
             echo "- Recent failed CI runs: $(echo "$CI_RUNS" | jq '[.[] | select(.conclusion != "success")] | length')"
+            echo "- Backlog: Linear is canonical. GitHub Issues are historical and are not counted here."
             echo
             echo "## Stuck Agent PRs"
             echo
@@ -87,10 +85,6 @@ jobs:
             echo "## Needs-Human Stops"
             echo
             echo "$NEEDS_HUMAN_PRS" | jq -r '.[] | "- #\(.number) \(.title) (`\(.headRefName)`, updated \(.updatedAt))"' || true
-            echo
-            echo "## Flaky Gate Reports"
-            echo
-            echo "$FLAKINESS_ISSUES" | jq -r '.[] | "- [#\(.number) \(.title)](\(.url)) updated \(.updatedAt)"' || true
             echo
             echo "## Recent CI Failures"
             echo

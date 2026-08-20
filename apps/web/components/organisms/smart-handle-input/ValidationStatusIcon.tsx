@@ -1,7 +1,7 @@
 'use client';
 
+import { Spinner as LoadingSpinner } from '@jovie/ui';
 import { Icon } from '@/components/atoms/Icon';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 
 interface ValidationStatusIconProps {
   readonly showAvailability: boolean;

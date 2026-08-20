@@ -397,6 +397,7 @@ describe('getBaseClientConfig', () => {
     const config = getBaseClientConfig();
 
     expect(config).toHaveProperty('dsn');
+    expect(config).toHaveProperty('release');
     expect(config).toHaveProperty('tracesSampleRate');
     expect(config).toHaveProperty('enableLogs');
     expect(config).toHaveProperty('sendDefaultPii');
@@ -422,6 +423,21 @@ describe('getBaseClientConfig', () => {
     const config = getBaseClientConfig();
     expect(typeof config.tracesSampleRate).toBe('number');
   });
+
+  it('tags events with the exact public production release when provided', async () => {
+    const release = 'a'.repeat(40);
+    vi.stubEnv('NEXT_PUBLIC_SENTRY_RELEASE', release);
+    vi.resetModules();
+
+    try {
+      const config = await import('@/lib/sentry/config');
+      expect(config.getBaseClientConfig().release).toBe(release);
+      expect(config.getBaseServerConfig().release).toBe(release);
+    } finally {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    }
+  });
 });
 
 describe('getBaseServerConfig', () => {
@@ -429,6 +445,7 @@ describe('getBaseServerConfig', () => {
     const config = getBaseServerConfig();
 
     expect(config).toHaveProperty('dsn');
+    expect(config).toHaveProperty('release');
     expect(config).toHaveProperty('tracesSampleRate');
     expect(config).toHaveProperty('enableLogs');
     expect(config).toHaveProperty('sendDefaultPii');

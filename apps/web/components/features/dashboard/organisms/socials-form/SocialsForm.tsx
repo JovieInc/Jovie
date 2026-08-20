@@ -1,11 +1,15 @@
 'use client';
 
 import type { CommonDropdownItem } from '@jovie/ui';
-import { Button, CommonDropdown, Input } from '@jovie/ui';
+import {
+  Button,
+  CommonDropdown,
+  Input,
+  Spinner as LoadingSpinner,
+} from '@jovie/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ALL_PLATFORMS, PLATFORM_METADATA_MAP } from '@/constants/platforms';

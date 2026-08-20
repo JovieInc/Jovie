@@ -26,6 +26,12 @@
 | `/api/account/email` | GET | `auth` | Get user email |
 | `/api/account/export` | GET | `auth` | Export user data |
 
+### Actions
+
+| Route | Methods | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/v1/actions` | GET | `auth` | Read-only canonical Actions discovery. Resolves advisory capabilities for the four stable action IDs against an owned profile. No writes. |
+
 ### Admin
 
 | Route | Methods | Auth | Description |
@@ -237,6 +243,14 @@
 | `/api/dsp/matches` | GET | `auth` | List DSP artist match suggestions |
 | `/api/dsp/matches/[id]/confirm` | POST | `auth` | Confirm a DSP artist match |
 | `/api/dsp/matches/[id]/reject` | POST | `auth` | Reject a DSP artist match |
+
+### YouTube Library
+
+| Route | Methods | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/youtube-library/links` | GET | `auth` | Approval queue: pending_review video↔release ISRC links for the user's profiles |
+| `/api/youtube-library/links/[id]/approve` | POST | `auth` | Approve a pending ISRC release link (owner only) |
+| `/api/youtube-library/links/[id]/reject` | POST | `auth` | Reject a pending ISRC release link with a reason (owner only) |
 
 ### Email
 

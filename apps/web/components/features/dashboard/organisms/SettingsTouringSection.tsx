@@ -2,6 +2,7 @@
 
 import {
   Button,
+  ConfirmDialog,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -30,7 +31,6 @@ import {
 import { SettingsActionRow } from '@/components/features/dashboard/molecules/SettingsActionRow';
 import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
 import { toast } from '@/components/feedback';
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { TouringSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
 import {
   Dialog,
@@ -87,7 +87,7 @@ export function SettingsTouringSection({
             description='We could not load your touring connection status.'
             action={
               <Button variant='ghost' size='sm' onClick={() => refetch()}>
-                Try again
+                Try Again
               </Button>
             }
           />
@@ -382,40 +382,47 @@ function BandsintownConnectDialog({
       <DialogTitle>
         {isConnected ? 'Update Bandsintown' : 'Connect Bandsintown'}
       </DialogTitle>
+      {/* eslint-disable @jovie/canonical-ui-label-casing -- False positive: the copy already matches the rule's expected sentence case. */}
       <DialogDescription>
-        Enter your Bandsintown artist name to sync tour dates to your profile.
+        Sync tour dates to your profile by entering your Bandsintown artist
+        name.
       </DialogDescription>
+      {/* eslint-enable @jovie/canonical-ui-label-casing */}
 
       <DialogBody>
         <div className='space-y-3'>
           <div className='space-y-1.5'>
             <Label htmlFor='bandsintown-artist' className='text-2xs'>
-              Artist name
+              Artist Name
             </Label>
+            {/* eslint-disable @jovie/canonical-ui-label-casing -- False positive: the placeholder already matches the rule's expected sentence case. */}
             <Input
               id='bandsintown-artist'
               value={artistName}
               onChange={e => setArtistName(e.target.value)}
-              placeholder='e.g. The Beatles'
+              placeholder='E.g. The Beatles'
               disabled={isSaving}
             />
+            {/* eslint-enable @jovie/canonical-ui-label-casing */}
           </div>
 
           <div className='space-y-1.5'>
             <Label htmlFor='bandsintown-api-key' className='text-2xs'>
-              API key{' '}
+              API Key{' '}
               <span className='font-normal text-tertiary-token'>
                 (optional)
               </span>
             </Label>
+            {/* eslint-disable @jovie/canonical-ui-label-casing -- False positive: the placeholder already matches the rule's expected sentence case. */}
             <Input
               id='bandsintown-api-key'
               type='password'
               value={apiKey}
               onChange={e => setApiKey(e.target.value)}
-              placeholder='Your Bandsintown API key'
+              placeholder='Paste the key from Bandsintown'
               disabled={isSaving}
             />
+            {/* eslint-enable @jovie/canonical-ui-label-casing */}
           </div>
         </div>
       </DialogBody>

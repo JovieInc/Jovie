@@ -1,7 +1,6 @@
 'use client';
 
-import { Button, Input } from '@jovie/ui';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { Button, Input, Spinner as LoadingSpinner } from '@jovie/ui';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { FormField } from '@/components/molecules/FormField';
 import { ErrorSummary } from '@/components/organisms/ErrorSummary';
@@ -61,7 +60,7 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
           type='text'
           value={formData.name}
           onChange={e => setFormData({ ...formData, name: e.target.value })}
-          placeholder='Your Artist Name'
+          placeholder='Your artist name'
           required
           autoCapitalize='words'
           autoCorrect='on'

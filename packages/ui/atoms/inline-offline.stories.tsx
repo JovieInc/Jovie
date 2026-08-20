@@ -45,3 +45,20 @@ export const WithoutRetry: Story = {
     ),
   ],
 };
+
+export const NarrowLongMessage: Story = {
+  args: {
+    message:
+      'You are offline. Cached audience data remains available, and pending changes will sync automatically when the connection returns.',
+    retryLabel: 'Try again',
+    onRetry: () => undefined,
+  },
+  decorators: [
+    Story => (
+      <div className='w-64'>
+        <Story />
+      </div>
+    ),
+  ],
+  parameters: { viewport: { defaultViewport: 'mobile1' } },
+};

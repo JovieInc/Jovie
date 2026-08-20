@@ -1,58 +1,67 @@
-# Jovie Eve Pilot
+# Eve (Jovie + Ovie)
 
-This is the first, deliberately narrow Jovie integration with Vercel Eve.
+Eve is the talk runtime. Ovie is Tim's door. Jovie is the artist identity.
+Summer on Gem is the factory behind the door.
 
-## What it proves
+## Split
 
-- Eve can discover Jovie-owned Markdown skills and typed TypeScript tools.
-- The pilot returns structured, read-only capability boundaries.
-- It carries no user-data access, external-provider credentials, write scope,
-  deployment configuration, or public channel.
-- When Jovie's `EVE_CORE_CHAT_MODE=shadow` bridge is explicitly configured, the
-  pilot can receive a bounded core-chat observation through Eve's authenticated
-  session API. Jovie's existing `streamText` path remains authoritative.
+Tim always talks to Ovie.
 
-## What it does not change
+- Creator work and dogfood → Ovie drives Jovie on the same product path.
+- Jovie cannot do it → Ovie admits a build (engineering). No second chat.
+- Feeling the product → Tim opens the Jovie app. That is taste, not talk.
+- Jovie-on-iMessage is later.
 
-- apps/web remains on AI SDK v6 and continues to own synchronous chat.
-- Trigger.dev remains the durable customer-workflow runner.
-- The pilot is not an authorization path and cannot make database or provider
-  changes.
+## Channels
+
+| Channel | Identity | Notes |
+|---|---|---|
+| iOS / Mac / OV chat | Ovie when `chatMode=ov` | App is still the primary surface |
+| Telegram | Ovie | Dedicated bot. Do not reuse Hermes |
+| iMessage (Photon) | Ovie | Portable Photon creds. No Vercel Connect |
+| Jovie product chat | Jovie | Artist identity only |
+
+Telegram and iMessage fail closed without an allowlist. Groups and unknown
+senders are dropped.
+
+## Credentials (no Vercel Connect)
+
+Set these on the Eve host, never in git:
+
+    TELEGRAM_BOT_TOKEN=
+    TELEGRAM_WEBHOOK_SECRET_TOKEN=
+    OVIE_TELEGRAM_ALLOWED_USER_IDS=782165716
+    OVIE_TELEGRAM_BOT_USERNAME=
+
+    IMESSAGE_PROJECT_ID=
+    IMESSAGE_PROJECT_SECRET=
+    IMESSAGE_WEBHOOK_SECRET=
+    OVIE_IMESSAGE_ALLOWED_SENDERS=+17326682148
+
+Photon is the paid iMessage exception. Everything else should be an
+internal extension (public repo / Composio / Eve registry) when a
+capability is missing.
+
+After the Eve host is public HTTPS:
+
+    curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" \
+      -H "Content-Type: application/json" \
+      -d '{"url":"https://<eve-host>/eve/v1/telegram","secret_token":"'"$TELEGRAM_WEBHOOK_SECRET_TOKEN"'","allowed_updates":["message","callback_query"]}'
+
+Point Photon's webhook at `https://<eve-host>/eve/v1/photon`. Then take
+Summer off Photon talk so iMessage is Ovie, not the factory.
 
 ## Local verification
 
-Requires Node 24 or later because Eve 0.27.8 requires it. This requirement is
-isolated to this deploy unit; the monorepo root remains on its established Node
-22 contract.
-
-Install the isolated package from the repository root:
+Node 24 or later. Isolated from the monorepo Node 22 CI runner.
 
     pnpm --dir apps/eve-pilot install --frozen-lockfile --ignore-workspace
-
-Run the deterministic, credential-free Eve discovery smoke:
-
-    pnpm --dir apps/eve-pilot --ignore-workspace run smoke
-
-For the complete local verification set:
-
     pnpm --dir apps/eve-pilot --ignore-workspace run typecheck
     pnpm --dir apps/eve-pilot --ignore-workspace run test
     pnpm --dir apps/eve-pilot --ignore-workspace run build
 
-## Core-chat bridge guardrails
+## What this unit does not do
 
-The bridge sends the latest user text (bounded to 4,000 characters) plus
-read-only routing metadata. It does not send the Jovie system prompt, user id,
-provider credentials, or tool implementations. Eve route auth remains required
-outside loopback development: the pilot's channel accepts the shared
-`EVE_CORE_CHAT_AUTH_TOKEN` bearer or its configured Vercel OIDC caller. Use
-HTTPS for non-loopback endpoints. Any transport or protocol failure is a
-fail-closed fallback to Jovie's existing chat stream.
-
-## Promotion gate
-
-Before enabling the bridge outside a controlled development or preview
-environment, add a Jovie-owned authenticated API boundary, scoped identity
-propagation, audit logs, explicit approval semantics for writes, and a
-production security review. Provider OAuth or Vercel Connect configuration is
-intentionally out of scope for this pilot.
+- It does not replace `executeChatTurn` as Jovie web's generation path.
+- It does not privileged-write gbrain or heal Symphony.
+- It does not join LYB Eve.

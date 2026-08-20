@@ -16,11 +16,18 @@ import {
   inboxThreadPriorityEnum,
   inboxThreadStatusEnum,
 } from './enums';
-import { creatorContacts, creatorProfiles } from './profiles';
+import {
+  creatorContactPeople,
+  creatorContacts,
+  creatorProfiles,
+} from './profiles';
 
 /**
- * Inbound emails table.
- * Stores raw incoming emails received at artist@jovie.fm addresses.
+ * Inbox message record.
+ *
+ * A separately authorized provider integration may import messages here. This
+ * schema does not configure a domain, mailbox, DNS, forwarding, or delivery
+ * provider, and Inbox remains the system of record once a message exists.
  */
 export const inboundEmails = pgTable(
   'inbound_emails',
@@ -88,8 +95,14 @@ export const emailThreads = pgTable(
     territory: text('territory'),
     priority: inboxThreadPriorityEnum('priority').default('medium'),
     status: inboxThreadStatusEnum('status').notNull().default('pending_review'),
+    // Retained for legacy records during the expand/backfill/read-cutover.
+    // New routing is always recorded against a directory person below.
     routedToContactId: uuid('routed_to_contact_id').references(
       () => creatorContacts.id,
+      { onDelete: 'set null' }
+    ),
+    routedToContactPersonId: uuid('routed_to_contact_person_id').references(
+      () => creatorContactPeople.id,
       { onDelete: 'set null' }
     ),
     routedAt: timestamp('routed_at'),
@@ -125,9 +138,10 @@ export const emailThreads = pgTable(
 );
 
 /**
- * Outbound replies table.
- * Stores routing messages sent by Jovie on behalf of the artist.
- * Artists do NOT compose emails — only Jovie sends routing introductions.
+ * Historical outbound-reply record.
+ *
+ * The contact assignment router does not send or forward messages. Any future
+ * provider-backed delivery capability requires a separate explicit decision.
  */
 export const outboundReplies = pgTable(
   'outbound_replies',

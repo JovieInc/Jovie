@@ -28,7 +28,7 @@ describe('DrawerTabs', () => {
     );
   });
 
-  it('renders active tabs as pills and notifies on selection changes', () => {
+  it('uses a quiet selected surface and reserves rings for keyboard focus', () => {
     const onValueChange = vi.fn();
 
     render(
@@ -48,6 +48,18 @@ describe('DrawerTabs', () => {
 
     expect(activeTab).toHaveAttribute('aria-selected', 'true');
     expect(inactiveTab).toHaveAttribute('aria-selected', 'false');
+    expect(activeTab).toHaveClass(
+      'rounded-md',
+      'border-subtle',
+      'bg-surface-0',
+      'shadow-none'
+    );
+    expect(activeTab).not.toHaveClass('ring-(--color-accent)');
+    expect(inactiveTab).toHaveClass(
+      'border-transparent',
+      'focus-visible:ring-2',
+      'focus-visible:ring-focus/35'
+    );
 
     fireEvent.click(inactiveTab);
     expect(onValueChange).toHaveBeenCalledWith('activity');

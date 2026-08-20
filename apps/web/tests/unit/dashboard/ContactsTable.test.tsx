@@ -75,16 +75,13 @@ vi.mock(
   () => ({
     ContactDetailSidebar: ({
       contact,
-      entityHeaderSurface,
       isOpen,
     }: {
       readonly contact: EditableContact | null;
-      readonly entityHeaderSurface?: string;
       readonly isOpen: boolean;
     }) => (
       <div
         data-contact-id={contact?.id ?? ''}
-        data-entity-header-surface={entityHeaderSurface ?? 'card'}
         data-open={String(isOpen)}
         data-testid='contact-detail-sidebar'
       />
@@ -193,6 +190,9 @@ describe('ContactsTable', () => {
       'data-loading',
       'true'
     );
+    expect(screen.getByTestId('contacts-toolbar-count')).toHaveTextContent(
+      'Loading contacts'
+    );
     expect(screen.queryByText('No Contacts Yet')).not.toBeInTheDocument();
   });
 
@@ -211,9 +211,20 @@ describe('ContactsTable', () => {
     expect(
       screen.getByRole('heading', { name: 'No Contacts Yet' })
     ).toBeVisible();
+    expect(screen.getByTestId('contacts-toolbar-count')).toHaveTextContent(
+      '0 contacts'
+    );
     expect(
       screen.getByText('Add bookings, management, and press contacts.')
     ).toBeVisible();
+    const emptyState = screen
+      .getByRole('heading', { name: 'No Contacts Yet' })
+      .closest('output');
+    expect(emptyState).not.toBeNull();
+    if (!emptyState) throw new TypeError('Expected canonical empty state');
+    expect(emptyState.className).toContain('min-h-full');
+    expect(emptyState.parentElement?.className).toContain('flex');
+    expect(emptyState.querySelector('svg')).toBeNull();
     expect(
       screen.queryByRole('button', { name: 'Add Contact' })
     ).not.toBeInTheDocument();

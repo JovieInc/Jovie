@@ -21,6 +21,7 @@ const admitter = await import('../admitter.mjs');
 const routing = await import('../symphony-routing.mjs');
 const triageRouter = await import('../triage-router.mjs');
 const deterministicGates = await import('../deterministic-gates.mjs');
+const { withFullGateReceipts } = await import('./pre-lease.mjs');
 
 describe('team production health contract', () => {
   it('uses a direct bounded LYB artifact instead of the redirecting homepage', async () => {
@@ -884,17 +885,32 @@ describe('entrypoint contract', () => {
 });
 
 describe('deterministic Symphony admission boundary', () => {
+  /**
+   * @param {{
+   *   skipReceipts?: boolean
+   *   id?: string
+   *   identifier?: string
+   *   title?: string
+   *   state?: string
+   *   labels?: string[]
+   *   assignee?: { id?: string, name?: string } | null
+   *   comments?: Array<{ body?: string, createdAt?: string }>
+   * }} [overrides]
+   */
   function admissionIssue(overrides = {}) {
-    return makeIssue({
-      id: overrides.id || `${overrides.identifier || 'JOV-900'}-id`,
-      identifier: overrides.identifier || 'JOV-900',
+    const skipReceipts = Boolean(overrides.skipReceipts);
+    const identifier = overrides.identifier || 'JOV-900';
+    const issue = makeIssue({
+      id: overrides.id || `${identifier}-id`,
+      identifier,
       title: overrides.title || 'Fix the real thing',
       state: overrides.state || 'Triage',
-      labels: overrides.labels || ['plan-approved', 'admission-approved'],
+      labels: overrides.labels || [],
       assignee: overrides.assignee || null,
       comments: overrides.comments || [],
-      ...overrides,
     });
+    if (skipReceipts || overrides.comments) return issue;
+    return withFullGateReceipts(issue);
   }
 
   function classification(issue) {
@@ -1938,21 +1954,24 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
   });
 
   it('records an idempotent lease receipt without duplicate mutations', async () => {
-    const issue = admissionIssue({
-      state: 'Todo',
-      labels: ['plan-approved', 'admission-approved', 'symphony'],
-    });
-    issue.comments.nodes.push(routingComment(issue));
-    issue.comments.nodes.push({
-      body: admitter.buildAdmissionReceipt(issue, {
+    const gated = withFullGateReceipts(
+      admissionIssue({
+        state: 'Todo',
+        labels: ['plan-approved', 'admission-approved', 'symphony'],
+      }),
+      { now: '2026-07-29T00:00:00.000Z' }
+    );
+    gated.comments.nodes.push(routingComment(gated));
+    gated.comments.nodes.push({
+      body: admitter.buildAdmissionReceipt(gated, {
         now: '2026-07-29T00:00:00.000Z',
       }),
       createdAt: '2026-07-29T00:00:00.000Z',
     });
-    const client = fakeClient(issue);
+    const client = fakeClient(gated);
     const result = await admitter.admitIssue({
-      issue,
-      classification: classification(issue),
+      issue: gated,
+      classification: classification(gated),
       client,
       now: '2026-07-29T00:00:00.000Z',
     });
@@ -1963,10 +1982,13 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
   });
 
   it('verifies state, labels, and receipt by reread after mutation', async () => {
-    const issue = admissionIssue({
-      state: 'Triage',
-      labels: ['plan-approved', 'admission-approved'],
-    });
+    const issue = withFullGateReceipts(
+      admissionIssue({
+        state: 'Triage',
+        labels: ['plan-approved', 'admission-approved'],
+      }),
+      { now: '2026-07-29T00:00:00.000Z' }
+    );
     const afterTransition = admissionIssue({
       state: 'Todo',
       labels: ['plan-approved', 'admission-approved'],

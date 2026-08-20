@@ -11,6 +11,12 @@ export {
   type ButtonSize,
   type ButtonVariant,
 } from './button-contract';
+export type { CloseButtonIconProps } from './close-button';
+export {
+  CloseButtonIcon,
+  closeButtonClassName,
+  closeButtonStyles,
+} from './close-button';
 export {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -40,6 +46,8 @@ export {
 } from './icon-button-contract';
 export type { KbdProps } from './kbd';
 export { Kbd } from './kbd';
+export type { NativeSelectOption, NativeSelectProps } from './native-select';
+export { NativeSelect } from './native-select';
 export {
   Popover,
   PopoverAnchor,

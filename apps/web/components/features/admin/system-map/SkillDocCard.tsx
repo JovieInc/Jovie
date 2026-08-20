@@ -5,6 +5,7 @@ import { Button } from '@jovie/ui';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import { ChatMarkdown } from '@/components/jovie/components/ChatMarkdown';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { cn } from '@/lib/utils';
 
 interface SkillDocCardProps {
@@ -29,10 +30,7 @@ export function SkillDocCard({
   const [open, setOpen] = useState(false);
 
   return (
-    <div
-      className='rounded-lg border border-subtle bg-surface-1'
-      data-testid={`skill-card-${id}`}
-    >
+    <ContentSurfaceCard surface='nested' data-testid={`skill-card-${id}`}>
       <Button
         type='button'
         variant='ghost'
@@ -84,6 +82,6 @@ export function SkillDocCard({
           </p>
         </div>
       ) : null}
-    </div>
+    </ContentSurfaceCard>
   );
 }

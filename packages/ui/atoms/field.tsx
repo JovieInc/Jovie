@@ -35,7 +35,10 @@ export interface FieldProps {
    * The form control (Input, Select, Textarea, etc.)
    */
   readonly children: React.ReactElement<
-    React.HTMLAttributes<HTMLElement> & { variant?: string }
+    React.HTMLAttributes<HTMLElement> & {
+      variant?: string;
+      required?: boolean;
+    }
   >;
   /**
    * Additional className for the container
@@ -57,52 +60,65 @@ const Field = React.forwardRef<HTMLDivElement, FieldProps>(
     ref
   ) => {
     const generatedId = useId();
-    const id = providedId || generatedId;
+    const id = providedId ?? children.props.id ?? generatedId;
     const errorId = `${id}-error`;
     const descriptionId = `${id}-description`;
+    const hasDescription =
+      description !== undefined &&
+      description !== null &&
+      description !== false;
+    const hasError =
+      error !== undefined && error !== null && error !== false && error !== '';
 
-    // Determine aria-describedby
-    const describedByIds = [];
-    if (description) describedByIds.push(descriptionId);
-    if (error) describedByIds.push(errorId);
+    // Preserve descriptions already owned by the child control.
+    const describedByIds =
+      children.props['aria-describedby']?.split(/\s+/).filter(Boolean) ?? [];
+    if (hasDescription) describedByIds.push(descriptionId);
+    if (hasError) describedByIds.push(errorId);
     const ariaDescribedBy =
       describedByIds.length > 0 ? describedByIds.join(' ') : undefined;
 
     // Determine validation state
-    const isInvalid = !!error;
-
     // Clone the child element and inject accessibility props
     const childWithProps = React.cloneElement(children, {
       id,
       'aria-describedby': ariaDescribedBy,
-      'aria-invalid': isInvalid || undefined,
-      'aria-required': required || undefined,
+      'aria-invalid': hasError || children.props['aria-invalid'] || undefined,
+      'aria-required': required || children.props['aria-required'] || undefined,
+      required: required || children.props.required || undefined,
       ...(children.props.variant === undefined &&
-        isInvalid && { variant: 'error' }),
+        hasError && { variant: 'error' }),
     });
 
     return (
-      <div ref={ref} className={cn('space-y-2', className)}>
+      <div
+        ref={ref}
+        className={cn('grid gap-1.5', className)}
+        data-slot='field'
+        data-invalid={hasError || undefined}
+        data-required={required || undefined}
+      >
         {label && (
           <Label htmlFor={id} required={required}>
             {label}
           </Label>
         )}
 
-        {description && (
-          <p id={descriptionId} className='text-xs text-muted-foreground'>
+        {childWithProps}
+
+        {hasDescription && (
+          <p id={descriptionId} className='text-xs text-tertiary-token'>
             {description}
           </p>
         )}
 
-        {childWithProps}
-
-        {error && (
+        {hasError && (
           <p
             id={errorId}
-            className='text-sm text-destructive'
+            className='text-xs font-medium text-destructive'
             role='alert'
             aria-live='polite'
+            aria-atomic='true'
           >
             {error}
           </p>

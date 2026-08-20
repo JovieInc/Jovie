@@ -7,14 +7,64 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
-### Changed
+### Fixed
 
+- [internal] **Production monitors page again:** post-deploy probe failures Slack `#alerts-production`, golden-path probes add claim/billing/Stripe liveness, observability and synthetics file Linear, and the canary `/api/chat` auth-gate retries then fails closed.
+
+### Added
+
+- [internal] **Live merge-queue ruleset verify pages Slack:** the scheduled observer still fails the run and now posts to the existing webhook.
+- [internal] **Critical-surface vitest coverage floors are non-zero:** entitlements, Stripe webhooks, webhook signatures, and test-auth globs ratchet from the last measured snapshot minus 3pp on `vitest --coverage`. Merge-queue unit shards stay coverage-off.
+- [internal] **Canonical Actions now have one contract package:** `@jovie/action-contracts` owns the four stable IDs, and authenticated `GET /api/v1/actions` can list what a profile can do. Nothing is created yet.
+
+- [internal] **Design governance is now a standing audit, not a one-off sweep:** `pnpm design:governance:audit` fails closed on dangling skill links, stale token exports, DESIGN.md Noir Ion rgb drift, and unwired enforcement commands. It runs locally and weekly (informational / issue-only), not as a `ci-fast` merge gate.
+
+- **iPhone Library is Catalog, Collections, and Ideas:** Catalog is releases, merch, and docs. Collections auto-bundles a vlog with its script, takes, and B-roll. Ideas is the untagged third home.
+- **iPhone chat is home:** Ask Jovie is the first signed-in surface. There is no bottom tab bar. Swipe from the leading edge for the sidebar and from the trailing edge for the right rail.
+- **iPhone chat home can introduce what’s new:** An empty chat highlights one feature or lists up to three recent changes. Dismiss stays dismissed. More than three changes ends on And more, which opens the changelog.
+
+- **Ovie is one morning screen:** `/hud` now carries the brief, a Loom-style screen walk, shipper, and dashboard. Fullscreen asks the logged-in admin for the kiosk token and reloads `/hud?fs=1&kiosk=…`. `/app/ov/ops` and `/hud-tv` redirect there.
+- **Screen walks reuse one account-video store:** founder walks and later creator screen recordings upload through `lib/capture` into the Jovie account blob. The walk is stored and not admitted until Summer classifies it.
+
+### Changed
+- [internal] **Removed unused `/exp` fake-UI fixtures:** deleted admin-only `auth-v1`, `home-v1`, `profile-v1`, and `onboarding-v1` playgrounds plus their style-guard tests, and lowered the raw-button, arbitrary-value, and `--linear-*` ratchet floors to match.
+- **Saving a vlog opens Collections:** the new clip lands with its shoot instead of in Catalog.
+- **Empty chat Talk lives inside the composer pill:** typing swaps Talk for Send without moving the bar. Tap, drag, or Done dismisses the keyboard.
+- **Drawer Profile stays Dashboard:** tapping the account name opens the public profile when a URL exists. Venue QR stays in the sidebar.
+- [internal] **iOS chat composer, waitlist, and shell now have focused QA coverage:** reserved composer send slot, slash palette overlay, waitlist action geometry, and keyboard-locked edge-drag are locked by unit and UI tests.
+
+- [internal] **@types/node is 26.2.0 across workspace packages including desktop:** types-only bump; no DMG.
+
+- [internal] **Linear is the sole canonical backlog:** GitHub-Issue dispatchers and shippers are hard-retired, active tracker facades fail closed on Linear errors with no dual-write, and dashboards no longer substitute historical GitHub Issues for backlog counts.
+- **Ops and the TV HUD are aliases now:** admin nav “Ovie” opens `/hud`. The Mac app grants display-capture only on that route.
 - [internal] **Demo-video stories preserve document scrolling (JOV-4946):** both canonical route aliases now inherit the production marketing context without fixed-height overflow clipping at tablet or mobile viewports.
+- [internal] **Capital policy now protects survival before selectivity:** pre-PMF runway gets a fast path for credible, clean SAFE financing, while investor filtering tightens only after the company can afford to make capital optional.
 - [internal] **Product UI no longer uses raw black/white color utilities:** remaining contrast-ratchet hits now use named Noir Ion tokens, and the owned baseline buckets are at zero.
 - [internal] **Token-drift eval drives the shipped contrast scanner:** a fail-closed unit eval imports `lint-contrast-ratchet.mjs` and requires owned raw-token buckets to stay at zero.
 - [internal] **Gem activation has a direct host preflight:** production-proven controller activation uses the fixed fleet and fails before writes when user supervision is unavailable.
-- [internal] **Local Eve verification is deterministic and credential-free (JOV-5171):** the isolated `eve@0.27.8` pilot now has one root-invokable smoke command that runs from a cold app root, blocks model-catalog network access, and fails when the allowed skills, tools, channels, subagents, or schedules drift.
+- [internal] **Local Eve verification is deterministic and credential-free (JOV-5171):** the isolated Eve pilot now has one root-invokable smoke command that runs from a cold app root, blocks model-catalog network access, and fails when the allowed skills, tools, channels, subagents, or schedules drift.
 - **Label logo bars now align by visible artwork instead of file padding:** one shared asset registry measures transparent bounds, preserves aspect ratio, and propagates approved optical corrections across homepage, artist-profile, and experimental review surfaces.
+
+### Fixed
+
+- [internal] **Stale grok remount units no longer block a fresh rebase:** sidecar stops a DIRTY/CONFLICTING fallback-ship older than 15 minutes so changelog remounts can run after a sibling lands. Merge-queue UNMERGEABLE (`CONFLICTING`) counts as remount, not inflight skip.
+- [internal] **DIRTY remounts that only conflict on CHANGELOG.md merge and push without waiting on grok:** Unreleased bullets from the branch are unioned onto main so sibling ships stop parking CLEAN-except-changelog heads for an hour.
+- [internal] **Hold-intake missed-admission recovery now enrolls CLEAN `queue-deferred` heads:** exact admission already strips that label, but a main-push recovery used to skip it and left CI-green Symphony PRs parked off the merge queue.
+- [internal] **Agent QC wires now match autonomous-shipping doctrine:** Scope Judge is retired instead of advertised, Slop Gate stays a weekly post-merge smell report, GStack PR comments are no longer auto-approve evidence, exhausted `needs-human` PRs ping Slack/Linear before the 48h close, agent-pipeline classifies branches with the shared allowlist so `hotfix/` and `feat/` stop looking like agent PRs, and live merge-queue ruleset verify runs on a schedule instead of only in docs.
+- [internal] **Nightly coverage audit publishes again and pages Slack:** coverage skips the Chromium-launching artifact-secret spec that was failing the heatmap for months, RED-surface ≥3pp drops fail the job, and failures notify the existing Slack webhook instead of a retired GitHub Issue writer.
+- [internal] **CI duration SLO breaches notify Slack:** the nightly p95 ratchet still fails the run and now posts to the existing webhook.
+- [internal] **Long typechecks now report phase timing instead of looking stuck:** singleflight logs elapsed time, tsbuildinfo age/size, and child CPU/RSS while the live compiler keeps ownership.
+- [internal] **Symphony admits from one receipt, not three labels:** a current `admission-gate/v1` receipt is the admission authority. The `plan-approved`, `admission-approved`, and `symphony` labels stay as derived audit. Protected and human-review work stays excluded.
+- [internal] **Merge-queue Path Changes no longer rejects coalesced heads:** an empty event-base diff now recomputes against live `main` before a typed no-op, so green combined heads can land.
+- **Mac chat stays on screen once the answer starts:** reserving the thread URL no longer remounts the live composer and transcript.
+- **Vlog capture matches how you hold the phone:** portrait, landscape left, and landscape right record the right way up. Landscape keeps record controls on screen.
+- **Expired iPhone chat sessions fail closed:** a 401 ends the turn as a failed reply and asks you to sign in again, instead of inventing an answer.
+- **Mobile chat uses the signed-in artist:** the second claims check that blocked a valid session profile is gone.
+- [internal] **Redis quota warnings no longer file as `Error: {"error":{"name":"UpstashError"}}` (JOV-5221):** captureWarning unwraps `{ error }` bags, classifies the opaque JSON payload as quota exhaustion, and drops that noise from Sentry. The hourly Redis canary still owns the standing alert.
+- [internal] **Public profile block checks fail open on a bad Redis pipeline payload (JOV-5196):** a non-array Upstash response is treated as a cache miss instead of throwing `res.map is not a function`.
+- **iPhone chat bubbles wrap like Messages:** The first word stays in the same sentence instead of sitting alone on the left.
+- **Public profiles keep names, places, and last songs readable:** Contact drawers show the person before the company, compact heroes keep the full city, Music’s last row clears the tab bar, and AEO mention links use the profile text token instead of browser purple.
+- **Waitlist copy sits in the middle:** The waitlist message and account switch stay centered when they fit. They only scroll if the type is too large.
 
 ## [26.8.1] - 2026-08-16
 

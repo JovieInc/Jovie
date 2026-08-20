@@ -13,6 +13,7 @@ import {
 // require the dedicated native authorization below.
 export const DEFAULT_MERGE_QUEUE_BACKEND = 'native';
 export const MERGE_QUEUE_BACKENDS = Object.freeze(['native']);
+export const CANONICAL_NATIVE_MUTATION_ACTOR = 'jovie-bot[bot]';
 
 const DEFAULT_REPOSITORY = 'JovieInc/Jovie';
 const DEFAULT_RULESET_ID = '10512119';
@@ -54,6 +55,8 @@ const HARD_HOLD_LABELS = new Set([
 const PULL_REQUEST_STATE_QUERY = `query MergeQueuePullRequestState($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){${PULL_REQUEST_STATE_FIELDS}}}}`;
 const OPEN_PULL_REQUEST_STATES_QUERY = `query MergeQueueOpenPullRequestStates($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){pullRequests(first:100,after:$endCursor,states:OPEN){nodes{${PULL_REQUEST_STATE_FIELDS}} pageInfo{hasNextPage endCursor}}}}`;
 const BRANCH_PROTECTION_QUERY = `query MergeQueueBranchProtection($owner:String!,$name:String!,$refName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$refName){name branchProtectionRule{id}}}}`;
+const NATIVE_MUTATION_ACTOR_QUERY =
+  'query MergeQueueNativeMutationActor { viewer { login } }';
 const DEQUEUE_PULL_REQUEST_MUTATION = `mutation DequeuePullRequest($id:ID!){dequeuePullRequest(input:{id:$id}){mergeQueueEntry{id}}}`;
 const ENABLE_AUTO_MERGE_MUTATION = `mutation EnablePullRequestAutoMerge($pullRequestId:ID!,$mergeMethod:PullRequestMergeMethod!){enablePullRequestAutoMerge(input:{pullRequestId:$pullRequestId,mergeMethod:$mergeMethod}){pullRequest{id}}}`;
 const DISABLE_AUTO_MERGE_MUTATION = `mutation DisablePullRequestAutoMerge($pullRequestId:ID!){disablePullRequestAutoMerge(input:{pullRequestId:$pullRequestId}){pullRequest{id}}}`;
@@ -451,6 +454,30 @@ function assertGraphqlResponse(payload, description) {
   return payload;
 }
 
+async function assertCanonicalNativeMutationActor(runner) {
+  const description = 'verifying the native queue mutation actor';
+  const payload = assertGraphqlResponse(
+    await runGhJson(
+      runner,
+      graphqlArgs(NATIVE_MUTATION_ACTOR_QUERY, {}),
+      description
+    ),
+    description
+  );
+  const observedActor = payload?.data?.viewer?.login;
+  if (observedActor !== CANONICAL_NATIVE_MUTATION_ACTOR) {
+    throw backendError(
+      'native_mutation_actor_unauthorized',
+      `Native queue mutation requires authenticated actor ${CANONICAL_NATIVE_MUTATION_ACTOR}; observed ${JSON.stringify(observedActor ?? null)}`,
+      {
+        expectedActor: CANONICAL_NATIVE_MUTATION_ACTOR,
+        observedActor: typeof observedActor === 'string' ? observedActor : null,
+      }
+    );
+  }
+  return observedActor;
+}
+
 function normalizeNativePullRequest(pr) {
   const missing = REQUIRED_NATIVE_STATE_FIELDS.filter(
     field => !Object.hasOwn(pr ?? {}, field)
@@ -655,6 +682,7 @@ export async function enrollPullRequest({
   const resolvedBackend = requireNativeBackend(backend);
   const parsedNumber = parsePullRequestNumber(number);
   const expectedHead = parseExpectedHeadOid(expectedHeadOid);
+  const mutationActor = await assertCanonicalNativeMutationActor(runner);
   const stateOptions = {
     backend: resolvedBackend,
     repository,
@@ -674,7 +702,12 @@ export async function enrollPullRequest({
   const before = await readPullRequestQueueState(stateOptions);
   assertEnrollCandidate(before, expectedHead);
   if (enrollmentPostcondition(before, expectedHead)) {
-    return { backend: resolvedBackend, changed: false, state: before };
+    return {
+      backend: resolvedBackend,
+      changed: false,
+      mutationActor,
+      state: before,
+    };
   }
 
   let mutationError = null;
@@ -699,6 +732,7 @@ export async function enrollPullRequest({
     return {
       backend: resolvedBackend,
       changed: true,
+      mutationActor,
       postconditionAttempts: observation.attempts,
       reconciledAfterCommandError: Boolean(mutationError),
       state: observation.state,
@@ -736,6 +770,7 @@ export async function dequeuePullRequest({
 } = {}) {
   const resolvedBackend = requireNativeBackend(backend);
   const parsedNumber = parsePullRequestNumber(number);
+  const mutationActor = await assertCanonicalNativeMutationActor(runner);
   const stateOptions = {
     backend: resolvedBackend,
     repository,
@@ -744,7 +779,12 @@ export async function dequeuePullRequest({
   };
   const before = await readPullRequestQueueState(stateOptions);
   if (dequeuePostcondition(before)) {
-    return { backend: resolvedBackend, changed: false, state: before };
+    return {
+      backend: resolvedBackend,
+      changed: false,
+      mutationActor,
+      state: before,
+    };
   }
 
   const mutationErrors = [];
@@ -781,6 +821,7 @@ export async function dequeuePullRequest({
     return {
       backend: resolvedBackend,
       changed: true,
+      mutationActor,
       reconciledAfterCommandError: mutationErrors.length > 0,
       state: current,
     };

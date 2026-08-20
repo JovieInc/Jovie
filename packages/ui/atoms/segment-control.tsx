@@ -34,8 +34,8 @@ const segmentControlSurfaceSizeClassNames = {
 
 const segmentTriggerVariants = cva(
   [
-    'relative rounded-full border border-transparent bg-transparent transition-[background-color,color,box-shadow,border-color]',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)/30 focus-visible:ring-offset-1 focus-visible:ring-offset-(--linear-app-content-surface)',
+    "relative rounded-full border border-transparent bg-transparent transition-[background-color,color,box-shadow,border-color] duration-subtle ease-subtle before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[''] motion-reduce:transition-none",
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/55 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page',
     'disabled:pointer-events-none disabled:opacity-45',
     // Inactive state
     'text-tertiary-token hover:border-subtle hover:bg-surface-0 hover:text-secondary-token',
@@ -45,8 +45,8 @@ const segmentTriggerVariants = cva(
   {
     variants: {
       variant: {
-        default: 'font-[510] tracking-[-0.01em] duration-fast ease-interactive',
-        ghost: 'font-[510] tracking-[-0.01em] duration-fast ease-interactive',
+        default: 'font-medium tracking-normal',
+        ghost: 'font-medium tracking-normal',
         'linear-pill': cn(
           linearPillLabelClassName,
           linearPillFocusClassName,
@@ -79,6 +79,8 @@ interface IndicatorLayout {
 export interface SegmentControlOption<T extends string = string> {
   readonly value: T;
   readonly label: React.ReactNode;
+  /** Accessible name override for icon-only or richly formatted labels. */
+  readonly ariaLabel?: string;
   readonly disabled?: boolean;
 }
 
@@ -158,12 +160,13 @@ export function SegmentControl<T extends string = string>({
   variant,
   size = 'md',
   layout = 'fill',
-  'aria-label': ariaLabel,
+  'aria-label': ariaLabel = 'Choose a view',
   className,
   listClassName,
   triggerClassName,
   indicatorClassName,
 }: SegmentControlProps<T>) {
+  const resolvedVariant = variant ?? 'default';
   const listRef = React.useRef<HTMLDivElement | null>(null);
   const triggerRefs = React.useRef<Record<string, HTMLButtonElement | null>>(
     {}
@@ -172,7 +175,7 @@ export function SegmentControl<T extends string = string>({
     React.useState<IndicatorLayout | null>(null);
 
   const syncIndicator = React.useCallback(() => {
-    if (variant !== 'linear-pill') {
+    if (resolvedVariant !== 'linear-pill') {
       setIndicatorLayout(null);
       return;
     }
@@ -188,14 +191,14 @@ export function SegmentControl<T extends string = string>({
       width: activeTrigger.offsetWidth,
       x: activeTrigger.offsetLeft,
     });
-  }, [value, variant]);
+  }, [resolvedVariant, value]);
 
   React.useLayoutEffect(() => {
     syncIndicator();
   }, [syncIndicator, options]);
 
   React.useEffect(() => {
-    if (variant !== 'linear-pill') {
+    if (resolvedVariant !== 'linear-pill') {
       return;
     }
 
@@ -224,10 +227,10 @@ export function SegmentControl<T extends string = string>({
     return () => {
       resizeObserver.disconnect();
     };
-  }, [options, syncIndicator, variant]);
+  }, [options, resolvedVariant, syncIndicator]);
 
   React.useEffect(() => {
-    if (variant !== 'linear-pill' || typeof document === 'undefined') {
+    if (resolvedVariant !== 'linear-pill' || typeof document === 'undefined') {
       return;
     }
 
@@ -239,18 +242,21 @@ export function SegmentControl<T extends string = string>({
     void fonts.ready.then(() => {
       syncIndicator();
     });
-  }, [syncIndicator, variant]);
+  }, [resolvedVariant, syncIndicator]);
 
   const linearPillTriggerSizeClassName =
-    variant === 'linear-pill' ? linearPillSizeClassNames[size] : null;
+    resolvedVariant === 'linear-pill' ? linearPillSizeClassNames[size] : null;
 
   return (
     <Tabs.Root
       value={value}
       onValueChange={onValueChange as (value: string) => void}
+      data-layout={layout}
+      data-size={size}
+      data-variant={resolvedVariant}
       className={cn(
-        segmentControlVariants({ variant }),
-        variant === 'linear-pill'
+        segmentControlVariants({ variant: resolvedVariant }),
+        resolvedVariant === 'linear-pill'
           ? null
           : segmentControlSurfaceSizeClassNames[size],
         layout === 'fill' ? 'w-full' : 'max-w-full',
@@ -266,7 +272,7 @@ export function SegmentControl<T extends string = string>({
           listClassName
         )}
       >
-        {variant === 'linear-pill' && indicatorLayout ? (
+        {resolvedVariant === 'linear-pill' && indicatorLayout ? (
           <div
             aria-hidden='true'
             className={cn(linearPillIndicatorClassName, indicatorClassName)}
@@ -281,19 +287,20 @@ export function SegmentControl<T extends string = string>({
             key={option.value}
             value={option.value}
             disabled={option.disabled}
+            aria-label={option.ariaLabel}
             ref={node => {
               triggerRefs.current[option.value] = node;
             }}
             className={cn(
-              segmentTriggerVariants({ layout, variant }),
+              segmentTriggerVariants({ layout, variant: resolvedVariant }),
               linearPillTriggerSizeClassName ??
                 segmentTriggerSizeClassNames[size],
-              variant !== 'linear-pill' &&
-                'motion-safe:transition-[background-color,color,box-shadow] motion-safe:duration-150 motion-safe:ease-out',
               triggerClassName
             )}
           >
-            {option.label}
+            <span className='min-w-0 overflow-hidden text-ellipsis whitespace-nowrap'>
+              {option.label}
+            </span>
           </Tabs.Trigger>
         ))}
       </Tabs.List>

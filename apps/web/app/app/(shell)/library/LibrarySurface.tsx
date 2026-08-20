@@ -83,6 +83,7 @@ import {
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import {
   TOOLBAR_MENU_CONTENT_CLASS,
   ToolbarMenuChoiceItem,
@@ -1696,11 +1697,13 @@ function EmptyCatalog() {
       data-testid='library-surface'
     >
       <NavigationDestinationReady destination='library' />
-      <TableEmptyState
+      <EmptyState
         icon={<Music2 className='h-5 w-5' strokeWidth={2.25} />}
         heading='No Library Items'
         description='Releases, merch, images, videos, and audio will appear here as they land.'
-        className='m-3 min-h-90'
+        presentation='workspace'
+        testId='library-workspace-empty-state'
+        className='min-h-90'
         actionSlot={
           <Link
             href={APP_ROUTES.RELEASES}

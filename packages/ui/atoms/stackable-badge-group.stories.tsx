@@ -45,3 +45,22 @@ export const WithDisabledItem: Story = {
     maxVisible: 3,
   },
 };
+
+export const OverflowDisclosure: Story = {
+  args: {
+    items: [
+      ...ITEMS,
+      { id: 'soundcloud', label: 'SoundCloud', icon: <span>Sc</span> },
+      { id: 'bandcamp', label: 'Bandcamp', icon: <span>Bc</span> },
+    ],
+    maxVisible: 1,
+    width: 'standard',
+  },
+};
+
+export const SelectedItem: Story = {
+  args: {
+    items: [ITEMS[0], { ...ITEMS[1], selected: true }, ITEMS[2]],
+    maxVisible: 3,
+  },
+};

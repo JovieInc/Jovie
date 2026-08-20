@@ -7,10 +7,9 @@
  * Allows adding, verifying, and removing email addresses.
  */
 
-import { Badge, Button, Input } from '@jovie/ui';
+import { Badge, Button, ConfirmDialog, Input } from '@jovie/ui';
 import { CheckCircle, ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
 
 import type { ClerkEmailAddressResource, ClerkUserResource } from './types';

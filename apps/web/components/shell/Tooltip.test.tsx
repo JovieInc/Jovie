@@ -106,6 +106,7 @@ describe('Tooltip (shell)', () => {
     );
 
     const content = screen.getByTestId('tooltip-content');
+    expect(content).toHaveAttribute('data-slot', 'shell-tooltip-content');
     expect(content.className).not.toContain('whitespace-nowrap');
 
     // Radix may duplicate content for accessibility — assert on the visible

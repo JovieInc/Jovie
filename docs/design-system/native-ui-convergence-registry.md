@@ -164,7 +164,7 @@ macOS rendering of the iOS product surface.
 | ID | Surface and owner | Source evidence | States verified in source | Adaptive behavior | Parity/proof |
 | --- | --- | --- | --- | --- | --- |
 | `macos.menu-monitor` | Menu bar label and menu; `MenuMonitorApp`, `MenuMonitorMenu` | `apps/macos/MenuMonitor/Sources/MenuMonitor/MenuMonitorApp.swift:L4-L20,L23-L43,L45-L100`; target platform `Package.swift:L4-L17` | Count badge 0/positive/99+, refreshed timestamp, error text, status output, restart/status/dashboard/refresh/quit actions | Menu-bar-only accessory app; no responsive width/size-class contract; macOS 14 target | `verified-source`; not product UI parity. |
-| `macos.shipping-store` | Poll/fallback/action state model; `ShippingStatusStore` | `apps/macos/MenuMonitor/Sources/MenuMonitor/ShippingStatusStore.swift:L4-L71,L73-L111` | Counts loaded, Kanban error with GitHub fallback, terminal fetch error, action message, status output, 30-second polling | Main-actor state with detached utility work; shell/process output is operator-only | `verified-source`; `actionMessage` is published but not rendered by `MenuMonitorMenu` (state gap). |
+| `macos.shipping-store` | Poll/fail-closed/action state model; `ShippingStatusStore` | `apps/macos/MenuMonitor/Sources/MenuMonitor/ShippingStatusStore.swift:L4-L71,L73-L111` | Counts loaded from Linear-backed Symphony status; status errors remain explicit with no GitHub Issue fallback; action message, status output, 30-second polling | Main-actor state with detached utility work; shell/process output is operator-only | `verified-source`; `actionMessage` is published but not rendered by `MenuMonitorMenu` (state gap). |
 
 ### macOS state gap
 

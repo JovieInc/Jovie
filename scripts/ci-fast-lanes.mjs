@@ -64,6 +64,12 @@ const LANES = [
     run: runGuardrails,
   },
   {
+    id: 'design-conformance',
+    name: 'Design Conformance',
+    nextLocalCommand: 'pnpm design:conformance:gate',
+    run: runDesignConformance,
+  },
+  {
     id: 'ios-fast',
     name: 'iOS Fast Contract',
     nextLocalCommand: 'pnpm run ios:lint',
@@ -99,6 +105,7 @@ export const LANE_GROUPS = Object.freeze({
     'eslint-server-boundaries',
     'scripts-typecheck',
     'guardrails',
+    'design-conformance',
     'ios-fast',
     'profile-admission',
     'structural',
@@ -293,7 +300,7 @@ function runGuardrails() {
     `node scripts/version-fanout-guard.mjs --base ${JSON.stringify(originBase)}`,
     'node scripts/design-authority-guard.mjs',
     'pnpm design:logo-assets:check',
-    'node --test scripts/cleanup-stale-dev.test.mjs scripts/desktop-release-guard.test.mjs scripts/desktop-installed-apps-audit.test.mjs scripts/dev-web-fast.test.mjs scripts/ios-guardrail-rollout-audit.test.mjs scripts/version-fanout-guard.test.mjs scripts/version-stamp.test.mjs scripts/agent/preflight.test.mjs scripts/agent/pen-save-receipt.test.mjs scripts/agent/pen-live-canvas-persist.test.mjs scripts/agent/pen-cold-readback.test.mjs',
+    'node --test scripts/cleanup-stale-dev.test.mjs scripts/desktop-release-guard.test.mjs scripts/desktop-installed-apps-audit.test.mjs scripts/dev-web-fast.test.mjs scripts/ios-guardrail-rollout-audit.test.mjs scripts/version-fanout-guard.test.mjs scripts/version-stamp.test.mjs scripts/agent/preflight.test.mjs scripts/agent/pen-save-receipt.test.mjs scripts/agent/pen-live-canvas-persist.test.mjs scripts/agent/pen-cold-readback.test.mjs scripts/skill-governance-guard.test.mjs scripts/skill-catalog.test.mjs scripts/agent-web-contract.test.mjs',
     'node scripts/version-check.mjs',
     'node apps/web/scripts/next-proxy-guard.mjs',
   ];
@@ -306,6 +313,12 @@ function runGuardrails() {
     }
   }
   return { code: 0, output: combined };
+}
+
+function runDesignConformance() {
+  // Always validate the normalized manifest. The selector inside the command
+  // reports affected design domains but never invokes Gem/Symphony/Ubuntu ops.
+  return shell(LANE_COMMANDS['design-conformance']);
 }
 
 function runIosFast() {

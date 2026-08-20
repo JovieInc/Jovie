@@ -1,6 +1,6 @@
 'use client';
 
-import { upload } from '@vercel/blob/client';
+import { uploadAccountVideo } from '@/lib/capture/upload-account-video';
 import { trackTeleprompterFunnel } from './analytics';
 import type { RecordableVideoKind, TeleprompterShowcaseVariant } from './types';
 
@@ -16,10 +16,7 @@ export async function uploadRecordableVideo(params: {
   readonly kind: RecordableVideoKind;
   readonly showcaseVariant: TeleprompterShowcaseVariant;
 }): Promise<{ readonly blobUrl: string }> {
-  const blob = await upload(params.file.name, params.file, {
-    access: 'public',
-    handleUploadUrl: '/api/chat/files/upload-token',
-  });
+  const uploaded = await uploadAccountVideo(params.file);
 
   trackTeleprompterFunnel('teleprompter_video_uploaded', {
     profileId: params.profileId,
@@ -27,8 +24,8 @@ export async function uploadRecordableVideo(params: {
     showcaseVariant: params.showcaseVariant,
     fileName: params.file.name,
     fileSizeBytes: params.file.size,
-    blobUrl: blob.url,
+    blobUrl: uploaded.url,
   });
 
-  return { blobUrl: blob.url };
+  return { blobUrl: uploaded.url };
 }

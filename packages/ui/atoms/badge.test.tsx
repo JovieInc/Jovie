@@ -29,11 +29,14 @@ describe('Badge', () => {
   });
 
   describe('Variants', () => {
-    it('applies secondary variant by default', () => {
+    it('applies the default variant and stable border geometry', () => {
       render(<Badge data-testid='badge'>New</Badge>);
       const badge = screen.getByTestId('badge');
       expect(badge.className).toContain('bg-(--color-bg-primary)');
       expect(badge.className).toContain('text-(--linear-text-primary)');
+      expect(badge.className).toContain('border');
+      expect(badge).toHaveAttribute('data-variant', 'default');
+      expect(badge).toHaveAttribute('data-size', 'md');
     });
 
     it('applies secondary variant explicitly', () => {
@@ -56,6 +59,7 @@ describe('Badge', () => {
       const badge = screen.getByTestId('badge');
       expect(badge.className).toContain('bg-(--color-success-subtle)');
       expect(badge.className).toContain('text-success');
+      expect(badge.className).toContain('border-success/20');
     });
 
     it('applies warning variant', () => {
@@ -100,6 +104,7 @@ describe('Badge', () => {
       const badge = screen.getByTestId('badge');
       expect(badge.className).toContain('border-accent/20');
       expect(badge.className).toContain('text-accent');
+      expect(badge).toHaveAttribute('data-tone', 'accent');
     });
   });
 
@@ -140,6 +145,7 @@ describe('Badge', () => {
       const badge = screen.getByTestId('badge');
       expect(badge.className).toContain('inline-flex');
       expect(badge.className).toContain('items-center');
+      expect(badge.className).toContain('gap-1');
       expect(badge.className).toContain('rounded-full');
       expect(badge.className).toContain('whitespace-nowrap');
       expect(badge.className).toContain('font-[510]');

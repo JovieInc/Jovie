@@ -20,7 +20,7 @@ export interface WorkspaceTabOption<T extends string> {
 
 const PRIMARY_TAB_RESET_KEYS = ['page', 'pageSize', 'q', 'sort'] as const;
 
-interface WorkspaceTabsSurfaceProps<
+export interface WorkspaceTabsSurfaceProps<
   TPrimary extends string,
   TSecondary extends string = never,
 > {
