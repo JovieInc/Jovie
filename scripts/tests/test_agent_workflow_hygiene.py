@@ -311,6 +311,64 @@ def test_stuck_draft_autoclose_is_manual_and_hosted_only() -> None:
     )
 
 
+def test_merge_queue_ruleset_verify_is_scheduled_not_pr_ready() -> None:
+    """Live ruleset parity must run; it must not become a source PR gate."""
+    workflow = (WORKFLOWS / "merge-queue-ruleset-verify.yml").read_text(
+        encoding="utf-8"
+    )
+    trigger_block = workflow.split("\non:\n", 1)[1].split(
+        "\npermissions:", 1
+    )[0]
+    assert "schedule:" in trigger_block
+    assert "workflow_dispatch:" in trigger_block
+    assert "pull_request" not in trigger_block
+    assert "node scripts/ci-merge-queue-check.mjs verify" in workflow
+    assert "ci-harness/manifest.json" not in workflow
+
+
+def test_slop_gate_is_post_merge_informational() -> None:
+    """Copy smell stays off PR Ready; taste is post-ship."""
+    workflow = (WORKFLOWS / "slop-gate.yml").read_text(encoding="utf-8")
+    trigger_block = workflow.split("\non:\n", 1)[1].split(
+        "\npermissions:", 1
+    )[0]
+    assert "schedule:" in trigger_block
+    assert "workflow_dispatch:" in trigger_block
+    assert "pull_request" not in trigger_block
+    assert "ci-harness/manifest.json" in workflow
+    assert "continue-on-error: true" in workflow
+    assert "HEAD~1" not in workflow
+    assert "--before='7 days ago'" in workflow
+
+
+def test_agent_pipeline_retires_dead_qc_wires() -> None:
+    """Scope Judge, self-attested GStack comments, and denylist classifier stay gone."""
+    workflow = (WORKFLOWS / "agent-pipeline.yml").read_text(encoding="utf-8")
+    trigger_block = workflow.split("\non:\n", 1)[1].split(
+        "\npermissions:", 1
+    )[0]
+    assert '"Scope Judge"' not in trigger_block
+    assert 'workflows: ["CI"]' in trigger_block
+    assert "AGENT_RUN_SOURCE_RUN_ID" not in workflow
+    assert "check-agent-gate-evidence.ts" not in workflow
+    assert "gstack-gates" not in workflow
+    assert 'Scope judge (diff aligns with ticket intent)' not in workflow
+    assert "retries_exhausted" in workflow
+    assert "SLACK_WEBHOOK_URL" in _job_block("agent-pipeline.yml", "exhaust")
+    assert "LINEAR_API_KEY" in _job_block("agent-pipeline.yml", "exhaust")
+    stale = _job_block("agent-pipeline.yml", "stale-cleanup")
+    assert "SLACK_WEBHOOK_URL" in stale
+    assert "LINEAR_API_KEY" in stale
+    assert (
+        'test("^(codex|codegen-bot|linear|claude)/") or test("^[^/]+/jov-[0-9]+([_-].+)?$"; "i")'
+        in stale
+    )
+    assert "gh pr close" in stale
+    landing = (WORKFLOWS / "agent-landing-sweep.yml").read_text(encoding="utf-8")
+    assert "scope-judge" not in landing
+    assert "Scope Judge" not in landing.split("\njobs:", 1)[1]
+
+
 def test_node_only_agent_jobs_do_not_write_to_system_corepack_dir() -> None:
     """Node scripts must not call corepack enable on locked-down runners."""
     for workflow_name in (
