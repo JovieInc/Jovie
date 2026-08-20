@@ -213,7 +213,7 @@ export function UniversalLinkInputUrlMode({
               type='button'
               onClick={onClear}
               className='flex h-9 w-9 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
-              aria-label='Clear input'
+              aria-label='Clear Input'
             >
               <X className='h-4 w-4' />
             </button>
@@ -247,7 +247,7 @@ export function UniversalLinkInputUrlMode({
                 type='button'
                 onClick={onCancelVoiceRecording}
                 className='flex h-9 w-9 items-center justify-center rounded-lg text-tertiary-token transition-colors hover:bg-surface-1 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
-                aria-label='Cancel voice recording'
+                aria-label='Cancel Voice Recording'
               >
                 <X className='h-4 w-4' />
               </button>
@@ -266,7 +266,7 @@ export function UniversalLinkInputUrlMode({
                 type='button'
                 onClick={onSendVoiceRecording}
                 className='flex h-9 w-9 items-center justify-center rounded-lg bg-secondary-token text-primary-inverse transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
-                aria-label='Send voice recording'
+                aria-label='Send Voice Recording'
               >
                 <Check className='h-4 w-4' />
               </button>

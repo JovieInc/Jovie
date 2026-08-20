@@ -40,7 +40,7 @@ export function ThreadAudioCard({
         onClick={onPlay}
         disabled={!onPlay}
         className='system-b-thread-audio-play'
-        aria-label='Play in global player'
+        aria-label='Play In Global Player'
       >
         <Play
           className='h-3 w-3 translate-x-px'

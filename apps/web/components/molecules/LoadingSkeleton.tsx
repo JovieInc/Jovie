@@ -118,12 +118,12 @@ export function ProfileSkeleton() {
     <output
       className='flex flex-col items-center space-y-4 text-center'
       aria-busy='true'
-      aria-label='Loading artist profile'
+      aria-label='Loading Artist Profile'
     >
       <Skeleton className='h-32 w-32' rounded='full' />
       <div className='space-y-2'>
-        <Skeleton className='h-8 w-48' aria-label='Loading artist name' />
-        <Skeleton className='h-6 w-64' aria-label='Loading artist tagline' />
+        <Skeleton className='h-8 w-48' aria-label='Loading Artist Name' />
+        <Skeleton className='h-6 w-64' aria-label='Loading Artist Tagline' />
       </div>
     </output>
   );
@@ -131,7 +131,7 @@ export function ProfileSkeleton() {
 
 export function ButtonSkeleton() {
   return (
-    <output aria-label='Loading action button' aria-busy='true'>
+    <output aria-label='Loading Action Button' aria-busy='true'>
       <Skeleton className='block h-12 w-full max-w-sm' rounded='lg' />
     </output>
   );
@@ -143,7 +143,7 @@ export function SocialBarSkeleton() {
   return (
     <nav
       className='flex flex-wrap justify-center gap-4'
-      aria-label='Loading social media links'
+      aria-label='Loading Social Media Links'
       aria-busy='true'
     >
       {SOCIAL_BAR_SKELETON_KEYS.map(key => (
@@ -157,7 +157,7 @@ export function AuthFormSkeleton() {
   return (
     <output
       className='block space-y-5'
-      aria-label='Loading authentication form'
+      aria-label='Loading Authentication Form'
       aria-busy='true'
     >
       <Skeleton className='block h-4 w-24' rounded='full' />

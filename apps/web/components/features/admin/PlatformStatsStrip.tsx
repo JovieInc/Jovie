@@ -49,19 +49,19 @@ export function PlatformStatsStrip({
   return (
     <div data-testid='platform-stats-strip' className='space-y-4'>
       <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7'>
-        <StatCard value={stats.labelsOnPlatform} label='Labels on platform' />
+        <StatCard value={stats.labelsOnPlatform} label='Labels On Platform' />
         <StatCard
           value={stats.totalUniqueVisitors}
-          label='Total unique visitors'
+          label='Total Unique Visitors'
         />
-        <StatCard value={stats.dspClicksDriven} label='DSP clicks driven' />
-        <StatCard value={stats.contactsCaptured} label='Contacts captured' />
+        <StatCard value={stats.dspClicksDriven} label='DSP Clicks Driven' />
+        <StatCard value={stats.contactsCaptured} label='Contacts Captured' />
         <StatCard
           value={stats.creatorsOnPlatform}
-          label='Creators on platform'
+          label='Creators On Platform'
         />
-        <StatCard value={stats.releasesTracked} label='Releases tracked' />
-        <StatCard value={stats.tracksTracked} label='Tracks tracked' />
+        <StatCard value={stats.releasesTracked} label='Releases Tracked' />
+        <StatCard value={stats.tracksTracked} label='Tracks Tracked' />
       </div>
 
       <ContentSurfaceCard className='space-y-2 p-3'>

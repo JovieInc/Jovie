@@ -318,7 +318,7 @@ export function UTMCopyDropdown({
       {
         type: 'label',
         id: 'label-utm',
-        label: 'Copy with UTM',
+        label: 'Copy With UTM',
       }
     );
 
@@ -434,7 +434,7 @@ export function UTMCopyDropdown({
         align='end'
         side='bottom'
         sideOffset={4}
-        aria-label='Copy link options'
+        aria-label='Copy Link Options'
       />
     </span>
   );

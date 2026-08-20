@@ -77,25 +77,25 @@ export function SentryMetricsCard({
           <MetricBlock
             icon={Bug}
             iconClassName='text-info'
-            label='Unresolved issues'
+            label='Unresolved Issues'
             value={formatMetric(metrics.unresolvedIssues24h)}
           />
           <MetricBlock
             icon={Flame}
             iconClassName='text-warning'
-            label='Error events'
+            label='Error Events'
             value={formatMetric(metrics.totalEvents24h)}
           />
           <MetricBlock
             icon={Users}
             iconClassName='text-accent'
-            label='Impacted users'
+            label='Impacted Users'
             value={formatMetric(metrics.impactedUsers24h)}
           />
           <MetricBlock
             icon={AlertOctagon}
             iconClassName='text-error'
-            label='Critical issues'
+            label='Critical Issues'
             value={formatMetric(metrics.criticalIssues24h)}
           />
         </div>

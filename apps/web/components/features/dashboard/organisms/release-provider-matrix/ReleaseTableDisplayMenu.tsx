@@ -32,7 +32,7 @@ function ReleaseViewSegmentedControl({
       size='md'
       className='grid w-full grid-cols-2'
       triggerClassName='min-h-9 px-3 py-1.5 text-xs'
-      aria-label='Choose releases view'
+      aria-label='Choose Releases View'
     />
   );
 }

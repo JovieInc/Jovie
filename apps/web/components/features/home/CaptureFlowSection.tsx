@@ -6,6 +6,7 @@ export function CaptureFlowSection() {
       <Container size='homepage'>
         <div className='max-w-3xl mx-auto'>
           <h2 className='marketing-h2-linear text-center mb-4'>
+            {/* ui-casing-allow: marketing display headline */}
             New fans subscribe. Returning fans listen.
           </h2>
           <p className='marketing-lead-linear text-secondary-token text-center mb-12'>
@@ -19,7 +20,7 @@ export function CaptureFlowSection() {
                 First visit
               </p>
               <h3 className='text-lg font-medium text-primary-token mb-2'>
-                Get their email or SMS
+                Get Their Email Or SMS
               </h3>
               <p className='text-sm text-secondary-token'>
                 Before they see your links, they subscribe. No more anonymous
@@ -33,7 +34,7 @@ export function CaptureFlowSection() {
                 Return visit
               </p>
               <h3 className='text-lg font-medium text-primary-token mb-2'>
-                Send them straight to your music
+                Send Them Straight To Your Music
               </h3>
               <p className='text-sm text-secondary-token'>
                 Already subscribed? Skip the form. One tap to Spotify, Apple

@@ -34,7 +34,7 @@ export function buildTourDateActions(
   if (tourDate.ticketUrl) {
     items.push({
       id: 'open-tickets',
-      label: 'Open ticket link',
+      label: 'Open Ticket Link',
       icon: <Icon name='ExternalLink' className='h-4 w-4' />,
       onClick: () =>
         globalThis.open(tourDate.ticketUrl!, '_blank', 'noopener,noreferrer'),

@@ -29,6 +29,7 @@ export function ProblemSolutionSection() {
           id='problem-solution-heading'
           className='mt-6 text-4xl md:text-6xl font-medium tracking-tight text-balance text-primary-token'
         >
+          {/* ui-casing-allow: marketing display headline */}
           Your bio link is a speed bump.
           <br />
           <span className='text-3xl md:text-5xl text-secondary-token font-semibold'>
@@ -37,6 +38,7 @@ export function ProblemSolutionSection() {
         </h2>
 
         <h3 className='mt-6 text-2xl md:text-3xl font-bold text-primary-token'>
+          {/* ui-casing-allow: marketing display headline */}
           Stop designing. Start converting.
         </h3>
 

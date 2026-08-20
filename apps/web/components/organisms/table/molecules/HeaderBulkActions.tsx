@@ -96,7 +96,7 @@ export function HeaderBulkActions({
           size='sm'
           onClick={onClearSelection}
           className='h-7 w-7 rounded-full border border-transparent p-0 text-tertiary-token transition-[background-color,border-color,color] duration-subtle hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
-          aria-label='Clear selection'
+          aria-label='Clear Selection'
         >
           <X className='h-3.5 w-3.5' />
         </Button>

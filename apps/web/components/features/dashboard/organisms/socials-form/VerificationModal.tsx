@@ -85,6 +85,7 @@ export function VerificationModal({
     <Dialog open={open} onClose={onClose} size='md'>
       <DialogTitle>Verify Your Website</DialogTitle>
       <DialogDescription>
+        {/* ui-casing-allow: sentence fragment after hostname (Found === Expected) */}
         Prove you own <strong>{hostname}</strong> by adding a DNS TXT record.
       </DialogDescription>
 
@@ -147,7 +148,7 @@ export function VerificationModal({
                   size='sm'
                   onClick={() => copy(verificationToken)}
                   className='shrink-0 gap-1.5'
-                  aria-label='Copy verification token'
+                  aria-label='Copy Verification Token'
                   data-testid='copy-token-button'
                 >
                   {isCopied ? (
