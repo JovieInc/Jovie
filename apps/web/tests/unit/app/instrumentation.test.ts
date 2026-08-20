@@ -73,6 +73,22 @@ describe('server instrumentation guard', () => {
 
     expect(Sentry.captureRequestError).toHaveBeenCalledWith(error);
   });
+
+  it('skips request-error capture for the JOV-5228 UpstashError JSON bag', async () => {
+    process.env.CI = 'false';
+    process.env.NODE_ENV = 'production';
+    process.env.NEXT_RUNTIME = 'nodejs';
+    delete process.env.NEXT_PUBLIC_E2E_MODE;
+    delete process.env.E2E_USE_TEST_AUTH_BYPASS;
+
+    const Sentry = await import('@sentry/nextjs');
+    const { onRequestError } = await import('@/instrumentation');
+    const error = new Error('{"error":{"name":"UpstashError"}}');
+
+    await onRequestError(error);
+
+    expect(Sentry.captureRequestError).not.toHaveBeenCalled();
+  });
 });
 
 describe('client instrumentation bundle isolation', () => {

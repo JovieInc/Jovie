@@ -317,6 +317,15 @@ export async function onRequestError(...args: unknown[]) {
     return;
   }
 
+  // Next.js request-error capture bypasses captureError unwrap. A thrown
+  // `{ error: UpstashError }` JSON-stringifies to the JOV-5228 Linear title.
+  const { isOpaqueUpstashErrorJsonBag } = await import(
+    '@/lib/sentry/non-actionable-issues'
+  );
+  if (isOpaqueUpstashErrorJsonBag(args[0])) {
+    return;
+  }
+
   const Sentry = await loadSentry();
   return Sentry.captureRequestError(...args);
 }

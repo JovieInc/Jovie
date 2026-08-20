@@ -86,6 +86,14 @@ describe('non-actionable Sentry issues', () => {
         })
       ).toBe(false);
     });
+
+    it('matches a prefixed JOV-5228 Sentry title', () => {
+      expect(
+        isNonActionableUpstashErrorBag({
+          title: 'Unhandled error: {"error":{"name":"UpstashError"}}',
+        })
+      ).toBe(true);
+    });
   });
 
   describe('isNonActionableUpstashErrorBagEvent', () => {
@@ -122,13 +130,48 @@ describe('non-actionable Sentry issues', () => {
         })
       ).toBe(false);
     });
+
+    it('matches a prefixed JSON-bag exception value (JOV-5228)', () => {
+      expect(
+        isNonActionableUpstashErrorBagEvent({
+          exception: {
+            values: [
+              {
+                type: 'Error',
+                value: 'Unhandled {"error":{"name":"UpstashError"}}',
+              },
+            ],
+          },
+        })
+      ).toBe(true);
+    });
   });
 
   describe('isOpaqueUpstashErrorJsonBag', () => {
+    it('matches an Error whose message is the JSON bag', () => {
+      expect(
+        isOpaqueUpstashErrorJsonBag(new Error(UPSTASH_ERROR_JSON_BAG))
+      ).toBe(true);
+    });
+
+    it('matches a thrown { error: UpstashError } object', () => {
+      const inner = new Error('ERR max requests limit exceeded');
+      inner.name = 'UpstashError';
+      expect(isOpaqueUpstashErrorJsonBag({ error: inner })).toBe(true);
+    });
+
     it('matches the JOV-5229 Linear title', () => {
       expect(
         isOpaqueUpstashErrorJsonBag(`Error: ${UPSTASH_ERROR_JSON_BAG}`)
       ).toBe(true);
+    });
+
+    it('does not match a real quota UpstashError instance', () => {
+      const error = new Error(
+        'Command failed: ERR max requests limit exceeded. Limit: 500000'
+      );
+      error.name = 'UpstashError';
+      expect(isOpaqueUpstashErrorJsonBag(error)).toBe(false);
     });
 
     it('does not match a real Upstash quota exception', () => {

@@ -6,8 +6,9 @@
  * It is not an application defect and should not trigger autofix or performance alerts.
  *
  * Opaque `{"error":{"name":"UpstashError"}}` titles are the JSON-stringified
- * form of an UpstashError whose `message` is non-enumerable (JOV-5220, JOV-5221,
- * JOV-5229). The standing Redis operability canary already pages on quota exhaustion.
+ * form of an UpstashError whose `message` is non-enumerable (JOV-5220,
+ * JOV-5221, JOV-5228, JOV-5229). The standing Redis operability canary already
+ * pages on quota exhaustion.
  */
 
 export interface SentryIssueSummary {
@@ -26,6 +27,10 @@ export interface SentryEventLike {
   } | null;
 }
 
+/**
+ * JSON.stringify({ error: UpstashError }) because `message` is non-enumerable.
+ * Substring match so prefixed Sentry titles still drop (JOV-5228).
+ */
 const UPSTASH_ERROR_JSON_BAG_PATTERNS: ReadonlyArray<RegExp> = [
   /\{\s*"error"\s*:\s*\{\s*"name"\s*:\s*"UpstashError"\s*\}\s*\}/,
   /\{\s*"name"\s*:\s*"UpstashError"\s*\}/,
@@ -58,11 +63,38 @@ function normalize(value: string | null | undefined): string {
 }
 
 function isUpstashErrorJsonBagText(value: string | null | undefined): boolean {
+  if (!value) return false;
   const normalized = normalize(value);
   return (
     normalized === normalize(UPSTASH_ERROR_JSON_BAG) ||
-    normalized === normalize(UPSTASH_ERROR_JSON_BAG_TITLE)
+    normalized === normalize(UPSTASH_ERROR_JSON_BAG_TITLE) ||
+    UPSTASH_ERROR_JSON_BAG_PATTERNS[0].test(value)
   );
+}
+
+/**
+ * True when a captured value would Sentry-title as
+ * `Error: {"error":{"name":"UpstashError"}}` (JOV-5228 / JOV-5229).
+ * Does not match a real `UpstashError: ERR max requests…` exception.
+ */
+export function isOpaqueUpstashErrorJsonBag(value: unknown): boolean {
+  if (typeof value === 'string') {
+    return (
+      isUpstashErrorJsonBagText(value) ||
+      UPSTASH_ERROR_JSON_BAG_PATTERNS.some(pattern => pattern.test(value))
+    );
+  }
+  if (value instanceof Error) {
+    return isOpaqueUpstashErrorJsonBag(value.message);
+  }
+  if (value && typeof value === 'object') {
+    try {
+      return isOpaqueUpstashErrorJsonBag(JSON.stringify(value));
+    } catch {
+      return false;
+    }
+  }
+  return false;
 }
 
 export interface SentryExceptionLike {
@@ -75,21 +107,6 @@ export interface SentryExceptionLike {
       readonly value?: string | null;
     } | null> | null;
   } | null;
-}
-
-/**
- * Returns true when a string is the opaque JSON.stringify UpstashError bag
- * (`{"error":{"name":"UpstashError"}}`), including the `Error: …` title
- * Sentry/Linear used for JOV-5229. Quota command text does not match.
- */
-export function isOpaqueUpstashErrorJsonBag(
-  value: string | null | undefined
-): boolean {
-  if (!value) return false;
-  return (
-    isUpstashErrorJsonBagText(value) ||
-    UPSTASH_ERROR_JSON_BAG_PATTERNS.some(pattern => pattern.test(value))
-  );
 }
 
 /**
@@ -111,7 +128,7 @@ export function isNonActionableUpstashErrorBag(
 export function isNonActionableUpstashErrorBagEvent(
   event: SentryExceptionLike
 ): boolean {
-  const values: Array<string | null | undefined> = [
+  const values: Array<unknown> = [
     event.title,
     event.message,
     event.logentry?.message,

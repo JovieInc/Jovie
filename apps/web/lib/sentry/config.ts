@@ -53,7 +53,10 @@
  */
 
 import type * as Sentry from '@sentry/nextjs';
-import { isNonActionableUpstashErrorBagEvent } from '@/lib/sentry/non-actionable-issues';
+import {
+  isNonActionableUpstashErrorBagEvent,
+  UPSTASH_QUOTA_IGNORE_ERRORS,
+} from '@/lib/sentry/non-actionable-issues';
 
 /**
  * Sentry Event type alias for cleaner code
@@ -433,7 +436,7 @@ export function scrubPii(event: SentryEvent): SentryEvent | null {
     return null;
   }
 
-  // Filter captureWarning/captureError JSON bags (JOV-5218, JOV-5229).
+  // Filter captureWarning/captureError JSON bags (JOV-5218, JOV-5228, JOV-5229).
   // Real Upstash quota exceptions keep their command-failure title.
   if (isNonActionableUpstashErrorBagEvent(event)) {
     return null;
@@ -588,6 +591,7 @@ export function getBaseClientConfig(): BaseSentryClientConfig {
     sendDefaultPii: false, // Disabled on client - user context set server-side only
     beforeSend: scrubPii,
     ignoreErrors: [
+      ...UPSTASH_QUOTA_IGNORE_ERRORS,
       // React hooks mismatch: known bug in onboarding/settings — tracked separately.
       // This is a client-side React error, so it must be filtered here (not server config).
       /Rendered more hooks than during the previous render/,
