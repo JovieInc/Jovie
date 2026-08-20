@@ -108,6 +108,25 @@ describe('server instrumentation guard', () => {
 
     expect(Sentry.captureRequestError).not.toHaveBeenCalled();
   });
+
+  it('skips request-error capture when Next.js wraps the JOV-5209 bag on cause', async () => {
+    process.env.CI = 'false';
+    process.env.NODE_ENV = 'production';
+    process.env.NEXT_RUNTIME = 'nodejs';
+    delete process.env.NEXT_PUBLIC_E2E_MODE;
+    delete process.env.E2E_USE_TEST_AUTH_BYPASS;
+
+    const Sentry = await import('@sentry/nextjs');
+    const { onRequestError } = await import('@/instrumentation');
+    const wrapper = new Error(
+      'An error occurred in the Server Components render'
+    );
+    wrapper.cause = { error: { name: 'UpstashError' } };
+
+    await onRequestError(wrapper);
+
+    expect(Sentry.captureRequestError).not.toHaveBeenCalled();
+  });
 });
 
 describe('client instrumentation bundle isolation', () => {

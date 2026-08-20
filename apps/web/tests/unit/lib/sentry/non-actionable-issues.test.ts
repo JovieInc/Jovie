@@ -52,7 +52,7 @@ describe('non-actionable Sentry issues', () => {
   });
 
   describe('isNonActionableUpstashErrorBag', () => {
-    it('matches the JOV-5218 Linear/Sentry title', () => {
+    it('matches the JOV-5209 Linear/Sentry title', () => {
       expect(
         isNonActionableUpstashErrorBag({
           title: `Error: ${UPSTASH_ERROR_JSON_BAG}`,
@@ -161,6 +161,20 @@ describe('non-actionable Sentry issues', () => {
       inner.name = 'UpstashError';
       expect(JSON.stringify({ error: inner })).toBe(UPSTASH_ERROR_JSON_BAG);
       expect(isOpaqueUpstashErrorJsonBag({ error: inner })).toBe(true);
+    });
+
+    it('matches a Next.js wrapper whose cause is the JSON bag (JOV-5209)', () => {
+      const wrapper = new Error(
+        'An error occurred in the Server Components render'
+      );
+      wrapper.cause = { error: { name: 'UpstashError' } };
+      expect(isOpaqueUpstashErrorJsonBag(wrapper)).toBe(true);
+    });
+
+    it('does not hang on a circular Error.cause chain (JOV-5209)', () => {
+      const wrapper = new Error('wrapped');
+      wrapper.cause = wrapper;
+      expect(isOpaqueUpstashErrorJsonBag(wrapper)).toBe(false);
     });
 
     it('matches the JOV-5229 Linear title', () => {
