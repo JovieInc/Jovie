@@ -21,10 +21,19 @@ export interface TimActionIssue {
   stateType: string;
 }
 
+export type TimActionsObservation =
+  | 'ok'
+  | 'empty'
+  | 'unavailable'
+  | 'not_configured';
+
 export interface TimActionsResponse {
   issues: TimActionIssue[];
   fetchedAt: string; // ISO
+  /** True when LINEAR_API_KEY is present — not a successful observation. */
   available: boolean;
+  observation: TimActionsObservation;
+  errorMessage: string | null;
 }
 
 interface LinearIssueNode {
@@ -70,7 +79,13 @@ export async function fetchTimActionIssues(): Promise<TimActionsResponse> {
 
   if (!apiKey) {
     logger.warn('[hud/linear-actions] LINEAR_API_KEY not configured');
-    return { issues: [], fetchedAt, available: false };
+    return {
+      issues: [],
+      fetchedAt,
+      available: false,
+      observation: 'not_configured',
+      errorMessage: 'LINEAR_API_KEY is not configured.',
+    };
   }
 
   const query = `
@@ -120,8 +135,13 @@ export async function fetchTimActionIssues(): Promise<TimActionsResponse> {
         response.status,
         response.statusText
       );
-      // available stays true — API key is configured, this is a transient failure
-      return { issues: [], fetchedAt, available: true };
+      return {
+        issues: [],
+        fetchedAt,
+        available: true,
+        observation: 'unavailable',
+        errorMessage: `Linear API error (${response.status})`,
+      };
     }
 
     const payload = (await response.json()) as LinearGraphQLResponse;
@@ -131,8 +151,13 @@ export async function fetchTimActionIssues(): Promise<TimActionsResponse> {
         '[hud/linear-actions] Linear GraphQL errors',
         payload.errors[0]?.message
       );
-      // available stays true — API key is configured, this is a transient/schema error
-      return { issues: [], fetchedAt, available: true };
+      return {
+        issues: [],
+        fetchedAt,
+        available: true,
+        observation: 'unavailable',
+        errorMessage: payload.errors[0]?.message ?? 'Linear GraphQL error',
+      };
     }
 
     const nodes = payload.data?.issues?.nodes ?? [];
@@ -162,14 +187,26 @@ export async function fetchTimActionIssues(): Promise<TimActionsResponse> {
       stateType: node.state.type,
     }));
 
-    return { issues, fetchedAt, available: true };
+    return {
+      issues,
+      fetchedAt,
+      available: true,
+      observation: issues.length === 0 ? 'empty' : 'ok',
+      errorMessage: null,
+    };
   } catch (error) {
     logger.error(
       '[hud/linear-actions] Failed to fetch tim-action issues',
       error
     );
-    // available stays true — API key is configured, this is a transient network error
-    return { issues: [], fetchedAt, available: true };
+    return {
+      issues: [],
+      fetchedAt,
+      available: true,
+      observation: 'unavailable',
+      errorMessage:
+        error instanceof Error ? error.message : 'Linear request failed',
+    };
   }
 }
 

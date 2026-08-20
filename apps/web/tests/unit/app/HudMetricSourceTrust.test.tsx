@@ -50,6 +50,20 @@ describe('HudMetricSourceTrust', () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
+  it('exposes retry when a successful source is stale', () => {
+    const onRetry = vi.fn();
+    const staleSource: HudMetricSourceTrustType = {
+      ...freshSource,
+      fetchedAtIso: new Date(Date.now() - 6 * 60 * 1000).toISOString(),
+    };
+
+    render(<HudMetricSourceTrust source={staleSource} onRetry={onRetry} />);
+
+    expect(screen.getByText(/Stale/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Retry/i }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
   it('reserves footer height to avoid layout shift', () => {
     const { container } = render(<HudMetricSourceTrust source={freshSource} />);
 

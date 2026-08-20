@@ -3,7 +3,7 @@
 import { Button } from '@jovie/ui';
 
 import dynamic from 'next/dynamic';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   DailyBucket,
   ShippingVelocityResponse,
@@ -296,9 +296,12 @@ export function ShippingVelocityChart({
   const [error, setError] = useState<string | null>(null);
   const [spotlight, setSpotlight] = useState<string | null>(null);
   const [showClosed, setShowClosed] = useState(false);
+  const hasObservedRef = useRef(Boolean(initialData));
 
   const fetchData = useCallback(async (r: Range) => {
-    setIsLoading(true);
+    if (!hasObservedRef.current) {
+      setIsLoading(true);
+    }
     setError(null);
     try {
       const response = await fetch(
@@ -310,6 +313,7 @@ export function ShippingVelocityChart({
       const result = (await response.json()) as ShippingVelocityResponse;
       setData(result.data);
       setCachedAt(result.cachedAt);
+      hasObservedRef.current = true;
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Could not load shipping data'
@@ -421,7 +425,7 @@ export function ShippingVelocityChart({
       {/* Chart area */}
       {isLoading ? (
         <ChartSkeleton />
-      ) : error ? (
+      ) : error && data.length === 0 ? (
         <div className='flex h-50 flex-col items-center justify-center gap-2'>
           <p className='text-app text-secondary-token'>{error}</p>
           {cachedAt ? (
@@ -441,18 +445,38 @@ export function ShippingVelocityChart({
             Retry
           </Button>
         </div>
-      ) : isEmpty ? (
+      ) : isEmpty && !error ? (
         <div className='flex h-50 items-center justify-center'>
           <p className='text-app text-tertiary-token'>No PRs in this period</p>
         </div>
       ) : (
-        <LazyVelocityChart
-          data={data}
-          spotlight={spotlight}
-          onLineClick={handleLineClick}
-          onChartClick={handleChartClick}
-          showClosed={showClosed}
-        />
+        <>
+          {error ? (
+            <div className='mb-2 flex items-center justify-between gap-2'>
+              <p className='text-app text-secondary-token'>
+                Showing last known velocity. {error}
+              </p>
+              <Button
+                type='button'
+                variant='secondary'
+                size='sm'
+                onClick={() => {
+                  fetchData(range).catch(() => {});
+                }}
+                className='h-auto rounded-lg border border-subtle bg-surface-0 px-3 py-1.5 text-2xs font-medium text-secondary-token'
+              >
+                Retry
+              </Button>
+            </div>
+          ) : null}
+          <LazyVelocityChart
+            data={data}
+            spotlight={spotlight}
+            onLineClick={handleLineClick}
+            onChartClick={handleChartClick}
+            showClosed={showClosed}
+          />
+        </>
       )}
 
       {/* Footer */}

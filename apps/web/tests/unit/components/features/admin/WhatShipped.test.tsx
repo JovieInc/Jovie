@@ -54,12 +54,13 @@ describe('WhatShipped', () => {
     expect(screen.getByTestId('what-shipped-card')).toBeInTheDocument();
   });
 
-  it('shows the empty state when no items are available', async () => {
+  it('shows the empty state when a successful observation returns no items', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify({
-          generatedAt: null,
-          available: false,
+          generatedAt: '2026-07-03T10:05:34.770172+00:00',
+          available: true,
+          observation: 'empty',
           items: [],
         }),
         { status: 200 }
@@ -70,8 +71,55 @@ describe('WhatShipped', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText('nothing shipped in the last few hours')
+        screen.getByText('Nothing shipped in the last few hours.')
       ).toBeInTheDocument();
     });
+    expect(screen.getByTestId('what-shipped-observation')).toHaveAttribute(
+      'data-state',
+      'empty'
+    );
+  });
+
+  it('shows not configured when the source is missing', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          generatedAt: null,
+          available: false,
+          observation: 'not_configured',
+          items: [],
+          errorMessage: 'What shipped source is not configured.',
+        }),
+        { status: 200 }
+      )
+    );
+
+    renderWithQuery(<WhatShipped />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('what-shipped-observation')).toHaveAttribute(
+        'data-state',
+        'not_configured'
+      );
+    });
+    expect(
+      screen.queryByRole('button', { name: 'Retry' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('distinguishes unavailable from empty and exposes retry', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('upstream failed', { status: 503 })
+    );
+
+    renderWithQuery(<WhatShipped />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('what-shipped-observation')).toHaveAttribute(
+        'data-state',
+        'unavailable'
+      );
+    });
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 });
