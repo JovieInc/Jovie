@@ -122,8 +122,8 @@ export const RATE_LIMITERS = {
     limit: 600,
     window: '1 m',
     prefix: 'navigation_telemetry',
-    analytics: true,
-    algorithm: 'sliding-window',
+    analytics: false,
+    algorithm: 'fixed-window',
     trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
@@ -202,8 +202,8 @@ export const RATE_LIMITERS = {
     limit: 30,
     window: '1 m',
     prefix: 'dashboard_links',
-    analytics: true,
-    algorithm: 'sliding-window',
+    analytics: false,
+    algorithm: 'fixed-window',
     trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
@@ -213,8 +213,8 @@ export const RATE_LIMITERS = {
     limit: 60,
     window: '1 m',
     prefix: 'header_search',
-    analytics: true,
-    algorithm: 'sliding-window',
+    analytics: false,
+    algorithm: 'fixed-window',
     trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
@@ -498,8 +498,8 @@ export const RATE_LIMITERS = {
     limit: 30,
     window: '1 m',
     prefix: 'spotify:search',
-    analytics: true,
-    algorithm: 'sliding-window',
+    analytics: false,
+    algorithm: 'fixed-window',
     trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
