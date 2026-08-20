@@ -1966,15 +1966,16 @@ class FallbackTests(unittest.TestCase):
         self.assertNotIn("checkout -B fallback/JOV-7-fix origin/main", events)
         self.assertIn("failing CI", events)
 
-    def test_grok_ship_one_remount_continues_after_changelog_conflict(self):
-        """Live #16211: merge origin/main hit CHANGELOG.md and set -e killed grok."""
+    def test_grok_ship_one_remount_autoresolves_changelog_only_conflict(self):
+        """Live #16229: DIRTY vs main was CHANGELOG-only; grok sat for an hour."""
         created = self.root / "pr-created"
         self.command(
             "gh",
             'case "$*" in\n'
-            '  *headRefName*) echo \'[{"number":16211,"headRefName":"grok/JOV-7-fix","mergeStateStatus":"DIRTY"}]\';;\n'
+            '  *headRefName*) echo \'[{"number":16229,"headRefName":"fallback/JOV-7-fix","mergeStateStatus":"DIRTY"}]\';;\n'
             '  *statusCheckRollup*) echo \'{"statusCheckRollup":[{"conclusion":"SUCCESS"}]}\';;\n'
-            '  *) [ ! -f "$GROK_CREATED" ] && echo 0 || echo 1;;\n'
+            '  *isDraft*) echo false;;\n'
+            '  *) echo 1;;\n'
             'esac\n',
         )
         self.command(
@@ -1986,7 +1987,13 @@ class FallbackTests(unittest.TestCase):
             '  *"rev-parse --is-shallow-repository") printf "false\\n";;\n'
             '  *"merge-base HEAD origin/main") exit 0;;\n'
             '  *"merge --no-edit origin/main") echo "CONFLICT (content): Merge conflict in CHANGELOG.md" >&2; exit 1;;\n'
-            '  *"ls-files -u") printf "100644 abc CHANGELOG.md\\n";;\n'
+            '  *"diff --name-only --diff-filter=U") printf "CHANGELOG.md\\n";;\n'
+            '  *"show :2:CHANGELOG.md") printf -- "- **ours unique JOV-7**\\n";;\n'
+            '  *"show :3:CHANGELOG.md") printf "# Changelog\\n\\n## [Unreleased]\\n\\n### Fixed\\n\\n- **theirs**\\n";;\n'
+            '  *"ls-files"*) if [ -f "$GEM_EVENTS.changelog-added" ]; then exit 0; fi; printf "100644 abc CHANGELOG.md\\n";;\n'
+            '  *"add CHANGELOG.md") : > "$GEM_EVENTS.changelog-added";;\n'
+            '  *"commit --no-edit") ;;\n'
+            '  *"push origin"*) printf "pushed\\n" >> "$GEM_EVENTS";;\n'
             'esac\n',
         )
         self.command(
@@ -2012,9 +2019,68 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         log = (self.root / "logs/JOV-7.log").read_text()
         self.assertIn("remount_merge_conflicts", log)
+        self.assertIn("remount_changelog_autoresolved", log)
+        self.assertIn("remount_changelog_pushed", log)
         events = self.events.read_text()
         self.assertIn("merge --no-edit origin/main", events)
+        self.assertIn("add CHANGELOG.md", events)
+        self.assertIn("commit --no-edit", events)
+        self.assertIn("push origin", events)
+        self.assertNotIn("grok -", events)
+        self.assertFalse(created.exists(), "changelog-only DIRTY remount must not wait on grok")
+
+    def test_grok_ship_one_remount_still_invokes_grok_for_product_conflicts(self):
+        created = self.root / "pr-created"
+        self.command(
+            "gh",
+            'case "$*" in\n'
+            '  *headRefName*) echo \'[{"number":16234,"headRefName":"fallback/JOV-7-fix","mergeStateStatus":"DIRTY"}]\';;\n'
+            '  *statusCheckRollup*) echo \'{"statusCheckRollup":[{"conclusion":"SUCCESS"}]}\';;\n'
+            '  *) [ ! -f "$GROK_CREATED" ] && echo 0 || echo 1;;\n'
+            'esac\n',
+        )
+        self.command(
+            "git",
+            'printf "git %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            '[ "$1" != clone ] || mkdir -p "$5/.git"\n'
+            'case "$*" in\n'
+            '  *"rev-parse HEAD") printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";;\n'
+            '  *"rev-parse --is-shallow-repository") printf "false\\n";;\n'
+            '  *"merge-base HEAD origin/main") exit 0;;\n'
+            '  *"merge --no-edit origin/main") echo "CONFLICT (content): Merge conflict in apps/web/x.ts" >&2; exit 1;;\n'
+            '  *"diff --name-only --diff-filter=U") printf "CHANGELOG.md\\napps/web/x.ts\\n";;\n'
+            '  *"show :2:CHANGELOG.md") printf -- "- **ours**\\n";;\n'
+            '  *"show :3:CHANGELOG.md") printf "# Changelog\\n\\n## [Unreleased]\\n\\n- **theirs**\\n";;\n'
+            '  *"ls-files -u") printf "100644 abc CHANGELOG.md\\n100644 def apps/web/x.ts\\n";;\n'
+            'esac\n',
+        )
+        self.command(
+            "grok",
+            'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            'touch "$GROK_CREATED"\n',
+        )
+        result = subprocess.run(
+            [self.install_runtime() / GROK_SHIP.name, "JOV-7"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_EVENTS=self.events,
+                GROK_CREATED=created,
+                GROK_SHIP_WS_ROOT=self.root / "workspaces",
+                GROK_SHIP_LOG_DIR=self.root / "logs",
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.grok_linear_url(),
+                SYMPHONY_OPEN_PR_INDEX="live",
+            ),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        log = (self.root / "logs/JOV-7.log").read_text()
+        self.assertIn("remount_merge_conflicts", log)
+        self.assertNotIn("remount_changelog_autoresolved", log)
+        events = self.events.read_text()
         self.assertIn("grok -", events)
+        self.assertNotIn("push origin", events)
 
     def test_grok_ship_one_remounts_dirty_head_without_admission_receipt(self):
         created = self.root / "pr-created"

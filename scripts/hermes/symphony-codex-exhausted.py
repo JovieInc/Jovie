@@ -993,6 +993,7 @@ def open_pr_verdict_command(identifier: str) -> int:
         payload["number"] = pr.get("number")
         payload["head"] = pr.get("head")
         payload["repo"] = pr.get("repo")
+        payload["mergeStateStatus"] = pr.get("mergeStateStatus")
     print(json.dumps(payload))
     return 0
 
