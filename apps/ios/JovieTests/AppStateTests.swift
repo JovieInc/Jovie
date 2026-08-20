@@ -859,6 +859,76 @@ struct AppStateTests {
     #expect(url == nil)
   }
 
+  @Test func mobileBrowserAuthURLAllowsLocalhostHTTPOutsideHarness() {
+    let url = MobileBrowserAuthURLBuilder.signInURL(
+      baseURL: URL(string: "http://localhost:3100")!,
+      codeChallenge: "challenge_123"
+    )
+
+    #expect(
+      url?.absoluteString == "http://localhost:3100/auth/start?client=ios&intent=sign_in&return_to=/app&code_challenge=challenge_123&code_challenge_method=S256"
+    )
+  }
+
+  @Test func mobileBrowserAuthURLRejectsSchemelessAndCleartextRemoteHosts() {
+    #expect(
+      MobileBrowserAuthURLBuilder.signInURL(
+        baseURL: URL(string: "jov.ie")!,
+        codeChallenge: "challenge_123"
+      ) == nil
+    )
+    #expect(
+      MobileBrowserAuthURLBuilder.signInURL(
+        baseURL: URL(string: "http://jov.ie")!,
+        codeChallenge: "challenge_123"
+      ) == nil
+    )
+    #expect(
+      MobileBrowserAuthURLBuilder.isSupportedBrowserAuthURL(
+        URL(string: "https://jov.ie")!
+      )
+    )
+    #expect(
+      !MobileBrowserAuthURLBuilder.isSupportedBrowserAuthURL(
+        URL(string: "jov.ie")!
+      )
+    )
+  }
+
+  @Test func mobileAuthPresentationAnchorPrefersKeyThenVisibleWindow() {
+    #expect(
+      MobileAuthPresentationAnchor.preferredWindowIndex(
+        in: [
+          MobileAuthWindowSnapshot(isKey: false, isHidden: false),
+          MobileAuthWindowSnapshot(isKey: true, isHidden: false),
+        ]
+      ) == 1
+    )
+    #expect(
+      MobileAuthPresentationAnchor.preferredWindowIndex(
+        in: [
+          MobileAuthWindowSnapshot(isKey: false, isHidden: true),
+          MobileAuthWindowSnapshot(isKey: false, isHidden: false),
+        ]
+      ) == 1
+    )
+    #expect(
+      MobileAuthPresentationAnchor.preferredWindowIndex(
+        in: [MobileAuthWindowSnapshot(isKey: false, isHidden: true)]
+      ) == nil
+    )
+  }
+
+  @Test func mobileAuthCoordinatorErrorsKeepStableNSErrorCodes() {
+    #expect(
+      (MobileAuthCoordinatorError.invalidAuthURL as NSError).domain ==
+        "Jovie.MobileAuthCoordinatorError"
+    )
+    #expect((MobileAuthCoordinatorError.invalidAuthURL as NSError).code == 1)
+    #expect((MobileAuthCoordinatorError.sessionStartFailed as NSError).code == 2)
+    #expect((MobileAuthCoordinatorError.missingCallbackURL as NSError).code == 3)
+  }
+
   @Test func mobileAuthReturnParserAcceptsCodeCallback() {
     let result = MobileAuthReturnParser.parse(
       URL(string: "ie.jov.jovie://auth/complete?code=code_123&state=state_123")!,
@@ -1010,6 +1080,10 @@ struct AppStateTests {
     )
     #expect(
       mobileAuthFailureMessage(for: MobileAuthCoordinatorError.invalidAuthURL) ==
+        MobileAuthCopy.failure
+    )
+    #expect(
+      mobileAuthFailureMessage(for: MobileAuthCoordinatorError.sessionStartFailed) ==
         MobileAuthCopy.failure
     )
   }

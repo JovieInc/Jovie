@@ -8,8 +8,10 @@
  * Opaque `{"error":{"name":"UpstashError"}}` titles are the JSON-stringified
  * form of an UpstashError whose `message` is non-enumerable (JOV-5182,
  * JOV-5183, JOV-5187, JOV-5209, JOV-5218, JOV-5220, JOV-5221, JOV-5228,
- * JOV-5229). The
- * standing Redis operability canary already pages on quota exhaustion.
+ * JOV-5229). The standing Redis operability canary already pages on quota
+ * exhaustion. The real command-failure title (`UpstashError: ERR max
+ * requests limit exceeded`, JOV-5184) is the same incident — drop it at
+ * capture time so it does not file a Linear issue per route.
  */
 
 export interface SentryIssueSummary {
@@ -54,7 +56,8 @@ const DEGRADED_HTTP_OPERATION_TITLE = 'degraded http operation';
  * Exact Sentry/Linear title created when `captureWarning(msg, { error })`
  * JSON-stringifies an UpstashError whose only enumerable field is `name`.
  * Real quota exceptions keep the `UpstashError: Command failed: ERR max
- * requests…` title (JOV-5199) and must not match this bag.
+ * requests…` title (JOV-5184 / JOV-5199) and must not match this bag —
+ * they are dropped separately as quota noise.
  */
 export const UPSTASH_ERROR_JSON_BAG = '{"error":{"name":"UpstashError"}}';
 const UPSTASH_ERROR_JSON_BAG_TITLE = `Error: ${UPSTASH_ERROR_JSON_BAG}`;
@@ -77,7 +80,8 @@ function isUpstashErrorJsonBagText(value: string | null | undefined): boolean {
  * True when a captured value would Sentry-title as
  * `Error: {"error":{"name":"UpstashError"}}` (JOV-5183 / JOV-5187 / JOV-5209 /
  * JOV-5218 / JOV-5228). Error instances are matched on `message` so a real
- * `UpstashError: ERR max requests…` exception stays visible.
+ * `UpstashError: ERR max requests…` exception is classified as quota noise
+ * (JOV-5184), not this bag.
  * Next.js request wrappers keep the bag on `cause`; walk a bounded chain.
  */
 export function isOpaqueUpstashErrorJsonBag(value: unknown): boolean {
