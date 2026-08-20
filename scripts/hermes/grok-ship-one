@@ -10,6 +10,10 @@ case "$ID" in
 esac
 
 export PATH="$HOME/.local/bin:$HOME/.npm-global/bin:/usr/local/bin:$PATH:/usr/bin:/bin"
+# Husky pre-push defaults to 1 vitest worker (laptop). Gem remounts then take
+# 20–40 min (live JOV-5220). Override without skipping the gate.
+export AUTOMATION_VERIFY_MAX_WORKERS="${AUTOMATION_VERIFY_MAX_WORKERS:-4}"
+export AUTOMATION_VERIFY_SHARD_CONCURRENCY="${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-2}"
 set -a
 # shellcheck disable=SC1091
 [ -f "$HOME/.config/symphony/linear.env" ] && . "$HOME/.config/symphony/linear.env"
@@ -344,9 +348,14 @@ PY
 if [ "$CHANGELOG_ONLY_REMOUNT" = 1 ]; then
   merge_state="$(printf '%s' "$EXISTING_MERGE_STATE" | tr '[:lower:]' '[:upper:]')"
   if [ -z "$merge_state" ] || [ "$merge_state" = "DIRTY" ] || [ "$merge_state" = "BEHIND" ]; then
-    git -C "$WS" push origin "$BRANCH"
-    echo "$(date -u +%FT%TZ) $ID remount_changelog_pushed" >> "$LOG"
-    SKIP_GROK=1
+    # Live JOV-5238: set -e abort after autoresolve left no END and no grok
+    # when package.json pre-push typecheck failed on the merge.
+    if git -C "$WS" push origin "$BRANCH"; then
+      echo "$(date -u +%FT%TZ) $ID remount_changelog_pushed" >> "$LOG"
+      SKIP_GROK=1
+    else
+      echo "$(date -u +%FT%TZ) $ID remount_changelog_push_failed" >> "$LOG"
+    fi
   fi
 fi
 
