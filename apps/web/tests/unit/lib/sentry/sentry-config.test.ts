@@ -8,8 +8,8 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-
-// Import config functions
+import { getFullClientConfig } from '@/lib/sentry/client-full';
+import { getLiteClientConfig } from '@/lib/sentry/client-lite';
 import {
   createBeforeSendHook,
   getBaseClientConfig,
@@ -19,6 +19,8 @@ import {
   SENSITIVE_HEADERS,
   scrubPii,
 } from '@/lib/sentry/config';
+
+vi.unmock('@/lib/sentry/client-lite');
 
 // ============================================================================
 // PII Scrubbing Tests
@@ -353,6 +355,24 @@ describe('scrubPii', () => {
     expect(scrubPii(event as any)).toBeNull();
   });
 
+  it('should drop a JOV-5183 bag kept on a non-standard extra key', () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value: 'Non-Error exception captured with keys: error',
+          },
+        ],
+      },
+      extra: {
+        ctx: { error: { name: 'UpstashError' } },
+      },
+    };
+
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
   it('should drop a JOV-5187 logentry.formatted Linear title', () => {
     const event = {
       logentry: {
@@ -617,6 +637,37 @@ describe('getBaseClientConfig', () => {
       vi.unstubAllEnvs();
       vi.resetModules();
     }
+  });
+});
+
+function ignoresUpstashJsonBag(
+  ignoreErrors: Array<string | RegExp> | undefined
+): boolean {
+  return Boolean(
+    ignoreErrors?.some(
+      pattern =>
+        pattern instanceof RegExp &&
+        pattern.test('{"error":{"name":"UpstashError"}}')
+    )
+  );
+}
+
+describe('client init configs (JOV-5183)', () => {
+  it('forwards the UpstashError JSON bag ignoreErrors into lite Sentry.init', () => {
+    expect(ignoresUpstashJsonBag(getLiteClientConfig().ignoreErrors)).toBe(
+      true
+    );
+  });
+
+  it('forwards the UpstashError JSON bag ignoreErrors into full Sentry.init', () => {
+    expect(
+      ignoresUpstashJsonBag(
+        getFullClientConfig({
+          enableBreadcrumbs: false,
+          enableReplay: false,
+        }).ignoreErrors
+      )
+    ).toBe(true);
   });
 });
 

@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Opaque `Error: {"error":{"name":"UpstashError"}}` bags no longer file from the browser SDK (JOV-5183):** lite and full client `Sentry.init` now receive the shared `ignoreErrors` bag patterns, and `beforeSend` drops the bag on any `extra` key. Real quota command failures still report.
+
 - [internal] **Opaque `Error: {"error":{"name":"UpstashError"}}` bags no longer file from client object-captures (JOV-5187):** client `beforeSend` now drops `hint.originalException` bags, and events that only keep the bag on `extra.__serialized__` or `logentry.formatted` are dropped. Real quota command failures still report.
 
 - [internal] **Opaque `Error: {"error":{"name":"UpstashError"}}` bags no longer file from wrapped request errors (JOV-5209):** `beforeSend` drops `hint.originalException` bags and `onRequestError` walks `Error.cause`. Real quota command failures still report.
