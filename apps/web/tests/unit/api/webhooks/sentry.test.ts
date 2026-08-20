@@ -98,7 +98,7 @@ describe('POST /api/webhooks/sentry', () => {
     );
   });
 
-  it('skips autofix for the JOV-5183 UpstashError JSON bag', async () => {
+  it('skips autofix for the JOV-5182 UpstashError JSON bag', async () => {
     mockAcquireRecentDispatch.mockResolvedValue({
       acquired: true,
       reason: 'acquired',
@@ -108,8 +108,9 @@ describe('POST /api/webhooks/sentry', () => {
     const payload = {
       data: {
         issue: {
-          id: '7677474491',
+          id: '7677474502',
           title: 'Error: {"error":{"name":"UpstashError"}}',
+          culprit: 'GET /',
         },
       },
     };
