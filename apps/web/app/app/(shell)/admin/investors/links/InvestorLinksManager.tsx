@@ -1,6 +1,7 @@
 'use client';
 
 import { Badge, Button, ConfirmDialog, Input } from '@jovie/ui';
+import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import {
   ArrowLeft,
   Check,
@@ -22,19 +23,16 @@ import {
   DrawerFormField,
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
-import { TableIconButton } from '@/components/organisms/table';
+import {
+  TableEmptyState,
+  TableIconButton,
+  UnifiedTable,
+  UnifiedTableSkeleton,
+} from '@/components/organisms/table';
 import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
-import {
-  InvestorTable,
-  InvestorTableBody,
-  InvestorTableCell,
-  InvestorTableHead,
-  InvestorTableHeaderCell,
-  InvestorTableHeaderRow,
-  InvestorTableRow,
-} from '../_components/InvestorTablePrimitives';
 
 // ---------------------------------------------------------------------------
 // Types (mirrored from schema to avoid server-only import in client component)
@@ -61,6 +59,8 @@ type InvestorLinkWithCounts = InvestorLink & {
   viewCount?: number;
   lastViewed?: string | null;
 };
+
+const columnHelper = createColumnHelper<InvestorLinkWithCounts>();
 
 // ---------------------------------------------------------------------------
 // Create Link Dialog
@@ -428,9 +428,15 @@ function LinkActions({
 // Main Manager Component
 // ---------------------------------------------------------------------------
 
-export function InvestorLinksManager() {
-  const [links, setLinks] = useState<InvestorLinkWithCounts[]>([]);
-  const [loading, setLoading] = useState(true);
+export function InvestorLinksManager({
+  initialLinks,
+}: {
+  readonly initialLinks?: readonly InvestorLinkWithCounts[];
+}) {
+  const [links, setLinks] = useState<InvestorLinkWithCounts[]>(() => [
+    ...(initialLinks ?? []),
+  ]);
+  const [loading, setLoading] = useState(initialLinks === undefined);
   const [error, setError] = useState<string | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [pendingDeleteLink, setPendingDeleteLink] =
@@ -450,8 +456,10 @@ export function InvestorLinksManager() {
   }, []);
 
   useEffect(() => {
-    fetchLinks();
-  }, [fetchLinks]);
+    if (initialLinks === undefined) {
+      fetchLinks();
+    }
+  }, [fetchLinks, initialLinks]);
 
   const handleToggleActive = async (id: string, isActive: boolean) => {
     // Optimistic update
@@ -497,45 +505,99 @@ export function InvestorLinksManager() {
     setLinks(prev => [link, ...prev]);
   };
 
+  const columns = [
+    columnHelper.accessor('label', {
+      header: 'Label',
+      cell: info => (
+        <span className='font-semibold text-primary-token'>
+          {info.getValue()}
+        </span>
+      ),
+    }),
+    columnHelper.accessor('investorName', {
+      header: 'Investor',
+      cell: info => (
+        <div className='text-secondary-token'>
+          <span>{info.getValue() || 'Unknown'}</span>
+          {info.row.original.email ? (
+            <span className='ml-1 text-2xs text-tertiary-token'>
+              ({info.row.original.email})
+            </span>
+          ) : null}
+        </div>
+      ),
+    }),
+    columnHelper.accessor('stage', {
+      header: 'Stage',
+      cell: info => <StageBadge stage={info.getValue()} />,
+    }),
+    columnHelper.accessor('isActive', {
+      header: 'Status',
+      cell: info => <StatusBadge isActive={info.getValue()} />,
+    }),
+    columnHelper.accessor('createdAt', {
+      header: 'Created',
+      cell: info => (
+        <span className='text-secondary-token'>
+          {new Date(info.getValue()).toLocaleDateString()}
+        </span>
+      ),
+    }),
+    columnHelper.display({
+      id: 'actions',
+      header: 'Actions',
+      cell: info => (
+        <div className='flex justify-end'>
+          <LinkActions
+            link={info.row.original}
+            onToggleActive={handleToggleActive}
+            onRequestDelete={() => setPendingDeleteLink(info.row.original)}
+          />
+        </div>
+      ),
+      meta: { className: 'w-24 text-right' },
+      enableSorting: false,
+    }),
+  ];
+
   if (loading) {
     return (
-      <ContentSurfaceCard className='overflow-hidden p-0'>
-        <div className='space-y-2 px-3 py-3'>
-          {Array.from({ length: 4 }, (_, i) => (
-            <div
-              // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders never reorder
-              key={`skeleton-${i}`}
-              className='h-11 animate-pulse rounded-lg bg-surface-0'
-            />
-          ))}
-        </div>
+      <ContentSurfaceCard surface='table' className='overflow-hidden p-0'>
+        <UnifiedTableSkeleton
+          columns={columns as ColumnDef<InvestorLinkWithCounts, unknown>[]}
+          skeletonRows={4}
+          rowHeight={44}
+          minWidth='700px'
+          containerClassName='px-3 py-3'
+        />
       </ContentSurfaceCard>
     );
   }
 
   if (error) {
     return (
-      <ContentSurfaceCard className='p-6 text-center'>
-        <p className='text-sm text-destructive'>{error}</p>
-        <Button
-          variant='secondary'
-          size='sm'
-          onClick={() => {
-            setError(null);
-            setLoading(true);
-            fetchLinks();
+      <ContentSurfaceCard>
+        <EmptyState
+          variant='error'
+          heading='Could not load investor links'
+          description={error}
+          action={{
+            label: 'Retry',
+            variant: 'secondary',
+            onClick: () => {
+              setError(null);
+              setLoading(true);
+              fetchLinks();
+            },
           }}
-          className='mt-3'
-        >
-          Retry
-        </Button>
+        />
       </ContentSurfaceCard>
     );
   }
 
   return (
     <>
-      <ContentSurfaceCard className='overflow-hidden p-0'>
+      <ContentSurfaceCard surface='table' className='overflow-hidden p-0'>
         <div className='flex items-center justify-end gap-2 px-3 py-2'>
           <Button variant='secondary' size='sm' asChild>
             <Link href={APP_ROUTES.ADMIN_INVESTORS}>
@@ -549,65 +611,20 @@ export function InvestorLinksManager() {
           </Button>
         </div>
 
-        {links.length === 0 ? (
-          <div className='px-(--linear-app-header-padding-x) py-6 text-app text-secondary-token'>
-            No investor links yet.
-          </div>
-        ) : (
-          <InvestorTable minWidth='min-w-175'>
-            <InvestorTableHead>
-              <InvestorTableHeaderRow>
-                <InvestorTableHeaderCell>Label</InvestorTableHeaderCell>
-                <InvestorTableHeaderCell>Investor</InvestorTableHeaderCell>
-                <InvestorTableHeaderCell>Stage</InvestorTableHeaderCell>
-                <InvestorTableHeaderCell>Status</InvestorTableHeaderCell>
-                <InvestorTableHeaderCell>Created</InvestorTableHeaderCell>
-                <InvestorTableHeaderCell align='right'>
-                  Actions
-                </InvestorTableHeaderCell>
-              </InvestorTableHeaderRow>
-            </InvestorTableHead>
-            <InvestorTableBody>
-              {links.map(link => (
-                <InvestorTableRow key={link.id}>
-                  <InvestorTableCell>
-                    <span className='font-semibold text-primary-token'>
-                      {link.label}
-                    </span>
-                  </InvestorTableCell>
-                  <InvestorTableCell className='text-secondary-token'>
-                    <div>
-                      <span>{link.investorName || 'Unknown'}</span>
-                      {link.email && (
-                        <span className='ml-1 text-2xs text-tertiary-token'>
-                          ({link.email})
-                        </span>
-                      )}
-                    </div>
-                  </InvestorTableCell>
-                  <InvestorTableCell>
-                    <StageBadge stage={link.stage} />
-                  </InvestorTableCell>
-                  <InvestorTableCell>
-                    <StatusBadge isActive={link.isActive} />
-                  </InvestorTableCell>
-                  <InvestorTableCell className='text-secondary-token'>
-                    {new Date(link.createdAt).toLocaleDateString()}
-                  </InvestorTableCell>
-                  <InvestorTableCell>
-                    <div className='flex justify-end'>
-                      <LinkActions
-                        link={link}
-                        onToggleActive={handleToggleActive}
-                        onRequestDelete={() => setPendingDeleteLink(link)}
-                      />
-                    </div>
-                  </InvestorTableCell>
-                </InvestorTableRow>
-              ))}
-            </InvestorTableBody>
-          </InvestorTable>
-        )}
+        <UnifiedTable
+          data={links}
+          columns={columns as ColumnDef<InvestorLinkWithCounts, unknown>[]}
+          enableVirtualization={false}
+          rowHeight={44}
+          minWidth='700px'
+          getRowId={link => link.id}
+          emptyState={
+            <TableEmptyState
+              heading='No investor links yet'
+              description='Create an investor link to begin sharing the portal.'
+            />
+          }
+        />
       </ContentSurfaceCard>
 
       <CreateLinkDialog
