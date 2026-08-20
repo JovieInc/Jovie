@@ -84,8 +84,8 @@ gh api repos/JovieInc/Jovie/rulesets/10512119 \
 `ci:merge-queue:verify` (live ruleset `10512119` via `gh api`) runs in
 `.github/workflows/merge-queue-ruleset-verify.yml` on a daily schedule, on
 `main` pushes that touch the ruleset/check sources, and on `workflow_dispatch`.
-It is not a source `PR Ready` context. Pending native cohort cutover fields
-are already exempted in `validateLiveMergeQueueRuleset`.
+It is not a source `PR Ready` context. Failures notify Slack. Pending native
+cohort cutover fields are already exempted in `validateLiveMergeQueueRuleset`.
 
 Bare local controller/check commands default to `native`, matching the live
 repository variable. Unknown backends fail closed. Native enrollment/dequeue

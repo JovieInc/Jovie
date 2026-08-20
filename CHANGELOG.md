@@ -7,13 +7,19 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Redis quota JSON bags no longer auto-file as `Error: {"error":{"name":"UpstashError"}}` (JOV-5218):** Sentry drops that exact capture-bag title and the autofix webhook skips it, while real Upstash quota exceptions stay visible.
+
 ### Fixed
 
 - [internal] **Production monitors page again:** post-deploy probe failures Slack `#alerts-production`, golden-path probes add claim/billing/Stripe liveness, observability and synthetics file Linear, and the canary `/api/chat` auth-gate retries then fails closed.
 
 ### Added
 
+- [internal] **Live merge-queue ruleset verify pages Slack:** the scheduled observer still fails the run and now posts to the existing webhook.
+- [internal] **Critical-surface vitest coverage floors are non-zero:** entitlements, Stripe webhooks, webhook signatures, and test-auth globs ratchet from the last measured snapshot minus 3pp on `vitest --coverage`. Merge-queue unit shards stay coverage-off.
 - [internal] **Canonical Actions now have one contract package:** `@jovie/action-contracts` owns the four stable IDs, and authenticated `GET /api/v1/actions` can list what a profile can do. Nothing is created yet.
+
+- [internal] **Design governance is now a standing audit, not a one-off sweep:** `pnpm design:governance:audit` fails closed on dangling skill links, stale token exports, DESIGN.md Noir Ion rgb drift, and unwired enforcement commands. It runs locally and weekly (informational / issue-only), not as a `ci-fast` merge gate.
 
 - **iPhone Library is Catalog, Collections, and Ideas:** Catalog is releases, merch, and docs. Collections auto-bundles a vlog with its script, takes, and B-roll. Ideas is the untagged third home.
 - **iPhone chat is home:** Ask Jovie is the first signed-in surface. There is no bottom tab bar. Swipe from the leading edge for the sidebar and from the trailing edge for the right rail.
@@ -43,9 +49,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-- [internal] **Redis quota JSON bags no longer auto-file as `Error: {"error":{"name":"UpstashError"}}` (JOV-5218):** Sentry drops that exact capture-bag title and the autofix webhook skips it, while real Upstash quota exceptions stay visible.
+- [internal] **Stale grok remount units no longer block a fresh rebase:** sidecar stops a DIRTY/CONFLICTING fallback-ship older than 15 minutes so changelog remounts can run after a sibling lands. Merge-queue UNMERGEABLE (`CONFLICTING`) counts as remount, not inflight skip.
+- [internal] **DIRTY remounts that only conflict on CHANGELOG.md merge and push without waiting on grok:** Unreleased bullets from the branch are unioned onto main so sibling ships stop parking CLEAN-except-changelog heads for an hour.
 - [internal] **Hold-intake missed-admission recovery now enrolls CLEAN `queue-deferred` heads:** exact admission already strips that label, but a main-push recovery used to skip it and left CI-green Symphony PRs parked off the merge queue.
 - [internal] **Agent QC wires now match autonomous-shipping doctrine:** Scope Judge is retired instead of advertised, Slop Gate stays a weekly post-merge smell report, GStack PR comments are no longer auto-approve evidence, exhausted `needs-human` PRs ping Slack/Linear before the 48h close, agent-pipeline classifies branches with the shared allowlist so `hotfix/` and `feat/` stop looking like agent PRs, and live merge-queue ruleset verify runs on a schedule instead of only in docs.
+- [internal] **Nightly coverage audit publishes again and pages Slack:** coverage skips the Chromium-launching artifact-secret spec that was failing the heatmap for months, RED-surface ≥3pp drops fail the job, and failures notify the existing Slack webhook instead of a retired GitHub Issue writer.
+- [internal] **CI duration SLO breaches notify Slack:** the nightly p95 ratchet still fails the run and now posts to the existing webhook.
 - [internal] **Long typechecks now report phase timing instead of looking stuck:** singleflight logs elapsed time, tsbuildinfo age/size, and child CPU/RSS while the live compiler keeps ownership.
 - [internal] **Symphony admits from one receipt, not three labels:** a current `admission-gate/v1` receipt is the admission authority. The `plan-approved`, `admission-approved`, and `symphony` labels stay as derived audit. Protected and human-review work stays excluded.
 - [internal] **Merge-queue Path Changes no longer rejects coalesced heads:** an empty event-base diff now recomputes against live `main` before a typed no-op, so green combined heads can land.
