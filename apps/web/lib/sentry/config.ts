@@ -433,7 +433,7 @@ export function scrubPii(event: SentryEvent): SentryEvent | null {
     return null;
   }
 
-  // Filter captureWarning({ error: UpstashError }) JSON bags (JOV-5218).
+  // Filter captureWarning/captureError JSON bags (JOV-5218, JOV-5229).
   // Real Upstash quota exceptions keep their command-failure title.
   if (isNonActionableUpstashErrorBagEvent(event)) {
     return null;

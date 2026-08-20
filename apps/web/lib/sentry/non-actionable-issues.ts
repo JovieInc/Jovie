@@ -6,8 +6,8 @@
  * It is not an application defect and should not trigger autofix or performance alerts.
  *
  * Opaque `{"error":{"name":"UpstashError"}}` titles are the JSON-stringified
- * form of an UpstashError whose `message` is non-enumerable (JOV-5220, JOV-5221).
- * The standing Redis operability canary already pages on quota exhaustion.
+ * form of an UpstashError whose `message` is non-enumerable (JOV-5220, JOV-5221,
+ * JOV-5229). The standing Redis operability canary already pages on quota exhaustion.
  */
 
 export interface SentryIssueSummary {
@@ -26,11 +26,15 @@ export interface SentryEventLike {
   } | null;
 }
 
+const UPSTASH_ERROR_JSON_BAG_PATTERNS: ReadonlyArray<RegExp> = [
+  /\{\s*"error"\s*:\s*\{\s*"name"\s*:\s*"UpstashError"\s*\}\s*\}/,
+  /\{\s*"name"\s*:\s*"UpstashError"\s*\}/,
+];
+
 /** Drop these in server/edge `ignoreErrors` so quota noise never files issues. */
 export const UPSTASH_QUOTA_IGNORE_ERRORS: ReadonlyArray<RegExp> = [
   /ERR max requests limit exceeded/i,
-  /\{\s*"error"\s*:\s*\{\s*"name"\s*:\s*"UpstashError"\s*\}\s*\}/,
-  /\{\s*"name"\s*:\s*"UpstashError"\s*\}/,
+  ...UPSTASH_ERROR_JSON_BAG_PATTERNS,
 ];
 
 /** Transaction names excluded from performance tracing (0% sample rate). */
@@ -62,6 +66,7 @@ function isUpstashErrorJsonBagText(value: string | null | undefined): boolean {
 }
 
 export interface SentryExceptionLike {
+  readonly title?: string | null;
   readonly message?: string | null;
   readonly logentry?: { readonly message?: string | null } | null;
   readonly exception?: {
@@ -70,6 +75,21 @@ export interface SentryExceptionLike {
       readonly value?: string | null;
     } | null> | null;
   } | null;
+}
+
+/**
+ * Returns true when a string is the opaque JSON.stringify UpstashError bag
+ * (`{"error":{"name":"UpstashError"}}`), including the `Error: …` title
+ * Sentry/Linear used for JOV-5229. Quota command text does not match.
+ */
+export function isOpaqueUpstashErrorJsonBag(
+  value: string | null | undefined
+): boolean {
+  if (!value) return false;
+  return (
+    isUpstashErrorJsonBagText(value) ||
+    UPSTASH_ERROR_JSON_BAG_PATTERNS.some(pattern => pattern.test(value))
+  );
 }
 
 /**
@@ -92,6 +112,7 @@ export function isNonActionableUpstashErrorBagEvent(
   event: SentryExceptionLike
 ): boolean {
   const values: Array<string | null | undefined> = [
+    event.title,
     event.message,
     event.logentry?.message,
   ];
@@ -103,7 +124,7 @@ export function isNonActionableUpstashErrorBagEvent(
     }
   }
 
-  return values.some(value => isUpstashErrorJsonBagText(value));
+  return values.some(value => isOpaqueUpstashErrorJsonBag(value));
 }
 
 /**

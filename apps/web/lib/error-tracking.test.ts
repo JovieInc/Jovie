@@ -98,6 +98,14 @@ describe('captureError wrapped UpstashError (JOV-5220)', () => {
     getClient.mockReturnValue({});
   });
 
+  it('does not send the opaque JSON bag at error severity (JOV-5229)', async () => {
+    await captureError(
+      '[db-cache] Redis read failed',
+      new Error('{"error":{"name":"UpstashError"}}')
+    );
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
   it('captures the inner UpstashError and fingerprints quota as one class', async () => {
     const inner = new UpstashError(
       'ERR max requests limit exceeded. Limit: 500000, Usage: 500099'

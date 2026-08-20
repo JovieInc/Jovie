@@ -3,9 +3,11 @@
 import { Badge } from '@jovie/ui';
 import type { CellContext, ColumnDef } from '@tanstack/react-table';
 import { createColumnHelper } from '@tanstack/react-table';
-import { Activity } from 'lucide-react';
 import { useMemo } from 'react';
-import { PAGE_TOOLBAR_META_TEXT_CLASS } from '@/components/organisms/table';
+import {
+  PAGE_TOOLBAR_META_TEXT_CLASS,
+  TableEmptyState,
+} from '@/components/organisms/table';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableSubheader } from '@/features/admin/table/AdminTableHeader';
 import type { AdminActivityItem, AdminActivityStatus } from '@/lib/admin/types';
@@ -153,17 +155,11 @@ export function ActivityTableUnified({
           columns={columns}
           isLoading={false}
           emptyState={
-            <div className='flex flex-col items-center gap-3 px-4 py-10 text-center text-sm text-secondary-token'>
-              <Activity className='h-6 w-6' />
-              <div>
-                <div className='font-medium text-primary-token'>
-                  No recent activity
-                </div>
-                <div className='text-xs text-secondary-token'>
-                  Activity from the last 7 days will appear here.
-                </div>
-              </div>
-            </div>
+            <TableEmptyState
+              heading='No Recent Activity'
+              description='Activity from the last 7 days will appear here.'
+              testId='admin-activity-empty-state'
+            />
           }
           getRowId={row => row.id}
         />
