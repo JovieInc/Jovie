@@ -7,8 +7,9 @@
  *
  * Opaque `{"error":{"name":"UpstashError"}}` titles are the JSON-stringified
  * form of an UpstashError whose `message` is non-enumerable (JOV-5209,
- * JOV-5218, JOV-5220, JOV-5221, JOV-5228, JOV-5229). The standing Redis
- * operability canary already pages on quota exhaustion.
+ * JOV-5218, JOV-5220, JOV-5221, JOV-5228, JOV-5229). `{ clerkUserId, error }`
+ * wrappers stringify to the JOV-5185 title. The standing Redis operability
+ * canary already pages on quota exhaustion.
  */
 
 export interface SentryIssueSummary {
@@ -30,10 +31,17 @@ export interface SentryEventLike {
 /**
  * JSON.stringify({ error: UpstashError }) because `message` is non-enumerable.
  * Substring match so prefixed Sentry titles still drop (JOV-5228).
+ * `{ clerkUserId, error: UpstashError }` is the JOV-5185 Linear title.
  */
+const UPSTASH_ERROR_JSON_BAG_PATTERN =
+  /\{\s*"error"\s*:\s*\{\s*"name"\s*:\s*"UpstashError"\s*\}\s*\}/;
+const UPSTASH_ERROR_NAME_ONLY_PATTERN = /\{\s*"name"\s*:\s*"UpstashError"\s*\}/;
+const UPSTASH_ERROR_CLERK_USER_JSON_BAG_PATTERN =
+  /\{\s*"clerkUserId"\s*:\s*"[^"]+"\s*,\s*"error"\s*:\s*\{\s*"name"\s*:\s*"UpstashError"\s*\}\s*\}/;
 const UPSTASH_ERROR_JSON_BAG_PATTERNS: ReadonlyArray<RegExp> = [
-  /\{\s*"error"\s*:\s*\{\s*"name"\s*:\s*"UpstashError"\s*\}\s*\}/,
-  /\{\s*"name"\s*:\s*"UpstashError"\s*\}/,
+  UPSTASH_ERROR_JSON_BAG_PATTERN,
+  UPSTASH_ERROR_NAME_ONLY_PATTERN,
+  UPSTASH_ERROR_CLERK_USER_JSON_BAG_PATTERN,
 ];
 
 /** Drop these in server/edge `ignoreErrors` so quota noise never files issues. */
@@ -68,13 +76,15 @@ function isUpstashErrorJsonBagText(value: string | null | undefined): boolean {
   return (
     normalized === normalize(UPSTASH_ERROR_JSON_BAG) ||
     normalized === normalize(UPSTASH_ERROR_JSON_BAG_TITLE) ||
-    UPSTASH_ERROR_JSON_BAG_PATTERNS[0].test(value)
+    UPSTASH_ERROR_JSON_BAG_PATTERN.test(value) ||
+    UPSTASH_ERROR_CLERK_USER_JSON_BAG_PATTERN.test(value)
   );
 }
 
 /**
  * True when a captured value would Sentry-title as
- * `Error: {"error":{"name":"UpstashError"}}` (JOV-5209 / JOV-5218 / JOV-5228).
+ * `Error: {"error":{"name":"UpstashError"}}` (JOV-5209 / JOV-5218 / JOV-5228)
+ * or the clerkUserId-wrapped JOV-5185 bag.
  * Error instances are matched on `message` so a real
  * `UpstashError: ERR max requests…` exception stays visible.
  * Next.js request wrappers keep the bag on `cause`; walk a bounded chain.
@@ -131,8 +141,8 @@ export interface SentryExceptionLike {
 }
 
 /**
- * Returns true when a Sentry issue is the JOV-5218 JSON-bag title, not a
- * real Upstash command failure.
+ * Returns true when a Sentry issue is the JOV-5218 / JOV-5185 JSON-bag
+ * title, not a real Upstash command failure.
  */
 export function isNonActionableUpstashErrorBag(
   issue: SentryIssueSummary

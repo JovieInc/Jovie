@@ -153,4 +153,14 @@ describe('captureError wrapped UpstashError (JOV-5220)', () => {
     );
     expect(captureException).not.toHaveBeenCalled();
   });
+
+  it('does not send the clerkUserId-wrapped JSON bag at error severity (JOV-5185)', async () => {
+    await captureError(
+      '[ban-check] Redis cache read failed',
+      new Error(
+        '{"clerkUserId":"af5b9ee0-ecec-4508-86e0-4f364c2e349d","error":{"name":"UpstashError"}}'
+      )
+    );
+    expect(captureException).not.toHaveBeenCalled();
+  });
 });

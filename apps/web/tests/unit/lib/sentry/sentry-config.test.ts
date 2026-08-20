@@ -314,6 +314,15 @@ describe('scrubPii', () => {
     expect(scrubPii(event as any)).toBeNull();
   });
 
+  it('should drop the JOV-5185 clerkUserId-wrapped UpstashError JSON bag', () => {
+    const event = {
+      title:
+        'Error: {"clerkUserId":"af5b9ee0-ecec-4508-86e0-4f364c2e349d","error":{"name":"UpstashError"}}',
+    };
+
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
   it('should keep real Upstash quota exceptions', () => {
     const event = {
       exception: {
@@ -441,6 +450,32 @@ describe('createBeforeSendHook', () => {
     expect(customProcessor).toHaveBeenCalledWith(expect.anything(), hint);
   });
 
+  it('drops a generic object-capture whose originalException is the JOV-5185 bag', () => {
+    const beforeSend = createBeforeSendHook();
+    const inner = new Error(
+      'Command failed: ERR max requests limit exceeded. Limit: 500000'
+    );
+    inner.name = 'UpstashError';
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value: 'Non-Error exception captured with keys: clerkUserId, error',
+          },
+        ],
+      },
+    };
+    const hint = {
+      originalException: {
+        clerkUserId: 'af5b9ee0-ecec-4508-86e0-4f364c2e349d',
+        error: inner,
+      },
+    };
+
+    expect(beforeSend(event as any, hint as any)).toBeNull();
+  });
+
   it('drops a generic object-capture whose originalException is the JOV-5209 bag', () => {
     const beforeSend = createBeforeSendHook();
     const inner = new Error(
@@ -529,6 +564,19 @@ describe('getBaseClientConfig', () => {
         pattern =>
           pattern instanceof RegExp &&
           pattern.test('{"error":{"name":"UpstashError"}}')
+      )
+    ).toBe(true);
+  });
+
+  it('ignores the clerkUserId-wrapped UpstashError JSON bag on the client (JOV-5185)', () => {
+    const config = getBaseClientConfig();
+    expect(
+      config.ignoreErrors?.some(
+        pattern =>
+          pattern instanceof RegExp &&
+          pattern.test(
+            'Error: {"clerkUserId":"af5b9ee0-ecec-4508-86e0-4f364c2e349d","error":{"name":"UpstashError"}}'
+          )
       )
     ).toBe(true);
   });
