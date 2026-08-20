@@ -106,6 +106,13 @@ import {
 import type { CanvasGenerationInput } from '@/lib/services/canvas/types';
 import { buildChannelIntelligenceReport } from '@/lib/services/channel-intelligence';
 import {
+  CHANNEL_PLAYLIST_RULE_CASE_IDS,
+  CHANNEL_PLAYLIST_TARGET_RULES,
+  type ChannelPlaylistRuleCaseId,
+  evaluateAllChannelPlaylistRuleCases,
+  evaluateChannelPlaylistRuleCase,
+} from '@/lib/services/channel-intelligence/playlist-rules';
+import {
   buildSystemPrompt as buildInsightSystemPrompt,
   buildUserPrompt as buildInsightUserPrompt,
 } from '@/lib/services/insights/prompts';
@@ -5899,6 +5906,17 @@ function evaluateSkillPromptContract(vars: EvalVars) {
   const requestedPackagingRule = requestedPackagingRuleCase
     ? evaluatePackagingRuleCase(requestedPackagingRuleCase)
     : null;
+  const channelPlaylistRuleCases = evaluateAllChannelPlaylistRuleCases();
+  const requestedChannelPlaylistRuleCase =
+    typeof vars.channelPlaylistRuleCase === 'string' &&
+    (CHANNEL_PLAYLIST_RULE_CASE_IDS as readonly string[]).includes(
+      vars.channelPlaylistRuleCase
+    )
+      ? (vars.channelPlaylistRuleCase as ChannelPlaylistRuleCaseId)
+      : null;
+  const requestedChannelPlaylistRule = requestedChannelPlaylistRuleCase
+    ? evaluateChannelPlaylistRuleCase(requestedChannelPlaylistRuleCase)
+    : null;
   const packagingPromptFacts = {
     evidenceNotVibes: textIncludesAll(PACKAGING_AUDIT_SYSTEM_PROMPT, [
       'Evidence, not vibes',
@@ -5944,6 +5962,39 @@ function evaluateSkillPromptContract(vars: EvalVars) {
       packagingChangePlan.changePlan[0]?.priority === 1 &&
       packagingChangePlan.changePlan.every(item => item.observation.length > 0),
   };
+  const channelIntelligencePromptFacts = {
+    playlistTargetNoInvent: textIncludesAll(CHANNEL_PLAYLIST_TARGET_RULES, [
+      'No invented placements',
+      'not in the fetched data',
+      'say empty',
+    ]),
+    playlistFreshnessUnknownNeverActive: textIncludesAll(
+      CHANNEL_PLAYLIST_TARGET_RULES,
+      ['12 months', '90-day', 'never claim "active"', '15–25']
+    ),
+    playlistPeerWarmth: textIncludesAll(CHANNEL_PLAYLIST_TARGET_RULES, [
+      '2+ peers',
+    ]),
+    inventedRefused:
+      channelPlaylistRuleCases.find(item => item.id === 'invented-refused')
+        ?.passed === true,
+    dormantDropped:
+      channelPlaylistRuleCases.find(item => item.id === 'dormant-dropped')
+        ?.passed === true,
+    missingActivityUnknown:
+      channelPlaylistRuleCases.find(
+        item => item.id === 'missing-activity-unknown'
+      )?.passed === true,
+    emptyFetchEmpty:
+      channelPlaylistRuleCases.find(item => item.id === 'empty-fetch-empty')
+        ?.passed === true,
+    cap15To25:
+      channelPlaylistRuleCases.find(item => item.id === 'cap-15-25')?.passed ===
+      true,
+    omittedPlaylistsStayEmpty:
+      packagingChangePlan.playlistGate.empty === true &&
+      packagingChangePlan.playlists.length === 0,
+  };
   const retouchGuardrails = [
     "Preserve the person's identity",
     'Do not change protected or sensitive attributes',
@@ -5962,6 +6013,11 @@ function evaluateSkillPromptContract(vars: EvalVars) {
     .filter(([, passed]) => !passed)
     .map(([name]) => name);
   const missingPackagingPromptFacts = Object.entries(packagingPromptFacts)
+    .filter(([, passed]) => !passed)
+    .map(([name]) => name);
+  const missingChannelIntelligencePromptFacts = Object.entries(
+    channelIntelligencePromptFacts
+  )
     .filter(([, passed]) => !passed)
     .map(([name]) => name);
   const missingRetouchGenerationFacts = [
@@ -6030,6 +6086,17 @@ function evaluateSkillPromptContract(vars: EvalVars) {
         ? requestedPackagingRule.passed
         : packagingRuleCases.every(item => item.passed),
       ruleCaseReason: requestedPackagingRule?.reason ?? null,
+    },
+    channelIntelligence: {
+      skillId: 'channelIntelligenceReport',
+      facts: channelIntelligencePromptFacts,
+      missingFacts: missingChannelIntelligencePromptFacts,
+      ruleCases: channelPlaylistRuleCases,
+      ruleCase: requestedChannelPlaylistRule?.id ?? null,
+      ruleCasePassed: requestedChannelPlaylistRule
+        ? requestedChannelPlaylistRule.passed
+        : channelPlaylistRuleCases.every(item => item.passed),
+      ruleCaseReason: requestedChannelPlaylistRule?.reason ?? null,
     },
     retouch: {
       skillId: 'retouch',
