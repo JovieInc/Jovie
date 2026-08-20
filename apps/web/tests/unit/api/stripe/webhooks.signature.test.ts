@@ -4,6 +4,7 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  mockCaptureCriticalError,
   mockConstructEvent,
   mockGetHandler,
   mockGetPlanFromPriceId,
@@ -33,6 +34,7 @@ describe('/api/stripe/webhooks - Signature Verification', () => {
     expect(response.status).toBe(400);
     const data = await response.json();
     expect(data.error).toBe('Missing signature');
+    expect(mockCaptureCriticalError).not.toHaveBeenCalled();
   });
 
   it('returns 400 when signature is invalid', async () => {
@@ -53,5 +55,10 @@ describe('/api/stripe/webhooks - Signature Verification', () => {
     expect(response.status).toBe(400);
     const data = await response.json();
     expect(data.error).toBe('Invalid signature');
+    expect(mockCaptureCriticalError).toHaveBeenCalledWith(
+      'Invalid Stripe webhook signature',
+      expect.any(Error),
+      expect.objectContaining({ route: '/api/stripe/webhooks' })
+    );
   });
 });
