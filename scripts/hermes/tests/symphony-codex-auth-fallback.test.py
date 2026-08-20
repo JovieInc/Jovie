@@ -2315,6 +2315,82 @@ class FallbackTests(unittest.TestCase):
         self.assertNotIn("hermes should not run", events)
         self.assertTrue(created.exists())
 
+    def test_grok_ship_one_retries_cursor_model_flag_when_grok_46_rejected(self):
+        """Live JOV-5220: cursor argv uses --model grok-4.6, not -m."""
+        created = self.root / "pr-created"
+        self.command(
+            "cursor-agent",
+            'printf "cursor %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            'case " $* " in\n'
+            '  *" --model grok-4.6 "*)\n'
+            '    echo "Cannot use this model: grok-4.6[fast=false]. Available models: auto, cursor-grok-4.6-high" >&2\n'
+            '    exit 1;;\n'
+            '  *" --model cursor-grok-4.6-high "*)\n'
+            '    touch "$GROK_CREATED"\n'
+            '    exit 0;;\n'
+            'esac\n'
+            'exit 3\n',
+        )
+        self.command(
+            "gh",
+            'case "$*" in\n'
+            '  *headRefName*) echo \'[{"number":16229,"headRefName":"fallback/JOV-7-fix","mergeStateStatus":"DIRTY"}]\';;\n'
+            '  *statusCheckRollup*) echo \'{"statusCheckRollup":[{"conclusion":"FAILURE"}]}\';;\n'
+            '  *) [ ! -f "$GROK_CREATED" ] && echo 0 || echo 1;;\n'
+            'esac\n',
+        )
+        self.command(
+            "git",
+            'printf "git %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            '[ "$1" != clone ] || mkdir -p "$5/.git"\n'
+            'case "$*" in\n'
+            '  *"rev-parse HEAD") printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";;\n'
+            '  *"rev-parse --is-shallow-repository") printf "false\\n";;\n'
+            '  *"merge-base HEAD origin/main") exit 0;;\n'
+            '  *"merge --no-edit origin/main") echo "CONFLICT (content): Merge conflict in apps/web/x.ts" >&2; exit 1;;\n'
+            '  *"diff --name-only --diff-filter=U") printf "apps/web/x.ts\\n";;\n'
+            '  *"ls-files -u") printf "100644 def apps/web/x.ts\\n";;\n'
+            'esac\n',
+        )
+        selection = {
+            "schema_version": 1,
+            "deterministic_first": True,
+            "selected": {
+                "id": "cursor-grok-4.6",
+                "provider": "cursor",
+                "model": "grok-4.6",
+                "executor": {
+                    "executable": str(self.bin / "cursor-agent"),
+                    "argv": ["-p", "--force", "--model", "{model}", "{prompt}"],
+                },
+            },
+        }
+        result = subprocess.run(
+            [self.install_runtime() / GROK_SHIP.name, "JOV-7"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_EVENTS=self.events,
+                GROK_CREATED=created,
+                GROK_SHIP_WS_ROOT=self.root / "workspaces",
+                GROK_SHIP_LOG_DIR=self.root / "logs",
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.grok_linear_url(),
+                SYMPHONY_OPEN_PR_INDEX="live",
+                SYMPHONY_FALLBACK_SELECTION_B64=base64.b64encode(
+                    json.dumps(selection).encode()
+                ).decode(),
+            ),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        log = (self.root / "logs/JOV-7.log").read_text()
+        self.assertIn("retry_cursor_grok_model cursor-grok-4.6-high", log)
+        events = self.events.read_text()
+        self.assertIn("--model grok-4.6", events)
+        self.assertIn("--model cursor-grok-4.6-high", events)
+        self.assertTrue(created.exists())
+
     def test_grok_ship_one_changelog_union_failure_still_invokes_grok(self):
         """Live JOV-5238: changelog union crashed and remount exited before START."""
         created = self.root / "pr-created"
