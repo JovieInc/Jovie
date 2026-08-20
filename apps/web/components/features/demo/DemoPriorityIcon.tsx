@@ -16,7 +16,7 @@ const PRIORITY_CONFIG: Record<
   none: {
     color: 'var(--color-text-quaternary-token)',
     bars: 0,
-    label: 'No priority',
+    label: 'No Priority',
   },
 };
 

@@ -28,7 +28,7 @@ describe('HomepageHeroMockupCarousel', () => {
       )
     ).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Go to next slide' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Go To Next Slide' }));
 
     expectActiveShot(secondShotId);
   });
@@ -46,7 +46,7 @@ describe('HomepageHeroMockupCarousel', () => {
     render(<HomepageHeroMockupCarousel />);
 
     fireEvent.mouseEnter(
-      screen.getByRole('button', { name: 'Go to next slide' })
+      screen.getByRole('button', { name: 'Go To Next Slide' })
     );
     vi.advanceTimersByTime(2200);
 
@@ -67,7 +67,7 @@ describe('HomepageHeroMockupCarousel', () => {
 
     render(<HomepageHeroMockupCarousel />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Go to next slide' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Go To Next Slide' }));
 
     expectActiveShot(secondShotId);
     expect(screen.getByTestId('homepage-hero-carousel')).toHaveAttribute(

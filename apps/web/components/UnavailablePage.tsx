@@ -29,7 +29,7 @@ export function UnavailablePage() {
         </svg>
 
         <h1 className='system-b-unavailable-title'>
-          Jovie is unavailable right now
+          Jovie Is Unavailable Right Now
         </h1>
 
         <p className='system-b-unavailable-copy'>Please try again later.</p>

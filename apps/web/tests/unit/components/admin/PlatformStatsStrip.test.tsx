@@ -25,15 +25,15 @@ describe('PlatformStatsStrip', () => {
       </TooltipProvider>
     );
 
-    expect(screen.getByText('Labels on platform')).toBeInTheDocument();
+    expect(screen.getByText('Labels On Platform')).toBeInTheDocument();
     expect(screen.getByText('36')).toBeInTheDocument();
-    expect(screen.getByText('Total unique visitors')).toBeInTheDocument();
+    expect(screen.getByText('Total Unique Visitors')).toBeInTheDocument();
     expect(screen.getByText('1,200')).toBeInTheDocument();
-    expect(screen.getByText('DSP clicks driven')).toBeInTheDocument();
+    expect(screen.getByText('DSP Clicks Driven')).toBeInTheDocument();
     expect(screen.getByText('950')).toBeInTheDocument();
-    expect(screen.getByText('Contacts captured')).toBeInTheDocument();
+    expect(screen.getByText('Contacts Captured')).toBeInTheDocument();
     expect(screen.getByText('110')).toBeInTheDocument();
-    expect(screen.getByText('Tracks tracked')).toBeInTheDocument();
+    expect(screen.getByText('Tracks Tracked')).toBeInTheDocument();
     expect(screen.getByText('1,742')).toBeInTheDocument();
   });
 

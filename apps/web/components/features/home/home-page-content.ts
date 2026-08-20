@@ -140,11 +140,11 @@ export const HOME_CHAPTER_1_CONTENT: HomeChapter1Content = {
   baseStateId: 'fans-opt-in',
   callouts: [
     {
-      label: 'New song',
+      label: 'New Song',
       body: 'Fans get notified the moment a release goes live.',
     },
     {
-      label: 'Local show',
+      label: 'Local Show',
       body: 'Nearby fans hear about shows in their city first.',
     },
   ],

@@ -107,7 +107,7 @@ export function ChatMerchDesignCarouselLoading() {
   return (
     <section
       aria-busy='true'
-      aria-label='Preparing merch concepts'
+      aria-label='Preparing Merch Concepts'
       className='max-w-3xl'
     >
       <div className='grid grid-cols-3 gap-3' aria-hidden='true'>
@@ -261,7 +261,7 @@ export function ChatMerchDesignCarousel({
         ? product.mockupUrl
         : chosenDesign.preview_url;
     return (
-      <section aria-label='Selected merch product' className='max-w-3xl'>
+      <section aria-label='Selected Merch Product' className='max-w-3xl'>
         <article className='grid gap-3 sm:grid-cols-3'>
           <div className='relative aspect-square overflow-hidden rounded-lg bg-surface-0'>
             {art ? (
@@ -328,7 +328,7 @@ export function ChatMerchDesignCarousel({
 
   if (chosenDesign && productOptions.length > 0) {
     return (
-      <section aria-label='Choose a merch product' className='max-w-3xl'>
+      <section aria-label='Choose A Merch Product' className='max-w-3xl'>
         <article className='grid gap-3 sm:grid-cols-3'>
           <div className='relative aspect-square overflow-hidden rounded-lg bg-surface-0'>
             <DesignArt design={chosenDesign} />
@@ -368,7 +368,7 @@ export function ChatMerchDesignCarousel({
   }
 
   return (
-    <section aria-label='Merch design concepts' className='max-w-3xl'>
+    <section aria-label='Merch Design Concepts' className='max-w-3xl'>
       <p className='mb-3 text-xs text-secondary-token'>
         Do you like any of these?
       </p>

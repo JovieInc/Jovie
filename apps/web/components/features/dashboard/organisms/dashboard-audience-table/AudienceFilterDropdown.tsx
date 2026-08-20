@@ -23,7 +23,9 @@ const SEGMENT_OPTIONS: readonly {
   { id: 'alertsOn', label: 'Alerts On', iconName: 'Bell' },
   { id: 'highIntent', label: 'High Intent', iconName: 'Bolt' },
   { id: 'returning', label: 'Returning', iconName: 'RefreshCw' },
+  // ui-casing-allow: numeric visit count (Found === Expected)
   { id: 'frequent', label: '3+ Visits', iconName: 'RefreshCw' },
+  // ui-casing-allow: 24h period (Found === Expected)
   { id: 'recent24h', label: 'Last 24h', iconName: 'AlarmClock' },
   { id: 'touringCity', label: 'Touring City', iconName: 'MapPin' },
 ];

@@ -20,7 +20,7 @@ export function ProfileLinkCard({ handle }: ProfileLinkCardProps) {
       <div className='min-w-0 flex-1'>
         <div>
           <h3 className='text-app font-caption text-primary-token'>
-            Your profile link
+            Your Profile Link
           </h3>
           <p className='mt-1 truncate text-app text-secondary-token'>
             {profileUrl}

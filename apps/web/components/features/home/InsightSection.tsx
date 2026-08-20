@@ -21,6 +21,7 @@ export function InsightSection() {
               marginBottom: 'var(--linear-space-8)',
             }}
           >
+            {/* ui-casing-allow: marketing display headline */}
             One action. The right one.
           </h2>
 

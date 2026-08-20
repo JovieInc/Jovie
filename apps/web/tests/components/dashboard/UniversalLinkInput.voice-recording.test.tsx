@@ -87,7 +87,7 @@ describe('UniversalLinkInput voice recording overlay', () => {
     });
 
     expect(
-      screen.getByRole('button', { name: 'Cancel voice recording' })
+      screen.getByRole('button', { name: 'Cancel Voice Recording' })
     ).toBeInTheDocument();
 
     act(() => {
@@ -97,7 +97,7 @@ describe('UniversalLinkInput voice recording overlay', () => {
     expect(screen.getByText('0:02')).toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Send voice recording' })
+      screen.getByRole('button', { name: 'Send Voice Recording' })
     );
 
     act(() => {

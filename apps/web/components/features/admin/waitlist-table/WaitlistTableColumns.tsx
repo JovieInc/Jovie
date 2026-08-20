@@ -61,7 +61,7 @@ export function useWaitlistColumns({
       },
       {
         id: 'primaryGoal',
-        header: 'Primary goal',
+        header: 'Primary Goal',
         cell: entry => {
           const primaryGoalLabel = entry.primaryGoal
             ? (PRIMARY_GOAL_LABELS[entry.primaryGoal] ?? entry.primaryGoal)

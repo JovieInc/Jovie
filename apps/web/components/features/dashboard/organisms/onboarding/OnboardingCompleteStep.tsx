@@ -43,7 +43,7 @@ export function OnboardingCompleteStep({
         </div>
 
         <AuthLinkPreviewCard
-          label='Your link'
+          label='Your Link'
           hrefText={`${displayDomain}/${handle}`}
         />
 

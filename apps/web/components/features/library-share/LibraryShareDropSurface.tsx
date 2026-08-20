@@ -48,7 +48,7 @@ export function LibraryShareDropSurface({
         data-testid='library-share-expired'
       >
         <h1 className='text-2xl font-semibold text-primary-token'>
-          This drop has expired
+          This Drop Has Expired
         </h1>
         <p className='mt-3 text-sm text-secondary-token'>
           Ask {view.artistName} for a fresh link.

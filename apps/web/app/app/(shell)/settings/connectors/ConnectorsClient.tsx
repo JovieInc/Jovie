@@ -103,6 +103,7 @@ export function ConnectorsClient({
     <SettingsSection
       id='connectors'
       title='Connections'
+      // ui-casing-allow: sentence-case description (Found === Expected)
       description='Connect Gmail and Google Calendar to automatically detect booking confirmations.'
     >
       <SettingsPanel title='Google Account'>

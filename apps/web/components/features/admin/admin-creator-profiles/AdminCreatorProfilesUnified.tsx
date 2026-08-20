@@ -299,14 +299,14 @@ export function AdminCreatorProfilesUnified({
         },
       },
       {
-        label: 'Enable marketing emails',
+        label: 'Enable Marketing Emails',
         icon: <Mail className='h-3.5 w-3.5' />,
         onClick: () => {
           void handleBulkEnableMarketing();
         },
       },
       {
-        label: 'Disable marketing emails',
+        label: 'Disable Marketing Emails',
         icon: <MailX className='h-3.5 w-3.5' />,
         onClick: () => {
           void handleBulkDisableMarketing();

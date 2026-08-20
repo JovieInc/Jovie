@@ -139,7 +139,7 @@ export function useIngestProfile({
         {
           action: profileUsername
             ? {
-                label: 'View profile',
+                label: 'View Profile',
                 onClick: () => router.push(`/${profileUsername}`),
               }
             : undefined,
