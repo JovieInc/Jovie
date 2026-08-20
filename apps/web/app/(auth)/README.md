@@ -45,6 +45,6 @@ This directory contains the App Router auth pages for Jovie. The primary auth UI
 
 ## Manual QA
 
-- Signed-out auth-page QA can use `/browse` directly against `/signin` and `/signup`.
-- Signed-in dashboard or onboarding QA through gstack browse should first import cookies with `/setup-browser-cookies`, then reopen the app in the browse session.
+- Signed-out auth-page QA uses Playwright against `/signin` and `/signup`.
+- Signed-in dashboard or onboarding QA uses Playwright plus the local test-auth bypass.
 - For staging verification, always check both `/signin` and `/signup` on `staging.jov.ie`; a healthy `/api/health` response is not enough to prove auth is working.
