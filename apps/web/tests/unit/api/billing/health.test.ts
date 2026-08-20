@@ -154,8 +154,67 @@ describe('GET /api/billing/health', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
+    expect(data.healthy).toBe(true);
     expect(data.checks.recentReconciliation.status).toBe('warning');
     expect(data.metrics.lastReconciliationAt).toBe(lastReconciliationAt);
+    expect(mockCaptureWarning).not.toHaveBeenCalled();
+  });
+
+  it('does not file Sentry for warning-level checks (JOV-5242)', async () => {
+    const lastReconciliationAt = new Date();
+    mockHealthQueries([
+      [{ count: 0 }],
+      [{ count: 0 }],
+      [{ createdAt: lastReconciliationAt }],
+      [{ count: 1 }],
+      [{ lastBillingEventAt: lastReconciliationAt }],
+    ]);
+
+    mockStripeSubscriptionsList.mockResolvedValue({
+      data: [{ id: 'sub_1' }],
+      has_more: false,
+    });
+
+    const { GET } = await import('@/app/api/billing/health/route');
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.healthy).toBe(true);
+    expect(data.checks.webhooksProcessing.status).toBe('warning');
+    expect(mockCaptureWarning).not.toHaveBeenCalled();
+  });
+
+  it('still reports critical billing health to Sentry', async () => {
+    const lastReconciliationAt = new Date();
+    mockHealthQueries([
+      [{ count: 1 }],
+      [{ count: 11 }],
+      [{ createdAt: lastReconciliationAt }],
+      [{ count: 1 }],
+      [{ lastBillingEventAt: lastReconciliationAt }],
+    ]);
+
+    mockStripeSubscriptionsList.mockResolvedValue({
+      data: [{ id: 'sub_1' }],
+      has_more: false,
+    });
+
+    const { GET } = await import('@/app/api/billing/health/route');
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(data.healthy).toBe(false);
+    expect(data.checks.noStuckWebhooks.status).toBe('critical');
+    expect(mockCaptureWarning).toHaveBeenCalledWith(
+      'Billing health check critical',
+      undefined,
+      expect.objectContaining({
+        service: 'billing',
+        route: '/api/billing/health',
+      })
+    );
   });
 
   it('returns 503 on critical failure', async () => {

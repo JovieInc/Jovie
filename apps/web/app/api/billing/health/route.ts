@@ -167,7 +167,6 @@ export async function GET() {
       proCountSync,
     ];
     const hasCritical = allChecks.some(c => c.status === 'critical');
-    const hasWarning = allChecks.some(c => c.status === 'warning');
 
     const result: HealthCheckResult = {
       healthy: !hasCritical,
@@ -189,18 +188,17 @@ export async function GET() {
       },
     };
 
-    // Log warnings/criticals to error tracking
-    if (hasCritical || hasWarning) {
-      await captureWarning(
-        `Billing health check ${hasCritical ? 'critical' : 'warning'}`,
-        undefined,
-        {
-          service: 'billing',
-          route: '/api/billing/health',
-          checks: result.checks,
-          metrics: result.metrics,
-        }
-      );
+    // Critical stays in Sentry. Warning-level results belong in the JSON
+    // body for monitors — captureWarning of the string "Billing health check
+    // warning" files Linear as `Error: Billing health check warning` on every
+    // poll (JOV-5242).
+    if (hasCritical) {
+      await captureWarning('Billing health check critical', undefined, {
+        service: 'billing',
+        route: '/api/billing/health',
+        checks: result.checks,
+        metrics: result.metrics,
+      });
     }
 
     const statusCode = hasCritical ? 503 : 200;
