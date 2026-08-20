@@ -422,7 +422,18 @@ function scrubUserPii(user: SentryEvent['user']): void {
  * @param event - The Sentry event to process
  * @returns The scrubbed event, or null to drop the event
  */
-export function scrubPii(event: SentryEvent): SentryEvent | null {
+export function scrubPii(
+  event: SentryEvent,
+  hint?: SentryEventHint
+): SentryEvent | null {
+  // Client `beforeSend` is this function directly, so hint must be read here.
+  // `captureException({ error: UpstashError })` keeps the bag on
+  // originalException while the event value is a generic object capture
+  // (JOV-5187 / JOV-5209).
+  if (isOpaqueUpstashErrorJsonBag(hint?.originalException)) {
+    return null;
+  }
+
   if (isNonProductionServerNoise(event)) {
     return null;
   }
@@ -437,8 +448,9 @@ export function scrubPii(event: SentryEvent): SentryEvent | null {
     return null;
   }
 
-  // Filter captureWarning/captureError JSON bags (JOV-5209, JOV-5218, JOV-5228).
-  // Real Upstash quota exceptions keep their command-failure title.
+  // Filter captureWarning/captureError JSON bags (JOV-5187, JOV-5209,
+  // JOV-5218, JOV-5228). Real Upstash quota exceptions keep their
+  // command-failure title.
   if (isNonActionableUpstashErrorBagEvent(event)) {
     return null;
   }
@@ -501,15 +513,7 @@ export function createBeforeSendHook(
   ) => SentryEvent | null
 ): (event: SentryEvent, hint?: SentryEventHint) => SentryEvent | null {
   return (event: SentryEvent, hint?: SentryEventHint): SentryEvent | null => {
-    // Direct captureException({ error: UpstashError }) keeps the bag on
-    // hint.originalException while the event value is a generic object
-    // capture (JOV-5209).
-    if (isOpaqueUpstashErrorJsonBag(hint?.originalException)) {
-      return null;
-    }
-
-    // First apply PII scrubbing
-    const scrubbedEvent = scrubPii(event);
+    const scrubbedEvent = scrubPii(event, hint);
 
     if (!scrubbedEvent) {
       return null;
