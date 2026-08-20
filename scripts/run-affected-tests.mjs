@@ -1621,6 +1621,13 @@ export function buildFullSuiteCommands(maxWorkers, shardCount = 8) {
       `${index + 1}/${shardCount}`,
       '--maxWorkers',
       maxWorkers,
+      // Local `vitest.config.mts` keeps a 5s timeout for interactive runs.
+      // Full-suite pre-push shards have the same load as GitHub CI, which
+      // uses 12s so `vi.resetModules()` + dynamic import does not flake.
+      '--testTimeout',
+      '12000',
+      '--hookTimeout',
+      '12000',
     ],
   ]);
 }
