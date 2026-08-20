@@ -2,6 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  APP_SCREEN_COMPONENT_REGISTRY,
+  APP_SCREEN_RECIPE_REGISTRY,
+} from '@/data/appScreens';
+import {
   UI_OWNERSHIP_ENTRY_IDS,
   UI_OWNERSHIP_PLATFORMS,
   UI_OWNERSHIP_REGISTRY,
@@ -63,6 +67,42 @@ describe('cross-surface UI ownership registry', () => {
     expect(item('molecule.profile-primary-cta').visibleControlGeometry).toEqual(
       { visiblePx: 32, hitTargetPx: 44, appliesTo: 'marketing-control' }
     );
+  });
+
+  it('resolves authenticated recipes and ownership to one content-panel owner', () => {
+    const registeredOwner = APP_SCREEN_COMPONENT_REGISTRY.find(
+      entry => entry.id === 'component.app-shell-content-panel'
+    );
+    const ownershipEntry = item('organism.app-shell-content-panel');
+
+    expect(registeredOwner).toMatchObject({
+      source: 'apps/web/components/organisms/AppShellContentPanel.tsx',
+      storybookTitle: 'Organisms/AppShellContentPanel',
+    });
+    expect(ownershipEntry.sourceAuthority).toEqual({
+      registry: 'app-screens',
+      id: registeredOwner?.id,
+    });
+    expect(ownershipEntry.canonicalOwner).toEqual({
+      sourcePath: registeredOwner?.source,
+      exportName: 'AppShellContentPanel',
+      registryId: registeredOwner?.id,
+    });
+    expect(ownershipEntry.duplicateAliases).toContain('PageShell');
+
+    const contentRecipes = APP_SCREEN_RECIPE_REGISTRY.filter(recipe =>
+      recipe.componentIds.includes('component.app-shell-content-panel')
+    );
+    expect(contentRecipes.map(recipe => recipe.id)).toEqual([
+      'recipe.app-standard',
+      'recipe.app-settings',
+      'recipe.app-operator',
+    ]);
+    expect(
+      APP_SCREEN_COMPONENT_REGISTRY.some(component =>
+        component.source.endsWith('/PageShell.tsx')
+      )
+    ).toBe(false);
   });
   it('fails closed on duplicate ownership, source paths, and aliases', () => {
     const [first, second] = UI_OWNERSHIP_REGISTRY;
