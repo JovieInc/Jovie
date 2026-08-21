@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -10,6 +10,10 @@ import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboar
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import type { ChatActionCard } from '@/components/jovie/types';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  FounderDoorProvider,
+  useFounderDoor,
+} from '@/contexts/FounderDoorContext';
 import { fastRender } from '@/tests/utils/fast-render';
 
 // Controllable mocks
@@ -129,6 +133,7 @@ vi.mock('@/components/jovie/JovieChat', () => ({
     initialQuery?: string;
     isFirstSession?: boolean;
     actionCards?: readonly ChatActionCard[];
+    chatMode?: 'ov';
   }) => {
     if (mockJovieChatShouldThrow) {
       throw new Error('simulated chat render failure');
@@ -142,6 +147,7 @@ vi.mock('@/components/jovie/JovieChat', () => ({
       'data-conversation-id': props.conversationId ?? '',
       'data-is-first-session': props.isFirstSession ? 'true' : 'false',
       'data-action-card-count': String(props.actionCards?.length ?? 0),
+      'data-chat-mode': props.chatMode ?? '',
     });
   },
 }));
@@ -670,5 +676,35 @@ describe('ChatPageClient', () => {
 
     expect(mockErrorNotification).not.toHaveBeenCalled();
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('keeps /app/chat on Jovie and omits chatMode when not entitled', () => {
+    globalThis.sessionStorage.setItem('jovie:founder-door', 'ovie');
+    const { getByTestId } = renderChatPage();
+    expect(getByTestId('jovie-chat').getAttribute('data-chat-mode')).toBe('');
+  });
+
+  it('passes chatMode ov after an entitled founder-door toggle', () => {
+    function ToggleDoor() {
+      const { toggle } = useFounderDoor();
+      return (
+        <button type='button' onClick={toggle}>
+          toggle-door
+        </button>
+      );
+    }
+
+    const { getByTestId, getByRole } = fastRender(
+      <DashboardDataProvider value={{ ...baseDashboardData, isAdmin: true }}>
+        <FounderDoorProvider>
+          <ToggleDoor />
+          <ChatPageClient />
+        </FounderDoorProvider>
+      </DashboardDataProvider>
+    );
+
+    expect(getByTestId('jovie-chat').getAttribute('data-chat-mode')).toBe('');
+    fireEvent.click(getByRole('button', { name: 'toggle-door' }));
+    expect(getByTestId('jovie-chat').getAttribute('data-chat-mode')).toBe('ov');
   });
 });

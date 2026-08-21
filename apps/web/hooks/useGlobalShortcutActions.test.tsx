@@ -1,7 +1,9 @@
 import { fireEvent, render } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { FounderDoorProvider } from '@/contexts/FounderDoorContext';
+import { FOUNDER_DOOR_STORAGE_KEY } from '@/lib/ovie/founder-door';
 
 const cycleTheme = vi.fn();
 const signOut = vi.fn();
@@ -40,7 +42,7 @@ function Probe({ withProvider = true }: { readonly withProvider?: boolean }) {
         } as DashboardData
       }
     >
-      {node}
+      <FounderDoorProvider>{node}</FounderDoorProvider>
     </DashboardDataContext.Provider>
   );
 }
@@ -214,5 +216,44 @@ describe('useGlobalShortcutActions (JOV-1827)', () => {
     });
 
     expect(push).not.toHaveBeenCalled();
+  });
+});
+
+describe('useGlobalShortcutActions founder door (JOV-5239)', () => {
+  afterEach(() => {
+    globalThis.sessionStorage.clear();
+  });
+
+  it('toggles ov ↔ jovie pack on Cmd+O for entitled users', () => {
+    shortcutState.isAdmin = true;
+    render(<Probe />);
+
+    fireEvent.keyDown(window, { key: 'o', code: 'KeyO', metaKey: true });
+    expect(globalThis.sessionStorage.getItem(FOUNDER_DOOR_STORAGE_KEY)).toBe(
+      'ovie'
+    );
+
+    fireEvent.keyDown(window, { key: 'o', code: 'KeyO', ctrlKey: true });
+    expect(globalThis.sessionStorage.getItem(FOUNDER_DOOR_STORAGE_KEY)).toBe(
+      'jovie'
+    );
+  });
+
+  it('is a no-op for users without Ovie access', () => {
+    shortcutState.isAdmin = false;
+    render(<Probe />);
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'o',
+      code: 'KeyO',
+      metaKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    const prevented = !window.dispatchEvent(event);
+    expect(prevented).toBe(false);
+    expect(globalThis.sessionStorage.getItem(FOUNDER_DOOR_STORAGE_KEY)).toBe(
+      null
+    );
   });
 });

@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  FOUNDER_DOOR_SHORTCUT,
   KEYBOARD_SHORTCUTS,
   NAV_SHORTCUTS,
   SHORTCUT_CATEGORY_LABELS,
   type ShortcutCategory,
+  shortcutsForHelpSheet,
   WORKSPACE_SWITCH_SHORTCUT,
 } from './keyboard-shortcuts';
 
@@ -199,6 +201,27 @@ describe('keyboard-shortcuts definitions', () => {
         status: 'required',
         binding: 'useGlobalShortcutActions',
       });
+    });
+
+    it('keeps the founder-door binding out of the public help catalog', () => {
+      expect(KEYBOARD_SHORTCUTS.some(s => s.id === 'toggle-founder-door')).toBe(
+        false
+      );
+      expect(FOUNDER_DOOR_SHORTCUT.shortcutKey).toBe('Meta+o');
+      expect(FOUNDER_DOOR_SHORTCUT.decision).toEqual({
+        status: 'required',
+        binding: 'useGlobalShortcutActions',
+      });
+      expect(
+        shortcutsForHelpSheet({ canUseFounderDoor: false }).some(
+          s => s.id === 'toggle-founder-door'
+        )
+      ).toBe(false);
+      expect(
+        shortcutsForHelpSheet({ canUseFounderDoor: true }).some(
+          s => s.id === 'toggle-founder-door'
+        )
+      ).toBe(true);
     });
 
     it('includes sidebar toggle shortcut', () => {

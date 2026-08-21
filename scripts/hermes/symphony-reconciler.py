@@ -154,6 +154,22 @@ def _source_bundle_available() -> bool:
     )
 
 
+def _source_bundle_hashes() -> dict[str, str] | None:
+    value = os.environ.get("SYMPHONY_RUNTIME_SOURCE_ROOT")
+    if not value:
+        return None
+    root = pathlib.Path(os.path.expanduser(value))
+    revision, hashes = _runtime_revision(
+        {
+            "runtime": root / "symphony-reconciler.py",
+            "router": root / "model-router.py",
+            "registry": root / "config" / "model-registry.json",
+            "manifest": root / "config" / "symphony-reconciler-capabilities.json",
+        }
+    )
+    return hashes if revision is not None else None
+
+
 def _runtime_receipt(
     paths: dict[str, pathlib.Path], manifest: dict[str, object]
 ) -> dict[str, object] | None:
@@ -162,12 +178,19 @@ def _runtime_receipt(
     )
     if revision is None:
         return None
+    installed_at = (
+        dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    )
+    source_hashes = _source_bundle_hashes()
     return {
         "schema": RUNTIME_RECEIPT_SCHEMA,
         "runtime": "symphony-reconciler",
         "runtimeRevision": revision,
+        "installedAt": installed_at,
         "capabilities": sorted(manifest["capabilities"]),
         "files": files,
+        "runtimeHashes": files,
+        "sourceHashes": source_hashes or files,
     }
 
 
@@ -311,12 +334,26 @@ def runtime_preflight(
             "receipt": receipt,
         }
 
+    source_hashes = installed_receipt.get("sourceHashes")
+    runtime_hashes = installed_receipt.get("runtimeHashes")
+    current_source_hashes = _source_bundle_hashes()
     if (
         installed_receipt.get("schema") != RUNTIME_RECEIPT_SCHEMA
         or installed_receipt.get("runtime") != receipt["runtime"]
         or installed_receipt.get("runtimeRevision") != receipt["runtimeRevision"]
         or installed_receipt.get("capabilities") != receipt["capabilities"]
         or installed_receipt.get("files") != receipt["files"]
+        or runtime_hashes not in (None, receipt["files"])
+        or source_hashes not in (None, receipt["files"])
+        or (
+            current_source_hashes is not None
+            and (
+                current_source_hashes != receipt["files"]
+                or source_hashes != current_source_hashes
+            )
+        )
+        or not isinstance(installed_receipt.get("installedAt"), str)
+        or not installed_receipt.get("installedAt")
     ):
         return {
             "status": "recoverable",
@@ -336,6 +373,9 @@ def runtime_preflight(
 
 DETERMINISTIC_LAUNCHER_ATTEMPTS = 1
 TRANSIENT_LAUNCHER_ATTEMPTS = 3
+EX_CONFIG = 78
+EX_TEMPFAIL = 75
+SYMPHONY_ROUTING_SCHEMA = "symphony-routing/v1"
 
 DETERMINISTIC_LAUNCHER_PATTERN = re.compile(
     r"SYMPHONY_LAUNCHER_FAILURE.*deterministic-launcher"
@@ -352,6 +392,10 @@ DETERMINISTIC_LAUNCHER_PATTERN = re.compile(
 TRANSIENT_LAUNCHER_PATTERN = re.compile(
     r"CAPACITY_UNAVAILABLE|account_busy|rate limit|quota|usage limit"
     r"|provider.*(?:temporarily )?unavailable|temporarily unavailable",
+    re.IGNORECASE,
+)
+PORT_EXIT_PATTERN = re.compile(
+    r"\{:port_exit,\s*(\d+)\}|port_exit[, :]+(\d+)",
     re.IGNORECASE,
 )
 
@@ -381,31 +425,312 @@ def _parse_time(value: object) -> dt.datetime | None:
         return None
 
 
-def classify_launcher_failure(error: object) -> dict[str, object]:
-    """Classify launcher evidence into a bounded, observable retry policy."""
+def parse_port_exit(error: object) -> int | None:
+    """Extract a port/process exit status from controller or launcher evidence."""
+    if isinstance(error, dict):
+        for key in ("port_exit", "exit_code", "exitCode", "status"):
+            value = error.get(key)
+            if isinstance(value, int):
+                return value
+            if isinstance(value, str) and value.isdigit():
+                return int(value)
+        error = error.get("error") or error.get("reason") or error.get("message")
     evidence = str(error or "")
-    if DETERMINISTIC_LAUNCHER_PATTERN.search(evidence):
-        return {
-            "schema": LAUNCHER_FAILURE_SCHEMA,
-            "class": "deterministic-launcher",
-            "code": "deterministic-launcher-failure",
-            "retryable": False,
-            "maxAttempts": DETERMINISTIC_LAUNCHER_ATTEMPTS,
-        }
-    if TRANSIENT_LAUNCHER_PATTERN.search(evidence):
-        return {
-            "schema": LAUNCHER_FAILURE_SCHEMA,
-            "class": "transient-launcher",
-            "code": "capacity-or-provider-unavailable",
-            "retryable": True,
-            "maxAttempts": TRANSIENT_LAUNCHER_ATTEMPTS,
-        }
+    match = PORT_EXIT_PATTERN.search(evidence)
+    if not match:
+        return None
+    for group in match.groups():
+        if group is not None:
+            try:
+                return int(group)
+            except ValueError:
+                return None
+    return None
+
+
+def parse_launcher_sentinel(error: object) -> dict[str, object] | None:
+    """Preserve a structured symphony-launcher-failure/v1 sentinel when present."""
+    if isinstance(error, dict) and error.get("schema") == LAUNCHER_FAILURE_SCHEMA:
+        return error
+    evidence = str(error or "")
+    marker = "SYMPHONY_LAUNCHER_FAILURE"
+    index = evidence.find(marker)
+    if index < 0:
+        return None
+    payload = evidence[index + len(marker) :].strip()
+    fields: dict[str, object] = {"schema": LAUNCHER_FAILURE_SCHEMA}
+    try:
+        tokens = shlex.split(payload)
+    except ValueError:
+        tokens = payload.split()
+    for token in tokens:
+        if "=" not in token:
+            continue
+        key, value = token.split("=", 1)
+        if value in {"true", "false"}:
+            fields[key] = value == "true"
+        elif value.isdigit():
+            fields[key] = int(value)
+        else:
+            fields[key] = value
+    return fields
+
+
+def _failure(
+    class_name: str,
+    code: str,
+    *,
+    retryable: bool,
+    max_attempts: int,
+) -> dict[str, object]:
     return {
         "schema": LAUNCHER_FAILURE_SCHEMA,
-        "class": "unknown-launcher",
-        "code": "unclassified-launcher-failure",
+        "class": class_name,
+        "code": code,
+        "retryable": retryable,
+        "maxAttempts": max_attempts,
+    }
+
+
+def classify_launcher_failure(
+    error: object,
+    item: dict[str, object] | None = None,
+) -> dict[str, object]:
+    """Classify launcher and controller-exit evidence into a bounded retry policy.
+
+    Structured sentinels and sysexits EX_CONFIG (78) are terminal. EX_TEMPFAIL
+    (75) stays a distinct bounded capacity state. Unknown exits stay typed
+    unknown and bounded, never collapsed into exit 78.
+    """
+    item = item or {}
+    sentinel = parse_launcher_sentinel(error)
+    if sentinel is None:
+        sentinel = parse_launcher_sentinel(item.get("error") or item.get("launcherFailure"))
+    if isinstance(sentinel, dict) and sentinel.get("retryable") is False:
+        return _failure(
+            str(sentinel.get("class") or "deterministic-launcher"),
+            str(sentinel.get("code") or "deterministic-launcher-failure"),
+            retryable=False,
+            max_attempts=DETERMINISTIC_LAUNCHER_ATTEMPTS,
+        )
+    port_exit = parse_port_exit(error)
+    if port_exit is None:
+        port_exit = parse_port_exit(item.get("error"))
+    if port_exit is None:
+        for key in ("port_exit", "exit_code", "exitCode"):
+            value = item.get(key)
+            if isinstance(value, int):
+                port_exit = value
+                break
+    if port_exit == EX_CONFIG:
+        return _failure(
+            "deterministic-launcher",
+            "deterministic-launcher-failure",
+            retryable=False,
+            max_attempts=DETERMINISTIC_LAUNCHER_ATTEMPTS,
+        )
+    evidence = str(error or item.get("error") or "")
+    if DETERMINISTIC_LAUNCHER_PATTERN.search(evidence):
+        return _failure(
+            "deterministic-launcher",
+            "deterministic-launcher-failure",
+            retryable=False,
+            max_attempts=DETERMINISTIC_LAUNCHER_ATTEMPTS,
+        )
+    if port_exit == EX_TEMPFAIL or TRANSIENT_LAUNCHER_PATTERN.search(evidence):
+        return _failure(
+            "transient-launcher",
+            "capacity-or-provider-unavailable",
+            retryable=True,
+            max_attempts=TRANSIENT_LAUNCHER_ATTEMPTS,
+        )
+    if port_exit is not None:
+        return _failure(
+            "unknown-launcher",
+            f"unclassified-port-exit-{port_exit}",
+            retryable=True,
+            max_attempts=TRANSIENT_LAUNCHER_ATTEMPTS,
+        )
+    if isinstance(sentinel, dict) and sentinel.get("retryable") is True:
+        return _failure(
+            str(sentinel.get("class") or "transient-launcher"),
+            str(sentinel.get("code") or "capacity-or-provider-unavailable"),
+            retryable=True,
+            max_attempts=TRANSIENT_LAUNCHER_ATTEMPTS,
+        )
+    return _failure(
+        "unknown-launcher",
+        "unclassified-launcher-failure",
+        retryable=True,
+        max_attempts=TRANSIENT_LAUNCHER_ATTEMPTS,
+    )
+
+
+def _valid_materialized_routing_receipt(
+    receipt: object,
+    issue_identifier: object,
+) -> bool:
+    """Validate the complete workspace-local receipt written by admission."""
+    if not isinstance(receipt, dict) or receipt.get("schema") != SYMPHONY_ROUTING_SCHEMA:
+        return False
+    if receipt.get("issue") != issue_identifier or not isinstance(receipt.get("modelId"), str):
+        return False
+    if not isinstance(receipt.get("model"), str) or not receipt.get("model"):
+        return False
+    if not isinstance(receipt.get("escalation"), bool):
+        return False
+    if receipt.get("fallback") is not None and not isinstance(receipt.get("fallback"), str):
+        return False
+    classification = receipt.get("classification")
+    if not isinstance(classification, dict):
+        return False
+    if classification.get("risk") not in {"low", "medium", "high"}:
+        return False
+    if classification.get("complexity") not in {"low", "standard", "high"}:
+        return False
+    capabilities = classification.get("capabilities")
+    reasons = classification.get("reasons")
+    if not isinstance(capabilities, list) or not capabilities or not all(
+        isinstance(value, str) and value for value in capabilities
+    ):
+        return False
+    if not isinstance(reasons, list) or not reasons or not all(
+        isinstance(value, str) and value for value in reasons
+    ):
+        return False
+    candidates = receipt.get("candidates")
+    if not isinstance(candidates, list) or any(
+        not isinstance(candidate, dict)
+        or not isinstance(candidate.get("id"), str)
+        or candidate.get("status") not in {"incompatible", "cooldown", "unavailable"}
+        for candidate in candidates
+    ):
+        return False
+    capacity = receipt.get("capacity")
+    if not isinstance(capacity, dict) or capacity.get("readable") is not True:
+        return False
+    if not isinstance(capacity.get("accounts"), int) or capacity.get("accounts", 0) <= 0:
+        return False
+    fingerprint = receipt.get("fingerprint")
+    return isinstance(fingerprint, str) and re.fullmatch(r"[0-9a-f]{24}", fingerprint) is not None
+
+
+def controller_retry_decision(
+    observation: dict[str, object],
+    previous: dict[str, object] | None = None,
+    *,
+    routing_receipt: dict[str, object] | None = None,
+) -> dict[str, object]:
+    """Sole retry scheduler for the Symphony controller runtime.
+
+    A non-retryable sentinel or port exit 78 parks terminally: retryable=false,
+    maxAttempts=1, no due_at, no alternate-provider handoff, and no new lease.
+    Repeated observation of the same generation must not advance attempts.
+    A later generation may run only after canonical admission materializes a
+    valid symphony-routing/v1 receipt.
+    """
+    failure = classify_launcher_failure(
+        observation.get("error") or observation.get("reason"),
+        observation,
+    )
+    generation = observation.get("generation")
+    previous_generation = previous.get("generation") if previous else None
+    repaired = bool(
+        _valid_materialized_routing_receipt(
+            routing_receipt,
+            observation.get("issue_identifier"),
+        )
+        and generation
+        and generation != previous_generation
+    )
+    if (
+        _valid_materialized_routing_receipt(
+            routing_receipt,
+            observation.get("issue_identifier"),
+        )
+        and previous
+        and generation == previous_generation
+        and previous.get("state") == "ready"
+    ):
+        return {
+            "state": "ready",
+            "retryable": True,
+            "maxAttempts": TRANSIENT_LAUNCHER_ATTEMPTS,
+            "due_at": None,
+            "attempt": 0,
+            "lease": None,
+            "handoff": False,
+            "providerAccount": None,
+            "failure": None,
+        }
+    if repaired:
+        return {
+            "state": "ready",
+            "retryable": True,
+            "maxAttempts": TRANSIENT_LAUNCHER_ATTEMPTS,
+            "due_at": None,
+            "attempt": 0,
+            "lease": None,
+            "handoff": False,
+            "providerAccount": None,
+            "failure": None,
+        }
+    if (
+        previous
+        and previous_generation == generation
+        and previous.get("retryable") is False
+    ):
+        return {
+            "state": str(previous.get("state") or "blocked"),
+            "retryable": False,
+            "maxAttempts": DETERMINISTIC_LAUNCHER_ATTEMPTS,
+            "due_at": None,
+            "attempt": int(previous.get("attempt") or 1),
+            "lease": None,
+            "handoff": False,
+            "providerAccount": None,
+            "failure": previous.get("failure") or failure,
+        }
+    if failure["retryable"] is False:
+        return {
+            "state": "blocked",
+            "retryable": False,
+            "maxAttempts": DETERMINISTIC_LAUNCHER_ATTEMPTS,
+            "due_at": None,
+            "attempt": 1,
+            "lease": None,
+            "handoff": False,
+            "providerAccount": None,
+            "failure": failure,
+        }
+    try:
+        attempt = int(observation.get("attempt") or 0)
+    except (TypeError, ValueError):
+        attempt = 0
+    max_attempts = int(failure["maxAttempts"])
+    if attempt >= max_attempts:
+        return {
+            "state": "blocked",
+            "retryable": False,
+            "maxAttempts": max_attempts,
+            "due_at": None,
+            "attempt": max_attempts,
+            "lease": None,
+            "handoff": False,
+            "providerAccount": None,
+            "failure": {**failure, "exhausted": True},
+        }
+    delay_minutes = 1 if failure["class"] == "transient-launcher" else RETRY_MINUTES
+    return {
+        "state": "retrying",
         "retryable": True,
-        "maxAttempts": TRANSIENT_LAUNCHER_ATTEMPTS,
+        "maxAttempts": max_attempts,
+        "due_at": _iso(_now() + dt.timedelta(minutes=delay_minutes)),
+        "attempt": attempt + 1,
+        "lease": None,
+        "handoff": False,
+        "providerAccount": None,
+        "failure": failure,
     }
 
 
@@ -701,6 +1026,8 @@ def _alternate_due(
     identifier = str(item.get("issue_identifier", ""))
     if not identifier:
         return False
+    if classify_launcher_failure(item.get("error"), item).get("retryable") is False:
+        return False
     state = _workspace_state(item.get("workspace_path"), identifier)
     if not state.get("valid") or not _is_repeated_or_conflict(item, source, state):
         return False
@@ -896,7 +1223,38 @@ def _reconcile_item(
     runtime = runtime or runtime_preflight()
     generation = _generation(identifier, error, state_before, runtime)
     previous = _read_receipt(identifier)
-    launcher_failure = classify_launcher_failure(error)
+    launcher_failure = classify_launcher_failure(error, item)
+    routing_receipt = None
+    workspace_value = state_before.get("workspace")
+    if isinstance(workspace_value, str):
+        routing_receipt = _load_json(pathlib.Path(workspace_value) / ".symphony-routing.json")
+    decision = controller_retry_decision(
+        {
+            **item,
+            "error": error,
+            "generation": generation,
+            "attempt": attempt,
+        },
+        {
+            "generation": previous.get("generation"),
+            "retryable": (previous.get("retryPolicy") or {}).get("retryable")
+            if isinstance(previous.get("retryPolicy"), dict)
+            else None,
+            "attempt": previous.get("attempt"),
+            "state": previous.get("controllerState") or previous.get("runtimeState"),
+            "failure": previous.get("launcherFailure"),
+        }
+        if previous
+        else None,
+        routing_receipt=routing_receipt,
+    )
+    launcher_failure = decision["failure"] or launcher_failure
+    policy_retryable = bool(decision["retryable"])
+    decision_state = str(decision["state"])
+    retry_scheduled = decision_state == "retrying"
+    terminal = decision_state == "blocked"
+    deterministic_terminal = terminal and launcher_failure.get("retryable") is False
+    retry_exhausted = terminal and launcher_failure.get("exhausted") is True
     previous_launcher_failure = previous.get("launcherFailure") if previous else None
     if (
         previous
@@ -914,26 +1272,25 @@ def _reconcile_item(
             retry_at=None,
         )
         return
-    next_retry = (
-        None
-        if launcher_failure["retryable"] is False
-        else _parse_time(item.get("due_at"))
-        or (_now() + dt.timedelta(minutes=RETRY_MINUTES))
-    )
-    repeated = launcher_failure["retryable"] and _is_repeated_or_conflict(
-        item, source, state_before
+    next_retry = _parse_time(decision.get("due_at")) if retry_scheduled else None
+    repeated = (
+        alternate_permitted
+        and (retry_scheduled or retry_exhausted)
+        and _is_repeated_or_conflict(item, source, state_before)
     )
     attempted: list[dict[str, object]] = [
         {
             "kind": (
-                "launcher_failure_classification"
-                if launcher_failure["retryable"] is False
+                "retry_policy_exhausted"
+                if launcher_failure.get("exhausted") is True
+                else "launcher_failure_classification"
+                if terminal
                 else "normal_model_bounded_retry"
             ),
-            "attempt": attempt,
+            "attempt": decision["attempt"],
             "result": (
                 "blocked"
-                if launcher_failure["retryable"] is False
+                if terminal
                 else "failed"
                 if repeated
                 else "scheduled"
@@ -948,17 +1305,25 @@ def _reconcile_item(
         "status": "not_due",
     }
     transition = (
-        "deterministic_launcher_blocked"
-        if launcher_failure["retryable"] is False
+        "admitted_generation_ready"
+        if decision_state == "ready"
+        else
+        "bounded_retry_exhausted"
+        if launcher_failure.get("exhausted") is True
+        else "deterministic_launcher_blocked"
+        if terminal
         else "normal_retry_scheduled"
     )
     next_action = (
+        "normal_model_run_admitted_generation"
+        if decision_state == "ready"
+        else
         "manual_or_environment_repair"
-        if launcher_failure["retryable"] is False
+        if terminal
         else "normal_model_retry"
     )
     state_after = state_before
-    if launcher_failure["retryable"] is False:
+    if deterministic_terminal:
         alternate["status"] = "not_permitted"
 
     already_attempted = bool(previous and previous.get("generation") == generation and previous.get("alternateModel", {}).get("status") in {"repair_handoff_ready", "repair_failed", "repair_timed_out", "repair_not_started"})
@@ -1028,8 +1393,8 @@ def _reconcile_item(
         "reason": error,
         "launcherFailure": launcher_failure,
         "retryPolicy": {
-            "retryable": launcher_failure["retryable"],
-            "maxAttempts": launcher_failure["maxAttempts"],
+            "retryable": policy_retryable,
+            "maxAttempts": decision["maxAttempts"],
         },
         "entryCriteria": "runtime retry/blocked after bounded normal-model attempt",
         "authoritativeOwner": "symphony-reconciler" if alternate_permitted else "symphony-ui-pilot",
@@ -1044,7 +1409,7 @@ def _reconcile_item(
         },
         "deadline": (
             None
-            if launcher_failure["retryable"] is False
+            if deterministic_terminal or decision_state == "ready"
             else _iso(_now() + dt.timedelta(seconds=_model_timeout_seconds()))
             if alternate_permitted
             else _iso(next_retry)
@@ -1052,7 +1417,8 @@ def _reconcile_item(
             else None
         ),
         "runtimeState": source,
-        "attempt": attempt,
+        "controllerState": decision_state,
+        "attempt": decision["attempt"],
         "headBaseBefore": state_before,
         "headBaseCurrent": state_after,
         "runtimeRevision": runtime.get("runtimeRevision"),
@@ -1109,43 +1475,18 @@ def main() -> int:
     if not items:
         _event("control-plane", "healthy_or_idle", reason="no_stopped_work")
         return 0
-    running = state.get("running", [])
-    candidates = [
-        (source, item)
-        for source, item in items
-        if _alternate_due(item, source, runtime)
-    ]
-    handoff_acquired = False
-    if candidates and isinstance(running, list) and not running:
-        handoff_acquired = _stop_scheduler()
-        _event(
-            "control-plane",
-            "alternate_owner_acquired" if handoff_acquired else "alternate_owner_deferred",
-            reason="scheduler_stopped" if handoff_acquired else "scheduler_stop_unproven",
-            next="bounded_local_repair" if handoff_acquired else "retry_timer",
-        )
-
-    alternate_used = False
-    try:
-        for source, item in items:
-            permitted = handoff_acquired and not alternate_used and (source, item) in candidates
-            _reconcile_item(item, source, permitted, runtime)
-            alternate_used = alternate_used or permitted
-    finally:
-        if handoff_acquired:
-            if not _start_scheduler():
-                _event(
-                    "control-plane",
-                    "scheduler_restore_failed",
-                    reason="service_not_active",
-                    next="systemd_retry_and_operator_escalation",
-                )
-                return 3
+    for source, item in items:
+        try:
+            # The controller is the sole scheduler. Reconciliation observes and
+            # attests policy only; it never stops the healthy listener or takes
+            # alternate-provider ownership.
+            _reconcile_item(item, source, False, runtime)
+        except (OSError, TypeError, ValueError, subprocess.SubprocessError) as exc:
             _event(
-                "control-plane",
-                "normal_owner_restored",
-                reason="scheduler_active",
-                next="normal_update_test_ready_native_merge",
+                str(item.get("issue_identifier") or "unknown"),
+                "item_reconciliation_failed",
+                reason=type(exc).__name__,
+                next="retry_timer",
             )
     return 0
 

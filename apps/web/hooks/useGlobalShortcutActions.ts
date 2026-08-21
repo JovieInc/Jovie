@@ -6,6 +6,7 @@
  *
  *   - Alt+T        → cycle theme (next-themes via useThemeToggle)
  *   - Alt+Shift+Q  → Clerk sign-out
+ *   - Cmd/Ctrl+O   → toggle founder door (entitled only)
  *
  * Sequential nav (G then X), Cmd+/, Cmd+B, Cmd+K all live in their own
  * hooks. This hook is mounted once inside `KeyboardShortcutsHandler` so the
@@ -18,6 +19,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useContext, useEffect } from 'react';
 import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { useThemeToggle } from '@/components/site/theme-toggle/useThemeToggle';
+import { useFounderDoor } from '@/contexts/FounderDoorContext';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import {
   APP_SHELL_WORKSPACES,
@@ -25,6 +27,7 @@ import {
   getNextAppShellWorkspace,
 } from '@/lib/app-shell/workspaces';
 import { WORKSPACE_SWITCH_KEY } from '@/lib/keyboard-shortcuts';
+import { isFounderDoorToggleEvent } from '@/lib/ovie/founder-door';
 import { isFormElement } from '@/lib/utils/keyboard';
 
 export function useGlobalShortcutActions() {
@@ -32,6 +35,8 @@ export function useGlobalShortcutActions() {
   const { signOut } = useAuthSafe();
   const dashboardData = useContext(DashboardDataContext);
   const isAdmin = dashboardData?.isAdmin ?? false;
+  const { canUse: canUseFounderDoor, toggle: toggleFounderDoor } =
+    useFounderDoor();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -87,4 +92,17 @@ export function useGlobalShortcutActions() {
     globalThis.addEventListener('keydown', onKey);
     return () => globalThis.removeEventListener('keydown', onKey);
   }, [isAdmin, pathname, router]);
+
+  // Cmd+O / Ctrl+O → toggle founder door. Entitled app shell only.
+  // Not entitled: do not preventDefault, so native Open can still fire.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!isFounderDoorToggleEvent(e)) return;
+      if (!canUseFounderDoor) return;
+      e.preventDefault();
+      toggleFounderDoor();
+    }
+    globalThis.addEventListener('keydown', onKey);
+    return () => globalThis.removeEventListener('keydown', onKey);
+  }, [canUseFounderDoor, toggleFounderDoor]);
 }

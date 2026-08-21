@@ -70,6 +70,13 @@ interface LockedRegistryArtist {
 const MAX_CREDITED_ARTISTS_PER_RECONCILIATION = 24;
 const PROFILE_RECONCILIATION_CONFLICT_KEY = 'publicProfileReconciliation';
 
+function isMissingNextStaticGenerationStore(reason: unknown): boolean {
+  return (
+    reason instanceof Error &&
+    reason.message.includes('static generation store missing')
+  );
+}
+
 async function getCreditedArtistCandidates(
   creatorProfileId: string,
   ownerSpotifyId: string
@@ -572,6 +579,7 @@ export async function reconcileCreditedArtistProfiles(
   if (conflicted > 0) {
     await captureWarning(
       'Credited artist profile identity conflicts detected',
+      undefined,
       {
         source: 'spotify_release_credit',
         creatorProfileId,
@@ -581,13 +589,17 @@ export async function reconcileCreditedArtistProfiles(
   }
 
   if (candidateSelection.deferred) {
-    await captureWarning('Credited artist profile reconciliation was bounded', {
-      source: 'spotify_release_credit',
-      creatorProfileId,
-      processed: plan.length,
-      limit: MAX_CREDITED_ARTISTS_PER_RECONCILIATION,
-      retry: 'next_spotify_import_or_backfill',
-    });
+    await captureWarning(
+      'Credited artist profile reconciliation was bounded',
+      undefined,
+      {
+        source: 'spotify_release_credit',
+        creatorProfileId,
+        processed: plan.length,
+        limit: MAX_CREDITED_ARTISTS_PER_RECONCILIATION,
+        retry: 'next_spotify_import_or_backfill',
+      }
+    );
   }
 
   // Refresh both sides of the new relationship: a previously cached owner
@@ -597,23 +609,44 @@ export async function reconcileCreditedArtistProfiles(
     if (owner?.usernameNormalized) {
       handlesToInvalidate.add(owner.usernameNormalized);
     }
+    const handles = [...handlesToInvalidate];
     const cacheResults = await Promise.allSettled(
-      [...handlesToInvalidate].map(handle => invalidateProfileCache(handle))
+      handles.map(handle => invalidateProfileCache(handle))
     );
-    const failedHandles = [...handlesToInvalidate].filter(
-      (_, index) => cacheResults[index]?.status === 'rejected'
-    );
-    if (failedHandles.length > 0) {
-      // CLI backfills have no Next static-generation store. The identity writes
-      // are already committed and must retain an accurate success receipt;
-      // cache refresh remains observable best-effort for the next request.
-      await Promise.allSettled([
-        captureWarning('Credited artist profile cache invalidation deferred', {
-          source: 'spotify_release_credit',
-          creatorProfileId,
-          failedHandles,
-        }),
-      ]);
+    const failures = handles.flatMap((handle, index) => {
+      const cacheResult = cacheResults[index];
+      return cacheResult?.status === 'rejected'
+        ? [{ handle, reason: cacheResult.reason }]
+        : [];
+    });
+    if (failures.length > 0) {
+      const failedHandles = failures.map(failure => failure.handle);
+      // CLI / script callers have no Next static-generation store. Identity
+      // writes are already committed; do not file that expected miss as a
+      // Sentry exception (JOV-5264 titled the context bag as the error).
+      if (
+        failures.every(({ reason }) =>
+          isMissingNextStaticGenerationStore(reason)
+        )
+      ) {
+        logger.info(
+          'Credited artist profile cache invalidation skipped without Next store',
+          { creatorProfileId, failedHandles }
+        );
+      } else {
+        const unexpected = failures.find(
+          ({ reason }) => !isMissingNextStaticGenerationStore(reason)
+        );
+        await captureWarning(
+          'Credited artist profile cache invalidation deferred',
+          unexpected?.reason,
+          {
+            source: 'spotify_release_credit',
+            creatorProfileId,
+            failedHandles,
+          }
+        );
+      }
     }
   }
 

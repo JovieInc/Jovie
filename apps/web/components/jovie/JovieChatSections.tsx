@@ -2,7 +2,7 @@
 
 import type { Virtualizer } from '@tanstack/react-virtual';
 import type { ReactNode, RefCallback } from 'react';
-import { CHAT_COMPOSER_EMPTY_PLACEHOLDER } from './chat-composer-copy';
+import { composerPlaceholderForChatMode } from './chat-composer-copy';
 import {
   CHAT_COMPOSER_DOCK_CLASSNAME,
   CHAT_COMPOSER_SCROLL_FADE_CLASSNAME,
@@ -30,6 +30,7 @@ import type { ChatError, MessagePart } from './types';
 
 interface ChatComposerSurfaceProps {
   readonly chatInputProps: ChatInputProps;
+  readonly chatMode?: 'ov';
   readonly showThreadView: boolean;
   readonly isRateLimited: boolean;
   readonly showManifest: boolean;
@@ -53,6 +54,7 @@ interface ChatComposerSurfaceProps {
 
 export function ChatComposerSurface({
   chatInputProps,
+  chatMode,
   showThreadView,
   isRateLimited,
   showManifest,
@@ -128,7 +130,7 @@ export function ChatComposerSurface({
 
       <ChatInput
         {...chatInputProps}
-        placeholder={CHAT_COMPOSER_EMPTY_PLACEHOLDER} // ui-casing-allow: brand placeholder
+        placeholder={composerPlaceholderForChatMode(chatMode)} // ui-casing-allow: brand placeholder
         variant={showThreadView ? 'compact' : 'hero'}
       />
     </div>
