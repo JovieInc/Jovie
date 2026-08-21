@@ -14,14 +14,23 @@ async function readAasaResponse(response: Response) {
 }
 
 describe('apple-app-site-association routes', () => {
-  it('canonical payload includes ie.jov.Jovie applinks for /app/* and /auth/*', () => {
+  it('canonical payload includes ie.jov.Jovie applinks for /app/* and native handback paths only', () => {
     expect(JOVIE_APPLE_APP_SITE_ASSOCIATION.applinks.apps).toEqual([]);
     expect(JOVIE_APPLE_APP_SITE_ASSOCIATION.applinks.details).toEqual([
       {
         appID: `${JOVIE_APPLE_TEAM_ID}.${JOVIE_IOS_BUNDLE_ID}`,
-        paths: ['/app/*', '/auth/*'],
+        paths: [
+          '/app/*',
+          '/auth/ios/complete',
+          '/auth/ios/complete?*',
+          '/auth/native-return',
+          '/auth/native-return?*',
+        ],
       },
     ]);
+    expect(JSON.stringify(JOVIE_APPLE_APP_SITE_ASSOCIATION)).not.toContain(
+      '/auth/*'
+    );
   });
 
   it.each([

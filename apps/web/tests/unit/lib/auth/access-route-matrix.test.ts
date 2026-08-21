@@ -87,6 +87,40 @@ describe('access route matrix (JOV-3087)', () => {
         )
       ).toBe(APP_ROUTES.DASHBOARD);
     });
+
+    it('sends native auth_state back to the central callback instead of the dashboard', () => {
+      const authState = 'a'.repeat(32);
+      expect(
+        getAuthenticatedAuthRouteRedirect(CanonicalUserState.ACTIVE, {
+          authState,
+        })
+      ).toBe(`${APP_ROUTES.AUTH_CALLBACK}?state=${authState}`);
+      expect(
+        getAuthenticatedAuthRouteRedirect(CanonicalUserState.NEEDS_ONBOARDING, {
+          authState,
+        })
+      ).toBe(`${APP_ROUTES.AUTH_CALLBACK}?state=${authState}`);
+      expect(
+        getClientAuthenticatedAuthEntryRedirect(
+          new URLSearchParams(`auth_state=${authState}`)
+        )
+      ).toBe(`${APP_ROUTES.AUTH_CALLBACK}?state=${authState}`);
+      expect(
+        getClientAuthenticatedAuthEntryRedirect(
+          new URLSearchParams(
+            `auth_state=${authState}&redirect_url=${encodeURIComponent(APP_ROUTES.DASHBOARD)}`
+          )
+        )
+      ).toBe(`${APP_ROUTES.AUTH_CALLBACK}?state=${authState}`);
+    });
+
+    it('keeps banned users off the native callback even when auth_state is present', () => {
+      expect(
+        getAuthenticatedAuthRouteRedirect(CanonicalUserState.BANNED, {
+          authState: 'a'.repeat(32),
+        })
+      ).toBe(APP_ROUTES.UNAVAILABLE);
+    });
   });
 
   describe('chat-first waitlist recovery (JOV-5001)', () => {

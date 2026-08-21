@@ -32,6 +32,8 @@ test('desktop disposition keeps authenticated app and auth callback routes in-ap
     'https://jov.ie/app/settings/usage',
     'https://jov.ie/desktop-auth?auth_url=https%3A%2F%2Fjov.ie%2Fsignin',
     'https://jov.ie/auth/native-complete?client=electron&state=state_123',
+    'https://jov.ie/auth/native-return?code=code_123&state=state_123',
+    'https://jov.ie/auth/ios/complete?code=code_123&state=state_123',
     'https://jov.ie/signin/sso-callback?desktop_return=%2Fapp',
     'https://jov.ie/signup/sso-callback?desktop_return=%2Fstart',
     'https://jov.ie/sso-callback?desktop_return=%2Fapp',

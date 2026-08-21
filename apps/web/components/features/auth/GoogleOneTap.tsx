@@ -28,6 +28,11 @@ interface GoogleOneTapProps {
   readonly mode: AuthShellMode;
   /** Suppress while OTP step active or a provider is pending (audit row 20). */
   readonly suppress: boolean;
+  /**
+   * Native browser handoff must resume `/auth/callback`, not `/signin`.
+   * When omitted, One Tap keeps the mode-local auth entry fallback.
+   */
+  readonly callbackURL?: string;
 }
 
 function isNativeWebview(): boolean {
@@ -43,7 +48,11 @@ function isNativeWebview(): boolean {
   );
 }
 
-export function GoogleOneTap({ mode, suppress }: GoogleOneTapProps) {
+export function GoogleOneTap({
+  mode,
+  suppress,
+  callbackURL,
+}: GoogleOneTapProps) {
   useEffect(() => {
     if (suppress) return;
     if (isNativeWebview()) return;
@@ -55,7 +64,8 @@ export function GoogleOneTap({ mode, suppress }: GoogleOneTapProps) {
     const oneTap = authClient.oneTap;
     if (!oneTap) return;
 
-    const callbackURL = mode === 'sign-up' ? '/signup' : '/signin';
+    const resolvedCallbackURL =
+      callbackURL ?? (mode === 'sign-up' ? '/signup' : '/signin');
     const context = mode === 'sign-up' ? 'signup' : 'signin';
 
     // `oneTap(opts)` shows the One Tap prompt, resolves on credential
@@ -63,11 +73,11 @@ export function GoogleOneTap({ mode, suppress }: GoogleOneTapProps) {
     // exchanges the Google ID token server-side and sets the session cookie.
     // `context` controls the Google-facing prompt copy ("Sign up with Google"
     // vs "Sign in with Google").
-    oneTap({ callbackURL, context }).catch(() => {
+    oneTap({ callbackURL: resolvedCallbackURL, context }).catch(() => {
       // Silent fallback: dismissal, cooldown, or origin not authorized.
       // The provider buttons remain the primary path. No layout shift.
     });
-  }, [mode, suppress]);
+  }, [callbackURL, mode, suppress]);
 
   // One Tap renders in Google-owned chrome (an iframe positioned by GSI).
   // This component has no DOM footprint of its own — it's a mount trigger.
