@@ -9,6 +9,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - [internal] **Gem Symphony restores the stopped-work reconciler and parks terminal launcher exit 78 (JOV-5253):** the existing installer materializes the versioned reconciler runtime and enables only its timer, activation fails closed unless `--check`, `runtime-preflight`, timer state, and source-to-runtime hashes match, and a structured or `port_exit 78` failure stays blocked with `retryable=false` and no retry deadline. Exit 75 stays typed capacity backoff.
 
+- [internal] **Native auto-enroll produces or explains an exact-head queue receipt (JOV-5174):** admission requires persisted `isInMergeQueue` plus a positioned `mergeQueueEntry`, delayed GitHub reads are reconciled, a later hard hold is not membership, and a selector no-op or missing receipt fails with the exact reason. Auto-merge intent is not membership.
+
 - [internal] **Ops bottleneck is the death-step funnel, and shipping velocity no longer looks like zero when GitHub is missing (JOV-5256):** The scan-first Bottleneck band is funnel-only. Survival and velocity keep their own bands. Unconfigured GitHub reports Not configured instead of empty PR charts. Funnel query failures report Unavailable with Retry instead of empty zeros.
 
 - **Private ideas stay private until you approve one exact script:** Library now has an Ideas & Scripts workspace. Save an idea, keep versioned revisions, attach evidence to factual claims, approve one revision, and hand that exact copy to capture. Nothing publishes from this slice.
