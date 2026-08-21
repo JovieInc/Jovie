@@ -93,6 +93,8 @@ jobs:
         if: steps.refresh.outputs.work_allowed == 'true'
         env:
           JOVIE_AGENT_PROFILE: no_agent
+          JOVIE_GBRAIN_BIN: /home/timwhite/.local/bin/gbrain
+          JOVIE_GBRAIN_DIALECT: adapter
         shell: bash
         run: |
           set -euo pipefail
