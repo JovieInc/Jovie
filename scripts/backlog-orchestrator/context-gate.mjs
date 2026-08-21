@@ -3,8 +3,10 @@ export const CONTEXT_GATE_SCHEMA = 'symphony-context/v1';
 export const CONTEXT_GATE_PREFIX = '<!-- symphony-context/v1 -->';
 export const CONTEXT_GATE_SUFFIX = '<!--/symphony-context-->';
 export const ORG_CHART_SLUG = 'agent-org-chart';
+export const AGENT_JOB_LEDGER_SLUG = 'coordination/agent-job-ledger';
 export const CONTEXT_RECEIPT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 export const MAX_CONTEXT_PAGES_PER_QUERY = 1;
+export const CONTEXT_LOOKUP_BUDGET_MS = 10_000;
 
 export const IMPLEMENTATION_OWNER = 'Symphony';
 export const VERIFICATION_OWNER = 'Gem';
@@ -62,7 +64,28 @@ export function issueContentHash(issue) {
   return createHash('sha256').update(canonical).digest('hex').slice(0, 24);
 }
 
+const CONTEXT_TERM_NOISE = new Set([
+  'build',
+  'canonize',
+  'create',
+  'first',
+  'implement',
+  'repair',
+  'update',
+]);
+
 function keyTerms(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/\b([a-z0-9]+)-first\b/g, '$1 ')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(word => word.length > 3 && !CONTEXT_TERM_NOISE.has(word))
+    .slice(-5)
+    .join(' ');
+}
+
+function receiptKeyTerms(text) {
   return String(text || '')
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '')
@@ -72,12 +95,100 @@ function keyTerms(text) {
     .join(' ');
 }
 
+export function buildContextSearchTerms(issue) {
+  return keyTerms(issue?.title) || String(issue?.identifier || '');
+}
+
 export function buildContextQueries(issue) {
-  const terms = keyTerms(issue?.title) || String(issue?.identifier || '');
+  // Preserve the original v1 query labels so existing signed receipts remain
+  // valid. The actual lookup uses buildContextSearchTerms(issue).
+  const terms =
+    receiptKeyTerms(issue?.title) || String(issue?.identifier || '');
   return [
     `ownership and current priorities for ${terms}`,
     `existing agent work and prior decisions related to ${terms}`,
   ];
+}
+
+function remainingLookupMs(
+  startedAt,
+  clock = Date.now,
+  budgetMs = CONTEXT_LOOKUP_BUDGET_MS
+) {
+  return Math.max(0, budgetMs - (clock() - startedAt));
+}
+
+function lookupErrorCode(error) {
+  const errors =
+    error instanceof AggregateError && Array.isArray(error.errors)
+      ? error.errors
+      : [error];
+  const missing = errors.find(candidate => candidate?.code === 'ENOENT');
+  if (missing) return 'ENOENT';
+  const timedOut = errors.find(
+    candidate =>
+      candidate?.code === 'ETIMEDOUT' ||
+      candidate?.killed === true ||
+      candidate?.signal === 'SIGTERM'
+  );
+  if (timedOut) return 'ETIMEDOUT';
+  return String(
+    errors.find(candidate => candidate?.code)?.code || error?.name || 'Error'
+  );
+}
+
+function lookupFailure(
+  operation,
+  target,
+  error,
+  lookupStartedAt,
+  clock = Date.now,
+  budgetMs = CONTEXT_LOOKUP_BUDGET_MS
+) {
+  return Object.assign(new Error('gbrain-context-lookup-failed'), {
+    detail: [
+      `operation=${operation}`,
+      'source=gbrain',
+      `target=${target}`,
+      `error=${lookupErrorCode(error)}`,
+      `elapsed_ms=${Math.max(0, clock() - lookupStartedAt)}`,
+      `remaining_ms=${remainingLookupMs(lookupStartedAt, clock, budgetMs)}`,
+    ].join(';'),
+  });
+}
+
+/** @param {unknown} error */
+function lookupErrorDetail(error) {
+  if (!error || typeof error !== 'object' || !('detail' in error)) return null;
+  return typeof error.detail === 'string' ? error.detail : null;
+}
+
+async function getPageEvidence(gbrain, slug, timeoutMs, clock = Date.now) {
+  const startedAt = clock();
+  if (typeof gbrain.getPageWithEvidence === 'function') {
+    return gbrain.getPageWithEvidence(slug, { timeoutMs });
+  }
+  return {
+    page: await gbrain.getPage(slug, { timeoutMs }),
+    source: 'get',
+    ms: Math.max(0, clock() - startedAt),
+  };
+}
+
+async function searchPageEvidence(gbrain, query, timeoutMs, clock = Date.now) {
+  const startedAt = clock();
+  if (typeof gbrain.searchPagesWithEvidence === 'function') {
+    return gbrain.searchPagesWithEvidence(query, MAX_CONTEXT_PAGES_PER_QUERY, {
+      timeoutMs,
+    });
+  }
+  return {
+    pages: await gbrain.searchPages(query, MAX_CONTEXT_PAGES_PER_QUERY, {
+      timeoutMs,
+    }),
+    source: 'legacy',
+    ms: Math.max(0, clock() - startedAt),
+  };
 }
 
 export function boundPage(page) {
@@ -108,16 +219,73 @@ export async function collectContextEvidence({
   issue,
   gbrain,
   now = new Date().toISOString(),
+  clock = Date.now,
+  lookupBudgetMs = CONTEXT_LOOKUP_BUDGET_MS,
 }) {
-  let orgChart;
+  const lookupStartedAt = clock();
+  let orgChartLookup;
+  let ledgerLookup;
   try {
-    orgChart = await gbrain.getPage(ORG_CHART_SLUG);
-  } catch {
-    return { evidence: null, reason: CONTEXT_BLOCKER.GBRAIN_UNAVAILABLE };
+    [orgChartLookup, ledgerLookup] = await Promise.all([
+      getPageEvidence(
+        gbrain,
+        ORG_CHART_SLUG,
+        remainingLookupMs(lookupStartedAt, clock, lookupBudgetMs),
+        clock
+      ).catch(error => {
+        throw lookupFailure(
+          'get',
+          ORG_CHART_SLUG,
+          error,
+          lookupStartedAt,
+          clock,
+          lookupBudgetMs
+        );
+      }),
+      getPageEvidence(
+        gbrain,
+        AGENT_JOB_LEDGER_SLUG,
+        remainingLookupMs(lookupStartedAt, clock, lookupBudgetMs),
+        clock
+      ).catch(error => {
+        throw lookupFailure(
+          'get',
+          AGENT_JOB_LEDGER_SLUG,
+          error,
+          lookupStartedAt,
+          clock,
+          lookupBudgetMs
+        );
+      }),
+    ]);
+  } catch (error) {
+    return {
+      evidence: null,
+      reason: CONTEXT_BLOCKER.GBRAIN_UNAVAILABLE,
+      detail:
+        lookupErrorDetail(error) ||
+        lookupFailure(
+          'get',
+          'required-context-pages',
+          error,
+          lookupStartedAt,
+          clock,
+          lookupBudgetMs
+        ).detail,
+    };
   }
+  const orgChart = orgChartLookup?.page;
   const boundOrgChart = boundPage(orgChart);
   if (!boundOrgChart)
     return { evidence: null, reason: CONTEXT_BLOCKER.ORG_CHART_MISSING };
+  const boundLedger = boundPage(ledgerLookup?.page);
+  if (!boundLedger || boundLedger.slug !== AGENT_JOB_LEDGER_SLUG) {
+    return {
+      evidence: null,
+      reason: CONTEXT_BLOCKER.NO_RESULTS,
+      detail: `required coordination page returned no bindable page: ${AGENT_JOB_LEDGER_SLUG}`,
+    };
+  }
 
   const implementationOwner = declaredOwner(orgChart, 'implementation');
   const verificationOwner = declaredOwner(orgChart, 'verification');
@@ -132,25 +300,88 @@ export async function collectContextEvidence({
     };
   }
 
-  const queries = [];
-  for (const query of buildContextQueries(issue)) {
-    let pages;
-    try {
-      pages = await gbrain.searchPages(query, MAX_CONTEXT_PAGES_PER_QUERY);
-    } catch {
-      return { evidence: null, reason: CONTEXT_BLOCKER.GBRAIN_UNAVAILABLE };
-    }
-    if (!Array.isArray(pages))
-      return { evidence: null, reason: CONTEXT_BLOCKER.GBRAIN_UNAVAILABLE };
-    const bound = pages.map(boundPage).filter(Boolean);
-    if (bound.length === 0)
-      return {
-        evidence: null,
-        reason: CONTEXT_BLOCKER.NO_RESULTS,
-        detail: `targeted context query returned no bindable pages: ${query}`,
-      };
-    queries.push({ query, pages: bound });
+  const [ownershipQuery, priorDecisionQuery] = buildContextQueries(issue);
+  const searchTerms = buildContextSearchTerms(issue);
+  const remainingMs = remainingLookupMs(lookupStartedAt, clock, lookupBudgetMs);
+  if (remainingMs <= 0) {
+    return {
+      evidence: null,
+      reason: CONTEXT_BLOCKER.GBRAIN_UNAVAILABLE,
+      detail: lookupFailure(
+        'search',
+        searchTerms,
+        { code: 'ETIMEDOUT' },
+        lookupStartedAt,
+        clock,
+        lookupBudgetMs
+      ).detail,
+    };
   }
+  let priorDecisionLookup;
+  try {
+    priorDecisionLookup = await searchPageEvidence(
+      gbrain,
+      searchTerms,
+      remainingMs,
+      clock
+    );
+  } catch (error) {
+    return {
+      evidence: null,
+      reason: CONTEXT_BLOCKER.GBRAIN_UNAVAILABLE,
+      detail: lookupFailure(
+        'search',
+        searchTerms,
+        error,
+        lookupStartedAt,
+        clock,
+        lookupBudgetMs
+      ).detail,
+    };
+  }
+  if (!Array.isArray(priorDecisionLookup?.pages)) {
+    return {
+      evidence: null,
+      reason: CONTEXT_BLOCKER.GBRAIN_UNAVAILABLE,
+      detail: lookupFailure(
+        'search',
+        searchTerms,
+        { code: 'INVALID_RESPONSE' },
+        lookupStartedAt,
+        clock,
+        lookupBudgetMs
+      ).detail,
+    };
+  }
+  const boundPriorDecisions = priorDecisionLookup.pages
+    .map(boundPage)
+    .filter(Boolean);
+  if (boundPriorDecisions.length === 0)
+    return {
+      evidence: null,
+      reason: CONTEXT_BLOCKER.NO_RESULTS,
+      detail: `targeted context query returned no bindable pages: ${priorDecisionQuery}`,
+    };
+
+  const queries = [
+    {
+      query: ownershipQuery,
+      pages: [boundLedger],
+      lookup: {
+        source: 'ledger',
+        ms: Math.max(0, Number(ledgerLookup?.ms) || 0),
+      },
+    },
+    {
+      query: priorDecisionQuery,
+      pages: boundPriorDecisions,
+      lookup: {
+        source: priorDecisionLookup.source || 'legacy',
+        terms: searchTerms,
+        ms: Math.max(0, Number(priorDecisionLookup.ms) || 0),
+      },
+    },
+  ];
 
   return {
     evidence: {
@@ -158,6 +389,11 @@ export async function collectContextEvidence({
       issueHash: issueContentHash(issue),
       ownership: { ...EXPECTED_OWNERSHIP },
       orgChart: boundOrgChart,
+      orgChartLookup: {
+        source: orgChartLookup.source || 'get',
+        ms: Math.max(0, Number(orgChartLookup.ms) || 0),
+      },
+      ledger: boundLedger,
       queries,
       observedAt: now,
     },
@@ -184,6 +420,24 @@ export function validateContextEvidence(
   if (!orgChart || orgChart.slug !== ORG_CHART_SLUG)
     return CONTEXT_BLOCKER.ORG_CHART_MISSING;
 
+  const hasLookupEvidence = Array.isArray(evidence.queries)
+    ? evidence.queries.some(entry => entry?.lookup)
+    : false;
+  const ledger = evidence.ledger ? boundPage(evidence.ledger) : null;
+  if (
+    (evidence.ledger && !ledger) ||
+    (ledger && ledger.slug !== AGENT_JOB_LEDGER_SLUG)
+  )
+    return 'context-malformed';
+  if (hasLookupEvidence && !ledger) return CONTEXT_BLOCKER.NO_RESULTS;
+  if (
+    evidence.orgChartLookup &&
+    (!nonEmptyString(evidence.orgChartLookup.source) ||
+      !Number.isFinite(evidence.orgChartLookup.ms) ||
+      evidence.orgChartLookup.ms < 0)
+  )
+    return 'context-malformed';
+
   const expectedQueries = buildContextQueries(issue);
   const actualQueries = Array.isArray(evidence.queries)
     ? evidence.queries.map(entry => entry?.query)
@@ -194,6 +448,29 @@ export function validateContextEvidence(
     if (!Array.isArray(entry?.pages)) return 'context-malformed';
     if (entry.pages.length === 0) return CONTEXT_BLOCKER.NO_RESULTS;
     if (entry.pages.some(page => !boundPage(page))) return 'context-malformed';
+    if (entry.lookup) {
+      if (
+        !nonEmptyString(entry.lookup.source) ||
+        !Number.isFinite(entry.lookup.ms) ||
+        entry.lookup.ms < 0
+      )
+        return 'context-malformed';
+    }
+  }
+  if (hasLookupEvidence) {
+    const [ownershipEntry, priorDecisionEntry] = evidence.queries;
+    if (
+      ownershipEntry?.lookup?.source !== 'ledger' ||
+      !ownershipEntry.pages.some(page => page?.slug === AGENT_JOB_LEDGER_SLUG)
+    )
+      return 'context-malformed';
+    if (
+      priorDecisionEntry?.lookup?.terms !== buildContextSearchTerms(issue) ||
+      !['keyword', 'semantic', 'legacy'].includes(
+        priorDecisionEntry?.lookup?.source
+      )
+    )
+      return 'context-query-mismatch';
   }
 
   const nowMs = Date.parse(now);
@@ -215,6 +492,23 @@ function normalizedEvidence(evidence) {
       id: String(evidence.orgChart.id).trim(),
       revision: String(evidence.orgChart.revision).trim(),
     },
+    ...(evidence.orgChartLookup
+      ? {
+          orgChartLookup: {
+            source: evidence.orgChartLookup.source.trim(),
+            ms: evidence.orgChartLookup.ms,
+          },
+        }
+      : {}),
+    ...(evidence.ledger
+      ? {
+          ledger: {
+            slug: evidence.ledger.slug.trim(),
+            id: String(evidence.ledger.id).trim(),
+            revision: String(evidence.ledger.revision).trim(),
+          },
+        }
+      : {}),
     queries: evidence.queries.map(entry => ({
       query: entry.query.trim(),
       pages: entry.pages.map(page => ({
@@ -222,6 +516,17 @@ function normalizedEvidence(evidence) {
         id: String(page.id).trim(),
         revision: String(page.revision).trim(),
       })),
+      ...(entry.lookup
+        ? {
+            lookup: {
+              source: entry.lookup.source.trim(),
+              ...(entry.lookup.terms
+                ? { terms: entry.lookup.terms.trim() }
+                : {}),
+              ms: entry.lookup.ms,
+            },
+          }
+        : {}),
     })),
     observedAt: evidence.observedAt.trim(),
   });

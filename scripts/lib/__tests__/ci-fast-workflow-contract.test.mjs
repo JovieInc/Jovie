@@ -162,6 +162,12 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     expect(structuralDecision).not.toContain('apps/ios/');
     expect(structuralDecision).toContain('echo "skip=true"');
+    expect(structuralDecision).toContain(
+      'scripts/backlog-orchestrator/(context-gate|gbrain-client)'
+    );
+    expect(structuralDecision).toContain(
+      'scripts/backlog-orchestrator/__tests__/pre-lease-gates'
+    );
     expect(CI_FAST_SOURCE).toMatch(
       /function runDesignConformance\(\)[\s\S]*LANE_COMMANDS\['design-conformance'\]/
     );
@@ -203,6 +209,9 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     expect(CI_FAST_SOURCE).toContain(
       "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs"
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs'
     );
   });
 
