@@ -1,12 +1,14 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { searchParamsMock } = vi.hoisted(() => ({
+const { searchParamsMock, pathnameMock } = vi.hoisted(() => ({
   searchParamsMock: vi.fn(() => new URLSearchParams()),
+  pathnameMock: vi.fn(() => '/auth/native-return'),
 }));
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => searchParamsMock(),
+  usePathname: () => pathnameMock(),
 }));
 
 vi.mock('next/link', () => ({
@@ -27,6 +29,10 @@ const FLOW = 'htmjTw7x7kSYKEPuInDfGOJ0U9q56p4Y';
 
 function setSearchParams(query: string) {
   searchParamsMock.mockReturnValue(new URLSearchParams(query));
+}
+
+function setPathname(pathname: string) {
+  pathnameMock.mockReturnValue(pathname);
 }
 
 function setLocationOrigin(origin: string) {
@@ -50,9 +56,10 @@ function setLocationOrigin(origin: string) {
   return hrefWrites;
 }
 
-describe('NativeReturnPage (desktop auth bounce)', () => {
+describe('NativeReturnPage (native auth bounce)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setPathname('/auth/native-return');
     // jsdom cannot navigate to a custom scheme; swallow the auto-fire assign.
     setLocationOrigin('https://jov.ie');
   });
@@ -134,5 +141,58 @@ describe('NativeReturnPage (desktop auth bounce)', () => {
     render(<NativeReturnPage />);
 
     expect(screen.queryByRole('link', { name: 'Return to Jovie' })).toBeNull();
+  });
+
+  it('bounces iOS to ie.jov.jovie:// and never offers a web app continue', () => {
+    const hrefWrites = setLocationOrigin('https://jov.ie');
+    setPathname('/auth/ios/complete');
+    setSearchParams(`code=${CODE}&state=${STATE}`);
+    render(<NativeReturnPage />);
+
+    const expectedDeepLink = `ie.jov.jovie://auth/complete?code=${CODE}&state=${STATE}`;
+    expect(
+      screen.getByRole('link', { name: 'Return to Jovie' })
+    ).toHaveAttribute('href', expectedDeepLink);
+    expect(hrefWrites).toEqual([expectedDeepLink]);
+    expect(screen.queryByRole('link', { name: /continue/i })).toBeNull();
+    expect(screen.queryByRole('link', { name: /dashboard/i })).toBeNull();
+    expect(screen.queryByRole('link', { name: /library/i })).toBeNull();
+  });
+
+  it('uses the iOS scheme on staging and local bounce origins', () => {
+    setPathname('/auth/ios/complete');
+    setSearchParams(`code=${CODE}&state=${STATE}`);
+
+    setLocationOrigin('https://staging.jov.ie');
+    const { unmount: unmountStaging } = render(<NativeReturnPage />);
+    expect(
+      screen.getByRole('link', { name: 'Return to Jovie' })
+    ).toHaveAttribute(
+      'href',
+      `ie.jov.jovie://auth/complete?code=${CODE}&state=${STATE}`
+    );
+    unmountStaging();
+
+    setLocationOrigin('http://localhost:3112');
+    render(<NativeReturnPage />);
+    expect(
+      screen.getByRole('link', { name: 'Return to Jovie' })
+    ).toHaveAttribute(
+      'href',
+      `ie.jov.jovie://auth/complete?code=${CODE}&state=${STATE}`
+    );
+  });
+
+  it('treats client=ios as the iOS bounce even on the electron path', () => {
+    setPathname('/auth/native-return');
+    setSearchParams(`client=ios&code=${CODE}&state=${STATE}`);
+    render(<NativeReturnPage />);
+
+    expect(
+      screen.getByRole('link', { name: 'Return to Jovie' })
+    ).toHaveAttribute(
+      'href',
+      `ie.jov.jovie://auth/complete?code=${CODE}&state=${STATE}`
+    );
   });
 });

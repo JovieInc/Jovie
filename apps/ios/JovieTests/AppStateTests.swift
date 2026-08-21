@@ -944,6 +944,57 @@ struct AppStateTests {
     )
   }
 
+  @Test func mobileAuthReturnParserAcceptsHttpsIosCompleteCallback() {
+    let result = MobileAuthReturnParser.parse(
+      URL(string: "https://jov.ie/auth/ios/complete?code=code_123&state=state_123")!,
+      codeVerifier: "verifier_123"
+    )
+
+    #expect(
+      result == MobileAuthReturn(
+        code: "code_123",
+        state: "state_123",
+        codeVerifier: "verifier_123"
+      )
+    )
+  }
+
+  @Test func mobileAuthReturnParserAcceptsLocalHttpsHandback() {
+    let result = MobileAuthReturnParser.parse(
+      URL(string: "http://localhost:3112/auth/ios/complete?code=code_123&state=state_123")!,
+      codeVerifier: "verifier_123"
+    )
+
+    #expect(
+      result == MobileAuthReturn(
+        code: "code_123",
+        state: "state_123",
+        codeVerifier: "verifier_123"
+      )
+    )
+  }
+
+  @Test func mobileAuthReturnParserRejectsWebAppPagesAsCallbacks() {
+    #expect(
+      MobileAuthReturnParser.parse(
+        URL(string: "https://jov.ie/app?code=code_123&state=state_123")!,
+        codeVerifier: "verifier_123"
+      ) == nil
+    )
+    #expect(
+      MobileAuthReturnParser.parse(
+        URL(string: "https://jov.ie/app/library?code=code_123&state=state_123")!,
+        codeVerifier: "verifier_123"
+      ) == nil
+    )
+    #expect(
+      MobileAuthReturnParser.parse(
+        URL(string: "https://evil.example/auth/ios/complete?code=code_123&state=state_123")!,
+        codeVerifier: "verifier_123"
+      ) == nil
+    )
+  }
+
   @Test func mobileAuthReturnParserRejectsMissingVerifier() {
     let result = MobileAuthReturnParser.parse(
       URL(string: "ie.jov.jovie://auth/complete?code=code_123&state=state_123")!

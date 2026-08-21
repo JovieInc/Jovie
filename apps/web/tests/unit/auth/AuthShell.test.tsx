@@ -175,6 +175,19 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     });
   });
 
+  it('preserves central native auth state through One Tap success', async () => {
+    oneTapConfiguredState.value = true;
+    const centralCallback = '/auth/callback?state=state_1234567890';
+    render(<AuthShell mode='sign-in' fallbackRedirectUrl={centralCallback} />);
+
+    await waitFor(() => {
+      expect(oneTapMock).toHaveBeenCalledWith({
+        callbackURL: centralCallback,
+        context: 'signin',
+      });
+    });
+  });
+
   it('preserves central native auth state through OAuth success, error, and new-user callbacks', async () => {
     const user = userEvent.setup();
     const centralCallback = '/auth/callback?state=state_1234567890';

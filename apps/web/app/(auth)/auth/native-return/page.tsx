@@ -2,22 +2,22 @@
 
 import {
   buildElectronAuthCompleteUrl,
+  buildIosAuthCompleteUrl,
   type ElectronAuthCompleteProtocol,
   getElectronAuthCompleteProtocolForOrigin,
+  NATIVE_HANDBACK_BOUNCE_PATHS,
+  type NativeAuthClient,
 } from '@jovie/auth-routing';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 
-// Bounce page for the desktop (Electron) auth return.
+// Bounce page for native auth return (iOS + Electron).
 //
-// The Electron sign-in flow runs in the user's real system browser
-// (shell.openExternal), not inside an ASWebAuthenticationSession. A raw
-// server 302 to `jovie://auth/complete` is NOT reliably handed off to the app
-// by modern browsers without a user gesture, so users would sign in on the web
-// and never bounce back to the Mac client. This page fires the deep link
-// automatically AND exposes a "Return to Jovie" button (guaranteed user gesture),
-// mirroring the proven legacy `/auth-return` page.
+// Native sign-in runs in ASWebAuthenticationSession or the system browser.
+// A raw server 302 to a custom scheme is not a reliable handback, so this
+// same-origin page fires the allowlisted deep link and keeps a "Return to
+// Jovie" button. It never continues into the web dashboard/profile/library.
 
 const DESKTOP_FLOW_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
 
@@ -25,10 +25,32 @@ function sanitizeExchangeCode(value: string | null): string | null {
   return value && /^[a-f0-9]{16,64}$/i.test(value) ? value : null;
 }
 
+function resolveNativeReturnClient(
+  pathname: string | null,
+  queryClient: string | null
+): NativeAuthClient | null {
+  if (queryClient === 'ios' || pathname === NATIVE_HANDBACK_BOUNCE_PATHS.ios) {
+    return 'ios';
+  }
+  if (
+    queryClient === 'electron' ||
+    queryClient === null ||
+    pathname === NATIVE_HANDBACK_BOUNCE_PATHS.electron
+  ) {
+    return queryClient === 'web' ? null : 'electron';
+  }
+  return null;
+}
+
 function NativeReturnContent() {
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const [protocol, setProtocol] = useState<ElectronAuthCompleteProtocol | null>(
     null
+  );
+  const client = resolveNativeReturnClient(
+    pathname,
+    searchParams.get('client')
   );
 
   useEffect(() => {
@@ -53,13 +75,17 @@ function NativeReturnContent() {
   }, [searchParams]);
 
   const deepLink = useMemo(() => {
-    if (!nativeReturnParams || !protocol) return null;
+    if (!nativeReturnParams || !client) return null;
+    if (client === 'ios') {
+      return buildIosAuthCompleteUrl(nativeReturnParams);
+    }
+    if (!protocol) return null;
 
     return buildElectronAuthCompleteUrl({
       ...nativeReturnParams,
       protocol,
     });
-  }, [nativeReturnParams, protocol]);
+  }, [client, nativeReturnParams, protocol]);
 
   useEffect(() => {
     if (deepLink && globalThis.location) {

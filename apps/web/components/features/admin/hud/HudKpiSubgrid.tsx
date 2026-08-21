@@ -8,6 +8,7 @@ import type {
 } from '@/app/api/admin/hud/shipping-velocity/route';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { medianNumber } from '@/lib/hud/number-series';
+import { isSuccessfulHudObservation } from '@/lib/hud/observation';
 import type { HudTone } from '@/lib/hud/tone-determination';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
 import { getAccentCssVars, HUD_TONE_ACCENT } from '@/lib/ui/accent-palette';
@@ -183,7 +184,10 @@ export function HudKpiSubgrid({
   const last7 = buckets.slice(-7);
   const prior7 = buckets.slice(-14, -7);
 
-  const hasVelocityData = velocityQuery.data !== undefined;
+  const velocityObservation = velocityQuery.data?.observation;
+  const hasVelocityData =
+    velocityObservation !== undefined &&
+    isSuccessfulHudObservation(velocityObservation);
   const mergedLast7 = sumMerged(last7);
   const velocityDelta = deltaPercent(mergedLast7, sumMerged(prior7));
 

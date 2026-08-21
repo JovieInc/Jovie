@@ -91,6 +91,12 @@ describe('proxy routing helpers', () => {
       expect(categorizePath(APP_ROUTES.AUTH_NATIVE_COMPLETE).needsNonce).toBe(
         true
       );
+      expect(categorizePath(APP_ROUTES.AUTH_NATIVE_RETURN).needsNonce).toBe(
+        true
+      );
+      expect(categorizePath(APP_ROUTES.AUTH_IOS_COMPLETE).needsNonce).toBe(
+        true
+      );
       expect(categorizePath(APP_ROUTES.START).needsNonce).toBe(true);
       expect(categorizePath('/pricing').needsNonce).toBe(false);
     });

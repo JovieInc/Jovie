@@ -22,12 +22,11 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { AgentOsRunsPanel } from '@/components/features/admin/agent-os';
 import { DesignProposalReviewPanel } from '@/components/features/admin/design-lab';
-import { FounderConversionHud } from '@/components/features/admin/hud/FounderConversionHud';
+import { FounderFunnelBand } from '@/components/features/admin/hud/FounderFunnelBand';
 import { FounderMorningWalkCard } from '@/components/features/admin/hud/FounderMorningWalkCard';
 import { HudCashMrrBand } from '@/components/features/admin/hud/HudCashMrrBand';
 import { HudKpiSubgrid } from '@/components/features/admin/hud/HudKpiSubgrid';
 import { HudNoiseDisclosure } from '@/components/features/admin/hud/HudNoiseDisclosure';
-import { HudObservationStatus } from '@/components/features/admin/hud/HudObservationStatus';
 import {
   HudGithubBudgetPanel,
   HudShipperNeedPanel,
@@ -811,18 +810,7 @@ export function HudDashboardClient({
           </ContentSurfaceCard>
         ) : (
           <div data-testid={section.testId}>
-            {initialFunnel ? (
-              <FounderConversionHud
-                mrrUsd={null}
-                initialFunnel={initialFunnel}
-              />
-            ) : (
-              <HudObservationStatus
-                state='not_configured'
-                message='Funnel data is not configured.'
-                testId='hud-bottleneck-observation'
-              />
-            )}
+            <FounderFunnelBand initialFunnel={initialFunnel} />
           </div>
         );
       case 'factory-health':

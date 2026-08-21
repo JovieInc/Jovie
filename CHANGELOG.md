@@ -9,6 +9,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - [internal] **Native auto-enroll produces or explains an exact-head queue receipt (JOV-5174):** admission requires persisted `isInMergeQueue` plus a positioned `mergeQueueEntry`, delayed GitHub reads are reconciled, a later hard hold is not membership, and a selector no-op or missing receipt fails with the exact reason. Auto-merge intent is not membership.
 
+- [internal] **Ops bottleneck is the death-step funnel, and shipping velocity no longer looks like zero when GitHub is missing (JOV-5256):** The scan-first Bottleneck band is funnel-only. Survival and velocity keep their own bands. Unconfigured GitHub reports Not configured instead of empty PR charts. Funnel query failures report Unavailable with Retry instead of empty zeros.
+
 - **Private ideas stay private until you approve one exact script:** Library now has an Ideas & Scripts workspace. Save an idea, keep versioned revisions, attach evidence to factual claims, approve one revision, and hand that exact copy to capture. Nothing publishes from this slice.
 - [internal] **Tasks and scripts share one focused editor (JOV-5173):** Task descriptions persist bounded Tiptap JSON with optimistic concurrency, and private creator documents use immutable revisions plus an idempotent Save Idea path.
 - [internal] **Opaque `Error: {"error":{"name":"UpstashError"}}` bags no longer file from the client SDK (JOV-5186):** client `beforeSend` uses the same `hint.originalException` drop as server, so object-captures whose event value is `Non-Error exception captured with keys: error` never become Linear issues. Quota command failures are dropped separately (JOV-5184).
@@ -35,6 +37,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- **iPhone and Mac sign-in return to the app instead of the website:** after browser login, iOS and macOS bounce through an allowlisted return page and reopen Jovie. Signed-in native sessions no longer dump into the web dashboard.
 - **iPhone sign-in can open the browser when SwiftUI has no key window (JOV-5198):** Continue in Browser waits for a foreground-active window, presents from a visible or scene-backed window when needed, and a failed session start is no longer reported as `invalidAuthURL`.
 - [internal] **Ovie eval review persists a durable row and records `judge:absent` as a verdict:** enqueue reports success only after `ovie_operating_kv` write, missing rubric judges are not scored as pass, word count is a `word-count:N` signal unless a verbosity budget is set, and Slack feedback redacts emails in the message body.
 - [internal] **Touch-target lint accepts the 44px hit container:** compact controls stay visually small (`h-7`/`h-8`/`h-9`); the prescribed rescue is `before:h-11`, not enlarging the item. `min-h-11` on the control still counts so the ratchet does not jump.
