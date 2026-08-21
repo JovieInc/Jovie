@@ -13,6 +13,7 @@ import {
 import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import { ChatThreadNavigationRail } from '@/components/features/chat/navigation-rail';
 import { track } from '@/lib/analytics';
+import { AUDIO_FILE_ACCEPT } from '@/lib/audio/constants';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 import { useAppFlag } from '@/lib/flags/client';
 import { usePendingOpportunityCardsQuery, usePlanGate } from '@/lib/queries';
@@ -88,6 +89,7 @@ export function JovieChat({
   const initialQuerySubmitted = useRef(false);
   const initialSkillApplied = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const audioFileInputRef = useRef<HTMLInputElement>(null);
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
   /** Local dismiss ledger for empty-state action cards (session-scoped). */
   const [dismissedActionCardIds, setDismissedActionCardIds] = useState<
@@ -255,6 +257,10 @@ export function JovieChat({
 
   const openFilePicker = useCallback(() => {
     fileInputRef.current?.click();
+  }, []);
+
+  const openAudioPicker = useCallback(() => {
+    audioFileInputRef.current?.click();
   }, []);
 
   const handleFileChange = useCallback(
@@ -634,6 +640,7 @@ export function JovieChat({
     isStreaming,
     onStop: stop,
     onFileAttach: openFilePicker,
+    onAudioAttach: openAudioPicker,
     isFileProcessing: isUploading,
     pendingFiles,
     onRemoveFile: removeFile,
@@ -719,6 +726,15 @@ export function JovieChat({
           multiple
           className='hidden'
           tabIndex={-1}
+        />
+        <input
+          ref={audioFileInputRef}
+          type='file'
+          accept={AUDIO_FILE_ACCEPT}
+          onChange={handleFileChange}
+          className='hidden'
+          tabIndex={-1}
+          data-testid='chat-audio-file-input'
         />
 
         {/* Drag-and-drop overlay */}

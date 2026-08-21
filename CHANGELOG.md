@@ -9,6 +9,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - [internal] **Staged production builds now receive Google OAuth credentials (JOV-4361):** Doppler `--only-secrets` injects `AUTH_GOOGLE_CLIENT_ID` and `AUTH_GOOGLE_CLIENT_SECRET` into the production deployment build and passes them as runtime `--env`, matching staging. `--no-fallback` and the OAuth/artifact guards stay in place.
 
+- **Upload a song from a new chat:** drop or attach an audio file, Jovie classifies it as a new track, an existing release, or a reference, and keeps the file in Library so it is not orphaned.
+
 - [internal] **Native auto-enroll produces or explains an exact-head queue receipt (JOV-5174):** admission requires persisted `isInMergeQueue` plus a positioned `mergeQueueEntry`, delayed GitHub reads are reconciled, a later hard hold is not membership, and a selector no-op or missing receipt fails with the exact reason. Auto-merge intent is not membership.
 
 - [internal] **Ops bottleneck is the death-step funnel, and shipping velocity no longer looks like zero when GitHub is missing (JOV-5256):** The scan-first Bottleneck band is funnel-only. Survival and velocity keep their own bands. Unconfigured GitHub reports Not configured instead of empty PR charts. Funnel query failures report Unavailable with Retry instead of empty zeros.
