@@ -128,6 +128,8 @@ export const PUBLIC_SKILL_REGISTRY = {
     activeVersion: '1.0.0',
     entitlement: 'canAccessEmailCampaigns',
     model: 'anthropic/claude-haiku-4-5-20251001',
+    inputSchemaZodPath: 'apps/web/lib/services/fan-email/types.ts',
+    outputSchemaZodPath: 'apps/web/lib/services/fan-email/types.ts',
     metadata: {
       surface: 'email',
       action: 'fan_send',

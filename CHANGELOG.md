@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Fan email cannot invent metrics or auto-send (JOV-5261):** `fan_email_send` drafts or queues for approval, skips unknown/empty lists, omits unverifiable ESP numbers, and never sends without a human.
+
 - [internal] **Staged production builds now receive Google OAuth credentials (JOV-4361):** Doppler `--only-secrets` injects `AUTH_GOOGLE_CLIENT_ID` and `AUTH_GOOGLE_CLIENT_SECRET` into the production deployment build and passes them as runtime `--env`, matching staging. `--no-fallback` and the OAuth/artifact guards stay in place.
 
 - [internal] **Symphony pre-lease context retrieval uses Gem's bounded GBrain adapter (JOV-5268):** the intake controller binds the explicit deployed JSON adapter, reads org-chart and job-ledger pages in parallel, searches short issue keywords before a hard-budgeted semantic fallback, and preserves clean no-results versus total command failure as distinct fail-closed blockers.
