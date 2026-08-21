@@ -12,6 +12,7 @@ import {
 import {
   isTransientInfraHttpTransaction,
   isUpstashQuotaSentryEvent,
+  SPOTIFY_RELEASE_CREDIT_BOUND_IGNORE_ERRORS,
   UPSTASH_QUOTA_IGNORE_ERRORS,
 } from '@/lib/sentry/non-actionable-issues';
 
@@ -41,6 +42,7 @@ Sentry.init({
   // Suppress known non-actionable errors
   ignoreErrors: [
     ...UPSTASH_QUOTA_IGNORE_ERRORS,
+    ...SPOTIFY_RELEASE_CREDIT_BOUND_IGNORE_ERRORS,
     // Clerk SSR race condition: auth()/currentUser() called before request
     // context is available during edge/serverless cold starts. Not a code bug —
     // all usages are correctly in server components/actions/API routes.

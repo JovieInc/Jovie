@@ -322,6 +322,7 @@ describe('credited artist profile reconciliation', () => {
     expect(result).toMatchObject({ created: 1, conflicted: 0 });
     expect(hoisted.captureWarning).toHaveBeenCalledWith(
       'Credited artist profile cache invalidation deferred',
+      undefined,
       expect.objectContaining({ creatorProfileId: 'owner-profile' })
     );
   });
@@ -439,6 +440,7 @@ describe('credited artist profile reconciliation', () => {
     );
     expect(hoisted.captureWarning).toHaveBeenCalledWith(
       'Credited artist profile identity conflicts detected',
+      undefined,
       expect.objectContaining({
         conflicted: 1,
         creatorProfileId: 'owner-profile',
@@ -479,12 +481,15 @@ describe('credited artist profile reconciliation', () => {
       deferred: true,
       reused: 24,
     });
-    expect(hoisted.captureWarning).toHaveBeenCalledWith(
+    expect(hoisted.captureWarning).not.toHaveBeenCalled();
+    expect(hoisted.loggerInfo).toHaveBeenCalledWith(
       'Credited artist profile reconciliation was bounded',
       expect.objectContaining({
         creatorProfileId: 'owner-profile',
         limit: 24,
         processed: 24,
+        retry: 'next_spotify_import_or_backfill',
+        source: 'spotify_release_credit',
       })
     );
   });

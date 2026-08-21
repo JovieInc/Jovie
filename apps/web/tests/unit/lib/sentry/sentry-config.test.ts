@@ -674,6 +674,20 @@ describe('getBaseClientConfig', () => {
     ).toBe(true);
   });
 
+  it('drops the JOV-5263 bounded Spotify credit JSON bag', () => {
+    const config = getBaseClientConfig();
+    const title =
+      'Error: {"source":"spotify_release_credit","creatorProfileId":"c07d767c-1784-4bb7-af6b-2fdfb8a88eb9","processed":24,"limit":24,"retry":"next_spotify_import_or_backfill"}';
+
+    expect(
+      config.beforeSend({
+        exception: {
+          values: [{ type: 'Error', value: title }],
+        },
+      } as never)
+    ).toBeNull();
+  });
+
   it('drops a client object-capture whose originalException is the JOV-5186 bag', () => {
     const config = getBaseClientConfig();
     const inner = new Error(

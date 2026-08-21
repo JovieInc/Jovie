@@ -32,6 +32,7 @@ import {
 } from '@/lib/sentry/init';
 import {
   isOpaqueUpstashErrorJsonBag,
+  isSpotifyReleaseCreditBoundCapture,
   isUpstashQuotaNoise,
 } from '@/lib/sentry/non-actionable-issues';
 import {
@@ -271,7 +272,7 @@ export async function captureError(
 ): Promise<void> {
   const resolvedError = unwrapCapturedError(error);
   const resolvedContext = unwrapCapturedContext(error, context);
-  const errorData = formatError(resolvedError);
+  const errorData = formatError(resolvedError ?? message);
   const sentryMode = getSentryMode();
   const environment = getEnvironment();
 
@@ -295,10 +296,13 @@ export async function captureError(
   const quotaNoise =
     isRedisQuotaFailure(resolvedError) ||
     isUpstashQuotaNoise(quotaNoiseText(resolvedError));
+  const boundedCreditReceipt =
+    isSpotifyReleaseCreditBoundCapture(resolvedError, resolvedContext) ||
+    isSpotifyReleaseCreditBoundCapture(error, context);
 
-  if (!opaqueBag && !quotaNoise) {
+  if (!opaqueBag && !quotaNoise && !boundedCreditReceipt) {
     sendToSentry({
-      error: resolvedError,
+      error: resolvedError ?? message,
       errorMessage: errorData.message,
       message,
       severity,

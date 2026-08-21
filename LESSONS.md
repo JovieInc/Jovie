@@ -5,6 +5,15 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 ---
 
+## Sentry / Error Tracking
+
+### `captureWarning(message, context)` files Linear as `Error: {json}`
+**Mistake:** Passing a plain context object as `captureWarning`'s second argument JSON-stringifies it into `new Error(...)`. Sentry titles that bag `Error: {"source":"spotify_release_credit",...}` and autofix files a Linear issue per payload (JOV-5263, same class as JOV-5242 / Upstash JSON bags).
+
+**Rule:** Expected bounds, retries, and health warnings belong in `logger` or a returned receipt — not Sentry. Real warnings use `captureWarning(message, error | undefined, context)`. A plain object without `error`/`message` is context. Add a drop/test for any bag that already filed Linear.
+
+---
+
 ## Auth / Env
 
 ### OAuth provider buttons use a code allowlist, not NEXT_PUBLIC kill-switches

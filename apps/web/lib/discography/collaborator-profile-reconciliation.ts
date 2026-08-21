@@ -572,6 +572,7 @@ export async function reconcileCreditedArtistProfiles(
   if (conflicted > 0) {
     await captureWarning(
       'Credited artist profile identity conflicts detected',
+      undefined,
       {
         source: 'spotify_release_credit',
         creatorProfileId,
@@ -580,8 +581,12 @@ export async function reconcileCreditedArtistProfiles(
     );
   }
 
+  // Expected per-run cap. Remaining rows retry on the next import/backfill
+  // (`result.deferred`). Passing this receipt as captureWarning's error
+  // argument filed Linear as `Error: {"source":"spotify_release_credit",...}`
+  // (JOV-5263).
   if (candidateSelection.deferred) {
-    await captureWarning('Credited artist profile reconciliation was bounded', {
+    logger.info('Credited artist profile reconciliation was bounded', {
       source: 'spotify_release_credit',
       creatorProfileId,
       processed: plan.length,
@@ -608,11 +613,15 @@ export async function reconcileCreditedArtistProfiles(
       // are already committed and must retain an accurate success receipt;
       // cache refresh remains observable best-effort for the next request.
       await Promise.allSettled([
-        captureWarning('Credited artist profile cache invalidation deferred', {
-          source: 'spotify_release_credit',
-          creatorProfileId,
-          failedHandles,
-        }),
+        captureWarning(
+          'Credited artist profile cache invalidation deferred',
+          undefined,
+          {
+            source: 'spotify_release_credit',
+            creatorProfileId,
+            failedHandles,
+          }
+        ),
       ]);
     }
   }

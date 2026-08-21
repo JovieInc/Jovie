@@ -254,6 +254,44 @@ describe('POST /api/webhooks/sentry', () => {
     expect(mockServerFetch).not.toHaveBeenCalled();
   });
 
+  it('skips autofix for bounded Spotify credit receipts (JOV-5263)', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+
+    const { POST } = await import('@/app/api/webhooks/sentry/route');
+    const payload = {
+      data: {
+        issue: {
+          id: '5263',
+          title:
+            'Error: {"source":"spotify_release_credit","creatorProfileId":"c07d767c-1784-4bb7-af6b-2fdfb8a88eb9","processed":24,"limit":24,"retry":"next_spotify_import_or_backfill"}',
+          culprit: 'captureWarning',
+        },
+      },
+    };
+    const body = JSON.stringify(payload);
+    const request = new Request('https://example.com/api/webhooks/sentry', {
+      method: 'POST',
+      headers: {
+        'sentry-hook-signature': sign(body),
+      },
+      body,
+    });
+
+    const response = await POST(request as never);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({
+      received: true,
+      skipped: true,
+      reason: 'spotify-release-credit-bound',
+    });
+    expect(mockServerFetch).not.toHaveBeenCalled();
+  });
+
   it('skips autofix for quota-exhausted UpstashError titles', async () => {
     mockAcquireRecentDispatch.mockResolvedValue({
       acquired: true,

@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Spotify credit bounding no longer files Linear as `Error: {"source":"spotify_release_credit",...}` (JOV-5263):** catalogs larger than the per-run cap retry on the next import or backfill. Context-only `captureWarning` bags stay on extra, not the Sentry title.
+
 - [internal] **Sign-out stays available when Redis is missing (JOV-5260):** Better Auth secondary-storage delete no longer fails closed just because the Redis client is unconfigured or the quota circuit shed it. Reachable Redis deletes still retry and fail closed.
 - **Upload a song from a new chat:** drop or attach an audio file, Jovie classifies it as a new track, an existing release, or a reference, and keeps the file in Library so it is not orphaned.
 

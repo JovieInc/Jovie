@@ -90,6 +90,41 @@ describe('captureWarning quota noise (JOV-5221)', () => {
       expect.objectContaining({ level: 'warning' })
     );
   });
+
+  it('does not send expected Spotify credit bounding receipts (JOV-5263)', async () => {
+    await captureWarning('Credited artist profile reconciliation was bounded', {
+      creatorProfileId: 'c07d767c-1784-4bb7-af6b-2fdfb8a88eb9',
+      limit: 24,
+      processed: 24,
+      retry: 'next_spotify_import_or_backfill',
+      source: 'spotify_release_credit',
+    });
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it('does not title context-only bags as Error JSON (JOV-5263)', async () => {
+    await captureWarning(
+      'Credited artist profile identity conflicts detected',
+      {
+        conflicted: 1,
+        creatorProfileId: 'owner-profile',
+        source: 'spotify_release_credit',
+      }
+    );
+    expect(captureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Credited artist profile identity conflicts detected',
+      }),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          conflicted: 1,
+          creatorProfileId: 'owner-profile',
+          source: 'spotify_release_credit',
+        }),
+        level: 'warning',
+      })
+    );
+  });
 });
 
 describe('captureError wrapped UpstashError (JOV-5220)', () => {
