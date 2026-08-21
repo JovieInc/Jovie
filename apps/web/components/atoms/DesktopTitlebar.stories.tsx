@@ -13,7 +13,7 @@ const meta = {
   },
   decorators: [
     Story => (
-      <div className='min-h-12 bg-surface-1 text-primary-token'>
+      <div className='min-h-12 bg-(--noir-ion-card) text-(--noir-ion-text-primary)'>
         <Story />
       </div>
     ),

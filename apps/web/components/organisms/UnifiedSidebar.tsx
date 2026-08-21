@@ -452,7 +452,7 @@ function CustomerUserPanel({
     <div
       data-sidebar='user-panel'
       data-testid='sidebar-user-panel'
-      className='border-t border-(--linear-border-subtle) px-2.5 py-1.5'
+      className='border-t border-(--noir-ion-border-subtle) px-2.5 py-1.5'
     >
       <SidebarMenu className='gap-1'>
         {profileHref && profileDisplayHref ? (
@@ -480,7 +480,7 @@ function CustomerUserPanel({
         <SidebarMenuItem
           className={cn(
             profileHref &&
-              'border-t border-(--linear-border-subtle) pt-1 group-data-[collapsible=icon]:border-t-0 group-data-[collapsible=icon]:pt-0'
+              'border-t border-(--noir-ion-border-subtle) pt-1 group-data-[collapsible=icon]:border-t-0 group-data-[collapsible=icon]:pt-0'
           )}
         >
           <UserButton
