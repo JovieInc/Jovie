@@ -129,6 +129,10 @@ describe('compilePlaybookToSkill', () => {
   it('registry tool set includes channelIntelligenceReport', () => {
     expect(getRegistryToolIds().has('channelIntelligenceReport')).toBe(true);
   });
+
+  it('registry tool set includes fan_email_send', () => {
+    expect(getRegistryToolIds().has('fan_email_send')).toBe(true);
+  });
 });
 
 describe('compiled dogfood playbooks', () => {
@@ -136,6 +140,7 @@ describe('compiled dogfood playbooks', () => {
     'jovie-youtube-channel-optimization.playbook.md',
     'jovie-dsp-content-audit.playbook.md',
     'jovie-release-planner.playbook.md',
+    'release-day-announcement.playbook.md',
   ])('%s validates and compiles to draft', fileName => {
     const raw = loadPlaybook(fileName);
     const validated = validatePlaybookSource(raw);

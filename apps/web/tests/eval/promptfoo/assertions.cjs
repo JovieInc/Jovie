@@ -3656,6 +3656,22 @@ function assertSkillPromptContractCovered(output) {
     );
   }
 
+  const fanEmail = payload.fanEmail ?? {};
+  if (!fanEmail || typeof fanEmail !== 'object') {
+    return fail('skill prompt contract missing fanEmail payload');
+  }
+  if (fanEmail.skillId !== 'fan_email_send') {
+    return fail('fanEmail payload is not tied to fan_email_send');
+  }
+  const missingFanEmailFacts = Array.isArray(fanEmail.missingFacts)
+    ? fanEmail.missingFacts
+    : [];
+  if (missingFanEmailFacts.length > 0) {
+    return fail(
+      `fan email no-invent gate missing facts: ${missingFanEmailFacts.join(', ')}`
+    );
+  }
+
   return pass();
 }
 
@@ -3684,6 +3700,20 @@ function assertChannelPlaylistRuleCase(output) {
   if (channelIntelligence.ruleCasePassed !== true) {
     return fail(
       `channel playlist rule case failed: ${String(channelIntelligence.ruleCase)} ${String(channelIntelligence.ruleCaseReason)}`
+    );
+  }
+  return pass();
+}
+
+function assertFanEmailRuleCase(output) {
+  const payload = parseOutput(output);
+  const fanEmail = payload.fanEmail ?? {};
+  if (fanEmail.skillId !== 'fan_email_send') {
+    return fail('fan email rule case is not tied to fan_email_send');
+  }
+  if (fanEmail.ruleCasePassed !== true) {
+    return fail(
+      `fan email rule case failed: ${String(fanEmail.ruleCase)} ${String(fanEmail.ruleCaseReason)}`
     );
   }
   return pass();
@@ -5180,6 +5210,7 @@ module.exports = {
   assertSkillPromptContractCovered,
   assertPackagingFormatSplitCase,
   assertChannelPlaylistRuleCase,
+  assertFanEmailRuleCase,
   assertAlbumArtProviderContractCovered,
   assertAiToolPromptContractCovered,
   assertChatTitleContractCovered,
