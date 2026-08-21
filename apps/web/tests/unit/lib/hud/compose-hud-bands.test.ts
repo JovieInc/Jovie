@@ -140,4 +140,17 @@ describe('composeHudForPresentation', () => {
     expect(source).not.toContain('founder-hud-mrr');
     expect(source).not.toContain('founder-hud-shipping-velocity');
   });
+
+  it('reuses FounderFunnelBand instead of a second funnel flowchart', () => {
+    const conversionHud = readFileSync(
+      join(
+        TEST_DIR,
+        '../../../../components/features/admin/hud/FounderConversionHud.tsx'
+      ),
+      'utf8'
+    );
+    expect(conversionHud).toContain('FounderFunnelBand');
+    expect(conversionHud).not.toContain('founder-funnel-stage-');
+    expect(conversionHud).not.toContain('FunnelStageTile');
+  });
 });

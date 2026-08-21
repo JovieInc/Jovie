@@ -10,6 +10,7 @@ import type {
 } from '@/app/api/admin/hud/shipping-velocity/route';
 import { HudObservationStatus } from '@/components/features/admin/hud/HudObservationStatus';
 import type { HudObservationState } from '@/lib/hud/observation';
+import { observationFromShippingVelocityBuckets } from '@/lib/hud/shipping-velocity-observation';
 
 export type { DailyBucket };
 
@@ -286,18 +287,6 @@ const LazyVelocityChart = dynamic(
   }
 );
 
-function observationFromBuckets(
-  buckets: readonly DailyBucket[]
-): Extract<HudObservationState, 'fresh' | 'empty'> {
-  const isEmpty =
-    buckets.length === 0 ||
-    buckets.every(
-      bucket =>
-        bucket.merged === 0 && bucket.opened === 0 && bucket.closed === 0
-    );
-  return isEmpty ? 'empty' : 'fresh';
-}
-
 export function ShippingVelocityChart({
   initialData,
   initialRange = '7d',
@@ -309,7 +298,9 @@ export function ShippingVelocityChart({
   const [isLoading, setIsLoading] = useState(!initialData);
   const [error, setError] = useState<string | null>(null);
   const [observation, setObservation] = useState<HudObservationState>(
-    initialData ? observationFromBuckets(initialData) : 'loading'
+    initialData
+      ? observationFromShippingVelocityBuckets(initialData)
+      : 'loading'
   );
   const [spotlight, setSpotlight] = useState<string | null>(null);
   const [showClosed, setShowClosed] = useState(false);
@@ -330,7 +321,10 @@ export function ShippingVelocityChart({
       const result = (await response.json()) as ShippingVelocityResponse;
       setData(result.data);
       setCachedAt(result.cachedAt);
-      setObservation(result.observation ?? observationFromBuckets(result.data));
+      setObservation(
+        result.observation ??
+          observationFromShippingVelocityBuckets(result.data)
+      );
       hasObservedRef.current = true;
     } catch (err) {
       setError(

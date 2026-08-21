@@ -14,9 +14,10 @@ function renderWithQuery(ui: ReactElement) {
     },
   });
 
-  return render(
-    <QueryClientProvider client={client}>{ui}</QueryClientProvider>
-  );
+  return {
+    client,
+    ...render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>),
+  };
 }
 
 function stage(
@@ -47,7 +48,9 @@ function makeFunnel(
   };
 }
 
-function makeEmptyFunnel(): FounderFunnelData {
+function makeEmptyFunnel(
+  overrides: Partial<FounderFunnelData> = {}
+): FounderFunnelData {
   return makeFunnel({
     biggestDropOffKey: null,
     stages: makeFunnel().stages.map(entry => ({
@@ -56,6 +59,7 @@ function makeEmptyFunnel(): FounderFunnelData {
       conversionRate: null,
       dropOff: null,
     })),
+    ...overrides,
   });
 }
 
@@ -112,5 +116,55 @@ describe('FounderFunnelBand', () => {
     });
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
     expect(screen.queryByTestId('founder-hud-mrr')).not.toBeInTheDocument();
+  });
+
+  it('shows unavailable with retry when a successful query payload has errors', () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('upstream failed', { status: 503 })
+    );
+
+    renderWithQuery(
+      <FounderFunnelBand
+        initialFunnel={makeEmptyFunnel({ errors: ['connection refused'] })}
+      />
+    );
+
+    expect(screen.getByTestId('hud-bottleneck-observation')).toHaveAttribute(
+      'data-state',
+      'unavailable'
+    );
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(screen.getByText('Funnel data is unavailable.')).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        'No funnel data yet. Zero is shown only after a successful observation.'
+      )
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps last known funnel tiles when a refetch fails', async () => {
+    const { client } = renderWithQuery(
+      <FounderFunnelBand initialFunnel={makeFunnel()} />
+    );
+
+    expect(
+      screen.getByTestId('founder-funnel-stage-onboarding_chats')
+    ).toBeInTheDocument();
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('upstream failed', { status: 503 })
+    );
+    await client.invalidateQueries({ queryKey: ['hud', 'founder-funnel'] });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('hud-bottleneck-observation')).toHaveAttribute(
+        'data-state',
+        'unavailable'
+      );
+    });
+    expect(
+      screen.getByTestId('founder-funnel-stage-onboarding_chats')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 });

@@ -177,12 +177,16 @@ function isEmptyFunnel(funnel: FounderFunnelData | undefined): boolean {
   return Boolean(funnel?.stages.every(stage => stage.count === 0));
 }
 
+function hasFunnelQueryErrors(funnel: FounderFunnelData | undefined): boolean {
+  return Boolean(funnel && funnel.errors.length > 0);
+}
+
 function resolveFunnelObservation(query: {
   readonly isLoading: boolean;
   readonly isError: boolean;
   readonly data: FounderFunnelData | undefined;
 }): HudObservationState {
-  if (query.isError) return 'unavailable';
+  if (query.isError || hasFunnelQueryErrors(query.data)) return 'unavailable';
   if (query.isLoading && !query.data) return 'loading';
   if (!query.data) return 'empty';
   if (isEmptyFunnel(query.data)) return 'empty';
@@ -194,7 +198,7 @@ function observationMessage(
   funnel: FounderFunnelData | undefined
 ): string {
   if (state === 'unavailable') {
-    return funnel
+    return funnel && !hasFunnelQueryErrors(funnel) && !isEmptyFunnel(funnel)
       ? 'Showing last known funnel. Retry to refresh.'
       : 'Funnel data is unavailable.';
   }

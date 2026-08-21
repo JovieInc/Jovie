@@ -187,8 +187,7 @@ export function HudKpiSubgrid({
   const velocityObservation = velocityQuery.data?.observation;
   const hasVelocityData =
     velocityObservation !== undefined &&
-    isSuccessfulHudObservation(velocityObservation) &&
-    !velocityQuery.isError;
+    isSuccessfulHudObservation(velocityObservation);
   const mergedLast7 = sumMerged(last7);
   const velocityDelta = deltaPercent(mergedLast7, sumMerged(prior7));
 

@@ -6,6 +6,7 @@ import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { medianNumber } from '@/lib/hud/number-series';
 import type { HudObservationState } from '@/lib/hud/observation';
+import { observationFromShippingVelocityBuckets } from '@/lib/hud/shipping-velocity-observation';
 import { getRedis } from '@/lib/redis';
 import { logger } from '@/lib/utils/logger';
 
@@ -268,22 +269,6 @@ async function authorizeAdmin(): Promise<Response | null> {
   return null;
 }
 
-function bucketsAreEmpty(data: readonly DailyBucket[]): boolean {
-  return (
-    data.length === 0 ||
-    data.every(
-      bucket =>
-        bucket.merged === 0 && bucket.opened === 0 && bucket.closed === 0
-    )
-  );
-}
-
-function observationFromBuckets(
-  data: readonly DailyBucket[]
-): Extract<HudObservationState, 'fresh' | 'empty'> {
-  return bucketsAreEmpty(data) ? 'empty' : 'fresh';
-}
-
 function normalizeVelocityResponse(
   result: ShippingVelocityResponse
 ): ShippingVelocityResponse {
@@ -299,7 +284,7 @@ function normalizeVelocityResponse(
   }
   return {
     ...result,
-    observation: observationFromBuckets(result.data),
+    observation: observationFromShippingVelocityBuckets(result.data),
     errorMessage: result.errorMessage ?? null,
   };
 }
@@ -351,22 +336,22 @@ export async function GET(request: Request): Promise<Response> {
     const range = parseRange(request);
     const days = RANGE_DAYS[range] ?? 7;
 
-    const redis = getRedis();
-    const cacheKey = `hud:shipping-velocity:v2:${range}`;
-    const cached = await readCachedVelocity(redis, cacheKey);
-    if (cached) {
-      return NextResponse.json(cached, {
-        status: 200,
-        headers: NO_STORE_HEADERS,
-      });
-    }
-
     const token = env.HUD_GITHUB_TOKEN;
     const owner = env.HUD_GITHUB_OWNER;
     const repo = env.HUD_GITHUB_REPO;
 
     if (!token || !owner || !repo) {
       return NextResponse.json(notConfiguredVelocityResponse(range), {
+        status: 200,
+        headers: NO_STORE_HEADERS,
+      });
+    }
+
+    const redis = getRedis();
+    const cacheKey = `hud:shipping-velocity:v2:${range}`;
+    const cached = await readCachedVelocity(redis, cacheKey);
+    if (cached && cached.observation !== 'not_configured') {
+      return NextResponse.json(cached, {
         status: 200,
         headers: NO_STORE_HEADERS,
       });
@@ -389,7 +374,7 @@ export async function GET(request: Request): Promise<Response> {
       data: buckets,
       range,
       cachedAt: new Date().toISOString(),
-      observation: observationFromBuckets(buckets),
+      observation: observationFromShippingVelocityBuckets(buckets),
     };
 
     await cacheVelocity(redis, cacheKey, result);
