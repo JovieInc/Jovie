@@ -23,7 +23,6 @@ import {
 import { useChatThreadContextMenu } from '@/components/shell/useChatThreadContextMenu';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
-import { shouldShowInboxNavigation } from '@/lib/inbox/navigation-availability';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import {
@@ -97,8 +96,7 @@ function normalizeTrailingSlash(pathname: string): string {
 }
 
 export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
-  const { creatorProfiles, inboxNavigation, selectedProfile } =
-    useDashboardData();
+  const { creatorProfiles, selectedProfile } = useDashboardData();
   const { isMobile, openMobile, state: sidebarState } = useSidebar();
   const pathname = usePathname();
   const router = useRouter();
@@ -123,14 +121,10 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     [isElectron, isMobile]
   );
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
-  const eligiblePrimaryNavigation = useMemo(
-    () =>
-      primaryNavigation.filter(
-        item =>
-          item.id !== 'inbox' || shouldShowInboxNavigation(inboxNavigation)
-      ),
-    [inboxNavigation]
-  );
+  // Inbox is the shell's single attention center. Keep the destination stable
+  // even when it is caught up; attention state belongs inside the route, not in
+  // whether the route exists.
+  const eligiblePrimaryNavigation = primaryNavigation;
   const activePrimaryItemId = useMemo(() => {
     const active = eligiblePrimaryNavigation.find(item => {
       if (item.id === 'chat' && item.href === APP_ROUTES.CHAT) {

@@ -39,6 +39,9 @@ const signOutMock = vi.hoisted(() => vi.fn());
 const userButtonPropsMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/desktop/electron-bridge', () => ({
+  isElectronRuntime: () =>
+    document.documentElement.dataset.desktopRuntime === 'electron' ||
+    electronRuntimeMock.isElectronRuntime,
   useIsElectronRuntime: () => electronRuntimeMock.isElectronRuntime,
 }));
 
@@ -66,11 +69,19 @@ vi.mock('@/components/organisms/user-button', () => ({
 }));
 
 vi.mock('@/features/feedback/SidebarUpgradeBanner', () => ({
-  SidebarUpgradeBanner: () => null,
+  SidebarUpgradeBanner: () => <div data-testid='sidebar-upgrade-banner' />,
+}));
+
+vi.mock('@/components/atoms/UpdateAvailablePill', () => ({
+  UpdateAvailablePill: () => (
+    <button type='button' data-testid='update-available-pill'>
+      Update
+    </button>
+  ),
 }));
 
 vi.mock('@/features/feedback/SidebarInstallBanner', () => ({
-  SidebarInstallBanner: () => null,
+  SidebarInstallBanner: () => <div data-testid='sidebar-install-banner' />,
 }));
 
 vi.mock('@/components/organisms/SidebarBottomNowPlayingBridge', () => ({
@@ -79,8 +90,22 @@ vi.mock('@/components/organisms/SidebarBottomNowPlayingBridge', () => ({
 
 const dashboardData: DashboardData = {
   user: { id: 'user_123' },
-  creatorProfiles: [],
-  selectedProfile: null,
+  creatorProfiles: [
+    {
+      id: 'profile_123',
+      avatarUrl: null,
+      displayName: 'Tim White',
+      username: 'timwhite',
+      usernameNormalized: 'timwhite',
+    } as DashboardData['creatorProfiles'][number],
+  ],
+  selectedProfile: {
+    id: 'profile_123',
+    avatarUrl: null,
+    displayName: 'Tim White',
+    username: 'timwhite',
+    usernameNormalized: 'timwhite',
+  } as DashboardData['selectedProfile'],
   needsOnboarding: false,
   sidebarCollapsed: false,
   hasSocialLinks: false,
@@ -166,6 +191,7 @@ function renderUnifiedSidebar({
 describe('UnifiedSidebar library route', () => {
   afterEach(() => {
     electronRuntimeMock.isElectronRuntime = true;
+    document.documentElement.removeAttribute('data-desktop-runtime');
     signOutMock.mockReset();
     userButtonPropsMock.mockReset();
     resetDashboardNavTestMocks();
@@ -188,14 +214,67 @@ describe('UnifiedSidebar library route', () => {
     expect(userButtonPropsMock).toHaveBeenCalledWith(
       expect.objectContaining({ showUserInfo: true })
     );
+    const panel = screen.getByTestId('sidebar-user-panel');
+    expect(panel).toContainElement(screen.getByTestId('user-button'));
     expect(
-      screen.getByTestId('user-button').parentElement?.parentElement
-        ?.parentElement
-    ).toHaveClass('min-h-(--app-shell-footer-row-height)', 'px-2.5', 'py-0.5');
+      within(panel).getByRole('link', { name: /Public Profile/i })
+    ).toHaveAttribute('href', '/timwhite');
+    expect(panel).toHaveTextContent('jov.ie/timwhite');
+    expect(screen.queryByTestId('sidebar-upgrade-banner')).toBeNull();
+
+    const update = screen.getByTestId('update-available-pill');
+    expect(screen.getByTestId('sidebar-notifications')).toContainElement(
+      update
+    );
+    expect(update.closest('[data-sidebar="content"]')).not.toBeNull();
+    expect(update.closest('[data-sidebar="footer"]')).toBeNull();
+  });
+
+  it('mounts the desktop update listener before the runtime effect resolves', () => {
+    electronRuntimeMock.isElectronRuntime = false;
+    document.documentElement.dataset.desktopRuntime = 'electron';
+
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.DASHBOARD,
+      section: 'dashboard',
+    });
+
+    // The runtime hook is intentionally still false on this first render,
+    // but the synchronous bridge check must mount the pill now so a one-shot
+    // Electron update event emitted during boot cannot be missed.
+    expect(screen.getByTestId('update-available-pill')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-notifications')).toContainElement(
+      screen.getByTestId('update-available-pill')
+    );
+
+    document.documentElement.removeAttribute('data-desktop-runtime');
+  });
+
+  it('keeps the unified user panel available on settings routes', () => {
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.SETTINGS,
+      section: 'settings',
+    });
+
+    const panel = screen.getByTestId('sidebar-user-panel');
+    expect(panel).toContainElement(screen.getByTestId('user-button'));
     expect(
-      screen.getByTestId('user-button').parentElement?.parentElement
-        ?.parentElement
-    ).not.toHaveClass('border-t', 'border-(--linear-border-subtle)');
+      within(panel).getByRole('link', { name: /Public Profile/i })
+    ).toHaveAttribute('href', '/timwhite');
+  });
+
+  it('keeps the unified user panel when a route-owned sidebar override replaces nav', () => {
+    renderUnifiedSidebar({
+      overrideContent: <span>Library-owned sidebar</span>,
+      section: 'library',
+    });
+
+    expect(screen.getByText('Library-owned sidebar')).toBeInTheDocument();
+    const panel = screen.getByTestId('sidebar-user-panel');
+    expect(panel).toContainElement(screen.getByTestId('user-button'));
+    expect(
+      within(panel).getByRole('link', { name: /Public Profile/i })
+    ).toHaveAttribute('href', '/timwhite');
   });
 
   it('uses existing subtle border token without growing --linear-* namespace', () => {

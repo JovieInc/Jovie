@@ -3,7 +3,6 @@
 import { ChevronLeft, ChevronRight, PanelLeft } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useContext } from 'react';
-import { UpdateAvailablePill } from '@/components/atoms/UpdateAvailablePill';
 import { SidebarContext } from '@/components/organisms/sidebar/context';
 import {
   useDesktopNavigation,
@@ -15,7 +14,7 @@ import { cn } from '@/lib/utils';
  * DesktopTitlebar — Electron-only titlebar drag region.
  *
  * Layout:
- *   [sidebar-width: traffic-light spacer, back button, update pill]
+ *   [sidebar-width: traffic-light spacer, back/forward navigation]
  *   [main: forward nav, drag region]
  *
  * Renders as a zero-height invisible element in the browser; CSS on
@@ -105,12 +104,6 @@ export function DesktopTitlebar() {
               >
                 <ChevronRight className='h-3.5 w-3.5' strokeWidth={2} />
               </button>
-            </div>
-            <div
-              className='ml-auto min-w-0 shrink-0'
-              style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
-            >
-              <UpdateAvailablePill />
             </div>
           </div>
 

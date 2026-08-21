@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -100,6 +100,44 @@ describe('Electron runtime bridge', () => {
 
     unmount();
 
+    expect(unsubscribeAvailable).toHaveBeenCalledTimes(1);
+    expect(unsubscribeDownloaded).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps an update emitted while the boot listener is installed', async () => {
+    const unsubscribeAvailable = vi.fn();
+    const unsubscribeDownloaded = vi.fn();
+
+    setElectronAPI({
+      platform: 'darwin',
+      electronVersion: '42.0.0',
+      onUpdateAvailable: cb => {
+        // electron-updater can emit before the rest of the shell settles;
+        // the first listener registration must observe that boot event.
+        cb();
+        return unsubscribeAvailable;
+      },
+      onUpdateDownloaded: () => unsubscribeDownloaded,
+      installUpdateAndRestart: vi.fn(),
+    });
+
+    function Probe(): ReactNode {
+      const update = useDesktopUpdate();
+      return (
+        <output>
+          {update.available ? 'available' : 'idle'}:
+          {update.downloaded ? 'downloaded' : 'pending'}
+        </output>
+      );
+    }
+
+    const { unmount } = render(<Probe />);
+
+    await waitFor(() => {
+      expect(screen.getByText('available:pending')).toBeInTheDocument();
+    });
+
+    unmount();
     expect(unsubscribeAvailable).toHaveBeenCalledTimes(1);
     expect(unsubscribeDownloaded).toHaveBeenCalledTimes(1);
   });
