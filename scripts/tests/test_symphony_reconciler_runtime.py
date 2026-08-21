@@ -177,6 +177,56 @@ def test_runtime_receipt_matches_exact_bundle_revision_and_detects_drift(tmp_pat
     assert verified["receipt"]["runtimeHashes"] == verified["receipt"]["files"]
 
 
+def test_runtime_preflight_fails_closed_for_source_drift_and_receipt_metadata(
+    tmp_path: Path,
+) -> None:
+    runtime_root = tmp_path / "runtime"
+    runtime_root.mkdir()
+    paths, _ = _runtime_fixture(runtime_root)
+    source_root = tmp_path / "source"
+    (source_root / "config").mkdir(parents=True)
+    (source_root / "symphony-reconciler.py").write_bytes(paths["runtime"].read_bytes())
+    (source_root / "model-router.py").write_bytes(paths["router"].read_bytes())
+    (source_root / "config/model-registry.json").write_bytes(paths["registry"].read_bytes())
+    (source_root / "config/symphony-reconciler-capabilities.json").write_bytes(
+        paths["manifest"].read_bytes()
+    )
+    with patch.dict(
+        os.environ,
+        {
+            "SYMPHONY_RUNTIME_SOURCE_ROOT": str(source_root),
+            "SYMPHONY_RUNTIME_RECEIPT": str(paths["receipt"]),
+        },
+    ):
+        receipt = RECONCILER.write_runtime_receipt(paths)
+        assert receipt is not None
+        assert RECONCILER.runtime_preflight(paths)["status"] == "ready"
+
+        source_router = source_root / "model-router.py"
+        original_source = source_router.read_bytes()
+        source_router.write_bytes(original_source + b"# source drift\n")
+        source_drift = RECONCILER.runtime_preflight(paths)
+        assert source_drift["status"] == "recoverable"
+        assert source_drift["reason"] == "runtime_receipt_stale"
+        source_router.write_bytes(original_source)
+
+        original_receipt = json.loads(paths["receipt"].read_text(encoding="utf-8"))
+        for field, value in (
+            ("installedAt", ""),
+            ("sourceHashes", {}),
+            ("runtimeHashes", {}),
+        ):
+            malformed = {**original_receipt, field: value}
+            paths["receipt"].write_text(json.dumps(malformed), encoding="utf-8")
+            stale = RECONCILER.runtime_preflight(paths)
+            assert stale["status"] == "recoverable", field
+            assert stale["reason"] == "runtime_receipt_stale", field
+        paths["receipt"].unlink()
+        missing = RECONCILER.runtime_preflight(paths)
+        assert missing["status"] == "recoverable"
+        assert missing["reason"] == "runtime_receipt_missing"
+
+
 def test_structured_and_port_exit_78_are_terminal_at_controller_retry_boundary() -> None:
     sentinel = (
         "SYMPHONY_LAUNCHER_FAILURE schema=symphony-launcher-failure/v1 "
@@ -211,6 +261,21 @@ def test_structured_and_port_exit_78_are_terminal_at_controller_retry_boundary()
         assert decision["attempt"] == 1
 
 
+def test_malformed_sentinel_attempt_bound_cannot_crash_or_expand_retries() -> None:
+    terminal = RECONCILER.classify_launcher_failure(
+        "SYMPHONY_LAUNCHER_FAILURE schema=symphony-launcher-failure/v1 "
+        "class=deterministic-launcher retryable=false maxAttempts=garbage"
+    )
+    transient = RECONCILER.classify_launcher_failure(
+        "SYMPHONY_LAUNCHER_FAILURE schema=symphony-launcher-failure/v1 "
+        "class=transient-launcher retryable=true maxAttempts=999999"
+    )
+    assert terminal["retryable"] is False
+    assert terminal["maxAttempts"] == 1
+    assert transient["retryable"] is True
+    assert transient["maxAttempts"] == 3
+
+
 def test_exit_75_is_typed_transient_and_unknown_exit_is_bounded_not_78() -> None:
     transient = RECONCILER.classify_launcher_failure("agent exited: {:port_exit, 75}")
     unknown = RECONCILER.classify_launcher_failure("agent exited: {:port_exit, 1}")
@@ -235,6 +300,25 @@ def test_exit_75_is_typed_transient_and_unknown_exit_is_bounded_not_78() -> None
         assert decision["due_at"]
         assert decision["failure"]["code"] != "deterministic-launcher-failure"
         assert decision["failure"]["class"] == failure["class"]
+        exhausted = RECONCILER.controller_retry_decision(
+            {
+                "issue_identifier": "JOV-1",
+                "error": error,
+                "attempt": failure["maxAttempts"],
+                "generation": "g",
+            }
+        )
+        assert exhausted["state"] == "blocked"
+        assert exhausted["retryable"] is False
+        assert exhausted["maxAttempts"] == failure["maxAttempts"]
+        assert exhausted["attempt"] == failure["maxAttempts"]
+        assert exhausted["due_at"] is None
+        assert exhausted["lease"] is None
+        assert exhausted["handoff"] is False
+        assert exhausted["providerAccount"] is None
+        assert exhausted["failure"]["class"] == failure["class"]
+        assert exhausted["failure"]["code"] != "deterministic-launcher-failure"
+        assert exhausted["failure"]["exhausted"] is True
 
 
 def test_jov_4999_fixture_parks_once_without_retry_deadline_or_lease(
@@ -300,6 +384,35 @@ def test_jov_4999_fixture_parks_once_without_retry_deadline_or_lease(
     assert not (workspace / ".symphony-routing.json").exists()
 
 
+def _routing_receipt(issue: str = "JOV-4999") -> dict[str, object]:
+    return {
+        "schema": "symphony-routing/v1",
+        "issue": issue,
+        "modelId": "codex-sol",
+        "model": "gpt-5.6-sol",
+        "escalation": False,
+        "fallback": None,
+        "classification": {
+            "risk": "high",
+            "complexity": "high",
+            "capabilities": ["root-cause", "architecture"],
+            "reasons": [
+                "capabilities=root-cause,architecture",
+                "risk=high",
+                "complexity=high",
+            ],
+        },
+        "candidates": [],
+        "capacity": {
+            "accounts": 4,
+            "ready": 3,
+            "active": None,
+            "readable": True,
+        },
+        "fingerprint": "9197946728dd292864478412",
+    }
+
+
 def test_repaired_generation_runs_only_after_routing_receipt() -> None:
     parked = RECONCILER.controller_retry_decision(
         {
@@ -341,14 +454,89 @@ def test_repaired_generation_runs_only_after_routing_receipt() -> None:
             "attempt": 1,
             "state": "blocked",
         },
-        routing_receipt={
-            "schema": "symphony-routing/v1",
-            "issue": "JOV-4999",
-            "model": "gpt-5.6-luna",
-        },
+        routing_receipt=_routing_receipt(),
     )
     assert repaired["state"] == "ready"
     assert repaired["retryable"] is True
     assert repaired["due_at"] is None
     assert repaired["attempt"] == 0
     assert repaired["handoff"] is False
+
+
+def test_repaired_generation_rejects_partial_or_cross_issue_routing_receipt() -> None:
+    previous = {
+        "generation": "missing-routing",
+        "retryable": False,
+        "attempt": 1,
+        "state": "blocked",
+    }
+    observation = {
+        "issue_identifier": "JOV-4999",
+        "error": "port_exit 78",
+        "attempt": 1,
+        "generation": "repaired-routing",
+    }
+    invalid_receipts = (
+        {"schema": "symphony-routing/v1", "model": "gpt-5.6-sol"},
+        _routing_receipt("JOV-OTHER"),
+        {**_routing_receipt(), "fingerprint": "not-a-fingerprint"},
+        {**_routing_receipt(), "capacity": None},
+    )
+    for receipt in invalid_receipts:
+        decision = RECONCILER.controller_retry_decision(
+            observation,
+            previous,
+            routing_receipt=receipt,
+        )
+        assert decision["state"] == "blocked"
+        assert decision["retryable"] is False
+        assert decision["due_at"] is None
+
+
+def test_reconciler_consumes_materialized_receipt_once_for_repaired_generation(
+    tmp_path: Path, monkeypatch
+) -> None:
+    workspace_root = tmp_path / "workspaces"
+    workspace = workspace_root / "JOV-4999"
+    workspace.mkdir(parents=True)
+    _git(workspace, "init", "-q")
+    _git(workspace, "config", "user.email", "test@example.com")
+    _git(workspace, "config", "user.name", "Test")
+    (workspace / "proof.txt").write_text("historical\n", encoding="utf-8")
+    _git(workspace, "add", "proof.txt")
+    _git(workspace, "commit", "-qm", "base")
+    _git(workspace, "remote", "add", "origin", ".")
+    _git(workspace, "update-ref", "refs/remotes/origin/main", "HEAD")
+    monkeypatch.setenv("SYMPHONY_WORKSPACE_ROOT", str(workspace_root))
+    monkeypatch.setenv("SYMPHONY_RECONCILER_STATE", str(tmp_path / "state"))
+    item = {
+        "issue_identifier": "JOV-4999",
+        "workspace_path": str(workspace),
+        "attempt": 1,
+        "error": "port_exit 78",
+    }
+
+    RECONCILER._reconcile_item(item, "retrying", False)
+    receipt_path = tmp_path / "state/receipts/JOV-4999.json"
+    parked = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert parked["controllerState"] == "blocked"
+    assert parked["retryPolicy"]["retryable"] is False
+
+    routing_path = workspace / ".symphony-routing.json"
+    routing_path.write_text(json.dumps(_routing_receipt()), encoding="utf-8")
+    routing_path.chmod(0o600)
+    RECONCILER._reconcile_item(item, "retrying", False)
+    admitted = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert admitted["generation"] != parked["generation"]
+    assert admitted["controllerState"] == "ready"
+    assert admitted["transition"] == "admitted_generation_ready"
+    assert admitted["nextAutomatedAction"] == "normal_model_run_admitted_generation"
+    assert admitted["nextRetryAt"] is None
+    assert admitted["attempt"] == 0
+
+    RECONCILER._reconcile_item(item, "retrying", False)
+    repeated = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert repeated["controllerState"] == "ready"
+    assert repeated["generation"] == admitted["generation"]
+    assert repeated["nextRetryAt"] is None
+    assert repeated["attempt"] == 0

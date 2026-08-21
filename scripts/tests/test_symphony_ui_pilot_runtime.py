@@ -592,7 +592,7 @@ def test_deterministic_launcher_failure_is_parked_without_retry(tmp_path: Path, 
     assert receipt_path.read_text() == before
 
 
-def test_reconciler_hands_repeated_failure_to_local_model_then_returns_to_normal_loop(
+def test_reconciler_never_stops_main_service_or_takes_alternate_ownership(
     tmp_path: Path,
 ) -> None:
     workspace_root = tmp_path / "workspaces"
@@ -607,24 +607,12 @@ def test_reconciler_hands_repeated_failure_to_local_model_then_returns_to_normal
     subprocess.run(["git", "remote", "add", "origin", "."], cwd=workspace, check=True)
     subprocess.run(["git", "update-ref", "refs/remotes/origin/main", "HEAD"], cwd=workspace, check=True)
 
-    fake_ollama = tmp_path / "ollama"
-    fake_ollama.write_text("#!/bin/sh\necho 'qwen3-coder:30b latest'\n")
-    fake_ollama.chmod(0o755)
-    fake_agent = tmp_path / "hermes"
-    fake_agent.write_text("#!/bin/sh\nprintf 'repaired by local model\\n' > repair.txt\necho repair-complete\n")
-    fake_agent.chmod(0o755)
-    fake_systemctl_state = tmp_path / "systemctl-state"
-    fake_systemctl_state.write_text("active\n")
+    systemctl_log = tmp_path / "systemctl.log"
     fake_systemctl = tmp_path / "systemctl"
     fake_systemctl.write_text(
         "#!/bin/sh\n"
-        f"state='{fake_systemctl_state}'\n"
-        "case \"$2\" in\n"
-        "  stop) echo inactive > \"$state\"; exit 0;;\n"
-        "  start) echo active > \"$state\"; exit 0;;\n"
-        "  is-active) grep -qx active \"$state\";;\n"
-        "  *) exit 2;;\n"
-        "esac\n"
+        f"printf '%s\\n' \"$*\" >> '{systemctl_log}'\n"
+        "exit 99\n"
     )
     fake_systemctl.chmod(0o755)
 
@@ -661,60 +649,24 @@ def test_reconciler_hands_repeated_failure_to_local_model_then_returns_to_normal
         SYMPHONY_STATE_URL=f"http://127.0.0.1:{server.server_port}/api/v1/state",
         SYMPHONY_WORKSPACE_ROOT=str(workspace_root),
         SYMPHONY_RECONCILER_STATE=str(tmp_path / "state"),
-        GEM_PR_DRAIN_QWEN=str(fake_ollama),
-        GEM_QWEN_AGENT_EXECUTABLE=str(fake_agent),
-        GEM_MODEL_ROUTER_STATE=str(tmp_path / "router-state.json"),
         SYMPHONY_SYSTEMCTL=str(fake_systemctl),
     )
     try:
         result = subprocess.run(["python3", str(RECONCILER)], env=env, capture_output=True, text=True, check=False)
-        first_receipt = json.loads((tmp_path / "state/receipts/JOV-2.json").read_text())
-        subprocess.run(["git", "add", "repair.txt"], cwd=workspace, check=True)
-        subprocess.run(["git", "commit", "-qm", "alternate handoff"], cwd=workspace, check=True)
-        changed_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=workspace, text=True).strip()
-        fake_agent.write_text("#!/bin/sh\nsleep 2\n")
-        env["SYMPHONY_ALTERNATE_TIMEOUT_SECONDS"] = "1"
-        timeout_result = subprocess.run(
-            ["python3", str(RECONCILER)], env=env, capture_output=True, text=True, check=False
-        )
-        timeout_receipt = json.loads((tmp_path / "state/receipts/JOV-2.json").read_text())
-        waiting_result = subprocess.run(
-            ["python3", str(RECONCILER)], env=env, capture_output=True, text=True, check=False
-        )
-        waiting_receipt = json.loads((tmp_path / "state/receipts/JOV-2.json").read_text())
+        receipt = json.loads((tmp_path / "state/receipts/JOV-2.json").read_text())
     finally:
         server.shutdown()
         thread.join()
     assert result.returncode == 0, result.stderr
-    assert (workspace / "repair.txt").read_text() == "repaired by local model\n"
-    assert first_receipt["alternateModel"]["status"] == "repair_handoff_ready"
-    assert first_receipt["transition"] == "returned_to_normal_loop"
-    assert first_receipt["nextAutomatedAction"] == "normal_model_update_test_ready_native_merge"
-    assert first_receipt["headBaseCurrent"]["dirty"] is True
-    assert len(first_receipt["runtimeRevision"]) == 64
-    assert first_receipt["runtimeCapabilities"] == [
-        "immutable-runtime-revision",
-        "isolated-repair",
-        "router-selection",
-        "workspace-observation",
-        "workspace-upgrade",
-    ]
-    assert first_receipt["headBaseCurrent"]["workspaceRevision"]["schema"] == "symphony-workspace-revision/v1"
-    assert first_receipt["authoritativeOwner"] == "symphony-reconciler"
-    assert first_receipt["attemptedRepairs"][1]["result"] == "acquired"
-    assert "transition=alternate_local_repair_started" in result.stdout
-    assert "transition=returned_to_normal_loop" in result.stdout
-    assert "transition=normal_owner_restored" in result.stdout
-    assert timeout_result.returncode == 0, timeout_result.stderr
-    assert timeout_receipt["generation"] != first_receipt["generation"]
-    assert timeout_receipt["headBaseCurrent"]["head"] == changed_head
-    assert timeout_receipt["alternateModel"]["status"] == "repair_timed_out"
-    assert timeout_receipt["nextAutomatedAction"] == "retry_alternate_local_model"
-    assert "transition=alternate_local_repair_deferred" in timeout_result.stdout
-    assert waiting_result.returncode == 0, waiting_result.stderr
-    assert waiting_receipt["nextRetryAt"] == timeout_receipt["nextRetryAt"]
-    assert waiting_receipt["nextAutomatedAction"] == "retry_scheduler_handoff_then_alternate_local_model"
-    assert fake_systemctl_state.read_text() == "active\n"
+    assert not systemctl_log.exists()
+    assert not (workspace / "repair.txt").exists()
+    assert receipt["controllerState"] == "blocked"
+    assert receipt["retryPolicy"] == {"maxAttempts": 3, "retryable": False}
+    assert receipt["nextRetryAt"] is None
+    assert receipt["alternateModel"]["status"] == "not_due"
+    assert receipt["authoritativeOwner"] == "symphony-ui-pilot"
+    assert "alternate_owner" not in result.stdout
+    assert "normal_owner_restored" not in result.stdout
 
 
 def test_installer_backs_up_and_detects_drift(tmp_path: Path) -> None:
