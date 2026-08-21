@@ -9,6 +9,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - [internal] **Staged production builds now receive Google OAuth credentials (JOV-4361):** Doppler `--only-secrets` injects `AUTH_GOOGLE_CLIENT_ID` and `AUTH_GOOGLE_CLIENT_SECRET` into the production deployment build and passes them as runtime `--env`, matching staging. `--no-fallback` and the OAuth/artifact guards stay in place.
 
+- [internal] **Symphony pre-lease context retrieval uses Gem's bounded GBrain adapter (JOV-5268):** the intake controller binds the explicit deployed JSON adapter, reads org-chart and job-ledger pages in parallel, searches short issue keywords before a hard-budgeted semantic fallback, and preserves clean no-results versus total command failure as distinct fail-closed blockers.
+
 - [internal] **Gem Symphony restores the stopped-work reconciler and parks terminal launcher exit 78 (JOV-5253):** the existing installer materializes the versioned reconciler runtime and enables only its timer, activation fails closed unless `--check`, `runtime-preflight`, timer state, and source-to-runtime hashes match, and a structured or `port_exit 78` failure stays blocked with `retryable=false` and no retry deadline. Exit 75 stays typed capacity backoff.
 
 - [internal] **Sign-out stays available when Redis is missing (JOV-5260):** Better Auth secondary-storage delete no longer fails closed just because the Redis client is unconfigured or the quota circuit shed it. Reachable Redis deletes still retry and fail closed.

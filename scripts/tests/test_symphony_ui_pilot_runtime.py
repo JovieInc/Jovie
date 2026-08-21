@@ -151,6 +151,12 @@ def test_workflow_uses_event_wake_with_slow_poll_backstop() -> None:
     assert 'any(.teams[]; .status == "admitted"' in intake
 
 
+def test_intake_workflow_pins_the_gem_gbrain_adapter_contract() -> None:
+    intake = INTAKE_WORKFLOW.read_text()
+    assert "JOVIE_GBRAIN_BIN: /home/timwhite/.local/bin/gbrain" in intake
+    assert "JOVIE_GBRAIN_DIALECT: adapter" in intake
+
+
 def test_activation_requires_exact_production_revision_and_attestation() -> None:
     installer = FLEET_INSTALLER.read_text()
     assert "GEM_CONTROLLER_EXPECTED_REVISION" in installer
