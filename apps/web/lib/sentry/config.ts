@@ -54,8 +54,10 @@
 
 import type * as Sentry from '@sentry/nextjs';
 import {
+  isNonActionableSpotifyReleaseCreditBoundEvent,
   isNonActionableUpstashErrorBagEvent,
   isOpaqueUpstashErrorJsonBag,
+  isSpotifyReleaseCreditBoundCapture,
   isUpstashQuotaSentryEvent,
   UPSTASH_QUOTA_IGNORE_ERRORS,
 } from '@/lib/sentry/non-actionable-issues';
@@ -433,6 +435,13 @@ export function scrubPii(
   // originalException while the event value is a generic object capture
   // (JOV-5186 / JOV-5187 / JOV-5209).
   if (isOpaqueUpstashErrorJsonBag(hint?.originalException)) {
+    return null;
+  }
+
+  if (
+    isSpotifyReleaseCreditBoundCapture(hint?.originalException) ||
+    isNonActionableSpotifyReleaseCreditBoundEvent(event)
+  ) {
     return null;
   }
 

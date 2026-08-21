@@ -588,18 +588,18 @@ export async function reconcileCreditedArtistProfiles(
     );
   }
 
+  // Expected per-run cap. Remaining rows retry on the next import/backfill
+  // (`result.deferred`). Passing this receipt as captureWarning's error
+  // argument filed Linear as `Error: {"source":"spotify_release_credit",...}`
+  // (JOV-5263).
   if (candidateSelection.deferred) {
-    await captureWarning(
-      'Credited artist profile reconciliation was bounded',
-      undefined,
-      {
-        source: 'spotify_release_credit',
-        creatorProfileId,
-        processed: plan.length,
-        limit: MAX_CREDITED_ARTISTS_PER_RECONCILIATION,
-        retry: 'next_spotify_import_or_backfill',
-      }
-    );
+    logger.info('Credited artist profile reconciliation was bounded', {
+      source: 'spotify_release_credit',
+      creatorProfileId,
+      processed: plan.length,
+      limit: MAX_CREDITED_ARTISTS_PER_RECONCILIATION,
+      retry: 'next_spotify_import_or_backfill',
+    });
   }
 
   // Refresh both sides of the new relationship: a previously cached owner

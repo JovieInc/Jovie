@@ -34,6 +34,19 @@ describe('unwrapCapturedError', () => {
       )
     ).toEqual({ clerkUserId: 'user_1', route: '/app' });
   });
+
+  it('promotes context-only bags so they are not Error titles (JOV-5263)', () => {
+    const bag = {
+      creatorProfileId: 'c07d767c-1784-4bb7-af6b-2fdfb8a88eb9',
+      limit: 24,
+      processed: 24,
+      retry: 'next_spotify_import_or_backfill',
+      source: 'spotify_release_credit',
+    };
+
+    expect(unwrapCapturedError(bag)).toBeUndefined();
+    expect(unwrapCapturedContext(bag)).toEqual(bag);
+  });
 });
 
 describe('errorToString', () => {

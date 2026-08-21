@@ -53,6 +53,63 @@ export const UPSTASH_QUOTA_IGNORE_ERRORS: ReadonlyArray<RegExp> = [
   ...UPSTASH_ERROR_JSON_BAG_PATTERNS,
 ];
 
+/**
+ * Expected per-run collaborator-profile cap. `captureWarning(msg, receipt)`
+ * JSON-stringified the receipt into Linear as JOV-5263.
+ */
+const SPOTIFY_RELEASE_CREDIT_BOUND_PATTERN =
+  /"source"\s*:\s*"spotify_release_credit"[\s\S]*"retry"\s*:\s*"next_spotify_import_or_backfill"/;
+
+export const SPOTIFY_RELEASE_CREDIT_BOUND_IGNORE_ERRORS: ReadonlyArray<RegExp> =
+  [SPOTIFY_RELEASE_CREDIT_BOUND_PATTERN];
+
+function isSpotifyReleaseCreditBoundBag(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return (
+    record.source === 'spotify_release_credit' &&
+    record.retry === 'next_spotify_import_or_backfill'
+  );
+}
+
+/**
+ * True when a capture is the expected credit-reconciliation bound receipt,
+ * not an identity conflict or cache-invalidation failure.
+ */
+export function isSpotifyReleaseCreditBoundCapture(
+  value: unknown,
+  context?: Record<string, unknown> | null
+): boolean {
+  if (isSpotifyReleaseCreditBoundBag(context)) return true;
+  if (isSpotifyReleaseCreditBoundBag(value)) return true;
+  if (typeof value === 'string') {
+    return SPOTIFY_RELEASE_CREDIT_BOUND_PATTERN.test(value);
+  }
+  if (value instanceof Error) {
+    return SPOTIFY_RELEASE_CREDIT_BOUND_PATTERN.test(value.message);
+  }
+  if (value && typeof value === 'object') {
+    try {
+      return SPOTIFY_RELEASE_CREDIT_BOUND_PATTERN.test(JSON.stringify(value));
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+/**
+ * True when a Sentry/Linear title is the JOV-5263 bounded-credit JSON bag.
+ */
+export function isNonActionableSpotifyReleaseCreditBoundIssue(
+  issue: SentryIssueSummary
+): boolean {
+  return (
+    SPOTIFY_RELEASE_CREDIT_BOUND_PATTERN.test(issue.title ?? '') ||
+    SPOTIFY_RELEASE_CREDIT_BOUND_PATTERN.test(issue.culprit ?? '')
+  );
+}
+
 /** Transaction names excluded from performance tracing (0% sample rate). */
 export const TRANSIENT_INFRA_HTTP_TRANSACTIONS = [
   'POST /pipeline', // Upstash Redis REST pipeline
@@ -149,6 +206,38 @@ export interface SentryExceptionLike {
   } | null;
 }
 
+function collectSentryEventCaptureValues(
+  event: SentryExceptionLike
+): Array<unknown> {
+  const values: Array<unknown> = [
+    event.title,
+    event.message,
+    event.logentry?.message,
+    event.logentry?.formatted,
+    ...Object.values(event.extra ?? {}),
+  ];
+
+  for (const exception of event.exception?.values ?? []) {
+    values.push(exception?.value);
+    if (exception?.type && exception.value) {
+      values.push(`${exception.type}: ${exception.value}`);
+    }
+  }
+
+  return values;
+}
+
+/**
+ * True when a Sentry event is the JOV-5263 bounded-credit JSON bag.
+ */
+export function isNonActionableSpotifyReleaseCreditBoundEvent(
+  event: SentryExceptionLike
+): boolean {
+  return collectSentryEventCaptureValues(event).some(value =>
+    isSpotifyReleaseCreditBoundCapture(value)
+  );
+}
+
 /**
  * Returns true when a Sentry issue is the JOV-5183 / JOV-5185 / JOV-5186 /
  * JOV-5187 JSON-bag title, not a real Upstash command failure.
@@ -171,22 +260,9 @@ export function isNonActionableUpstashErrorBag(
 export function isNonActionableUpstashErrorBagEvent(
   event: SentryExceptionLike
 ): boolean {
-  const values: Array<unknown> = [
-    event.title,
-    event.message,
-    event.logentry?.message,
-    event.logentry?.formatted,
-    ...Object.values(event.extra ?? {}),
-  ];
-
-  for (const exception of event.exception?.values ?? []) {
-    values.push(exception?.value);
-    if (exception?.type && exception.value) {
-      values.push(`${exception.type}: ${exception.value}`);
-    }
-  }
-
-  return values.some(value => isOpaqueUpstashErrorJsonBag(value));
+  return collectSentryEventCaptureValues(event).some(value =>
+    isOpaqueUpstashErrorJsonBag(value)
+  );
 }
 
 /**

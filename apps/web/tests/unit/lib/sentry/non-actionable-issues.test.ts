@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  isNonActionableSpotifyReleaseCreditBoundEvent,
+  isNonActionableSpotifyReleaseCreditBoundIssue,
   isNonActionableUpstashErrorBag,
   isNonActionableUpstashErrorBagEvent,
   isNonActionableUpstashIssue,
   isOpaqueUpstashErrorJsonBag,
+  isSpotifyReleaseCreditBoundCapture,
   isTransientInfraHttpIssue,
   isTransientInfraHttpTransaction,
   isUpstashQuotaNoise,
   isUpstashQuotaSentryEvent,
+  SPOTIFY_RELEASE_CREDIT_BOUND_IGNORE_ERRORS,
   UPSTASH_ERROR_JSON_BAG,
 } from '@/lib/sentry/non-actionable-issues';
 
@@ -363,6 +367,52 @@ describe('non-actionable Sentry issues', () => {
         isNonActionableUpstashIssue({
           title:
             'UpstashError: WRONGPASS invalid or missing auth token. See https://docs.upstash.com/redis/troubleshooting/http_unauthorized for details.',
+        })
+      ).toBe(false);
+    });
+  });
+
+  describe('isSpotifyReleaseCreditBoundCapture (JOV-5263)', () => {
+    const jov5263Title =
+      'Error: {"source":"spotify_release_credit","creatorProfileId":"c07d767c-1784-4bb7-af6b-2fdfb8a88eb9","processed":24,"limit":24,"retry":"next_spotify_import_or_backfill"}';
+
+    it('matches the Linear JSON title', () => {
+      expect(
+        isNonActionableSpotifyReleaseCreditBoundIssue({ title: jov5263Title })
+      ).toBe(true);
+      expect(
+        SPOTIFY_RELEASE_CREDIT_BOUND_IGNORE_ERRORS.some(pattern =>
+          pattern.test(jov5263Title)
+        )
+      ).toBe(true);
+    });
+
+    it('matches a context-only capture bag', () => {
+      expect(
+        isSpotifyReleaseCreditBoundCapture({
+          creatorProfileId: 'c07d767c-1784-4bb7-af6b-2fdfb8a88eb9',
+          limit: 24,
+          processed: 24,
+          retry: 'next_spotify_import_or_backfill',
+          source: 'spotify_release_credit',
+        })
+      ).toBe(true);
+    });
+
+    it('does not match identity-conflict receipts', () => {
+      expect(
+        isSpotifyReleaseCreditBoundCapture({
+          conflicted: 1,
+          creatorProfileId: 'owner-profile',
+          source: 'spotify_release_credit',
+        })
+      ).toBe(false);
+      expect(
+        isNonActionableSpotifyReleaseCreditBoundEvent({
+          extra: {
+            source: 'spotify_release_credit',
+            conflicted: 1,
+          },
         })
       ).toBe(false);
     });

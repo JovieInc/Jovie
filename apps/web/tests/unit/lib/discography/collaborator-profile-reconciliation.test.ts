@@ -533,13 +533,15 @@ describe('credited artist profile reconciliation', () => {
       deferred: true,
       reused: 24,
     });
-    expect(hoisted.captureWarning).toHaveBeenCalledWith(
+    expect(hoisted.captureWarning).not.toHaveBeenCalled();
+    expect(hoisted.loggerInfo).toHaveBeenCalledWith(
       'Credited artist profile reconciliation was bounded',
-      undefined,
       expect.objectContaining({
         creatorProfileId: 'owner-profile',
         limit: 24,
         processed: 24,
+        retry: 'next_spotify_import_or_backfill',
+        source: 'spotify_release_credit',
       })
     );
   });

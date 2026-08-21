@@ -68,11 +68,25 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * `captureWarning(msg, { source, creatorProfileId, ... })` used to become
+ * Linear title `Error: {"source":"..."}` (JOV-5263). A plain object with
+ * neither `error` nor `message` is context, not an exception.
+ */
+function isContextOnlyCaptureBag(
+  value: unknown
+): value is Record<string, unknown> {
+  return isPlainObject(value) && !('error' in value) && !('message' in value);
+}
+
+/**
  * Callers often pass `{ error }` as captureError's second argument.
  * Unwrap that so Sentry captures the inner Error instead of
  * `Error: {"error":{"name":"UpstashError"}}`.
  */
 export function unwrapCapturedError(error: unknown): unknown {
+  if (isContextOnlyCaptureBag(error)) {
+    return undefined;
+  }
   if (!isPlainObject(error) || !('error' in error)) {
     return error;
   }
@@ -87,6 +101,10 @@ export function unwrapCapturedContext(
   error: unknown,
   context?: Record<string, unknown>
 ): Record<string, unknown> | undefined {
+  if (isContextOnlyCaptureBag(error)) {
+    const merged = { ...error, ...(context ?? {}) };
+    return Object.keys(merged).length > 0 ? merged : undefined;
+  }
   if (!isPlainObject(error) || !('error' in error)) {
     return context;
   }
