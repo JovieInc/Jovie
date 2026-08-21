@@ -32,6 +32,7 @@ import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { APP_ROUTES } from '@/constants/routes';
+import { useFounderDoor } from '@/contexts/FounderDoorContext';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { RECOVERY_COPY } from '@/features/feedback/recovery-contract';
@@ -337,6 +338,7 @@ export function ChatPageClient({
   const notifications = useNotifications();
   const [initialQueryHandled, setInitialQueryHandled] = useState(false);
   const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
+  const { chatMode } = useFounderDoor();
   const [autoRetryCount, setAutoRetryCount] = useState(0);
   const [currentThreadTitle, setCurrentThreadTitle] = useState<string | null>(
     initialConversationTitle
@@ -976,6 +978,7 @@ export function ChatPageClient({
             isFirstSession={isFirstSession || dashboardIsFirstSession || false}
             isProfileComplete={profileCompletion.percentage >= 100}
             actionCards={chatActionCards}
+            chatMode={chatMode}
             ambientOwnedByShell
           />
         </ChatWorkspaceSurface>

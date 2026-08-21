@@ -17,6 +17,7 @@ import {
   PanelRight,
   Play,
   Radio,
+  Repeat2,
   Search,
   Settings,
   Sun,
@@ -33,6 +34,7 @@ export const GLYPH_SHIFT = String.fromCodePoint(0x21e7);
 export const GLYPH_ARROW_RIGHT = String.fromCodePoint(0x2192);
 export const WORKSPACE_SWITCH_KEY = 'w';
 export const WORKSPACE_SWITCH_SHORTCUT_KEY = 'Alt+Shift+w';
+export const FOUNDER_DOOR_SHORTCUT_KEY = 'Meta+o';
 
 /**
  * Shipping gate — every shortcut must declare its status before merge.
@@ -98,6 +100,21 @@ export const WORKSPACE_SWITCH_SHORTCUT: KeyboardShortcut = {
   description: 'Switch the active workspace',
   category: 'actions',
   shortcutKey: WORKSPACE_SWITCH_SHORTCUT_KEY,
+  decision: { status: 'required', binding: 'useGlobalShortcutActions' },
+};
+
+/**
+ * Admin-only founder-door binding. Stays outside the public shortcut catalog
+ * so customer help surfaces never reveal Ovie.
+ */
+export const FOUNDER_DOOR_SHORTCUT: KeyboardShortcut = {
+  id: 'toggle-founder-door',
+  label: 'Toggle Ovie / Jovie',
+  keys: `${GLYPH_CMD} O`,
+  description: 'Switch the founder door between Ovie and Jovie',
+  category: 'actions',
+  icon: Repeat2,
+  shortcutKey: FOUNDER_DOOR_SHORTCUT_KEY,
   decision: { status: 'required', binding: 'useGlobalShortcutActions' },
 };
 
@@ -374,6 +391,13 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     decision: { status: 'required', binding: 'ContextMenuOverlay' },
   },
 ];
+
+export function shortcutsForHelpSheet(options: {
+  readonly canUseFounderDoor: boolean;
+}): readonly KeyboardShortcut[] {
+  if (!options.canUseFounderDoor) return KEYBOARD_SHORTCUTS;
+  return [...KEYBOARD_SHORTCUTS, FOUNDER_DOOR_SHORTCUT];
+}
 
 /**
  * Map from nav item ID to shortcut for quick lookup
