@@ -67,6 +67,7 @@ export const tasks = pgTable(
       { onDelete: 'set null' }
     ),
     metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+    mutationVersion: integer('mutation_version').notNull().default(1),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },

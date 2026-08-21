@@ -172,6 +172,7 @@ function mapTaskRow(
     position: row.position,
     sourceTemplateId: row.sourceTemplateId ?? null,
     metadata: row.metadata ?? null,
+    mutationVersion: row.mutationVersion ?? 1,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -484,6 +485,7 @@ export async function getTasks(filters?: TaskFilters): Promise<TaskListResult> {
       position: tasks.position,
       sourceTemplateId: tasks.sourceTemplateId,
       metadata: tasks.metadata,
+      mutationVersion: tasks.mutationVersion,
       createdAt: tasks.createdAt,
       updatedAt: tasks.updatedAt,
     })
@@ -547,6 +549,7 @@ export async function getTaskBoard(
           position: tasks.position,
           sourceTemplateId: tasks.sourceTemplateId,
           metadata: tasks.metadata,
+          mutationVersion: tasks.mutationVersion,
           createdAt: tasks.createdAt,
           updatedAt: tasks.updatedAt,
         })
@@ -602,6 +605,7 @@ export async function getTask(taskId: string): Promise<TaskView> {
       position: tasks.position,
       sourceTemplateId: tasks.sourceTemplateId,
       metadata: tasks.metadata,
+      mutationVersion: tasks.mutationVersion,
       createdAt: tasks.createdAt,
       updatedAt: tasks.updatedAt,
     })
@@ -636,20 +640,31 @@ export async function updateTask(
   await requireTasksWorkspaceAccess();
   const profileId = await requireProfileId();
   const existingTask = await getOwnedTaskOrThrow(profileId, taskId);
+  const expectedMutationVersion = data.expectedMutationVersion;
 
   await assertReleaseAccess(profileId, data.releaseId);
 
   const [updated] = await db
     .update(tasks)
-    .set(buildTaskUpdateFieldPatch(data, existingTask))
+    .set({
+      ...buildTaskUpdateFieldPatch(data, existingTask),
+      mutationVersion: drizzleSql`${tasks.mutationVersion} + 1`,
+    })
     .where(
       and(
         eq(tasks.id, taskId),
         eq(tasks.creatorProfileId, profileId),
-        isNull(tasks.deletedAt)
+        isNull(tasks.deletedAt),
+        expectedMutationVersion === undefined
+          ? undefined
+          : eq(tasks.mutationVersion, expectedMutationVersion)
       )
     )
     .returning();
+
+  if (!updated) {
+    throw new Error('Task changed in another session');
+  }
 
   revalidatePath(APP_ROUTES.TASKS);
   revalidatePath(APP_ROUTES.RELEASES);
