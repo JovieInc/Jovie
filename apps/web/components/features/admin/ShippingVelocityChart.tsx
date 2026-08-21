@@ -8,6 +8,9 @@ import type {
   DailyBucket,
   ShippingVelocityResponse,
 } from '@/app/api/admin/hud/shipping-velocity/route';
+import { HudObservationStatus } from '@/components/features/admin/hud/HudObservationStatus';
+import type { HudObservationState } from '@/lib/hud/observation';
+import { observationFromShippingVelocityBuckets } from '@/lib/hud/shipping-velocity-observation';
 
 export type { DailyBucket };
 
@@ -294,6 +297,11 @@ export function ShippingVelocityChart({
   const [cachedAt, setCachedAt] = useState<string | undefined>(initialCachedAt);
   const [isLoading, setIsLoading] = useState(!initialData);
   const [error, setError] = useState<string | null>(null);
+  const [observation, setObservation] = useState<HudObservationState>(
+    initialData
+      ? observationFromShippingVelocityBuckets(initialData)
+      : 'loading'
+  );
   const [spotlight, setSpotlight] = useState<string | null>(null);
   const [showClosed, setShowClosed] = useState(false);
   const hasObservedRef = useRef(Boolean(initialData));
@@ -313,11 +321,16 @@ export function ShippingVelocityChart({
       const result = (await response.json()) as ShippingVelocityResponse;
       setData(result.data);
       setCachedAt(result.cachedAt);
+      setObservation(
+        result.observation ??
+          observationFromShippingVelocityBuckets(result.data)
+      );
       hasObservedRef.current = true;
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Could not load shipping data'
       );
+      setObservation('unavailable');
     } finally {
       setIsLoading(false);
     }
@@ -342,10 +355,14 @@ export function ShippingVelocityChart({
     setSpotlight(null);
   }
 
-  const isEmpty =
-    !isLoading &&
-    !error &&
-    data.every(d => d.merged === 0 && d.opened === 0 && d.closed === 0);
+  const handleRetry = () => {
+    fetchData(range).catch(() => {});
+  };
+  const showChart =
+    observation !== 'not_configured' &&
+    observation !== 'loading' &&
+    !(observation === 'unavailable' && data.length === 0) &&
+    observation !== 'empty';
 
   return (
     <div className='p-4'>
@@ -423,51 +440,45 @@ export function ShippingVelocityChart({
       </div>
 
       {/* Chart area */}
-      {isLoading ? (
+      {isLoading && data.length === 0 ? (
         <ChartSkeleton />
-      ) : error && data.length === 0 ? (
-        <div className='flex h-50 flex-col items-center justify-center gap-2'>
-          <p className='text-app text-secondary-token'>{error}</p>
-          {cachedAt ? (
-            <p className='text-2xs text-tertiary-token'>
-              Last updated {formatCachedAgo(cachedAt)}
-            </p>
-          ) : null}
-          <Button
-            type='button'
-            variant='secondary'
-            size='sm'
-            onClick={() => {
-              fetchData(range).catch(() => {});
-            }}
-            className='mt-1 h-auto rounded-lg border border-subtle bg-surface-0 px-3 py-1.5 text-2xs font-medium text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
-          >
-            Retry
-          </Button>
+      ) : observation === 'not_configured' ? (
+        <div className='flex h-50 items-center'>
+          <HudObservationStatus
+            state='not_configured'
+            message={error ?? 'GitHub is not configured for shipping velocity.'}
+            testId='hud-shipping-velocity-observation'
+          />
         </div>
-      ) : isEmpty && !error ? (
-        <div className='flex h-50 items-center justify-center'>
-          <p className='text-app text-tertiary-token'>No PRs in this period</p>
+      ) : observation === 'empty' ? (
+        <div className='flex h-50 items-center'>
+          <HudObservationStatus
+            state='empty'
+            message='No PRs in this period. Zero is shown only after a successful observation.'
+            freshnessLabel={cachedAt ? formatCachedAgo(cachedAt) : null}
+            testId='hud-shipping-velocity-observation'
+          />
         </div>
-      ) : (
+      ) : observation === 'unavailable' && data.length === 0 ? (
+        <div className='flex h-50 items-center'>
+          <HudObservationStatus
+            state='unavailable'
+            message={error ?? 'Shipping velocity is unavailable.'}
+            freshnessLabel={cachedAt ? formatCachedAgo(cachedAt) : null}
+            onRetry={handleRetry}
+            testId='hud-shipping-velocity-observation'
+          />
+        </div>
+      ) : showChart ? (
         <>
-          {error ? (
-            <div className='mb-2 flex items-center justify-between gap-2'>
-              <p className='text-app text-secondary-token'>
-                Showing last known velocity. {error}
-              </p>
-              <Button
-                type='button'
-                variant='secondary'
-                size='sm'
-                onClick={() => {
-                  fetchData(range).catch(() => {});
-                }}
-                className='h-auto rounded-lg border border-subtle bg-surface-0 px-3 py-1.5 text-2xs font-medium text-secondary-token'
-              >
-                Retry
-              </Button>
-            </div>
+          {observation === 'unavailable' ? (
+            <HudObservationStatus
+              state='unavailable'
+              message={`Showing last known velocity. ${error ?? 'Refresh failed.'}`}
+              freshnessLabel={cachedAt ? formatCachedAgo(cachedAt) : null}
+              onRetry={handleRetry}
+              testId='hud-shipping-velocity-observation'
+            />
           ) : null}
           <LazyVelocityChart
             data={data}
@@ -477,6 +488,8 @@ export function ShippingVelocityChart({
             showClosed={showClosed}
           />
         </>
+      ) : (
+        <ChartSkeleton />
       )}
 
       {/* Footer */}

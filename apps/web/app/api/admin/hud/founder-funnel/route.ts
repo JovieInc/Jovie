@@ -49,6 +49,12 @@ export async function GET(request: Request): Promise<Response> {
     if (authResponse) return authResponse;
 
     const funnel = await getFounderFunnelData(parseRange(request));
+    if (funnel.errors.length > 0) {
+      return NextResponse.json(
+        { error: funnel.errors[0] ?? 'Funnel query failed' },
+        { status: 503, headers: NO_STORE_HEADERS }
+      );
+    }
     return NextResponse.json(funnel, {
       status: 200,
       headers: NO_STORE_HEADERS,
