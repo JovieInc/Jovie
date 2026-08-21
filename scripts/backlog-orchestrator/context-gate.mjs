@@ -136,7 +136,9 @@ export async function collectContextEvidence({
   for (const query of buildContextQueries(issue)) {
     let pages;
     try {
-      pages = await gbrain.searchPages(query, MAX_CONTEXT_PAGES_PER_QUERY);
+      pages = await gbrain.searchPages(query, MAX_CONTEXT_PAGES_PER_QUERY, {
+        identifier: issue?.identifier,
+      });
     } catch {
       return { evidence: null, reason: CONTEXT_BLOCKER.GBRAIN_UNAVAILABLE };
     }

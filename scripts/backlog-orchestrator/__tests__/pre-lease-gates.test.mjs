@@ -150,6 +150,40 @@ describe('symphony-context/v1', () => {
     );
   });
 
+  it('keeps gbrain-unavailable when targeted lookup paths all error after a healthy org-chart read', async () => {
+    const candidate = issue();
+    const result = await contextGate.approveContext({
+      issue: candidate,
+      gbrain: {
+        ...fakeGbrain(),
+        async searchPages() {
+          throw new Error('gbrain unreachable');
+        },
+      },
+      client: fakeLinearClient(candidate),
+      now: NOW,
+    });
+    assert.equal(result.status, 'rejected');
+    assert.equal(result.reason, 'gbrain-unavailable');
+  });
+
+  it('keeps context-no-results for a healthy targeted miss', async () => {
+    const candidate = issue();
+    const result = await contextGate.approveContext({
+      issue: candidate,
+      gbrain: {
+        ...fakeGbrain(),
+        async searchPages() {
+          return [];
+        },
+      },
+      client: fakeLinearClient(candidate),
+      now: NOW,
+    });
+    assert.equal(result.status, 'rejected');
+    assert.equal(result.reason, 'context-no-results');
+  });
+
   it('blocks the lease when the org chart declares another implementation owner', async () => {
     const candidate = issue();
     const result = await contextGate.approveContext({

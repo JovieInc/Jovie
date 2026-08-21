@@ -44,6 +44,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- [internal] **Symphony context lookup is keyword-first again (JOV-5268):** targeted GBrain page binding uses bounded issue-term `gbrain search` before any hybrid `query`, so a statement-timeout on the long prior-decisions command cannot erase a keyword hit or deny `symphony-context/v1`.
 - **iPhone and Mac sign-in return to the app instead of the website:** after browser login, iOS and macOS bounce through an allowlisted return page and reopen Jovie. Signed-in native sessions no longer dump into the web dashboard.
 - **iPhone sign-in can open the browser when SwiftUI has no key window (JOV-5198):** Continue in Browser waits for a foreground-active window, presents from a visible or scene-backed window when needed, and a failed session start is no longer reported as `invalidAuthURL`.
 - [internal] **Ovie eval review persists a durable row and records `judge:absent` as a verdict:** enqueue reports success only after `ovie_operating_kv` write, missing rubric judges are not scored as pass, word count is a `word-count:N` signal unless a verbosity budget is set, and Slack feedback redacts emails in the message body.
