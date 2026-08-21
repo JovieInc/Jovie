@@ -254,9 +254,12 @@ jobs:
           verify_head || skip_stale_review
           gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" \
             | jq -r '(add // []) | .[].filename' > "$RUNNER_TEMP/changed-files.txt"
-          gh api \
+          if ! gh api \
             -H 'Accept: application/vnd.github.v3.diff' \
-            "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" > "$RUNNER_TEMP/pr.diff"
+            "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" > "$RUNNER_TEMP/pr.diff"; then
+            printf 'review=false\nreview_status=unavailable\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           verify_head || skip_stale_review
           node --input-type=module - <<'NODE'
           import { readFile, writeFile } from 'node:fs/promises';

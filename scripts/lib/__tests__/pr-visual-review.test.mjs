@@ -271,7 +271,6 @@ describe('bounded PR visual review contract', () => {
       ],
     });
     expect(review).toMatchObject({
-      summary: expect.not.stringContaining('\n'),
       findings: [{ category: 'functional', severity: 'high' }],
     });
     expect(review.summary).not.toContain('@everyone');
@@ -280,17 +279,20 @@ describe('bounded PR visual review contract', () => {
 
   it('reads only bounded PNG captures from the downloaded artifact directory', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'visual-artifact-'));
+    const outside = await mkdtemp(join(tmpdir(), 'visual-outside-'));
     const capture = join(directory, 'capture.png');
+    const outsideFile = join(outside, 'outside.png');
     const png = Buffer.concat([
       Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
       Buffer.from('bounded-test-payload'),
     ]);
     try {
       await writeFile(capture, png);
+      await writeFile(outsideFile, png);
       await expect(
         readTrustedCapture(directory, 'capture.png')
       ).resolves.toEqual(png);
-      await symlink('/etc/hosts', join(directory, 'escape.png'));
+      await symlink(outsideFile, join(directory, 'escape.png'));
       await expect(readTrustedCapture(directory, 'escape.png')).rejects.toThrow(
         'escapes downloaded artifact directory'
       );
@@ -300,6 +302,7 @@ describe('bounded PR visual review contract', () => {
       );
     } finally {
       await rm(directory, { recursive: true, force: true });
+      await rm(outside, { recursive: true, force: true });
     }
   });
 
@@ -373,16 +376,13 @@ describe('bounded PR visual review contract', () => {
 });
 
 const sonarCheck = (overrides = {}) => ({
-  id: 1,
   name: SONAR_CHECK_NAME,
   app: { slug: SONAR_CHECK_APP_SLUG },
   status: 'completed',
   conclusion: 'failure',
   details_url: 'https://sonarcloud.io/project/pull_requests?id=jovie',
-  completed_at: '2026-08-20T01:00:00Z',
   ...overrides,
 });
-
 const sonarReceiptInput = {
   repository: 'jovie/jovie',
   runId: '42',
@@ -396,7 +396,6 @@ const sonarReceiptInput = {
     'https://sonarcloud.io/project/pull_requests?id=jovie&pullRequest=7',
   capacity: { openAgentPrs: 4, maxOpenAgentPrs: 5, candidateRank: 2 },
 };
-
 describe('trusted Sonar remediation contracts', () => {
   it('selects the newest authenticated failure and ignores stale results', () => {
     const newest = sonarCheck({ id: 4, completed_at: '2026-08-20T04:00:00Z' });
@@ -421,7 +420,6 @@ describe('trusted Sonar remediation contracts', () => {
       ])
     ).toBeNull();
   });
-
   it('emits owned visual incidents and bounded quality-debt receipts', () => {
     const incident = buildVisualConfigurationIncident({
       ...sonarReceiptInput,

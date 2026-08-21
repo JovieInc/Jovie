@@ -464,7 +464,8 @@ async function main() {
       return;
     }
     let manifest;
-    let screenshots;
+    let screenshots,
+      screenshotPaths = [];
     try {
       manifest = JSON.parse(
         await readFile(join(artifactDir, 'manifest.json'), 'utf8')
@@ -486,6 +487,7 @@ async function main() {
         if (capturedBytes > MAX_TOTAL_CAPTURE_BYTES)
           throw new Error('capture evidence exceeds the trusted total bound');
         screenshots.push(data.toString('base64'));
+        screenshotPaths.push(capture.path);
       }
     } catch (error) {
       await writeFile(
@@ -505,9 +507,7 @@ async function main() {
     const prompt = buildReviewPrompt({
       diff: input.diff,
       changedFiles: input.changedFiles,
-      screenshots: manifest.captures
-        .filter(c => c.status === 'captured')
-        .map(c => c.path),
+      screenshots: screenshotPaths,
     });
     try {
       const { review, provider } = await reviewWithConfiguredBackends({
