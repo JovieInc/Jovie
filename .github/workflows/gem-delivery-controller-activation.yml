@@ -65,6 +65,10 @@ jobs:
           set -euo pipefail
           bash scripts/hermes/install-gem-fleet-controller.sh
           bash scripts/hermes/install-gem-pr-rehabilitation.sh
+          main_pid="$(systemctl --user show symphony-ui-pilot.service --property=MainPID --value)"
+          bash scripts/hermes/install-symphony-ui-pilot.sh
+          after_pid="$(systemctl --user show symphony-ui-pilot.service --property=MainPID --value)"
+          test "$main_pid" = "$after_pid"
       - name: Verify runtime identity after reload
         env:
           GEM_WORKSPACE: /home/timwhite/gem-workspace
@@ -89,3 +93,15 @@ jobs:
             .lastCycleResult == "success" and
             ([.artifacts[].matches] | all)
           ' "$GEM_WORKSPACE/state/gem-pr-rehabilitation-attestation.json" >/dev/null
+          bash scripts/hermes/install-symphony-ui-pilot.sh --check
+          SYMPHONY_RUNTIME_SOURCE_ROOT="$PWD/scripts/hermes" \
+            SYMPHONY_MODEL_ROUTER="$HOME/.local/lib/symphony-reconciler/model-router.py" \
+            SYMPHONY_MODEL_REGISTRY="$HOME/.local/lib/symphony-reconciler/model-registry.json" \
+            SYMPHONY_RUNTIME_CAPABILITY_MANIFEST="$HOME/.local/lib/symphony-reconciler/symphony-reconciler-capabilities.json" \
+            SYMPHONY_RUNTIME_RECEIPT="$HOME/.local/lib/symphony-reconciler/runtime-receipt.json" \
+            python3 "$HOME/.local/bin/symphony-reconciler" runtime-preflight \
+            | jq -e '.status == "ready"' >/dev/null
+          systemctl --user is-enabled --quiet symphony-reconciler.timer
+          systemctl --user is-active --quiet symphony-reconciler.timer
+          test "$(systemctl --user show symphony-reconciler.timer --property=FragmentPath --value)" \
+            = "$HOME/.config/systemd/user/symphony-reconciler.timer"
