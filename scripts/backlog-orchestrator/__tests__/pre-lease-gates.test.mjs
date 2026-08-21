@@ -4,7 +4,11 @@ import { describe, it } from 'node:test';
 import * as admissionGate from '../admission-gate.mjs';
 import * as admitter from '../admitter.mjs';
 import * as contextGate from '../context-gate.mjs';
-import { parsePage, parseSearchSlugs } from '../gbrain-client.mjs';
+import {
+  createGbrainClient,
+  parsePage,
+  parseSearchSlugs,
+} from '../gbrain-client.mjs';
 import * as planGate from '../plan-gate.mjs';
 import * as researchGate from '../research-gate.mjs';
 import * as routing from '../symphony-routing.mjs';
@@ -60,7 +64,20 @@ function fakeGbrain({
 } = {}) {
   return {
     async getPage(slug) {
-      if (fail) throw new Error('gbrain unreachable');
+      if (fail) {
+        throw Object.assign(
+          new Error('spawn output that must not be exposed'),
+          { code: 'ENOENT' }
+        );
+      }
+      if (slug === contextGate.AGENT_JOB_LEDGER_SLUG) {
+        return {
+          slug,
+          id: 'page-agent-job-ledger',
+          revision: 'rev-ledger-1',
+          compiledTruth: 'Symphony owns implementation; Gem verifies.',
+        };
+      }
       if (slug !== contextGate.ORG_CHART_SLUG) return null;
       return {
         slug,
@@ -131,6 +148,191 @@ describe('symphony-context/v1', () => {
     assert.deepEqual(parseSearchSlugs('[0.99] one/page -- first'), [
       'one/page',
     ]);
+
+    const jsonPage = parsePage(
+      'agent-org-chart',
+      '{"id":6467,"slug":"agent-org-chart","compiled_truth":"implementation owner: Symphony","content_hash":"bdab4f"}'
+    );
+    assert.equal(jsonPage.revision, 'bdab4f');
+    assert.equal(jsonPage.compiledTruth, 'implementation owner: Symphony');
+    assert.deepEqual(parseSearchSlugs('[{"slug":"design/decision"}]'), [
+      'design/decision',
+    ]);
+  });
+
+  it('keeps keyword hits when semantic lookup would time out', async () => {
+    const calls = [];
+    const client = createGbrainClient({
+      bin: '/home/timwhite/.local/bin/gbrain',
+      dialect: 'adapter',
+      execute(_bin, args) {
+        calls.push(args);
+        if (args[0] === 'search') {
+          return JSON.stringify([
+            { slug: 'decisions/color-harmony', page_id: 7 },
+          ]);
+        }
+        if (args[0] === 'get') {
+          return JSON.stringify({
+            id: 7,
+            slug: 'decisions/color-harmony',
+            compiled_truth: 'approved decision',
+            content_hash: 'decision-rev',
+          });
+        }
+        throw new Error('semantic query timed out');
+      },
+    });
+
+    const result = await client.searchPagesWithEvidence(
+      'color harmony generated brand imagery',
+      1
+    );
+    assert.equal(result.source, 'keyword');
+    assert.deepEqual(
+      result.pages.map(page => page.slug),
+      ['decisions/color-harmony']
+    );
+    assert.deepEqual(calls, [
+      ['search', 'color harmony generated brand imagery', '1'],
+      ['get', 'decisions/color-harmony'],
+    ]);
+  });
+
+  it('preserves the legacy CLI limit flag outside the deployed adapter', async () => {
+    const calls = [];
+    const client = createGbrainClient({
+      dialect: 'legacy',
+      execute(_bin, args) {
+        calls.push(args);
+        if (args[0] === 'search')
+          return '[0.99] decisions/legacy -- matching decision';
+        return "---\nupdated_at: '2026-08-21T00:00:00Z'\n---\nlegacy truth";
+      },
+    });
+    await client.searchPages('legacy terms', 1);
+    assert.deepEqual(calls, [
+      ['search', 'legacy terms', '--limit', '1'],
+      ['get', 'decisions/legacy'],
+    ]);
+  });
+
+  it('normalizes task framing into bounded salient context terms', () => {
+    assert.equal(
+      contextGate.buildContextSearchTerms(
+        issue({
+          title:
+            'Canonize scene-first color harmony for generated brand imagery',
+        })
+      ),
+      'color harmony generated brand imagery'
+    );
+    assert.equal(
+      contextGate.buildContextSearchTerms(
+        issue({
+          title:
+            'Implement bounded keyword-first context lookup for prior decisions',
+        })
+      ),
+      'keyword context lookup prior decisions'
+    );
+  });
+
+  it('holds the complete adapter lookup inside one shared deadline', async () => {
+    let clock = 0;
+    const calls = [];
+    const client = createGbrainClient({
+      dialect: 'adapter',
+      now: () => clock,
+      execute(_bin, args, options) {
+        calls.push([args, options.timeout]);
+        if (args[0] === 'search') {
+          clock += 2_000;
+          return '[]';
+        }
+        if (args[0] === 'query') {
+          clock += 1_800;
+          return JSON.stringify([{ slug: 'design/decision', page_id: 7 }]);
+        }
+        const isDecision = args[1] === 'design/decision';
+        return Promise.resolve().then(() => {
+          clock = isDecision ? clock + 2_000 : Math.max(clock, 2_100);
+          return JSON.stringify({
+            id: isDecision ? 7 : args[1],
+            slug: args[1],
+            compiled_truth: isDecision
+              ? 'approved decision'
+              : 'implementation owner: Symphony\nverification owner: Gem',
+            content_hash: `${args[1]}-rev`,
+          });
+        });
+      },
+    });
+    const result = await contextGate.collectContextEvidence({
+      issue: issue({
+        title: 'Canonize scene-first color harmony for generated brand imagery',
+      }),
+      gbrain: client,
+      now: NOW,
+      clock: () => clock,
+      lookupBudgetMs: 10_000,
+    });
+
+    assert.equal(result.reason, null);
+    assert.equal(result.evidence.queries[1].lookup.source, 'semantic');
+    assert.equal(clock, 7_900);
+    assert.deepEqual(calls, [
+      [['get', 'agent-org-chart'], 10_000],
+      [['get', 'coordination/agent-job-ledger'], 10_000],
+      [['search', 'color harmony generated brand imagery', '1'], 5_000],
+      [['query', 'color harmony generated brand imagery', '1'], 5_900],
+      [['get', 'design/decision'], 4_100],
+    ]);
+  });
+
+  it('fails closed with context-no-results when the direct ledger is missing', async () => {
+    const result = await contextGate.collectContextEvidence({
+      issue: issue(),
+      gbrain: {
+        async getPage(slug) {
+          if (slug === contextGate.AGENT_JOB_LEDGER_SLUG) return null;
+          return {
+            slug,
+            id: 'org',
+            revision: 'org-rev',
+            compiledTruth:
+              'implementation owner: Symphony\nverification owner: Gem',
+          };
+        },
+      },
+      now: NOW,
+    });
+    assert.equal(result.reason, 'context-no-results');
+    assert.match(result.detail, /coordination\/agent-job-ledger/);
+  });
+
+  it('keeps clean misses distinct from total command failure', async () => {
+    const cleanMiss = createGbrainClient({
+      execute(_bin, args) {
+        if (args[0] === 'search') return '[]';
+        throw new Error('semantic query timed out');
+      },
+    });
+    assert.deepEqual(
+      await cleanMiss.searchPages('no matching prior decision', 1),
+      []
+    );
+
+    const unavailable = createGbrainClient({
+      bin: '/definitely/missing/gbrain',
+      execute() {
+        throw Object.assign(new Error('spawn ENOENT'), { code: 'ENOENT' });
+      },
+    });
+    await assert.rejects(
+      unavailable.searchPages('required prior decision', 1),
+      /gbrain-context-lookup-failed/
+    );
   });
 
   it('turns a GBrain outage into a typed system-blocker before lease', async () => {
@@ -143,6 +345,10 @@ describe('symphony-context/v1', () => {
     });
     assert.equal(result.status, 'rejected');
     assert.equal(result.reason, 'gbrain-unavailable');
+    assert.match(result.detail, /operation=get/);
+    assert.match(result.detail, /error=ENOENT/);
+    assert.match(result.detail, /remaining_ms=\d+/);
+    assert.doesNotMatch(result.detail, /must not be exposed/);
 
     assert.equal(
       admissionGate.validateAdmissionCandidate(candidate, { now: NOW }),

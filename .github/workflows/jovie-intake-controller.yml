@@ -25,6 +25,9 @@ jobs:
     name: Persist and classify one JOV intake event
     runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 3
+    env:
+      JOVIE_GBRAIN_BIN: /home/timwhite/.local/bin/gbrain
+      JOVIE_GBRAIN_DIALECT: adapter
     steps:
       - name: Checkout exact main controller source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
