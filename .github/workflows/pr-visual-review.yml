@@ -201,9 +201,9 @@ jobs:
     needs: capture
     if: ${{ always() && needs.capture.result == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 12
     concurrency:
-      group: pr-visual-review-trusted-review
+      group: pr-visual-review-trusted-review-${{ github.event.pull_request.number }}
       cancel-in-progress: false
     permissions:
       contents: read

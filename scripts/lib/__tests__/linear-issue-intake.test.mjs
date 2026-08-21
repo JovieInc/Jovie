@@ -96,7 +96,7 @@ describe('upsertLinearIssueByTitleFingerprint', () => {
               team: {
                 states: {
                   nodes: [
-                    { id: 'backlog-state', name: 'Backlog', type: 'backlog' },
+                    { id: 'backlog-state', name: 'Queued', type: 'backlog' },
                   ],
                 },
               },

@@ -16,9 +16,8 @@ async function linearGraphql(
   { query, variables, apiKey, fetchImpl = fetch },
   caller
 ) {
-  let response;
   try {
-    response = await fetchImpl(LINEAR_API, {
+    const response = await fetchImpl(LINEAR_API, {
       method: 'POST',
       headers: {
         Authorization: apiKey,
@@ -27,6 +26,15 @@ async function linearGraphql(
       body: JSON.stringify({ query, variables }),
       signal: AbortSignal.timeout(LINEAR_REQUEST_TIMEOUT_MS),
     });
+    const parsed = await readResponse(response);
+    if (!response.ok) {
+      return {
+        ok: false,
+        reason: `${caller}_${response.status}`,
+        body: parsed.json ?? parsed.text,
+      };
+    }
+    return { ok: true, data: parsed.json?.data ?? null, raw: parsed.json };
   } catch (error) {
     return {
       ok: false,
@@ -34,15 +42,6 @@ async function linearGraphql(
       body: error instanceof Error ? error.message : String(error),
     };
   }
-  const parsed = await readResponse(response);
-  if (!response.ok) {
-    return {
-      ok: false,
-      reason: `${caller}_${response.status}`,
-      body: parsed.json ?? parsed.text,
-    };
-  }
-  return { ok: true, data: parsed.json?.data ?? null, raw: parsed.json };
 }
 
 // Dedup by fingerprint in the title. Linear removed issueSearch.
@@ -135,9 +134,10 @@ export async function upsertLinearIssueByTitleFingerprint({
   }
 
   const terminal = ['completed', 'canceled'].includes(match.state?.type);
-  const backlogState = found.data?.team?.states?.nodes?.find(
-    state => state?.name === 'Backlog'
-  );
+  const states = found.data?.team?.states?.nodes ?? [];
+  const backlogState =
+    states.find(state => state?.name === 'Backlog') ??
+    states.find(state => state?.type === 'backlog');
   if (terminal && reopenTerminal && !backlogState)
     return { ok: false, reason: 'linear_backlog_state_missing' };
   const input = {

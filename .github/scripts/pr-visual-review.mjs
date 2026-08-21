@@ -114,6 +114,8 @@ export function validateCaptureManifest(manifest, expected = {}) {
     failures.push('no required routes');
   if (!Array.isArray(viewportNames) || viewportNames.length === 0)
     failures.push('no required viewports');
+  if (captures.length > 12)
+    failures.push(`too many captures: ${captures.length}`);
 
   const byTarget = new Map();
   for (const capture of captures) {
@@ -272,7 +274,7 @@ export function inspectReviewBackendConfiguration({ grok, codex }) {
 
 export async function readTrustedCapture(artifactRoot, capturePath) {
   const requestedRoot = resolve(artifactRoot);
-  const requested = resolve(capturePath);
+  const requested = resolve(requestedRoot, capturePath);
   const requestedRelative = relative(requestedRoot, requested);
   if (
     requestedRelative.startsWith('..') ||
@@ -477,6 +479,7 @@ async function main() {
       );
       const validation = validateCaptureManifest(manifest, {
         routes: input.routes,
+        viewportNames: REQUIRED_CAPTURE_VIEWPORTS,
       });
       if (!validation.ok)
         throw new Error(

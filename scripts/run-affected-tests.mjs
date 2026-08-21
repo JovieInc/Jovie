@@ -214,6 +214,9 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/queue-deferred-release.test.mjs',
   'scripts/lib/__tests__/queue-deferred-release-admission.test.mjs',
   'scripts/lib/__tests__/setup-worktree-health.test.mjs',
+  'scripts/lib/__tests__/linear-issue-intake.test.mjs',
+  'scripts/lib/__tests__/agent-qc-wires.test.mjs',
+  'scripts/lib/__tests__/needs-human-autoclose.test.mjs',
 ];
 const MERGE_QUEUE_CONTROLLER_INPUTS = new Set([
   '.github/workflows/merge-queue-autoenroll.yml',
@@ -1636,6 +1639,16 @@ export function buildFullSuiteCommands(maxWorkers, shardCount = 8) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
+  if (args.includes('--control')) {
+    await runCommand('pnpm', [
+      'exec',
+      'vitest',
+      '--root',
+      'scripts',
+      'run',
+      ...CI_CONTROL_SCRIPT_TESTS.map(file => file.replace(/^scripts\//, '')),
+    ]);
+  }
   const base = argValue(args, '--base', 'origin/main');
   const maxWorkers = argValue(args, '--max-workers', '2');
   const shardConcurrency = argValue(args, '--shard-concurrency', '2');

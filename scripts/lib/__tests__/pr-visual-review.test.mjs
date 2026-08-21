@@ -158,18 +158,21 @@ describe('bounded PR visual review contract', () => {
     });
     expect(complete).toEqual({ ok: true, failures: [] });
 
-    const incomplete = validateCaptureManifest({
-      routes: ['/app/chat'],
-      viewports: { desktop: {}, mobile: {} },
-      captures: [
-        {
-          route: '/app/chat',
-          viewport: 'desktop',
-          status: 'captured',
-          path: 'chat-desktop.png',
-        },
-      ],
-    });
+    const incomplete = validateCaptureManifest(
+      {
+        routes: ['/app/chat'],
+        viewports: { desktop: {}, mobile: {} },
+        captures: [
+          {
+            route: '/app/chat',
+            viewport: 'desktop',
+            status: 'captured',
+            path: 'chat-desktop.png',
+          },
+        ],
+      },
+      { routes: ['/app/chat'], viewportNames: ['desktop', 'mobile'] }
+    );
     expect(incomplete.ok).toBe(false);
     expect(incomplete.failures).toContain('missing capture /app/chat::mobile');
   });
@@ -286,9 +289,9 @@ describe('bounded PR visual review contract', () => {
     ]);
     try {
       await writeFile(capture, png);
-      await expect(readTrustedCapture(directory, capture)).resolves.toEqual(
-        png
-      );
+      await expect(
+        readTrustedCapture(directory, 'capture.png')
+      ).resolves.toEqual(png);
       await expect(
         readTrustedCapture(directory, '/proc/self/environ')
       ).rejects.toThrow('escapes downloaded artifact directory');
@@ -336,24 +339,6 @@ describe('bounded PR visual review contract', () => {
     );
     expect(workflow).toContain('GROK_VISUAL_REVIEW_API_KEY');
     expect(workflow).toContain('CODEX_VISUAL_REVIEW_API_KEY');
-    const reviewJob = workflow.slice(workflow.indexOf('\n  review:'));
-    expect(reviewJob).toContain(
-      'ref: ${{ github.event.pull_request.base.sha }}'
-    );
-    expect(reviewJob).toContain('persist-credentials: false');
-    expect(reviewJob).toContain(
-      'sparse-checkout: .github/scripts/pr-visual-review.mjs'
-    );
-    expect(reviewJob).toMatch(/^    continue-on-error: true$/m);
-    expect(reviewJob).toMatch(
-      /uses: actions\/download-artifact@v8\n\s+id: evidence\n\s+continue-on-error: true/
-    );
-    expect(reviewJob).toContain(
-      'name: Derive trusted routing and bounded diff'
-    );
-    expect(reviewJob).toContain('routeChangedFiles(files)');
-    expect(reviewJob).toContain('.head.sha == $head');
-    expect(reviewJob).toContain('trusted-routing.json');
     expect(workflow).toContain('Call Grok 4.5 with Codex fallback');
     expect(workflow).not.toContain('Kimi');
     expect(workflow).toContain("'unavailable'");

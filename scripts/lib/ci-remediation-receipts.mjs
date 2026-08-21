@@ -1,8 +1,8 @@
+import * as sonarChecks from './sonar-check-selection.mjs';
 export const REMEDIATION_RECEIPT_SCHEMA = 'jovie-remediation-receipt/v1';
 export const VISUAL_CONFIGURATION_FINGERPRINT =
   'ci-config:pr-visual-review-backends';
 export const QUALITY_DEBT_ATTEMPT_BUDGET = 3;
-
 function sourceReceipt({ repository, runId, runUrl, prNumber, headSha }) {
   if (!/^[^/\s]+\/[^/\s]+$/.test(String(repository ?? '')))
     throw new Error('repository must be owner/name');
@@ -20,12 +20,11 @@ function sourceReceipt({ repository, runId, runUrl, prNumber, headSha }) {
     headSha,
   };
 }
-
 export function buildVisualConfigurationIncident(input) {
   const errors = [...new Set(input.configurationErrors ?? [])].filter(error =>
     /^backend_unconfigured:/.test(String(error))
   );
-  if (errors.length === 0)
+  if (!errors.length)
     throw new Error(
       'visual configuration incident requires configuration errors'
     );
@@ -66,11 +65,9 @@ export function buildVisualConfigurationIncident(input) {
     observedAt: input.observedAt ?? new Date().toISOString(),
   };
 }
-
 export function qualityDebtFingerprint({ repository, prNumber }) {
   return `quality-debt:sonar:${sourceReceipt({ repository, prNumber, runId: 0, runUrl: '', headSha: '0'.repeat(40) }).repository}:pr-${prNumber}`;
 }
-
 function expectedSonarUrl(detailsUrl, prNumber) {
   try {
     const url = new URL(detailsUrl);
@@ -82,13 +79,11 @@ function expectedSonarUrl(detailsUrl, prNumber) {
     return false;
   }
 }
-
 export function buildSonarQualityDebtReceipt(input) {
-  const source = sourceReceipt(input);
   if (
-    input.checkName !== 'SonarCloud Code Analysis' ||
+    input.checkName !== sonarChecks.SONAR_CHECK_NAME ||
     input.checkConclusion !== 'failure' ||
-    input.checkAppSlug !== 'sonarqubecloud' ||
+    input.checkAppSlug !== sonarChecks.SONAR_CHECK_APP_SLUG ||
     !expectedSonarUrl(input.detailsUrl, input.prNumber)
   )
     throw new Error('quality debt receipt requires a failing SonarCloud check');
@@ -114,7 +109,7 @@ export function buildSonarQualityDebtReceipt(input) {
       ? 'owned_eligible_when_admitted'
       : 'owned_capacity_deferred',
     severity: 'low',
-    source,
+    source: sourceReceipt(input),
     signal: {
       system: 'sonarcloud',
       checkName: input.checkName,
