@@ -15,8 +15,22 @@ const queryClient = new QueryClient({
 
 const dashboardData: DashboardData = {
   user: { id: 'story-user' },
-  creatorProfiles: [],
-  selectedProfile: null,
+  creatorProfiles: [
+    {
+      id: 'story-profile',
+      avatarUrl: null,
+      displayName: 'Tim White',
+      username: 'timwhite',
+      usernameNormalized: 'timwhite',
+    } as DashboardData['creatorProfiles'][number],
+  ],
+  selectedProfile: {
+    id: 'story-profile',
+    avatarUrl: null,
+    displayName: 'Tim White',
+    username: 'timwhite',
+    usernameNormalized: 'timwhite',
+  } as DashboardData['selectedProfile'],
   needsOnboarding: false,
   sidebarCollapsed: false,
   hasSocialLinks: false,
@@ -37,6 +51,7 @@ const dashboardData: DashboardData = {
     steps: [],
     profileIsLive: false,
   },
+  inboxNavigation: { state: 'empty', pendingCount: 0 },
 };
 
 const meta: Meta<typeof UnifiedSidebar> = {
@@ -74,6 +89,12 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Dashboard: Story = {};
+
+export const Settings: Story = {
+  args: {
+    section: 'settings',
+  },
+};
 
 export const Operator: Story = {
   args: {

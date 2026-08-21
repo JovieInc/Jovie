@@ -1,5 +1,6 @@
 'use client';
 
+import { ExternalLink } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
@@ -14,6 +15,7 @@ import {
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useProfileData } from '@/hooks/useProfileData';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import {
   type NavigationTelemetryContext,
@@ -57,6 +59,7 @@ export function DashboardMobileTabs({
   const pathname = usePathname();
   const isMobile = useMediaQuery('(max-width: 1023px)');
   const isElectron = useIsElectronRuntime();
+  const { profileHref } = useProfileData(true);
   const telemetryContext = useMemo<NavigationTelemetryContext>(
     () => ({
       isElectron,
@@ -83,6 +86,23 @@ export function DashboardMobileTabs({
       expandedItems: [...partition.more, ...artistNavigation].map(toMenuItem),
     };
   }, [activeItemId]);
+
+  const utilityItems = useMemo<LiquidGlassMenuItem[]>(
+    () => [
+      ...(profileHref
+        ? [
+            {
+              id: 'public-profile',
+              label: 'Public Profile',
+              href: profileHref,
+              icon: ExternalLink,
+            },
+          ]
+        : []),
+      ...UTILITY_ITEMS,
+    ],
+    [profileHref]
+  );
 
   useEffect(() => {
     if (!isMobile) return;
@@ -128,7 +148,7 @@ export function DashboardMobileTabs({
     <LiquidGlassMenu
       primaryItems={primaryItems}
       expandedItems={expandedItems}
-      utilityItems={UTILITY_ITEMS}
+      utilityItems={utilityItems}
       onItemActivate={handleItemActivate}
       onExpandedItemsVisible={handleExpandedItemsVisible}
       onSignOut={handleSignOut}

@@ -408,7 +408,9 @@ describe('ChatMessage', () => {
                 product_type: 'hoodie',
                 colorway: 'black',
                 concept: 'Cover art on heavyweight black fleece.',
-                mockup_urls: ['https://cdn.example.com/hoodie.png'],
+                mockup_urls: [
+                  'https://blob.vercel-storage.com/merch/generated/a/b/hoodie-mockup.jpg',
+                ],
                 price_recommendation: {
                   sale_price: '$68.00',
                   profit: '$22.00',
@@ -432,7 +434,9 @@ describe('ChatMessage', () => {
     try {
       fastRender(<ChatMessage {...messageProps} />);
 
-      expect(screen.getByText('Merch Options')).toBeInTheDocument();
+      expect(
+        screen.getByRole('region', { name: 'Merch Options' })
+      ).toBeInTheDocument();
       expect(screen.getByTestId('chat-merch-option-card')).toHaveTextContent(
         'Never Say A Word Hoodie'
       );

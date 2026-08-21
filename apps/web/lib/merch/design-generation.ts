@@ -10,21 +10,20 @@ import 'server-only';
  * publish blockers apply identically everywhere.
  *
  * Generates N illustrated, transparent (alpha) print graphics for the artist via
- * the multi-model graphic engine, persists each as a merchDesignOption bound to
- * the default product (so the existing selectMerchDesign machinery can turn one
- * into a card), and returns the carousel result the chat renders.
+ * the multi-model graphic engine, composites each onto the product garment so
+ * the merch card shows the design (not a blank shirt), persists each as a
+ * merchDesignOption bound to the default product, and returns the carousel
+ * result the chat renders.
  *
- * Product/color application onto a real Printful blank (the truthful mockup) is
- * Phase B — selecting a design routes through the existing selectMerchDesign.
+ * Printful photorealistic mockups are attached asynchronously after return.
  *
  * @see @/lib/merch/graphic-engine — the alpha graphic generator
+ * @see @/lib/merch/mockup-engine — instant garment compositing
  * @see @/lib/merch/service — selectMerchDesign (Phase B entry)
  */
 
 import { randomUUID } from 'node:crypto';
-import { put } from '@vercel/blob';
 import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
-import { uploadBufferToBlob } from '@/app/api/images/upload/lib/blob-upload';
 import { db } from '@/lib/db';
 import {
   type MerchArtistBrief,
@@ -33,7 +32,6 @@ import {
   merchGenerationBatches,
 } from '@/lib/db/schema/merch';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
 import { resolveMerchCatalogSelection } from './catalog';
 import {
@@ -54,6 +52,7 @@ import {
   type MerchGenerationReceipt,
 } from './generation-contract';
 import { generatePrintGraphic } from './graphic-engine';
+import { createGeneratedMerchArtwork } from './mockup-engine';
 import { scheduleMerchMockupEnrichment } from './mockup-enrichment';
 import {
   buildMerchPricingSnapshot,
@@ -200,20 +199,6 @@ export function selectMerchDesignStrategies(
           ),
         ];
   return candidates.slice(0, count);
-}
-
-async function uploadAlphaPng(path: string, buffer: Buffer): Promise<string> {
-  if (!env.BLOB_READ_WRITE_TOKEN) {
-    if (env.NODE_ENV === 'production') {
-      throw new TypeError('Blob storage not configured');
-    }
-    return `https://blob.vercel-storage.com/${path}`;
-  }
-  const url = await uploadBufferToBlob(put, path, buffer, 'image/png');
-  if (!url.startsWith('https://')) {
-    throw new TypeError('Invalid blob URL returned from storage');
-  }
-  return url;
 }
 
 async function artistName(profileId: string): Promise<string> {
@@ -680,6 +665,7 @@ export async function generateMerchDesigns(params: {
         readonly optionId: string;
         readonly preview: MerchDesignPreview | null;
         readonly review: MerchContentReview | null;
+        readonly printFileUrl?: string;
       }> => {
         const optionId = randomUUID();
         const sourceLabel = params.source
@@ -701,10 +687,13 @@ export async function generateMerchDesigns(params: {
             selection: { weights: modelWeights },
             content: { prompt: params.prompt, concept },
           });
-          const previewUrl = await uploadAlphaPng(
-            `merch/generated/${params.profileId}/${generationId}/${optionId}.png`,
-            graphic.image
-          );
+          const artwork = await createGeneratedMerchArtwork({
+            profileId: params.profileId,
+            generationId,
+            optionId,
+            printFile: graphic.image,
+            productType: catalog.productType,
+          });
 
           await db.insert(merchDesignOptions).values({
             id: optionId,
@@ -735,8 +724,8 @@ export async function generateMerchDesigns(params: {
             whyItFits: params.source
               ? `Built from the verified ${params.source.sourceType.replaceAll('_', ' ')} “${params.source.sourceText}”.`
               : 'Illustrated graphic generated for this artist without an invented likeness.',
-            mockupUrls: [previewUrl],
-            printFileUrls: [previewUrl],
+            mockupUrls: [artwork.mockupUrl],
+            printFileUrls: [artwork.printFileUrl],
             productionWarnings: catalogWarnings,
             qualityReview: {
               copyrightRisk: 'low',
@@ -766,6 +755,7 @@ export async function generateMerchDesigns(params: {
           return {
             optionId,
             review: graphic.contentReview,
+            printFileUrl: artwork.printFileUrl,
             preview: {
               id: optionId,
               option_number: index + 1,
@@ -774,7 +764,7 @@ export async function generateMerchDesigns(params: {
               concept,
               status: 'ready',
               mockup_status: 'pending_mockup',
-              preview_url: previewUrl,
+              preview_url: artwork.mockupUrl,
               slots: {
                 artist_name: name,
                 short_text: params.source.sourceText,
@@ -845,8 +835,10 @@ export async function generateMerchDesigns(params: {
     contentReviews,
   });
 
-  const enrichmentDesigns = ready.flatMap(d =>
-    d.preview_url ? [{ optionId: d.id, printFileUrl: d.preview_url }] : []
+  const enrichmentDesigns = attempts.flatMap(attempt =>
+    attempt.preview && attempt.printFileUrl
+      ? [{ optionId: attempt.optionId, printFileUrl: attempt.printFileUrl }]
+      : []
   );
   if (enrichmentDesigns.length > 0) {
     schedulePrintfulMockupEnrichment({

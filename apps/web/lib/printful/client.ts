@@ -248,6 +248,22 @@ function readData<T>(payload: PrintfulDataResponse<T>): T {
   return data;
 }
 
+function readCreatedMockupTask(
+  payload: PrintfulListResponse<PrintfulMockupTask> &
+    PrintfulDataResponse<PrintfulMockupTask>
+): PrintfulMockupTask {
+  const data = payload.data ?? payload.result;
+  const task = Array.isArray(data) ? data[0] : data;
+  if (!task || task.id === undefined || task.id === null || task.id === '') {
+    throw new PrintfulApiError(
+      'Printful mockup task response did not contain a task id',
+      502,
+      payload
+    );
+  }
+  return task;
+}
+
 export async function listCatalogProducts(params?: {
   readonly sellingRegionName?: string;
   readonly placements?: readonly string[];
@@ -376,22 +392,26 @@ export async function createMockupTask(input: {
   readonly mockupStyleIds?: number[];
 }): Promise<PrintfulMockupTask> {
   const payload = await requestPrintful<
-    PrintfulDataResponse<PrintfulMockupTask>
+    PrintfulListResponse<PrintfulMockupTask> &
+      PrintfulDataResponse<PrintfulMockupTask>
   >('/v2/mockup-tasks', {
     method: 'POST',
     body: JSON.stringify({
       format: 'jpg',
       products: [
         {
+          source: 'catalog',
           catalog_product_id: input.catalogProductId,
           catalog_variant_ids: input.catalogVariantIds,
           placements: input.placements,
-          mockup_style_ids: input.mockupStyleIds,
+          ...(input.mockupStyleIds && input.mockupStyleIds.length > 0
+            ? { mockup_style_ids: input.mockupStyleIds }
+            : {}),
         },
       ],
     }),
   });
-  return readData(payload);
+  return readCreatedMockupTask(payload);
 }
 
 export async function retrieveMockupTasks(

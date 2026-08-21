@@ -178,7 +178,7 @@ jobs:
         id: upload
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: pr-visual-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
           path: pr-visual-artifacts/
@@ -196,12 +196,15 @@ jobs:
 
   review:
     name: Review screenshots and post advisory review
-    # The review is useful steering information, never a production gate.
+    # Product findings are advisory and never a production gate.
     continue-on-error: true
     needs: capture
-    if: ${{ always() && needs.capture.result == 'success' }}
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 12
+    concurrency:
+      group: pr-visual-review-trusted-review-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
     permissions:
       contents: read
       pull-requests: write
@@ -224,35 +227,49 @@ jobs:
           sparse-checkout-cone-mode: false
           persist-credentials: false
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        id: evidence
+        continue-on-error: true
         with:
           name: pr-visual-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
           path: pr-visual-artifacts
 
-      - name: Skip non-UI changes
+      - name: Derive trusted routing and bounded diff
         id: routed
-        run: |
-          if [ "$(node -p "require('./pr-visual-artifacts/routing.json').shouldReview")" != "true" ]; then
-            echo "No UI surface changed; review is a deliberate no-op."
-            echo "review=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "review=true" >> "$GITHUB_OUTPUT"
-          fi
-          echo "review_status=$(node -p "require('./pr-visual-artifacts/routing.json').review_status")" >> "$GITHUB_OUTPUT"
-
-      - name: Prepare bounded diff context
-        if: steps.routed.outputs.review == 'true'
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
-          git fetch --no-tags --depth=2 origin "$BASE_SHA" "$HEAD_SHA"
-          git diff --no-ext-diff "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/pr.diff" 2>/dev/null || git diff --no-ext-diff "$BASE_SHA" "$HEAD_SHA" > "$RUNNER_TEMP/pr.diff" || :
+          set -euo pipefail
+          verify_head() {
+            gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" \
+              | jq -e --arg head "$PR_HEAD_SHA" --arg base "$BASE_REF" '
+                  .state == "open" and .head.sha == $head and .base.ref == $base
+                ' >/dev/null
+          }
+          skip_stale_review() {
+            echo "::notice::PR head moved or PR is closed; skipping stale advisory review."
+            printf 'review=false\nreview_status=unavailable\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+          verify_head || skip_stale_review
+          gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" \
+            | jq -r '(add // []) | .[].filename' > "$RUNNER_TEMP/changed-files.txt"
+          if ! gh api \
+            -H 'Accept: application/vnd.github.v3.diff' \
+            "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" > "$RUNNER_TEMP/pr.diff"; then
+            printf 'review=false\nreview_status=unavailable\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          verify_head || skip_stale_review
           node --input-type=module - <<'NODE'
           import { readFile, writeFile } from 'node:fs/promises';
-          const routing = JSON.parse(await readFile('pr-visual-artifacts/routing.json', 'utf8'));
+          import { routeChangedFiles } from './.github/scripts/pr-visual-review.mjs';
+          const files = (await readFile(process.env.RUNNER_TEMP + '/changed-files.txt', 'utf8')).split('\n').filter(Boolean);
+          const routing = { ...routeChangedFiles(files), files };
           const diff = await readFile(process.env.RUNNER_TEMP + '/pr.diff', 'utf8');
-          await writeFile('review-input.json', JSON.stringify({ artifactDir: 'pr-visual-artifacts', changedFiles: routing.files, diff, reviewStatus: routing.review_status, output: 'review-result.json' }));
+          await writeFile('trusted-routing.json', JSON.stringify(routing, null, 2));
+          await writeFile('review-input.json', JSON.stringify({ artifactDir: 'pr-visual-artifacts', changedFiles: files, routes: routing.routes, diff, reviewStatus: routing.review_status, output: 'review-result.json' }));
+          await writeFile(process.env.GITHUB_OUTPUT, `review=${routing.shouldReview}\nreview_status=${routing.review_status}\n`, { flag: 'a' });
           NODE
 
       - name: Call Grok 4.5 with Codex fallback
