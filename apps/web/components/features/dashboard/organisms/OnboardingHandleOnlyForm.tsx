@@ -73,7 +73,7 @@ export function OnboardingHandleOnlyForm({
   designV1 = false,
 }: Readonly<OnboardingHandleOnlyFormProps>) {
   const router = useRouter();
-  const onboardingStartedAtRef = useRef(Date.now());
+  const [onboardingStartedAtMs] = useState(() => Date.now());
   const handleInputRef = useRef<HTMLInputElement | null>(null);
   const normalizedInitialHandle = initialHandle.trim().toLowerCase();
   const [handleInput, setHandleInput] = useState(normalizedInitialHandle);
@@ -112,7 +112,7 @@ export function OnboardingHandleOnlyForm({
       handleValidation,
       isHydrated,
       isReservedHandle,
-      onboardingStartedAtMs: onboardingStartedAtRef.current,
+      onboardingStartedAtMs,
       setProfileReadyHandle,
       shouldAutoSubmitHandle,
       userEmail,

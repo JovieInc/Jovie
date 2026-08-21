@@ -8,7 +8,7 @@ import { listPages, searchPages } from '@/lib/wiki/gbrain-client';
 import { groupByNamespace } from '@/lib/wiki/namespace';
 
 interface Props {
-  searchParams: Promise<{ q?: string }>;
+  readonly searchParams: Promise<{ q?: string }>;
 }
 
 export default async function WikiIndexPage({ searchParams }: Props) {

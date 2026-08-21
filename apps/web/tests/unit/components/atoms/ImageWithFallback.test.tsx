@@ -68,9 +68,10 @@ describe('ImageWithFallback', () => {
     const img = screen.getByTestId('next-image');
     fireEvent.error(img);
 
-    expect(screen.queryByTestId('next-image')).not.toBeInTheDocument();
+    expect(img).toHaveStyle({ display: 'none' });
     const fallback = screen.getByRole('img', { name: 'Broken image' });
     expect(fallback).toBeInTheDocument();
+    expect(fallback).not.toHaveAttribute('hidden');
   });
 
   it('resets error state when src changes', () => {
@@ -85,7 +86,7 @@ describe('ImageWithFallback', () => {
 
     // Trigger error
     fireEvent.error(screen.getByTestId('next-image'));
-    expect(screen.queryByTestId('next-image')).not.toBeInTheDocument();
+    expect(screen.getByTestId('next-image')).toHaveStyle({ display: 'none' });
 
     // Change src — should reset and show image again
     rerender(

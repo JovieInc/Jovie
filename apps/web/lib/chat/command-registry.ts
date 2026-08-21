@@ -38,7 +38,12 @@ const COMMANDS: readonly CommandDefinition[] = [
           : `Apple Wallet is not available for this profile yet.`,
       execute: () => {
         if (ctx.username && ctx.appleWalletProfilePassAvailable) {
-          globalThis.location.assign('/api/wallet/apple/profile-pass');
+          globalThis.location.assign(
+            new URL(
+              '/api/wallet/apple/profile-pass',
+              globalThis.location.origin
+            ).href
+          );
         }
       },
     }),
@@ -52,7 +57,12 @@ const COMMANDS: readonly CommandDefinition[] = [
           : `Apple Wallet is not available for this profile yet.`,
       execute: () => {
         if (ctx.username && ctx.appleWalletProfilePassAvailable) {
-          globalThis.location.assign('/api/wallet/apple/profile-pass');
+          globalThis.location.assign(
+            new URL(
+              '/api/wallet/apple/profile-pass',
+              globalThis.location.origin
+            ).href
+          );
         }
       },
     }),

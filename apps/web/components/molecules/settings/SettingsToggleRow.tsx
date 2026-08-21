@@ -4,6 +4,7 @@
 import { Switch } from '@jovie/ui';
 import * as React from 'react';
 import { SettingsPlanGateLabel } from '@/components/atoms/SettingsPlanGateLabel';
+import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 
 interface SettingsToggleRowBaseProps {
@@ -44,6 +45,16 @@ export function SettingsToggleRow(props: Readonly<SettingsToggleRowProps>) {
   const baseId = id ?? `settings-toggle-${reactId}`;
   const titleId = `${baseId}-title`;
   const descriptionId = description ? `${baseId}-description` : undefined;
+  const gateFeatureContext = props.gated ? props.gateFeatureContext : undefined;
+  const gatePlanName = props.gated ? (props.gatePlanName ?? 'Pro') : undefined;
+
+  React.useEffect(() => {
+    if (!gateFeatureContext || !gatePlanName) return;
+    track('upgrade_nudge_shown', {
+      feature: gateFeatureContext,
+      plan_required: gatePlanName,
+    });
+  }, [gateFeatureContext, gatePlanName]);
 
   return (
     <div

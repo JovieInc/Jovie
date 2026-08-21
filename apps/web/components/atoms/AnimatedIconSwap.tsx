@@ -1,6 +1,6 @@
 'use client';
 
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import type { ReactNode } from 'react';
 import {
   ICON_SWAP_TRANSITION,
@@ -34,14 +34,16 @@ export function AnimatedIconSwap({
   activeKey,
   children,
   className,
+  reducedMotion = false,
 }: {
   /** Identity of the current state. Changing it triggers the swap. */
   readonly activeKey: string;
   /** The icon (or small glyph cluster) for the current state. */
   readonly children: ReactNode;
   readonly className?: string;
+  /** Optional override; CSS `motion-reduce` also keeps the swap opacity-only. */
+  readonly reducedMotion?: boolean;
 }) {
-  const reducedMotion = useReducedMotion();
   const variants = reducedMotion
     ? ICON_SWAP_VARIANTS_REDUCED
     : ICON_SWAP_VARIANTS;

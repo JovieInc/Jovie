@@ -80,7 +80,6 @@ export function AppleMusicSyncBanner({
       enabled:
         providedIsLoading === undefined && spotifyConnected && !!profileId,
     });
-  const matches = providedMatches ?? queriedMatches ?? ([] as DspMatch[]);
   const isLoading = providedIsLoading ?? isQueryLoading;
 
   const confirmMutation = useConfirmDspMatchMutation();
@@ -88,13 +87,14 @@ export function AppleMusicSyncBanner({
 
   // Find the Apple Music match (best one by confidence)
   const appleMusicMatch = useMemo((): DspMatch | null => {
+    const matches = providedMatches ?? queriedMatches ?? ([] as DspMatch[]);
     const amMatches = matches
       .filter((m: DspMatch) => m.providerId === 'apple_music')
       .sort(
         (a: DspMatch, b: DspMatch) => b.confidenceScore - a.confidenceScore
       );
     return amMatches[0] ?? null;
-  }, [matches]);
+  }, [providedMatches, queriedMatches]);
 
   // Calculate Apple Music link coverage (used only for determineSyncState)
   const withAppleMusic = useMemo(() => {

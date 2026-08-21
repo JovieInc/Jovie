@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useId } from 'react';
+import { memo } from 'react';
 
 export type ReleasePriority = 'urgent' | 'high' | 'medium' | 'low' | 'none';
 
@@ -29,7 +29,6 @@ export const PriorityIcon = memo(function PriorityIcon({
   readonly className?: string;
 }) {
   const { color, bars, label } = PRIORITY_CONFIG[priority];
-  const titleId = useId();
 
   if (bars === 0) {
     return (
@@ -38,10 +37,9 @@ export const PriorityIcon = memo(function PriorityIcon({
         height={SIZE}
         viewBox='0 0 14 14'
         fill='none'
-        aria-labelledby={titleId}
         className={`shrink-0 ${className ?? ''}`}
       >
-        <title id={titleId}>{label}</title>
+        <title>{label}</title>
         <line
           x1='3'
           y1='7'
@@ -66,10 +64,9 @@ export const PriorityIcon = memo(function PriorityIcon({
       height={SIZE}
       viewBox='0 0 14 14'
       fill='none'
-      aria-labelledby={titleId}
       className={`shrink-0 ${className ?? ''}`}
     >
-      <title id={titleId}>{label}</title>
+      <title>{label}</title>
       {Array.from({ length: bars }, (_, i) => {
         const height = 3 + i * 2;
         const x = startX + i * (barWidth + gap);

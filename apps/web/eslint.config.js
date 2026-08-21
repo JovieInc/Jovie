@@ -311,6 +311,8 @@ module.exports = [
       'components/atoms/CopyableMonospaceCell.tsx',
       'components/atoms/TableErrorFallback.tsx',
       'components/atoms/AvatarUploadOverlay.tsx',
+      // Stories compose atoms for docs; they are not production atom modules.
+      '**/*.stories.tsx',
     ],
     rules: {
       'no-restricted-syntax': [

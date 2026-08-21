@@ -91,7 +91,7 @@ export type InterviewSignal = z.infer<typeof interviewSignalSchema>;
  * Append-only: each tool call appends one entry. Read-time consumers should
  * use the most recent occurrence of a given field as the canonical value.
  */
-export const interviewSignalsMetadataSchema = z.object({
+export const interviewSignalsMetadataSchema = chatToolSchema({
   metadataVersion: z.literal(1),
   signals: z
     .array(

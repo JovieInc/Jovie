@@ -1,7 +1,7 @@
 import { Badge } from '@jovie/ui';
 import type { CellContext, HeaderContext, Table } from '@tanstack/react-table';
 import { Copy, ExternalLink } from 'lucide-react';
-import type { RefObject } from 'react';
+
 import { EmptyCell } from '@/components/atoms/EmptyCell';
 import { InlineIconButton } from '@/components/atoms/InlineIconButton';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
@@ -269,7 +269,7 @@ export function renderWelcomeCell({ row }: CellContext<AdminUserRow, unknown>) {
  * preventing column recreation on every selection change.
  */
 export function createSelectHeaderRenderer(
-  headerCheckboxStateRef: RefObject<boolean | 'indeterminate'>,
+  headerCheckboxState: boolean | 'indeterminate',
   onToggleSelectAll: () => void
 ) {
   return function SelectHeader({
@@ -278,7 +278,7 @@ export function createSelectHeaderRenderer(
     return (
       <TableCheckboxCell
         table={table as Table<AdminUserRow>}
-        headerCheckboxState={headerCheckboxStateRef.current ?? false}
+        headerCheckboxState={headerCheckboxState}
         onToggleSelectAll={onToggleSelectAll}
       />
     );
@@ -291,12 +291,12 @@ export function createSelectHeaderRenderer(
  * preventing column recreation on every selection change.
  */
 export function createSelectCellRenderer(
-  selectedIdsRef: RefObject<Set<string>>,
+  selectedIds: ReadonlySet<string>,
   onToggleSelect: (id: string) => void
 ) {
   return function SelectCell({ row }: CellContext<AdminUserRow, unknown>) {
     const user = row.original;
-    const isChecked = selectedIdsRef.current?.has(user.id) ?? false;
+    const isChecked = selectedIds.has(user.id);
     const rowNumber = row.index + 1;
 
     return (

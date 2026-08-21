@@ -2,7 +2,6 @@
 
 import type { ReactNode } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { PlatformPill } from '@/features/dashboard/atoms/PlatformPill';
 import { cn } from '@/lib/utils';
 
 export interface CompactLinkRailItem {
@@ -80,16 +79,24 @@ export function CompactLinkRail({
         )}
       >
         {visibleItems.map(item => (
-          <PlatformPill
+          <button
             key={item.id}
-            platformIcon={item.platformIcon}
-            platformName={item.platformName}
-            primaryText={item.primaryText}
-            collapsed={useCollapsedPills}
-            stackable={useCollapsedPills}
+            type='button'
             onClick={item.onClick}
-            className='min-w-0 max-w-full'
-          />
+            title={item.platformName}
+            className={cn(
+              'inline-flex h-6 min-w-0 max-w-full shrink-0 items-center gap-1 rounded-full border border-(--app-shell-frame-seam) bg-surface-1 px-1.5 text-2xs font-caption tracking-tight text-secondary-token',
+              item.onClick && 'hover:bg-surface-0'
+            )}
+          >
+            <SocialIcon
+              platform={item.platformIcon}
+              className='h-3 w-3 shrink-0'
+            />
+            {useCollapsedPills ? null : (
+              <span className='min-w-0 truncate'>{item.primaryText}</span>
+            )}
+          </button>
         ))}
       </div>
     </div>

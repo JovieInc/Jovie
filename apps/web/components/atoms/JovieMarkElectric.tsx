@@ -1,11 +1,10 @@
 'use client';
 
-import { type CSSProperties, useId } from 'react';
+import type { CSSProperties } from 'react';
 import {
   JOVIE_ICON_PATH,
   JOVIE_ICON_VIEW_BOX,
 } from '@/components/atoms/jovie-icon-path';
-import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 
 interface JovieMarkElectricProps {
@@ -42,14 +41,11 @@ export function JovieMarkElectric({
   spark = true,
   settledSpark = false,
 }: JovieMarkElectricProps) {
-  const reactId = useId();
-  const safeId = (idSeed ?? reactId).replace(/[^a-zA-Z0-9_-]/g, '');
+  const safeId = (idSeed ?? 'jve').replace(/[^a-zA-Z0-9_-]/g, '');
   const filterId = `jve-filter-${safeId}`;
   const styleId = `jve-style-${safeId}`;
   const sparkAnimationName = `jve-pulse-${safeId}`;
-
-  const prefersReducedMotion = useReducedMotion();
-  const showSpark = spark && !prefersReducedMotion;
+  const showSpark = spark;
   const sparkDuration = 'calc(var(--ds-motion-cinematic-duration) * 3.5)';
   const sparkDelay = 'calc(var(--ds-motion-subtle-duration) * 1.6)';
 
@@ -67,6 +63,11 @@ export function JovieMarkElectric({
             42%  { stroke-dashoffset: -500;  opacity: 0.72; }
             76%  { stroke-dashoffset: -820;  opacity: 0.34; }
             100% { stroke-dashoffset: -1000; opacity: 0; }
+          }
+          @media (prefers-reduced-motion: reduce) {
+            #${styleId} ~ svg [style*="${sparkAnimationName}"] {
+              animation: none !important;
+            }
           }
         `}</style>
       )}

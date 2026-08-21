@@ -22,7 +22,7 @@ const SERVER_ONLY_PATH_PATTERNS = [
   /^@\/lib\/auth\/gate$/,
   /^@\/lib\/env-server/,
   /^@\/lib\/stripe\/client$/,
-  /^@\/lib\/admin\/(?!types$|csv-configs\/)/, // @/lib/admin/* (except types.ts and csv-configs/)
+  /^@\/lib\/admin\/(?!types$|csv-configs\/|format$)/, // @/lib/admin/* (except types, csv-configs, format)
   /\.server$/, // *.server.ts files
 ];
 
@@ -81,6 +81,12 @@ module.exports = {
         const sourceValue = node.source && node.source.value;
         if (typeof sourceValue !== 'string') return;
         if (!isServerOnlyImport(sourceValue)) return;
+        // Type-only imports are erased and never bundle server code.
+        if (node.importKind === 'type') return;
+        const hasValueSpecifier = node.specifiers.some(
+          specifier => specifier.importKind !== 'type'
+        );
+        if (!hasValueSpecifier) return;
 
         context.report({
           node,

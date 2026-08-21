@@ -449,7 +449,7 @@ describe('useLinksPersistence', () => {
       );
 
       expect(result.current.debouncedSave).toBeDefined();
-      expect(typeof result.current.debouncedSave).toBe('function');
+      expect(typeof result.current.debouncedSave.save).toBe('function');
       expect(typeof result.current.debouncedSave.flush).toBe('function');
       expect(typeof result.current.debouncedSave.cancel).toBe('function');
     });
@@ -464,7 +464,7 @@ describe('useLinksPersistence', () => {
       );
 
       act(() => {
-        result.current.debouncedSave([]);
+        result.current.debouncedSave.save([]);
       });
 
       // Fetch not called yet (debounced)

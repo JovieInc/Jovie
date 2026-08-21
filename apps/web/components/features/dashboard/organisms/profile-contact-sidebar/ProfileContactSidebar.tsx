@@ -2,7 +2,14 @@
 import { Button } from '@jovie/ui';
 import { Plus } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   type PreviewPanelData,
@@ -25,6 +32,7 @@ import { useEmailSignatureMenuAction } from '@/features/dashboard/molecules/useE
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { buildSignatureInputFromProfile } from '@/lib/email-signature/profile-input';
+import { useLatestRef } from '@/lib/hooks/useLatestRef';
 import {
   beginPreviewPanelEdit,
   endPreviewPanelEdit,
@@ -269,8 +277,7 @@ export function ProfileContactSidebar() {
   );
 
   // Keep a ref to the latest previewData so async callbacks avoid stale closures
-  const previewDataRef = useRef(previewData);
-  previewDataRef.current = previewData;
+  const previewDataRef = useLatestRef(previewData);
 
   const mountedRef = useRef(true);
   const operationEpochRef = useRef(0);
@@ -383,7 +390,7 @@ export function ProfileContactSidebar() {
       setPreviewData(next);
       return next;
     },
-    [setPreviewData]
+    [previewDataRef, setPreviewData]
   );
 
   const beginMutationStatus = useCallback(() => {
@@ -450,8 +457,7 @@ export function ProfileContactSidebar() {
   const [selectedCategory, setSelectedCategory] = useState<
     CategoryOption | 'about'
   >('social');
-  const selectedCategoryRef = useRef<CategoryOption | 'about'>('social');
-  selectedCategoryRef.current = selectedCategory;
+  const selectedCategoryRef = useLatestRef(selectedCategory);
 
   // Suggested DSP matches — used for dot indicator on Music tab
   const { data: suggestedMatches } = useDspMatchesQuery({
@@ -480,8 +486,7 @@ export function ProfileContactSidebar() {
 
   // Add link state
   const [isAddingLink, setIsAddingLink] = useState(false);
-  const isAddingLinkRef = useRef(false);
-  isAddingLinkRef.current = isAddingLink;
+  const isAddingLinkRef = useLatestRef(isAddingLink);
 
   // Track temp link IDs with pending server adds. If user deletes a temp link
   // while its confirm-link request is in flight, we queue a server delete for
@@ -524,7 +529,7 @@ export function ProfileContactSidebar() {
     ) {
       setIsAddingLink(true);
     }
-  }, [searchParams]);
+  }, [isAddingLinkRef, searchParams, selectedCategoryRef]);
 
   const supportsAddAction = LINK_ACTION_CATEGORIES.has(
     resolvedCategory as CategoryOption
@@ -679,10 +684,13 @@ export function ProfileContactSidebar() {
       completeMutationSuccess,
       drainProfileSaveQueue,
       patchPreviewData,
+      previewDataRef,
       selectedProfile,
     ]
   );
-  saveProfileFieldRef.current = saveProfileField;
+  useLayoutEffect(() => {
+    saveProfileFieldRef.current = saveProfileField;
+  });
 
   // Handle bio change — save to server and instantly update sidebar
   const handleBioChange = useCallback(
@@ -778,7 +786,7 @@ export function ProfileContactSidebar() {
       }
       if (mountedRef.current) toast.success(`${platformName} link added`);
     },
-    [patchPreviewData, removeLinkMutation]
+    [patchPreviewData, previewDataRef, removeLinkMutation]
   );
 
   // Revert optimistic add on failure
@@ -798,7 +806,7 @@ export function ProfileContactSidebar() {
       if (mountedRef.current) toast.error('Failed to add link');
       return true;
     },
-    [patchPreviewData]
+    [patchPreviewData, previewDataRef]
   );
 
   // Handle adding a new link (opens smart input)
@@ -968,14 +976,17 @@ export function ProfileContactSidebar() {
       revertOptimisticAdd,
       removeLinkMutation,
       patchPreviewData,
+      previewDataRef,
       beginMutationStatus,
       completeMutationError,
       completeMutationSuccess,
     ]
   );
-  addLinkRef.current = link => {
-    void handleSmartAddLink(link);
-  };
+  useLayoutEffect(() => {
+    addLinkRef.current = link => {
+      void handleSmartAddLink(link);
+    };
+  });
 
   // Handle removing a link
   const handleRemoveLink = useCallback(
@@ -1089,11 +1100,14 @@ export function ProfileContactSidebar() {
       completeMutationError,
       completeMutationSuccess,
       patchPreviewData,
+      previewDataRef,
       removeLinkMutation,
       selectedProfile,
     ]
   );
-  removeLinkRef.current = handleRemoveLink;
+  useLayoutEffect(() => {
+    removeLinkRef.current = handleRemoveLink;
+  });
 
   // Header parts hook needs to be called unconditionally
   const { overflowActions: baseOverflowActions } = useProfileHeaderParts({

@@ -1,26 +1,26 @@
 'use client';
 
 import { RailToggleButton } from '@/components/atoms/RailToggleButton';
-import { useSidebar } from '@/components/organisms/Sidebar';
 import { SIDEBAR_KEYBOARD_SHORTCUT_BARE } from '@/hooks/useSidebarKeyboardShortcut';
 
 interface SidebarCollapseButtonProps {
   readonly className?: string;
+  readonly open: boolean;
+  readonly onToggle: () => void;
 }
 
 export function SidebarCollapseButton({
   className,
+  open,
+  onToggle,
 }: SidebarCollapseButtonProps) {
-  const { toggleSidebar, state } = useSidebar();
-  const isCollapsed = state === 'closed';
-
   return (
     <RailToggleButton
       side='left'
-      open={!isCollapsed}
+      open={open}
       openLabel='Collapse sidebar'
       closedLabel='Expand sidebar'
-      onToggle={toggleSidebar}
+      onToggle={onToggle}
       shortcut={SIDEBAR_KEYBOARD_SHORTCUT_BARE}
       className={className}
       dataTestId='sidebar-rail-toggle'

@@ -4,7 +4,6 @@ import { Search, X } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { AppSearchField } from '@/components/molecules/AppSearchField';
-import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { cn } from '@/lib/utils';
 
 export interface HeaderSearchActionProps {
@@ -63,14 +62,15 @@ export function HeaderSearchAction({
 
   if (!isOpen && !alwaysOpen) {
     return (
-      <DashboardHeaderActionButton
+      <AppIconButton
+        type='button'
         ariaLabel={submitAriaLabel}
         onClick={() => setIsOpen(true)}
-        icon={submitIcon}
-        iconOnly
         tooltipLabel={tooltipLabel}
         className={className}
-      />
+      >
+        {submitIcon}
+      </AppIconButton>
     );
   }
 

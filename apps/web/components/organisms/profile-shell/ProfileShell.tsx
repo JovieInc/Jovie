@@ -11,9 +11,9 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
-import { ArtistInfo } from '@/components/molecules/ArtistInfo';
 import { ProfileNavButton } from '@/components/molecules/ProfileNavButton';
 import { SocialLink as SocialLinkComponent } from '@/components/molecules/SocialLink';
+import { ArtistInfo } from '@/components/organisms/ArtistInfo';
 import { ProfileNotificationsButton } from '@/components/organisms/ProfileNotificationsButton';
 import {
   PublicSurfaceFooter,

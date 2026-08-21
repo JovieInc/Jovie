@@ -2,7 +2,6 @@
 
 import type { ImageProps } from 'next/image';
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { shouldBypassImageOptimization } from '@/lib/utils/dsp-images';
 
@@ -124,7 +123,6 @@ export function ImageWithFallback({
   onLoadError,
   ...rest
 }: ImageWithFallbackProps) {
-  const [hasError, setHasError] = useState(false);
   let sourceUrl: string | null = null;
   if (typeof src === 'string') {
     sourceUrl = src;
@@ -132,46 +130,54 @@ export function ImageWithFallback({
     sourceUrl = src.src;
   }
 
-  // Reset error state when src changes
-  useEffect(() => {
-    setHasError(false);
-  }, [src]);
+  const FallbackIcon = FALLBACK_ICONS[fallbackVariant];
+  // When `fill` is used, Next.js Image renders as `position: absolute; inset: 0`.
+  // The fallback must match that behaviour so it fills the positioned parent even
+  // when the parent has no explicit height in normal flow.
+  const isFill = Boolean(rest.fill);
+  const fallback = (
+    <div
+      className={cn(
+        'flex items-center justify-center outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10',
+        isFill ? 'absolute inset-0' : 'h-full w-full',
+        fallbackClassName
+      )}
+      role='img'
+      aria-label={alt}
+    >
+      <FallbackIcon className='h-1/3 w-1/3 text-tertiary-token' />
+    </div>
+  );
 
-  if (!src || hasError) {
-    const FallbackIcon = FALLBACK_ICONS[fallbackVariant];
-    // When `fill` is used, Next.js Image renders as `position: absolute; inset: 0`.
-    // The fallback must match that behaviour so it fills the positioned parent even
-    // when the parent has no explicit height in normal flow.
-    const isFill = Boolean(rest.fill);
-    return (
-      <div
-        className={cn(
-          'flex items-center justify-center outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10',
-          isFill ? 'absolute inset-0' : 'h-full w-full',
-          fallbackClassName
-        )}
-        role='img'
-        aria-label={alt}
-      >
-        <FallbackIcon className='h-1/3 w-1/3 text-tertiary-token' />
-      </div>
-    );
+  if (!src) {
+    return fallback;
   }
 
+  const sourceKey = typeof src === 'string' ? src : sourceUrl;
+
   return (
-    <Image
-      src={src}
-      alt={alt}
-      className={cn(
-        'outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10',
-        className
-      )}
-      onError={() => {
-        setHasError(true);
-        onLoadError?.();
-      }}
-      unoptimized={shouldBypassImageOptimization(sourceUrl)}
-      {...rest}
-    />
+    <span className={cn(isFill ? 'absolute inset-0 block' : 'contents')}>
+      <Image
+        key={sourceKey}
+        src={src}
+        alt={alt}
+        className={cn(
+          'outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10',
+          className
+        )}
+        onError={event => {
+          event.currentTarget.style.display = 'none';
+          event.currentTarget.setAttribute('aria-hidden', 'true');
+          const sibling = event.currentTarget.nextElementSibling;
+          if (sibling instanceof HTMLElement) {
+            sibling.hidden = false;
+          }
+          onLoadError?.();
+        }}
+        unoptimized={shouldBypassImageOptimization(sourceUrl)}
+        {...rest}
+      />
+      <div hidden>{fallback}</div>
+    </span>
   );
 }

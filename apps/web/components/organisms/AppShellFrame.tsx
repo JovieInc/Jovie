@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import { memo } from 'react';
 import { CanvasGrain } from '@/components/atoms/CanvasGrain';
-import { DesktopTitlebar } from '@/components/atoms/DesktopTitlebar';
+import { DesktopTitlebar } from '@/components/organisms/DesktopTitlebar';
 import { AppShellRightRail } from '@/components/shell/AppShellRightRail';
 import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { cn } from '@/lib/utils';

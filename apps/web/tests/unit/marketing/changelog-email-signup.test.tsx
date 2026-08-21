@@ -30,7 +30,7 @@ vi.mock('@/lib/hooks/useReducedMotion', () => ({
   useReducedMotion: () => true,
 }));
 
-vi.mock('@/components/atoms/InvisibleTurnstile', () => ({
+vi.mock('@/components/molecules/InvisibleTurnstile', () => ({
   InvisibleTurnstile: ({
     onToken,
     onStateChange,

@@ -284,8 +284,6 @@ export function VisualQaReviewPanel() {
     );
   }
 
-  let surfaceIndex = 0;
-
   return (
     <ContentSurfaceCard
       surface='details'
@@ -307,15 +305,23 @@ export function VisualQaReviewPanel() {
 
       {runs.length > 0 ? (
         <div className='grid gap-3'>
-          {runs.map(run => (
+          {runs.map((run, runIndex) => (
             <div key={run.runId} className='space-y-2'>
               <p className='text-2xs text-tertiary-token'>
                 Run {run.runId} · {formatComputedAt(run.computedAt)} ·{' '}
                 {run.passed ? 'Passed' : 'Needs review'}
               </p>
               <div className='grid gap-3'>
-                {run.surfaces.map(surface => {
-                  surfaceIndex += 1;
+                {run.surfaces.map((surface, surfaceOffset) => {
+                  const surfaceIndex =
+                    runs
+                      .slice(0, runIndex)
+                      .reduce(
+                        (count, item) => count + item.surfaces.length,
+                        0
+                      ) +
+                    surfaceOffset +
+                    1;
                   const referenceId = `HUD-VQA-${String(surfaceIndex).padStart(3, '0')}`;
                   return (
                     <VisualQaSurfaceCard

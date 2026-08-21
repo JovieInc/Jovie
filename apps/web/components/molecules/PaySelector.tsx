@@ -5,7 +5,6 @@ import { ChevronDown, PencilLine } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AmountSelector } from '@/components/atoms/AmountSelector';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 import { cn } from '@/lib/utils';
 import { formatDollarAmount } from '@/lib/utils/format-number';
 
@@ -226,27 +225,27 @@ export function PaySelector({
             </div>
           </div>
 
-          <SmartLinkProviderButton
-            label={
-              isLoading
-                ? `Opening ${resolvedMethod?.label ?? 'payment'}…`
-                : paymentActionLabel
-            }
-            ariaLabel={paymentActionLabel}
-            primary
+          <button
+            type='button'
             onClick={handleContinue}
             disabled={isLoading || !canContinue || !isMethodAvailable}
-            icon={
-              resolvedMethod?.id === 'venmo' ? (
-                <SocialIcon
-                  platform='venmo'
-                  size={20}
-                  className='shrink-0'
-                  aria-hidden
-                />
-              ) : null
-            }
-          />
+            aria-label={paymentActionLabel}
+            className='group flex min-h-13 w-full items-center justify-center gap-2 rounded-full border border-btn-primary bg-btn-primary px-5 text-btn-primary-foreground shadow-button-inset transition-[background-color,border-color,color,box-shadow,opacity] duration-subtle hover:border-btn-primary-hover hover:bg-btn-primary-hover disabled:pointer-events-none disabled:opacity-[var(--state-disabled-opacity)]'
+          >
+            {resolvedMethod?.id === 'venmo' ? (
+              <SocialIcon
+                platform='venmo'
+                size={20}
+                className='shrink-0'
+                aria-hidden
+              />
+            ) : null}
+            <span className='text-btn-primary-foreground flex-none text-base font-semibold'>
+              {isLoading
+                ? `Opening ${resolvedMethod?.label ?? 'payment'}…`
+                : paymentActionLabel}
+            </span>
+          </button>
 
           <Button
             type='button'

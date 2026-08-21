@@ -55,12 +55,15 @@ function AuthShellInner({
   isChatRoute = false,
   children,
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
-  const { isMobile, state: sidebarState } = useSidebar();
+  const { isMobile, state: sidebarState, toggleSidebar } = useSidebar();
   const { isComposerFocused } = useComposerFocus();
   const rightPanel = useRightPanel();
   const previewPanelState = usePreviewPanelState();
   const sidebarTrigger = isMobile ? null : sidebarState === 'closed' ? (
-    <SidebarCollapseButton />
+    <SidebarCollapseButton
+      open={sidebarState !== 'closed'}
+      onToggle={toggleSidebar}
+    />
   ) : null;
 
   const isInSettings = section === 'settings';

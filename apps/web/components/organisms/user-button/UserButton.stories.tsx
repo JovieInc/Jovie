@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { APP_ROUTES } from '@/constants/routes';
 import { UserButton } from './UserButton';
 
 const meta: Meta<typeof UserButton> = {
@@ -12,8 +13,8 @@ const meta: Meta<typeof UserButton> = {
   },
   args: {
     showUserInfo: true,
-    profileHref: '/app/settings/profile',
-    settingsHref: '/app/settings',
+    profileHref: APP_ROUTES.SETTINGS_PROFILE,
+    settingsHref: APP_ROUTES.SETTINGS,
   },
 };
 

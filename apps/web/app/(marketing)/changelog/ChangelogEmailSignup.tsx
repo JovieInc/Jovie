@@ -16,7 +16,7 @@ import {
   type InvisibleTurnstileState,
   isTurnstileClientBypassed,
   isTurnstileClientConfigured,
-} from '@/components/atoms/InvisibleTurnstile';
+} from '@/components/molecules/InvisibleTurnstile';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 
 type Status = 'idle' | 'submitting' | 'success' | 'error';

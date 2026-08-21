@@ -13,12 +13,14 @@ import {
   startTransition,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react';
 import { toast } from '@/components/feedback';
 import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
+import { useLatestRef } from '@/lib/hooks/useLatestRef';
 import { LYRICS_FORMAT_LABELS, type LyricsFormat } from '@/lib/lyrics/types';
 import { cn } from '@/lib/utils';
 import { ReleaseSaveStatusRow } from './ReleaseSaveStatusRow';
@@ -71,14 +73,13 @@ export function ReleaseLyricsSection({
   const savedIndicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
-  const draftRef = useRef(draftLyrics);
-  const releaseIdRef = useRef(releaseId);
-  const lyricsRef = useRef(lyrics);
-
-  // Keep refs in sync
-  draftRef.current = draftLyrics;
-  releaseIdRef.current = releaseId;
-  lyricsRef.current = lyrics;
+  const draftRef = useLatestRef(draftLyrics);
+  const releaseIdRef = useLatestRef(releaseId);
+  const lyricsRef = useLatestRef(lyrics);
+  const performAutoSaveRef = useRef<() => Promise<void>>(async () => {});
+  const handleFormatRef = useRef<(format: LyricsFormat) => Promise<void>>(
+    async () => {}
+  );
 
   // Sync draft when lyrics or releaseId changes externally
   useEffect(() => {
@@ -123,12 +124,16 @@ export function ReleaseLyricsSection({
         createSaveFeedback(
           message,
           'Retry save',
-          createVoidRetryHandler(performAutoSave)
+          createVoidRetryHandler(() => performAutoSaveRef.current())
         )
       );
       toast.error(message);
     }
-  }, [onSaveLyrics]);
+  }, [draftRef, lyricsRef, onSaveLyrics, releaseIdRef]);
+
+  useLayoutEffect(() => {
+    performAutoSaveRef.current = performAutoSave;
+  });
 
   // Debounced auto-save on draft changes
   useEffect(() => {
@@ -180,7 +185,7 @@ export function ReleaseLyricsSection({
           createSaveFeedback(
             message,
             'Retry format',
-            createVoidRetryHandler(() => handleFormat(format))
+            createVoidRetryHandler(() => handleFormatRef.current(format))
           )
         );
         toast.error(message);
@@ -190,6 +195,10 @@ export function ReleaseLyricsSection({
     },
     [onFormatLyrics, releaseId, draftLyrics]
   );
+
+  useLayoutEffect(() => {
+    handleFormatRef.current = handleFormat;
+  });
 
   const handleCopy = useCallback(async () => {
     if (!draftLyrics.trim()) {

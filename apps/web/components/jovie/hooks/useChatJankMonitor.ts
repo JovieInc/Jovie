@@ -13,6 +13,7 @@ import {
   type MessageSnapshot,
   type PartSnapshot,
 } from '@/lib/chat/jank-monitor';
+import { useLatestRef } from '@/lib/hooks/useLatestRef';
 import { logger } from '@/lib/utils/logger';
 
 /** Client-local id prefixes (anything else is treated as server-assigned). */
@@ -144,10 +145,8 @@ export function useChatJankMonitor({
   }, [emitFn]);
 
   const snapshots = useMemo(() => toMessageSnapshots(messages), [messages]);
-  const snapshotsRef = useRef(snapshots);
-  snapshotsRef.current = snapshots;
-  const statusRef = useRef(status);
-  statusRef.current = status;
+  const snapshotsRef = useLatestRef(snapshots);
+  const statusRef = useLatestRef(status);
   const pendingTool = useMemo(() => hasActivePendingTool(messages), [messages]);
 
   // ── Observe messages (throttled while streaming) ─────────────
@@ -165,7 +164,7 @@ export function useChatJankMonitor({
     observeLatest();
     const interval = setInterval(observeLatest, STREAMING_SNAPSHOT_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [enabled, conversationId, status, monitor]);
+  }, [enabled, conversationId, status, monitor, snapshotsRef, statusRef]);
 
   useEffect(() => {
     if (!enabled || status === 'streaming') return;

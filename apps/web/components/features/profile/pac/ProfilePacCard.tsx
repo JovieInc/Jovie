@@ -22,7 +22,7 @@ import {
   useState,
 } from 'react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
-import { SeekBar } from '@/components/atoms/SeekBar';
+import { SeekBar } from '@/components/molecules/SeekBar';
 import type { EntityCarouselLayout } from '@/components/organisms/entity-card';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import type { ProfileRenderMode } from '@/features/profile/contracts';

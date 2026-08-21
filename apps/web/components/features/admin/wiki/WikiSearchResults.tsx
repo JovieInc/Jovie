@@ -1,20 +1,21 @@
 import { slugToHref, titleFromSlug } from '@/lib/wiki/format';
 
 interface Props {
-  results: {
-    slug: string;
-    title: string;
-    score?: number;
-    chunk_text?: string;
+  readonly results: {
+    readonly slug: string;
+    readonly title: string;
+    readonly score?: number;
+    readonly chunk_text?: string;
   }[];
-  query: string;
+  readonly query: string;
 }
 
 export function WikiSearchResults({ results, query }: Props) {
   return (
     <div className='mt-6'>
       <p className='mb-4 text-sm text-gray-500 dark:text-gray-400'>
-        {results.length} result{results.length !== 1 ? 's' : ''} for "{query}"
+        {results.length} result{results.length !== 1 ? 's' : ''} for &quot;
+        {query}&quot;
       </p>
       <ul className='space-y-3'>
         {results.map(r => (

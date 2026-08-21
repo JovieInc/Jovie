@@ -4,7 +4,7 @@ import { getCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { getPage } from '@/lib/wiki/gbrain-client';
 
 interface Props {
-  params: Promise<{ slug: string[] }>;
+  readonly params: Promise<{ slug: string[] }>;
 }
 
 export default async function WikiPageView({ params }: Props) {
