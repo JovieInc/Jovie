@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  hasFinishedGarmentMockup,
   hasRenderableMockup,
+  isCompositedMerchMockupUrl,
   isInternalMerchMockupUrl,
   isPrintfulMockupUrl,
   selectPreferredMockupUrl,
@@ -22,6 +24,19 @@ describe('mockup-urls', () => {
         'https://blob.vercel-storage.com/merch/generated/profile/gen/opt-mockup.jpg'
       )
     ).toBe(true);
+    expect(
+      isCompositedMerchMockupUrl(
+        'https://blob.vercel-storage.com/merch/generated/profile/gen/opt-mockup.jpg'
+      )
+    ).toBe(true);
+  });
+
+  it('does not treat a print-art PNG as a finished garment mockup', () => {
+    const printArt =
+      'https://blob.vercel-storage.com/merch/generated/a/b/c-print.png';
+    expect(isCompositedMerchMockupUrl(printArt)).toBe(false);
+    expect(selectPreferredMockupUrl([printArt])).toBeNull();
+    expect(hasFinishedGarmentMockup([printArt])).toBe(false);
   });
 
   it('prefers Printful mockups over internal placeholders', () => {
@@ -33,9 +48,10 @@ describe('mockup-urls', () => {
     ).toBe('https://files.printful.com/mockup/tee.jpg');
   });
 
-  it('falls back to the first URL when no Printful mockup exists', () => {
+  it('falls back to the composited garment when no Printful mockup exists', () => {
     expect(
       selectPreferredMockupUrl([
+        'https://blob.vercel-storage.com/merch/generated/a/b/c-print.png',
         'https://blob.vercel-storage.com/merch/generated/a/b/c-mockup.jpg',
       ])
     ).toBe('https://blob.vercel-storage.com/merch/generated/a/b/c-mockup.jpg');

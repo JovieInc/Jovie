@@ -255,6 +255,18 @@ function buildBlankGarmentSvg(productType: string | null | undefined): Buffer {
   </svg>`);
 }
 
+function isLegacyPrintSheet(width: number, height: number): boolean {
+  return width >= PRINT_WIDTH && height >= PRINT_HEIGHT;
+}
+
+/**
+ * Composites print artwork onto a product-aware garment template.
+ *
+ * Legacy deterministic print sheets are 4500×5400 with content in
+ * PRINT_CHEST_REGION. Generated graphics are full-bleed (typically 1024²)
+ * alpha PNGs — extracting the sheet region from those drops the design
+ * and yields a blank garment.
+ */
 export async function renderMockup(
   printFile: Buffer,
   productType?: string | null
@@ -264,8 +276,14 @@ export async function renderMockup(
     .png()
     .toBuffer();
 
-  const croppedPrint = await sharp(printFile)
-    .extract(PRINT_CHEST_REGION)
+  const sourceMeta = await sharp(printFile).metadata();
+  const sourceWidth = sourceMeta.width ?? 0;
+  const sourceHeight = sourceMeta.height ?? 0;
+  const printSource = isLegacyPrintSheet(sourceWidth, sourceHeight)
+    ? sharp(printFile).extract(PRINT_CHEST_REGION)
+    : sharp(printFile);
+
+  const croppedPrint = await printSource
     .resize(productPrintRegion.width, productPrintRegion.height, {
       fit: 'inside',
       withoutEnlargement: false,
@@ -289,6 +307,31 @@ export async function renderMockup(
     .toBuffer();
 }
 
+async function persistPrintAndMockup(params: {
+  readonly profileId: string;
+  readonly generationId: string;
+  readonly optionId: string;
+  readonly printFile: Buffer;
+  readonly productType?: string | null;
+}): Promise<{ readonly printFileUrl: string; readonly mockupUrl: string }> {
+  const mockup = await renderMockup(params.printFile, params.productType);
+  const basePath = `merch/generated/${params.profileId}/${params.generationId}/${params.optionId}`;
+  const [printFileUrl, mockupUrl] = await Promise.all([
+    uploadPublicBuffer({
+      path: `${basePath}-print.png`,
+      buffer: params.printFile,
+      contentType: 'image/png',
+    }),
+    uploadPublicBuffer({
+      path: `${basePath}-mockup.jpg`,
+      buffer: mockup,
+      contentType: 'image/jpeg',
+    }),
+  ]);
+
+  return { printFileUrl, mockupUrl };
+}
+
 export async function createMerchArtwork(params: {
   readonly profileId: string;
   readonly generationId: string;
@@ -300,20 +343,22 @@ export async function createMerchArtwork(params: {
   readonly productType?: string | null;
 }): Promise<{ readonly printFileUrl: string; readonly mockupUrl: string }> {
   const printFile = await sharp(buildPrintSvg(params)).png().toBuffer();
-  const mockup = await renderMockup(printFile, params.productType);
-  const basePath = `merch/generated/${params.profileId}/${params.generationId}/${params.optionId}`;
-  const [printFileUrl, mockupUrl] = await Promise.all([
-    uploadPublicBuffer({
-      path: `${basePath}-print.png`,
-      buffer: printFile,
-      contentType: 'image/png',
-    }),
-    uploadPublicBuffer({
-      path: `${basePath}-mockup.jpg`,
-      buffer: mockup,
-      contentType: 'image/jpeg',
-    }),
-  ]);
+  return persistPrintAndMockup({
+    profileId: params.profileId,
+    generationId: params.generationId,
+    optionId: params.optionId,
+    printFile,
+    productType: params.productType,
+  });
+}
 
-  return { printFileUrl, mockupUrl };
+/** Composites a generated alpha print graphic onto the garment and uploads both. */
+export async function createGeneratedMerchArtwork(params: {
+  readonly profileId: string;
+  readonly generationId: string;
+  readonly optionId: string;
+  readonly printFile: Buffer;
+  readonly productType?: string | null;
+}): Promise<{ readonly printFileUrl: string; readonly mockupUrl: string }> {
+  return persistPrintAndMockup(params);
 }

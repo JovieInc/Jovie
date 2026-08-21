@@ -50,7 +50,11 @@ import {
 } from './generation-contract';
 import { resolveArchivedMerchRestoreStatus } from './merch-lifecycle-policy';
 import { scheduleMerchMockupEnrichment } from './mockup-enrichment';
-import { isPrintfulMockupUrl, selectPreferredMockupUrl } from './mockup-urls';
+import {
+  isCompositedMerchMockupUrl,
+  isPrintfulMockupUrl,
+  selectPreferredMockupUrl,
+} from './mockup-urls';
 import {
   buildMerchPresetPriceQuotes,
   buildMerchPricingSnapshot,
@@ -1156,9 +1160,11 @@ export async function selectMerchDesign(params: {
   ) {
     publishBlockers.push(MERCH_MOCKUP_FAILURE_PUBLISH_BLOCKER);
   }
-  const printfulMockupUrl =
+  const displayMockupUrl =
     card.mockupUrls.find(isPrintfulMockupUrl) ??
     selected.mockupUrls.find(isPrintfulMockupUrl) ??
+    card.mockupUrls.find(isCompositedMerchMockupUrl) ??
+    selected.mockupUrls.find(isCompositedMerchMockupUrl) ??
     null;
 
   return {
@@ -1179,8 +1185,8 @@ export async function selectMerchDesign(params: {
         card.printful.catalogProductName ?? selected.printfulProductName,
       colorway: selected.colorway,
       artworkUrl: selected.printFileUrls[0] ?? null,
-      mockupUrl: printfulMockupUrl,
-      mockupStatus: printfulMockupUrl ? 'ready' : 'pending',
+      mockupUrl: displayMockupUrl,
+      mockupStatus: displayMockupUrl ? 'ready' : 'pending',
       retailPrice: formatMerchMoney(card.retailPriceCents),
       artistProfit: formatMerchMoney(card.artistPayoutPerUnitEstimateCents),
       publishEligible: publishBlockers.length === 0,

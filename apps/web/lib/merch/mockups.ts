@@ -126,7 +126,6 @@ export async function createMockupGenerationTasks(
 
   for (const product of products) {
     try {
-      const mockupStyles = getMockupStyleIds(product.productType);
       const task = await createMockupTask({
         catalogProductId: product.catalogProductId,
         catalogVariantIds: product.catalogVariantIds,
@@ -140,7 +139,6 @@ export async function createMockupGenerationTasks(
             },
           ],
         })),
-        mockupStyleIds: mockupStyles,
       });
       taskIds.push(task.id);
       taskIdToCatalogProductId[String(task.id)] = product.catalogProductId;
@@ -346,16 +344,4 @@ function extractMockupUrls(task: PrintfulMockupTask): string[] {
     }
   }
   return [...new Set(urls)];
-}
-
-function getMockupStyleIds(productType: string): number[] | undefined {
-  switch (productType) {
-    case 'premium hoodie':
-      return [2, 4];
-    case 'mug':
-      return [5, 8];
-    case 'premium tee':
-    default:
-      return [1, 3];
-  }
 }

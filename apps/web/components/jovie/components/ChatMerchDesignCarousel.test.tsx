@@ -191,4 +191,27 @@ describe('ChatMerchDesignCarousel', () => {
     expect(container.querySelectorAll('.aspect-square')).toHaveLength(3);
     expect(screen.queryByText(/generating/i)).not.toBeInTheDocument();
   });
+
+  it('does not present a blank garment when mockup rendering failed', () => {
+    render(
+      <ChatMerchDesignCarousel
+        result={{
+          ...result,
+          designs: [
+            {
+              ...result.designs[0],
+              status: 'generating',
+              preview_url: undefined,
+              mockup_status: 'mockup_failed',
+            },
+          ],
+        }}
+      />
+    );
+
+    expect(screen.getByTestId('chat-merch-mockup-failed')).toHaveTextContent(
+      'Preview unavailable'
+    );
+    expect(screen.queryByAltText(/mockup/i)).toBeNull();
+  });
 });

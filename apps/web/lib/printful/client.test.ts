@@ -179,4 +179,43 @@ describe('Printful client', () => {
       'https://printful.test/v2/catalog-products?selling_region_name=north_america&placements=front&limit=20&offset=20'
     );
   });
+
+  it('creates catalog mockup tasks from the v2 array envelope', async () => {
+    const serverFetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            data: [{ id: 752213059, status: 'pending' }],
+          }),
+          { status: 200 }
+        )
+    );
+    const { client } = await loadPrintfulClient({ serverFetch });
+
+    const task = await client.createMockupTask({
+      catalogProductId: 71,
+      catalogVariantIds: [4012],
+      placements: [
+        {
+          placement: 'front',
+          technique: 'dtg',
+          layers: [{ type: 'file', url: 'https://cdn.test/print.png' }],
+        },
+      ],
+    });
+
+    expect(task).toEqual({ id: 752213059, status: 'pending' });
+    const call = serverFetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(call[0]).toBe('https://printful.test/v2/mockup-tasks');
+    expect(JSON.parse(String(call[1]?.body))).toMatchObject({
+      format: 'jpg',
+      products: [
+        {
+          source: 'catalog',
+          catalog_product_id: 71,
+          catalog_variant_ids: [4012],
+        },
+      ],
+    });
+  });
 });
