@@ -4,6 +4,7 @@ const hoisted = vi.hoisted(() => ({
   getCachedAuthMock: vi.fn(),
   withDbSessionTxMock: vi.fn(),
   captureErrorMock: vi.fn(),
+  getDashboardContactsMock: vi.fn(),
 }));
 
 vi.mock('@/lib/auth/cached', () => ({
@@ -14,8 +15,12 @@ vi.mock('@/lib/auth/session', () => ({
   withDbSessionTx: hoisted.withDbSessionTxMock,
 }));
 
+vi.mock('@/lib/contacts/queries', () => ({
+  getDashboardContacts: hoisted.getDashboardContactsMock,
+}));
+
 vi.mock('@/lib/db/schema/auth', () => ({
-  users: { id: 'id', clerkId: 'clerkId' },
+  users: { id: 'userId', clerkId: 'clerkId' },
 }));
 
 vi.mock('@/lib/db/schema/profiles', () => ({
@@ -54,6 +59,7 @@ vi.mock('@/lib/error-tracking', () => ({
 describe('GET /api/dashboard/contacts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hoisted.getDashboardContactsMock.mockResolvedValue([]);
   });
 
   it('returns 401 when unauthenticated', async () => {
@@ -115,6 +121,7 @@ describe('GET /api/dashboard/contacts', () => {
   it('checks profile ownership with the authenticated app user id', async () => {
     const profileQuery = {
       from: vi.fn().mockReturnThis(),
+      innerJoin: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue([{ id: 'profile_123' }]),
     };

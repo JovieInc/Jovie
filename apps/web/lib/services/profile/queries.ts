@@ -5,7 +5,7 @@
  * This is the single source of truth for profile queries.
  */
 
-import { and, eq, gt, inArray, isNull, ne, or } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull, ne, or } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { getPressPhotosByProfileId } from '@/lib/db/queries/press-photos';
@@ -13,7 +13,9 @@ import { users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
 import {
   type CreatorContact,
-  creatorContacts,
+  creatorContactAssignments,
+  creatorContactPeople,
+  creatorContactResponsibilities,
   creatorProfiles,
 } from '@/lib/db/schema/profiles';
 import { getLatestReleaseByUsername } from '@/lib/discography/queries';
@@ -95,6 +97,58 @@ const legacyProfileSelectColumns = {
 // Bounded data retrieval limits to prevent OOM on profiles with many links
 const MAX_SOCIAL_LINKS = 100;
 const MAX_CONTACTS = 50;
+
+async function getDirectoryProfileContacts(
+  profileId: string
+): Promise<CreatorContact[]> {
+  const contacts = await db
+    .select({
+      id: creatorContactAssignments.id,
+      creatorProfileId: creatorContactPeople.creatorProfileId,
+      role: creatorContactResponsibilities.role,
+      customLabel: creatorContactResponsibilities.customLabel,
+      personName: creatorContactPeople.displayName,
+      companyName: creatorContactPeople.companyName,
+      territories: creatorContactAssignments.territories,
+      email: creatorContactPeople.email,
+      phone: creatorContactPeople.phone,
+      preferredChannel: creatorContactPeople.preferredChannel,
+      isActive: creatorContactAssignments.isActive,
+      sortOrder: creatorContactAssignments.sortOrder,
+      createdAt: creatorContactAssignments.createdAt,
+      updatedAt: creatorContactAssignments.updatedAt,
+    })
+    .from(creatorContactAssignments)
+    .innerJoin(
+      creatorContactPeople,
+      eq(creatorContactPeople.id, creatorContactAssignments.personId)
+    )
+    .innerJoin(
+      creatorContactResponsibilities,
+      eq(
+        creatorContactResponsibilities.id,
+        creatorContactAssignments.responsibilityId
+      )
+    )
+    .where(
+      and(
+        eq(creatorContactPeople.creatorProfileId, profileId),
+        eq(creatorContactAssignments.isActive, true)
+      )
+    )
+    .orderBy(
+      asc(creatorContactAssignments.sortOrder),
+      asc(creatorContactAssignments.createdAt)
+    )
+    .limit(MAX_CONTACTS);
+
+  return contacts.map(contact => ({
+    ...contact,
+    customLabel: contact.customLabel || null,
+    forwardInboxEmails: false,
+    autoMarkRead: false,
+  }));
+}
 
 // Redis edge cache settings
 const PROFILE_CACHE_KEY_PREFIX = 'profile:data:';
@@ -237,34 +291,7 @@ export async function getProfileContacts(
   profileId: string
 ): Promise<CreatorContact[]> {
   try {
-    const contacts = await db
-      .select({
-        id: creatorContacts.id,
-        creatorProfileId: creatorContacts.creatorProfileId,
-        role: creatorContacts.role,
-        customLabel: creatorContacts.customLabel,
-        personName: creatorContacts.personName,
-        companyName: creatorContacts.companyName,
-        territories: creatorContacts.territories,
-        email: creatorContacts.email,
-        phone: creatorContacts.phone,
-        preferredChannel: creatorContacts.preferredChannel,
-        forwardInboxEmails: creatorContacts.forwardInboxEmails,
-        autoMarkRead: creatorContacts.autoMarkRead,
-        isActive: creatorContacts.isActive,
-        sortOrder: creatorContacts.sortOrder,
-        createdAt: creatorContacts.createdAt,
-        updatedAt: creatorContacts.updatedAt,
-      })
-      .from(creatorContacts)
-      .where(
-        and(
-          eq(creatorContacts.creatorProfileId, profileId),
-          eq(creatorContacts.isActive, true)
-        )
-      )
-      .orderBy(creatorContacts.sortOrder, creatorContacts.createdAt)
-      .limit(MAX_CONTACTS);
+    const contacts = await getDirectoryProfileContacts(profileId);
 
     if (contacts.length === MAX_CONTACTS) {
       logger.warn(
@@ -289,7 +316,7 @@ export async function getProfileContacts(
       causeMessage.includes('does not exist')
     ) {
       logger.warn(
-        'creator_contacts table does not exist, returning empty',
+        'contact directory tables do not exist, returning empty',
         undefined,
         'profile-service'
       );
@@ -576,35 +603,7 @@ async function fetchProfileFromDatabase(
         .orderBy(socialLinks.sortOrder)
         .limit(MAX_SOCIAL_LINKS),
 
-      // Contacts - use profile ID directly (no JOIN to creatorProfiles needed)
-      db
-        .select({
-          id: creatorContacts.id,
-          creatorProfileId: creatorContacts.creatorProfileId,
-          role: creatorContacts.role,
-          customLabel: creatorContacts.customLabel,
-          personName: creatorContacts.personName,
-          companyName: creatorContacts.companyName,
-          territories: creatorContacts.territories,
-          email: creatorContacts.email,
-          phone: creatorContacts.phone,
-          preferredChannel: creatorContacts.preferredChannel,
-          forwardInboxEmails: creatorContacts.forwardInboxEmails,
-          autoMarkRead: creatorContacts.autoMarkRead,
-          isActive: creatorContacts.isActive,
-          sortOrder: creatorContacts.sortOrder,
-          createdAt: creatorContacts.createdAt,
-          updatedAt: creatorContacts.updatedAt,
-        })
-        .from(creatorContacts)
-        .where(
-          and(
-            eq(creatorContacts.creatorProfileId, profile.id),
-            eq(creatorContacts.isActive, true)
-          )
-        )
-        .orderBy(creatorContacts.sortOrder, creatorContacts.createdAt)
-        .limit(MAX_CONTACTS),
+      getDirectoryProfileContacts(profile.id),
 
       // Latest release - still uses username (existing function)
       getLatestReleaseByUsername(normalizedUsername),

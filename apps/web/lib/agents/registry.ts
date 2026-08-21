@@ -121,7 +121,7 @@ export const PUBLIC_SKILL_REGISTRY = {
     id: 'fan_email_send',
     name: 'Send fan email',
     description:
-      'Queue a fan-list email for a release announcement with the live smart link.',
+      'Queue a fan-list email for human approval. Skip if list size is unknown or 0. Never invent ESP metrics. Never auto-send.',
     kind: 'tool',
     version: '1.0.0',
     lifecycle: 'ga',

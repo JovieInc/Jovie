@@ -162,6 +162,7 @@ describe('credited artist profile reconciliation', () => {
     hoisted.insertedValues.length = 0;
     hoisted.updatedValues.length = 0;
     hoisted.getSpotifyArtistsBatch.mockResolvedValue([]);
+    hoisted.invalidateProfileCache.mockResolvedValue(undefined);
   });
 
   it('self-heals an eligible legacy entity route with one exact-ID unclaimed profile', async () => {
@@ -310,9 +311,53 @@ describe('credited artist profile reconciliation', () => {
       ],
       [{ id: candidate.artistId }]
     );
-    hoisted.invalidateProfileCache.mockRejectedValueOnce(
-      new Error('static generation store missing')
+    hoisted.invalidateProfileCache.mockRejectedValue(
+      new Error('Invariant: static generation store missing in revalidateTag')
     );
+
+    const result = await reconcileCreditedArtistProfiles(
+      'owner-profile',
+      'spotify-owner'
+    );
+
+    expect(result).toMatchObject({ created: 1, conflicted: 0 });
+    expect(hoisted.captureWarning).not.toHaveBeenCalled();
+    expect(hoisted.loggerInfo).toHaveBeenCalledWith(
+      'Credited artist profile cache invalidation skipped without Next store',
+      expect.objectContaining({
+        creatorProfileId: 'owner-profile',
+        failedHandles: expect.arrayContaining([
+          'owner-handle',
+          'a_eiqd46x3irj64dlgo8a3glau4',
+        ]),
+      })
+    );
+  });
+
+  it('reports unexpected cache invalidation without using the context bag as the error', async () => {
+    queueOwnerAndCandidates();
+    hoisted.txSelectResults.push(
+      [
+        {
+          ...candidate,
+          creatorProfileId: null,
+          id: candidate.artistId,
+        },
+      ],
+      [],
+      []
+    );
+    hoisted.txReturningResults.push(
+      [
+        {
+          id: 'created-profile',
+          usernameNormalized: 'a_eiqd46x3irj64dlgo8a3glau4',
+        },
+      ],
+      [{ id: candidate.artistId }]
+    );
+    const cacheError = new Error('redis edge cache failed');
+    hoisted.invalidateProfileCache.mockRejectedValue(cacheError);
 
     const result = await reconcileCreditedArtistProfiles(
       'owner-profile',
@@ -322,8 +367,15 @@ describe('credited artist profile reconciliation', () => {
     expect(result).toMatchObject({ created: 1, conflicted: 0 });
     expect(hoisted.captureWarning).toHaveBeenCalledWith(
       'Credited artist profile cache invalidation deferred',
-      undefined,
-      expect.objectContaining({ creatorProfileId: 'owner-profile' })
+      cacheError,
+      expect.objectContaining({
+        source: 'spotify_release_credit',
+        creatorProfileId: 'owner-profile',
+        failedHandles: expect.arrayContaining([
+          'owner-handle',
+          'a_eiqd46x3irj64dlgo8a3glau4',
+        ]),
+      })
     );
   });
 
