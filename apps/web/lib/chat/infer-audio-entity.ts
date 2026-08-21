@@ -70,6 +70,10 @@ function titleMatchScore(fileTitle: string, releaseTitle: string): number {
   return tokenOverlapScore(normalizedFileTitle, normalizedReleaseTitle);
 }
 
+/** Filename/title match only — no fingerprinting in this slice. */
+const HIGH_CONFIDENCE_SCORE = 0.9;
+const ASK_BEFORE_ATTACH_SCORE = 0.75;
+
 export function inferAudioEntity({
   fileName,
   catalog,
@@ -91,11 +95,11 @@ export function inferAudioEntity({
     }
   }
 
-  if (bestMatch && bestMatch.score >= 0.75) {
+  if (bestMatch && bestMatch.score >= HIGH_CONFIDENCE_SCORE) {
     if (!bestMatch.release.hasAudio) {
       return {
         kind: 'attach-to-existing',
-        confidence: bestMatch.score >= 0.9 ? 'high' : 'low',
+        confidence: 'high',
         suggestedTitle,
         releaseId: bestMatch.release.id,
         releaseTitle: bestMatch.release.title,
@@ -105,7 +109,19 @@ export function inferAudioEntity({
 
     return {
       kind: 'reference',
-      confidence: bestMatch.score >= 0.9 ? 'high' : 'low',
+      confidence: 'high',
+      suggestedTitle,
+      releaseId: bestMatch.release.id,
+      releaseTitle: bestMatch.release.title,
+      matchScore: bestMatch.score,
+    };
+  }
+
+  // Weak catalog overlap: save a draft and ask rather than attaching.
+  if (bestMatch && bestMatch.score >= ASK_BEFORE_ATTACH_SCORE) {
+    return {
+      kind: 'new-track',
+      confidence: 'low',
       suggestedTitle,
       releaseId: bestMatch.release.id,
       releaseTitle: bestMatch.release.title,
@@ -115,12 +131,22 @@ export function inferAudioEntity({
 
   return {
     kind: 'new-track',
-    confidence: 'low',
+    confidence: 'high',
     suggestedTitle,
     releaseId: null,
     releaseTitle: null,
     matchScore: bestMatch?.score ?? 0,
   };
+}
+
+export function shouldLandChatAudioOnExisting(
+  inference: AudioEntityInference
+): boolean {
+  return (
+    inference.confidence === 'high' &&
+    inference.releaseId !== null &&
+    (inference.kind === 'attach-to-existing' || inference.kind === 'reference')
+  );
 }
 
 export function buildAudioUploadPrompt({
@@ -149,6 +175,16 @@ export function buildAudioUploadPrompt({
       `It looks related to my existing release "${inference.releaseTitle}", which already has audio.`,
       `Stored preview: ${previewUrl}`,
       'How should I use this reference in my release plan?',
+    ].join(' ');
+  }
+
+  if (inference.confidence === 'low' && inference.releaseTitle) {
+    return [
+      `I uploaded "${fileName}" for a track called "${title}".`,
+      `Jovie saved it as a draft single so the audio is in Library.`,
+      `It might belong on "${inference.releaseTitle}", but the match isn't certain.`,
+      `Preview: ${previewUrl}`,
+      `Should I attach this to "${inference.releaseTitle}", keep it as a new release, or use it as a reference?`,
     ].join(' ');
   }
 

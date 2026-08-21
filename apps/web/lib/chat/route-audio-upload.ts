@@ -9,6 +9,7 @@ import {
   type AudioEntityInference,
   buildAudioUploadPrompt,
   inferAudioEntity,
+  shouldLandChatAudioOnExisting,
 } from '@/lib/chat/infer-audio-entity';
 import { db } from '@/lib/db';
 import {
@@ -245,15 +246,16 @@ export async function routeChatAudioUpload(
 
   let releaseId = inference.releaseId;
   let releaseTitle = inference.releaseTitle ?? inference.suggestedTitle;
+  const landOnExisting = shouldLandChatAudioOnExisting(inference);
 
-  if (inference.kind === 'attach-to-existing' && releaseId) {
+  if (landOnExisting && inference.kind === 'attach-to-existing' && releaseId) {
     await attachAudioToRelease({
       profileId: input.profileId,
       releaseId,
       blobUrl: input.blobUrl,
       fileMimeType: canonicalMimeType,
     });
-  } else if (inference.kind === 'reference' && releaseId) {
+  } else if (landOnExisting && inference.kind === 'reference' && releaseId) {
     await storeReferenceAudio({
       profileId: input.profileId,
       title: inference.suggestedTitle,

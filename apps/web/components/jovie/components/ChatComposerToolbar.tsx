@@ -8,7 +8,15 @@ import {
   DropdownMenuTrigger,
   SimpleTooltip,
 } from '@jovie/ui';
-import { ArrowUp, Loader2, Mic, MicOff, Paperclip, Plus } from 'lucide-react';
+import {
+  ArrowUp,
+  FileAudio2,
+  Loader2,
+  Mic,
+  MicOff,
+  Paperclip,
+  Plus,
+} from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useRef } from 'react';
 
@@ -17,6 +25,8 @@ import {
   CHAT_COMPOSER_ATTACH_ARIA_LABEL,
   CHAT_COMPOSER_SEND_ARIA_LABEL,
   CHAT_COMPOSER_STOP_ARIA_LABEL,
+  CHAT_COMPOSER_UPLOAD_SONG_HINT,
+  CHAT_COMPOSER_UPLOAD_SONG_LABEL,
 } from '../chat-composer-copy';
 import { TRANSITION_FAST } from './chat-motion';
 
@@ -24,7 +34,7 @@ import { TRANSITION_FAST } from './chat-motion';
  * Toolbar primitives for the morphing chat composer.
  *
  * Three pieces, exposed independently so the surface can place them itself:
- *   - <ComposerAttachButton>: leading + button → image upload dropdown.
+ *   - <ComposerAttachButton>: leading + button → file / song upload dropdown.
  *   - <ComposerMicButton>: trailing push-to-talk mic control.
  *   - <ComposerSendButton>: trailing primary send / stop.
  *
@@ -138,6 +148,7 @@ export interface ComposerAttachButtonProps {
   readonly onOpenChange: (open: boolean) => void;
   readonly onMouseDown: (event: React.MouseEvent<HTMLButtonElement>) => void;
   readonly onFileAttach: () => void;
+  readonly onAudioAttach?: () => void;
 }
 
 export function ComposerAttachButton({
@@ -147,6 +158,7 @@ export function ComposerAttachButton({
   onOpenChange,
   onMouseDown,
   onFileAttach,
+  onAudioAttach,
 }: ComposerAttachButtonProps) {
   const isProcessing = isFileProcessing;
 
@@ -195,6 +207,21 @@ export function ComposerAttachButton({
             Drop or browse
           </span>
         </DropdownMenuItem>
+        {onAudioAttach ? (
+          <DropdownMenuItem
+            className='min-h-9 gap-2 rounded-lg px-2.5 py-2'
+            data-testid='chat-composer-upload-song'
+            onSelect={() => {
+              onAudioAttach();
+            }}
+          >
+            <FileAudio2 className='h-3.5 w-3.5' />
+            {CHAT_COMPOSER_UPLOAD_SONG_LABEL}
+            <span className='ml-auto text-2xs text-tertiary-token'>
+              {CHAT_COMPOSER_UPLOAD_SONG_HINT}
+            </span>
+          </DropdownMenuItem>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

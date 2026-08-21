@@ -47,10 +47,15 @@ vi.mock('drizzle-orm', () => ({
   eq: vi.fn(),
 }));
 
-vi.mock('@/lib/chat/infer-audio-entity', () => ({
-  inferAudioEntity: hoisted.inferAudioEntityMock,
-  buildAudioUploadPrompt: hoisted.buildAudioUploadPromptMock,
-}));
+vi.mock('@/lib/chat/infer-audio-entity', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/lib/chat/infer-audio-entity')>();
+  return {
+    ...actual,
+    inferAudioEntity: hoisted.inferAudioEntityMock,
+    buildAudioUploadPrompt: hoisted.buildAudioUploadPromptMock,
+  };
+});
 
 vi.mock('@/lib/discography/queries', () => ({
   getReleasesForProfile: hoisted.getReleasesForProfileMock,
@@ -131,5 +136,22 @@ describe('routeChatAudioUpload', () => {
       /not supported/
     );
     expect(hoisted.upsertRecordingMock).not.toHaveBeenCalled();
+  });
+
+  it('creates a draft instead of attaching when confidence is low', async () => {
+    hoisted.inferAudioEntityMock.mockReturnValue({
+      kind: 'attach-to-existing',
+      confidence: 'low',
+      suggestedTitle: 'Take Me Over',
+      releaseId: 'release_existing',
+      releaseTitle: 'Take Me Over',
+      matchScore: 0.8,
+    });
+
+    const { db } = await import('@/lib/db');
+    await run('audio/mpeg');
+
+    expect(hoisted.upsertReleaseMock).toHaveBeenCalled();
+    expect(db.update).not.toHaveBeenCalled();
   });
 });
