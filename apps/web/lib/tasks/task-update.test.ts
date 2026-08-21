@@ -40,6 +40,124 @@ describe('buildTaskUpdateFieldPatch', () => {
     ).toEqual({
       description: null,
       assigneeKind: 'jovie',
+      metadata: {
+        descriptionRichTextV1: {
+          type: 'doc',
+          content: [{ type: 'paragraph' }],
+        },
+      },
+      updatedAt: now,
+    });
+  });
+
+  it('reconciles rich metadata when a plain-text caller changes description', () => {
+    expect(
+      buildTaskUpdateFieldPatch(
+        { description: 'Fresh plain text' },
+        {
+          ...createExistingTask(),
+          metadata: {
+            source: 'release',
+            descriptionRichTextV1: {
+              type: 'doc',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Stale rich text' }],
+                },
+              ],
+            },
+          },
+        },
+        now
+      )
+    ).toEqual({
+      description: 'Fresh plain text',
+      metadata: {
+        source: 'release',
+        descriptionRichTextV1: {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Fresh plain text' }],
+            },
+          ],
+        },
+      },
+      updatedAt: now,
+    });
+  });
+
+  it('preserves an explicit metadata clear during a plain-text update', () => {
+    expect(
+      buildTaskUpdateFieldPatch(
+        { description: 'Fresh plain text', metadata: null },
+        {
+          ...createExistingTask(),
+          metadata: {
+            source: 'release',
+            descriptionRichTextV1: {
+              type: 'doc',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Stale rich text' }],
+                },
+              ],
+            },
+          },
+        },
+        now
+      )
+    ).toEqual({
+      description: 'Fresh plain text',
+      metadata: null,
+      updatedAt: now,
+    });
+  });
+
+  it('merges rich description content into existing metadata', () => {
+    const content = {
+      type: 'doc' as const,
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'Set list' }] },
+      ],
+    };
+
+    expect(
+      buildTaskUpdateFieldPatch(
+        { description: 'Set list', descriptionContent: content },
+        { ...createExistingTask(), metadata: { source: 'release' } },
+        now
+      )
+    ).toEqual({
+      description: 'Set list',
+      metadata: { source: 'release', descriptionRichTextV1: content },
+      updatedAt: now,
+    });
+  });
+
+  it('keeps plain text synchronized for a rich-content-only update', () => {
+    const content = {
+      type: 'doc' as const,
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Canonical rich text' }],
+        },
+      ],
+    };
+
+    expect(
+      buildTaskUpdateFieldPatch(
+        { descriptionContent: content },
+        { ...createExistingTask(), metadata: { source: 'release' } },
+        now
+      )
+    ).toEqual({
+      description: 'Canonical rich text',
+      metadata: { source: 'release', descriptionRichTextV1: content },
       updatedAt: now,
     });
   });
