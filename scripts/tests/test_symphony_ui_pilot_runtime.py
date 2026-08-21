@@ -42,8 +42,12 @@ FLEET_INSTALLER = ROOT / "scripts/hermes/install-gem-fleet-controller.sh"
 REHAB_INSTALLER = ROOT / "scripts/hermes/install-gem-pr-rehabilitation.sh"
 USER_SYSTEMD_LIB = ROOT / "scripts/hermes/lib/user-systemd-context.sh"
 INTAKE_WORKFLOW = ROOT / ".github/workflows/jovie-intake-controller.yml"
+FLEET_GATE_REFRESH_WORKFLOW = ROOT / ".github/workflows/fleet-gate-refresh.yml"
 ACTIVATION_WORKFLOW = ROOT / ".github/workflows/gem-delivery-controller-activation.yml"
 ACTIONLINT_CONFIG = ROOT / ".github/actionlint.yaml"
+FLEET_ADMIT_STEP = "Admit one issue from the fresh event"
+GEM_GBRAIN_BIN = "/home/timwhite/.local/bin/gbrain"
+GEM_GBRAIN_DIALECT = "adapter"
 
 
 def _load_reconciler_module():
@@ -155,6 +159,134 @@ def test_intake_workflow_pins_the_gem_gbrain_adapter_contract() -> None:
     intake = INTAKE_WORKFLOW.read_text()
     assert "JOVIE_GBRAIN_BIN: /home/timwhite/.local/bin/gbrain" in intake
     assert "JOVIE_GBRAIN_DIALECT: adapter" in intake
+
+
+def _named_step_block(workflow_text: str, step_name: str) -> str:
+    marker = f"      - name: {step_name}\n"
+    assert marker in workflow_text, f"missing step {step_name}"
+    return workflow_text.split(marker, 1)[1].split("\n      - name:", 1)[0]
+
+
+def _step_env(step_block: str) -> dict[str, str]:
+    env: dict[str, str] = {}
+    inside = False
+    for line in step_block.splitlines():
+        if re.match(r"^        env:\s*$", line):
+            inside = True
+            continue
+        if inside:
+            match = re.match(r"^          ([A-Z0-9_]+):\s*(.*?)\s*$", line)
+            if match:
+                env[match.group(1)] = match.group(2).strip('"').strip("'")
+                continue
+            if line.strip() and not line.startswith("          "):
+                break
+    return env
+
+
+def _assert_gem_gbrain_adapter_bindings(env: dict[str, str]) -> None:
+    assert env.get("JOVIE_GBRAIN_BIN") == GEM_GBRAIN_BIN, (
+        "Fleet Admit must pin JOVIE_GBRAIN_BIN="
+        f"{GEM_GBRAIN_BIN!r}, got {env.get('JOVIE_GBRAIN_BIN')!r}"
+    )
+    assert env.get("JOVIE_GBRAIN_DIALECT") == GEM_GBRAIN_DIALECT, (
+        "Fleet Admit must pin JOVIE_GBRAIN_DIALECT="
+        f"{GEM_GBRAIN_DIALECT!r}, got {env.get('JOVIE_GBRAIN_DIALECT')!r}"
+    )
+
+
+def _admit_step_yaml(env_lines: list[str]) -> str:
+    env_body = "".join(f"          {line}\n" for line in env_lines)
+    return (
+        f"      - name: {FLEET_ADMIT_STEP}\n"
+        "        id: admit\n"
+        "        env:\n"
+        f"{env_body}"
+        "        shell: bash\n"
+    )
+
+
+def _expect_gbrain_binding_rejection(env: dict[str, str], reason: str) -> None:
+    try:
+        _assert_gem_gbrain_adapter_bindings(env)
+    except AssertionError:
+        return
+    raise AssertionError(f"expected Gem GBrain binding rejection for {reason}")
+
+
+def test_fleet_admit_pins_the_gem_gbrain_adapter_contract() -> None:
+    admit = _named_step_block(
+        FLEET_GATE_REFRESH_WORKFLOW.read_text(), FLEET_ADMIT_STEP
+    )
+    assert f"JOVIE_GBRAIN_BIN: {GEM_GBRAIN_BIN}" in admit
+    assert f"JOVIE_GBRAIN_DIALECT: {GEM_GBRAIN_DIALECT}" in admit
+    env = _step_env(admit)
+    _assert_gem_gbrain_adapter_bindings(env)
+    assert env["JOVIE_AGENT_PROFILE"] == "no_agent"
+
+
+def test_fleet_admit_rejects_absent_blank_and_legacy_gbrain_dialect() -> None:
+    green_lines = [
+        "JOVIE_AGENT_PROFILE: no_agent",
+        f"JOVIE_GBRAIN_BIN: {GEM_GBRAIN_BIN}",
+        f"JOVIE_GBRAIN_DIALECT: {GEM_GBRAIN_DIALECT}",
+    ]
+    _assert_gem_gbrain_adapter_bindings(
+        _step_env(_named_step_block(_admit_step_yaml(green_lines), FLEET_ADMIT_STEP))
+    )
+    red_cases: list[tuple[str, list[str]]] = [
+        (
+            "absent-bin",
+            [
+                "JOVIE_AGENT_PROFILE: no_agent",
+                f"JOVIE_GBRAIN_DIALECT: {GEM_GBRAIN_DIALECT}",
+            ],
+        ),
+        (
+            "blank-bin",
+            [
+                "JOVIE_AGENT_PROFILE: no_agent",
+                "JOVIE_GBRAIN_BIN:",
+                f"JOVIE_GBRAIN_DIALECT: {GEM_GBRAIN_DIALECT}",
+            ],
+        ),
+        (
+            "absent-dialect",
+            [
+                "JOVIE_AGENT_PROFILE: no_agent",
+                f"JOVIE_GBRAIN_BIN: {GEM_GBRAIN_BIN}",
+            ],
+        ),
+        (
+            "blank-dialect",
+            [
+                "JOVIE_AGENT_PROFILE: no_agent",
+                f"JOVIE_GBRAIN_BIN: {GEM_GBRAIN_BIN}",
+                "JOVIE_GBRAIN_DIALECT:",
+            ],
+        ),
+        (
+            "legacy-dialect",
+            [
+                "JOVIE_AGENT_PROFILE: no_agent",
+                f"JOVIE_GBRAIN_BIN: {GEM_GBRAIN_BIN}",
+                "JOVIE_GBRAIN_DIALECT: legacy",
+            ],
+        ),
+        (
+            "adapter-v2",
+            [
+                "JOVIE_AGENT_PROFILE: no_agent",
+                f"JOVIE_GBRAIN_BIN: {GEM_GBRAIN_BIN}",
+                "JOVIE_GBRAIN_DIALECT: adapter-v2",
+            ],
+        ),
+    ]
+    for reason, env_lines in red_cases:
+        _expect_gbrain_binding_rejection(
+            _step_env(_named_step_block(_admit_step_yaml(env_lines), FLEET_ADMIT_STEP)),
+            reason,
+        )
 
 
 def test_activation_requires_exact_production_revision_and_attestation() -> None:
