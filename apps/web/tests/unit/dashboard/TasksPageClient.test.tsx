@@ -29,6 +29,90 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
+vi.mock('@/components/organisms/RichTextEditor', () => ({
+  RichTextEditor: React.forwardRef(function MockRichTextEditor(
+    {
+      ariaLabel,
+      content,
+      onChange,
+      onFocus,
+      placeholder,
+      statusLabel,
+      statusAction,
+    }: {
+      ariaLabel: string;
+      content: {
+        type: 'doc';
+        content?: Array<Record<string, unknown>>;
+      };
+      onChange: (change: {
+        content: {
+          type: 'doc';
+          content: Array<Record<string, unknown>>;
+        };
+        plainText: string;
+      }) => void;
+      onFocus?: () => void;
+      placeholder?: string;
+      statusLabel?: string;
+      statusAction?: { label: string; onClick: () => void };
+    },
+    ref: React.ForwardedRef<{ focus: () => void }>
+  ) {
+    const inputRef = React.useRef<HTMLTextAreaElement>(null);
+    React.useImperativeHandle(ref, () => ({
+      focus: () => inputRef.current?.focus(),
+    }));
+    const plainText = (content.content ?? [])
+      .flatMap(node =>
+        Array.isArray(node.content)
+          ? (node.content as Array<Record<string, unknown>>)
+              .map(child => child.text)
+              .filter((value): value is string => typeof value === 'string')
+          : []
+      )
+      .join('\n');
+
+    return (
+      <div>
+        <textarea
+          ref={inputRef}
+          aria-label={ariaLabel}
+          value={plainText}
+          placeholder={placeholder || undefined}
+          onFocus={onFocus}
+          onChange={event =>
+            onChange({
+              content: {
+                type: 'doc',
+                content: [
+                  {
+                    type: 'paragraph',
+                    ...(event.target.value
+                      ? {
+                          content: [{ type: 'text', text: event.target.value }],
+                        }
+                      : {}),
+                  },
+                ],
+              },
+              plainText: event.target.value,
+            })
+          }
+          className='focus-visible:bg-surface-1'
+          style={{ boxShadow: 'none' }}
+        />
+        <span>{statusLabel}</span>
+        {statusAction ? (
+          <button type='button' onClick={statusAction.onClick}>
+            {statusAction.label}
+          </button>
+        ) : null}
+      </div>
+    );
+  }),
+}));
+
 vi.mock('@jovie/ui', async () => {
   const actual = await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
 
@@ -131,6 +215,7 @@ const mockTask = {
   position: 0,
   sourceTemplateId: null,
   metadata: null,
+  mutationVersion: 7,
   createdAt: new Date('2026-04-01T00:00:00.000Z'),
   updatedAt: new Date('2026-04-01T00:00:00.000Z'),
 } as const;
@@ -197,6 +282,7 @@ const mockHelperTask = {
 const mockCreateTask = vi.fn();
 const mockDeleteTask = vi.fn();
 const mockUpdateTask = vi.fn();
+const mockUpdateTaskAsync = vi.fn();
 const mockMoveTask = vi.fn();
 let mockIsXlUp = true;
 let mockIs2xlUp = true;
@@ -380,6 +466,7 @@ vi.mock('@/lib/queries/useTaskMutations', () => ({
   }),
   useUpdateTaskMutation: () => ({
     mutate: mockUpdateTask,
+    mutateAsync: mockUpdateTaskAsync,
     isPending: false,
   }),
   useMoveTaskMutation: () => ({
@@ -673,6 +760,7 @@ describe('TasksPageClient', () => {
     mockCreateTask.mockReset();
     mockDeleteTask.mockReset();
     mockUpdateTask.mockReset();
+    mockUpdateTaskAsync.mockReset().mockResolvedValue(undefined);
     mockMoveTask.mockReset();
     mockSetViewMode.mockClear();
     mockRegisterRightPanel.mockReset();
@@ -935,6 +1023,18 @@ describe('TasksPageClient', () => {
     expect(descriptionEditor).toHaveStyle({ boxShadow: 'none' });
   });
 
+  it('remounts the shared editor when switching tasks to clear undo history', () => {
+    renderPage();
+    openTask(mockTask);
+    const firstEditor = screen.getByLabelText('Task Description');
+
+    openTask(mockTaskTwo);
+
+    const secondEditor = screen.getByLabelText('Task Description');
+    expect(secondEditor).not.toBe(firstEditor);
+    expect(secondEditor).toHaveValue(mockTaskTwo.description);
+  });
+
   it('keeps the tasks subheader at the same compact header height as the page header', () => {
     renderPage();
 
@@ -1141,21 +1241,99 @@ describe('TasksPageClient', () => {
       vi.advanceTimersByTime(500);
     });
 
-    expect(mockUpdateTask).toHaveBeenCalledWith(
-      {
-        taskId: 'task-2',
-        data: {
-          title: 'Updated release handoff title',
-          description: mockTaskTwo.description,
-        },
-      },
-      expect.objectContaining({
-        onError: expect.any(Function),
-      })
+    expect(mockUpdateTaskAsync).toHaveBeenCalledWith({
+      taskId: 'task-2',
+      data: expect.objectContaining({
+        title: 'Updated release handoff title',
+        description: mockTaskTwo.description,
+        descriptionContent: expect.objectContaining({ type: 'doc' }),
+        expectedMutationVersion: mockTaskTwo.mutationVersion,
+      }),
+    });
+  });
+
+  it('retains failed task edits and retries from the stable save slot', async () => {
+    mockUpdateTaskAsync
+      .mockRejectedValueOnce(new Error('save failed'))
+      .mockResolvedValueOnce(undefined);
+    renderPage();
+    openTask();
+
+    fireEvent.change(screen.getByLabelText('Task Description'), {
+      target: { value: 'Keep this unsaved context intact.' },
+    });
+    await act(async () => vi.advanceTimersByTime(500));
+
+    expect(screen.getByText('Not saved')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await act(async () => vi.advanceTimersByTime(500));
+
+    expect(mockUpdateTaskAsync).toHaveBeenCalledTimes(2);
+    expect(screen.getByText('Saved')).toBeInTheDocument();
+  });
+
+  it('does not mark a newer edit saved when an older request finishes', async () => {
+    let finishFirstSave: (() => void) | undefined;
+    mockUpdateTaskAsync.mockImplementationOnce(
+      () =>
+        new Promise<void>(resolve => {
+          finishFirstSave = resolve;
+        })
+    );
+    renderPage();
+    openTask();
+
+    const descriptionEditor = screen.getByLabelText('Task Description');
+    fireEvent.change(descriptionEditor, {
+      target: { value: 'First draft' },
+    });
+    act(() => vi.advanceTimersByTime(500));
+    expect(screen.getByText('Saving…')).toBeInTheDocument();
+
+    fireEvent.change(descriptionEditor, {
+      target: { value: 'Newer draft that must remain dirty' },
+    });
+    act(() => vi.advanceTimersByTime(500));
+    expect(mockUpdateTaskAsync).toHaveBeenCalledTimes(1);
+    await act(async () => finishFirstSave?.());
+
+    expect(screen.getByText('Edited')).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(500));
+    expect(mockUpdateTaskAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it('blocks task switching until the active autosave finishes', async () => {
+    let finishFirstSave: (() => void) | undefined;
+    mockUpdateTaskAsync.mockImplementationOnce(
+      () =>
+        new Promise<void>(resolve => {
+          finishFirstSave = resolve;
+        })
+    );
+    renderPage();
+    openTask(mockTask);
+
+    fireEvent.change(screen.getByLabelText('Task Description'), {
+      target: { value: 'Edit task A' },
+    });
+    act(() => vi.advanceTimersByTime(500));
+
+    openTask(mockTaskTwo);
+    expect(screen.getByLabelText('Task Description')).toHaveValue(
+      'Edit task A'
+    );
+    expect(mockUpdateTaskAsync).toHaveBeenCalledOnce();
+
+    await act(async () => finishFirstSave?.());
+    expect(screen.getByText('Saved')).toBeInTheDocument();
+
+    openTask(mockTaskTwo);
+    expect(screen.getByLabelText('Task Description')).toHaveValue(
+      mockTaskTwo.description
     );
   });
 
-  it('does not reset unsaved title text when task metadata refreshes', () => {
+  it('turns a remote task version into a conflict without overwriting the draft', () => {
     const view = renderPage();
     openTask();
 
@@ -1167,8 +1345,10 @@ describe('TasksPageClient', () => {
     mockTasksData = [
       {
         ...mockTaskTwo,
+        title: 'Remote task title',
         priority: 'urgent',
         assigneeKind: 'human',
+        mutationVersion: 8,
       },
       mockTask,
     ];
@@ -1186,22 +1366,72 @@ describe('TasksPageClient', () => {
       'Unsaved metadata-safe title'
     );
 
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
+    expect(
+      screen.getByText('Conflict · reload task changes')
+    ).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(500));
+    expect(mockUpdateTaskAsync).not.toHaveBeenCalled();
 
-    expect(mockUpdateTask).toHaveBeenCalledWith(
-      {
-        taskId: 'task-2',
-        data: {
-          title: 'Unsaved metadata-safe title',
-          description: mockTaskTwo.description,
-        },
-      },
-      expect.objectContaining({
-        onError: expect.any(Function),
-      })
+    fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
+    expect(screen.getByLabelText('Task Title')).toHaveValue(
+      'Remote task title'
     );
+  });
+
+  it('advances the editor version only after its own metadata update succeeds', () => {
+    renderPage();
+    openTask();
+
+    const urgentChoice = within(screen.getByTestId('task-document-pane'))
+      .getAllByText('Urgent')
+      .map(node => node.closest('button'))
+      .find((button): button is HTMLButtonElement => Boolean(button));
+    if (!urgentChoice) throw new Error('Expected an urgent priority choice');
+    fireEvent.click(urgentChoice);
+
+    const [input, options] = mockUpdateTask.mock.calls.at(-1) ?? [];
+    expect(input).toEqual({
+      taskId: 'task-2',
+      data: { priority: 'urgent', expectedMutationVersion: 7 },
+    });
+    act(() =>
+      options?.onSuccess?.({ ...mockTaskTwo, mutationVersion: 8 } as TaskView)
+    );
+
+    fireEvent.change(screen.getByLabelText('Task Title'), {
+      target: { value: 'Draft after local metadata update' },
+    });
+    act(() => vi.advanceTimersByTime(500));
+    expect(mockUpdateTaskAsync).toHaveBeenCalledWith({
+      taskId: 'task-2',
+      data: expect.objectContaining({ expectedMutationVersion: 8 }),
+    });
+  });
+
+  it('ignores a late metadata acknowledgement from the previously open task', () => {
+    renderPage();
+    openTask();
+    const urgentChoice = within(screen.getByTestId('task-document-pane'))
+      .getAllByText('Urgent')
+      .map(node => node.closest('button'))
+      .find((button): button is HTMLButtonElement => Boolean(button));
+    if (!urgentChoice) throw new Error('Expected an urgent priority choice');
+    fireEvent.click(urgentChoice);
+    const [, options] = mockUpdateTask.mock.calls.at(-1) ?? [];
+
+    openTask(mockTask);
+    act(() =>
+      options?.onSuccess?.({ ...mockTaskTwo, mutationVersion: 8 } as TaskView)
+    );
+    fireEvent.change(screen.getByLabelText('Task Title'), {
+      target: { value: 'Task B keeps its own version' },
+    });
+    act(() => vi.advanceTimersByTime(500));
+
+    expect(mockUpdateTaskAsync).toHaveBeenCalledWith({
+      taskId: 'task-1',
+      data: expect.objectContaining({ expectedMutationVersion: 7 }),
+    });
   });
 
   it('shows the empty-description helper for supported release tasks', () => {

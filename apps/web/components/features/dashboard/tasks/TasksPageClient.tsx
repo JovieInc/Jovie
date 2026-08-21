@@ -59,6 +59,11 @@ import {
 } from '@/components/molecules/menus/ToolbarMenuPrimitives';
 import { ReleaseDueBadge } from '@/components/molecules/ReleaseDueBadge';
 import { PageShell } from '@/components/organisms/PageShell';
+import {
+  RichTextEditor,
+  type RichTextEditorChange,
+  type RichTextEditorHandle,
+} from '@/components/organisms/RichTextEditor';
 import { ReleaseSidebar } from '@/components/organisms/release-sidebar';
 import {
   ShellListRowButton,
@@ -95,6 +100,10 @@ import {
 } from '@/lib/queries/useTasksQuery';
 import { DEFAULT_RELEASE_TASK_TEMPLATE } from '@/lib/release-tasks/default-template';
 import {
+  emptyRichTextDocument,
+  type RichTextDocument,
+} from '@/lib/rich-text/document';
+import {
   buildTaskPitchChatPrompt,
   isPitchRelatedText,
 } from '@/lib/services/pitch/targets';
@@ -106,6 +115,7 @@ import {
   readTaskDescriptionHelper,
   type TaskDescriptionHelperPayload,
 } from '@/lib/tasks/task-description-helper';
+import { readTaskDescriptionContent } from '@/lib/tasks/task-rich-text';
 import type {
   MoveTaskInput,
   TaskAssigneeKind,
@@ -170,6 +180,13 @@ const TASK_VIEW_MODES: Array<'board' | 'list'> = ['board', 'list'];
 
 type MobileTaskScope = 'all' | 'open' | 'done';
 type ReleasePanelStatus = 'loading' | 'error' | 'empty';
+type TaskEditorSaveStatus =
+  | 'idle'
+  | 'dirty'
+  | 'saving'
+  | 'saved'
+  | 'conflict'
+  | 'error';
 
 const MOBILE_TASK_SCOPE_OPTIONS = [
   ['all', 'All'],
@@ -586,8 +603,12 @@ function TaskDocumentPanel({
   task,
   title,
   description,
+  descriptionContent,
+  saveStatus,
   onTitleChange,
   onDescriptionChange,
+  onRetrySave,
+  onResolveConflict,
   onClose,
   onOpenRelease,
   onUpdateStatus,
@@ -601,8 +622,12 @@ function TaskDocumentPanel({
   task: TaskView | null;
   title: string;
   description: string;
+  descriptionContent: RichTextDocument;
+  saveStatus: TaskEditorSaveStatus;
   onTitleChange: (value: string) => void;
-  onDescriptionChange: (value: string) => void;
+  onDescriptionChange: (change: RichTextEditorChange) => void;
+  onRetrySave: () => void;
+  onResolveConflict: () => void;
   onClose: () => void;
   onOpenRelease: (task: TaskView) => void;
   onUpdateStatus: (taskId: string, status: TaskStatus) => void;
@@ -613,7 +638,7 @@ function TaskDocumentPanel({
   isDesktopLayout: boolean;
   compactMetadata?: boolean;
 }>) {
-  const descriptionEditorRef = useRef<HTMLTextAreaElement>(null);
+  const descriptionEditorRef = useRef<RichTextEditorHandle>(null);
   const [descriptionHelperDismissed, setDescriptionHelperDismissed] =
     useState(false);
   const metadataDescriptionHelper = readTaskDescriptionHelper(task?.metadata);
@@ -834,19 +859,51 @@ function TaskDocumentPanel({
               )}
             </div>
 
-            <div className='relative'>
-              <textarea
+            <div className='relative min-h-130'>
+              <RichTextEditor
+                key={task.id}
                 ref={descriptionEditorRef}
-                id='task-context-editor'
-                aria-label='Task Description'
-                value={description}
-                onFocus={handleDescriptionFocus}
-                onChange={event => onDescriptionChange(event.target.value)}
+                content={descriptionContent}
+                onChange={onDescriptionChange}
+                ariaLabel='Task Description'
                 placeholder={
-                  showDescriptionHelper ? undefined : 'Start writing...'
+                  showDescriptionHelper
+                    ? ''
+                    : 'Write context, decisions, and next steps…'
                 }
-                className='min-h-130 w-full resize-none rounded-md border-0 bg-transparent px-0 py-0 text-mid leading-[1.8] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)] transition-colors duration-fast focus:outline-none! focus-visible:ring-0! focus:shadow-none! focus-visible:bg-[color-mix(in_oklab,var(--linear-border-focus)_16%,transparent)]'
-                style={{ boxShadow: 'none' }}
+                onFocus={handleDescriptionFocus}
+                minHeight='32.5rem'
+                statusLabel={
+                  saveStatus === 'saving'
+                    ? 'Saving…'
+                    : saveStatus === 'saved'
+                      ? 'Saved'
+                      : saveStatus === 'error'
+                        ? 'Not saved'
+                        : saveStatus === 'conflict'
+                          ? 'Conflict · reload task changes'
+                          : saveStatus === 'dirty'
+                            ? 'Edited'
+                            : 'Up to date'
+                }
+                statusTone={
+                  saveStatus === 'saving'
+                    ? 'pending'
+                    : saveStatus === 'saved'
+                      ? 'success'
+                      : saveStatus === 'error'
+                        ? 'error'
+                        : saveStatus === 'conflict'
+                          ? 'error'
+                          : 'neutral'
+                }
+                statusAction={
+                  saveStatus === 'error'
+                    ? { label: 'Retry', onClick: onRetrySave }
+                    : saveStatus === 'conflict'
+                      ? { label: 'Reload', onClick: onResolveConflict }
+                      : undefined
+                }
               />
               {showDescriptionHelper && descriptionHelper ? (
                 <TaskDescriptionHelper
@@ -1145,6 +1202,8 @@ function useTaskActions({
   openReleaseSidebar,
   openTaskDocument,
   updateTask,
+  getExpectedMutationVersion,
+  onMutationAcknowledged,
 }: {
   artistName: string | null | undefined;
   onGeneratePitch: (task: TaskView) => void;
@@ -1154,10 +1213,14 @@ function useTaskActions({
   updateTask: (
     params: {
       taskId: string;
-      data: Partial<Pick<TaskView, 'status' | 'priority' | 'assigneeKind'>>;
+      data: Partial<Pick<TaskView, 'status' | 'priority' | 'assigneeKind'>> & {
+        readonly expectedMutationVersion?: number;
+      };
     },
-    opts: { onError: () => void }
+    opts: { onError: () => void; onSuccess?: (task: TaskView) => void }
   ) => void;
+  getExpectedMutationVersion: (taskId: string) => number | undefined;
+  onMutationAcknowledged: (taskId: string, task: TaskView) => void;
 }) {
   const updateTaskField = useCallback(
     (
@@ -1165,11 +1228,20 @@ function useTaskActions({
       data: Partial<Pick<TaskView, 'status' | 'priority' | 'assigneeKind'>>
     ) => {
       updateTask(
-        { taskId, data },
-        { onError: () => toast.error("Couldn't update task") }
+        {
+          taskId,
+          data: {
+            ...data,
+            expectedMutationVersion: getExpectedMutationVersion(taskId),
+          },
+        },
+        {
+          onError: () => toast.error("Couldn't update task"),
+          onSuccess: task => onMutationAcknowledged(taskId, task),
+        }
       );
     },
-    [updateTask]
+    [getExpectedMutationVersion, onMutationAcknowledged, updateTask]
   );
 
   const handleDeleteTask = useCallback(
@@ -1294,6 +1366,17 @@ export function TasksPageClient() {
   );
   const [editorTitle, setEditorTitle] = useState('');
   const [editorDescription, setEditorDescription] = useState('');
+  const [editorDescriptionContent, setEditorDescriptionContent] =
+    useState<RichTextDocument>(emptyRichTextDocument);
+  const [editorSaveStatus, setEditorSaveStatus] =
+    useState<TaskEditorSaveStatus>('idle');
+  const [editorSavingTaskIds, setEditorSavingTaskIds] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
+  const [editorTaskId, setEditorTaskId] = useState<string | null>(null);
+  const editorRevisionRef = useRef(0);
+  const editorSaveRequestRef = useRef(0);
+  const editorExpectedMutationVersionRef = useRef<number | null>(null);
   const latestSelectedTaskIdRef = useRef<string | null>(null);
   const deferredPills = useDeferredValue(pills);
   const searchFilter = useMemo(
@@ -1321,7 +1404,8 @@ export function TasksPageClient() {
   const updateTaskMutation = useUpdateTaskMutation();
   const moveTaskMutation = useMoveTaskMutation();
   const { mutateAsync: deleteTaskAsync } = deleteTaskMutation;
-  const { mutate: updateTask } = updateTaskMutation;
+  const { mutate: updateTask, mutateAsync: updateTaskAsync } =
+    updateTaskMutation;
   const { mutate: moveTask } = moveTaskMutation;
   const selectedReleaseQuery = useReleaseEntityQuery(
     profileId ?? '',
@@ -1580,20 +1664,72 @@ export function TasksPageClient() {
   const selectedTaskEditorId = selectedTask?.id ?? null;
   const selectedTaskEditorTitle = selectedTask?.title ?? '';
   const selectedTaskEditorDescription = selectedTask?.description ?? '';
+  const selectedTaskEditorContent = useMemo(
+    () =>
+      readTaskDescriptionContent(
+        selectedTask?.metadata,
+        selectedTaskEditorDescription
+      ),
+    [selectedTask?.metadata, selectedTaskEditorDescription]
+  );
 
   useEffect(() => {
+    if (
+      selectedTaskEditorId &&
+      selectedTaskEditorId === editorTaskId &&
+      selectedTask?.mutationVersion !== undefined &&
+      selectedTask.mutationVersion >
+        (editorExpectedMutationVersionRef.current ?? 0)
+    ) {
+      if (editorSaveStatus === 'idle' || editorSaveStatus === 'saved') {
+        editorExpectedMutationVersionRef.current = selectedTask.mutationVersion;
+        setEditorTitle(selectedTaskEditorTitle);
+        setEditorDescription(selectedTaskEditorDescription);
+        setEditorDescriptionContent(selectedTaskEditorContent);
+        setEditorSaveStatus('idle');
+      } else {
+        setEditorSaveStatus('conflict');
+      }
+    }
+  }, [
+    editorSaveStatus,
+    editorTaskId,
+    selectedTask?.mutationVersion,
+    selectedTaskEditorContent,
+    selectedTaskEditorDescription,
+    selectedTaskEditorId,
+    selectedTaskEditorTitle,
+  ]);
+
+  useEffect(() => {
+    if (selectedTaskEditorId === editorTaskId) return;
+    editorSaveRequestRef.current += 1;
     if (!selectedTaskEditorId) {
       setEditorTitle('');
       setEditorDescription('');
+      setEditorDescriptionContent(emptyRichTextDocument);
+      setEditorSaveStatus('idle');
+      setEditorTaskId(null);
+      editorExpectedMutationVersionRef.current = null;
+      editorRevisionRef.current = 0;
       return;
     }
 
     setEditorTitle(selectedTaskEditorTitle);
     setEditorDescription(selectedTaskEditorDescription);
+    setEditorDescriptionContent(selectedTaskEditorContent);
+    setEditorSaveStatus('idle');
+    setEditorTaskId(selectedTaskEditorId);
+    editorExpectedMutationVersionRef.current =
+      selectedTask?.mutationVersion ?? null;
+    editorRevisionRef.current = 0;
   }, [
+    editorTaskId,
+    selectedTaskEditorContent,
     selectedTaskEditorDescription,
     selectedTaskEditorId,
     selectedTaskEditorTitle,
+    selectedTask?.mutationVersion,
   ]);
 
   const openReleaseSidebar = useCallback((task: TaskView) => {
@@ -1604,14 +1740,35 @@ export function TasksPageClient() {
 
   const openTaskDocument = useCallback(
     (task: TaskView) => {
+      if (
+        selectedTaskEditorId &&
+        task.id !== selectedTaskEditorId &&
+        editorSaveStatus !== 'idle' &&
+        editorSaveStatus !== 'saved'
+      ) {
+        toast.error('Wait for this task to save before opening another task.');
+        return;
+      }
       setHeaderMode(current => (current === 'create' ? 'default' : current));
       if (!canShowTaskDocumentAlongsideReleaseSidebar) {
         setSelectedReleaseId(null);
       }
       setSelectedTaskId(task.id);
     },
-    [canShowTaskDocumentAlongsideReleaseSidebar]
+    [
+      canShowTaskDocumentAlongsideReleaseSidebar,
+      editorSaveStatus,
+      selectedTaskEditorId,
+    ]
   );
+
+  const closeTaskDocument = useCallback(() => {
+    if (editorSaveStatus !== 'idle' && editorSaveStatus !== 'saved') {
+      toast.error('Wait for this task to save before closing it.');
+      return;
+    }
+    setSelectedTaskId(null);
+  }, [editorSaveStatus]);
 
   const handleGenerateTaskPitch = useCallback(
     (task: TaskView) => {
@@ -1644,6 +1801,18 @@ export function TasksPageClient() {
     openReleaseSidebar,
     openTaskDocument,
     updateTask,
+    getExpectedMutationVersion: useCallback(
+      (taskId: string) =>
+        taskId === editorTaskId
+          ? (editorExpectedMutationVersionRef.current ?? undefined)
+          : undefined,
+      [editorTaskId]
+    ),
+    onMutationAcknowledged: useCallback((taskId: string, task: TaskView) => {
+      if (taskId === latestSelectedTaskIdRef.current) {
+        editorExpectedMutationVersionRef.current = task.mutationVersion ?? null;
+      }
+    }, []),
   });
   const handleMoveTask = useCallback(
     (input: MoveTaskInput) => {
@@ -1680,7 +1849,10 @@ export function TasksPageClient() {
     }
 
     if (tasks.length === 0) {
-      if (selectedTaskId !== null) {
+      if (
+        selectedTaskId !== null &&
+        (editorSaveStatus === 'idle' || editorSaveStatus === 'saved')
+      ) {
         setSelectedTaskId(null);
       }
       return;
@@ -1693,10 +1865,20 @@ export function TasksPageClient() {
       return;
     }
 
-    if (!hasVisibleSelection) {
+    if (
+      !hasVisibleSelection &&
+      (editorSaveStatus === 'idle' || editorSaveStatus === 'saved')
+    ) {
       setSelectedTaskId(null);
     }
-  }, [isBoardMode, isLoading, selectedTaskId, tasks, visibleTasks]);
+  }, [
+    editorSaveStatus,
+    isBoardMode,
+    isLoading,
+    selectedTaskId,
+    tasks,
+    visibleTasks,
+  ]);
 
   const selectTaskByIndex = useCallback(
     (index: number) => {
@@ -1731,40 +1913,91 @@ export function TasksPageClient() {
   }, [selectedTaskEditorId]);
 
   useEffect(() => {
-    if (!selectedTaskEditorId) {
+    if (!selectedTaskEditorId || editorTaskId !== selectedTaskEditorId) {
       return;
     }
 
     const nextTitle = editorTitle.trim();
     const nextDescription = editorDescription.trim();
     const currentDescription = selectedTaskEditorDescription;
+    const contentChanged =
+      JSON.stringify(editorDescriptionContent) !==
+      JSON.stringify(selectedTaskEditorContent);
     const hasChanges =
       nextTitle !== selectedTaskEditorTitle ||
-      nextDescription !== currentDescription;
+      nextDescription !== currentDescription ||
+      contentChanged;
 
-    if (!hasChanges || !nextTitle) {
+    if (
+      !hasChanges ||
+      !nextTitle ||
+      editorSaveStatus !== 'dirty' ||
+      editorSavingTaskIds.has(selectedTaskEditorId)
+    ) {
       return;
     }
 
     const selectedTaskIdAtSchedule = selectedTaskEditorId;
+    const revisionAtSchedule = editorRevisionRef.current;
+    const requestAtSchedule = ++editorSaveRequestRef.current;
 
     const timeoutId = globalThis.setTimeout(() => {
       if (selectedTaskIdAtSchedule !== latestSelectedTaskIdRef.current) {
         return;
       }
 
-      updateTask(
-        {
-          taskId: selectedTaskIdAtSchedule,
-          data: {
-            title: nextTitle,
-            description: nextDescription || null,
-          },
+      setEditorSaveStatus('saving');
+      setEditorSavingTaskIds(current => {
+        const next = new Set(current);
+        next.add(selectedTaskIdAtSchedule);
+        return next;
+      });
+      void updateTaskAsync({
+        taskId: selectedTaskIdAtSchedule,
+        data: {
+          title: nextTitle,
+          description: nextDescription || null,
+          descriptionContent: editorDescriptionContent,
+          expectedMutationVersion:
+            editorExpectedMutationVersionRef.current ?? undefined,
         },
-        {
-          onError: () => {
-            toast.error("Couldn't update task");
-          },
+      }).then(
+        savedTask => {
+          if (savedTask?.mutationVersion !== undefined) {
+            editorExpectedMutationVersionRef.current =
+              savedTask.mutationVersion;
+          }
+          setEditorSavingTaskIds(current => {
+            const next = new Set(current);
+            next.delete(selectedTaskIdAtSchedule);
+            return next;
+          });
+          if (
+            latestSelectedTaskIdRef.current !== selectedTaskIdAtSchedule ||
+            editorSaveRequestRef.current !== requestAtSchedule
+          ) {
+            return;
+          }
+          setEditorSaveStatus(
+            editorRevisionRef.current === revisionAtSchedule ? 'saved' : 'dirty'
+          );
+        },
+        () => {
+          setEditorSavingTaskIds(current => {
+            const next = new Set(current);
+            next.delete(selectedTaskIdAtSchedule);
+            return next;
+          });
+          if (
+            latestSelectedTaskIdRef.current !== selectedTaskIdAtSchedule ||
+            editorSaveRequestRef.current !== requestAtSchedule
+          ) {
+            return;
+          }
+          setEditorSaveStatus(
+            editorRevisionRef.current === revisionAtSchedule ? 'error' : 'dirty'
+          );
+          toast.error("Couldn't update task");
         }
       );
     }, 450);
@@ -1774,11 +2007,16 @@ export function TasksPageClient() {
     };
   }, [
     editorDescription,
+    editorDescriptionContent,
+    editorSavingTaskIds,
+    editorSaveStatus,
+    editorTaskId,
     editorTitle,
     selectedTaskEditorDescription,
     selectedTaskEditorId,
+    selectedTaskEditorContent,
     selectedTaskEditorTitle,
-    updateTask,
+    updateTaskAsync,
   ]);
 
   const handleCloseShortcut = useCallback(
@@ -1793,10 +2031,10 @@ export function TasksPageClient() {
 
       if (selectedTask) {
         event.preventDefault();
-        setSelectedTaskId(null);
+        closeTaskDocument();
       }
     },
-    [headerMode, selectedTask]
+    [closeTaskDocument, headerMode, selectedTask]
   );
 
   const handleRowNavigationShortcut = useCallback(
@@ -2238,11 +2476,44 @@ export function TasksPageClient() {
                 {selectedTask ? (
                   <TaskDocumentPanel
                     task={selectedTask}
-                    title={editorTitle}
-                    description={editorDescription}
-                    onTitleChange={setEditorTitle}
-                    onDescriptionChange={setEditorDescription}
-                    onClose={() => setSelectedTaskId(null)}
+                    title={
+                      editorTaskId === selectedTask.id
+                        ? editorTitle
+                        : selectedTaskEditorTitle
+                    }
+                    description={
+                      editorTaskId === selectedTask.id
+                        ? editorDescription
+                        : selectedTaskEditorDescription
+                    }
+                    descriptionContent={
+                      editorTaskId === selectedTask.id
+                        ? editorDescriptionContent
+                        : selectedTaskEditorContent
+                    }
+                    saveStatus={editorSaveStatus}
+                    onTitleChange={value => {
+                      editorRevisionRef.current += 1;
+                      setEditorTitle(value);
+                      setEditorSaveStatus('dirty');
+                    }}
+                    onDescriptionChange={change => {
+                      editorRevisionRef.current += 1;
+                      setEditorDescription(change.plainText);
+                      setEditorDescriptionContent(change.content);
+                      setEditorSaveStatus('dirty');
+                    }}
+                    onRetrySave={() => setEditorSaveStatus('dirty')}
+                    onResolveConflict={() => {
+                      setEditorTitle(selectedTaskEditorTitle);
+                      setEditorDescription(selectedTaskEditorDescription);
+                      setEditorDescriptionContent(selectedTaskEditorContent);
+                      editorExpectedMutationVersionRef.current =
+                        selectedTask.mutationVersion ?? null;
+                      editorRevisionRef.current += 1;
+                      setEditorSaveStatus('idle');
+                    }}
+                    onClose={closeTaskDocument}
                     onOpenRelease={openReleaseSidebar}
                     onUpdateStatus={(taskId, status) =>
                       updateTaskField(taskId, { status })
@@ -2263,8 +2534,12 @@ export function TasksPageClient() {
                     task={null}
                     title=''
                     description=''
+                    descriptionContent={emptyRichTextDocument}
+                    saveStatus='idle'
                     onTitleChange={NOOP}
                     onDescriptionChange={NOOP}
+                    onRetrySave={NOOP}
+                    onResolveConflict={NOOP}
                     onClose={NOOP}
                     onOpenRelease={NOOP_TASK_OPEN}
                     onUpdateStatus={NOOP_TASK_STATUS_UPDATE}

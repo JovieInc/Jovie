@@ -164,6 +164,16 @@ All routes live under `apps/web/app/api/`. Auth is via Clerk (`auth()`) unless n
 | `/api/health/keys` | GET | Admin | API key health |
 | `/api/health/redis` | GET | Admin or CRON_SECRET | Redis write/read operability probe |
 
+### Library Documents (authenticated creator)
+
+| Endpoint | Method | Auth | Purpose |
+|----------|--------|------|---------|
+| `/api/library/documents` | GET/POST | Clerk | Cursor-page private documents or capture an idempotent idea |
+| `/api/library/documents/[id]` | PATCH | Clerk | Save an immutable rich-text revision with optimistic concurrency |
+| `/api/library/documents/[id]/claims` | POST | Clerk | Add evidence to the exact current revision |
+| `/api/library/documents/[id]/review` | POST | Clerk | Complete factual evidence review for a script |
+| `/api/library/documents/[id]/approve` | POST | Owner | Approve and hand off the exact revision for capture |
+
 ### Images
 
 | Endpoint | Method | Auth | Purpose |

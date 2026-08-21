@@ -1,3 +1,6 @@
+import { plainTextToRichTextDocument } from '@/lib/rich-text/document';
+import { richTextDocumentToPlainText } from '@/lib/rich-text/extensions';
+import { writeTaskDescriptionContent } from './task-rich-text';
 import type { TaskStatus, TaskView, UpdateTaskInput } from './types';
 
 export interface TaskUpdateFieldPatch {
@@ -41,7 +44,8 @@ function resolvePatchCompletedAt(
 
 export function buildTaskUpdateFieldPatch(
   data: UpdateTaskInput,
-  existingTask: Pick<TaskView, 'completedAt' | 'status'>,
+  existingTask: Pick<TaskView, 'completedAt' | 'status'> &
+    Partial<Pick<TaskView, 'metadata'>>,
   now = new Date()
 ): TaskUpdateFieldPatch {
   const patch: Partial<MutableTaskUpdateFieldPatch> = {
@@ -76,6 +80,18 @@ export function buildTaskUpdateFieldPatch(
     patch.sourceTemplateId = data.sourceTemplateId;
   }
   if (data.metadata !== undefined) patch.metadata = data.metadata;
+  if (data.descriptionContent !== undefined) {
+    patch.description = richTextDocumentToPlainText(data.descriptionContent);
+    patch.metadata = writeTaskDescriptionContent(
+      data.metadata ?? existingTask.metadata,
+      data.descriptionContent
+    );
+  } else if (data.description !== undefined && data.metadata !== null) {
+    patch.metadata = writeTaskDescriptionContent(
+      data.metadata ?? existingTask.metadata,
+      plainTextToRichTextDocument(data.description ?? '')
+    );
+  }
 
   return patch as TaskUpdateFieldPatch;
 }

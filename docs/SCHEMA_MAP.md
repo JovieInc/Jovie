@@ -49,6 +49,7 @@ Token read/write must go through `apps/web/lib/connectors/token-vault.ts` — ne
 | `youtube-library.ts` | `youtubeVideos`, `youtubeVideoMetricSnapshots`, `youtubeThumbnailVersions`, `youtubeVideoReleaseLinks` | `youtubeVideos.creatorProfileId` → `creatorProfiles`; snapshots/thumbnails/links `.videoId` → `youtubeVideos` cascade; links `.releaseId`/`recordingId` → `discogReleases`/`discogRecordings`. Thumbnail versions are append-only (never delete, never update imageUrl/provenance). Sync engine in `lib/youtube-library/`; provider interface plugs in with JOV-3189 |
 | `dsp-bio-sync.ts` | `dspBioSyncRequests` | `dspBioSyncRequests.creatorProfileId` → `creatorProfiles` |
 | `release-tasks.ts` | `releaseTasks`, `releaseTaskTemplates`, `releaseTaskTemplateItems` | `releaseTasks.releaseId` → `discogReleases` |
+| `creator-documents.ts` | `creatorDocuments`, `creatorDocumentRevisions`, `creatorRevisionClaims`, `creatorRevisionApprovals`, `creatorCaptureHandoffs` | Documents belong to `creatorProfiles`; revisions and evidence are immutable per document revision; approvals bind one exact revision to one capture handoff |
 | `pre-save.ts` | `preSaveTokens` | Links fans to upcoming releases |
 | `tour.ts` | `tourDates` | `tourDates.creatorProfileId` → `creatorProfiles` |
 
