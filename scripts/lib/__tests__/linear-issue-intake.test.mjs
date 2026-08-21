@@ -85,4 +85,72 @@ describe('upsertLinearIssueByTitleFingerprint', () => {
       identifier: 'JOV-9001',
     });
   });
+
+  it('reopens a matching terminal receipt into Backlog when requested', async () => {
+    const fetchImpl = vi.fn(async (_url, init) => {
+      const payload = JSON.parse(String(init.body));
+      if (payload.query.includes('FindIssueByFingerprint')) {
+        return new Response(
+          JSON.stringify({
+            data: {
+              team: {
+                states: {
+                  nodes: [
+                    { id: 'backlog-state', name: 'Backlog', type: 'backlog' },
+                  ],
+                },
+              },
+              issues: {
+                nodes: [
+                  {
+                    id: 'lin-1',
+                    identifier: 'JOV-9001',
+                    url: 'https://linear.app/jovie/issue/JOV-9001',
+                    title: `[${fingerprint}] crash`,
+                    state: {
+                      id: 'done-state',
+                      name: 'Done',
+                      type: 'completed',
+                    },
+                  },
+                ],
+              },
+            },
+          })
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          data: {
+            issueUpdate: {
+              success: true,
+              issue: created.data.issueCreate.issue,
+            },
+          },
+        })
+      );
+    });
+
+    await expect(
+      upsertLinearIssueByTitleFingerprint({
+        fingerprint,
+        title: `[${fingerprint}] crash`,
+        description: 'new occurrence',
+        apiKey: 'lin-key',
+        fetchImpl,
+        reopenTerminal: true,
+      })
+    ).resolves.toMatchObject({
+      ok: true,
+      action: 'updated',
+      reopened: true,
+    });
+    const update = fetchImpl.mock.calls
+      .map(([, init]) => JSON.parse(String(init.body)))
+      .find(payload => payload.query.includes('issueUpdate'));
+    expect(update.variables.input).toEqual({
+      description: 'new occurrence',
+      stateId: 'backlog-state',
+    });
+  });
 });

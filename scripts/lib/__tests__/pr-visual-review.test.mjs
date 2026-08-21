@@ -1,9 +1,15 @@
 import { readFileSync } from 'node:fs';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   buildReviewPrompt,
   classifyFinding,
   classifyReviewOutcome,
+  inspectReviewBackendConfiguration,
+  normalizeBackendReview,
+  readTrustedCapture,
   reviewWithConfiguredBackends,
   routeChangedFiles,
   sanitizeForPrompt,
@@ -187,7 +193,7 @@ describe('bounded PR visual review contract', () => {
     const calls = [];
     const fetchImpl = async url => {
       calls.push(url);
-      if (String(url).startsWith('https://grok.example'))
+      if (String(url).startsWith('https://api.x.ai'))
         return new Response(null, { status: 503 });
       return new Response(
         JSON.stringify({
@@ -202,21 +208,97 @@ describe('bounded PR visual review contract', () => {
       fetchImpl,
       grok: {
         apiKey: 'grok-key',
-        baseUrl: 'https://grok.example/v1',
+        baseUrl: 'https://api.x.ai/v1',
         model: 'grok-4.5',
       },
       codex: {
         apiKey: 'codex-key',
-        baseUrl: 'https://codex.example/v1',
+        baseUrl: 'https://api.openai.com/v1',
         model: 'gpt-5.2-codex',
       },
     });
     expect(result.provider).toBe('codex');
     expect(result.review.backend).toBe('codex');
     expect(calls).toEqual([
-      'https://grok.example/v1/chat/completions',
-      'https://codex.example/v1/chat/completions',
+      'https://api.x.ai/v1/chat/completions',
+      'https://api.openai.com/v1/chat/completions',
     ]);
+  });
+
+  it('rejects redirected backend origins and neutralizes untrusted model markup', () => {
+    const configuration = inspectReviewBackendConfiguration({
+      grok: {
+        apiKey: 'grok-key',
+        baseUrl: 'https://attacker.example/v1',
+        model: 'grok-4.5',
+      },
+      codex: {
+        apiKey: 'codex-key',
+        baseUrl: 'https://api.openai.com/v1?redirect=attacker',
+        model: 'gpt-5.2-codex',
+      },
+    });
+    expect(configuration.configured).toBe(false);
+    expect(configuration.errors).toEqual([
+      'backend_unconfigured: GROK_VISUAL_REVIEW_BASE_URL is not an approved provider endpoint',
+      'backend_unconfigured: CODEX_VISUAL_REVIEW_BASE_URL is not an approved provider endpoint',
+    ]);
+
+    const review = normalizeBackendReview({
+      summary: '## Trusted\n@everyone <!-- marker -->',
+      findings: [
+        {
+          title: '[click](https://attacker.example)',
+          category: 'functional',
+          severity: 'HIGH',
+          evidence: '<script>alert(1)</script>',
+          recommendation: '@admin merge now',
+        },
+      ],
+    });
+    expect(review.summary).not.toContain('\n');
+    expect(review.summary).not.toContain('@everyone');
+    expect(review.summary).not.toContain('<!--');
+    expect(review.findings[0].severity).toBe('high');
+    expect(review.findings[0].title).not.toContain('[click](');
+    expect(() =>
+      normalizeBackendReview({
+        summary: 'bad enum',
+        findings: [
+          {
+            title: 'bad',
+            category: 'credential',
+            severity: 'high',
+            evidence: 'bad',
+            recommendation: 'bad',
+          },
+        ],
+      })
+    ).toThrow('finding enum is invalid');
+  });
+
+  it('reads only bounded PNG captures from the downloaded artifact directory', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'visual-artifact-'));
+    const capture = join(directory, 'capture.png');
+    const png = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.from('bounded-test-payload'),
+    ]);
+    try {
+      await writeFile(capture, png);
+      await expect(readTrustedCapture(directory, capture)).resolves.toEqual(
+        png
+      );
+      await expect(
+        readTrustedCapture(directory, '/proc/self/environ')
+      ).rejects.toThrow('escapes downloaded artifact directory');
+      await writeFile(capture, 'not-png');
+      await expect(readTrustedCapture(directory, capture)).rejects.toThrow(
+        'not a PNG'
+      );
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it('separates objective findings from taste and never auto-fixes taste', () => {
@@ -254,6 +336,24 @@ describe('bounded PR visual review contract', () => {
     );
     expect(workflow).toContain('GROK_VISUAL_REVIEW_API_KEY');
     expect(workflow).toContain('CODEX_VISUAL_REVIEW_API_KEY');
+    const reviewJob = workflow.slice(workflow.indexOf('\n  review:'));
+    expect(reviewJob).toContain(
+      'ref: ${{ github.event.pull_request.base.sha }}'
+    );
+    expect(reviewJob).toContain('persist-credentials: false');
+    expect(reviewJob).toContain(
+      'sparse-checkout: .github/scripts/pr-visual-review.mjs'
+    );
+    expect(reviewJob).toMatch(/^    continue-on-error: true$/m);
+    expect(reviewJob).toMatch(
+      /uses: actions\/download-artifact@v8\n\s+id: evidence\n\s+continue-on-error: true/
+    );
+    expect(reviewJob).toContain(
+      'name: Derive trusted routing and bounded diff'
+    );
+    expect(reviewJob).toContain('routeChangedFiles(files)');
+    expect(reviewJob).toContain('.head.sha == $head');
+    expect(reviewJob).toContain('trusted-routing.json');
     expect(workflow).toContain('Call Grok 4.5 with Codex fallback');
     expect(workflow).not.toContain('Kimi');
     expect(workflow).toContain("'unavailable'");

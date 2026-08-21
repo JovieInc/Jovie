@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { readFile, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { readFile, realpath, stat, writeFile } from 'node:fs/promises';
+import { join, relative, resolve } from 'node:path';
 
 const MAX_DIFF = 18_000;
 const UI_FILE =
@@ -10,6 +10,27 @@ const SECRET =
 const GROK_MODEL = /grok[-_ ]?4(?:[._ -]?5)?/i;
 const CODEX_MODEL =
   /(?:gpt[-_ ]?5(?:[._ -]?\d+)?(?:[-_ ]?codex)?|codex[-_ ]?[\w.-]+)/i;
+const BACKEND_ORIGIN = {
+  grok: 'https://api.x.ai',
+  codex: 'https://api.openai.com',
+};
+const REVIEW_CATEGORIES = new Set([
+  'layout',
+  'accessibility',
+  'responsive',
+  'functional',
+  'taste',
+  'preference',
+  'brand',
+  'identity',
+  'composition',
+  'copy-tone',
+]);
+const REVIEW_SEVERITIES = new Set(['high', 'medium', 'low']);
+const MAX_CAPTURE_BYTES = 10 * 1024 * 1024;
+const PNG_SIGNATURE = Buffer.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+]);
 
 export const REQUIRED_CAPTURE_VIEWPORTS = ['desktop', 'mobile'];
 const PUBLIC_HOME_CAPTURE_ROUTE = '/';
@@ -162,11 +183,115 @@ function requireBackend({ apiKey, baseUrl, model, provider }) {
     throw new Error(
       `backend_unconfigured: ${prefix}_VISUAL_REVIEW_BASE_URL is missing`
     );
+  let parsedBaseUrl;
+  try {
+    parsedBaseUrl = new URL(baseUrl);
+  } catch {
+    throw new Error(
+      `backend_unconfigured: ${prefix}_VISUAL_REVIEW_BASE_URL is invalid`
+    );
+  }
+  if (
+    parsedBaseUrl.origin !== BACKEND_ORIGIN[provider] ||
+    !['/v1', '/v1/'].includes(parsedBaseUrl.pathname) ||
+    parsedBaseUrl.username ||
+    parsedBaseUrl.password ||
+    parsedBaseUrl.search ||
+    parsedBaseUrl.hash
+  )
+    throw new Error(
+      `backend_unconfigured: ${prefix}_VISUAL_REVIEW_BASE_URL is not an approved provider endpoint`
+    );
   const allowed = provider === 'grok' ? GROK_MODEL : CODEX_MODEL;
   if (!allowed.test(model ?? ''))
     throw new Error(
       `backend_unconfigured: ${prefix}_VISUAL_REVIEW_MODEL is invalid`
     );
+}
+
+function sanitizeReviewText(value, maxLength) {
+  return String(value ?? '')
+    .replace(/[\u0000-\u001f\u007f]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/@/g, '@\u200b')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/([\\`*_{}\[\]()#+.!|~-])/g, '\\$1')
+    .trim()
+    .slice(0, maxLength);
+}
+
+export function normalizeBackendReview(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new Error('backend_failed: review must be an object');
+  if (typeof value.summary !== 'string' || !Array.isArray(value.findings))
+    throw new Error('backend_failed: review shape is invalid');
+  if (value.findings.length > 20)
+    throw new Error('backend_failed: too many findings');
+  return {
+    summary: sanitizeReviewText(value.summary, 1_500),
+    findings: value.findings.map(finding => {
+      if (!finding || typeof finding !== 'object' || Array.isArray(finding))
+        throw new Error('backend_failed: finding must be an object');
+      const category = String(finding.category ?? '');
+      const severity = String(finding.severity ?? '').toLowerCase();
+      if (!REVIEW_CATEGORIES.has(category) || !REVIEW_SEVERITIES.has(severity))
+        throw new Error('backend_failed: finding enum is invalid');
+      for (const key of ['title', 'evidence', 'recommendation']) {
+        if (typeof finding[key] !== 'string' || finding[key].trim() === '')
+          throw new Error(`backend_failed: finding ${key} is invalid`);
+      }
+      return {
+        title: sanitizeReviewText(finding.title, 240),
+        category,
+        severity,
+        evidence: sanitizeReviewText(finding.evidence, 1_000),
+        recommendation: sanitizeReviewText(finding.recommendation, 1_000),
+      };
+    }),
+  };
+}
+
+export function inspectReviewBackendConfiguration({ grok, codex }) {
+  const errors = [];
+  for (const [provider, backend] of [
+    ['grok', grok],
+    ['codex', codex],
+  ]) {
+    try {
+      requireBackend({ ...backend, provider });
+    } catch (error) {
+      errors.push(String(error.message ?? error));
+    }
+  }
+  return {
+    configured: errors.length === 0,
+    errors,
+  };
+}
+
+export async function readTrustedCapture(artifactRoot, capturePath) {
+  const requestedRoot = resolve(artifactRoot);
+  const requested = resolve(capturePath);
+  const requestedRelative = relative(requestedRoot, requested);
+  if (
+    requestedRelative.startsWith('..') ||
+    resolve(requestedRoot, requestedRelative) !== requested
+  )
+    throw new Error('capture path escapes downloaded artifact directory');
+  const root = await realpath(requestedRoot);
+  const candidate = await realpath(requested);
+  const withinRoot = relative(root, candidate);
+  if (withinRoot.startsWith('..') || resolve(root, withinRoot) !== candidate)
+    throw new Error('capture path escapes downloaded artifact directory');
+  const metadata = await stat(candidate);
+  if (!metadata.isFile()) throw new Error('capture path is not a regular file');
+  if (metadata.size <= 0 || metadata.size > MAX_CAPTURE_BYTES)
+    throw new Error('capture file size is outside the trusted bound');
+  const data = await readFile(candidate);
+  if (!data.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE))
+    throw new Error('capture file is not a PNG');
+  return data;
 }
 
 export async function reviewWithBackend({
@@ -194,6 +319,7 @@ export async function reviewWithBackend({
       `${baseUrl.replace(/\/$/, '')}/chat/completions`,
       {
         method: 'POST',
+        redirect: 'error',
         signal: controller.signal,
         headers: {
           authorization: `Bearer ${apiKey}`,
@@ -213,7 +339,9 @@ export async function reviewWithBackend({
     const text = payload?.choices?.[0]?.message?.content;
     if (typeof text !== 'string' || text.length === 0)
       throw new Error('backend_failed: empty response');
-    return JSON.parse(text.replace(/^```json\s*|\s*```$/g, ''));
+    return normalizeBackendReview(
+      JSON.parse(text.replace(/^```json\s*|\s*```$/g, ''))
+    );
   } finally {
     clearTimeout(timeout);
   }
@@ -322,9 +450,6 @@ async function main() {
   if (command === 'review') {
     const input = JSON.parse(await readFile(args[0], 'utf8'));
     const artifactDir = resolve(input.artifactDir);
-    const manifest = JSON.parse(
-      await readFile(join(artifactDir, 'manifest.json'), 'utf8')
-    );
     const reviewStatus = input.reviewStatus ?? 'advisory';
     if (reviewStatus === 'skipped' || reviewStatus === 'unavailable') {
       await writeFile(
@@ -344,20 +469,49 @@ async function main() {
       );
       return;
     }
-    const screenshots = [];
-    for (const capture of manifest.captures ?? []) {
-      if (capture.status !== 'captured') continue;
-      screenshots.push(
-        (await readFile(resolve(capture.path))).toString('base64')
+    let manifest;
+    let screenshots;
+    try {
+      manifest = JSON.parse(
+        await readFile(join(artifactDir, 'manifest.json'), 'utf8')
       );
+      const validation = validateCaptureManifest(manifest, {
+        routes: input.routes,
+      });
+      if (!validation.ok)
+        throw new Error(
+          `capture evidence is invalid: ${validation.failures.join('; ')}`
+        );
+      screenshots = [];
+      for (const capture of manifest.captures ?? []) {
+        if (capture.status !== 'captured') continue;
+        screenshots.push(
+          (await readTrustedCapture(artifactDir, capture.path)).toString(
+            'base64'
+          )
+        );
+      }
+    } catch (error) {
+      await writeFile(
+        input.output,
+        JSON.stringify(
+          {
+            status: 'unavailable',
+            review_status: 'unavailable',
+            error: String(error?.message ?? error),
+          },
+          null,
+          2
+        )
+      );
+      return;
     }
     const prompt = buildReviewPrompt({
       diff: input.diff,
       changedFiles: input.changedFiles,
-      screenshots:
-        manifest.captures
-          ?.filter(c => c.status === 'captured')
-          .map(c => c.path) ?? [],
+      screenshots: manifest.captures
+        .filter(c => c.status === 'captured')
+        .map(c => c.path),
     });
     try {
       const { review, provider } = await reviewWithConfiguredBackends({
@@ -385,7 +539,7 @@ async function main() {
           {
             status: 'unavailable',
             review_status: 'unavailable',
-            error: String(error.message ?? error),
+            error: String(error?.message ?? error),
           },
           null,
           2
