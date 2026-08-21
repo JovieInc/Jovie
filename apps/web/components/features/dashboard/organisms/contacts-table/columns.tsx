@@ -55,16 +55,23 @@ export function createContactColumns(
   callbacks: ContactColumnCallbacks
 ): ContactColumnDef[] {
   return [
-    // Role column
-    contactColumnHelper.accessor('role', {
-      id: 'role',
-      header: 'Role',
+    contactColumnHelper.display({
+      id: 'responsibilities',
+      header: 'Responsibilities',
       cell: ({ row }) => {
         const contact = row.original;
-        const label = getContactRoleLabel(contact.role, contact.customLabel);
-        return <span className='font-caption text-primary-token'>{label}</span>;
+        const labels = (contact.responsibilities ?? [contact])
+          .filter(responsibility => responsibility.isActive)
+          .map(responsibility =>
+            getContactRoleLabel(responsibility.role, responsibility.customLabel)
+          );
+        return (
+          <span className='font-caption text-primary-token'>
+            {labels.join(', ') || 'No Active Responsibility'}
+          </span>
+        );
       },
-      size: 180,
+      size: 220,
     }),
 
     // Name/Company column
