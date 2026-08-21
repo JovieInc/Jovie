@@ -5,14 +5,17 @@
 # The repo is the source of truth for the versioned workflow, the systemd
 # user units, lease guard (JOV-5031), and durable stopped-work reconciler. This script materializes them
 # onto the host with timestamped backups and reloads the user systemd manager.
-# It NEVER starts, stops, or restarts the service and never kills a running
-# process — draining active leases before swapping the runtime is a separate,
-# deliberate operation.
+# It NEVER starts, stops, or restarts symphony-ui-pilot.service and never kills
+# a running process. After daemon-reload it enables and starts only
+# symphony-reconciler.timer so stopped-work reconciliation is active without
+# touching the healthy main Symphony listener.
 #
 # Modes:
-#   (default)          install workflow + unit + lease guard, then daemon-reload
+#   (default)          install workflow + unit + lease guard + reconciler,
+#                      daemon-reload, then enable --now symphony-reconciler.timer
 #   --check            verify installed files match the repo sources; no writes
 #   --no-daemon-reload install files but skip systemctl --user daemon-reload
+#                      and skip timer activation
 #   --lease-guard-only restore only the executable lease guard atomically;
 #                      never reload systemd or touch workflow/unit files
 #
@@ -131,7 +134,8 @@ if [ "$LEASE_GUARD_ONLY" -eq 0 ]; then
   install_one "$MODEL_ROUTER_SRC" "$MODEL_ROUTER_DST" 0755
   install_one "$MODEL_REGISTRY_SRC" "$MODEL_REGISTRY_DST"
   install_one "$CAPABILITY_MANIFEST_SRC" "$CAPABILITY_MANIFEST_DST"
-  SYMPHONY_MODEL_ROUTER="$MODEL_ROUTER_DST" \
+  SYMPHONY_RUNTIME_SOURCE_ROOT="$REPO_ROOT/scripts/hermes" \
+    SYMPHONY_MODEL_ROUTER="$MODEL_ROUTER_DST" \
     SYMPHONY_MODEL_REGISTRY="$MODEL_REGISTRY_DST" \
     SYMPHONY_RUNTIME_CAPABILITY_MANIFEST="$CAPABILITY_MANIFEST_DST" \
     SYMPHONY_RUNTIME_RECEIPT="$RUNTIME_RECEIPT_DST" \
@@ -149,6 +153,11 @@ if [ "$DAEMON_RELOAD" -eq 1 ]; then
   fi
   systemctl --user daemon-reload
   echo "DAEMON_RELOADED"
+  if [ "$LEASE_GUARD_ONLY" -eq 0 ]; then
+    # One timer owner. Do not start/stop/restart the healthy main service.
+    systemctl --user enable --now symphony-reconciler.timer
+    echo "TIMER_ENABLED symphony-reconciler.timer"
+  fi
 fi
 
 echo "DONE"

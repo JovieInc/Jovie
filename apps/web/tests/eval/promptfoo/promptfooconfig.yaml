@@ -1834,42 +1834,70 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertChannelPlaylistRuleCase
 
-  - description: Fan email refuses invented ESP and scarcity numbers
+  - description: Fan email refuses invented list-size numbers
     metadata:
       cost: deterministic
     vars:
-      input: "Fan email no-invent gate: invented metrics refused"
+      input: "Fan email gate: invented list-size refused"
       target: skill-prompt-contract
       skillPromptCase: release-pitch-retouch-prompts
-      fanEmailRuleCase: invented-metrics-refused
+      fanEmailRuleCase: invented-list-size-refused
     assert:
       - type: javascript
         value: file://assertions.cjs:assertDeterministicNoSpend
       - type: javascript
         value: file://assertions.cjs:assertFanEmailRuleCase
 
-  - description: Fan email skips unknown or empty lists without queuing
+  - description: Fan email skips send when list size is unknown or zero
     metadata:
       cost: deterministic
     vars:
-      input: "Fan email no-invent gate: unknown or zero list skips"
+      input: "Fan email gate: unknown or zero list skips send"
       target: skill-prompt-contract
       skillPromptCase: release-pitch-retouch-prompts
-      fanEmailRuleCase: unknown-or-zero-list-skips
+      fanEmailRuleCase: unknown-or-zero-list-skips-send
     assert:
       - type: javascript
         value: file://assertions.cjs:assertDeterministicNoSpend
       - type: javascript
         value: file://assertions.cjs:assertFanEmailRuleCase
 
-  - description: Fan email never auto-sends or schedules without a human
+  - description: Fan email marks missing open rate unverifiable
     metadata:
       cost: deterministic
     vars:
-      input: "Fan email human-send gate: auto-send refused"
+      input: "Fan email gate: missing open-rate unverifiable"
       target: skill-prompt-contract
       skillPromptCase: release-pitch-retouch-prompts
-      fanEmailRuleCase: human-send-only
+      fanEmailRuleCase: missing-open-rate-unverifiable
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertFanEmailRuleCase
+
+  - description: Fan email refuses send without human sign-off
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Fan email gate: no human sign-off no send"
+      target: skill-prompt-contract
+      skillPromptCase: release-pitch-retouch-prompts
+      fanEmailRuleCase: no-human-signoff-no-send
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertFanEmailRuleCase
+
+  - description: Fan email keeps one live CTA and omits borrowed testimonials
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Fan email gate: one CTA"
+      target: skill-prompt-contract
+      skillPromptCase: release-pitch-retouch-prompts
+      fanEmailRuleCase: one-cta
     assert:
       - type: javascript
         value: file://assertions.cjs:assertDeterministicNoSpend

@@ -1,37 +1,19 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSessionTx } from '@/lib/auth/session';
-import { creatorContacts, creatorProfiles } from '@/lib/db/schema/profiles';
+import { getDashboardContacts } from '@/lib/contacts/queries';
+import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
-import type { DashboardContact } from '@/types/contacts';
 
 const NO_STORE_HEADERS = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
   Pragma: 'no-cache',
 } as const;
 
-function mapContact(
-  row: typeof creatorContacts.$inferSelect
-): DashboardContact {
-  return {
-    id: row.id,
-    creatorProfileId: row.creatorProfileId,
-    role: row.role,
-    customLabel: row.customLabel,
-    personName: row.personName,
-    companyName: row.companyName,
-    territories: row.territories ?? [],
-    email: row.email,
-    phone: row.phone,
-    preferredChannel: row.preferredChannel,
-    isActive: row.isActive ?? true,
-    sortOrder: row.sortOrder ?? 0,
-  };
-}
-
-export async function GET(req: Request) {
+export async function GET(request: Request) {
   try {
     const { userId } = await getCachedAuth();
     if (!userId) {
@@ -41,9 +23,7 @@ export async function GET(req: Request) {
       );
     }
 
-    const { searchParams } = new URL(req.url);
-    const profileId = searchParams.get('profileId');
-
+    const profileId = new URL(request.url).searchParams.get('profileId');
     if (!profileId) {
       return NextResponse.json(
         { error: 'Missing profileId' },
@@ -52,32 +32,18 @@ export async function GET(req: Request) {
     }
 
     const contacts = await withDbSessionTx(
-      async (tx, appUserId) => {
+      async (tx, sessionUserId) => {
         const [profile] = await tx
           .select({ id: creatorProfiles.id })
           .from(creatorProfiles)
+          .innerJoin(users, eq(users.id, creatorProfiles.userId))
           .where(
-            and(
-              eq(creatorProfiles.id, profileId),
-              eq(creatorProfiles.userId, appUserId)
-            )
+            and(eq(creatorProfiles.id, profileId), eq(users.id, sessionUserId))
           )
           .limit(1);
+        if (!profile) return null;
 
-        if (!profile) {
-          return null;
-        }
-
-        const rows = await tx
-          .select()
-          .from(creatorContacts)
-          .where(eq(creatorContacts.creatorProfileId, profileId))
-          .orderBy(
-            asc(creatorContacts.sortOrder),
-            asc(creatorContacts.createdAt)
-          );
-
-        return rows.map(mapContact);
+        return getDashboardContacts(tx, profileId);
       },
       { clerkUserId: userId }
     );

@@ -50,6 +50,10 @@ import {
 } from '@/lib/constants/ai-models';
 import type { getEntitlements as GetEntitlements } from '@/lib/entitlements/registry';
 import { startChatTurnLangfuseTrace } from '@/lib/observability/langfuse';
+import {
+  applyEveIdentityToSystemPrompt,
+  type EveIdentityId,
+} from '@/lib/ovie/identity';
 
 type EntitlementsForPlan = ReturnType<typeof GetEntitlements>;
 
@@ -196,6 +200,15 @@ export interface ExecuteChatTurnInput {
    * callers behaviour-stable.
    */
   mode?: 'app' | 'onboarding';
+  /**
+   * Bound Eve identity pack (JOV-5216 / JOV-5239). Ovie prepends pack
+   * instructions so self-id follows the selected door. Jovie leaves the
+   * existing artist system prompt unchanged.
+   */
+  identity?: {
+    readonly id: EveIdentityId;
+    readonly instructions: string;
+  };
 }
 
 export interface ChatTurnFinishSignals {
@@ -261,6 +274,7 @@ export async function executeChatTurn(
     telemetry,
     onStreamError,
     mode = 'app',
+    identity,
   } = input;
 
   // Onboarding mode swaps in the Stanley-style prompt and skips the
@@ -301,6 +315,9 @@ export async function executeChatTurn(
       pinnedOpportunity: pinnedOpportunityBlock,
       lockedTools,
     });
+    if (identity) {
+      systemPrompt = applyEveIdentityToSystemPrompt(systemPrompt, identity);
+    }
   }
 
   const modelMessages = await convertToModelMessages(uiMessages);

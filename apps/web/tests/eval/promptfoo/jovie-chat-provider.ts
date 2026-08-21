@@ -83,6 +83,13 @@ import {
 import { users } from '@/lib/db/schema/auth';
 import { chatMessages, chatTurns } from '@/lib/db/schema/chat';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import {
+  evaluateAllFanEmailRuleCases,
+  evaluateFanEmailRuleCase,
+  FAN_EMAIL_RULE_CASE_IDS,
+  FAN_EMAIL_SEND_RULES,
+  type FanEmailRuleCaseId,
+} from '@/lib/email/campaigns/fan-email-rules';
 import { getEntitlements, type PlanId } from '@/lib/entitlements/registry';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
@@ -112,13 +119,6 @@ import {
   evaluateAllChannelPlaylistRuleCases,
   evaluateChannelPlaylistRuleCase,
 } from '@/lib/services/channel-intelligence/playlist-rules';
-import {
-  evaluateAllFanEmailRuleCases,
-  evaluateFanEmailRuleCase,
-  FAN_EMAIL_RULE_CASE_IDS,
-  type FanEmailRuleCaseId,
-} from '@/lib/services/fan-email/send-rule-cases';
-import { FAN_EMAIL_SEND_RULES } from '@/lib/services/fan-email/send-rules';
 import {
   buildSystemPrompt as buildInsightSystemPrompt,
   buildUserPrompt as buildInsightUserPrompt,
@@ -5935,11 +5935,8 @@ function evaluateSkillPromptContract(vars: EvalVars) {
   const requestedFanEmailRule = requestedFanEmailRuleCase
     ? evaluateFanEmailRuleCase(requestedFanEmailRuleCase)
     : null;
-  const releaseDayPlaybook = registryPathContent(
+  const fanEmailPlaybook = registryPathContent(
     'docs/playbooks/release-day-announcement.playbook.md'
-  );
-  const releasePlannerPlaybook = registryPathContent(
-    'docs/playbooks/jovie-release-planner.playbook.md'
   );
   const packagingPromptFacts = {
     evidenceNotVibes: textIncludesAll(PACKAGING_AUDIT_SYSTEM_PROMPT, [
@@ -6021,45 +6018,52 @@ function evaluateSkillPromptContract(vars: EvalVars) {
   };
   const fanEmailPromptFacts = {
     noInventEspMetrics: textIncludesAll(FAN_EMAIL_SEND_RULES, [
-      'Never fabricate',
       'open rate',
       'click rate',
       'list size',
-      'scarcity',
-      'deadline',
       'unverifiable',
-      'observed_at',
+    ]),
+    unknownZeroListSkips: textIncludesAll(FAN_EMAIL_SEND_RULES, [
       'unknown or 0',
-      'Human-only send',
-      'queue-for-approval',
+      'skip send',
+      'No queue',
+    ]),
+    humanSignOffRequired: textIncludesAll(FAN_EMAIL_SEND_RULES, [
+      'human sign-off',
+      'auto-send is not',
+    ]),
+    oneCtaLiveLink: textIncludesAll(FAN_EMAIL_SEND_RULES, [
+      'One CTA',
+      'Live smart link',
+      'Do not invent a send',
+    ]),
+    noBorrowedTestimonials: textIncludesAll(FAN_EMAIL_SEND_RULES, [
+      'No borrowed testimonials',
+    ]),
+    playbookEncodesGate: textIncludesAll(fanEmailPlaybook, [
+      'unverifiable',
+      'unknown or 0',
+      'human sign-off',
+      'auto-send is not',
       'One CTA',
       'No borrowed testimonials',
     ]),
-    playbookEncodesGate: textIncludesAll(
-      `${releaseDayPlaybook}\n${releasePlannerPlaybook}`,
-      [
-        'unverifiable',
-        'queue-for-approval',
-        'no fan emails yet',
-        'human sign-off',
-        'never auto-send',
-      ]
-    ),
-    inventedMetricsRefused:
-      fanEmailRuleCases.find(item => item.id === 'invented-metrics-refused')
+    inventedListSizeRefused:
+      fanEmailRuleCases.find(item => item.id === 'invented-list-size-refused')
         ?.passed === true,
-    missingEspUnverifiable:
-      fanEmailRuleCases.find(item => item.id === 'missing-esp-unverifiable')
+    unknownOrZeroListSkipsSend:
+      fanEmailRuleCases.find(
+        item => item.id === 'unknown-or-zero-list-skips-send'
+      )?.passed === true,
+    missingOpenRateUnverifiable:
+      fanEmailRuleCases.find(
+        item => item.id === 'missing-open-rate-unverifiable'
+      )?.passed === true,
+    noHumanSignoffNoSend:
+      fanEmailRuleCases.find(item => item.id === 'no-human-signoff-no-send')
         ?.passed === true,
-    unknownOrZeroListSkips:
-      fanEmailRuleCases.find(item => item.id === 'unknown-or-zero-list-skips')
-        ?.passed === true,
-    humanSendOnly:
-      fanEmailRuleCases.find(item => item.id === 'human-send-only')?.passed ===
-      true,
-    oneCtaLiveLink:
-      fanEmailRuleCases.find(item => item.id === 'one-cta-live-link')
-        ?.passed === true,
+    oneCta:
+      fanEmailRuleCases.find(item => item.id === 'one-cta')?.passed === true,
   };
   const retouchGuardrails = [
     "Preserve the person's identity",

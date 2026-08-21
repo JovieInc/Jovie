@@ -447,4 +447,41 @@ describe('executeChatTurn — parity assertions', () => {
     expect(ctx.extra.profileId).toBe('profile-1');
     expect(ctx.extra.conversationId).toBe('conv-1');
   });
+
+  it('applies Ovie identity instructions so self-id follows the selected pack', async () => {
+    const turn = await executeChatTurn({
+      ...baseInput,
+      uiMessages: [userMessage('hello')],
+      planLimits: paidPlanLimits,
+      identity: {
+        id: 'ovie',
+        instructions: "You are Ovie, Tim's only talk door.",
+      },
+    });
+
+    expect(
+      turn.systemPrompt.startsWith("You are Ovie, Tim's only talk door.")
+    ).toBe(true);
+    expect(turn.systemPrompt).toContain('Do not identify as Jovie.');
+    expect(turn.systemPrompt).toContain('Aurora');
+  });
+
+  it('keeps Jovie self-id when the jovie pack is bound', async () => {
+    const turn = await executeChatTurn({
+      ...baseInput,
+      uiMessages: [userMessage('hello')],
+      planLimits: paidPlanLimits,
+      identity: {
+        id: 'jovie',
+        instructions: 'You are Jovie, the artist-facing product agent.',
+      },
+    });
+
+    expect(
+      turn.systemPrompt.startsWith(
+        'You are Jovie, an AI music career assistant.'
+      )
+    ).toBe(true);
+    expect(turn.systemPrompt).not.toContain('Do not identify as Jovie.');
+  });
 });

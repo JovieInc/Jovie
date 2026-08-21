@@ -59,10 +59,17 @@ describe('fan email no-invent + human-send gate', () => {
       resolve(ROOT, 'docs/playbooks/release-day-announcement.playbook.md'),
       'utf8'
     );
+    const planner = readFileSync(
+      resolve(ROOT, 'docs/playbooks/jovie-release-planner.playbook.md'),
+      'utf8'
+    );
     expect(announcement).toContain('unverifiable');
     expect(announcement).toContain('queue-for-approval');
     expect(announcement).not.toContain(
       'one email send is queued to the fan list'
     );
+    expect(planner).toContain('unverifiable');
+    expect(planner).toContain('never auto-send');
+    expect(planner).toContain('No borrowed testimonials');
   });
 });

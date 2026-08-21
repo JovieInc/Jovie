@@ -252,6 +252,17 @@ describe('JovieChat empty state', () => {
     expect(queryByText('Release link')).toBeNull();
   });
 
+  it('uses Ovie composer copy when chatMode is ov', () => {
+    const { getByTestId, queryByText } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' chatMode='ov' />
+    );
+
+    expect(getByTestId('chat-input').getAttribute('data-placeholder')).toBe(
+      'Ask Ovie...'
+    );
+    expect(queryByText('Ask Jovie to plan your next release...')).toBeNull();
+  });
+
   it('renders the canonical starter-actions rail without the legacy card map', () => {
     renderWithQueryClient(
       <JovieChat
