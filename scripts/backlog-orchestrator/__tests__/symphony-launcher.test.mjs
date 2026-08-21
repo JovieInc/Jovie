@@ -186,6 +186,39 @@ describe('Symphony launcher closed loop', () => {
     }
   });
 
+  it('parks the preserved JOV-4999 missing-routing shape at exit 78 without writing routing', () => {
+    const env = fixture();
+    const workspace = join(env.root, 'JOV-4999');
+    mkdirSync(workspace, { recursive: true });
+    env.workspace = workspace;
+    try {
+      const issue = {
+        identifier: 'JOV-4999',
+        title: 'Historical missing routing receipt',
+        description: '',
+        labels: { nodes: [] },
+        comments: { nodes: [] },
+      };
+      assert.throws(
+        () => runRouter(env, issue),
+        error => {
+          assert.equal(/** @type {any} */ (error).status, 78);
+          assert.match(
+            String(/** @type {any} */ (error).stderr),
+            /SYMPHONY_LAUNCHER_FAILURE.*retryable=false.*maxAttempts=1/
+          );
+          return true;
+        }
+      );
+      assert.throws(() =>
+        readFileSync(join(workspace, '.symphony-routing.json'), 'utf8')
+      );
+      assert.throws(() => readFileSync(env.rotateLog, 'utf8'));
+    } finally {
+      rmSync(env.root, { recursive: true, force: true });
+    }
+  });
+
   it('fails closed when codex-rotate capacity is unreadable', () => {
     const env = fixture();
     try {

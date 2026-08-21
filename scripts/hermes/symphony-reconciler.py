@@ -154,6 +154,22 @@ def _source_bundle_available() -> bool:
     )
 
 
+def _source_bundle_hashes() -> dict[str, str] | None:
+    value = os.environ.get("SYMPHONY_RUNTIME_SOURCE_ROOT")
+    if not value:
+        return None
+    root = pathlib.Path(os.path.expanduser(value))
+    revision, hashes = _runtime_revision(
+        {
+            "runtime": root / "symphony-reconciler.py",
+            "router": root / "model-router.py",
+            "registry": root / "config" / "model-registry.json",
+            "manifest": root / "config" / "symphony-reconciler-capabilities.json",
+        }
+    )
+    return hashes if revision is not None else None
+
+
 def _runtime_receipt(
     paths: dict[str, pathlib.Path], manifest: dict[str, object]
 ) -> dict[str, object] | None:
@@ -162,12 +178,19 @@ def _runtime_receipt(
     )
     if revision is None:
         return None
+    installed_at = (
+        dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    )
+    source_hashes = _source_bundle_hashes()
     return {
         "schema": RUNTIME_RECEIPT_SCHEMA,
         "runtime": "symphony-reconciler",
         "runtimeRevision": revision,
+        "installedAt": installed_at,
         "capabilities": sorted(manifest["capabilities"]),
         "files": files,
+        "runtimeHashes": files,
+        "sourceHashes": source_hashes or files,
     }
 
 
@@ -311,12 +334,18 @@ def runtime_preflight(
             "receipt": receipt,
         }
 
+    source_hashes = installed_receipt.get("sourceHashes")
+    runtime_hashes = installed_receipt.get("runtimeHashes")
     if (
         installed_receipt.get("schema") != RUNTIME_RECEIPT_SCHEMA
         or installed_receipt.get("runtime") != receipt["runtime"]
         or installed_receipt.get("runtimeRevision") != receipt["runtimeRevision"]
         or installed_receipt.get("capabilities") != receipt["capabilities"]
         or installed_receipt.get("files") != receipt["files"]
+        or runtime_hashes not in (None, receipt["files"])
+        or source_hashes not in (None, receipt["files"])
+        or not isinstance(installed_receipt.get("installedAt"), str)
+        or not installed_receipt.get("installedAt")
     ):
         return {
             "status": "recoverable",
@@ -336,6 +365,9 @@ def runtime_preflight(
 
 DETERMINISTIC_LAUNCHER_ATTEMPTS = 1
 TRANSIENT_LAUNCHER_ATTEMPTS = 3
+EX_CONFIG = 78
+EX_TEMPFAIL = 75
+SYMPHONY_ROUTING_SCHEMA = "symphony-routing/v1"
 
 DETERMINISTIC_LAUNCHER_PATTERN = re.compile(
     r"SYMPHONY_LAUNCHER_FAILURE.*deterministic-launcher"
@@ -352,6 +384,10 @@ DETERMINISTIC_LAUNCHER_PATTERN = re.compile(
 TRANSIENT_LAUNCHER_PATTERN = re.compile(
     r"CAPACITY_UNAVAILABLE|account_busy|rate limit|quota|usage limit"
     r"|provider.*(?:temporarily )?unavailable|temporarily unavailable",
+    re.IGNORECASE,
+)
+PORT_EXIT_PATTERN = re.compile(
+    r"\{:port_exit,\s*(\d+)\}|port_exit[, :]+(\d+)",
     re.IGNORECASE,
 )
 
@@ -381,31 +417,229 @@ def _parse_time(value: object) -> dt.datetime | None:
         return None
 
 
-def classify_launcher_failure(error: object) -> dict[str, object]:
-    """Classify launcher evidence into a bounded, observable retry policy."""
+def parse_port_exit(error: object) -> int | None:
+    """Extract a port/process exit status from controller or launcher evidence."""
+    if isinstance(error, dict):
+        for key in ("port_exit", "exit_code", "exitCode", "status"):
+            value = error.get(key)
+            if isinstance(value, int):
+                return value
+            if isinstance(value, str) and value.isdigit():
+                return int(value)
+        error = error.get("error") or error.get("reason") or error.get("message")
     evidence = str(error or "")
-    if DETERMINISTIC_LAUNCHER_PATTERN.search(evidence):
-        return {
-            "schema": LAUNCHER_FAILURE_SCHEMA,
-            "class": "deterministic-launcher",
-            "code": "deterministic-launcher-failure",
-            "retryable": False,
-            "maxAttempts": DETERMINISTIC_LAUNCHER_ATTEMPTS,
-        }
-    if TRANSIENT_LAUNCHER_PATTERN.search(evidence):
-        return {
-            "schema": LAUNCHER_FAILURE_SCHEMA,
-            "class": "transient-launcher",
-            "code": "capacity-or-provider-unavailable",
-            "retryable": True,
-            "maxAttempts": TRANSIENT_LAUNCHER_ATTEMPTS,
-        }
+    match = PORT_EXIT_PATTERN.search(evidence)
+    if not match:
+        return None
+    for group in match.groups():
+        if group is not None:
+            try:
+                return int(group)
+            except ValueError:
+                return None
+    return None
+
+
+def parse_launcher_sentinel(error: object) -> dict[str, object] | None:
+    """Preserve a structured symphony-launcher-failure/v1 sentinel when present."""
+    if isinstance(error, dict) and error.get("schema") == LAUNCHER_FAILURE_SCHEMA:
+        return error
+    evidence = str(error or "")
+    marker = "SYMPHONY_LAUNCHER_FAILURE"
+    index = evidence.find(marker)
+    if index < 0:
+        return None
+    payload = evidence[index + len(marker) :].strip()
+    fields: dict[str, object] = {"schema": LAUNCHER_FAILURE_SCHEMA}
+    try:
+        tokens = shlex.split(payload)
+    except ValueError:
+        tokens = payload.split()
+    for token in tokens:
+        if "=" not in token:
+            continue
+        key, value = token.split("=", 1)
+        if value in {"true", "false"}:
+            fields[key] = value == "true"
+        elif value.isdigit():
+            fields[key] = int(value)
+        else:
+            fields[key] = value
+    return fields
+
+
+def _failure(
+    class_name: str,
+    code: str,
+    *,
+    retryable: bool,
+    max_attempts: int,
+) -> dict[str, object]:
     return {
         "schema": LAUNCHER_FAILURE_SCHEMA,
-        "class": "unknown-launcher",
-        "code": "unclassified-launcher-failure",
+        "class": class_name,
+        "code": code,
+        "retryable": retryable,
+        "maxAttempts": max_attempts,
+    }
+
+
+def classify_launcher_failure(
+    error: object,
+    item: dict[str, object] | None = None,
+) -> dict[str, object]:
+    """Classify launcher and controller-exit evidence into a bounded retry policy.
+
+    Structured sentinels and sysexits EX_CONFIG (78) are terminal. EX_TEMPFAIL
+    (75) stays a distinct bounded capacity state. Unknown exits stay typed
+    unknown and bounded, never collapsed into exit 78.
+    """
+    item = item or {}
+    sentinel = parse_launcher_sentinel(error)
+    if sentinel is None:
+        sentinel = parse_launcher_sentinel(item.get("error") or item.get("launcherFailure"))
+    if isinstance(sentinel, dict) and sentinel.get("retryable") is False:
+        return _failure(
+            str(sentinel.get("class") or "deterministic-launcher"),
+            str(sentinel.get("code") or "deterministic-launcher-failure"),
+            retryable=False,
+            max_attempts=int(sentinel.get("maxAttempts") or DETERMINISTIC_LAUNCHER_ATTEMPTS),
+        )
+    port_exit = parse_port_exit(error)
+    if port_exit is None:
+        port_exit = parse_port_exit(item.get("error"))
+    if port_exit is None:
+        for key in ("port_exit", "exit_code", "exitCode"):
+            value = item.get(key)
+            if isinstance(value, int):
+                port_exit = value
+                break
+    if port_exit == EX_CONFIG:
+        return _failure(
+            "deterministic-launcher",
+            "deterministic-launcher-failure",
+            retryable=False,
+            max_attempts=DETERMINISTIC_LAUNCHER_ATTEMPTS,
+        )
+    evidence = str(error or item.get("error") or "")
+    if DETERMINISTIC_LAUNCHER_PATTERN.search(evidence):
+        return _failure(
+            "deterministic-launcher",
+            "deterministic-launcher-failure",
+            retryable=False,
+            max_attempts=DETERMINISTIC_LAUNCHER_ATTEMPTS,
+        )
+    if port_exit == EX_TEMPFAIL or TRANSIENT_LAUNCHER_PATTERN.search(evidence):
+        return _failure(
+            "transient-launcher",
+            "capacity-or-provider-unavailable",
+            retryable=True,
+            max_attempts=TRANSIENT_LAUNCHER_ATTEMPTS,
+        )
+    if port_exit is not None:
+        return _failure(
+            "unknown-launcher",
+            f"unclassified-port-exit-{port_exit}",
+            retryable=True,
+            max_attempts=TRANSIENT_LAUNCHER_ATTEMPTS,
+        )
+    if isinstance(sentinel, dict) and sentinel.get("retryable") is True:
+        return _failure(
+            str(sentinel.get("class") or "transient-launcher"),
+            str(sentinel.get("code") or "capacity-or-provider-unavailable"),
+            retryable=True,
+            max_attempts=int(sentinel.get("maxAttempts") or TRANSIENT_LAUNCHER_ATTEMPTS),
+        )
+    return _failure(
+        "unknown-launcher",
+        "unclassified-launcher-failure",
+        retryable=True,
+        max_attempts=TRANSIENT_LAUNCHER_ATTEMPTS,
+    )
+
+
+def controller_retry_decision(
+    observation: dict[str, object],
+    previous: dict[str, object] | None = None,
+    *,
+    routing_receipt: dict[str, object] | None = None,
+) -> dict[str, object]:
+    """Sole retry scheduler for the Symphony controller runtime.
+
+    A non-retryable sentinel or port exit 78 parks terminally: retryable=false,
+    maxAttempts=1, no due_at, no alternate-provider handoff, and no new lease.
+    Repeated observation of the same generation must not advance attempts.
+    A later generation may run only after canonical admission materializes a
+    valid symphony-routing/v1 receipt.
+    """
+    failure = classify_launcher_failure(
+        observation.get("error") or observation.get("reason"),
+        observation,
+    )
+    generation = observation.get("generation")
+    previous_generation = previous.get("generation") if previous else None
+    repaired = bool(
+        isinstance(routing_receipt, dict)
+        and routing_receipt.get("schema") == SYMPHONY_ROUTING_SCHEMA
+        and routing_receipt.get("model")
+        and generation
+        and generation != previous_generation
+    )
+    if repaired:
+        return {
+            "state": "ready",
+            "retryable": True,
+            "maxAttempts": TRANSIENT_LAUNCHER_ATTEMPTS,
+            "due_at": None,
+            "attempt": 0,
+            "lease": None,
+            "handoff": False,
+            "providerAccount": None,
+            "failure": None,
+        }
+    if (
+        previous
+        and previous_generation == generation
+        and previous.get("retryable") is False
+    ):
+        return {
+            "state": str(previous.get("state") or "blocked"),
+            "retryable": False,
+            "maxAttempts": DETERMINISTIC_LAUNCHER_ATTEMPTS,
+            "due_at": None,
+            "attempt": int(previous.get("attempt") or 1),
+            "lease": None,
+            "handoff": False,
+            "providerAccount": None,
+            "failure": previous.get("failure") or failure,
+        }
+    if failure["retryable"] is False:
+        return {
+            "state": "blocked",
+            "retryable": False,
+            "maxAttempts": DETERMINISTIC_LAUNCHER_ATTEMPTS,
+            "due_at": None,
+            "attempt": 1,
+            "lease": None,
+            "handoff": False,
+            "providerAccount": None,
+            "failure": failure,
+        }
+    try:
+        attempt = int(observation.get("attempt") or 0)
+    except (TypeError, ValueError):
+        attempt = 0
+    delay_minutes = 1 if failure["class"] == "transient-launcher" else RETRY_MINUTES
+    return {
+        "state": "retrying",
         "retryable": True,
-        "maxAttempts": TRANSIENT_LAUNCHER_ATTEMPTS,
+        "maxAttempts": int(failure["maxAttempts"]),
+        "due_at": _iso(_now() + dt.timedelta(minutes=delay_minutes)),
+        "attempt": min(attempt + 1, int(failure["maxAttempts"])),
+        "lease": None,
+        "handoff": False,
+        "providerAccount": None,
+        "failure": failure,
     }
 
 
@@ -701,6 +935,8 @@ def _alternate_due(
     identifier = str(item.get("issue_identifier", ""))
     if not identifier:
         return False
+    if classify_launcher_failure(item.get("error"), item).get("retryable") is False:
+        return False
     state = _workspace_state(item.get("workspace_path"), identifier)
     if not state.get("valid") or not _is_repeated_or_conflict(item, source, state):
         return False
@@ -896,7 +1132,28 @@ def _reconcile_item(
     runtime = runtime or runtime_preflight()
     generation = _generation(identifier, error, state_before, runtime)
     previous = _read_receipt(identifier)
-    launcher_failure = classify_launcher_failure(error)
+    launcher_failure = classify_launcher_failure(error, item)
+    decision = controller_retry_decision(
+        {
+            **item,
+            "error": error,
+            "generation": generation,
+            "attempt": attempt,
+        },
+        {
+            "generation": previous.get("generation"),
+            "retryable": (previous.get("retryPolicy") or {}).get("retryable")
+            if isinstance(previous.get("retryPolicy"), dict)
+            else None,
+            "attempt": previous.get("attempt"),
+            "state": previous.get("runtimeState"),
+            "failure": previous.get("launcherFailure"),
+        }
+        if previous
+        else None,
+    )
+    if decision["retryable"] is False:
+        launcher_failure = decision["failure"] or launcher_failure
     previous_launcher_failure = previous.get("launcherFailure") if previous else None
     if (
         previous
