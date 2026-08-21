@@ -5,13 +5,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuthSafe } from '@/hooks/useJovieAuth';
 import { buildAudioBlobPath } from '@/lib/audio/blob-path';
 import {
-  AUDIO_MAX_FILE_SIZE_BYTES,
   getAudioFormatByFileName,
   getCanonicalAudioMimeType,
   isSupportedAudioFile,
   resolveAudioUploadMime,
   SUPPORTED_AUDIO_MIME_TYPES,
+  validateAudioUpload,
 } from '@/lib/audio/constants';
+import type { AudioEntityInference } from '@/lib/chat/infer-audio-entity';
 import {
   convertHeicToJpeg,
   isHeicLikeMimeType,
@@ -89,6 +90,10 @@ export interface PendingFile {
   readonly kindLabel: string;
   readonly aspect?: string;
   readonly duplicateOf?: string;
+  readonly inference?: AudioEntityInference;
+  readonly releaseId?: string;
+  readonly releaseTitle?: string;
+  readonly prompt?: string;
 }
 
 interface UseChatFileAttachmentsOptions {
@@ -402,6 +407,10 @@ async function uploadAudioAttachment(
       progress: 100,
       blobUrl: blob.url,
       previewUrl: body.previewUrl,
+      inference: body.inference,
+      releaseId: body.releaseId,
+      releaseTitle: body.releaseTitle,
+      prompt: body.prompt,
     });
   } catch (err) {
     updateFile(id, {
@@ -460,9 +469,26 @@ async function buildPendingCandidate(
   seenHashes: Map<string, string>
 ): Promise<{ candidate: PendingFile; file: File } | null> {
   const kind = detectKind(file);
-  const maxBytes =
-    kind === 'audio' ? AUDIO_MAX_FILE_SIZE_BYTES : CHAT_FILE_MAX_SIZE;
-  if (file.size > maxBytes) {
+  if (kind === 'audio') {
+    const validation = validateAudioUpload(file);
+    if (!validation.ok) {
+      return {
+        file,
+        candidate: {
+          id: generateId(),
+          name: file.name,
+          size: file.size,
+          mediaType: file.type || 'application/octet-stream',
+          kind,
+          progress: 0,
+          speed: 0,
+          status: 'failed',
+          error: validation.message,
+          kindLabel: buildKindLabel(file, kind),
+        },
+      };
+    }
+  } else if (file.size > CHAT_FILE_MAX_SIZE) {
     return null;
   }
 
@@ -619,11 +645,13 @@ export function useChatFileAttachments({
 
         const built = await buildPendingCandidate(file, seenHashes);
         if (!built) {
-          const kind = detectKind(file);
-          const maxBytes =
-            kind === 'audio' ? AUDIO_MAX_FILE_SIZE_BYTES : CHAT_FILE_MAX_SIZE;
-          onError(`${file.name} exceeds ${formatBytes(maxBytes)}. Skipped.`);
+          onError(
+            `${file.name} exceeds ${formatBytes(CHAT_FILE_MAX_SIZE)}. Skipped.`
+          );
           continue;
+        }
+        if (built.candidate.status === 'failed') {
+          onError(built.candidate.error ?? `Could not attach ${file.name}.`);
         }
 
         fileById.set(built.candidate.id, built.file);
@@ -646,7 +674,10 @@ export function useChatFileAttachments({
       });
 
       const toUpload = markedToAdd.filter(
-        c => c.status !== 'duplicate' && c.status !== 'locked'
+        c =>
+          c.status !== 'duplicate' &&
+          c.status !== 'locked' &&
+          c.status !== 'failed'
       );
       if (toUpload.length === 0) return;
 

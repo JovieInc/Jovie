@@ -239,6 +239,12 @@ describe('JovieChat empty state', () => {
     expect(fileInput).not.toBeNull();
     expect(fileInput).toHaveClass('hidden');
     expect(fileInput).toHaveAttribute('tabindex', '-1');
+    const audioInput = container.querySelector<HTMLInputElement>(
+      '[data-testid="chat-audio-file-input"]'
+    );
+    expect(audioInput).not.toBeNull();
+    expect(audioInput).toHaveClass('hidden');
+    expect(audioInput?.accept).toContain('audio/mpeg');
     expect(queryByText('Share Feedback')).toBeNull();
     // Old task-list-style actions should NOT appear — they belong in the profile switcher.
     expect(queryByText('Preview profile')).toBeNull();

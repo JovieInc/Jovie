@@ -7,6 +7,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- **Upload a song from a new chat:** drop or attach an audio file, Jovie classifies it as a new track, an existing release, or a reference, and keeps the file in Library so it is not orphaned.
 - **Private ideas stay private until you approve one exact script:** Library now has an Ideas & Scripts workspace. Save an idea, keep versioned revisions, attach evidence to factual claims, approve one revision, and hand that exact copy to capture. Nothing publishes from this slice.
 - [internal] **Tasks and scripts share one focused editor (JOV-5173):** Task descriptions persist bounded Tiptap JSON with optimistic concurrency, and private creator documents use immutable revisions plus an idempotent Save Idea path.
 - [internal] **Opaque `Error: {"error":{"name":"UpstashError"}}` bags no longer file from the client SDK (JOV-5186):** client `beforeSend` uses the same `hint.originalException` drop as server, so object-captures whose event value is `Non-Error exception captured with keys: error` never become Linear issues. Quota command failures are dropped separately (JOV-5184).

@@ -22,3 +22,9 @@ export const CHAT_COMPOSER_STOP_ARIA_LABEL = 'Stop generating';
 
 /** Attach control accessible name (Title Case product UI). */
 export const CHAT_COMPOSER_ATTACH_ARIA_LABEL = 'Attach Files';
+
+/** Plus-menu item for uploading a song from the new-chat composer. */
+export const CHAT_COMPOSER_UPLOAD_SONG_LABEL = 'Upload Song';
+
+/** Supported audio formats shown next to the song-upload action. */
+export const CHAT_COMPOSER_UPLOAD_SONG_HINT = 'MP3, WAV, FLAC, AAC';

@@ -101,11 +101,13 @@ function renderComposer({
   pendingFiles = [],
   onSubmit = vi.fn(),
   onFileAttach = vi.fn(),
+  onAudioAttach = vi.fn(),
 }: {
   readonly value?: string;
   readonly pendingFiles?: PendingFile[];
   readonly onSubmit?: ReturnType<typeof vi.fn>;
   readonly onFileAttach?: ReturnType<typeof vi.fn>;
+  readonly onAudioAttach?: ReturnType<typeof vi.fn>;
 } = {}) {
   const client = new QueryClient({
     defaultOptions: {
@@ -120,6 +122,7 @@ function renderComposer({
     isLoading: false,
     isSubmitting: false,
     onFileAttach,
+    onAudioAttach,
     pendingFiles,
     onRemoveFile: vi.fn(),
   };
@@ -246,5 +249,47 @@ describe('ChatComposerSurface accessibility states', () => {
     dictate.focus();
     await user.keyboard('{Enter}');
     expect(dictate).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('offers an upload-song action from the new-chat composer', async () => {
+    const user = userEvent.setup();
+    const onAudioAttach = vi.fn();
+    renderComposer({ onAudioAttach });
+
+    await user.click(screen.getByRole('button', { name: 'Attach Files' }));
+    await user.click(await screen.findByTestId('chat-composer-upload-song'));
+    expect(onAudioAttach).toHaveBeenCalledOnce();
+  });
+
+  it('shows audio classification in the composer after upload', () => {
+    renderComposer({
+      pendingFiles: [
+        {
+          id: 'audio-1',
+          name: 'demo-track.mp3',
+          size: 2048,
+          mediaType: 'audio/mpeg',
+          kind: 'audio',
+          progress: 100,
+          speed: 0,
+          status: 'ready',
+          kindLabel: 'MP3 · audio',
+          previewUrl: 'https://example.com/demo-track.mp3',
+          releaseTitle: 'demo track',
+          inference: {
+            kind: 'new-track',
+            confidence: 'high',
+            suggestedTitle: 'demo track',
+            releaseId: 'release-1',
+            releaseTitle: 'demo track',
+            matchScore: 0,
+          },
+        },
+      ],
+    });
+
+    expect(screen.getByTestId('chat-audio-preview-strip')).toBeInTheDocument();
+    expect(screen.getByText('New track · demo track')).toBeInTheDocument();
+    expect(screen.getByTestId('chat-audio-preview-player')).toBeInTheDocument();
   });
 });

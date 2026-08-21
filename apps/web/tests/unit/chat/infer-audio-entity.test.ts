@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildAudioUploadPrompt,
   inferAudioEntity,
+  shouldLandChatAudioOnExisting,
 } from '@/lib/chat/infer-audio-entity';
 
 describe('inferAudioEntity', () => {
@@ -20,6 +21,7 @@ describe('inferAudioEntity', () => {
     expect(inference.kind).toBe('attach-to-existing');
     expect(inference.releaseId).toBe('release-1');
     expect(inference.confidence).toBe('high');
+    expect(shouldLandChatAudioOnExisting(inference)).toBe(true);
   });
 
   it('treats a matched release with audio as a reference', () => {
@@ -39,8 +41,22 @@ describe('inferAudioEntity', () => {
     });
 
     expect(inference.kind).toBe('new-track');
+    expect(inference.confidence).toBe('high');
     expect(inference.releaseId).toBeNull();
     expect(inference.suggestedTitle).toBe('brand new song');
+  });
+
+  it('asks instead of attaching when the catalog match is only a weak overlap', () => {
+    const inference = inferAudioEntity({
+      fileName: 'take-me-extra-over.mp3',
+      catalog,
+    });
+
+    expect(inference.kind).toBe('new-track');
+    expect(inference.confidence).toBe('low');
+    expect(inference.releaseId).toBe('release-1');
+    expect(inference.releaseTitle).toBe('Take Me Over');
+    expect(shouldLandChatAudioOnExisting(inference)).toBe(false);
   });
 });
 
@@ -61,5 +77,23 @@ describe('buildAudioUploadPrompt', () => {
 
     expect(prompt).toContain('attached the audio');
     expect(prompt).toContain('Take Me Over');
+  });
+
+  it('asks the user how to classify a low-confidence match', () => {
+    const prompt = buildAudioUploadPrompt({
+      fileName: 'take-me-over-mix.mp3',
+      previewUrl: 'https://example.com/audio.mp3',
+      inference: {
+        kind: 'new-track',
+        confidence: 'low',
+        suggestedTitle: 'take me over mix',
+        releaseId: 'release-1',
+        releaseTitle: 'Take Me Over',
+        matchScore: 0.75,
+      },
+    });
+
+    expect(prompt).toContain('saved it as a draft single');
+    expect(prompt).toContain('Should I attach this to "Take Me Over"');
   });
 });
