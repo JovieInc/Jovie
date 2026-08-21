@@ -3,15 +3,13 @@
  *
  * OV chat must not generate as artist Jovie and must not self-identify as
  * Ovie. Conversational authority is the real current Summer (JOV-5212).
- * Until that child binds the live Mac Summer runtime, the door fails closed
- * with a typed unavailable state after Eve intake/ack.
+ * The web route resolves this marker through the authenticated Mac bridge.
  */
 
 import type { OvieReceipt } from '@/lib/ovie/ingest';
 import {
   assertModelMustNotSelfIdentifyAsOvie,
   assertOvieDoorDoesNotUseArtistJovieGeneration,
-  type OperationalTruthState,
   type OvieDoorGenerationKind,
 } from '@/lib/ovie/program';
 
@@ -19,9 +17,7 @@ export type OvieDoorGeneration =
   | { readonly kind: 'artist-jovie' }
   | {
       readonly kind: 'summer-transport';
-      readonly state: Extract<OperationalTruthState, 'unavailable'>;
-      readonly text: string;
-      readonly blockingIssue: 'JOV-5212';
+      readonly state: 'queued';
     };
 
 export function buildSummerUnavailableTransportText(
@@ -52,9 +48,7 @@ export function resolveOvieDoorGeneration(
   }
   const generation: OvieDoorGeneration = {
     kind: 'summer-transport',
-    state: 'unavailable',
-    text: buildSummerUnavailableTransportText(receipts),
-    blockingIssue: 'JOV-5212',
+    state: 'queued',
   };
   assertOvieDoorDoesNotUseArtistJovieGeneration(chatMode, generation.kind);
   return generation;

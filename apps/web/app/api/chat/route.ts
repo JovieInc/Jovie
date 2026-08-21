@@ -156,6 +156,12 @@ import {
   OVIE_PROGRAM,
 } from '@/lib/ovie/program';
 import {
+  enqueueOvieSummerTurn,
+  ovieSummerTurnId,
+  waitForOvieSummerTurn,
+} from '@/lib/ovie/summer-conversation';
+import { buildSummerUnavailableTransportText } from '@/lib/ovie/summer-transport';
+import {
   albumArtGenerationBurstLimiter,
   albumArtGenerationLimiter,
   checkAiChatRateLimitForPlan,
@@ -2456,12 +2462,13 @@ export async function POST(req: Request) {
   const userText = extractLastUserText(uiMessages);
   // JOV-5215/5216/5214: bind Eve pack + persist/ack dump to Summer Kanban
   // before any model. OV door must not fall through to artist Jovie chat.
+  const ovieStore = getOvieOperatingStore();
   const {
     eveTurn,
     receipts: ovieIngestReceipts,
     generation,
   } = await prepareOvieChatTurn(chatMode, userText, {
-    store: getOvieOperatingStore(),
+    store: ovieStore,
   });
   assertOvieDoorDoesNotUseArtistJovieGeneration(chatMode, generation.kind);
   const clientTurnId = normalizeClientId(body.clientTurnId);
@@ -2721,14 +2728,60 @@ export async function POST(req: Request) {
   }
 
   if (generation.kind === 'summer-transport') {
-    const replyText = generation.text;
+    const summerConversationId =
+      reservedTurn?.conversationId ??
+      resolvedConversationId ??
+      `ovie-founder:${userId}`;
+    const summerClientTurnId =
+      reservedTurn?.turnId ?? clientTurnId ?? requestId;
+    const summerTurnId = ovieSummerTurnId({
+      conversationId: summerConversationId,
+      clientTurnId: summerClientTurnId,
+    });
+    let summerState: 'completed' | 'unavailable' = 'unavailable';
+    let replyText = buildSummerUnavailableTransportText(ovieIngestReceipts);
+    if (userText?.trim()) {
+      try {
+        await enqueueOvieSummerTurn(ovieStore, {
+          id: summerTurnId,
+          conversationId: summerConversationId,
+          userText,
+        });
+        const terminal = await waitForOvieSummerTurn(ovieStore, {
+          id: summerTurnId,
+          timeoutMs: 45_000,
+          signal: req.signal,
+        });
+        if (terminal?.state === 'completed' && terminal.responseText) {
+          summerState = 'completed';
+          replyText = terminal.responseText;
+        } else {
+          replyText =
+            'Summer received this turn but did not complete before the live response deadline. Ovie is the door, not the speaker. State: unavailable.';
+        }
+      } catch (error) {
+        await captureError('Ovie Summer bridge turn failed', error, {
+          feature: 'ovie-summer-bridge',
+          requestId,
+          userId,
+          summerTurnId,
+        });
+      }
+    }
     assertModelMustNotSelfIdentifyAsOvie(replyText);
     if (reservedTurn) {
       await persistTerminalAssistantMessage({
         conversationId: reservedTurn.conversationId,
         turnId: reservedTurn.turnId,
-        status: 'completed',
+        status:
+          summerState === 'completed' ? 'completed' : 'failed_model_error',
         content: replyText,
+        ...(summerState === 'completed'
+          ? {}
+          : {
+              errorCode: 'OVIE_SUMMER_UNAVAILABLE',
+              errorMessage: 'Summer bridge response deadline exceeded',
+            }),
       });
     }
     return createAssistantTextStreamResponse({
@@ -2737,7 +2790,8 @@ export async function POST(req: Request) {
       corsHeaders,
       headers: {
         'x-ovie-door': '1',
-        'x-ovie-summer-state': generation.state,
+        'x-ovie-summer-state': summerState,
+        'x-ovie-summer-turn-id': summerTurnId,
         'x-ovie-m1': OVIE_PROGRAM.m1Status,
         ...(reservedTurn
           ? {

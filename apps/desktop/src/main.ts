@@ -66,6 +66,10 @@ import {
 } from './renderer-recovery';
 import { SYSTEM_B_DESKTOP_TOKENS } from './system-b-tokens';
 import { sanitizeWindowState, type WindowState } from './window-state';
+import {
+  createSummerRuntimeBridge,
+  type SummerRuntimeBridge,
+} from './summer-runtime-bridge';
 
 // Separate userData for non-production shells so local, staging, and production
 // sessions coexist without sharing cookies or corrupted renderer state.
@@ -195,6 +199,7 @@ let pendingLegacyAuthReturnRoute: string | null = null;
 let pendingDesktopAuthPkce: PendingDesktopAuthPkce | null = null;
 let mainWindowHiddenForAuthHandoff = false;
 let currentHudBuildFingerprint: string | null = null;
+let summerRuntimeBridge: SummerRuntimeBridge | null = null;
 
 /**
  * Per-webContents boot-watchdog controllers (JOV-3595). The hosted web app
@@ -1887,6 +1892,27 @@ ipcMain.on(APP_BOOTED_CHANNEL, event => {
   const parsed = parseUrl(event.senderFrame?.url ?? event.sender.getURL());
   if (parsed?.origin !== APP_ORIGIN) return;
   rendererBootControllers.get(event.sender.id)?.markBooted();
+  if (process.platform === 'darwin' && !summerRuntimeBridge) {
+    summerRuntimeBridge = createSummerRuntimeBridge({
+      platform: process.platform,
+      appOrigin: APP_ORIGIN,
+      homeDirectory: app.getPath('home'),
+      workerId: `jovie-desktop-${createHash('sha256')
+        .update(app.getPath('userData'))
+        .digest('hex')
+        .slice(0, 16)}`,
+      fetch: event.sender.session.fetch.bind(event.sender.session),
+      onReceipt: receipt => {
+        console.info('[ovie-summer-bridge]', JSON.stringify(receipt));
+      },
+    });
+    summerRuntimeBridge.start();
+  }
+});
+
+app.on('before-quit', () => {
+  summerRuntimeBridge?.stop();
+  summerRuntimeBridge = null;
 });
 
 ipcMain.handle(GO_BACK_CHANNEL, (event: IpcMainInvokeEvent) => {
