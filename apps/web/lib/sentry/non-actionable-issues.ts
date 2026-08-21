@@ -110,30 +110,6 @@ export function isNonActionableSpotifyReleaseCreditBoundIssue(
   );
 }
 
-/**
- * True when a Sentry event is the JOV-5263 bounded-credit JSON bag.
- */
-export function isNonActionableSpotifyReleaseCreditBoundEvent(
-  event: SentryExceptionLike
-): boolean {
-  const values: Array<unknown> = [
-    event.title,
-    event.message,
-    event.logentry?.message,
-    event.logentry?.formatted,
-    ...Object.values(event.extra ?? {}),
-  ];
-
-  for (const exception of event.exception?.values ?? []) {
-    values.push(exception?.value);
-    if (exception?.type && exception.value) {
-      values.push(`${exception.type}: ${exception.value}`);
-    }
-  }
-
-  return values.some(value => isSpotifyReleaseCreditBoundCapture(value));
-}
-
 /** Transaction names excluded from performance tracing (0% sample rate). */
 export const TRANSIENT_INFRA_HTTP_TRANSACTIONS = [
   'POST /pipeline', // Upstash Redis REST pipeline
@@ -230,6 +206,38 @@ export interface SentryExceptionLike {
   } | null;
 }
 
+function collectSentryEventCaptureValues(
+  event: SentryExceptionLike
+): Array<unknown> {
+  const values: Array<unknown> = [
+    event.title,
+    event.message,
+    event.logentry?.message,
+    event.logentry?.formatted,
+    ...Object.values(event.extra ?? {}),
+  ];
+
+  for (const exception of event.exception?.values ?? []) {
+    values.push(exception?.value);
+    if (exception?.type && exception.value) {
+      values.push(`${exception.type}: ${exception.value}`);
+    }
+  }
+
+  return values;
+}
+
+/**
+ * True when a Sentry event is the JOV-5263 bounded-credit JSON bag.
+ */
+export function isNonActionableSpotifyReleaseCreditBoundEvent(
+  event: SentryExceptionLike
+): boolean {
+  return collectSentryEventCaptureValues(event).some(value =>
+    isSpotifyReleaseCreditBoundCapture(value)
+  );
+}
+
 /**
  * Returns true when a Sentry issue is the JOV-5183 / JOV-5185 / JOV-5186 /
  * JOV-5187 JSON-bag title, not a real Upstash command failure.
@@ -252,22 +260,9 @@ export function isNonActionableUpstashErrorBag(
 export function isNonActionableUpstashErrorBagEvent(
   event: SentryExceptionLike
 ): boolean {
-  const values: Array<unknown> = [
-    event.title,
-    event.message,
-    event.logentry?.message,
-    event.logentry?.formatted,
-    ...Object.values(event.extra ?? {}),
-  ];
-
-  for (const exception of event.exception?.values ?? []) {
-    values.push(exception?.value);
-    if (exception?.type && exception.value) {
-      values.push(`${exception.type}: ${exception.value}`);
-    }
-  }
-
-  return values.some(value => isOpaqueUpstashErrorJsonBag(value));
+  return collectSentryEventCaptureValues(event).some(value =>
+    isOpaqueUpstashErrorJsonBag(value)
+  );
 }
 
 /**
