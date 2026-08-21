@@ -72,12 +72,38 @@ function keyTerms(text) {
     .join(' ');
 }
 
-export function buildContextQueries(issue) {
-  const terms = keyTerms(issue?.title) || String(issue?.identifier || '');
+export function issueKeyTerms(issue) {
+  return keyTerms(issue?.title) || String(issue?.identifier || '').trim();
+}
+
+export function buildKeywordAttempts(issue) {
+  const terms = keyTerms(issue?.title);
+  const identifier = String(issue?.identifier || '').trim();
+  /** @type {string[]} */
+  const attempts = [];
+  if (terms) attempts.push(terms);
+  if (identifier && identifier !== terms) attempts.push(identifier);
+  return attempts;
+}
+
+export function buildSemanticFallbackQueries(issue) {
+  const terms = issueKeyTerms(issue);
   return [
     `ownership and current priorities for ${terms}`,
     `existing agent work and prior decisions related to ${terms}`,
   ];
+}
+
+export function buildContextQueries(issue) {
+  const keyword = buildKeywordAttempts(issue);
+  return keyword.length > 0 ? keyword : buildSemanticFallbackQueries(issue);
+}
+
+export function allowedContextQueries(issue) {
+  return [
+    ...buildKeywordAttempts(issue),
+    ...buildSemanticFallbackQueries(issue),
+  ].filter((query, index, all) => all.indexOf(query) === index);
 }
 
 export function boundPage(page) {
@@ -102,6 +128,76 @@ function declaredOwner(orgChart, role) {
     'i'
   ).exec(truth);
   return match ? match[1] : null;
+}
+
+async function bindPages(loader) {
+  try {
+    const pages = await loader();
+    if (!Array.isArray(pages)) return { status: 'error' };
+    const bound = pages.map(boundPage).filter(Boolean);
+    return bound.length > 0
+      ? { status: 'hit', pages: bound }
+      : { status: 'miss' };
+  } catch {
+    return { status: 'error' };
+  }
+}
+
+function keywordLookup(gbrain, query) {
+  const fn = gbrain.searchPagesKeyword || gbrain.searchPages;
+  return bindPages(() => fn.call(gbrain, query, MAX_CONTEXT_PAGES_PER_QUERY));
+}
+
+function semanticLookup(gbrain, query) {
+  const fn = gbrain.searchPagesSemantic || gbrain.searchPages;
+  return bindPages(() => fn.call(gbrain, query, MAX_CONTEXT_PAGES_PER_QUERY));
+}
+
+export async function lookupTargetedContext({ issue, gbrain }) {
+  const queries = [];
+  for (const query of buildKeywordAttempts(issue)) {
+    const result = await keywordLookup(gbrain, query);
+    if (result.status === 'hit') {
+      queries.push({ query, pages: result.pages });
+      return { queries, reason: null, detail: null };
+    }
+  }
+
+  let semanticMiss = false;
+  for (const query of buildSemanticFallbackQueries(issue)) {
+    const result = await semanticLookup(gbrain, query);
+    if (result.status === 'hit') {
+      queries.push({ query, pages: result.pages });
+      return { queries, reason: null, detail: null };
+    }
+    if (result.status === 'miss') {
+      semanticMiss = true;
+      continue;
+    }
+    return {
+      queries: [],
+      reason: CONTEXT_BLOCKER.GBRAIN_UNAVAILABLE,
+      detail: `semantic context fallback failed: ${query}`,
+    };
+  }
+
+  if (semanticMiss || buildKeywordAttempts(issue).length > 0) {
+    const attempted = [
+      ...buildKeywordAttempts(issue),
+      ...buildSemanticFallbackQueries(issue),
+    ].join('; ');
+    return {
+      queries: [],
+      reason: CONTEXT_BLOCKER.NO_RESULTS,
+      detail: `targeted context lookup returned no bindable pages: ${attempted}`,
+    };
+  }
+
+  return {
+    queries: [],
+    reason: CONTEXT_BLOCKER.GBRAIN_UNAVAILABLE,
+    detail: 'targeted context lookup had no supported search path',
+  };
 }
 
 export async function collectContextEvidence({
@@ -132,25 +228,11 @@ export async function collectContextEvidence({
     };
   }
 
-  const queries = [];
-  for (const query of buildContextQueries(issue)) {
-    let pages;
-    try {
-      pages = await gbrain.searchPages(query, MAX_CONTEXT_PAGES_PER_QUERY);
-    } catch {
-      return { evidence: null, reason: CONTEXT_BLOCKER.GBRAIN_UNAVAILABLE };
-    }
-    if (!Array.isArray(pages))
-      return { evidence: null, reason: CONTEXT_BLOCKER.GBRAIN_UNAVAILABLE };
-    const bound = pages.map(boundPage).filter(Boolean);
-    if (bound.length === 0)
-      return {
-        evidence: null,
-        reason: CONTEXT_BLOCKER.NO_RESULTS,
-        detail: `targeted context query returned no bindable pages: ${query}`,
-      };
-    queries.push({ query, pages: bound });
-  }
+  const { queries, reason, detail } = await lookupTargetedContext({
+    issue,
+    gbrain,
+  });
+  if (reason) return { evidence: null, reason, detail };
 
   return {
     evidence: {
@@ -184,13 +266,11 @@ export function validateContextEvidence(
   if (!orgChart || orgChart.slug !== ORG_CHART_SLUG)
     return CONTEXT_BLOCKER.ORG_CHART_MISSING;
 
-  const expectedQueries = buildContextQueries(issue);
-  const actualQueries = Array.isArray(evidence.queries)
-    ? evidence.queries.map(entry => entry?.query)
-    : [];
-  if (JSON.stringify(actualQueries) !== JSON.stringify(expectedQueries))
-    return 'context-query-mismatch';
+  const allowedQueries = new Set(allowedContextQueries(issue));
+  if (!Array.isArray(evidence.queries) || evidence.queries.length === 0)
+    return CONTEXT_BLOCKER.NO_RESULTS;
   for (const entry of evidence.queries) {
+    if (!allowedQueries.has(entry?.query)) return 'context-query-mismatch';
     if (!Array.isArray(entry?.pages)) return 'context-malformed';
     if (entry.pages.length === 0) return CONTEXT_BLOCKER.NO_RESULTS;
     if (entry.pages.some(page => !boundPage(page))) return 'context-malformed';

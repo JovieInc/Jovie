@@ -1,14 +1,29 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
-const GBRAIN_BIN = process.env.JOVIE_GBRAIN_BIN || 'gbrain';
-const GBRAIN_TIMEOUT_MS = 30_000;
+export const GBRAIN_TIMEOUT_MS = 30_000;
+/** Keyword index cap aligned with JOV-4185's 10s ownership ceiling. */
+export const KEYWORD_TIMEOUT_MS = 10_000;
+/** Semantic/hybrid query is a bounded fallback, never a 30s hang. */
+export const SEMANTIC_TIMEOUT_MS = 10_000;
 
-function run(args) {
-  return execFileSync(GBRAIN_BIN, args, {
+function gbrainBin() {
+  return process.env.JOVIE_GBRAIN_BIN || 'gbrain';
+}
+
+function run(args, timeoutMs = GBRAIN_TIMEOUT_MS) {
+  return execFileSync(gbrainBin(), args, {
     encoding: 'utf8',
-    timeout: GBRAIN_TIMEOUT_MS,
+    timeout: timeoutMs,
   }).trim();
+}
+
+export function keywordSearchArgs(query, limit = 3) {
+  return ['search', query, '--limit', String(limit)];
+}
+
+export function semanticSearchArgs(query, limit = 3) {
+  return ['query', query, '--limit', String(limit)];
 }
 
 export async function getPage(slug) {
@@ -32,11 +47,57 @@ export function parsePage(slug, raw) {
   };
 }
 
-export async function searchPages(query, limit = 3) {
-  const slugs = parseSearchSlugs(
-    run(['query', query, '--limit', String(limit)])
+async function pagesForSlugs(raw, limit) {
+  const slugs = parseSearchSlugs(raw).slice(0, limit);
+  return Promise.all(slugs.map(getPage));
+}
+
+export async function searchPagesKeyword(query, limit = 3) {
+  return pagesForSlugs(
+    run(keywordSearchArgs(query, limit), KEYWORD_TIMEOUT_MS),
+    limit
   );
-  return Promise.all(slugs.slice(0, limit).map(getPage));
+}
+
+export async function searchPagesSemantic(query, limit = 3) {
+  return pagesForSlugs(
+    run(semanticSearchArgs(query, limit), SEMANTIC_TIMEOUT_MS),
+    limit
+  );
+}
+
+function bindablePages(pages) {
+  return Array.isArray(pages) ? pages.filter(Boolean) : [];
+}
+
+/**
+ * Keyword-first targeted lookup (JOV-4185 / JOV-5268).
+ * Semantic/hybrid `query` runs only when keyword cannot bind a page.
+ * A failed semantic command never erases a successful keyword result.
+ */
+export async function searchPages(query, limit = 3) {
+  let keywordPages = [];
+  let keywordError = null;
+  try {
+    keywordPages = await searchPagesKeyword(query, limit);
+    const bound = bindablePages(keywordPages);
+    if (bound.length > 0) return bound;
+  } catch (error) {
+    keywordError = error;
+  }
+
+  try {
+    const semanticPages = await searchPagesSemantic(query, limit);
+    const bound = bindablePages(semanticPages);
+    if (bound.length > 0) return bound;
+    if (keywordError) throw keywordError;
+    return Array.isArray(semanticPages) ? semanticPages : [];
+  } catch (semanticError) {
+    const bound = bindablePages(keywordPages);
+    if (bound.length > 0) return bound;
+    if (keywordError) throw keywordError;
+    throw semanticError;
+  }
 }
 
 export function parseSearchSlugs(raw) {
@@ -45,4 +106,9 @@ export function parseSearchSlugs(raw) {
     .filter((slug, index, all) => all.indexOf(slug) === index);
 }
 
-export const cliGbrainClient = Object.freeze({ getPage, searchPages });
+export const cliGbrainClient = Object.freeze({
+  getPage,
+  searchPages,
+  searchPagesKeyword,
+  searchPagesSemantic,
+});

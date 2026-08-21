@@ -76,6 +76,65 @@ function fakeGbrain({
   };
 }
 
+const BOUND_CONTEXT_PAGE = {
+  slug: 'notes/color-harmony',
+  id: 'page-1',
+  revision: 'rev-1',
+};
+
+function jov5265Issue() {
+  return issue({
+    identifier: 'JOV-5265',
+    title: 'Canonize scene-first color harmony for generated brand imagery',
+    description:
+      'Canonize scene-first color harmony for generated brand imagery.',
+  });
+}
+
+/**
+ * @typedef {{ slug: string, id: string, revision: string }} BoundContextPage
+ * @param {{
+ *   keyword?: (query: string, limit?: number) => BoundContextPage[],
+ *   semantic?: (query: string, limit?: number) => BoundContextPage[],
+ * }} [options]
+ */
+function recordingGbrain({
+  keyword = (_query, _limit) => [BOUND_CONTEXT_PAGE],
+  semantic = (_query, _limit) => {
+    throw new Error('canceling statement due to statement timeout');
+  },
+} = {}) {
+  const calls = [];
+  return {
+    calls,
+    async getPage(slug) {
+      calls.push({ method: 'getPage', slug });
+      if (slug !== contextGate.ORG_CHART_SLUG) return null;
+      return {
+        slug,
+        id: 'page-org-chart',
+        revision: 'rev-1',
+        compiledTruth:
+          'implementation owner: Symphony\nverification owner: Gem',
+      };
+    },
+    async searchPagesKeyword(query, limit) {
+      calls.push({ method: 'searchPagesKeyword', query, limit });
+      return keyword(query, limit);
+    },
+    async searchPagesSemantic(query, limit) {
+      calls.push({ method: 'searchPagesSemantic', query, limit });
+      return semantic(query, limit);
+    },
+    async searchPages(query) {
+      calls.push({ method: 'searchPages', query });
+      throw new Error(
+        'combined searchPages must not run on the split lookup path'
+      );
+    },
+  };
+}
+
 function fakeLinearClient(initialIssue) {
   let current = initialIssue;
   const labelNames = new Map(
@@ -195,6 +254,111 @@ describe('symphony-context/v1', () => {
         { now: NOW }
       ),
       null
+    );
+  });
+
+  it('binds JOV-5265 issue terms through keyword search without the long semantic query', async () => {
+    const candidate = jov5265Issue();
+    const terms = contextGate.buildKeywordAttempts(candidate);
+    assert.equal(
+      terms[0],
+      'canonize scene-first color harmony generated brand imagery'
+    );
+    assert.ok(
+      contextGate
+        .buildSemanticFallbackQueries(candidate)
+        .some(query =>
+          query.startsWith(
+            'existing agent work and prior decisions related to '
+          )
+        )
+    );
+
+    const gbrain = recordingGbrain();
+    const client = fakeLinearClient(candidate);
+    const result = await contextGate.approveContext({
+      issue: candidate,
+      gbrain,
+      client,
+      now: NOW,
+    });
+    assert.equal(result.status, 'approved');
+    assert.deepEqual(
+      gbrain.calls
+        .filter(call => call.method !== 'getPage')
+        .map(call => call.method),
+      ['searchPagesKeyword']
+    );
+    assert.equal(gbrain.calls[1].query, terms[0]);
+    const payload = contextGate.contextGateReceipt(client.issue, { now: NOW });
+    assert.equal(payload.payload.evidence.queries[0].query, terms[0]);
+    assert.equal(
+      payload.payload.evidence.queries[0].pages[0].slug,
+      'notes/color-harmony'
+    );
+  });
+
+  it('keeps a keyword hit when the semantic command fails with a statement timeout', async () => {
+    const candidate = jov5265Issue();
+    const gbrain = recordingGbrain({
+      semantic: () => {
+        throw new Error('canceling statement due to statement timeout');
+      },
+    });
+    const client = fakeLinearClient(candidate);
+    const result = await contextGate.approveContext({
+      issue: candidate,
+      gbrain,
+      client,
+      now: NOW,
+    });
+    assert.equal(result.status, 'approved');
+    assert.equal(
+      gbrain.calls.some(call => call.method === 'searchPagesSemantic'),
+      false
+    );
+    assert.ok(contextGate.contextGateReceipt(client.issue, { now: NOW }));
+  });
+
+  it('records context-no-results for a healthy keyword and semantic miss', async () => {
+    const candidate = jov5265Issue();
+    const gbrain = recordingGbrain({
+      keyword: () => [],
+      semantic: () => [],
+    });
+    const result = await contextGate.approveContext({
+      issue: candidate,
+      gbrain,
+      client: fakeLinearClient(candidate),
+      now: NOW,
+    });
+    assert.equal(result.status, 'rejected');
+    assert.equal(result.reason, 'context-no-results');
+    assert.ok(gbrain.calls.some(call => call.method === 'searchPagesKeyword'));
+    assert.ok(gbrain.calls.some(call => call.method === 'searchPagesSemantic'));
+  });
+
+  it('records gbrain-unavailable when every targeted lookup path errors', async () => {
+    const candidate = jov5265Issue();
+    const gbrain = recordingGbrain({
+      keyword: () => {
+        throw new Error('gbrain search unreachable');
+      },
+      semantic: () => {
+        throw new Error('canceling statement due to statement timeout');
+      },
+    });
+    const result = await contextGate.approveContext({
+      issue: candidate,
+      gbrain,
+      client: fakeLinearClient(candidate),
+      now: NOW,
+    });
+    assert.equal(result.status, 'rejected');
+    assert.equal(result.reason, 'gbrain-unavailable');
+    assert.equal(
+      gbrain.calls.some(call => call.method === 'getPage'),
+      true
     );
   });
 });

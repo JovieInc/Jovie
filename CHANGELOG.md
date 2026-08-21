@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Symphony context lookup is ledger/keyword-first again (JOV-5268):** targeted GBrain retrieval uses bounded issue-term `gbrain search` first, keeps a keyword hit when semantic `query` times out, and only falls back to hybrid query when keyword cannot bind a page. Healthy misses stay `context-no-results`; total command failure stays `gbrain-unavailable`.
+
 - [internal] **Gem Symphony restores the stopped-work reconciler and parks terminal launcher exit 78 (JOV-5253):** the existing installer materializes the versioned reconciler runtime and enables only its timer, activation fails closed unless `--check`, `runtime-preflight`, timer state, and source-to-runtime hashes match, and a structured or `port_exit 78` failure stays blocked with `retryable=false` and no retry deadline. Exit 75 stays typed capacity backoff.
 
 - [internal] **Sign-out stays available when Redis is missing (JOV-5260):** Better Auth secondary-storage delete no longer fails closed just because the Redis client is unconfigured or the quota circuit shed it. Reachable Redis deletes still retry and fail closed.
