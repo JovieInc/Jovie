@@ -1,5 +1,6 @@
 import {
   AUTH_STATE_PARAM,
+  buildNativeHandbackBouncePath,
   createAuthAnalyticsEvent,
   type NativeAuthClient,
   resolveAuthCallback,
@@ -137,18 +138,22 @@ export async function GET(request: Request) {
       returnTo: stateRecord.returnTo,
     });
 
-    // Electron sign-in runs in the user's real system browser, which does not
-    // reliably hand off a non-user-gesture 302 to a custom scheme. Bounce
-    // through a same-origin web page that fires the deep link AND offers an
-    // "Open Jovie" button. iOS keeps the raw redirect: ASWebAuthenticationSession
-    // intercepts its scheme directly. See app/(auth)/auth/native-return/page.tsx.
-    if (resolved.client === 'electron' && exchangeCode) {
-      const bounce = new URL('/auth/native-return', request.url);
-      bounce.searchParams.set('code', exchangeCode);
-      bounce.searchParams.set('state', stateRecord.state);
-      if (stateRecord.desktopFlow) {
-        bounce.searchParams.set('desktop_flow', stateRecord.desktopFlow);
-      }
+    // Native sign-in runs in ASWebAuthenticationSession (iOS) or the system
+    // browser (Electron). A raw 302 to a custom scheme is not a reliable
+    // handback: Safari/ASWebAuthenticationSession can leave the user on the
+    // last HTTPS page, which used to be the web dashboard. Bounce through an
+    // allowlisted same-origin page that fires the deep link and keeps an
+    // explicit "Return to Jovie" control. Never fall through to /app.
+    if (resolved.client !== 'web' && exchangeCode) {
+      const bounce = new URL(
+        buildNativeHandbackBouncePath({
+          client: resolved.client,
+          code: exchangeCode,
+          state: stateRecord.state,
+          desktopFlow: stateRecord.desktopFlow,
+        }),
+        request.url
+      );
       return NextResponse.redirect(bounce, { headers: NO_STORE_HEADERS });
     }
 

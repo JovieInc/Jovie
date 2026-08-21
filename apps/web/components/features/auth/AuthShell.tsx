@@ -283,6 +283,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
       <GoogleOneTap
         mode={mode}
         suppress={!hasHydrated || pendingProvider !== null || otpStepActive}
+        callbackURL={fallbackRedirectUrl}
       />
       <AuthOAuthStartSurface
         mode={mode}

@@ -33,6 +33,8 @@ const IN_APP_ROUTE_PREFIXES = [
 const AUTH_CALLBACK_ROUTE_PREFIXES = [
   '/auth/callback',
   '/auth/native-complete',
+  '/auth/native-return',
+  '/auth/ios/complete',
   '/app/auth/callback',
   '/signin/sso-callback',
   '/signup/sso-callback',

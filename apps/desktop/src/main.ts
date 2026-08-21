@@ -366,6 +366,8 @@ const AUTH_ROUTE_PREFIXES = [
   '/sign-up/sso-callback',
   '/auth/callback',
   DESKTOP_AUTH_NATIVE_COMPLETE_PATH,
+  '/auth/native-return',
+  '/auth/ios/complete',
   '/app/auth/callback',
 ] as const;
 

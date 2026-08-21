@@ -33,6 +33,10 @@ export type NavigationDisposition =
 
 export const AUTH_STATE_PARAM = 'auth_state';
 export const AUTH_CALLBACK_PATH = '/auth/callback';
+export const NATIVE_HANDBACK_BOUNCE_PATHS = {
+  ios: '/auth/ios/complete',
+  electron: '/auth/native-return',
+} as const satisfies Record<NativeAuthClient, string>;
 
 export interface AuthStartUrlInput {
   readonly baseUrl: string;
@@ -92,9 +96,16 @@ export interface AuthAnalyticsEventPayload {
 const AUTH_STATE_TTL_MS = 10 * 60 * 1000;
 const NATIVE_EXCHANGE_TTL_MS = 5 * 60 * 1000;
 const IOS_AUTH_COMPLETE_URL = 'ie.jov.jovie://auth/complete';
+const IOS_AUTH_COMPLETE_SCHEME = 'ie.jov.jovie';
 const DEFAULT_ELECTRON_AUTH_COMPLETE_PROTOCOL = 'jovie';
-const IOS_UNIVERSAL_AUTH_COMPLETE_PATH = '/auth/ios/complete';
+const ELECTRON_AUTH_COMPLETE_PROTOCOLS = [
+  'jovie',
+  'jovie-staging',
+  'jovie-local',
+] as const;
+const IOS_UNIVERSAL_AUTH_COMPLETE_PATH = NATIVE_HANDBACK_BOUNCE_PATHS.ios;
 const DEFAULT_DOCS_URL = 'https://docs.jov.ie';
+const LOOPBACK_HANDBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 const RETURN_BLOCKED_PREFIXES = [
   '/api',
@@ -358,6 +369,73 @@ export function buildIosUniversalAuthCompleteUrl(input: {
   return buildUrlWithCodeAndState(
     new URL(IOS_UNIVERSAL_AUTH_COMPLETE_PATH, input.origin).toString(),
     input
+  );
+}
+
+export function buildNativeHandbackBouncePath(input: {
+  readonly client: NativeAuthClient;
+  readonly code: string;
+  readonly state: string;
+  readonly desktopFlow?: string | null;
+}): string {
+  return buildUrlWithCodeAndState(
+    `https://jov.ie${NATIVE_HANDBACK_BOUNCE_PATHS[input.client]}`,
+    {
+      code: input.code,
+      state: input.state,
+      desktopFlow: input.client === 'electron' ? input.desktopFlow : null,
+    }
+  ).replace(/^https:\/\/jov\.ie/, '');
+}
+
+function isLoopbackHandbackHost(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  return (
+    LOOPBACK_HANDBACK_HOSTS.has(normalized) || normalized.endsWith('.localhost')
+  );
+}
+
+function isAllowlistedHttpsHandbackHost(
+  hostname: string,
+  protocol: string
+): boolean {
+  const normalized = hostname.toLowerCase();
+  if (normalized === 'jov.ie' || normalized === 'staging.jov.ie') {
+    return protocol === 'https:';
+  }
+  if (isLoopbackHandbackHost(normalized)) {
+    return protocol === 'http:' || protocol === 'https:';
+  }
+  return false;
+}
+
+export function isAllowlistedNativeHandbackUrl(urlString: string): boolean {
+  const parsed = parseUrl(urlString);
+  if (!parsed) return false;
+
+  const protocol = parsed.protocol.replace(/:$/, '');
+  if (protocol === IOS_AUTH_COMPLETE_SCHEME) {
+    return parsed.host === 'auth' && parsed.pathname === '/complete';
+  }
+
+  if (
+    ELECTRON_AUTH_COMPLETE_PROTOCOLS.includes(
+      protocol as ElectronAuthCompleteProtocol
+    )
+  ) {
+    return parsed.host === 'auth' && parsed.pathname === '/complete';
+  }
+
+  if (
+    !isAllowlistedHttpsHandbackHost(parsed.hostname, parsed.protocol) ||
+    !hasSafePathname(parsed.pathname)
+  ) {
+    return false;
+  }
+
+  return (
+    parsed.pathname === NATIVE_HANDBACK_BOUNCE_PATHS.ios ||
+    parsed.pathname === NATIVE_HANDBACK_BOUNCE_PATHS.electron
   );
 }
 
