@@ -124,28 +124,31 @@ describe('DashboardNav', () => {
     ).toEqual(CANONICAL_NAV);
   });
 
-  it('hides a settled-empty Inbox away from its active destination', () => {
-    const { getByRole, queryByRole } = renderDashboardNav({
+  it('keeps the Inbox attention center visible when it is settled empty', () => {
+    const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
       overrides: {
         inboxNavigation: { state: 'empty', pendingCount: 0 },
       },
     });
 
-    expect(queryByRole('link', { name: 'Inbox' })).toBeNull();
+    expect(getByRole('link', { name: 'Inbox' })).toBeInTheDocument();
     expect(getByRole('link', { name: 'New Chat' })).toBeInTheDocument();
   });
 
-  it('hides a settled-empty Inbox while its root destination is active', () => {
+  it('keeps the Inbox attention center visible at its root destination', () => {
     mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
-    const { queryByRole } = renderDashboardNav({
+    const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
       overrides: {
         inboxNavigation: { state: 'empty', pendingCount: 0 },
       },
     });
 
-    expect(queryByRole('link', { name: 'Inbox' })).toBeNull();
+    expect(getByRole('link', { name: 'Inbox' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
   });
 
   it('keeps Inbox visible when availability is unknown', () => {

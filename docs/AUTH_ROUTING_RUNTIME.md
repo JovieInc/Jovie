@@ -40,9 +40,11 @@ There are two intentional layers:
 Avoid introducing a third place where auth routing decisions are made.
 
 Redis is not an authentication availability dependency. Rate limiting and
-secondary-storage caching may degrade during a Redis outage, but PKCE state,
+secondary-storage caching may degrade during a Redis outage, including
+session-cache deletes when the Redis client is missing, but PKCE state,
 native exchange codes, durable sessions, and one-time tokens remain
-Postgres-backed and atomically consumed.
+Postgres-backed and atomically consumed. Reachable Redis session deletes
+still fail closed after retry.
 
 ## Runtime selection (Vercel)
 

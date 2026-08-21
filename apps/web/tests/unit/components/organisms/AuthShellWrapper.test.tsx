@@ -128,7 +128,11 @@ vi.mock('@/features/dashboard/atoms/DrawerToggleButton', () => ({
 }));
 
 vi.mock('@/components/atoms/UpdateAvailablePill', () => ({
-  UpdateAvailablePill: () => null,
+  UpdateAvailablePill: () => (
+    <button type='button' data-testid='update-available-pill'>
+      Update
+    </button>
+  ),
 }));
 
 vi.mock('@/components/shell/ArtistProfileRailToggle', () => ({
@@ -199,6 +203,19 @@ describe('AuthShellWrapper', () => {
 
     expect(
       screen.queryByLabelText(/Jovie usage: .* remaining/i)
+    ).not.toBeInTheDocument();
+  });
+
+  it('leaves update notifications to the left navigation', () => {
+    render(
+      <AuthShellWrapper>
+        <div>dashboard content</div>
+      </AuthShellWrapper>
+    );
+
+    expect(screen.getByTestId('shell-header-actions')).toBeEmptyDOMElement();
+    expect(
+      screen.queryByTestId('update-available-pill')
     ).not.toBeInTheDocument();
   });
 

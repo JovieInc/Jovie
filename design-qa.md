@@ -98,3 +98,44 @@ is tracked as candidate follow-up JOV-4627.
 - P1: none
 - P2: none
 - P3: none
+
+
+# Jovie Sidebar Refinement Design QA
+
+final result: passed
+
+## Source and implementation
+
+- Approved source mock: `/Users/timwhite/.codex/generated_images/01a0223a-6b19-7f43-8b08-333c823a63f2/exec-c09b88f1-0d24-4694-8b1d-6dbdc06754be.png`
+- Current-main desktop rail: `/Users/timwhite/.codex/visualizations/2026/08/21/01a0224f-7041-7f20-849b-653a0bf8231c/jovie-sidebar-current-main-rail-1440x900.png`
+- Same-state visual comparison: `/Users/timwhite/.codex/visualizations/2026/08/21/01a0224f-7041-7f20-849b-653a0bf8231c/jovie-sidebar-current-main-comparison.png`
+- Current-main responsive captures: `/Users/timwhite/.codex/visualizations/2026/08/21/01a0224f-7041-7f20-849b-653a0bf8231c/jovie-sidebar-current-main-768x1024.png`, `/Users/timwhite/.codex/visualizations/2026/08/21/01a0224f-7041-7f20-849b-653a0bf8231c/jovie-sidebar-current-main-375x812.png`
+
+## Viewports and states
+
+| Viewport | State | Result |
+| --- | --- | --- |
+| 1440 × 900 | Current-main `/demo` shell, expanded rail | Passed: one protected user panel, Public Profile inside it, notification slot owned by sidebar content, no upgrade card or header/titlebar duplicate |
+| 768 × 1024 | Responsive More surface open | Passed: desktop rail hidden, account utilities include Public Profile, Settings, and Sign out, dialog remains in viewport |
+| 375 × 812 | Responsive More surface open | Passed: no horizontal overflow, same account utilities, Escape restores More focus |
+| 1023 / 1024 × 768 | Breakpoint boundary | Passed: mobile surface at 1023; desktop rail at 1024; no horizontal overflow |
+
+## Interaction and layout checks
+
+- Public Profile keeps the canonical sidebar focus ring when reached by keyboard.
+- Mobile More opens with contained focus and Escape restores the trigger; unit and runtime checks agree.
+- `data-sidebar="notifications"` is rendered once inside SidebarContent; update controls are absent from the shell header, Electron titlebar, and account footer.
+- Electron update detection uses the synchronous runtime bridge check so the
+  first sidebar commit installs the one-shot IPC listener; the boot-emission
+  regression is covered by `tests/unit/desktop/electron-runtime.test.tsx` and
+  `tests/unit/components/organisms/UnifiedSidebar.library.test.tsx`.
+- The account panel is a single footer block and contains the Public Profile link immediately above the existing UserButton contract.
+- The demo harness intentionally shows its no-auth loading identity state; loaded UserButton keyboard behavior is covered by `tests/components/user-button.test.tsx`.
+- The authenticated `/app` browser route remains unavailable in this isolated worktree without `DATABASE_URL`; the database-free `/demo` shell was used for current-main visual/runtime evidence.
+
+## Severity audit
+
+- P0: none
+- P1: none
+- P2: none
+- P3: demo-only identity loading state and Storybook full-build infrastructure failures are outside this refinement

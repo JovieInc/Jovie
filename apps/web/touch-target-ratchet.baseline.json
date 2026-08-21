@@ -1,4 +1,4 @@
 {
   "_comment": "Touch-target ratchet baseline — interactive elements with explicit sub-44px visual heights and no 44px hit container (scripts/lint-touch-target.ts). Ratchet only goes down. Fix by enlarging the touch-target container (before:absolute before:h-11 before:min-w-11), not the visible control. Then `pnpm --filter web run lint:touch-target -- --update`.",
-  "count": 178
+  "count": 177
 }

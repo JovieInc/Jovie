@@ -183,12 +183,7 @@ describe('ci-fast bounded parallel workflow', () => {
   it('keeps workflow contracts in the bounded CI control suite', () => {
     const controlTest = PACKAGE_JSON.scripts['ci:control:test'];
 
-    expect(controlTest).toContain(
-      'lib/__tests__/ci-fast-workflow-contract.test.mjs'
-    );
-    expect(controlTest).toContain(
-      'lib/__tests__/merge-group-workflow-contract.test.mjs'
-    );
+    expect(controlTest).toBe('node scripts/run-affected-tests.mjs --control');
   });
 
   it('enforces meaningful Gem rehabilitation policy coverage in structural CI', () => {

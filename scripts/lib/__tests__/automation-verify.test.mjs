@@ -492,6 +492,7 @@ describe('automation-verify affected scope', () => {
       pythonUnittestTests: ['scripts/hermes/tests/gem-priority-gate.test.py'],
       scriptVitestTests: [
         'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/pr-visual-review.test.mjs',
         'scripts/lib/__tests__/ci-harness.test.mjs',
         'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
         'scripts/lib/__tests__/ci-branching-guard.test.mjs',
@@ -511,6 +512,9 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/queue-deferred-release.test.mjs',
         'scripts/lib/__tests__/queue-deferred-release-admission.test.mjs',
         'scripts/lib/__tests__/setup-worktree-health.test.mjs',
+        'scripts/lib/__tests__/linear-issue-intake.test.mjs',
+        'scripts/lib/__tests__/agent-qc-wires.test.mjs',
+        'scripts/lib/__tests__/needs-human-autoclose.test.mjs',
         'scripts/lib/__tests__/hermes-launchd.test.mjs',
       ],
     });

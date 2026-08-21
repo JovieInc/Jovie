@@ -6,12 +6,13 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@jovie/ui';
-import { ArrowLeft, Copy, LogOut, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Copy, ExternalLink, LogOut, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { UpdateAvailablePill } from '@/components/atoms/UpdateAvailablePill';
 import { toast } from '@/components/feedback';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button';
 import { WorkspaceSelector } from '@/components/molecules/WorkspaceSelector';
@@ -30,7 +31,7 @@ import { UserButton } from '@/components/organisms/user-button';
 import { getVersionUpdateTitle } from '@/components/shell/getVersionUpdateTitle';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
 import { InstallBanner } from '@/components/shell/InstallBanner';
-import { BASE_URL } from '@/constants/domains';
+import { BASE_URL, HOSTNAME } from '@/constants/domains';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
@@ -40,13 +41,15 @@ import {
   userSettingsNavigation,
 } from '@/features/dashboard/dashboard-nav/config';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
-import { SidebarUpgradeBanner } from '@/features/feedback/SidebarUpgradeBanner';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useProfileData } from '@/hooks/useProfileData';
 import { APP_SHELL_WORKSPACES } from '@/lib/app-shell/workspaces';
 import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
-import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
+import {
+  isElectronRuntime,
+  useIsElectronRuntime,
+} from '@/lib/desktop/electron-bridge';
 import { env } from '@/lib/env-client';
 import { useAppFlag } from '@/lib/flags/client';
 import {
@@ -438,14 +441,64 @@ function OperatorSessionControls() {
   );
 }
 
+function CustomerUserPanel({
+  profileHref,
+}: Readonly<{ profileHref: string | undefined }>) {
+  const profileDisplayHref = profileHref
+    ? `${HOSTNAME}${profileHref}`
+    : undefined;
+
+  return (
+    <div
+      data-sidebar='user-panel'
+      data-testid='sidebar-user-panel'
+      className='border-t border-(--noir-ion-border-subtle) px-2.5 py-1.5'
+    >
+      <SidebarMenu className='gap-1'>
+        {profileHref && profileDisplayHref ? (
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              size='lg'
+              tooltip='Public Profile'
+              className='h-10 py-1'
+            >
+              <Link href={profileHref}>
+                <ExternalLink aria-hidden='true' />
+                <span className='min-w-0 flex-1 group-data-[collapsible=icon]:hidden'>
+                  <span className='block truncate text-app font-normal text-sidebar-item-foreground'>
+                    Public Profile
+                  </span>
+                  <span className='block truncate text-2xs font-normal text-sidebar-muted'>
+                    {profileDisplayHref}
+                  </span>
+                </span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        ) : null}
+        <SidebarMenuItem
+          className={cn(
+            profileHref &&
+              'border-t border-(--noir-ion-border-subtle) pt-1 group-data-[collapsible=icon]:border-t-0 group-data-[collapsible=icon]:pt-0'
+          )}
+        >
+          <UserButton
+            profileHref={profileHref}
+            settingsHref={APP_ROUTES.SETTINGS}
+            showUserInfo
+          />
+        </SidebarMenuItem>
+      </SidebarMenu>
+    </div>
+  );
+}
+
 /**
  * UnifiedSidebar - Single sidebar component for all post-auth sections
  *
- * Header now shows a clean Jovie logo only (no workspace/user button).
- * The user menu (with profile, settings, billing, sign out, etc.) is opened
- * via a native "Settings" button at the bottom of the sidebar (above Now Playing).
- * The version string (vX.Y.Z + optional sha) is now rendered inside the user
- * menu (visible to everyone) instead of the previous admin-only footer.
+ * Header shows workspace identity, navigation owns attention and update state,
+ * and one protected footer panel owns the public-profile and account controls.
  */
 export function UnifiedSidebar({
   section,
@@ -458,10 +511,13 @@ export function UnifiedSidebar({
   const isInSettings = section === 'settings';
   const isOperatorSection = section === 'admin' || section === 'ov';
   const isRouteSidebar = isInSettings || sidebarOverride !== null;
-  const usesStandardAppNavigation = !isOperatorSection && !isRouteSidebar;
   const hasMultipleProfiles = creatorProfiles.length >= 2;
+  // Read the bridge synchronously so the desktop update listener mounts on
+  // the first committed sidebar render. Electron emits update events once;
+  // waiting for the effect-backed runtime hook would miss a boot-time event.
+  const isDesktop = isElectronRuntime();
 
-  const { profileHref } = useProfileData(usesStandardAppNavigation);
+  const { profileHref } = useProfileData(section !== 'ov');
 
   return (
     <Sidebar
@@ -514,34 +570,32 @@ export function UnifiedSidebar({
             )}
           </SidebarGroupContent>
         </SidebarGroup>
+        <div
+          data-sidebar='notifications'
+          data-testid='sidebar-notifications'
+          className='shrink-0 group-data-[collapsible=icon]:hidden'
+        >
+          {isDesktop ? (
+            <div className='flex px-2 pb-1.5'>
+              <UpdateAvailablePill />
+            </div>
+          ) : (
+            <ShellSidebarInstallBanner />
+          )}
+        </div>
       </SidebarContent>
 
-      {isRouteSidebar ? null : section === 'ov' ? (
+      {section === 'ov' ? (
         <SidebarFooter className='mt-auto gap-0 px-0 py-0'>
           <OperatorSessionControls />
         </SidebarFooter>
       ) : (
         // SidebarFooter is shrink-0; with the restored full-height flex chain
         // (sidebar peer + shell mount both h-full), SidebarContent's flex-1
-        // absorbs free space so Settings + Now Playing + banners pin bottom.
+        // absorbs free space so media and the protected account panel pin bottom.
         <SidebarFooter className='mt-auto gap-0 px-0 py-0'>
-          {/* The footer is the shell's single identity entry. UserButton owns both
-              the avatar/name trigger and its existing settings menu. */}
-          <div className='min-h-(--app-shell-footer-row-height) px-2.5 py-0.5'>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <UserButton
-                  profileHref={profileHref}
-                  settingsHref={APP_ROUTES.SETTINGS}
-                  showUserInfo
-                />
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </div>
-
           <SidebarBottomNowPlayingBridge />
-          {isDemoRoute ? null : <SidebarUpgradeBanner />}
-          <ShellSidebarInstallBanner />
+          <CustomerUserPanel profileHref={profileHref} />
         </SidebarFooter>
       )}
     </Sidebar>

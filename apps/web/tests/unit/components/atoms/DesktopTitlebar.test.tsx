@@ -52,7 +52,7 @@ describe('DesktopTitlebar', () => {
     electronRuntimeMock.isElectronRuntime = true;
   });
 
-  it('renders Electron titlebar with nav controls, sidebar toggle, and update pill in the sidebar cell', () => {
+  it('renders Electron titlebar navigation without duplicating sidebar notifications', () => {
     renderTitlebar();
 
     expect(screen.getByTestId('electron-titlebar-row')).toBeInTheDocument();
@@ -74,10 +74,9 @@ describe('DesktopTitlebar', () => {
       screen.getByTestId('electron-titlebar-sidebar-cell')
     ).toContainElement(screen.getByTestId('electron-nav-forward'));
 
-    // Update pill is in the sidebar cell
     expect(
-      screen.getByTestId('electron-titlebar-sidebar-cell')
-    ).toContainElement(screen.getByTestId('update-available-pill'));
+      screen.queryByTestId('update-available-pill')
+    ).not.toBeInTheDocument();
 
     expect(
       screen.getByRole('button', { name: 'Collapse sidebar' })

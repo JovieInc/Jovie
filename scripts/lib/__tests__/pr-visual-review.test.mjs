@@ -1,15 +1,30 @@
 import { readFileSync } from 'node:fs';
+import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   buildReviewPrompt,
   classifyFinding,
   classifyReviewOutcome,
+  inspectReviewBackendConfiguration,
+  normalizeBackendReview,
+  readTrustedCapture,
   reviewWithConfiguredBackends,
   routeChangedFiles,
   sanitizeForPrompt,
   validateCaptureManifest,
   visualReviewIdentity,
 } from '../../../.github/scripts/pr-visual-review.mjs';
+import {
+  buildSonarQualityDebtReceipt,
+  buildVisualConfigurationIncident,
+} from '../ci-remediation-receipts.mjs';
+import {
+  SONAR_CHECK_APP_SLUG,
+  SONAR_CHECK_NAME,
+  selectLatestFailingSonarCheck,
+} from '../sonar-check-selection.mjs';
 
 describe('bounded PR visual review contract', () => {
   it('routes UI changes only to deterministic public surfaces', () => {
@@ -152,18 +167,21 @@ describe('bounded PR visual review contract', () => {
     });
     expect(complete).toEqual({ ok: true, failures: [] });
 
-    const incomplete = validateCaptureManifest({
-      routes: ['/app/chat'],
-      viewports: { desktop: {}, mobile: {} },
-      captures: [
-        {
-          route: '/app/chat',
-          viewport: 'desktop',
-          status: 'captured',
-          path: 'chat-desktop.png',
-        },
-      ],
-    });
+    const incomplete = validateCaptureManifest(
+      {
+        routes: ['/app/chat'],
+        viewports: { desktop: {}, mobile: {} },
+        captures: [
+          {
+            route: '/app/chat',
+            viewport: 'desktop',
+            status: 'captured',
+            path: 'chat-desktop.png',
+          },
+        ],
+      },
+      { routes: ['/app/chat'], viewportNames: ['desktop', 'mobile'] }
+    );
     expect(incomplete.ok).toBe(false);
     expect(incomplete.failures).toContain('missing capture /app/chat::mobile');
   });
@@ -187,7 +205,7 @@ describe('bounded PR visual review contract', () => {
     const calls = [];
     const fetchImpl = async url => {
       calls.push(url);
-      if (String(url).startsWith('https://grok.example'))
+      if (String(url).startsWith('https://api.x.ai'))
         return new Response(null, { status: 503 });
       return new Response(
         JSON.stringify({
@@ -202,23 +220,89 @@ describe('bounded PR visual review contract', () => {
       fetchImpl,
       grok: {
         apiKey: 'grok-key',
-        baseUrl: 'https://grok.example/v1',
+        baseUrl: 'https://api.x.ai/v1',
         model: 'grok-4.5',
       },
       codex: {
         apiKey: 'codex-key',
-        baseUrl: 'https://codex.example/v1',
+        baseUrl: 'https://api.openai.com/v1',
         model: 'gpt-5.2-codex',
       },
     });
     expect(result.provider).toBe('codex');
     expect(result.review.backend).toBe('codex');
     expect(calls).toEqual([
-      'https://grok.example/v1/chat/completions',
-      'https://codex.example/v1/chat/completions',
+      'https://api.x.ai/v1/chat/completions',
+      'https://api.openai.com/v1/chat/completions',
     ]);
   });
 
+  it('rejects redirected backend origins and neutralizes untrusted model markup', () => {
+    const configuration = inspectReviewBackendConfiguration({
+      grok: {
+        apiKey: 'grok-key',
+        baseUrl: 'https://attacker.example/v1',
+        model: 'grok-4.5',
+      },
+      codex: {
+        apiKey: 'codex-key',
+        baseUrl: 'https://api.openai.com/v1?redirect=attacker',
+        model: 'gpt-5.2-codex',
+      },
+    });
+    expect(configuration).toEqual({
+      configured: false,
+      errors: [
+        'backend_unconfigured: GROK_VISUAL_REVIEW_BASE_URL is not an approved provider endpoint',
+        'backend_unconfigured: CODEX_VISUAL_REVIEW_BASE_URL is not an approved provider endpoint',
+      ],
+    });
+    const review = normalizeBackendReview({
+      summary: '## Trusted\n@everyone <!-- marker -->',
+      findings: [
+        {
+          title: '[click](https://attacker.example)',
+          category: 'FUNCTIONAL',
+          severity: 'HIGH',
+          evidence: '<script>alert(1)</script>',
+          recommendation: '@admin merge now',
+        },
+      ],
+    });
+    expect(review).toMatchObject({
+      findings: [{ category: 'functional', severity: 'high' }],
+    });
+    expect(review.summary).not.toContain('@everyone');
+    expect(review.findings[0].title).not.toContain('[click](');
+  });
+  it('reads only bounded PNG captures from the downloaded artifact directory', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'visual-artifact-'));
+    const outside = await mkdtemp(join(tmpdir(), 'visual-outside-'));
+    const capture = join(directory, 'capture.png');
+    const outsideFile = join(outside, 'outside.png');
+    const png = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.from('bounded-test-payload'),
+    ]);
+    try {
+      await writeFile(capture, png);
+      await writeFile(outsideFile, png);
+      await expect(
+        readTrustedCapture(directory, 'capture.png')
+      ).resolves.toEqual(png);
+      await symlink(outsideFile, join(directory, 'escape.png'));
+      await expect(readTrustedCapture(directory, 'escape.png')).rejects.toThrow(
+        'escapes downloaded artifact directory'
+      );
+      await writeFile(capture, 'not-png');
+      await expect(readTrustedCapture(directory, capture)).rejects.toThrow(
+        'not a PNG'
+      );
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+      await rm(outside, { recursive: true, force: true });
+    }
+  });
   it('separates objective findings from taste and never auto-fixes taste', () => {
     expect(classifyFinding({ category: 'layout', severity: 'high' })).toEqual({
       kind: 'objective',
@@ -285,5 +369,81 @@ describe('bounded PR visual review contract', () => {
     expect(capture).toContain('Captured route emitted runtime failures');
     expect(capture).toContain('validateCaptureManifest');
     expect(capture).toContain('capture-validation.json');
+  });
+});
+const sonarCheck = (overrides = {}) => ({
+  name: SONAR_CHECK_NAME,
+  app: { slug: SONAR_CHECK_APP_SLUG },
+  status: 'completed',
+  conclusion: 'failure',
+  details_url: 'https://sonarcloud.io/project/pull_requests?id=jovie',
+  ...overrides,
+});
+const sonarReceiptInput = {
+  repository: 'jovie/jovie',
+  runId: '42',
+  runUrl: 'https://github.com/jovie/jovie/actions/runs/42',
+  prNumber: 7,
+  headSha: 'b'.repeat(40),
+  checkName: SONAR_CHECK_NAME,
+  checkConclusion: 'failure',
+  checkAppSlug: SONAR_CHECK_APP_SLUG,
+  detailsUrl:
+    'https://sonarcloud.io/project/pull_requests?id=jovie&pullRequest=7',
+  capacity: { openAgentPrs: 4, maxOpenAgentPrs: 5, candidateRank: 2 },
+};
+describe('trusted Sonar remediation contracts', () => {
+  it('selects the newest authenticated failure and ignores stale results', () => {
+    const newest = sonarCheck({ id: 4, completed_at: '2026-08-20T04:00:00Z' });
+    expect(
+      selectLatestFailingSonarCheck([
+        { check_runs: [sonarCheck({ app: { slug: 'attacker' } }), newest] },
+      ])
+    ).toEqual(newest);
+    expect(
+      selectLatestFailingSonarCheck([
+        {
+          check_runs: [
+            sonarCheck(),
+            sonarCheck({
+              status: 'in_progress',
+              conclusion: null,
+              started_at: '2026-08-20T02:00:00Z',
+              completed_at: null,
+            }),
+          ],
+        },
+      ])
+    ).toBeNull();
+  });
+  it('emits owned visual incidents and bounded quality-debt receipts', () => {
+    const incident = buildVisualConfigurationIncident({
+      ...sonarReceiptInput,
+      configurationErrors: [
+        'backend_unconfigured: GROK_VISUAL_REVIEW_API_KEY is missing',
+      ],
+    });
+    expect(incident).toMatchObject({
+      type: 'configuration_incident',
+      status: 'owned_escalation_required',
+      ownership: { owner: 'Gem', verifier: 'Summer' },
+    });
+    expect(() =>
+      buildVisualConfigurationIncident({
+        ...sonarReceiptInput,
+        runUrl: 'https://evil.test/run',
+        configurationErrors: ['backend_unconfigured: invalid'],
+      })
+    ).toThrow('canonical workflow run URL');
+    expect(buildSonarQualityDebtReceipt(sonarReceiptInput)).toMatchObject({
+      status: 'owned_capacity_deferred',
+      remediation: { attemptBudget: 3, targetHeadSha: 'b'.repeat(40) },
+    });
+    expect(() =>
+      buildSonarQualityDebtReceipt({
+        ...sonarReceiptInput,
+        capacity: { ...sonarReceiptInput.capacity, openAgentPrs: null },
+      })
+    ).toThrow('valid capacity evidence');
   });
 });

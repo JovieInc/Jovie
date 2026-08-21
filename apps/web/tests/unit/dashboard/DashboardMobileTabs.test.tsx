@@ -7,11 +7,13 @@ import { APP_ROUTES } from '@/constants/routes';
 const {
   mockPathname,
   mockSignOut,
+  mockProfileHref,
   mockStartNavigationTelemetry,
   mockTrackNavigationImpressions,
 } = vi.hoisted(() => ({
   mockPathname: vi.fn(() => APP_ROUTES.CHAT),
   mockSignOut: vi.fn(),
+  mockProfileHref: vi.fn(() => '/timwhite'),
   mockStartNavigationTelemetry: vi.fn(),
   mockTrackNavigationImpressions: vi.fn(),
 }));
@@ -25,6 +27,9 @@ vi.mock('@/hooks/useClerkSafe', () => ({
 }));
 
 vi.mock('@/hooks/useMediaQuery', () => ({ useMediaQuery: () => true }));
+vi.mock('@/hooks/useProfileData', () => ({
+  useProfileData: () => ({ profileHref: mockProfileHref() }),
+}));
 vi.mock('@/lib/desktop/electron-bridge', () => ({
   useIsElectronRuntime: () => false,
 }));
@@ -52,6 +57,8 @@ describe('DashboardMobileTabs', () => {
     mockPathname.mockReset();
     mockPathname.mockReturnValue(APP_ROUTES.CHAT);
     mockSignOut.mockReset();
+    mockProfileHref.mockReset();
+    mockProfileHref.mockReturnValue('/timwhite');
     mockStartNavigationTelemetry.mockReset();
     mockTrackNavigationImpressions.mockReset();
   });
@@ -106,7 +113,7 @@ describe('DashboardMobileTabs', () => {
     });
   });
 
-  it('shows the exact expanded destinations in order, with Settings separated as utility', async () => {
+  it('shows the exact expanded destinations in order, with account utilities separated', async () => {
     const user = userEvent.setup();
     render(<DashboardMobileTabs />);
 
@@ -128,8 +135,10 @@ describe('DashboardMobileTabs', () => {
       APP_ROUTES.TASKS,
       APP_ROUTES.PROFILES,
     ]);
-    expect(links.at(7)).toHaveTextContent('Settings');
-    expect(links.at(7)).toHaveAttribute('href', APP_ROUTES.SETTINGS);
+    expect(links.at(7)).toHaveTextContent('Public Profile');
+    expect(links.at(7)).toHaveAttribute('href', '/timwhite');
+    expect(links.at(8)).toHaveTextContent('Settings');
+    expect(links.at(8)).toHaveAttribute('href', APP_ROUTES.SETTINGS);
 
     for (const label of ['Search', 'Touring', 'Audience', 'Releases']) {
       expect(within(menu).queryByRole('link', { name: label })).toBeNull();

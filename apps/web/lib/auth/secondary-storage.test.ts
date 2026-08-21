@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   captureError: vi.fn(),
   env: { VERCEL_ENV: 'preview' as string | undefined },
   getRedis: vi.fn(),
+  logger: { warn: vi.fn() },
 }));
 
 vi.mock('server-only', () => ({}));
@@ -11,7 +12,7 @@ vi.mock('@/lib/env', () => ({ env: mocks.env }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: mocks.captureError }));
 vi.mock('@/lib/redis', () => ({ getRedis: mocks.getRedis }));
 vi.mock('@/lib/utils/logger', () => ({
-  logger: { warn: vi.fn() },
+  logger: mocks.logger,
 }));
 
 import {
@@ -64,6 +65,18 @@ describe('Better Auth database-authoritative verification storage', () => {
       { operation: 'secondary-storage.delete' }
     );
   });
+
+  it('skips production deletion when Redis is unavailable instead of failing closed', async () => {
+    mocks.getRedis.mockReturnValue(null);
+
+    await expect(
+      secondaryStorage.delete('session-token')
+    ).resolves.toBeUndefined();
+    expect(mocks.captureError).not.toHaveBeenCalled();
+    expect(mocks.logger.warn).toHaveBeenCalledWith(
+      '[auth/secondary-storage] Redis unavailable, delete skipped'
+    );
+  });
 });
 
 describe('Better Auth secondary storage getAndDelete', () => {
@@ -109,12 +122,13 @@ describe('Better Auth secondary storage getAndDelete', () => {
     );
   });
 
-  it('fails closed when Redis is unavailable in production', async () => {
+  it('degrades getAndDelete when Redis is unavailable in production', async () => {
     mocks.env.VERCEL_ENV = 'production';
 
-    await expect(secondaryStorage.getAndDelete('one-time')).rejects.toThrow(
-      'Redis unavailable in production'
+    await expect(secondaryStorage.getAndDelete('one-time')).resolves.toBeNull();
+    expect(mocks.captureError).not.toHaveBeenCalled();
+    expect(mocks.logger.warn).toHaveBeenCalledWith(
+      '[auth/secondary-storage] Redis unavailable, getAndDelete degraded'
     );
-    expect(mocks.captureError).toHaveBeenCalledTimes(1);
   });
 });

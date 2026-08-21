@@ -17,14 +17,20 @@ import { logger } from '@/lib/utils/logger';
  * - `get`/`set`/`increment` are best-effort: bounded by a 500ms timeout race,
  *   warn-and-degrade, never throw. Sessions stay durable in Postgres
  *   (`storeSessionInDatabase: true`), so Redis loss only costs latency.
- * - `getAndDelete`/`delete` FAIL CLOSED. A swallowed removal could allow
- *   reuse of a one-time value or leave a revoked session readable from Redis
- *   until TTL (security.md fail-closed persistence rule).
+ * - `getAndDelete`/`delete` FAIL CLOSED when Redis is reachable. A swallowed
+ *   removal could allow reuse of a one-time value or leave a revoked session
+ *   readable from Redis until TTL (security.md fail-closed persistence rule).
+ *   When the client is missing (unconfigured, init failure, or quota circuit),
+ *   throwing cannot delete the key and would block Postgres-backed sign-out
+ *   (infra.md: quota exhaustion must not block authentication). Skip and warn;
+ *   `get` already degrades to null for the outage, so leftover Redis rows are
+ *   unreadable until the client returns.
  * - `verification:*` is intentionally excluded from Redis. Better Auth is
  *   configured with `verification.storeInDatabase: true`, so Postgres is the
  *   atomic source of truth for one-time values. Caching those rows makes a
  *   Redis quota outage able to reject an OTP after Postgres already consumed
- *   it. Session and revocation keys keep the fail-closed Redis contract.
+ *   it. Reachable session and revocation keys keep the fail-closed Redis
+ *   contract.
  * - In-memory Map fallback is used ONLY when Redis is unconfigured AND the
  *   deploy is not production (security.md bans in-memory public traffic
  *   controls in production).
@@ -223,15 +229,10 @@ export const secondaryStorage = {
     const redis = getRedis();
     if (!redis) {
       if (!isProductionDeploy()) return memoryGetAndDelete(key);
-      const error = new Error(
-        'Secondary storage getAndDelete failed closed: Redis unavailable in production'
+      logger.warn(
+        '[auth/secondary-storage] Redis unavailable, getAndDelete degraded'
       );
-      await captureError(
-        'Better Auth secondary storage getAndDelete unavailable',
-        error,
-        { operation: 'secondary-storage.getAndDelete' }
-      );
-      throw error;
+      return null;
     }
 
     try {
@@ -257,15 +258,8 @@ export const secondaryStorage = {
         memoryStore.delete(key);
         return;
       }
-      const error = new Error(
-        'Secondary storage delete failed closed: Redis unavailable in production'
-      );
-      await captureError(
-        'Better Auth secondary storage delete unavailable',
-        error,
-        { operation: 'secondary-storage.delete' }
-      );
-      throw error;
+      logger.warn('[auth/secondary-storage] Redis unavailable, delete skipped');
+      return;
     }
     try {
       await withTimeout(redis.del(key));

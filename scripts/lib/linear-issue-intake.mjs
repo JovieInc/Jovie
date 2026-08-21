@@ -1,4 +1,5 @@
 const LINEAR_API = 'https://api.linear.app/graphql';
+const LINEAR_REQUEST_TIMEOUT_MS = 15_000;
 export const JOVIE_TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
 
 async function readResponse(response) {
@@ -15,23 +16,38 @@ async function linearGraphql(
   { query, variables, apiKey, fetchImpl = fetch },
   caller
 ) {
-  const response = await fetchImpl(LINEAR_API, {
-    method: 'POST',
-    headers: {
-      Authorization: apiKey,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query, variables }),
-  });
-  const parsed = await readResponse(response);
-  if (!response.ok) {
+  try {
+    const response = await fetchImpl(LINEAR_API, {
+      method: 'POST',
+      headers: {
+        Authorization: apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query, variables }),
+      signal: AbortSignal.timeout(LINEAR_REQUEST_TIMEOUT_MS),
+    });
+    const parsed = await readResponse(response);
+    if (!response.ok) {
+      return {
+        ok: false,
+        reason: `${caller}_${response.status}`,
+        body: parsed.json ?? parsed.text,
+      };
+    }
+    if (Array.isArray(parsed.json?.errors) && parsed.json.errors.length > 0)
+      return {
+        ok: false,
+        reason: `${caller}_graphql_error`,
+        body: parsed.json.errors,
+      };
+    return { ok: true, data: parsed.json?.data ?? null, raw: parsed.json };
+  } catch (error) {
     return {
       ok: false,
-      reason: `${caller}_${response.status}`,
-      body: parsed.json ?? parsed.text,
+      reason: `${caller}_transport`,
+      body: error instanceof Error ? error.message : String(error),
     };
   }
-  return { ok: true, data: parsed.json?.data ?? null, raw: parsed.json };
 }
 
 // Dedup by fingerprint in the title. Linear removed issueSearch.
@@ -40,6 +56,7 @@ export async function upsertLinearIssueByTitleFingerprint({
   title,
   description,
   priority = 1,
+  reopenTerminal = false,
   apiKey = process.env.LINEAR_API_KEY,
   fetchImpl = fetch,
 }) {
@@ -54,6 +71,7 @@ export async function upsertLinearIssueByTitleFingerprint({
     {
       query: `
         query FindIssueByFingerprint($teamId: String!, $fingerprint: String!) {
+          team(id: $teamId) { states { nodes { id name type } } }
           issues(
             filter: {
               team: { id: { eq: $teamId } }
@@ -61,7 +79,7 @@ export async function upsertLinearIssueByTitleFingerprint({
             }
             first: 5
           ) {
-            nodes { id identifier url title description }
+            nodes { id identifier url title description state { id name type } }
           }
         }
       `,
@@ -121,17 +139,28 @@ export async function upsertLinearIssueByTitleFingerprint({
     };
   }
 
+  const terminal = ['completed', 'canceled'].includes(match.state?.type);
+  const states = found.data?.team?.states?.nodes ?? [];
+  const backlogState =
+    states.find(state => state?.name === 'Backlog') ??
+    states.find(state => state?.type === 'backlog');
+  if (terminal && reopenTerminal && !backlogState)
+    return { ok: false, reason: 'linear_backlog_state_missing' };
+  const input = {
+    description,
+    ...(terminal && reopenTerminal ? { stateId: backlogState.id } : {}),
+  };
   const updated = await linearGraphql(
     {
       query: `
-        mutation UpdateDedupedLinearIssue($id: String!, $description: String!) {
-          issueUpdate(id: $id, input: { description: $description }) {
+        mutation UpdateDedupedLinearIssue($id: String!, $input: IssueUpdateInput!) {
+          issueUpdate(id: $id, input: $input) {
             success
             issue { id identifier url }
           }
         }
       `,
-      variables: { id: match.id, description },
+      variables: { id: match.id, input },
       apiKey,
       fetchImpl,
     },
@@ -148,6 +177,7 @@ export async function upsertLinearIssueByTitleFingerprint({
   return {
     ok: true,
     action: 'updated',
+    reopened: terminal && reopenTerminal,
     id: match.id,
     identifier: match.identifier,
     url: match.url,
