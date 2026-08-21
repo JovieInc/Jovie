@@ -34,6 +34,12 @@ async function linearGraphql(
         body: parsed.json ?? parsed.text,
       };
     }
+    if (Array.isArray(parsed.json?.errors) && parsed.json.errors.length > 0)
+      return {
+        ok: false,
+        reason: `${caller}_graphql_error`,
+        body: parsed.json.errors,
+      };
     return { ok: true, data: parsed.json?.data ?? null, raw: parsed.json };
   } catch (error) {
     return {

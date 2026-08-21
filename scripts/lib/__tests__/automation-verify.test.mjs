@@ -493,7 +493,6 @@ describe('automation-verify affected scope', () => {
       scriptVitestTests: [
         'scripts/lib/__tests__/automation-verify.test.mjs',
         'scripts/lib/__tests__/pr-visual-review.test.mjs',
-        'scripts/lib/__tests__/sonar-check-selection.test.mjs',
         'scripts/lib/__tests__/ci-harness.test.mjs',
         'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
         'scripts/lib/__tests__/ci-branching-guard.test.mjs',

@@ -14,23 +14,15 @@ const BACKEND_ORIGIN = {
   grok: 'https://api.x.ai',
   codex: 'https://api.openai.com',
 };
-const REVIEW_CATEGORIES = new Set([
-  'layout',
-  'accessibility',
-  'responsive',
-  'functional',
-  'taste',
-  'preference',
-  'brand',
-  'identity',
-  'composition',
-  'copy-tone',
-]);
+const REVIEW_CATEGORIES = new Set(
+  'layout accessibility responsive functional taste preference brand identity composition copy-tone'.split(
+    ' '
+  )
+);
 const REVIEW_SEVERITIES = new Set(['high', 'medium', 'low']);
 const MAX_CAPTURE_BYTES = 10 * 1024 * 1024;
-const PNG_SIGNATURE = Buffer.from([
-  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-]);
+const MAX_TOTAL_CAPTURE_BYTES = 24 * 1024 * 1024;
+const PNG_SIGNATURE = Buffer.from('89504e470d0a1a0a', 'hex');
 
 export const REQUIRED_CAPTURE_VIEWPORTS = ['desktop', 'mobile'];
 const PUBLIC_HOME_CAPTURE_ROUTE = '/';
@@ -235,7 +227,7 @@ export function normalizeBackendReview(value) {
     findings: value.findings.map(finding => {
       if (!finding || typeof finding !== 'object' || Array.isArray(finding))
         throw new Error('backend_failed: finding must be an object');
-      const category = String(finding.category ?? '');
+      const category = String(finding.category ?? '').toLowerCase();
       const severity = String(finding.severity ?? '').toLowerCase();
       if (!REVIEW_CATEGORIES.has(category) || !REVIEW_SEVERITIES.has(severity))
         throw new Error('backend_failed: finding enum is invalid');
@@ -486,13 +478,14 @@ async function main() {
           `capture evidence is invalid: ${validation.failures.join('; ')}`
         );
       screenshots = [];
+      let capturedBytes = 0;
       for (const capture of manifest.captures ?? []) {
         if (capture.status !== 'captured') continue;
-        screenshots.push(
-          (await readTrustedCapture(artifactDir, capture.path)).toString(
-            'base64'
-          )
-        );
+        const data = await readTrustedCapture(artifactDir, capture.path);
+        capturedBytes += data.length;
+        if (capturedBytes > MAX_TOTAL_CAPTURE_BYTES)
+          throw new Error('capture evidence exceeds the trusted total bound');
+        screenshots.push(data.toString('base64'));
       }
     } catch (error) {
       await writeFile(

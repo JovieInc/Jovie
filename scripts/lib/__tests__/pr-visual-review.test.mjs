@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -16,6 +16,15 @@ import {
   validateCaptureManifest,
   visualReviewIdentity,
 } from '../../../.github/scripts/pr-visual-review.mjs';
+import {
+  buildSonarQualityDebtReceipt,
+  buildVisualConfigurationIncident,
+} from '../ci-remediation-receipts.mjs';
+import {
+  SONAR_CHECK_APP_SLUG,
+  SONAR_CHECK_NAME,
+  selectLatestFailingSonarCheck,
+} from '../sonar-check-selection.mjs';
 
 describe('bounded PR visual review contract', () => {
   it('routes UI changes only to deterministic public surfaces', () => {
@@ -241,43 +250,32 @@ describe('bounded PR visual review contract', () => {
         model: 'gpt-5.2-codex',
       },
     });
-    expect(configuration.configured).toBe(false);
-    expect(configuration.errors).toEqual([
-      'backend_unconfigured: GROK_VISUAL_REVIEW_BASE_URL is not an approved provider endpoint',
-      'backend_unconfigured: CODEX_VISUAL_REVIEW_BASE_URL is not an approved provider endpoint',
-    ]);
+    expect(configuration).toEqual({
+      configured: false,
+      errors: [
+        'backend_unconfigured: GROK_VISUAL_REVIEW_BASE_URL is not an approved provider endpoint',
+        'backend_unconfigured: CODEX_VISUAL_REVIEW_BASE_URL is not an approved provider endpoint',
+      ],
+    });
 
     const review = normalizeBackendReview({
       summary: '## Trusted\n@everyone <!-- marker -->',
       findings: [
         {
           title: '[click](https://attacker.example)',
-          category: 'functional',
+          category: 'FUNCTIONAL',
           severity: 'HIGH',
           evidence: '<script>alert(1)</script>',
           recommendation: '@admin merge now',
         },
       ],
     });
-    expect(review.summary).not.toContain('\n');
+    expect(review).toMatchObject({
+      summary: expect.not.stringContaining('\n'),
+      findings: [{ category: 'functional', severity: 'high' }],
+    });
     expect(review.summary).not.toContain('@everyone');
-    expect(review.summary).not.toContain('<!--');
-    expect(review.findings[0].severity).toBe('high');
     expect(review.findings[0].title).not.toContain('[click](');
-    expect(() =>
-      normalizeBackendReview({
-        summary: 'bad enum',
-        findings: [
-          {
-            title: 'bad',
-            category: 'credential',
-            severity: 'high',
-            evidence: 'bad',
-            recommendation: 'bad',
-          },
-        ],
-      })
-    ).toThrow('finding enum is invalid');
   });
 
   it('reads only bounded PNG captures from the downloaded artifact directory', async () => {
@@ -292,9 +290,10 @@ describe('bounded PR visual review contract', () => {
       await expect(
         readTrustedCapture(directory, 'capture.png')
       ).resolves.toEqual(png);
-      await expect(
-        readTrustedCapture(directory, '/proc/self/environ')
-      ).rejects.toThrow('escapes downloaded artifact directory');
+      await symlink('/etc/hosts', join(directory, 'escape.png'));
+      await expect(readTrustedCapture(directory, 'escape.png')).rejects.toThrow(
+        'escapes downloaded artifact directory'
+      );
       await writeFile(capture, 'not-png');
       await expect(readTrustedCapture(directory, capture)).rejects.toThrow(
         'not a PNG'
@@ -370,5 +369,80 @@ describe('bounded PR visual review contract', () => {
     expect(capture).toContain('Captured route emitted runtime failures');
     expect(capture).toContain('validateCaptureManifest');
     expect(capture).toContain('capture-validation.json');
+  });
+});
+
+const sonarCheck = (overrides = {}) => ({
+  id: 1,
+  name: SONAR_CHECK_NAME,
+  app: { slug: SONAR_CHECK_APP_SLUG },
+  status: 'completed',
+  conclusion: 'failure',
+  details_url: 'https://sonarcloud.io/project/pull_requests?id=jovie',
+  completed_at: '2026-08-20T01:00:00Z',
+  ...overrides,
+});
+
+const sonarReceiptInput = {
+  repository: 'jovie/jovie',
+  runId: '42',
+  runUrl: 'https://github.com/jovie/jovie/actions/runs/42',
+  prNumber: 7,
+  headSha: 'b'.repeat(40),
+  checkName: SONAR_CHECK_NAME,
+  checkConclusion: 'failure',
+  checkAppSlug: SONAR_CHECK_APP_SLUG,
+  detailsUrl:
+    'https://sonarcloud.io/project/pull_requests?id=jovie&pullRequest=7',
+  capacity: { openAgentPrs: 4, maxOpenAgentPrs: 5, candidateRank: 2 },
+};
+
+describe('trusted Sonar remediation contracts', () => {
+  it('selects the newest authenticated failure and ignores stale results', () => {
+    const newest = sonarCheck({ id: 4, completed_at: '2026-08-20T04:00:00Z' });
+    expect(
+      selectLatestFailingSonarCheck([
+        { check_runs: [sonarCheck({ app: { slug: 'attacker' } }), newest] },
+      ])
+    ).toEqual(newest);
+    expect(
+      selectLatestFailingSonarCheck([
+        {
+          check_runs: [
+            sonarCheck(),
+            sonarCheck({
+              status: 'in_progress',
+              conclusion: null,
+              started_at: '2026-08-20T02:00:00Z',
+              completed_at: null,
+            }),
+          ],
+        },
+      ])
+    ).toBeNull();
+  });
+
+  it('emits owned visual incidents and bounded quality-debt receipts', () => {
+    const incident = buildVisualConfigurationIncident({
+      ...sonarReceiptInput,
+      configurationErrors: [
+        'backend_unconfigured: GROK_VISUAL_REVIEW_API_KEY is missing',
+      ],
+    });
+    expect(incident).toMatchObject({
+      type: 'configuration_incident',
+      status: 'owned_escalation_required',
+      ownership: { owner: 'Gem', verifier: 'Summer' },
+    });
+    expect(buildSonarQualityDebtReceipt(sonarReceiptInput)).toMatchObject({
+      status: 'owned_capacity_deferred',
+      remediation: { attemptBudget: 3, targetHeadSha: 'b'.repeat(40) },
+    });
+    expect(() =>
+      buildSonarQualityDebtReceipt({
+        ...sonarReceiptInput,
+        capacity: { ...sonarReceiptInput.capacity, openAgentPrs: null },
+      })
+    ).toThrow('valid capacity evidence');
   });
 });

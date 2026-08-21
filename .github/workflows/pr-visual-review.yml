@@ -178,7 +178,7 @@ jobs:
         id: upload
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: pr-visual-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
           path: pr-visual-artifacts/
@@ -199,7 +199,7 @@ jobs:
     # Product findings are advisory and never a production gate.
     continue-on-error: true
     needs: capture
-    if: ${{ always() && needs.capture.result == 'success' }}
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     concurrency:
@@ -227,7 +227,7 @@ jobs:
           sparse-checkout-cone-mode: false
           persist-credentials: false
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         id: evidence
         continue-on-error: true
         with:
@@ -246,13 +246,18 @@ jobs:
                   .state == "open" and .head.sha == $head and .base.ref == $base
                 ' >/dev/null
           }
-          verify_head
+          skip_stale_review() {
+            echo "::notice::PR head moved or PR is closed; skipping stale advisory review."
+            printf 'review=false\nreview_status=unavailable\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+          verify_head || skip_stale_review
           gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" \
             | jq -r '(add // []) | .[].filename' > "$RUNNER_TEMP/changed-files.txt"
           gh api \
             -H 'Accept: application/vnd.github.v3.diff' \
             "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" > "$RUNNER_TEMP/pr.diff"
-          verify_head
+          verify_head || skip_stale_review
           node --input-type=module - <<'NODE'
           import { readFile, writeFile } from 'node:fs/promises';
           import { routeChangedFiles } from './.github/scripts/pr-visual-review.mjs';
