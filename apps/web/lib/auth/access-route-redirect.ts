@@ -1,4 +1,6 @@
+import { AUTH_STATE_PARAM } from '@jovie/auth-routing';
 import { APP_ROUTES } from '@/constants/routes';
+import { getCentralAuthCallbackPath } from '@/lib/auth/central-auth-routing';
 import {
   CanonicalUserState,
   getRedirectForState,
@@ -43,16 +45,29 @@ export function canAccessAppShell(state: CanonicalUserState): boolean {
  */
 export function getAuthenticatedAuthRouteRedirect(
   state: CanonicalUserState,
-  options?: { readonly redirectUrl?: string | null }
+  options?: {
+    readonly redirectUrl?: string | null;
+    readonly authState?: string | null;
+  }
 ): string {
   const sanitizedRedirect = sanitizeRedirectUrl(options?.redirectUrl ?? null);
   const stateRedirect = getRedirectForState(state);
+  const nativeCallback = getCentralAuthCallbackPath({
+    get: key =>
+      key === AUTH_STATE_PARAM ? (options?.authState ?? null) : null,
+  });
 
   if (
     state === CanonicalUserState.BANNED ||
     state === CanonicalUserState.USER_CREATION_FAILED
   ) {
     return stateRedirect ?? APP_ROUTES.UNAVAILABLE;
+  }
+
+  // Native browser handoff binds the completing session to /auth/callback.
+  // Dashboard/start redirects would strand iOS and macOS users on the web app.
+  if (nativeCallback) {
+    return nativeCallback;
   }
 
   if (sanitizedRedirect && isWaitlistInviteRedirect(sanitizedRedirect)) {
@@ -83,6 +98,11 @@ type AuthEntrySearchParams = {
 export function getClientAuthenticatedAuthEntryRedirect(
   searchParams: AuthEntrySearchParams
 ): string {
+  const nativeCallback = getCentralAuthCallbackPath(searchParams);
+  if (nativeCallback) {
+    return nativeCallback;
+  }
+
   const sanitizedRedirect = sanitizeRedirectUrl(
     searchParams.get('redirect_url')
   );

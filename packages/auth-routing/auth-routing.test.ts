@@ -4,10 +4,13 @@ import {
   buildElectronAuthCompleteUrl,
   buildIosAuthCompleteUrl,
   buildNativeExchangeCodeRecord,
+  buildNativeHandbackBouncePath,
   classifyNavigation,
   createAuthAnalyticsEvent,
   createAuthStateRecord,
   getElectronAuthCompleteProtocolForOrigin,
+  isAllowlistedNativeHandbackUrl,
+  NATIVE_HANDBACK_BOUNCE_PATHS,
   resolveAuthCallback,
   sanitizeReturnTo,
   validateNativeExchange,
@@ -243,11 +246,76 @@ describe('auth routing boundary', () => {
       classifyNavigation('ios', 'https://jov.ie/app/settings', options)
     ).toBe('internal');
     expect(
+      classifyNavigation(
+        'ios',
+        'https://jov.ie/auth/ios/complete?code=c&state=s',
+        options
+      )
+    ).toBe('auth');
+    expect(
+      classifyNavigation(
+        'electron',
+        'https://jov.ie/auth/native-return?code=c&state=s',
+        options
+      )
+    ).toBe('auth');
+    expect(
+      classifyNavigation('ios', 'https://jov.ie/app/library', options)
+    ).toBe('internal');
+    expect(classifyNavigation('ios', 'https://jov.ie/pricing', options)).toBe(
+      'external'
+    );
+    expect(
       classifyNavigation('electron', 'https://jov.ie/auth/start', options)
     ).toBe('auth');
     expect(
       classifyNavigation('web', 'https://jov.ie/legal/privacy', options)
     ).toBe('internal');
+  });
+
+  it('builds same-origin bounce paths instead of web app pages', () => {
+    expect(
+      buildNativeHandbackBouncePath({
+        client: 'ios',
+        code: 'ios_code',
+        state: 'ios_state',
+      })
+    ).toBe(`${NATIVE_HANDBACK_BOUNCE_PATHS.ios}?code=ios_code&state=ios_state`);
+    expect(
+      buildNativeHandbackBouncePath({
+        client: 'electron',
+        code: 'electron_code',
+        state: 'electron_state',
+        desktopFlow: 'flow_nonce',
+      })
+    ).toBe(
+      `${NATIVE_HANDBACK_BOUNCE_PATHS.electron}?code=electron_code&state=electron_state&desktop_flow=flow_nonce`
+    );
+  });
+
+  it.each([
+    'ie.jov.jovie://auth/complete?code=c&state=s',
+    'jovie://auth/complete?code=c&state=s',
+    'jovie-staging://auth/complete?code=c&state=s',
+    'jovie-local://auth/complete?code=c&state=s',
+    'https://jov.ie/auth/ios/complete?code=c&state=s',
+    'https://staging.jov.ie/auth/native-return?code=c&state=s',
+    'http://localhost:3112/auth/ios/complete?code=c&state=s',
+  ])('allowlists native handback target %s', url => {
+    expect(isAllowlistedNativeHandbackUrl(url)).toBe(true);
+  });
+
+  it.each([
+    'https://jov.ie/app',
+    'https://jov.ie/app/library',
+    'https://jov.ie/tim',
+    'https://jov.ie/signin',
+    'https://evil.example/auth/ios/complete?code=c&state=s',
+    'http://jov.ie/auth/ios/complete?code=c&state=s',
+    'ie.jov.jovie://evil/complete',
+    'jovie://settings',
+  ])('rejects untrusted handback target %s', url => {
+    expect(isAllowlistedNativeHandbackUrl(url)).toBe(false);
   });
 
   it('uses separate native callback builders', () => {
