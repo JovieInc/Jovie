@@ -16,6 +16,7 @@ const hoisted = vi.hoisted(() => ({
   persistTerminalAssistantMessageMock: vi.fn(),
   isAdminMock: vi.fn(),
   getOvieOperatingStoreMock: vi.fn(),
+  waitForOvieSummerTurnMock: vi.fn(),
 }));
 
 vi.mock('@/app/api/chat/onboarding-handler', () => ({
@@ -35,6 +36,15 @@ vi.mock('@/lib/admin/roles', () => ({
 vi.mock('@/lib/ovie/mcp/runtime-store', () => ({
   getOvieOperatingStore: hoisted.getOvieOperatingStoreMock,
 }));
+
+vi.mock('@/lib/ovie/summer-conversation', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/lib/ovie/summer-conversation')>();
+  return {
+    ...actual,
+    waitForOvieSummerTurn: hoisted.waitForOvieSummerTurnMock,
+  };
+});
 
 vi.mock('@/lib/auth/session', () => ({
   getSessionContext: hoisted.getSessionContextMock,
@@ -349,6 +359,7 @@ describe('POST /api/chat guard wiring', () => {
     hoisted.getOvieOperatingStoreMock.mockReturnValue(
       new MemoryOperatingStore()
     );
+    hoisted.waitForOvieSummerTurnMock.mockResolvedValue(undefined);
   });
 
   it('returns 401 for unauthenticated requests without touching billing, rate limits, or the LLM', async () => {
@@ -474,6 +485,16 @@ describe('POST /api/chat guard wiring', () => {
 
   it('transports entitled OV turns to Summer without artist Jovie generation or Ovie self-id', async () => {
     hoisted.isAdminMock.mockResolvedValue(true);
+    hoisted.waitForOvieSummerTurnMock.mockResolvedValue({
+      id: 'turn_summer',
+      kind: 'summer-turn',
+      conversationId: 'founder-conversation',
+      userText: 'research eval dogfood',
+      state: 'completed',
+      responseText: 'Summer says ship the authenticated bridge first.',
+      createdAt: '2026-08-21T23:00:00.000Z',
+      updatedAt: '2026-08-21T23:00:01.000Z',
+    });
 
     const response = await POST(
       chatRequest(
@@ -492,10 +513,10 @@ describe('POST /api/chat guard wiring', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('x-ovie-door')).toBe('1');
-    expect(response.headers.get('x-ovie-summer-state')).toBe('unavailable');
+    expect(response.headers.get('x-ovie-summer-state')).toBe('completed');
     expect(response.headers.get('x-ovie-m1')).toBe('not-passed');
     const body = await response.text();
-    expect(body).toMatch(/unavailable/i);
+    expect(body).toContain('Summer says ship the authenticated bridge first.');
     expect(body.toLowerCase()).not.toMatch(/i am ovie/);
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
     expect(hoisted.checkAiChatRateLimitForPlanMock).not.toHaveBeenCalled();
