@@ -63,6 +63,260 @@ def _drain_command(
     return f'{env_prefix}bash "{_DRAIN_SCRIPT}"'
 
 
+def _write_native_receipt_fakes(
+    tmp_path: Path,
+    *,
+    head: str,
+    mergeable: str,
+    is_draft: bool,
+    selector: dict[str, object],
+    receipt: dict[str, object],
+) -> None:
+    fake_node = tmp_path / "node"
+    fake_node.write_text(
+        textwrap.dedent(
+            f"""\
+            #!/usr/bin/env bash
+            set -euo pipefail
+            case "${{2:-}}" in
+              preflight) exit 0 ;;
+              list-state) echo '{{"16068":{{"headRefOid":"{head}","queued":false,"isInMergeQueue":false,"mergeQueueEntry":null}}}}' ;;
+              explain-selector)
+                cat >/dev/null
+                printf '%s\\n' '{json.dumps(selector)}'
+                ;;
+              prove-receipt)
+                printf '%s\\n' '{json.dumps(receipt)}'
+                ;;
+              enroll) echo "enroll should not run for this receipt fixture" >&2; exit 2 ;;
+              dequeue) echo '{{"state":{{"queued":false}}}}' ;;
+              max-queue-depth) echo 16 ;;
+              --classify-queue) echo '[]' ;;
+              *) echo "unexpected node args: $*" >&2; exit 2 ;;
+            esac
+            """
+        ),
+        encoding="utf-8",
+    )
+    fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+    draft_json = "true" if is_draft else "false"
+    fake_gh = tmp_path / "gh"
+    fake_gh.write_text(
+        textwrap.dedent(
+            f"""\
+            #!/usr/bin/env bash
+            set -euo pipefail
+            if [[ "$1 $2" == "pr list" ]]; then
+              echo '[{{"n":16068,"t":"Exact-head receipt","draft":false,"m":"{mergeable}","ms":"CLEAN","head":"codex/receipt","headOid":"{head}","base":"main","body":"","L":[],"fail":[]}}]'
+              exit 0
+            fi
+            if [[ "$1 $2" == "pr checks" ]]; then
+              echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+              exit 0
+            fi
+            if [[ "$1 $2" == "pr view" ]]; then
+              echo '{{"state":"OPEN","isDraft":{draft_json},"mergeable":"{mergeable}","labels":[],"headRefOid":"{head}","baseRefName":"main","body":""}}'
+              exit 0
+            fi
+            if [[ "$1" == "api" ]]; then
+              exit 1
+            fi
+            echo "unexpected gh args: $*" >&2
+            exit 2
+            """
+        ),
+        encoding="utf-8",
+    )
+    fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+
+class TestExactHeadQueueReceipt:
+    def test_delayed_native_receipt_reconciles_without_enrolling(self, tmp_path: Path) -> None:
+        head = "6" * 40
+        _write_native_receipt_fakes(
+            tmp_path,
+            head=head,
+            mergeable="UNKNOWN",
+            is_draft=False,
+            selector={
+                "observed": True,
+                "queued": False,
+                "eligible": False,
+                "reason": "mergeable=UNKNOWN",
+            },
+            receipt={
+                "ok": True,
+                "attempts": 3,
+                "state": {
+                    "isInMergeQueue": True,
+                    "queued": True,
+                    "headRefOid": head,
+                    "mergeQueueEntry": {
+                        "id": "MQE_1",
+                        "state": "QUEUED",
+                        "position": 1,
+                    },
+                },
+                "explanation": {"ok": True, "reason": "queued"},
+            },
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=f"DRAIN_ADMISSION_PR=16068 DRAIN_ADMISSION_HEAD={head}",
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "delayed native receipt at " + head in result.stdout
+        assert "state QUEUED, position 1" in result.stdout
+        assert "queue-noop" not in result.stderr
+
+    def test_selector_noop_fails_with_the_exact_reason(self, tmp_path: Path) -> None:
+        head = "6" * 40
+        _write_native_receipt_fakes(
+            tmp_path,
+            head=head,
+            mergeable="UNKNOWN",
+            is_draft=False,
+            selector={
+                "observed": True,
+                "queued": False,
+                "eligible": False,
+                "reason": "mergeable=UNKNOWN",
+            },
+            receipt={
+                "ok": False,
+                "attempts": 2,
+                "state": {
+                    "isInMergeQueue": False,
+                    "queued": False,
+                    "headRefOid": head,
+                    "mergeQueueEntry": None,
+                    "autoMergeRequest": None,
+                },
+                "explanation": {
+                    "ok": False,
+                    "reason": "isInMergeQueue=false mergeQueueEntry=null",
+                },
+            },
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=f"DRAIN_ADMISSION_PR=16068 DRAIN_ADMISSION_HEAD={head}",
+            )
+        )
+
+        assert result.returncode == 3, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert (
+            "queue-noop: selector: exact admission #16068 at "
+            + head
+            + " (mergeable=UNKNOWN)"
+            in result.stderr
+        )
+
+    def test_missing_receipt_does_not_treat_auto_merge_as_membership(
+        self, tmp_path: Path
+    ) -> None:
+        head = "6" * 40
+        _write_native_receipt_fakes(
+            tmp_path,
+            head=head,
+            mergeable="MERGEABLE",
+            is_draft=True,
+            selector={
+                "observed": True,
+                "queued": False,
+                "eligible": True,
+                "reason": "eligible",
+            },
+            receipt={
+                "ok": False,
+                "attempts": 2,
+                "state": {
+                    "isInMergeQueue": False,
+                    "queued": False,
+                    "headRefOid": head,
+                    "mergeQueueEntry": None,
+                    "autoMergeRequest": {"enabledAt": "2026-08-17T01:28:00Z"},
+                },
+                "explanation": {
+                    "ok": False,
+                    "reason": (
+                        "isInMergeQueue=false mergeQueueEntry=null "
+                        "autoMergeRequest=present (auto-merge intent is not membership)"
+                    ),
+                },
+            },
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=f"DRAIN_ADMISSION_PR=16068 DRAIN_ADMISSION_HEAD={head}",
+            )
+        )
+
+        assert result.returncode == 3, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert (
+            "queue-noop: missing receipt: exact admission #16068 at " + head
+            in result.stderr
+        )
+        assert "auto-merge intent is not membership" in result.stderr
+
+    def test_delayed_receipt_fails_when_a_hard_hold_is_live(self, tmp_path: Path) -> None:
+        head = "6" * 40
+        _write_native_receipt_fakes(
+            tmp_path,
+            head=head,
+            mergeable="UNKNOWN",
+            is_draft=False,
+            selector={
+                "observed": True,
+                "queued": False,
+                "eligible": True,
+                "reason": "eligible",
+            },
+            receipt={
+                "ok": False,
+                "attempts": 1,
+                "state": {
+                    "isInMergeQueue": True,
+                    "queued": True,
+                    "headRefOid": head,
+                    "labels": {"nodes": [{"name": "queue-deferred"}]},
+                    "mergeQueueEntry": {
+                        "id": "MQE_1",
+                        "state": "QUEUED",
+                        "position": 1,
+                    },
+                },
+                "explanation": {"ok": False, "reason": "held-by=queue-deferred"},
+            },
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=f"DRAIN_ADMISSION_PR=16068 DRAIN_ADMISSION_HEAD={head}",
+            )
+        )
+
+        assert result.returncode == 3, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert (
+            "queue-noop: missing receipt: exact admission #16068 at " + head
+            in result.stderr
+        )
+        assert "held-by=queue-deferred" in result.stderr
+        assert "delayed native receipt" not in result.stdout
+
 
 class TestGhRetryHelper:
     def test_retries_transient_504_then_succeeds(self, tmp_path: Path) -> None:
