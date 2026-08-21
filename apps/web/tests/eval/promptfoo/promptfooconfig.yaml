@@ -1834,6 +1834,48 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertChannelPlaylistRuleCase
 
+  - description: Fan email refuses invented ESP and scarcity numbers
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Fan email no-invent gate: invented metrics refused"
+      target: skill-prompt-contract
+      skillPromptCase: release-pitch-retouch-prompts
+      fanEmailRuleCase: invented-metrics-refused
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertFanEmailRuleCase
+
+  - description: Fan email skips unknown or empty lists without queuing
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Fan email no-invent gate: unknown or zero list skips"
+      target: skill-prompt-contract
+      skillPromptCase: release-pitch-retouch-prompts
+      fanEmailRuleCase: unknown-or-zero-list-skips
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertFanEmailRuleCase
+
+  - description: Fan email never auto-sends or schedules without a human
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Fan email human-send gate: auto-send refused"
+      target: skill-prompt-contract
+      skillPromptCase: release-pitch-retouch-prompts
+      fanEmailRuleCase: human-send-only
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertFanEmailRuleCase
+
   - description: AI chat tool prompt builders preserve no-text and factual guardrails
     metadata:
       cost: deterministic

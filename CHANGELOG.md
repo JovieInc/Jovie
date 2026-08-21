@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Fan email cannot invent metrics or auto-send (JOV-5261):** `fan_email_send` drafts or queues for approval, skips unknown/empty lists, omits unverifiable ESP numbers, and never sends without a human.
+
 - **Upload a song from a new chat:** drop or attach an audio file, Jovie classifies it as a new track, an existing release, or a reference, and keeps the file in Library so it is not orphaned.
 
 - [internal] **Native auto-enroll produces or explains an exact-head queue receipt (JOV-5174):** admission requires persisted `isInMergeQueue` plus a positioned `mergeQueueEntry`, delayed GitHub reads are reconciled, a later hard hold is not membership, and a selector no-op or missing receipt fails with the exact reason. Auto-merge intent is not membership.

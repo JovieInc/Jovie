@@ -2,7 +2,7 @@
 {
   "id": "release-day-announcement",
   "title": "Release Day Announcement",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "problemStatement": "My song just went live and I don't have time to update my link, tell my fans, and post everywhere before the day is over.",
   "triggerConditions": [
     "A tracked release reaches its release date and is live on at least one DSP",
@@ -29,13 +29,13 @@
     },
     {
       "kind": "prompt",
-      "description": "Draft the fan announcement copy in the artist's voice",
-      "prompt": "Write a short release-day announcement for {{releaseId}} in a {{announcementTone}} tone. One clear CTA: the smart link. No hashtag walls, no AI-slop phrasing."
+      "description": "Draft fan copy. No invented metrics, scarcity, or testimonials.",
+      "prompt": "Write a short release-day announcement for {{releaseId}} in a {{announcementTone}} tone. One CTA: the live smart link only if it exists. Never write open rate, click rate, list size, scarcity, or deadline numbers that were not retrieved this run. Missing ESP metrics are unverifiable — omit them. Scored claims need evidence and observed_at. No borrowed testimonials. Draft or queue-for-approval only; never auto-send or schedule without explicit human sign-off. Do not invent a send."
     },
     {
       "kind": "tool_call",
       "tool": "fan_email_send",
-      "description": "Send the announcement to the artist's fan email list with the live smart link",
+      "description": "Draft or queue-for-approval. Skip if fan list size is unknown or 0. Never auto-send.",
       "inputs": { "releaseId": "{{releaseId}}" }
     }
   ],
@@ -50,22 +50,24 @@
       "name": "single-release-with-email-list",
       "input": {
         "releaseId": "rel_eval_single",
-        "announcementTone": "celebratory"
+        "announcementTone": "celebratory",
+        "fanListSize": 200
       },
-      "expected": "Smart link is switched to live mode, announcement copy contains the smart link URL exactly once, and one email send is queued to the fan list."
+      "expected": "Smart link switches live. One live-link CTA. fan_email_send queues for human approval and does not send or schedule."
     },
     {
       "name": "release-with-empty-fan-list",
       "input": {
         "releaseId": "rel_eval_no_fans",
-        "announcementTone": "understated"
+        "announcementTone": "understated",
+        "fanListSize": 0
       },
-      "expected": "Smart link is switched to live mode; email step degrades gracefully with a clear 'no fan emails yet' message instead of failing the run."
+      "expected": "Smart link switches live; fan_email_send is skipped with a clear 'no fan emails yet' message. Run still succeeds. No queue."
     }
   ],
   "costEstimate": {
     "credits": 3,
-    "notes": "One LLM drafting call plus two tool calls; email send cost scales with list size."
+    "notes": "One LLM drafting call plus two tool calls. fan_email_send never auto-sends."
   },
   "requiredTools": ["smart_link_switch_live", "fan_email_send"],
   "requiredConnectors": [],
@@ -85,5 +87,8 @@ Notes for reviewers:
   no-op by design.
 - Fan email copy goes through the artist's saved voice profile; the
   `announcementTone` input only nudges it.
-- Social posting is deliberately out of scope for v0.1 — it lands as a
+- `fan_email_send` drafts or queues for approval. Unknown or 0 list skips
+  send; the run still succeeds. Never invent ESP metrics. One CTA. No
+  borrowed testimonials. Human sign-off required to send.
+- Social posting is deliberately out of scope for v0.2 — it lands as a
   separate playbook so this one stays cheap and reliable.

@@ -113,6 +113,13 @@ import {
   evaluateChannelPlaylistRuleCase,
 } from '@/lib/services/channel-intelligence/playlist-rules';
 import {
+  evaluateAllFanEmailRuleCases,
+  evaluateFanEmailRuleCase,
+  FAN_EMAIL_RULE_CASE_IDS,
+  type FanEmailRuleCaseId,
+} from '@/lib/services/fan-email/send-rule-cases';
+import { FAN_EMAIL_SEND_RULES } from '@/lib/services/fan-email/send-rules';
+import {
   buildSystemPrompt as buildInsightSystemPrompt,
   buildUserPrompt as buildInsightUserPrompt,
 } from '@/lib/services/insights/prompts';
@@ -5917,6 +5924,23 @@ function evaluateSkillPromptContract(vars: EvalVars) {
   const requestedChannelPlaylistRule = requestedChannelPlaylistRuleCase
     ? evaluateChannelPlaylistRuleCase(requestedChannelPlaylistRuleCase)
     : null;
+  const fanEmailRuleCases = evaluateAllFanEmailRuleCases();
+  const requestedFanEmailRuleCase =
+    typeof vars.fanEmailRuleCase === 'string' &&
+    (FAN_EMAIL_RULE_CASE_IDS as readonly string[]).includes(
+      vars.fanEmailRuleCase
+    )
+      ? (vars.fanEmailRuleCase as FanEmailRuleCaseId)
+      : null;
+  const requestedFanEmailRule = requestedFanEmailRuleCase
+    ? evaluateFanEmailRuleCase(requestedFanEmailRuleCase)
+    : null;
+  const releaseDayPlaybook = registryPathContent(
+    'docs/playbooks/release-day-announcement.playbook.md'
+  );
+  const releasePlannerPlaybook = registryPathContent(
+    'docs/playbooks/jovie-release-planner.playbook.md'
+  );
   const packagingPromptFacts = {
     evidenceNotVibes: textIncludesAll(PACKAGING_AUDIT_SYSTEM_PROMPT, [
       'Evidence, not vibes',
@@ -5995,6 +6019,48 @@ function evaluateSkillPromptContract(vars: EvalVars) {
       packagingChangePlan.playlistGate.empty === true &&
       packagingChangePlan.playlists.length === 0,
   };
+  const fanEmailPromptFacts = {
+    noInventEspMetrics: textIncludesAll(FAN_EMAIL_SEND_RULES, [
+      'Never fabricate',
+      'open rate',
+      'click rate',
+      'list size',
+      'scarcity',
+      'deadline',
+      'unverifiable',
+      'observed_at',
+      'unknown or 0',
+      'Human-only send',
+      'queue-for-approval',
+      'One CTA',
+      'No borrowed testimonials',
+    ]),
+    playbookEncodesGate: textIncludesAll(
+      `${releaseDayPlaybook}\n${releasePlannerPlaybook}`,
+      [
+        'unverifiable',
+        'queue-for-approval',
+        'no fan emails yet',
+        'human sign-off',
+        'never auto-send',
+      ]
+    ),
+    inventedMetricsRefused:
+      fanEmailRuleCases.find(item => item.id === 'invented-metrics-refused')
+        ?.passed === true,
+    missingEspUnverifiable:
+      fanEmailRuleCases.find(item => item.id === 'missing-esp-unverifiable')
+        ?.passed === true,
+    unknownOrZeroListSkips:
+      fanEmailRuleCases.find(item => item.id === 'unknown-or-zero-list-skips')
+        ?.passed === true,
+    humanSendOnly:
+      fanEmailRuleCases.find(item => item.id === 'human-send-only')?.passed ===
+      true,
+    oneCtaLiveLink:
+      fanEmailRuleCases.find(item => item.id === 'one-cta-live-link')
+        ?.passed === true,
+  };
   const retouchGuardrails = [
     "Preserve the person's identity",
     'Do not change protected or sensitive attributes',
@@ -6018,6 +6084,9 @@ function evaluateSkillPromptContract(vars: EvalVars) {
   const missingChannelIntelligencePromptFacts = Object.entries(
     channelIntelligencePromptFacts
   )
+    .filter(([, passed]) => !passed)
+    .map(([name]) => name);
+  const missingFanEmailPromptFacts = Object.entries(fanEmailPromptFacts)
     .filter(([, passed]) => !passed)
     .map(([name]) => name);
   const missingRetouchGenerationFacts = [
@@ -6097,6 +6166,17 @@ function evaluateSkillPromptContract(vars: EvalVars) {
         ? requestedChannelPlaylistRule.passed
         : channelPlaylistRuleCases.every(item => item.passed),
       ruleCaseReason: requestedChannelPlaylistRule?.reason ?? null,
+    },
+    fanEmail: {
+      skillId: 'fan_email_send',
+      facts: fanEmailPromptFacts,
+      missingFacts: missingFanEmailPromptFacts,
+      ruleCases: fanEmailRuleCases,
+      ruleCase: requestedFanEmailRule?.id ?? null,
+      ruleCasePassed: requestedFanEmailRule
+        ? requestedFanEmailRule.passed
+        : fanEmailRuleCases.every(item => item.passed),
+      ruleCaseReason: requestedFanEmailRule?.reason ?? null,
     },
     retouch: {
       skillId: 'retouch',
