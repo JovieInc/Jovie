@@ -1,3 +1,4 @@
+export { AudioPreviewStrip } from './AudioPreviewStrip';
 export { ChatAvatarUploadCard } from './ChatAvatarUploadCard';
 export { ChatDropZoneOverlay } from './ChatDropZoneOverlay';
 export {

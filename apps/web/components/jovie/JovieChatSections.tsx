@@ -19,10 +19,12 @@ import {
   ErrorDisplay,
   ScrollToBottom,
 } from './components';
+import { AudioPreviewStrip } from './components/AudioPreviewStrip';
 import { ChatFileChips } from './components/ChatFileChips';
 import type { ChatInputProps } from './components/ChatInput';
 import { ChatUploadManifest } from './components/ChatUploadManifest';
 import { ChatUsageAlert } from './components/ChatUsageAlert';
+import type { PendingAudio } from './hooks/useChatAudioAttachments';
 import type { PendingFile } from './hooks/useChatFileAttachments';
 import type { ChatError, MessagePart } from './types';
 
@@ -64,6 +66,12 @@ export function ChatComposerSurface({
   onCollapseManifest,
   onExpandManifest,
 }: ChatComposerSurfaceProps) {
+  const audioFiles = pendingFiles.filter(file => file.kind === 'audio');
+  const otherFiles = pendingFiles.filter(file => file.kind !== 'audio');
+  const showOtherManifest = showManifest && otherFiles.length > 0;
+  const showOtherChips =
+    showChips && otherFiles.some(file => file.status === 'ready');
+
   return (
     <div className={CHAT_CONTENT_SHELL_CLASSNAME}>
       <ChatUsageAlert />
@@ -74,10 +82,10 @@ export function ChatComposerSurface({
         </p>
       ) : null}
 
-      {showManifest && !manifestCollapsed ? (
+      {showOtherManifest && !manifestCollapsed ? (
         <div className='mb-2.5'>
           <ChatUploadManifest
-            files={pendingFiles}
+            files={otherFiles}
             aggregate={aggregate}
             isUploading={isUploading}
             onRemove={onRemoveFile}
@@ -88,10 +96,10 @@ export function ChatComposerSurface({
         </div>
       ) : null}
 
-      {showManifest && manifestCollapsed ? (
+      {showOtherManifest && manifestCollapsed ? (
         <div className='mb-2.5'>
           <ChatUploadManifest
-            files={pendingFiles}
+            files={otherFiles}
             aggregate={aggregate}
             isUploading={isUploading}
             onRemove={onRemoveFile}
@@ -103,9 +111,18 @@ export function ChatComposerSurface({
         </div>
       ) : null}
 
-      {showChips ? (
+      {audioFiles.map(file => (
+        <div className='mb-2.5' key={file.id}>
+          <AudioPreviewStrip
+            audio={toPendingAudio(file)}
+            onRemove={() => onRemoveFile(file.id)}
+          />
+        </div>
+      ))}
+
+      {showOtherChips ? (
         <div className='mb-2.5'>
-          <ChatFileChips files={pendingFiles} onRemove={onRemoveFile} />
+          <ChatFileChips files={otherFiles} onRemove={onRemoveFile} />
         </div>
       ) : null}
 
@@ -281,6 +298,34 @@ export function ChatThreadMessages({
       <ScrollToBottom visible={!isStuckToBottom} onClick={onScrollToBottom} />
     </div>
   );
+}
+
+function toPendingAudio(file: PendingFile): PendingAudio {
+  const status: PendingAudio['status'] =
+    file.status === 'queued'
+      ? 'uploading'
+      : file.status === 'duplicate' || file.status === 'locked'
+        ? 'failed'
+        : file.status;
+
+  return {
+    id: file.id,
+    name: file.name,
+    mediaType: file.mediaType,
+    status,
+    error:
+      file.error ??
+      (file.status === 'duplicate'
+        ? 'Duplicate file skipped'
+        : file.status === 'locked'
+          ? 'Upload limit reached'
+          : undefined),
+    previewUrl: file.previewUrl,
+    inference: file.inference,
+    releaseId: file.releaseId,
+    releaseTitle: file.releaseTitle,
+    prompt: file.prompt,
+  };
 }
 
 function ChatModelRotationMetadata({ notice }: { readonly notice: string }) {

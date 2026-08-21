@@ -49,6 +49,33 @@ describe('AudioPreviewStrip', () => {
     ).toBeTruthy();
   });
 
+  it('renders a low-confidence draft classification', () => {
+    render(
+      <AudioPreviewStrip
+        audio={{
+          id: 'audio-low',
+          name: 'take-me-over-mix.mp3',
+          mediaType: 'audio/mpeg',
+          status: 'ready',
+          previewUrl: 'https://example.com/audio.mp3',
+          releaseTitle: 'take me over mix',
+          inference: {
+            kind: 'new-track',
+            confidence: 'low',
+            suggestedTitle: 'take me over mix',
+            releaseId: 'release-1',
+            releaseTitle: 'Take Me Over',
+            matchScore: 0.75,
+          },
+        }}
+      />
+    );
+
+    expect(
+      screen.getByText('Might match Take Me Over · saved as a draft')
+    ).toBeTruthy();
+  });
+
   it.each([
     ['processing', 'Processing audio…'],
     ['failed', 'The audio service is unavailable'],
