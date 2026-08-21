@@ -7,10 +7,10 @@
  *
  * Opaque `{"error":{"name":"UpstashError"}}` titles are the JSON-stringified
  * form of an UpstashError whose `message` is non-enumerable (JOV-5182,
- * JOV-5183, JOV-5187, JOV-5209, JOV-5218, JOV-5220, JOV-5221, JOV-5228,
- * JOV-5229). `{ clerkUserId, error }` wrappers stringify to the JOV-5185
- * title. The standing Redis operability canary already pages on quota
- * exhaustion. The real command-failure title (`UpstashError: ERR max
+ * JOV-5183, JOV-5185, JOV-5186, JOV-5187, JOV-5209, JOV-5218, JOV-5220,
+ * JOV-5221, JOV-5228, JOV-5229). `{ clerkUserId, error }` wrappers stringify
+ * to the JOV-5185 title. The standing Redis operability canary already pages
+ * on quota exhaustion. The real command-failure title (`UpstashError: ERR max
  * requests limit exceeded`, JOV-5184) is the same incident — drop it at
  * capture time so it does not file a Linear issue per route.
  */
@@ -87,12 +87,12 @@ function isUpstashErrorJsonBagText(value: string | null | undefined): boolean {
 
 /**
  * True when a captured value would Sentry-title as
- * `Error: {"error":{"name":"UpstashError"}}` (JOV-5183 / JOV-5187 / JOV-5209 /
- * JOV-5218 / JOV-5228) or the clerkUserId-wrapped JOV-5185 bag.
- * Error instances are matched on `message` so a real
+ * `Error: {"error":{"name":"UpstashError"}}` (JOV-5183 / JOV-5186 /
+ * JOV-5187 / JOV-5209 / JOV-5218 / JOV-5228) or the clerkUserId-wrapped
+ * JOV-5185 bag. Error instances are matched on `message` so a real
  * `UpstashError: ERR max requests…` exception is classified as quota noise
- * (JOV-5184), not this bag.
- * Next.js request wrappers keep the bag on `cause`; walk a bounded chain.
+ * (JOV-5184), not this bag. Next.js request wrappers keep the bag on
+ * `cause`; walk a bounded chain.
  */
 export function isOpaqueUpstashErrorJsonBag(value: unknown): boolean {
   return isOpaqueUpstashErrorJsonBagInner(value, new Set());
@@ -150,8 +150,8 @@ export interface SentryExceptionLike {
 }
 
 /**
- * Returns true when a Sentry issue is the JOV-5183 / JOV-5187 / JOV-5185
- * JSON-bag title, not a real Upstash command failure.
+ * Returns true when a Sentry issue is the JOV-5183 / JOV-5185 / JOV-5186 /
+ * JOV-5187 JSON-bag title, not a real Upstash command failure.
  */
 export function isNonActionableUpstashErrorBag(
   issue: SentryIssueSummary
@@ -163,8 +163,8 @@ export function isNonActionableUpstashErrorBag(
 }
 
 /**
- * Returns true when a Sentry event is the JOV-5183 / JOV-5187 JSON-bag
- * exception. Object captures keep the bag on `extra` (commonly
+ * Returns true when a Sentry event is the JOV-5183 / JOV-5186 / JOV-5187
+ * JSON-bag exception. Object captures keep the bag on `extra` (commonly
  * `__serialized__` / `error`) while `logentry.formatted` holds the Linear
  * title (JOVIE-WEB-TY).
  */
