@@ -5,11 +5,16 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   CANONICAL_NATIVE_MUTATION_ACTOR,
+  canAcceptExactHeadQueueReceipt,
   DEFAULT_MERGE_QUEUE_BACKEND,
   dequeuePullRequest,
   enrollPullRequest,
+  explainExactHeadAdmissionSelector,
+  explainExactHeadQueueReceipt,
+  hasAuthoritativeExactHeadQueueReceipt,
   listPullRequestQueueStates,
   preflightMergeQueue,
+  proveExactHeadQueueReceipt,
   resolveMergeQueueBackend,
   runCli,
   validateNativePreflightEvidence,
@@ -438,7 +443,20 @@ describe('queue workflow mutation safety', () => {
       'could not compensate malformed native enrollment receipt'
     );
     expect(drain).toContain(
-      'exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD has no native queue receipt'
+      'node scripts/merge-queue-backend.mjs explain-selector'
+    );
+    expect(drain).toContain(
+      'node scripts/merge-queue-backend.mjs prove-receipt'
+    );
+    expect(drain).toContain('.state.isInMergeQueue == true');
+    expect(drain).toContain(
+      '(.state.labels.nodes // []) | map(.name) | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast") | not'
+    );
+    expect(drain).toContain(
+      'queue-noop: missing receipt: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD'
+    );
+    expect(drain).toContain(
+      'queue-noop: selector: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD'
     );
     expect(drain).toContain('exit 3');
   });
@@ -1105,6 +1123,25 @@ describe('native enrollment', () => {
     expect(invokedEnrollment(runner)).toBe(false);
   });
 
+  it('refuses a delayed queue entry when a hard hold appears after SNAP', async () => {
+    const queuedAndHeld = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+      autoMergeRequest: AUTO_MERGE,
+      labels: { nodes: [{ name: 'queue-deferred' }] },
+    });
+    const runner = createNativeRunner({
+      states: [prState(), queuedAndHeld],
+    });
+    await expect(
+      enroll(runner, { postconditionAttempts: 2, wait: async () => {} })
+    ).rejects.toMatchObject({
+      code: 'held_pull_request',
+      details: { labels: ['queue-deferred'] },
+    });
+    expect(invokedEnrollment(runner)).toBe(true);
+  });
+
   it('rejects auto-merge success without an authoritative native queue entry', async () => {
     const runner = createNativeRunner({
       states: [
@@ -1292,6 +1329,234 @@ describe('native dequeue', () => {
     await expect(dequeue(runner)).rejects.toMatchObject({
       code: 'dequeue_postcondition_failed',
     });
+  });
+});
+
+describe('exact-head queue receipt proof', () => {
+  const selectorRow = {
+    n: 16068,
+    draft: false,
+    m: 'MERGEABLE',
+    base: 'main',
+    fail: [],
+    q: false,
+    L: [],
+    headOid: HEAD,
+    iso: false,
+  };
+
+  it('accepts persisted isInMergeQueue plus a positioned mergeQueueEntry', async () => {
+    const state = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+    });
+    expect(hasAuthoritativeExactHeadQueueReceipt(state, HEAD)).toBe(true);
+    expect(explainExactHeadQueueReceipt(state, HEAD)).toEqual({
+      ok: true,
+      reason: 'queued',
+    });
+
+    const runner = createNativeRunner({ states: [state] });
+    await expect(
+      proveExactHeadQueueReceipt(
+        nativeOptions(runner, { expectedHeadOid: HEAD })
+      )
+    ).resolves.toMatchObject({
+      ok: true,
+      attempts: 1,
+      state: {
+        isInMergeQueue: true,
+        queued: true,
+        mergeQueueEntry: QUEUE_ENTRY,
+      },
+    });
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it('polls through delayed authoritative reads until the receipt appears', async () => {
+    const wait = vi.fn(async () => {});
+    const runner = createNativeRunner({
+      states: [
+        prState({ autoMergeRequest: AUTO_MERGE }),
+        prState({ autoMergeRequest: AUTO_MERGE }),
+        prState({
+          isInMergeQueue: true,
+          mergeQueueEntry: QUEUE_ENTRY,
+          autoMergeRequest: AUTO_MERGE,
+        }),
+      ],
+    });
+
+    await expect(
+      proveExactHeadQueueReceipt(
+        nativeOptions(runner, {
+          expectedHeadOid: HEAD,
+          postconditionAttempts: 6,
+          postconditionDelayMs: 2_000,
+          wait,
+        })
+      )
+    ).resolves.toMatchObject({
+      ok: true,
+      attempts: 3,
+      state: { isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY },
+    });
+    expect(wait).toHaveBeenCalledTimes(2);
+    expect(wait).toHaveBeenNthCalledWith(1, 2_000);
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it('classifies selector no-ops without requiring the native backend', () => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        'scripts/merge-queue-backend.mjs',
+        'explain-selector',
+        '16068',
+        HEAD,
+        'normal',
+        '15',
+      ],
+      {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          MERGE_QUEUE_BACKEND: 'test-label-fixture',
+        },
+        input: JSON.stringify([selectorRow]),
+      }
+    );
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(JSON.parse(result.stdout)).toEqual({
+      observed: true,
+      queued: false,
+      eligible: true,
+      reason: 'eligible',
+    });
+  });
+
+  it('does not treat a delayed native entry as a receipt when a hard hold is live', async () => {
+    const queuedAndHeld = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+      labels: { nodes: [{ name: 'needs-human' }] },
+    });
+    expect(hasAuthoritativeExactHeadQueueReceipt(queuedAndHeld, HEAD)).toBe(
+      true
+    );
+    expect(canAcceptExactHeadQueueReceipt(queuedAndHeld, HEAD)).toBe(false);
+    expect(explainExactHeadQueueReceipt(queuedAndHeld, HEAD)).toEqual({
+      ok: false,
+      reason: 'held-by=needs-human',
+    });
+
+    const runner = createNativeRunner({ states: [queuedAndHeld] });
+    await expect(
+      proveExactHeadQueueReceipt(
+        nativeOptions(runner, { expectedHeadOid: HEAD })
+      )
+    ).resolves.toMatchObject({
+      ok: false,
+      attempts: 1,
+      explanation: { ok: false, reason: 'held-by=needs-human' },
+    });
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it('fails closed on a missing receipt and does not treat auto-merge as membership', async () => {
+    const wait = vi.fn(async () => {});
+    const autoMergeOnly = prState({ autoMergeRequest: AUTO_MERGE });
+    expect(hasAuthoritativeExactHeadQueueReceipt(autoMergeOnly, HEAD)).toBe(
+      false
+    );
+    expect(explainExactHeadQueueReceipt(autoMergeOnly, HEAD)).toEqual({
+      ok: false,
+      reason:
+        'isInMergeQueue=false mergeQueueEntry=null autoMergeRequest=present (auto-merge intent is not membership)',
+    });
+
+    const runner = createNativeRunner({
+      states: [autoMergeOnly, autoMergeOnly],
+    });
+    await expect(
+      proveExactHeadQueueReceipt(
+        nativeOptions(runner, {
+          expectedHeadOid: HEAD,
+          postconditionAttempts: 2,
+          postconditionDelayMs: 2_000,
+          wait,
+        })
+      )
+    ).resolves.toMatchObject({
+      ok: false,
+      attempts: 2,
+      explanation: {
+        ok: false,
+        reason:
+          'isInMergeQueue=false mergeQueueEntry=null autoMergeRequest=present (auto-merge intent is not membership)',
+      },
+    });
+    expect(wait).toHaveBeenCalledTimes(1);
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it('explains a selector no-op instead of a generic missing receipt', () => {
+    expect(
+      explainExactHeadAdmissionSelector({
+        snapshot: [{ ...selectorRow, m: 'UNKNOWN' }],
+        admissionPr: 16068,
+        admissionHead: HEAD,
+        promotionMode: 'normal',
+        enrollSlots: 15,
+      })
+    ).toEqual({
+      observed: true,
+      queued: false,
+      eligible: false,
+      reason: 'mergeable=UNKNOWN',
+    });
+  });
+
+  it('does not treat snapshot auto-merge intent as queued membership', () => {
+    expect(
+      explainExactHeadAdmissionSelector({
+        snapshot: [{ ...selectorRow, q: false, autoMergeRequest: AUTO_MERGE }],
+        admissionPr: 16068,
+        admissionHead: HEAD,
+        promotionMode: 'normal',
+        enrollSlots: 15,
+      })
+    ).toEqual({
+      observed: true,
+      queued: false,
+      eligible: true,
+      reason: 'eligible',
+    });
+  });
+
+  it('proves a native receipt without mutation authorization', async () => {
+    const runner = createNativeRunner({
+      states: [
+        prState({
+          isInMergeQueue: true,
+          mergeQueueEntry: QUEUE_ENTRY,
+        }),
+      ],
+    });
+    await expect(
+      runCli(['prove-receipt', '14359', HEAD], {
+        env: {
+          MERGE_QUEUE_BACKEND: 'native',
+          GITHUB_REPOSITORY: REPOSITORY,
+        },
+        runner,
+        write: vi.fn(),
+      })
+    ).resolves.toMatchObject({ ok: true, state: { queued: true } });
+    expect(invokedNativeMutation(runner)).toBe(false);
+    expect(invokedMutationActorCheck(runner)).toBe(false);
   });
 });
 
