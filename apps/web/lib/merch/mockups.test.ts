@@ -96,6 +96,11 @@ describe('createMockupGenerationTasks', () => {
         ],
       })
     );
+    expect(printful.createMockupTask).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        mockupStyleIds: expect.anything(),
+      })
+    );
   });
 
   it('uses explicit catalog product data when provided', async () => {

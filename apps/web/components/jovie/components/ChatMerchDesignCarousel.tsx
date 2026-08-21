@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { Check, Loader2 } from 'lucide-react';
+import { AlertTriangle, Check, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -68,13 +68,21 @@ function DesignArt({ design }: { readonly design: MerchDesignPreview }) {
     );
   }
 
+  const failed = design.mockup_status === 'mockup_failed';
   return (
     <div
-      className='flex h-full items-center justify-center bg-surface-0 text-2xs text-tertiary-token'
+      className='flex h-full items-center justify-center bg-surface-0 px-3 text-center text-2xs text-tertiary-token'
       role='status'
+      data-testid={
+        failed ? 'chat-merch-mockup-failed' : 'chat-merch-mockup-fallback'
+      }
     >
-      <Loader2 className='mr-2 h-3.5 w-3.5 animate-spin' aria-hidden />
-      Rendering
+      {failed ? (
+        <AlertTriangle className='mr-2 h-3.5 w-3.5' aria-hidden />
+      ) : (
+        <Loader2 className='mr-2 h-3.5 w-3.5 animate-spin' aria-hidden />
+      )}
+      {failed ? 'Preview unavailable' : 'Rendering'}
     </div>
   );
 }
@@ -256,10 +264,7 @@ export function ChatMerchDesignCarousel({
   if (selected && chosenDesign) {
     const product = selected.product;
     const live = selected.status === 'live';
-    const art =
-      product.mockupStatus === 'ready' && product.mockupUrl
-        ? product.mockupUrl
-        : chosenDesign.preview_url;
+    const art = product.mockupUrl ?? chosenDesign.preview_url;
     return (
       <section aria-label='Selected Merch Product' className='max-w-3xl'>
         <article className='grid gap-3 sm:grid-cols-3'>
@@ -287,11 +292,6 @@ export function ChatMerchDesignCarousel({
               <p className='mt-1 text-2xs text-tertiary-token'>
                 {product.retailPrice} · {product.artistProfit} artist profit
               </p>
-              {product.mockupStatus === 'pending' ? (
-                <p className='mt-1 text-2xs text-tertiary-token'>
-                  Artwork is shown while the product mockup renders.
-                </p>
-              ) : null}
               {selected.publishBlockedReasons?.length ? (
                 <p className='mt-1 line-clamp-2 text-2xs text-tertiary-token'>
                   {selected.publishBlockedReasons.join(' ')}

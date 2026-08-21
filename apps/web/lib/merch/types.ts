@@ -145,7 +145,7 @@ export interface MerchDesignPreview {
    * pre-contract options.
    */
   readonly mockup_status?: MerchMockupStatus;
-  /** Transparent (alpha) print-art preview. Present only when status is `ready`. */
+  /** Composited garment preview (design on product). Present when status is `ready`. */
   readonly preview_url?: string;
   readonly slots: MerchDesignSlots;
   /** Product economics shown before the single approval action. */

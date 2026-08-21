@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   ExternalLink,
   Loader2,
-  Shirt,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -16,15 +15,12 @@ import { MerchPricingSummary } from '@/components/molecules/MerchPricingSummary'
 import { accentVar } from '@/components/organisms/entity-card/kind-presets';
 import type { EntityAccent } from '@/components/organisms/entity-card/types';
 import {
-  hasRenderableMockup,
-  isInternalMerchMockupUrl,
-  isPrintfulMockupUrl,
+  hasFinishedGarmentMockup,
   selectPreferredMockupUrl,
 } from '@/lib/merch/mockup-urls';
 import type { MerchMarginPreset } from '@/lib/merch/pricing';
 import { MERCH_DEFAULT_MARGIN_PRESET } from '@/lib/merch/pricing';
 import { cn } from '@/lib/utils';
-import { ChatGenerationArtifactSurface } from './ChatGenerationArtifactSurface';
 import { ChatMerchActionCard } from './ChatMerchActionCard';
 
 // Rotate the studio ambient-glow accent across generated options so the bento
@@ -209,21 +205,21 @@ export function ChatMerchOptionsCard({
   );
 
   return (
-    <ChatGenerationArtifactSurface
-      title='Merch Options'
-      subtitle={result.nextStep ?? 'Pick one to save it to Library'}
-      className='max-w-160'
-    >
-      <div className='grid gap-2.5 md:grid-cols-3'>
+    <section aria-label='Merch Options' className='max-w-3xl'>
+      <p className='mb-3 text-xs text-secondary-token'>
+        {result.nextStep ?? 'Pick one to save it to Library'}
+      </p>
+      <div className='grid gap-3 sm:grid-cols-3'>
         {result.options.map(option => {
           const mockupUrls = option.mockup_urls ?? [];
           const imageUrl = selectPreferredMockupUrl(mockupUrls);
           const productLabel =
             option.printful_product_name ?? option.product_type;
-          const mockupPending =
-            hasRenderableMockup(mockupUrls) &&
-            mockupUrls.every(url => isInternalMerchMockupUrl(url)) &&
-            !mockupUrls.some(isPrintfulMockupUrl);
+          const mockupFailed =
+            !hasFinishedGarmentMockup(mockupUrls) &&
+            (option.sellability?.reasons ?? []).some(reason =>
+              reason.toLowerCase().includes('mockup failed')
+            );
           const sellable = option.sellability?.sellable ?? true;
           const blockedReasons = option.sellability?.reasons ?? [];
           const accent =
@@ -232,10 +228,10 @@ export function ChatMerchOptionsCard({
             <article
               key={option.id}
               data-testid='chat-merch-option-card'
-              className='flex min-w-0 flex-col gap-2.5 rounded-xl border border-subtle bg-surface-1 p-2.5 shadow-card'
+              className='flex min-w-0 flex-col overflow-hidden rounded-xl border border-subtle bg-surface-1 shadow-card'
             >
               <div
-                className='relative aspect-square overflow-hidden rounded-lg border border-subtle'
+                className='relative aspect-square overflow-hidden bg-surface-0'
                 style={{
                   background: `radial-gradient(120% 120% at 32% 22%, color-mix(in oklab, ${accentVar(accent)} 22%, transparent), transparent 62%), linear-gradient(155deg, var(--color-bg-surface-2), var(--color-bg-surface-1))`,
                 }}
@@ -251,43 +247,45 @@ export function ChatMerchOptionsCard({
                   />
                 ) : (
                   <div
-                    data-testid='chat-merch-mockup-fallback'
-                    className='flex h-full w-full flex-col items-center justify-center gap-2 text-tertiary-token'
+                    data-testid={
+                      mockupFailed
+                        ? 'chat-merch-mockup-failed'
+                        : 'chat-merch-mockup-fallback'
+                    }
+                    className='flex h-full w-full flex-col items-center justify-center gap-2 px-3 text-center text-tertiary-token'
+                    role='status'
                   >
-                    <Loader2
-                      className='h-7 w-7 animate-spin'
-                      strokeWidth={1.8}
-                    />
+                    {mockupFailed ? (
+                      <AlertTriangle
+                        className='h-6 w-6'
+                        strokeWidth={1.8}
+                        aria-hidden
+                      />
+                    ) : (
+                      <Loader2
+                        className='h-6 w-6 animate-spin'
+                        strokeWidth={1.8}
+                        aria-hidden
+                      />
+                    )}
                     <span className='text-3xs font-medium'>
-                      Rendering mockup
+                      {mockupFailed
+                        ? 'Preview unavailable'
+                        : 'Rendering mockup'}
                     </span>
                   </div>
                 )}
-                {mockupPending ? (
-                  <div className='absolute inset-x-0 bottom-0 flex items-center justify-center gap-1.5 bg-black/45 px-2 py-1.5 text-3xs font-medium text-white dark:text-white backdrop-blur'>
-                    <Loader2 className='h-3 w-3 animate-spin' strokeWidth={2} />
-                    Photorealistic preview pending
-                  </div>
-                ) : null}
-                <div className='absolute left-2 top-2'>
-                  <span className='rounded-md border border-white/15 bg-black/55 px-1.5 py-0.5 text-3xs font-medium text-white dark:text-white backdrop-blur'>
-                    Option {option.option_number}
-                  </span>
-                </div>
               </div>
-              <div className='flex flex-1 flex-col gap-2'>
+              <div className='flex flex-1 flex-col gap-2 p-2.5'>
                 <div className='min-w-0'>
                   <h3 className='truncate text-app font-semibold text-primary-token'>
                     {option.design_name}
                   </h3>
                   <p className='mt-0.5 truncate text-2xs text-tertiary-token'>
                     {productLabel}
-                    {option.colorway ? ` - ${option.colorway}` : ''}
+                    {option.colorway ? ` · ${option.colorway}` : ''}
                   </p>
                 </div>
-                <p className='line-clamp-3 min-h-14 text-2xs leading-[18px] text-secondary-token'>
-                  {option.concept}
-                </p>
                 <MerchOptionPricing
                   recommendation={option.price_recommendation}
                 />
@@ -322,7 +320,7 @@ export function ChatMerchOptionsCard({
           );
         })}
       </div>
-    </ChatGenerationArtifactSurface>
+    </section>
   );
 }
 
@@ -391,20 +389,18 @@ export function ChatMerchSelectionCard({
               type='button'
               size='sm'
               variant='secondary'
-              className='h-8 gap-1.5'
+              className='h-8'
               onClick={() => handleAlternativeItem('hoodie')}
             >
-              <Shirt className='h-3 w-3' />
               Hoodie
             </Button>
             <Button
               type='button'
               size='sm'
               variant='secondary'
-              className='h-8 gap-1.5'
+              className='h-8'
               onClick={() => handleAlternativeItem('hat')}
             >
-              <Shirt className='h-3 w-3' />
               Hat
             </Button>
           </div>

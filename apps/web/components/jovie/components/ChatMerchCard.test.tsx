@@ -49,7 +49,9 @@ const generationResult: ChatMerchGenerationResult = {
       product_type: 'Premium Tee',
       colorway: 'black',
       concept: 'A premium shirt with restrained artist typography.',
-      mockup_urls: ['https://cdn.test/signal.jpg'],
+      mockup_urls: [
+        'https://blob.vercel-storage.com/merch/generated/a/b/signal-mockup.jpg',
+      ],
       price_recommendation: {
         sale_price: '$45.00',
         profit: '$11.87',
@@ -85,7 +87,9 @@ const generationResult: ChatMerchGenerationResult = {
       product_type: 'Hoodie',
       colorway: 'black',
       concept: 'A heavier item waiting on provider pricing.',
-      mockup_urls: ['https://cdn.test/hoodie.jpg'],
+      mockup_urls: [
+        'https://blob.vercel-storage.com/merch/generated/a/b/hoodie-mockup.jpg',
+      ],
       price_recommendation: {
         sale_price: '$58.00',
         profit: '$0.00',
@@ -217,5 +221,67 @@ describe('ChatMerchCard', () => {
     );
 
     dispatch.mockRestore();
+  });
+
+  it('renders the composited garment and omits leftover mockup chrome', () => {
+    render(<ChatMerchOptionsCard result={generationResult} />);
+
+    expect(screen.getByAltText('Signal Tee mockup')).toHaveAttribute(
+      'src',
+      'https://blob.vercel-storage.com/merch/generated/a/b/signal-mockup.jpg'
+    );
+    expect(screen.queryByText(/photorealistic/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/option 1/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('chat-merch-mockup-fallback')).toBeNull();
+  });
+
+  it('reserves the mockup slot with a loading state instead of a blank garment', () => {
+    render(
+      <ChatMerchOptionsCard
+        result={{
+          ...generationResult,
+          options: [
+            {
+              ...generationResult.options[0],
+              mockup_urls: [
+                'https://blob.vercel-storage.com/merch/generated/a/b/c-print.png',
+              ],
+            },
+          ],
+        }}
+      />
+    );
+
+    expect(screen.getByTestId('chat-merch-mockup-fallback')).toHaveTextContent(
+      'Rendering mockup'
+    );
+    expect(screen.queryByAltText('Signal Tee mockup')).toBeNull();
+  });
+
+  it('shows a failure state when mockup rendering failed without a garment image', () => {
+    render(
+      <ChatMerchOptionsCard
+        result={{
+          ...generationResult,
+          options: [
+            {
+              ...generationResult.options[0],
+              mockup_urls: [],
+              sellability: {
+                sellable: false,
+                reasons: [
+                  'Product mockup failed to render on the real garment; regenerate the design before publishing.',
+                ],
+              },
+            },
+          ],
+        }}
+      />
+    );
+
+    expect(screen.getByTestId('chat-merch-mockup-failed')).toHaveTextContent(
+      'Preview unavailable'
+    );
+    expect(screen.queryByAltText('Signal Tee mockup')).toBeNull();
   });
 });

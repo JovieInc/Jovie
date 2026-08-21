@@ -16,6 +16,18 @@ async function buildPrintFile(): Promise<Buffer> {
     .toBuffer();
 }
 
+async function sampleChest(mockup: Buffer): Promise<{
+  readonly r: number;
+  readonly g: number;
+  readonly b: number;
+}> {
+  const { data } = await sharp(mockup)
+    .extract({ left: 820, top: 980, width: 1, height: 1 })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  return { r: data[0] ?? 0, g: data[1] ?? 0, b: data[2] ?? 0 };
+}
+
 describe('renderMockup', () => {
   it('renders distinct product-aware fallback mockups', async () => {
     const printFile = await buildPrintFile();
@@ -37,5 +49,44 @@ describe('renderMockup', () => {
     expect(tee.equals(hoodie)).toBe(false);
     expect(tee.equals(hat)).toBe(false);
     expect(hoodie.equals(hat)).toBe(false);
+  });
+
+  it('keeps a generated full-bleed graphic visible on the garment', async () => {
+    const [design, empty] = await Promise.all([
+      sharp({
+        create: {
+          width: 1024,
+          height: 1024,
+          channels: 4,
+          background: { r: 255, g: 0, b: 255, alpha: 1 },
+        },
+      })
+        .png()
+        .toBuffer(),
+      sharp({
+        create: {
+          width: 1024,
+          height: 1024,
+          channels: 4,
+          background: { r: 0, g: 0, b: 0, alpha: 0 },
+        },
+      })
+        .png()
+        .toBuffer(),
+    ]);
+
+    const [composited, blank] = await Promise.all([
+      renderMockup(design, 'premium tee'),
+      renderMockup(empty, 'premium tee'),
+    ]);
+
+    const designedChest = await sampleChest(composited);
+    const blankChest = await sampleChest(blank);
+
+    expect(designedChest.r).toBeGreaterThan(200);
+    expect(designedChest.b).toBeGreaterThan(200);
+    expect(designedChest.g).toBeLessThan(40);
+    expect(blankChest.r).toBeLessThan(80);
+    expect(designedChest).not.toEqual(blankChest);
   });
 });
