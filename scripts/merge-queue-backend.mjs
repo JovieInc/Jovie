@@ -639,8 +639,26 @@ export function hasAuthoritativeExactHeadQueueReceipt(state, expectedHeadOid) {
   );
 }
 
+export function hardHoldLabels(state) {
+  const nodes = Array.isArray(state?.labels?.nodes) ? state.labels.nodes : [];
+  return [
+    ...new Set(
+      nodes
+        .map(label => (typeof label?.name === 'string' ? label.name : null))
+        .filter(name => HARD_HOLD_LABELS.has(name))
+    ),
+  ];
+}
+
+export function canAcceptExactHeadQueueReceipt(state, expectedHeadOid) {
+  return (
+    hasAuthoritativeExactHeadQueueReceipt(state, expectedHeadOid) &&
+    hardHoldLabels(state).length === 0
+  );
+}
+
 export function enrollmentPostcondition(state, expectedHeadOid) {
-  return hasAuthoritativeExactHeadQueueReceipt(state, expectedHeadOid);
+  return canAcceptExactHeadQueueReceipt(state, expectedHeadOid);
 }
 
 /**
@@ -650,7 +668,8 @@ export function enrollmentPostcondition(state, expectedHeadOid) {
  * @param {string} expectedHeadOid
  */
 export function explainExactHeadQueueReceipt(state, expectedHeadOid) {
-  if (hasAuthoritativeExactHeadQueueReceipt(state, expectedHeadOid)) {
+  const held = hardHoldLabels(state);
+  if (canAcceptExactHeadQueueReceipt(state, expectedHeadOid)) {
     return { ok: true, reason: 'queued' };
   }
   const expected =
@@ -691,6 +710,9 @@ export function explainExactHeadQueueReceipt(state, expectedHeadOid) {
     parts.push(
       'autoMergeRequest=present (auto-merge intent is not membership)'
     );
+  }
+  if (held.length > 0) {
+    parts.push(`held-by=${held.join(',')}`);
   }
   return {
     ok: false,
@@ -855,9 +877,20 @@ export async function proveExactHeadQueueReceipt({
   let state;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     state = await readPullRequestQueueState(stateOptions);
-    if (hasAuthoritativeExactHeadQueueReceipt(state, expectedHead)) {
+    if (canAcceptExactHeadQueueReceipt(state, expectedHead)) {
       return {
         ok: true,
+        attempts: attempt,
+        state,
+        explanation: explainExactHeadQueueReceipt(state, expectedHead),
+      };
+    }
+    if (
+      hasAuthoritativeExactHeadQueueReceipt(state, expectedHead) &&
+      hardHoldLabels(state).length > 0
+    ) {
+      return {
+        ok: false,
         attempts: attempt,
         state,
         explanation: explainExactHeadQueueReceipt(state, expectedHead),
@@ -1117,15 +1150,21 @@ export async function runCli(
     write = value => process.stdout.write(`${value}\n`),
   } = {}
 ) {
-  const backend = resolveMergeQueueBackend(
-    env.MERGE_QUEUE_BACKEND ?? DEFAULT_MERGE_QUEUE_BACKEND
-  );
+  const [command, ...args] = argv;
+  // explain-selector classifies a local SNAP JSON document. Fixture dry-runs
+  // inherit MERGE_QUEUE_BACKEND=test-label-fixture and must still explain a
+  // stale exact-head scope instead of failing closed on backend validation.
+  const backend =
+    command === 'explain-selector'
+      ? DEFAULT_MERGE_QUEUE_BACKEND
+      : resolveMergeQueueBackend(
+          env.MERGE_QUEUE_BACKEND ?? DEFAULT_MERGE_QUEUE_BACKEND
+        );
   const repository = env.REPO ?? env.GITHUB_REPOSITORY ?? DEFAULT_REPOSITORY;
   const rulesetId = env.MERGE_QUEUE_RULESET_ID ?? DEFAULT_RULESET_ID;
   const baseBranch = env.MERGE_QUEUE_BASE_BRANCH ?? DEFAULT_BASE_BRANCH;
   const allowUnavailableBypassActors =
     env.MERGE_QUEUE_NATIVE_AUTHORIZATION === 'merge-queue-autoenroll';
-  const [command, ...args] = argv;
   const options = { backend, repository, rulesetId, baseBranch, runner };
   const preflightOptions = { ...options, allowUnavailableBypassActors };
   const commands = {

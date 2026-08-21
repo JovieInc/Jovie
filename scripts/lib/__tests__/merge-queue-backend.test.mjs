@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   CANONICAL_NATIVE_MUTATION_ACTOR,
+  canAcceptExactHeadQueueReceipt,
   DEFAULT_MERGE_QUEUE_BACKEND,
   dequeuePullRequest,
   enrollPullRequest,
@@ -448,6 +449,9 @@ describe('queue workflow mutation safety', () => {
       'node scripts/merge-queue-backend.mjs prove-receipt'
     );
     expect(drain).toContain('.state.isInMergeQueue == true');
+    expect(drain).toContain(
+      '(.state.labels.nodes // []) | map(.name) | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast") | not'
+    );
     expect(drain).toContain(
       'queue-noop: missing receipt: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD'
     );
@@ -1119,6 +1123,25 @@ describe('native enrollment', () => {
     expect(invokedEnrollment(runner)).toBe(false);
   });
 
+  it('refuses a delayed queue entry when a hard hold appears after SNAP', async () => {
+    const queuedAndHeld = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+      autoMergeRequest: AUTO_MERGE,
+      labels: { nodes: [{ name: 'queue-deferred' }] },
+    });
+    const runner = createNativeRunner({
+      states: [prState(), queuedAndHeld],
+    });
+    await expect(
+      enroll(runner, { postconditionAttempts: 2, wait: async () => {} })
+    ).rejects.toMatchObject({
+      code: 'held_pull_request',
+      details: { labels: ['queue-deferred'] },
+    });
+    expect(invokedEnrollment(runner)).toBe(true);
+  });
+
   it('rejects auto-merge success without an authoritative native queue entry', async () => {
     const runner = createNativeRunner({
       states: [
@@ -1380,6 +1403,65 @@ describe('exact-head queue receipt proof', () => {
     });
     expect(wait).toHaveBeenCalledTimes(2);
     expect(wait).toHaveBeenNthCalledWith(1, 2_000);
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it('classifies selector no-ops without requiring the native backend', () => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        'scripts/merge-queue-backend.mjs',
+        'explain-selector',
+        '16068',
+        HEAD,
+        'normal',
+        '15',
+      ],
+      {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          MERGE_QUEUE_BACKEND: 'test-label-fixture',
+        },
+        input: JSON.stringify([selectorRow]),
+      }
+    );
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(JSON.parse(result.stdout)).toEqual({
+      observed: true,
+      queued: false,
+      eligible: true,
+      reason: 'eligible',
+    });
+  });
+
+  it('does not treat a delayed native entry as a receipt when a hard hold is live', async () => {
+    const queuedAndHeld = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+      labels: { nodes: [{ name: 'needs-human' }] },
+    });
+    expect(hasAuthoritativeExactHeadQueueReceipt(queuedAndHeld, HEAD)).toBe(
+      true
+    );
+    expect(canAcceptExactHeadQueueReceipt(queuedAndHeld, HEAD)).toBe(false);
+    expect(explainExactHeadQueueReceipt(queuedAndHeld, HEAD)).toEqual({
+      ok: false,
+      reason: 'held-by=needs-human',
+    });
+
+    const runner = createNativeRunner({ states: [queuedAndHeld] });
+    await expect(
+      proveExactHeadQueueReceipt(
+        nativeOptions(runner, { expectedHeadOid: HEAD })
+      )
+    ).resolves.toMatchObject({
+      ok: false,
+      attempts: 1,
+      explanation: { ok: false, reason: 'held-by=needs-human' },
+    });
     expect(invokedEnrollment(runner)).toBe(false);
   });
 

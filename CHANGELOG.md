@@ -7,7 +7,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
-- [internal] **Native auto-enroll produces or explains an exact-head queue receipt (JOV-5174):** admission requires persisted `isInMergeQueue` plus a positioned `mergeQueueEntry`, delayed GitHub reads are reconciled, and a selector no-op or missing receipt fails with the exact reason. Auto-merge intent is not membership.
+- [internal] **Native auto-enroll produces or explains an exact-head queue receipt (JOV-5174):** admission requires persisted `isInMergeQueue` plus a positioned `mergeQueueEntry`, delayed GitHub reads are reconciled, a later hard hold is not membership, and a selector no-op or missing receipt fails with the exact reason. Auto-merge intent is not membership.
 
 - **Private ideas stay private until you approve one exact script:** Library now has an Ideas & Scripts workspace. Save an idea, keep versioned revisions, attach evidence to factual claims, approve one revision, and hand that exact copy to capture. Nothing publishes from this slice.
 - [internal] **Tasks and scripts share one focused editor (JOV-5173):** Task descriptions persist bounded Tiptap JSON with optimistic concurrency, and private creator documents use immutable revisions plus an idempotent Save Idea path.

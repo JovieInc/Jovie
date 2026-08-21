@@ -270,6 +270,53 @@ class TestExactHeadQueueReceipt:
         )
         assert "auto-merge intent is not membership" in result.stderr
 
+    def test_delayed_receipt_fails_when_a_hard_hold_is_live(self, tmp_path: Path) -> None:
+        head = "6" * 40
+        _write_native_receipt_fakes(
+            tmp_path,
+            head=head,
+            mergeable="UNKNOWN",
+            is_draft=False,
+            selector={
+                "observed": True,
+                "queued": False,
+                "eligible": True,
+                "reason": "eligible",
+            },
+            receipt={
+                "ok": False,
+                "attempts": 1,
+                "state": {
+                    "isInMergeQueue": True,
+                    "queued": True,
+                    "headRefOid": head,
+                    "labels": {"nodes": [{"name": "queue-deferred"}]},
+                    "mergeQueueEntry": {
+                        "id": "MQE_1",
+                        "state": "QUEUED",
+                        "position": 1,
+                    },
+                },
+                "explanation": {"ok": False, "reason": "held-by=queue-deferred"},
+            },
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=f"DRAIN_ADMISSION_PR=16068 DRAIN_ADMISSION_HEAD={head}",
+            )
+        )
+
+        assert result.returncode == 3, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert (
+            "queue-noop: missing receipt: exact admission #16068 at " + head
+            in result.stderr
+        )
+        assert "held-by=queue-deferred" in result.stderr
+        assert "delayed native receipt" not in result.stdout
+
 
 class TestGhRetryHelper:
     def test_retries_transient_504_then_succeeds(self, tmp_path: Path) -> None:

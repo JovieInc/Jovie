@@ -1525,7 +1525,8 @@ if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 ]]; then
   # The pre-enrollment snapshot can race GitHub's native queue write. Before
   # publishing a terminal queue-noop, poll the authoritative native state for
   # isInMergeQueue plus a positioned mergeQueueEntry. Auto-merge intent is
-  # never membership. Only a valid exact-head receipt suppresses the error.
+  # never membership. A live hard-hold label added after SNAP is not a
+  # successful receipt. Only an unheld exact-head receipt suppresses the error.
   if [[ "$MERGE_QUEUE_BACKEND" == "native" && "$DRY_RUN" != "1" \
     && "$ADMISSION_TARGET_OBSERVED" == "true" && "$ADMISSION_ALREADY_QUEUED" != "true" ]]; then
     LIVE_NATIVE_RECEIPT="$(node scripts/merge-queue-backend.mjs prove-receipt \
@@ -1537,6 +1538,7 @@ if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 ]]; then
       and (.state.mergeQueueEntry.state | IN("QUEUED", "AWAITING_CHECKS", "MERGEABLE", "UNMERGEABLE", "LOCKED"))
       and (.state.mergeQueueEntry.position | type == "number" and floor == . and . > 0)
       and ((.state.headRefOid // "") | ascii_downcase) == $head
+      and ((.state.labels.nodes // []) | map(.name) | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast") | not)
     ' --arg head "$DRAIN_ADMISSION_HEAD" <<<"$LIVE_NATIVE_RECEIPT" >/dev/null; then
       ADMISSION_ALREADY_QUEUED="true"
       echo "  #$DRAIN_ADMISSION_PR  ~ delayed native receipt at $DRAIN_ADMISSION_HEAD (state $(jq -r '.state.mergeQueueEntry.state' <<<"$LIVE_NATIVE_RECEIPT"), position $(jq -r '.state.mergeQueueEntry.position' <<<"$LIVE_NATIVE_RECEIPT"))"
