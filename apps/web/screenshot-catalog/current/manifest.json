@@ -710,8 +710,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-20T17:31:07.373Z",
-    "gitSha": "107bb8b61bd89f43b5730ce4c552451506fe1408",
+    "capturedAt": "2026-08-20T22:32:54.409Z",
+    "gitSha": "e2066efcd28be6e4f78ccf5032d8ffc3677e1f08",
     "imagePath": "dashboard-earnings-desktop.png"
   },
   {

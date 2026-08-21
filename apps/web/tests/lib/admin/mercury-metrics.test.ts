@@ -96,6 +96,12 @@ describe('getAdminMercuryMetrics', () => {
     expect(metrics.defaultStatus).toBe('alive');
     expect(metrics.errorMessage).toBeUndefined();
     expect(mockCaptureError).not.toHaveBeenCalled();
+    expect(new URL(String(fetchMock.mock.calls[0]?.[0])).pathname).toBe(
+      '/api/v1/account/acct_123'
+    );
+    expect(new URL(String(fetchMock.mock.calls[1]?.[0])).pathname).toBe(
+      '/api/v1/account/acct_123/transactions'
+    );
   });
 
   it('returns isAvailable false when Mercury API fails', async () => {
@@ -135,6 +141,34 @@ describe('getAdminMercuryMetrics', () => {
     expect(metrics.isAvailable).toBe(false);
     expect(metrics.errorMessage).toContain('401');
     expect(metrics.errorMessage).toContain('ipNotWhitelisted');
+    expect(mockCaptureError).not.toHaveBeenCalled();
+  });
+
+  it('does not report Mercury 404 notFound errors to Sentry', async () => {
+    process.env.MERCURY_API_TOKEN = 'token';
+    process.env.MERCURY_CHECKING_ACCOUNT_ID = 'acct_123';
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      text: async () =>
+        JSON.stringify({
+          errors: {
+            notFound: [
+              'We couldn’t find the data associated with your request. Please contact help@mercury.com',
+            ],
+          },
+        }),
+    });
+
+    const metrics = await getAdminMercuryMetrics();
+
+    expect(metrics.isConfigured).toBe(true);
+    expect(metrics.isAvailable).toBe(false);
+    expect(metrics.defaultStatus).toBe('unknown');
+    expect(metrics.errorMessage).toContain('404');
+    expect(metrics.errorMessage).toContain('/account/acct_123');
+    expect(metrics.errorMessage).toContain('notFound');
     expect(mockCaptureError).not.toHaveBeenCalled();
   });
 
