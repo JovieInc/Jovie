@@ -12,7 +12,6 @@ import {
   useTransition,
 } from 'react';
 import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { UpdateAvailablePill } from '@/components/atoms/UpdateAvailablePill';
 import { ComposerFocusProvider } from '@/components/features/chat/Composer';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { ArtistProfileRailToggle } from '@/components/shell/ArtistProfileRailToggle';
@@ -37,7 +36,6 @@ import { RightRailKeyboardHandler } from '@/hooks/RightRailKeyboardHandler';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
 import { useGlobalShortcutActions } from '@/hooks/useGlobalShortcutActions';
-import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import type { AppShellMode } from '@/types/app-shell';
 import { AuthShell } from './AuthShell';
 import { CommandPalette, CommandPaletteMainSurface } from './CommandPalette';
@@ -87,7 +85,6 @@ function AuthShellWrapperInner({
   const config = useAuthRouteConfig(mode);
   const pathname = usePathname();
   const headerActions = useHeaderActions();
-  const isElectron = useIsElectronRuntime();
   const [, startTransition] = useTransition();
   const [pendingShellRoute, setPendingShellRoute] =
     useState<PendingShellRoute>(null);
@@ -117,15 +114,11 @@ function AuthShellWrapperInner({
     !config.isDemoRoute &&
     (config.isChatRoute || pathname === APP_ROUTES.DASHBOARD);
 
-  // Determine header action: use custom actions from context if available,
-  // otherwise fall back to default based on route type
-  const defaultHeaderAction = useMemo(
-    () => <>{isElectron ? null : <UpdateAvailablePill />}</>,
-    [isElectron]
-  );
+  // Route-owned header actions remain available, while global update state is
+  // rendered once by UnifiedSidebar's notification region.
   // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
   // degrades gracefully (renders nothing + toast) instead of crashing the shell.
-  const rawHeaderAction = headerActions.headerActions ?? defaultHeaderAction;
+  const rawHeaderAction = headerActions.headerActions ?? null;
   const headerAction = rawHeaderAction ? (
     <ErrorBoundary fallback={null}>{rawHeaderAction}</ErrorBoundary>
   ) : null;
