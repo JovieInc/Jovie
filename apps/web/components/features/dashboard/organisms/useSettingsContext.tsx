@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { hasAdvancedFeatures } from '@/lib/entitlements/registry';
 import { UNKNOWN_AVATAR_QUALITY } from '@/lib/profile/avatar-quality';
 import { useBillingStatusQuery } from '@/lib/queries';
 import { type Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
@@ -22,7 +23,7 @@ export function useSettingsContext() {
   }, [selectedArtist]);
   const { data: billingData } = useBillingStatusQuery();
   const isPro = billingData?.isPro ?? false;
-  const isGrowth = billingData?.plan === 'max';
+  const isGrowth = hasAdvancedFeatures(billingData?.plan);
 
   return {
     artist,

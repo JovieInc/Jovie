@@ -156,6 +156,19 @@ describe('signin page', () => {
     );
   });
 
+  it('uses auth_state as the native callback fallback instead of the dashboard', async () => {
+    const authState = 'a'.repeat(32);
+    searchParamsState.value = `auth_state=${authState}`;
+
+    render(<SignInPageClient />);
+
+    expect(authShellMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fallbackRedirectUrl: `${APP_ROUTES.AUTH_CALLBACK}?state=${authState}`,
+      })
+    );
+  });
+
   it('preserves redirect_url when linking from sign in to sign up', async () => {
     searchParamsState.value = 'redirect_url=%2Fonboarding';
 

@@ -1042,6 +1042,10 @@ describe('automation-verify affected scope', () => {
           '1/2',
           '--maxWorkers',
           '2',
+          '--testTimeout',
+          '12000',
+          '--hookTimeout',
+          '12000',
         ],
       ],
       [
@@ -1057,6 +1061,10 @@ describe('automation-verify affected scope', () => {
           '2/2',
           '--maxWorkers',
           '2',
+          '--testTimeout',
+          '12000',
+          '--hookTimeout',
+          '12000',
         ],
       ],
     ]);

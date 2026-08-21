@@ -78,6 +78,7 @@ describe('GET /auth/callback', () => {
     expect(location).toBe(
       'https://jov.ie/auth/native-return?code=00000000000040008000000000000001&state=state_123'
     );
+    expect(location?.includes('/app')).toBe(false);
     // The browser must never receive a bare custom-scheme redirect here.
     expect(location?.startsWith('jovie://')).toBe(false);
     expect(hoisted.consumeStoredAuthState).toHaveBeenCalledTimes(1);
@@ -122,7 +123,7 @@ describe('GET /auth/callback', () => {
     );
   });
 
-  it('keeps the raw scheme redirect for iOS (ASWebAuthenticationSession intercepts it)', async () => {
+  it('bounces iOS through the same-origin ios-complete page, never a web app page', async () => {
     hoisted.consumeStoredAuthState.mockResolvedValueOnce({
       client: 'ios',
       intent: 'sign_in',
@@ -150,8 +151,68 @@ describe('GET /auth/callback', () => {
     );
 
     expect(response.headers.get('location')).toBe(
-      'ie.jov.jovie://auth/complete?code=00000000000040008000000000000001&state=state_123'
+      'https://jov.ie/auth/ios/complete?code=00000000000040008000000000000001&state=state_123'
     );
+    expect(
+      response.headers.get('location')?.startsWith('ie.jov.jovie://')
+    ).toBe(false);
+    expect(response.headers.get('location')?.includes('/app')).toBe(false);
+  });
+
+  it('preserves staging and local origins on the iOS bounce', async () => {
+    hoisted.consumeStoredAuthState.mockResolvedValue({
+      client: 'ios',
+      intent: 'sign_in',
+      returnTo: '/app',
+      state: 'state_123',
+      codeChallenge: 'challenge_123',
+      createdAt: 1_000,
+      expiresAt: 601_000,
+      consumedAt: null,
+    });
+
+    const staging = await GET(
+      new Request('https://staging.jov.ie/auth/callback?state=state_123')
+    );
+    expect(staging.headers.get('location')).toBe(
+      'https://staging.jov.ie/auth/ios/complete?code=00000000000040008000000000000001&state=state_123'
+    );
+
+    const local = await GET(
+      new Request('http://localhost:3112/auth/callback?state=state_123')
+    );
+    expect(local.headers.get('location')).toBe(
+      'http://localhost:3112/auth/ios/complete?code=00000000000040008000000000000001&state=state_123'
+    );
+  });
+
+  it('returns 400 when callback state is missing', async () => {
+    const response = await GET(new Request('https://jov.ie/auth/callback'));
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Missing auth state',
+    });
+    expect(hoisted.createStoredNativeExchangeCode).not.toHaveBeenCalled();
+  });
+
+  it('returns web clients to the sanitized in-app route, never a native bounce', async () => {
+    hoisted.consumeStoredAuthState.mockResolvedValueOnce({
+      client: 'web',
+      intent: 'sign_in',
+      returnTo: '/app',
+      state: 'state_123',
+      codeChallenge: null,
+      createdAt: 1_000,
+      expiresAt: 601_000,
+      consumedAt: null,
+    });
+
+    const response = await GET(
+      new Request('https://jov.ie/auth/callback?state=state_123')
+    );
+
+    expect(response.headers.get('location')).toBe('https://jov.ie/app');
+    expect(hoisted.createStoredNativeExchangeCode).not.toHaveBeenCalled();
   });
 
   it('does not create a native exchange when the auth state was already consumed', async () => {

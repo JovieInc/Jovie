@@ -12,6 +12,9 @@ import {
   UPSTASH_ERROR_JSON_BAG,
 } from '@/lib/sentry/non-actionable-issues';
 
+const JOV_5185_TITLE =
+  'Error: {"clerkUserId":"af5b9ee0-ecec-4508-86e0-4f364c2e349d","error":{"name":"UpstashError"}}';
+
 describe('non-actionable Sentry issues', () => {
   describe('isTransientInfraHttpIssue', () => {
     it('matches Degraded HTTP Operation on POST /pipeline', () => {
@@ -52,7 +55,23 @@ describe('non-actionable Sentry issues', () => {
   });
 
   describe('isNonActionableUpstashErrorBag', () => {
-    it('matches the JOV-5218 Linear/Sentry title', () => {
+    it('matches the JOV-5183 Linear/Sentry title', () => {
+      expect(
+        isNonActionableUpstashErrorBag({
+          title: `Error: ${UPSTASH_ERROR_JSON_BAG}`,
+        })
+      ).toBe(true);
+    });
+
+    it('matches the JOV-5186 Linear/Sentry title', () => {
+      expect(
+        isNonActionableUpstashErrorBag({
+          title: `Error: ${UPSTASH_ERROR_JSON_BAG}`,
+        })
+      ).toBe(true);
+    });
+
+    it('matches the JOV-5209 Linear/Sentry title', () => {
       expect(
         isNonActionableUpstashErrorBag({
           title: `Error: ${UPSTASH_ERROR_JSON_BAG}`,
@@ -78,13 +97,20 @@ describe('non-actionable Sentry issues', () => {
       ).toBe(false);
     });
 
-    it('does not match the clerkUserId bag owned by JOV-5185', () => {
+    it('matches the clerkUserId-wrapped bag (JOV-5185)', () => {
       expect(
         isNonActionableUpstashErrorBag({
-          title:
-            'Error: {"clerkUserId":"af5b9ee0-ecec-4508-86e0-4f364c2e349d","error":{"name":"UpstashError"}}',
+          title: JOV_5185_TITLE,
         })
-      ).toBe(false);
+      ).toBe(true);
+    });
+
+    it('matches a prefixed JOV-5228 Sentry title', () => {
+      expect(
+        isNonActionableUpstashErrorBag({
+          title: 'Unhandled error: {"error":{"name":"UpstashError"}}',
+        })
+      ).toBe(true);
     });
   });
 
@@ -122,13 +148,128 @@ describe('non-actionable Sentry issues', () => {
         })
       ).toBe(false);
     });
+
+    it('matches a prefixed JSON-bag exception value (JOV-5228)', () => {
+      expect(
+        isNonActionableUpstashErrorBagEvent({
+          exception: {
+            values: [
+              {
+                type: 'Error',
+                value: 'Unhandled {"error":{"name":"UpstashError"}}',
+              },
+            ],
+          },
+        })
+      ).toBe(true);
+    });
+
+    it('matches the clerkUserId-wrapped Linear title (JOV-5185)', () => {
+      expect(
+        isNonActionableUpstashErrorBagEvent({
+          title: JOV_5185_TITLE,
+        })
+      ).toBe(true);
+    });
+
+    it('matches a JOV-5183 extra bag stored under a non-standard key', () => {
+      expect(
+        isNonActionableUpstashErrorBagEvent({
+          exception: {
+            values: [
+              {
+                type: 'Error',
+                value: 'Non-Error exception captured with keys: error',
+              },
+            ],
+          },
+          extra: { ctx: { error: { name: 'UpstashError' } } },
+        })
+      ).toBe(true);
+    });
+
+    it('matches a JOV-5187 extra.__serialized__ object capture', () => {
+      expect(
+        isNonActionableUpstashErrorBagEvent({
+          exception: {
+            values: [
+              {
+                type: 'Error',
+                value: 'Non-Error exception captured with keys: error',
+              },
+            ],
+          },
+          extra: { __serialized__: { error: { name: 'UpstashError' } } },
+        })
+      ).toBe(true);
+    });
+
+    it('matches a JOV-5187 logentry.formatted Linear title', () => {
+      expect(
+        isNonActionableUpstashErrorBagEvent({
+          logentry: {
+            formatted: `Error: ${UPSTASH_ERROR_JSON_BAG}`,
+          },
+        })
+      ).toBe(true);
+    });
   });
 
   describe('isOpaqueUpstashErrorJsonBag', () => {
+    it('matches an Error whose message is the JSON bag', () => {
+      expect(
+        isOpaqueUpstashErrorJsonBag(new Error(UPSTASH_ERROR_JSON_BAG))
+      ).toBe(true);
+    });
+
+    it('matches a thrown { error: UpstashError } object (JOV-5218)', () => {
+      const inner = new Error(
+        'Command failed: ERR max requests limit exceeded. Limit: 500000'
+      );
+      inner.name = 'UpstashError';
+      expect(JSON.stringify({ error: inner })).toBe(UPSTASH_ERROR_JSON_BAG);
+      expect(isOpaqueUpstashErrorJsonBag({ error: inner })).toBe(true);
+    });
+
+    it('matches a Next.js wrapper whose cause is the JSON bag (JOV-5209)', () => {
+      const wrapper = new Error(
+        'An error occurred in the Server Components render'
+      );
+      wrapper.cause = { error: { name: 'UpstashError' } };
+      expect(isOpaqueUpstashErrorJsonBag(wrapper)).toBe(true);
+    });
+
+    it('does not hang on a circular Error.cause chain (JOV-5209)', () => {
+      const wrapper = new Error('wrapped');
+      wrapper.cause = wrapper;
+      expect(isOpaqueUpstashErrorJsonBag(wrapper)).toBe(false);
+    });
+
     it('matches the JOV-5229 Linear title', () => {
       expect(
         isOpaqueUpstashErrorJsonBag(`Error: ${UPSTASH_ERROR_JSON_BAG}`)
       ).toBe(true);
+    });
+
+    it('matches a thrown { clerkUserId, error: UpstashError } object (JOV-5185)', () => {
+      const inner = new Error(
+        'Command failed: ERR max requests limit exceeded. Limit: 500000'
+      );
+      inner.name = 'UpstashError';
+      expect(
+        isOpaqueUpstashErrorJsonBag({
+          clerkUserId: 'af5b9ee0-ecec-4508-86e0-4f364c2e349d',
+          error: inner,
+        })
+      ).toBe(true);
+    });
+
+    it('does not match a real quota UpstashError instance', () => {
+      const error = new Error(
+        'Command failed: ERR max requests limit exceeded. Limit: 500000'
+      );
+      error.name = 'UpstashError';
+      expect(isOpaqueUpstashErrorJsonBag(error)).toBe(false);
     });
 
     it('does not match a real Upstash quota exception', () => {
@@ -180,6 +321,15 @@ describe('non-actionable Sentry issues', () => {
         })
       ).toBe(false);
     });
+
+    it('matches the JOV-5181 Linear/Sentry quota title', () => {
+      expect(
+        isUpstashQuotaSentryEvent({
+          title:
+            'UpstashError: Command failed: ERR max requests limit exceeded. Limit: 500000, Usage: 500099. See https://upstash.com/docs/redis/troubleshooting/max_requests_limit for details',
+        })
+      ).toBe(true);
+    });
   });
 
   describe('isNonActionableUpstashIssue', () => {
@@ -194,8 +344,7 @@ describe('non-actionable Sentry issues', () => {
     it('matches clerkUserId-wrapped opaque UpstashError titles', () => {
       expect(
         isNonActionableUpstashIssue({
-          title:
-            'Error: {"clerkUserId":"af5b9ee0-ecec-4508-86e0-4f364c2e349d","error":{"name":"UpstashError"}}',
+          title: JOV_5185_TITLE,
         })
       ).toBe(true);
     });

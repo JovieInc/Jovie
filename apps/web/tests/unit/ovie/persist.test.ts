@@ -15,9 +15,13 @@ import {
 } from '@/lib/ovie/mcp/store';
 import {
   applyOvieDump,
+  applyOvieDumpBeforeModel,
+  initiativeAckView,
+  isInitiativeLanded,
   listPendingInitiatives,
   markInitiativeLanded,
   ovieIdempotencyKey,
+  persistReceiptAsInitiative,
 } from '@/lib/ovie/persist';
 
 describe('Ovie durable dump persist', () => {
@@ -141,5 +145,49 @@ describe('Ovie durable dump persist', () => {
     });
     const afterBody = (await after.json()) as { initiatives: unknown[] };
     expect(afterBody.initiatives).toEqual([]);
+  });
+
+  it('persists a classified receipt and skips empty chat dumps', async () => {
+    const store = new MemoryOperatingStore();
+    expect(await applyOvieDumpBeforeModel(null, { store })).toEqual([]);
+    expect(await applyOvieDumpBeforeModel('   ', { store })).toEqual([]);
+    const record = await persistReceiptAsInitiative(store, {
+      text: 'post this tweet',
+      lane: 'flash',
+      destination: 'kanban',
+      ack: 'stored and queued for Summer lander',
+      destinationHandle: null,
+      workerSpawned: false,
+      workId: 'ini_receipt1',
+      idempotencyKey: 'ovie-dump:v1:post this tweet',
+      routingState: 'queued',
+    });
+    expect(record.id).toBe('ini_receipt1');
+    expect(initiativeAckView(record).queuedFor).toBe('summer-lander');
+    expect(isInitiativeLanded(record)).toBe(false);
+    const landedView = initiativeAckView({
+      ...record,
+      routingState: 'landed',
+      destinationHandle: 't_kanban_1',
+    });
+    expect(landedView.complete).toBe(true);
+    expect(isInitiativeLanded({ ...record, routingState: 'landed' })).toBe(
+      true
+    );
+    expect(initiativeAckView({ ...record, routingState: 'blocked' }).ack).toBe(
+      'stored; routing blocked'
+    );
+    expect(
+      isInitiativeLanded({
+        ...record,
+        destinationHandle: null,
+        evidence: [
+          {
+            kind: 'destination',
+            summary: 'landed: t_kanban_landed',
+          },
+        ],
+      })
+    ).toBe(true);
   });
 });

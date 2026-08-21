@@ -36,11 +36,13 @@ const PRODUCT_MEMORY_PATHS = [
 
 const INTERNAL_AGENTOS_WDK_PATHS = [
   'workflows/agent-os-dry-run.ts',
+  'workflows/ovie-dump-ack.ts',
   'lib/agent-os/workflows.ts',
 ] as const;
 
 const FORBIDDEN_PRODUCT_IMPORT_MARKERS = [
   '@/workflows/agent-os-dry-run',
+  '@/workflows/ovie-dump-ack',
   '@/lib/agent-os/workflows',
   "from 'workflow'",
   'from "workflow"',

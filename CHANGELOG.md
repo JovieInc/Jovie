@@ -7,20 +7,47 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
-- [internal] **Agent QC wires no longer advertise dead gates (JOV-5235):** Scope Judge is retired, Slop Gate stays post-merge informational, auto-approve ignores self-attested GStack comments, needs-human autoclose notifies Slack/Linear first, and the agent-pipeline branch check uses the shared allowlist.
+- **Upload a song from a new chat:** drop or attach an audio file, Jovie classifies it as a new track, an existing release, or a reference, and keeps the file in Library so it is not orphaned.
 
+- [internal] **Native auto-enroll produces or explains an exact-head queue receipt (JOV-5174):** admission requires persisted `isInMergeQueue` plus a positioned `mergeQueueEntry`, delayed GitHub reads are reconciled, a later hard hold is not membership, and a selector no-op or missing receipt fails with the exact reason. Auto-merge intent is not membership.
+
+- [internal] **Ops bottleneck is the death-step funnel, and shipping velocity no longer looks like zero when GitHub is missing (JOV-5256):** The scan-first Bottleneck band is funnel-only. Survival and velocity keep their own bands. Unconfigured GitHub reports Not configured instead of empty PR charts. Funnel query failures report Unavailable with Retry instead of empty zeros.
+
+- **Private ideas stay private until you approve one exact script:** Library now has an Ideas & Scripts workspace. Save an idea, keep versioned revisions, attach evidence to factual claims, approve one revision, and hand that exact copy to capture. Nothing publishes from this slice.
+- [internal] **Tasks and scripts share one focused editor (JOV-5173):** Task descriptions persist bounded Tiptap JSON with optimistic concurrency, and private creator documents use immutable revisions plus an idempotent Save Idea path.
+- [internal] **Opaque `Error: {"error":{"name":"UpstashError"}}` bags no longer file from the client SDK (JOV-5186):** client `beforeSend` uses the same `hint.originalException` drop as server, so object-captures whose event value is `Non-Error exception captured with keys: error` never become Linear issues. Quota command failures are dropped separately (JOV-5184).
+- [internal] **Opaque `Error: {"clerkUserId":...,"error":{"name":"UpstashError"}}` bags no longer file (JOV-5185):** Sentry drops the clerkUserId-wrapped JSON bag, `beforeSend` / `onRequestError` / `captureError` skip it, and the autofix webhook classifies it as the same Upstash JSON bag. Real quota command failures still report.
+- [internal] **Upstash quota command failures no longer file Linear issues (JOV-5181):** `onRequestError`, `captureError`, and shared `beforeSend` drop `ERR max requests limit exceeded`. The hourly Redis operability canary still pages via `redis_operability_quota_exceeded`.
+- [internal] **Opaque `Error: {"error":{"name":"UpstashError"}}` bags no longer file from reconstructed client Sentry.init (JOV-5182):** lite and full client configs now spread the shared base, so `ignoreErrors` and `release` reach the browser SDK. Real quota command failures still report.
+- [internal] **Redis quota command failures no longer file Linear issues per route (JOV-5184):** `captureError`, Next.js `onRequestError`, and shared Sentry `beforeSend` drop `ERR max requests limit exceeded`. The hourly Redis canary still owns the standing alert. Unrelated Upstash errors such as `WRONGPASS` still report.
+- [internal] **Opaque `Error: {"error":{"name":"UpstashError"}}` bags no longer file from the browser SDK (JOV-5183):** lite and full client `Sentry.init` now receive the shared `ignoreErrors` bag patterns, and `beforeSend` drops the bag on any `extra` key. Real quota command failures still report.
+- [internal] **Opaque `Error: {"error":{"name":"UpstashError"}}` bags no longer file from client object-captures (JOV-5187):** client `beforeSend` now drops `hint.originalException` bags, and events that only keep the bag on `extra.__serialized__` or `logentry.formatted` are dropped. Real quota command failures still report.
+
+- [internal] **Opaque `Error: {"error":{"name":"UpstashError"}}` bags no longer file from wrapped request errors (JOV-5209):** `beforeSend` drops `hint.originalException` bags and `onRequestError` walks `Error.cause`. Real quota command failures still report.
+
+- [internal] **Thrown `{ error: UpstashError }` request errors no longer file as `Error: {"error":{"name":"UpstashError"}}` (JOV-5218):** `onRequestError` skips the JSON-stringified object bag, not only an already-stringified Error message. Real quota command failures still report.
+
+- [internal] **Summer dump-ack is the first promoted Eve/Vercel workflow (JOV-5217):** inventory rejects discretionary Summer candidates, Eve cannot mutate the frozen contract, executions carry stable work/workflow/version ids plus a redacted Summer receipt, Eve persist never Linear-routes or dispatches Symphony, and disablement keeps durable intake and Summer authority.
+
+- [internal] **Billing health warnings no longer file as `Error: Billing health check warning` (JOV-5242):** warning-level `/api/billing/health` results stay in the JSON monitors already poll. Sentry still captures thrown failures and critical status.
+
+- [internal] **Agent QC wires no longer advertise dead gates (JOV-5235):** Scope Judge is retired, Slop Gate stays post-merge informational, auto-approve ignores self-attested GStack comments, needs-human autoclose notifies Slack/Linear first, and the agent-pipeline branch check uses the shared allowlist.
+- [internal] **Opaque `Error: {"error":{"name":"UpstashError"}}` bags no longer file from error-severity captures (JOV-5228):** `captureError` and Next.js `onRequestError` drop the JSON bag at every severity, client `ignoreErrors` includes the bag pattern, and prefixed Sentry titles still match.
 - [internal] **Opaque `UpstashError` JSON bags no longer file at error severity (JOV-5229):** `captureError` drops `Error: {"error":{"name":"UpstashError"}}` at every severity, and Sentry `beforeSend` drops title-only events of that bag. Real quota command failures still report.
 - [internal] **Redis quota JSON bags no longer auto-file as `Error: {"error":{"name":"UpstashError"}}` (JOV-5218):** Sentry drops that exact capture-bag title and the autofix webhook skips it, while real Upstash quota exceptions stay visible.
 - [internal] **Redis quota errors no longer file opaque `UpstashError` Sentry issues (JOV-5220):** wrapped `{ error }` capture payloads keep the inner message, quota events fingerprint as one class, and autofix skips the name-only JSON titles.
 
 ### Fixed
 
+- **iPhone and Mac sign-in return to the app instead of the website:** after browser login, iOS and macOS bounce through an allowlisted return page and reopen Jovie. Signed-in native sessions no longer dump into the web dashboard.
+- **iPhone sign-in can open the browser when SwiftUI has no key window (JOV-5198):** Continue in Browser waits for a foreground-active window, presents from a visible or scene-backed window when needed, and a failed session start is no longer reported as `invalidAuthURL`.
 - [internal] **Ovie eval review persists a durable row and records `judge:absent` as a verdict:** enqueue reports success only after `ovie_operating_kv` write, missing rubric judges are not scored as pass, word count is a `word-count:N` signal unless a verbosity budget is set, and Slack feedback redacts emails in the message body.
 - [internal] **Touch-target lint accepts the 44px hit container:** compact controls stay visually small (`h-7`/`h-8`/`h-9`); the prescribed rescue is `before:h-11`, not enlarging the item. `min-h-11` on the control still counts so the ratchet does not jump.
 - [internal] **Production monitors page again:** post-deploy probe failures Slack `#alerts-production`, golden-path probes add claim/billing/Stripe liveness, observability and synthetics file Linear, and the canary `/api/chat` auth-gate retries then fails closed.
 
 ### Added
 
+- **Web chat home can introduce what’s new (JOV-5206):** Empty chat highlights one feature or lists up to three recent changes on the same System B card as iOS. Dismiss stays dismissed. More than three changes ends on And more, which opens `/changelog`.
 - [internal] **Live merge-queue ruleset verify pages Slack:** the scheduled observer still fails the run and now posts to the existing webhook.
 - [internal] **Critical-surface vitest coverage floors are non-zero:** entitlements, Stripe webhooks, webhook signatures, and test-auth globs ratchet from the last measured snapshot minus 3pp on `vitest --coverage`. Merge-queue unit shards stay coverage-off.
 - [internal] **Canonical Actions now have one contract package:** `@jovie/action-contracts` owns the four stable IDs, and authenticated `GET /api/v1/actions` can list what a profile can do. Nothing is created yet.
@@ -69,6 +96,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - **Mac chat stays on screen once the answer starts:** reserving the thread URL no longer remounts the live composer and transcript.
 - **Vlog capture matches how you hold the phone:** portrait, landscape left, and landscape right record the right way up. Landscape keeps record controls on screen.
 - **Expired iPhone chat sessions fail closed:** a 401 ends the turn as a failed reply and asks you to sign in again, instead of inventing an answer.
+- **iPhone chat answers with the signed-in artist:** a missed extra artist-context lookup no longer replaces the reply with “could not load your artist context.”
 - **Mobile chat uses the signed-in artist:** the second claims check that blocked a valid session profile is gone.
 - [internal] **Redis quota warnings no longer file as `Error: {"error":{"name":"UpstashError"}}` (JOV-5221):** captureWarning unwraps `{ error }` bags, classifies the opaque JSON payload as quota exhaustion, and drops that noise from Sentry. The hourly Redis canary still owns the standing alert.
 - [internal] **Public profile block checks fail open on a bad Redis pipeline payload (JOV-5196):** a non-array Upstash response is treated as a cache miss instead of throwing `res.map is not a function`.

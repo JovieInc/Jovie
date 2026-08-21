@@ -199,7 +199,10 @@ export function categorizePath(pathname: string): PathCategory {
   );
   const isWaitlistPath = matchesRoute(pathname, '/waitlist');
   const isDesktopAuthPath = pathname === APP_ROUTES.DESKTOP_AUTH;
-  const isNativeAuthCompletePath = pathname === APP_ROUTES.AUTH_NATIVE_COMPLETE;
+  const isNativeAuthCompletePath =
+    pathname === APP_ROUTES.AUTH_NATIVE_COMPLETE ||
+    pathname === APP_ROUTES.AUTH_NATIVE_RETURN ||
+    pathname === APP_ROUTES.AUTH_IOS_COMPLETE;
   const isStartPath = pathname === APP_ROUTES.START;
 
   const isProtectedPath =

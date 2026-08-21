@@ -86,11 +86,10 @@ export function getLiteClientConfig(
   } = options;
 
   return {
-    dsn: baseConfig.dsn,
+    // Reconstructing field-by-field dropped ignoreErrors/release, so the
+    // JOV-5182 JSON bag never hit InboundFilters on public routes.
+    ...baseConfig,
     tracesSampleRate,
-    enableLogs: baseConfig.enableLogs,
-    sendDefaultPii: baseConfig.sendDefaultPii,
-    beforeSend: baseConfig.beforeSend,
 
     // Lite-specific: preserve core error capture (GlobalHandlers,
     // BrowserApiErrors, LinkedErrors, Dedupe, and PII filtering) while dropping

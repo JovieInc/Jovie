@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Badge, Button } from '@jovie/ui';
 import { CalendarPlus, Clock, Mail, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -35,18 +35,37 @@ export interface SuggestedActionCardProps {
   readonly className?: string;
 }
 
-function formatDateTime(iso: string): string {
+const ACTION_STATUS = {
+  approved: { label: 'Approved', tone: 'info' },
+  executed: { label: 'Executed', tone: 'success' },
+  rejected: { label: 'Rejected', tone: 'neutral' },
+  failed: { label: 'Failed', tone: 'error' },
+  expired: { label: 'Expired', tone: 'neutral' },
+} as const;
+
+function formatDateTime(iso: string): string | null {
+  if (typeof iso !== 'string' || !/^\d{4}-\d{2}-\d{2}(?:T|$)/.test(iso)) {
+    return null;
+  }
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(iso);
+  const [year, month, day] = iso.slice(0, 10).split('-').map(Number);
+  const calendarDate = new Date(Date.UTC(year, month - 1, day));
+  if (calendarDate.toISOString().slice(0, 10) !== iso.slice(0, 10)) return null;
+
+  const date = new Date(isDateOnly ? `${iso}T00:00:00.000Z` : iso);
+  if (Number.isNaN(date.getTime())) return null;
+
   try {
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      timeZoneName: 'short',
-    }).format(new Date(iso));
+      ...(isDateOnly
+        ? { timeZone: 'UTC' }
+        : { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }),
+    }).format(date);
   } catch {
-    return iso;
+    return null;
   }
 }
 
@@ -56,14 +75,29 @@ function buildLocationLine(
   region: string | null | undefined,
   country: string | null | undefined
 ): string | null {
-  const parts = [venueName, city, region, country].filter(Boolean);
+  const parts = [venueName, city, region, country]
+    .map(value => (typeof value === 'string' ? value.trim() : null))
+    .filter((value): value is string => Boolean(value));
   return parts.length > 0 ? parts.join(', ') : null;
 }
 
-function confidenceDotClass(confidence: number): string {
-  if (confidence >= 0.9) return 'bg-green-500';
-  if (confidence >= 0.7) return 'bg-yellow-500';
-  return 'bg-red-500';
+function getConfidencePresentation(confidence: number): {
+  readonly label: string;
+  readonly percentage: number;
+  readonly tone: 'success' | 'warning' | 'error';
+} {
+  const normalizedConfidence = Number.isFinite(confidence)
+    ? Math.min(1, Math.max(0, confidence))
+    : 0;
+  const percentage = Math.round(normalizedConfidence * 100);
+
+  if (normalizedConfidence >= 0.9) {
+    return { label: 'High Confidence', percentage, tone: 'success' };
+  }
+  if (normalizedConfidence >= 0.7) {
+    return { label: 'Medium Confidence', percentage, tone: 'warning' };
+  }
+  return { label: 'Low Confidence', percentage, tone: 'error' };
 }
 
 /**
@@ -88,92 +122,122 @@ export function SuggestedActionCard({
   onReject,
   className,
 }: SuggestedActionCardProps) {
-  const locationLine = buildLocationLine(venueName, city, region, country);
+  const startsAtLabel = formatDateTime(startsAt);
+  const endsAtLabel = endsAt ? formatDateTime(endsAt) : null;
+  const locationLine =
+    buildLocationLine(venueName, city, region, country) ??
+    'Location unavailable';
+  const rawSubject = sourceRef?.subject;
+  const sourceSubject =
+    (typeof rawSubject === 'string' && rawSubject.trim()) ||
+    'Source email unavailable';
+  const confidencePresentation = getConfidencePresentation(confidence);
   const isPending = status === 'pending';
 
   return (
-    <div
+    <article
       className={cn(
-        'rounded-lg border border-subtle bg-surface-0 p-4 space-y-3',
+        'space-y-3 rounded-lg border border-subtle bg-surface-0 p-4',
         className
       )}
       data-testid={`suggested-action-card-${id}`}
+      data-status={status}
     >
-      {/* Header */}
       <div className='flex items-start justify-between gap-2'>
-        <div className='flex items-center gap-2'>
-          <CalendarPlus className='h-4 w-4 shrink-0 text-secondary' />
-          <span className='text-sm font-medium text-primary'>{title}</span>
+        <div className='flex min-w-0 items-start gap-2'>
+          <CalendarPlus
+            className='mt-0.5 h-4 w-4 shrink-0 text-secondary'
+            aria-hidden='true'
+          />
+          <h3 className='min-w-0 text-balance text-sm font-medium text-primary'>
+            {title}
+          </h3>
         </div>
-        <div
-          className={cn(
-            'mt-1 h-2 w-2 shrink-0 rounded-full',
-            confidenceDotClass(confidence)
-          )}
-          title={`Confidence: ${Math.round(confidence * 100)}%`}
-        />
+        <Badge
+          variant='outline'
+          size='sm'
+          tone={confidencePresentation.tone}
+          className='shrink-0'
+          aria-label={`${confidencePresentation.label}, ${confidencePresentation.percentage}%`}
+        >
+          {confidencePresentation.label} · {confidencePresentation.percentage}%
+        </Badge>
       </div>
 
-      {/* Time */}
       <div className='flex items-center gap-1.5 text-xs text-secondary'>
-        <Clock className='h-3.5 w-3.5 shrink-0' />
-        <span>
-          {formatDateTime(startsAt)}
-          {endsAt && ` – ${formatDateTime(endsAt)}`}
-        </span>
+        <Clock className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
+        {startsAtLabel ? (
+          <time dateTime={startsAt}>{startsAtLabel}</time>
+        ) : (
+          <span>Date unavailable</span>
+        )}
+        {endsAtLabel && (
+          <>
+            {' – '}
+            <time dateTime={endsAt ?? undefined}>{endsAtLabel}</time>
+          </>
+        )}
       </div>
 
-      {/* Location */}
-      {locationLine && (
-        <div className='flex items-center gap-1.5 text-xs text-secondary'>
-          <MapPin className='h-3.5 w-3.5 shrink-0' />
-          <span>{locationLine}</span>
-        </div>
-      )}
+      <div className='flex items-center gap-1.5 text-xs text-secondary'>
+        <MapPin className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
+        <span>{locationLine}</span>
+      </div>
 
-      {/* Source email chip */}
       <div className='flex items-center gap-1.5'>
-        <Mail className='h-3 w-3 shrink-0 text-tertiary' />
+        <Mail className='h-3 w-3 shrink-0 text-tertiary' aria-hidden='true' />
         <span
           className='truncate text-xs text-tertiary'
-          title={sourceRef.subject}
+          title={
+            sourceSubject === 'Source email unavailable'
+              ? undefined
+              : sourceSubject
+          }
         >
-          {sourceRef.subject}
+          {sourceSubject}
         </span>
       </div>
 
-      {/* Rationale */}
       <p className='text-xs text-tertiary italic'>{rationale}</p>
 
       {/* v1.1 side-effects slot (empty in v1) */}
       {/* When v1.1 ships, fill this slot with fan-facing side effect previews */}
 
-      {/* Actions — READ-ONLY until C-PR-3 wires the endpoints */}
-      {isPending && (
-        <div className='flex gap-2 pt-1'>
-          <Button
-            size='sm'
-            onClick={onApprove}
-            disabled={!onApprove}
-            className='flex-1'
-          >
-            Approve
-          </Button>
-          <Button
-            size='sm'
+      <div className='flex min-h-7 items-center pt-1'>
+        {isPending ? (
+          <div className='flex w-full gap-2'>
+            <Button
+              size='sm'
+              onClick={onApprove}
+              disabled={!onApprove}
+              className='flex-1'
+              aria-label={`Approve ${title}`}
+            >
+              Approve
+            </Button>
+            <Button
+              size='sm'
+              variant='secondary'
+              onClick={onReject}
+              disabled={!onReject}
+              className='flex-1'
+              aria-label={`Reject ${title}`}
+            >
+              Reject
+            </Button>
+          </div>
+        ) : (
+          <Badge
             variant='outline'
-            onClick={onReject}
-            disabled={!onReject}
-            className='flex-1'
+            size='sm'
+            tone={ACTION_STATUS[status].tone}
+            role='status'
+            aria-label={`Status: ${ACTION_STATUS[status].label}`}
           >
-            Reject
-          </Button>
-        </div>
-      )}
-
-      {!isPending && (
-        <div className='text-xs text-tertiary capitalize'>Status: {status}</div>
-      )}
-    </div>
+            Status: {ACTION_STATUS[status].label}
+          </Badge>
+        )}
+      </div>
+    </article>
   );
 }

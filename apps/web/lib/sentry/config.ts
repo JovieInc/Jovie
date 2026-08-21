@@ -53,7 +53,13 @@
  */
 
 import type * as Sentry from '@sentry/nextjs';
-import { isNonActionableUpstashErrorBagEvent } from '@/lib/sentry/non-actionable-issues';
+import {
+  isNonActionableUpstashErrorBagEvent,
+  isOpaqueUpstashErrorJsonBag,
+  isUpstashQuotaSentryEvent,
+  UPSTASH_QUOTA_IGNORE_ERRORS,
+} from '@/lib/sentry/non-actionable-issues';
+import { isRedisQuotaFailure } from '@/lib/utils/errors';
 
 /**
  * Sentry Event type alias for cleaner code
@@ -418,7 +424,29 @@ function scrubUserPii(user: SentryEvent['user']): void {
  * @param event - The Sentry event to process
  * @returns The scrubbed event, or null to drop the event
  */
-export function scrubPii(event: SentryEvent): SentryEvent | null {
+export function scrubPii(
+  event: SentryEvent,
+  hint?: SentryEventHint
+): SentryEvent | null {
+  // Client `beforeSend` is this function directly, so hint must be read here.
+  // `captureException({ error: UpstashError })` keeps the bag on
+  // originalException while the event value is a generic object capture
+  // (JOV-5186 / JOV-5187 / JOV-5209).
+  if (isOpaqueUpstashErrorJsonBag(hint?.originalException)) {
+    return null;
+  }
+
+  // Real `UpstashError: ERR max requests limit exceeded` events (JOV-5181 /
+  // JOV-5184) are one Redis-quota incident. Server/edge already drop them;
+  // client `beforeSend` is this function, so drop here too. The hourly
+  // canary owns the standing alert.
+  if (
+    isRedisQuotaFailure(hint?.originalException) ||
+    isUpstashQuotaSentryEvent(event)
+  ) {
+    return null;
+  }
+
   if (isNonProductionServerNoise(event)) {
     return null;
   }
@@ -433,8 +461,9 @@ export function scrubPii(event: SentryEvent): SentryEvent | null {
     return null;
   }
 
-  // Filter captureWarning/captureError JSON bags (JOV-5218, JOV-5229).
-  // Real Upstash quota exceptions keep their command-failure title.
+  // Filter captureWarning/captureError JSON bags kept on extra/logentry
+  // (JOV-5182, JOV-5183, JOV-5185, JOV-5186, JOV-5187, JOV-5209, JOV-5218, JOV-5228).
+  // Quota command failures (JOV-5181 / JOV-5184) are already dropped above.
   if (isNonActionableUpstashErrorBagEvent(event)) {
     return null;
   }
@@ -497,8 +526,7 @@ export function createBeforeSendHook(
   ) => SentryEvent | null
 ): (event: SentryEvent, hint?: SentryEventHint) => SentryEvent | null {
   return (event: SentryEvent, hint?: SentryEventHint): SentryEvent | null => {
-    // First apply PII scrubbing
-    const scrubbedEvent = scrubPii(event);
+    const scrubbedEvent = scrubPii(event, hint);
 
     if (!scrubbedEvent) {
       return null;
@@ -556,7 +584,8 @@ export interface BaseSentryClientConfig {
  * - **Trace Sampling**: Uses the shared `TRACES_SAMPLE_RATE` constant
  * - **Log Enablement**: Always enabled for error breadcrumbs
  * - **PII Handling**: `sendDefaultPii` disabled; user context set server-side only
- * - **Before Send**: Applies `scrubPii` to filter sensitive data
+ * - **Before Send**: Applies `scrubPii` to filter sensitive data and drop
+ *   client object-capture UpstashError bags (JOV-5186 / JOV-5187)
  *
  * ## Lazy Loading Integration
  *
@@ -588,6 +617,7 @@ export function getBaseClientConfig(): BaseSentryClientConfig {
     sendDefaultPii: false, // Disabled on client - user context set server-side only
     beforeSend: scrubPii,
     ignoreErrors: [
+      ...UPSTASH_QUOTA_IGNORE_ERRORS,
       // React hooks mismatch: known bug in onboarding/settings — tracked separately.
       // This is a client-side React error, so it must be filtered here (not server config).
       /Rendered more hooks than during the previous render/,

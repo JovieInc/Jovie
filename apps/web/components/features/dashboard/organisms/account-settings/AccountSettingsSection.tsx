@@ -96,7 +96,7 @@ export function AccountSettingsSection({
 }: AccountSettingsSectionProps) {
   return (
     <div className='space-y-4' data-testid='account-settings-section'>
-      <SettingsPanel title='Signed In As' cardClassName='px-4 py-4 sm:px-5'>
+      <SettingsPanel title='Signed In As' bodyClassName='px-4 py-4 sm:px-5'>
         <AccountIdentitySummary />
       </SettingsPanel>
       <SettingsAppearanceSection />

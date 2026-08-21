@@ -49,7 +49,7 @@ test.describe('Admin Dashboard', () => {
     );
     test.setTimeout(120_000);
 
-    const response = await smokeNavigateWithRetry(page, APP_ROUTES.ADMIN, {
+    const response = await smokeNavigateWithRetry(page, APP_ROUTES.HUD, {
       timeout: 90_000,
       retries: fastIteration ? 3 : 2,
     });
@@ -67,14 +67,13 @@ test.describe('Admin Dashboard', () => {
 
     // Main container proves page rendered, not just the shell
     await expect(
-      page.locator('[data-testid="admin-dashboard-content"]'),
-      'Admin dashboard content container missing — page did not render'
+      page.locator('[data-testid="hud-admin-page"]'),
+      'Canonical Ops page missing — /hud did not render'
     ).toBeVisible({ timeout: 30_000 });
 
-    // Health dashboard must render — proves overview queries succeeded (JOV-2098)
     await expect(
-      page.locator('[data-testid="admin-health-dashboard"]'),
-      'Admin health dashboard missing — Suspense errored or DB query failed'
+      page.locator('[data-testid="tim-action-required"]'),
+      'Needs Tim band missing — Ops scan-first contract broke'
     ).toBeVisible({ timeout: 30_000 });
 
     const bodyText =

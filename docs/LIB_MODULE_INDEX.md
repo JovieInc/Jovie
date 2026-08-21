@@ -37,6 +37,8 @@
 | `services/tips/` | Post-tip-completion: fan upsert, cumulative totals, thank-you emails | `processTipCompleted` |
 | `services/link-wrapping/` | Smart link wrapping with anti-cloaking and URL encryption | `WrappedLink`, `generateShortId` |
 | `youtube-library/` | YouTube channel video sync substrate: heuristic content classification, metric snapshots, append-only thumbnail history, ISRC release linkage (JOV-5136; provider interface plugs in with JOV-3189) | `syncChannelVideos`, `runScheduledRefreshes`, `classifyYouTubeVideo`, `resolveReleaseLink`, `listVideosForProfile` |
+| `creator-documents/` | Private idea/script validation, exact-revision evidence review, and capture approval contracts | `saveIdeaInputSchema`, `saveRevisionInputSchema`, `hashRevision` |
+| `rich-text/` | Shared bounded Tiptap JSON contract used by task descriptions and Library documents | `RichTextDocument`, `plainTextToRichTextDocument`, `richTextDocumentToPlainText` |
 
 ## Communication
 

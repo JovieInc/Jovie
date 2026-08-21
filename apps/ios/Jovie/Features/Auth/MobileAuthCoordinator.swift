@@ -29,6 +29,14 @@ enum MobileBrowserAuthURLBuilder {
       return nil
     }
 
+    guard isSupportedBrowserAuthURL(baseURL) else {
+      MobileAuthDiagnostics.record(
+        "auth_url_rejected",
+        detail: "browser auth requires https or localhost http"
+      )
+      return nil
+    }
+
     guard var components = URLComponents(
       url: baseURL.appending(path: authPath),
       resolvingAgainstBaseURL: false
@@ -60,7 +68,33 @@ enum MobileBrowserAuthURLBuilder {
       }
     }
 
-    return components.url
+    guard let url = components.url, isSupportedBrowserAuthURL(url) else {
+      return nil
+    }
+
+    return url
+  }
+
+  static func isSupportedBrowserAuthURL(_ url: URL) -> Bool {
+    guard let scheme = url.scheme?.lowercased(),
+          let host = url.host?.lowercased(),
+          !host.isEmpty
+    else {
+      return false
+    }
+
+    if scheme == "https" {
+      return true
+    }
+
+    if scheme == "http" {
+      return host == "localhost"
+        || host == "127.0.0.1"
+        || host == "::1"
+        || host.hasSuffix(".localhost")
+    }
+
+    return false
   }
 
   private static func sanitizeReturnRoute(_ route: String) -> String? {
@@ -84,10 +118,119 @@ enum MobileBrowserAuthURLBuilder {
   }
 }
 
-enum MobileAuthCoordinatorError: Error {
+enum MobileAuthCoordinatorError: Error, CustomNSError {
   case invalidAuthURL
+  case sessionStartFailed
   case missingCallbackURL
   case providerError(MobileAuthProviderError)
+
+  static var errorDomain: String { "Jovie.MobileAuthCoordinatorError" }
+
+  var errorCode: Int {
+    switch self {
+    case .invalidAuthURL:
+      return 1
+    case .sessionStartFailed:
+      return 2
+    case .missingCallbackURL:
+      return 3
+    case .providerError:
+      return 4
+    }
+  }
+}
+
+struct MobileAuthWindowSnapshot: Equatable {
+  let isKey: Bool
+  let isHidden: Bool
+}
+
+enum MobileAuthPresentationAnchor {
+  static func preferredWindowIndex(
+    in windows: [MobileAuthWindowSnapshot]
+  ) -> Int? {
+    if let keyIndex = windows.firstIndex(where: \.isKey) {
+      return keyIndex
+    }
+
+    return windows.firstIndex { !$0.isHidden }
+  }
+
+  static func current() -> ASPresentationAnchor? {
+    let scenes = UIApplication.shared.connectedScenes
+      .compactMap { $0 as? UIWindowScene }
+    let windows = scenes.flatMap(\.windows)
+    let snapshots = windows.map {
+      MobileAuthWindowSnapshot(isKey: $0.isKeyWindow, isHidden: $0.isHidden)
+    }
+
+    if let index = preferredWindowIndex(in: snapshots) {
+      return windows[index]
+    }
+
+    let fallbackScene = scenes.first { $0.activationState == .foregroundActive }
+      ?? scenes.first { $0.activationState == .foregroundInactive }
+      ?? scenes.first
+    guard let fallbackScene else {
+      return nil
+    }
+
+    if let sceneWindow = fallbackScene.windows.first {
+      return sceneWindow
+    }
+
+    return ASPresentationAnchor(windowScene: fallbackScene)
+  }
+}
+
+struct MobileAuthPresentationWindowCandidate: Equatable {
+  let isForegroundActive: Bool
+  let isKeyWindow: Bool
+}
+
+enum MobileAuthPresentationWindowSelector {
+  static func selectedIndex(
+    from candidates: [MobileAuthPresentationWindowCandidate]
+  ) -> Int? {
+    let activeIndices = candidates.indices.filter { candidates[$0].isForegroundActive }
+    if let keyIndex = activeIndices.first(where: { candidates[$0].isKeyWindow }) {
+      return keyIndex
+    }
+    return activeIndices.first
+  }
+}
+
+enum MobileAuthPresentationContextRetryPolicy {
+  static let maxAttempts = 2
+
+  static func shouldRetry(error: Error, attempt: Int) -> Bool {
+    attempt < maxAttempts && isAuthSessionPresentationContextInvalid(error)
+  }
+}
+
+@MainActor
+enum MobileAuthPresentationWindows {
+  static func selectedWindow(
+    from application: UIApplication = .shared
+  ) -> UIWindow? {
+    let windows = attachedWindows(from: application)
+    let candidates = windows.map { window in
+      MobileAuthPresentationWindowCandidate(
+        isForegroundActive: window.windowScene?.activationState == .foregroundActive,
+        isKeyWindow: window.isKeyWindow
+      )
+    }
+    guard let index = MobileAuthPresentationWindowSelector.selectedIndex(from: candidates) else {
+      return nil
+    }
+    return windows[index]
+  }
+
+  static func attachedWindows(from application: UIApplication = .shared) -> [UIWindow] {
+    application.connectedScenes
+      .compactMap { $0 as? UIWindowScene }
+      .flatMap(\.windows)
+  }
 }
 
 @MainActor
@@ -127,23 +270,69 @@ final class MobileAuthCoordinator: NSObject, ASWebAuthenticationPresentationCont
     }
 
     pendingStore.save(codeVerifier: codeVerifier)
+    Task { @MainActor in
+      await self.startAuthenticationSession(
+        authURL: authURL,
+        codeVerifier: codeVerifier,
+        attempt: 1,
+        completion: completion
+      )
+    }
+  }
+
+  private func startAuthenticationSession(
+    authURL: URL,
+    codeVerifier: String,
+    attempt: Int,
+    completion: @escaping (Result<MobileAuthReturn, Error>) -> Void
+  ) async {
+    await Self.waitForForegroundActivePresentationWindow()
+
     Observability.addBreadcrumb(
       .authSheetOpened,
-      context: ["auth_url": authURL]
+      context: [
+        "auth_url": authURL,
+        "attempt": attempt,
+      ]
     )
     MobileAuthDiagnostics.record(
-      "auth_session_opening",
+      attempt == 1 ? "auth_session_opening" : "auth_session_presentation_retry",
       detail: "\(authURL.host ?? "unknown")\(authURL.path)"
     )
 
     let session = ASWebAuthenticationSession(
       url: authURL,
-      callbackURLScheme: "ie.jov.jovie"
+      callback: .customScheme("ie.jov.jovie")
     ) { callbackURL, error in
       Task { @MainActor in
         self.session = nil
 
         if let error {
+          if MobileAuthPresentationContextRetryPolicy.shouldRetry(
+            error: error,
+            attempt: attempt
+          ) {
+            Observability.addBreadcrumb(
+              .authSessionClosed,
+              level: .warning,
+              context: [
+                "reason": "presentation_context_invalid_retry",
+                "attempt": attempt,
+              ]
+            )
+            MobileAuthDiagnostics.record(
+              "auth_session_presentation_retry",
+              detail: error.localizedDescription
+            )
+            await self.startAuthenticationSession(
+              authURL: authURL,
+              codeVerifier: codeVerifier,
+              attempt: attempt + 1,
+              completion: completion
+            )
+            return
+          }
+
           Observability.addBreadcrumb(
             .authSessionClosed,
             context: [
@@ -221,6 +410,22 @@ final class MobileAuthCoordinator: NSObject, ASWebAuthenticationPresentationCont
     session.prefersEphemeralWebBrowserSession = false
     self.session = session
 
+    guard MobileAuthPresentationAnchor.current() != nil else {
+      self.session = nil
+      Observability.addBreadcrumb(
+        .authSessionClosed,
+        level: .warning,
+        context: ["reason": "missing_presentation_anchor"]
+      )
+      pendingStore.clear()
+      MobileAuthDiagnostics.record(
+        "auth_session_start_failed",
+        detail: "missing_presentation_anchor"
+      )
+      completion(.failure(MobileAuthCoordinatorError.sessionStartFailed))
+      return
+    }
+
     if !session.start() {
       self.session = nil
       Observability.addBreadcrumb(
@@ -230,7 +435,7 @@ final class MobileAuthCoordinator: NSObject, ASWebAuthenticationPresentationCont
       )
       pendingStore.clear()
       MobileAuthDiagnostics.record("auth_session_start_failed")
-      completion(.failure(MobileAuthCoordinatorError.invalidAuthURL))
+      completion(.failure(MobileAuthCoordinatorError.sessionStartFailed))
     } else {
       MobileAuthDiagnostics.record("auth_session_opened")
     }
@@ -239,10 +444,33 @@ final class MobileAuthCoordinator: NSObject, ASWebAuthenticationPresentationCont
   func presentationAnchor(
     for session: ASWebAuthenticationSession
   ) -> ASPresentationAnchor {
-    UIApplication.shared.connectedScenes
-      .compactMap { $0 as? UIWindowScene }
-      .flatMap(\.windows)
-      .first { $0.isKeyWindow } ?? ASPresentationAnchor()
+    if let window = MobileAuthPresentationWindows.selectedWindow() {
+      return window
+    }
+
+    // Prefer any scene-attached window over a detached dummy window. ASWebAuthenticationSession
+    // Code 3 fires when the returned window's scene is missing or not foreground-active.
+    if let window = MobileAuthPresentationWindows.attachedWindows().first {
+      return window
+    }
+
+    return MobileAuthPresentationAnchor.current() ?? ASPresentationAnchor()
+  }
+
+  private static func waitForForegroundActivePresentationWindow() async {
+    if MobileAuthPresentationWindows.selectedWindow() != nil {
+      return
+    }
+
+    for _ in 0..<40 {
+      try? await Task.sleep(for: .milliseconds(50))
+      if Task.isCancelled {
+        return
+      }
+      if MobileAuthPresentationWindows.selectedWindow() != nil {
+        return
+      }
+    }
   }
 
   private static func makeCodeVerifier() -> String {
@@ -267,6 +495,16 @@ func isAuthSessionCancellation(_ error: Error) -> Bool {
   }
 
   return false
+}
+
+func isAuthSessionPresentationContextInvalid(_ error: Error) -> Bool {
+  if let error = error as? ASWebAuthenticationSessionError {
+    return error.code == .presentationContextInvalid
+  }
+
+  let nsError = error as NSError
+  return nsError.domain == ASWebAuthenticationSessionErrorDomain
+    && nsError.code == ASWebAuthenticationSessionError.Code.presentationContextInvalid.rawValue
 }
 
 private extension String {

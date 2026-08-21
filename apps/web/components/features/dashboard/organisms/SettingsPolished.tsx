@@ -18,6 +18,7 @@ import { SettingsSmsAccessSection } from '@/features/dashboard/organisms/Setting
 import { SettingsTouringSection } from '@/features/dashboard/organisms/SettingsTouringSection';
 import { SettingsUsageStatsSection } from '@/features/dashboard/organisms/SettingsUsageStatsSection';
 import { SettingsArtistProfileSection } from '@/features/dashboard/organisms/settings-artist-profile-section';
+import { hasAdvancedFeatures } from '@/lib/entitlements/registry';
 import { publicEnv } from '@/lib/env-public';
 import { useAppFlag } from '@/lib/flags/client';
 import { useBillingStatusQuery } from '@/lib/queries';
@@ -81,7 +82,7 @@ export function SettingsPolished({
   const router = useRouter();
   const { data: billingData } = useBillingStatusQuery();
   const isPro = billingData?.isPro ?? false;
-  const isGrowth = billingData?.plan === 'growth';
+  const isGrowth = hasAdvancedFeatures(billingData?.plan);
   const isStripeConnectEnabled = useAppFlag('STRIPE_CONNECT_ENABLED');
 
   const renderAccountSection = useCallback(
@@ -167,7 +168,7 @@ export function SettingsPolished({
           'Fan verification, opt-in preferences, and conversion pixel tracking.',
         render: () => (
           <div className='space-y-4'>
-            <SettingsAudienceSection />
+            <SettingsAudienceSection isGrowth={isGrowth} />
             {isPro && (
               <SettingsSmsAccessSection
                 smsSubscriberCount={0}
@@ -191,7 +192,7 @@ export function SettingsPolished({
         ),
       },
     ],
-    [artist, isPro, onArtistUpdate]
+    [artist, isGrowth, isPro, onArtistUpdate]
   );
 
   // -- Monetization group (billing, payments) --

@@ -10,7 +10,7 @@ export type AppScreenKind = 'canonical' | 'alias' | 'legacy' | 'operator';
 
 export type AppScreenComponentId =
   | 'component.app-shell-frame'
-  | 'component.page-shell'
+  | 'component.app-shell-content-panel'
   | 'component.settings-panel'
   | 'component.unified-table'
   | 'component.entity-sidebar'
@@ -89,14 +89,15 @@ export const APP_SCREEN_COMPONENT_REGISTRY = [
       'No native canonical-Pen app-shell root is source-mapped; promote only after manifest/readback proof.',
   },
   {
-    id: 'component.page-shell',
-    source: 'apps/web/components/organisms/PageShell.tsx',
-    storySource: 'apps/web/components/organisms/PageShell.stories.tsx',
-    storybookTitle: 'Organisms/PageShell',
+    id: 'component.app-shell-content-panel',
+    source: 'apps/web/components/organisms/AppShellContentPanel.tsx',
+    storySource:
+      'apps/web/components/organisms/AppShellContentPanel.stories.tsx',
+    storybookTitle: 'Organisms/AppShellContentPanel',
     penRootId: null,
     penReferenceEligible: false,
     penIdentityReason:
-      'No native canonical-Pen page-shell root is source-mapped; promote only after manifest/readback proof.',
+      'No native canonical-Pen app-shell content-panel root is source-mapped; promote only after manifest/readback proof.',
   },
   {
     id: 'component.settings-panel',
@@ -161,7 +162,7 @@ export const APP_SCREEN_RECIPE_REGISTRY = [
     id: 'recipe.app-standard',
     componentIds: [
       'component.app-shell-frame',
-      'component.page-shell',
+      'component.app-shell-content-panel',
       'component.empty-state',
       'component.entity-sidebar',
       'component.error-fallback',
@@ -173,7 +174,7 @@ export const APP_SCREEN_RECIPE_REGISTRY = [
     id: 'recipe.app-settings',
     componentIds: [
       'component.app-shell-frame',
-      'component.page-shell',
+      'component.app-shell-content-panel',
       'component.settings-panel',
       'component.error-fallback',
     ],
@@ -184,7 +185,7 @@ export const APP_SCREEN_RECIPE_REGISTRY = [
     id: 'recipe.app-operator',
     componentIds: [
       'component.app-shell-frame',
-      'component.page-shell',
+      'component.app-shell-content-panel',
       'component.unified-table',
       'component.empty-state',
       'component.error-fallback',
@@ -330,6 +331,7 @@ const NON_REFERENCE_SOURCES = new Set<string>([
   'apps/web/app/app/(shell)/admin/ingest/page.tsx',
   'apps/web/app/app/(shell)/admin/leads/page.tsx',
   'apps/web/app/app/(shell)/admin/ops/page.tsx',
+  'apps/web/app/app/(shell)/admin/page.tsx',
   'apps/web/app/app/(shell)/admin/outreach/dm/page.tsx',
   'apps/web/app/app/(shell)/admin/outreach/email/page.tsx',
   'apps/web/app/app/(shell)/admin/outreach/page.tsx',

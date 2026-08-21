@@ -26,6 +26,10 @@ function inferenceLabel(audio: PendingAudio): string {
     return 'Upload cancelled';
   }
 
+  if (audio.inference?.confidence === 'low' && audio.inference.releaseTitle) {
+    return `Might match ${audio.inference.releaseTitle} · saved as a draft`;
+  }
+
   if (audio.inference?.kind === 'attach-to-existing') {
     return `Matched ${audio.releaseTitle ?? 'release'} · attaching audio`;
   }

@@ -8,8 +8,8 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-
-// Import config functions
+import { getFullClientConfig } from '@/lib/sentry/client-full';
+import { getLiteClientConfig } from '@/lib/sentry/client-lite';
 import {
   createBeforeSendHook,
   getBaseClientConfig,
@@ -19,6 +19,8 @@ import {
   SENSITIVE_HEADERS,
   scrubPii,
 } from '@/lib/sentry/config';
+
+vi.unmock('@/lib/sentry/client-lite');
 
 // ============================================================================
 // PII Scrubbing Tests
@@ -291,6 +293,21 @@ describe('scrubPii', () => {
     expect(scrubPii(event as any)).toBeNull();
   });
 
+  it('should drop a prefixed JOV-5228 UpstashError JSON bag', () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value: 'Unhandled {"error":{"name":"UpstashError"}}',
+          },
+        ],
+      },
+    };
+
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
   it('should drop the JOV-5229 title-only UpstashError JSON bag', () => {
     const event = {
       title: 'Error: {"error":{"name":"UpstashError"}}',
@@ -299,14 +316,106 @@ describe('scrubPii', () => {
     expect(scrubPii(event as any)).toBeNull();
   });
 
-  it('should keep real Upstash quota exceptions', () => {
+  it('should drop the JOV-5185 clerkUserId-wrapped UpstashError JSON bag', () => {
+    const event = {
+      title:
+        'Error: {"clerkUserId":"af5b9ee0-ecec-4508-86e0-4f364c2e349d","error":{"name":"UpstashError"}}',
+    };
+
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
+  it('should drop a JOV-5187 object-capture whose originalException is the bag', () => {
+    const inner = new Error(
+      'Command failed: ERR max requests limit exceeded. Limit: 500000'
+    );
+    inner.name = 'UpstashError';
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value: 'Non-Error exception captured with keys: error',
+          },
+        ],
+      },
+    };
+
+    expect(
+      scrubPii(event as any, { originalException: { error: inner } } as any)
+    ).toBeNull();
+  });
+
+  it('should drop a JOV-5187 bag kept on extra.__serialized__', () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value: 'Non-Error exception captured with keys: error',
+          },
+        ],
+      },
+      extra: {
+        __serialized__: { error: { name: 'UpstashError' } },
+      },
+    };
+
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
+  it('should drop a JOV-5183 bag kept on a non-standard extra key', () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value: 'Non-Error exception captured with keys: error',
+          },
+        ],
+      },
+      extra: {
+        ctx: { error: { name: 'UpstashError' } },
+      },
+    };
+
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
+  it('should drop a JOV-5187 logentry.formatted Linear title', () => {
+    const event = {
+      logentry: {
+        formatted: 'Error: {"error":{"name":"UpstashError"}}',
+      },
+    };
+
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
+  it('should drop real Upstash quota exceptions (JOV-5181)', () => {
     const event = {
       exception: {
         values: [
           {
             type: 'UpstashError',
             value:
-              'Command failed: ERR max requests limit exceeded. Limit: 500000',
+              'Command failed: ERR max requests limit exceeded. Limit: 500000, Usage: 500099. See https://upstash.com/docs/redis/troubleshooting/max_requests_limit for details',
+          },
+        ],
+      },
+    };
+
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
+  it('should keep unrelated Upstash auth failures', () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'UpstashError',
+            value:
+              'WRONGPASS invalid or missing auth token. See https://docs.upstash.com/redis/troubleshooting/http_unauthorized for details.',
           },
         ],
       },
@@ -425,6 +534,97 @@ describe('createBeforeSendHook', () => {
     beforeSend(event as any, hint as any);
     expect(customProcessor).toHaveBeenCalledWith(expect.anything(), hint);
   });
+
+  it('drops a generic object-capture whose originalException is the JOV-5185 bag', () => {
+    const beforeSend = createBeforeSendHook();
+    const inner = new Error(
+      'Command failed: ERR max requests limit exceeded. Limit: 500000'
+    );
+    inner.name = 'UpstashError';
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value: 'Non-Error exception captured with keys: clerkUserId, error',
+          },
+        ],
+      },
+    };
+    const hint = {
+      originalException: {
+        clerkUserId: 'af5b9ee0-ecec-4508-86e0-4f364c2e349d',
+        error: inner,
+      },
+    };
+
+    expect(beforeSend(event as any, hint as any)).toBeNull();
+  });
+
+  it('drops a generic object-capture whose originalException is the JOV-5209 bag', () => {
+    const beforeSend = createBeforeSendHook();
+    const inner = new Error(
+      'Command failed: ERR max requests limit exceeded. Limit: 500000'
+    );
+    inner.name = 'UpstashError';
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value: 'Non-Error exception captured with keys: error',
+          },
+        ],
+      },
+    };
+    const hint = { originalException: { error: inner } };
+
+    expect(beforeSend(event as any, hint as any)).toBeNull();
+  });
+
+  it('drops the JOV-5187 bag on the client beforeSend path', () => {
+    const { beforeSend } = getBaseClientConfig();
+    const inner = new Error(
+      'Command failed: ERR max requests limit exceeded. Limit: 500000'
+    );
+    inner.name = 'UpstashError';
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value: 'Non-Error exception captured with keys: error',
+          },
+        ],
+      },
+    };
+
+    expect(
+      beforeSend(event as any, { originalException: { error: inner } } as any)
+    ).toBeNull();
+  });
+
+  it('drops a real quota UpstashError on hint.originalException (JOV-5181)', () => {
+    const beforeSend = createBeforeSendHook();
+    const error = new Error(
+      'Command failed: ERR max requests limit exceeded. Limit: 500000, Usage: 500099. See https://upstash.com/docs/redis/troubleshooting/max_requests_limit for details'
+    );
+    error.name = 'UpstashError';
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value: 'An error occurred in the Server Components render',
+          },
+        ],
+      },
+    };
+
+    expect(
+      beforeSend(event as any, { originalException: error } as any)
+    ).toBeNull();
+  });
 });
 
 // ============================================================================
@@ -463,6 +663,57 @@ describe('getBaseClientConfig', () => {
     expect(typeof config.tracesSampleRate).toBe('number');
   });
 
+  it('ignores the opaque UpstashError JSON bag on the client (JOV-5228)', () => {
+    const config = getBaseClientConfig();
+    expect(
+      config.ignoreErrors?.some(
+        pattern =>
+          pattern instanceof RegExp &&
+          pattern.test('{"error":{"name":"UpstashError"}}')
+      )
+    ).toBe(true);
+  });
+
+  it('drops a client object-capture whose originalException is the JOV-5186 bag', () => {
+    const config = getBaseClientConfig();
+    const inner = new Error(
+      'Command failed: ERR max requests limit exceeded. Limit: 500000'
+    );
+    inner.name = 'UpstashError';
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value: 'Non-Error exception captured with keys: error',
+          },
+        ],
+      },
+    };
+
+    expect(
+      config.beforeSend(
+        event as never,
+        {
+          originalException: { error: inner },
+        } as never
+      )
+    ).toBeNull();
+  });
+
+  it('ignores the clerkUserId-wrapped UpstashError JSON bag on the client (JOV-5185)', () => {
+    const config = getBaseClientConfig();
+    expect(
+      config.ignoreErrors?.some(
+        pattern =>
+          pattern instanceof RegExp &&
+          pattern.test(
+            'Error: {"clerkUserId":"af5b9ee0-ecec-4508-86e0-4f364c2e349d","error":{"name":"UpstashError"}}'
+          )
+      )
+    ).toBe(true);
+  });
+
   it('tags events with the exact public production release when provided', async () => {
     const release = 'a'.repeat(40);
     vi.stubEnv('NEXT_PUBLIC_SENTRY_RELEASE', release);
@@ -476,6 +727,37 @@ describe('getBaseClientConfig', () => {
       vi.unstubAllEnvs();
       vi.resetModules();
     }
+  });
+});
+
+function ignoresUpstashJsonBag(
+  ignoreErrors: Array<string | RegExp> | undefined
+): boolean {
+  return Boolean(
+    ignoreErrors?.some(
+      pattern =>
+        pattern instanceof RegExp &&
+        pattern.test('{"error":{"name":"UpstashError"}}')
+    )
+  );
+}
+
+describe('client init configs (JOV-5183)', () => {
+  it('forwards the UpstashError JSON bag ignoreErrors into lite Sentry.init', () => {
+    expect(ignoresUpstashJsonBag(getLiteClientConfig().ignoreErrors)).toBe(
+      true
+    );
+  });
+
+  it('forwards the UpstashError JSON bag ignoreErrors into full Sentry.init', () => {
+    expect(
+      ignoresUpstashJsonBag(
+        getFullClientConfig({
+          enableBreadcrumbs: false,
+          enableReplay: false,
+        }).ignoreErrors
+      )
+    ).toBe(true);
   });
 });
 

@@ -188,6 +188,7 @@ vi.mock('@/components/jovie/components/ChatUsageAlert', () => ({
 describe('JovieChat empty state', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     mockSearchParams = new URLSearchParams();
     mockPendingOpportunityCards.length = 0;
     mockChatState.input = '';
@@ -219,7 +220,11 @@ describe('JovieChat empty state', () => {
       "What's next?"
     );
     expect(getByTestId('chat-empty-state-centered-composer')).toBeTruthy();
-    // No action cards and no featured skills: welcome + docked composer only.
+    expect(getByTestId('feature-intro-card')).toHaveAttribute(
+      'data-mode',
+      'highlight'
+    );
+    // No action cards and no featured skills: welcome + intro card + docked composer.
     expect(queryByTestId('chat-empty-state-action-card-slot')).toBeNull();
     expect(queryByTestId('chat-composer-dock')).toBeNull();
     expect(queryByTestId('chat-empty-state-soft-suggestions-slot')).toBeNull();
@@ -234,6 +239,12 @@ describe('JovieChat empty state', () => {
     expect(fileInput).not.toBeNull();
     expect(fileInput).toHaveClass('hidden');
     expect(fileInput).toHaveAttribute('tabindex', '-1');
+    const audioInput = container.querySelector<HTMLInputElement>(
+      '[data-testid="chat-audio-file-input"]'
+    );
+    expect(audioInput).not.toBeNull();
+    expect(audioInput).toHaveClass('hidden');
+    expect(audioInput?.accept).toContain('audio/mpeg');
     expect(queryByText('Share Feedback')).toBeNull();
     // Old task-list-style actions should NOT appear — they belong in the profile switcher.
     expect(queryByText('Preview profile')).toBeNull();
@@ -427,6 +438,7 @@ describe('JovieChat empty state', () => {
     expect(queryByTestId('chat-empty-state-welcome')).toBeNull();
     expect(queryByTestId('chat-empty-state-logo')).toBeNull();
     expect(queryByTestId('chat-empty-state-greeting')).toBeNull();
+    expect(queryByTestId('feature-intro-card')).toBeNull();
     expect(getByTestId('chat-input')).toBeTruthy();
     expect(queryByText('Connect Your Music Catalog')).toBeNull();
     expect(queryByTestId('suggested-prompts-rail')).toBeNull();
@@ -451,6 +463,7 @@ describe('JovieChat empty state', () => {
     expect(queryByTestId('suggested-prompts-rail')).toBeNull();
     expect(queryByTestId('chat-empty-state-welcome')).toBeNull();
     expect(queryByTestId('chat-empty-state-greeting')).toBeNull();
+    expect(queryByTestId('feature-intro-card')).toBeNull();
   });
 
   it('does not render first-session welcome copy in the empty state', () => {

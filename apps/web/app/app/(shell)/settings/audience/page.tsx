@@ -6,7 +6,7 @@ import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection'
 import { useSettingsContext } from '@/features/dashboard/organisms/useSettingsContext';
 
 export default function SettingsAudiencePage() {
-  const { isPro } = useSettingsContext();
+  const { isGrowth, isPro } = useSettingsContext();
 
   return (
     <SettingsSection
@@ -15,7 +15,7 @@ export default function SettingsAudiencePage() {
       description='Fan verification, opt-ins, and tracking.'
     >
       <div className='space-y-4'>
-        <SettingsAudienceSection />
+        <SettingsAudienceSection isGrowth={isGrowth} />
         <SettingsAdPixelsSection isPro={isPro} />
       </div>
     </SettingsSection>

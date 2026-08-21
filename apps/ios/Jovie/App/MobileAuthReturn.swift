@@ -242,16 +242,47 @@ enum MobileAuthReturnParser {
   }
 
   private static func isSupportedCallback(_ url: URL) -> Bool {
-    guard url.scheme?.lowercased() == "ie.jov.jovie" else { return false }
+    if url.scheme?.lowercased() == "ie.jov.jovie" {
+      if url.host == "auth", url.path == "/complete" {
+        return true
+      }
 
-    if url.host == "auth", url.path == "/complete" {
-      return true
+      if url.host == "auth-return" {
+        return true
+      }
+
+      return url.path == "/auth-return"
     }
 
-    if url.host == "auth-return" {
-      return true
+    return isAllowlistedHttpsHandback(url)
+  }
+
+  private static func isAllowlistedHttpsHandback(_ url: URL) -> Bool {
+    guard let scheme = url.scheme?.lowercased(),
+          let host = url.host?.lowercased(),
+          !host.isEmpty
+    else {
+      return false
     }
 
-    return url.path == "/auth-return"
+    let path = url.path
+    guard path == "/auth/ios/complete" || path == "/auth/native-return" else {
+      return false
+    }
+
+    let isLoopback = host == "localhost"
+      || host == "127.0.0.1"
+      || host == "[::1]"
+      || host.hasSuffix(".localhost")
+
+    if scheme == "https" {
+      return host == "jov.ie" || host == "staging.jov.ie" || isLoopback
+    }
+
+    if scheme == "http" {
+      return isLoopback
+    }
+
+    return false
   }
 }

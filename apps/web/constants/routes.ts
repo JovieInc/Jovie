@@ -193,6 +193,7 @@ export const APP_ROUTES = {
   /** Legacy native callback alias retained for older client builds. */
   LEGACY_APP_AUTH_CALLBACK: '/app/auth/callback',
   AUTH_NATIVE_COMPLETE: '/auth/native-complete',
+  AUTH_NATIVE_RETURN: '/auth/native-return',
   AUTH_IOS_COMPLETE: '/auth/ios/complete',
   AUTH_RETURN: '/auth-return',
   DESKTOP_AUTH: '/desktop-auth',

@@ -72,6 +72,18 @@ describe('recent-dispatch', () => {
     await expect(hasRecentDispatch('linear', 'issue_1')).resolves.toBe(false);
   });
 
+  it('hasRecentDispatch fail-opens when Redis quota is exhausted', async () => {
+    mockExists.mockRejectedValueOnce(
+      new Error('ERR max requests limit exceeded. Limit: 500000')
+    );
+
+    const { hasRecentDispatch } = await import(
+      '@/lib/webhooks/recent-dispatch'
+    );
+
+    await expect(hasRecentDispatch('linear', 'issue_1')).resolves.toBe(false);
+  });
+
   it('fails closed in production when Redis is unavailable', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     mockGetRedis.mockReturnValue(null);

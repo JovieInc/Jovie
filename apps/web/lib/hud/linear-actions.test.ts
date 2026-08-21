@@ -27,6 +27,7 @@ describe('fetchTimActionIssues', () => {
     const result = await fetchTimActionIssues();
 
     expect(result.available).toBe(false);
+    expect(result.observation).toBe('not_configured');
     expect(result.issues).toEqual([]);
     expect(typeof result.fetchedAt).toBe('string');
   });

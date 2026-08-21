@@ -1764,6 +1764,76 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertPackagingFormatSplitCase
 
+  - description: Channel intel refuses invented playlist names and follower counts
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Channel intel playlist gate: invented refused"
+      target: skill-prompt-contract
+      skillPromptCase: release-pitch-retouch-prompts
+      channelPlaylistRuleCase: invented-refused
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertChannelPlaylistRuleCase
+
+  - description: Channel intel drops dormant playlists
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Channel intel playlist gate: dormant dropped"
+      target: skill-prompt-contract
+      skillPromptCase: release-pitch-retouch-prompts
+      channelPlaylistRuleCase: dormant-dropped
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertChannelPlaylistRuleCase
+
+  - description: Channel intel marks missing playlist activity unknown
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Channel intel playlist gate: missing activity unknown"
+      target: skill-prompt-contract
+      skillPromptCase: release-pitch-retouch-prompts
+      channelPlaylistRuleCase: missing-activity-unknown
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertChannelPlaylistRuleCase
+
+  - description: Channel intel empty playlist fetch stays empty
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Channel intel playlist gate: empty fetch empty"
+      target: skill-prompt-contract
+      skillPromptCase: release-pitch-retouch-prompts
+      channelPlaylistRuleCase: empty-fetch-empty
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertChannelPlaylistRuleCase
+
+  - description: Channel intel caps recommended playlists at 15-25
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Channel intel playlist gate: cap 15-25"
+      target: skill-prompt-contract
+      skillPromptCase: release-pitch-retouch-prompts
+      channelPlaylistRuleCase: cap-15-25
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertChannelPlaylistRuleCase
+
   - description: AI chat tool prompt builders preserve no-text and factual guardrails
     metadata:
       cost: deterministic

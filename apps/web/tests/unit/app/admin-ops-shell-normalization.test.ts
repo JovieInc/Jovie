@@ -47,7 +47,7 @@ function readSource(filePath: string): string {
 }
 
 describe('admin ops shell normalization', () => {
-  it('keeps Ovie inside AdminPage and treats ops as a redirect', () => {
+  it('keeps Ops inside AdminPage and treats /app/ov/ops as a redirect', () => {
     const hud = readSource(HUD_PAGE);
     const ops = readSource(OPS_PAGE);
 
@@ -88,9 +88,7 @@ describe('admin ops shell normalization', () => {
     const hudSource = readSource(HUD_DASHBOARD_CLIENT);
 
     expect(hudSource).toContain('import { WhatShipped }');
-    expect(hudSource).toContain(
-      '<WhatShipped key={section.id} kioskToken={kioskToken} />'
-    );
+    expect(hudSource).toContain('<WhatShipped kioskToken={kioskToken} />');
     expect(hudSource.indexOf("case 'factory-health'")).toBeLessThan(
       hudSource.indexOf("case 'what-shipped'")
     );

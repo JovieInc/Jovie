@@ -22,8 +22,12 @@ export async function hasRecentDispatch(
     return false;
   }
 
-  const exists = await redis.exists(buildDispatchKey(scope, key));
-  return exists === 1;
+  try {
+    const exists = await redis.exists(buildDispatchKey(scope, key));
+    return exists === 1;
+  } catch {
+    return false;
+  }
 }
 
 export async function acquireRecentDispatch(
@@ -76,9 +80,13 @@ export async function markRecentDispatch(
     return;
   }
 
-  await redis.set(buildDispatchKey(scope, key), Date.now().toString(), {
-    ex: ttlSeconds,
-  });
+  try {
+    await redis.set(buildDispatchKey(scope, key), Date.now().toString(), {
+      ex: ttlSeconds,
+    });
+  } catch {
+    return;
+  }
 }
 
 export async function clearRecentDispatch(
@@ -90,5 +98,9 @@ export async function clearRecentDispatch(
     return;
   }
 
-  await redis.del(buildDispatchKey(scope, key));
+  try {
+    await redis.del(buildDispatchKey(scope, key));
+  } catch {
+    return;
+  }
 }

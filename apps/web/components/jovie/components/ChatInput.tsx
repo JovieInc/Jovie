@@ -68,6 +68,7 @@ export interface ChatInputProps {
   readonly placeholder?: string;
   readonly variant?: 'default' | 'compact' | 'hero';
   readonly onFileAttach?: () => void;
+  readonly onAudioAttach?: () => void;
   readonly isFileProcessing?: boolean;
   readonly pendingFiles?: import('../hooks/useChatFileAttachments').PendingFile[];
   readonly onRemoveFile?: (id: string) => void;
@@ -227,6 +228,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       placeholder = CHAT_COMPOSER_EMPTY_PLACEHOLDER,
       variant = 'default',
       onFileAttach,
+      onAudioAttach,
       isFileProcessing = false,
       pendingFiles,
       onRemoveFile,
@@ -251,7 +253,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const characterCount = value.length;
     const isNearLimit = characterCount > MAX_MESSAGE_LENGTH * 0.9;
     const isOverLimit = characterCount > MAX_MESSAGE_LENGTH;
-    const hasAttachButton = Boolean(onFileAttach);
+    const hasAttachButton = Boolean(onFileAttach || onAudioAttach);
     const hasPendingFiles = (pendingFiles?.length ?? 0) > 0;
     const hasChips = (chips?.length ?? 0) > 0;
 
@@ -760,6 +762,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       isNearLimit,
       hasAttachButton,
       onFileAttach,
+      onAudioAttach,
       isFileProcessing,
       isLoading,
       isSubmitting,
@@ -1019,6 +1022,7 @@ interface InputRowProps {
   readonly isNearLimit: boolean;
   readonly hasAttachButton: boolean;
   readonly onFileAttach?: () => void;
+  readonly onAudioAttach?: () => void;
   readonly isFileProcessing: boolean;
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
@@ -1073,6 +1077,7 @@ function InputRow({
   isNearLimit,
   hasAttachButton,
   onFileAttach,
+  onAudioAttach,
   isFileProcessing,
   isLoading,
   isSubmitting,
@@ -1135,6 +1140,7 @@ function InputRow({
             onOpenChange={setPlusMenuOpen}
             onMouseDown={handlePreserveFocus}
             onFileAttach={onFileAttach ?? (() => undefined)}
+            onAudioAttach={onAudioAttach}
           />
         ) : null}
         <div
@@ -1222,6 +1228,7 @@ function InputRow({
                 onOpenChange={setPlusMenuOpen}
                 onMouseDown={handlePreserveFocus}
                 onFileAttach={onFileAttach ?? (() => undefined)}
+                onAudioAttach={onAudioAttach}
               />
             ) : null}
           </div>

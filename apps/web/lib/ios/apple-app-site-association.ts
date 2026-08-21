@@ -19,7 +19,13 @@ export const JOVIE_APPLE_APP_SITE_ASSOCIATION = {
     details: [
       {
         appID: `${JOVIE_APPLE_TEAM_ID}.${JOVIE_IOS_BUNDLE_ID}`,
-        paths: ['/app/*', '/auth/*'],
+        paths: [
+          '/app/*',
+          '/auth/ios/complete',
+          '/auth/ios/complete?*',
+          '/auth/native-return',
+          '/auth/native-return?*',
+        ],
       },
     ],
   },

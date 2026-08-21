@@ -317,6 +317,20 @@ export async function onRequestError(...args: unknown[]) {
     return;
   }
 
+  // Next.js request-error capture bypasses captureError unwrap. A thrown
+  // `{ error: UpstashError }` JSON-stringifies to the JOV-5209 / JOV-5218
+  // Linear title. Nested wrappers keep the bag on `cause`. A raw quota
+  // `UpstashError` (JOV-5181 / JOV-5184) files as `ERR max requests limit
+  // exceeded` — the hourly operability canary owns the standing alert.
+  const [{ isOpaqueUpstashErrorJsonBag }, { isRedisQuotaFailure }] =
+    await Promise.all([
+      import('@/lib/sentry/non-actionable-issues'),
+      import('@/lib/utils/errors'),
+    ]);
+  if (isOpaqueUpstashErrorJsonBag(args[0]) || isRedisQuotaFailure(args[0])) {
+    return;
+  }
+
   const Sentry = await loadSentry();
   return Sentry.captureRequestError(...args);
 }

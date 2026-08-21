@@ -265,17 +265,18 @@ export async function handleMobileChatTurn(
 
   const artistContext = await fetchMobileArtistContext({
     profileId,
+    authorizedProfile: session.profile,
   });
 
   if (!artistContext) {
     const message =
-      'Jovie could not load your artist context for this request. Refresh and try again.';
+      'Your artist profile is missing a username, so chat cannot start. Finish setup on the web and try again.';
     await persistTerminalAssistantMessage({
       conversationId: reservation.conversationId,
       turnId: reservation.turn.id,
       status: 'failed_model_error',
       content: message,
-      errorCode: 'ARTIST_CONTEXT_UNAVAILABLE',
+      errorCode: 'ARTIST_USERNAME_MISSING',
     });
 
     return ndjsonResponse([

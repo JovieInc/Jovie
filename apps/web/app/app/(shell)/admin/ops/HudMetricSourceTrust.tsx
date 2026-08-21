@@ -57,7 +57,7 @@ export function HudMetricSourceTrust({
           )}
         </p>
         <div className='flex shrink-0 items-center gap-2'>
-          {onRetry && source.state === 'unavailable' ? (
+          {onRetry && (source.state === 'unavailable' || stale) ? (
             <Button
               type='button'
               variant='link'

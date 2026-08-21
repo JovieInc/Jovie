@@ -45,24 +45,26 @@ describe('composeHudForPresentation', () => {
     for (const { sections } of composed) {
       expect(needSignalIds(sections)).toEqual([...HUD_NEED_SECTION_IDS]);
       expect(getHudNeedBand(sections).map(entry => entry.id)).toEqual([
-        'morning-walk',
+        'action-required',
         'cash-mrr',
-        'factory-health',
+        'bottleneck',
         'shipper',
+        'factory-health',
       ]);
       expect(getHudNeedBand(sections).map(entry => entry.testId)).toEqual([
-        HUD_SECTION_TEST_IDS['morning-walk'],
+        HUD_SECTION_TEST_IDS['action-required'],
         HUD_SECTION_TEST_IDS['cash-mrr'],
-        HUD_SECTION_TEST_IDS['factory-health'],
+        HUD_SECTION_TEST_IDS.bottleneck,
         HUD_SECTION_TEST_IDS.shipper,
+        HUD_SECTION_TEST_IDS['factory-health'],
       ]);
 
       const noiseIds = getHudNoiseBand(sections).map(entry => entry.id);
       expect(noiseIds.slice(0, 4)).toEqual([
+        'morning-walk',
         'design-jury',
         'velocity',
         'agent-runs',
-        'what-shipped',
       ]);
       expect(noiseIds).toEqual([...HUD_NOISE_SECTION_IDS]);
 
@@ -87,7 +89,8 @@ describe('composeHudForPresentation', () => {
       expect(needIds.filter(id => id === 'cash-mrr')).toHaveLength(1);
       expect(needIds.filter(id => id === 'shipper')).toHaveLength(1);
       expect(needIds.filter(id => id === 'factory-health')).toHaveLength(1);
-      expect(needIds.filter(id => id === 'morning-walk')).toHaveLength(1);
+      expect(needIds.filter(id => id === 'action-required')).toHaveLength(1);
+      expect(needIds.filter(id => id === 'bottleneck')).toHaveLength(1);
     }
   });
 
@@ -125,7 +128,29 @@ describe('composeHudForPresentation', () => {
     expect(walk).not.toContain('Cash {');
     expect(kpi).not.toContain("label: 'Cash'");
     expect(kpi).not.toContain('hud-kpi-cash');
+    expect(kpi).toContain('isSuccessfulHudObservation');
     expect(health).not.toContain("name: 'Shipper'");
     expect(shipper).not.toContain("data-testid='hud-what-shipped-panel'");
+  });
+
+  it('keeps the bottleneck band funnel-only in HudDashboardClient', () => {
+    const source = readFileSync(HUD_DASHBOARD_CLIENT, 'utf8');
+    expect(source).toContain('FounderFunnelBand');
+    expect(source).not.toContain('FounderConversionHud');
+    expect(source).not.toContain('founder-hud-mrr');
+    expect(source).not.toContain('founder-hud-shipping-velocity');
+  });
+
+  it('reuses FounderFunnelBand instead of a second funnel flowchart', () => {
+    const conversionHud = readFileSync(
+      join(
+        TEST_DIR,
+        '../../../../components/features/admin/hud/FounderConversionHud.tsx'
+      ),
+      'utf8'
+    );
+    expect(conversionHud).toContain('FounderFunnelBand');
+    expect(conversionHud).not.toContain('founder-funnel-stage-');
+    expect(conversionHud).not.toContain('FunnelStageTile');
   });
 });

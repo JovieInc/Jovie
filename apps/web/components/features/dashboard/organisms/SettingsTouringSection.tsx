@@ -28,10 +28,10 @@ import {
   saveBandsintownApiKey,
   syncFromBandsintown,
 } from '@/app/app/(shell)/dashboard/tour-dates/actions';
-import { SettingsActionRow } from '@/components/features/dashboard/molecules/SettingsActionRow';
-import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
 import { toast } from '@/components/feedback';
 import { TouringSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
+import { SettingsActionRow } from '@/components/molecules/settings/SettingsActionRow';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import {
   Dialog,
   DialogActions,
@@ -69,29 +69,25 @@ export function SettingsTouringSection({
 
   if (isLoading) {
     return (
-      <SettingsPanel>
-        <div className='px-4 py-4 sm:px-5'>
-          <TouringSectionSkeleton />
-        </div>
+      <SettingsPanel bodyClassName='px-4 py-4 sm:px-5'>
+        <TouringSectionSkeleton />
       </SettingsPanel>
     );
   }
 
   if (isError) {
     return (
-      <SettingsPanel>
-        <div className='px-4 py-4 sm:px-5'>
-          <SettingsActionRow
-            icon={<Calendar className='h-4 w-4' aria-hidden />}
-            title='Unable to load Bandsintown'
-            description='We could not load your touring connection status.'
-            action={
-              <Button variant='ghost' size='sm' onClick={() => refetch()}>
-                Try Again
-              </Button>
-            }
-          />
-        </div>
+      <SettingsPanel bodyClassName='px-4 py-4 sm:px-5'>
+        <SettingsActionRow
+          icon={<Calendar className='h-4 w-4' aria-hidden />}
+          title='Unable to load Bandsintown'
+          description='We could not load your touring connection status.'
+          action={
+            <Button variant='ghost' size='sm' onClick={() => refetch()}>
+              Try Again
+            </Button>
+          }
+        />
       </SettingsPanel>
     );
   }
@@ -138,8 +134,8 @@ export function SettingsTouringSection({
   };
 
   return (
-    <SettingsPanel>
-      <div className='px-4 py-4 sm:px-5'>
+    <>
+      <SettingsPanel bodyClassName='px-4 py-4 sm:px-5'>
         <SettingsActionRow
           icon={<Calendar className='h-4 w-4' aria-hidden />}
           title={
@@ -158,7 +154,7 @@ export function SettingsTouringSection({
             />
           }
         />
-      </div>
+      </SettingsPanel>
 
       <BandsintownConnectDialog
         open={connectDialogOpen}
@@ -177,7 +173,7 @@ export function SettingsTouringSection({
         variant='destructive'
         onConfirm={handleDisconnectConfirm}
       />
-    </SettingsPanel>
+    </>
   );
 }
 

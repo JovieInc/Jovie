@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, GitBranch, Loader2, Ship } from 'lucide-react';
+import { HudObservationStatus } from '@/components/features/admin/hud/HudObservationStatus';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -275,10 +276,42 @@ export function HudShipperNeedPanel({
   }
 
   if (!shipperQuery.data) {
+    if (shipperQuery.isError) {
+      return (
+        <ContentSurfaceCard
+          surface='details'
+          className='space-y-3 p-3'
+          data-testid='hud-shipper-status-panel'
+        >
+          <HudObservationStatus
+            state='unavailable'
+            message='Shipper status is unavailable.'
+            onRetry={() => {
+              shipperQuery.refetch().catch(() => {});
+            }}
+            testId='hud-shipper-observation'
+          />
+        </ContentSurfaceCard>
+      );
+    }
     return <PanelSkeleton />;
   }
 
-  return <ShipperStatusPanel payload={shipperQuery.data} />;
+  return (
+    <>
+      <ShipperStatusPanel payload={shipperQuery.data} />
+      {shipperQuery.isError ? (
+        <HudObservationStatus
+          state='unavailable'
+          message='Showing last known shipper status.'
+          onRetry={() => {
+            shipperQuery.refetch().catch(() => {});
+          }}
+          testId='hud-shipper-last-known'
+        />
+      ) : null}
+    </>
+  );
 }
 
 export function HudGithubBudgetPanel() {
@@ -295,6 +328,18 @@ export function HudGithubBudgetPanel() {
   });
 
   if (!rateLimitsQuery.data) {
+    if (rateLimitsQuery.isError) {
+      return (
+        <HudObservationStatus
+          state='unavailable'
+          message='GitHub rate limits are unavailable.'
+          onRetry={() => {
+            rateLimitsQuery.refetch().catch(() => {});
+          }}
+          testId='hud-github-budget-observation'
+        />
+      );
+    }
     return <PanelSkeleton />;
   }
 

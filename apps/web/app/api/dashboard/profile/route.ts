@@ -9,6 +9,8 @@ import { db } from '@/lib/db';
 import { isUniqueViolation } from '@/lib/db/errors';
 import { dashboardQuery } from '@/lib/db/query-timeout';
 import { syncSocialLinksFromPrimaryMusicUrls } from '@/lib/db/social-links-sync';
+import { hasAdvancedFeatures } from '@/lib/entitlements/registry';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { buildThemeWithProfileAccent } from '@/lib/profile/profile-theme.server';
@@ -130,6 +132,7 @@ export async function PUT(req: Request) {
     if (parsedRequest instanceof NextResponse) return parsedRequest;
 
     const {
+      parsedUpdates,
       dbProfileUpdates,
       displayNameForUserUpdate,
       avatarUrl,
@@ -137,6 +140,15 @@ export async function PUT(req: Request) {
       expectedVersion,
       profileId,
     } = parsedRequest;
+    if (parsedUpdates.settings?.require_double_opt_in === false) {
+      const entitlements = await getCurrentUserEntitlements();
+      if (!hasAdvancedFeatures(entitlements.plan)) {
+        return NextResponse.json(
+          { error: 'Double opt-in can only be disabled on Max.' },
+          { status: 403, headers: NO_STORE_HEADERS }
+        );
+      }
+    }
     const avatarPreflight =
       avatarUrl === undefined
         ? undefined

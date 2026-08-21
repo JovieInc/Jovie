@@ -1,11 +1,26 @@
 'use client';
 
-import { createContext, useContext, useMemo } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { UNKNOWN_INBOX_NAVIGATION_AVAILABILITY } from '@/lib/inbox/navigation-availability';
 import { UNKNOWN_AVATAR_QUALITY } from '@/lib/profile/avatar-quality';
 import type { DashboardData } from './actions';
 
-export const DashboardDataContext = createContext<DashboardData | null>(null);
+interface DashboardDataContextValue extends DashboardData {
+  readonly updateSelectedProfileSettings?: (
+    profileId: string,
+    settings: Record<string, unknown>
+  ) => void;
+}
+
+export const DashboardDataContext =
+  createContext<DashboardDataContextValue | null>(null);
 
 const EMPTY_PROFILE_COMPLETION: DashboardData['profileCompletion'] = {
   percentage: 0,
@@ -35,7 +50,34 @@ export function DashboardDataProvider({
   value,
   children,
 }: Readonly<DashboardDataProviderProps>) {
-  const normalizedValue = useMemo(() => normalizeDashboardData(value), [value]);
+  const [selectedProfile, setSelectedProfile] = useState(value.selectedProfile);
+
+  useEffect(() => {
+    setSelectedProfile(value.selectedProfile);
+  }, [value.selectedProfile]);
+
+  const updateSelectedProfileSettings = useCallback(
+    (profileId: string, settings: Record<string, unknown>) => {
+      setSelectedProfile(current =>
+        current?.id === profileId
+          ? {
+              ...current,
+              settings: { ...(current.settings ?? {}), ...settings },
+            }
+          : current
+      );
+    },
+    []
+  );
+
+  const normalizedValue = useMemo(
+    () => ({
+      ...normalizeDashboardData(value),
+      selectedProfile,
+      updateSelectedProfileSettings,
+    }),
+    [selectedProfile, updateSelectedProfileSettings, value]
+  );
 
   return (
     <DashboardDataContext.Provider value={normalizedValue}>
@@ -44,7 +86,7 @@ export function DashboardDataProvider({
   );
 }
 
-export function useDashboardData(): DashboardData {
+export function useDashboardData(): DashboardDataContextValue {
   const context = useContext(DashboardDataContext);
   if (!context) {
     throw new TypeError(

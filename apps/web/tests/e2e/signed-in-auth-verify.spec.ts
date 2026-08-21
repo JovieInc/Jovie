@@ -233,4 +233,65 @@ test.describe('Signed-in auth verification @smoke', () => {
       cleanup();
     }
   });
+
+  test('iOS sign-in returns through /auth/ios/complete, not the web app', async ({
+    page,
+  }) => {
+    test.skip(
+      TEST_AUTH_BYPASS_ENABLED,
+      'iOS native auth requires a real Better Auth session to mint its one-time token'
+    );
+    test.setTimeout(180_000);
+    const { cleanup } = setupPageMonitoring(page);
+
+    try {
+      await bootstrapSignedInSession(page);
+
+      const codeChallenge = 'AnbivgIKxV6Dz4JKlerQLNduBe4AJ-ACgu63xx7m4_A';
+      const startUrl =
+        '/auth/start?client=ios&intent=sign_in&return_to=%2Fapp' +
+        `&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+
+      const toUrl = (raw: string): URL | null => {
+        try {
+          return new URL(raw);
+        } catch {
+          return null;
+        }
+      };
+      const respPaths: URL[] = [];
+      let authStartStatus: number | null = null;
+      page.on('response', response => {
+        const url = toUrl(response.url());
+        if (!url) return;
+        respPaths.push(url);
+        if (url.pathname === '/auth/start') authStartStatus = response.status();
+      });
+
+      await page.goto(startUrl, { waitUntil: 'commit' }).catch(() => undefined);
+      await page.waitForTimeout(1500);
+
+      test.skip(
+        authStartStatus === 503,
+        'auth-state store unavailable (/auth/start 503) in this environment'
+      );
+
+      const iosReturn = respPaths.find(
+        url => url.pathname === '/auth/ios/complete'
+      );
+
+      expect(
+        iosReturn,
+        'iOS auth must bounce through /auth/ios/complete'
+      ).toBeDefined();
+      expect(iosReturn?.searchParams.get('code')).toMatch(/^[a-f0-9]+$/);
+      expect(iosReturn?.searchParams.get('state')).toMatch(/^[a-f0-9]+$/);
+      expect(
+        respPaths.some(url => /^\/app(\/|$)/.test(url.pathname)),
+        'iOS auth must not land on the web /app'
+      ).toBe(false);
+    } finally {
+      cleanup();
+    }
+  });
 });

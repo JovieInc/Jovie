@@ -16,7 +16,7 @@ export type UIOwnershipRegistryIssue = {
   readonly id: string;
 };
 const appExports = Object.fromEntries(
-  'component.app-shell-frame=AppShellFrame;component.page-shell=PageShell;component.settings-panel=SettingsPanel;component.unified-table=UnifiedTable;component.entity-sidebar=EntitySidebarShell;component.empty-state=EmptyState;component.error-fallback=DashboardErrorFallback'
+  'component.app-shell-frame=AppShellFrame;component.app-shell-content-panel=AppShellContentPanel;component.settings-panel=SettingsPanel;component.unified-table=UnifiedTable;component.entity-sidebar=EntitySidebarShell;component.empty-state=EmptyState;component.error-fallback=DashboardErrorFallback'
     .split(';')
     .map(item => item.split('='))
 ) as Readonly<Record<string, string>>;

@@ -1,8 +1,10 @@
 /**
- * Shipped Ovie/Jovie chat entry (JOV-5215/5216).
+ * Shipped Ovie/Jovie chat entry (JOV-5215/5216/5214).
  *
  * The chat route must call this — not classify-and-void. Identity packs are
- * bound here; factory gbrain-write / Symphony heal fail closed.
+ * bound here; factory gbrain-write / Symphony heal fail closed. OV door
+ * turns ingest via Eve then transport to Summer; they must not generate
+ * as artist Jovie.
  */
 
 import {
@@ -16,6 +18,10 @@ import {
   type OperatingStore,
 } from '@/lib/ovie/mcp/store';
 import { applyOvieDumpBeforeModel } from '@/lib/ovie/persist';
+import {
+  type OvieDoorGeneration,
+  resolveOvieDoorGeneration,
+} from '@/lib/ovie/summer-transport';
 
 export async function prepareOvieChatTurn(
   chatMode: 'ov' | null | undefined,
@@ -24,6 +30,7 @@ export async function prepareOvieChatTurn(
 ): Promise<{
   readonly eveTurn: EveBoundTurn;
   readonly receipts: OvieReceipt[];
+  readonly generation: OvieDoorGeneration;
 }> {
   const eveTurn = bindEveIdentityForChatMode(chatMode);
   assertEveChatFactoryLock(eveTurn);
@@ -33,5 +40,9 @@ export async function prepareOvieChatTurn(
         store: options?.store ?? getDefaultOperatingStore(),
       })
     : [];
-  return { eveTurn, receipts };
+  return {
+    eveTurn,
+    receipts,
+    generation: resolveOvieDoorGeneration(chatMode, receipts),
+  };
 }

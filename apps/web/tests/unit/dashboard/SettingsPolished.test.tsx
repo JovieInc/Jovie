@@ -4,6 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsPolished } from '@/features/dashboard/organisms/SettingsPolished';
 import type { Artist } from '@/types/db';
 
+const { billingState } = vi.hoisted(() => ({
+  billingState: { plan: 'free' },
+}));
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     refresh: vi.fn(),
@@ -17,7 +21,9 @@ vi.mock('@/features/dashboard/atoms/DashboardCard', () => ({
 }));
 
 vi.mock('@/features/dashboard/organisms/account-settings', () => ({
-  AccountSettingsSection: () => <div>Account Settings</div>,
+  AccountSettingsSection: ({ isGrowth }: { isGrowth: boolean }) => (
+    <div data-testid='account-settings' data-growth={String(isGrowth)} />
+  ),
 }));
 vi.mock('@/features/dashboard/organisms/DataPrivacySection', () => ({
   DataPrivacySection: () => <div>Data Privacy</div>,
@@ -30,7 +36,9 @@ vi.mock('@/features/dashboard/organisms/SettingsAnalyticsSection', () => ({
   SettingsAnalyticsSection: () => <div>Analytics</div>,
 }));
 vi.mock('@/features/dashboard/organisms/SettingsAudienceSection', () => ({
-  SettingsAudienceSection: () => <div>Audience</div>,
+  SettingsAudienceSection: ({ isGrowth }: { isGrowth: boolean }) => (
+    <div data-testid='audience-settings' data-growth={String(isGrowth)} />
+  ),
 }));
 vi.mock('@/features/dashboard/organisms/SettingsBillingSection', () => ({
   SettingsBillingSection: () => <div>Billing</div>,
@@ -56,6 +64,7 @@ vi.mock(
 
 vi.mock('@/lib/env-public', () => ({
   publicEnv: {
+    NEXT_PUBLIC_BETTER_AUTH_URL: 'https://auth.example.test',
     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: 'pk_test_123',
   },
 }));
@@ -68,13 +77,14 @@ vi.mock('@/lib/queries', () => ({
   useBillingStatusQuery: () => ({
     data: {
       isPro: false,
-      plan: 'free',
+      plan: billingState.plan,
     },
   }),
 }));
 
 describe('SettingsPolished', () => {
   beforeEach(() => {
+    billingState.plan = 'free';
     Element.prototype.scrollIntoView = vi.fn();
   });
 
@@ -114,5 +124,22 @@ describe('SettingsPolished', () => {
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
     expect(document.getElementById('contacts')).toBeTruthy();
     expect(document.getElementById('touring')).toBeNull();
+  });
+
+  it.each([
+    'max',
+    'growth',
+  ])('passes the %s alias to both gated surfaces', plan => {
+    billingState.plan = plan;
+    render(<SettingsPolished artist={{ id: 'artist_1' } as Artist} />);
+
+    expect(screen.getByTestId('account-settings')).toHaveAttribute(
+      'data-growth',
+      'true'
+    );
+    expect(screen.getByTestId('audience-settings')).toHaveAttribute(
+      'data-growth',
+      'true'
+    );
   });
 });
