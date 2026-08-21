@@ -210,11 +210,10 @@ function sanitizeReviewText(value, maxLength) {
     .replace(/@/g, '@\u200b')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/([\\`*_{}\[\]()#+.!|~-])/g, '\\$1')
+    .replace(/([\\`*_[\]()|~])/g, '\\$1')
     .trim()
     .slice(0, maxLength);
 }
-
 export function normalizeBackendReview(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new Error('backend_failed: review must be an object');
@@ -245,7 +244,6 @@ export function normalizeBackendReview(value) {
     }),
   };
 }
-
 export function inspectReviewBackendConfiguration({ grok, codex }) {
   const errors = [];
   for (const [provider, backend] of [
@@ -263,7 +261,6 @@ export function inspectReviewBackendConfiguration({ grok, codex }) {
     errors,
   };
 }
-
 export async function readTrustedCapture(artifactRoot, capturePath) {
   const requestedRoot = resolve(artifactRoot);
   const requested = resolve(requestedRoot, capturePath);
@@ -287,7 +284,6 @@ export async function readTrustedCapture(artifactRoot, capturePath) {
     throw new Error('capture file is not a PNG');
   return data;
 }
-
 export async function reviewWithBackend({
   apiKey,
   baseUrl,

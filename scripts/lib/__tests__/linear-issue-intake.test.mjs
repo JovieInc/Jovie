@@ -44,7 +44,6 @@ describe('upsertLinearIssueByTitleFingerprint', () => {
       reason: 'linear_search_graphql_error',
     });
   });
-
   it('creates when new and updates the matching title', async () => {
     const fetchImpl = vi.fn(async (_url, init) => {
       const payload = JSON.parse(String(init.body));
@@ -103,7 +102,6 @@ describe('upsertLinearIssueByTitleFingerprint', () => {
       identifier: 'JOV-9001',
     });
   });
-
   it('reopens, fails closed without Backlog, and preserves terminal issues by default', async () => {
     let states = [{ id: 'backlog-state', name: 'Queued', type: 'backlog' }];
     const terminal = {
@@ -143,7 +141,6 @@ describe('upsertLinearIssueByTitleFingerprint', () => {
         fetchImpl,
         reopenTerminal,
       });
-
     await expect(upsert('new occurrence', true)).resolves.toMatchObject({
       ok: true,
       reopened: true,

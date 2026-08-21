@@ -257,7 +257,6 @@ describe('bounded PR visual review contract', () => {
         'backend_unconfigured: CODEX_VISUAL_REVIEW_BASE_URL is not an approved provider endpoint',
       ],
     });
-
     const review = normalizeBackendReview({
       summary: '## Trusted\n@everyone <!-- marker -->',
       findings: [
@@ -276,7 +275,6 @@ describe('bounded PR visual review contract', () => {
     expect(review.summary).not.toContain('@everyone');
     expect(review.findings[0].title).not.toContain('[click](');
   });
-
   it('reads only bounded PNG captures from the downloaded artifact directory', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'visual-artifact-'));
     const outside = await mkdtemp(join(tmpdir(), 'visual-outside-'));
@@ -305,7 +303,6 @@ describe('bounded PR visual review contract', () => {
       await rm(outside, { recursive: true, force: true });
     }
   });
-
   it('separates objective findings from taste and never auto-fixes taste', () => {
     expect(classifyFinding({ category: 'layout', severity: 'high' })).toEqual({
       kind: 'objective',
@@ -374,7 +371,6 @@ describe('bounded PR visual review contract', () => {
     expect(capture).toContain('capture-validation.json');
   });
 });
-
 const sonarCheck = (overrides = {}) => ({
   name: SONAR_CHECK_NAME,
   app: { slug: SONAR_CHECK_APP_SLUG },
@@ -432,6 +428,13 @@ describe('trusted Sonar remediation contracts', () => {
       status: 'owned_escalation_required',
       ownership: { owner: 'Gem', verifier: 'Summer' },
     });
+    expect(() =>
+      buildVisualConfigurationIncident({
+        ...sonarReceiptInput,
+        runUrl: 'https://evil.test/run',
+        configurationErrors: ['backend_unconfigured: invalid'],
+      })
+    ).toThrow('canonical workflow run URL');
     expect(buildSonarQualityDebtReceipt(sonarReceiptInput)).toMatchObject({
       status: 'owned_capacity_deferred',
       remediation: { attemptBudget: 3, targetHeadSha: 'b'.repeat(40) },

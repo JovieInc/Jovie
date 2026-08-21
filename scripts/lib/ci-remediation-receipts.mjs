@@ -29,6 +29,8 @@ function sourceReceipt({ repository, runId, runUrl, prNumber, headSha }) {
     throw new Error('prNumber must be a positive integer');
   if (!/^\d+$/.test(String(runId ?? '')))
     throw new Error('runId must be numeric');
+  if (runUrl !== `https://github.com/${repository}/actions/runs/${runId}`)
+    throw new Error('runUrl must be the canonical workflow run URL');
   return {
     repository,
     workflowRunId: String(runId),

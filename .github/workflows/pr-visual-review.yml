@@ -199,7 +199,7 @@ jobs:
     # Product findings are advisory and never a production gate.
     continue-on-error: true
     needs: capture
-    if: ${{ always() }}
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     concurrency:

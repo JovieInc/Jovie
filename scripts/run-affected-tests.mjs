@@ -1644,6 +1644,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       'vitest',
       '--root',
       'scripts',
+      ...['--config', 'vitest.config.mts'],
       'run',
       ...CI_CONTROL_SCRIPT_TESTS.map(file => file.replace(/^scripts\//, '')),
     ]);
