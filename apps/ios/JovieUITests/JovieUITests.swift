@@ -914,30 +914,28 @@ final class JovieUITests: XCTestCase {
     }
   }
 
-  // JOV-3635: horizontal page-swipes between tabs are banned. Profile is
-  // drawer-only — open the drawer, pick Profile, then return via Chat tab.
+  // JOV-5201: on chat home, a leading pan opens the sidebar. It must not
+  // page onto Profile. Profile stays a sidebar destination.
   func testSwipeNavigatesBetweenProfileAndChat() {
     let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"chat-composer-input\"") {
       $0.textFields["chat-composer-input"]
     }
 
-    // Full-width swipe must NOT switch tabs (gesture ownership: edges only).
-    app.swipeRight()
+    dragChatHomeLeadingSwipe(app)
+    let profileSurface = app.buttons["shell-drawer-surface-shell-tab-profile"]
     XCTAssertTrue(
-      app.textFields["chat-composer-input"].waitForExistence(timeout: 2),
-      "Horizontal swipe incorrectly left Chat.\n\(app.debugDescription)"
+      waitForHittable(profileSurface, timeout: 3),
+      "Leading swipe did not open the sidebar.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.buttons["shell-drawer-surface-shell-tab-library"].isHittable,
+      "Sidebar Library must be reachable after a leading swipe.\n\(app.debugDescription)"
     )
     XCTAssertFalse(
       app.buttons["Copy URL"].exists,
-      "Horizontal swipe must not open Profile (drawer-only surface).\n\(app.debugDescription)"
+      "Horizontal swipe must not open Profile as a paged tab.\n\(app.debugDescription)"
     )
 
-    app.buttons["Open navigation drawer"].tap()
-    let profileSurface = app.buttons["shell-drawer-surface-shell-tab-profile"]
-    XCTAssertTrue(
-      profileSurface.waitForExistence(timeout: 3),
-      "Drawer Profile surface missing.\n\(app.debugDescription)"
-    )
     profileSurface.tap()
     XCTAssertTrue(
       app.buttons["Copy URL"].waitForExistence(timeout: 3),
@@ -955,6 +953,27 @@ final class JovieUITests: XCTestCase {
       app.textFields["chat-composer-input"].waitForExistence(timeout: 3),
       "Drawer Chat did not return to Chat.\n\(app.debugDescription)"
     )
+  }
+
+  func testChatHomeTrailingSwipeOpensRightRail() {
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"chat-composer-input\"") {
+      $0.textFields["chat-composer-input"]
+    }
+
+    dragChatHomeTrailingSwipe(app)
+    XCTAssertTrue(
+      app.descendants(matching: .any)["shell-right-rail"].waitForExistence(timeout: 3),
+      "Trailing swipe did not open the right rail.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.buttons["shell-rail-talk"].waitForExistence(timeout: 2),
+      "Empty right rail must still offer Talk.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      shellControlExists(app, identifier: "shell-tab-bar"),
+      "Right-rail swipe must not restore the bottom tab bar.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "chat-first-right-rail", app: app)
   }
 
   func testChatComposerWorkflowSheetShowsWorkflowGrid() {
@@ -2023,6 +2042,20 @@ final class JovieUITests: XCTestCase {
         line: line
       )
     }
+  }
+
+  /// Mid-canvas pans on chat home (JOV-5201). Start away from the 44pt edges
+  /// so the test proves full-width swipe, not only the leftover edge drag.
+  private func dragChatHomeLeadingSwipe(_ app: XCUIApplication) {
+    let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.22, dy: 0.42))
+    let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.42))
+    start.press(forDuration: 0.05, thenDragTo: end)
+  }
+
+  private func dragChatHomeTrailingSwipe(_ app: XCUIApplication) {
+    let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.78, dy: 0.42))
+    let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.12, dy: 0.42))
+    start.press(forDuration: 0.05, thenDragTo: end)
   }
 
   private func waitForHittable(_ element: XCUIElement, timeout: TimeInterval) -> Bool {

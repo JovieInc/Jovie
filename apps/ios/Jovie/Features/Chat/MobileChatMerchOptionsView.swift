@@ -3,6 +3,7 @@ import SwiftUI
 struct MobileChatMerchOptionsView: View {
   let artifact: MobileChatMerchArtifact
   let onSelectPrompt: (String) -> Void
+  @Environment(\.appShellRailSwipeSuppression) private var railSwipeSuppression
 
   var body: some View {
     switch artifact {
@@ -127,7 +128,24 @@ struct MobileChatMerchOptionsView: View {
           content()
         }
       }
+      .simultaneousGesture(horizontalMerchScrollGesture)
+      .onDisappear {
+        railSwipeSuppression?.wrappedValue = false
+      }
     }
+  }
+
+  private var horizontalMerchScrollGesture: some Gesture {
+    DragGesture(minimumDistance: 6, coordinateSpace: .local)
+      .onChanged { value in
+        railSwipeSuppression?.wrappedValue = AppShellGesturePolicy.isHorizontalDragIntent(
+          translationX: value.translation.width,
+          translationY: value.translation.height
+        )
+      }
+      .onEnded { _ in
+        railSwipeSuppression?.wrappedValue = false
+      }
   }
 
   private func merchCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {

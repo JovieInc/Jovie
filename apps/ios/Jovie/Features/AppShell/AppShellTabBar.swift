@@ -118,13 +118,40 @@ struct AppShellTabBar: View {
   }
 }
 
-/// Pure helpers for gesture ownership (JOV-3635) — edge swipes own rails;
-/// tabs own surface switching. Horizontal page-swipes between tabs are banned.
+private struct AppShellRailSwipeSuppressionKey: EnvironmentKey {
+  static let defaultValue: Binding<Bool>? = nil
+}
+
+extension EnvironmentValues {
+  var appShellRailSwipeSuppression: Binding<Bool>? {
+    get { self[AppShellRailSwipeSuppressionKey.self] }
+    set { self[AppShellRailSwipeSuppressionKey.self] = newValue }
+  }
+}
+
+/// Gesture ownership (JOV-5201): chat-home pans open sidebar / right rail.
+/// Other surfaces keep thumb-sized edge drags so Inbox triage still owns the
+/// card. Horizontal pans never switch tabs.
 enum AppShellGesturePolicy {
-  static let leftEdgeOpenWidth: CGFloat = 28
-  static let rightEdgeOpenWidth: CGFloat = 28
+  static let leftEdgeOpenWidth: CGFloat = 44
+  static let rightEdgeOpenWidth: CGFloat = 44
   static let openDistance: CGFloat = 72
   static let openPredicted: CGFloat = 120
+  static let horizontalDominanceRatio: CGFloat = 1.35
+  static let horizontalFollowDominanceRatio: CGFloat = 0.75
+
+  static func isDominantHorizontalSwipe(translationX: CGFloat, translationY: CGFloat) -> Bool {
+    abs(translationX) > abs(translationY) * horizontalDominanceRatio
+  }
+
+  static func isHorizontalDragIntent(translationX: CGFloat, translationY: CGFloat) -> Bool {
+    abs(translationX) >= 8 && abs(translationX) > abs(translationY) * horizontalFollowDominanceRatio
+  }
+
+  /// Chat is the home pager: a full-width horizontal pan opens rails.
+  static func allowsFullWidthRailSwipe(selectedTab: AppShellTab) -> Bool {
+    selectedTab == .chat
+  }
 
   static func isLeftEdgeOpen(startX: CGFloat, translationX: CGFloat, predictedX: CGFloat)
     -> Bool
@@ -143,6 +170,75 @@ enum AppShellGesturePolicy {
       && (translationX < -openDistance || predictedX < -openPredicted)
   }
 
+  static func isLeadingSwipeOpen(
+    selectedTab: AppShellTab,
+    startX: CGFloat,
+    translationX: CGFloat,
+    predictedX: CGFloat,
+    translationY: CGFloat
+  ) -> Bool {
+    guard isDominantHorizontalSwipe(translationX: translationX, translationY: translationY) else {
+      return false
+    }
+    if allowsFullWidthRailSwipe(selectedTab: selectedTab) {
+      return translationX > openDistance || predictedX > openPredicted
+    }
+    return isLeftEdgeOpen(startX: startX, translationX: translationX, predictedX: predictedX)
+  }
+
+  static func isTrailingSwipeOpen(
+    selectedTab: AppShellTab,
+    startX: CGFloat,
+    containerWidth: CGFloat,
+    translationX: CGFloat,
+    predictedX: CGFloat,
+    translationY: CGFloat
+  ) -> Bool {
+    guard isDominantHorizontalSwipe(translationX: translationX, translationY: translationY) else {
+      return false
+    }
+    if allowsFullWidthRailSwipe(selectedTab: selectedTab) {
+      return translationX < -openDistance || predictedX < -openPredicted
+    }
+    return isRightEdgeOpen(
+      startX: startX,
+      containerWidth: containerWidth,
+      translationX: translationX,
+      predictedX: predictedX
+    )
+  }
+
+  static func shouldFollowLeadingDrag(
+    selectedTab: AppShellTab,
+    startX: CGFloat,
+    translationX: CGFloat,
+    translationY: CGFloat
+  ) -> Bool {
+    guard translationX > 0,
+          isHorizontalDragIntent(translationX: translationX, translationY: translationY)
+    else { return false }
+    if allowsFullWidthRailSwipe(selectedTab: selectedTab) {
+      return true
+    }
+    return startX < leftEdgeOpenWidth
+  }
+
+  static func shouldFollowTrailingDrag(
+    selectedTab: AppShellTab,
+    startX: CGFloat,
+    containerWidth: CGFloat,
+    translationX: CGFloat,
+    translationY: CGFloat
+  ) -> Bool {
+    guard translationX < 0,
+          isHorizontalDragIntent(translationX: translationX, translationY: translationY)
+    else { return false }
+    if allowsFullWidthRailSwipe(selectedTab: selectedTab) {
+      return true
+    }
+    return startX > containerWidth - rightEdgeOpenWidth
+  }
+
   static func isRightEdgeClose(
     isRailOpen: Bool,
     translationX: CGFloat,
@@ -157,14 +253,16 @@ enum AppShellGesturePolicy {
     false
   }
 
-  /// Edge-drag rails must not fight text selection, Talk, or a teleprompter.
+  /// Rail drags must not fight text selection, Talk, or a teleprompter. Reduce
+  /// Motion keeps the navigation path available; the shell suppresses offset
+  /// animation separately.
   static func allowsEdgeRailDrag(
     reduceMotion: Bool,
     isKeyboardVisible: Bool,
     isShowingTalkOverlay: Bool,
     hasTeleprompterProposal: Bool
   ) -> Bool {
-    !reduceMotion && !isKeyboardVisible && !isShowingTalkOverlay && !hasTeleprompterProposal
+    !isKeyboardVisible && !isShowingTalkOverlay && !hasTeleprompterProposal
   }
 }
 

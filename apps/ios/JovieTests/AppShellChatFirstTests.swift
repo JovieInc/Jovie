@@ -200,5 +200,49 @@ struct AppShellChatFirstTests {
     #expect(appShellHomeSurface(chatEnabled: true) == .chat)
     #expect(AppShellPanePolicy.showsBottomTabBar() == false)
     #expect(AppShellGesturePolicy.shouldSwitchTabFromHorizontalSwipe() == false)
+    #expect(AppShellGesturePolicy.allowsFullWidthRailSwipe(selectedTab: .chat))
+  }
+
+  @Test func transcriptMotionFadesWithoutOffsetOrScale() throws {
+    #expect(MobileChatTranscriptMotion.rowInsertion(reduceMotion: true) == nil)
+    #expect(MobileChatTranscriptMotion.jumpToLatest(reduceMotion: true) == nil)
+    #expect(MobileChatTranscriptMotion.rowInsertion(reduceMotion: false) != nil)
+    #expect(MobileChatTranscriptMotion.jumpToLatest(reduceMotion: false) != nil)
+
+    let sourceURL = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("Jovie/Features/Chat/MobileChatView.swift")
+    let source = try String(contentsOf: sourceURL, encoding: .utf8)
+    #expect(!source.contains("offset(y: 6)"))
+    #expect(!source.contains("scale(scale:"))
+    #expect(!source.contains("duration: 0.25"))
+    #expect(!source.contains("spring(duration: 0.2)"))
+  }
+
+  @Test func shellRailGestureResetsOffsetsAndHonorsSubviewSuppression() throws {
+    let sourceURL = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("Jovie/Features/AppShell/AppShellView.swift")
+    let source = try String(contentsOf: sourceURL, encoding: .utf8)
+    #expect(source.contains("@State private var isRailSwipeSuppressedBySubview = false"))
+    #expect(source.contains(#".environment(\.appShellRailSwipeSuppression, $isRailSwipeSuppressedBySubview)"#))
+    #expect(source.contains("guard !isRailSwipeSuppressedBySubview else"))
+    #expect(source.contains("private func resetRailDragOffsets()"))
+    #expect(source.contains("followLeadingRailDrag(translationX:"))
+    #expect(source.contains("followTrailingRailDrag(translationX:"))
+  }
+
+  @Test func merchHorizontalScrollSuppressesShellRailSwipe() throws {
+    let sourceURL = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("Jovie/Features/Chat/MobileChatMerchOptionsView.swift")
+    let source = try String(contentsOf: sourceURL, encoding: .utf8)
+    #expect(source.contains("@Environment(\\.appShellRailSwipeSuppression)"))
+    #expect(source.contains(".simultaneousGesture(horizontalMerchScrollGesture)"))
+    #expect(source.contains("AppShellGesturePolicy.isHorizontalDragIntent("))
+    #expect(source.contains("railSwipeSuppression?.wrappedValue = false"))
   }
 }
