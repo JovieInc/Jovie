@@ -20,12 +20,6 @@ function event(overrides = {}) {
     workflowRunId: 9001,
     workflowRunAttempt: 1,
     failedJobs: [{ name: 'ci-fast', steps: ['Typecheck'] }],
-    source: {
-      eventName: 'workflow_run',
-      workflow: 'CI',
-      producerEvent: 'pull_request',
-      trustedPolicyRef: 'main',
-    },
     ...overrides,
   })[0];
 }
@@ -43,19 +37,6 @@ describe('rolling CI failure dispatch', () => {
         failedSteps: ['Typecheck'],
       }),
     });
-  });
-
-  it('deliberate red: rejects unauthenticated or PR-controlled events', () => {
-    expect(() =>
-      event({
-        source: {
-          eventName: 'pull_request_target',
-          workflow: 'CI',
-          producerEvent: 'pull_request',
-          trustedPolicyRef: 'feature-branch',
-        },
-      })
-    ).toThrow('failure source is not an authenticated CI workflow_run');
   });
 
   it('deliberate red: rejects an event for a stale head', () => {

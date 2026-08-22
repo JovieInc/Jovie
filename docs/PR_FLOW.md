@@ -45,12 +45,6 @@ testable commit instead of waiting for promotion-grade local verification.
   the landing lane only when the final exact, current head passes every required
   test, coverage, security, and policy gate. Never weaken a required gate or
   substitute draft-publication checks for production/runtime proof.
-- After a repair, persist a learning receipt with the root-cause class,
-  current-head reproduction, minimal repair, equivalent-surface sweep,
-  deliberate-red fixture, and guardrail decision. Product-wide invariants need
-  before/after test proof; environment failures become runner/execution-path
-  fixes, and one-offs are recorded without adding rule sprawl. A repaired draft
-  cannot auto-promote until that receipt and the exact head are green.
 
 Regression case: PR #16336 had a coherent committed checkpoint with focused
 tests/typechecks green, but its mandatory affected pre-push shard ran for more

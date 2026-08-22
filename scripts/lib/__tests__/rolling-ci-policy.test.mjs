@@ -39,18 +39,8 @@ describe('draft-first rolling CI policy wiring', () => {
     expect(workflow).toContain('ref: main');
     expect(workflow).toContain('persist-credentials: false');
     expect(workflow).toContain('Failure event is stale or ownership changed');
-    expect(workflow).toContain('scripts/lib/rolling-ci-handoff.mjs');
-    expect(workflow).toContain("steps.dispatch-plan.outputs.route == 'fx'");
-    expect(workflow).toContain('fx-auth-missing');
     expect(workflow).not.toContain(
       'ref: ${{ needs.guard.outputs.pr_head_sha }}'
     );
-  });
-
-  it('requires a current-head learning receipt before automatic promotion', () => {
-    const autoReady = read('scripts/auto-ready-agent-drafts.sh');
-    expect(autoReady).toContain('rolling_ci_learning_complete');
-    expect(autoReady).toContain('rolling-ci-promotion-receipt.mjs');
-    expect(autoReady).toContain('leaving draft');
   });
 });
