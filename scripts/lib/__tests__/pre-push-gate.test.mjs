@@ -176,7 +176,7 @@ describe('pre-push gate Node and fanout wiring (JOV-4329)', () => {
       '--max-workers "${AUTOMATION_VERIFY_MAX_WORKERS:-2}"'
     );
     expect(automationVerify).toContain(
-      '--shard-concurrency "${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-1}"'
+      '--shard-concurrency "${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-auto}"'
     );
   });
 

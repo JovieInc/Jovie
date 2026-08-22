@@ -722,7 +722,7 @@ describe('automation-verify affected scope', () => {
       '--max-workers "${AUTOMATION_VERIFY_MAX_WORKERS:-2}"'
     );
     expect(script).toContain(
-      '--shard-concurrency "${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-1}"'
+      '--shard-concurrency "${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-auto}"'
     );
   });
 

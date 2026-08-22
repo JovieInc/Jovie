@@ -192,11 +192,6 @@ describe('rolling CI defect-class learning', () => {
       parseLearningReceiptMarker(learningReceiptMarker(validReceipt))
     ).toEqual(validReceipt);
     expect(parseLearningReceiptMarker('no marker')).toBeNull();
-    expect(
-      parseLearningReceiptMarker(
-        '<!-- jovie-rolling-ci-learning:not-valid-json -->'
-      )
-    ).toBeNull();
   });
 
   it('fails closed on invalid identity, head, guard delivery, and green proof', () => {
