@@ -8,10 +8,12 @@ import {
   fxBackstopRoute,
   fxConfigurationIncident,
   HANDOFF_SCHEMA,
+  isImplementerLeaseLive,
   parseHandoffReceipt,
   receiptMarker,
   resolveFxAdapter,
   resolveRemediationRoute,
+  resolveWebhookFxRoute,
   supersedeOwnership,
   validateHandoffReceipt,
   writerClaimKey,
@@ -218,6 +220,42 @@ describe('rolling CI ownership and FX backstop', () => {
         claim: claimed,
       })
     ).toEqual({ action: 'supersede_repairs_green', claim: null });
+  });
+
+  it('treats a missing or expired lease as not live for webhook FX launch', () => {
+    expect(isImplementerLeaseLive(null)).toBe(false);
+    expect(
+      isImplementerLeaseLive(active, {
+        liveHead: head,
+        now: '2026-08-22T01:00:00Z',
+      })
+    ).toBe(true);
+    expect(
+      isImplementerLeaseLive(active, {
+        liveHead: head,
+        now: '2026-08-22T04:00:00Z',
+      })
+    ).toBe(false);
+    expect(
+      resolveWebhookFxRoute({
+        liveHead: head,
+        implementer: 'tim',
+        fxAdapter,
+      })
+    ).toMatchObject({ route: 'fx', writer: FX_ADAPTER_NAME, launch: true });
+    expect(
+      resolveWebhookFxRoute({
+        receipt: active,
+        liveHead: head,
+        implementer: 'tim',
+        fxAdapter,
+        now: '2026-08-22T01:00:00Z',
+      })
+    ).toMatchObject({
+      route: 'implementer',
+      writer: 'implementer',
+      launch: false,
+    });
   });
 
   it('maps FX backstop failures without inventing a second owner', () => {
