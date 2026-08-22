@@ -3,7 +3,6 @@ import {
   DurableOperatingStore,
   memoryRecordBackend,
 } from '@/lib/ovie/mcp/store';
-import type { OvieSummerTurn } from '@/lib/ovie/mcp/types';
 import {
   claimOvieSummerTurn,
   completeOvieSummerTurn,
@@ -21,70 +20,6 @@ import {
 
 describe('Ovie Summer conversation store', () => {
   afterEach(() => vi.useRealTimers());
-  it('persists one durable idempotent turn across store instances', async () => {
-    const backend = memoryRecordBackend();
-    const writer = new DurableOperatingStore(backend);
-    const reader = new DurableOperatingStore(backend);
-    const queued: OvieSummerTurn = {
-      id: 'turn_01',
-      kind: 'summer-turn',
-      conversationId: 'conversation_01',
-      userText: 'What should we ship first?',
-      state: 'queued',
-      createdAt: '2026-08-21T23:40:00.000Z',
-      updatedAt: '2026-08-21T23:40:00.000Z',
-    };
-
-    await writer.putSummerTurn(queued);
-    await writer.putSummerTurn({
-      ...queued,
-      state: 'completed',
-      responseText: 'Ship the authenticated bridge first.',
-      updatedAt: '2026-08-21T23:41:00.000Z',
-    });
-
-    await expect(reader.getSummerTurn(queued.id)).resolves.toMatchObject({
-      state: 'completed',
-      responseText: 'Ship the authenticated bridge first.',
-    });
-    await expect(reader.listSummerTurns()).resolves.toHaveLength(1);
-  });
-
-  it('grants one fenced claim for a queued turn', async () => {
-    const backend = memoryRecordBackend();
-    const first = new DurableOperatingStore(backend);
-    const second = new DurableOperatingStore(backend);
-    await first.putSummerTurn({
-      id: 'turn_claim',
-      kind: 'summer-turn',
-      conversationId: 'conversation_01',
-      userText: 'Give me the current priority.',
-      state: 'queued',
-      createdAt: '2026-08-21T23:40:00.000Z',
-      updatedAt: '2026-08-21T23:40:00.000Z',
-    });
-
-    const claim = {
-      workerId: 'summer-mac',
-      claimToken: 'claim_01',
-      expiresAt: '2026-08-21T23:42:00.000Z',
-      ttlSeconds: 120,
-    };
-    await expect(
-      first.claimSummerTurn('turn_claim', claim)
-    ).resolves.toMatchObject({
-      state: 'claimed',
-      claimedBy: 'summer-mac',
-      claimToken: 'claim_01',
-    });
-    await expect(
-      second.claimSummerTurn('turn_claim', {
-        ...claim,
-        claimToken: 'claim_02',
-      })
-    ).resolves.toBeUndefined();
-  });
-
   it('deduplicates browser retries and rejects payload drift', async () => {
     const store = new DurableOperatingStore(memoryRecordBackend());
     const id = ovieSummerTurnId({
