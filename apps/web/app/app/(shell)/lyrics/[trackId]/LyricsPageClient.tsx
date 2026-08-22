@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo } from 'react';
+import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
   type LyricLine,
@@ -82,14 +83,20 @@ export function LyricsPageClient({
   const currentTimeSec = isActive ? playbackState.currentTime : 0;
 
   return (
-    <LyricsView
-      track={track}
-      durationSec={durationSec}
-      currentTimeSec={currentTimeSec}
-      lines={initialLines}
-      onSeek={seek}
-      timed={false}
-      autoFocusView
-    />
+    <AppShellContentPanel
+      frame='none'
+      contentPadding='none'
+      data-testid='lyrics-page-surface'
+    >
+      <LyricsView
+        track={track}
+        durationSec={durationSec}
+        currentTimeSec={currentTimeSec}
+        lines={initialLines}
+        onSeek={seek}
+        timed={false}
+        autoFocusView
+      />
+    </AppShellContentPanel>
   );
 }
