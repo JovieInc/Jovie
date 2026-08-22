@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, open, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -9,7 +8,6 @@ export const OWNERSHIP_TRANSFER_SCHEMA = 'jovie-rolling-ci-handoff/v1';
 export const WRITER_CLAIM_SCHEMA = 'jovie-rolling-ci-writer-claim/v1';
 export const FX_CONFIGURATION_INCIDENT_SCHEMA =
   'jovie-rolling-ci-fx-configuration-incident/v1';
-
 const SHA = /^[0-9a-f]{40}$/;
 const REPOSITORY = /^[^/\s]+\/[^/\s]+$/;
 function nonEmpty(value, field) {
@@ -33,7 +31,14 @@ function instant(value, field) {
 function digest(value) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
-
+function claimKeyFor({ repository, prNumber, failureFingerprint }) {
+  return digest({ repository, prNumber, failureFingerprint });
+}
+function recordDigestMatches(record, key) {
+  const body = { ...record };
+  delete body[key];
+  return record[key] === digest(body);
+}
 function ownershipIdentity(input) {
   const repository = nonEmpty(input.repository, 'repository');
   if (!REPOSITORY.test(repository)) {
@@ -60,35 +65,32 @@ export function buildImplementerLease(input) {
     throw new Error('expiresAt must be later than issuedAt');
   }
   const ownerId = nonEmpty(input.implementerId, 'implementerId');
-  const claimKey = digest({
-    repository: identity.repository,
-    prNumber: identity.prNumber,
-    failureFingerprint: identity.failureFingerprint,
-  });
-  return {
+  const claimKey = claimKeyFor(identity);
+  const lease = {
     schema: OWNERSHIP_LEASE_SCHEMA,
-    leaseKey: digest({
-      claimKey,
-      headSha: identity.headSha,
-      ownerId,
-      issuedAt,
-    }),
     claimKey,
     ...identity,
     owner: { kind: 'implementer', id: ownerId },
     issuedAt,
     expiresAt,
   };
+  return { ...lease, leaseKey: digest(lease) };
 }
 function assertLease(lease) {
   if (lease?.schema !== OWNERSHIP_LEASE_SCHEMA) {
     throw new Error('implementer lease is missing or malformed');
   }
   ownershipIdentity(lease);
-  exactSha(lease.headSha);
-  instant(lease.issuedAt, 'issuedAt');
-  instant(lease.expiresAt, 'expiresAt');
+  const issuedAt = instant(lease.issuedAt, 'issuedAt');
+  const expiresAt = instant(lease.expiresAt, 'expiresAt');
   nonEmpty(lease.owner?.id, 'lease owner');
+  if (
+    lease.owner?.kind !== 'implementer' ||
+    !recordDigestMatches(lease, 'leaseKey') ||
+    Date.parse(expiresAt) <= Date.parse(issuedAt)
+  ) {
+    throw new Error('implementer lease integrity check failed');
+  }
   return lease;
 }
 export function buildOwnershipTransferReceipt(
@@ -143,12 +145,13 @@ function validTransfer(lease, receipt) {
     receipt.headSha === lease.headSha &&
     receipt.failureFingerprint === lease.failureFingerprint &&
     receipt.from?.id === lease.owner.id &&
-    receipt.to?.kind === 'fx'
+    receipt.to?.kind === 'fx' &&
+    recordDigestMatches(receipt, 'receiptKey')
   );
 }
 function validTransferAt(lease, receipt, observedAt) {
   if (!validTransfer(lease, receipt)) return false;
-  const transferAt = Date.parse(String(receipt.observedAt ?? ''));
+  const transferAt = Date.parse(String(receipt.observedAt));
   return (
     Number.isFinite(transferAt) &&
     transferAt >= Date.parse(lease.issuedAt) &&
@@ -224,7 +227,6 @@ export function routeRemediationOwner(
 function claimDirectory(stateDir, claimKey) {
   return join(stateDir, 'rolling-ci-ownership', claimKey);
 }
-
 async function readJson(path) {
   try {
     return JSON.parse(await readFile(path, 'utf8'));
@@ -233,7 +235,6 @@ async function readJson(path) {
     throw error;
   }
 }
-
 async function writeJsonAtomic(path, value) {
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });
   const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
@@ -243,7 +244,6 @@ async function writeJsonAtomic(path, value) {
   });
   await rename(temporary, path);
 }
-
 async function withClaimLock(directory, operation) {
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const lockPath = join(directory, '.writer-lock');
@@ -264,7 +264,6 @@ async function withClaimLock(directory, operation) {
     await rm(lockPath, { force: true });
   }
 }
-
 function buildWriterClaim({ lease, writer, route, now, previous = null }) {
   const claim = {
     schema: WRITER_CLAIM_SCHEMA,
@@ -282,6 +281,12 @@ function buildWriterClaim({ lease, writer, route, now, previous = null }) {
     previousWriterClaimKey: previous?.writerClaimKey ?? null,
   };
   return { ...claim, writerClaimKey: digest(claim) };
+}
+function assertStoredWriterClaim(current) {
+  if (current?.status !== 'active') return;
+  if (!recordDigestMatches(current, 'writerClaimKey')) {
+    throw new Error('stored writer claim integrity check failed');
+  }
 }
 /**
  * Atomically acquire the only writer slot for one PR/root-cause pair.
@@ -302,6 +307,7 @@ export async function acquireRemediationWriterClaim(
   const currentPath = join(directory, 'current.json');
   return withClaimLock(directory, async () => {
     const current = await readJson(currentPath);
+    assertStoredWriterClaim(current);
     if (
       current?.status === 'active' &&
       current.headSha === lease.headSha &&
@@ -359,11 +365,11 @@ export async function acquireRemediationWriterClaim(
         superseded
       );
     }
-    await writeJsonAtomic(currentPath, claim);
     await writeJsonAtomic(
       join(directory, 'receipts', `${claim.writerClaimKey}.json`),
       claim
     );
+    await writeJsonAtomic(currentPath, claim);
     return {
       status: current ? 'superseded-and-acquired' : 'acquired',
       claim,
@@ -379,15 +385,12 @@ export async function supersedeRemediationWriterClaim(
   if (input.checkConclusion !== 'success') {
     return { status: 'rejected', reason: 'green-proof-required' };
   }
-  const claimKey = digest({
-    repository: identity.repository,
-    prNumber: identity.prNumber,
-    failureFingerprint: identity.failureFingerprint,
-  });
+  const claimKey = claimKeyFor(identity);
   const directory = claimDirectory(stateDir, claimKey);
   const currentPath = join(directory, 'current.json');
   return withClaimLock(directory, async () => {
     const current = await readJson(currentPath);
+    assertStoredWriterClaim(current);
     if (!current || current.status !== 'active') {
       return { status: 'ignored', reason: 'no-active-claim' };
     }
@@ -406,11 +409,11 @@ export async function supersedeRemediationWriterClaim(
         reason: 'green-rerun',
       }),
     };
-    await writeJsonAtomic(currentPath, superseded);
     await writeJsonAtomic(
       join(directory, 'receipts', `${superseded.supersessionReceiptKey}.json`),
       superseded
     );
+    await writeJsonAtomic(currentPath, superseded);
     return { status: 'superseded', claim: superseded };
   });
 }
@@ -422,6 +425,9 @@ export function authorizeRemediationMutation({
 }) {
   if (claim?.schema !== WRITER_CLAIM_SCHEMA || claim.status !== 'active') {
     return { authorized: false, reason: 'claim-not-active' };
+  }
+  if (!recordDigestMatches(claim, 'writerClaimKey')) {
+    return { authorized: false, reason: 'claim-integrity-failed' };
   }
   if (claim.writer?.id !== writerId) {
     return { authorized: false, reason: 'writer-mismatch' };

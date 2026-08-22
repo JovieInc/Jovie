@@ -2,7 +2,6 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-
 import {
   acquireRemediationWriterClaim,
   authorizeRemediationMutation,
@@ -20,7 +19,6 @@ const NOW = '2026-08-22T01:00:00.000Z';
 const EXPIRED = '2026-08-22T03:00:00.000Z';
 const FINGERPRINT = 'ci-fast:typecheck:missing-export';
 const directories = [];
-
 function lease(overrides = {}) {
   return buildImplementerLease({
     repository: 'JovieInc/Jovie',
@@ -33,7 +31,6 @@ function lease(overrides = {}) {
     ...overrides,
   });
 }
-
 function transfer(currentLease, overrides = {}, now = NOW) {
   return buildOwnershipTransferReceipt(
     {
@@ -47,7 +44,6 @@ function transfer(currentLease, overrides = {}, now = NOW) {
     { now }
   );
 }
-
 function evidence(overrides = {}) {
   return {
     repository: 'JovieInc/Jovie',
@@ -57,13 +53,14 @@ function evidence(overrides = {}) {
     ...overrides,
   };
 }
-
 async function stateDir() {
   const directory = await mkdtemp(join(tmpdir(), 'jovie-handoff-'));
   directories.push(directory);
   return directory;
 }
-
+function ownershipDir(directory, claimKey = lease().claimKey) {
+  return join(directory, 'rolling-ci-ownership', claimKey);
+}
 function acquire(directory, currentLease = lease(), overrides = {}) {
   return acquireRemediationWriterClaim(
     {
@@ -74,7 +71,6 @@ function acquire(directory, currentLease = lease(), overrides = {}) {
     { stateDir: directory, now: overrides.now ?? NOW }
   );
 }
-
 afterEach(async () => {
   await Promise.all(
     directories
@@ -82,7 +78,6 @@ afterEach(async () => {
       .map(directory => rm(directory, { recursive: true, force: true }))
   );
 });
-
 describe('rolling CI remediation ownership', () => {
   it('fails closed on malformed identity, lease, and transfer evidence', () => {
     for (const [overrides, message] of [
@@ -96,15 +91,16 @@ describe('rolling CI remediation ownership', () => {
       expect(() => lease(overrides)).toThrow(message);
     }
     expect(() => routeRemediationOwner({ lease: {} })).toThrow(/malformed/);
-    const currentLease = lease();
-    expect(() => transfer(currentLease, { kind: 'delegated' })).toThrow(
+    const active = lease();
+    expect(() => transfer(active, { kind: 'delegated' })).toThrow(
       /handoff or abandonment/
     );
-    expect(() =>
-      transfer(currentLease, { recordedBy: 'competing-agent' })
-    ).toThrow(/active implementer/);
+    expect(() => transfer(active, { recordedBy: 'competing-agent' })).toThrow(
+      /active implementer/
+    );
+    active.claimKey = '../escape';
+    expect(() => routeRemediationOwner({ lease: active })).toThrow(/integrity/);
   });
-
   it('routes the live implementer and refuses implicit FX after expiry', () => {
     expect(
       routeRemediationOwner(
@@ -123,7 +119,6 @@ describe('rolling CI remediation ownership', () => {
       )
     ).toEqual({ status: 'rejected', reason: 'explicit-handoff-required' });
   });
-
   it('routes FX only through an exact explicit handoff', () => {
     const currentLease = lease();
     const handoff = transfer(currentLease);
@@ -144,6 +139,7 @@ describe('rolling CI remediation ownership', () => {
     for (const invalidReceipt of [
       { ...handoff, observedAt: null },
       { ...handoff, claimKey: 'wrong-claim' },
+      { ...handoff, reason: 'tampered after receipt creation' },
     ]) {
       expect(
         routeRemediationOwner({
@@ -167,7 +163,6 @@ describe('rolling CI remediation ownership', () => {
       buildFxConfigurationIncident(currentLease, futureHandoff, { now: NOW })
     ).toThrow(/exact handoff receipt/);
   });
-
   it('makes missing FX auth a terminal incident without blocking implementers', () => {
     const currentLease = lease();
     const handoff = transfer(currentLease);
@@ -192,7 +187,6 @@ describe('rolling CI remediation ownership', () => {
       ).status
     ).toBe('configuration-incident');
   });
-
   it('allows controller abandonment only after lease expiry', () => {
     const currentLease = lease();
     const abandoned = (now = NOW) =>
@@ -218,7 +212,6 @@ describe('rolling CI remediation ownership', () => {
       ).route
     ).toBe('fx-backstop');
   });
-
   it('deliberate red: admits exactly one writer under competing claims', async () => {
     const directory = await stateDir();
     const candidates = [lease(), lease({ implementerId: 'competing-agent' })];
@@ -235,7 +228,6 @@ describe('rolling CI remediation ownership', () => {
     );
     expect((await acquire(directory, winningLease)).status).toBe('duplicate');
   });
-
   it('supersedes a prior head and rejects its delayed delivery', async () => {
     const directory = await stateDir();
     const first = await acquire(directory);
@@ -266,7 +258,6 @@ describe('rolling CI remediation ownership', () => {
       await acquire(directory, lease(), { now: '2026-08-22T01:06:00.000Z' })
     ).toEqual({ status: 'rejected', reason: 'out-of-order-head' });
   });
-
   it('persists green rerun supersession and rejects invalid green evidence', async () => {
     const emptyDirectory = await stateDir();
     expect(
@@ -281,7 +272,6 @@ describe('rolling CI remediation ownership', () => {
         { stateDir: emptyDirectory, now: NOW }
       )
     ).toEqual({ status: 'ignored', reason: 'no-active-claim' });
-
     const directory = await stateDir();
     const active = await acquire(directory);
     expect(
@@ -306,7 +296,6 @@ describe('rolling CI remediation ownership', () => {
       })
     ).toEqual({ authorized: false, reason: 'claim-not-active' });
   });
-
   it('rejects stale or unroutable acquisition before persistence', async () => {
     const directory = await stateDir();
     expect(
@@ -317,7 +306,6 @@ describe('rolling CI remediation ownership', () => {
       reason: 'explicit-handoff-required',
     });
   });
-
   it('fails closed on corrupt state and a non-progressing lock', async () => {
     const currentLease = lease();
     for (const [filename, contents, matcher] of [
@@ -325,11 +313,7 @@ describe('rolling CI remediation ownership', () => {
       ['.writer-lock', 'busy', { code: 'EEXIST' }],
     ]) {
       const directory = await stateDir();
-      const claimDirectory = join(
-        directory,
-        'rolling-ci-ownership',
-        currentLease.claimKey
-      );
+      const claimDirectory = ownershipDir(directory, currentLease.claimKey);
       await mkdir(claimDirectory, { recursive: true });
       await writeFile(join(claimDirectory, filename), contents);
       const assertion = expect(acquire(directory, currentLease)).rejects;
@@ -337,9 +321,9 @@ describe('rolling CI remediation ownership', () => {
       else await assertion.toMatchObject(matcher);
     }
   });
-
   it('authorizes only the exact active writer while its check is red', async () => {
-    const result = await acquire(await stateDir());
+    const directory = await stateDir();
+    const result = await acquire(directory);
     const authorize = overrides =>
       authorizeRemediationMutation({
         claim: result.claim,
@@ -355,6 +339,17 @@ describe('rolling CI remediation ownership', () => {
       authorized: false,
       reason: 'green-rerun',
     });
+    const forged = { ...result.claim, route: 'forged' };
+    expect(authorize({ claim: forged })).toEqual({
+      authorized: false,
+      reason: 'claim-integrity-failed',
+    });
+    const currentPath = join(
+      ownershipDir(directory, result.claim.claimKey),
+      'current.json'
+    );
+    await writeFile(currentPath, JSON.stringify(forged));
+    await expect(acquire(directory)).rejects.toThrow(/integrity/);
     expect(authorize()).toEqual({
       authorized: true,
       reason: 'exact-head-writer',
