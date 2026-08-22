@@ -385,6 +385,7 @@ export function UserButton({
   settingsHref,
   showUserInfo = false,
   embeddedInIdentityGroup = false,
+  onMenuOpenChange,
   trigger,
 }: UserButtonProps) {
   const keyboardShortcuts = useKeyboardShortcutsSafe();
@@ -440,6 +441,14 @@ export function UserButton({
 
   const { userImageUrl, displayName, userInitials, formattedUsername } =
     userInfo;
+
+  const handleMenuOpenChange = useCallback(
+    (open: boolean) => {
+      setIsMenuOpen(open);
+      onMenuOpenChange?.(open);
+    },
+    [onMenuOpenChange, setIsMenuOpen]
+  );
 
   const handleHelp = useCallback(() => {
     window.open(APP_ROUTES.SUPPORT, '_blank', 'noopener,noreferrer');
@@ -501,7 +510,7 @@ export function UserButton({
             trigger={trigger}
             align='start'
             open={isMenuOpen}
-            onOpenChange={setIsMenuOpen}
+            onOpenChange={handleMenuOpenChange}
             disabled
             contentClassName={USER_MENU_CONTENT_CLASS}
           />
@@ -626,7 +635,7 @@ export function UserButton({
         trigger={triggerElement}
         align={trigger || showUserInfo ? 'start' : 'end'}
         open={isMenuOpen}
-        onOpenChange={setIsMenuOpen}
+        onOpenChange={handleMenuOpenChange}
         contentClassName={USER_MENU_CONTENT_CLASS}
       />
       <DashboardFeedbackModal

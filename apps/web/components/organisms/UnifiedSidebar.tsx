@@ -444,6 +444,7 @@ function OperatorSessionControls() {
 export function SidebarIdentityFooter({
   profileHref,
 }: Readonly<{ profileHref: string | undefined }>) {
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const profileDisplayHref = profileHref
     ? `${HOSTNAME}${profileHref}`
     : undefined;
@@ -461,16 +462,16 @@ export function SidebarIdentityFooter({
         data-testid='sidebar-identity-group'
         className={cn(
           'group/sidebar-identity w-full min-w-0 rounded-xl border border-(--noir-ion-border-subtle) bg-transparent p-0.5',
-          'transition-[background-color,border-color,box-shadow] duration-fast ease-interactive',
+          'transition-colors duration-fast ease-interactive',
           'hover:bg-sidebar-accent/40',
           'focus-within:border-sidebar-ring/35 focus-within:bg-sidebar-accent/35 focus-within:ring-1 focus-within:ring-sidebar-ring/20',
-          'has-[[aria-expanded=true]]:border-sidebar-ring/35 has-[[aria-expanded=true]]:bg-sidebar-accent/55',
-          'group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:py-0.5'
+          isAccountMenuOpen && 'border-sidebar-ring/35 bg-sidebar-accent/55'
         )}
       >
         <legend className='sr-only'>Creator identity</legend>
         <UserButton
           embeddedInIdentityGroup
+          onMenuOpenChange={setIsAccountMenuOpen}
           profileHref={profileHref}
           settingsHref={APP_ROUTES.SETTINGS}
           showUserInfo

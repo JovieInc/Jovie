@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
@@ -67,6 +73,7 @@ vi.mock('@/components/shell/HeaderSearchSurfaceFromContext', () => ({
 vi.mock('@/components/organisms/user-button', () => ({
   UserButton: (props: {
     readonly embeddedInIdentityGroup?: boolean;
+    readonly onMenuOpenChange?: (open: boolean) => void;
     readonly showUserInfo?: boolean;
   }) => {
     userButtonPropsMock(props);
@@ -78,6 +85,7 @@ vi.mock('@/components/organisms/user-button', () => ({
         data-sidebar-identity-action={
           props.embeddedInIdentityGroup ? 'account-menu' : undefined
         }
+        onClick={() => props.onMenuOpenChange?.(true)}
       >
         Tim White
       </button>
@@ -253,6 +261,15 @@ describe('UnifiedSidebar library route', () => {
     expect(identityGroup).toHaveAttribute(
       'data-sidebar-identity-boundary',
       'true'
+    );
+    fireEvent.click(
+      within(identityGroup).getByRole('button', {
+        name: 'Open account menu for Tim White',
+      })
+    );
+    expect(identityGroup).toHaveClass(
+      'border-sidebar-ring/35',
+      'bg-sidebar-accent/55'
     );
     expect(screen.queryByTestId('sidebar-upgrade-banner')).toBeNull();
 

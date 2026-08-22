@@ -824,14 +824,22 @@ describe('UserButton billing actions', () => {
     );
   });
 
-  it('lets the enclosing identity group own the account trigger boundary', () => {
+  it('lets the enclosing identity group own account trigger and open state', async () => {
     mockUseBillingStatusQuery.mockReturnValue({
       data: { isPro: false, plan: null, hasStripeCustomer: false },
       isLoading: false,
       error: null,
     } as any);
 
-    render(<UserButton showUserInfo embeddedInIdentityGroup />);
+    const onMenuOpenChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <UserButton
+        showUserInfo
+        embeddedInIdentityGroup
+        onMenuOpenChange={onMenuOpenChange}
+      />
+    );
 
     const trigger = screen.getByRole('button', {
       name: 'Open account menu for Adele Adkins',
@@ -850,6 +858,11 @@ describe('UserButton billing actions', () => {
       'hover:bg-sidebar-accent',
       'focus-visible:ring-2'
     );
+
+    await user.click(trigger);
+    expect(onMenuOpenChange).toHaveBeenCalledWith(true);
+    await user.keyboard('{Escape}');
+    expect(onMenuOpenChange).toHaveBeenLastCalledWith(false);
   });
 
   it('anchors the sidebar identity menu to the start edge', async () => {
