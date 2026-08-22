@@ -212,7 +212,12 @@ describe('rolling CI FX webhook remediation', () => {
       source: trustedSource,
       checkSuiteId: 44,
       checks: [
-        { name: 'ci-fast', conclusion: 'failure', headSha: head, checkSuiteId: 44 },
+        {
+          name: 'ci-fast',
+          conclusion: 'failure',
+          headSha: head,
+          checkSuiteId: 44,
+        },
       ],
       writer: 'tim',
       priorCommentBody: '',
