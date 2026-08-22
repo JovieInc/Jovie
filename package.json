@@ -205,6 +205,7 @@
     "pre-push:gate": "bash scripts/hooks/pre-push-gate.sh lint",
     "pre-push:gate:test": "bash scripts/hooks/pre-push-gate.sh test",
     "pre-push:gate:affected": "bash scripts/hooks/pre-push-gate.sh affected",
+    "pre-push:gate:publication": "bash scripts/hooks/pre-push-gate.sh publication",
     "pre-push:gate:format": "bash scripts/hooks/pre-push-gate.sh format",
     "pre-push:gate:all": "bash scripts/hooks/pre-push-gate.sh all",
     "ship:verify": "node scripts/ship-verify.mjs",
