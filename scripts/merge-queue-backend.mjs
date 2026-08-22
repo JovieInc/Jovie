@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 import {
   buildNativeQueuePolicyReadback,
   isPendingNativeCohortCutoverField,
+  mergeNativeQueuePolicyObservations,
   NATIVE_QUEUE_POLICY,
 } from './lib/merge-queue-guard.mjs';
 
@@ -77,6 +78,7 @@ const CLEAN_ADMITTING_PROMOTION_MODES = new Set([
 const PULL_REQUEST_STATE_QUERY = `query MergeQueuePullRequestState($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){${PULL_REQUEST_STATE_FIELDS}}}}`;
 const OPEN_PULL_REQUEST_STATES_QUERY = `query MergeQueueOpenPullRequestStates($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){pullRequests(first:100,after:$endCursor,states:OPEN){nodes{${PULL_REQUEST_STATE_FIELDS}} pageInfo{hasNextPage endCursor}}}}`;
 const BRANCH_PROTECTION_QUERY = `query MergeQueueBranchProtection($owner:String!,$name:String!,$refName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$refName){name branchProtectionRule{id}}}}`;
+const LIVE_QUEUE_CONFIGURATION_QUERY = `query MergeQueueLiveConfiguration($owner:String!,$name:String!,$branch:String!){repository(owner:$owner,name:$name){mergeQueue(branch:$branch){configuration{checkResponseTimeout maximumEntriesToBuild maximumEntriesToMerge mergeMethod minimumEntriesToMerge minimumEntriesToMergeWaitTime}}}}`;
 const NATIVE_MUTATION_ACTOR_QUERY =
   'query MergeQueueNativeMutationActor { viewer { login } }';
 const DEQUEUE_PULL_REQUEST_MUTATION = `mutation DequeuePullRequest($id:ID!){dequeuePullRequest(input:{id:$id}){mergeQueueEntry{id}}}`;
@@ -271,6 +273,7 @@ function hasMergeGroupChecksRequested(workflowYaml) {
  *   repository?: object | null,
  *   workflowYaml?: string | null,
  *   branchProtectionRef?: object | null,
+ *   liveQueueConfiguration?: object | null,
  *   rulesetId?: string,
  *   baseBranch?: string,
  *   allowUnavailableBypassActors?: boolean,
@@ -281,6 +284,7 @@ export function validateNativePreflightEvidence({
   repository,
   workflowYaml,
   branchProtectionRef,
+  liveQueueConfiguration = null,
   rulesetId = DEFAULT_RULESET_ID,
   baseBranch = DEFAULT_BASE_BRANCH,
   allowUnavailableBypassActors = false,
@@ -289,7 +293,10 @@ export function validateNativePreflightEvidence({
   const mergeQueueRule = ruleset?.rules?.find(
     rule => rule?.type === 'merge_queue'
   );
-  const mergeQueue = mergeQueueRule?.parameters;
+  const mergeQueue = mergeNativeQueuePolicyObservations(
+    mergeQueueRule?.parameters,
+    liveQueueConfiguration
+  );
   const requiredChecks = requiredCheckContexts(ruleset);
   const includedRefs = ruleset?.conditions?.ref_name?.include;
   const workflowHasMergeGroup = hasMergeGroupChecksRequested(
@@ -341,7 +348,7 @@ export function validateNativePreflightEvidence({
     ...Object.fromEntries(
       Object.entries(NATIVE_QUEUE_POLICY).map(([field, expected]) => [
         `merge_queue ${field} must be ${expected}`,
-        mergeQueue?.[field] === expected ||
+        mergeQueue[field] === expected ||
           isPendingNativeCohortCutoverField(field),
       ])
     ),
@@ -385,7 +392,7 @@ export function validateNativePreflightEvidence({
     policyReadback,
     evidence: {
       baseBranch,
-      mergeMethod: mergeQueue?.merge_method ?? null,
+      mergeMethod: mergeQueue.merge_method ?? null,
       requiredChecks,
       rulesetId: ruleset?.id ?? null,
       workflowHasMergeGroup,
@@ -439,11 +446,26 @@ export async function preflightMergeQueue({
     'checking for redundant classic branch protection'
   );
   const branchProtectionRef = branchProtectionPayload?.data?.repository?.ref;
+  const liveQueuePayload = assertGraphqlResponse(
+    await runGhJson(
+      runner,
+      graphqlArgs(LIVE_QUEUE_CONFIGURATION_QUERY, {
+        owner,
+        name,
+        branch: baseBranch,
+      }),
+      'reading the live GraphQL merge-queue configuration'
+    ),
+    'reading the live GraphQL merge-queue configuration'
+  );
+  const liveQueueConfiguration =
+    liveQueuePayload?.data?.repository?.mergeQueue?.configuration ?? null;
   const validation = validateNativePreflightEvidence({
     ruleset,
     repository: repositoryEvidence,
     workflowYaml,
     branchProtectionRef,
+    liveQueueConfiguration,
     rulesetId,
     baseBranch,
     allowUnavailableBypassActors,

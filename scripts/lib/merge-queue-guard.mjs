@@ -132,23 +132,221 @@ export function evaluateNativeCohortMergeDecision({
 }
 
 /**
+ * GitHub REST ruleset parameters use snake_case (`max_entries_to_build`).
+ * Live GraphQL `mergeQueue.configuration` uses camelCase aliases
+ * (`maximumEntriesToBuild`). Enroll must treat GraphQL as live truth so a
+ * stale REST readback cannot fail the product PR check after the lock already
+ * matches (JOV-5291 / PR #16370).
+ */
+export const NATIVE_QUEUE_GRAPHQL_POLICY_FIELDS = Object.freeze({
+  checkResponseTimeout: 'check_response_timeout_minutes',
+  groupingStrategy: 'grouping_strategy',
+  maxEntriesToBuild: 'max_entries_to_build',
+  maximumEntriesToBuild: 'max_entries_to_build',
+  maxEntriesToMerge: 'max_entries_to_merge',
+  maximumEntriesToMerge: 'max_entries_to_merge',
+  mergeMethod: 'merge_method',
+  minEntriesToMerge: 'min_entries_to_merge',
+  minimumEntriesToMerge: 'min_entries_to_merge',
+  minEntriesToMergeWaitMinutes: 'min_entries_to_merge_wait_minutes',
+  minimumEntriesToMergeWaitTime: 'min_entries_to_merge_wait_minutes',
+});
+
+export const UNMERGEABLE_EJECT_SCHEMA = 'jovie-native-unmergeable/v1';
+export const CHANGELOG_COLLISION_PATH = 'CHANGELOG.md';
+
+const ENUM_POLICY_FIELDS = new Set(['merge_method', 'grouping_strategy']);
+
+/**
+ * Normalize REST snake_case or GraphQL camelCase queue parameters onto the
+ * canonical `NATIVE_QUEUE_POLICY` keys. Unknown keys are dropped.
+ *
+ * @param {Record<string, unknown> | null | undefined} observed
+ * @returns {Record<string, unknown>}
+ */
+export function normalizeNativeQueuePolicyParameters(observed = {}) {
+  if (!observed || typeof observed !== 'object' || Array.isArray(observed)) {
+    return /** @type {Record<string, unknown>} */ ({});
+  }
+  /** @type {Record<string, unknown>} */
+  const normalized = Object.create(null);
+  for (const [key, value] of Object.entries(observed)) {
+    const restKey = NATIVE_QUEUE_GRAPHQL_POLICY_FIELDS[key] ?? key;
+    if (!Object.hasOwn(NATIVE_QUEUE_POLICY, restKey)) continue;
+    let mapped = value;
+    if (ENUM_POLICY_FIELDS.has(restKey) && typeof value === 'string') {
+      mapped = value.toUpperCase();
+    }
+    normalized[restKey] = mapped;
+  }
+  return normalized;
+}
+
+/**
+ * GraphQL live configuration wins for every field it actually returns. REST
+ * keeps fields GraphQL omits (notably `grouping_strategy`).
+ *
+ * @param {Record<string, unknown> | null | undefined} restParameters
+ * @param {Record<string, unknown> | null | undefined} liveQueueConfiguration
+ * @returns {Record<string, unknown>}
+ */
+export function mergeNativeQueuePolicyObservations(
+  restParameters,
+  liveQueueConfiguration
+) {
+  return {
+    ...normalizeNativeQueuePolicyParameters(restParameters),
+    ...normalizeNativeQueuePolicyParameters(liveQueueConfiguration),
+  };
+}
+
+/**
  * Deterministic readback of observed native queue parameters vs source policy.
  *
  * @param {Record<string, unknown> | null | undefined} observed
  */
 export function buildNativeQueuePolicyReadback(observed = {}) {
   const expected = { ...NATIVE_QUEUE_POLICY };
+  const normalized = normalizeNativeQueuePolicyParameters(observed);
   const drift = Object.keys(expected).filter(
-    key => observed?.[key] !== expected[key]
+    key => normalized[key] !== expected[key]
   );
   return {
     schema: NATIVE_QUEUE_POLICY_READBACK_SCHEMA,
     matched: drift.length === 0,
     expected,
     observed: Object.fromEntries(
-      Object.keys(expected).map(key => [key, observed?.[key] ?? null])
+      Object.keys(expected).map(key => [key, normalized[key] ?? null])
     ),
     drift,
+  };
+}
+
+/**
+ * Auto-eject a parked native UNMERGEABLE entry. Unknown evidence never
+ * mutates. A MERGEABLE source PR in an UNMERGEABLE group is a group
+ * collision (CHANGELOG under ALLGREEN is the measured case), not a source
+ * conflict.
+ *
+ * @param {{
+ *   queued?: unknown,
+ *   queueEntryState?: unknown,
+ *   mergeable?: unknown,
+ *   headSha?: unknown,
+ * }} [input]
+ */
+export function unmergeableEjectDecision({
+  queued,
+  queueEntryState,
+  mergeable,
+  headSha,
+} = {}) {
+  if (queued !== true) {
+    return {
+      action: 'keep',
+      reason: 'not-queued',
+      schema: UNMERGEABLE_EJECT_SCHEMA,
+    };
+  }
+  if (typeof queueEntryState !== 'string' || queueEntryState.length === 0) {
+    return {
+      action: 'unknown',
+      reason: 'queue-entry-state-unavailable',
+      schema: UNMERGEABLE_EJECT_SCHEMA,
+    };
+  }
+  if (queueEntryState !== 'UNMERGEABLE') {
+    return {
+      action: 'keep',
+      reason: `state=${queueEntryState}`,
+      schema: UNMERGEABLE_EJECT_SCHEMA,
+    };
+  }
+  if (typeof headSha !== 'string' || !/^[0-9a-f]{40}$/i.test(headSha)) {
+    return {
+      action: 'unknown',
+      reason: 'head-unavailable',
+      schema: UNMERGEABLE_EJECT_SCHEMA,
+    };
+  }
+  const reason =
+    mergeable === 'MERGEABLE'
+      ? 'unmergeable-group-collision'
+      : mergeable === 'CONFLICTING'
+        ? 'unmergeable-source-conflict'
+        : 'unmergeable-parked';
+  return {
+    action: 'eject',
+    reason,
+    schema: UNMERGEABLE_EJECT_SCHEMA,
+    reenqueue: false,
+  };
+}
+
+/**
+ * Refuse to re-enroll an unchanged head that already received a typed
+ * UNMERGEABLE eject. A new head SHA lifts the block.
+ *
+ * @param {{ headSha?: unknown, ejectReceiptHeadSha?: unknown }} [input]
+ */
+export function unmergeableReenqueueDecision({
+  headSha,
+  ejectReceiptHeadSha,
+} = {}) {
+  const head = typeof headSha === 'string' ? headSha.toLowerCase() : '';
+  const ejected =
+    typeof ejectReceiptHeadSha === 'string'
+      ? ejectReceiptHeadSha.toLowerCase()
+      : '';
+  if (!/^[0-9a-f]{40}$/.test(head)) {
+    return { action: 'unknown', reason: 'head-unavailable' };
+  }
+  if (!/^[0-9a-f]{40}$/.test(ejected)) {
+    return { action: 'allow', reason: 'no-eject-receipt' };
+  }
+  if (head === ejected) {
+    return { action: 'block', reason: 'unchanged-head-unmergeable-eject' };
+  }
+  return { action: 'allow', reason: 'head-moved-after-eject' };
+}
+
+/**
+ * ALLGREEN groups merge queued PRs together. GitHub's server merge ignores
+ * local `merge=union`, so two Unreleased CHANGELOG edits park the later
+ * entry UNMERGEABLE while the source PR stays MERGEABLE vs main.
+ *
+ * Unknown evidence never skips (same fail-open as front-item churn).
+ *
+ * @param {{
+ *   candidateFiles?: unknown,
+ *   queuedMemberFiles?: unknown,
+ * }} [input]
+ */
+export function changelogGroupCollisionDecision({
+  candidateFiles,
+  queuedMemberFiles,
+} = {}) {
+  if (!Array.isArray(candidateFiles) || !Array.isArray(queuedMemberFiles)) {
+    return { action: 'unknown', reason: 'changelog-evidence-unavailable' };
+  }
+  const touchesChangelog = files =>
+    Array.isArray(files) && files.includes(CHANGELOG_COLLISION_PATH);
+  if (!touchesChangelog(candidateFiles)) {
+    return { action: 'allow', reason: 'candidate-omits-changelog' };
+  }
+  const colliding = queuedMemberFiles.filter(
+    member =>
+      Number.isInteger(member?.prNumber) &&
+      member.prNumber > 0 &&
+      touchesChangelog(member.files)
+  );
+  if (colliding.length === 0) {
+    return { action: 'allow', reason: 'no-queued-changelog-member' };
+  }
+  return {
+    action: 'skip',
+    reason: 'changelog-collision',
+    collidingPrs: colliding.map(member => member.prNumber),
   };
 }
 
@@ -1156,7 +1354,10 @@ export function validateMergeQueueRepoConfig(input) {
  * Validate a live GitHub ruleset payload (gh api repos/.../rulesets/...).
  *
  * @param {Record<string, unknown>} ruleset
- * @param {{ backend?: 'native' }} [options]
+ * @param {{
+ *   backend?: 'native',
+ *   liveQueueConfiguration?: Record<string, unknown> | null,
+ * }} [options]
  */
 export function validateLiveMergeQueueRuleset(ruleset, options = {}) {
   const errors = [];
@@ -1179,13 +1380,18 @@ export function validateLiveMergeQueueRuleset(ruleset, options = {}) {
       'live native ruleset unexpectedly enables dormant signature or non-fast-forward rules'
     );
   }
-  if (mergeQueueRule)
+  if (mergeQueueRule) {
+    const observed = mergeNativeQueuePolicyObservations(
+      mergeQueueRule.parameters,
+      options.liveQueueConfiguration
+    );
     for (const [field, expected] of Object.entries(NATIVE_QUEUE_POLICY))
       if (
-        mergeQueueRule?.parameters?.[field] !== expected &&
+        observed[field] !== expected &&
         !isPendingNativeCohortCutoverField(field)
       )
         errors.push(`live native merge_queue ${field} must be ${expected}`);
+  }
 
   const statusRule = rules.find(
     rule => rule?.type === 'required_status_checks'
