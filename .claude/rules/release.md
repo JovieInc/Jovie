@@ -76,13 +76,13 @@ still requires their final exact-head green proof.
 - When a command produces multiple independent fixes, ship each as its own PR.
 - **Open a draft PR on first push** — root PRs target `main`; dependent children
   target their immediate parent and stay draft/unenrolled until retargeted.
-  Source CI begins when the PR targets `main` (or a supported integration base),
-  giving early feedback without violating stack order.
+  Source CI begins on root, integration, and `codex/**` stacked bases, giving
+  every layer early feedback without violating stack order.
 - Push frequently — concurrency groups cancel stale CI runs automatically.
 - Run `/ship` when ready — it detects the draft PR and promotes it to ready-for-review.
-- CI runs in parallel on eligible root/integration PRs while the agent continues
-  working; dependent children receive source CI after the parent lands and the
-  child is retargeted/rebased to `main`.
+- CI runs in parallel on root, integration, and dependent stacked drafts while
+  agents continue working. A child remains ineligible for ready/queue until its
+  parent lands and the child is retargeted/rebased to `main` with fresh proof.
 - This preserves throughput without enrolling a child against an unlanded base.
 - If a PR fails CI, fix and push again; don't create a new PR.
 - Enable auto-merge only after the PR is marked ready (not while draft).
@@ -348,10 +348,10 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 
 | Stage | Exact responsibility |
 | --- | --- |
-| Source PR | Deterministic path + brand classification, risk classification, `ci-fast`, diff secret scan, and `Golden Path Lock`. `Migration Guard`, `Fork PR Gate`, and `PR Size Guard` remain separate required contexts. |
-| Native merge queue | Re-run deterministic gates on the exact `merge_group` head, then require five affected unit shards, one hosted build + layout workspace, path-selected Xcode, and model-free semantic evals. |
+| Source PR | Deterministic path + brand classification, risk classification, `ci-fast`, ten affected unit shards, coverage ratchet, diff secret scan, and `Golden Path Lock`. `Migration Guard`, `Fork PR Gate`, and `PR Size Guard` remain separate required contexts. |
+| Native merge queue | Re-run deterministic gates and ten affected unit shards on the exact `merge_group` head, then require one hosted build + layout workspace, path-selected Xcode, and model-free semantic evals. |
 | Queue-proven main | Reuse the exact successful merge-group `PR Ready` proof and skip duplicate fallback work. |
-| Direct/admin main | Fail closed through path/risk/fast/secret/migration, all five unit shards, and the combined hosted build + layout job; skipped placeholders are invalid. |
+| Direct/admin main | Fail closed through path/risk/fast/secret/migration, all ten unit shards, and the combined hosted build + layout job; skipped placeholders are invalid. |
 | Production release | One reusable staging/canary/promotion/rollback DAG under one non-cancelling caller lease. |
 | Post-deploy | Hosted public, auth, homepage, and explicitly provisioned Lighthouse probes settle into `Production Verified` before notification. |
 | Scheduled/manual/event | Exhaustive E2E, Neon, a11y, performance, eval, visual, slop, brand, and repair/report loops. |
