@@ -5,11 +5,13 @@ import { describe, expect, it } from 'vitest';
 import {
   emptyRollingCiState,
   failureFingerprint,
+  isCiFamilyCheckName,
   normalizeFailureEvents,
   parseRollingCiState,
   planFailureDispatch,
   planGreenRecovery,
   renderDispatchComment,
+  resolveCiWorkflowRun,
   runDispatch,
   TRUSTED_CI_WORKFLOW_PATH,
 } from '../rolling-ci-dispatch.mjs';
@@ -90,6 +92,76 @@ describe('rolling CI failure dispatch', () => {
     });
   });
 
+  it('accepts authenticated check_suite and CI-family check_run sources', () => {
+    expect(
+      event({
+        source: {
+          eventName: 'check_suite',
+          producerEvent: 'pull_request',
+          trustedPolicyRef: 'main',
+          checkSuiteAppSlug: 'github-actions',
+        },
+      }).source.eventName
+    ).toBe('check_suite');
+    expect(
+      event({
+        source: {
+          eventName: 'check_run',
+          producerEvent: 'pull_request',
+          trustedPolicyRef: 'main',
+          checkSuiteAppSlug: 'github-actions',
+          checkRunName: 'Test',
+        },
+      }).source.eventName
+    ).toBe('check_run');
+    expect(isCiFamilyCheckName('ci-fast')).toBe(true);
+    expect(isCiFamilyCheckName('Snyk')).toBe(false);
+  });
+
+  it('unifies workflow_run and check_run deliveries on the same suite and fingerprint', () => {
+    const fromWorkflow = event();
+    const fromCheck = event({
+      workflowRunId: 7777,
+      source: {
+        eventName: 'check_run',
+        producerEvent: 'pull_request',
+        trustedPolicyRef: 'main',
+        checkSuiteAppSlug: 'github-actions',
+        checkRunName: 'ci-fast',
+      },
+    });
+    expect(fromWorkflow.delivery).toBe(fromCheck.delivery);
+    expect(fromWorkflow.delivery.startsWith('44:')).toBe(true);
+  });
+
+  it('resolves the authenticated CI workflow_run for a check suite', () => {
+    const run = resolveCiWorkflowRun({
+      headSha: head,
+      checkSuiteId: 44,
+      runs: [
+        {
+          id: 11,
+          name: 'CI',
+          path: TRUSTED_CI_WORKFLOW_PATH,
+          event: 'pull_request',
+          head_sha: head,
+          check_suite_id: 44,
+          run_attempt: 1,
+        },
+        {
+          id: 12,
+          name: 'Agent Pipeline',
+          path: '.github/workflows/agent-pipeline.yml',
+          event: 'pull_request',
+          head_sha: head,
+          check_suite_id: 44,
+          run_attempt: 1,
+        },
+      ],
+    });
+    expect(run?.id).toBe(11);
+  });
+
   it('deliberate red: rejects unauthenticated or PR-controlled events', () => {
     expect(() =>
       event({
@@ -106,6 +178,17 @@ describe('rolling CI failure dispatch', () => {
         source: {
           ...trustedSource,
           workflowPath: '.github/workflows/agent-pipeline.yml',
+        },
+      })
+    ).toThrow('failure source is not an authenticated CI workflow_run');
+    expect(() =>
+      event({
+        source: {
+          eventName: 'check_run',
+          producerEvent: 'pull_request',
+          trustedPolicyRef: 'main',
+          checkSuiteAppSlug: 'github-actions',
+          checkRunName: 'Snyk',
         },
       })
     ).toThrow('failure source is not an authenticated CI workflow_run');
@@ -152,7 +235,7 @@ describe('rolling CI failure dispatch', () => {
 
   it('deliberate red: rejects a competing remediation writer', () => {
     expect(
-      plan(event({ workflowRunId: 9002 }), {
+      plan(event({ workflowRunId: 9002, workflowRunAttempt: 2 }), {
         writer: 'fx',
         priorState: plan(event(), { writer: 'implementer' }).state,
       })
@@ -261,17 +344,21 @@ describe('rolling CI dispatch CLI and workflow', () => {
     );
   });
 
-  it('uses native workflow_run/check provenance with minimal permissions', () => {
+  it('uses native workflow_run/check provenance with FX remediation', () => {
     for (const token of [
       "workflows: ['CI']",
+      'check_suite:',
+      'check_run:',
       "github.event.workflow_run.event == 'pull_request'",
       "github.event.workflow_run.path == '.github/workflows/ci.yml'",
       "github.event.workflow_run.conclusion == 'failure'",
       "github.event.workflow_run.conclusion == 'success'",
+      "github.event.check_suite.conclusion == 'failure'",
+      "github.event.check_run.conclusion == 'failure'",
       'EVENT_NAME: ${{ github.event_name }}',
-      'WORKFLOW_PATH: ${{ github.event.workflow_run.path }}',
-      'CHECK_SUITE_ID: ${{ github.event.workflow_run.check_suite_id }}',
-      'EXPECTED_HEAD: ${{ github.event.workflow_run.head_sha }}',
+      'WORKFLOW_PATH: ${{ github.event.workflow_run.path',
+      'CHECK_SUITE_ID: ${{ github.event.workflow_run.check_suite_id',
+      'EXPECTED_HEAD: ${{ github.event.workflow_run.head_sha',
       'ref: ${{ github.sha }}',
       'persist-credentials: false',
       'actions: read',
@@ -279,7 +366,10 @@ describe('rolling CI dispatch CLI and workflow', () => {
       'contents: read',
       'pull-requests: write',
       'GH_TOKEN: ${{ github.token }}',
-      'node scripts/rolling-ci-dispatch.mjs',
+      'secrets.CURSOR_API_KEY',
+      'node scripts/lib/rolling-ci-fx.mjs',
+      'scripts/lib/rolling-ci-handoff.mjs',
+      'Launch FX remediator',
       'runs-on: ubuntu-latest',
     ]) {
       expect(WORKFLOW, token).toContain(token);
@@ -287,7 +377,6 @@ describe('rolling CI dispatch CLI and workflow', () => {
     expect(WORKFLOW).toMatch(/^permissions: \{\}$/m);
     expect(WORKFLOW).not.toContain('contents: write');
     expect(WORKFLOW).not.toContain('JOVIE_BOT_PRIVATE_KEY');
-    expect(WORKFLOW).not.toContain('scripts/lib/rolling-ci-handoff.mjs');
     expect(WORKFLOW).not.toContain(
       'ref: ${{ github.event.workflow_run.head_sha }}'
     );

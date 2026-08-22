@@ -6,8 +6,85 @@ export const ROLLING_CI_STATE_MARKER = 'jovie-rolling-ci-state';
 export const MAX_REPAIR_DELIVERIES = 3;
 export const TRUSTED_CI_WORKFLOW = 'CI';
 export const TRUSTED_CI_WORKFLOW_PATH = '.github/workflows/ci.yml';
+export const GITHUB_ACTIONS_APP_SLUG = 'github-actions';
+export const TRUSTED_FAILURE_EVENTS = Object.freeze([
+  'workflow_run',
+  'check_suite',
+  'check_run',
+]);
 
 const SHA_RE = /^[0-9a-f]{40}$/i;
+const CI_FAMILY_CHECK_NAME =
+  /^(?:CI\b|Test\b|Typecheck\b|Lint\b|E2E\b|e2e\b|ci-fast\b)/i;
+
+export function isCiFamilyCheckName(name) {
+  return CI_FAMILY_CHECK_NAME.test(String(name ?? '').trim());
+}
+
+function isTrustedPolicyRef(source) {
+  return source?.trustedPolicyRef === 'main';
+}
+
+function isAuthenticatedWorkflowRun(source) {
+  const workflowPath = source?.workflowPath;
+  return (
+    source?.eventName === 'workflow_run' &&
+    source?.workflow === TRUSTED_CI_WORKFLOW &&
+    source?.producerEvent === 'pull_request' &&
+    isTrustedPolicyRef(source) &&
+    (workflowPath == null || workflowPath === TRUSTED_CI_WORKFLOW_PATH)
+  );
+}
+
+function isAuthenticatedCheckEvent(source) {
+  if (!TRUSTED_FAILURE_EVENTS.includes(source?.eventName)) return false;
+  if (source.eventName === 'workflow_run') return false;
+  if (!isTrustedPolicyRef(source)) return false;
+  if (source?.producerEvent && source.producerEvent !== 'pull_request') {
+    return false;
+  }
+  const slug = source?.checkSuiteAppSlug;
+  if (slug && slug !== GITHUB_ACTIONS_APP_SLUG) return false;
+  if (
+    source.eventName === 'check_run' &&
+    source?.checkRunName &&
+    !isCiFamilyCheckName(source.checkRunName)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/** @param {Record<string, any>} [input] */
+export function resolveCiWorkflowRun(input = {}) {
+  const runs = Array.isArray(input.runs) ? input.runs : [];
+  const head = String(input.headSha ?? '').toLowerCase();
+  const suite = input.checkSuiteId == null ? null : String(input.checkSuiteId);
+  return (
+    [...runs]
+      .filter(run => {
+        const path = run?.path ?? run?.workflowPath;
+        const runHead = String(
+          run?.head_sha ?? run?.headSha ?? ''
+        ).toLowerCase();
+        const runSuite = String(run?.check_suite_id ?? run?.checkSuiteId ?? '');
+        return (
+          run?.name === TRUSTED_CI_WORKFLOW &&
+          path === TRUSTED_CI_WORKFLOW_PATH &&
+          run?.event === 'pull_request' &&
+          runHead === head &&
+          (suite == null || runSuite === suite)
+        );
+      })
+      .sort((left, right) => {
+        const attemptDelta =
+          (right.run_attempt ?? right.runAttempt ?? 0) -
+          (left.run_attempt ?? left.runAttempt ?? 0);
+        if (attemptDelta !== 0) return attemptDelta;
+        return Number(right.id ?? 0) - Number(left.id ?? 0);
+      })[0] ?? null
+  );
+}
 
 function assertPositiveInteger(value, name) {
   if (!Number.isInteger(value) || value < 1) {
@@ -29,22 +106,23 @@ function stableFailureSignal(check, failedSteps) {
 }
 
 export function validateFailureSource(source) {
-  const workflowPath = source?.workflowPath;
-  const authentic =
-    source?.eventName === 'workflow_run' &&
-    source?.workflow === TRUSTED_CI_WORKFLOW &&
-    source?.producerEvent === 'pull_request' &&
-    source?.trustedPolicyRef === 'main' &&
-    (workflowPath == null || workflowPath === TRUSTED_CI_WORKFLOW_PATH);
-  if (!authentic) {
+  if (
+    !isAuthenticatedWorkflowRun(source) &&
+    !isAuthenticatedCheckEvent(source)
+  ) {
     throw new Error('failure source is not an authenticated CI workflow_run');
   }
+  const workflowPath = source?.workflowPath;
   return {
     eventName: source.eventName,
-    workflow: source.workflow,
-    producerEvent: source.producerEvent,
+    workflow: source.workflow ?? TRUSTED_CI_WORKFLOW,
+    producerEvent: source.producerEvent ?? 'pull_request',
     trustedPolicyRef: source.trustedPolicyRef,
     ...(workflowPath ? { workflowPath } : {}),
+    ...(source?.checkSuiteAppSlug
+      ? { checkSuiteAppSlug: source.checkSuiteAppSlug }
+      : {}),
+    ...(source?.checkRunName ? { checkRunName: source.checkRunName } : {}),
   };
 }
 
@@ -121,7 +199,7 @@ export function normalizeFailureEvents({
         workflowRunId: String(workflowRunId),
         ...(suiteId ? { checkSuiteId: suiteId } : {}),
         fingerprint,
-        delivery: `${workflowRunId}:${workflowRunAttempt}:${fingerprint}`,
+        delivery: `${suiteId ?? workflowRunId}:${workflowRunAttempt}:${fingerprint}`,
         failedSteps: [...new Set(failedSteps)].sort(),
         source: trustedSource,
       };
@@ -266,6 +344,7 @@ export function planGreenRecovery({ headSha, liveHead, priorState = null }) {
 export function renderDispatchComment({ event, plan }) {
   const owner = plan.state?.claim?.writer ?? 'unassigned';
   const count = plan.state?.failures?.[event.fingerprint]?.deliveryCount ?? 0;
+  const role = owner === 'fx' ? 'FX backstop' : 'active implementer';
   return `## Rolling CI failure dispatched
 
 - PR: #${event.pr}
@@ -273,7 +352,7 @@ export function renderDispatchComment({ event, plan }) {
 - Check: \`${event.check}\`
 - Workflow attempt: ${event.attempt}
 - Failure fingerprint: \`${event.fingerprint}\`
-- Remediation writer: @${owner} (active implementer)
+- Remediation writer: @${owner} (${role})
 - Repair delivery: ${count}/${MAX_REPAIR_DELIVERIES}
 
 The one-writer lease is pinned to this exact head. A new commit or green rerun supersedes this repair; revalidate the fingerprint before changing code.
