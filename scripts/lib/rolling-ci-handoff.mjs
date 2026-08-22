@@ -157,13 +157,24 @@ function validTransfer(lease, receipt) {
   );
 }
 
+function validTransferAt(lease, receipt, observedAt) {
+  if (!validTransfer(lease, receipt)) return false;
+  const transferAt = Date.parse(String(receipt.observedAt ?? ''));
+  return (
+    Number.isFinite(transferAt) &&
+    transferAt >= Date.parse(lease.issuedAt) &&
+    transferAt <= Date.parse(observedAt)
+  );
+}
+
 export function buildFxConfigurationIncident(
   lease,
   transferReceipt,
   { now = new Date().toISOString() } = {}
 ) {
   assertLease(lease);
-  if (!validTransfer(lease, transferReceipt)) {
+  const observedAt = instant(now, 'observedAt');
+  if (!validTransferAt(lease, transferReceipt, observedAt)) {
     throw new Error(
       'FX configuration incident requires an exact handoff receipt'
     );
@@ -182,7 +193,7 @@ export function buildFxConfigurationIncident(
     remedy:
       'Configure the FX adapter authentication through the authorized secret-management path, then redeliver the exact current-head claim.',
     implementerOwnedRepairBlocked: false,
-    observedAt: instant(now, 'observedAt'),
+    observedAt,
   };
   return { ...incident, incidentKey: digest(incident) };
 }
@@ -194,7 +205,7 @@ export function routeRemediationOwner(
 ) {
   assertLease(lease);
   const observedAt = instant(now, 'observedAt');
-  if (transferReceipt && !validTransfer(lease, transferReceipt)) {
+  if (transferReceipt && !validTransferAt(lease, transferReceipt, observedAt)) {
     return { status: 'rejected', reason: 'handoff-receipt-mismatch' };
   }
   if (
@@ -281,6 +292,7 @@ function buildWriterClaim({ lease, writer, route, now, previous = null }) {
     writer,
     route,
     status: 'active',
+    leaseIssuedAt: lease.issuedAt,
     claimedAt: now,
     previousWriterClaimKey: previous?.writerClaimKey ?? null,
   };
@@ -324,13 +336,45 @@ export async function acquireRemediationWriterClaim(
     ) {
       return { status: 'duplicate', claim: current };
     }
+    if (
+      current?.status === 'active' &&
+      current.headSha !== lease.headSha &&
+      Date.parse(lease.issuedAt) <= Date.parse(current.leaseIssuedAt)
+    ) {
+      return { status: 'rejected', reason: 'out-of-order-head' };
+    }
+    const claimedAt = instant(now, 'claimedAt');
+    const superseded = current
+      ? {
+          ...current,
+          status: 'superseded',
+          supersededAt: claimedAt,
+          supersededReason: 'new-head',
+          supersessionReceiptKey: digest({
+            writerClaimKey: current.writerClaimKey,
+            supersededAt: claimedAt,
+            reason: 'new-head',
+            byHeadSha: lease.headSha,
+          }),
+        }
+      : null;
     const claim = buildWriterClaim({
       lease,
       writer: route.writer,
       route: route.route,
-      now: instant(now, 'claimedAt'),
+      now: claimedAt,
       previous: current,
     });
+    if (superseded) {
+      await writeJsonAtomic(
+        join(
+          directory,
+          'receipts',
+          `${superseded.supersessionReceiptKey}.json`
+        ),
+        superseded
+      );
+    }
     await writeJsonAtomic(currentPath, claim);
     await writeJsonAtomic(
       join(directory, 'receipts', `${claim.writerClaimKey}.json`),
@@ -339,8 +383,53 @@ export async function acquireRemediationWriterClaim(
     return {
       status: current ? 'superseded-and-acquired' : 'acquired',
       claim,
-      superseded: current ?? null,
+      superseded,
     };
+  });
+}
+
+/** Persist a green exact-head rerun as a terminal supersession receipt. */
+export async function supersedeRemediationWriterClaim(
+  input,
+  { stateDir = DEFAULT_DELIVERY_STATE_DIR, now = new Date().toISOString() } = {}
+) {
+  const identity = ownershipIdentity(input);
+  if (input.checkConclusion !== 'success') {
+    return { status: 'rejected', reason: 'green-proof-required' };
+  }
+  const claimKey = digest({
+    repository: identity.repository,
+    prNumber: identity.prNumber,
+    failureFingerprint: identity.failureFingerprint,
+  });
+  const directory = claimDirectory(stateDir, claimKey);
+  const currentPath = join(directory, 'current.json');
+  return withClaimLock(directory, async () => {
+    const current = await readJson(currentPath);
+    if (!current || current.status !== 'active') {
+      return { status: 'ignored', reason: 'no-active-claim' };
+    }
+    if (current.headSha !== identity.headSha) {
+      return { status: 'rejected', reason: 'stale-head' };
+    }
+    const supersededAt = instant(now, 'supersededAt');
+    const superseded = {
+      ...current,
+      status: 'superseded',
+      supersededAt,
+      supersededReason: 'green-rerun',
+      supersessionReceiptKey: digest({
+        writerClaimKey: current.writerClaimKey,
+        supersededAt,
+        reason: 'green-rerun',
+      }),
+    };
+    await writeJsonAtomic(currentPath, superseded);
+    await writeJsonAtomic(
+      join(directory, 'receipts', `${superseded.supersessionReceiptKey}.json`),
+      superseded
+    );
+    return { status: 'superseded', claim: superseded };
   });
 }
 

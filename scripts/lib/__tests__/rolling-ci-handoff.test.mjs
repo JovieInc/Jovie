@@ -10,6 +10,7 @@ import {
   buildOwnershipTransferReceipt,
   FX_CONFIGURATION_INCIDENT_SCHEMA,
   routeRemediationOwner,
+  supersedeRemediationWriterClaim,
 } from '../rolling-ci-handoff.mjs';
 
 const HEAD_A = 'a'.repeat(40);
@@ -149,30 +150,37 @@ describe('rolling CI remediation ownership', () => {
     ).toBe('fx-backstop');
   });
 
-  it('deduplicates one writer and rejects a competing writer for the same root cause', async () => {
+  it('deliberate red: admits exactly one writer under competing claims', async () => {
     const directory = await stateDir();
-    const currentLease = lease();
-    const first = await acquireRemediationWriterClaim(
-      { lease: currentLease, currentHeadSha: HEAD_A },
-      { stateDir: directory, now: NOW }
-    );
-    expect(first.status).toBe('acquired');
+    const firstLease = lease();
+    const competingLease = lease({ implementerId: 'competing-agent' });
+    const results = await Promise.all([
+      acquireRemediationWriterClaim(
+        { lease: firstLease, currentHeadSha: HEAD_A },
+        { stateDir: directory, now: NOW }
+      ),
+      acquireRemediationWriterClaim(
+        { lease: competingLease, currentHeadSha: HEAD_A },
+        { stateDir: directory, now: NOW }
+      ),
+    ]);
+    expect(results.map(result => result.status).sort()).toEqual([
+      'acquired',
+      'conflict',
+    ]);
+    const winner = results.find(result => result.status === 'acquired');
 
     const duplicate = await acquireRemediationWriterClaim(
-      { lease: currentLease, currentHeadSha: HEAD_A },
+      {
+        lease:
+          winner.claim.writer.id === firstLease.owner.id
+            ? firstLease
+            : competingLease,
+        currentHeadSha: HEAD_A,
+      },
       { stateDir: directory, now: NOW }
     );
     expect(duplicate.status).toBe('duplicate');
-
-    const competingLease = lease({ implementerId: 'competing-agent' });
-    const conflict = await acquireRemediationWriterClaim(
-      { lease: competingLease, currentHeadSha: HEAD_A },
-      { stateDir: directory, now: NOW }
-    );
-    expect(conflict).toMatchObject({
-      status: 'conflict',
-      reason: 'writer-already-claimed',
-    });
   });
 
   it('supersedes the old claim on a newly verified current head', async () => {
@@ -191,7 +199,11 @@ describe('rolling CI remediation ownership', () => {
       { stateDir: directory, now: '2026-08-22T01:05:00.000Z' }
     );
     expect(next.status).toBe('superseded-and-acquired');
-    expect(next.superseded.writerClaimKey).toBe(first.claim.writerClaimKey);
+    expect(next.superseded).toMatchObject({
+      writerClaimKey: first.claim.writerClaimKey,
+      status: 'superseded',
+      supersededReason: 'new-head',
+    });
     expect(
       authorizeRemediationMutation({
         claim: first.claim,
@@ -201,20 +213,52 @@ describe('rolling CI remediation ownership', () => {
     ).toEqual({ authorized: false, reason: 'superseded-head' });
   });
 
-  it('makes a green rerun cancel authorization for the exact head', async () => {
+  it('persists a green rerun as a superseded exact-head claim', async () => {
     const directory = await stateDir();
     const result = await acquireRemediationWriterClaim(
       { lease: lease(), currentHeadSha: HEAD_A },
       { stateDir: directory, now: NOW }
     );
+    const superseded = await supersedeRemediationWriterClaim(
+      {
+        repository: 'JovieInc/Jovie',
+        prNumber: 16337,
+        headSha: HEAD_A,
+        failureFingerprint: 'ci-fast:typecheck:missing-export',
+        checkConclusion: 'success',
+      },
+      { stateDir: directory, now: '2026-08-22T01:10:00.000Z' }
+    );
+    expect(superseded).toMatchObject({
+      status: 'superseded',
+      claim: { status: 'superseded', supersededReason: 'green-rerun' },
+    });
     expect(
       authorizeRemediationMutation({
-        claim: result.claim,
+        claim: superseded.claim,
         writerId: result.claim.writer.id,
         currentHeadSha: HEAD_A,
-        checkConclusion: 'success',
       })
-    ).toEqual({ authorized: false, reason: 'green-rerun' });
+    ).toEqual({ authorized: false, reason: 'claim-not-active' });
+  });
+
+  it('rejects an older head event delivered after a newer claim', async () => {
+    const directory = await stateDir();
+    const newer = lease({
+      headSha: HEAD_B,
+      issuedAt: '2026-08-22T01:05:00.000Z',
+      expiresAt: '2026-08-22T03:05:00.000Z',
+    });
+    await acquireRemediationWriterClaim(
+      { lease: newer, currentHeadSha: HEAD_B },
+      { stateDir: directory, now: '2026-08-22T01:05:00.000Z' }
+    );
+    await expect(
+      acquireRemediationWriterClaim(
+        { lease: lease(), currentHeadSha: HEAD_A },
+        { stateDir: directory, now: '2026-08-22T01:06:00.000Z' }
+      )
+    ).resolves.toEqual({ status: 'rejected', reason: 'out-of-order-head' });
   });
 
   it('rejects stale-head acquisition before any writer claim is persisted', async () => {
