@@ -55,6 +55,8 @@ export type SummerSpeaker = {
 
 export type SummerSpeakInput = {
   readonly userText: string;
+  readonly conversationId: string;
+  readonly clientTurnId: string;
   readonly history: readonly {
     readonly role: 'user' | 'assistant';
     readonly text: string;
@@ -289,6 +291,8 @@ export async function* runOvieSummerTurn(input: {
   try {
     for await (const event of input.speaker.speak({
       userText: input.userText,
+      conversationId: session.identity.sessionId,
+      clientTurnId: input.clientTurnId ?? binding.correlationId,
       history: session.turns.flatMap(turn => [
         { role: 'user' as const, text: turn.userText },
         { role: 'assistant' as const, text: turn.assistantText },

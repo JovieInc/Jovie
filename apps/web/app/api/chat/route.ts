@@ -155,6 +155,7 @@ import {
   assertOvieDoorDoesNotUseArtistJovieGeneration,
   OVIE_PROGRAM,
 } from '@/lib/ovie/program';
+import { bindCurrentSummerQueueSpeaker } from '@/lib/ovie/summer-queue-speaker';
 import { createSummerAssistantStreamResponse } from '@/lib/ovie/summer-stream';
 import {
   getBoundSummerSpeaker,
@@ -2462,12 +2463,14 @@ export async function POST(req: Request) {
   const userText = extractLastUserText(uiMessages);
   // JOV-5215/5216/5214: bind Eve pack + persist/ack dump to Summer Kanban
   // before any model. OV door must not fall through to artist Jovie chat.
+  const ovieStore = getOvieOperatingStore();
+  if (chatMode === 'ov') bindCurrentSummerQueueSpeaker(ovieStore);
   const {
     eveTurn,
     receipts: ovieIngestReceipts,
     generation,
   } = await prepareOvieChatTurn(chatMode, userText, {
-    store: getOvieOperatingStore(),
+    store: ovieStore,
   });
   assertOvieDoorDoesNotUseArtistJovieGeneration(chatMode, generation.kind);
   const clientTurnId = normalizeClientId(body.clientTurnId);
@@ -2746,7 +2749,7 @@ export async function POST(req: Request) {
           receipts: ovieIngestReceipts,
           userText: userText || '',
           speaker,
-          store: getOvieOperatingStore(),
+          store: ovieStore,
           signal: req.signal,
           clientTurnId,
         }),
