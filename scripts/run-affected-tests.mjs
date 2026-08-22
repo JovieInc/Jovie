@@ -3,6 +3,10 @@ import { execFileSync, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  LOCAL_FULL_SUITE_SHARD_COUNT,
+  resolveLocalRemediationConcurrency,
+} from './lib/local-remediation-concurrency.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Full-suite shards are deliberately independent so one Vitest process cannot
@@ -1608,7 +1612,10 @@ export function buildSelectedTestCommands(plan, maxWorkers) {
   return commands;
 }
 
-export function buildFullSuiteCommands(maxWorkers, shardCount = 8) {
+export function buildFullSuiteCommands(
+  maxWorkers,
+  shardCount = LOCAL_FULL_SUITE_SHARD_COUNT
+) {
   return Array.from({ length: shardCount }, (_, index) => [
     'pnpm',
     [
@@ -1651,7 +1658,11 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
   const base = argValue(args, '--base', 'origin/main');
   const maxWorkers = argValue(args, '--max-workers', '2');
-  const shardConcurrency = argValue(args, '--shard-concurrency', '2');
+  const requestedShardConcurrency = argValue(
+    args,
+    '--shard-concurrency',
+    'auto'
+  );
   const shardTimeoutMs = positiveDurationMs(
     argValue(
       args,
@@ -1684,7 +1695,16 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     // 2k-file web suite to trigger host memory pressure near teardown. Keep
     // deterministic, bounded-memory shards, but schedule a small bounded set
     // concurrently so a complete fail-closed suite does not serialize all 8.
-    await runCommands(buildFullSuiteCommands(maxWorkers), shardConcurrency, {
+    const commands = buildFullSuiteCommands(maxWorkers);
+    const concurrency = resolveLocalRemediationConcurrency({
+      commandCount: commands.length,
+      requested: requestedShardConcurrency,
+      maxWorkersPerShard: maxWorkers,
+    });
+    console.log(
+      `[affected-tests] local-concurrency mode=${concurrency.mode} selected=${concurrency.concurrency} commands=${concurrency.commandCount} cpuPressure=${concurrency.cpuPressureRatio.toFixed(2)} memoryUsed=${concurrency.memoryUsedRatio.toFixed(2)}`
+    );
+    await runCommands(commands, concurrency.concurrency, {
       timeoutMs: shardTimeoutMs,
       progressIntervalMs,
       labelPrefix: 'shard',
