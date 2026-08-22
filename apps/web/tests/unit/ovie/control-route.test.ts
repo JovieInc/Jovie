@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { respondToSummerControl } from '@/app/api/summer/control/route';
 import { resetPromotedDumpAckRuntime } from '@/lib/ovie/promoted-workflows';
+import { resetSummerTransportRuntime } from '@/lib/ovie/summer-transport';
 
 describe('POST /api/summer/control', () => {
   beforeEach(() => {
     resetPromotedDumpAckRuntime();
+    resetSummerTransportRuntime();
   });
 
   it('fails closed when unauthenticated', async () => {
@@ -58,6 +60,18 @@ describe('POST /api/summer/control', () => {
         owner: 'summer',
         eveCannotMutate: true,
       },
+    });
+  });
+
+  it('disables Summer transport while keeping durable receipts', async () => {
+    const founder = { authenticated: true, isAdmin: true };
+    const disabled = respondToSummerControl(founder, {
+      action: 'disable-transport',
+    });
+    expect(disabled.status).toBe(200);
+    await expect(disabled.json()).resolves.toMatchObject({
+      ok: true,
+      summerTransportEnabled: false,
     });
   });
 });

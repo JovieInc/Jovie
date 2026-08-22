@@ -128,7 +128,8 @@ describe('JOV-5214 Ovie program contract', () => {
     expect(transport.kind).toBe('summer-transport');
     if (transport.kind !== 'summer-transport') return;
     expect(transport.state).toBe('unavailable');
-    expect(transport.blockingIssue).toBe('JOV-5212');
+    expect(transport.speaker).toBe('summer');
+    expect(transport.session).toBeNull();
     expect(transport.text).toContain('stored and queued for Summer lander');
     expect(transport.text).toContain('Ovie is the door, not the speaker');
     expect(transport.text.toLowerCase()).not.toMatch(/i am ovie/);

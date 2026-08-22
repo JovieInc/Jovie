@@ -26,6 +26,7 @@ const IN_APP_ROUTE_PREFIXES = [
   '/artist-selection',
   '/billing',
   '/desktop-auth',
+  '/hud',
   '/onboarding',
   '/start',
 ] as const;

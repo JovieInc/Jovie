@@ -54,6 +54,7 @@ import {
   applyEveIdentityToSystemPrompt,
   type EveIdentityId,
 } from '@/lib/ovie/identity';
+import { OvieProgramError } from '@/lib/ovie/program';
 
 type EntitlementsForPlan = ReturnType<typeof GetEntitlements>;
 
@@ -276,6 +277,13 @@ export async function executeChatTurn(
     mode = 'app',
     identity,
   } = input;
+
+  if (identity?.id === 'ovie') {
+    throw new OvieProgramError(
+      'ovie-door-artist-jovie-fallthrough',
+      'OV-mode cannot execute the artist Jovie turn. Summer owns the Ovie door response.'
+    );
+  }
 
   // Onboarding mode swaps in the Stanley-style prompt and skips the
   // music-industry knowledge context (which is keyed on the artist's profile,
