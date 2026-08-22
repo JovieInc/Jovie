@@ -21,6 +21,8 @@ describe('delivery state machine', () => {
       ['workflow-cancelled', 'reconcile-cancelled-workflow'],
       ['queue-noop', 'reconcile-exact-head-queue-admission'],
       ['ci-failed', 'create-bounded-ci-repair-pr'],
+      ['ci-failed-after-handoff', 'repair-current-pr-exact-head'],
+      ['fx-auth-missing', 'restore-fx-adapter-authentication'],
       ['lease-ambiguous', 'reconcile-exact-head-lease'],
       ['stale-config', 'reload-and-attest-controller-service'],
       ['missing-trigger', 'restore-event-trigger-and-reconcile'],
@@ -155,6 +157,47 @@ describe('delivery state machine', () => {
       });
       assert.equal(result.task.owner, 'symphony');
       assert.equal(result.task.route, 'gem-to-symphony');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('writes handed-off repair work as one exact-head Gem-to-FX task', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'jovie-delivery-fx-'));
+    try {
+      const receipt = buildDeliveryReceipt({
+        delivery_key: 'ci-fx-1',
+        failure: 'ci-failed-after-handoff',
+        pr_number: 16019,
+        head_sha: HEAD,
+      });
+      const result = await persistDeliveryOutcome(receipt, {
+        stateDir: directory,
+      });
+      assert.equal(result.task.owner, 'fx');
+      assert.equal(result.task.route, 'gem-to-fx');
+      assert.equal(result.task.headSha, HEAD);
+      assert.equal(result.task.action, 'repair-current-pr-exact-head');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps missing FX auth as a Gem-local configuration incident', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'jovie-delivery-fx-auth-'));
+    try {
+      const receipt = buildDeliveryReceipt({
+        delivery_key: 'fx-auth-1',
+        failure: 'fx-auth-missing',
+        pr_number: 16019,
+        head_sha: HEAD,
+      });
+      const result = await persistDeliveryOutcome(receipt, {
+        stateDir: directory,
+      });
+      assert.equal(result.task.owner, 'gem');
+      assert.equal(result.task.route, 'gem-local');
+      assert.equal(result.task.action, 'restore-fx-adapter-authentication');
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
