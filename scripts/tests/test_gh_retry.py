@@ -91,6 +91,9 @@ def _write_native_receipt_fakes(
               enroll) echo "enroll should not run for this receipt fixture" >&2; exit 2 ;;
               dequeue) echo '{{"state":{{"queued":false}}}}' ;;
               max-queue-depth) echo 16 ;;
+              unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
+              unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
+              changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
               --classify-queue) echo '[]' ;;
               *) echo "unexpected node args: $*" >&2; exit 2 ;;
             esac
@@ -494,6 +497,9 @@ class TestDrainPrQueueWiring:
                     echo '{{"state":{{"queued":false}}}}'
                     ;;
                   max-queue-depth) echo 16 ;;
+                  unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
+                  unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
+                  changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 2 ;;
                 esac
@@ -588,6 +594,9 @@ class TestDrainPrQueueWiring:
                     ;;
                   dequeue) echo '{{"state":{{"queued":false}}}}' ;;
                   max-queue-depth) echo 16 ;;
+                  unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
+                  unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
+                  changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 2 ;;
                 esac
@@ -684,6 +693,9 @@ JSON
                     ;;
                   dequeue) echo '{{"state":{{"queued":false}}}}' ;;
                   max-queue-depth) echo 16 ;;
+                  unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
+                  unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
+                  changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 2 ;;
                 esac
@@ -776,6 +788,9 @@ JSON
                   list-state) echo '{{"1001":{{"headRefOid":"{snapshot_head}","queued":false}}}}' ;;
                   enroll) touch "{enrolled}"; exit 99 ;;
                   max-queue-depth) echo 16 ;;
+                  unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
+                  unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
+                  changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 2 ;;
                 esac
