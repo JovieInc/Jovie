@@ -167,21 +167,32 @@ export async function appendSummerTurn(
   const session = await openCurrentSummerSession(store, now);
   assertSummerIdentity(session.identity);
   const duplicate = findTurnByClientId(session, turn.clientTurnId);
-  if (duplicate) {
+  if (duplicate && !shouldReplaceSummerTurn(duplicate, turn)) {
     return session;
   }
+  const persisted: SummerPersistedTurn = duplicate
+    ? { ...turn, turnIndex: duplicate.turnIndex }
+    : { ...turn, turnIndex: session.turns.length + 1 };
   const next: SummerSession = {
     identity: session.identity,
-    turns: [
-      ...session.turns,
-      {
-        ...turn,
-        turnIndex: session.turns.length + 1,
-      },
-    ],
+    turns: duplicate
+      ? session.turns.map(existing =>
+          existing.clientTurnId === turn.clientTurnId ? persisted : existing
+        )
+      : [...session.turns, persisted],
   };
   await store.putDecision(toDecision(next, now));
   return next;
+}
+
+function shouldReplaceSummerTurn(
+  existing: SummerPersistedTurn,
+  next: Omit<SummerPersistedTurn, 'turnIndex'>
+): boolean {
+  if (existing.state === 'canceled') return true;
+  const existingEmpty = existing.assistantText === '' && !existing.toolReceipt;
+  const nextHasContent = next.assistantText !== '' || Boolean(next.toolReceipt);
+  return existingEmpty && nextHasContent;
 }
 
 export function eveBindingFromReceipts(receipts: readonly OvieReceipt[]): {

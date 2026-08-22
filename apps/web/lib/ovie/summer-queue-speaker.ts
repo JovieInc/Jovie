@@ -42,8 +42,13 @@ export function createCurrentSummerQueueSpeaker(
           timeoutMs: SUMMER_RESPONSE_TIMEOUT_MS,
           signal: input.signal,
         });
-        if (terminal?.state === 'completed' && terminal.responseText) {
-          yield { type: 'text-delta', text: terminal.responseText };
+        if (
+          terminal?.state === 'completed' &&
+          (terminal.responseText || terminal.tool)
+        ) {
+          if (terminal.responseText) {
+            yield { type: 'text-delta', text: terminal.responseText };
+          }
           if (terminal.tool && isSummerSafeTool(terminal.tool.name)) {
             yield {
               type: 'tool',

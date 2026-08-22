@@ -10,6 +10,7 @@ import {
   completeOvieSummerTurn,
   enqueueOvieSummerTurn,
   OvieSummerTurnError,
+  ovieSummerTurnId,
 } from '@/lib/ovie/summer-conversation';
 import {
   respondToOvieSummerAction,
@@ -19,7 +20,10 @@ import {
   bindCurrentSummerQueueSpeaker,
   createCurrentSummerQueueSpeaker,
 } from '@/lib/ovie/summer-queue-speaker';
-import { loadCurrentSummerSession } from '@/lib/ovie/summer-session';
+import {
+  CURRENT_SUMMER_SESSION_ID,
+  loadCurrentSummerSession,
+} from '@/lib/ovie/summer-session';
 import {
   bindCurrentSummerSpeaker,
   getBoundSummerSpeaker,
@@ -263,6 +267,53 @@ describe('Ovie Summer conversation handoff', () => {
     expect(session?.turns).toHaveLength(1);
     expect(session?.turns[0]?.eveWorkId).toBe('ini_work_resume');
     expect(session?.identity.memoryNamespace).toBe('summer');
+  });
+
+  it('accepts a tool-only Mac completion without founder prose', async () => {
+    const store = new DurableOperatingStore(memoryRecordBackend());
+    const id = ovieSummerTurnId({
+      conversationId: CURRENT_SUMMER_SESSION_ID,
+      clientTurnId: 'tool-only',
+    });
+    await enqueueOvieSummerTurn(store, {
+      id,
+      conversationId: CURRENT_SUMMER_SESSION_ID,
+      userText: 'Org state?',
+    });
+    await claimOvieSummerTurn(store, {
+      id,
+      workerId: 'summer-mac',
+      claimToken: 'tool-only-claim',
+    });
+    await completeOvieSummerTurn(store, {
+      id,
+      claimToken: 'tool-only-claim',
+      responseText: '',
+      tool: {
+        name: 'get_org_state',
+        ok: true,
+        receiptId: 'tool_only',
+        summary: 'org',
+      },
+    });
+    const events: unknown[] = [];
+    for await (const event of createCurrentSummerQueueSpeaker(store).speak({
+      userText: 'Org state?',
+      conversationId: 'summer-session:current',
+      clientTurnId: 'tool-only',
+      history: [],
+    })) {
+      events.push(event);
+    }
+    expect(events).toEqual([
+      {
+        type: 'tool',
+        tool: 'get_org_state',
+        ok: true,
+        receiptId: 'tool_only',
+        summary: 'org',
+      },
+    ]);
   });
 
   it('fails a fenced Mac claim and refuses a stale token', async () => {
