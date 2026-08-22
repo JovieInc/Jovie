@@ -107,13 +107,71 @@ function asClaimedTurn(
   return turn as SummerClaimedTurn;
 }
 
+/** Keep aligned with apps/web/lib/ovie/isolation.ts SUMMER_SAFE_TOOLS. */
+const SUMMER_SAFE_TOOLS = [
+  'get_org_state',
+  'inspect_kanban',
+  'search_gbrain',
+] as const;
+
+const SUMMER_TOOL_FENCE = /```summer-tool\s*\r?\n([\s\S]*?)\r?\n```/;
+
+export type SummerRuntimeTool = {
+  readonly name: string;
+  readonly ok: boolean;
+  readonly receiptId: string;
+  readonly summary: string;
+};
+
+export type SummerRuntimeCompletion = {
+  readonly responseText: string;
+  readonly tool?: SummerRuntimeTool;
+};
+
+function isSummerSafeTool(name: string): boolean {
+  return (SUMMER_SAFE_TOOLS as readonly string[]).includes(name);
+}
+
+export function parseSummerRuntimeCompletion(
+  stdout: string
+): SummerRuntimeCompletion {
+  const match = stdout.match(SUMMER_TOOL_FENCE);
+  if (!match) return { responseText: stdout.trim() };
+  const responseText = stdout.replace(match[0], '').trim();
+  try {
+    const parsed = JSON.parse(match[1] ?? '') as Record<string, unknown>;
+    if (
+      typeof parsed.name === 'string' &&
+      typeof parsed.receiptId === 'string' &&
+      typeof parsed.summary === 'string'
+    ) {
+      return {
+        responseText,
+        tool: {
+          name: parsed.name,
+          ok: parsed.ok === true,
+          receiptId: parsed.receiptId,
+          summary: parsed.summary,
+        },
+      };
+    }
+  } catch {
+    // Malformed fence is ignored; founder text still completes.
+  }
+  return { responseText };
+}
+
+function ignoreStreamError(): void {
+  // EPIPE after SIGTERM, or a closed stdout/stderr, must not crash the app.
+}
+
 export async function invokeSummerRuntime(input: {
   readonly homeDirectory: string;
   readonly turn: SummerClaimedTurn;
   readonly spawnProcess?: SpawnSummer;
   readonly timeoutMs?: number;
   readonly signal?: AbortSignal;
-}): Promise<string> {
+}): Promise<SummerRuntimeCompletion> {
   const spawnProcess = input.spawnProcess ?? (spawn as unknown as SpawnSummer);
   const executable = join(input.homeDirectory, '.hermes', 'bin', 'hermes');
   const child = spawnProcess(
@@ -133,7 +191,7 @@ export async function invokeSummerRuntime(input: {
     ],
     { shell: false, stdio: ['pipe', 'pipe', 'pipe'] }
   );
-  return new Promise<string>((resolve, reject) => {
+  return new Promise<SummerRuntimeCompletion>((resolve, reject) => {
     let stdout = '';
     let stdoutBytes = 0;
     let settled = false;
@@ -142,18 +200,27 @@ export async function invokeSummerRuntime(input: {
       child.kill('SIGTERM');
       finish(new Error('summer-runtime-canceled'));
     };
-    const finish = (error?: Error, response?: string): void => {
+    const finish = (
+      error?: Error,
+      response?: SummerRuntimeCompletion
+    ): void => {
       if (settled) return;
       settled = true;
       if (timer) clearTimeout(timer);
       input.signal?.removeEventListener('abort', abort);
       if (error) reject(error);
-      else resolve(response ?? '');
+      else resolve(response ?? { responseText: '' });
     };
     timer = setTimeout(() => {
       child.kill('SIGTERM');
       finish(new Error('summer-runtime-timeout'));
     }, input.timeoutMs ?? DEFAULT_RUNTIME_TIMEOUT_MS);
+    child.stdin.on('error', ignoreStreamError);
+    child.stdout.on('error', ignoreStreamError);
+    child.stderr.on('error', ignoreStreamError);
+    // Drain stderr so Hermes cannot fill the pipe and deadlock. Diagnostics
+    // never become founder conversation text.
+    child.stderr.on('data', () => undefined);
     if (input.signal?.aborted) abort();
     else input.signal?.addEventListener('abort', abort, { once: true });
     child.stdout.on('data', chunk => {
@@ -172,14 +239,20 @@ export async function invokeSummerRuntime(input: {
         finish(new Error(`summer-runtime-exit-${code ?? 'signal'}`));
         return;
       }
-      const response = stdout.trim();
-      if (!response) {
+      const completion = parseSummerRuntimeCompletion(stdout);
+      if (!completion.responseText) {
         finish(new Error('summer-runtime-empty-response'));
         return;
       }
-      finish(undefined, response);
+      if (completion.tool && !isSummerSafeTool(completion.tool.name)) {
+        finish(new Error('summer-unsafe-tool'));
+        return;
+      }
+      finish(undefined, completion);
     });
-    child.stdin.end(input.turn.user_text);
+    if (!settled) {
+      child.stdin.end(input.turn.user_text);
+    }
   });
 }
 
@@ -256,10 +329,10 @@ export function createSummerRuntimeBridge(input: {
         };
         return receipt;
       }
-      let responseText: string;
+      let completion: SummerRuntimeCompletion;
       try {
         activeRuntime = new AbortController();
-        responseText = await invokeSummerRuntime({
+        completion = await invokeSummerRuntime({
           homeDirectory: input.homeDirectory,
           turn: claimed,
           spawnProcess: input.spawnProcess,
@@ -288,7 +361,8 @@ export function createSummerRuntimeBridge(input: {
         action: 'complete',
         id: claimed.id,
         claim_token: claimed.claim_token,
-        response_text: responseText,
+        response_text: completion.responseText,
+        ...(completion.tool ? { tool: completion.tool } : {}),
       });
       if (!completed.ok) {
         receipt = {

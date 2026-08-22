@@ -295,6 +295,9 @@ describe('Summer transport (JOV-5212)', () => {
         row => (row as { type?: string; state?: string }).state === 'canceled'
       )
     ).toBe(true);
+    expect((await loadCurrentSummerSession(store))?.turns ?? []).toHaveLength(
+      0
+    );
 
     disableSummerTransport();
     const disabled = resolveOvieDoorGeneration('ov', [RECEIPT], { speaker });
