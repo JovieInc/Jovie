@@ -48,6 +48,15 @@ walk capture, dispatch, and developer controls stay in disclosure.
 | `/hud` | One Ops screen. Fullscreen `?fs=1`. Unattended TV `?kiosk=TOKEN`. |
 | `/app/ov/chat` | Entitled operator door. Must not fall through to artist Jovie chat or self-identify as Ovie. |
 
+## Ubuntu operational truth (JOV-5248)
+
+Read-only projection `ovie.shipping-state.v1` at `GET /api/hud/shipping-state`.
+It composes Symphony runtime/task state, lease-guard capacity, native
+`mergeQueueEntry`, exact-SHA CI, Production Controller, live build-info, and
+the typed fleet receipt. JOV-5249 consumes freshness UX. Shutdown retains the
+expired last-known marker. No Mac-journal fallback, merged-PR-as-shipped, or
+dispatch/retry/cancel/restart surface.
+
 If you are already signed in as admin, Fullscreen fetches `/api/hud/kiosk-session` and writes the token onto the URL so the same tab can be bookmarked or thrown on a display.
 
 ## History

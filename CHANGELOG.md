@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Ubuntu operational truth publishes a read-only `ovie.shipping-state.v1` projection (JOV-5248):** Symphony runtime, lease-guard capacity, native merge queue, exact-SHA CI, Production Controller, live build-info, and the typed fleet receipt compose one freshness-aware snapshot. Zero is only legal after a successful measurement. Shutdown keeps the expired last-known marker. No dispatch, retry, or arbitrary file/log surface.
+
 - [internal] **Draft-first rolling CI publishes the first coherent commit without waiting on local affected tests (JOV-5271):** husky defaults to a thin publication gate (diff integrity, changed-file secrets, hook policy). Fast source CI still runs on every push and cancels superseded heads. Failed checks normalize to PR/head/check/attempt/fingerprint, one implementer writer owns repair, and FX stays the recovery backstop after an explicit handoff. Ready/landing still requires rebased exact-head tests, coverage, security, and policy.
 - [internal] **Mac Ovie door talks to the current Summer through Eve (JOV-5212):** entitled OV turns persist Eve receipts, bind the current Mac Summer session, and stream Summer only. Missing transport stays explicit unavailable with no Jovie, Eve, Ovie-persona, or mock fallback. Operator memory and tools stay isolated from customer Jovie.
 

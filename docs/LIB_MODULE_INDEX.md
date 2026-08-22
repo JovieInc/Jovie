@@ -47,6 +47,7 @@
 | `email/` | Email templates (claim invites, DSP bio updates, tip thank-yous) with job queuing | `enqueueClaimInviteJob`, `getClaimInviteEmail` |
 | `notifications/` | Multi-channel dispatch (email, Slack) with quota, reputation, suppression management | `sendNotification`, `checkQuota`, `isEmailSuppressed` |
 | `chat/` | AI chat assistant: system prompt, command registry, knowledge routing | `buildSystemPrompt`, `COMMANDS`, `routeKnowledge` |
+| `ovie/shipping-state/` | Versioned read-only Ubuntu shipping projection `ovie.shipping-state.v1` (JOV-5248) | `publishShippingState`, `snapshotReaders`, `SHIPPING_STATE_SCHEMA` |
 
 ## DSP Integrations
 
