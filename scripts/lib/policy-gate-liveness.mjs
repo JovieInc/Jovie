@@ -1,5 +1,24 @@
 import { pathToFileURL } from 'node:url';
 
+/**
+ * @typedef {object} PolicyGate
+ * @property {string} id
+ * @property {string} transition
+ * @property {string} mode
+ * @property {string[]} [requires]
+ * @property {string[]} [dependsOn]
+ * @property {string} [reason]
+ * @property {string} [owner]
+ * @property {string} [remedy]
+ * @property {string} [evidenceSource]
+ */
+
+/**
+ * @typedef {object} PolicyGateConfiguration
+ * @property {Record<string, string[]>} blockingAllowlist
+ * @property {PolicyGate[]} gates
+ */
+
 export const POLICY_STAGES = Object.freeze([
   'pre-draft',
   'draft-publication',
@@ -22,6 +41,7 @@ export const POLICY_EVIDENCE = Object.freeze({
   'production-runtime-proof': 'landing',
 });
 
+/** @type {PolicyGateConfiguration} */
 export const DEFAULT_POLICY_GATES = Object.freeze({
   blockingAllowlist: {
     'draft-publication': [
@@ -97,6 +117,7 @@ export const DEFAULT_POLICY_GATES = Object.freeze({
   ],
 });
 
+/** @param {PolicyGateConfiguration} policy */
 export function validatePolicyGates(policy = DEFAULT_POLICY_GATES) {
   const errors = [];
   const byId = new Map(policy.gates.map(gate => [gate.id, gate]));
