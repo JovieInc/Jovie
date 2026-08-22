@@ -22,6 +22,10 @@ If you are an agent about to open a PR, read [Agent checklist](#agent-checklist)
 
 Policy gates are **bootstrap-safe, acyclic, and monotonic**: a transition may
 block only on allowlisted evidence produced strictly before that transition.
+The delivery boundary is **thin publication gate, broad remote verification,
+exact-head promotion gate**. Full typecheck, lint, affected tests, and coverage
+fan out on GitHub after publication; focused local tests are optional feedback,
+not a prerequisite for opening or updating the draft.
 
 This repository operationalizes OpenAI's
 [harness-engineering guidance](https://openai.com/index/harness-engineering/)

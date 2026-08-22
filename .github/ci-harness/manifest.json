@@ -116,9 +116,18 @@
       "name": "Unit Tests",
       "tier": "fast-gate",
       "mergeGate": true,
-      "gateStage": "merge-group",
+      "gateStage": "both",
       "nextLocalCommand": "pnpm --filter=@jovie/web run test:fast",
       "remediation": "Run the failing Vitest file locally, add or update regression coverage, and keep quarantined tests in the quarantine lane."
+    },
+    {
+      "id": "ci-draft-coverage",
+      "name": "Draft Coverage",
+      "tier": "fast-gate",
+      "mergeGate": true,
+      "gateStage": "source-pr",
+      "nextLocalCommand": "pnpm --filter @jovie/web test:coverage && pnpm run test:coverage:diff",
+      "remediation": "Restore meaningful changed-behavior coverage or the committed coverage ratchet; draft publication remains available but promotion fails closed."
     },
     {
       "id": "ci-build-layout",

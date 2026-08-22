@@ -3182,9 +3182,9 @@ jobs:
   ci-unit-tests:
     name: Unit Tests (${{ matrix.shard }})
     needs: [ci-path-changes, ci-merge-group-admission]
-    # Runs ten shards on every non-empty merge-group combined head and the
-    # direct-main fallback. Only an exact typed empty-diff merge group skips the
-    # matrix; source PRs defer unit evidence to the combined queue head.
+    # Runs ten affected shards on every source PR and non-empty merge-group
+    # combined head, plus the direct-main fallback. New pushes supersede stale
+    # source heads through the workflow's per-PR concurrency group.
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
@@ -3193,6 +3193,7 @@ jobs:
         needs.ci-merge-group-admission.result == 'success'
       ) &&
       (
+        github.event_name == 'pull_request' ||
         (
           github.event_name == 'merge_group' &&
           needs.ci-path-changes.outputs.is_noop_merge_group != 'true'
@@ -3309,9 +3310,9 @@ jobs:
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "main: Running web unit suite through Turbo without coverage; nightly coverage audit uploads Codecov coverage"
             pnpm turbo test:fast --filter=@jovie/web -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
-          elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
-            echo "🔍 Merge group: Running affected test suite"
-            # Run affected tests against the merge-group base SHA.
+          elif [[ "${{ github.event_name }}" == "merge_group" || "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "🔍 Published head: Running affected test suite"
+            # Run affected tests against the source or merge-group base SHA.
             pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} $OUTPUT_FLAG
           else
             echo "🔍 Manual dispatch: Running critical + interaction tests (no base_ref available)"
@@ -3349,6 +3350,28 @@ jobs:
           flags: unittests
           fail_ci_if_error: false
           verbose: true
+
+  ci-draft-coverage:
+    name: Draft Coverage
+    needs: [ci-path-changes]
+    if: ${{ always() && github.event_name == 'pull_request' && needs.ci-path-changes.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Run coverage and enforce the committed ratchet
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
+          CLERK_SECRET_KEY: sk_test_dummy_secret_for_coverage_run_only
+        run: |
+          pnpm --filter @jovie/web test:coverage
+          pnpm run test:coverage:diff
 
   ci-a11y:
     name: A11y (axe)
@@ -4802,11 +4825,10 @@ jobs:
   # (JOV-4326) so the evidence has a single owner.
   ci-pr-ready:
     name: ${{ github.event_name == 'pull_request' && 'PR Ready' || 'PR Ready (source inactive)' }}
-    # The source-branch aggregate is intentionally small and deterministic.
-    # GitHub's merge_group producer reuses the same required context name for
-    # combined-head unit/build/layout evidence. Migration Guard, Fork PR Gate,
-    # and PR Size Guard remain separately required ruleset contexts.
-    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-secret-scan, ci-golden-path-lock]
+    # Source publication starts broad remote verification in parallel. The
+    # aggregate remains the exact-head promotion gate; local publication never
+    # substitutes for these results.
+    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-unit-tests, ci-draft-coverage, ci-secret-scan, ci-golden-path-lock]
     if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -4820,24 +4842,28 @@ jobs:
           SECRET_SCAN_RESULT="${{ needs.ci-secret-scan.result }}"
           GOLDEN_PATH_LOCK_RESULT="${{ needs.ci-golden-path-lock.result }}"
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
+          UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
+          COVERAGE_RESULT="${{ needs.ci-draft-coverage.result }}"
           RISK_LEVEL="${{ needs.ci-risk-classifier.outputs.risk_level }}"
           RISK_RULES="${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}"
 
           {
             echo "### PR Ready"
             echo
-            echo "Source PRs run deterministic fast checks only. Unit, build, and layout integration evidence runs on the merge-group combined head."
+            echo "Draft heads fan out typecheck, lint, affected unit tests, coverage, security, and policy remotely."
             echo
             echo "| Gate | Result | Next local command |"
             echo "| --- | --- | --- |"
             echo "| Path Changes | $PATH_RESULT | re-run workflow if cancelled/failed |"
             echo "| ci-fast (typecheck/biome/eslint/guardrails/structural) | $FAST_RESULT | \`pnpm run typecheck && pnpm run biome:check\` |"
+            echo "| Affected Unit Tests (10 shards) | $UNIT_RESULT | \`pnpm --filter @jovie/web test:fast\` |"
+            echo "| Coverage ratchet | $COVERAGE_RESULT | \`pnpm --filter @jovie/web test:coverage\` |"
             echo "| Secret Scan | $SECRET_SCAN_RESULT | \`./scripts/security/scan-secrets.sh ci-pr origin/main\` |"
             echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT | \`node scripts/golden-path-lock.mjs merge-gate\` |"
             echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
             echo
             echo "Risk level: ${RISK_LEVEL:-low}; matched rules: ${RISK_RULES:-none}"
-            echo "Heavy evidence is manual, scheduled, or event-driven and never starts from this source-PR gate."
+            echo "Build, layout, browser, and other deep evidence remains merge-group, manual, scheduled, or event-driven."
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [[ "$PATH_RESULT" != "success" ]]; then
@@ -4859,6 +4885,14 @@ jobs:
 
           if [[ "$FAST_RESULT" != "success" ]]; then
             echo "❌ ci-fast did not pass (result: $FAST_RESULT)"
+            exit 1
+          fi
+          if [[ "$UNIT_RESULT" != "success" ]]; then
+            echo "❌ affected unit shards did not pass (result: $UNIT_RESULT)"
+            exit 1
+          fi
+          if [[ "$COVERAGE_RESULT" != "success" ]]; then
+            echo "❌ coverage ratchet did not pass (result: $COVERAGE_RESULT)"
             exit 1
           fi
 

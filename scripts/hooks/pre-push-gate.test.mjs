@@ -61,5 +61,7 @@ test('publication remains policy gated without running affected tests', () => {
   assert.match(publication, /--mode warn/);
   assert.match(publication, /git diff --check/);
   assert.match(publication, /scan-secrets\.sh publication origin\/main/);
+  assert.match(publication, /policy-gate-liveness\.mjs/);
   assert.doesNotMatch(publication, /automation-verify|run_affected/);
+  assert.doesNotMatch(publication, /typecheck|biome|coverage/);
 });

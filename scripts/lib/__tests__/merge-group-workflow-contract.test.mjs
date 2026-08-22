@@ -329,7 +329,8 @@ describe('merge_group workflow contract', () => {
     expect(sourceAggregate).not.toContain(
       'RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"'
     );
-    expect(sourceAggregate).not.toContain('ci-unit-tests');
+    expect(sourceAggregate).toContain('ci-unit-tests');
+    expect(sourceAggregate).toContain('ci-draft-coverage');
     expect(sourceAggregate).toContain(
       'All deterministic source PR checks passed.'
     );
@@ -342,7 +343,7 @@ describe('merge_group workflow contract', () => {
       "github.event_name == 'push' && github.ref == 'refs/heads/main'"
     );
     expect(unitTests).toContain("github.event_name == 'workflow_dispatch'");
-    expect(unitTests).not.toContain("github.event_name == 'pull_request'");
+    expect(unitTests).toContain("github.event_name == 'pull_request'");
     expect(aggregate).not.toMatch(
       /github\.event\.pull_request|github\.(base_ref|head_ref)/
     );
@@ -354,7 +355,6 @@ describe('merge_group workflow contract', () => {
     for (const job of [
       'ci-risk-classifier',
       'drizzle-migration-guard',
-      'ci-unit-tests',
       'ci-build-layout',
       'ci-ios',
       'ci-promptfoo-evals',
@@ -364,6 +364,8 @@ describe('merge_group workflow contract', () => {
         "github.event_name == 'merge_group'"
       );
     }
+    expect(unitTests).toContain("github.event_name == 'merge_group'");
+    expect(unitTests).toContain("github.event_name == 'pull_request'");
     expect(getJobBlock(CI_WORKFLOW, 'drizzle-migration-guard')).toContain(
       'name: Migration Guard'
     );
