@@ -9,6 +9,11 @@
 import { createHash } from 'node:crypto';
 import { hasProtectedAdmissionLabel } from './admission-policy.mjs';
 import { contextGateReceipt } from './context-gate.mjs';
+import {
+  admissionTargetPacket,
+  resolveAdmissionTarget,
+  sameAdmissionTarget,
+} from './ownership-inventory.mjs';
 import { researchGateReceipt } from './research-gate.mjs';
 
 export const PLAN_GATE_SCHEMA = 'plan-gate/v1';
@@ -140,10 +145,21 @@ export function validatePlanCandidate(issue, evidence) {
   if (evidence.repo !== canonicalRepo) return 'repo-not-canonical';
   if (issue.project?.name && issue.project.name !== evidence.project)
     return 'project-mismatch';
+  if (evidence.target) {
+    const target = admissionTargetPacket(evidence.target);
+    if (!target) return 'target-fields-missing';
+    const targeting = resolveAdmissionTarget(issue);
+    if (targeting.decision !== 'admit')
+      return targeting.reason || 'no-jovie-artifact';
+    if (!sameAdmissionTarget(target, targeting.target))
+      return 'target-mismatch';
+    if (target.target_repo !== evidence.repo) return 'target-repo-mismatch';
+  }
   return null;
 }
 
 function normalizedEvidence(evidence) {
+  const target = admissionTargetPacket(evidence.target);
   return sorted({
     verified: true,
     concrete: true,
@@ -162,6 +178,7 @@ function normalizedEvidence(evidence) {
       ? evidence.test.map(item => item.trim())
       : [evidence.test.trim()],
     rollback: evidence.rollback.trim(),
+    ...(target ? { target } : {}),
   });
 }
 

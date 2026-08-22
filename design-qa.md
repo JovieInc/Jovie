@@ -139,3 +139,40 @@ final result: passed
 - P1: none
 - P2: none
 - P3: demo-only identity loading state and Storybook full-build infrastructure failures are outside this refinement
+
+---
+
+# Sidebar identity footer composition Design QA (JOV-5272)
+
+final result: passed (component/contract); CI visual-review owns exact-runtime captures at 1440×900 and 390×844
+
+## Product contract
+
+One semantic identity, one top-level footer composition. Active creator
+identity and Public Profile access share a single enclosing group in expanded
+(224px), narrow (160px), and collapsed (icon) sidebar states. Actions remain
+siblings. There is no standalone Public Profile row and no duplicate creator
+name or profile URL outside the group.
+
+## Viewports and states
+
+| Viewport | State | Result |
+| --- | --- | --- |
+| 1440 × 900 | Expanded authenticated rail | Identity group owns name + Public Profile URL; one enclosing hover/focus boundary |
+| 768 × 1024 | Narrow rail / tablet | Same group, truncated URL, two tab stops |
+| 375 × 812 | Collapsed / compact | Same group; avatar + Public Profile icon remain siblings |
+| Split-layout fixture | Deliberate-red adjacent rows | Forbidden shape only; production group count stays 1 |
+
+## Interaction and layout checks
+
+- Keyboard order is creator identity, then Public Profile. No nested interactive elements.
+- Accessible names: group `Creator Identity`; link `Public Profile {hostname}{href}`.
+- Equivalent sidebar/profile surface sweep uses the same profile href.
+
+## Severity audit
+
+- P0: none
+- P1: none
+- P2: none
+- P3: none
+

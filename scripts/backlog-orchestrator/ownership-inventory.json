@@ -1,0 +1,138 @@
+{
+  "schema": "jovie-ownership-inventory/v1",
+  "issue": "JOV-5278",
+  "slice": 1,
+  "consumers": "Later JOV-5278 slices consume this inventory instead of rediscovering systems.",
+  "flow": "Tim → Ovie → Eve intake/ack → Summer → Symphony → identified worker",
+  "repos": {
+    "JovieInc/Jovie": { "verification_authority": "JovieInc/Jovie CI" },
+    "JovieInc/summer-config": {
+      "verification_authority": "JovieInc/summer-config validation"
+    },
+    "JovieInc/Ops": { "verification_authority": "JovieInc/Ops review" },
+    "JovieInc/LogYourBody": {
+      "verification_authority": "JovieInc/LogYourBody CI"
+    },
+    "runtime-ledger": { "verification_authority": "runtime ledger receipts" },
+    "existing-shipping-authority": {
+      "verification_authority": "existing Symphony/factory authority"
+    }
+  },
+  "adapter_sets": {
+    "summer": [
+      "apps/web/lib/ovie/summer-transport.ts",
+      "apps/web/lib/ovie/summer-http.ts",
+      "apps/web/lib/ovie/summer-session.ts",
+      "apps/web/lib/ovie/summer-stream.ts",
+      "apps/web/lib/ovie/summer-conversation.ts",
+      "apps/web/lib/ovie/summer-queue-speaker.ts",
+      "apps/web/app/api/ovie/summer/",
+      "apps/web/app/api/summer/",
+      "apps/desktop/src/summer-runtime-bridge.ts"
+    ]
+  },
+  "systems": [
+    {
+      "id": "jovie-product",
+      "owner": "Jovie product",
+      "intended_repo": "JovieInc/Jovie",
+      "current_repo": "JovieInc/Jovie",
+      "verification_authority": "JovieInc/Jovie CI",
+      "default_artifact": "jovie-product",
+      "current_artifacts": [
+        "apps/",
+        "packages/",
+        "lib/",
+        "scripts/backlog-orchestrator/",
+        "scripts/ci/",
+        ".github/workflows/",
+        "canon/",
+        "docs/OVIE.md",
+        "docs/OVIE_PROGRAM.md",
+        "docs/OVIE_MCP.md"
+      ],
+      "jovie_admission": "allow"
+    },
+    {
+      "id": "jovie-thin-adapters",
+      "owner": "Jovie product",
+      "intended_repo": "JovieInc/Jovie",
+      "current_repo": "JovieInc/Jovie",
+      "verification_authority": "JovieInc/Jovie CI",
+      "default_artifact": "apps/web/lib/ovie/summer-transport.ts",
+      "adapter_set": "summer",
+      "jovie_admission": "allow"
+    },
+    {
+      "id": "summer-runtime-policy",
+      "owner": "Summer",
+      "intended_repo": "JovieInc/summer-config",
+      "current_repo": "JovieInc/summer-config",
+      "verification_authority": "JovieInc/summer-config validation",
+      "default_artifact": "summer runtime manifest",
+      "adapter_set": "summer",
+      "keywords": [
+        "summer-config",
+        "summer identity",
+        "summer policy",
+        "summer skills",
+        "summer runtime manifest",
+        "summer installation",
+        "summer recovery"
+      ],
+      "jovie_admission": "adapter-only",
+      "later_slice": 2
+    },
+    {
+      "id": "company-canon",
+      "owner": "Ops",
+      "intended_repo": "JovieInc/Ops",
+      "current_repo": "JovieInc/Jovie",
+      "verification_authority": "JovieInc/Jovie CI",
+      "default_artifact": "docs/company/",
+      "current_artifacts": [
+        "canon/FLEET.md",
+        "docs/company/",
+        "STRATEGY.md",
+        "content/investors/",
+        "docs/fundraising/"
+      ],
+      "keywords": ["company canon", "fundraising operations", "JovieInc/Ops"],
+      "jovie_admission": "allow-until-rehome",
+      "later_slice": 3
+    },
+    {
+      "id": "runtime-ledger",
+      "owner": "runtime ledger",
+      "intended_repo": "runtime-ledger",
+      "current_repo": "runtime-ledger",
+      "verification_authority": "runtime ledger receipts",
+      "default_artifact": "runtime ledger",
+      "keywords": ["runtime ledger", "company kanban", "gbrain page"],
+      "jovie_admission": "reject",
+      "later_slice": 3
+    },
+    {
+      "id": "cross-repo-shipping",
+      "owner": "existing Symphony/factory authority",
+      "intended_repo": "existing-shipping-authority",
+      "current_repo": "JovieInc/Jovie",
+      "verification_authority": "JovieInc/Jovie CI",
+      "default_artifact": "scripts/hermes/",
+      "current_artifacts": ["scripts/hermes/"],
+      "adapter_artifacts": ["scripts/backlog-orchestrator/"],
+      "jovie_admission": "allow-until-rehome",
+      "later_slice": 4
+    },
+    {
+      "id": "logyourbody-product",
+      "owner": "LogYourBody product",
+      "intended_repo": "JovieInc/LogYourBody",
+      "current_repo": "JovieInc/LogYourBody",
+      "verification_authority": "JovieInc/LogYourBody CI",
+      "default_artifact": "logyourbody-product",
+      "keywords": ["JovieInc/LogYourBody"],
+      "jovie_admission": "reject"
+    }
+  ]
+}

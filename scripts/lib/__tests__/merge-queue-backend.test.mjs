@@ -11,12 +11,15 @@ import {
   enrollPullRequest,
   explainExactHeadAdmissionSelector,
   explainExactHeadQueueReceipt,
+  HARD_HOLD_LABELS,
   hasAuthoritativeExactHeadQueueReceipt,
   listPullRequestQueueStates,
+  NO_AUTO_HOLD_LABELS,
   preflightMergeQueue,
   proveExactHeadQueueReceipt,
   resolveMergeQueueBackend,
   runCli,
+  SELECTOR_BLOCKING_LABELS,
   validateNativePreflightEvidence,
 } from '../../merge-queue-backend.mjs';
 import { extractWorkflowJobBlock } from '../merge-queue-guard.mjs';
@@ -450,7 +453,10 @@ describe('queue workflow mutation safety', () => {
     );
     expect(drain).toContain('.state.isInMergeQueue == true');
     expect(drain).toContain(
-      '(.state.labels.nodes // []) | map(.name) | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast") | not'
+      'NO_AUTO_HOLD_JQ=\'. == "no-auto" or . == "no-auto-merge" or . == "no-automerge"\''
+    );
+    expect(drain).toContain(
+      '(.state.labels.nodes // []) | map(.name) | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or \'"$NO_AUTO_HOLD_JQ"\') | not'
     );
     expect(drain).toContain(
       'queue-noop: missing receipt: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD'
@@ -1123,6 +1129,40 @@ describe('native enrollment', () => {
     expect(invokedEnrollment(runner)).toBe(false);
   });
 
+  it.each([
+    ...NO_AUTO_HOLD_LABELS,
+  ])('refuses a %s tombstone before invoking the enrollment mutation', async label => {
+    const runner = createNativeRunner({
+      states: [prState({ labels: { nodes: [{ name: label }] } })],
+    });
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'held_pull_request',
+      details: { labels: [label] },
+    });
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it.each([
+    ...NO_AUTO_HOLD_LABELS,
+  ])('refuses a delayed queue entry when a %s tombstone appears after SNAP', async label => {
+    const queuedAndHeld = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+      autoMergeRequest: AUTO_MERGE,
+      labels: { nodes: [{ name: label }] },
+    });
+    const runner = createNativeRunner({
+      states: [prState(), queuedAndHeld],
+    });
+    await expect(
+      enroll(runner, { postconditionAttempts: 2, wait: async () => {} })
+    ).rejects.toMatchObject({
+      code: 'held_pull_request',
+      details: { labels: [label] },
+    });
+    expect(invokedEnrollment(runner)).toBe(true);
+  });
+
   it('refuses a delayed queue entry when a hard hold appears after SNAP', async () => {
     const queuedAndHeld = prState({
       isInMergeQueue: true,
@@ -1534,6 +1574,78 @@ describe('exact-head queue receipt proof', () => {
       eligible: true,
       reason: 'eligible',
     });
+  });
+
+  it('treats the no-auto tombstone family as a durable selector hard hold', () => {
+    const preRepairSelectorBlockingLabels = new Set([
+      'needs-human',
+      'hold',
+      'gated',
+      'needs-conflict-resolution',
+      'fast',
+    ]);
+    expect([...NO_AUTO_HOLD_LABELS]).toEqual([
+      'no-auto',
+      'no-auto-merge',
+      'no-automerge',
+    ]);
+    for (const label of NO_AUTO_HOLD_LABELS) {
+      expect(preRepairSelectorBlockingLabels.has(label)).toBe(false);
+      expect(SELECTOR_BLOCKING_LABELS.has(label)).toBe(true);
+      expect(HARD_HOLD_LABELS.has(label)).toBe(true);
+
+      const snapshot = [{ ...selectorRow, L: [label] }];
+      expect(
+        snapshot[0].L.some(name => preRepairSelectorBlockingLabels.has(name))
+      ).toBe(false);
+
+      for (const promotionMode of ['normal', 'hold-intake', 'draft-only']) {
+        expect(
+          explainExactHeadAdmissionSelector({
+            snapshot,
+            admissionPr: 16068,
+            admissionHead: HEAD,
+            promotionMode,
+            enrollSlots: 15,
+          })
+        ).toEqual({
+          observed: true,
+          queued: false,
+          eligible: false,
+          reason: `held-by=${label}`,
+        });
+      }
+    }
+  });
+
+  it.each([
+    ...NO_AUTO_HOLD_LABELS,
+  ])('does not treat a delayed native entry as a receipt when %s is live', async label => {
+    const queuedAndHeld = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+      labels: { nodes: [{ name: label }] },
+    });
+    expect(hasAuthoritativeExactHeadQueueReceipt(queuedAndHeld, HEAD)).toBe(
+      true
+    );
+    expect(canAcceptExactHeadQueueReceipt(queuedAndHeld, HEAD)).toBe(false);
+    expect(explainExactHeadQueueReceipt(queuedAndHeld, HEAD)).toEqual({
+      ok: false,
+      reason: `held-by=${label}`,
+    });
+
+    const runner = createNativeRunner({ states: [queuedAndHeld] });
+    await expect(
+      proveExactHeadQueueReceipt(
+        nativeOptions(runner, { expectedHeadOid: HEAD })
+      )
+    ).resolves.toMatchObject({
+      ok: false,
+      attempts: 1,
+      explanation: { ok: false, reason: `held-by=${label}` },
+    });
+    expect(invokedEnrollment(runner)).toBe(false);
   });
 
   it('proves a native receipt without mutation authorization', async () => {

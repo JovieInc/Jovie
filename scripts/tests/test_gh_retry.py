@@ -1337,6 +1337,181 @@ JSON
         assert "[dry-run] would +merge-queue on #16187" in result.stdout
         assert "would +merge-queue on #16186" not in result.stdout
 
+    def test_hold_intake_missed_admission_never_recovers_no_auto_tombstone(
+        self, tmp_path: Path
+    ) -> None:
+        """Run 32542714770 re-admitted PR #16263 after a live no-auto tombstone
+        because the missed-admission selector omitted the no-auto family.
+        """
+        tombstone_head = "528ab46cd724ca78cb72ee5168dd3b2851045b6d"
+        clean_head = "564bcf770f353f0c8a9e6c1d2b3a4e5f67890123"
+        receipt = {
+            "schema": "jovie-fleet-gate/v1",
+            "state": "AMBER",
+            "promotionMode": "hold-intake",
+            "observedAt": datetime.now(timezone.utc).isoformat(),
+            "signals": {
+                "main": {"status": "green", "sha": "a" * 40},
+                "production": {"status": "green", "deployedSha": "b" * 40},
+                "controller": {"status": "green"},
+                "queue": {
+                    "status": "known",
+                    "eligiblePrs": 1,
+                    "greenReadyPrs": 1,
+                    "target": 15,
+                },
+                "integrity": {"status": "clear"},
+            },
+            "promotionAdmission": {"allowed": False},
+            "isolatedPromotionAdmission": {
+                "allowed": False,
+                "deploymentsAllowed": False,
+            },
+            "productionUnboundRepairAdmission": {
+                "allowed": True,
+                "condition": "production-deployment-unbound",
+                "mainSha": "a" * 40,
+                "deployedSha": "b" * 40,
+                "maxConcurrent": 1,
+                "deploymentsAllowed": False,
+            },
+            "alreadyAdmittedCohort": {
+                "preserve": True,
+                "newIntakeAllowed": True,
+                "semantics": "preserve-cohort-and-continue-isolated-implementation",
+            },
+        }
+        encoded = base64.b64encode(json.dumps(receipt).encode()).decode()
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":16263,"t":"No-auto tombstone","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/jov-16263","headOid":"{tombstone_head}","base":"main","L":["no-auto"],"fail":[],"q":false}},{{"n":16187,"t":"Grok CLEAN deferred","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"grok/JOV-5041-fix","headOid":"{clean_head}","base":"main","L":["queue-deferred"],"fail":[],"q":false}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  if [[ "$3" == "16263" ]]; then
+                    echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[{{"name":"no-auto"}}],"headRefOid":"{tombstone_head}","baseRefName":"main","body":"Fixes JOV-5276"}}'
+                    exit 0
+                  fi
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[{{"name":"queue-deferred"}}],"headRefOid":"{clean_head}","baseRefName":"main","body":"Fixes JOV-5041"}}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(
+            fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRY_RUN=1 DRAIN_PROMOTION_MODE=hold-intake "
+                    "DRAIN_RECONCILE_MISSED_ADMISSION=1 "
+                    f"DRAIN_FLEET_GATE_B64={encoded}"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "exact missed admission at " + tombstone_head not in result.stdout
+        assert "would +merge-queue on #16263" not in result.stdout
+        assert "would -queue-deferred on #16263" not in result.stdout
+        assert "exact missed admission at " + clean_head in result.stdout
+        assert "would -queue-deferred on #16187" in result.stdout
+        assert "[dry-run] would +merge-queue on #16187" in result.stdout
+        assert "{no-auto}" in result.stdout
+
+    def test_label_event_does_not_enroll_a_no_auto_tombstone(
+        self, tmp_path: Path
+    ) -> None:
+        head = "528ab46cd724ca78cb72ee5168dd3b2851045b6d"
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":16263,"t":"No-auto tombstone","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/jov-16263","headOid":"{head}","base":"main","L":["no-auto"],"fail":[],"q":false}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[{{"name":"no-auto"}}],"headRefOid":"{head}","baseRefName":"main","body":""}}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(
+            fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    f"DRY_RUN=1 DRAIN_ADMISSION_PR=16263 DRAIN_ADMISSION_HEAD={head}"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "would +merge-queue on #16263" not in result.stdout
+        assert "{no-auto}" in result.stdout
+
+    def test_queued_no_auto_tombstone_is_dequeued_once(self, tmp_path: Path) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{"n":16263,"t":"Queued no-auto","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/jov-16263","headOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","base":"main","L":["no-auto","merge-queue"],"fail":[]}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo "pr checks should not run for a no-auto tombstone" >&2
+                  exit 2
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(
+            fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        result = _run_bash(_drain_command(tmp_path, extra_env="DRY_RUN=1"))
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "=== DEQUEUE (hard gates" in result.stdout
+        assert "[dry-run] would -merge-queue on #16263" in result.stdout
+        assert "would +merge-queue on #16263" not in result.stdout
+        assert "{no-auto,merge-queue}" in result.stdout
+
     def test_draft_only_enrolls_clean_unrelated_pr(self, tmp_path: Path) -> None:
         head = "c" * 40
         receipt = {
@@ -1989,6 +2164,17 @@ JSON
         assert "DRAIN_MUTATION_AUTHORIZATION" in content
         assert "tim-approved" not in content
         assert "approved:taste" not in content
+        assert (
+            'NO_AUTO_HOLD_JQ=\'. == "no-auto" or . == "no-auto-merge" or . == "no-automerge"\''
+            in content
+        )
+        assert content.count("$NO_AUTO_HOLD_JQ") >= 20
+        missed = content.split("bounded exact-head native admission", 1)[1].split(
+            "A completed Production Controller", 1
+        )[0]
+        assert "$NO_AUTO_HOLD_JQ" in missed
+        assert 'index("queue-deferred")' in missed
+        assert 'index("no-auto")' not in missed
 
     def test_red_required_checks_block_enqueue(self, tmp_path: Path) -> None:
         fake_gh = tmp_path / "gh"
