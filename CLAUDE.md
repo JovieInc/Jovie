@@ -68,7 +68,7 @@ Details and remediation live in scoped rules — hooks block violations.
 
 1. Read relevant files → plan risky/multi-file work.
 2. Mark Linear `In Progress` before edits ([`.claude/rules/linear.md`](.claude/rules/linear.md)).
-3. Edit only task files → draft PR on first push.
+3. Edit only task files → publish the first coherent commit as a draft, then consume rolling CI while implementation continues ([`docs/PR_FLOW.md`](docs/PR_FLOW.md)).
 4. Run narrowest verification → summarize changes, checks, risks in PR.
 
 Skip issues labeled `human-review-required` or containing "This issue requires human review". File Linear issues for all follow-ups — no orphan "deferred" bullets.

@@ -221,6 +221,29 @@ it was a paused queue. **The lesson encoded above: cheap per-PR CI, a queue that
 tolerates transient check states, no heavy scans on the PR path, and labelers that
 never false-positive.**
 
+## Draft-first rolling CI contract
+
+Publication is not promotion. PR #16336 missed GitHub because a local
+affected-test shard ran more than two minutes and failed before the draft
+existed. Contract:
+
+1. Publish the first coherent commit as a draft.
+   `JOVIE_PUSH_PHASE=publication git push` is the default husky path (diff,
+   secrets, hook policy only).
+2. Fast source CI on every push.
+   Per-PR concurrency cancels superseded runs.
+3. Normalize failures (PR, exact head, check, attempt, fingerprint);
+   stale or duplicate deliveries are rejected.
+4. One remediation writer holds the PR lease. Implementer first.
+   FX is the recovery tier after handoff or abandonment.
+5. A new commit or green rerun supersedes obsolete repairs.
+6. Moving on requires an explicit handoff receipt (draft PR, current head,
+   acceptance criteria, remaining checks, fingerprints, remediation owner).
+7. Ready/landing requires the final exact, current head to be green for
+   tests, coverage, security, and policy.
+
+Use `JOVIE_PUSH_PHASE=qualification git push` before ready/landing.
+
 ## Agent checklist
 
 Before you open a PR:
@@ -234,8 +257,9 @@ Before you open a PR:
    `llm-review` and the PR ships autonomously — there is no taste gate to wait
    on (the old 👍 `taste-approve` workflow was removed 2026-07-06). Don't add
    `needs-human`.
-4. **Verify locally** (typecheck, lint, affected tests), push, open a draft PR,
-   let the fast gate run. Don't hand-merge; the queue does it.
+4. **Publish the draft first** (`JOVIE_PUSH_PHASE=publication`), consume rolling
+   CI, then qualify the final exact, current head before ready. Don't hand-merge;
+   the queue does it.
 5. If a PR's base branch was deleted, **retarget to `main`** before debugging a
    "conflict."
 

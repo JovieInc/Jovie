@@ -40,6 +40,10 @@ pnpm --filter @jovie/web run test:bug-to-test
 
 **IMPORTANT:** Always run `pnpm biome check --write apps/web` before pushing so formatting issues are fixed in-place. The pre-push hook calls `biome check .` (read-only) and will reject pushes with formatter violations.
 
+First coherent checkpoint: [draft-first rolling CI](../../docs/PR_FLOW.md#draft-first-rolling-ci-contract).
+`JOVIE_PUSH_PHASE=publication git push` is the default; qualification remains
+required before ready/landing.
+
 ### One PR = One Concern
 
 - Each PR addresses exactly one Linear issue or one bug fix.
