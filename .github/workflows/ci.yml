@@ -6,7 +6,9 @@ on:
     # Re-run the required contexts when that PR becomes reviewable so it can
     # enter the native queue without a synthetic close/reopen.
     types: [opened, synchronize, reopened, ready_for_review]
-    branches: [main, 'integration/**']
+    # Stacked agent drafts target their exact parent head so every slice can
+    # receive rolling feedback before the parent lands.
+    branches: [main, 'integration/**', 'codex/**']
   # GitHub native merge queue validates the exact synthetic combined head.
   merge_group:
     types: [checks_requested]
