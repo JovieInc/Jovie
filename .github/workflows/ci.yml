@@ -467,6 +467,7 @@ jobs:
       run_neon: ${{ steps.detect.outputs.run_neon || 'false' }}
       run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}
       has_code_changes: ${{ steps.detect.outputs.has_code_changes || 'false' }}
+      has_web_coverage_changes: ${{ steps.detect.outputs.has_web_coverage_changes || 'false' }}
       is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -509,7 +510,11 @@ jobs:
           BRAND_CANDIDATES="$RUNNER_TEMP/brand-scrub-candidates.txt"
           # Materialize the diff before filtering so a Git failure cannot be
           # hidden by a no-match grep exit status.
-          git diff --name-only --diff-filter=d "$DIFF_BASE" HEAD > "$BRAND_CANDIDATES"
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git diff --name-only --diff-filter=d "$DIFF_BASE...HEAD" > "$BRAND_CANDIDATES"
+          else
+            git diff --name-only --diff-filter=d "$DIFF_BASE" HEAD > "$BRAND_CANDIDATES"
+          fi
           mapfile -t brand_files < <(
             awk '
               (/\.(md|mdx|txt)$/ || /^docs\//) &&
@@ -562,7 +567,7 @@ jobs:
               # still validate the exact combined head. The typed no-op output
               # lets only unit and build/layout skip their expensive work.
               echo "is_noop_merge_group=true" >> "$GITHUB_OUTPUT"
-              for output in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios has_code_changes; do
+              for output in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios has_code_changes has_web_coverage_changes; do
                 echo "$output=false" >> "$GITHUB_OUTPUT"
               done
               exit 0
@@ -576,7 +581,10 @@ jobs:
               echo "::error::Could not resolve origin/${{ github.base_ref }} after fetch"
               exit 1
             fi
-            CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
+            # Source evidence belongs to the immutable PR head and its merge
+            # base. A later unrelated main commit must not appear as a reverse
+            # source change or recursively expand/restart source lanes.
+            CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
             if [[ -z "${CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
               echo "::error::Empty changed-file list vs origin/${{ github.base_ref }}; refusing a false docs-only classification."
               exit 1
@@ -584,7 +592,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
-            for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios has_code_changes; do
+            for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios has_code_changes has_web_coverage_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -623,6 +631,7 @@ jobs:
             ! echo "$CHANGED_FILES" | grep -v -E "$PROMPTFOO_INFRA_ALLOWED_PATTERN" | grep -q .; then
             echo "Promptfoo eval-infrastructure-only source PR: deferring semantic evidence to the merge-group head."
             echo "has_code_changes=true" >> "$GITHUB_OUTPUT"
+            echo "has_web_coverage_changes=false" >> "$GITHUB_OUTPUT"
             echo "run_promptfoo_evals=false" >> "$GITHUB_OUTPUT"
             echo "run_golden_eval_set=false" >> "$GITHUB_OUTPUT"
             for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_golden_path run_drizzle run_neon; do
@@ -635,13 +644,24 @@ jobs:
           if ! echo "$CHANGED_FILES" | grep -q -E '^\.github/' &&
             ! echo "$CHANGED_FILES" | grep -q -v -E '\.(md|txt)$'; then
             echo "Only documentation files changed"
-            for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
+            for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes has_web_coverage_changes; do
               echo "$t=false" >> "$GITHUB_OUTPUT"
             done
             exit 0
           fi
 
           echo "has_code_changes=true" >> "$GITHUB_OUTPUT"
+
+          # Full V8 coverage is meaningful only when the exact diff can affect
+          # web runtime behavior or its test/coverage substrate. Other code
+          # changes keep an explicit non-applicable receipt while their selected
+          # CI lanes continue to gate promotion.
+          WEB_COVERAGE_PATTERN='^(apps/web/.*\.[cm]?[jt]sx?$|apps/web/package\.json$|packages/ui/|package\.json$|pnpm-lock\.yaml$|turbo\.json$)'
+          if echo "$CHANGED_FILES" | grep -q -E "$WEB_COVERAGE_PATTERN"; then
+            echo "has_web_coverage_changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_web_coverage_changes=false" >> "$GITHUB_OUTPUT"
+          fi
 
           # Build paths
           BUILD_PATTERN='^(apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/constants/|apps/web/package.*\.json|apps/web/next\.config\.js|apps/web/tailwind\.config\.|apps/web/postcss\.config\.|apps/web/instrumentation.*\.ts|apps/web/sentry\..*\.config\.ts|apps/web/middleware\.ts|package.*\.json|turbo\.json)'
@@ -3350,6 +3370,84 @@ jobs:
           fail_ci_if_error: false
           verbose: true
 
+  ci-exact-head-coverage:
+    name: Exact-head Coverage
+    needs: [ci-path-changes]
+    # Coverage is promotion evidence, not a draft-publication prerequisite.
+    # Run the full web unit suite with V8 coverage on the exact source head and
+    # exact synthetic merge-group head. Docs-only heads keep an explicit green
+    # no-code receipt without spending a runner on an empty coverage pass.
+    if: >-
+      always() &&
+      needs.ci-path-changes.result == 'success' &&
+      (github.event_name == 'pull_request' || github.event_name == 'merge_group')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Record non-applicable coverage receipt
+        if: needs.ci-path-changes.outputs.has_web_coverage_changes != 'true'
+        run: echo "No web runtime or coverage-substrate change; selected exact-head CI tests own the changed behavior."
+
+      - name: Checkout exact coverage head
+        if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact coverage head and diff base
+        if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'
+        env:
+          EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          COVERAGE_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$COVERAGE_BASE" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git cat-file -e "${COVERAGE_BASE}^{commit}"
+
+      - uses: ./.github/actions/setup-node-pnpm
+        if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'
+
+      - name: Run exact-head coverage and changed-behavior ratchet
+        if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
+          CLERK_SECRET_KEY: sk_test_dummy_secret_for_coverage_run_only
+          EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          COVERAGE_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: |
+          set -euo pipefail
+          coverage_group=''
+          stop_coverage() {
+            trap - EXIT INT TERM
+            if [[ -n "$coverage_group" ]] && kill -0 -- "-$coverage_group" 2>/dev/null; then
+              kill -TERM -- "-$coverage_group" 2>/dev/null || true
+              sleep 2
+              kill -KILL -- "-$coverage_group" 2>/dev/null || true
+            fi
+            wait "$coverage_group" 2>/dev/null || true
+          }
+          trap 'stop_coverage; exit 130' INT
+          trap 'stop_coverage; exit 143' TERM
+          trap stop_coverage EXIT
+          export EXPECTED_HEAD COVERAGE_BASE
+          setsid bash -c "
+            set -euo pipefail
+            pnpm --filter @jovie/web test:coverage
+            node scripts/check-changed-test-coverage.mjs \
+              --base \"\$COVERAGE_BASE\" \
+              --head \"\$EXPECTED_HEAD\"
+          " &
+          coverage_group=$!
+          wait "$coverage_group"
+          coverage_group=''
+          trap - EXIT INT TERM
+
   ci-a11y:
     name: A11y (axe)
     # Manual hosted axe-core WCAG 2.1 AA evidence using the shared build artifact.
@@ -4681,6 +4779,7 @@ jobs:
         ci-risk-classifier,
         ci-fast,
         ci-unit-tests,
+        ci-exact-head-coverage,
         ci-build-layout,
         ci-ios,
         ci-promptfoo-evals,
@@ -4702,6 +4801,7 @@ jobs:
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
           FAST_RESULT="${{ needs.ci-fast.result }}"
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
+          COVERAGE_RESULT="${{ needs.ci-exact-head-coverage.result }}"
           BUILD_LAYOUT_RESULT="${{ needs.ci-build-layout.result }}"
           IOS_RESULT="${{ needs.ci-ios.result }}"
           PROMPTFOO_RESULT="${{ needs.ci-promptfoo-evals.result }}"
@@ -4727,6 +4827,7 @@ jobs:
             echo "| CI Risk Classifier | $RISK_RESULT |"
             echo "| ci-fast | $FAST_RESULT |"
             echo "| Unit Tests | $UNIT_RESULT |"
+            echo "| Exact-head Coverage | $COVERAGE_RESULT |"
             echo "| Build + Layout (same hosted workspace) | $BUILD_LAYOUT_RESULT |"
             echo "| iOS Build + Test | $IOS_RESULT |"
             echo "| Promptfoo Evals (path-selected) | $PROMPTFOO_RESULT |"
@@ -4743,6 +4844,7 @@ jobs:
             "Merge Group Admission:$ADMISSION_RESULT" \
             "CI Risk Classifier:$RISK_RESULT" \
             "ci-fast:$FAST_RESULT" \
+            "Exact-head Coverage:$COVERAGE_RESULT" \
             "Secret Scan:$SECRET_RESULT" \
             "Golden Path Lock:$GOLDEN_PATH_LOCK_RESULT" \
             "Migration Guard:$MIGRATION_RESULT"; do
@@ -4802,11 +4904,11 @@ jobs:
   # (JOV-4326) so the evidence has a single owner.
   ci-pr-ready:
     name: ${{ github.event_name == 'pull_request' && 'PR Ready' || 'PR Ready (source inactive)' }}
-    # The source-branch aggregate is intentionally small and deterministic.
-    # GitHub's merge_group producer reuses the same required context name for
-    # combined-head unit/build/layout evidence. Migration Guard, Fork PR Gate,
-    # and PR Size Guard remain separately required ruleset contexts.
-    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-secret-scan, ci-golden-path-lock]
+    # The source aggregate stays deterministic: exact-head V8 coverage runs in
+    # parallel with the fast lanes, while build/layout integration stays on the
+    # merge-group head. Migration Guard, Fork PR Gate, and PR Size Guard remain
+    # separately required ruleset contexts.
+    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock]
     if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -4820,18 +4922,20 @@ jobs:
           SECRET_SCAN_RESULT="${{ needs.ci-secret-scan.result }}"
           GOLDEN_PATH_LOCK_RESULT="${{ needs.ci-golden-path-lock.result }}"
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
+          COVERAGE_RESULT="${{ needs.ci-exact-head-coverage.result }}"
           RISK_LEVEL="${{ needs.ci-risk-classifier.outputs.risk_level }}"
           RISK_RULES="${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}"
 
           {
             echo "### PR Ready"
             echo
-            echo "Source PRs run deterministic fast checks only. Unit, build, and layout integration evidence runs on the merge-group combined head."
+            echo "Source PRs run deterministic fast checks plus exact-head coverage. Build and layout integration evidence runs on the merge-group combined head."
             echo
             echo "| Gate | Result | Next local command |"
             echo "| --- | --- | --- |"
             echo "| Path Changes | $PATH_RESULT | re-run workflow if cancelled/failed |"
             echo "| ci-fast (typecheck/biome/eslint/guardrails/structural) | $FAST_RESULT | \`pnpm run typecheck && pnpm run biome:check\` |"
+            echo "| Exact-head Coverage | $COVERAGE_RESULT | \`pnpm --filter @jovie/web test:coverage && pnpm run test:coverage:diff\` |"
             echo "| Secret Scan | $SECRET_SCAN_RESULT | \`./scripts/security/scan-secrets.sh ci-pr origin/main\` |"
             echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT | \`node scripts/golden-path-lock.mjs merge-gate\` |"
             echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
@@ -4859,6 +4963,10 @@ jobs:
 
           if [[ "$FAST_RESULT" != "success" ]]; then
             echo "❌ ci-fast did not pass (result: $FAST_RESULT)"
+            exit 1
+          fi
+          if [[ "$COVERAGE_RESULT" != "success" ]]; then
+            echo "❌ Exact-head Coverage did not pass (result: $COVERAGE_RESULT)"
             exit 1
           fi
 

@@ -195,6 +195,7 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/pr-visual-review.test.mjs',
   'scripts/lib/__tests__/ci-harness.test.mjs',
+  'scripts/lib/__tests__/changed-test-coverage.test.mjs',
   'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
   'scripts/lib/__tests__/ci-branching-guard.test.mjs',
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
@@ -211,12 +212,19 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/golden-path-prod-autofix-workflow-contract.test.mjs',
   'scripts/lib/__tests__/queue-deferral-receipt.test.mjs',
   'scripts/lib/__tests__/rolling-ci-handoff.test.mjs',
+  'scripts/lib/__tests__/rolling-ci-pipeline.test.mjs',
   'scripts/lib/__tests__/queue-deferred-release.test.mjs',
   'scripts/lib/__tests__/queue-deferred-release-admission.test.mjs',
   'scripts/lib/__tests__/setup-worktree-health.test.mjs',
   'scripts/lib/__tests__/linear-issue-intake.test.mjs',
   'scripts/lib/__tests__/agent-qc-wires.test.mjs',
   'scripts/lib/__tests__/needs-human-autoclose.test.mjs',
+];
+// Run 32547855063 spent 3180.55s collecting V8 coverage before this static
+// ownership contract failed. Keep it in the cheap structural selector so
+// coverage-lane drift fails before an expensive changed-surface collection.
+const CI_CONTROL_WEB_TESTS = [
+  'apps/web/tests/unit/ci/test-coverage-audit-workflow.test.ts',
 ];
 const MERGE_QUEUE_CONTROLLER_INPUTS = new Set([
   '.github/workflows/merge-queue-autoenroll.yml',
@@ -1640,15 +1648,41 @@ export function buildFullSuiteCommands(maxWorkers, shardCount = 8) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   if (args.includes('--control')) {
-    await runCommand('pnpm', [
-      'exec',
-      'vitest',
-      '--root',
-      'scripts',
-      ...['--config', 'vitest.config.mts'],
-      'run',
-      ...CI_CONTROL_SCRIPT_TESTS.map(file => file.replace(/^scripts\//, '')),
-    ]);
+    await runCommands(
+      [
+        [
+          'pnpm',
+          [
+            'exec',
+            'vitest',
+            '--root',
+            'scripts',
+            ...['--config', 'vitest.config.mts'],
+            'run',
+            ...CI_CONTROL_SCRIPT_TESTS.map(file =>
+              file.replace(/^scripts\//, '')
+            ),
+          ],
+        ],
+        [
+          'pnpm',
+          [
+            '--filter',
+            '@jovie/web',
+            'exec',
+            'vitest',
+            'run',
+            ...CI_CONTROL_WEB_TESTS.map(file =>
+              file.replace(/^apps\/web\//, '')
+            ),
+            '--maxWorkers',
+            '1',
+          ],
+        ],
+      ],
+      1,
+      { labelPrefix: 'ci-control' }
+    );
   }
   const base = argValue(args, '--base', 'origin/main');
   const maxWorkers = argValue(args, '--max-workers', '2');
