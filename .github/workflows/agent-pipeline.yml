@@ -546,6 +546,7 @@ jobs:
           sparse-checkout: |
             scripts/lib/upsert-pr-comment.sh
             scripts/lib/rolling-ci-dispatch.mjs
+            scripts/lib/rolling-ci-handoff.mjs
             scripts/rolling-ci-dispatch.mjs
           sparse-checkout-cone-mode: false
           persist-credentials: false
@@ -560,11 +561,14 @@ jobs:
           IMPLEMENTER: ${{ needs.guard.outputs.pr_author }}
           WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
           WORKFLOW_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          FX_ADAPTER: ${{ vars.FX_REMEDIATION_ADAPTER }}
+          FX_AUTH_CONFIGURED: ${{ vars.FX_REMEDIATION_AUTH_READY == 'true' }}
         run: |
           LIVE_PR=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER" \
-            --jq '{head: .head.sha, author: .user.login, state: .state}')
+            --jq '{head: .head.sha, author: .user.login, state: .state, body: (.body // "")}')
           LIVE_HEAD=$(jq -r '.head' <<<"$LIVE_PR")
           LIVE_AUTHOR=$(jq -r '.author' <<<"$LIVE_PR")
+          PR_BODY=$(jq -r '.body' <<<"$LIVE_PR")
           if [[ "$(jq -r '.state' <<<"$LIVE_PR")" != "open" || "$LIVE_HEAD" != "$EXPECTED_HEAD" || "$LIVE_AUTHOR" != "$IMPLEMENTER" ]]; then
             echo "Failure event is stale or ownership changed; refusing dispatch."
             echo "should_record=false" >> "$GITHUB_OUTPUT"
@@ -584,14 +588,19 @@ jobs:
             --arg workflowRunId "$WORKFLOW_RUN_ID" \
             --argjson workflowRunAttempt "$WORKFLOW_RUN_ATTEMPT" \
             --argjson failedJobs "$FAILED_JOBS" \
-            --arg writer "$IMPLEMENTER" \
+            --arg implementer "$IMPLEMENTER" \
+            --arg prBody "$PR_BODY" \
+            --arg fxAdapter "$FX_ADAPTER" \
+            --argjson fxAuthConfigured "$FX_AUTH_CONFIGURED" \
             --arg priorCommentBody "$PRIOR_COMMENT" \
-            '{repository,prNumber,headSha,liveHead,workflowRunId,workflowRunAttempt,failedJobs,writer,priorCommentBody}' \
+            '{repository,prNumber,headSha,liveHead,workflowRunId,workflowRunAttempt,failedJobs,implementer,prBody,priorCommentBody,fxAdapter:{name:$fxAdapter,authConfigured:$fxAuthConfigured},source:{eventName:"workflow_run",workflow:"CI",producerEvent:"pull_request",trustedPolicyRef:"main"}}' \
             | node scripts/rolling-ci-dispatch.mjs > "$RUNNER_TEMP/rolling-ci-plan.json"
 
           cat "$RUNNER_TEMP/rolling-ci-plan.json"
-          echo "should_record=$(jq -r '.mutate' "$RUNNER_TEMP/rolling-ci-plan.json")" >> "$GITHUB_OUTPUT"
           {
+            echo "should_record=$(jq -r '.mutate' "$RUNNER_TEMP/rolling-ci-plan.json")"
+            echo "should_comment=$(jq -r '.shouldComment' "$RUNNER_TEMP/rolling-ci-plan.json")"
+            echo "route=$(jq -r '.route' "$RUNNER_TEMP/rolling-ci-plan.json")"
             echo "comment_body<<ROLLING_CI_COMMENT"
             jq -r '.body' "$RUNNER_TEMP/rolling-ci-plan.json"
             echo "ROLLING_CI_COMMENT"
@@ -617,7 +626,7 @@ jobs:
             --field "labels[]=$ATTEMPT_LABEL" >/dev/null
 
       - name: Notify the active implementer
-        if: steps.dispatch-plan.outputs.should_record == 'true'
+        if: steps.dispatch-plan.outputs.should_comment == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPOSITORY: ${{ github.repository }}
@@ -625,6 +634,39 @@ jobs:
           COMMENT_BODY: ${{ steps.dispatch-plan.outputs.comment_body }}
         run: |
           bash scripts/lib/upsert-pr-comment.sh "$PR_NUMBER" "rolling-ci-dispatch" "$COMMENT_BODY"
+
+      - name: Dispatch handed-off failure to FX backstop
+        if: steps.dispatch-plan.outputs.route == 'fx' && steps.dispatch-plan.outputs.should_record == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ needs.guard.outputs.pr_number }}
+          HEAD_SHA: ${{ needs.guard.outputs.pr_head_sha }}
+        run: |
+          jq -n \
+            --arg delivery_key "rolling-ci-fx:${PR_NUMBER}:${HEAD_SHA}:${{ github.run_id }}" \
+            --argjson pr_number "$PR_NUMBER" \
+            --arg head_sha "$HEAD_SHA" \
+            --argjson evidence "$(jq '.events' "$RUNNER_TEMP/rolling-ci-plan.json")" \
+            '{event_type:"delivery-control-failure",client_payload:{delivery_key:$delivery_key,source:"agent-pipeline",event:"exact-head-ci-failure",failure:"ci-failed-after-handoff",pr_number:$pr_number,head_sha:$head_sha,evidence:$evidence}}' \
+            > "$RUNNER_TEMP/fx-dispatch.json"
+          gh api "repos/$REPOSITORY/dispatches" --method POST --input "$RUNNER_TEMP/fx-dispatch.json"
+
+      - name: Persist missing FX authentication incident
+        if: steps.dispatch-plan.outputs.route == 'configuration_incident'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ needs.guard.outputs.pr_number }}
+          HEAD_SHA: ${{ needs.guard.outputs.pr_head_sha }}
+        run: |
+          jq -n \
+            --arg delivery_key "rolling-ci-fx-auth:${PR_NUMBER}:${HEAD_SHA}" \
+            --argjson pr_number "$PR_NUMBER" \
+            --arg head_sha "$HEAD_SHA" \
+            '{event_type:"delivery-control-failure",client_payload:{delivery_key:$delivery_key,source:"agent-pipeline",event:"fx-configuration",failure:"fx-auth-missing",pr_number:$pr_number,head_sha:$head_sha,evidence:{classification:"configuration_incident"}}}' \
+            > "$RUNNER_TEMP/fx-config-incident.json"
+          gh api "repos/$REPOSITORY/dispatches" --method POST --input "$RUNNER_TEMP/fx-config-incident.json"
       - name: Clean up stale attempt labels
         if: always()
         env:

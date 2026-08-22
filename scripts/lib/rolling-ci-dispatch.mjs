@@ -26,6 +26,23 @@ function stableFailureSignal(check, failedSteps) {
   });
 }
 
+export function validateFailureSource(source) {
+  const authentic =
+    source?.eventName === 'workflow_run' &&
+    source?.workflow === 'CI' &&
+    source?.producerEvent === 'pull_request' &&
+    source?.trustedPolicyRef === 'main';
+  if (!authentic) {
+    throw new Error('failure source is not an authenticated CI workflow_run');
+  }
+  return {
+    eventName: source.eventName,
+    workflow: source.workflow,
+    producerEvent: source.producerEvent,
+    trustedPolicyRef: source.trustedPolicyRef,
+  };
+}
+
 export function failureFingerprint({ check, failedSteps = [] }) {
   if (!String(check ?? '').trim()) throw new Error('check is required');
   return `ci:${createHash('sha256')
@@ -41,6 +58,7 @@ export function normalizeFailureEvents({
   workflowRunId,
   workflowRunAttempt,
   failedJobs,
+  source,
 }) {
   if (!/^[^/\s]+\/[^/\s]+$/.test(String(repository ?? ''))) {
     throw new Error('repository must be owner/name');
@@ -54,6 +72,7 @@ export function normalizeFailureEvents({
   if (!Array.isArray(failedJobs) || failedJobs.length === 0) {
     throw new Error('at least one failed job is required');
   }
+  const trustedSource = validateFailureSource(source);
 
   return failedJobs
     .map(job => {
@@ -73,6 +92,7 @@ export function normalizeFailureEvents({
         fingerprint,
         delivery: `${workflowRunId}:${workflowRunAttempt}:${fingerprint}`,
         failedSteps: [...new Set(failedSteps)].sort(),
+        source: trustedSource,
       };
     })
     .sort((left, right) => left.check.localeCompare(right.check));

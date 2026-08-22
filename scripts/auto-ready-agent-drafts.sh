@@ -148,6 +148,21 @@ check_failures_for_pr() {  # check_failures_for_pr <num>
   jq -cn --arg reason "required check status unavailable" '[$reason]'
 }
 
+rolling_ci_learning_complete() { # rolling_ci_learning_complete <num> <head>
+  local comments dispatch_comment learning_comment
+  comments="$(gh_retry api "repos/${REPO}/issues/$1/comments" --paginate \
+    --jq '[.[] | .body]')" || return 1
+  dispatch_comment="$(jq -r '[.[] | select(contains("<!-- bot-comment:rolling-ci-dispatch -->"))] | last // ""' <<<"$comments")"
+  [[ -z "$dispatch_comment" ]] && return 0
+  learning_comment="$(jq -r '[.[] | select(contains("<!-- jovie-rolling-ci-learning:"))] | last // ""' <<<"$comments")"
+  jq -n \
+    --arg head "$2" \
+    --arg dispatchComment "$dispatch_comment" \
+    --arg learningComment "$learning_comment" \
+    '{head,dispatchComment,learningComment}' \
+    | node "$(dirname "${BASH_SOURCE[0]}")/rolling-ci-promotion-receipt.mjs" >/dev/null
+}
+
 echo "=== AUTO-READY: scanning for green agent drafts ==="
 
 SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
@@ -197,6 +212,11 @@ echo "$SNAP" | jq -c '.[]
     fail="$(check_failures_for_pr "$n")"
     if [[ "$(jq 'length' <<<"$fail")" -ne 0 ]]; then
       echo "    ~ required checks are not exact-head green: $(jq -r 'join(", ")' <<<"$fail")"
+      continue
+    fi
+
+    if ! rolling_ci_learning_complete "$n" "$expected_head"; then
+      echo "    ~ rolling CI repair lacks a current-head learning receipt; leaving draft"
       continue
     fi
 
