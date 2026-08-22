@@ -34,7 +34,7 @@ jobs:
   refresh:
     name: Refresh persisted fleet gate receipt
     # Skip cancelled workflow_run so a superseded CI does not occupy a
-    # 5-minute jovie-fixed slot. A merged PR also emits push(main); skip
+    # serialized admission slot. A merged PR also emits push(main); skip
     # its redundant closed event so one landing cannot enqueue two
     # admission attempts. Unmerged closure still frees green-ready
     # capacity. Labeled/unlabeled only run when the label can change
@@ -55,7 +55,7 @@ jobs:
       )
     # The canonical receipt lives on the Gem host; exact-main gate code only.
     runs-on: [self-hosted, Linux, X64, jovie-fixed]
-    timeout-minutes: 5
+    timeout-minutes: 12
     steps:
       - name: Generate read-only Jovie Bot token
         id: app-token
@@ -98,8 +98,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          timeout 180s scripts/backlog-orchestrator/run-backlog.sh reconcile
-          timeout 60s scripts/backlog-orchestrator/run-backlog.sh gate-next
+          python3 scripts/hermes/gem-gate-next-admission.py --mode=fleet
 
       - name: Record event admission heartbeat
         if: always()

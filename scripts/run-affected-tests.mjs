@@ -359,6 +359,24 @@ const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
 ]);
+const GATE_NEXT_ADMISSION_PRIMARY_INPUTS = new Set([
+  '.github/workflows/fleet-gate-refresh.yml',
+  '.github/workflows/jovie-intake-controller.yml',
+  'scripts/hermes/gem-gate-next-admission.py',
+  'scripts/hermes/tests/gem-gate-next-admission.test.py',
+  'scripts/backlog-orchestrator/run-backlog.sh',
+]);
+export const GATE_NEXT_ADMISSION_LANE = new Set([
+  ...GATE_NEXT_ADMISSION_PRIMARY_INPUTS,
+  'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/tests/test_agent_workflow_hygiene.py',
+  'scripts/tests/test_symphony_ui_pilot_runtime.py',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/run-affected-tests.mjs',
+  'CHANGELOG.md',
+]);
 const AUTHENTICATED_A11Y_REPAIR_CORE = new Set([
   'apps/web/app/exp/shell-v1/page.tsx',
   'apps/web/components/jovie/components/ChatInput.tsx',
@@ -673,6 +691,31 @@ export function buildAffectedTestPlan(
       rootVitestTests: [],
       pythonTests: [],
       pythonUnittestTests: GEM_PR_REHABILITATION_PYTHON_TESTS,
+      scriptVitestTests: [
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+      ],
+      nodeTests: [],
+    };
+  }
+  const isBoundedGateNextAdmissionChange =
+    files.some(file => GATE_NEXT_ADMISSION_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => GATE_NEXT_ADMISSION_LANE.has(file));
+  if (isBoundedGateNextAdmissionChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [
+        'scripts/tests/test_agent_workflow_hygiene.py',
+        'scripts/tests/test_symphony_ui_pilot_runtime.py',
+      ],
+      pythonUnittestTests: [
+        'scripts/hermes/tests/gem-gate-next-admission.test.py',
+        'scripts/hermes/tests/gem-priority-gate.test.py',
+      ],
       scriptVitestTests: [
         'scripts/lib/__tests__/automation-verify.test.mjs',
         'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
