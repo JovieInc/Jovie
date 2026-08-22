@@ -328,6 +328,8 @@ class ReportTests(unittest.TestCase):
         self.assertIsNone(receipt["orphanLaunchers"])
         self.assertEqual(receipt["capacity"]["state"], "unknown")
         self.assertEqual(receipt["tombstones"], {})
+        self.assertEqual(receipt["fallbackLocks"]["state"], "empty")
+        self.assertEqual(receipt["fallbackLocks"]["count"], 0)
         for key in (
             "checks",
             "admitted",
@@ -337,6 +339,19 @@ class ReportTests(unittest.TestCase):
             "indeterminate",
         ):
             self.assertIn(key, receipt["counters"])
+
+    def test_fallback_lock_census_counts_leftover_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            leases = pathlib.Path(tmp) / "leases"
+            leases.mkdir()
+            (leases / "JOV-5257.lock").write_text("")
+            (leases / "JOV-5001.lock").write_text("")
+            (leases / "notes.txt").write_text("ignore")
+            with mock.patch.dict(os.environ, {"SYMPHONY_FALLBACK_LEASE_DIR": str(leases)}):
+                census = MODULE.fallback_lock_census()
+        self.assertEqual(census["state"], "present")
+        self.assertEqual(census["count"], 2)
+        self.assertEqual(census["held"], 0)
 
 
 if __name__ == "__main__":

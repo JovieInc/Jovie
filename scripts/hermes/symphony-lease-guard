@@ -463,6 +463,47 @@ def capacity_state() -> dict:
     }
 
 
+def fallback_lock_census() -> dict:
+    """Observe leftover fallback lock files. Unknown when the directory cannot be read."""
+    raw = os.environ.get(
+        "SYMPHONY_FALLBACK_LEASE_DIR",
+        os.path.expanduser("~/.local/state/symphony-fallback/leases"),
+    )
+    directory = pathlib.Path(os.path.expanduser(raw))
+    try:
+        names = [path.name for path in directory.iterdir() if path.is_file()]
+    except FileNotFoundError:
+        return {"state": "empty", "count": 0, "reason": None}
+    except OSError:
+        return {"state": "unknown", "count": None, "reason": "lease_dir_unreadable"}
+    count = 0
+    held = 0
+    for name in names:
+        if not re.fullmatch(r"(?:JOV|LYB)-\d+\.lock", name):
+            continue
+        count += 1
+        lock_file = directory / name
+        try:
+            descriptor = os.open(lock_file, os.O_RDONLY)
+        except OSError:
+            continue
+        try:
+            try:
+                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                held += 1
+            else:
+                fcntl.flock(descriptor, fcntl.LOCK_UN)
+        finally:
+            os.close(descriptor)
+    return {
+        "state": "present" if count else "empty",
+        "count": count,
+        "held": held,
+        "reason": None,
+    }
+
+
 def report() -> int:
     state = _load_state()
     receipt = {
@@ -472,6 +513,7 @@ def report() -> int:
         "counters": state["counters"],
         "orphanLaunchers": count_orphan_launchers(),
         "capacity": capacity_state(),
+        "fallbackLocks": fallback_lock_census(),
     }
     print(json.dumps(receipt, indent=2, sort_keys=True))
     return 0
