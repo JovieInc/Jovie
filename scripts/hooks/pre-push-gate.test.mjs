@@ -46,8 +46,24 @@ test('.no-mistakes.yaml points lint/test/format at pre-push-gate.sh', () => {
   assert.match(config, /format: bash scripts\/hooks\/pre-push-gate\.sh format/);
 });
 
-test('.husky/pre-push delegates to the pre-push-gate affected profile', () => {
+test('.husky/pre-push separates draft publication from qualification', () => {
   const hook = readFileSync(path.join(repoRoot, '.husky/pre-push'), 'utf8');
   assert.match(hook, /set -e/);
+  assert.match(hook, /JOVIE_PUSH_PHASE:-publication/);
+  assert.match(hook, /pre-push-gate\.sh publication/);
   assert.match(hook, /pre-push-gate\.sh affected/);
+});
+
+test('publication remains policy gated without running affected tests', () => {
+  const source = readFileSync(gateScript, 'utf8');
+  const publication = source
+    .split('run_publication() {', 2)[1]
+    .split('\n}', 1)[0];
+  assert.match(publication, /ci-branching-guard\.mjs check/);
+  assert.match(publication, /--mode warn/);
+  assert.match(publication, /git diff --check/);
+  assert.match(publication, /scan-secrets\.sh publication origin\/main/);
+  assert.match(publication, /policy-gate-liveness\.mjs/);
+  assert.doesNotMatch(publication, /automation-verify|run_affected/);
+  assert.doesNotMatch(publication, /typecheck|biome|coverage/);
 });

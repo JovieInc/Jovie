@@ -47,6 +47,23 @@ run_affected() {
   bash scripts/automation-verify.sh affected
 }
 
+run_publication() {
+  # Draft publication is a feedback start, not a promotion qualification.
+  # Keep the committed diff safe, then let rolling CI evaluate the broader
+  # affected surface while implementation continues.
+  local head_ref
+  head_ref="$(git branch --show-current)"
+  node scripts/ci-branching-guard.mjs check \
+    --head "$head_ref" --base main --mode warn
+  git rev-parse --verify HEAD >/dev/null
+  git diff --check
+  git diff --cached --check
+  git diff --check "$(git merge-base origin/main HEAD)..HEAD"
+  bash scripts/security/scan-secrets.sh publication origin/main
+  node scripts/lib/policy-gate-liveness.mjs
+  node --test scripts/hooks/pre-push-gate.test.mjs
+}
+
 run_format() {
   pnpm biome check --write .
 }
@@ -61,6 +78,9 @@ case "$MODE" in
   affected)
     run_affected
     ;;
+  publication)
+    run_publication
+    ;;
   format)
     run_format
     ;;
@@ -69,7 +89,7 @@ case "$MODE" in
     run_test
     ;;
   *)
-    echo "usage: scripts/hooks/pre-push-gate.sh [lint|test|affected|format|all]" >&2
+    echo "usage: scripts/hooks/pre-push-gate.sh [lint|test|affected|publication|format|all]" >&2
     exit 2
     ;;
 esac

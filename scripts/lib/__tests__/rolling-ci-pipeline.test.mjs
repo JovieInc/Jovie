@@ -1,0 +1,304 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import {
+  evaluateVerificationBoundary,
+  PUBLICATION_GATES,
+  REMOTE_DRAFT_GATES,
+} from '../draft-verification-boundary.mjs';
+import {
+  DEFAULT_POLICY_GATES,
+  validatePolicyGates,
+} from '../policy-gate-liveness.mjs';
+import {
+  emptyRollingCiState,
+  MAX_REPAIR_DELIVERIES,
+  normalizeFailureEvents,
+  planFailureDispatch,
+  planGreenRecovery,
+} from '../rolling-ci-dispatch.mjs';
+import {
+  claimSingleWriter,
+  FX_ADAPTER_NAME,
+  HANDOFF_SCHEMA,
+  resolveRemediationRoute,
+} from '../rolling-ci-handoff.mjs';
+import {
+  evaluateImplementerPickupEnd,
+  evaluateReadyLanding,
+  staleWorkReceipt,
+  timeToFirstCiReceipt,
+} from '../rolling-ci-pipeline.mjs';
+
+const head = 'a'.repeat(40);
+const nextHead = 'b'.repeat(40);
+const read = path =>
+  readFileSync(resolve(import.meta.dirname, '../../..', path), 'utf8');
+const green = names => Object.fromEntries(names.map(name => [name, 'success']));
+const failure = normalizeFailureEvents({
+  repository: 'JovieInc/Jovie',
+  prNumber: 5271,
+  headSha: head,
+  workflowRunId: 9001,
+  workflowRunAttempt: 1,
+  failedJobs: [{ name: 'ci-fast', steps: ['Typecheck'] }],
+  source: {
+    eventName: 'workflow_run',
+    workflow: 'CI',
+    producerEvent: 'pull_request',
+    trustedPolicyRef: 'main',
+    workflowPath: '.github/workflows/ci.yml',
+  },
+  checkSuiteId: 44,
+})[0];
+const identity = {
+  repository: 'JovieInc/Jovie',
+  pr: 5271,
+  head,
+  fingerprint: failure.fingerprint,
+};
+const fxAdapter = { name: FX_ADAPTER_NAME, authConfigured: true };
+const checks = {
+  tests: 'success',
+  coverage: 'success',
+  security: 'success',
+  policy: 'success',
+};
+
+function plan(event, extra = {}) {
+  return planFailureDispatch({
+    event,
+    liveHead: extra.liveHead ?? head,
+    writer: extra.writer ?? 'tim',
+    priorState: extra.priorState,
+  });
+}
+
+function attempted(attempt, runId = 9000 + attempt) {
+  return {
+    ...failure,
+    attempt,
+    workflowRunId: String(runId),
+    delivery: `${runId}:${attempt}:${failure.fingerprint}`,
+  };
+}
+
+describe('draft-first rolling CI pipeline', () => {
+  it('deliberate red: local affected failure cannot deadlock publication', () => {
+    const result = evaluateVerificationBoundary({
+      localEvidence: { ...green(PUBLICATION_GATES), affectedTests: 'failure' },
+      remoteEvidence: {
+        ...green(REMOTE_DRAFT_GATES),
+        affectedTests: 'failure',
+      },
+      publishedHead: head,
+      liveHead: head,
+    });
+    expect(result.publicationGreen).toBe(true);
+    expect(result.promotionGreen).toBe(false);
+    expect(resolveRemediationRoute({ implementer: 'tim', fxAdapter })).toEqual({
+      route: 'implementer',
+      writer: 'tim',
+    });
+  });
+
+  it('deliberate red: stale, duplicate, competing writer, supersede, retry, recovery', () => {
+    expect(
+      staleWorkReceipt({
+        pr: 5271,
+        eventHead: head,
+        liveHead: nextHead,
+        fingerprint: failure.fingerprint,
+      })
+    ).toMatchObject({ action: 'reject_stale_head', stale: true });
+    expect(plan(failure, { liveHead: nextHead })).toMatchObject({
+      action: 'reject_stale_head',
+      mutate: false,
+    });
+    const first = plan(failure);
+    expect(plan(failure, { priorState: first.state })).toMatchObject({
+      action: 'deduplicate_delivery',
+      mutate: false,
+    });
+    const owned = claimSingleWriter({
+      writer: 'implementer',
+      identity,
+      liveHead: head,
+    });
+    expect(
+      claimSingleWriter({
+        existingClaim: owned.claim,
+        writer: FX_ADAPTER_NAME,
+        identity,
+        liveHead: head,
+      }).action
+    ).toBe('reject_competing_writer');
+    expect(
+      plan(
+        { ...attempted(1, 9002), head: nextHead },
+        { liveHead: nextHead, priorState: first.state }
+      )
+    ).toMatchObject({ action: 'dispatch_superseding_head' });
+    let state = emptyRollingCiState(head);
+    for (let attempt = 1; attempt <= MAX_REPAIR_DELIVERIES; attempt += 1) {
+      const next = plan(attempted(attempt), { priorState: state });
+      expect(next.mutate).toBe(true);
+      state = next.state;
+    }
+    expect(plan(attempted(4, 9010), { priorState: state })).toMatchObject({
+      action: 'terminal_configuration_incident',
+      mutate: false,
+    });
+    expect(
+      planGreenRecovery({
+        headSha: head,
+        liveHead: head,
+        priorState: first.state,
+      })
+    ).toMatchObject({ action: 'supersede_repairs_green', mutate: true });
+  });
+
+  it('requires an explicit current-head handoff before pickup ends', () => {
+    const receipt = {
+      schema: HANDOFF_SCHEMA,
+      pr: 5271,
+      head,
+      status: 'active',
+      leaseExpiresAt: '2026-08-22T03:00:00Z',
+      acceptanceCriteria: ['exact-head green'],
+      remainingChecks: ['Unit Tests'],
+      failureFingerprints: [failure.fingerprint],
+      remediationOwner: 'implementer',
+    };
+    expect(
+      evaluateImplementerPickupEnd({ liveHead: head, fxAdapter })
+    ).toMatchObject({
+      action: 'require_handoff_receipt',
+    });
+    expect(
+      evaluateImplementerPickupEnd({
+        receipt,
+        liveHead: head,
+        fxAdapter,
+        now: '2026-08-22T01:00:00Z',
+      }).action
+    ).toBe('pickup_still_active');
+    expect(
+      evaluateImplementerPickupEnd({
+        receipt: { ...receipt, status: 'handed-off' },
+        liveHead: head,
+        fxAdapter,
+      })
+    ).toMatchObject({ action: 'fx', route: { writer: FX_ADAPTER_NAME } });
+  });
+
+  it('requires rebased exact-head tests, coverage, security, and policy', () => {
+    expect(
+      evaluateReadyLanding({
+        publishedHead: head,
+        liveHead: head,
+        rebased: true,
+        checks: { ...checks, coverage: 'failure' },
+      }).reason
+    ).toBe('missing-coverage');
+    expect(
+      evaluateReadyLanding({
+        publishedHead: head,
+        liveHead: nextHead,
+        rebased: true,
+        checks,
+      }).reason
+    ).toBe('stale-head');
+    expect(
+      evaluateReadyLanding({ publishedHead: head, liveHead: head, checks })
+        .reason
+    ).toBe('not-rebased');
+    expect(
+      evaluateReadyLanding({
+        publishedHead: head,
+        liveHead: head,
+        rebased: true,
+        checks,
+      })
+    ).toEqual({ ok: true, reason: 'exact-head-qualified' });
+  });
+
+  it('records time-to-first-CI', () => {
+    expect(
+      timeToFirstCiReceipt({
+        pr: 5271,
+        head,
+        publishedAt: '2026-08-22T00:18:58Z',
+        firstCheckStartedAt: '2026-08-22T00:19:11Z',
+      }).secondsToFirstCi
+    ).toBe(13);
+  });
+});
+
+describe('bootstrap-safe policy gates', () => {
+  it('rejects CI-before-draft, blocking advisory, and cycles', () => {
+    expect(validatePolicyGates()).toEqual({ ok: true, errors: [] });
+    const policy = structuredClone(DEFAULT_POLICY_GATES);
+    policy.gates.find(gate => gate.id === 'hook-policy').requires = [
+      'exact-head-ci',
+    ];
+    expect(validatePolicyGates(policy).errors).toContain(
+      'hook-policy: exact-head-ci is not available before draft-publication'
+    );
+    policy.gates.find(gate => gate.id === 'branch-recommendation').mode =
+      'blocking';
+    expect(validatePolicyGates(policy).errors).toContain(
+      'branch-recommendation: blocker is not allowlisted for draft-publication'
+    );
+    policy.gates.push(
+      {
+        id: 'A',
+        transition: 'fast-ci',
+        mode: 'advisory',
+        requires: ['github-pr-metadata'],
+        dependsOn: ['B'],
+      },
+      {
+        id: 'B',
+        transition: 'remediation',
+        mode: 'advisory',
+        requires: ['exact-head-ci'],
+        dependsOn: ['A'],
+      }
+    );
+    expect(validatePolicyGates(policy).errors).toContain(
+      'policy cycle detected at A'
+    );
+  });
+});
+
+describe('draft-first rolling CI policy wiring', () => {
+  it('records the contract without adding source-PR coverage jobs', () => {
+    expect(read('AGENTS.md')).toContain(
+      'publish the first coherent commit as a draft'
+    );
+    const flow = read('docs/PR_FLOW.md');
+    for (const text of [
+      'JOVIE_PUSH_PHASE=publication git push',
+      'Per-PR concurrency cancels superseded runs',
+      'stale or duplicate deliveries are rejected',
+      'One remediation writer holds the PR lease',
+      'FX is the recovery tier',
+      'final exact, current head',
+      'PR #16336',
+    ]) {
+      expect(flow).toContain(text);
+    }
+    expect(flow).toMatch(/Moving on requires an explicit handoff\s+receipt/);
+    expect(read('.github/workflows/ci.yml')).not.toContain(
+      'ci-draft-coverage:'
+    );
+    expect(read('.husky/pre-push')).toContain('JOVIE_PUSH_PHASE:-publication');
+    const publication = read('scripts/hooks/pre-push-gate.sh')
+      .split('run_publication() {', 2)[1]
+      .split('\n}', 1)[0];
+    expect(publication).not.toMatch(
+      /automation-verify|run_affected|typecheck|biome|coverage/
+    );
+  });
+});

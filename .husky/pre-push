@@ -16,4 +16,15 @@ export AUTOMATION_VERIFY_SHARD_CONCURRENCY="${AUTOMATION_VERIFY_SHARD_CONCURRENC
 # `git push` dying with SIGPIPE (exit 141) right after the last check —
 # scripts/setup.sh sets core.sshCommand keepalives to prevent that.
 
-bash scripts/hooks/pre-push-gate.sh affected
+case "${JOVIE_PUSH_PHASE:-publication}" in
+  publication)
+    bash scripts/hooks/pre-push-gate.sh publication
+    ;;
+  qualification)
+    bash scripts/hooks/pre-push-gate.sh affected
+    ;;
+  *)
+    echo "JOVIE_PUSH_PHASE must be publication or qualification" >&2
+    exit 2
+    ;;
+esac
