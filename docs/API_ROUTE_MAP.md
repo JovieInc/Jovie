@@ -365,6 +365,12 @@
 | `/api/notifications/update-name` | PATCH | `public` | Update subscriber display name |
 | `/api/notifications/verify-email-otp` | POST | `public` | Verify email OTP for notification subscription |
 
+### Ovie
+
+| Route | Methods | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/ovie/summer` | GET, POST | `admin` | Founder Mac lander: list/claim/complete/fail Eve-bound current-Summer turns. |
+
 ### Pixel
 
 | Route | Methods | Auth | Description |

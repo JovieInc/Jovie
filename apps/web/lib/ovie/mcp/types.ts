@@ -102,6 +102,31 @@ export type OvieInitiative = {
   readonly evidence: readonly OvieEvidence[];
 };
 
+export type OvieSummerTurnState = 'queued' | 'claimed' | 'completed' | 'failed';
+
+export type OvieSummerTurn = {
+  readonly id: string;
+  readonly kind: 'summer-turn';
+  readonly conversationId: string;
+  readonly userText: string;
+  readonly state: OvieSummerTurnState;
+  readonly eveWorkId?: string | null;
+  readonly eveAcks?: readonly string[];
+  readonly responseText?: string;
+  readonly failureCode?: string;
+  readonly claimedBy?: string;
+  readonly claimToken?: string;
+  readonly claimExpiresAt?: string;
+  readonly tool?: {
+    readonly name: string;
+    readonly ok: boolean;
+    readonly receiptId: string;
+    readonly summary: string;
+  };
+  readonly createdAt: string;
+  readonly updatedAt: string;
+};
+
 export type OvieEvidence = {
   readonly kind:
     | 'receipt'
