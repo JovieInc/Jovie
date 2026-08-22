@@ -51,6 +51,11 @@ import {
   parseUrl,
   type UrlDisposition,
 } from './navigation';
+import {
+  OVIE_OPERATOR_TALK_ROUTE,
+  packagedDesktopAppId,
+  packagedUsesCompetingStagingShell,
+} from './ovie-door';
 import { evaluateRemoteDebuggingGuard } from './remote-debugging-guard';
 import {
   decideAbortedMainFrameRecovery,
@@ -64,6 +69,10 @@ import {
   shouldRecoverAuthHandoffToCanonicalShell,
   shouldSkipRendererWatchdogForAuthHandoff,
 } from './renderer-recovery';
+import {
+  createSummerRuntimeBridge,
+  type SummerRuntimeBridge,
+} from './summer-runtime-bridge';
 import { SYSTEM_B_DESKTOP_TOKENS } from './system-b-tokens';
 import { sanitizeWindowState, type WindowState } from './window-state';
 
@@ -78,6 +87,7 @@ if (APP_ENV === 'staging') {
 const APP_ORIGIN = new URL(APP_URL).origin;
 const URL_DISPOSITION_OPTIONS = { appUrl: APP_URL, appEnv: APP_ENV } as const;
 const APP_ENTRY_URL = buildAppUrl('/app/chat');
+const OVIE_OPERATOR_TALK_URL = buildAppUrl(OVIE_OPERATOR_TALK_ROUTE);
 const SETTINGS_URL = buildAppUrl('/app/settings');
 const APP_BACKGROUND_COLOR = SYSTEM_B_DESKTOP_TOKENS.backgroundColor;
 const NAVIGATION_ABORTED_ERROR_CODE = -3;
@@ -195,6 +205,7 @@ let pendingLegacyAuthReturnRoute: string | null = null;
 let pendingDesktopAuthPkce: PendingDesktopAuthPkce | null = null;
 let mainWindowHiddenForAuthHandoff = false;
 let currentHudBuildFingerprint: string | null = null;
+let summerRuntimeBridge: SummerRuntimeBridge | null = null;
 
 /**
  * Per-webContents boot-watchdog controllers (JOV-3595). The hosted web app
@@ -1635,6 +1646,17 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   win.webContents.on('did-navigate-in-page', sendNavState);
   win.webContents.on('did-navigate', sendNavState);
 
+  if (
+    packagedUsesCompetingStagingShell({
+      appId: packagedDesktopAppId(APP_ENV),
+      appEnv: APP_ENV,
+      appUrl: APP_URL,
+    })
+  ) {
+    showDesktopLoadFailure(win);
+    return win;
+  }
+
   const initialAuthUrl = buildDesktopBrowserAuthUrl(initialUrl);
   const hostedEntry = initialAuthUrl
     ? buildDesktopAuthHandoffUrl(initialAuthUrl)
@@ -1648,6 +1670,16 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   loadHostedUrlAfterSplash(win, hostedEntry);
 
   return win;
+}
+
+function openOvieOperatorTalkDoor(): void {
+  if (isAuthHandoffOpen()) return;
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow(OVIE_OPERATOR_TALK_URL);
+    return;
+  }
+  void mainWindow.loadURL(OVIE_OPERATOR_TALK_URL);
+  showWindow(mainWindow);
 }
 
 function openPreferences(): void {
@@ -1777,6 +1809,10 @@ function buildApplicationMenu(): Menu {
             accelerator: 'Command+,',
             click: openPreferences,
           },
+          {
+            label: 'Ovie',
+            click: openOvieOperatorTalkDoor,
+          },
           { type: 'separator' },
           { role: 'services' },
           { type: 'separator' },
@@ -1887,6 +1923,27 @@ ipcMain.on(APP_BOOTED_CHANNEL, event => {
   const parsed = parseUrl(event.senderFrame?.url ?? event.sender.getURL());
   if (parsed?.origin !== APP_ORIGIN) return;
   rendererBootControllers.get(event.sender.id)?.markBooted();
+  if (process.platform === 'darwin' && !summerRuntimeBridge) {
+    summerRuntimeBridge = createSummerRuntimeBridge({
+      platform: process.platform,
+      appOrigin: APP_ORIGIN,
+      homeDirectory: app.getPath('home'),
+      workerId: `jovie-desktop-${createHash('sha256')
+        .update(app.getPath('userData'))
+        .digest('hex')
+        .slice(0, 16)}`,
+      fetch: event.sender.session.fetch.bind(event.sender.session),
+      onReceipt: receipt => {
+        console.info('[ovie-summer-bridge]', JSON.stringify(receipt));
+      },
+    });
+    summerRuntimeBridge.start();
+  }
+});
+
+app.on('before-quit', () => {
+  summerRuntimeBridge?.stop();
+  summerRuntimeBridge = null;
 });
 
 ipcMain.handle(GO_BACK_CHANNEL, (event: IpcMainInvokeEvent) => {

@@ -268,7 +268,7 @@ export async function* runOvieSummerTurn(input: {
   };
   yield { type: 'binding', binding };
 
-  if (replay) {
+  if (replay && replay.state !== 'canceled') {
     yield { type: 'state', state: 'recovery' };
     if (replay.assistantText) {
       yield { type: 'text-delta', text: replay.assistantText };
@@ -336,23 +336,35 @@ export async function* runOvieSummerTurn(input: {
       break;
     }
   } catch {
-    terminal = 'failure';
+    terminal = input.signal?.aborted ? 'canceled' : 'failure';
   }
 
-  if (input.signal?.aborted) terminal = 'canceled';
+  if (
+    input.signal?.aborted &&
+    terminal === 'completed' &&
+    !assistantText &&
+    !toolReceipt
+  ) {
+    terminal = 'canceled';
+  }
   assertModelMustNotSelfIdentifyAsOvie(assistantText);
 
-  await appendSummerTurn(input.store, {
-    clientTurnId: input.clientTurnId ?? null,
-    userText: input.userText,
-    assistantText,
-    eveWorkId: binding.eveWorkId,
-    eveAcks: binding.eveAcks,
-    correlationId: binding.correlationId,
-    state: terminal,
-    toolReceipt,
-    createdAt: new Date().toISOString(),
-  });
+  // Canceled streams are not durable session turns. The Eve/Mac queue keeps
+  // the work; reconnect with the same clientTurnId waits for completion
+  // instead of replaying an empty canceled row.
+  if (terminal !== 'canceled') {
+    await appendSummerTurn(input.store, {
+      clientTurnId: input.clientTurnId ?? null,
+      userText: input.userText,
+      assistantText,
+      eveWorkId: binding.eveWorkId,
+      eveAcks: binding.eveAcks,
+      correlationId: binding.correlationId,
+      state: terminal,
+      toolReceipt,
+      createdAt: new Date().toISOString(),
+    });
+  }
 
   yield {
     type: 'state',

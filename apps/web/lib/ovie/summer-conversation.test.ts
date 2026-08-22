@@ -9,9 +9,16 @@ import {
   enqueueOvieSummerTurn,
   OvieSummerTurnError,
 } from '@/lib/ovie/summer-conversation';
-import { respondToOvieSummerAction } from '@/lib/ovie/summer-http';
+import {
+  respondToOvieSummerAction,
+  respondToOvieSummerPending,
+} from '@/lib/ovie/summer-http';
 import { createCurrentSummerQueueSpeaker } from '@/lib/ovie/summer-queue-speaker';
-import { resetSummerTransportRuntime } from '@/lib/ovie/summer-transport';
+import { loadCurrentSummerSession } from '@/lib/ovie/summer-session';
+import {
+  resetSummerTransportRuntime,
+  runOvieSummerTurn,
+} from '@/lib/ovie/summer-transport';
 
 const founder = {
   authenticated: true,
@@ -120,5 +127,128 @@ describe('Ovie Summer conversation handoff', () => {
     await expect(store.getSummerTurn('turn_live')).resolves.toMatchObject({
       tool: { receiptId: 'tool_ok_1' },
     });
+  });
+
+  it('keeps the Mac lander founder-gated and lists Eve-bound pending turns', async () => {
+    const store = new DurableOperatingStore(memoryRecordBackend());
+    await enqueueOvieSummerTurn(store, {
+      id: 'turn_pending',
+      userText: 'Status?',
+      receipts: [
+        {
+          text: 'x',
+          lane: 'heavy',
+          destination: 'kanban',
+          ack: 'stored',
+          destinationHandle: null,
+          workerSpawned: false,
+          workId: 'ini_work_pending',
+        },
+      ],
+    });
+    const guest = { authenticated: false, isAdmin: false, scopes: [] as const };
+    expect(
+      (await respondToOvieSummerPending({ principal: guest, store })).status
+    ).toBe(401);
+    const listed = await respondToOvieSummerPending({
+      principal: founder,
+      store,
+    });
+    expect(listed.status).toBe(200);
+    await expect(listed.json()).resolves.toMatchObject({
+      ok: true,
+      turns: [{ id: 'turn_pending', eve_work_id: 'ini_work_pending' }],
+    });
+  });
+
+  it('reconnects a canceled stream without losing the later Mac completion', async () => {
+    const store = new DurableOperatingStore(memoryRecordBackend());
+    const speaker = createCurrentSummerQueueSpeaker(store);
+    const abort = new AbortController();
+    const first = (async () => {
+      const rows: Array<{ type: string; state?: string; text?: string }> = [];
+      let text = '';
+      for await (const event of runOvieSummerTurn({
+        receipts: [
+          {
+            text: 'x',
+            lane: 'heavy',
+            destination: 'kanban',
+            ack: 'stored',
+            destinationHandle: null,
+            workerSpawned: false,
+            workId: 'ini_work_resume',
+          },
+        ],
+        userText: 'Resume me',
+        speaker,
+        store,
+        signal: abort.signal,
+        clientTurnId: 'resume-1',
+      })) {
+        rows.push(event);
+        if (event.type === 'text-delta') text += event.text;
+      }
+      return { rows, text };
+    })();
+    await vi.waitFor(async () => {
+      expect((await store.listSummerTurns()).length).toBe(1);
+    });
+    abort.abort();
+    const canceled = await first;
+    expect(canceled.rows.some(row => row.state === 'canceled')).toBe(true);
+    expect(canceled.text).toBe('');
+    expect((await loadCurrentSummerSession(store))?.turns ?? []).toHaveLength(
+      0
+    );
+
+    const queued = (await store.listSummerTurns())[0];
+    await claimOvieSummerTurn(store, {
+      id: queued?.id ?? '',
+      workerId: 'summer-mac',
+      claimToken: 'resume-claim',
+    });
+    await completeOvieSummerTurn(store, {
+      id: queued?.id ?? '',
+      claimToken: 'resume-claim',
+      responseText: 'Recovered Summer after reconnect.',
+      tool: {
+        name: 'get_org_state',
+        ok: true,
+        receiptId: 'tool_resume',
+        summary: 'org',
+      },
+    });
+
+    const rows: Array<{ type: string; receipt?: { receiptId: string } }> = [];
+    let text = '';
+    for await (const event of runOvieSummerTurn({
+      receipts: [
+        {
+          text: 'x',
+          lane: 'heavy',
+          destination: 'kanban',
+          ack: 'stored',
+          destinationHandle: null,
+          workerSpawned: false,
+          workId: 'ini_work_resume',
+        },
+      ],
+      userText: 'Resume me',
+      speaker,
+      store,
+      clientTurnId: 'resume-1',
+    })) {
+      rows.push(event);
+      if (event.type === 'text-delta') text += event.text;
+    }
+    expect(text).toBe('Recovered Summer after reconnect.');
+    expect(rows.some(row => row.receipt?.receiptId === 'tool_resume')).toBe(
+      true
+    );
+    const session = await loadCurrentSummerSession(store);
+    expect(session?.turns).toHaveLength(1);
+    expect(session?.turns[0]?.eveWorkId).toBe('ini_work_resume');
+    expect(session?.identity.memoryNamespace).toBe('summer');
   });
 });
