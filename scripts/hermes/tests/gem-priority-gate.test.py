@@ -1275,8 +1275,10 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("github.event.label.name == 'queue-deferred'", content)
         self.assertIn("github.event.label.name == 'needs-human'", content)
         self.assertIn("JOVIE_AGENT_PROFILE: no_agent", content)
-        self.assertIn("timeout 180s scripts/backlog-orchestrator/run-backlog.sh reconcile", content)
-        self.assertIn("timeout 60s scripts/backlog-orchestrator/run-backlog.sh gate-next", content)
+        self.assertIn("scripts/hermes/gem-gate-next-admission.py --mode=fleet", content)
+        self.assertNotIn("run-backlog.sh reconcile", content)
+        self.assertNotIn("run-backlog.sh gate-next", content)
+        self.assertIn("timeout-minutes: 12", content)
         self.assertIn("symphony-event-admission-heartbeat/v1", content)
 
     def test_stale_window_matches_the_consumer_fail_closed_window(self):

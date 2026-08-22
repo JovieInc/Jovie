@@ -1015,6 +1015,22 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     assert "github.event.label.name == 'queue-deferred'" in block
     assert "github.event.label.name == 'needs-human'" in block
     assert "runs-on: [self-hosted, Linux, X64, jovie-fixed]" in block
+    assert "scripts/hermes/gem-gate-next-admission.py --mode=fleet" in block
+    assert "run-backlog.sh reconcile" not in block
+    assert "run-backlog.sh gate-next" not in block
+    assert "timeout-minutes: 12" in block
+    intake = (WORKFLOWS / "jovie-intake-controller.yml").read_text(encoding="utf-8")
+    assert "group: jovie-intake-admission" in intake
+    assert "group: fleet-gate-event-admission" not in intake
+    assert "scripts/hermes/gem-gate-next-admission.py --mode=intake --issue=" in intake
+    assert 'run-backlog.sh gate-next --issue="$ISSUE_IDENTIFIER"' not in intake
+    assert "timeout-minutes: 8" in _job_block(
+        "jovie-intake-controller.yml", "receive"
+    )
+    entry = (REPO_ROOT / "scripts/backlog-orchestrator/run-backlog.sh").read_text(
+        encoding="utf-8"
+    )
+    assert "JOVIE_GEM_GATE_ADMISSION_LOCK_HELD" in entry
 
 
 def test_heartbeat_is_the_only_scheduled_generic_fixed_runner_consumer() -> None:
