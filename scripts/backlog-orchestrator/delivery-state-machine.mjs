@@ -32,14 +32,6 @@ const AUTOMATED_FAILURES = Object.freeze({
     owner: 'symphony',
     action: 'create-bounded-ci-repair-pr',
   },
-  'ci-failed-after-handoff': {
-    owner: 'fx',
-    action: 'repair-current-pr-exact-head',
-  },
-  'fx-auth-missing': {
-    owner: 'gem',
-    action: 'restore-fx-adapter-authentication',
-  },
   'lease-ambiguous': {
     owner: 'symphony',
     action: 'reconcile-exact-head-lease',
@@ -264,12 +256,7 @@ export function repairTaskForReceipt(receipt) {
     createdAt: receipt.observedAt,
     receiptKey: receipt.receiptKey,
     owner: receipt.next.owner,
-    route:
-      receipt.next.owner === 'symphony'
-        ? 'gem-to-symphony'
-        : receipt.next.owner === 'fx'
-          ? 'gem-to-fx'
-          : 'gem-local',
+    route: receipt.next.owner === 'symphony' ? 'gem-to-symphony' : 'gem-local',
     action: receipt.next.action,
     issue: receipt.event.issue,
     pr: receipt.event.pr,
