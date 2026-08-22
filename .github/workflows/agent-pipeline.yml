@@ -7,7 +7,7 @@
 # REPLACES: agent-remediation.yml, auto-approve-agent-prs.yml, coderabbit-autofix.yml
 #
 # TRIGGERS:
-# 1. CI failure on agent branches → fix job (Claude Code fixes)
+# 1. CI completion on agent branches → trusted exact-head failure/green event
 # 2. CI PR Ready succeeds → approve job (auto-approve + queue handoff)
 #
 # NOTE: CodeRabbit blocking review trigger (pull_request_review) was removed
@@ -67,6 +67,7 @@ jobs:
       issues: read
     outputs:
       should_fix: ${{ steps.evaluate.outputs.should_fix }}
+      should_reconcile: ${{ steps.evaluate.outputs.should_reconcile }}
       should_approve: ${{ steps.evaluate.outputs.should_approve }}
       trigger_type: ${{ steps.evaluate.outputs.trigger_type }}
       pr_number: ${{ steps.evaluate.outputs.pr_number }}
@@ -413,8 +414,13 @@ jobs:
           echo "Has needs-human: $HAS_NEEDS_HUMAN"
 
           SHOULD_FIX="false"
+          SHOULD_RECONCILE="false"
           SHOULD_APPROVE="false"
           RETRIES_EXHAUSTED="false"
+
+          if [[ "$SHOULD_CONTINUE" == "true" && "$IS_AGENT" == "true" ]]; then
+            SHOULD_RECONCILE="true"
+          fi
 
           if [[ "$SHOULD_CONTINUE" != "true" || "$IS_AGENT" != "true" || "$IS_READY" != "true" ]]; then
             echo "Basic guards failed"
@@ -436,6 +442,7 @@ jobs:
           fi
 
           write_output "should_fix=$SHOULD_FIX"
+          write_output "should_reconcile=$SHOULD_RECONCILE"
           write_output "should_approve=$SHOULD_APPROVE"
           write_output "retries_exhausted=$RETRIES_EXHAUSTED"
           write_output "trigger_type=$TRIGGER_TYPE"
@@ -494,6 +501,138 @@ jobs:
           **Skipping individual code-fix attempts.** These failures likely originated on \`main\`.
 
           **Automated remediation:** Event-driven \`merge-queue-autoenroll\` re-evaluates mergeable agent PRs and can rebase them onto latest \`main\` (\`scripts/drain-pr-remediate.mjs\`) to re-trigger CI. If checks stay red after that rebase, fix \`main\` first or address branch-specific failures manually."
+
+  # ==========================================================================
+  # TRUSTED DISPATCH: Normalize exact-head failure/green events from CI.
+  # This job checks out default-branch policy only and never executes PR code.
+  # ==========================================================================
+  trusted-dispatch:
+    name: Trusted Rolling CI Dispatch
+    needs: guard
+    if: needs.guard.outputs.should_reconcile == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: rolling-ci-dispatch-${{ github.repository }}-${{ needs.guard.outputs.pr_number }}
+      cancel-in-progress: true
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Checkout trusted dispatch policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            scripts/lib/upsert-pr-comment.sh
+            scripts/lib/rolling-ci-dispatch.mjs
+            scripts/rolling-ci-dispatch.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Node for trusted dispatch
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Verify provenance and plan exact-head dispatch
+        id: dispatch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ needs.guard.outputs.pr_number }}
+          EXPECTED_HEAD: ${{ needs.guard.outputs.pr_head_sha }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          EVENT_ACTION: ${{ github.event.action }}
+          POLICY_REF: ${{ github.ref }}
+          POLICY_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -euo pipefail
+
+          LIVE_PR=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER" \
+            --jq '{state: .state, head: .head.sha, head_repository: .head.repo.full_name}')
+          LIVE_HEAD=$(jq -r '.head' <<<"$LIVE_PR")
+          LIVE_HEAD_REPOSITORY=$(jq -r '.head_repository' <<<"$LIVE_PR")
+          if [[ "$(jq -r '.state' <<<"$LIVE_PR")" != "open" || "$LIVE_HEAD" != "$EXPECTED_HEAD" ]]; then
+            echo "Workflow run head is stale or the PR closed; refusing dispatch."
+            {
+              echo "action=reject_stale_head"
+              echo "should_dispatch=false"
+              echo "should_comment=false"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ "$LIVE_HEAD_REPOSITORY" != "$REPOSITORY" ]]; then
+            echo "PR head repository is untrusted; refusing dispatch."
+            exit 1
+          fi
+
+          RUN_DATA=$(gh api "repos/$REPOSITORY/actions/runs/$RUN_ID" \
+            --jq '{id: .id, run_attempt: .run_attempt, name: .name, path: .path, event: .event, status: .status, conclusion: .conclusion, head_sha: .head_sha, head_repository: .head_repository.full_name}')
+          CANONICAL_HEAD=$(jq -r '.head_sha' <<<"$RUN_DATA")
+          if [[ "$CANONICAL_HEAD" != "$EXPECTED_HEAD" ]]; then
+            echo "Canonical workflow run head does not match the guarded PR head."
+            exit 1
+          fi
+
+          CONCLUSION=$(jq -r '.conclusion' <<<"$RUN_DATA")
+          FAILED_JOBS='[]'
+          if [[ "$CONCLUSION" == "failure" ]]; then
+            FAILED_JOBS=$(gh api "repos/$REPOSITORY/actions/runs/$RUN_ID/jobs?per_page=100" \
+              --paginate --slurp \
+              --jq '[.[] | .jobs[] | select(.conclusion == "failure") | {name: .name, steps: [.steps[]? | select(.conclusion == "failure") | .name]}]')
+          fi
+
+          PRIOR_COMMENT=$(gh api "repos/$REPOSITORY/issues/$PR_NUMBER/comments?per_page=100" \
+            --paginate --slurp \
+            --jq '[.[] | .[] | select(.user.login == "github-actions[bot]") | select(.body | contains("<!-- jovie-rolling-ci-dispatch-state:"))] | last | .body // ""')
+
+          jq -n \
+            --arg repository "$REPOSITORY" \
+            --argjson prNumber "$PR_NUMBER" \
+            --arg headSha "$EXPECTED_HEAD" \
+            --arg liveHead "$LIVE_HEAD" \
+            --arg workflowRunId "$(jq -r '.id' <<<"$RUN_DATA")" \
+            --argjson workflowRunAttempt "$(jq -r '.run_attempt' <<<"$RUN_DATA")" \
+            --arg conclusion "$CONCLUSION" \
+            --argjson failedJobs "$FAILED_JOBS" \
+            --arg priorCommentBody "$PRIOR_COMMENT" \
+            --arg eventAction "$EVENT_ACTION" \
+            --arg workflowName "$(jq -r '.name' <<<"$RUN_DATA")" \
+            --arg workflowPath "$(jq -r '.path' <<<"$RUN_DATA")" \
+            --arg producerEvent "$(jq -r '.event' <<<"$RUN_DATA")" \
+            --arg status "$(jq -r '.status' <<<"$RUN_DATA")" \
+            --arg sourceConclusion "$CONCLUSION" \
+            --arg sourceRepository "$REPOSITORY" \
+            --arg headRepository "$(jq -r '.head_repository' <<<"$RUN_DATA")" \
+            --arg policyRef "$POLICY_REF" \
+            --arg policySha "$POLICY_SHA" \
+            '{repository,prNumber,headSha,liveHead,workflowRunId,workflowRunAttempt,conclusion,failedJobs,priorCommentBody,source:{eventName:"workflow_run",action:$eventAction,workflowName:$workflowName,workflowPath:$workflowPath,producerEvent:$producerEvent,status:$status,conclusion:$sourceConclusion,repository:$sourceRepository,headRepository:$headRepository,policyRef:$policyRef,policySha:$policySha}}' \
+            | node scripts/rolling-ci-dispatch.mjs > "$RUNNER_TEMP/rolling-ci-plan.json"
+
+          cat "$RUNNER_TEMP/rolling-ci-plan.json"
+          {
+            echo "action=$(jq -r '.action' "$RUNNER_TEMP/rolling-ci-plan.json")"
+            echo "should_dispatch=$(jq -r '.shouldDispatch' "$RUNNER_TEMP/rolling-ci-plan.json")"
+            echo "should_comment=$(jq -r '.shouldComment' "$RUNNER_TEMP/rolling-ci-plan.json")"
+            echo "comment_body<<ROLLING_CI_COMMENT"
+            jq -r '.body' "$RUNNER_TEMP/rolling-ci-plan.json"
+            echo "ROLLING_CI_COMMENT"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Record normalized dispatch receipt
+        if: steps.dispatch.outputs.should_comment == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.guard.outputs.pr_number }}
+          COMMENT_BODY: ${{ steps.dispatch.outputs.comment_body }}
+        run: |
+          bash scripts/lib/upsert-pr-comment.sh "$PR_NUMBER" "rolling-ci-dispatch" "$COMMENT_BODY"
+          echo "Rolling CI action: ${{ steps.dispatch.outputs.action }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Exact head: ${{ needs.guard.outputs.pr_head_sha }}" >> "$GITHUB_STEP_SUMMARY"
 
   # ==========================================================================
   # FIX: Apply fixes using Claude agent (CI failure or CodeRabbit review)
