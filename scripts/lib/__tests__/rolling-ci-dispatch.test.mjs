@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { planRollingCiDispatch } from '../../rolling-ci-dispatch.mjs';
 import {
@@ -14,6 +15,17 @@ import {
 const head = 'a'.repeat(40);
 const nextHead = 'b'.repeat(40);
 const policySha = 'c'.repeat(40);
+const agentPipeline = readFileSync(
+  new URL('../../../.github/workflows/agent-pipeline.yml', import.meta.url),
+  'utf8'
+);
+
+function workflowJob(name, nextName) {
+  const start = agentPipeline.indexOf(`\n  ${name}:\n`);
+  const end = agentPipeline.indexOf(`\n  ${nextName}:\n`, start + 1);
+  if (start < 0 || end < 0) throw new Error(`workflow job ${name} not found`);
+  return agentPipeline.slice(start, end);
+}
 
 function trustedSource(conclusion = 'failure', overrides = {}) {
   return {
@@ -288,5 +300,50 @@ describe('rolling CI workflow adapter', () => {
       shouldComment: true,
       state: { failures: {}, deliveries: [] },
     });
+  });
+});
+
+describe('trusted dispatch workflow contract', () => {
+  const dispatchJob = workflowJob('trusted-dispatch', 'fix');
+
+  it('runs default-branch policy with minimal permissions and no PR code', () => {
+    expect(dispatchJob).toContain('ref: main');
+    expect(dispatchJob).toContain('persist-credentials: false');
+    expect(dispatchJob).toContain('actions: read');
+    expect(dispatchJob).toContain('contents: read');
+    expect(dispatchJob).toContain('issues: write');
+    expect(dispatchJob).toContain('pull-requests: read');
+    expect(dispatchJob).not.toContain('contents: write');
+    expect(dispatchJob).not.toContain('id-token: write');
+    expect(dispatchJob).not.toContain('secrets.');
+    expect(dispatchJob).not.toContain('github.event.pull_request.head.sha');
+  });
+
+  it('deliberate red: re-fetches native provenance and rejects stale heads', () => {
+    expect(dispatchJob).toContain('actions/runs/$RUN_ID');
+    expect(dispatchJob).toContain('.head_repository.full_name');
+    expect(dispatchJob).toContain('CANONICAL_HEAD');
+    expect(dispatchJob).toContain('CANONICAL_HEAD" != "$EXPECTED_HEAD');
+    expect(dispatchJob).toContain('LIVE_HEAD" != "$EXPECTED_HEAD');
+    expect(dispatchJob).toContain('github.workflow_sha');
+    expect(dispatchJob).toContain('github.event.action');
+  });
+
+  it('deduplicates per PR and cancels superseded dispatch runs', () => {
+    expect(dispatchJob).toContain(
+      'group: rolling-ci-dispatch-${{ github.repository }}-${{ needs.guard.outputs.pr_number }}'
+    );
+    expect(dispatchJob).toContain('cancel-in-progress: true');
+    expect(dispatchJob).toContain('github-actions[bot]');
+    expect(dispatchJob).toContain('jovie-rolling-ci-dispatch-state:');
+  });
+
+  it('reconciles both draft failures and current-head green reruns', () => {
+    expect(agentPipeline).toContain(
+      'should_reconcile: ${{ steps.evaluate.outputs.should_reconcile }}'
+    );
+    expect(agentPipeline).toContain('SHOULD_RECONCILE="true"');
+    expect(dispatchJob).toContain('CONCLUSION');
+    expect(dispatchJob).toContain('scripts/rolling-ci-dispatch.mjs');
   });
 });
