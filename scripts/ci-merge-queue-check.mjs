@@ -3,9 +3,12 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
+  changelogGroupCollisionDecision,
   frontItemChurnDecision,
   MERGE_QUEUE_POLICY,
   MERGE_QUEUE_REPO_PATHS,
+  unmergeableEjectDecision,
+  unmergeableReenqueueDecision,
   validateLiveMergeQueueRuleset,
   validateMergeQueueEnrollHotPath,
   validateMergeQueueRepoConfig,
@@ -184,9 +187,39 @@ async function main() {
       console.log(JSON.stringify(decision));
       break;
     }
+    case 'unmergeable-eject': {
+      let input = {};
+      try {
+        input = JSON.parse(process.env.UNMERGEABLE_EJECT_JSON ?? '{}');
+      } catch {
+        input = {};
+      }
+      console.log(JSON.stringify(unmergeableEjectDecision(input)));
+      break;
+    }
+    case 'unmergeable-reenqueue': {
+      let input = {};
+      try {
+        input = JSON.parse(process.env.UNMERGEABLE_REENQUEUE_JSON ?? '{}');
+      } catch {
+        input = {};
+      }
+      console.log(JSON.stringify(unmergeableReenqueueDecision(input)));
+      break;
+    }
+    case 'changelog-collision': {
+      let input = {};
+      try {
+        input = JSON.parse(process.env.CHANGELOG_COLLISION_JSON ?? '{}');
+      } catch {
+        input = {};
+      }
+      console.log(JSON.stringify(changelogGroupCollisionDecision(input)));
+      break;
+    }
     default:
       console.error(
-        'Usage: node scripts/ci-merge-queue-check.mjs <validate|verify|policy|max-queue-depth|front-churn>'
+        'Usage: node scripts/ci-merge-queue-check.mjs <validate|verify|policy|max-queue-depth|front-churn|unmergeable-eject|unmergeable-reenqueue|changelog-collision>'
       );
       process.exitCode = 1;
   }
