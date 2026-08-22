@@ -129,7 +129,10 @@ final result: passed
   first sidebar commit installs the one-shot IPC listener; the boot-emission
   regression is covered by `tests/unit/desktop/electron-runtime.test.tsx` and
   `tests/unit/components/organisms/UnifiedSidebar.library.test.tsx`.
-- The account panel is a single footer block and contains the Public Profile link immediately above the existing UserButton contract.
+- Historical finding, superseded by JOV-5272: this pass accepted a shared
+  footer ancestor with Public Profile immediately above UserButton as a
+  single block. That structural-only check missed two adjacent top-level
+  controls for the same creator identity.
 - The demo harness intentionally shows its no-auth loading identity state; loaded UserButton keyboard behavior is covered by `tests/components/user-button.test.tsx`.
 - The authenticated `/app` browser route remains unavailable in this isolated worktree without `DATABASE_URL`; the database-free `/demo` shell was used for current-main visual/runtime evidence.
 
@@ -139,3 +142,74 @@ final result: passed
 - P1: none
 - P2: none
 - P3: demo-only identity loading state and Storybook full-build infrastructure failures are outside this refinement
+
+---
+
+# Sidebar Creator Identity Composition Design QA
+
+final result: passed
+
+## Invariant and defect comparison
+
+**One semantic identity, one top-level composition.** The active creator
+identity and public-profile access must share one semantic and visual owner in
+every sidebar state. Distinct actions remain sibling interactives inside that
+owner; they may not become nested controls or adjacent footer rows.
+
+- Defect evidence: `/var/folders/94/18gm8rr177124d51gsv4qj4m0000gn/T/TemporaryItems/NSIRD_screencaptureui_beDAUV/Screenshot 2026-08-21 at 5.04.19 PM.png`
+- Exact-head desktop runtime: `/Users/timwhite/.codex/visualizations/2026/08/22/01a026c9-f138-7373-a453-f334a4a6b8d7/jov-5272-desktop-1440x900.png`
+- Exact 694 × 340 comparison crop: `/Users/timwhite/.codex/visualizations/2026/08/22/01a026c9-f138-7373-a453-f334a4a6b8d7/jov-5272-sidebar-694x340.png`
+- Runtime audit receipt: `/Users/timwhite/.codex/visualizations/2026/08/22/01a026c9-f138-7373-a453-f334a4a6b8d7/jov-5272-runtime-proof.json`
+- Implementation source SHA for this capture: `c2b9c694ae22d3501f6c1f92277142dd6e4efb72`
+
+The defect screenshot has two peer focal boundaries: a standalone Public
+Profile row and a separately selected Tim White row. The corrected runtime has
+one compact bordered identity composition. Creator name is primary; the profile
+URL is subordinate inside the same boundary. This matches the authenticated app
+shell's calm, low-chrome hierarchy without inventing a new component style.
+
+## Viewports and equivalent surfaces
+
+| Surface or state | Evidence | Result |
+| --- | --- | --- |
+| Expanded, 1440 × 900 | Authenticated `/app/chat` runtime and exact crop | Passed: one group, one boundary, creator name and URL occur once inside it |
+| Narrow, 12rem rail | `UnifiedSidebar` Narrow story plus library regression test | Passed: same group and action order, copy truncates inside the owner |
+| Collapsed icon rail | `UnifiedSidebar` Collapsed story plus library regression test | Passed: same group, two distinct icon actions, no sibling profile row |
+| Equivalent sidebar/profile source sweep | invariant test scans sidebar footer surfaces that mention UserButton or Public Profile | Passed: no second creator composition or standalone same-creator profile row |
+| Current split layout | deliberate-red fixture | Correctly rejected for sibling row, duplicate identity copy, and multiple boundaries |
+
+## Interaction, focus, and layout checks
+
+- Runtime audit found exactly one `creator` identity group, one enclosing
+  identity boundary, two interactive descendants, zero nested interactives,
+  and zero identity actions outside the group.
+- Keyboard order is account menu first, then public profile. Runtime accessible
+  names were `Open account menu for Browse Ready User` and
+  `Open public profile at jov.ie/browse-ready-user`; both actions have one tab
+  stop.
+- Account-focus proof:
+  `/Users/timwhite/.codex/visualizations/2026/08/22/01a026c9-f138-7373-a453-f334a4a6b8d7/jov-5272-sidebar-account-focus-694x340.png`
+- Profile-focus proof:
+  `/Users/timwhite/.codex/visualizations/2026/08/22/01a026c9-f138-7373-a453-f334a4a6b8d7/jov-5272-sidebar-profile-focus-694x340.png`
+- Selected/open proof:
+  `/Users/timwhite/.codex/visualizations/2026/08/22/01a026c9-f138-7373-a453-f334a4a6b8d7/jov-5272-sidebar-account-selected-694x340.png`
+- Computed runtime styles confirm the child actions add no border, outline, or
+  box shadow. Focus-within and selected/open treatments belong to the enclosing
+  fieldset. Its idle geometry remains 204 × 64 CSS pixels, so the state change
+  does not shift layout.
+
+## RCA
+
+The earlier refinement put both controls under a common footer ancestor but
+rendered them as adjacent `SidebarMenuItem` rows. Its test asserted only the
+shared ancestor, and the prior visual review repeated that structural claim as
+"one protected user panel." Neither encoded semantic group count, peer-row
+rejection, duplicate identity copy, or focus-boundary ownership. JOV-5272 adds
+those mechanical checks and keeps the deliberate split fixture red.
+
+## Severity audit
+
+- P0: none
+- P1: none
+- P2: none
+- P3: none
