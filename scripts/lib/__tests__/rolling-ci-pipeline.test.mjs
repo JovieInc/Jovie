@@ -192,12 +192,16 @@ describe('draft-first rolling CI pipeline', () => {
     ).toMatchObject({ action: 'fx', route: { writer: FX_ADAPTER_NAME } });
   });
 
-  it('requires rebased exact-head tests, coverage, security, and policy', () => {
+  it('deliberate red: main advance cannot recurse source checks; merge_group owns latest-main proof', () => {
+    const observedBase = 'c'.repeat(40);
+    const latestMain = 'd'.repeat(40);
+    const combinedHead = 'e'.repeat(40);
     expect(
       evaluateReadyLanding({
         publishedHead: head,
         liveHead: head,
-        rebased: true,
+        observedBase,
+        liveMain: latestMain,
         checks: { ...checks, coverage: 'failure' },
       }).reason
     ).toBe('missing-coverage');
@@ -205,22 +209,60 @@ describe('draft-first rolling CI pipeline', () => {
       evaluateReadyLanding({
         publishedHead: head,
         liveHead: nextHead,
-        rebased: true,
+        observedBase,
+        liveMain: latestMain,
         checks,
       }).reason
     ).toBe('stale-head');
     expect(
-      evaluateReadyLanding({ publishedHead: head, liveHead: head, checks })
-        .reason
-    ).toBe('not-rebased');
-    expect(
       evaluateReadyLanding({
         publishedHead: head,
         liveHead: head,
-        rebased: true,
+        observedBase,
+        liveMain: latestMain,
         checks,
       })
-    ).toEqual({ ok: true, reason: 'exact-head-qualified' });
+    ).toEqual({
+      ok: true,
+      reason: 'source-head-qualified-for-queue',
+      baseAdvanced: true,
+    });
+    expect(
+      evaluateReadyLanding({
+        stage: 'merge-group',
+        combinedHead,
+        checkedCombinedHead: combinedHead,
+        latestMainIncluded: false,
+        checks: { ...checks, combined: 'success' },
+      }).reason
+    ).toBe('latest-main-not-proven');
+    expect(
+      evaluateReadyLanding({
+        stage: 'merge-group',
+        combinedHead,
+        checkedCombinedHead: nextHead,
+        latestMainIncluded: true,
+        checks: { ...checks, combined: 'success' },
+      }).reason
+    ).toBe('stale-combined-head');
+    expect(
+      evaluateReadyLanding({
+        stage: 'merge-group',
+        combinedHead,
+        checkedCombinedHead: combinedHead,
+        latestMainIncluded: true,
+        checks: { ...checks, combined: 'failure' },
+      }).reason
+    ).toBe('missing-combined');
+    expect(
+      evaluateReadyLanding({
+        stage: 'merge-group',
+        combinedHead,
+        checkedCombinedHead: combinedHead,
+        latestMainIncluded: true,
+        checks: { ...checks, combined: 'success' },
+      })
+    ).toEqual({ ok: true, reason: 'merge-group-qualified-for-landing' });
   });
 
   it('records time-to-first-CI', () => {
@@ -291,6 +333,9 @@ describe('draft-first rolling CI policy wiring', () => {
     }
     expect(flow).toMatch(/Moving on requires an explicit handoff\s+receipt/);
     const workflow = read('.github/workflows/ci.yml');
+    expect(workflow).toContain(
+      'git diff --name-only "origin/${{ github.base_ref }}...HEAD"'
+    );
     const coverage = workflow.slice(
       workflow.indexOf('  ci-exact-head-coverage:'),
       workflow.indexOf('  ci-a11y:')
@@ -302,11 +347,13 @@ describe('draft-first rolling CI policy wiring', () => {
     expect(coverage).toContain(
       'test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"'
     );
-    expect(coverage).toContain(
-      'git show "$COVERAGE_BASE:apps/web/reports/test-coverage-snapshot.json"'
-    );
+    expect(coverage).toContain('has_web_coverage_changes');
     expect(coverage).toContain('pnpm --filter @jovie/web test:coverage');
-    expect(coverage).toContain('pnpm run test:coverage:diff');
+    expect(coverage).toContain('scripts/check-changed-test-coverage.mjs');
+    expect(coverage).toContain(String.raw`--base \"\$COVERAGE_BASE\"`);
+    expect(coverage).toContain(String.raw`--head \"\$EXPECTED_HEAD\"`);
+    expect(coverage).not.toContain('test:coverage:diff');
+    expect(coverage).not.toContain('exact-head-coverage-baseline.json');
     expect(coverage).toContain("trap 'stop_coverage; exit 143' TERM");
     expect(coverage).not.toContain('secrets.CODECOV_TOKEN');
     const mergeReady = workflow.slice(

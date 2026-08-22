@@ -467,6 +467,7 @@ jobs:
       run_neon: ${{ steps.detect.outputs.run_neon || 'false' }}
       run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}
       has_code_changes: ${{ steps.detect.outputs.has_code_changes || 'false' }}
+      has_web_coverage_changes: ${{ steps.detect.outputs.has_web_coverage_changes || 'false' }}
       is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -509,7 +510,11 @@ jobs:
           BRAND_CANDIDATES="$RUNNER_TEMP/brand-scrub-candidates.txt"
           # Materialize the diff before filtering so a Git failure cannot be
           # hidden by a no-match grep exit status.
-          git diff --name-only --diff-filter=d "$DIFF_BASE" HEAD > "$BRAND_CANDIDATES"
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git diff --name-only --diff-filter=d "$DIFF_BASE...HEAD" > "$BRAND_CANDIDATES"
+          else
+            git diff --name-only --diff-filter=d "$DIFF_BASE" HEAD > "$BRAND_CANDIDATES"
+          fi
           mapfile -t brand_files < <(
             awk '
               (/\.(md|mdx|txt)$/ || /^docs\//) &&
@@ -562,7 +567,7 @@ jobs:
               # still validate the exact combined head. The typed no-op output
               # lets only unit and build/layout skip their expensive work.
               echo "is_noop_merge_group=true" >> "$GITHUB_OUTPUT"
-              for output in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios has_code_changes; do
+              for output in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios has_code_changes has_web_coverage_changes; do
                 echo "$output=false" >> "$GITHUB_OUTPUT"
               done
               exit 0
@@ -576,7 +581,10 @@ jobs:
               echo "::error::Could not resolve origin/${{ github.base_ref }} after fetch"
               exit 1
             fi
-            CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
+            # Source evidence belongs to the immutable PR head and its merge
+            # base. A later unrelated main commit must not appear as a reverse
+            # source change or recursively expand/restart source lanes.
+            CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
             if [[ -z "${CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
               echo "::error::Empty changed-file list vs origin/${{ github.base_ref }}; refusing a false docs-only classification."
               exit 1
@@ -584,7 +592,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
-            for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios has_code_changes; do
+            for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios has_code_changes has_web_coverage_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -623,6 +631,7 @@ jobs:
             ! echo "$CHANGED_FILES" | grep -v -E "$PROMPTFOO_INFRA_ALLOWED_PATTERN" | grep -q .; then
             echo "Promptfoo eval-infrastructure-only source PR: deferring semantic evidence to the merge-group head."
             echo "has_code_changes=true" >> "$GITHUB_OUTPUT"
+            echo "has_web_coverage_changes=false" >> "$GITHUB_OUTPUT"
             echo "run_promptfoo_evals=false" >> "$GITHUB_OUTPUT"
             echo "run_golden_eval_set=false" >> "$GITHUB_OUTPUT"
             for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_golden_path run_drizzle run_neon; do
@@ -635,13 +644,24 @@ jobs:
           if ! echo "$CHANGED_FILES" | grep -q -E '^\.github/' &&
             ! echo "$CHANGED_FILES" | grep -q -v -E '\.(md|txt)$'; then
             echo "Only documentation files changed"
-            for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
+            for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes has_web_coverage_changes; do
               echo "$t=false" >> "$GITHUB_OUTPUT"
             done
             exit 0
           fi
 
           echo "has_code_changes=true" >> "$GITHUB_OUTPUT"
+
+          # Full V8 coverage is meaningful only when the exact diff can affect
+          # web runtime behavior or its test/coverage substrate. Other code
+          # changes keep an explicit non-applicable receipt while their selected
+          # CI lanes continue to gate promotion.
+          WEB_COVERAGE_PATTERN='^(apps/web/.*\.[cm]?[jt]sx?$|apps/web/package\.json$|packages/ui/|package\.json$|pnpm-lock\.yaml$|turbo\.json$)'
+          if echo "$CHANGED_FILES" | grep -q -E "$WEB_COVERAGE_PATTERN"; then
+            echo "has_web_coverage_changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_web_coverage_changes=false" >> "$GITHUB_OUTPUT"
+          fi
 
           # Build paths
           BUILD_PATTERN='^(apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/constants/|apps/web/package.*\.json|apps/web/next\.config\.js|apps/web/tailwind\.config\.|apps/web/postcss\.config\.|apps/web/instrumentation.*\.ts|apps/web/sentry\..*\.config\.ts|apps/web/middleware\.ts|package.*\.json|turbo\.json)'
@@ -3366,20 +3386,20 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Record no-code coverage receipt
-        if: needs.ci-path-changes.outputs.has_code_changes != 'true'
-        run: echo "No executable code changed; exact-head coverage is not applicable."
+      - name: Record non-applicable coverage receipt
+        if: needs.ci-path-changes.outputs.has_web_coverage_changes != 'true'
+        run: echo "No web runtime or coverage-substrate change; selected exact-head CI tests own the changed behavior."
 
       - name: Checkout exact coverage head
-        if: needs.ci-path-changes.outputs.has_code_changes == 'true'
+        if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify exact coverage head and baseline
-        if: needs.ci-path-changes.outputs.has_code_changes == 'true'
+      - name: Verify exact coverage head and diff base
+        if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'
         env:
           EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
           COVERAGE_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
@@ -3389,18 +3409,17 @@ jobs:
           [[ "$COVERAGE_BASE" =~ ^[0-9a-f]{40}$ ]]
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           git cat-file -e "${COVERAGE_BASE}^{commit}"
-          git show "$COVERAGE_BASE:apps/web/reports/test-coverage-snapshot.json" \
-            > "$RUNNER_TEMP/exact-head-coverage-baseline.json"
 
       - uses: ./.github/actions/setup-node-pnpm
-        if: needs.ci-path-changes.outputs.has_code_changes == 'true'
+        if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'
 
-      - name: Run exact-head coverage and committed risk ratchet
-        if: needs.ci-path-changes.outputs.has_code_changes == 'true'
+      - name: Run exact-head coverage and changed-behavior ratchet
+        if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
           CLERK_SECRET_KEY: sk_test_dummy_secret_for_coverage_run_only
-          COVERAGE_BASELINE: ${{ runner.temp }}/exact-head-coverage-baseline.json
+          EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          COVERAGE_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: |
           set -euo pipefail
           coverage_group=''
@@ -3416,12 +3435,13 @@ jobs:
           trap 'stop_coverage; exit 130' INT
           trap 'stop_coverage; exit 143' TERM
           trap stop_coverage EXIT
-          export COVERAGE_BASELINE
+          export EXPECTED_HEAD COVERAGE_BASE
           setsid bash -c "
             set -euo pipefail
             pnpm --filter @jovie/web test:coverage
-            cp \"\$COVERAGE_BASELINE\" apps/web/reports/test-coverage-snapshot.json
-            pnpm run test:coverage:diff
+            node scripts/check-changed-test-coverage.mjs \
+              --base \"\$COVERAGE_BASE\" \
+              --head \"\$EXPECTED_HEAD\"
           " &
           coverage_group=$!
           wait "$coverage_group"

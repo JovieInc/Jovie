@@ -28,7 +28,7 @@
     {
       "id": "exact-head-coverage",
       "name": "Exact-Head Coverage",
-      "purpose": "Meaningful V8 coverage and the committed risk-surface ratchet on the exact source and synthetic combined heads, with no untrusted-code secrets."
+      "purpose": "Meaningful V8 coverage and a 60% changed-line ratchet on exact source and synthetic combined heads, with no untrusted-code secrets; nightly retains the global risk-surface debt check."
     },
     {
       "id": "risk-triggered-smoke",
@@ -131,8 +131,8 @@
       "tier": "exact-head-coverage",
       "mergeGate": true,
       "gateStage": "both",
-      "nextLocalCommand": "pnpm --filter @jovie/web test:coverage && pnpm run test:coverage:diff",
-      "remediation": "Reproduce the exact-head coverage loss, add meaningful changed-behavior tests, and restore the committed risk-surface ratchet without lowering a threshold."
+      "nextLocalCommand": "pnpm --filter @jovie/web test:coverage && node scripts/check-changed-test-coverage.mjs --base <base-sha> --head <head-sha>",
+      "remediation": "Reproduce the exact-head changed-line loss and add meaningful tests until the existing 60% patch floor passes. Unrelated nightly global risk debt remains visible and never lowers this gate."
     },
     {
       "id": "ci-build-layout",

@@ -48,7 +48,7 @@ in the merge queue, while network/deploy/exhaustive depth runs later.
 
 | Tier | Jobs | Trigger |
 |---|---|---|
-| **PR gate** | typecheck, lint, exact-source-head web coverage (full unit suite plus committed risk ratchet), portable iOS contract, structural contract, diff secret scan, Golden Path Lock, size/fork/migration policy | every PR — deterministic, path-aware, parallel |
+| **PR gate** | typecheck, lint, exact-source-head web coverage (full unit suite plus 60% changed-line ratchet), portable iOS contract, structural contract, diff secret scan, Golden Path Lock, size/fork/migration policy | every PR — deterministic, path-aware, parallel |
 | **Merge queue** | combined-head `ci-fast`, exact-combined-head web coverage, ten affected unit shards, one hosted build + layout workspace, path-selected hosted Xcode build/test, path-selected model-free Promptfoo/golden evals, diff secret scan, Golden Path Lock, migration policy | GitHub `merge_group` synthetic head |
 | **Release (`main`)** | exact queue proof or fail-closed direct-main fallback, then successful exact CI-attempt authorization into one `production-mutation` FIFO spanning staging, promotion, one centralized rollback owner, and final verification | completed successful `CI` workflow run for `main`; one bounded controller retry |
 | **Post-deploy** | hosted public, homepage, and live Lighthouse probes against the immutable deployment URL while the controller retains its lease; authenticated smoke is explicit optional evidence until credentials exist; final current-main/canonical check; `Production Verified` marker; event-driven Golden Path Prod Autofix (Cursor-direct, fail-closed) | successful current production release |
@@ -232,9 +232,11 @@ existed. Contract:
    secrets, hook policy only).
 2. Fast source CI on every push.
    Per-PR concurrency cancels superseded runs.
-   `Exact-head Coverage` runs the full web unit suite and committed risk-surface
-   ratchet on the source head without repository secrets; the native queue
-   repeats it on the synthetic combined head.
+   `Exact-head Coverage` runs the full web unit suite and 60% changed-line
+   ratchet on web-impacting source heads without repository secrets; the native
+   queue repeats it on the synthetic combined head. Non-web heads emit an
+   explicit non-applicable receipt. Nightly retains the global risk-surface
+   debt check, so stale unrelated debt cannot deadlock promotion.
 3. Normalize failures (PR, exact head, check, attempt, fingerprint);
    stale or duplicate deliveries are rejected.
 4. One remediation writer holds the PR lease. Implementer first.
@@ -242,8 +244,12 @@ existed. Contract:
 5. A new commit or green rerun supersedes obsolete repairs.
 6. Moving on requires an explicit handoff receipt (draft PR, current head,
    acceptance criteria, remaining checks, fingerprints, remediation owner).
-7. Ready/landing requires the final exact, current head to be green for
-   tests, coverage, security, and policy.
+7. Source readiness is bound to the immutable PR head and its observed base.
+   An unrelated main advance does not recursively invalidate green source
+   evidence, widen its merge-base diff, or force a rebase. Landing still
+   requires a newly synthesized
+   native `merge_group` head containing latest main to pass exact-head tests,
+   coverage, security, policy, and every combined-head gate.
 
 Use `JOVIE_PUSH_PHASE=qualification git push` before ready/landing.
 
