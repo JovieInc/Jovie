@@ -36,6 +36,14 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 ## Testing
 
+### Sidebar footer identity is one group, not two rows (JOV-5272)
+
+**Mistake:** Public Profile (with the creator URL) and the UserButton creator identity were adjacent top-level sidebar footer controls. That split one semantic identity across two visual and focus boundaries, duplicated chrome, and made collapsed/narrow states read as two unrelated icon rows.
+
+**Rule:** Active creator identity and Public Profile access live in exactly one footer identity group (`SidebarIdentityGroup`). Keep both actions as siblings — never nest a link inside the account trigger. The group owns hover, focus-visible, selected, spacing, and border. Do not restore a standalone Public Profile row. The deliberate-red `SidebarIdentitySplitLayoutFixture` is the regression shape; production must not match it.
+
+---
+
 ### Layout-stability guards must model semantic ownership, not ban all reflow
 
 **Mistake:** The FAQ stability repair reserved every answer's full height and hid closed text with visibility/opacity. CLS stayed quiet, but every accordion row looked expanded because the source guard treated all geometry change as a defect.

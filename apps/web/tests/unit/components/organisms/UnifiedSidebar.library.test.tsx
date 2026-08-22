@@ -215,11 +215,17 @@ describe('UnifiedSidebar library route', () => {
       expect.objectContaining({ showUserInfo: true })
     );
     const panel = screen.getByTestId('sidebar-user-panel');
+    expect(panel.tagName).toBe('FIELDSET');
+    expect(panel).toHaveAccessibleName('Creator Identity');
+    expect(
+      screen.getAllByRole('group', { name: 'Creator Identity' })
+    ).toHaveLength(1);
     expect(panel).toContainElement(screen.getByTestId('user-button'));
     expect(
       within(panel).getByRole('link', { name: /Public Profile/i })
     ).toHaveAttribute('href', '/timwhite');
     expect(panel).toHaveTextContent('jov.ie/timwhite');
+    expect(screen.queryByText('Public Profile')).not.toBeInTheDocument();
     expect(screen.queryByTestId('sidebar-upgrade-banner')).toBeNull();
 
     const update = screen.getByTestId('update-available-pill');
