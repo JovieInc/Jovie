@@ -1,5 +1,13 @@
 # MEMORY ADR — Split Product Memory Workflows from Internal AgentOS WDK
 
+> ⚠️ CONTRACT-TESTED DOC: `apps/web/tests/unit/memory/memory-adr-contract.test.ts`
+> asserts on this file's content (including the literal string "Trigger.dev").
+> Edit this doc and that test together or CI breaks.
+> STATUS NOTE: Trigger.dev was evaluated but is NOT installed — no
+> `@trigger.dev/*` dependency exists and `trigger/` contains only `.gitkeep`.
+> Durability rides Vercel Workflow (via Eve). Treat Trigger.dev references
+> below as historical evaluation context, not live architecture.
+
 > Issue: JOV-2705
 > Status: Accepted
 > Date: 2026-06-27

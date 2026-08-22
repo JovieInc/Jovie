@@ -1,5 +1,10 @@
 # Design System — gstack
 
+> ⚠️ **This is gstack's OWN design system (vendored third-party skill) — it is
+> NOT Jovie's.** It references DM Sans and other tokens that are retired or
+> were never used in Jovie. Jovie's design canon is the repo-root `DESIGN.md`
+> (Noir Ion) and `.claude/rules/ui.md`. Never apply this file to Jovie UI.
+
 ## Product Context
 
 - **What this is:** Community website for gstack — a CLI tool that turns Claude Code into a virtual engineering team

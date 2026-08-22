@@ -73,7 +73,7 @@ When querying Linear, always apply both filters:
 
 ## Linear Ownership Contract (mandatory)
 
-See `AGENTS.md` → "Linear Ownership Contract" for the full rules. Autopilot-specific responsibilities:
+See `.claude/rules/linear.md` → "Linear Ownership Contract" for the full rules. Autopilot-specific responsibilities:
 
 - **Before dispatching a teammate:** confirm the Linear issue is in `In Progress` (set it if not). Dispatched teammates own subsequent state (In Review / Done are automated).
 - **Never dispatch two teammates to the same Linear issue.** If the issue is already `In Progress` and assigned to another agent, skip it or escalate — do not collide.
