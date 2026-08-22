@@ -2,10 +2,12 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  classifyCacheKey,
+  buildOpenCacheRefs,
+  CACHE_BYTES_SOFT_LIMIT,
+  CACHE_COUNT_SOFT_LIMIT,
   isProtectedCacheKey,
-  isTurboCacheKey,
-  planActionsCacheGc,
+  planCacheGc,
+  turboFamily,
 } from '../actions-cache-gc.mjs';
 
 const WORKFLOW = readFileSync(
@@ -19,87 +21,131 @@ const WORKFLOW = readFileSync(
   'utf8'
 );
 
-function cache(overrides) {
+const now = Date.parse('2026-08-22T12:00:00Z');
+
+function cache(overrides = {}) {
   return {
     id: 1,
     key: 'Linux-turbo-aaa',
-    ref: 'refs/heads/main',
-    created_at: '2026-08-01T00:00:00Z',
-    last_accessed_at: '2026-08-20T00:00:00Z',
+    ref: 'refs/heads/stale-branch',
+    last_accessed_at: '2026-08-21T12:00:00Z',
     size_in_bytes: 100,
     ...overrides,
   };
 }
 
-describe('Actions cache GC planner', () => {
-  it('classifies turbo vs protected pnpm/node/playwright keys', () => {
-    expect(isTurboCacheKey('Linux-turbo-abc')).toBe(true);
-    expect(classifyCacheKey('Linux-turbo-abc')).toBe('turbo');
-    expect(isProtectedCacheKey('node-cache-Linux-pnpm-lock')).toBe(true);
-    expect(isProtectedCacheKey('Linux-playwright-chromium-hash')).toBe(true);
-    expect(isTurboCacheKey('Linux-playwright-chromium-hash')).toBe(false);
-    expect(isTurboCacheKey('node-cache-Linux-pnpm-lock')).toBe(false);
-  });
-
-  it('evicts duplicate and stale turbo keys without touching protected caches', () => {
-    const plan = planActionsCacheGc({
+describe('Actions cache GC', () => {
+  it('evicts closed-ref and exact-key duplicate turbo caches', () => {
+    const plan = planCacheGc({
+      nowMs: now,
+      openRefs: buildOpenCacheRefs({
+        pullRequests: [{ number: 17, headRef: 'cursor/fx' }],
+      }),
+      usage: { active_caches_count: 10, active_caches_size_in_bytes: 1000 },
       caches: [
+        cache({ id: 1, ref: 'refs/heads/closed-pr', key: 'Linux-turbo-old' }),
         cache({
-          id: 11,
-          key: 'Linux-turbo-current',
-          last_accessed_at: '2026-08-22T00:00:00Z',
+          id: 2,
+          ref: 'refs/heads/cursor/fx',
+          key: 'Linux-turbo-aaa',
+          last_accessed_at: '2026-08-22T10:00:00Z',
         }),
         cache({
-          id: 12,
-          key: 'Linux-turbo-current',
-          last_accessed_at: '2026-08-10T00:00:00Z',
+          id: 3,
+          ref: 'refs/heads/cursor/fx',
+          key: 'Linux-turbo-aaa',
+          last_accessed_at: '2026-08-20T10:00:00Z',
         }),
         cache({
-          id: 21,
-          key: 'Linux-turbo-previous',
-          last_accessed_at: '2026-08-21T00:00:00Z',
-        }),
-        cache({
-          id: 31,
-          key: 'Linux-turbo-stale',
-          last_accessed_at: '2026-07-01T00:00:00Z',
-        }),
-        cache({
-          id: 41,
-          key: 'node-cache-Linux-pnpm-lockhash',
-          last_accessed_at: '2026-07-01T00:00:00Z',
-        }),
-        cache({
-          id: 42,
-          key: 'Linux-playwright-chromium-lockhash',
-          last_accessed_at: '2026-07-01T00:00:00Z',
+          id: 4,
+          ref: 'refs/heads/main',
+          key: 'Linux-playwright-chromium-v1',
         }),
       ],
     });
-    expect(plan.protected).toBe(2);
-    expect(plan.deleteCount).toBe(2);
-    expect(plan.deletions.map(entry => entry.id).sort((a, b) => a - b)).toEqual(
-      [12, 31]
-    );
-    expect(plan.keptUniqueTurboKeys).toEqual([
-      'Linux-turbo-current',
-      'Linux-turbo-previous',
+    expect(plan.evict.map(item => item.reason).sort()).toEqual([
+      'closed_ref',
+      'exact_key_duplicate',
     ]);
-    expect(
-      plan.deletions.some(entry =>
-        /pnpm|playwright|node-cache/i.test(entry.key)
-      )
-    ).toBe(false);
+    expect(plan.evict.map(item => item.id).sort()).toEqual([1, 3]);
+    expect(plan.keep.map(item => item.id).sort()).toEqual([2, 4]);
+    expect(isProtectedCacheKey('Linux-playwright-chromium-v1')).toBe(true);
+    expect(turboFamily('Linux-turbo-aaa')).toBe('Linux-turbo');
   });
-});
 
-describe('Actions Cache GC workflow contract', () => {
-  it('schedules automatic GC with a dry-run dispatch path', () => {
-    expect(WORKFLOW).toContain('name: Actions Cache GC');
-    expect(WORKFLOW).toContain("cron: '53 4 * * *'");
-    expect(WORKFLOW).toContain('node scripts/actions-cache-gc.mjs');
-    expect(WORKFLOW).toContain('actions: write');
-    expect(WORKFLOW).toContain('ref: ${{ github.sha }}');
+  it('keeps only the newest turbo family per live ref when over budget', () => {
+    const plan = planCacheGc({
+      nowMs: now,
+      openRefs: new Set(['refs/heads/main']),
+      usage: {
+        active_caches_count: CACHE_COUNT_SOFT_LIMIT + 1,
+        active_caches_size_in_bytes: CACHE_BYTES_SOFT_LIMIT + 1,
+      },
+      caches: [
+        cache({
+          id: 1,
+          ref: 'refs/heads/main',
+          key: 'Linux-turbo-one',
+          last_accessed_at: '2026-08-22T11:00:00Z',
+        }),
+        cache({
+          id: 2,
+          ref: 'refs/heads/main',
+          key: 'Linux-turbo-two',
+          last_accessed_at: '2026-08-20T11:00:00Z',
+        }),
+        cache({
+          id: 3,
+          ref: 'refs/heads/main',
+          key: 'Linux-pnpm-9',
+          last_accessed_at: '2026-07-01T11:00:00Z',
+        }),
+        cache({
+          id: 4,
+          ref: 'refs/heads/main',
+          key: 'Linux-playwright-chromium-v1',
+          last_accessed_at: '2026-08-22T11:00:00Z',
+        }),
+      ],
+    });
+    expect(plan.overBudget).toBe(true);
+    expect(plan.turboKeep).toBe(1);
+    expect(plan.evict.map(item => item.id).sort()).toEqual([2, 3]);
+    expect(plan.keep.map(item => item.id).sort()).toEqual([1, 4]);
+    expect(plan.evict.find(item => item.id === 3)?.reason).toBe(
+      'protected_stale_over_budget'
+    );
+  });
+
+  it('does not smash a recently used live playwright cache under budget', () => {
+    const plan = planCacheGc({
+      nowMs: now,
+      openRefs: new Set(['refs/heads/main']),
+      usage: { active_caches_count: 10, active_caches_size_in_bytes: 100 },
+      caches: [
+        cache({
+          id: 9,
+          ref: 'refs/heads/main',
+          key: 'Linux-playwright-chromium-v1',
+          last_accessed_at: '2026-08-22T11:00:00Z',
+        }),
+      ],
+    });
+    expect(plan.evict).toEqual([]);
+    expect(plan.keep.map(item => item.id)).toEqual([9]);
+  });
+
+  it('schedules automatic GC with actions: write and no human smash', () => {
+    for (const token of [
+      'name: Actions Cache GC',
+      "cron: '19 4 * * *'",
+      'workflow_dispatch:',
+      'actions: write',
+      'node scripts/lib/actions-cache-gc.mjs',
+      "APPLY: ${{ github.event.inputs.apply || 'true' }}",
+    ]) {
+      expect(WORKFLOW, token).toContain(token);
+    }
     expect(WORKFLOW).not.toContain('contents: write');
     expect(WORKFLOW).not.toContain('JOVIE_BOT_PRIVATE_KEY');
   });

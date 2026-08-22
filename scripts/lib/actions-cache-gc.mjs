@@ -1,140 +1,243 @@
-export const ACTIONS_CACHE_GC_SCHEMA = 'jovie-actions-cache-gc/v1';
-export const KEEP_UNIQUE_TURBO_KEYS = 2;
-export const MAX_DELETES_PER_RUN = 100;
+#!/usr/bin/env node
+import { pathToFileURL } from 'node:url';
 
-const TURBO_KEY_RE = /(?:^|-)turbo-/i;
-const PROTECTED_KEY_RE = /pnpm|node-cache|playwright/i;
-
-function nonEmpty(value) {
-  return typeof value === 'string' && value.trim().length > 0;
-}
-
-function asCache(entry) {
-  if (!entry || typeof entry !== 'object') return null;
-  const id = Number(entry.id);
-  if (!Number.isInteger(id) || id < 1) return null;
-  const key = String(entry.key ?? '');
-  if (!nonEmpty(key)) return null;
-  const accessed = Date.parse(String(entry.last_accessed_at ?? ''));
-  const created = Date.parse(String(entry.created_at ?? ''));
-  return {
-    id,
-    key,
-    ref: String(entry.ref ?? ''),
-    sizeInBytes: Number(entry.size_in_bytes) || 0,
-    lastAccessedAt: Number.isFinite(accessed) ? accessed : 0,
-    createdAt: Number.isFinite(created) ? created : 0,
-  };
-}
-
-function recency(cache) {
-  return Math.max(cache.lastAccessedAt, cache.createdAt, cache.id);
-}
-
-function byRecencyDesc(left, right) {
-  return recency(right) - recency(left);
-}
+export const CACHE_COUNT_SOFT_LIMIT = 400;
+export const CACHE_BYTES_SOFT_LIMIT = 8 * 1024 * 1024 * 1024;
+export const PROTECTED_KEY = /pnpm|node-cache|playwright|setup-node/i;
+export const PROTECTED_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+export const TURBO_KEEP_UNDER_BUDGET = 2;
+export const TURBO_KEEP_OVER_BUDGET = 1;
 
 export function isProtectedCacheKey(key) {
-  return PROTECTED_KEY_RE.test(String(key ?? ''));
+  return PROTECTED_KEY.test(String(key ?? ''));
 }
 
-export function isTurboCacheKey(key) {
-  const value = String(key ?? '');
-  return TURBO_KEY_RE.test(value) && !isProtectedCacheKey(value);
+export function turboFamily(key) {
+  const match = String(key ?? '').match(/^((?:Linux|macOS|Windows)-turbo)/);
+  return match ? match[1] : null;
 }
 
-export function classifyCacheKey(key) {
-  if (isProtectedCacheKey(key)) return 'protected';
-  if (isTurboCacheKey(key)) return 'turbo';
-  return 'other';
+export function isOverCacheBudget(usage = {}, cacheCount = 0) {
+  return (
+    (usage.active_caches_count ?? cacheCount) > CACHE_COUNT_SOFT_LIMIT ||
+    (usage.active_caches_size_in_bytes ?? 0) > CACHE_BYTES_SOFT_LIMIT
+  );
 }
 
-/**
- * Evict stale/duplicate Linux-turbo-* (and other OS turbo) caches.
- * Never delete pnpm, node-cache, or playwright caches.
- * @param {object} [input]
- */
-export function planActionsCacheGc({
-  caches = [],
-  keepUniqueTurboKeys = KEEP_UNIQUE_TURBO_KEYS,
-  maxDeletes = MAX_DELETES_PER_RUN,
-} = {}) {
-  const keepUnique = Number.isInteger(keepUniqueTurboKeys)
-    ? Math.max(1, keepUniqueTurboKeys)
-    : KEEP_UNIQUE_TURBO_KEYS;
-  const deleteCap = Number.isInteger(maxDeletes)
-    ? Math.max(1, maxDeletes)
-    : MAX_DELETES_PER_RUN;
+function accessedAtMs(cache) {
+  const raw = cache?.last_accessed_at ?? cache?.created_at ?? 0;
+  const ms = Date.parse(raw);
+  return Number.isFinite(ms) ? ms : 0;
+}
 
-  const records = (Array.isArray(caches) ? caches : [])
-    .map(asCache)
-    .filter(Boolean);
-  const protectedCaches = records.filter(
-    cache => classifyCacheKey(cache.key) === 'protected'
-  );
-  const otherCaches = records.filter(
-    cache => classifyCacheKey(cache.key) === 'other'
-  );
-  const turboCaches = records.filter(
-    cache => classifyCacheKey(cache.key) === 'turbo'
-  );
+function newestFirst(left, right) {
+  return accessedAtMs(right) - accessedAtMs(left);
+}
 
-  const byKey = new Map();
-  for (const cache of turboCaches) {
-    const group = byKey.get(cache.key) ?? [];
-    group.push(cache);
-    byKey.set(cache.key, group);
+function isLiveRef(ref, openRefs) {
+  return openRefs.has(String(ref ?? ''));
+}
+
+function evictRecord(cache, reason) {
+  return {
+    id: cache.id,
+    key: cache.key,
+    ref: cache.ref,
+    reason,
+    size_in_bytes: cache.size_in_bytes ?? 0,
+  };
+}
+
+/** @param {Record<string, any>} [input] */
+export function buildOpenCacheRefs(input = {}) {
+  const { mainRef = 'refs/heads/main', pullRequests = [] } = input;
+  const refs = new Set([mainRef]);
+  for (const pull of pullRequests) {
+    const number = Number(pull?.number);
+    const branch = String(pull?.headRef ?? pull?.head?.ref ?? '').trim();
+    if (Number.isInteger(number) && number > 0) {
+      refs.add(`refs/pull/${number}/merge`);
+      refs.add(`refs/pull/${number}/head`);
+    }
+    if (branch) refs.add(`refs/heads/${branch}`);
   }
+  return refs;
+}
 
-  const uniqueKeys = [...byKey.entries()]
-    .map(([key, group]) => ({
-      key,
-      newest: group.reduce((best, cache) =>
-        recency(cache) > recency(best) ? cache : best
-      ),
-      group,
-    }))
-    .slice()
-    .sort((left, right) => byRecencyDesc(left.newest, right.newest));
+/** @param {Record<string, any>} [input] */
+export function planCacheGc(input = {}) {
+  const {
+    caches = [],
+    openRefs = new Set(['refs/heads/main']),
+    usage = {},
+    nowMs = Date.now(),
+  } = input;
+  const liveRefs = openRefs instanceof Set ? openRefs : new Set(openRefs);
+  const overBudget = isOverCacheBudget(usage, caches.length);
+  const turboKeep = overBudget
+    ? TURBO_KEEP_OVER_BUDGET
+    : TURBO_KEEP_UNDER_BUDGET;
+  const evict = [];
+  const live = [];
 
-  const keptKeys = new Set(
-    uniqueKeys.slice(0, keepUnique).map(entry => entry.key)
-  );
-  const deleteCandidates = [];
-
-  for (const { key, group } of uniqueKeys) {
-    const sorted = group.slice().sort(byRecencyDesc);
-    if (!keptKeys.has(key)) {
-      deleteCandidates.push(...sorted);
+  for (const cache of caches) {
+    if (isLiveRef(cache.ref, liveRefs)) {
+      live.push(cache);
       continue;
     }
-    deleteCandidates.push(...sorted.slice(1));
+    evict.push(evictRecord(cache, 'closed_ref'));
   }
 
-  const protectedIds = new Set(protectedCaches.map(cache => cache.id));
-  const deletions = [];
-  for (const cache of deleteCandidates) {
-    if (protectedIds.has(cache.id)) continue;
-    if (isProtectedCacheKey(cache.key)) continue;
-    if (!isTurboCacheKey(cache.key)) continue;
-    deletions.push(cache);
-    if (deletions.length >= deleteCap) break;
+  const byExactKey = new Map();
+  for (const cache of live) {
+    const groupKey = `${cache.ref}\0${cache.key}`;
+    const group = byExactKey.get(groupKey) ?? [];
+    group.push(cache);
+    byExactKey.set(groupKey, group);
+  }
+  const afterDupes = [];
+  for (const group of byExactKey.values()) {
+    const sorted = [...group].sort(newestFirst);
+    afterDupes.push(sorted[0]);
+    for (const extra of sorted.slice(1)) {
+      evict.push(evictRecord(extra, 'exact_key_duplicate'));
+    }
+  }
+
+  const turboGroups = new Map();
+  const afterTurbo = [];
+  for (const cache of afterDupes) {
+    const family = turboFamily(cache.key);
+    if (!family) {
+      afterTurbo.push(cache);
+      continue;
+    }
+    const groupKey = `${cache.ref}\0${family}`;
+    const group = turboGroups.get(groupKey) ?? [];
+    group.push(cache);
+    turboGroups.set(groupKey, group);
+  }
+  for (const group of turboGroups.values()) {
+    const sorted = [...group].sort(newestFirst);
+    afterTurbo.push(...sorted.slice(0, turboKeep));
+    for (const extra of sorted.slice(turboKeep)) {
+      evict.push(evictRecord(extra, 'turbo_surplus'));
+    }
+  }
+
+  const keep = [];
+  for (const cache of afterTurbo) {
+    const stale = nowMs - accessedAtMs(cache) > PROTECTED_MAX_AGE_MS;
+    if (overBudget && isProtectedCacheKey(cache.key) && stale) {
+      evict.push(evictRecord(cache, 'protected_stale_over_budget'));
+      continue;
+    }
+    keep.push(cache);
   }
 
   return {
-    schema: ACTIONS_CACHE_GC_SCHEMA,
-    scanned: records.length,
-    turbo: turboCaches.length,
-    protected: protectedCaches.length,
-    other: otherCaches.length,
-    keptUniqueTurboKeys: [...keptKeys],
-    deleteCount: deletions.length,
-    deletions: deletions.map(cache => ({
-      id: cache.id,
-      key: cache.key,
-      ref: cache.ref,
-      sizeInBytes: cache.sizeInBytes,
-    })),
+    evict,
+    keep,
+    overBudget,
+    turboKeep,
+    protectedRetained: keep.filter(cache => isProtectedCacheKey(cache.key))
+      .length,
   };
+}
+
+/** @param {Record<string, any>} [input] */
+export async function collectCacheGcSnapshot(input = {}) {
+  const { repository, execJson } = input;
+  if (!repository) throw new Error('repository is required');
+  if (typeof execJson !== 'function') {
+    throw new Error('execJson is required');
+  }
+  const cachesRaw = await execJson([
+    'api',
+    '--paginate',
+    `repos/${repository}/actions/caches`,
+    '--jq',
+    '[.actions_caches[]]',
+  ]);
+  const usage = await execJson([
+    'api',
+    `repos/${repository}/actions/cache/usage`,
+  ]);
+  const pulls = await execJson([
+    'api',
+    '--paginate',
+    `repos/${repository}/pulls?state=open&per_page=100`,
+    '--jq',
+    '[.[] | {number, headRef: .head.ref}]',
+  ]);
+  return {
+    caches: Array.isArray(cachesRaw) ? cachesRaw.flat() : [],
+    usage: usage ?? {},
+    openRefs: buildOpenCacheRefs({ pullRequests: pulls ?? [] }),
+  };
+}
+
+async function main() {
+  const repository = process.env.GITHUB_REPOSITORY;
+  if (!repository) throw new Error('GITHUB_REPOSITORY is required');
+  const apply = process.env.APPLY !== 'false';
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const execFileAsync = promisify(execFile);
+  const snapshot = await collectCacheGcSnapshot({
+    repository,
+    execJson: async args => {
+      const { stdout } = await execFileAsync('gh', args, {
+        maxBuffer: 20 * 1024 * 1024,
+        env: process.env,
+      });
+      return JSON.parse(stdout || 'null');
+    },
+  });
+  const plan = planCacheGc({
+    caches: snapshot.caches,
+    openRefs: snapshot.openRefs,
+    usage: snapshot.usage,
+  });
+  const deleted = [];
+  if (apply) {
+    for (const cache of plan.evict) {
+      await execFileAsync(
+        'gh',
+        [
+          'api',
+          '-X',
+          'DELETE',
+          `repos/${repository}/actions/caches/${cache.id}`,
+        ],
+        { env: process.env }
+      );
+      deleted.push(cache.id);
+    }
+  }
+  const summary = {
+    apply,
+    cacheCount: snapshot.caches.length,
+    evictCount: plan.evict.length,
+    keepCount: plan.keep.length,
+    overBudget: plan.overBudget,
+    turboKeep: plan.turboKeep,
+    protectedRetained: plan.protectedRetained,
+    reasons: plan.evict.reduce((counts, cache) => {
+      counts[cache.reason] = (counts[cache.reason] ?? 0) + 1;
+      return counts;
+    }, {}),
+    deleted,
+  };
+  process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
+}
+
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  main().catch(error => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  });
 }

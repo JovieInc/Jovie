@@ -239,6 +239,8 @@ existed. Contract:
    `Rolling CI Dispatch` subscribes to `check_suite`, `workflow_run`, and
    `check_run` failures and launches Cursor-direct exact-head repair when
    the implementer lease is not live. It does not check out PR code.
+   `Actions Cache GC` evicts stale or duplicate turbo caches without
+   deleting live pnpm, node-cache, or playwright caches.
 5. A new commit or green rerun supersedes obsolete repairs.
 6. Moving on requires an explicit handoff receipt (draft PR, current head,
    acceptance criteria, remaining checks, fingerprints, remediation owner).

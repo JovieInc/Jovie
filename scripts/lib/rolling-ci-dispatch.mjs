@@ -1,9 +1,4 @@
 import { createHash } from 'node:crypto';
-import { planFxCursorLaunch } from './rolling-ci-fx.mjs';
-import {
-  parseHandoffReceipt,
-  resolveWebhookFxRoute,
-} from './rolling-ci-handoff.mjs';
 
 export const ROLLING_CI_EVENT_SCHEMA = 'jovie-rolling-ci-failure/v1';
 export const ROLLING_CI_STATE_SCHEMA = 'jovie-rolling-ci-state/v1';
@@ -11,13 +6,85 @@ export const ROLLING_CI_STATE_MARKER = 'jovie-rolling-ci-state';
 export const MAX_REPAIR_DELIVERIES = 3;
 export const TRUSTED_CI_WORKFLOW = 'CI';
 export const TRUSTED_CI_WORKFLOW_PATH = '.github/workflows/ci.yml';
-export const AUTHENTICATED_CI_FAILURE_EVENTS = Object.freeze([
+export const GITHUB_ACTIONS_APP_SLUG = 'github-actions';
+export const TRUSTED_FAILURE_EVENTS = Object.freeze([
   'workflow_run',
   'check_suite',
   'check_run',
 ]);
 
 const SHA_RE = /^[0-9a-f]{40}$/i;
+const CI_FAMILY_CHECK_NAME =
+  /^(?:CI\b|Test\b|Typecheck\b|Lint\b|E2E\b|e2e\b|ci-fast\b)/i;
+
+export function isCiFamilyCheckName(name) {
+  return CI_FAMILY_CHECK_NAME.test(String(name ?? '').trim());
+}
+
+function isTrustedPolicyRef(source) {
+  return source?.trustedPolicyRef === 'main';
+}
+
+function isAuthenticatedWorkflowRun(source) {
+  const workflowPath = source?.workflowPath;
+  return (
+    source?.eventName === 'workflow_run' &&
+    source?.workflow === TRUSTED_CI_WORKFLOW &&
+    source?.producerEvent === 'pull_request' &&
+    isTrustedPolicyRef(source) &&
+    (workflowPath == null || workflowPath === TRUSTED_CI_WORKFLOW_PATH)
+  );
+}
+
+function isAuthenticatedCheckEvent(source) {
+  if (!TRUSTED_FAILURE_EVENTS.includes(source?.eventName)) return false;
+  if (source.eventName === 'workflow_run') return false;
+  if (!isTrustedPolicyRef(source)) return false;
+  if (source?.producerEvent && source.producerEvent !== 'pull_request') {
+    return false;
+  }
+  const slug = source?.checkSuiteAppSlug;
+  if (slug && slug !== GITHUB_ACTIONS_APP_SLUG) return false;
+  if (
+    source.eventName === 'check_run' &&
+    source?.checkRunName &&
+    !isCiFamilyCheckName(source.checkRunName)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/** @param {Record<string, any>} [input] */
+export function resolveCiWorkflowRun(input = {}) {
+  const runs = Array.isArray(input.runs) ? input.runs : [];
+  const head = String(input.headSha ?? '').toLowerCase();
+  const suite = input.checkSuiteId == null ? null : String(input.checkSuiteId);
+  return (
+    [...runs]
+      .filter(run => {
+        const path = run?.path ?? run?.workflowPath;
+        const runHead = String(
+          run?.head_sha ?? run?.headSha ?? ''
+        ).toLowerCase();
+        const runSuite = String(run?.check_suite_id ?? run?.checkSuiteId ?? '');
+        return (
+          run?.name === TRUSTED_CI_WORKFLOW &&
+          path === TRUSTED_CI_WORKFLOW_PATH &&
+          run?.event === 'pull_request' &&
+          runHead === head &&
+          (suite == null || runSuite === suite)
+        );
+      })
+      .sort((left, right) => {
+        const attemptDelta =
+          (right.run_attempt ?? right.runAttempt ?? 0) -
+          (left.run_attempt ?? left.runAttempt ?? 0);
+        if (attemptDelta !== 0) return attemptDelta;
+        return Number(right.id ?? 0) - Number(left.id ?? 0);
+      })[0] ?? null
+  );
+}
 
 function assertPositiveInteger(value, name) {
   if (!Number.isInteger(value) || value < 1) {
@@ -39,24 +106,23 @@ function stableFailureSignal(check, failedSteps) {
 }
 
 export function validateFailureSource(source) {
-  const workflowPath = source?.workflowPath;
-  const authentic =
-    AUTHENTICATED_CI_FAILURE_EVENTS.includes(source?.eventName) &&
-    source?.workflow === TRUSTED_CI_WORKFLOW &&
-    source?.producerEvent === 'pull_request' &&
-    source?.trustedPolicyRef === 'main' &&
-    (workflowPath == null || workflowPath === TRUSTED_CI_WORKFLOW_PATH);
-  if (!authentic) {
-    throw new Error(
-      'failure source is not an authenticated CI failure webhook'
-    );
+  if (
+    !isAuthenticatedWorkflowRun(source) &&
+    !isAuthenticatedCheckEvent(source)
+  ) {
+    throw new Error('failure source is not an authenticated CI workflow_run');
   }
+  const workflowPath = source?.workflowPath;
   return {
     eventName: source.eventName,
-    workflow: source.workflow,
-    producerEvent: source.producerEvent,
+    workflow: source.workflow ?? TRUSTED_CI_WORKFLOW,
+    producerEvent: source.producerEvent ?? 'pull_request',
     trustedPolicyRef: source.trustedPolicyRef,
     ...(workflowPath ? { workflowPath } : {}),
+    ...(source?.checkSuiteAppSlug
+      ? { checkSuiteAppSlug: source.checkSuiteAppSlug }
+      : {}),
+    ...(source?.checkRunName ? { checkRunName: source.checkRunName } : {}),
   };
 }
 
@@ -133,7 +199,7 @@ export function normalizeFailureEvents({
         workflowRunId: String(workflowRunId),
         ...(suiteId ? { checkSuiteId: suiteId } : {}),
         fingerprint,
-        delivery: `${workflowRunId}:${workflowRunAttempt}:${fingerprint}`,
+        delivery: `${suiteId ?? workflowRunId}:${workflowRunAttempt}:${fingerprint}`,
         failedSteps: [...new Set(failedSteps)].sort(),
         source: trustedSource,
       };
@@ -278,13 +344,7 @@ export function planGreenRecovery({ headSha, liveHead, priorState = null }) {
 export function renderDispatchComment({ event, plan }) {
   const owner = plan.state?.claim?.writer ?? 'unassigned';
   const count = plan.state?.failures?.[event.fingerprint]?.deliveryCount ?? 0;
-  const fxWriter = owner === 'fx';
-  const writerLine = fxWriter
-    ? 'FX (Cursor-direct exact-head repair; implementer lease is not live)'
-    : `@${owner} (active implementer)`;
-  const fxNote = fxWriter
-    ? '\nFX launched Cursor-direct exact-head repair. Draft PRs are included. This workflow does not check out PR code.\n'
-    : '';
+  const role = owner === 'fx' ? 'FX backstop' : 'active implementer';
   return `## Rolling CI failure dispatched
 
 - PR: #${event.pr}
@@ -292,9 +352,9 @@ export function renderDispatchComment({ event, plan }) {
 - Check: \`${event.check}\`
 - Workflow attempt: ${event.attempt}
 - Failure fingerprint: \`${event.fingerprint}\`
-- Remediation writer: ${writerLine}
+- Remediation writer: @${owner} (${role})
 - Repair delivery: ${count}/${MAX_REPAIR_DELIVERIES}
-${fxNote}
+
 The one-writer lease is pinned to this exact head. A new commit or green rerun supersedes this repair; revalidate the fingerprint before changing code.
 
 ${rollingCiStateMarker(plan.state)}`;
@@ -311,78 +371,6 @@ The previous repair claim is released. Required CI remains the promotion gate.
 ${rollingCiStateMarker(plan.state)}`;
 }
 
-function emptyFxPlan() {
-  return { action: 'skip', launch: false };
-}
-
-function resolveDispatchWriter(input) {
-  if (input?.fxAdapter == null) {
-    return { writer: input.writer, fxRoute: null };
-  }
-  const receipt = parseHandoffReceipt(
-    input.priorHandoffBody ?? input.priorCommentBody
-  );
-  const fxRoute = resolveWebhookFxRoute({
-    receipt,
-    liveHead: input.liveHead,
-    implementer: input.writer,
-    fxAdapter: input.fxAdapter,
-    now: input.now,
-  });
-  if (fxRoute.route === 'implementer') {
-    return { writer: fxRoute.writer || input.writer, fxRoute };
-  }
-  if (fxRoute.route === 'fx') {
-    return { writer: fxRoute.writer, fxRoute };
-  }
-  return { writer: input.writer, fxRoute };
-}
-
-function attachFxLaunch({ input, mutated, action, event, fxRoute }) {
-  if (input.conclusion === 'success' || !event) return emptyFxPlan();
-  if (!fxRoute) return emptyFxPlan();
-  if (fxRoute.route === 'implementer') {
-    return { action: 'defer_to_implementer', launch: false };
-  }
-  if (fxRoute.route === 'configuration_incident') {
-    return {
-      action: 'fail_closed',
-      launch: false,
-      reason: 'missing_cursor_api_key',
-      incident: fxRoute.incident,
-    };
-  }
-  const launchable =
-    mutated &&
-    (action === 'dispatch_implementer' ||
-      action === 'dispatch_superseding_head');
-  if (!launchable) {
-    return { action: 'dedup', launch: false, fingerprint: event.fingerprint };
-  }
-  const launch = planFxCursorLaunch({
-    cursorApiKey: input.cursorApiKey ?? 'configured',
-    repository: event.repository,
-    pr: event.pr,
-    head: event.head,
-    branch: input.branch,
-    check: event.check,
-    fingerprint: event.fingerprint,
-    failedSteps: event.failedSteps,
-    eventName: event.source?.eventName,
-  });
-  return {
-    ...launch,
-    launch: launch.action === 'launch',
-    repository: event.repository,
-    pr: event.pr,
-    head: event.head,
-    branch: input.branch,
-    check: event.check,
-    failedSteps: event.failedSteps,
-    eventName: event.source?.eventName,
-  };
-}
-
 export function runDispatch(input) {
   if (!String(input?.writer ?? '').trim()) {
     throw new Error('writer is required');
@@ -395,7 +383,6 @@ export function runDispatch(input) {
   });
 
   let state = parseRollingCiState(input.priorCommentBody);
-  const { writer, fxRoute } = resolveDispatchWriter(input);
 
   if (input.conclusion === 'success') {
     const plan = planGreenRecovery({
@@ -408,39 +395,10 @@ export function runDispatch(input) {
       action: plan.action,
       mutate: Boolean(plan.mutate),
       state: plan.state,
-      fx: emptyFxPlan(),
       body: plan.mutate
         ? renderGreenRecoveryComment({ head: input.liveHead, plan })
         : '',
     };
-  }
-
-  if (fxRoute?.route === 'configuration_incident') {
-    return {
-      events: [],
-      action: 'fx_auth_missing',
-      mutate: false,
-      state,
-      fx: {
-        action: 'fail_closed',
-        launch: false,
-        reason: 'missing_cursor_api_key',
-        incident: fxRoute.incident,
-      },
-      body: '',
-    };
-  }
-
-  const priorWriter = state?.claim?.writer ?? null;
-  const takeover =
-    fxRoute?.route === 'fx' &&
-    Boolean(priorWriter) &&
-    priorWriter !== writer &&
-    state?.claim?.status === 'active' &&
-    state.claim.head === String(input.liveHead).toLowerCase();
-
-  if (takeover) {
-    state = { ...state, claim: null };
   }
 
   const events = normalizeFailureEvents(input);
@@ -450,7 +408,7 @@ export function runDispatch(input) {
     finalPlan = planFailureDispatch({
       event,
       liveHead: input.liveHead,
-      writer,
+      writer: input.writer,
       priorState: state,
     });
     if (finalPlan.mutate) {
@@ -458,44 +416,18 @@ export function runDispatch(input) {
       state = finalPlan.state;
     }
   }
-  if (takeover && !mutated && events[0]) {
-    const event = events[0];
-    state = {
-      ...(state ?? emptyRollingCiState(event.head)),
-      claim: {
-        status: 'active',
-        writer,
-        key: `${event.repository}:pr-${event.pr}:${event.head}:${event.check}:${event.fingerprint}`,
-        repository: event.repository,
-        pr: event.pr,
-        head: event.head,
-        check: event.check,
-        fingerprint: event.fingerprint,
-      },
-    };
-    mutated = true;
-    finalPlan = { action: 'dispatch_implementer', mutate: true, state };
-  }
   const actionableEvent = events.find(event =>
     state?.deliveries?.includes(event.delivery)
   );
-  const action = finalPlan?.action ?? 'no_failure';
   return {
     events,
-    action,
+    action: finalPlan?.action ?? 'no_failure',
     mutate: mutated,
     state,
-    fx: attachFxLaunch({
-      input,
-      mutated,
-      action,
-      event: actionableEvent ?? events[0],
-      fxRoute,
-    }),
     body:
-      mutated && (actionableEvent ?? events[0]) && state
+      mutated && actionableEvent && state
         ? renderDispatchComment({
-            event: actionableEvent ?? events[0],
+            event: actionableEvent,
             plan: { ...finalPlan, state },
           })
         : '',

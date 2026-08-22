@@ -1,140 +1,350 @@
-export const CURSOR_AGENTS_URL = 'https://api.cursor.com/v0/agents';
-export const JOVIE_GITHUB_REPO = 'https://github.com/JovieInc/Jovie';
+#!/usr/bin/env node
+import { pathToFileURL } from 'node:url';
+import { parseRollingCiState, runDispatch } from './rolling-ci-dispatch.mjs';
+import {
+  FX_ADAPTER_NAME,
+  FX_HANDOFF_FAILURE,
+  fxConfigurationIncident,
+  parseHandoffReceipt,
+  resolveFxAdapter,
+  resolveRemediationRoute,
+} from './rolling-ci-handoff.mjs';
 
-/**
- * @param {string} apiKey
- * @returns {string}
- */
+export const CURSOR_AGENTS_URL = 'https://api.cursor.com/v0/agents';
+
 export function cursorAuthHeader(apiKey) {
-  const token = Buffer.from(`${apiKey}:`, 'utf8').toString('base64');
-  return `Basic ${token}`;
+  return `Basic ${Buffer.from(`${apiKey}:`, 'utf8').toString('base64')}`;
 }
 
-/** @param {unknown} agents @param {string} [fingerprint] @returns {string[]} */
-export function findOwnedFxAgents(agents, fingerprint) {
-  const list = Array.isArray(agents) ? agents : [];
+export function findOwnedAgents(agents, fingerprint) {
   const needle = String(fingerprint ?? '');
   if (!needle) return [];
-  return list
-    .filter(agent => {
-      const haystack = JSON.stringify(agent ?? {}).toLowerCase();
-      return haystack.includes(needle.toLowerCase());
-    })
-    .map(agent => {
-      const record = /** @type {Record<string, unknown>} */ (agent ?? {});
-      return record.id;
-    })
-    .filter(
-      /** @returns {id is string} */
-      id => typeof id === 'string' && id.length > 0
-    );
+  return (Array.isArray(agents) ? agents : [])
+    .filter(agent =>
+      JSON.stringify(agent ?? {})
+        .toLowerCase()
+        .includes(needle.toLowerCase())
+    )
+    .map(agent => agent?.id)
+    .filter(id => typeof id === 'string' && id.length > 0);
 }
 
 /**
- * @param {object} input
- * @returns {string}
+ * Webhook ingress: missing handoff routes to FX. Pickup-end
+ * `resolveRemediationRoute` still keeps the implementer when no receipt.
+ * @param {Record<string, any>} [input]
  */
-export function buildFxRepairPrompt({
-  repository,
-  pr,
-  head,
-  branch,
-  check,
-  fingerprint,
-  failedSteps = [],
-  eventName,
-}) {
-  const steps = (Array.isArray(failedSteps) ? failedSteps : [])
-    .map(step => String(step).trim())
-    .filter(Boolean);
-  return [
-    'P0: repair this open pull request at the exact failing head. Do not open a second PR.',
-    '',
-    `Repository: ${repository}`,
-    `PR: #${pr}`,
-    `Branch: ${branch}`,
-    `Exact head: ${head}`,
-    `Failed check: ${check}`,
-    `Failure fingerprint: ${fingerprint}`,
-    `Webhook: ${eventName}`,
-    steps.length > 0
-      ? `Failed steps: ${steps.join(', ')}`
-      : 'Failed steps: (not provided)',
-    '',
-    'Constraints:',
-    '- Work only on this PR branch and this exact head.',
-    '- Draft PRs are in scope. Agent Pipeline skipping drafts is not a reason to no-op.',
-    '- Do not check out untrusted workflow payloads as executable code; repair the branch.',
-    '- Do not merge, deploy, or promote.',
-    '- Do not add the queue-deferred label.',
-    '- Native merge-queue autoenroll is the hold during hold-intake.',
-    '- Add or update the smallest regression test that would have caught this failure.',
-    '- Do not split the monorepo. Do not invent a second fleet hold.',
-  ].join('\n');
-}
+export function resolveWebhookRemediationRoute(input = {}) {
+  const {
+    receipt = null,
+    liveHead,
+    implementer,
+    fxAdapter = null,
+    now,
+  } = input;
+  if (receipt) {
+    const pickup = resolveRemediationRoute({
+      receipt,
+      liveHead,
+      implementer,
+      fxAdapter,
+      now,
+    });
+    return pickup.route === 'implementer'
+      ? { ...pickup, reason: 'implementer_lease_live' }
+      : pickup;
+  }
 
-/**
- * Cursor-direct exact-head repair for the current PR branch.
- * autoCreatePr stays false so FX does not open a competing PR.
- * @param {object} [input]
- */
-export function planFxCursorLaunch({
-  cursorApiKey,
-  existingAgentIds = [],
-  repository,
-  pr,
-  head,
-  branch,
-  check,
-  fingerprint,
-  failedSteps = [],
-  eventName,
-} = {}) {
-  if (typeof cursorApiKey !== 'string' || cursorApiKey.trim().length === 0) {
+  const adapter = resolveFxAdapter(fxAdapter);
+  if (!adapter.name || adapter.authConfigured !== true) {
     return {
-      action: 'fail_closed',
-      reason: 'missing_cursor_api_key',
-      fingerprint,
+      route: 'configuration_incident',
+      writer: null,
+      reason: 'fx-auth-missing',
+      incident: fxConfigurationIncident(),
     };
   }
-  const owned = (
-    Array.isArray(existingAgentIds) ? existingAgentIds : []
-  ).filter(id => typeof id === 'string' && id.length > 0);
+  return {
+    route: 'fx',
+    writer: adapter.name,
+    failure: FX_HANDOFF_FAILURE,
+    reason: 'no_handoff_receipt',
+  };
+}
+
+/** @param {Record<string, any>} [input] */
+export function resolveDispatchWriter(input = {}) {
+  const { route, priorClaimWriter, implementer } = input;
+  if (route?.route === 'implementer') {
+    return route.writer || implementer;
+  }
+  if (route?.route === 'fx') {
+    if (priorClaimWriter && priorClaimWriter !== FX_ADAPTER_NAME) {
+      return priorClaimWriter;
+    }
+    return FX_ADAPTER_NAME;
+  }
+  return implementer;
+}
+
+/** @param {Record<string, any>} [input] */
+export function buildFxPrompt(input = {}) {
+  const {
+    repository,
+    prNumber,
+    headSha,
+    fingerprint,
+    failedChecks = [],
+  } = input;
+  return [
+    'Repair the current pull request at the exact failed head. Do not open a sibling PR.',
+    `Repository: ${repository}`,
+    `PR: #${prNumber}`,
+    `Exact head: ${headSha}`,
+    `Failure fingerprint: ${fingerprint}`,
+    failedChecks.length ? `Failed checks: ${failedChecks.join(', ')}` : '',
+    'Add or update the smallest regression test. Do not skip drafts. Do not merge.',
+    'Do not invent a second fleet hold. Area collision holds only.',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/** @param {Record<string, any>} [input] */
+export function planFxLaunch(input = {}) {
+  const {
+    repository,
+    prNumber,
+    headSha,
+    headRef,
+    fingerprint,
+    failedChecks = [],
+    cursorAgents = [],
+    cursorApiKey,
+  } = input;
+  if (typeof cursorApiKey !== 'string' || cursorApiKey.trim().length === 0) {
+    return {
+      action: 'configuration_incident',
+      reason: 'fx-auth-missing',
+      incident: fxConfigurationIncident(),
+    };
+  }
+  const owned = findOwnedAgents(cursorAgents, fingerprint);
   if (owned.length > 0) {
     return {
       action: 'dedup',
       reason: 'agent_already_owns_fingerprint',
-      fingerprint,
       existingAgentIds: owned,
     };
   }
-  const repoUrl = /^https:\/\//.test(String(repository ?? ''))
-    ? String(repository)
-    : `https://github.com/${repository}`;
   return {
     action: 'launch',
-    reason: 'implementer_lease_not_live',
-    fingerprint,
+    reason: 'ci-failed-after-webhook',
     request: {
       prompt: {
-        text: buildFxRepairPrompt({
+        text: buildFxPrompt({
           repository,
-          pr,
-          head,
-          branch,
-          check,
+          prNumber,
+          headSha,
           fingerprint,
-          failedSteps,
-          eventName,
+          failedChecks,
         }),
       },
       source: {
-        repository: repoUrl || JOVIE_GITHUB_REPO,
-        ref: String(branch || '').trim() || String(head),
+        repository: `https://github.com/${repository}`,
+        ref: headRef || `refs/pull/${prNumber}/head`,
       },
       target: {
         autoCreatePr: false,
+        autoBranchOnConflict: false,
+        skipReviewerRequest: true,
       },
     },
   };
+}
+
+/** @param {Record<string, any>} [input] */
+export function planFxWebhookRemediation(input = {}) {
+  const {
+    dispatch,
+    receipt = null,
+    liveHead,
+    implementer,
+    fxAdapter,
+    cursorAgents = [],
+    cursorApiKey = '',
+    now,
+    repository,
+    prNumber,
+    headSha,
+    headRef,
+  } = input;
+  const route = resolveWebhookRemediationRoute({
+    receipt,
+    liveHead,
+    implementer,
+    fxAdapter: fxAdapter ?? {
+      name: FX_ADAPTER_NAME,
+      authConfigured: Boolean(String(cursorApiKey ?? '').trim()),
+    },
+    now,
+  });
+  const action = dispatch?.action ?? '';
+  const isFailureDispatch =
+    action === 'dispatch_implementer' ||
+    action === 'dispatch_superseding_head' ||
+    action === 'reject_competing_writer';
+
+  if (route.route === 'implementer') {
+    return {
+      dispatch,
+      route,
+      launch: { action: 'skip', reason: 'implementer_lease_live' },
+    };
+  }
+  if (route.route === 'configuration_incident') {
+    return {
+      dispatch,
+      route,
+      launch: {
+        action: 'configuration_incident',
+        reason: 'fx-auth-missing',
+        incident: route.incident,
+      },
+    };
+  }
+  if (route.route !== 'fx' || !isFailureDispatch) {
+    return {
+      dispatch,
+      route,
+      launch: { action: 'skip', reason: action || route.route },
+    };
+  }
+
+  return {
+    dispatch,
+    route,
+    launch: planFxLaunch({
+      repository: repository ?? dispatch?.events?.[0]?.repository,
+      prNumber: prNumber ?? dispatch?.events?.[0]?.pr,
+      headSha: headSha ?? liveHead ?? dispatch?.state?.head,
+      headRef,
+      fingerprint:
+        dispatch?.state?.claim?.fingerprint ||
+        dispatch?.events?.[0]?.fingerprint ||
+        '',
+      failedChecks: (dispatch?.events ?? []).map(event => event.check),
+      cursorAgents,
+      cursorApiKey,
+    }),
+  };
+}
+
+/** @param {Record<string, any>} [input] */
+export async function listCursorAgents(input = {}) {
+  const { cursorApiKey, fetchImpl = fetch } = input;
+  const response = await fetchImpl(CURSOR_AGENTS_URL, {
+    headers: {
+      Authorization: cursorAuthHeader(cursorApiKey),
+      'Content-Type': 'application/json',
+    },
+  });
+  const body = /** @type {Record<string, any>} */ (
+    await response.json().catch(() => ({}))
+  );
+  if (!response.ok) {
+    throw new Error(`cursor list failed: ${response.status}`);
+  }
+  return Array.isArray(body?.agents) ? body.agents : [];
+}
+
+/** @param {Record<string, any>} [input] */
+export async function launchCursorAgent(input = {}) {
+  const { request, cursorApiKey, fetchImpl = fetch } = input;
+  const response = await fetchImpl(CURSOR_AGENTS_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: cursorAuthHeader(cursorApiKey),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(`cursor launch failed: ${response.status}`);
+  }
+  return body;
+}
+
+async function readInput() {
+  const chunks = [];
+  for await (const chunk of process.stdin) chunks.push(chunk);
+  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+}
+
+async function main() {
+  const input = await readInput();
+  const receipt =
+    input.receipt ??
+    parseHandoffReceipt(input.handoffCommentBody ?? '') ??
+    null;
+  const cursorApiKey = input.cursorApiKey ?? process.env.CURSOR_API_KEY ?? '';
+  let cursorAgents = Array.isArray(input.cursorAgents)
+    ? input.cursorAgents
+    : [];
+  if (
+    cursorApiKey &&
+    cursorAgents.length === 0 &&
+    input.listCursorAgents !== false
+  ) {
+    try {
+      cursorAgents = await listCursorAgents({ cursorApiKey });
+    } catch {
+      cursorAgents = [];
+    }
+  }
+  const route = resolveWebhookRemediationRoute({
+    receipt,
+    liveHead: input.liveHead,
+    implementer: input.writer,
+    fxAdapter: input.fxAdapter ?? {
+      name: FX_ADAPTER_NAME,
+      authConfigured: Boolean(String(cursorApiKey).trim()),
+    },
+    now: input.now,
+  });
+  const priorClaimWriter =
+    input.priorClaimWriter ||
+    parseRollingCiState(input.priorCommentBody)?.claim?.writer;
+  const writer = resolveDispatchWriter({
+    route,
+    priorClaimWriter,
+    implementer: input.writer,
+  });
+  const dispatch = runDispatch({ ...input, writer });
+  const result = planFxWebhookRemediation({
+    dispatch,
+    receipt,
+    liveHead: input.liveHead,
+    implementer: input.writer,
+    fxAdapter: input.fxAdapter,
+    cursorAgents,
+    cursorApiKey,
+    now: input.now,
+    repository: input.repository,
+    prNumber: input.prNumber,
+    headSha: input.headSha,
+    headRef: input.headRef,
+  });
+  process.stdout.write(`${JSON.stringify(result)}\n`);
+}
+
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  main().catch(error => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  });
 }

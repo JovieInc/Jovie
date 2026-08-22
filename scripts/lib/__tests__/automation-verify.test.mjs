@@ -177,6 +177,19 @@ const SAFE_PR_REMEDIATION_LANE = [
   'scripts/lib/__tests__/safe-pr-remediation.test.mjs',
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ];
+const ROLLING_CI_FX_CACHE_GC_LANE = [
+  '.github/workflows/actions-cache-gc.yml',
+  '.github/workflows/rolling-ci-dispatch.yml',
+  'docs/CRON_REGISTRY.md',
+  'scripts/lib/actions-cache-gc.mjs',
+  'scripts/lib/rolling-ci-dispatch.mjs',
+  'scripts/lib/rolling-ci-fx.mjs',
+  'scripts/lib/__tests__/actions-cache-gc.test.mjs',
+  'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
+  'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+  'scripts/lib/__tests__/rolling-ci-handoff.test.mjs',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+];
 const EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST = [
   '.github/workflows/fleet-gate-refresh.yml',
   'scripts/hermes/launchd/README.md',
@@ -670,6 +683,28 @@ describe('automation-verify affected scope', () => {
       buildAffectedTestPlan([
         ...GEM_PR_REHABILITATION_LANE,
         'apps/ios/Jovie/RootView.swift',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('selects the bounded FX webhook + Actions cache GC contract and fails closed on unrelated files', () => {
+    expect(buildAffectedTestPlan(ROLLING_CI_FX_CACHE_GC_LANE)).toMatchObject({
+      mode: 'selected',
+      selectedTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: [
+        'scripts/lib/__tests__/actions-cache-gc.test.mjs',
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
+        'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+        'scripts/lib/__tests__/rolling-ci-handoff.test.mjs',
+      ],
+      nodeTests: ['scripts/typecheck-scripts.mjs'],
+    });
+    expect(
+      buildAffectedTestPlan([
+        ...ROLLING_CI_FX_CACHE_GC_LANE,
+        'apps/web/lib/unknown-fx-cache-peer.ts',
       ]).mode
     ).toBe('full');
   });
