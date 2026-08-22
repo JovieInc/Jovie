@@ -55,6 +55,9 @@ export type SummerSpeaker = {
 
 export type SummerSpeakInput = {
   readonly userText: string;
+  readonly conversationId?: string;
+  readonly clientTurnId?: string;
+  readonly receipts?: readonly OvieReceipt[];
   readonly history: readonly {
     readonly role: 'user' | 'assistant';
     readonly text: string;
@@ -265,7 +268,7 @@ export async function* runOvieSummerTurn(input: {
   };
   yield { type: 'binding', binding };
 
-  if (replay) {
+  if (replay && replay.state !== 'canceled') {
     yield { type: 'state', state: 'recovery' };
     if (replay.assistantText) {
       yield { type: 'text-delta', text: replay.assistantText };
@@ -289,6 +292,9 @@ export async function* runOvieSummerTurn(input: {
   try {
     for await (const event of input.speaker.speak({
       userText: input.userText,
+      conversationId: session.identity.sessionId,
+      clientTurnId: input.clientTurnId ?? binding.correlationId,
+      receipts: input.receipts,
       history: session.turns.flatMap(turn => [
         { role: 'user' as const, text: turn.userText },
         { role: 'assistant' as const, text: turn.assistantText },
@@ -330,23 +336,35 @@ export async function* runOvieSummerTurn(input: {
       break;
     }
   } catch {
-    terminal = 'failure';
+    terminal = input.signal?.aborted ? 'canceled' : 'failure';
   }
 
-  if (input.signal?.aborted) terminal = 'canceled';
+  if (
+    input.signal?.aborted &&
+    terminal === 'completed' &&
+    !assistantText &&
+    !toolReceipt
+  ) {
+    terminal = 'canceled';
+  }
   assertModelMustNotSelfIdentifyAsOvie(assistantText);
 
-  await appendSummerTurn(input.store, {
-    clientTurnId: input.clientTurnId ?? null,
-    userText: input.userText,
-    assistantText,
-    eveWorkId: binding.eveWorkId,
-    eveAcks: binding.eveAcks,
-    correlationId: binding.correlationId,
-    state: terminal,
-    toolReceipt,
-    createdAt: new Date().toISOString(),
-  });
+  // Canceled streams are not durable session turns. The Eve/Mac queue keeps
+  // the work; reconnect with the same clientTurnId waits for completion
+  // instead of replaying an empty canceled row.
+  if (terminal !== 'canceled') {
+    await appendSummerTurn(input.store, {
+      clientTurnId: input.clientTurnId ?? null,
+      userText: input.userText,
+      assistantText,
+      eveWorkId: binding.eveWorkId,
+      eveAcks: binding.eveAcks,
+      correlationId: binding.correlationId,
+      state: terminal,
+      toolReceipt,
+      createdAt: new Date().toISOString(),
+    });
+  }
 
   yield {
     type: 'state',

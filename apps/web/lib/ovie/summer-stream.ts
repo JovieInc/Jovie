@@ -17,16 +17,37 @@ export async function createSummerAssistantStreamResponse(input: {
   const textId = randomUUID();
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
+      let metadata: Record<string, unknown> = { ...input.metadata };
       writer.write({
         type: 'start',
         messageId,
-        ...(input.metadata ? { messageMetadata: input.metadata } : {}),
+        ...(Object.keys(metadata).length > 0
+          ? { messageMetadata: metadata }
+          : {}),
       });
       writer.write({ type: 'start-step' });
       writer.write({ type: 'text-start', id: textId });
       for await (const event of input.events) {
         if (event.type === 'text-delta' && event.text) {
           writer.write({ type: 'text-delta', id: textId, delta: event.text });
+          continue;
+        }
+        if (event.type === 'binding') {
+          metadata = {
+            ...metadata,
+            eveWorkId: event.binding.eveWorkId,
+            summerSession: event.binding.summerSessionId,
+            correlationId: event.binding.correlationId,
+            summerSpeaker: event.binding.speaker,
+          };
+          continue;
+        }
+        if (event.type === 'state') {
+          metadata = { ...metadata, summerState: event.state };
+          continue;
+        }
+        if (event.type === 'tool') {
+          metadata = { ...metadata, toolReceipt: event.receipt };
         }
       }
       writer.write({ type: 'text-end', id: textId });
@@ -34,7 +55,7 @@ export async function createSummerAssistantStreamResponse(input: {
       writer.write({
         type: 'finish',
         finishReason: 'stop',
-        ...(input.metadata ? { messageMetadata: input.metadata } : {}),
+        messageMetadata: metadata,
       });
     },
   });

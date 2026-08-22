@@ -6,7 +6,7 @@ import * as admitter from '../admitter.mjs';
 import * as deterministicGates from '../deterministic-gates.mjs';
 import { withFullGateReceipts, withPreLeaseReceipts } from './pre-lease.mjs';
 
-const NOW = '2026-08-19T12:00:00.000Z';
+const NOW = new Date().toISOString();
 
 function issue(overrides = {}) {
   return {

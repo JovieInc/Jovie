@@ -12,6 +12,7 @@ import { getEntitlements } from '@/lib/entitlements/registry';
 import { MemoryOperatingStore } from '@/lib/ovie/mcp/store';
 import {
   bindCurrentSummerSpeaker,
+  disableSummerTransport,
   resetSummerTransportRuntime,
   type SummerSpeaker,
 } from '@/lib/ovie/summer-transport';
@@ -491,6 +492,7 @@ describe('POST /api/chat guard wiring', () => {
 
   it('transports entitled OV turns to Summer without artist Jovie generation or Ovie self-id', async () => {
     hoisted.isAdminMock.mockResolvedValue(true);
+    disableSummerTransport();
 
     const response = await POST(
       chatRequest(

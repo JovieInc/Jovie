@@ -66,6 +66,7 @@ describe('deterministic no-model gates', () => {
     const result = deterministicGates.buildDeterministicPlanEvidence(issue());
     assert.equal(result.reason, null);
     assert.equal(result.evidence.repo, 'JovieInc/Jovie');
+    assert.equal(result.evidence.target.target_repo, 'JovieInc/Jovie');
     assert.equal(result.evidence.project, 'Infra & CI/CD');
     assert.deepEqual(result.evidence.acceptance, [
       'Repeated events group into one issue.',
