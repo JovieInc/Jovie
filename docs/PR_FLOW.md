@@ -48,8 +48,8 @@ in the merge queue, while network/deploy/exhaustive depth runs later.
 
 | Tier | Jobs | Trigger |
 |---|---|---|
-| **PR gate** (must stay fast) | typecheck, lint, portable iOS contract, structural contract, diff secret scan, Golden Path Lock, size/fork/migration policy | every PR — deterministic, path-aware |
-| **Merge queue** | combined-head `ci-fast`, five affected unit shards, one hosted build + layout workspace, path-selected hosted Xcode build/test, path-selected model-free Promptfoo/golden evals, diff secret scan, Golden Path Lock, migration policy | GitHub `merge_group` synthetic head |
+| **PR gate** | typecheck, lint, exact-source-head web coverage (full unit suite plus committed risk ratchet), portable iOS contract, structural contract, diff secret scan, Golden Path Lock, size/fork/migration policy | every PR — deterministic, path-aware, parallel |
+| **Merge queue** | combined-head `ci-fast`, exact-combined-head web coverage, ten affected unit shards, one hosted build + layout workspace, path-selected hosted Xcode build/test, path-selected model-free Promptfoo/golden evals, diff secret scan, Golden Path Lock, migration policy | GitHub `merge_group` synthetic head |
 | **Release (`main`)** | exact queue proof or fail-closed direct-main fallback, then successful exact CI-attempt authorization into one `production-mutation` FIFO spanning staging, promotion, one centralized rollback owner, and final verification | completed successful `CI` workflow run for `main`; one bounded controller retry |
 | **Post-deploy** | hosted public, homepage, and live Lighthouse probes against the immutable deployment URL while the controller retains its lease; authenticated smoke is explicit optional evidence until credentials exist; final current-main/canonical check; `Production Verified` marker; event-driven Golden Path Prod Autofix (Cursor-direct, fail-closed) | successful current production release |
 | **Deep / nightly** | CodeQL, Trivy, full-history secret scans, Scorecard, SonarCloud, full E2E matrix, exhaustive suites, weekly Slop Gate (advisory copy smell on main) | schedule, event, or explicit manual dispatch |
@@ -232,6 +232,9 @@ existed. Contract:
    secrets, hook policy only).
 2. Fast source CI on every push.
    Per-PR concurrency cancels superseded runs.
+   `Exact-head Coverage` runs the full web unit suite and committed risk-surface
+   ratchet on the source head without repository secrets; the native queue
+   repeats it on the synthetic combined head.
 3. Normalize failures (PR, exact head, check, attempt, fingerprint);
    stale or duplicate deliveries are rejected.
 4. One remediation writer holds the PR lease. Implementer first.

@@ -121,8 +121,9 @@ export default defineConfig({
     ...changedSuiteStabilityConfig,
 
     // Coverage disabled by default for speed (enable with --coverage flag).
-    // Merge-queue unit shards stay coverage-off; the nightly heatmap is the
-    // collection lane. Per-glob floors are last measured snapshot (2026-05-10)
+    // Standard unit shards stay coverage-off; the separate Exact-head Coverage
+    // gate and nightly heatmap own collection. Per-glob floors are the last
+    // measured snapshot (2026-05-10)
     // minus 3pp so `vitest --coverage` can fail closed on critical-surface
     // decay. Register targets (90/95/85) remain the ratchet destination.
     coverage: {

@@ -26,6 +26,11 @@
       "purpose": "Mechanical architecture, workflow, docs, and repo-rule checks."
     },
     {
+      "id": "exact-head-coverage",
+      "name": "Exact-Head Coverage",
+      "purpose": "Meaningful V8 coverage and the committed risk-surface ratchet on the exact source and synthetic combined heads, with no untrusted-code secrets."
+    },
+    {
       "id": "risk-triggered-smoke",
       "name": "Explicit Deep Evidence",
       "purpose": "Manual, scheduled, or event-driven deep evidence that never starts from or delays ordinary PR Ready."
@@ -119,6 +124,15 @@
       "gateStage": "merge-group",
       "nextLocalCommand": "pnpm --filter=@jovie/web run test:fast",
       "remediation": "Run the failing Vitest file locally, add or update regression coverage, and keep quarantined tests in the quarantine lane."
+    },
+    {
+      "id": "ci-exact-head-coverage",
+      "name": "Exact-head Coverage",
+      "tier": "exact-head-coverage",
+      "mergeGate": true,
+      "gateStage": "both",
+      "nextLocalCommand": "pnpm --filter @jovie/web test:coverage && pnpm run test:coverage:diff",
+      "remediation": "Reproduce the exact-head coverage loss, add meaningful changed-behavior tests, and restore the committed risk-surface ratchet without lowering a threshold."
     },
     {
       "id": "ci-build-layout",

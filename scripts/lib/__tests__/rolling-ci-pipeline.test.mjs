@@ -273,7 +273,7 @@ describe('bootstrap-safe policy gates', () => {
 });
 
 describe('draft-first rolling CI policy wiring', () => {
-  it('records the contract without adding source-PR coverage jobs', () => {
+  it('deliberate red: requires exact-head coverage before source or merge promotion', () => {
     expect(read('AGENTS.md')).toContain(
       'publish the first coherent commit as a draft'
     );
@@ -290,9 +290,39 @@ describe('draft-first rolling CI policy wiring', () => {
       expect(flow).toContain(text);
     }
     expect(flow).toMatch(/Moving on requires an explicit handoff\s+receipt/);
-    expect(read('.github/workflows/ci.yml')).not.toContain(
-      'ci-draft-coverage:'
+    const workflow = read('.github/workflows/ci.yml');
+    const coverage = workflow.slice(
+      workflow.indexOf('  ci-exact-head-coverage:'),
+      workflow.indexOf('  ci-a11y:')
     );
+    expect(coverage).toContain("github.event_name == 'pull_request'");
+    expect(coverage).toContain("github.event_name == 'merge_group'");
+    expect(coverage).toContain('github.event.pull_request.head.sha');
+    expect(coverage).toContain('github.event.merge_group.head_sha');
+    expect(coverage).toContain('test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"');
+    expect(coverage).toContain(
+      'git show "$COVERAGE_BASE:apps/web/reports/test-coverage-snapshot.json"'
+    );
+    expect(coverage).toContain('pnpm --filter @jovie/web test:coverage');
+    expect(coverage).toContain('pnpm run test:coverage:diff');
+    expect(coverage).toContain("trap 'stop_coverage; exit 143' TERM");
+    expect(coverage).not.toContain('secrets.CODECOV_TOKEN');
+    const mergeReady = workflow.slice(
+      workflow.indexOf('  ci-merge-group-ready:'),
+      workflow.indexOf('  ci-pr-ready:')
+    );
+    const sourceReady = workflow.slice(
+      workflow.indexOf('  ci-pr-ready:'),
+      workflow.indexOf('  ci-summary:')
+    );
+    for (const aggregate of [mergeReady, sourceReady]) {
+      expect(aggregate).toContain('ci-exact-head-coverage');
+      expect(aggregate).toContain(
+        'needs.ci-exact-head-coverage.result'
+      );
+    }
+    expect(mergeReady).toContain('Exact-head Coverage:$COVERAGE_RESULT');
+    expect(sourceReady).toContain('COVERAGE_RESULT" != "success"');
     expect(read('.husky/pre-push')).toContain('JOVIE_PUSH_PHASE:-publication');
     const publication = read('scripts/hooks/pre-push-gate.sh')
       .split('run_publication() {', 2)[1]
