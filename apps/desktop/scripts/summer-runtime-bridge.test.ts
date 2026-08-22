@@ -379,6 +379,95 @@ describe('packaged Summer runtime bridge', () => {
     expect(child.kill).toHaveBeenCalledWith('SIGTERM');
   });
 
+  it('completes a tool-only Summer fence without founder prose', async () => {
+    const { fetch, posted } = queueFetch({
+      id: 'turn_tool_only',
+      conversation_id: 'conversation_1',
+      user_text: 'Org state?',
+    });
+    const stdout = [
+      '```summer-tool',
+      JSON.stringify({
+        name: 'get_org_state',
+        ok: true,
+        receiptId: 'tool_only',
+        summary: 'read-only org snapshot',
+      }),
+      '```',
+    ].join('\n');
+    const bridge = createSummerRuntimeBridge({
+      platform: 'darwin',
+      appOrigin: 'https://jov.ie',
+      homeDirectory: '/Users/founder',
+      workerId: 'jovie-mac',
+      fetch,
+      spawnProcess: () => fakeChild({ stdout }),
+    });
+    await expect(bridge.runCycle()).resolves.toMatchObject({
+      state: 'completed',
+      turnId: 'turn_tool_only',
+    });
+    expect(posted.at(-1)).toMatchObject({
+      action: 'complete',
+      response_text: '',
+      tool: {
+        name: 'get_org_state',
+        ok: true,
+        receiptId: 'tool_only',
+      },
+    });
+  });
+
+  it('rejects stdout errors instead of completing partial output', async () => {
+    const child = hangingChild();
+    const result = invokeSummerRuntime({
+      homeDirectory: '/Users/founder',
+      turn: {
+        id: 'turn_stdout',
+        conversation_id: 'conversation_1',
+        user_text: 'Do not complete partial stdout',
+        claim_token: 'claim_stdout',
+      },
+      spawnProcess: () => child,
+    });
+    child.stdout.emit('error', new Error('EIO'));
+    await expect(result).rejects.toThrow('EIO');
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM');
+  });
+
+  it('resumes polling after stop without a competing worker', async () => {
+    const { fetch, posted } = queueFetch({
+      id: 'turn_resume',
+      conversation_id: 'conversation_1',
+      user_text: 'Background then resume',
+    });
+    const first = createSummerRuntimeBridge({
+      platform: 'darwin',
+      appOrigin: 'https://jov.ie',
+      homeDirectory: '/Users/founder',
+      workerId: 'jovie-mac',
+      fetch,
+      spawnProcess: () => fakeChild({ stdout: 'Resumed Summer.' }),
+    });
+    first.stop();
+    const resumed = createSummerRuntimeBridge({
+      platform: 'darwin',
+      appOrigin: 'https://jov.ie',
+      homeDirectory: '/Users/founder',
+      workerId: 'jovie-mac-resume',
+      fetch,
+      spawnProcess: () => fakeChild({ stdout: 'Resumed Summer.' }),
+    });
+    await expect(resumed.runCycle()).resolves.toMatchObject({
+      state: 'completed',
+      turnId: 'turn_resume',
+    });
+    expect(posted.at(-1)).toMatchObject({
+      action: 'complete',
+      response_text: 'Resumed Summer.',
+    });
+  });
+
   it('stays idle off Darwin and reports a claim conflict without spawning', async () => {
     const linux = createSummerRuntimeBridge({
       platform: 'linux',

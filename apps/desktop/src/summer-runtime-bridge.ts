@@ -161,8 +161,8 @@ export function parseSummerRuntimeCompletion(
   return { responseText };
 }
 
-function ignoreStreamError(): void {
-  // EPIPE after SIGTERM, or a closed stdout/stderr, must not crash the app.
+function asStreamError(error: unknown, fallback: string): Error {
+  return error instanceof Error ? error : new Error(fallback);
 }
 
 export async function invokeSummerRuntime(input: {
@@ -215,9 +215,22 @@ export async function invokeSummerRuntime(input: {
       child.kill('SIGTERM');
       finish(new Error('summer-runtime-timeout'));
     }, input.timeoutMs ?? DEFAULT_RUNTIME_TIMEOUT_MS);
-    child.stdin.on('error', ignoreStreamError);
-    child.stdout.on('error', ignoreStreamError);
-    child.stderr.on('error', ignoreStreamError);
+    // Stdin EPIPE after abort is expected. Stdout/stderr errors and pre-abort
+    // stdin errors must fail the invocation instead of completing partial text.
+    child.stdin.on('error', error => {
+      if (settled || input.signal?.aborted) return;
+      finish(asStreamError(error, 'summer-runtime-stdin'));
+    });
+    child.stdout.on('error', error => {
+      if (settled) return;
+      child.kill('SIGTERM');
+      finish(asStreamError(error, 'summer-runtime-stdout'));
+    });
+    child.stderr.on('error', error => {
+      if (settled) return;
+      child.kill('SIGTERM');
+      finish(asStreamError(error, 'summer-runtime-stderr'));
+    });
     // Drain stderr so Hermes cannot fill the pipe and deadlock. Diagnostics
     // never become founder conversation text.
     child.stderr.on('data', () => undefined);
@@ -240,7 +253,7 @@ export async function invokeSummerRuntime(input: {
         return;
       }
       const completion = parseSummerRuntimeCompletion(stdout);
-      if (!completion.responseText) {
+      if (!completion.responseText && !completion.tool) {
         finish(new Error('summer-runtime-empty-response'));
         return;
       }

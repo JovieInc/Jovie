@@ -11,7 +11,7 @@ export type OperatingStore = {
   putInitiative(record: OvieInitiative): Promise<void>;
   getInitiative(id: string): Promise<OvieInitiative | undefined>;
   listInitiatives(): Promise<readonly OvieInitiative[]>;
-  putSummerTurn(record: OvieSummerTurn): Promise<void>;
+  putSummerTurn(record: OvieSummerTurn): Promise<OvieSummerTurn>;
   getSummerTurn(id: string): Promise<OvieSummerTurn | undefined>;
   listSummerTurns(): Promise<readonly OvieSummerTurn[]>;
   claimSummerTurn(
@@ -111,10 +111,20 @@ export class DurableOperatingStore implements OperatingStore {
     return rows.filter((row): row is OvieInitiative => Boolean(row)).reverse();
   }
 
-  async putSummerTurn(record: OvieSummerTurn): Promise<void> {
+  async putSummerTurn(record: OvieSummerTurn): Promise<OvieSummerTurn> {
     const existing = await this.getSummerTurn(record.id);
+    // Enqueue retries must not clobber an active claim or terminal lander
+    // result. Claim/complete/fail write non-queued states on purpose.
+    if (
+      existing &&
+      isProtectedSummerTurn(existing) &&
+      record.state === 'queued'
+    ) {
+      return existing;
+    }
     await this.backend.set(summerTurnKey(record.id), record);
     if (!existing) await this.backend.lpush(SUMMER_TURN_INDEX, record.id);
+    return record;
   }
 
   async getSummerTurn(id: string): Promise<OvieSummerTurn | undefined> {
@@ -243,7 +253,7 @@ export class FailoverOperatingStore implements OperatingStore {
     return this.list('listInitiatives');
   }
 
-  putSummerTurn(record: OvieSummerTurn): Promise<void> {
+  putSummerTurn(record: OvieSummerTurn): Promise<OvieSummerTurn> {
     return this.putSummerCanonical(record);
   }
 
@@ -273,9 +283,12 @@ export class FailoverOperatingStore implements OperatingStore {
     return this.mutateSummer(store => store.failSummerTurn(...args));
   }
 
-  private async putSummerCanonical(record: OvieSummerTurn): Promise<void> {
-    await this.options.fallback.putSummerTurn(record);
-    await this.cacheSummerTurn(record);
+  private async putSummerCanonical(
+    record: OvieSummerTurn
+  ): Promise<OvieSummerTurn> {
+    const stored = await this.options.fallback.putSummerTurn(record);
+    await this.cacheSummerTurn(stored);
+    return stored;
   }
 
   private async mutateSummer(
@@ -370,6 +383,14 @@ function decisionKey(id: string): string {
 
 function summerTurnKey(id: string): string {
   return `ovie:mcp:v1:summer-turn:${id}`;
+}
+
+function isProtectedSummerTurn(record: OvieSummerTurn): boolean {
+  return (
+    record.state === 'claimed' ||
+    record.state === 'completed' ||
+    record.state === 'failed'
+  );
 }
 
 function matchesActiveClaim(

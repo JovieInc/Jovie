@@ -118,8 +118,10 @@ export async function completeOvieSummerTurn(
   }
 ): Promise<OvieSummerTurn> {
   const responseText = input.responseText.trim();
-  if (!responseText) throw new Error('Summer response is required');
-  assertModelMustNotSelfIdentifyAsOvie(responseText);
+  if (!responseText && !input.tool) {
+    throw new Error('Summer response is required');
+  }
+  if (responseText) assertModelMustNotSelfIdentifyAsOvie(responseText);
   if (input.tool && !isSummerSafeTool(input.tool.name)) {
     throw new Error('Summer tool is not on the safe allowlist');
   }
