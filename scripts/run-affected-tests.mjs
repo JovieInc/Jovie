@@ -156,6 +156,30 @@ const SAFE_PR_REMEDIATION_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
 const SAFE_PR_REMEDIATION_NODE_TESTS = ['scripts/typecheck-scripts.mjs'];
+const ROLLING_CI_FX_CACHE_GC_PRIMARY_INPUTS = new Set([
+  '.github/workflows/actions-cache-gc.yml',
+  '.github/workflows/rolling-ci-dispatch.yml',
+  'scripts/lib/actions-cache-gc.mjs',
+  'scripts/lib/rolling-ci-dispatch.mjs',
+  'scripts/lib/rolling-ci-fx.mjs',
+  'scripts/lib/__tests__/actions-cache-gc.test.mjs',
+  'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
+  'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+]);
+const ROLLING_CI_FX_CACHE_GC_LANE = new Set([
+  ...ROLLING_CI_FX_CACHE_GC_PRIMARY_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  'docs/CRON_REGISTRY.md',
+  'scripts/lib/__tests__/rolling-ci-handoff.test.mjs',
+]);
+const ROLLING_CI_FX_CACHE_GC_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/actions-cache-gc.test.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
+  'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+  'scripts/lib/__tests__/rolling-ci-handoff.test.mjs',
+];
+const ROLLING_CI_FX_CACHE_GC_NODE_TESTS = ['scripts/typecheck-scripts.mjs'];
 const CI_UI_DRIFT_GUARDRAIL_INPUTS = new Set([
   '.github/workflows/ci.yml',
   'apps/desktop/scripts/desktop-shell-contract.test.mjs',
@@ -661,6 +685,22 @@ export function buildAffectedTestPlan(
       pythonUnittestTests: SYMPHONY_THROUGHPUT_PYTHON_TESTS,
       scriptVitestTests: SYMPHONY_THROUGHPUT_SCRIPT_TESTS,
       nodeTests: SYMPHONY_THROUGHPUT_NODE_TESTS,
+    };
+  }
+  const isBoundedRollingCiFxCacheGcChange =
+    files.some(file => ROLLING_CI_FX_CACHE_GC_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => ROLLING_CI_FX_CACHE_GC_LANE.has(file));
+  if (isBoundedRollingCiFxCacheGcChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: ROLLING_CI_FX_CACHE_GC_SCRIPT_TESTS,
+      nodeTests: ROLLING_CI_FX_CACHE_GC_NODE_TESTS,
     };
   }
   const isBoundedSafePrRemediationChange =

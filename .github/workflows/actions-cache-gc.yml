@@ -1,0 +1,51 @@
+name: Actions Cache GC
+
+# Ongoing eviction for stale/duplicate Actions caches. Does not smash live
+# pnpm/node/playwright caches on main or open PR refs unless they are unused
+# and the repo is over the cache budget.
+
+on:
+  schedule:
+    - cron: '19 4 * * *'
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Delete selected caches (false keeps this a dry-run)'
+        required: false
+        default: 'true'
+
+permissions: {}
+
+concurrency:
+  group: actions-cache-gc
+  cancel-in-progress: false
+
+jobs:
+  gc:
+    name: Evict stale and duplicate Actions caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Checkout trusted cache GC policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/lib/actions-cache-gc.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+
+      - name: Plan and evict caches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          APPLY: ${{ github.event.inputs.apply || 'true' }}
+        run: node scripts/lib/actions-cache-gc.mjs
