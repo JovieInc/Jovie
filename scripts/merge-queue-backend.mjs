@@ -45,20 +45,29 @@ const REQUIRED_NATIVE_STATE_FIELDS =
   `id number state isDraft headRefOid labels isInMergeQueue mergeQueueEntry autoMergeRequest`.split(
     ' '
   );
-const HARD_HOLD_LABELS = new Set([
+// Durable tombstones. Unlike queue-deferred, these are never stripped by the
+// drain controller, including hold-intake missed-admission recovery (JOV-5276).
+export const NO_AUTO_HOLD_LABELS = Object.freeze([
+  'no-auto',
+  'no-auto-merge',
+  'no-automerge',
+]);
+export const HARD_HOLD_LABELS = new Set([
   'needs-human',
   'hold',
   'gated',
   'queue-deferred',
   'needs-conflict-resolution',
   'fast',
+  ...NO_AUTO_HOLD_LABELS,
 ]);
-const SELECTOR_BLOCKING_LABELS = new Set([
+export const SELECTOR_BLOCKING_LABELS = new Set([
   'needs-human',
   'hold',
   'gated',
   'needs-conflict-resolution',
   'fast',
+  ...NO_AUTO_HOLD_LABELS,
 ]);
 const CLEAN_ADMITTING_PROMOTION_MODES = new Set([
   'normal',

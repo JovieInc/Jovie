@@ -2,7 +2,8 @@
 # GitHub-native PR queue drain. Native enrollment uses exact-head admission and
 # authoritative queue state without reading, writing, or requiring a transport
 # label. A label-backed fixture exists only for isolated shell tests.
-# Autonomous shipping (2026-07-06): taste gates are advisory — only hold/gated/needs-human block.
+# Autonomous shipping (2026-07-06): taste gates are advisory. Durable hard holds
+# are hold/gated/needs-human, queue-deferred, and the no-auto tombstone family.
 #
 # It deliberately does NOT:
 #   - directly merge a PR (native enrollment uses `gh pr merge --auto`; the
@@ -110,6 +111,11 @@ DRAIN_RECONCILE_QUEUE_REENTRY="${DRAIN_RECONCILE_QUEUE_REENTRY:-0}"
 DRAIN_RECONCILE_MISSED_ADMISSION="${DRAIN_RECONCILE_MISSED_ADMISSION:-0}"
 DRAIN_QUEUE_REENTRY_MAX_PER_RUN="${DRAIN_QUEUE_REENTRY_MAX_PER_RUN:-2}"
 QUEUE_REENTRY_CONTEXT="jovie-queue-reentry/v1"
+# JOV-5276: no-auto* is a durable tombstone. Unlike queue-deferred, this
+# controller never strips these labels, including hold-intake missed-admission
+# recovery. Splice into every eligibility, dequeue, re-entry, and postcondition
+# jq predicate.
+NO_AUTO_HOLD_JQ='. == "no-auto" or . == "no-auto-merge" or . == "no-automerge"'
 QUEUE_DEFERRED_RELEASE_LIB="$(dirname "${BASH_SOURCE[0]}")/lib/queue-deferred-release-admission.mjs"
 PRODUCTION_UNBOUND_REPAIR_ATTESTATION_LIB="$(dirname "${BASH_SOURCE[0]}")/lib/production-unbound-repair-attestation.mjs"
 QUEUE_DEFERRED_RELEASE_MARKER='<!-- bot-comment:queue-deferred-release -->'
@@ -553,6 +559,7 @@ deferred_state_is_releasable() {  # state json <expected head> <expected base>
     and ([.labels[].name] | any(
       . == "needs-human" or . == "hold" or . == "gated"
       or . == "fast" or . == "needs-conflict-resolution"
+      or '"$NO_AUTO_HOLD_JQ"'
     ) | not)
   ' <<<"$1" >/dev/null
 }
@@ -664,6 +671,7 @@ reconcile_deferred_auto_merge_after_main_push() {
         and ([.labels[].name] | any(
           . == "needs-human" or . == "hold" or . == "gated"
           or . == "fast" or . == "needs-conflict-resolution"
+          or '"$NO_AUTO_HOLD_JQ"'
         ) | not)
       ' <<<"$after" >/dev/null; then
       echo "    !! release state changed; restoring queue-deferred hold" >&2
@@ -695,6 +703,7 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
       . == "needs-human" or . == "hold" or . == "gated"
       or . == "needs-conflict-resolution"
       or . == "fast" or ($backend == "test-label-fixture" and . == "merge-queue")
+      or '"$NO_AUTO_HOLD_JQ"'
     ) | not)
   ' <<<"$current" >/dev/null; then
     echo "    ⏸ eligibility changed; refusing enrollment for #$n"
@@ -832,6 +841,7 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
         . == "needs-human" or . == "hold" or . == "gated"
         or . == "queue-deferred" or . == "needs-conflict-resolution"
         or . == "fast"
+        or '"$NO_AUTO_HOLD_JQ"'
       ) | not)
     ' <<<"$current" >/dev/null; then
       echo "    ⏸ eligibility changed during native enrollment for #$n; compensating"
@@ -931,6 +941,7 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
       . == "needs-human" or . == "hold" or . == "gated"
       or . == "queue-deferred" or . == "needs-conflict-resolution"
       or . == "fast"
+      or '"$NO_AUTO_HOLD_JQ"'
     ) | not)
   ' <<<"$current" >/dev/null; then
     echo "    +merge-queue on #$n"
@@ -1188,7 +1199,7 @@ while IFS= read -r pr; do
     and (.base == "main")
     and (.m == "MERGEABLE")
     and (
-      (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "fast")) | not)
+      (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "fast" or '"$NO_AUTO_HOLD_JQ"')) | not)
       and (
         (([.L[]] | index("queue-deferred")) == null)
         or ((.n | tostring) == $admission_pr)
@@ -1222,7 +1233,7 @@ echo "$SNAP" | jq -r '
   def labels: (.L // []);
   def main_target: .base == "main";
   def queued: .q == true;
-  def hard_gated: labels | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred");
+  def hard_gated: labels | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or '"$NO_AUTO_HOLD_JQ"');
   [
     "  CLEAN: " + ([.[] | select(main_target and queued and (.ms // "") == "CLEAN")] | length | tostring),
     "  UNSTABLE: " + ([.[] | select(main_target and queued and (.ms // "") == "UNSTABLE")] | length | tostring),
@@ -1243,7 +1254,7 @@ while read -r pr; do
     fi
 done < <(echo "$SNAP" | jq -c '.[]
   | select(.q == true)
-  | select(.draft or ([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred")))')
+  | select(.draft or ([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or '"$NO_AUTO_HOLD_JQ"')))')
 
 # A production-red exception is intentionally WIP 1. Keep at most one queued
 # PR whose exact base/head/full diff still satisfies the semantic classifier;
@@ -1261,7 +1272,7 @@ if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" || "$DRAIN_FREEZE_EXISTING_QUEU
         | select(.draft | not)
         | select(.m == "MERGEABLE")
         | select(.fail | length == 0)
-        | select(([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred")) | not)
+        | select(([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)
         | .n ] | sort | first // empty')"
     [[ -n "$ISOLATED_KEEP_PR" ]] && echo "  preserving exact isolated PR #$ISOLATED_KEEP_PR (WIP 1)"
   fi
@@ -1296,7 +1307,7 @@ if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" || "$DRAIN_FREEZE_EXISTING_QUEU
   done < <(echo "$SNAP" | jq -c '.[]
     | select(.q == true)
     | select(.draft | not)
-    | select(([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred")) | not)')
+    | select(([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)')
 fi
 
 # --- DEQUEUE: only GENUINELY un-mergeable PRs (conflict or real failing checks) ---
@@ -1315,7 +1326,7 @@ echo "=== DEQUEUE (conflict / failing → queue removal) ==="
 echo "$SNAP" | jq -c --arg promotion_mode "$DRAIN_PROMOTION_MODE" --arg freeze "$DRAIN_FREEZE_EXISTING_QUEUE" '.[]
   | select($promotion_mode == "normal" or $promotion_mode == "hold-intake" or $promotion_mode == "draft-only" or ($promotion_mode == "blocked" and $freeze == "0"))
   | select(.q == true)
-  | select(([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred")) | not)
+  | select(([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)
   | select(
       ([.L[]] | any(.=="needs-conflict-resolution"))
       or (.m == "CONFLICTING")
@@ -1373,7 +1384,7 @@ if waiting_lane_allows_clean_enroll || [[ "$DRAIN_PROMOTION_MODE" == "blocked" &
     | select(.q == true)
     | select(.base == "main")
     | select(.draft | not)
-    | select(([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred")) | not)')
+    | select(([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)')
 fi
 
 # --- ENROLL: non-draft, mergeable, no FAILING checks, not opted-out, not queued ---
@@ -1445,7 +1456,7 @@ while read -r pr; do
     and (.m == "MERGEABLE")
     and (.base == "main")
     and ((.fail // []) | length == 0)
-    and (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast")) | not)
+    and (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or '"$NO_AUTO_HOLD_JQ"')) | not)
   ' <<<"$pr" >/dev/null; then
     clean_eligible=1
   fi
@@ -1502,7 +1513,7 @@ done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" --arg pro
   | select(.base=="main")
   | select(.fail|length==0)
   | select(.q | not)
-  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="needs-conflict-resolution" or .=="fast") | not)
+  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="needs-conflict-resolution" or .=="fast" or '"$NO_AUTO_HOLD_JQ"') | not)
   | select(
       ([.L[]] | index("queue-deferred") == null)
       or ((.n | tostring) == $admission_pr)
@@ -1538,7 +1549,7 @@ if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 ]]; then
       and (.state.mergeQueueEntry.state | IN("QUEUED", "AWAITING_CHECKS", "MERGEABLE", "UNMERGEABLE", "LOCKED"))
       and (.state.mergeQueueEntry.position | type == "number" and floor == . and . > 0)
       and ((.state.headRefOid // "") | ascii_downcase) == $head
-      and ((.state.labels.nodes // []) | map(.name) | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast") | not)
+      and ((.state.labels.nodes // []) | map(.name) | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or '"$NO_AUTO_HOLD_JQ"') | not)
     ' --arg head "$DRAIN_ADMISSION_HEAD" <<<"$LIVE_NATIVE_RECEIPT" >/dev/null; then
       ADMISSION_ALREADY_QUEUED="true"
       echo "  #$DRAIN_ADMISSION_PR  ~ delayed native receipt at $DRAIN_ADMISSION_HEAD (state $(jq -r '.state.mergeQueueEntry.state' <<<"$LIVE_NATIVE_RECEIPT"), position $(jq -r '.state.mergeQueueEntry.position' <<<"$LIVE_NATIVE_RECEIPT"))"
@@ -1566,6 +1577,7 @@ fi
 # Hold-intake/normal missed admission also considers CLEAN queue-deferred
 # heads: exact admission already strips that label, but a main-push recovery
 # used to filter them out and left CI-green Symphony heads (#16187) parked.
+# The no-auto tombstone family is never part of that exception (JOV-5276).
 if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" || "$DRAIN_RECONCILE_MISSED_ADMISSION" == "1" ]]; then
   echo "=== RECOVER (bounded exact-head native admission) ==="
   while read -r pr; do
@@ -1618,7 +1630,7 @@ if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" || "$DRAIN_RECONCILE_MISSED_ADMISS
     | select(.m == "MERGEABLE")
     | select(.base == "main")
     | select(.fail | length == 0)
-    | select([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "needs-conflict-resolution" or . == "fast") | not)
+    | select([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "needs-conflict-resolution" or . == "fast" or '"$NO_AUTO_HOLD_JQ"') | not)
     | select(
         ([.L[]] | index("queue-deferred") == null)
         or (
@@ -1671,7 +1683,7 @@ if [[ "$DRAIN_RECOVER_FLEET_HOLDS" == "1" ]]; then
     | select(.m == "MERGEABLE")
     | select(.base == "main")
     | select(.fail | length == 0)
-    | select([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast") | not)')
+    | select([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or '"$NO_AUTO_HOLD_JQ"') | not)')
 fi
 
 # --- CONFLICT: needs rebase (agent branches only) → label + hand to fix agent ---
@@ -1680,13 +1692,13 @@ echo "$SNAP" | jq -r --arg re "$AGENT_RE" '.[]
   | select(.m=="CONFLICTING")
   | select(.base=="main")
   | select(.head|test($re))
-  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred") | not)
+  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"') | not)
   | "  #\(.n)  \(.t)  [\(.head)]"'
 echo "$SNAP" | jq -r --arg re "$AGENT_RE" '.[]
   | select(.m=="CONFLICTING")
   | select(.base=="main")
   | select(.head|test($re))
-  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred") | not) | .n' \
+  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"') | not) | .n' \
 | while read -r n; do [[ -n "$n" ]] && label "$n" needs-conflict-resolution; done
 
 # --- BLOCKED: mergeable but red checks → hand to fix agent ---
@@ -1694,13 +1706,13 @@ echo "=== BLOCKED (red checks → fix agent) ==="
 echo "$SNAP" | jq -r '.[]
   | select(.draft|not) | select(.m=="MERGEABLE") | select(.fail|length>0)
   | select(.base=="main")
-  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred") | not)
+  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"') | not)
   | "  #\(.n)  \(.t)  ✗ \(.fail|join(", "))"'
 
 # --- SURFACE: human-gated / superseded → report only, never auto-close ---
 echo "=== SURFACE (human decision; not touched) ==="
 echo "$SNAP" | jq -r '.[]
-  | select(.draft or ([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred")))
+  | select(.draft or ([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')))
   | "  #\(.n)  \(.t)  {\(.L|join(","))}"'
 
 echo "=== done (DRY_RUN=$DRY_RUN) ==="
