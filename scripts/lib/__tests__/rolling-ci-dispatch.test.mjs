@@ -124,7 +124,11 @@ describe('rolling CI failure dispatch', () => {
         writer: 'tim',
         priorState: state,
       })
-    ).toMatchObject({ action: 'retry_budget_exhausted', mutate: false });
+    ).toMatchObject({
+      action: 'terminal_configuration_incident',
+      mutate: false,
+      incident: { type: 'non_progressing_policy_cycle' },
+    });
   });
 
   it('successful current-head rerun supersedes active repairs', () => {

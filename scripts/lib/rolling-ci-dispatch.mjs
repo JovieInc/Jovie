@@ -147,7 +147,19 @@ export function planFailureDispatch({
     deliveryCount: 0,
   };
   if (priorFailure.deliveryCount >= maxDeliveries) {
-    return { action: 'retry_budget_exhausted', mutate: false, state };
+    return {
+      action: 'terminal_configuration_incident',
+      mutate: false,
+      state,
+      incident: {
+        type: 'non_progressing_policy_cycle',
+        head: event.head,
+        fingerprint: event.fingerprint,
+        owner: 'CI Platform',
+        remedy:
+          'classify the execution path or repair the runner; do not add a product bypass',
+      },
+    };
   }
 
   state.deliveries.push(event.delivery);

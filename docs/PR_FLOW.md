@@ -20,6 +20,9 @@ If you are an agent about to open a PR, read [Agent checklist](#agent-checklist)
 
 ## Draft-first rolling CI contract
 
+Policy gates are **bootstrap-safe, acyclic, and monotonic**: a transition may
+block only on allowlisted evidence produced strictly before that transition.
+
 This repository operationalizes OpenAI's
 [harness-engineering guidance](https://openai.com/index/harness-engineering/)
 with one concrete Jovie decision: publish a draft after the first coherent,
@@ -265,8 +268,10 @@ Before you open a PR:
    `llm-review` and the PR ships autonomously — there is no taste gate to wait
    on (the old 👍 `taste-approve` workflow was removed 2026-07-06). Don't add
    `needs-human`.
-4. **Verify locally** (typecheck, lint, affected tests), push, open a draft PR,
-   let the fast gate run. Don't hand-merge; the queue does it.
+4. **Publish the first coherent, testable commit** with the bounded publication
+   gate and open the draft immediately. Continue in small commits while rolling
+   CI dispatches exact-head remediation. Run full affected qualification before
+   promotion; don't hand-merge—the queue does it.
 5. If a PR's base branch was deleted, **retarget to `main`** before debugging a
    "conflict."
 
