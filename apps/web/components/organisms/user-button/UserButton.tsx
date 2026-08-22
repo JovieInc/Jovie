@@ -384,6 +384,7 @@ export function UserButton({
   profileHref,
   settingsHref,
   showUserInfo = false,
+  embeddedInIdentityGroup = false,
   trigger,
 }: UserButtonProps) {
   const keyboardShortcuts = useKeyboardShortcutsSafe();
@@ -511,7 +512,10 @@ export function UserButton({
     return showUserInfo ? (
       <div
         data-testid='user-button-loading'
-        className='flex w-full items-center gap-2 rounded-md px-2 py-1 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0'
+        className={cn(
+          'flex w-full items-center gap-2 px-2 py-1 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0',
+          embeddedInIdentityGroup ? 'rounded-none' : 'rounded-md'
+        )}
       >
         <div className='h-6 w-6 shrink-0 rounded-full bg-sidebar-accent animate-pulse motion-reduce:animate-none' />
         <div
@@ -556,7 +560,16 @@ export function UserButton({
     (showUserInfo ? (
       <button
         type='button'
-        className='group/user-button flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0'
+        aria-label={`Open account menu for ${displayName}`}
+        data-sidebar-identity-action={
+          embeddedInIdentityGroup ? 'account-menu' : undefined
+        }
+        className={cn(
+          'group/user-button flex w-full min-w-0 items-center gap-2 px-2 py-1 text-left transition-colors focus-visible:outline-none group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0',
+          embeddedInIdentityGroup
+            ? 'rounded-none hover:bg-transparent focus-visible:[&_[data-user-button-display-name]]:text-primary-token'
+            : 'rounded-md hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring'
+        )}
       >
         <Avatar
           src={userImageUrl}

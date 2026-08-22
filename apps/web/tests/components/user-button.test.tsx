@@ -824,6 +824,34 @@ describe('UserButton billing actions', () => {
     );
   });
 
+  it('lets the enclosing identity group own the account trigger boundary', () => {
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+
+    render(<UserButton showUserInfo embeddedInIdentityGroup />);
+
+    const trigger = screen.getByRole('button', {
+      name: 'Open account menu for Adele Adkins',
+    });
+    expect(trigger).toHaveAttribute(
+      'data-sidebar-identity-action',
+      'account-menu'
+    );
+    expect(trigger).toHaveClass(
+      'rounded-none',
+      'hover:bg-transparent',
+      'focus-visible:[&_[data-user-button-display-name]]:text-primary-token'
+    );
+    expect(trigger).not.toHaveClass(
+      'rounded-md',
+      'hover:bg-sidebar-accent',
+      'focus-visible:ring-2'
+    );
+  });
+
   it('anchors the sidebar identity menu to the start edge', async () => {
     mockUseBillingStatusQuery.mockReturnValue({
       data: { isPro: false, plan: null, hasStripeCustomer: false },
