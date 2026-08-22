@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { planRollingCiDispatch } from '../../rolling-ci-dispatch.mjs';
 import {
   dispatchStateMarker,
   failureFingerprint,
@@ -217,5 +218,75 @@ describe('rolling CI dispatch idempotency and supersession', () => {
     expect(
       parseDispatchState('<!-- jovie-rolling-ci-dispatch-state:not-json -->')
     ).toBeNull();
+  });
+});
+
+describe('rolling CI workflow adapter', () => {
+  function workflowInput(overrides = {}) {
+    return {
+      repository: 'JovieInc/Jovie',
+      prNumber: 17,
+      headSha: head,
+      liveHead: head,
+      workflowRunId: 9001,
+      workflowRunAttempt: 1,
+      conclusion: 'failure',
+      failedJobs: [
+        { name: 'ci-fast', steps: ['Typecheck'] },
+        { name: 'Unit Tests', steps: ['Run affected tests'] },
+      ],
+      source: trustedSource(),
+      priorCommentBody: '',
+      ...overrides,
+    };
+  }
+
+  it('renders all normalized failures into one durable dispatch state', () => {
+    const result = planRollingCiDispatch(workflowInput());
+    expect(result).toMatchObject({
+      action: 'dispatch_exact_head_failure',
+      mutate: true,
+      shouldDispatch: true,
+      shouldComment: true,
+    });
+    expect(result.events).toHaveLength(2);
+    expect(result.body).toContain('`ci-fast`');
+    expect(result.body).toContain('`Unit Tests`');
+    expect(parseDispatchState(result.body)).toEqual(result.state);
+  });
+
+  it('does not comment or dispatch a duplicate workflow delivery', () => {
+    const first = planRollingCiDispatch(workflowInput());
+    const duplicate = planRollingCiDispatch(
+      workflowInput({ priorCommentBody: first.body })
+    );
+    expect(duplicate).toMatchObject({
+      action: 'deduplicate_delivery',
+      mutate: false,
+      shouldDispatch: false,
+      shouldComment: false,
+      body: '',
+    });
+  });
+
+  it('clears durable repair state after a current-head green rerun', () => {
+    const failed = planRollingCiDispatch(workflowInput());
+    const recovered = planRollingCiDispatch(
+      workflowInput({
+        conclusion: 'success',
+        source: trustedSource('success'),
+        workflowRunId: 9002,
+        workflowRunAttempt: 2,
+        failedJobs: undefined,
+        priorCommentBody: failed.body,
+      })
+    );
+    expect(recovered).toMatchObject({
+      action: 'supersede_repairs_green',
+      mutate: true,
+      shouldDispatch: false,
+      shouldComment: true,
+      state: { failures: {}, deliveries: [] },
+    });
   });
 });
