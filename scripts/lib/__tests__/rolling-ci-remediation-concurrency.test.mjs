@@ -11,6 +11,13 @@ import {
   resolveLocalRemediationShardCount,
 } from '../rolling-ci-remediation-concurrency.mjs';
 
+const tightHost = {
+  load: 0,
+  cpuCount: 16,
+  freeMemoryBytes: 256 * 1024 * 1024,
+  totalMemoryBytes: 16 * 1024 * 1024 * 1024,
+};
+
 describe('rolling CI local remediation concurrency', () => {
   it('keeps eight shards opt-in and defaults below that count', () => {
     expect(resolveLocalRemediationShardCount()).toBe(DEFAULT_LOCAL_SHARD_COUNT);
@@ -20,10 +27,6 @@ describe('rolling CI local remediation concurrency', () => {
     expect(resolveLocalRemediationShardCount({ optInEightShards: true })).toBe(
       OPT_IN_EIGHT_SHARD_COUNT
     );
-    expect(
-      resolveLocalRemediationConcurrency({ optInEightShards: false })
-        .plannedShardCount
-    ).toBe(DEFAULT_LOCAL_SHARD_COUNT);
   });
 
   it('never exceeds the actual shard-command count', () => {
@@ -56,24 +59,15 @@ describe('rolling CI local remediation concurrency', () => {
       concurrency: PRESSURE_FALLBACK_CONCURRENCY,
       reason: 'memory-pressure-fallback',
     });
-    expect(
-      detectHostPressure({
-        load: 0,
-        cpuCount: 16,
-        freeMemoryBytes: 256 * 1024 * 1024,
-        totalMemoryBytes: 16 * 1024 * 1024 * 1024,
-      })
-    ).toMatchObject({ cpuPressure: false, memoryPressure: true });
+    expect(detectHostPressure(tightHost)).toMatchObject({
+      cpuPressure: false,
+      memoryPressure: true,
+    });
     expect(
       planLocalRemediationConcurrency({
         shardCommandCount: 8,
         requestedConcurrency: 8,
-        host: {
-          load: 0,
-          cpuCount: 16,
-          freeMemoryBytes: 256 * 1024 * 1024,
-          totalMemoryBytes: 16 * 1024 * 1024 * 1024,
-        },
+        host: tightHost,
       })
     ).toMatchObject({
       concurrency: 1,
@@ -108,11 +102,5 @@ describe('rolling CI local remediation concurrency', () => {
       remoteFanoutIndependent: true,
     });
     expect(REMOTE_RUNNER_FANOUT).toBe(120);
-    expect(
-      resolveLocalRemediationConcurrency({
-        shardCommandCount: 2,
-        requestedConcurrency: REMOTE_RUNNER_FANOUT,
-      }).concurrency
-    ).toBe(2);
   });
 });

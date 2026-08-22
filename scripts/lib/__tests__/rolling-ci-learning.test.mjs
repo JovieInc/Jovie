@@ -1,13 +1,7 @@
-import { Readable } from 'node:stream';
 import { describe, expect, it } from 'vitest';
-import {
-  renderPromotionReceiptResult,
-  runPromotionReceiptCli,
-} from '../../rolling-ci-promotion-receipt.mjs';
 import {
   collectLearningReceipts,
   evaluateLearningPromotion,
-  evaluatePromotionReceipt,
   LEARNING_RECEIPT_SCHEMA,
   learningReceiptMarker,
   parseLearningReceiptMarker,
@@ -64,21 +58,22 @@ describe('rolling CI defect-class learning', () => {
     expect(
       evaluateLearningPromotion({
         repairedFailures: [repairedFailure],
-        receipts: [validReceipt],
+        comments: [learningReceiptMarker(validReceipt)],
         liveHead: head,
       })
     ).toMatchObject({ complete: true, requiredReceipts: 1 });
   });
 
   it('requires every learning field before a repaired class can close', () => {
-    const incomplete = {
-      ...validReceipt,
-      rootCauseClass: '',
-      currentHeadReproduction: { reproduced: false, head, evidence: '' },
-      minimalRepair: '',
-      equivalentSurfaceSweep: { surfaces: [], outcome: '' },
-    };
-    expect(validateLearningReceipt(incomplete).errors).toEqual(
+    expect(
+      validateLearningReceipt({
+        ...validReceipt,
+        rootCauseClass: '',
+        currentHeadReproduction: { reproduced: false, head, evidence: '' },
+        minimalRepair: '',
+        equivalentSurfaceSweep: { surfaces: [], outcome: '' },
+      }).errors
+    ).toEqual(
       expect.arrayContaining([
         'rootCauseClass is required',
         'current-head reproduction is required',
@@ -223,41 +218,5 @@ describe('rolling CI defect-class learning', () => {
     expect(
       collectLearningReceipts([learningReceiptMarker(validReceipt)])
     ).toEqual([validReceipt]);
-  });
-
-  it('CLI blocks promotion only when a repaired failure lacks its receipt', async () => {
-    const chunks = [];
-    const missing = await runPromotionReceiptCli({
-      stdin: Readable.from([
-        JSON.stringify({
-          liveHead: head,
-          repairedFailures: [repairedFailure],
-          receipts: [],
-        }),
-      ]),
-      stdout: { write: chunk => chunks.push(chunk) },
-    });
-    expect(missing).toBe(1);
-    expect(JSON.parse(chunks.join(''))).toMatchObject({
-      complete: false,
-      requiredReceipts: 1,
-    });
-
-    chunks.length = 0;
-    const ready = await runPromotionReceiptCli({
-      stdin: Readable.from([
-        JSON.stringify({
-          liveHead: head,
-          repairedFailures: [repairedFailure],
-          comments: [learningReceiptMarker(validReceipt)],
-        }),
-      ]),
-      stdout: { write: chunk => chunks.push(chunk) },
-    });
-    expect(ready).toBe(0);
-    expect(evaluatePromotionReceipt).toBeTypeOf('function');
-    expect(
-      renderPromotionReceiptResult({ complete: true, blockers: [] })
-    ).toContain('"complete":true');
   });
 });

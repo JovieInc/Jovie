@@ -6,61 +6,10 @@ const FAILURE_KINDS = new Set(['product', 'environment', 'one-off']);
 const GUARDRAIL_DELIVERIES = new Set(['same-pr', 'linked-follow-up']);
 const ENVIRONMENT_INCIDENT_CLASSES = new Set(['runner', 'execution-path']);
 
-/** @typedef {{
- *   repository: string,
- *   pr: number,
- *   head: string,
- *   check: string,
- *   fingerprint: string,
- * }} LearningIdentity */
-
-/** @typedef {{
- *   schema: string,
- *   identity: LearningIdentity,
- *   failureKind: string,
- *   rootCauseClass: string,
- *   currentHeadReproduction: {
- *     reproduced: boolean,
- *     head: string,
- *     evidence: string,
- *   },
- *   minimalRepair: string,
- *   equivalentSurfaceSweep: { surfaces: string[], outcome: string },
- *   deliberateRedRegression: {
- *     fixture: string,
- *     failsBeforeRepair: boolean,
- *     passesAfterRepair: boolean,
- *   },
- *   guardrailDecision: {
- *     warranted: boolean,
- *     reason: string,
- *     delivery?: string,
- *     followUpIssue?: string,
- *   },
- *   environmentRemediation?: {
- *     incidentClass?: string,
- *     executionPathClassifier?: string,
- *     runnerFix?: string,
- *   },
- *   antiRuleSprawlReason?: string,
- *   exactHeadGreen: boolean,
- * }} LearningReceipt */
-
-/** @typedef {{
- *   repository: string,
- *   pr: number,
- *   check: string,
- *   fingerprint: string,
- *   status: string,
- *   repairedHead: string,
- * }} RepairedFailure */
-
-/** @typedef {{
- *   repairedFailures?: RepairedFailure[],
- *   receipts?: LearningReceipt[],
- *   comments?: Array<string | LearningReceipt>,
- *   liveHead?: string,
- * }} LearningPromotionInput */
+/** @typedef {{ repository: string, pr: number, head: string, check: string, fingerprint: string }} LearningIdentity */
+/** @typedef {{ schema: string, identity: LearningIdentity, failureKind: string, rootCauseClass: string, currentHeadReproduction: { reproduced: boolean, head: string, evidence: string }, minimalRepair: string, equivalentSurfaceSweep: { surfaces: string[], outcome: string }, deliberateRedRegression: { fixture: string, failsBeforeRepair: boolean, passesAfterRepair: boolean }, guardrailDecision: { warranted: boolean, reason: string, delivery?: string, followUpIssue?: string }, environmentRemediation?: { incidentClass?: string, executionPathClassifier?: string, runnerFix?: string }, antiRuleSprawlReason?: string, exactHeadGreen: boolean }} LearningReceipt */
+/** @typedef {{ repository: string, pr: number, check: string, fingerprint: string, status: string, repairedHead: string }} RepairedFailure */
+/** @typedef {{ repairedFailures?: RepairedFailure[], receipts?: LearningReceipt[], comments?: Array<string | LearningReceipt>, liveHead?: string }} LearningPromotionInput */
 
 function nonEmpty(value) {
   return typeof value === 'string' && value.trim().length > 0;
@@ -227,10 +176,8 @@ function repairedFailureKey(failure, liveHead) {
 }
 
 /**
- * Learning-gate promotion check. Required CI is an independent gate and is
- * never an input here. This blocks only when a failure has entered repaired
- * state without an exact-head durable learning receipt.
- *
+ * Blocks promotion only for repaired failures missing an exact-head receipt.
+ * Required CI is an independent gate.
  * @param {LearningPromotionInput} [input]
  */
 export function evaluateLearningPromotion(input = {}) {

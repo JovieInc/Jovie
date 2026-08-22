@@ -9,22 +9,8 @@ export const REMOTE_RUNNER_FANOUT = 120;
 export const MEMORY_PRESSURE_FREE_RATIO = 0.2;
 export const MEMORY_PRESSURE_FREE_BYTES = 1 * 1024 * 1024 * 1024;
 
-/** @typedef {{
- *   load?: number,
- *   cpuCount?: number,
- *   freeMemoryBytes?: number,
- *   totalMemoryBytes?: number,
- * }} HostPressureInput */
-
-/** @typedef {{
- *   shardCommandCount?: number,
- *   requestedConcurrency?: number,
- *   optInEightShards?: boolean,
- *   cpuPressure?: boolean,
- *   memoryPressure?: boolean,
- *   remoteFanout?: number,
- *   host?: HostPressureInput,
- * }} LocalRemediationConcurrencyInput */
+/** @typedef {{ load?: number, cpuCount?: number, freeMemoryBytes?: number, totalMemoryBytes?: number }} HostPressureInput */
+/** @typedef {{ shardCommandCount?: number, requestedConcurrency?: number, optInEightShards?: boolean, cpuPressure?: boolean, memoryPressure?: boolean, remoteFanout?: number, host?: HostPressureInput }} LocalRemediationConcurrencyInput */
 
 function positiveInt(value, fallback = 0) {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -62,9 +48,8 @@ export function detectHostPressure(input = {}) {
 }
 
 /**
- * Adaptive local remediation concurrency.
- * Remote 120-runner fanout is independent and never raises the local cap.
- *
+ * Adaptive local remediation concurrency. Remote 120-runner fanout never
+ * raises the local cap.
  * @param {LocalRemediationConcurrencyInput} [input]
  */
 export function resolveLocalRemediationConcurrency(input = {}) {

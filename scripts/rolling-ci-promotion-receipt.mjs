@@ -4,9 +4,7 @@ import { evaluatePromotionReceipt } from './lib/rolling-ci-learning.mjs';
 /** @typedef {AsyncIterable<Buffer | string>} PromotionStdin */
 /** @typedef {{ write: (chunk: string) => unknown }} PromotionStdout */
 
-/**
- * @param {PromotionStdin} [stream]
- */
+/** @param {PromotionStdin} [stream] */
 export async function readPromotionReceiptInput(stream) {
   const source = stream ?? process.stdin;
   const chunks = [];
@@ -17,14 +15,6 @@ export async function readPromotionReceiptInput(stream) {
   return JSON.parse(raw || '{}');
 }
 
-/**
- * @param {{
- *   complete?: boolean,
- *   requiredReceipts?: number,
- *   acceptedReceipts?: number,
- *   blockers?: unknown[],
- * }} result
- */
 export function renderPromotionReceiptResult(result) {
   return `${JSON.stringify({
     complete: result.complete,
@@ -37,14 +27,13 @@ export function renderPromotionReceiptResult(result) {
   })}\n`;
 }
 
-/**
- * @param {{ stdin?: PromotionStdin, stdout?: PromotionStdout }} [io]
- */
+/** @param {{ stdin?: PromotionStdin, stdout?: PromotionStdout }} [io] */
 export async function runPromotionReceiptCli(io = {}) {
   const stdin = io.stdin ?? process.stdin;
   const stdout = io.stdout ?? process.stdout;
-  const input = await readPromotionReceiptInput(stdin);
-  const result = evaluatePromotionReceipt(input);
+  const result = evaluatePromotionReceipt(
+    await readPromotionReceiptInput(stdin)
+  );
   stdout.write(renderPromotionReceiptResult(result));
   return result.complete ? 0 : 1;
 }
