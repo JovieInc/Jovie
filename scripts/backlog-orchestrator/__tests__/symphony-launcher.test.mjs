@@ -70,6 +70,11 @@ function runRouter({ root, workspace, accounts, stub }, issue) {
       SYMPHONY_WORKSPACE: workspace,
       SYMPHONY_CODEX_ROTATE: stub,
       SYMPHONY_FALLBACK_LEASE_DIR: join(root, 'fallback-leases'),
+      SYMPHONY_OPEN_PR_INDEX: 'empty',
+      SYMPHONY_CODEX_EXHAUSTED: new URL(
+        '../../hermes/symphony-codex-exhausted.py',
+        import.meta.url
+      ).pathname,
       CODEX_ACCOUNTS_ROOT: accounts,
       CODEX_ACCOUNTS_STATE: join(accounts, 'state.json'),
     },
@@ -112,6 +117,49 @@ describe('Symphony launcher closed loop', () => {
           assert.match(
             String(/** @type {any} */ (error).stderr),
             /SYMPHONY_LAUNCHER_FAILURE.*class=deterministic-launcher.*retryable=false.*maxAttempts=1/
+          );
+          return true;
+        }
+      );
+      assert.throws(() => readFileSync(env.rotateLog, 'utf8'));
+    } finally {
+      rmSync(env.root, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed when pickup-check refuses an In Review issue', () => {
+    const env = fixture();
+    try {
+      const { issue } = issueWithReceipt('Fix README typo');
+      const stub = join(env.root, 'pickup-check-stub.py');
+      writeFileSync(
+        stub,
+        '#!/usr/bin/env python3\nimport sys\nprint(\'SYMPHONY_LAUNCHER_FAILURE schema=symphony-launcher-failure/v1 class=pickup-refused retryable=false maxAttempts=1 reason="issue_in_review owns JOV-5029"\', file=sys.stderr)\nsys.exit(78)\n'
+      );
+      chmodSync(stub, 0o755);
+      assert.throws(
+        () =>
+          execFileSync('bash', [ROUTER, 'app-server'], {
+            cwd: env.workspace,
+            env: {
+              ...process.env,
+              SYMPHONY_ROUTING_ISSUE_FILE: join(env.root, 'issue.json'),
+              SYMPHONY_ISSUE_IDENTIFIER: issue.identifier,
+              SYMPHONY_WORKSPACE: env.workspace,
+              SYMPHONY_CODEX_ROTATE: env.stub,
+              SYMPHONY_FALLBACK_LEASE_DIR: join(env.root, 'fallback-leases'),
+              SYMPHONY_OPEN_PR_INDEX: 'empty',
+              SYMPHONY_CODEX_EXHAUSTED: stub,
+              CODEX_ACCOUNTS_ROOT: env.accounts,
+              CODEX_ACCOUNTS_STATE: join(env.accounts, 'state.json'),
+            },
+            stdio: ['ignore', 'pipe', 'pipe'],
+          }),
+        error => {
+          assert.equal(/** @type {any} */ (error).status, 78);
+          assert.match(
+            String(/** @type {any} */ (error).stderr),
+            /issue_in_review/
           );
           return true;
         }

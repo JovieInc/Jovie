@@ -32,11 +32,16 @@ mkdir -p "$LOG_DIR" "$WS_ROOT" "$LEASE_DIR" "$RECEIPT_DIR"
 : "${SYMPHONY_FALLBACK_ISSUE_REVISION:?issue revision is required}"
 : "${SYMPHONY_FALLBACK_BUNDLE_REVISION:?bundle revision is required}"
 : "${SYMPHONY_FALLBACK_UNIT:?fallback unit is required}"
-exec 9>"$LEASE_DIR/$ID.lock"
+LEASE_FILE="$LEASE_DIR/$ID.lock"
+exec 9>"$LEASE_FILE"
 if ! flock -n 9; then
   echo "$(date -u +%FT%TZ) $ID duplicate_lease" >> "$LOG"
   exit 0
 fi
+release_fallback_lease() {
+  rm -f "$LEASE_FILE"
+}
+trap release_fallback_lease EXIT
 
 SELECTION_JSON="$(SELECTION_B64="$SYMPHONY_FALLBACK_SELECTION_B64" python3 - <<'PY'
 import base64, json, os
@@ -360,7 +365,7 @@ if [ "$CHANGELOG_ONLY_REMOUNT" = 1 ]; then
 fi
 
 attempt_log="$(mktemp "$LOG_DIR/.${ID}.attempt.XXXXXX")"
-trap 'rm -f "$attempt_log"' EXIT
+trap 'rm -f "$attempt_log"; release_fallback_lease' EXIT
 echo "START $ID $(date -u +%FT%TZ) repo=$REPO" | tee -a "$LOG"
 set +e
 if [ "$SKIP_GROK" = 1 ]; then

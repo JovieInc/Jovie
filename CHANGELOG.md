@@ -7,6 +7,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Stale Symphony fallback locks can no longer permanently own pickup (JOV-5297):** the sidecar GCs leftover `JOV-*.lock` files when the Linear issue is In Review / Done / has an inflight open PR, or when an unlocked lock is older than the typed TTL, and writes a receipt. Pickup now emits lease start, a typed refuse reason, lock count, and the next eligible issue; an unknown refuse reason is red. Codex refuses a second writer on In Review / open PR.
 - [internal] **Ubuntu operational truth publishes a read-only `ovie.shipping-state.v1` projection (JOV-5248):** Symphony runtime, lease-guard capacity, native merge queue, exact-SHA CI, Production Controller, live build-info, and the typed fleet receipt compose one freshness-aware snapshot. Zero is only legal after a successful measurement. Shutdown keeps the expired last-known marker. No dispatch, retry, or arbitrary file/log surface.
 - [internal] **Mac Ovie door talks to the current Summer through Eve (JOV-5212):** entitled OV turns persist Eve receipts, bind the current Mac Summer session, and stream Summer only. Live turns enqueue a durable current-Summer handoff instead of an in-process mock. Missing or disabled transport stays explicit unavailable with no Jovie, Eve, Ovie-persona, or mock fallback. Operator memory and tools stay isolated from customer Jovie.
 

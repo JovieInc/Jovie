@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import base64
+import fcntl
 import hashlib
 import http.server
 import importlib.machinery
@@ -2784,6 +2785,222 @@ class FallbackTests(unittest.TestCase):
         canary = self.command("codex-rotate", "echo GEM_MODEL_READY")
         result = subprocess.run([destination / WRAPPER.name], capture_output=True, text=True, env=self.env(GEM_CODEX_ROTATE_BIN=canary), check=False)
         self.assertEqual((result.stdout, result.returncode), ("no\n", 1))
+
+
+class FallbackLockGcTests(unittest.TestCase):
+    """JOV-5297: stale fallback locks cannot permanently own pickup."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = pathlib.Path(self.tmp.name)
+        self.leases = self.root / "leases"
+        self.leases.mkdir()
+        spec = importlib.util.spec_from_file_location("symphony_codex_exhausted_gc", CONTROLLER)
+        assert spec is not None and spec.loader is not None
+        self.module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.module)
+        self.env = mock.patch.dict(
+            os.environ,
+            {
+                "SYMPHONY_FALLBACK_LEASE_DIR": str(self.leases),
+                "SYMPHONY_FALLBACK_GC_RECEIPT": str(self.root / "gc.json"),
+                "SYMPHONY_FALLBACK_PICKUP_RECEIPT": str(self.root / "pickup.json"),
+                "SYMPHONY_OPEN_PR_INDEX": "empty",
+            },
+        )
+        self.env.start()
+        self.addCleanup(self.env.stop)
+
+    def touch_lock(self, identifier: str, age_seconds: float = 0) -> pathlib.Path:
+        path = self.leases / f"{identifier}.lock"
+        path.write_text("")
+        if age_seconds:
+            stamped = time.time() - age_seconds
+            os.utime(path, (stamped, stamped))
+        return path
+
+    def test_expire_decision_terminal_and_ttl(self):
+        expire = self.module.expire_fallback_lock_decision
+        self.assertEqual(
+            expire(held=False, state_name="In Review", pr_verdict="none", age_seconds=10),
+            ("expire", "issue_in_review"),
+        )
+        self.assertEqual(
+            expire(held=False, state_name="Done", pr_verdict="none", age_seconds=10),
+            ("expire", "issue_done"),
+        )
+        self.assertEqual(
+            expire(held=False, state_name="Todo", pr_verdict="skip", age_seconds=10),
+            ("expire", "open_pr_inflight"),
+        )
+        self.assertEqual(
+            expire(held=False, state_name="Todo", pr_verdict="none", age_seconds=self.module.FALLBACK_LEASE_TTL_SECONDS + 1),
+            ("expire", "ttl_expired"),
+        )
+        self.assertEqual(
+            expire(held=True, state_name="In Progress", pr_verdict="none", age_seconds=10_000),
+            ("keep", "live_holder"),
+        )
+        self.assertEqual(
+            expire(held=True, state_name="In Review", pr_verdict="remount", age_seconds=10),
+            ("keep", "live_remount"),
+        )
+        self.assertEqual(
+            expire(held=None, state_name="Done", pr_verdict="skip", age_seconds=10),
+            ("unknown", "lock_held_unverified"),
+        )
+
+    def test_gc_expires_in_review_and_ttl_leftovers_keeps_live_holder(self):
+        stale = self.touch_lock("JOV-5257", age_seconds=30)
+        leftover = self.touch_lock("JOV-5001", age_seconds=self.module.FALLBACK_LEASE_TTL_SECONDS + 5)
+        live = self.touch_lock("JOV-5002")
+        handle = open(live, "a+")
+        self.addCleanup(handle.close)
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        issues = {
+            "JOV-5257": {"state": {"name": "In Review"}},
+            "JOV-5001": {"state": {"name": "Todo"}},
+            "JOV-5002": {"state": {"name": "In Progress"}},
+        }
+        receipt = self.module.gc_fallback_locks(
+            open_prs={},
+            now=time.time(),
+            fetch_issue=lambda ident: issues.get(ident),
+        )
+        self.assertFalse(stale.exists())
+        self.assertFalse(leftover.exists())
+        self.assertTrue(live.exists())
+        self.assertEqual(receipt["lockCountBefore"], 3)
+        self.assertEqual(receipt["lockCountAfter"], 1)
+        self.assertEqual({row["identifier"] for row in receipt["expired"]}, {"JOV-5257", "JOV-5001"})
+        self.assertEqual(receipt["kept"][0]["identifier"], "JOV-5002")
+        self.assertFalse(receipt["red"])
+
+    def test_gc_expires_open_pr_inflight_without_linear(self):
+        path = self.touch_lock("JOV-5257", age_seconds=5)
+        fetches = []
+        receipt = self.module.gc_fallback_locks(
+            open_prs={"JOV-5257": {"number": 16365, "head": "fallback/JOV-5257-fix", "mergeStateStatus": "CLEAN"}},
+            fetch_issue=lambda ident: fetches.append(ident) or {"state": {"name": "In Progress"}},
+        )
+        self.assertFalse(path.exists())
+        self.assertEqual(fetches, [])
+        self.assertEqual(receipt["expired"][0]["reason"], "open_pr_inflight")
+
+    def test_pickup_refuses_in_review_and_unknown_is_red(self):
+        self.assertEqual(
+            self.module.pickup_refuse_reason(
+                "JOV-5257",
+                issue={"state": {"name": "In Review"}},
+                pr_verdict="skip",
+                held=False,
+            ),
+            "open_pr_inflight",
+        )
+        self.assertIsNone(
+            self.module.pickup_refuse_reason(
+                "JOV-5257",
+                issue={"state": {"name": "In Review"}},
+                pr_verdict="none",
+                held=False,
+            )
+        )
+        self.assertEqual(
+            self.module.pickup_refuse_reason(
+                "JOV-5257",
+                issue={"state": {"name": "In Review"}},
+                pr_verdict="none",
+                held=False,
+                codex_writer=True,
+            ),
+            "issue_in_review",
+        )
+        self.assertIsNone(
+            self.module.pickup_refuse_reason(
+                "JOV-5003",
+                issue={"state": {"name": "Todo"}},
+                pr_verdict="none",
+                held=False,
+            )
+        )
+        typed, red = self.module._typed_pickup_reason("not_a_real_reason")
+        self.assertEqual((typed, red), ("unknown", True))
+
+    def test_pickup_check_refuses_in_review_and_admits_todo(self):
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(self.module, "_autonomous_open_pr_index", return_value={}),
+            mock.patch.object(
+                self.module,
+                "_fetch_single_issue",
+                return_value={"identifier": "JOV-5257", "state": {"name": "In Review"}},
+            ),
+            contextlib.redirect_stderr(stderr),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            rc = self.module.pickup_check_command("JOV-5257")
+        self.assertEqual(rc, 78)
+        self.assertIn("issue_in_review", stderr.getvalue())
+        self.assertIn("pickup schema=symphony-fallback-pickup/v1 event=refuse", stderr.getvalue())
+
+        stdout = io.StringIO()
+        with (
+            mock.patch.object(self.module, "_autonomous_open_pr_index", return_value={}),
+            mock.patch.object(
+                self.module,
+                "_fetch_single_issue",
+                return_value={"identifier": "JOV-5003", "state": {"name": "Todo"}},
+            ),
+            contextlib.redirect_stderr(io.StringIO()),
+            contextlib.redirect_stdout(stdout),
+        ):
+            rc = self.module.pickup_check_command("JOV-5003")
+        self.assertEqual(rc, 0)
+        self.assertIn("PICKUP_ADMITTED identifier=JOV-5003", stdout.getvalue())
+
+    def test_launch_skips_inflight_and_names_next_eligible(self):
+        launches: list[list[str]] = []
+        stderr = io.StringIO()
+
+        def verdict(identifier, _index):
+            if identifier == "JOV-5257":
+                return "skip", {"number": 16365}
+            return "none", None
+
+        with (
+            mock.patch.object(self.module, "_autonomous_open_pr_index", return_value={}),
+            mock.patch.object(self.module, "_open_pr_verdict", side_effect=verdict),
+            mock.patch.object(
+                self.module,
+                "_fetch_single_issue",
+                return_value={"identifier": "JOV-5003", "state": {"name": "Todo"}},
+            ),
+            mock.patch.object(
+                self.module,
+                "_issue_meta",
+                return_value=(True, "admitted", {"issue_revision": "2026-08-22T00:00:00Z"}),
+            ),
+            mock.patch.object(
+                self.module, "_control", side_effect=lambda command: launches.append(command) or True
+            ),
+            contextlib.redirect_stderr(stderr),
+        ):
+            launched, used = self.module._launch_fallback_workers(
+                ["JOV-5257", "JOV-5003"],
+                [],
+                "/bin/true",
+                "a" * 64,
+                {"selected": {"id": "grok"}},
+                2,
+            )
+        self.assertEqual(used, 1)
+        self.assertEqual(len(launched), 1)
+        self.assertTrue(any("JOV-5003" in arg for command in launches for arg in command))
+        self.assertFalse(any("JOV-5257" in arg for command in launches for arg in command if arg.startswith("--unit=")))
+        log = stderr.getvalue()
+        self.assertIn("reason=open_pr_inflight", log)
+        self.assertIn("event=lease_start identifier=JOV-5003", log)
 
 
 if __name__ == "__main__":

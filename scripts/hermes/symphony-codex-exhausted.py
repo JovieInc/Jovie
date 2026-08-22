@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import base64
 import calendar
+import fcntl
 import hashlib
 import json
 import math
@@ -35,6 +36,36 @@ CONTROL_TIMEOUT_SECONDS = 10.0
 DEFAULT_GROK_MAX = 4  # Gem 16c/62GB safely runs 4 concurrent grok-ship workers (per-unit idempotent, active units skipped)
 MAX_GROK_MAX = 10  # hard ceiling; 10 only via explicit SYMPHONY_GROK_MAX (free-tier Build quota / dispatch risk above 4)
 STALE_REMOUNT_SECONDS = 90 * 60  # product remounts (JOV-5235) still grok at 54 min; 45 min would recycle live work
+# Unlocked leftover JOV-*.lock files older than this cannot keep pickup idle.
+# Held live implement/remount locks are never TTL-expired.
+FALLBACK_LEASE_TTL_SECONDS = STALE_REMOUNT_SECONDS
+FALLBACK_LEASE_DIR = "~/.local/state/symphony-fallback/leases"
+FALLBACK_GC_SCHEMA = "symphony-fallback-lease-gc/v1"
+FALLBACK_PICKUP_SCHEMA = "symphony-fallback-pickup/v1"
+FALLBACK_LOCK_NAME = re.compile(r"^((?:JOV|LYB)-\d+)\.lock$")
+TERMINAL_LOCK_STATES = frozenset(
+    ("in review", "done", "canceled", "cancelled", "duplicate", "closed")
+)
+DONE_LOCK_STATES = frozenset(("done", "canceled", "cancelled", "duplicate", "closed"))
+TYPED_PICKUP_REFUSE_REASONS = frozenset(
+    (
+        "open_pr_inflight",
+        "issue_in_review",
+        "issue_done",
+        "issue_canceled",
+        "issue_duplicate",
+        "fallback_lease_held",
+        "admission_unverifiable",
+        "not_admitted",
+        "grok_launch_failed",
+        "lock_gc_unverifiable",
+        "malformed_identifier",
+        "capacity_full",
+        "no_eligible_issue",
+        "blocked",
+        "state_not_admitted",
+    )
+)
 PRIMARY_SERVICE = "symphony-ui-pilot.service"
 OPTIONAL_SERVICES = ("symphony-lyb.service",)
 SERVICES = (PRIMARY_SERVICE, *OPTIONAL_SERVICES)
@@ -1112,6 +1143,379 @@ def open_pr_verdict_command(identifier: str) -> int:
     return 0
 
 
+def _fallback_lease_dir() -> pathlib.Path:
+    return pathlib.Path(
+        os.path.expanduser(os.environ.get("SYMPHONY_FALLBACK_LEASE_DIR", FALLBACK_LEASE_DIR))
+    )
+
+
+def _fallback_gc_receipt_path() -> pathlib.Path:
+    configured = os.environ.get("SYMPHONY_FALLBACK_GC_RECEIPT")
+    if configured:
+        return pathlib.Path(os.path.expanduser(configured))
+    return _fallback_lease_dir().parent / "gc" / "latest.json"
+
+
+def _fallback_pickup_receipt_path() -> pathlib.Path:
+    configured = os.environ.get("SYMPHONY_FALLBACK_PICKUP_RECEIPT")
+    if configured:
+        return pathlib.Path(os.path.expanduser(configured))
+    return _fallback_lease_dir().parent / "pickup" / "latest.json"
+
+
+def _write_json_atomic(path: pathlib.Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w") as handle:
+            json.dump(payload, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def _iter_fallback_locks() -> list[pathlib.Path]:
+    directory = _fallback_lease_dir()
+    try:
+        entries = list(directory.iterdir())
+    except FileNotFoundError:
+        return []
+    locks: list[pathlib.Path] = []
+    for path in entries:
+        if path.is_file() and FALLBACK_LOCK_NAME.fullmatch(path.name):
+            locks.append(path)
+    return sorted(locks)
+
+
+def _fallback_lock_count() -> int | None:
+    try:
+        return len(_iter_fallback_locks())
+    except OSError:
+        return None
+
+
+def _lock_identifier(path: pathlib.Path) -> str | None:
+    match = FALLBACK_LOCK_NAME.fullmatch(path.name)
+    return match.group(1) if match else None
+
+
+def _lock_held(path: pathlib.Path) -> bool | None:
+    """True when another process holds the exclusive flock. None if unreadable."""
+    try:
+        descriptor = os.open(path, os.O_RDWR)
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return None
+    try:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return True
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+        return False
+    finally:
+        os.close(descriptor)
+
+
+def _lock_age_seconds(path: pathlib.Path, now: float) -> float | None:
+    try:
+        age = now - path.stat().st_mtime
+    except OSError:
+        return None
+    return age if age >= 0 else None
+
+
+def expire_fallback_lock_decision(
+    *,
+    held: bool | None,
+    state_name: str | None,
+    pr_verdict: str | None,
+    age_seconds: float | None,
+    ttl_seconds: float = FALLBACK_LEASE_TTL_SECONDS,
+) -> tuple[str, str]:
+    """Pure GC verdict: expire | keep | unknown, plus a typed reason."""
+    if held is None:
+        return "unknown", "lock_held_unverified"
+    if pr_verdict == "skip":
+        return "expire", "open_pr_inflight"
+    state = (state_name or "").strip().lower()
+    if state in DONE_LOCK_STATES:
+        return "expire", {
+            "done": "issue_done",
+            "closed": "issue_done",
+            "canceled": "issue_canceled",
+            "cancelled": "issue_canceled",
+            "duplicate": "issue_duplicate",
+        }[state]
+    if state == "in review" and pr_verdict != "remount":
+        return "expire", "issue_in_review"
+    if held and pr_verdict == "remount":
+        return "keep", "live_remount"
+    if held and state in {"todo", "in progress"}:
+        return "keep", "live_holder"
+    if not held:
+        if age_seconds is not None and age_seconds > ttl_seconds:
+            return "expire", "ttl_expired"
+        if age_seconds is None and state_name is None and pr_verdict is None:
+            return "unknown", "lock_age_unverified"
+        return "keep", "ttl_unexpired"
+    if state_name is None and pr_verdict is None:
+        return "unknown", "lock_owner_unverified"
+    if state == "in review":
+        return "expire", "issue_in_review"
+    return "keep", "live_holder"
+
+
+def _issue_state_name(issue: dict | None) -> str | None:
+    if not isinstance(issue, dict):
+        return None
+    state = issue.get("state")
+    if not isinstance(state, dict) or not isinstance(state.get("name"), str):
+        return None
+    return state["name"]
+
+
+def _typed_pickup_reason(reason: str) -> tuple[str, bool]:
+    """Unknown refuse reasons are red."""
+    if reason in TYPED_PICKUP_REFUSE_REASONS:
+        return reason, False
+    return "unknown", True
+
+
+def _emit_pickup(
+    event: str,
+    *,
+    reason: str | None = None,
+    identifier: str | None = None,
+    lock_count: int | None = None,
+    next_issue: str | None = None,
+) -> dict:
+    typed_reason = reason
+    red = False
+    if event == "refuse":
+        typed_reason, red = _typed_pickup_reason(reason or "")
+        if red:
+            event = "red"
+    if event == "red":
+        typed_reason, _ = _typed_pickup_reason(reason or "unknown")
+        if typed_reason != "unknown":
+            typed_reason = "unknown"
+        red = True
+    count_text = "unknown" if lock_count is None else str(lock_count)
+    next_text = next_issue or ""
+    ident_text = identifier or ""
+    reason_text = typed_reason or ""
+    line = (
+        f"pickup schema={FALLBACK_PICKUP_SCHEMA} event={event}"
+        f" identifier={ident_text} reason={reason_text}"
+        f" lock_count={count_text} next={next_text}"
+    )
+    print(line, file=sys.stderr, flush=True)
+    receipt = {
+        "schema": FALLBACK_PICKUP_SCHEMA,
+        "observedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "event": event,
+        "identifier": identifier,
+        "reason": typed_reason,
+        "lockCount": lock_count,
+        "nextEligibleIssue": next_issue or None,
+        "red": red,
+    }
+    try:
+        _write_json_atomic(_fallback_pickup_receipt_path(), receipt)
+    except OSError:
+        pass
+    return receipt
+
+
+def gc_fallback_locks(
+    *,
+    open_prs: dict[str, dict] | None = None,
+    now: float | None = None,
+    fetch_issue=None,
+) -> dict:
+    """Expire leftover fallback locks that can permanently own pickup.
+
+    Unlink is the only mutation. Live implement/remount holders are kept.
+    Missing observations fail closed (keep the file).
+    """
+    observed = time.time() if now is None else now
+    fetch = fetch_issue or _fetch_single_issue
+    expired: list[dict] = []
+    kept: list[dict] = []
+    unknown: list[dict] = []
+    try:
+        locks = _iter_fallback_locks()
+    except OSError:
+        receipt = {
+            "schema": FALLBACK_GC_SCHEMA,
+            "observedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(observed)),
+            "ttlSeconds": FALLBACK_LEASE_TTL_SECONDS,
+            "lockCountBefore": None,
+            "lockCountAfter": None,
+            "expired": [],
+            "kept": [],
+            "unknown": [{"reason": "lock_dir_unreadable"}],
+            "red": True,
+        }
+        print(
+            f"pickup schema={FALLBACK_PICKUP_SCHEMA} event=red identifier= reason=lock_gc_unverifiable"
+            f" lock_count=unknown next=",
+            file=sys.stderr,
+            flush=True,
+        )
+        return receipt
+    if locks and open_prs is None:
+        open_prs = _autonomous_open_pr_index(None)
+    if open_prs is None:
+        open_prs = {}
+    for path in locks:
+        identifier = _lock_identifier(path)
+        if identifier is None:
+            unknown.append({"path": path.name, "reason": "malformed_lock"})
+            continue
+        held = _lock_held(path)
+        age = _lock_age_seconds(path, observed)
+        verdict, _pr = _open_pr_verdict(identifier, open_prs)
+        # Skip Linear when TTL or an inflight PR already proves the lock is stale.
+        state_name = None
+        needs_issue = not (
+            verdict == "skip" or (held is False and age is not None and age > FALLBACK_LEASE_TTL_SECONDS)
+        )
+        if needs_issue:
+            state_name = _issue_state_name(fetch(identifier))
+        action, reason = expire_fallback_lock_decision(
+            held=held,
+            state_name=state_name,
+            pr_verdict=verdict,
+            age_seconds=age,
+        )
+        record = {"identifier": identifier, "reason": reason, "held": held, "ageSeconds": None if age is None else int(age)}
+        if action == "expire":
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError:
+                unknown.append({**record, "reason": "lock_unlink_failed"})
+                continue
+            expired.append(record)
+            continue
+        if action == "unknown":
+            unknown.append(record)
+            continue
+        kept.append(record)
+    after = _fallback_lock_count()
+    receipt = {
+        "schema": FALLBACK_GC_SCHEMA,
+        "observedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(observed)),
+        "ttlSeconds": FALLBACK_LEASE_TTL_SECONDS,
+        "lockCountBefore": len(locks),
+        "lockCountAfter": after,
+        "expired": expired,
+        "kept": kept,
+        "unknown": unknown,
+        "red": bool(unknown),
+    }
+    try:
+        _write_json_atomic(_fallback_gc_receipt_path(), receipt)
+    except OSError:
+        pass
+    print(
+        f"fallback-lock-gc schema={FALLBACK_GC_SCHEMA} expired={len(expired)}"
+        f" kept={len(kept)} unknown={len(unknown)} lock_count={after if after is not None else 'unknown'}",
+        file=sys.stderr,
+        flush=True,
+    )
+    return receipt
+
+
+def pickup_refuse_reason(
+    identifier: str,
+    *,
+    issue: dict | None,
+    pr_verdict: str,
+    held: bool | None,
+    codex_writer: bool = False,
+) -> str | None:
+    """Typed reason to refuse a new writer. None means the issue may start.
+
+    Codex is never a second writer on In Review (lease-guard + router). The
+    sidecar may continue an In Review remount or receipt-less claimed head.
+    """
+    if not IDENTIFIER.fullmatch(identifier):
+        return "malformed_identifier"
+    if pr_verdict == "skip":
+        return "open_pr_inflight"
+    state = (_issue_state_name(issue) or "").strip().lower()
+    if state in DONE_LOCK_STATES:
+        return {
+            "done": "issue_done",
+            "closed": "issue_done",
+            "canceled": "issue_canceled",
+            "cancelled": "issue_canceled",
+            "duplicate": "issue_duplicate",
+        }[state]
+    if held is True:
+        return "fallback_lease_held"
+    if held is None:
+        return "lock_gc_unverifiable"
+    if state == "in review" and (codex_writer or pr_verdict == "skip"):
+        return "issue_in_review"
+    return None
+
+
+def pickup_check_command(identifier: str) -> int:
+    """Router preflight: GC this issue's stale lock, then fail closed with a typed reason."""
+    if not IDENTIFIER.fullmatch(identifier):
+        print(
+            'SYMPHONY_LAUNCHER_FAILURE schema=symphony-launcher-failure/v1 '
+            f'class=pickup-refused retryable=false maxAttempts=1 reason="malformed_identifier {identifier}"',
+            file=sys.stderr,
+        )
+        return 78
+    open_prs = _autonomous_open_pr_index([identifier])
+    gc_fallback_locks(open_prs=_autonomous_open_pr_index(None))
+    issue = _fetch_single_issue(identifier)
+    verdict, _pr = _open_pr_verdict(identifier, open_prs)
+    lock_path = _fallback_lease_dir() / f"{identifier}.lock"
+    held = _lock_held(lock_path) if lock_path.is_file() else False
+    reason = pickup_refuse_reason(
+        identifier, issue=issue, pr_verdict=verdict, held=held, codex_writer=True
+    )
+    lock_count = _fallback_lock_count()
+    if reason is not None:
+        _emit_pickup(
+            "refuse",
+            reason=reason,
+            identifier=identifier,
+            lock_count=lock_count,
+            next_issue="",
+        )
+        failure_class = "fallback-lease-held" if reason == "fallback_lease_held" else "pickup-refused"
+        print(
+            "SYMPHONY_LAUNCHER_FAILURE schema=symphony-launcher-failure/v1 "
+            f"class={failure_class} retryable=false maxAttempts=1 "
+            f'reason="{reason} owns {identifier}"',
+            file=sys.stderr,
+        )
+        return 78
+    _emit_pickup(
+        "lease_start",
+        reason="lease_start",
+        identifier=identifier,
+        lock_count=lock_count,
+        next_issue=identifier,
+    )
+    print(f"PICKUP_ADMITTED identifier={identifier} lock_count={lock_count}")
+    return 0
+
+
 def _launch_fallback_workers(
     identifiers: list[str],
     active: list[str],
@@ -1122,31 +1526,91 @@ def _launch_fallback_workers(
 ) -> tuple[set[str], int]:
     """Start isolated fallback units up to *limit*. Never stops Symphony."""
     open_prs = _autonomous_open_pr_index(None)
+    gc_fallback_locks(open_prs=open_prs)
     active_units = set(_recycle_stale_remount_units(active, open_prs))
     capacity_used = len(active_units)
     launched_units: set[str] = set()
+    lock_count = _fallback_lock_count()
+    next_eligible = ""
+    first_lease: str | None = None
     for identifier in identifiers:
         if capacity_used >= limit:
+            if next_eligible == "":
+                next_eligible = identifier
+            _emit_pickup(
+                "refuse",
+                reason="capacity_full",
+                identifier=identifier,
+                lock_count=lock_count,
+                next_issue=first_lease or next_eligible,
+            )
             break
         legacy_unit = f"grok-ship-{identifier}.service"
         fallback_prefix = f"fallback-ship-{identifier}-"
         if legacy_unit in active_units or any(unit.startswith(fallback_prefix) for unit in active_units):
             continue
         verdict, _pr = _open_pr_verdict(identifier, open_prs)
-        if verdict == "skip":
-            print(f"fallback skip {identifier} open_pr_inflight", file=sys.stderr, flush=True)
+        lock_path = _fallback_lease_dir() / f"{identifier}.lock"
+        held = _lock_held(lock_path) if lock_path.is_file() else False
+        issue = None
+        if verdict != "skip":
+            issue = _fetch_single_issue(identifier)
+        refuse = pickup_refuse_reason(
+            identifier, issue=issue, pr_verdict=verdict, held=held
+        )
+        if refuse is not None:
+            if next_eligible == "" and refuse not in {
+                "open_pr_inflight",
+                "issue_in_review",
+                "issue_done",
+                "issue_canceled",
+                "issue_duplicate",
+            }:
+                next_eligible = identifier
+            _emit_pickup(
+                "refuse",
+                reason=refuse,
+                identifier=identifier,
+                lock_count=lock_count,
+                next_issue=next_eligible,
+            )
+            skip_label = (
+                "not admitted"
+                if refuse in {"not_admitted", "blocked", "state_not_admitted"}
+                else refuse
+            )
+            print(f"fallback skip {identifier} {skip_label}", file=sys.stderr, flush=True)
             continue
-        issue = _fetch_single_issue(identifier)
         if issue is None:
+            _emit_pickup(
+                "refuse",
+                reason="admission_unverifiable",
+                identifier=identifier,
+                lock_count=lock_count,
+                next_issue=next_eligible,
+            )
             print(f"fallback skip {identifier} admission_unverifiable", file=sys.stderr, flush=True)
             continue
-        ok, _reason, meta = _issue_meta(
+        ok, meta_reason, meta = _issue_meta(
             issue,
             identifier,
             require_receipt=(verdict != "remount" and not _continue_without_receipt(issue)),
         )
         if not ok:
-            print(f"fallback skip {identifier} not admitted", file=sys.stderr, flush=True)
+            reason = meta_reason if meta_reason in TYPED_PICKUP_REFUSE_REASONS else "not_admitted"
+            _emit_pickup(
+                "refuse",
+                reason=reason,
+                identifier=identifier,
+                lock_count=lock_count,
+                next_issue=next_eligible,
+            )
+            skip_label = (
+                "not admitted"
+                if reason in {"not_admitted", "blocked", "state_not_admitted"}
+                else reason
+            )
+            print(f"fallback skip {identifier} {skip_label}", file=sys.stderr, flush=True)
             continue
         command = _grok_command(
             identifier,
@@ -1156,10 +1620,35 @@ def _launch_fallback_workers(
             bundle_revision,
         )
         if not _control(command):
+            _emit_pickup(
+                "refuse",
+                reason="grok_launch_failed",
+                identifier=identifier,
+                lock_count=lock_count,
+                next_issue=next_eligible,
+            )
             print(f"fallback skip {identifier} grok_launch_failed", file=sys.stderr, flush=True)
             continue
         launched_units.add(next(arg.removeprefix("--unit=") + ".service" for arg in command if arg.startswith("--unit=")))
         capacity_used += 1
+        if first_lease is None:
+            first_lease = identifier
+            next_eligible = identifier
+        _emit_pickup(
+            "lease_start",
+            reason="lease_start",
+            identifier=identifier,
+            lock_count=lock_count,
+            next_issue=identifier,
+        )
+    if not launched_units and first_lease is None:
+        _emit_pickup(
+            "idle",
+            reason="no_eligible_issue" if not next_eligible else "capacity_full",
+            identifier=None,
+            lock_count=lock_count,
+            next_issue=next_eligible,
+        )
     return launched_units, capacity_used
 
 
@@ -1189,6 +1678,7 @@ def _grok_command(
 
 
 def reconcile() -> int:
+    gc_fallback_locks()
     ready, reason = codex_canary_ready()
     if ready:
         active = _active_grok_units()
@@ -1604,7 +2094,15 @@ def main() -> int:
     parser.add_argument(
         "command",
         nargs="?",
-        choices=("probe", "reconcile", "install", "check-admission", "open-pr-verdict"),
+        choices=(
+            "probe",
+            "reconcile",
+            "install",
+            "check-admission",
+            "open-pr-verdict",
+            "gc-fallback-locks",
+            "pickup-check",
+        ),
         default=default,
     )
     parser.add_argument("identifier", nargs="?")
@@ -1629,6 +2127,15 @@ def main() -> int:
             print("open-pr-verdict requires an issue identifier", file=sys.stderr)
             return 2
         return open_pr_verdict_command(args.identifier)
+    if args.command == "gc-fallback-locks":
+        receipt = gc_fallback_locks()
+        print(json.dumps(receipt, indent=2, sort_keys=True))
+        return 2 if receipt.get("red") else 0
+    if args.command == "pickup-check":
+        if not args.identifier:
+            print("pickup-check requires an issue identifier", file=sys.stderr)
+            return 2
+        return pickup_check_command(args.identifier)
     ready, _ = codex_canary_ready()
     print("no" if ready else "yes")
     return 1 if ready else 0
