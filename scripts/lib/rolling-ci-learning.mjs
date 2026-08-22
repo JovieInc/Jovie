@@ -24,7 +24,7 @@ export function learningReceiptKey(identity) {
   if (!validIdentity(identity)) throw new Error('invalid learning identity');
   return [
     identity.repository,
-    identity.pr,
+    `pr-${identity.pr}`,
     identity.head.toLowerCase(),
     identity.check,
     identity.fingerprint,
@@ -166,6 +166,10 @@ export function evaluateLearningPromotion({
   }
 
   for (const [key, failure] of required) {
+    if (failure.failureKey && failure.failureKey !== key) {
+      blockers.push({ key, reason: 'repair-failure-key-mismatch' });
+      continue;
+    }
     if (failure.repairedHead !== liveHead) {
       blockers.push({
         key,

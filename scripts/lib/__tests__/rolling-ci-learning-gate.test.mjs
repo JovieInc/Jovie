@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { evaluateLearningGateInput } from '../../rolling-ci-learning-gate.mjs';
 import {
   LEARNING_RECEIPT_SCHEMA,
+  learningReceiptKey,
   learningReceiptMarker,
 } from '../rolling-ci-learning.mjs';
 
@@ -17,6 +18,7 @@ const identity = {
 };
 const repairedFailure = {
   ...identity,
+  failureKey: learningReceiptKey(identity),
   status: 'repaired',
   repairedHead: head,
 };

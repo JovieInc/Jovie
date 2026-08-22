@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   evaluateLearningPromotion,
   LEARNING_RECEIPT_SCHEMA,
+  learningReceiptKey,
   learningReceiptMarker,
   parseLearningReceiptMarker,
   validateLearningReceipt,
@@ -44,11 +45,18 @@ const validReceipt = {
 };
 const repairedFailure = {
   ...identity,
+  failureKey: learningReceiptKey(identity),
   status: 'repaired',
   repairedHead: head,
 };
 
 describe('rolling CI defect-class learning', () => {
+  it('uses the trusted-dispatch failure key exactly', () => {
+    expect(learningReceiptKey(identity)).toBe(
+      `JovieInc/Jovie:pr-16337:${head}:CI / ci-fast:vitest:policy-liveness:deadlock`
+    );
+  });
+
   it('accepts a complete exact-head repaired-failure receipt', () => {
     expect(validateLearningReceipt(validReceipt, { liveHead: head })).toEqual({
       ok: true,
@@ -97,6 +105,20 @@ describe('rolling CI defect-class learning', () => {
       expect.objectContaining({
         reason: 'repair-not-revalidated-on-current-head',
       })
+    );
+  });
+
+  it('rejects a repair record whose dispatch failure key was altered', () => {
+    expect(
+      evaluateLearningPromotion({
+        repairedFailures: [
+          { ...repairedFailure, failureKey: 'forged-dispatch-key' },
+        ],
+        receipts: [validReceipt],
+        liveHead: head,
+      }).blockers
+    ).toContainEqual(
+      expect.objectContaining({ reason: 'repair-failure-key-mismatch' })
     );
   });
 
