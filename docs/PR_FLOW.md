@@ -18,6 +18,37 @@ If you are an agent about to open a PR, read [Agent checklist](#agent-checklist)
   the source-PR gate cheap; put deterministic integration on the exact combined
   queue head and network/deploy/exhaustive depth after merge or on schedules.
 
+## Draft-first rolling CI contract
+
+This repository operationalizes OpenAI's
+[harness-engineering guidance](https://openai.com/index/harness-engineering/)
+with one concrete Jovie decision: publish a draft after the first coherent,
+testable commit instead of waiting for promotion-grade local verification.
+
+- Push the first checkpoint with `JOVIE_PUSH_PHASE=publication git push`, open
+  the draft immediately, and keep implementing in small commits while fast CI
+  evaluates prior heads. Publication still runs branch, diff-integrity, secret,
+  and hook-policy checks; it is not evidence for promotion.
+- Every push starts fast CI. Per-PR concurrency cancels superseded runs. A CI
+  failure is normalized to PR, exact head, check, attempt, and fingerprint;
+  stale or duplicate deliveries are rejected and every repair is revalidated
+  against the live head.
+- One remediation writer holds the PR lease. Route failures to the active
+  implementer while ownership is live. Moving on requires an explicit handoff
+  receipt containing the draft PR, current head, acceptance criteria, remaining
+  checks, failure fingerprints, and remediation owner. FX is the recovery tier
+  only after handoff, abandonment, infrastructure failure, or cross-PR conflict.
+- A new commit or green rerun supersedes obsolete repairs. Mark ready and enter
+  the landing lane only when the final exact, current head passes every required
+  test, coverage, security, and policy gate. Never weaken a required gate or
+  substitute draft-publication checks for production/runtime proof.
+
+Regression case: PR #16336 had a coherent committed checkpoint with focused
+tests/typechecks green, but its mandatory affected pre-push shard ran for more
+than two minutes and failed before GitHub could create the draft or start CI.
+Draft publication must remain independently available when that heavier
+promotion qualification fails.
+
 ## 1. Unit of work: one small PR → `main`
 
 - **Default: a small, focused PR targeting `main`.** ≤ 800 lines / 40 files
