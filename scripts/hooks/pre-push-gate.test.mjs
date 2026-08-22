@@ -56,7 +56,9 @@ test('.husky/pre-push separates draft publication from qualification', () => {
 
 test('publication remains policy gated without running affected tests', () => {
   const source = readFileSync(gateScript, 'utf8');
-  const publication = source.split('run_publication() {', 2)[1].split('\n}', 1)[0];
+  const publication = source
+    .split('run_publication() {', 2)[1]
+    .split('\n}', 1)[0];
   assert.match(publication, /ci-branching-guard\.mjs check/);
   assert.match(publication, /--mode warn/);
   assert.match(publication, /git diff --check/);
