@@ -540,7 +540,9 @@ const nextConfig = {
   // See JOV-2322.
   serverExternalPackages: ['@statsig/statsig-node-core'],
   experimental: {
-    cpus: process.env.GITHUB_ACTIONS === 'true' ? 2 : undefined,
+    // GitHub-hosted ubuntu-latest/24.04 runners are 4 vCPU / 16 GB RAM — cap
+    // at 4 (was 2, which halved build parallelism; revert to 2 if OOM recurs).
+    cpus: process.env.GITHUB_ACTIONS === 'true' ? 4 : undefined,
     // Note: PPR (ppr: 'incremental') was deprecated in Next.js 15.3
     // cacheComponents: true requires additional configuration, disabled for now
     // Turbopack filesystem cache for faster dev server startup
