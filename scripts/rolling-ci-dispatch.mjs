@@ -73,6 +73,7 @@ export function planRollingCiDispatch(input) {
     });
     return {
       events: [event],
+      dispatchEvents: [],
       actions: [plan.action],
       action: plan.action,
       mutate: plan.mutate,
@@ -118,6 +119,7 @@ export function planRollingCiDispatch(input) {
 
   return {
     events,
+    dispatchEvents,
     actions: plans.map(plan => plan.action),
     action,
     mutate,

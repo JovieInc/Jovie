@@ -197,6 +197,12 @@ export function emptyDispatchState({ repository, prNumber, headSha }) {
 }
 
 function stateForEvent(event, priorState) {
+  if (
+    priorState &&
+    (priorState.repository !== event.repository || priorState.pr !== event.pr)
+  ) {
+    throw new Error('prior dispatch state does not match the event PR scope');
+  }
   const isSupersedingHead = priorState?.head && priorState.head !== event.head;
   if (
     !priorState ||
@@ -326,13 +332,54 @@ export function parseDispatchState(commentBody) {
   if (!match) return null;
   try {
     const parsed = JSON.parse(Buffer.from(match[1], 'base64url').toString());
-    return parsed?.schema === ROLLING_CI_STATE_SCHEMA ? parsed : null;
+    if (!isDispatchState(parsed)) throw new Error('state shape is invalid');
+    return parsed;
   } catch {
-    return null;
+    throw new Error('rolling CI dispatch state marker is invalid');
   }
 }
 
 export function dispatchStateMarker(state) {
+  if (!isDispatchState(state)) {
+    throw new Error('rolling CI dispatch state is invalid');
+  }
   const encoded = Buffer.from(JSON.stringify(state)).toString('base64url');
   return `<!-- ${ROLLING_CI_STATE_MARKER}:${encoded} -->`;
+}
+
+function isDispatchState(state) {
+  try {
+    if (state?.schema !== ROLLING_CI_STATE_SCHEMA) return false;
+    normalizeRepository(state.repository);
+    assertPositiveInteger(state.pr, 'state.pr');
+    normalizeSha(state.head, 'state.head');
+    if (!Array.isArray(state.deliveries)) return false;
+    if (!state.deliveries.every(value => typeof value === 'string' && value)) {
+      return false;
+    }
+    if (new Set(state.deliveries).size !== state.deliveries.length)
+      return false;
+    if (!state.failures || typeof state.failures !== 'object') return false;
+    return Object.entries(state.failures).every(([key, failure]) => {
+      if (!key || !failure || typeof failure !== 'object') return false;
+      if (!String(failure.check ?? '').trim()) return false;
+      if (!/^ci:[0-9a-f]{24}$/.test(String(failure.fingerprint ?? ''))) {
+        return false;
+      }
+      if (
+        !Number.isInteger(failure.deliveryCount) ||
+        failure.deliveryCount < 1 ||
+        failure.deliveryCount > MAX_NON_PROGRESS_DELIVERIES
+      ) {
+        return false;
+      }
+      if (!['active', 'terminal'].includes(failure.status)) return false;
+      assertPositiveInteger(failure.lastAttempt, 'failure.lastAttempt');
+      if (!/^\d+$/.test(String(failure.lastWorkflowRunId ?? ''))) return false;
+      if (failure.status === 'terminal' && !failure.incident) return false;
+      return true;
+    });
+  } catch {
+    return false;
+  }
 }

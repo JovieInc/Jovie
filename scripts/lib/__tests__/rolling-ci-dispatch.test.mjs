@@ -222,14 +222,26 @@ describe('rolling CI dispatch idempotency and supersession', () => {
     ).toMatchObject({ action: 'reject_stale_green', mutate: false });
   });
 
-  it('round-trips durable state and rejects a malformed marker', () => {
+  it('round-trips durable state and fails closed on a malformed marker', () => {
     const plan = planFailureDispatch({ event: failure(), liveHead: head });
     expect(parseDispatchState(dispatchStateMarker(plan.state))).toEqual(
       plan.state
     );
-    expect(
+    expect(() =>
       parseDispatchState('<!-- jovie-rolling-ci-dispatch-state:not-json -->')
-    ).toBeNull();
+    ).toThrow('dispatch state marker is invalid');
+  });
+
+  it('deliberate red: rejects durable state from another PR scope', () => {
+    const plan = planFailureDispatch({ event: failure(), liveHead: head });
+    const crossPrState = { ...plan.state, pr: 18 };
+    expect(() =>
+      planFailureDispatch({
+        event: failure({ workflowRunId: 9002 }),
+        liveHead: head,
+        priorState: crossPrState,
+      })
+    ).toThrow('does not match the event PR scope');
   });
 });
 
@@ -262,6 +274,7 @@ describe('rolling CI workflow adapter', () => {
       shouldComment: true,
     });
     expect(result.events).toHaveLength(2);
+    expect(result.dispatchEvents).toHaveLength(2);
     expect(result.body).toContain('`ci-fast`');
     expect(result.body).toContain('`Unit Tests`');
     expect(parseDispatchState(result.body)).toEqual(result.state);
@@ -279,6 +292,7 @@ describe('rolling CI workflow adapter', () => {
       shouldComment: false,
       body: '',
     });
+    expect(duplicate.dispatchEvents).toEqual([]);
   });
 
   it('clears durable repair state after a current-head green rerun', () => {
