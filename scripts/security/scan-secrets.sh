@@ -2,6 +2,7 @@
 # Run gitleaks + trufflehog for defense-in-depth secret scanning (JOV-3215).
 # Modes:
 #   pre-commit          Scan staged changes (fast, for git hooks)
+#   publication         Scan current files changed since base (bootstrap-safe)
 #   ci-pr [base-ref]    Scan commits since base ref (PR CI)
 #   full                Scan full git history
 set -euo pipefail
@@ -146,6 +147,31 @@ run_trufflehog_pre_commit() {
   # shellcheck disable=SC2048,SC2086
   "$TRUFFLEHOG_BIN" filesystem \
     ${staged_files[@]} \
+    --no-verification \
+    --fail
+}
+
+run_trufflehog_publication() {
+  local -a changed_files=()
+  local file
+
+  while IFS= read -r file; do
+    if [[ -n "$file" && -f "$file" ]] && ! is_trufflehog_excluded "$file"; then
+      changed_files+=("$file")
+    fi
+  done < <(git diff --name-only --diff-filter=ACMR "${BASE_REF}...HEAD")
+
+  if [[ ${#changed_files[@]} -eq 0 ]]; then
+    echo "No changed files for draft-publication trufflehog scan."
+    return
+  fi
+
+  echo "Running bootstrap-safe trufflehog filesystem scan on ${#changed_files[@]} changed file(s)..."
+  # Promotion CI retains the exact commit-range git scan. Publication scans
+  # current committed files so it never needs to clone repository history.
+  # shellcheck disable=SC2048,SC2086
+  "$TRUFFLEHOG_BIN" filesystem \
+    ${changed_files[@]} \
     --no-verification \
     --fail
 }
@@ -340,7 +366,7 @@ run_trufflehog_full() {
 }
 
 usage() {
-  echo "Usage: $0 {pre-commit|ci-pr|ci-pr-trufflehog|full|full-trufflehog} [base-ref]" >&2
+  echo "Usage: $0 {pre-commit|publication|ci-pr|ci-pr-trufflehog|full|full-trufflehog} [base-ref]" >&2
   exit 1
 }
 
@@ -351,6 +377,10 @@ case "$MODE" in
   pre-commit)
     run_gitleaks_pre_commit
     run_trufflehog_pre_commit
+    ;;
+  publication)
+    run_gitleaks_ci_pr
+    run_trufflehog_publication
     ;;
   ci-pr)
     run_gitleaks_ci_pr

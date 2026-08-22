@@ -56,7 +56,7 @@ run_publication() {
   node scripts/ci-branching-guard.mjs check \
     --head "$head_ref" --base main --mode warn
   git diff --check "$(git merge-base origin/main HEAD)..HEAD"
-  bash scripts/security/scan-secrets.sh ci-pr origin/main
+  bash scripts/security/scan-secrets.sh publication origin/main
   node --test scripts/hooks/pre-push-gate.test.mjs
 }
 

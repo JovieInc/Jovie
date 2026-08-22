@@ -60,6 +60,6 @@ test('publication remains policy gated without running affected tests', () => {
   assert.match(publication, /ci-branching-guard\.mjs check/);
   assert.match(publication, /--mode warn/);
   assert.match(publication, /git diff --check/);
-  assert.match(publication, /scan-secrets\.sh ci-pr origin\/main/);
+  assert.match(publication, /scan-secrets\.sh publication origin\/main/);
   assert.doesNotMatch(publication, /automation-verify|run_affected/);
 });
