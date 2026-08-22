@@ -33,6 +33,9 @@ describe('draft-first rolling CI policy wiring', () => {
   it('fans broad verification out remotely and cancels stale source heads', () => {
     const workflow = read('.github/workflows/ci.yml');
     expect(workflow).toContain('cancel-in-progress: ${{ github.event_name ==');
+    expect(workflow).toContain(
+      "branches: [main, 'integration/**', 'codex/**']"
+    );
     expect(workflow).toContain("github.event_name == 'pull_request' ||");
     expect(workflow).toContain('ci-draft-coverage:');
     expect(workflow).toContain('Affected Unit Tests (10 shards)');
