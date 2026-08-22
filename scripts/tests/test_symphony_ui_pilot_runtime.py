@@ -150,6 +150,11 @@ def test_workflow_uses_event_wake_with_slow_poll_backstop() -> None:
     assert "steps.admission.outputs.admitted == 'true'" in intake
     assert "-X POST http://127.0.0.1:4041/api/v1/refresh" in intake
     assert 'any(.teams[]; .status == "admitted"' in intake
+    assert 'python3 scripts/hermes/gem-gate-next-admission.py --mode=intake --issue="$ISSUE_IDENTIFIER"' in intake
+    assert "run-backlog.sh gate-next" not in intake
+    fleet = FLEET_WORKFLOW.read_text()
+    assert "python3 scripts/hermes/gem-gate-next-admission.py --mode=fleet" in fleet
+    assert "run-backlog.sh gate-next" not in fleet
 
 
 def test_intake_workflow_pins_the_gem_gbrain_adapter_contract() -> None:

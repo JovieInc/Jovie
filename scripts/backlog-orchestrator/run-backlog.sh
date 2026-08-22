@@ -1,5 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
+command="${1:-}"
+mutating=0
+if [[ "$command" == "gate-next" || "$command" == "reconcile" ]]; then
+  mutating=1
+  for arg in "$@"; do
+    if [[ "$arg" == "--dry-run" ]]; then
+      mutating=0
+      break
+    fi
+  done
+fi
+if [[ "$mutating" == 1 && "${JOVIE_GEM_GATE_ADMISSION_LOCK_HELD:-}" != "1" ]]; then
+  printf 'mutating %s requires gem-gate-next-admission lock proof\n' "$command" >&2
+  exit 2
+fi
+
 if [[ -z "${LINEAR_API_KEY:-}" ]]; then
   linear_env_file="${HOME}/.config/symphony/linear.env"
   if [[ ! -r "$linear_env_file" ]]; then

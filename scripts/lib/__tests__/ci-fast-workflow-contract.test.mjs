@@ -208,6 +208,12 @@ describe('ci-fast bounded parallel workflow', () => {
       'coverage report --include="*/scripts/hermes/gem_rehabilitation_policy.py" --fail-under=90'
     );
     expect(CI_FAST_SOURCE).toContain(
+      'coverage run --branch scripts/hermes/tests/gem-gate-next-admission.test.py'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'coverage report --include="*/scripts/hermes/gem-gate-next-admission.py" --fail-under=90'
+    );
+    expect(CI_FAST_SOURCE).toContain(
       "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs"
     );
     expect(CI_FAST_SOURCE).toContain(

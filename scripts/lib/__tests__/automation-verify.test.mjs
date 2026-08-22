@@ -7,6 +7,7 @@ import {
   buildAffectedTestPlan,
   buildFullSuiteCommands,
   buildSelectedTestCommands,
+  GATE_NEXT_ADMISSION_LANE,
   runCommandStatus,
 } from '../../run-affected-tests.mjs';
 
@@ -680,6 +681,25 @@ describe('automation-verify affected scope', () => {
       buildAffectedTestPlan([
         ...GEM_PR_REHABILITATION_LANE,
         'apps/ios/Jovie/RootView.swift',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('selects the Gem gate-next admission singleflight contracts', () => {
+    expect(buildAffectedTestPlan([...GATE_NEXT_ADMISSION_LANE])).toMatchObject({
+      mode: 'selected',
+      pythonUnittestTests: [
+        'scripts/hermes/tests/gem-gate-next-admission.test.py',
+        'scripts/hermes/tests/gem-priority-gate.test.py',
+      ],
+    });
+    expect(
+      buildAffectedTestPlan(['scripts/hermes/gem-gate-next-admission.py']).mode
+    ).toBe('selected');
+    expect(
+      buildAffectedTestPlan([
+        ...GATE_NEXT_ADMISSION_LANE,
+        'scripts/hermes/unknown-admission-peer.py',
       ]).mode
     ).toBe('full');
   });

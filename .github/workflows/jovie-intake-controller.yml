@@ -24,7 +24,7 @@ jobs:
   receive:
     name: Persist and classify one JOV intake event
     runs-on: [self-hosted, Linux, X64, jovie-fixed]
-    timeout-minutes: 3
+    timeout-minutes: 8
     env:
       JOVIE_GBRAIN_BIN: /home/timwhite/.local/bin/gbrain
       JOVIE_GBRAIN_DIALECT: adapter
@@ -66,11 +66,10 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$ISSUE_IDENTIFIER"
-          # gate-next rereads the exact issue, requires the canonical fleet
-          # receipt, plan and admission receipts, then verifies its single
-          # lease. A hold is a successful no-op, never a retry bypass.
+          # The wrapper holds the shared Gem flock around issue-scoped
+          # gate-next. Child stdout remains the admission receipt.
           receipt="$RUNNER_TEMP/intake-admission.json"
-          scripts/backlog-orchestrator/run-backlog.sh gate-next --issue="$ISSUE_IDENTIFIER" | tee "$receipt"
+          python3 scripts/hermes/gem-gate-next-admission.py --mode=intake --issue="$ISSUE_IDENTIFIER" | tee "$receipt"
           if jq -e --arg issue "$ISSUE_IDENTIFIER" '
             .status == "admitted" and
             any(.teams[]; .status == "admitted" and .issue == $issue and .mutations == "verified")
