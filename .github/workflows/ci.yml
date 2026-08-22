@@ -43,7 +43,10 @@ concurrency:
            && format('merge-group-{0}', github.event.merge_group.head_sha)
            || format('run-{0}-{1}', github.run_id, github.run_attempt))
     }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # Non-PR events already use exact-run/head keys, so unconditional
+  # cancellation changes only superseded source-PR heads and avoids relying on
+  # expression coercion at workflow admission.
+  cancel-in-progress: true
 
 env:
   # Source and synthetic combined-head code are PR-controlled. Both stages are
