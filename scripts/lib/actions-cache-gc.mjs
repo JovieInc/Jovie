@@ -145,6 +145,32 @@ export function planCacheGc(input = {}) {
   };
 }
 
+export function parseGhJsonOutput(stdout) {
+  const trimmed = String(stdout ?? '').trim();
+  if (!trimmed) return null;
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const lines = trimmed
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean);
+    return lines.flatMap(line => {
+      const parsed = JSON.parse(line);
+      return Array.isArray(parsed) ? parsed : [parsed];
+    });
+  }
+}
+
+export function flattenGhPages(parsed, key) {
+  const pages = Array.isArray(parsed) ? parsed : parsed == null ? [] : [parsed];
+  return pages.flatMap(page => {
+    if (Array.isArray(page)) return page;
+    if (key && Array.isArray(page?.[key])) return page[key];
+    return page && typeof page === 'object' ? [page] : [];
+  });
+}
+
 /** @param {Record<string, any>} [input] */
 export async function collectCacheGcSnapshot(input = {}) {
   const { repository, execJson } = input;
@@ -152,28 +178,31 @@ export async function collectCacheGcSnapshot(input = {}) {
   if (typeof execJson !== 'function') {
     throw new Error('execJson is required');
   }
-  const cachesRaw = await execJson([
+  const cachePages = await execJson([
     'api',
     '--paginate',
+    '--slurp',
     `repos/${repository}/actions/caches`,
-    '--jq',
-    '[.actions_caches[]]',
   ]);
   const usage = await execJson([
     'api',
     `repos/${repository}/actions/cache/usage`,
   ]);
-  const pulls = await execJson([
+  const pullPages = await execJson([
     'api',
     '--paginate',
+    '--slurp',
     `repos/${repository}/pulls?state=open&per_page=100`,
-    '--jq',
-    '[.[] | {number, headRef: .head.ref}]',
   ]);
   return {
-    caches: Array.isArray(cachesRaw) ? cachesRaw.flat() : [],
+    caches: flattenGhPages(cachePages, 'actions_caches'),
     usage: usage ?? {},
-    openRefs: buildOpenCacheRefs({ pullRequests: pulls ?? [] }),
+    openRefs: buildOpenCacheRefs({
+      pullRequests: flattenGhPages(pullPages).map(pull => ({
+        number: pull?.number,
+        headRef: pull?.head?.ref ?? pull?.headRef,
+      })),
+    }),
   };
 }
 
@@ -191,7 +220,7 @@ async function main() {
         maxBuffer: 20 * 1024 * 1024,
         env: process.env,
       });
-      return JSON.parse(stdout || 'null');
+      return parseGhJsonOutput(stdout);
     },
   });
   const plan = planCacheGc({
