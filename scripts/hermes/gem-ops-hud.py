@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import html.parser
 import json
 import os
@@ -17,12 +18,13 @@ import termios
 import time
 import urllib.error
 import urllib.request
+import uuid
 from pathlib import Path
 from typing import Any
 
 
 REPO = "JovieInc/Jovie"
-LOCAL_INTERVAL = max(10, int(os.environ.get("HUD_LOCAL_INTERVAL", "15")))
+LOCAL_INTERVAL = max(5, int(os.environ.get("HUD_LOCAL_INTERVAL", "5")))
 REMOTE_INTERVAL = max(60, int(os.environ.get("HUD_REMOTE_INTERVAL", "120")))
 FLEET_RECEIPT_STALE_SECONDS = 10 * 60
 FLEET_RECEIPT_FUTURE_SKEW_SECONDS = 5
@@ -41,6 +43,7 @@ FLEET_GATE_RECEIPT = Path(
     )
 ).expanduser()
 FLEET_GATE_SCHEMA = "jovie-fleet-gate/v1"
+OVIE_SHIPPING_STATE_SCHEMA = "ovie.shipping-state.v1"
 WORKFLOWS = {
     "CI",
     "Production Controller",
@@ -824,6 +827,117 @@ def fetch_delivery() -> dict[str, Any]:
     }
 
 
+def _count(value: Any) -> int | None: return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
+def _flag(value: Any) -> bool | None: return value if isinstance(value, bool) else None
+def _object(value: Any) -> dict[str, Any]: return value if isinstance(value, dict) else {}
+def _sha(value: Any) -> str | None:
+    value = str(value or "").lower()
+    return value if re.fullmatch(r"[a-f0-9]{40}", value) else None
+def _source_status(section: dict[str, Any], facts: dict[str, Any], stale_seconds: int, previous_status: str | None,
+                   generated: dt.datetime) -> tuple[str, dt.datetime, str | None]:
+    raw_error = section.get("error")
+    error = re.sub(r"[^a-z0-9]+", "_", str(raw_error).lower()).strip("_")[:80] if raw_error else None
+    observed = parse_time(section.get("updated"))
+    if error:
+        if "unauthorized" in error or error in {"http_401", "http_403"}:
+            status = "unauthorized"
+        elif any(word in error for word in ("connection", "urlerror", "refused")):
+            status = "disconnected"
+        elif "schema" in error or error == "valueerror":
+            status = "unknown"
+        else:
+            status = "degraded" if observed else "unavailable"
+        return status, observed or generated, error
+    if observed is None or observed.tzinfo is None or observed.utcoffset() is None:
+        return "unknown", generated, None
+    age = (generated - observed).total_seconds()
+    if age < -FLEET_RECEIPT_FUTURE_SKEW_SECONDS:
+        return "unknown", observed, None
+    if age > stale_seconds:
+        return "stale", observed, None
+    if not facts or all(value is None for value in facts.values()):
+        return "unavailable", observed, None
+    if any(value is None for value in facts.values()):
+        return "degraded", observed, None
+    return ("recovery" if previous_status and previous_status not in {"fresh", "recovery"} else "fresh"), observed, None
+def build_shipping_projection(
+    state: dict[str, Any], previous: dict[str, Any] | None
+) -> dict[str, Any]:
+    """Compose allowlisted operational truth without logs, titles, or transcript data."""
+    generated = now()
+    generated_at = iso(generated)
+    valid_previous = previous if (
+        isinstance(previous, dict) and previous.get("schemaVersion") == OVIE_SHIPPING_STATE_SCHEMA
+        and isinstance(previous.get("projectionId"), str) and isinstance(previous.get("sequence"), int)
+    ) else None
+    sequence = int(valid_previous["sequence"]) + 1 if valid_previous else 1
+    projection_id = str(uuid.uuid4())
+    correlation_id = f"shipping:{projection_id}"
+    previous_sources = {item.get("sourceId"): item for item in (valid_previous or {}).get("sources", []) if isinstance(item, dict)}
+    sections = {key: _object(state.get(key)) for key in ("symphony", "fleet", "delivery", "issues")}
+    symphony, fleet, delivery, issues = (sections[key] for key in sections)
+    counts, slots = _object(symphony.get("counts")), _object(symphony.get("slots"))
+    prs, ci = _object(delivery.get("prs")), _object(_object(delivery.get("latency")).get("ci"))
+    facts = {
+        "symphony": {
+            "implementing": _count(counts.get("implementing")), "retrying": _count(counts.get("retrying")),
+            "readyQueue": _count(counts.get("queued")), "ownerBlocked": _count(counts.get("blocked")),
+            "slotsTotal": _count(slots.get("total")), "slotsAvailable": _count(slots.get("available")),
+        },
+        "fleet": {
+            "state": fleet.get("state") if fleet.get("state") in {"GREEN", "AMBER", "RED"} else None,
+            "promotionMode": fleet.get("promotionMode") if fleet.get("promotionMode") in {"normal", "isolated-only", "draft-only", "hold-intake", "blocked"} else None,
+            "workAllowed": _flag(_object(fleet.get("workAdmission")).get("allowed")),
+            "newIssueLeaseAllowed": _flag(_object(fleet.get("workAdmission")).get("newIssueLeaseAllowed")),
+            "promotionAllowed": _flag(_object(fleet.get("promotionAdmission")).get("allowed")),
+            "deploymentAllowed": _flag(_object(fleet.get("deploymentAdmission")).get("allowed")),
+        },
+        "delivery": {
+            "mainSha": _sha(delivery.get("main_sha")), "productionSha": _sha(delivery.get("prod_sha")),
+            "exactProduction": _flag(delivery.get("exact")), "deployStatus": compact(delivery.get("deploy_status"), 40) or None,
+            "openPullRequests": _count(prs.get("total")), "queuedPullRequests": _count(prs.get("queued")),
+            "successfulCiRuns": _count(ci.get("sample")), "successfulProductionRuns": _count(delivery.get("production_completions")),
+        },
+        "issues": {"source": "linear" if issues.get("source") == "linear" else None,
+                   "backlog": _count(issues.get("backlog")), "ready": _count(issues.get("ready"))},
+    }
+    schemas = {"symphony": "symphony-runtime/v1", "fleet": FLEET_GATE_SCHEMA,
+               "delivery": "jovie-delivery/v1", "issues": "linear-workflow/v1"}
+    sources: list[dict[str, Any]] = []
+    for source_id in ("symphony", "fleet", "delivery", "issues"):
+        section, source_facts, stale_seconds = sections[source_id], facts[source_id], STALE_AFTER[source_id]
+        previous_status = (previous_sources.get(source_id) or {}).get("status")
+        status, observed, error = _source_status(section, source_facts, stale_seconds, previous_status, generated)
+        observed_at = iso(observed)
+        revision_input = json.dumps([source_id, observed_at, status, error, source_facts], separators=(",", ":"), sort_keys=True)
+        sources.append(
+            {
+                "sourceId": source_id, "schemaVersion": schemas[source_id],
+                "status": status, "sequence": sequence,
+                "sourceRevision": hashlib.sha256(revision_input.encode("utf-8")).hexdigest(),
+                "observedAt": observed_at, "freshUntil": iso(observed + dt.timedelta(seconds=stale_seconds)),
+                "correlationId": correlation_id,
+                "lastSuccessAt": observed_at if section.get("updated") else None,
+                "partial": any(value is None for value in source_facts.values()),
+                "truncated": source_id == "delivery" and isinstance(delivery.get("production_completions"), str),
+                "lastError": {"code": error, "at": generated_at} if error else None,
+                "facts": source_facts,
+            }
+        )
+    priority = ("unauthorized", "disconnected", "unavailable", "unknown", "stale", "degraded", "recovery", "fresh")
+    statuses = {source["status"] for source in sources}
+    status = next(candidate for candidate in priority if candidate in statuses)
+    source_revision = hashlib.sha256(
+        "".join(source["sourceRevision"] for source in sources).encode("ascii")
+    ).hexdigest()[:40]
+    return {
+        "schemaVersion": OVIE_SHIPPING_STATE_SCHEMA, "projectionId": projection_id,
+        "previousProjectionId": valid_previous.get("projectionId") if valid_previous else None,
+        "producerId": "gem-ubuntu", "sequence": sequence, "sourceRevision": source_revision,
+        "generatedAt": generated_at,
+        "freshUntil": min(source["freshUntil"] for source in sources),
+        "correlationId": correlation_id, "status": status, "sources": sources,
+    }
 def load_state() -> dict[str, Any]:
     try:
         state = json.loads(STATE_FILE.read_text())
@@ -1016,7 +1130,7 @@ def render(state: dict[str, Any]) -> str:
             section_health(state, "symphony"),
             f"fleet {age_text(fleet.get('updated'))}; delivery {age_text(delivery.get('updated'))}; issues {age_text(issues.get('updated'))}",
         ),
-        grid_row("Refresh / fallback", "15s / 120s", "LOCAL / REMOTE", "last-known cache; ANSI auto; NO_COLOR plain text; errors sanitized"),
+        grid_row("Refresh / fallback", "5s / 120s", "LOCAL / REMOTE", "last-known cache; ANSI auto; NO_COLOR plain text; errors sanitized"),
         grid_bar("="),
     ]
     return "\n".join(colorize_line(row) for row in rows) + "\n"
@@ -1045,6 +1159,9 @@ def refresh(state: dict[str, Any], remote: bool) -> dict[str, Any]:
             section = state.setdefault("issues", {})
             section["error"] = str(exc)
             section["degraded"] = True
+    state["shipping_projection"] = build_shipping_projection(
+        state, _object(state.get("shipping_projection")) or None
+    )
     save_state(state)
     return state
 
@@ -1052,10 +1169,14 @@ def refresh(state: dict[str, Any], remote: bool) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--once", action="store_true", help="refresh and render once")
+    parser.add_argument("--projection-json", action="store_true", help="emit the versioned Ovie projection")
     parser.add_argument("--no-clear", action="store_true", help="do not clear the terminal")
     args = parser.parse_args()
     prepare_console()
     state = refresh(load_state(), remote=True)
+    if args.projection_json:
+        sys.stdout.write(json.dumps(state["shipping_projection"], separators=(",", ":")) + "\n")
+        return 0
     if args.once:
         sys.stdout.write(render(state))
         return 0
