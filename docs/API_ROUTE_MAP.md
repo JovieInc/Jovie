@@ -304,6 +304,7 @@
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
 | `/api/hud/metrics` | GET | `auth` | HUD metrics with kiosk token auth |
+| `/api/hud/shipping-state` | GET | `auth` | Read-only `ovie.shipping-state.v1` Ubuntu operational-truth projection (JOV-5248). Named authority reads only. No dispatch, retry, cancel, restart, or arbitrary file/log access. |
 
 ### Images
 

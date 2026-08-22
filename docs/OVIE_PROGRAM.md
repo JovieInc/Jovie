@@ -33,7 +33,7 @@ Current contract status: **not-passed**.
 - JOV-5215 — Eve durable intake/ack and Summer Kanban handoff
 - JOV-5212 — packaged Mac Ovie conversation with the real current Summer
 - JOV-5226 — one authoritative Summer company Kanban
-- JOV-5248 — Ubuntu Operational Truth normalized read-only publisher
+- JOV-5248 — Ubuntu Operational Truth normalized read-only publisher (`ovie.shipping-state.v1`, `GET /api/hud/shipping-state`)
 - JOV-5249 — Ovie Operational Truth client/freshness UX (blocked by JOV-5248)
 - JOV-4320 — Jovie/Summer identity, memory, credential, permission, session, and audit isolation
 - JOV-5253 — restore the deployed Symphony reconciler/runtime receipt and enforce terminal exit-78 before M1 code admission

@@ -162,6 +162,65 @@ export function resolveRemediationRoute({
   };
 }
 
+/**
+ * A live implementer lease is an unexpired `active` handoff receipt on the
+ * exact current head. Missing, expired, handed-off, abandoned, or stale
+ * receipts are not live.
+ * @param {object|null} [receipt]
+ * @param {{ liveHead?: string, now?: string }} [options]
+ */
+export function isImplementerLeaseLive(receipt, options = {}) {
+  if (!receipt) return false;
+  const validation = validateHandoffReceipt(receipt, options);
+  const leaseExpired = validation.errors.includes(
+    'implementer lease is expired'
+  );
+  const hardErrors = validation.errors.filter(
+    error => error !== 'implementer lease is expired'
+  );
+  return (
+    hardErrors.length === 0 && receipt.status === 'active' && !leaseExpired
+  );
+}
+
+/**
+ * Webhook backstop: launch FX when the implementer lease is not live.
+ * Pickup-end routing still requires an explicit handoff receipt.
+ * @param {object} [input]
+ */
+export function resolveWebhookFxRoute({
+  receipt = null,
+  liveHead,
+  implementer,
+  fxAdapter = null,
+  now,
+} = {}) {
+  if (isImplementerLeaseLive(receipt, { liveHead, now })) {
+    return {
+      route: 'implementer',
+      writer: receipt.remediationOwner || implementer,
+      launch: false,
+    };
+  }
+
+  const adapter = resolveFxAdapter(fxAdapter);
+  if (!adapter.name || adapter.authConfigured !== true) {
+    return {
+      route: 'configuration_incident',
+      writer: null,
+      launch: false,
+      incident: fxConfigurationIncident(),
+    };
+  }
+
+  return {
+    route: 'fx',
+    writer: adapter.name,
+    launch: true,
+    failure: FX_HANDOFF_FAILURE,
+  };
+}
+
 export function writerClaimKey({ repository, pr, head, fingerprint }) {
   if (!/^[^/\s]+\/[^/\s]+$/.test(String(repository ?? ''))) {
     throw new Error('repository must be owner/name');
