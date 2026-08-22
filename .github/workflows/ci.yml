@@ -35,14 +35,7 @@ concurrency:
   # CI owns only source/combined-head deduplication. Production serialization
   # lives exclusively in production-controller.yml's repo-wide FIFO lease.
   # Main push runs use unique keys so every SHA can produce exact evidence.
-  group: >-
-    ${{ github.workflow }}-${{
-      (github.event_name == 'pull_request')
-        && format('pr-{0}', github.event.pull_request.number)
-        || (github.event_name == 'merge_group'
-           && format('merge-group-{0}', github.event.merge_group.head_sha)
-           || format('run-{0}-{1}', github.run_id, github.run_attempt))
-    }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_sha || github.run_id }}
   # Non-PR events already use exact-run/head keys, so unconditional
   # cancellation changes only superseded source-PR heads and avoids relying on
   # expression coercion at workflow admission.

@@ -33,6 +33,9 @@ describe('draft-first rolling CI policy wiring', () => {
   it('fans broad verification out remotely and cancels stale source heads', () => {
     const workflow = read('.github/workflows/ci.yml');
     expect(workflow).toContain('cancel-in-progress: true');
+    expect(workflow).toContain(
+      'github.event.pull_request.number || github.event.merge_group.head_sha || github.run_id'
+    );
     expect(workflow).not.toContain(
       "cancel-in-progress: ${{ github.event_name == 'pull_request' }}"
     );
