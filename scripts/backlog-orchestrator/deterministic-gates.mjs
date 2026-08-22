@@ -2,6 +2,7 @@
 
 import { admissionGateReceipt } from './admission-gate.mjs';
 import { hasProtectedAdmissionLabel } from './admission-policy.mjs';
+import { resolveAdmissionTarget } from './ownership-inventory.mjs';
 
 export const TEAM_ROUTES = Object.freeze({
   JOV: Object.freeze({
@@ -137,12 +138,24 @@ export function validateDeterministicPlanCandidate(
     return 'scope-section-missing';
   if (!section(issue.description, ['Acceptance', 'Acceptance criteria']))
     return 'acceptance-section-missing';
+  const targeting = resolveAdmissionTarget(issue);
+  if (targeting.decision !== 'admit')
+    return targeting.reason || 'no-jovie-artifact';
   return null;
 }
 
 export function buildDeterministicPlanEvidence(issue) {
   const reason = validateDeterministicPlanCandidate(issue);
   if (reason) return { evidence: null, reason };
+  const targeting = resolveAdmissionTarget(issue);
+  if (targeting.decision !== 'admit') {
+    return {
+      evidence: null,
+      reason: targeting.reason || 'no-jovie-artifact',
+      target: targeting.target,
+      reroute: targeting.reroute || targeting.target,
+    };
+  }
   const scope = section(issue.description, [
     'Implementation plan',
     'Proposed fix',
@@ -152,13 +165,14 @@ export function buildDeterministicPlanEvidence(issue) {
     section(issue.description, ['Acceptance', 'Acceptance criteria'])
   );
   const route = teamRouteForIssue(issue);
+  const target = targeting.target;
   return {
     reason: null,
     evidence: {
       verified: true,
       concrete: true,
       bounded: true,
-      repo: route.repo,
+      repo: target.target_repo || route.repo,
       project: issue.project?.name || route.name,
       owners: {
         implementation: 'Symphony',
@@ -171,6 +185,7 @@ export function buildDeterministicPlanEvidence(issue) {
       ],
       rollback:
         'Revert the single issue-scoped commit or pull request. This gate does not merge or deploy.',
+      target,
     },
   };
 }

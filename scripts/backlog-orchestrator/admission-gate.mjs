@@ -3,6 +3,11 @@
 import { createHash } from 'node:crypto';
 import { hasProtectedAdmissionLabel } from './admission-policy.mjs';
 import { contextGateReceipt, issueContentHash } from './context-gate.mjs';
+import {
+  admissionTargetPacket,
+  resolveAdmissionTarget,
+  sameAdmissionTarget,
+} from './ownership-inventory.mjs';
 import { planGateReceipt } from './plan-gate.mjs';
 import { researchGateReceipt } from './research-gate.mjs';
 
@@ -78,6 +83,8 @@ export function admissionGateFingerprint(issue, options = {}) {
 
 export function buildAdmissionGateReceipt(issue, options = {}) {
   const plan = planGateReceipt(issue, options);
+  const targeting = resolveAdmissionTarget(issue);
+  const target = admissionTargetPacket(targeting.target);
   const payload = {
     schema: ADMISSION_GATE_SCHEMA,
     issue: issue.identifier,
@@ -89,6 +96,7 @@ export function buildAdmissionGateReceipt(issue, options = {}) {
     researchFingerprint:
       researchGateReceipt(issue, options)?.payload?.fingerprint || '',
     decision: 'approved',
+    ...(target || {}),
   };
   return `${ADMISSION_GATE_PREFIX}\n${JSON.stringify(payload)}\n${ADMISSION_GATE_SUFFIX}`;
 }
@@ -119,6 +127,21 @@ export function admissionGateReceipt(issue, options = {}) {
       admissionGateFingerprint(issue, options) !== payload.fingerprint
     )
       return null;
+    const storedTarget = admissionTargetPacket(payload);
+    if (
+      storedTarget ||
+      payload?.target_system ||
+      payload?.target_repo ||
+      payload?.artifact ||
+      payload?.verification_authority
+    ) {
+      const targeting = resolveAdmissionTarget(issue);
+      if (
+        targeting.decision !== 'admit' ||
+        !sameAdmissionTarget(storedTarget, targeting.target)
+      )
+        return null;
+    }
     return { body, payload };
   } catch {
     return null;
@@ -154,6 +177,15 @@ export async function approveAdmission({
 }) {
   const reason = validateAdmissionCandidate(issue, { now });
   if (reason) return { status: 'rejected', reason };
+  const targeting = resolveAdmissionTarget(issue);
+  if (targeting.decision !== 'admit') {
+    return {
+      status: 'rejected',
+      reason: targeting.reason || 'no-jovie-artifact',
+      target: targeting.target,
+      reroute: targeting.reroute || targeting.target,
+    };
+  }
 
   const receipt = buildAdmissionGateReceipt(issue, { now });
   if (hasReceipt(issue, receipt)) {
