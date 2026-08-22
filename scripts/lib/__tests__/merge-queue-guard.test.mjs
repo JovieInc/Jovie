@@ -12,6 +12,8 @@ import {
   bisectBatchFailure,
   buildNativeQueuePolicyReadback,
   buildProductionControllerGenerationReadback,
+  CHANGELOG_COLLISION_PATH,
+  changelogGroupCollisionDecision,
   ciWorkflowHasMergeGroupTrigger,
   compareRatchetCounts,
   detectChangedFileOverlap,
@@ -23,16 +25,20 @@ import {
   isAutonomousBranch,
   MERGE_QUEUE_ENROLL_HOT_PATH_FORBIDDEN,
   MERGE_QUEUE_REPO_PATHS,
+  mergeNativeQueuePolicyObservations,
   NATIVE_BRANCH_PROTECTION_POLICY,
   NATIVE_QUEUE_COHORT_POLICY,
   NATIVE_QUEUE_POLICY,
   normalizeBranchProtectionSource,
+  normalizeNativeQueuePolicyParameters,
   parseMergeQueueFrontBranch,
   parseMergeQueueTimeline,
   parseRequiredStatusChecksFromYaml,
   preQueueFreshnessDecision,
   requiredStatusDecision,
   uiFastTrackPolicy,
+  unmergeableEjectDecision,
+  unmergeableReenqueueDecision,
   validateAggregateRequiredChecks,
   validateLiveMergeQueueRuleset,
   validateMergeQueueEnrollHotPath,
@@ -2085,6 +2091,102 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     );
     expect(NATIVE_QUEUE_COHORT_POLICY.liveRulesetCutover).toBe('pending');
     expect(liveUntilCutover.ok).toBe(true);
+  });
+
+  it('normalizes GraphQL maximumEntriesToBuild onto the REST lock key', () => {
+    expect(
+      normalizeNativeQueuePolicyParameters({
+        maximumEntriesToBuild: 3,
+        grouping_strategy: 'ALLGREEN',
+      })
+    ).toMatchObject({
+      max_entries_to_build: 3,
+      grouping_strategy: 'ALLGREEN',
+    });
+    expect(
+      mergeNativeQueuePolicyObservations(
+        { ...NATIVE_QUEUE_POLICY, max_entries_to_build: 1 },
+        { maximumEntriesToBuild: 3 }
+      )
+    ).toMatchObject({ max_entries_to_build: 3 });
+    const graphqlReadback = buildNativeQueuePolicyReadback({
+      ...NATIVE_QUEUE_POLICY,
+      maximumEntriesToBuild: 3,
+    });
+    expect(graphqlReadback.observed.max_entries_to_build).toBe(3);
+  });
+
+  it('ejects UNMERGEABLE native entries and refuses to re-enqueue the same head', () => {
+    const head = 'a'.repeat(40);
+    expect(
+      unmergeableEjectDecision({
+        queued: true,
+        queueEntryState: 'UNMERGEABLE',
+        mergeable: 'MERGEABLE',
+        headSha: head,
+      })
+    ).toMatchObject({
+      action: 'eject',
+      reason: 'unmergeable-group-collision',
+      reenqueue: false,
+    });
+    expect(
+      unmergeableEjectDecision({
+        queued: true,
+        queueEntryState: 'AWAITING_CHECKS',
+        mergeable: 'MERGEABLE',
+        headSha: head,
+      }).action
+    ).toBe('keep');
+    expect(
+      unmergeableEjectDecision({
+        queued: true,
+        queueEntryState: 'UNMERGEABLE',
+        mergeable: 'MERGEABLE',
+      }).action
+    ).toBe('unknown');
+    expect(
+      unmergeableReenqueueDecision({
+        headSha: head,
+        ejectReceiptHeadSha: head,
+      })
+    ).toMatchObject({
+      action: 'block',
+      reason: 'unchanged-head-unmergeable-eject',
+    });
+    expect(
+      unmergeableReenqueueDecision({
+        headSha: 'b'.repeat(40),
+        ejectReceiptHeadSha: head,
+      }).action
+    ).toBe('allow');
+  });
+
+  it('skips ALLGREEN enrollment when CHANGELOG.md already sits in the queued group', () => {
+    expect(CHANGELOG_COLLISION_PATH).toBe('CHANGELOG.md');
+    expect(
+      changelogGroupCollisionDecision({
+        candidateFiles: ['CHANGELOG.md', 'scripts/foo.mjs'],
+        queuedMemberFiles: [
+          { prNumber: 16352, files: ['CHANGELOG.md', 'docs/x.md'] },
+        ],
+      })
+    ).toMatchObject({
+      action: 'skip',
+      reason: 'changelog-collision',
+      collidingPrs: [16352],
+    });
+    expect(
+      changelogGroupCollisionDecision({
+        candidateFiles: ['scripts/foo.mjs'],
+        queuedMemberFiles: [{ prNumber: 16352, files: ['CHANGELOG.md'] }],
+      }).action
+    ).toBe('allow');
+    expect(
+      changelogGroupCollisionDecision({
+        candidateFiles: ['CHANGELOG.md'],
+      }).action
+    ).toBe('unknown');
   });
 
   it('skips a superseded Production Controller generation and promotes only exact main', () => {

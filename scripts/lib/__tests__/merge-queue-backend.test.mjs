@@ -54,6 +54,14 @@ const VALID_BRANCH_PROTECTION_REF = Object.freeze({
   name: 'main',
   branchProtectionRule: null,
 });
+const VALID_LIVE_QUEUE_CONFIGURATION = Object.freeze({
+  checkResponseTimeout: 60,
+  maximumEntriesToBuild: 3,
+  maximumEntriesToMerge: 10,
+  mergeMethod: 'SQUASH',
+  minimumEntriesToMerge: 5,
+  minimumEntriesToMergeWaitTime: 10,
+});
 function prState(overrides = {}) {
   return {
     id: PR_ID,
@@ -82,6 +90,7 @@ function createNativeRunner({
   repository = VALID_REPOSITORY,
   workflow = VALID_WORKFLOW,
   branchProtectionRef = VALID_BRANCH_PROTECTION_REF,
+  liveQueueConfiguration = VALID_LIVE_QUEUE_CONFIGURATION,
   states = [],
   listPages = null,
   enableResult = ok({ data: {} }),
@@ -107,6 +116,18 @@ function createNativeRunner({
     }
     if (query.includes('MergeQueueBranchProtection')) {
       return ok({ data: { repository: { ref: branchProtectionRef } } });
+    }
+    if (query.includes('MergeQueueLiveConfiguration')) {
+      return ok({
+        data: {
+          repository: {
+            mergeQueue:
+              liveQueueConfiguration === null
+                ? null
+                : { configuration: liveQueueConfiguration },
+          },
+        },
+      });
     }
     if (query.includes('MergeQueueOpenPullRequestStates')) {
       return ok(
@@ -438,6 +459,18 @@ describe('queue workflow mutation safety', () => {
     expect(drain).toContain(
       '.state.mergeQueueEntry.state | IN("QUEUED", "AWAITING_CHECKS", "MERGEABLE", "UNMERGEABLE", "LOCKED")'
     );
+    expect(drain).toContain('DEQUEUE (UNMERGEABLE native entry → typed eject)');
+    expect(drain).toContain(
+      'UNMERGEABLE_EJECT_CONTEXT="jovie-native-unmergeable/v1"'
+    );
+    expect(drain).toContain(
+      'qs: ($states[(.n | tostring)].mergeQueueEntry.state // null)'
+    );
+    expect(drain).toContain('unmergeable-eject');
+    expect(drain).toContain('changelog-collision');
+    expect(drain).toContain(
+      'classified skip; enroll is not a product-quality failure'
+    );
     expect(drain).toContain(
       '.state.mergeQueueEntry.position | type == "number" and floor == . and . > 0'
     );
@@ -682,6 +715,95 @@ describe('native live preflight', () => {
     });
     expect(result.evidence).not.toHaveProperty('classicPushAllowanceCount');
     expect(result.evidence).not.toHaveProperty('classicPushAllowanceActors');
+  });
+
+  it('does not fail enroll preflight when GraphQL live max_entries_to_build matches the lock', () => {
+    const staleRest = {
+      ...VALID_RULESET,
+      rules: VALID_RULESET.rules.map(rule =>
+        rule.type === 'merge_queue'
+          ? {
+              ...rule,
+              parameters: {
+                ...rule.parameters,
+                max_entries_to_build: 1,
+              },
+            }
+          : rule
+      ),
+    };
+    const restOnly = validateNativePreflightEvidence({
+      ruleset: staleRest,
+      repository: VALID_REPOSITORY,
+      workflowYaml: VALID_WORKFLOW,
+      branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
+    });
+    expect(restOnly.ok).toBe(false);
+    expect(restOnly.policyReadback.drift).toContain('max_entries_to_build');
+
+    const liveGraphql = validateNativePreflightEvidence({
+      ruleset: staleRest,
+      repository: VALID_REPOSITORY,
+      workflowYaml: VALID_WORKFLOW,
+      branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
+      liveQueueConfiguration: VALID_LIVE_QUEUE_CONFIGURATION,
+    });
+    expect(liveGraphql.ok).toBe(true);
+    expect(liveGraphql.policyReadback).toMatchObject({
+      matched: true,
+      drift: [],
+      observed: { max_entries_to_build: 3 },
+    });
+  });
+
+  it('reads GraphQL mergeQueue.configuration during live preflight', async () => {
+    const runner = createNativeRunner();
+    const result = await preflightMergeQueue({
+      repository: REPOSITORY,
+      runner,
+    });
+    expect(result).toMatchObject({ ready: true });
+    expect(result.policyReadback).toMatchObject({
+      matched: true,
+      observed: { max_entries_to_build: 3 },
+    });
+    const liveConfigCall = runner.mock.calls.find(([args]) =>
+      queryText(args).includes('MergeQueueLiveConfiguration')
+    )?.[0];
+    expect(liveConfigCall).toEqual(
+      expect.arrayContaining(['-f', 'branch=main'])
+    );
+    expect(queryText(liveConfigCall)).toContain('maximumEntriesToBuild');
+  });
+
+  it('prefers GraphQL maximumEntriesToBuild over stale REST max_entries_to_build', async () => {
+    const staleRest = {
+      ...VALID_RULESET,
+      rules: VALID_RULESET.rules.map(rule =>
+        rule.type === 'merge_queue'
+          ? {
+              ...rule,
+              parameters: {
+                ...rule.parameters,
+                max_entries_to_build: 1,
+              },
+            }
+          : rule
+      ),
+    };
+    const runner = createNativeRunner({ ruleset: staleRest });
+    await expect(
+      preflightMergeQueue({
+        repository: REPOSITORY,
+        runner,
+      })
+    ).resolves.toMatchObject({
+      ready: true,
+      policyReadback: {
+        matched: true,
+        observed: { max_entries_to_build: 3 },
+      },
+    });
   });
 
   it.each([
