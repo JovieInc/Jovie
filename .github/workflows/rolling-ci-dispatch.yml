@@ -1,0 +1,125 @@
+name: Rolling CI Dispatch
+
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  group: rolling-ci-dispatch-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha }}
+  cancel-in-progress: true
+
+jobs:
+  dispatch:
+    name: Dispatch exact-head CI failure
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.path == '.github/workflows/ci.yml' &&
+      github.event.workflow_run.conclusion != 'cancelled' &&
+      (github.event.workflow_run.conclusion == 'failure' ||
+      github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout trusted dispatch policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/lib/rolling-ci-dispatch.mjs
+            scripts/lib/upsert-pr-comment.sh
+            scripts/rolling-ci-dispatch.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+
+      - name: Plan exact-head dispatch
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          WORKFLOW_PATH: ${{ github.event.workflow_run.path }}
+          PRODUCER_EVENT: ${{ github.event.workflow_run.event }}
+          TRUSTED_REF: ${{ github.ref_name }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          EXPECTED_HEAD: ${{ github.event.workflow_run.head_sha }}
+          WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
+          WORKFLOW_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          CHECK_SUITE_ID: ${{ github.event.workflow_run.check_suite_id }}
+          PR_NUMBER_EVENT: ${{ github.event.workflow_run.pull_requests[0].number }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${PR_NUMBER_EVENT:-}" || ! "$CHECK_SUITE_ID" =~ ^[0-9]+$ ]]; then
+            echo "No unique open pull request or authenticated check suite owns this workflow_run head."
+            echo "should_record=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          LIVE_PR=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER_EVENT" \
+            --jq '{head: .head.sha, author: .user.login, state: .state, fork: (.head.repo.fork // false), same_repo: (.head.repo.full_name == .base.repo.full_name)}')
+          LIVE_HEAD=$(jq -r '.head' <<<"$LIVE_PR")
+          LIVE_AUTHOR=$(jq -r '.author' <<<"$LIVE_PR")
+          if [[ "$(jq -r '.state' <<<"$LIVE_PR")" != "open" || "$LIVE_HEAD" != "$EXPECTED_HEAD" || "$(jq -r '.fork' <<<"$LIVE_PR")" == "true" || "$(jq -r '.same_repo' <<<"$LIVE_PR")" != "true" ]]; then
+            echo "Failure event is stale, forked, or no longer open; refusing dispatch."
+            echo "should_record=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          FAILED_JOBS=$(gh api "repos/$REPOSITORY/actions/runs/$WORKFLOW_RUN_ID/jobs" \
+            --jq '[.jobs[] | select(.conclusion == "failure") | {name: .name, steps: [.steps[]? | select(.conclusion == "failure") | .name]}]')
+          CHECKS=$(gh api --paginate "repos/$REPOSITORY/commits/$EXPECTED_HEAD/check-runs" \
+            --jq '.check_runs[] | {name: .name, conclusion: .conclusion, headSha: .head_sha, checkSuiteId: .check_suite.id}' \
+            | jq -s '.')
+          PRIOR_COMMENT=$(gh api "repos/$REPOSITORY/issues/$PR_NUMBER_EVENT/comments" --paginate \
+            --jq '[.[] | select(.body | contains("<!-- bot-comment:rolling-ci-dispatch -->"))] | last | .body // ""')
+
+          jq -n \
+            --arg repository "$REPOSITORY" \
+            --argjson prNumber "$PR_NUMBER_EVENT" \
+            --arg headSha "$EXPECTED_HEAD" \
+            --arg liveHead "$LIVE_HEAD" \
+            --arg workflowRunId "$WORKFLOW_RUN_ID" \
+            --argjson workflowRunAttempt "$WORKFLOW_RUN_ATTEMPT" \
+            --argjson failedJobs "$FAILED_JOBS" \
+            --arg writer "$LIVE_AUTHOR" \
+            --arg priorCommentBody "$PRIOR_COMMENT" \
+            --arg conclusion "$CONCLUSION" \
+            --argjson checkSuiteId "$CHECK_SUITE_ID" \
+            --argjson checks "$CHECKS" \
+            --arg eventName "$EVENT_NAME" \
+            --arg workflow "$WORKFLOW_NAME" \
+            --arg workflowPath "$WORKFLOW_PATH" \
+            --arg producerEvent "$PRODUCER_EVENT" \
+            --arg trustedPolicyRef "$TRUSTED_REF" \
+            '{repository,prNumber,headSha,liveHead,workflowRunId,workflowRunAttempt,failedJobs,writer,priorCommentBody,conclusion,checkSuiteId,checks,source:{eventName:$eventName,workflow:$workflow,workflowPath:$workflowPath,producerEvent:$producerEvent,trustedPolicyRef:$trustedPolicyRef}}' \
+            | node scripts/rolling-ci-dispatch.mjs > "$RUNNER_TEMP/rolling-ci-plan.json"
+
+          cat "$RUNNER_TEMP/rolling-ci-plan.json"
+          echo "should_record=$(jq -r '.mutate' "$RUNNER_TEMP/rolling-ci-plan.json")" >> "$GITHUB_OUTPUT"
+          {
+            echo "comment_body<<ROLLING_CI_COMMENT"
+            jq -r '.body' "$RUNNER_TEMP/rolling-ci-plan.json"
+            echo "ROLLING_CI_COMMENT"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Record exact-head dispatch comment
+        if: steps.plan.outputs.should_record == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          COMMENT_BODY: ${{ steps.plan.outputs.comment_body }}
+        run: |
+          set -euo pipefail
+          bash scripts/lib/upsert-pr-comment.sh "$PR_NUMBER" "rolling-ci-dispatch" "$COMMENT_BODY"
