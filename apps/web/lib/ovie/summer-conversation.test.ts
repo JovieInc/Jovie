@@ -14,7 +14,11 @@ import {
   respondToOvieSummerPending,
 } from '@/lib/ovie/summer-http';
 import { createCurrentSummerQueueSpeaker } from '@/lib/ovie/summer-queue-speaker';
-import { resetSummerTransportRuntime } from '@/lib/ovie/summer-transport';
+import { loadCurrentSummerSession } from '@/lib/ovie/summer-session';
+import {
+  resetSummerTransportRuntime,
+  runOvieSummerTurn,
+} from '@/lib/ovie/summer-transport';
 
 const founder = {
   authenticated: true,
@@ -155,5 +159,96 @@ describe('Ovie Summer conversation handoff', () => {
       ok: true,
       turns: [{ id: 'turn_pending', eve_work_id: 'ini_work_pending' }],
     });
+  });
+
+  it('reconnects a canceled stream without losing the later Mac completion', async () => {
+    const store = new DurableOperatingStore(memoryRecordBackend());
+    const speaker = createCurrentSummerQueueSpeaker(store);
+    const abort = new AbortController();
+    const first = (async () => {
+      const rows: Array<{ type: string; state?: string; text?: string }> = [];
+      let text = '';
+      for await (const event of runOvieSummerTurn({
+        receipts: [
+          {
+            text: 'x',
+            lane: 'heavy',
+            destination: 'kanban',
+            ack: 'stored',
+            destinationHandle: null,
+            workerSpawned: false,
+            workId: 'ini_work_resume',
+          },
+        ],
+        userText: 'Resume me',
+        speaker,
+        store,
+        signal: abort.signal,
+        clientTurnId: 'resume-1',
+      })) {
+        rows.push(event);
+        if (event.type === 'text-delta') text += event.text;
+      }
+      return { rows, text };
+    })();
+    await vi.waitFor(async () => {
+      expect((await store.listSummerTurns()).length).toBe(1);
+    });
+    abort.abort();
+    const canceled = await first;
+    expect(canceled.rows.some(row => row.state === 'canceled')).toBe(true);
+    expect(canceled.text).toBe('');
+    expect((await loadCurrentSummerSession(store))?.turns ?? []).toHaveLength(
+      0
+    );
+
+    const queued = (await store.listSummerTurns())[0];
+    await claimOvieSummerTurn(store, {
+      id: queued?.id ?? '',
+      workerId: 'summer-mac',
+      claimToken: 'resume-claim',
+    });
+    await completeOvieSummerTurn(store, {
+      id: queued?.id ?? '',
+      claimToken: 'resume-claim',
+      responseText: 'Recovered Summer after reconnect.',
+      tool: {
+        name: 'get_org_state',
+        ok: true,
+        receiptId: 'tool_resume',
+        summary: 'org',
+      },
+    });
+
+    const rows: Array<{ type: string; receipt?: { receiptId: string } }> = [];
+    let text = '';
+    for await (const event of runOvieSummerTurn({
+      receipts: [
+        {
+          text: 'x',
+          lane: 'heavy',
+          destination: 'kanban',
+          ack: 'stored',
+          destinationHandle: null,
+          workerSpawned: false,
+          workId: 'ini_work_resume',
+        },
+      ],
+      userText: 'Resume me',
+      speaker,
+      store,
+      clientTurnId: 'resume-1',
+    })) {
+      rows.push(event);
+      if (event.type === 'text-delta') text += event.text;
+    }
+    expect(text).toBe('Recovered Summer after reconnect.');
+    expect(rows.some(row => row.receipt?.receiptId === 'tool_resume')).toBe(
+      true
+    );
+    const session = await loadCurrentSummerSession(store);
+    expect(session?.turns).toHaveLength(1);
+    expect(session?.turns[0]?.eveWorkId).toBe('ini_work_resume');
+    expect(session?.identity.memoryNamespace).toBe('summer');
   });
 });
