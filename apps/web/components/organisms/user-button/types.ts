@@ -5,6 +5,9 @@ export interface UserButtonProps {
   readonly profileHref?: string;
   readonly settingsHref?: string;
   readonly showUserInfo?: boolean;
+  /** Let a parent identity composition own the shared visual boundary. */
+  readonly embeddedInIdentityGroup?: boolean;
+  readonly onMenuOpenChange?: (open: boolean) => void;
   readonly trigger?: React.ReactNode;
 }
 

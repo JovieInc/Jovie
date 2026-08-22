@@ -1,6 +1,7 @@
 import { TooltipProvider } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { CSSProperties } from 'react';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
@@ -61,23 +62,38 @@ const meta: Meta<typeof UnifiedSidebar> = {
     layout: 'fullscreen',
   },
   decorators: [
-    Story => (
-      <QueryClientProvider client={queryClient}>
-        <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
-          <DashboardDataProvider value={dashboardData}>
-            <TooltipProvider>
-              <SidebarProvider>
-                <ShellSidebarOverrideProvider>
-                  <div className='h-screen w-(--app-shell-sidebar-width)'>
-                    <Story />
-                  </div>
-                </ShellSidebarOverrideProvider>
-              </SidebarProvider>
-            </TooltipProvider>
-          </DashboardDataProvider>
-        </AppFlagProvider>
-      </QueryClientProvider>
-    ),
+    (Story, context) => {
+      const sidebarOpen = context.parameters.sidebarOpen !== false;
+      const sidebarWidth =
+        typeof context.parameters.sidebarWidth === 'string'
+          ? context.parameters.sidebarWidth
+          : 'var(--app-shell-sidebar-width)';
+
+      return (
+        <QueryClientProvider client={queryClient}>
+          <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+            <DashboardDataProvider value={dashboardData}>
+              <TooltipProvider>
+                <SidebarProvider
+                  open={sidebarOpen}
+                  style={
+                    {
+                      '--app-shell-sidebar-width': sidebarWidth,
+                    } as CSSProperties
+                  }
+                >
+                  <ShellSidebarOverrideProvider>
+                    <div className='h-screen w-(--app-shell-sidebar-width)'>
+                      <Story />
+                    </div>
+                  </ShellSidebarOverrideProvider>
+                </SidebarProvider>
+              </TooltipProvider>
+            </DashboardDataProvider>
+          </AppFlagProvider>
+        </QueryClientProvider>
+      );
+    },
   ],
   args: {
     section: 'dashboard',
@@ -93,6 +109,18 @@ export const Dashboard: Story = {};
 export const Settings: Story = {
   args: {
     section: 'settings',
+  },
+};
+
+export const Narrow: Story = {
+  parameters: {
+    sidebarWidth: '12rem',
+  },
+};
+
+export const Collapsed: Story = {
+  parameters: {
+    sidebarOpen: false,
   },
 };
 

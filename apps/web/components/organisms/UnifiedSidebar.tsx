@@ -441,9 +441,10 @@ function OperatorSessionControls() {
   );
 }
 
-function CustomerUserPanel({
+export function SidebarIdentityFooter({
   profileHref,
 }: Readonly<{ profileHref: string | undefined }>) {
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const profileDisplayHref = profileHref
     ? `${HOSTNAME}${profileHref}`
     : undefined;
@@ -454,42 +455,47 @@ function CustomerUserPanel({
       data-testid='sidebar-user-panel'
       className='border-t border-(--noir-ion-border-subtle) px-2.5 py-1.5'
     >
-      <SidebarMenu className='gap-1'>
+      <fieldset
+        data-sidebar='identity-group'
+        data-sidebar-identity-group='creator'
+        data-sidebar-identity-boundary='true'
+        data-testid='sidebar-identity-group'
+        className={cn(
+          'group/sidebar-identity w-full min-w-0 rounded-xl border border-(--noir-ion-border-subtle) bg-transparent p-0.5',
+          'transition-colors duration-fast ease-interactive',
+          'hover:bg-sidebar-accent/40',
+          'focus-within:border-sidebar-ring/35 focus-within:bg-sidebar-accent/35 focus-within:ring-1 focus-within:ring-sidebar-ring/20',
+          isAccountMenuOpen && 'border-sidebar-ring/35 bg-sidebar-accent/55'
+        )}
+      >
+        <legend className='sr-only'>Creator identity</legend>
+        <UserButton
+          embeddedInIdentityGroup
+          onMenuOpenChange={setIsAccountMenuOpen}
+          profileHref={profileHref}
+          settingsHref={APP_ROUTES.SETTINGS}
+          showUserInfo
+        />
         {profileHref && profileDisplayHref ? (
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              size='lg'
-              tooltip='Public Profile'
-              className='h-10 py-1'
-            >
-              <Link href={profileHref}>
-                <ExternalLink aria-hidden='true' />
-                <span className='min-w-0 flex-1 group-data-[collapsible=icon]:hidden'>
-                  <span className='block truncate text-app font-normal text-sidebar-item-foreground'>
-                    Public Profile
-                  </span>
-                  <span className='block truncate text-2xs font-normal text-sidebar-muted'>
-                    {profileDisplayHref}
-                  </span>
-                </span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          <Link
+            href={profileHref}
+            aria-label={`Open public profile at ${profileDisplayHref}`}
+            title='Public Profile'
+            data-focus-treatment='underline-only'
+            data-sidebar-identity-action='public-profile'
+            className={cn(
+              'flex min-h-6 min-w-0 items-center gap-1.5 rounded-md pb-1 pl-10 pr-2 pt-0.5 text-2xs font-normal text-sidebar-muted outline-none',
+              'transition-colors duration-fast ease-interactive hover:text-sidebar-item-foreground focus-visible:text-primary-token focus-visible:underline focus-visible:underline-offset-2',
+              'group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0'
+            )}
+          >
+            <ExternalLink className='size-3 shrink-0' aria-hidden='true' />
+            <span className='truncate group-data-[collapsible=icon]:hidden'>
+              {profileDisplayHref}
+            </span>
+          </Link>
         ) : null}
-        <SidebarMenuItem
-          className={cn(
-            profileHref &&
-              'border-t border-(--noir-ion-border-subtle) pt-1 group-data-[collapsible=icon]:border-t-0 group-data-[collapsible=icon]:pt-0'
-          )}
-        >
-          <UserButton
-            profileHref={profileHref}
-            settingsHref={APP_ROUTES.SETTINGS}
-            showUserInfo
-          />
-        </SidebarMenuItem>
-      </SidebarMenu>
+      </fieldset>
     </div>
   );
 }
@@ -595,7 +601,7 @@ export function UnifiedSidebar({
         // absorbs free space so media and the protected account panel pin bottom.
         <SidebarFooter className='mt-auto gap-0 px-0 py-0'>
           <SidebarBottomNowPlayingBridge />
-          <CustomerUserPanel profileHref={profileHref} />
+          <SidebarIdentityFooter profileHref={profileHref} />
         </SidebarFooter>
       )}
     </Sidebar>

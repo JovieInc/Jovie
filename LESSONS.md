@@ -36,6 +36,12 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 ## Testing
 
+### Identity controls need one semantic and visual owner, not only a common ancestor
+
+**Mistake:** The authenticated sidebar refactor placed Public Profile and the active creator account trigger in two adjacent `SidebarMenuItem` rows, then treated their shared footer panel as proof of consolidation. The regression test only asserted that both rows had the same ancestor, and visual QA described the ancestor as a single account block, so neither gate rejected the duplicate top-level spacing, border, hover, focus, and selected boundaries.
+
+**Rule:** One semantic identity gets one top-level composition. A creator name, profile URL/access action, and account-menu action must share one named identity group and one enclosing visual boundary. Distinct actions stay sibling interactives with explicit accessible names and deterministic tab order; never nest one action inside another. Regression coverage must count identity groups and boundaries, reject a sibling public-profile row and copy outside the group, exercise expanded/narrow/collapsed states, keep a deliberate-red split-layout fixture, and sweep equivalent sidebar/profile surfaces.
+
 ### Layout-stability guards must model semantic ownership, not ban all reflow
 
 **Mistake:** The FAQ stability repair reserved every answer's full height and hid closed text with visibility/opacity. CLS stayed quiet, but every accordion row looked expanded because the source guard treated all geometry change as a defect.

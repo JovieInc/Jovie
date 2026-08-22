@@ -824,6 +824,48 @@ describe('UserButton billing actions', () => {
     );
   });
 
+  it('lets the enclosing identity group own account trigger and open state', async () => {
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+
+    const onMenuOpenChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <UserButton
+        showUserInfo
+        embeddedInIdentityGroup
+        onMenuOpenChange={onMenuOpenChange}
+      />
+    );
+
+    const trigger = screen.getByRole('button', {
+      name: 'Open account menu for Adele Adkins',
+    });
+    expect(trigger).toHaveAttribute(
+      'data-sidebar-identity-action',
+      'account-menu'
+    );
+    expect(trigger).toHaveAttribute('data-focus-treatment', 'underline-only');
+    expect(trigger).toHaveClass(
+      'rounded-none',
+      'hover:bg-transparent',
+      'focus-visible:[&_[data-user-button-display-name]]:text-primary-token'
+    );
+    expect(trigger).not.toHaveClass(
+      'rounded-md',
+      'hover:bg-sidebar-accent',
+      'focus-visible:ring-2'
+    );
+
+    await user.click(trigger);
+    expect(onMenuOpenChange).toHaveBeenCalledWith(true);
+    await user.keyboard('{Escape}');
+    expect(onMenuOpenChange).toHaveBeenLastCalledWith(false);
+  });
+
   it('anchors the sidebar identity menu to the start edge', async () => {
     mockUseBillingStatusQuery.mockReturnValue({
       data: { isPro: false, plan: null, hasStripeCustomer: false },

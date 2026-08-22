@@ -2,13 +2,22 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
-import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
+import {
+  SidebarIdentityFooter,
+  UnifiedSidebar,
+} from '@/components/organisms/UnifiedSidebar';
 import { ADMIN_NAV_REGISTRY } from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -62,9 +71,28 @@ vi.mock('@/components/shell/HeaderSearchSurfaceFromContext', () => ({
 }));
 
 vi.mock('@/components/organisms/user-button', () => ({
-  UserButton: (props: { readonly showUserInfo?: boolean }) => {
+  UserButton: (props: {
+    readonly embeddedInIdentityGroup?: boolean;
+    readonly onMenuOpenChange?: (open: boolean) => void;
+    readonly showUserInfo?: boolean;
+  }) => {
     userButtonPropsMock(props);
-    return <div data-testid='user-button' />;
+    return (
+      <button
+        type='button'
+        aria-label='Open account menu for Tim White'
+        data-testid='user-button'
+        data-sidebar-identity-action={
+          props.embeddedInIdentityGroup ? 'account-menu' : undefined
+        }
+        data-focus-treatment={
+          props.embeddedInIdentityGroup ? 'underline-only' : undefined
+        }
+        onClick={() => props.onMenuOpenChange?.(true)}
+      >
+        Tim White
+      </button>
+    );
   },
 }));
 
@@ -212,14 +240,50 @@ describe('UnifiedSidebar library route', () => {
     ).not.toBeInTheDocument();
     expect(screen.getByTestId('user-button')).toBeInTheDocument();
     expect(userButtonPropsMock).toHaveBeenCalledWith(
-      expect.objectContaining({ showUserInfo: true })
+      expect.objectContaining({
+        embeddedInIdentityGroup: true,
+        showUserInfo: true,
+      })
     );
     const panel = screen.getByTestId('sidebar-user-panel');
-    expect(panel).toContainElement(screen.getByTestId('user-button'));
+    const identityGroup = within(panel).getByRole('group', {
+      name: 'Creator identity',
+    });
     expect(
-      within(panel).getByRole('link', { name: /Public Profile/i })
+      panel.querySelectorAll('[data-sidebar-identity-group]')
+    ).toHaveLength(1);
+    expect(identityGroup).toContainElement(screen.getByTestId('user-button'));
+    expect(
+      within(identityGroup).getByRole('link', {
+        name: 'Open public profile at jov.ie/timwhite',
+      })
     ).toHaveAttribute('href', '/timwhite');
-    expect(panel).toHaveTextContent('jov.ie/timwhite');
+    expect(identityGroup).toHaveTextContent('Tim White');
+    expect(identityGroup).toHaveTextContent('jov.ie/timwhite');
+    expect(identityGroup.querySelector('button a, a button')).toBeNull();
+    expect(
+      Array.from(
+        identityGroup.querySelectorAll<HTMLElement>(
+          '[data-sidebar-identity-action]'
+        )
+      ).every(
+        action =>
+          action.getAttribute('data-focus-treatment') === 'underline-only'
+      )
+    ).toBe(true);
+    expect(identityGroup).toHaveAttribute(
+      'data-sidebar-identity-boundary',
+      'true'
+    );
+    fireEvent.click(
+      within(identityGroup).getByRole('button', {
+        name: 'Open account menu for Tim White',
+      })
+    );
+    expect(identityGroup).toHaveClass(
+      'border-sidebar-ring/35',
+      'bg-sidebar-accent/55'
+    );
     expect(screen.queryByTestId('sidebar-upgrade-banner')).toBeNull();
 
     const update = screen.getByTestId('update-available-pill');
@@ -259,7 +323,7 @@ describe('UnifiedSidebar library route', () => {
     const panel = screen.getByTestId('sidebar-user-panel');
     expect(panel).toContainElement(screen.getByTestId('user-button'));
     expect(
-      within(panel).getByRole('link', { name: /Public Profile/i })
+      within(panel).getByRole('link', { name: /Open public profile/i })
     ).toHaveAttribute('href', '/timwhite');
   });
 
@@ -273,8 +337,51 @@ describe('UnifiedSidebar library route', () => {
     const panel = screen.getByTestId('sidebar-user-panel');
     expect(panel).toContainElement(screen.getByTestId('user-button'));
     expect(
-      within(panel).getByRole('link', { name: /Public Profile/i })
+      within(panel).getByRole('link', { name: /Open public profile/i })
     ).toHaveAttribute('href', '/timwhite');
+  });
+
+  it.each([
+    ['expanded', '', 'var(--app-shell-sidebar-width)'],
+    ['narrow', '', '12rem'],
+    ['collapsed', 'icon', '52px'],
+  ] as const)('keeps one identity composition in the %s sidebar state', (_state, collapsible, width) => {
+    const { container } = render(
+      <div className='group' data-collapsible={collapsible} style={{ width }}>
+        <SidebarIdentityFooter profileHref='/timwhite' />
+      </div>
+    );
+
+    const panel = screen.getByTestId('sidebar-user-panel');
+    const identityGroup = within(panel).getByRole('group', {
+      name: 'Creator identity',
+    });
+    const actions = Array.from(
+      identityGroup.querySelectorAll<HTMLElement>('button, a[href]')
+    );
+
+    expect(
+      container.querySelectorAll('[data-sidebar-identity-group]')
+    ).toHaveLength(1);
+    expect(actions.map(action => action.getAttribute('aria-label'))).toEqual([
+      'Open account menu for Tim White',
+      'Open public profile at jov.ie/timwhite',
+    ]);
+    expect(actions.every(action => action.tabIndex >= 0)).toBe(true);
+    expect(
+      actions.every(
+        action =>
+          action.getAttribute('data-focus-treatment') === 'underline-only'
+      )
+    ).toBe(true);
+    expect(
+      panel.querySelectorAll('[data-sidebar-identity-boundary]')
+    ).toHaveLength(1);
+    expect(
+      container.querySelector(
+        ':scope > [data-sidebar="user-panel"] > [data-sidebar-identity-action="public-profile"]'
+      )
+    ).toBeNull();
   });
 
   it('uses existing subtle border token without growing --linear-* namespace', () => {
