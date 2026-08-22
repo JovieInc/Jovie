@@ -166,7 +166,7 @@ describe('SidebarIdentityGroup', () => {
       'utf8'
     );
     expect(identityCss).toContain(':has(:focus-visible)');
-    expect(identityCss).toContain("[data-collapsible='icon']");
+    expect(identityCss).toContain('[data-collapsible="icon"]');
     expect(
       within(group).getByRole('link', { name: PROFILE_LINK_NAME })
     ).toHaveAttribute('aria-current', 'page');
