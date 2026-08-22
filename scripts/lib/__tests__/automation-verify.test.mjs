@@ -510,6 +510,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/golden-path-prod-autofix-workflow-contract.test.mjs',
         'scripts/lib/__tests__/queue-deferral-receipt.test.mjs',
         'scripts/lib/__tests__/rolling-ci-handoff.test.mjs',
+        'scripts/lib/__tests__/rolling-ci-pipeline.test.mjs',
         'scripts/lib/__tests__/queue-deferred-release.test.mjs',
         'scripts/lib/__tests__/queue-deferred-release-admission.test.mjs',
         'scripts/lib/__tests__/setup-worktree-health.test.mjs',
