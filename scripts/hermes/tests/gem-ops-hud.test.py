@@ -98,6 +98,37 @@ def fixture_state():
 
 
 class VersionedHudContractTests(unittest.TestCase):
+    def test_shipping_projection_preserves_zero_and_emits_allowlisted_contract(self):
+        state = fixture_state()
+        state["symphony"]["counts"]["implementing"] = 0
+        projection = HUD.build_shipping_projection(state, previous=None)
+        self.assertEqual(projection["schemaVersion"], "ovie.shipping-state.v1")
+        self.assertIsNone(projection["previousProjectionId"])
+        self.assertEqual(projection["sources"][0]["facts"]["implementing"], 0)
+        self.assertNotIn("jobs", json.dumps(projection))
+        self.assertNotIn("blockers", json.dumps(projection))
+    def test_shipping_projection_marks_recovery_after_a_failed_snapshot(self):
+        failed = fixture_state()
+        failed["symphony"]["error"] = "ConnectionRefusedError"
+        previous = HUD.build_shipping_projection(failed, previous=None)
+        recovered = HUD.build_shipping_projection(fixture_state(), previous=previous)
+        self.assertEqual(recovered["sequence"], 2)
+        self.assertEqual(recovered["previousProjectionId"], previous["projectionId"])
+        self.assertEqual(recovered["sources"][0]["status"], "recovery")
+        self.assertEqual(recovered["status"], "recovery")
+    def test_shipping_projection_distinguishes_failure_states(self):
+        cases = {
+            "linear_unauthorized": "unauthorized",
+            "ConnectionRefusedError": "disconnected",
+            "TimeoutError": "degraded",
+        }
+        for error, expected in cases.items():
+            state = fixture_state()
+            state["issues"]["error"] = error
+            with self.subTest(error=error):
+                projection = HUD.build_shipping_projection(state, previous=None)
+                source = next(item for item in projection["sources"] if item["sourceId"] == "issues")
+                self.assertEqual(source["status"], expected)
     def test_fixture_renders_fixed_width_operational_sections(self):
         moment = dt.datetime(2026, 8, 16, 12, 0, 30, tzinfo=dt.timezone.utc)
         with (
