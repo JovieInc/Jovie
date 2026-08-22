@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- **Chat is home on iOS:** swipe from the transcript to open recent chats or context. There is no bottom tab bar, new messages fade in instead of sliding, and Settings uses the system grouped list.
+
 - [internal] **Draft-first rolling CI publishes the first coherent commit without waiting on local affected tests (JOV-5271):** husky defaults to a thin publication gate (diff integrity, changed-file secrets, hook policy). Fast source CI still runs on every push and cancels superseded heads. Failed checks normalize to PR/head/check/attempt/fingerprint, one implementer writer owns repair, and FX stays the recovery backstop after an explicit handoff. Ready/landing still requires rebased exact-head tests, coverage, security, and policy.
 - [internal] **Mac Ovie door talks to the current Summer through Eve (JOV-5212):** entitled OV turns persist Eve receipts, bind the current Mac Summer session, and stream Summer only. Missing transport stays explicit unavailable with no Jovie, Eve, Ovie-persona, or mock fallback. Operator memory and tools stay isolated from customer Jovie.
 
@@ -70,6 +72,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - **iPhone Library is Catalog, Collections, and Ideas:** Catalog is releases, merch, and docs. Collections auto-bundles a vlog with its script, takes, and B-roll. Ideas is the untagged third home.
 - **iPhone chat is home:** Ask Jovie is the first signed-in surface. There is no bottom tab bar. Swipe from the leading edge for the sidebar and from the trailing edge for the right rail.
+- **iPhone chat swipes open the rails:** On chat home, a leading pan opens the sidebar and a trailing pan opens the right rail. Inbox and Library keep edge-only drags. Settings uses the system grouped list and toolbar materials.
 - **iPhone chat home can introduce what’s new:** An empty chat highlights one feature or lists up to three recent changes. Dismiss stays dismissed. More than three changes ends on And more, which opens the changelog.
 
 - **Ovie is one morning screen:** `/hud` now carries the brief, a Loom-style screen walk, shipper, and dashboard. Fullscreen asks the logged-in admin for the kiosk token and reloads `/hud?fs=1&kiosk=…`. `/app/ov/ops` and `/hud-tv` redirect there.
