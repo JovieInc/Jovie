@@ -27,7 +27,7 @@ describe('local remediation concurrency', () => {
     expect(
       resolveLocalRemediationConcurrency({
         commandCount: 3,
-        requested: 16,
+        requested: '16',
         resources: healthyMac,
       })
     ).toMatchObject({ concurrency: 3, commandCount: 3, commandCap: 3 });
@@ -37,7 +37,7 @@ describe('local remediation concurrency', () => {
     expect(
       resolveLocalRemediationConcurrency({
         commandCount: 8,
-        requested: 2,
+        requested: '2',
         resources: healthyMac,
       })
     ).toMatchObject({ concurrency: 2, mode: 'explicit-bounded' });
@@ -53,7 +53,7 @@ describe('local remediation concurrency', () => {
     expect(
       resolveLocalRemediationConcurrency({
         commandCount: 8,
-        requested: 8,
+        requested: '8',
         resources: healthyMac,
       })
     ).toMatchObject({
@@ -66,7 +66,7 @@ describe('local remediation concurrency', () => {
     expect(
       resolveLocalRemediationConcurrency({
         commandCount: 8,
-        requested: 8,
+        requested: '8',
         resources: {
           ...healthyMac,
           freeMemoryBytes: 1 * gib,

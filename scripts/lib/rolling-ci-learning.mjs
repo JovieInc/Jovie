@@ -48,7 +48,7 @@ export function parseLearningReceiptMarker(body) {
   }
 }
 
-export function validateLearningReceipt(receipt, { liveHead } = {}) {
+export function validateLearningReceipt(receipt, { liveHead = '' } = {}) {
   const errors = [];
   if (receipt?.schema !== LEARNING_RECEIPT_SCHEMA)
     errors.push('invalid learning receipt schema');
