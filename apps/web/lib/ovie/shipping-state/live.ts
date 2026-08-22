@@ -399,7 +399,14 @@ export function createLiveShippingStateReaders(
         NAMED_AUTHORITY_URLS['symphony-runtime'],
         750
       );
-      return { ...runtime, sourceId: 'symphony-task' };
+      return {
+        ...runtime,
+        sourceId: 'symphony-task',
+        schema:
+          runtime.status === 'ok'
+            ? SHIPPING_SOURCE_SCHEMAS['symphony-task']
+            : runtime.schema,
+      };
     },
     'lease-guard-capacity': async () => {
       const file = await readNamedJson(io, 'lease-guard-capacity');

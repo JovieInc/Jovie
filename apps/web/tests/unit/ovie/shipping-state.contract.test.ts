@@ -436,6 +436,37 @@ describe('zero, states, ordering, meanings, cadence', () => {
   });
 });
 
+describe('live symphony-task reader', () => {
+  it('overrides the shared runtime payload schema so task observations stay fresh', async () => {
+    const readers = createLiveShippingStateReaders({
+      readFile: vi.fn(async () => {
+        throw Object.assign(new Error('missing'), { code: 'ENOENT' });
+      }),
+      fetch: vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              schema: SHIPPING_SOURCE_SCHEMAS['symphony-runtime'],
+              running: [],
+              retrying: [],
+              blocked: [],
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } }
+          )
+      ),
+    });
+    const read = await readers['symphony-task']();
+    expect(read).toMatchObject({
+      sourceId: 'symphony-task',
+      status: 'ok',
+      schema: SHIPPING_SOURCE_SCHEMAS['symphony-task'],
+    });
+    const projection = await publish({ 'symphony-task': read });
+    expect(projection.sources['symphony-task'].state).toBe('fresh');
+    expect(projection.sources['symphony-task'].lastError).toBeNull();
+  });
+});
+
 describe('shipping-state security', () => {
   it('refuses arbitrary paths, secrets, and actuation keys', async () => {
     expect(isAllowlistedAuthorityPath('/etc/passwd')).toBe(false);
