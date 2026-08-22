@@ -32,14 +32,16 @@ export function findOwnedAgents(agents, fingerprint) {
 /**
  * Webhook ingress: missing handoff routes to FX. Pickup-end
  * `resolveRemediationRoute` still keeps the implementer when no receipt.
+ * @param {Record<string, any>} [input]
  */
-export function resolveWebhookRemediationRoute({
-  receipt = null,
-  liveHead,
-  implementer,
-  fxAdapter = null,
-  now,
-} = {}) {
+export function resolveWebhookRemediationRoute(input = {}) {
+  const {
+    receipt = null,
+    liveHead,
+    implementer,
+    fxAdapter = null,
+    now,
+  } = input;
   if (receipt) {
     const pickup = resolveRemediationRoute({
       receipt,
@@ -70,11 +72,9 @@ export function resolveWebhookRemediationRoute({
   };
 }
 
-export function resolveDispatchWriter({
-  route,
-  priorClaimWriter,
-  implementer,
-} = {}) {
+/** @param {Record<string, any>} [input] */
+export function resolveDispatchWriter(input = {}) {
+  const { route, priorClaimWriter, implementer } = input;
   if (route?.route === 'implementer') {
     return route.writer || implementer;
   }
@@ -87,13 +87,15 @@ export function resolveDispatchWriter({
   return implementer;
 }
 
-export function buildFxPrompt({
-  repository,
-  prNumber,
-  headSha,
-  fingerprint,
-  failedChecks = [],
-} = {}) {
+/** @param {Record<string, any>} [input] */
+export function buildFxPrompt(input = {}) {
+  const {
+    repository,
+    prNumber,
+    headSha,
+    fingerprint,
+    failedChecks = [],
+  } = input;
   return [
     'Repair the current pull request at the exact failed head. Do not open a sibling PR.',
     `Repository: ${repository}`,
@@ -108,16 +110,18 @@ export function buildFxPrompt({
     .join('\n');
 }
 
-export function planFxLaunch({
-  repository,
-  prNumber,
-  headSha,
-  headRef,
-  fingerprint,
-  failedChecks = [],
-  cursorAgents = [],
-  cursorApiKey,
-} = {}) {
+/** @param {Record<string, any>} [input] */
+export function planFxLaunch(input = {}) {
+  const {
+    repository,
+    prNumber,
+    headSha,
+    headRef,
+    fingerprint,
+    failedChecks = [],
+    cursorAgents = [],
+    cursorApiKey,
+  } = input;
   if (typeof cursorApiKey !== 'string' || cursorApiKey.trim().length === 0) {
     return {
       action: 'configuration_incident',
@@ -159,20 +163,22 @@ export function planFxLaunch({
   };
 }
 
-export function planFxWebhookRemediation({
-  dispatch,
-  receipt = null,
-  liveHead,
-  implementer,
-  fxAdapter,
-  cursorAgents = [],
-  cursorApiKey = '',
-  now,
-  repository,
-  prNumber,
-  headSha,
-  headRef,
-} = {}) {
+/** @param {Record<string, any>} [input] */
+export function planFxWebhookRemediation(input = {}) {
+  const {
+    dispatch,
+    receipt = null,
+    liveHead,
+    implementer,
+    fxAdapter,
+    cursorAgents = [],
+    cursorApiKey = '',
+    now,
+    repository,
+    prNumber,
+    headSha,
+    headRef,
+  } = input;
   const route = resolveWebhookRemediationRoute({
     receipt,
     liveHead,
@@ -234,28 +240,27 @@ export function planFxWebhookRemediation({
   };
 }
 
-export async function listCursorAgents({
-  cursorApiKey,
-  fetchImpl = fetch,
-} = {}) {
+/** @param {Record<string, any>} [input] */
+export async function listCursorAgents(input = {}) {
+  const { cursorApiKey, fetchImpl = fetch } = input;
   const response = await fetchImpl(CURSOR_AGENTS_URL, {
     headers: {
       Authorization: cursorAuthHeader(cursorApiKey),
       'Content-Type': 'application/json',
     },
   });
-  const body = await response.json().catch(() => ({}));
+  const body = /** @type {Record<string, any>} */ (
+    await response.json().catch(() => ({}))
+  );
   if (!response.ok) {
     throw new Error(`cursor list failed: ${response.status}`);
   }
   return Array.isArray(body?.agents) ? body.agents : [];
 }
 
-export async function launchCursorAgent({
-  request,
-  cursorApiKey,
-  fetchImpl = fetch,
-} = {}) {
+/** @param {Record<string, any>} [input] */
+export async function launchCursorAgent(input = {}) {
+  const { request, cursorApiKey, fetchImpl = fetch } = input;
   const response = await fetchImpl(CURSOR_AGENTS_URL, {
     method: 'POST',
     headers: {

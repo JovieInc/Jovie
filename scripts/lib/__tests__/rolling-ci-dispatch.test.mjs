@@ -235,7 +235,7 @@ describe('rolling CI failure dispatch', () => {
 
   it('deliberate red: rejects a competing remediation writer', () => {
     expect(
-      plan(event({ workflowRunId: 9002 }), {
+      plan(event({ workflowRunId: 9002, workflowRunAttempt: 2 }), {
         writer: 'fx',
         priorState: plan(event(), { writer: 'implementer' }).state,
       })

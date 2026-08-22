@@ -48,10 +48,9 @@ function evictRecord(cache, reason) {
   };
 }
 
-export function buildOpenCacheRefs({
-  mainRef = 'refs/heads/main',
-  pullRequests = [],
-} = {}) {
+/** @param {Record<string, any>} [input] */
+export function buildOpenCacheRefs(input = {}) {
+  const { mainRef = 'refs/heads/main', pullRequests = [] } = input;
   const refs = new Set([mainRef]);
   for (const pull of pullRequests) {
     const number = Number(pull?.number);
@@ -65,12 +64,14 @@ export function buildOpenCacheRefs({
   return refs;
 }
 
-export function planCacheGc({
-  caches = [],
-  openRefs = new Set(['refs/heads/main']),
-  usage = {},
-  nowMs = Date.now(),
-} = {}) {
+/** @param {Record<string, any>} [input] */
+export function planCacheGc(input = {}) {
+  const {
+    caches = [],
+    openRefs = new Set(['refs/heads/main']),
+    usage = {},
+    nowMs = Date.now(),
+  } = input;
   const liveRefs = openRefs instanceof Set ? openRefs : new Set(openRefs);
   const overBudget = isOverCacheBudget(usage, caches.length);
   const turboKeep = overBudget
@@ -96,7 +97,7 @@ export function planCacheGc({
   }
   const afterDupes = [];
   for (const group of byExactKey.values()) {
-    const sorted = [...group].toSorted(newestFirst);
+    const sorted = [...group].sort(newestFirst);
     afterDupes.push(sorted[0]);
     for (const extra of sorted.slice(1)) {
       evict.push(evictRecord(extra, 'exact_key_duplicate'));
@@ -117,7 +118,7 @@ export function planCacheGc({
     turboGroups.set(groupKey, group);
   }
   for (const group of turboGroups.values()) {
-    const sorted = [...group].toSorted(newestFirst);
+    const sorted = [...group].sort(newestFirst);
     afterTurbo.push(...sorted.slice(0, turboKeep));
     for (const extra of sorted.slice(turboKeep)) {
       evict.push(evictRecord(extra, 'turbo_surplus'));
@@ -144,7 +145,9 @@ export function planCacheGc({
   };
 }
 
-export async function collectCacheGcSnapshot({ repository, execJson } = {}) {
+/** @param {Record<string, any>} [input] */
+export async function collectCacheGcSnapshot(input = {}) {
+  const { repository, execJson } = input;
   if (!repository) throw new Error('repository is required');
   if (typeof execJson !== 'function') {
     throw new Error('execJson is required');

@@ -55,13 +55,11 @@ function isAuthenticatedCheckEvent(source) {
   return true;
 }
 
-export function resolveCiWorkflowRun({
-  runs = [],
-  headSha,
-  checkSuiteId,
-} = {}) {
-  const head = String(headSha ?? '').toLowerCase();
-  const suite = checkSuiteId == null ? null : String(checkSuiteId);
+/** @param {Record<string, any>} [input] */
+export function resolveCiWorkflowRun(input = {}) {
+  const runs = Array.isArray(input.runs) ? input.runs : [];
+  const head = String(input.headSha ?? '').toLowerCase();
+  const suite = input.checkSuiteId == null ? null : String(input.checkSuiteId);
   return (
     [...runs]
       .filter(run => {
@@ -78,7 +76,7 @@ export function resolveCiWorkflowRun({
           (suite == null || runSuite === suite)
         );
       })
-      .toSorted((left, right) => {
+      .sort((left, right) => {
         const attemptDelta =
           (right.run_attempt ?? right.runAttempt ?? 0) -
           (left.run_attempt ?? left.runAttempt ?? 0);

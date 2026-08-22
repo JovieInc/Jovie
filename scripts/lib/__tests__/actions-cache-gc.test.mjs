@@ -63,12 +63,12 @@ describe('Actions cache GC', () => {
         }),
       ],
     });
-    expect(plan.evict.map(item => item.reason).toSorted()).toEqual([
+    expect(plan.evict.map(item => item.reason).sort()).toEqual([
       'closed_ref',
       'exact_key_duplicate',
     ]);
-    expect(plan.evict.map(item => item.id).toSorted()).toEqual([1, 3]);
-    expect(plan.keep.map(item => item.id).toSorted()).toEqual([2, 4]);
+    expect(plan.evict.map(item => item.id).sort()).toEqual([1, 3]);
+    expect(plan.keep.map(item => item.id).sort()).toEqual([2, 4]);
     expect(isProtectedCacheKey('Linux-playwright-chromium-v1')).toBe(true);
     expect(turboFamily('Linux-turbo-aaa')).toBe('Linux-turbo');
   });
@@ -110,8 +110,8 @@ describe('Actions cache GC', () => {
     });
     expect(plan.overBudget).toBe(true);
     expect(plan.turboKeep).toBe(1);
-    expect(plan.evict.map(item => item.id).toSorted()).toEqual([2, 3]);
-    expect(plan.keep.map(item => item.id).toSorted()).toEqual([1, 4]);
+    expect(plan.evict.map(item => item.id).sort()).toEqual([2, 3]);
+    expect(plan.keep.map(item => item.id).sort()).toEqual([1, 4]);
     expect(plan.evict.find(item => item.id === 3)?.reason).toBe(
       'protected_stale_over_budget'
     );
