@@ -160,7 +160,6 @@ owner; they may not become nested controls or adjacent footer rows.
 - Exact-head desktop runtime: `/Users/timwhite/.codex/visualizations/2026/08/22/01a026c9-f138-7373-a453-f334a4a6b8d7/jov-5272-desktop-1440x900.png`
 - Exact 694 × 340 comparison crop: `/Users/timwhite/.codex/visualizations/2026/08/22/01a026c9-f138-7373-a453-f334a4a6b8d7/jov-5272-sidebar-694x340.png`
 - Runtime audit receipt: `/Users/timwhite/.codex/visualizations/2026/08/22/01a026c9-f138-7373-a453-f334a4a6b8d7/jov-5272-runtime-proof.json`
-- Implementation source SHA for this capture: `c2b9c694ae22d3501f6c1f92277142dd6e4efb72`
 
 The defect screenshot has two peer focal boundaries: a standalone Public
 Profile row and a separately selected Tim White row. The corrected runtime has
@@ -193,6 +192,10 @@ shell's calm, low-chrome hierarchy without inventing a new component style.
   `/Users/timwhite/.codex/visualizations/2026/08/22/01a026c9-f138-7373-a453-f334a4a6b8d7/jov-5272-sidebar-profile-focus-694x340.png`
 - Selected/open proof:
   `/Users/timwhite/.codex/visualizations/2026/08/22/01a026c9-f138-7373-a453-f334a4a6b8d7/jov-5272-sidebar-account-selected-694x340.png`
+- The first settled focus capture exposed the global `:focus-visible` fallback
+  halo on each child action. The embedded actions now explicitly suppress that
+  standalone shadow while retaining creator-name and URL cues; the enclosing
+  fieldset remains the only visual boundary.
 - Computed runtime styles confirm the child actions add no border, outline, or
   box shadow. Focus-within and selected/open treatments belong to the enclosing
   fieldset. Its idle geometry remains 204 × 64 CSS pixels, so the state change

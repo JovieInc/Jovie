@@ -85,6 +85,11 @@ vi.mock('@/components/organisms/user-button', () => ({
         data-sidebar-identity-action={
           props.embeddedInIdentityGroup ? 'account-menu' : undefined
         }
+        className={
+          props.embeddedInIdentityGroup
+            ? 'focus-visible:shadow-none'
+            : undefined
+        }
         onClick={() => props.onMenuOpenChange?.(true)}
       >
         Tim White
@@ -258,6 +263,13 @@ describe('UnifiedSidebar library route', () => {
     expect(identityGroup).toHaveTextContent('Tim White');
     expect(identityGroup).toHaveTextContent('jov.ie/timwhite');
     expect(identityGroup.querySelector('button a, a button')).toBeNull();
+    expect(
+      Array.from(
+        identityGroup.querySelectorAll<HTMLElement>(
+          '[data-sidebar-identity-action]'
+        )
+      ).every(action => action.classList.contains('focus-visible:shadow-none'))
+    ).toBe(true);
     expect(identityGroup).toHaveAttribute(
       'data-sidebar-identity-boundary',
       'true'
@@ -355,6 +367,11 @@ describe('UnifiedSidebar library route', () => {
       'Open public profile at jov.ie/timwhite',
     ]);
     expect(actions.every(action => action.tabIndex >= 0)).toBe(true);
+    expect(
+      actions.every(action =>
+        action.classList.contains('focus-visible:shadow-none')
+      )
+    ).toBe(true);
     expect(
       panel.querySelectorAll('[data-sidebar-identity-boundary]')
     ).toHaveLength(1);

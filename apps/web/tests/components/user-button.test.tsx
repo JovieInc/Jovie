@@ -851,6 +851,7 @@ describe('UserButton billing actions', () => {
     expect(trigger).toHaveClass(
       'rounded-none',
       'hover:bg-transparent',
+      'focus-visible:shadow-none',
       'focus-visible:[&_[data-user-button-display-name]]:text-primary-token'
     );
     expect(trigger).not.toHaveClass(

@@ -576,7 +576,7 @@ export function UserButton({
         className={cn(
           'group/user-button flex w-full min-w-0 items-center gap-2 px-2 py-1 text-left transition-colors focus-visible:outline-none group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0',
           embeddedInIdentityGroup
-            ? 'rounded-none hover:bg-transparent focus-visible:[&_[data-user-button-display-name]]:text-primary-token'
+            ? 'rounded-none hover:bg-transparent focus-visible:shadow-none focus-visible:[&_[data-user-button-display-name]]:text-primary-token'
             : 'rounded-md hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring'
         )}
       >

@@ -484,7 +484,7 @@ export function SidebarIdentityFooter({
             data-sidebar-identity-action='public-profile'
             className={cn(
               'flex min-h-6 min-w-0 items-center gap-1.5 rounded-md pb-1 pl-10 pr-2 pt-0.5 text-2xs font-normal text-sidebar-muted outline-none',
-              'transition-colors duration-fast ease-interactive hover:text-sidebar-item-foreground focus-visible:text-primary-token focus-visible:underline focus-visible:underline-offset-2',
+              'transition-colors duration-fast ease-interactive hover:text-sidebar-item-foreground focus-visible:text-primary-token focus-visible:shadow-none focus-visible:underline focus-visible:underline-offset-2',
               'group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0'
             )}
           >

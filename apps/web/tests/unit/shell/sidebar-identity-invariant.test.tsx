@@ -90,6 +90,15 @@ function sidebarIdentityViolations(root: HTMLElement): string[] {
     if (actions.some(action => action.querySelector('button, a[href]'))) {
       violations.push('identity actions must not contain nested interactives');
     }
+    if (
+      actions.some(
+        action => !action.classList.contains('focus-visible:shadow-none')
+      )
+    ) {
+      violations.push(
+        'identity actions must suppress standalone focus boundaries'
+      );
+    }
   }
 
   return violations;
@@ -122,6 +131,7 @@ function ComposedIdentityFooterFixture() {
           type='button'
           aria-label='Open account menu for Tim White'
           data-sidebar-identity-action='account-menu'
+          className='focus-visible:shadow-none'
         >
           Tim White
         </button>
@@ -129,6 +139,7 @@ function ComposedIdentityFooterFixture() {
           href='/timwhite'
           aria-label='Open public profile at jov.ie/timwhite'
           data-sidebar-identity-action='public-profile'
+          className='focus-visible:shadow-none'
         >
           jov.ie/timwhite
         </Link>
