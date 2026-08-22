@@ -11,6 +11,10 @@
 import { createHash } from 'node:crypto';
 import { mkdir, open, readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
+import {
+  FX_BACKSTOP_FAILURES,
+  fxBackstopRoute,
+} from '../lib/rolling-ci-handoff.mjs';
 
 export const DELIVERY_RECEIPT_SCHEMA = 'jovie-delivery-receipt/v1';
 export const REPAIR_TASK_SCHEMA = 'jovie-symphony-repair-task/v1';
@@ -32,6 +36,7 @@ const AUTOMATED_FAILURES = Object.freeze({
     owner: 'symphony',
     action: 'create-bounded-ci-repair-pr',
   },
+  ...FX_BACKSTOP_FAILURES,
   'lease-ambiguous': {
     owner: 'symphony',
     action: 'reconcile-exact-head-lease',
@@ -256,7 +261,7 @@ export function repairTaskForReceipt(receipt) {
     createdAt: receipt.observedAt,
     receiptKey: receipt.receiptKey,
     owner: receipt.next.owner,
-    route: receipt.next.owner === 'symphony' ? 'gem-to-symphony' : 'gem-local',
+    route: fxBackstopRoute(receipt.next.owner),
     action: receipt.next.action,
     issue: receipt.event.issue,
     pr: receipt.event.pr,
