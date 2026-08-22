@@ -32,6 +32,10 @@ describe('draft-first rolling CI policy wiring', () => {
 
   it('fans broad verification out remotely and cancels stale source heads', () => {
     const workflow = read('.github/workflows/ci.yml');
+    const coverage = workflow.slice(
+      workflow.indexOf('  ci-draft-coverage:'),
+      workflow.indexOf('  ci-a11y:')
+    );
     expect(workflow).toContain('cancel-in-progress: true');
     expect(workflow).toContain(
       'github.event.pull_request.number || github.event.merge_group.head_sha || github.run_id'
@@ -46,5 +50,10 @@ describe('draft-first rolling CI policy wiring', () => {
     expect(workflow).toContain('ci-draft-coverage:');
     expect(workflow).toContain('Affected Unit Tests (10 shards)');
     expect(workflow).toContain('coverage ratchet did not pass');
+    expect(coverage).toContain("trap 'stop_coverage; exit 143' TERM");
+    expect(coverage).toContain('kill -KILL -- "-$coverage_group"');
+    expect(coverage).toContain(
+      "setsid bash -c 'pnpm --filter @jovie/web test:coverage"
+    );
   });
 });

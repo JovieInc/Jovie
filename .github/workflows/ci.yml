@@ -3368,8 +3368,25 @@ jobs:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
           CLERK_SECRET_KEY: sk_test_dummy_secret_for_coverage_run_only
         run: |
-          pnpm --filter @jovie/web test:coverage
-          pnpm run test:coverage:diff
+          set -euo pipefail
+          coverage_group=''
+          stop_coverage() {
+            trap - EXIT INT TERM
+            if [[ -n "$coverage_group" ]] && kill -0 -- "-$coverage_group" 2>/dev/null; then
+              kill -TERM -- "-$coverage_group" 2>/dev/null || true
+              sleep 2
+              kill -KILL -- "-$coverage_group" 2>/dev/null || true
+            fi
+            wait "$coverage_group" 2>/dev/null || true
+          }
+          trap 'stop_coverage; exit 130' INT
+          trap 'stop_coverage; exit 143' TERM
+          trap stop_coverage EXIT
+          setsid bash -c 'pnpm --filter @jovie/web test:coverage && pnpm run test:coverage:diff' &
+          coverage_group=$!
+          wait "$coverage_group"
+          coverage_group=''
+          trap - EXIT INT TERM
 
   ci-a11y:
     name: A11y (axe)
