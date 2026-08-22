@@ -33,6 +33,22 @@ describe('local remediation concurrency', () => {
     ).toMatchObject({ concurrency: 3, commandCount: 3, commandCap: 3 });
   });
 
+  it('bounds ordinary explicit requests and validates resource evidence', () => {
+    expect(
+      resolveLocalRemediationConcurrency({
+        commandCount: 8,
+        requested: 2,
+        resources: healthyMac,
+      })
+    ).toMatchObject({ concurrency: 2, mode: 'explicit-bounded' });
+    expect(() =>
+      resolveLocalRemediationConcurrency({
+        commandCount: 8,
+        resources: { ...healthyMac, freeMemoryBytes: 33 * gib },
+      })
+    ).toThrow('memory evidence must be finite and within total memory');
+  });
+
   it('keeps eight shards behind an explicit healthy-machine opt-in', () => {
     expect(
       resolveLocalRemediationConcurrency({

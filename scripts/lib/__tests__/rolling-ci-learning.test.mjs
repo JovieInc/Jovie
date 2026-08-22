@@ -191,5 +191,39 @@ describe('rolling CI defect-class learning', () => {
     expect(
       parseLearningReceiptMarker(learningReceiptMarker(validReceipt))
     ).toEqual(validReceipt);
+    expect(parseLearningReceiptMarker('no marker')).toBeNull();
+    expect(
+      parseLearningReceiptMarker(
+        '<!-- jovie-rolling-ci-learning:not-valid-json -->'
+      )
+    ).toBeNull();
+  });
+
+  it('fails closed on invalid identity, head, guard delivery, and green proof', () => {
+    expect(() => learningReceiptKey({})).toThrow('invalid learning identity');
+    expect(() => evaluateLearningPromotion({ liveHead: 'not-a-sha' })).toThrow(
+      'liveHead must be a 40-character SHA'
+    );
+    const validation = validateLearningReceipt(
+      {
+        ...validReceipt,
+        identity: { ...identity, repository: 'invalid' },
+        guardrailDecision: {
+          warranted: true,
+          reason: 'reusable class',
+          delivery: 'linked-follow-up',
+        },
+        exactHeadGreen: false,
+      },
+      { liveHead: 'b'.repeat(40) }
+    );
+    expect(validation.errors).toEqual(
+      expect.arrayContaining([
+        'invalid learning identity',
+        'learning receipt is not for the current head',
+        'linked guardrail follow-up requires an owned Linear issue',
+        'repaired head is not exact-head green',
+      ])
+    );
   });
 });

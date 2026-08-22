@@ -81,6 +81,23 @@ describe('rolling CI learning promotion gate', () => {
     });
   });
 
+  it('exits green when the exact repaired head has its receipt', () => {
+    const script = resolve(
+      import.meta.dirname,
+      '../../rolling-ci-learning-gate.mjs'
+    );
+    const child = spawnSync(process.execPath, [script], {
+      input: JSON.stringify({
+        liveHead: head,
+        repairedFailures: [repairedFailure],
+        receipts: [receipt],
+      }),
+      encoding: 'utf8',
+    });
+    expect(child.status).toBe(0);
+    expect(JSON.parse(child.stdout).complete).toBe(true);
+  });
+
   it('stays green when no failure has been repaired', () => {
     expect(
       evaluateLearningGateInput({
