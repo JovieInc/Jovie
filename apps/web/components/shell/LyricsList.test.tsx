@@ -11,7 +11,10 @@ const SAMPLE_LINES: readonly LyricsListLine[] = [
 describe('LyricsList', () => {
   it('renders the default title and a row per line', () => {
     render(<LyricsList lines={SAMPLE_LINES} />);
-    expect(screen.getByText('Lyrics')).toBeInTheDocument();
+    const header = screen.getByText('Lyrics');
+    expect(header).toBeInTheDocument();
+    expect(header.className).toContain('tracking-normal');
+    expect(header.className).not.toMatch(/\buppercase\b/);
     expect(screen.getAllByRole('button').length).toBe(3);
   });
 
@@ -30,7 +33,10 @@ describe('LyricsList', () => {
   it('fires onEdit when the edit button is clicked', () => {
     const onEdit = vi.fn();
     render(<LyricsList lines={SAMPLE_LINES} onEdit={onEdit} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    const edit = screen.getByRole('button', { name: 'Edit' });
+    expect(edit.className).toContain('tracking-normal');
+    expect(edit.className).not.toMatch(/\buppercase\b/);
+    fireEvent.click(edit);
     expect(onEdit).toHaveBeenCalledOnce();
   });
 

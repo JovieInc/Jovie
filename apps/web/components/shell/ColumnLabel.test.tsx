@@ -16,7 +16,10 @@ describe('ColumnLabel', () => {
         onSort={() => undefined}
       />
     );
-    expect(screen.getByRole('button', { name: /Title/ })).toBeInTheDocument();
+    const header = screen.getByRole('button', { name: /Title/ });
+    expect(header).toBeInTheDocument();
+    expect(header.className).toContain('tracking-normal');
+    expect(header.className).not.toMatch(/\buppercase\b/);
   });
 
   it('fires onSort with the field when clicked', () => {

@@ -13,7 +13,10 @@ describe('PerformanceCard', () => {
         delta={12}
       />
     );
-    expect(screen.getByText('Smart link')).toBeInTheDocument();
+    const title = screen.getByText('Smart link');
+    expect(title).toBeInTheDocument();
+    expect(title.className).toContain('tracking-normal');
+    expect(title.className).not.toMatch(/\buppercase\b/);
     expect(screen.getByText('clicks')).toBeInTheDocument();
   });
 
