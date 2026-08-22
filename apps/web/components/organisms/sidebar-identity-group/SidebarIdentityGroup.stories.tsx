@@ -98,7 +98,8 @@ export const SidebarAndProfileSweep: Story = {
       </div>
       <div
         data-testid='profile-identity-surface'
-        className='w-[280px] rounded-xl border border-sidebar-border px-4 py-3'
+        className='rounded-xl border border-sidebar-border px-4 py-3'
+        style={{ width: 280 }}
       >
         <p className='text-app text-sidebar-item-foreground'>Tim White</p>
         <Link href='/timwhite' className='text-2xs text-sidebar-muted'>

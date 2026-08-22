@@ -14,7 +14,6 @@ import {
 } from '@/components/organisms/sidebar-identity-group';
 import {
   SIDEBAR_IDENTITY_SPLIT_FIXTURE_GROUP_COUNT,
-  SIDEBAR_IDENTITY_SPLIT_FIXTURE_RED_CLASS,
   SIDEBAR_IDENTITY_SPLIT_FIXTURE_TEST_ID,
   SidebarIdentitySplitLayoutFixture,
 } from '@/components/organisms/sidebar-identity-group/fixtures/split-layout';
@@ -45,22 +44,28 @@ const PROFILE_DISPLAY_HREF = formatPublicProfileDisplayHref(PROFILE_HREF);
 const PROFILE_LINK_NAME = publicProfileAccessibleName(PROFILE_DISPLAY_HREF);
 
 const IDENTITY_GROUP_STATES = [
-  { id: 'expanded', className: 'w-[224px]', collapsible: undefined },
-  { id: 'narrow', className: 'w-[160px]', collapsible: undefined },
-  { id: 'collapsed', className: 'w-[52px]', collapsible: 'icon' },
+  { id: 'expanded', width: 224, collapsible: undefined },
+  { id: 'narrow', width: 160, collapsible: undefined },
+  { id: 'collapsed', width: 52, collapsible: 'icon' },
 ] as const;
 
 function RailFrame({
   collapsible,
+  width,
   className,
   children,
 }: {
   readonly collapsible?: string;
+  readonly width?: number;
   readonly className?: string;
   readonly children: ReactNode;
 }) {
   return (
-    <div className={`group ${className ?? ''}`} data-collapsible={collapsible}>
+    <div
+      className={`group ${className ?? ''}`}
+      data-collapsible={collapsible}
+      style={width ? { width } : undefined}
+    >
       {children}
     </div>
   );
@@ -104,7 +109,7 @@ describe('SidebarIdentityGroup', () => {
 
   it('renders exactly one identity group with sibling identity and Public Profile actions', () => {
     const { container } = render(
-      <RailFrame className='w-[224px]'>
+      <RailFrame width={224}>
         <SidebarIdentityGroup profileHref={PROFILE_HREF} />
       </RailFrame>
     );
@@ -139,7 +144,7 @@ describe('SidebarIdentityGroup', () => {
   it('keeps one enclosing boundary for hover, focus-visible, selected, spacing, and border', () => {
     pathnameMock.mockReturnValue(PROFILE_HREF);
     const { container } = render(
-      <RailFrame className='w-[224px]'>
+      <RailFrame width={224}>
         <SidebarIdentityGroup profileHref={PROFILE_HREF} />
       </RailFrame>
     );
@@ -153,12 +158,15 @@ describe('SidebarIdentityGroup', () => {
     expect(group).toHaveAttribute('data-active', 'true');
     expect(group).toHaveClass('border-t');
     expect(composition).toHaveClass(
-      'hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)]',
-      'has-[:focus-visible]:ring-1'
+      'hover:bg-sidebar-accent',
+      'bg-sidebar-accent-active'
     );
-    expect(composition.className).toMatch(
-      /group-data-\[active=true\]\/identity-group:bg-/
+    const identityCss = readFileSync(
+      join(__dirname, './SidebarIdentityGroup.css'),
+      'utf8'
     );
+    expect(identityCss).toContain(':has(:focus-visible)');
+    expect(identityCss).toContain("[data-collapsible='icon']");
     expect(
       within(group).getByRole('link', { name: PROFILE_LINK_NAME })
     ).toHaveAttribute('aria-current', 'page');
@@ -170,7 +178,7 @@ describe('SidebarIdentityGroup', () => {
   it('preserves keyboard order and accessible names without duplicate tab stops', async () => {
     const user = userEvent.setup();
     render(
-      <RailFrame className='w-[224px]'>
+      <RailFrame width={224}>
         <SidebarIdentityGroup profileHref={PROFILE_HREF} />
       </RailFrame>
     );
@@ -192,11 +200,11 @@ describe('SidebarIdentityGroup', () => {
   it.each(
     IDENTITY_GROUP_STATES
   )('keeps one identity group in the $id sidebar state', ({
-    className,
+    width,
     collapsible,
   }) => {
     const { container } = render(
-      <RailFrame className={className} collapsible={collapsible}>
+      <RailFrame width={width} collapsible={collapsible}>
         <SidebarIdentityGroup profileHref={PROFILE_HREF} />
       </RailFrame>
     );
@@ -224,7 +232,7 @@ describe('SidebarIdentityGroup', () => {
         {IDENTITY_GROUP_STATES.map(state => (
           <RailFrame
             key={state.id}
-            className={state.className}
+            width={state.width}
             collapsible={state.collapsible}
           >
             <SidebarIdentityGroup profileHref={PROFILE_HREF} />
@@ -271,7 +279,8 @@ describe('SidebarIdentitySplitLayoutFixture', () => {
     );
 
     const fixture = screen.getByTestId(SIDEBAR_IDENTITY_SPLIT_FIXTURE_TEST_ID);
-    expect(fixture).toHaveClass(SIDEBAR_IDENTITY_SPLIT_FIXTURE_RED_CLASS);
+    expect(fixture).toHaveAttribute('data-deliberate-red', '');
+    expect(fixture.getAttribute('style') ?? '').toContain('#ff0000');
     expect(screen.getAllByRole('group')).toHaveLength(
       SIDEBAR_IDENTITY_SPLIT_FIXTURE_GROUP_COUNT
     );

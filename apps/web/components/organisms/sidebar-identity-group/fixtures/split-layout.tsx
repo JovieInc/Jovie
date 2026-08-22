@@ -4,7 +4,9 @@ import { HOSTNAME } from '@/constants/domains';
 export const SIDEBAR_IDENTITY_SPLIT_FIXTURE_TEST_ID =
   'sidebar-identity-split-fixture';
 export const SIDEBAR_IDENTITY_SPLIT_FIXTURE_GROUP_COUNT = 2;
-export const SIDEBAR_IDENTITY_SPLIT_FIXTURE_RED_CLASS = 'outline-[#ff0000]';
+export const SIDEBAR_IDENTITY_SPLIT_FIXTURE_RED_STYLE = {
+  outline: '2px solid #ff0000',
+} as const;
 
 export interface SidebarIdentitySplitLayoutFixtureProps {
   readonly profileHref: string;
@@ -29,7 +31,9 @@ export function SidebarIdentitySplitLayoutFixture({
     <div
       data-testid={SIDEBAR_IDENTITY_SPLIT_FIXTURE_TEST_ID}
       data-identity-split-fixture=''
-      className={`flex flex-col gap-1 outline outline-2 ${SIDEBAR_IDENTITY_SPLIT_FIXTURE_RED_CLASS}`}
+      data-deliberate-red=''
+      className='flex flex-col gap-1'
+      style={SIDEBAR_IDENTITY_SPLIT_FIXTURE_RED_STYLE}
     >
       <fieldset
         aria-label='Public Profile'

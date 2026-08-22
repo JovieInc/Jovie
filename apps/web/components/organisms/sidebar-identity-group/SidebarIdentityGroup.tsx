@@ -7,6 +7,7 @@ import { UserButton } from '@/components/organisms/user-button';
 import { HOSTNAME } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
+import './SidebarIdentityGroup.css';
 
 export const SIDEBAR_IDENTITY_GROUP_LABEL = 'Creator Identity';
 export const SIDEBAR_IDENTITY_GROUP_TEST_ID = 'sidebar-identity-group';
@@ -56,21 +57,16 @@ export function SidebarIdentityGroup({
       data-testid={SIDEBAR_USER_PANEL_TEST_ID}
       data-identity-group=''
       data-active={isPublicProfileActive ? 'true' : undefined}
-      className={cn(
-        'group/identity-group m-0 min-w-0 border-0 border-t border-(--noir-ion-border-subtle) px-2.5 py-1.5',
-        'group-data-[collapsible=icon]:px-0'
-      )}
+      className='m-0 min-w-0 border-0 border-t border-(--noir-ion-border-subtle) px-2.5 py-1.5'
     >
       <div
         data-sidebar='identity-group'
         data-testid={SIDEBAR_IDENTITY_GROUP_TEST_ID}
         className={cn(
           'relative flex flex-col rounded-xl px-0.5 py-0.5',
-          'transition-[background-color,box-shadow] duration-fast ease-interactive',
-          'hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)]',
-          'has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-ring/35',
-          'group-data-[active=true]/identity-group:bg-[color-mix(in_oklab,var(--color-sidebar-accent-active)_88%,var(--app-shell-content-surface))]',
-          'group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-0.5',
+          'transition-colors duration-fast ease-interactive',
+          'hover:bg-sidebar-accent',
+          isPublicProfileActive && 'bg-sidebar-accent-active',
           // Inner actions stay siblings; the group owns hover / focus-visible /
           // selected / spacing / border chrome so they do not read as two rows.
           '[&_[data-slot=common-dropdown-trigger]]:hover:bg-transparent',
@@ -86,17 +82,20 @@ export function SidebarIdentityGroup({
         {profileHref && profileDisplayHref ? (
           <Link
             href={profileHref}
+            data-sidebar='identity-public-profile'
             aria-current={isPublicProfileActive ? 'page' : undefined}
             aria-label={publicProfileAccessibleName(profileDisplayHref)}
             className={cn(
               'relative flex min-h-8 min-w-0 items-center gap-2 rounded-lg py-0.5 pl-10 pr-2 text-left outline-none',
               'text-2xs font-normal text-sidebar-muted',
               'focus-visible:bg-sidebar-accent',
-              'after:absolute after:-inset-y-1 after:inset-x-0 after:lg:hidden',
-              'group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:pl-0 group-data-[collapsible=icon]:pr-0 group-data-[collapsible=icon]:after:-inset-2'
+              'after:absolute after:-inset-y-1 after:inset-x-0 after:lg:hidden'
             )}
           >
-            <span className='min-w-0 flex-1 truncate group-data-[collapsible=icon]:hidden'>
+            <span
+              data-sidebar='identity-profile-url'
+              className='min-w-0 flex-1 truncate'
+            >
               {profileDisplayHref}
             </span>
             <ExternalLink
