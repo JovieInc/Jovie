@@ -30,17 +30,12 @@ describe('draft-first rolling CI policy wiring', () => {
     expect(flow).toMatch(/Moving on requires an explicit handoff\s+receipt/);
   });
 
-  it('keeps privileged failure dispatch on trusted main without PR checkout', () => {
-    const workflow = read('.github/workflows/agent-pipeline.yml');
-    expect(workflow).toContain(
-      'group: agent-remediation-${{ github.repository }}-'
-    );
-    expect(workflow).toContain('cancel-in-progress: false');
-    expect(workflow).toContain('ref: main');
-    expect(workflow).toContain('persist-credentials: false');
-    expect(workflow).toContain('Failure event is stale or ownership changed');
-    expect(workflow).not.toContain(
-      'ref: ${{ needs.guard.outputs.pr_head_sha }}'
-    );
+  it('fans broad verification out remotely and cancels stale source heads', () => {
+    const workflow = read('.github/workflows/ci.yml');
+    expect(workflow).toContain('cancel-in-progress: ${{ github.event_name ==');
+    expect(workflow).toContain("github.event_name == 'pull_request' ||");
+    expect(workflow).toContain('ci-draft-coverage:');
+    expect(workflow).toContain('Affected Unit Tests (10 shards)');
+    expect(workflow).toContain('coverage ratchet did not pass');
   });
 });

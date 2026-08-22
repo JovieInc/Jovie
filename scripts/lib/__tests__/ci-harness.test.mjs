@@ -35,6 +35,7 @@ const EXPECTED_MERGE_GATE_NAMES = [
   'Golden Path Lock',
   'Migration Guard',
   'Unit Tests',
+  'Draft Coverage',
   'Build + Layout (combined)',
   'iOS Build + Test (combined)',
   'Promptfoo Evals (deterministic)',
@@ -200,22 +201,20 @@ describe('ci-harness manifest', () => {
     }
   });
 
-  it('keeps required source PR Ready deterministic and runner-light', () => {
+  it('keeps required source PR Ready broad, remote, and exact-head gated', () => {
     const workflow = readFileSync(
       resolve(REPO_ROOT, '.github/workflows/ci.yml'),
       'utf8'
     );
     const prReady = extractWorkflowJobBlock(workflow, 'ci-pr-ready');
 
-    expect(prReady).toContain(
-      'needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-secret-scan, ci-golden-path-lock]'
-    );
+    expect(prReady).toContain('ci-unit-tests');
+    expect(prReady).toContain('ci-draft-coverage');
     expect(prReady).toContain('Evaluate deterministic source PR checks');
     expect(prReady).toContain('All deterministic source PR checks passed.');
     expect(workflow).not.toContain('withgraphite/graphite-ci-action');
     expect(workflow).not.toContain('steps.graphite');
     for (const heavyJob of [
-      'ci-unit-tests',
       'ci-build-public',
       'neon-db',
       'ci-pr-vercel-preview',
@@ -512,9 +511,10 @@ describe('ci-harness manifest', () => {
     expect(buildLayout).not.toContain('actions/upload-artifact');
     expect(buildLayout).not.toContain('actions/download-artifact');
 
-    expect(sourceReady).not.toContain('ci-unit-tests');
+    expect(sourceReady).toContain('ci-unit-tests');
+    expect(sourceReady).toContain('ci-draft-coverage');
     expect(unitTests).toContain("github.event_name == 'merge_group'");
-    expect(unitTests).not.toContain("github.event_name == 'pull_request'");
+    expect(unitTests).toContain("github.event_name == 'pull_request'");
     expect(mergeReady).toContain('ci-unit-tests');
     expect(mergeReady).toContain('ci-build-layout');
     expect(mergeReady).toContain('ci-ios');
@@ -547,7 +547,8 @@ describe('ci-harness manifest', () => {
     expect(docs).toContain(
       'Source `PR Ready` may require only `source-pr`/`both` jobs'
     );
-    expect(docs).toContain('| `Unit Tests` | merge-group |');
+    expect(docs).toContain('| `Unit Tests` | both |');
+    expect(docs).toContain('| `Draft Coverage` | source-pr |');
     expect(docs).toContain('| Auth and identity | high | yes | yes | no |');
     // Docs must list every locked merge gate + remediation command.
     for (const name of EXPECTED_MERGE_GATE_NAMES) {

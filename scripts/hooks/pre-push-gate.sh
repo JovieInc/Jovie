@@ -55,8 +55,12 @@ run_publication() {
   head_ref="$(git branch --show-current)"
   node scripts/ci-branching-guard.mjs check \
     --head "$head_ref" --base main --mode warn
+  git rev-parse --verify HEAD >/dev/null
+  git diff --check
+  git diff --cached --check
   git diff --check "$(git merge-base origin/main HEAD)..HEAD"
   bash scripts/security/scan-secrets.sh publication origin/main
+  node scripts/lib/policy-gate-liveness.mjs
   node --test scripts/hooks/pre-push-gate.test.mjs
 }
 

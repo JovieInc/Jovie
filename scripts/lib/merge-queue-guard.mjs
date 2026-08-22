@@ -252,6 +252,8 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Structural Contract',
   'CI / Unit Tests',
   'Unit Tests',
+  'CI / Draft Coverage',
+  'Draft Coverage',
   'CI / Build (public routes)',
   'Build (public routes)',
   'CI / Guardrails (proxy)',
