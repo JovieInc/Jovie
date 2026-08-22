@@ -163,10 +163,10 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(structuralDecision).not.toContain('apps/ios/');
     expect(structuralDecision).toContain('echo "skip=true"');
     expect(structuralDecision).toContain(
-      'scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|ownership-inventory)'
+      'scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|ownership-inventory)'
     );
     expect(structuralDecision).toContain(
-      'scripts/backlog-orchestrator/__tests__/(pre-lease-gates|ownership-inventory)'
+      'scripts/backlog-orchestrator/__tests__/(pre-lease-gates|gate-next-hold|ownership-inventory)'
     );
     expect(CI_FAST_SOURCE).toMatch(
       /function runDesignConformance\(\)[\s\S]*LANE_COMMANDS\['design-conformance'\]/
@@ -212,6 +212,9 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     expect(CI_FAST_SOURCE).toContain(
       'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'node --test scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs'
     );
     expect(CI_FAST_SOURCE).toContain(
       'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs'

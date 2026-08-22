@@ -1810,6 +1810,8 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
     assert.ok(
       body.indexOf('recoverStaleLeases') < body.indexOf('admissionPreflight')
     );
+    assert.match(body, /gateNextHold\.admitNextFromPool/);
+    assert.match(body, /gateNextHold\.loadIssueHolds/);
   });
 
   it('rejects synthetic workstream bundles and admits no member', async () => {
