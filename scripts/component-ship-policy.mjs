@@ -108,6 +108,7 @@ export function isUnderShipScope(relPath) {
   const p = normalizeRepoPath(relPath);
   if (!p.endsWith('.tsx')) return false;
   if (isStoryFile(p) || isTestFile(p)) return false;
+  if (p.split('/').some(seg => EXCLUDE_DIR_NAMES.has(seg))) return false;
   // packages/ui non-atom: only top-level .tsx under packages/ui/
   if (p.startsWith('packages/ui/atoms/')) return true;
   if (p.startsWith('packages/ui/')) {

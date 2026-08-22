@@ -6,7 +6,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@jovie/ui';
-import { ArrowLeft, Copy, ExternalLink, LogOut, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Copy, LogOut, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -27,11 +27,11 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/organisms/Sidebar';
-import { UserButton } from '@/components/organisms/user-button';
+import { SidebarIdentityGroup } from '@/components/organisms/sidebar-identity-group';
 import { getVersionUpdateTitle } from '@/components/shell/getVersionUpdateTitle';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
 import { InstallBanner } from '@/components/shell/InstallBanner';
-import { BASE_URL, HOSTNAME } from '@/constants/domains';
+import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
@@ -441,64 +441,11 @@ function OperatorSessionControls() {
   );
 }
 
-function CustomerUserPanel({
-  profileHref,
-}: Readonly<{ profileHref: string | undefined }>) {
-  const profileDisplayHref = profileHref
-    ? `${HOSTNAME}${profileHref}`
-    : undefined;
-
-  return (
-    <div
-      data-sidebar='user-panel'
-      data-testid='sidebar-user-panel'
-      className='border-t border-(--noir-ion-border-subtle) px-2.5 py-1.5'
-    >
-      <SidebarMenu className='gap-1'>
-        {profileHref && profileDisplayHref ? (
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              size='lg'
-              tooltip='Public Profile'
-              className='h-10 py-1'
-            >
-              <Link href={profileHref}>
-                <ExternalLink aria-hidden='true' />
-                <span className='min-w-0 flex-1 group-data-[collapsible=icon]:hidden'>
-                  <span className='block truncate text-app font-normal text-sidebar-item-foreground'>
-                    Public Profile
-                  </span>
-                  <span className='block truncate text-2xs font-normal text-sidebar-muted'>
-                    {profileDisplayHref}
-                  </span>
-                </span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        ) : null}
-        <SidebarMenuItem
-          className={cn(
-            profileHref &&
-              'border-t border-(--noir-ion-border-subtle) pt-1 group-data-[collapsible=icon]:border-t-0 group-data-[collapsible=icon]:pt-0'
-          )}
-        >
-          <UserButton
-            profileHref={profileHref}
-            settingsHref={APP_ROUTES.SETTINGS}
-            showUserInfo
-          />
-        </SidebarMenuItem>
-      </SidebarMenu>
-    </div>
-  );
-}
-
 /**
  * UnifiedSidebar - Single sidebar component for all post-auth sections
  *
  * Header shows workspace identity, navigation owns attention and update state,
- * and one protected footer panel owns the public-profile and account controls.
+ * and one footer identity group owns creator identity and Public Profile access.
  */
 export function UnifiedSidebar({
   section,
@@ -595,7 +542,7 @@ export function UnifiedSidebar({
         // absorbs free space so media and the protected account panel pin bottom.
         <SidebarFooter className='mt-auto gap-0 px-0 py-0'>
           <SidebarBottomNowPlayingBridge />
-          <CustomerUserPanel profileHref={profileHref} />
+          <SidebarIdentityGroup profileHref={profileHref} />
         </SidebarFooter>
       )}
     </Sidebar>

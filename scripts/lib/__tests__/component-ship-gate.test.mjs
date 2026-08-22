@@ -87,6 +87,11 @@ describe('component-ship-policy scope', () => {
     expect(isUnderShipScope('packages/ui/atoms/button.test.tsx')).toBe(false);
     expect(isUnderShipScope('packages/ui/hooks/useX.tsx')).toBe(false);
     expect(isUnderShipScope('apps/web/app/(marketing)/page.tsx')).toBe(false);
+    expect(
+      isUnderShipScope(
+        'apps/web/components/organisms/sidebar-identity-group/fixtures/split-layout.tsx'
+      )
+    ).toBe(false);
   });
 
   it('lists components with adjacent story/test pairing', () => {
