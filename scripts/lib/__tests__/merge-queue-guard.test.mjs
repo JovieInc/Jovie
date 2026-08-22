@@ -1016,9 +1016,13 @@ describe('absolute update-branch subprocess deadline', () => {
         process.execPath,
         [
           '-e',
-          'process.stdout.write(String(process.pid)); setInterval(() => {}, 1000)',
+          'process.stdout.write(`${process.pid}\n`, () => setInterval(() => {}, 1000))',
         ],
-        { encoding: 'utf8', timeout: 150 }
+        // Node startup exceeded 150ms under the complete structural cluster,
+        // so the fixture was killed before emitting its PID. The production
+        // deadline is unchanged; this bound only makes the kill assertion
+        // synchronize on a realistically started child.
+        { encoding: 'utf8', timeout: 1000 }
       );
     } catch (error) {
       failure = error;
