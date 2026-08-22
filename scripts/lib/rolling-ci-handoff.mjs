@@ -3,9 +3,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, open, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-
 import { DEFAULT_DELIVERY_STATE_DIR } from '../backlog-orchestrator/delivery-state-machine.mjs';
-
 export const OWNERSHIP_LEASE_SCHEMA = 'jovie-rolling-ci-owner-lease/v1';
 export const OWNERSHIP_TRANSFER_SCHEMA = 'jovie-rolling-ci-handoff/v1';
 export const WRITER_CLAIM_SCHEMA = 'jovie-rolling-ci-writer-claim/v1';
@@ -14,20 +12,17 @@ export const FX_CONFIGURATION_INCIDENT_SCHEMA =
 
 const SHA = /^[0-9a-f]{40}$/;
 const REPOSITORY = /^[^/\s]+\/[^/\s]+$/;
-
 function nonEmpty(value, field) {
   if (typeof value !== 'string' || !value.trim()) {
     throw new Error(`${field} is required`);
   }
   return value.trim();
 }
-
 function exactSha(value, field = 'headSha') {
   const sha = nonEmpty(value, field).toLowerCase();
   if (!SHA.test(sha)) throw new Error(`${field} must be a 40-character SHA`);
   return sha;
 }
-
 function instant(value, field) {
   const normalized = nonEmpty(value, field);
   if (!Number.isFinite(Date.parse(normalized))) {
@@ -35,7 +30,6 @@ function instant(value, field) {
   }
   return new Date(normalized).toISOString();
 }
-
 function digest(value) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
@@ -58,7 +52,6 @@ function ownershipIdentity(input) {
     ),
   };
 }
-
 export function buildImplementerLease(input) {
   const identity = ownershipIdentity(input);
   const issuedAt = instant(input.issuedAt, 'issuedAt');
@@ -87,7 +80,6 @@ export function buildImplementerLease(input) {
     expiresAt,
   };
 }
-
 function assertLease(lease) {
   if (lease?.schema !== OWNERSHIP_LEASE_SCHEMA) {
     throw new Error('implementer lease is missing or malformed');
@@ -99,7 +91,6 @@ function assertLease(lease) {
   nonEmpty(lease.owner?.id, 'lease owner');
   return lease;
 }
-
 export function buildOwnershipTransferReceipt(
   input,
   { now = new Date().toISOString() } = {}
@@ -142,7 +133,6 @@ export function buildOwnershipTransferReceipt(
   };
   return { ...receipt, receiptKey: digest(receipt) };
 }
-
 function validTransfer(lease, receipt) {
   return (
     receipt?.schema === OWNERSHIP_TRANSFER_SCHEMA &&
@@ -156,7 +146,6 @@ function validTransfer(lease, receipt) {
     receipt.to?.kind === 'fx'
   );
 }
-
 function validTransferAt(lease, receipt, observedAt) {
   if (!validTransfer(lease, receipt)) return false;
   const transferAt = Date.parse(String(receipt.observedAt ?? ''));
@@ -166,7 +155,6 @@ function validTransferAt(lease, receipt, observedAt) {
     transferAt <= Date.parse(observedAt)
   );
 }
-
 export function buildFxConfigurationIncident(
   lease,
   transferReceipt,
@@ -197,8 +185,6 @@ export function buildFxConfigurationIncident(
   };
   return { ...incident, incidentKey: digest(incident) };
 }
-
-/** Decide who may claim repair work without reading or exposing FX credentials. */
 export function routeRemediationOwner(
   { lease, transferReceipt = null, fxAdapter = null },
   { now = new Date().toISOString() } = {}
@@ -235,7 +221,6 @@ export function routeRemediationOwner(
     route: 'fx-backstop',
   };
 }
-
 function claimDirectory(stateDir, claimKey) {
   return join(stateDir, 'rolling-ci-ownership', claimKey);
 }
@@ -298,7 +283,6 @@ function buildWriterClaim({ lease, writer, route, now, previous = null }) {
   };
   return { ...claim, writerClaimKey: digest(claim) };
 }
-
 /**
  * Atomically acquire the only writer slot for one PR/root-cause pair.
  * `currentHeadSha` must come from the trusted dispatcher's fresh GitHub query.
@@ -387,8 +371,6 @@ export async function acquireRemediationWriterClaim(
     };
   });
 }
-
-/** Persist a green exact-head rerun as a terminal supersession receipt. */
 export async function supersedeRemediationWriterClaim(
   input,
   { stateDir = DEFAULT_DELIVERY_STATE_DIR, now = new Date().toISOString() } = {}
@@ -432,7 +414,6 @@ export async function supersedeRemediationWriterClaim(
     return { status: 'superseded', claim: superseded };
   });
 }
-
 export function authorizeRemediationMutation({
   claim,
   writerId,
