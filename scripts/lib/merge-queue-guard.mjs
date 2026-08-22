@@ -1838,7 +1838,17 @@ export function frontItemChurnDecision({
       RETRYABLE_PRODUCT_FAILURE_STEPS.has(step)
     )
   );
-  if (retryableProductFailures.length >= MERGE_GROUP_CHURN_FAILURE_THRESHOLD) {
+  // Drain historically attached failedSteps only to the latest run. Count
+  // sibling failed attempts for this unchanged head so a moving main SHA
+  // cannot reset the one-retry allowance forever (#16238).
+  const retryableAttemptCount =
+    retryableProductFailures.length === 0
+      ? 0
+      : Math.max(
+          retryableProductFailures.length,
+          failuresForCurrentHead.length
+        );
+  if (retryableAttemptCount >= MERGE_GROUP_CHURN_FAILURE_THRESHOLD) {
     const lastFailed = retryableProductFailures[0];
     const front = parseMergeQueueFrontBranch(lastFailed.headBranch);
     return {
@@ -1847,7 +1857,7 @@ export function frontItemChurnDecision({
         'unchanged head has repeated product-validation failures; re-enrollment would duplicate the same merge-group work until the source head moves',
       evidence: {
         failureClass: 'repeated-product-check',
-        failedAttempts: retryableProductFailures.length,
+        failedAttempts: retryableAttemptCount,
         lastFailedRunId: lastFailed.id ?? null,
         lastFailedAt: lastFailed.createdAt ?? null,
         failedSteps: lastFailed.failedSteps,
