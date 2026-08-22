@@ -11,7 +11,7 @@ export type OperatingStore = {
   putInitiative(record: OvieInitiative): Promise<void>;
   getInitiative(id: string): Promise<OvieInitiative | undefined>;
   listInitiatives(): Promise<readonly OvieInitiative[]>;
-  putSummerTurn(record: OvieSummerTurn): Promise<void>;
+  putSummerTurn(record: OvieSummerTurn): Promise<OvieSummerTurn>;
   getSummerTurn(id: string): Promise<OvieSummerTurn | undefined>;
   listSummerTurns(): Promise<readonly OvieSummerTurn[]>;
   claimSummerTurn(
@@ -151,10 +151,23 @@ export class DurableOperatingStore implements OperatingStore {
     return rows.filter((row): row is OvieInitiative => Boolean(row)).reverse();
   }
 
-  async putSummerTurn(record: OvieSummerTurn): Promise<void> {
+  async putSummerTurn(record: OvieSummerTurn): Promise<OvieSummerTurn> {
+    const created = await this.backend.setIfAbsent(
+      summerTurnKey(record.id),
+      record,
+      TTL_SECONDS
+    );
+    if (created) {
+      await this.backend.lpush(SUMMER_TURN_INDEX, record.id);
+      return record;
+    }
     const existing = await this.getSummerTurn(record.id);
-    await this.backend.set(summerTurnKey(record.id), record);
-    if (!existing) await this.backend.lpush(SUMMER_TURN_INDEX, record.id);
+    if (!existing) {
+      throw new Error(
+        `Summer turn ${record.id} exists without a valid durable record`
+      );
+    }
+    return existing;
   }
 
   async getSummerTurn(id: string): Promise<OvieSummerTurn | undefined> {
@@ -184,11 +197,30 @@ export class DurableOperatingStore implements OperatingStore {
     if (!current || (current.state !== 'queued' && !expiredClaim)) {
       return undefined;
     }
-    const acquired = await this.backend.setIfAbsent(
-      summerTurnClaimKey(id),
-      claim.claimToken,
+    const claimKey = summerTurnClaimKey(id);
+    const claimLease = summerTurnClaimLeaseValue(claim);
+    let acquired = await this.backend.setIfAbsent(
+      claimKey,
+      claimLease,
       claim.ttlSeconds
     );
+    if (!acquired) {
+      const storedLeaseValue = await this.backend.get(claimKey);
+      const storedLease = asSummerTurnClaimLease(storedLeaseValue);
+      if (
+        !storedLease ||
+        Date.parse(storedLease.expiresAt) > Date.now() ||
+        typeof storedLeaseValue !== 'string'
+      ) {
+        return undefined;
+      }
+      acquired = await this.backend.compareAndSet(
+        claimKey,
+        storedLeaseValue,
+        claimLease,
+        claim.ttlSeconds
+      );
+    }
     if (!acquired) return undefined;
     const next: OvieSummerTurn = {
       ...current,
@@ -198,7 +230,7 @@ export class DurableOperatingStore implements OperatingStore {
       claimExpiresAt: claim.expiresAt,
       updatedAt: new Date().toISOString(),
     };
-    await this.putSummerTurn(next);
+    await this.writeSummerTurn(next);
     return next;
   }
 
@@ -221,6 +253,10 @@ export class DurableOperatingStore implements OperatingStore {
       return undefined;
     }
     const claimKey = summerTurnClaimKey(id);
+    const claimLease = summerTurnClaimLeaseValue({
+      claimToken: current.claimToken,
+      expiresAt: current.claimExpiresAt,
+    });
     const completionMarker = `completed:${completion.claimToken}`;
     const alreadyFenced =
       (await this.backend.get(claimKey)) === completionMarker;
@@ -228,7 +264,7 @@ export class DurableOperatingStore implements OperatingStore {
       alreadyFenced ||
       (await this.backend.compareAndSet(
         claimKey,
-        completion.claimToken,
+        claimLease,
         completionMarker,
         TTL_SECONDS
       ));
@@ -239,7 +275,7 @@ export class DurableOperatingStore implements OperatingStore {
       responseText: completion.responseText,
       updatedAt: completion.completedAt,
     };
-    await this.putSummerTurn(next);
+    await this.writeSummerTurn(next);
     return next;
   }
 
@@ -262,13 +298,17 @@ export class DurableOperatingStore implements OperatingStore {
       return undefined;
     }
     const claimKey = summerTurnClaimKey(id);
+    const claimLease = summerTurnClaimLeaseValue({
+      claimToken: current.claimToken,
+      expiresAt: current.claimExpiresAt,
+    });
     const failureMarker = `failed:${failure.claimToken}`;
     const alreadyFenced = (await this.backend.get(claimKey)) === failureMarker;
     const fenced =
       alreadyFenced ||
       (await this.backend.compareAndSet(
         claimKey,
-        failure.claimToken,
+        claimLease,
         failureMarker,
         TTL_SECONDS
       ));
@@ -279,8 +319,12 @@ export class DurableOperatingStore implements OperatingStore {
       failureCode: failure.failureCode,
       updatedAt: failure.failedAt,
     };
-    await this.putSummerTurn(next);
+    await this.writeSummerTurn(next);
     return next;
+  }
+
+  private async writeSummerTurn(record: OvieSummerTurn): Promise<void> {
+    await this.backend.set(summerTurnKey(record.id), record);
   }
 }
 
@@ -331,7 +375,7 @@ export class FailoverOperatingStore implements OperatingStore {
     return this.list('listInitiatives');
   }
 
-  putSummerTurn(record: OvieSummerTurn): Promise<void> {
+  putSummerTurn(record: OvieSummerTurn): Promise<OvieSummerTurn> {
     return this.putSummerCanonical(record);
   }
 
@@ -386,9 +430,12 @@ export class FailoverOperatingStore implements OperatingStore {
     return failed;
   }
 
-  private async putSummerCanonical(record: OvieSummerTurn): Promise<void> {
-    await this.options.fallback.putSummerTurn(record);
-    await this.cacheSummerTurn(record);
+  private async putSummerCanonical(
+    record: OvieSummerTurn
+  ): Promise<OvieSummerTurn> {
+    const persisted = await this.options.fallback.putSummerTurn(record);
+    await this.cacheSummerTurn(persisted);
+    return persisted;
   }
 
   private async cacheSummerTurn(record: OvieSummerTurn): Promise<void> {
@@ -400,9 +447,10 @@ export class FailoverOperatingStore implements OperatingStore {
     }
   }
 
-  private async put<
-    K extends 'putDecision' | 'putInitiative' | 'putSummerTurn',
-  >(method: K, record: Parameters<OperatingStore[K]>[0]): Promise<void> {
+  private async put<K extends 'putDecision' | 'putInitiative'>(
+    method: K,
+    record: Parameters<OperatingStore[K]>[0]
+  ): Promise<void> {
     const { primary, fallback, writeThrough } = this.options;
     try {
       await (primary[method] as (row: typeof record) => Promise<void>)(record);
@@ -477,6 +525,41 @@ function summerTurnKey(id: string): string {
 
 function summerTurnClaimKey(id: string): string {
   return `ovie:mcp:v1:summer-turn:${id}:claim`;
+}
+
+type SummerTurnClaimLease = {
+  readonly claimToken: string;
+  readonly expiresAt: string;
+};
+
+function summerTurnClaimLeaseValue(lease: SummerTurnClaimLease): string {
+  return JSON.stringify({
+    claimToken: lease.claimToken,
+    expiresAt: lease.expiresAt,
+  });
+}
+
+function asSummerTurnClaimLease(
+  value: unknown
+): SummerTurnClaimLease | undefined {
+  if (typeof value !== 'string') return undefined;
+  try {
+    const parsed = JSON.parse(value) as Partial<SummerTurnClaimLease>;
+    if (
+      typeof parsed.claimToken !== 'string' ||
+      !parsed.claimToken ||
+      typeof parsed.expiresAt !== 'string' ||
+      !Number.isFinite(Date.parse(parsed.expiresAt))
+    ) {
+      return undefined;
+    }
+    return {
+      claimToken: parsed.claimToken,
+      expiresAt: parsed.expiresAt,
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 function asInitiative(value: unknown): OvieInitiative | undefined {
