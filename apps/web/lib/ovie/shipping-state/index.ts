@@ -6,7 +6,6 @@ export {
   emptyCounts,
   FORBIDDEN_ACTUATION,
   FORBIDDEN_QUERY_KEYS,
-  type IdentityFields,
   isExactSha,
   M1_SOURCE_TO_PROJECTION_BUDGET_MS,
   measuredBoolean,
@@ -37,24 +36,22 @@ export {
   type SourceObservation,
 } from './contract';
 export {
+  detectClockSkew,
+  emptyCursor,
   eventIdFor,
   freshnessDeadline,
+  type IngestAction,
+  type IngestInput,
+  type IngestResult,
   identityFields,
+  ingestSourceEvent,
+  observationFreshness,
   parseTimestamp,
+  type SourceCursor,
   sanitizedError,
   sanitizeErrorMessage,
   systemClock,
 } from './envelope';
-export {
-  detectClockSkew,
-  emptyCursor,
-  type IngestAction,
-  type IngestInput,
-  type IngestResult,
-  ingestSourceEvent,
-  observationFreshness,
-  type SourceCursor,
-} from './ingest';
 export {
   combineSourceStates,
   projectMeanings,
@@ -74,6 +71,7 @@ export {
 export {
   type AuthorityRead,
   type AuthorityReader,
+  type AuthorityReadStatus,
   disconnectedRead,
   initialCursors,
   interpretAuthorityRead,

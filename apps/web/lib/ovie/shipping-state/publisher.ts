@@ -6,10 +6,10 @@ import {
   type ShippingStateProjection,
   type SourceObservation,
 } from './contract';
-import { sanitizedError, systemClock } from './envelope';
-import { type SourceCursor } from './ingest';
+import { type SourceCursor, sanitizedError, systemClock } from './envelope';
 import { projectShippingState, unknownProjection } from './project';
 import {
+  failedRead,
   initialCursors,
   interpretAuthorityRead,
   type NamedAuthorityReaders,
@@ -106,19 +106,12 @@ export async function publishShippingState(
       try {
         return await input.readers[sourceId]();
       } catch (error) {
-        return {
+        return failedRead(
           sourceId,
-          status: 'error' as const,
-          schema: null,
-          payload: null,
-          truncated: false,
-          sourceTimestamp: null,
-          sourceRevision: null,
-          sequence: null,
-          eventId: null,
-          errorCode: 'reader-threw',
-          errorMessage: error instanceof Error ? error.message : 'reader-threw',
-        };
+          'error',
+          error instanceof Error ? error.message : 'reader-threw',
+          { errorCode: 'reader-threw' }
+        );
       }
     })
   );
@@ -126,7 +119,6 @@ export async function publishShippingState(
   const emissionTimestamp = clock.nowIso();
   runtime.sequence += 1;
   const sources = {} as Record<ShippingSourceId, SourceObservation>;
-
   for (const read of reads) {
     const current =
       runtime.cursors.get(read.sourceId) ??
@@ -139,15 +131,12 @@ export async function publishShippingState(
     );
     runtime.cursors.set(read.sourceId, interpreted.cursor);
     const previous = runtime.lastKnown?.sources[read.sourceId];
-    if (
+    const keep =
       interpreted.observation.ingest === 'duplicate' ||
       interpreted.observation.ingest === 'replay' ||
-      interpreted.observation.ingest === 'backfill'
-    ) {
-      sources[read.sourceId] = previous ?? interpreted.observation;
-    } else {
-      sources[read.sourceId] = interpreted.observation;
-    }
+      interpreted.observation.ingest === 'backfill';
+    sources[read.sourceId] =
+      keep && previous ? previous : interpreted.observation;
   }
 
   const latencyMs = Math.max(0, clock.nowMs() - startedMs);

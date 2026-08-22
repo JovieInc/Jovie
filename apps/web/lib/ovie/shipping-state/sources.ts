@@ -1,12 +1,9 @@
 import {
-  type BooleanMeasurement,
   type CountMeasurement,
   EMPTY_CORRELATION,
   emptyCounts,
   isExactSha,
-  measuredBoolean,
   measuredCount,
-  NOT_MEASURED_BOOLEAN,
   NOT_MEASURED_COUNT,
   type ObservationState,
   SHIPPING_SOURCE_IDS,
@@ -17,17 +14,15 @@ import {
   type SourceObservation,
 } from './contract';
 import {
+  emptyCursor,
   eventIdFor,
+  type IngestAction,
   identityFields,
+  ingestSourceEvent,
   parseTimestamp,
+  type SourceCursor,
   sanitizedError,
 } from './envelope';
-import {
-  emptyCursor,
-  type IngestAction,
-  ingestSourceEvent,
-  type SourceCursor,
-} from './ingest';
 
 export type AuthorityReadStatus =
   | 'ok'
@@ -60,7 +55,6 @@ export type AuthorityRead = {
 };
 
 export type AuthorityReader = () => Promise<AuthorityRead>;
-
 export type NamedAuthorityReaders = Readonly<
   Record<ShippingSourceId, AuthorityReader>
 >;
@@ -73,7 +67,7 @@ const NATIVE_QUEUE_ENTRY_STATES = new Set([
   'LOCKED',
 ]);
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
@@ -87,46 +81,60 @@ function schemaMatches(
 ): boolean {
   if (schema == null) return false;
   if (schema === SHIPPING_SOURCE_SCHEMAS[sourceId]) return true;
-  if (
-    sourceId === 'symphony-runtime' &&
-    schema === 'symphony-runtime-state/v1'
-  ) {
-    return true;
-  }
-  if (
-    sourceId === 'production-controller' &&
-    schema === 'github-actions-run/v1'
-  ) {
-    return true;
-  }
-  return false;
-}
-
-function statusToState(status: AuthorityReadStatus): ObservationState {
-  if (status === 'ok') return 'fresh';
-  return status;
+  return (
+    (sourceId === 'symphony-runtime' &&
+      schema === 'symphony-runtime-state/v1') ||
+    (sourceId === 'production-controller' && schema === 'github-actions-run/v1')
+  );
 }
 
 function countFromList(value: unknown, present: boolean): CountMeasurement {
-  if (!present) return NOT_MEASURED_COUNT;
-  if (!Array.isArray(value)) return NOT_MEASURED_COUNT;
-  return measuredCount(value.length);
+  return present && Array.isArray(value)
+    ? measuredCount(value.length)
+    : NOT_MEASURED_COUNT;
 }
 
 function countFromNumber(value: unknown): CountMeasurement {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
-    return NOT_MEASURED_COUNT;
-  }
-  return measuredCount(value);
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? measuredCount(value)
+    : NOT_MEASURED_COUNT;
+}
+
+export function failedRead(
+  sourceId: ShippingSourceId,
+  status: AuthorityReadStatus,
+  message: string,
+  extra: Partial<AuthorityRead> = {}
+): AuthorityRead {
+  return {
+    sourceId,
+    status,
+    schema: null,
+    payload: null,
+    truncated: false,
+    sourceTimestamp: null,
+    sourceRevision: null,
+    sequence: null,
+    eventId: null,
+    errorCode: status,
+    errorMessage: message,
+    ...extra,
+  };
+}
+
+export function disconnectedRead(
+  sourceId: ShippingSourceId,
+  message = 'producer disconnected'
+): AuthorityRead {
+  return failedRead(sourceId, 'disconnected', message);
 }
 
 export function interpretCounts(
   sourceId: ShippingSourceId,
   payload: Readonly<Record<string, unknown>> | null,
   status: AuthorityReadStatus
-): SourceObservationCounts {
+): SourceObservation['counts'] {
   if (status !== 'ok' || payload == null) return emptyCounts();
-
   if (sourceId === 'symphony-runtime' || sourceId === 'symphony-task') {
     return {
       running: countFromList(payload.running, 'running' in payload),
@@ -136,7 +144,6 @@ export function interpretCounts(
       capacityAvailable: NOT_MEASURED_COUNT,
     };
   }
-
   if (sourceId === 'lease-guard-capacity') {
     const capacity = isRecord(payload.capacity) ? payload.capacity : payload;
     return {
@@ -144,7 +151,6 @@ export function interpretCounts(
       capacityAvailable: countFromNumber(capacity.available),
     };
   }
-
   if (sourceId === 'github-native-merge-queue') {
     const entries = payload.entries ?? payload.nodes;
     return {
@@ -152,17 +158,8 @@ export function interpretCounts(
       queued: countFromList(entries, Array.isArray(entries)),
     };
   }
-
   return emptyCounts();
 }
-
-type SourceObservationCounts = {
-  readonly running: CountMeasurement;
-  readonly retrying: CountMeasurement;
-  readonly blocked: CountMeasurement;
-  readonly queued: CountMeasurement;
-  readonly capacityAvailable: CountMeasurement;
-};
 
 function taskEntities(
   payload: Readonly<Record<string, unknown>>,
@@ -189,10 +186,6 @@ function taskEntities(
             ? item.issue
             : null;
       if (issue == null) continue;
-      const error =
-        typeof item.error === 'string'
-          ? sanitizedError(observationTimestamp, 'task-error', item.error)
-          : null;
       entities.push({
         ...identityFields({
           sourceId: 'symphony-task',
@@ -213,7 +206,10 @@ function taskEntities(
             leaseId: issue,
             sha: isExactSha(item.head) ? item.head : null,
           },
-          lastError: error,
+          lastError:
+            typeof item.error === 'string'
+              ? sanitizedError(observationTimestamp, 'task-error', item.error)
+              : null,
         }),
         state: group.state,
         truncated: false,
@@ -229,12 +225,10 @@ function queueEntities(
   emissionTimestamp: string,
   sequence: number
 ): ShippingEntity[] {
-  const entries = asList(payload.entries ?? payload.nodes);
-  return entries.flatMap((entry, index) => {
+  return asList(payload.entries ?? payload.nodes).flatMap((entry, index) => {
     if (!isRecord(entry)) return [];
     const id = typeof entry.id === 'string' ? entry.id : `entry:${index}`;
     const pr = isRecord(entry.pullRequest) ? entry.pullRequest : entry;
-    const number = typeof pr.number === 'number' ? pr.number : null;
     const sha =
       typeof pr.headRefOid === 'string' && isExactSha(pr.headRefOid)
         ? pr.headRefOid
@@ -242,7 +236,6 @@ function queueEntities(
           ? entry.headSha
           : null;
     const state = typeof entry.state === 'string' ? entry.state : null;
-    const recognized = state != null && NATIVE_QUEUE_ENTRY_STATES.has(state);
     return [
       {
         ...identityFields({
@@ -252,9 +245,15 @@ function queueEntities(
           observationTimestamp,
           emissionTimestamp,
           sourceRevision: sha,
-          correlation: { prNumber: number, sha },
+          correlation: {
+            prNumber: typeof pr.number === 'number' ? pr.number : null,
+            sha,
+          },
         }),
-        state: recognized ? 'fresh' : 'degraded',
+        state:
+          state != null && NATIVE_QUEUE_ENTRY_STATES.has(state)
+            ? 'fresh'
+            : 'degraded',
         truncated: false,
       },
     ];
@@ -266,10 +265,7 @@ export function interpretAuthorityRead(
   cursor: SourceCursor,
   observationTimestamp: string,
   emissionTimestamp: string
-): {
-  readonly observation: SourceObservation;
-  readonly cursor: SourceCursor;
-} {
+): { readonly observation: SourceObservation; readonly cursor: SourceCursor } {
   const schemaOk =
     read.status !== 'ok' || schemaMatches(read.sourceId, read.schema);
   const sequence = read.sequence ?? cursor.lastSequence + 1;
@@ -284,11 +280,14 @@ export function interpretAuthorityRead(
     reachable: read.status !== 'disconnected',
   });
 
-  let state = statusToState(read.status);
+  let state: ObservationState = read.status === 'ok' ? 'fresh' : read.status;
   if (read.status === 'ok' && !schemaOk) state = 'error';
-  if (read.truncated && state === 'fresh') state = 'degraded';
-  if (ingest.sequenceGap && state === 'fresh') state = 'degraded';
-  if (ingest.clockSkew && state === 'fresh') state = 'degraded';
+  if (
+    (read.truncated || ingest.sequenceGap || ingest.clockSkew) &&
+    state === 'fresh'
+  ) {
+    state = 'degraded';
+  }
 
   const lastError =
     read.errorCode || read.status !== 'ok' || !schemaOk
@@ -299,7 +298,6 @@ export function interpretAuthorityRead(
             (schemaOk ? read.status : 'producer schema mismatch')
         )
       : null;
-
   const lastSuccess =
     ingest.replaceCurrent && read.status === 'ok' && schemaOk
       ? { at: observationTimestamp, sequence, eventId }
@@ -310,87 +308,63 @@ export function interpretAuthorityRead(
             eventId: cursor.lastEventId ?? eventId,
           }
         : null;
-
   const payload = ingest.replaceCurrent ? read.payload : null;
-  const counts = interpretCounts(
-    read.sourceId,
-    payload,
-    read.status === 'ok' && schemaOk ? 'ok' : read.status
-  );
+  const live = read.status === 'ok' && schemaOk && payload != null;
+  const entities = live
+    ? read.sourceId === 'github-native-merge-queue'
+      ? queueEntities(
+          payload,
+          observationTimestamp,
+          emissionTimestamp,
+          sequence
+        )
+      : read.sourceId === 'symphony-runtime' ||
+          read.sourceId === 'symphony-task'
+        ? taskEntities(
+            payload,
+            observationTimestamp,
+            emissionTimestamp,
+            sequence
+          )
+        : []
+    : [];
 
-  let entities: ShippingEntity[] = [];
-  if (payload && read.status === 'ok' && schemaOk) {
-    if (
-      read.sourceId === 'symphony-runtime' ||
-      read.sourceId === 'symphony-task'
-    ) {
-      entities = taskEntities(
-        payload,
-        observationTimestamp,
-        emissionTimestamp,
-        sequence
-      );
-    }
-    if (read.sourceId === 'github-native-merge-queue') {
-      entities = queueEntities(
-        payload,
-        observationTimestamp,
-        emissionTimestamp,
-        sequence
-      );
-    }
-  }
-
-  const observation = {
-    ...identityFields({
-      sourceId: read.sourceId,
-      entityId: read.sourceId,
-      sequence,
-      observationTimestamp,
-      emissionTimestamp,
-      sourceRevision: revision,
-      sourceTimestamp: read.sourceTimestamp,
-      correlation: read.correlation ?? EMPTY_CORRELATION,
-      lastSuccess,
-      lastError,
-      schema: read.schema ?? SHIPPING_SOURCE_SCHEMAS[read.sourceId],
-    }),
-    state,
-    truncated: read.truncated,
-    clockSkew: ingest.clockSkew,
-    recovered: ingest.recovered,
-    sequenceGap: ingest.sequenceGap,
-    ingest: ingest.action as IngestAction,
-    measuredMeanings: {
-      merged: read.measuredMeanings?.merged ?? null,
-      queued: read.measuredMeanings?.queued ?? null,
-      ciGreen: read.measuredMeanings?.ciGreen ?? null,
-      productionVerified: read.measuredMeanings?.productionVerified ?? null,
-      exactLiveBuild: read.measuredMeanings?.exactLiveBuild ?? null,
-    },
-    entities,
-    counts,
-  };
-
-  return { observation, cursor: ingest.cursor };
-}
-
-export function disconnectedRead(
-  sourceId: ShippingSourceId,
-  message = 'producer disconnected'
-): AuthorityRead {
   return {
-    sourceId,
-    status: 'disconnected',
-    schema: null,
-    payload: null,
-    truncated: false,
-    sourceTimestamp: null,
-    sourceRevision: null,
-    sequence: null,
-    eventId: null,
-    errorCode: 'disconnected',
-    errorMessage: message,
+    observation: {
+      ...identityFields({
+        sourceId: read.sourceId,
+        entityId: read.sourceId,
+        sequence,
+        observationTimestamp,
+        emissionTimestamp,
+        sourceRevision: revision,
+        sourceTimestamp: read.sourceTimestamp,
+        correlation: read.correlation ?? EMPTY_CORRELATION,
+        lastSuccess,
+        lastError,
+        schema: read.schema ?? SHIPPING_SOURCE_SCHEMAS[read.sourceId],
+      }),
+      state,
+      truncated: read.truncated,
+      clockSkew: ingest.clockSkew,
+      recovered: ingest.recovered,
+      sequenceGap: ingest.sequenceGap,
+      ingest: ingest.action as IngestAction,
+      measuredMeanings: {
+        merged: read.measuredMeanings?.merged ?? null,
+        queued: read.measuredMeanings?.queued ?? null,
+        ciGreen: read.measuredMeanings?.ciGreen ?? null,
+        productionVerified: read.measuredMeanings?.productionVerified ?? null,
+        exactLiveBuild: read.measuredMeanings?.exactLiveBuild ?? null,
+      },
+      entities,
+      counts: interpretCounts(
+        read.sourceId,
+        payload,
+        live ? 'ok' : read.status
+      ),
+    },
+    cursor: ingest.cursor,
   };
 }
 
@@ -418,19 +392,13 @@ export function mergeQueueIsMembership(
     readonly position?: unknown;
   } | null
 ): boolean {
-  if (!isInMergeQueue || entry == null) return false;
-  return (
-    typeof entry.id === 'string' &&
-    typeof entry.state === 'string' &&
-    NATIVE_QUEUE_ENTRY_STATES.has(entry.state) &&
-    Number.isInteger(entry.position) &&
-    Number(entry.position) >= 1
+  return Boolean(
+    isInMergeQueue &&
+      entry &&
+      typeof entry.id === 'string' &&
+      typeof entry.state === 'string' &&
+      NATIVE_QUEUE_ENTRY_STATES.has(entry.state) &&
+      Number.isInteger(entry.position) &&
+      Number(entry.position) >= 1
   );
-}
-
-export function booleanFromMeaning(
-  measured: boolean | null
-): BooleanMeasurement {
-  if (measured == null) return NOT_MEASURED_BOOLEAN;
-  return measuredBoolean(measured);
 }

@@ -3,24 +3,22 @@ import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import { SHIPPING_SOURCE_SCHEMAS, type ShippingSourceId } from './contract';
 import { parseTimestamp } from './envelope';
-import { readMergeQueue, readWorkflow } from './live-github';
 import {
   type AuthorityRead,
   disconnectedRead,
+  failedRead,
+  isRecord,
   type NamedAuthorityReaders,
 } from './sources';
 
-export {
-  GITHUB_API_URL,
-  GITHUB_GRAPHQL_URL,
-} from './live-github';
+export const GITHUB_GRAPHQL_URL = 'https://api.github.com/graphql';
+export const GITHUB_API_URL = 'https://api.github.com';
 
 export const NAMED_AUTHORITY_PATHS = {
   'symphony-runtime': '~/.local/lib/symphony-reconciler/runtime-receipt.json',
   'lease-guard-capacity':
     '~/.local/state/symphony-lease-guard/latest-report.json',
-  'fleet-receipt':
-    '/home/timwhite/gem-workspace/state/gem-priority-gate/latest.json',
+  'fleet-receipt': '~/gem-workspace/state/gem-priority-gate/latest.json',
 } as const;
 
 export const NAMED_AUTHORITY_URLS = {
@@ -29,6 +27,8 @@ export const NAMED_AUTHORITY_URLS = {
 } as const;
 
 const ALLOWED_PATHS = new Set<string>(Object.values(NAMED_AUTHORITY_PATHS));
+const MERGE_QUEUE_QUERY =
+  'query ShippingStateMergeQueue($owner:String!,$name:String!){repository(owner:$owner,name:$name){mergeQueue(branch:"main"){entries(first:20){pageInfo{hasNextPage}nodes{id position state pullRequest{number headRefOid}}}}}}';
 
 export type LiveIo = {
   readonly readFile: (path: string) => Promise<string>;
@@ -39,17 +39,16 @@ export type LiveIo = {
 };
 
 function expandHome(path: string): string {
-  if (path.startsWith('~/')) return resolve(homedir(), path.slice(2));
-  return path;
+  return path.startsWith('~/') ? resolve(homedir(), path.slice(2)) : path;
 }
 
 export function resolveNamedAuthorityPath(
   sourceId: ShippingSourceId
 ): string | null {
   if (!(sourceId in NAMED_AUTHORITY_PATHS)) return null;
-  const named =
-    NAMED_AUTHORITY_PATHS[sourceId as keyof typeof NAMED_AUTHORITY_PATHS];
-  return expandHome(named);
+  return expandHome(
+    NAMED_AUTHORITY_PATHS[sourceId as keyof typeof NAMED_AUTHORITY_PATHS]
+  );
 }
 
 export function isAllowlistedAuthorityPath(path: string): boolean {
@@ -58,79 +57,6 @@ export function isAllowlistedAuthorityPath(path: string): boolean {
     if (expanded === expandHome(named) || path === named) return true;
   }
   return false;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-async function readNamedJson(
-  io: LiveIo,
-  sourceId: ShippingSourceId
-): Promise<AuthorityRead | null> {
-  const path = resolveNamedAuthorityPath(sourceId);
-  if (path == null || !isAllowlistedAuthorityPath(path)) return null;
-  try {
-    const text = await io.readFile(path);
-    const payload: unknown = JSON.parse(text);
-    if (!isRecord(payload)) {
-      return {
-        sourceId,
-        status: 'error',
-        schema: null,
-        payload: null,
-        truncated: false,
-        sourceTimestamp: null,
-        sourceRevision: null,
-        sequence: null,
-        eventId: null,
-        errorCode: 'malformed',
-        errorMessage: 'named authority file was not an object',
-      };
-    }
-    const schema = typeof payload.schema === 'string' ? payload.schema : null;
-    return {
-      sourceId,
-      status: 'ok',
-      schema: schema ?? SHIPPING_SOURCE_SCHEMAS[sourceId],
-      payload,
-      truncated: false,
-      sourceTimestamp:
-        parseTimestamp(payload.ts) ??
-        parseTimestamp(payload.observedAt) ??
-        parseTimestamp(payload.installedAt),
-      sourceRevision:
-        typeof payload.runtimeRevision === 'string'
-          ? payload.runtimeRevision
-          : typeof payload.sourceRevision === 'string'
-            ? payload.sourceRevision
-            : isRecord(payload.signals)
-              ? shaFromSignals(payload.signals)
-              : null,
-      sequence: typeof payload.sequence === 'number' ? payload.sequence : null,
-      eventId: typeof payload.eventId === 'string' ? payload.eventId : null,
-      correlation: correlationFromPayload(sourceId, payload),
-    };
-  } catch (error) {
-    const code =
-      isRecord(error) && error.code === 'ENOENT'
-        ? 'disconnected'
-        : 'unavailable';
-    return {
-      sourceId,
-      status: code,
-      schema: null,
-      payload: null,
-      truncated: false,
-      sourceTimestamp: null,
-      sourceRevision: null,
-      sequence: null,
-      eventId: null,
-      errorCode: code,
-      errorMessage:
-        error instanceof Error ? error.message : 'named authority unreadable',
-    };
-  }
 }
 
 function shaFromSignals(signals: Record<string, unknown>): string | null {
@@ -177,6 +103,70 @@ function correlationFromPayload(
   };
 }
 
+function okFileRead(
+  sourceId: ShippingSourceId,
+  payload: Record<string, unknown>
+): AuthorityRead {
+  return {
+    sourceId,
+    status: 'ok',
+    schema:
+      typeof payload.schema === 'string'
+        ? payload.schema
+        : SHIPPING_SOURCE_SCHEMAS[sourceId],
+    payload,
+    truncated: false,
+    sourceTimestamp:
+      parseTimestamp(payload.ts) ??
+      parseTimestamp(payload.observedAt) ??
+      parseTimestamp(payload.installedAt),
+    sourceRevision:
+      typeof payload.runtimeRevision === 'string'
+        ? payload.runtimeRevision
+        : typeof payload.sourceRevision === 'string'
+          ? payload.sourceRevision
+          : isRecord(payload.signals)
+            ? shaFromSignals(payload.signals)
+            : typeof payload.commitSha === 'string'
+              ? payload.commitSha
+              : null,
+    sequence: typeof payload.sequence === 'number' ? payload.sequence : null,
+    eventId: typeof payload.eventId === 'string' ? payload.eventId : null,
+    correlation: correlationFromPayload(sourceId, payload),
+  };
+}
+
+async function readNamedJson(
+  io: LiveIo,
+  sourceId: ShippingSourceId
+): Promise<AuthorityRead | null> {
+  const path = resolveNamedAuthorityPath(sourceId);
+  if (path == null || !isAllowlistedAuthorityPath(path)) return null;
+  try {
+    const payload: unknown = JSON.parse(await io.readFile(path));
+    if (!isRecord(payload)) {
+      return failedRead(
+        sourceId,
+        'error',
+        'named authority file was not an object',
+        { errorCode: 'malformed' }
+      );
+    }
+    return okFileRead(sourceId, payload);
+  } catch (error) {
+    const code =
+      isRecord(error) && error.code === 'ENOENT'
+        ? 'disconnected'
+        : 'unavailable';
+    return failedRead(
+      sourceId,
+      code,
+      error instanceof Error ? error.message : 'named authority unreadable',
+      { errorCode: code }
+    );
+  }
+}
+
 async function readNamedUrl(
   io: LiveIo,
   sourceId: ShippingSourceId,
@@ -190,76 +180,192 @@ async function readNamedUrl(
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (response.status === 401 || response.status === 403) {
-      return {
+      return failedRead(
         sourceId,
-        status: 'unauthorized',
-        schema: null,
-        payload: null,
-        truncated: false,
-        sourceTimestamp: null,
-        sourceRevision: null,
-        sequence: null,
-        eventId: null,
-        errorCode: 'unauthorized',
-        errorMessage: `named authority returned ${response.status}`,
-      };
+        'unauthorized',
+        `named authority returned ${response.status}`
+      );
     }
     if (!response.ok) {
-      return {
+      return failedRead(
         sourceId,
-        status: 'unavailable',
-        schema: null,
-        payload: null,
-        truncated: false,
-        sourceTimestamp: null,
-        sourceRevision: null,
-        sequence: null,
-        eventId: null,
-        errorCode: `http-${response.status}`,
-        errorMessage: `named authority returned ${response.status}`,
-      };
+        'unavailable',
+        `named authority returned ${response.status}`,
+        { errorCode: `http-${response.status}` }
+      );
     }
     const payload: unknown = await response.json();
     if (!isRecord(payload)) {
-      return {
+      return failedRead(
         sourceId,
-        status: 'error',
-        schema: null,
-        payload: null,
-        truncated: false,
-        sourceTimestamp: null,
-        sourceRevision: null,
-        sequence: null,
-        eventId: null,
-        errorCode: 'malformed',
-        errorMessage: 'named authority payload was not an object',
-      };
+        'error',
+        'named authority payload was not an object',
+        { errorCode: 'malformed' }
+      );
     }
-    return {
-      sourceId,
-      status: 'ok',
-      schema:
-        typeof payload.schema === 'string'
-          ? payload.schema
-          : SHIPPING_SOURCE_SCHEMAS[sourceId],
-      payload,
-      truncated: false,
-      sourceTimestamp:
-        parseTimestamp(payload.observedAt) ?? parseTimestamp(payload.ts),
-      sourceRevision:
-        typeof payload.runtimeRevision === 'string'
-          ? payload.runtimeRevision
-          : typeof payload.commitSha === 'string'
-            ? payload.commitSha
-            : null,
-      sequence: null,
-      eventId: null,
-      correlation: correlationFromPayload(sourceId, payload),
-    };
+    return okFileRead(sourceId, payload);
   } catch (error) {
     return disconnectedRead(
       sourceId,
       error instanceof Error ? error.message : 'named authority unreachable'
+    );
+  }
+}
+
+async function githubFetch(
+  io: LiveIo,
+  sourceId: ShippingSourceId,
+  url: string,
+  init: RequestInit
+): Promise<Response | AuthorityRead> {
+  if (!io.githubToken || !io.githubOwner || !io.githubRepo) {
+    return failedRead(
+      sourceId,
+      'unavailable',
+      'GitHub credentials are not configured'
+    );
+  }
+  const response = await io.fetch(url, {
+    ...init,
+    signal: AbortSignal.timeout(2500),
+    headers: {
+      accept: 'application/vnd.github+json',
+      authorization: `Bearer ${io.githubToken}`,
+      ...init.headers,
+    },
+  });
+  if (response.status === 401 || response.status === 403) {
+    return failedRead(
+      sourceId,
+      'unauthorized',
+      `GitHub returned ${response.status}`
+    );
+  }
+  return response;
+}
+
+export async function readMergeQueue(io: LiveIo): Promise<AuthorityRead> {
+  try {
+    const response = await githubFetch(
+      io,
+      'github-native-merge-queue',
+      GITHUB_GRAPHQL_URL,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          query: MERGE_QUEUE_QUERY,
+          variables: { owner: io.githubOwner, name: io.githubRepo },
+        }),
+      }
+    );
+    if (!('ok' in response)) return response;
+    const body: unknown = await response.json();
+    const data = isRecord(body) && isRecord(body.data) ? body.data : null;
+    const repository =
+      data && isRecord(data.repository) ? data.repository : null;
+    const queue =
+      repository && isRecord(repository.mergeQueue)
+        ? repository.mergeQueue
+        : null;
+    const entries = queue && isRecord(queue.entries) ? queue.entries : null;
+    const nodes = entries && Array.isArray(entries.nodes) ? entries.nodes : [];
+    const truncated =
+      isRecord(entries?.pageInfo) && entries.pageInfo.hasNextPage === true;
+    return {
+      sourceId: 'github-native-merge-queue',
+      status: 'ok',
+      schema: SHIPPING_SOURCE_SCHEMAS['github-native-merge-queue'],
+      payload: { entries: nodes, truncated },
+      truncated,
+      sourceTimestamp: null,
+      sourceRevision:
+        nodes.length > 0 && isRecord(nodes[0])
+          ? String(nodes[0].id ?? '')
+          : 'empty',
+      sequence: null,
+      eventId: null,
+      measuredMeanings: { queued: nodes.length > 0 },
+    };
+  } catch (error) {
+    return disconnectedRead(
+      'github-native-merge-queue',
+      error instanceof Error ? error.message : 'merge queue unreachable'
+    );
+  }
+}
+
+export async function readWorkflow(
+  io: LiveIo,
+  sourceId: 'exact-sha-ci' | 'production-controller',
+  workflow: string
+): Promise<AuthorityRead> {
+  const url = `${GITHUB_API_URL}/repos/${encodeURIComponent(io.githubOwner ?? '')}/${encodeURIComponent(io.githubRepo ?? '')}/actions/workflows/${encodeURIComponent(workflow)}/runs?per_page=5&exclude_pull_requests=true`;
+  try {
+    const response = await githubFetch(io, sourceId, url, {});
+    if (!('ok' in response)) return response;
+    if (!response.ok) {
+      return failedRead(
+        sourceId,
+        'unavailable',
+        `GitHub Actions returned ${response.status}`,
+        { errorCode: `http-${response.status}` }
+      );
+    }
+    const body: unknown = await response.json();
+    const runs =
+      isRecord(body) && Array.isArray(body.workflow_runs)
+        ? body.workflow_runs
+        : [];
+    const latest = runs.find(isRecord) ?? null;
+    if (latest == null) {
+      return {
+        sourceId,
+        status: 'ok',
+        schema: SHIPPING_SOURCE_SCHEMAS[sourceId],
+        payload: { workflow_runs: [] },
+        truncated: false,
+        sourceTimestamp: null,
+        sourceRevision: 'empty',
+        sequence: null,
+        eventId: null,
+      };
+    }
+    const sha = typeof latest.head_sha === 'string' ? latest.head_sha : null;
+    const conclusion =
+      typeof latest.conclusion === 'string' ? latest.conclusion : null;
+    const verified =
+      sourceId === 'production-controller' &&
+      typeof latest.name === 'string' &&
+      latest.name.includes('Production Verified');
+    const green = conclusion === 'success';
+    return {
+      sourceId,
+      status: 'ok',
+      schema: SHIPPING_SOURCE_SCHEMAS[sourceId],
+      payload: latest,
+      truncated: runs.length >= 5,
+      sourceTimestamp: parseTimestamp(latest.updated_at),
+      sourceRevision: sha,
+      sequence:
+        typeof latest.run_number === 'number' ? latest.run_number : null,
+      eventId: latest.id != null ? String(latest.id) : null,
+      correlation: {
+        sha,
+        ciRunId: latest.id != null ? String(latest.id) : null,
+        deploymentId: verified && green ? String(latest.id) : null,
+      },
+      errorCode: green ? undefined : 'ci-not-green',
+      errorMessage: green ? undefined : (conclusion ?? 'ci-not-green'),
+      measuredMeanings:
+        sourceId === 'exact-sha-ci'
+          ? { ciGreen: green }
+          : { productionVerified: Boolean(verified && green) },
+    };
+  } catch (error) {
+    return disconnectedRead(
+      sourceId,
+      error instanceof Error ? error.message : 'workflow unreachable'
     );
   }
 }
@@ -284,8 +390,7 @@ export function createLiveShippingStateReaders(
         NAMED_AUTHORITY_URLS['symphony-runtime'],
         750
       );
-      if (live.status === 'ok') return live;
-      return file ?? live;
+      return live.status === 'ok' ? live : (file ?? live);
     },
     'symphony-task': async () => {
       const runtime = await readNamedUrl(

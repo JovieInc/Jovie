@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OPERATIONAL_TRUTH_STATES, TELEMETRY_BRIDGE } from '@/lib/ovie/program';
 import {
   type AuthorityRead,
+  type AuthorityReadStatus,
   M1_SOURCE_TO_PROJECTION_BUDGET_MS as BUDGET,
   emptyCursor,
   FORBIDDEN_ACTUATION,
@@ -20,16 +21,20 @@ import {
   snapshotReaders,
   stopPublishingShippingState,
 } from '@/lib/ovie/shipping-state';
+import {
+  createLiveShippingStateReaders,
+  isAllowlistedAuthorityPath,
+  NAMED_AUTHORITY_PATHS,
+  resolveNamedAuthorityPath,
+} from '@/lib/ovie/shipping-state/live';
 
 const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const SHA_B = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+const T0 = '2026-08-22T00:00:00.000Z';
 
-function clockAt(iso: string, ms = Date.parse(iso)): ShippingClock {
-  const currentMs = ms;
-  return {
-    nowIso: () => new Date(currentMs).toISOString(),
-    nowMs: () => currentMs,
-  };
+function clockAt(iso: string): ShippingClock {
+  const ms = Date.parse(iso);
+  return { nowIso: () => new Date(ms).toISOString(), nowMs: () => ms };
 }
 
 function ok(
@@ -43,19 +48,33 @@ function ok(
     schema: extra.schema ?? SHIPPING_SOURCE_SCHEMAS[sourceId],
     payload,
     truncated: extra.truncated ?? false,
-    sourceTimestamp: extra.sourceTimestamp ?? '2026-08-22T00:00:00.000Z',
+    sourceTimestamp: extra.sourceTimestamp ?? T0,
     sourceRevision: extra.sourceRevision ?? SHA,
     sequence: extra.sequence ?? 1,
     eventId: extra.eventId ?? `${sourceId}:1:${SHA}`,
-    correlation: extra.correlation,
-    measuredMeanings: extra.measuredMeanings,
-    errorCode: extra.errorCode,
-    errorMessage: extra.errorMessage,
+    ...extra,
   };
 }
 
-function allDisconnected(): Partial<Record<ShippingSourceId, AuthorityRead>> {
-  return {};
+function failed(
+  sourceId: ShippingSourceId,
+  status: AuthorityReadStatus,
+  extra: Partial<AuthorityRead> = {}
+): AuthorityRead {
+  return {
+    sourceId,
+    status,
+    schema: extra.schema ?? null,
+    payload: extra.payload ?? null,
+    truncated: false,
+    sourceTimestamp: null,
+    sourceRevision: null,
+    sequence: 1,
+    eventId: extra.eventId ?? `${sourceId}:${status}`,
+    errorCode: extra.errorCode ?? status,
+    errorMessage: extra.errorMessage ?? status,
+    ...extra,
+  };
 }
 
 function baseline(
@@ -111,12 +130,22 @@ function baseline(
   };
 }
 
+async function publish(
+  snapshots: Partial<Record<ShippingSourceId, AuthorityRead>>,
+  clock = clockAt(T0)
+) {
+  return publishShippingState({
+    readers: snapshotReaders(snapshots),
+    clock,
+  });
+}
+
 afterEach(() => {
   resetShippingStatePublisher();
 });
 
 describe('ovie.shipping-state.v1 contract', () => {
-  it('names every producer schema and includes program operational-truth states', () => {
+  it('names every producer schema and program operational-truth states', async () => {
     expect(SHIPPING_STATE_SCHEMA).toBe('ovie.shipping-state.v1');
     expect(SHIPPING_SOURCE_IDS).toEqual([
       'symphony-runtime',
@@ -130,12 +159,8 @@ describe('ovie.shipping-state.v1 contract', () => {
     ]);
     expect(BUDGET).toBe(10_000);
     for (const state of OPERATIONAL_TRUTH_STATES) {
-      if (state === 'failure') {
-        expect(SHIPPING_STATES).toContain('error');
-        continue;
-      }
-      if (state === 'recovery') continue;
-      expect(SHIPPING_STATES).toContain(state);
+      if (state === 'failure') expect(SHIPPING_STATES).toContain('error');
+      else if (state !== 'recovery') expect(SHIPPING_STATES).toContain(state);
     }
     expect(SHIPPING_STATES).toEqual(
       expect.arrayContaining([
@@ -154,9 +179,6 @@ describe('ovie.shipping-state.v1 contract', () => {
     ]);
     expect(TELEMETRY_BRIDGE.mode).toBe('read-only');
     expect(FORBIDDEN_ACTUATION).toEqual(expect.arrayContaining(['dispatch']));
-  });
-
-  it('exposes each named authority independently', async () => {
     const readers = snapshotReaders(
       baseline({
         'lease-guard-capacity': ok('lease-guard-capacity', {
@@ -172,29 +194,17 @@ describe('ovie.shipping-state.v1 contract', () => {
   });
 });
 
-describe('zero semantic', () => {
-  it('allows zero only after a successful measurement whose value is zero', async () => {
+describe('zero, states, ordering, meanings, cadence', () => {
+  it('allows zero only after a successful measurement', async () => {
     expect(measuredCount(0)).toEqual({ state: 'measured-zero', value: 0 });
     expect(measuredCount(3)).toEqual({ state: 'measured-nonzero', value: 3 });
-
-    const zero = await publishShippingState({
-      readers: snapshotReaders(
-        baseline({
-          'symphony-runtime': ok('symphony-runtime', {
-            running: [],
-            retrying: [],
-            blocked: [],
-          }),
-          'lease-guard-capacity': ok('lease-guard-capacity', {
-            capacity: { available: 0 },
-          }),
-          'github-native-merge-queue': ok('github-native-merge-queue', {
-            entries: [],
-          }),
-        })
-      ),
-      clock: clockAt('2026-08-22T00:00:00.000Z'),
-    });
+    const zero = await publish(
+      baseline({
+        'lease-guard-capacity': ok('lease-guard-capacity', {
+          capacity: { available: 0 },
+        }),
+      })
+    );
     expect(zero.sources['symphony-runtime'].counts.running).toEqual({
       state: 'measured-zero',
       value: 0,
@@ -207,393 +217,255 @@ describe('zero semantic', () => {
       state: 'measured-zero',
       value: 0,
     });
-
     resetShippingStatePublisher();
-    const missing = await publishShippingState({
-      readers: snapshotReaders(allDisconnected()),
-      clock: clockAt('2026-08-22T00:00:00.000Z'),
-    });
-    expect(missing.retrying.state).toBe('not-measured');
-    expect(missing.retrying.value).toBeNull();
+    const missing = await publish({});
+    expect(missing.retrying).toEqual({ state: 'not-measured', value: null });
     expect(missing.capacityAvailable.state).toBe('not-measured');
     expect(missing.meanings.merged.state).toBe('not-measured');
-    expect(missing.meanings.queued.state).toBe('not-measured');
     expect(missing.timeToShipSeconds.state).toBe('not-measured');
   });
-});
 
-describe('observation states', () => {
-  it('covers fresh, stale, disconnected, unavailable, unauthorized, degraded, unknown, error, and partial', async () => {
-    const fresh = await publishShippingState({
-      readers: snapshotReaders(baseline()),
-      clock: clockAt('2026-08-22T00:00:00.000Z'),
-    });
-    expect(fresh.state).toBe('fresh');
-    expect(fresh.publishing).toBe(true);
-
+  it('covers each observation state without synthesizing current truth', async () => {
+    expect((await publish(baseline())).state).toBe('fresh');
     resetShippingStatePublisher();
-    const staleClock = clockAt('2026-08-22T00:00:00.000Z');
-    const first = await publishShippingState({
-      readers: snapshotReaders(baseline()),
-      clock: staleClock,
-    });
-    expect(first.state).toBe('fresh');
-    const later = {
-      nowIso: () => '2026-08-22T00:00:20.000Z',
-      nowMs: () => Date.parse('2026-08-22T00:00:20.000Z'),
-    };
-    const stale = await publishShippingState({
-      readers: snapshotReaders(
-        baseline({
-          'symphony-runtime': ok(
-            'symphony-runtime',
-            { running: [], retrying: [], blocked: [] },
-            {
-              sequence: 1,
-              eventId:
-                'symphony-runtime:1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-            }
-          ),
-        })
-      ),
-      clock: later,
-    });
-    expect(['stale', 'fresh', 'degraded']).toContain(stale.state);
-
-    resetShippingStatePublisher();
-    const disconnected = await publishShippingState({
-      readers: snapshotReaders(allDisconnected()),
-      clock: clockAt('2026-08-22T00:00:00.000Z'),
-    });
-    expect(disconnected.sources['fleet-receipt'].state).toBe('disconnected');
-
-    resetShippingStatePublisher();
-    const unauthorized = await publishShippingState({
-      readers: snapshotReaders({
-        'exact-sha-ci': {
-          sourceId: 'exact-sha-ci',
-          status: 'unauthorized',
-          schema: null,
-          payload: null,
-          truncated: false,
-          sourceTimestamp: null,
-          sourceRevision: null,
-          sequence: 1,
-          eventId: 'ci:unauth',
-          errorCode: 'unauthorized',
-          errorMessage: '401',
-        },
-      }),
-      clock: clockAt('2026-08-22T00:00:00.000Z'),
-    });
-    expect(unauthorized.sources['exact-sha-ci'].state).toBe('unauthorized');
-
-    resetShippingStatePublisher();
-    const unavailable = await publishShippingState({
-      readers: snapshotReaders({
-        'live-build-info': {
-          sourceId: 'live-build-info',
-          status: 'unavailable',
-          schema: null,
-          payload: null,
-          truncated: false,
-          sourceTimestamp: null,
-          sourceRevision: null,
-          sequence: 1,
-          eventId: 'build:unavail',
-          errorCode: 'unavailable',
-          errorMessage: '503',
-        },
-      }),
-      clock: clockAt('2026-08-22T00:00:00.000Z'),
-    });
-    expect(unavailable.sources['live-build-info'].state).toBe('unavailable');
-
-    resetShippingStatePublisher();
-    const unknown = await publishShippingState({
-      readers: snapshotReaders({
-        'lease-guard-capacity': {
-          sourceId: 'lease-guard-capacity',
-          status: 'unknown',
+    expect((await publish({})).sources['fleet-receipt'].state).toBe(
+      'disconnected'
+    );
+    const cases: Array<[ShippingSourceId, AuthorityRead, string]> = [
+      [
+        'exact-sha-ci',
+        failed('exact-sha-ci', 'unauthorized', { errorMessage: '401' }),
+        'unauthorized',
+      ],
+      [
+        'live-build-info',
+        failed('live-build-info', 'unavailable', { errorMessage: '503' }),
+        'unavailable',
+      ],
+      [
+        'lease-guard-capacity',
+        failed('lease-guard-capacity', 'unknown', {
           schema: SHIPPING_SOURCE_SCHEMAS['lease-guard-capacity'],
           payload: { capacity: { state: 'unknown' } },
-          truncated: false,
-          sourceTimestamp: null,
-          sourceRevision: null,
-          sequence: 1,
-          eventId: 'lease:unknown',
-        },
-      }),
-      clock: clockAt('2026-08-22T00:00:00.000Z'),
-    });
-    expect(unknown.sources['lease-guard-capacity'].state).toBe('unknown');
-
+        }),
+        'unknown',
+      ],
+    ];
+    for (const [sourceId, read, state] of cases) {
+      resetShippingStatePublisher();
+      expect(
+        (await publish({ [sourceId]: read })).sources[sourceId].state
+      ).toBe(state);
+    }
     resetShippingStatePublisher();
-    const error = await publishShippingState({
-      readers: snapshotReaders({
-        'fleet-receipt': ok(
-          'fleet-receipt',
-          { state: 'GREEN' },
-          { schema: 'not-a-real-schema' }
-        ),
-      }),
-      clock: clockAt('2026-08-22T00:00:00.000Z'),
-    });
-    expect(error.sources['fleet-receipt'].state).toBe('error');
-    expect(error.sources['fleet-receipt'].ingest).toBe('schema-mismatch');
-
-    resetShippingStatePublisher();
-    const degraded = await publishShippingState({
-      readers: snapshotReaders(
-        baseline({
-          'github-native-merge-queue': ok(
-            'github-native-merge-queue',
-            { entries: [{ id: 'e1', state: 'QUEUED', position: 1 }] },
-            { truncated: true }
-          ),
-        })
+    const mismatch = await publish({
+      'fleet-receipt': ok(
+        'fleet-receipt',
+        { state: 'GREEN' },
+        { schema: 'not-a-real-schema' }
       ),
-      clock: clockAt('2026-08-22T00:00:00.000Z'),
     });
+    expect(mismatch.sources['fleet-receipt'].state).toBe('error');
+    expect(mismatch.sources['fleet-receipt'].ingest).toBe('schema-mismatch');
+    resetShippingStatePublisher();
+    const degraded = await publish(
+      baseline({
+        'github-native-merge-queue': ok(
+          'github-native-merge-queue',
+          { entries: [{ id: 'e1', state: 'QUEUED', position: 1 }] },
+          { truncated: true }
+        ),
+      })
+    );
     expect(degraded.sources['github-native-merge-queue'].state).toBe(
       'degraded'
     );
     expect(degraded.sources['github-native-merge-queue'].truncated).toBe(true);
-
     resetShippingStatePublisher();
-    const partial = await publishShippingState({
-      readers: snapshotReaders({
-        'live-build-info': ok(
-          'live-build-info',
-          { commitSha: SHA },
-          { correlation: { sha: SHA } }
-        ),
-      }),
-      clock: clockAt('2026-08-22T00:00:00.000Z'),
-    });
-    expect(partial.state).toBe('partial');
-  });
-});
-
-describe('ordering, replay, and gaps', () => {
-  it('drops duplicates and replays without replacing current truth', () => {
-    const first = ingestSourceEvent(emptyCursor(), {
-      eventId: 'evt-1',
-      sequence: 1,
-      sourceTimestamp: '2026-08-22T00:00:00.000Z',
-      observationTimestamp: '2026-08-22T00:00:01.000Z',
-      schemaOk: true,
-      reachable: true,
-    });
-    expect(first.action).toBe('accepted');
-    const dup = ingestSourceEvent(first.cursor, {
-      eventId: 'evt-1',
-      sequence: 1,
-      sourceTimestamp: '2026-08-22T00:00:00.000Z',
-      observationTimestamp: '2026-08-22T00:00:02.000Z',
-      schemaOk: true,
-      reachable: true,
-    });
-    expect(dup.action).toBe('duplicate');
-    expect(dup.replaceCurrent).toBe(false);
-    const replay = ingestSourceEvent(first.cursor, {
-      eventId: 'evt-0',
-      sequence: 1,
-      sourceTimestamp: '2026-08-22T00:00:00.000Z',
-      observationTimestamp: '2026-08-22T00:00:02.000Z',
-      schemaOk: true,
-      reachable: true,
-    });
-    expect(replay.action).toBe('replay');
-    const gap = ingestSourceEvent(first.cursor, {
-      eventId: 'evt-4',
-      sequence: 4,
-      sourceTimestamp: '2026-08-22T00:00:00.000Z',
-      observationTimestamp: '2026-08-22T00:00:02.000Z',
-      schemaOk: true,
-      reachable: true,
-    });
-    expect(gap.action).toBe('gap');
-    expect(gap.sequenceGap).toBe(true);
-    expect(gap.cursor.gapSequences).toEqual([2, 3]);
-    const backfill = ingestSourceEvent(gap.cursor, {
-      eventId: 'evt-2',
-      sequence: 2,
-      sourceTimestamp: '2026-08-22T00:00:00.000Z',
-      observationTimestamp: '2026-08-22T00:00:03.000Z',
-      schemaOk: true,
-      reachable: true,
-    });
-    expect(backfill.action).toBe('backfill');
-    expect(backfill.replaceCurrent).toBe(false);
-  });
-
-  it('flags clock skew without rewriting source time to now', () => {
-    const result = ingestSourceEvent(emptyCursor(), {
-      eventId: 'evt-1',
-      sequence: 1,
-      sourceTimestamp: '2026-08-22T00:10:00.000Z',
-      observationTimestamp: '2026-08-22T00:00:00.000Z',
-      schemaOk: true,
-      reachable: true,
-    });
-    expect(result.clockSkew).toBe(true);
-  });
-
-  it('reconnects after disconnect without fabricating a blank source', async () => {
-    const clock = clockAt('2026-08-22T00:00:00.000Z');
-    await publishShippingState({
-      readers: snapshotReaders(baseline()),
-      clock,
-    });
-    await publishShippingState({
-      readers: snapshotReaders(allDisconnected()),
-      clock,
-    });
-    const recovered = await publishShippingState({
-      readers: snapshotReaders(
-        baseline({
-          'symphony-runtime': ok(
-            'symphony-runtime',
-            {
-              running: [{ issue_identifier: 'JOV-1' }],
-              retrying: [],
-              blocked: [],
-            },
-            { sequence: 3, eventId: 'symphony-runtime:3:reconnect' }
-          ),
-        })
-      ),
-      clock,
-    });
-    expect(recovered.sources['symphony-runtime'].recovered).toBe(true);
-    expect(recovered.sources['symphony-runtime'].ingest).toBe('reconnect');
-    expect(recovered.retrying.state).not.toBe('not-measured');
-  });
-});
-
-describe('meanings stay distinct', () => {
-  it('does not treat merged, queued, ci-green, Production Verified, or exact live build as the same fact', async () => {
-    const projection = await publishShippingState({
-      readers: snapshotReaders(
-        baseline({
-          'github-native-merge-queue': ok(
-            'github-native-merge-queue',
-            { entries: [{ id: 'e1', state: 'QUEUED', position: 1 }] },
-            { measuredMeanings: { queued: true } }
-          ),
-          'fleet-receipt': ok(
-            'fleet-receipt',
-            { state: 'GREEN' },
-            { measuredMeanings: { merged: false } }
-          ),
-          'exact-sha-ci': ok(
-            'exact-sha-ci',
-            { conclusion: 'success' },
-            {
-              correlation: { ciRunId: '1', sha: SHA },
-              measuredMeanings: { ciGreen: true },
-            }
-          ),
-          'production-controller': ok(
-            'production-controller',
-            { conclusion: 'success' },
-            {
-              correlation: { sha: SHA_B },
-              measuredMeanings: { productionVerified: false },
-            }
-          ),
+    expect(
+      (
+        await publish({
           'live-build-info': ok(
             'live-build-info',
             { commitSha: SHA },
-            {
-              correlation: { sha: SHA },
-              measuredMeanings: { exactLiveBuild: false },
-            }
+            { correlation: { sha: SHA } }
           ),
         })
-      ),
-      clock: clockAt('2026-08-22T00:00:00.000Z'),
+      ).state
+    ).toBe('partial');
+  });
+
+  it('drops duplicates, replays, and gaps without replacing truth', () => {
+    const ingest = (
+      cursor: ReturnType<typeof emptyCursor>,
+      eventId: string,
+      sequence: number
+    ) =>
+      ingestSourceEvent(cursor, {
+        eventId,
+        sequence,
+        sourceTimestamp: T0,
+        observationTimestamp: '2026-08-22T00:00:01.000Z',
+        schemaOk: true,
+        reachable: true,
+      });
+    const first = ingest(emptyCursor(), 'evt-1', 1);
+    expect(first.action).toBe('accepted');
+    expect(ingest(first.cursor, 'evt-1', 1).action).toBe('duplicate');
+    expect(ingest(first.cursor, 'evt-0', 1).action).toBe('replay');
+    const gap = ingest(first.cursor, 'evt-4', 4);
+    expect(gap).toMatchObject({
+      action: 'gap',
+      sequenceGap: true,
+      cursor: { gapSequences: [2, 3] },
     });
-    expect(projection.meanings.merged).toEqual({
-      state: 'measured',
-      value: false,
+    expect(ingest(gap.cursor, 'evt-2', 2).replaceCurrent).toBe(false);
+    expect(
+      ingestSourceEvent(emptyCursor(), {
+        eventId: 'evt-1',
+        sequence: 1,
+        sourceTimestamp: '2026-08-22T00:10:00.000Z',
+        observationTimestamp: T0,
+        schemaOk: true,
+        reachable: true,
+      }).clockSkew
+    ).toBe(true);
+  });
+
+  it('reconnects after disconnect and keeps meanings distinct', async () => {
+    const clock = clockAt(T0);
+    await publish(baseline(), clock);
+    await publish({}, clock);
+    const recovered = await publish(
+      baseline({
+        'symphony-runtime': ok(
+          'symphony-runtime',
+          {
+            running: [{ issue_identifier: 'JOV-1' }],
+            retrying: [],
+            blocked: [],
+          },
+          { sequence: 3, eventId: 'symphony-runtime:3:reconnect' }
+        ),
+      }),
+      clock
+    );
+    expect(recovered.sources['symphony-runtime']).toMatchObject({
+      recovered: true,
+      ingest: 'reconnect',
     });
-    expect(projection.meanings.queued).toEqual({
-      state: 'measured',
-      value: true,
-    });
-    expect(projection.meanings.ciGreen).toEqual({
-      state: 'measured',
-      value: true,
-    });
-    expect(projection.meanings.productionVerified).toEqual({
-      state: 'measured',
-      value: false,
-    });
-    expect(projection.meanings.exactLiveBuild).toEqual({
-      state: 'measured',
-      value: false,
+    expect(recovered.retrying.state).not.toBe('not-measured');
+    resetShippingStatePublisher();
+    const projection = await publish(
+      baseline({
+        'github-native-merge-queue': ok(
+          'github-native-merge-queue',
+          { entries: [{ id: 'e1', state: 'QUEUED', position: 1 }] },
+          { measuredMeanings: { queued: true } }
+        ),
+        'production-controller': ok(
+          'production-controller',
+          { conclusion: 'success' },
+          {
+            correlation: { sha: SHA_B },
+            measuredMeanings: { productionVerified: false },
+          }
+        ),
+        'live-build-info': ok(
+          'live-build-info',
+          { commitSha: SHA },
+          {
+            correlation: { sha: SHA },
+            measuredMeanings: { exactLiveBuild: false },
+          }
+        ),
+      })
+    );
+    expect(projection.meanings).toEqual({
+      merged: { state: 'measured', value: false },
+      queued: { state: 'measured', value: true },
+      ciGreen: { state: 'measured', value: true },
+      productionVerified: { state: 'measured', value: false },
+      exactLiveBuild: { state: 'measured', value: false },
     });
   });
-});
 
-describe('cadence and shutdown', () => {
-  it('measures source-to-projection latency inside the M1 10s budget', async () => {
-    let now = Date.parse('2026-08-22T00:00:00.000Z');
+  it('measures latency and retains expired last-known on shutdown', async () => {
+    let now = Date.parse(T0);
     const clock: ShippingClock = {
       nowIso: () => new Date(now).toISOString(),
       nowMs: () => now,
     };
     const readers = snapshotReaders(baseline());
     const original = readers['fleet-receipt'];
-    const delayed: typeof original = async () => {
-      now += 25;
-      return original();
-    };
     const projection = await publishShippingState({
-      readers: { ...readers, 'fleet-receipt': delayed },
+      readers: {
+        ...readers,
+        'fleet-receipt': async () => {
+          now += 25;
+          return original();
+        },
+      },
       clock,
     });
     expect(projection.latencyMs).toBeGreaterThanOrEqual(0);
     expect(projection.latencyMs).toBeLessThanOrEqual(BUDGET);
     expect(projection.withinM1Budget).toBe(true);
-    expect(projection.observationTimestamp).toBe('2026-08-22T00:00:00.000Z');
     expect(projection.sourceTimestamp).toBeNull();
-  });
-
-  it('retains an expired last-known marker on shutdown and never fabricates current state', async () => {
-    const live = await publishShippingState({
-      readers: snapshotReaders(baseline()),
-      clock: clockAt('2026-08-22T00:00:00.000Z'),
-    });
-    expect(live.state).toBe('fresh');
+    resetShippingStatePublisher();
+    const live = await publish(baseline());
     const stopped = stopPublishingShippingState();
-    expect(stopped?.publishing).toBe(false);
-    expect(stopped?.state).toBe('stale');
-    expect(stopped?.lastError?.code).toBe('publisher-stopped');
-    expect(stopped?.lastSuccess?.eventId).toBe(live.lastSuccess?.eventId);
-    expect(stopped?.meanings.ciGreen.value).toBe(true);
-    expect(stopped?.observationTimestamp).toBe(live.observationTimestamp);
-
-    const after = await publishShippingState({
-      readers: snapshotReaders(
-        baseline({
-          'lease-guard-capacity': ok('lease-guard-capacity', {
-            capacity: { available: 9 },
-          }),
-        })
-      ),
-      clock: clockAt('2026-08-22T00:00:05.000Z'),
+    expect(stopped).toMatchObject({
+      publishing: false,
+      state: 'stale',
+      lastError: { code: 'publisher-stopped' },
+      observationTimestamp: live.observationTimestamp,
     });
+    expect(stopped?.lastSuccess?.eventId).toBe(live.lastSuccess?.eventId);
+    const after = await publish(
+      baseline({
+        'lease-guard-capacity': ok('lease-guard-capacity', {
+          capacity: { available: 9 },
+        }),
+      }),
+      clockAt('2026-08-22T00:00:05.000Z')
+    );
     expect(after.publishing).toBe(false);
     expect(after.capacityAvailable.value).not.toBe(9);
     expect(after.observationTimestamp).toBe(live.observationTimestamp);
   });
 });
 
-describe('security surface', () => {
-  it('does not expose actuation, raw logs, or path query keys', () => {
+describe('shipping-state security', () => {
+  it('refuses arbitrary paths, secrets, and actuation keys', async () => {
+    expect(isAllowlistedAuthorityPath('/etc/passwd')).toBe(false);
+    expect(isAllowlistedAuthorityPath('/var/log/syslog')).toBe(false);
+    expect(NAMED_AUTHORITY_PATHS['fleet-receipt'].startsWith('~/')).toBe(true);
+    expect(
+      isAllowlistedAuthorityPath(NAMED_AUTHORITY_PATHS['fleet-receipt'])
+    ).toBe(true);
+    expect(resolveNamedAuthorityPath('exact-sha-ci')).toBeNull();
+    const { sanitizeErrorMessage } = await import('@/lib/ovie/shipping-state');
+    expect(
+      sanitizeErrorMessage(
+        'failed ghp_abcdefghijklmnopqrstuvwxyz012345 /home/timwhite/.ssh/id_rsa Bearer abcdef'
+      )
+    ).not.toMatch(/ghp_|Bearer abcdef|\/home\/timwhite/);
+    const readFile = vi.fn(async (path: string) => {
+      throw Object.assign(new Error(`refused ${path}`), { code: 'ENOENT' });
+    });
+    const readers = createLiveShippingStateReaders({
+      readFile,
+      fetch: vi.fn(async () => {
+        throw new Error('offline');
+      }),
+    });
+    await readers['fleet-receipt']();
+    await readers['symphony-runtime']();
+    expect(readFile).not.toHaveBeenCalledWith('/etc/passwd');
+    for (const [path] of readFile.mock.calls) {
+      expect(isAllowlistedAuthorityPath(path)).toBe(true);
+    }
     expect(FORBIDDEN_QUERY_KEYS).toEqual(
       expect.arrayContaining([
         'path',

@@ -21,10 +21,11 @@ import {
 import {
   cursorFor,
   freshnessDeadline,
+  identityFields,
   mergeCorrelation,
+  observationFreshness,
   projectionIdFor,
 } from './envelope';
-import { observationFreshness } from './ingest';
 
 const SUCCESS_STATES = new Set<ObservationState>([
   'fresh',
@@ -46,8 +47,6 @@ export function combineSourceStates(
     return 'fresh';
   }
   if (states.some(state => SUCCESS_STATES.has(state))) return 'partial';
-  if (unique.has('unauthorized') && unique.size === 1) return 'unauthorized';
-  if (states.every(state => state === 'disconnected')) return 'disconnected';
   if (
     states.every(state => state === 'unavailable' || state === 'disconnected')
   ) {
@@ -57,16 +56,6 @@ export function combineSourceStates(
   if (unique.has('unauthorized')) return 'unauthorized';
   if (unique.has('unknown')) return 'unknown';
   return 'unavailable';
-}
-
-function firstSha(
-  sources: Readonly<Record<ShippingSourceId, SourceObservation>>
-): string | null {
-  for (const sourceId of SHIPPING_SOURCE_IDS) {
-    const sha = sources[sourceId].correlation.sha;
-    if (isExactSha(sha)) return sha;
-  }
-  return null;
 }
 
 function mergeAllCorrelation(
@@ -79,7 +68,7 @@ function mergeAllCorrelation(
     ciRunId: null,
     deploymentId: null,
     buildId: null,
-    sha: firstSha(sources),
+    sha: null,
   };
   for (const sourceId of SHIPPING_SOURCE_IDS) {
     acc = mergeCorrelation(acc, sources[sourceId].correlation);
@@ -91,89 +80,76 @@ function measuredOrNull(
   source: SourceObservation,
   key: keyof SourceObservation['measuredMeanings']
 ): boolean | null {
-  if (!SUCCESS_STATES.has(source.state)) return null;
-  return source.measuredMeanings[key];
+  return SUCCESS_STATES.has(source.state) ? source.measuredMeanings[key] : null;
 }
 
-function productionVerified(source: SourceObservation): boolean | null {
-  const hinted = measuredOrNull(source, 'productionVerified');
-  if (hinted != null) return hinted;
-  if (!SUCCESS_STATES.has(source.state)) return null;
-  if (source.lastError?.code === 'not-verified') return false;
-  if (source.correlation.deploymentId == null) return null;
-  return true;
-}
-
-function ciGreen(source: SourceObservation): boolean | null {
-  const hinted = measuredOrNull(source, 'ciGreen');
-  if (hinted != null) return hinted;
-  if (!SUCCESS_STATES.has(source.state)) return null;
-  if (source.lastError?.code === 'ci-not-green') return false;
-  if (source.correlation.ciRunId == null) return null;
-  return source.lastError == null;
-}
-
-function exactLiveBuild(
-  build: SourceObservation,
-  controller: SourceObservation
+function meaningFromHint(
+  source: SourceObservation,
+  key: keyof SourceObservation['measuredMeanings'],
+  falseCode: string,
+  fallback: () => boolean | null
 ): boolean | null {
-  const hinted = measuredOrNull(build, 'exactLiveBuild');
-  if (hinted != null) return hinted;
-  const live = build.correlation.sha;
-  const deployed = controller.correlation.sha;
-  if (!isExactSha(live) || !isExactSha(deployed)) {
-    if (
-      !SUCCESS_STATES.has(build.state) ||
-      !SUCCESS_STATES.has(controller.state)
-    ) {
-      return null;
-    }
-    return false;
-  }
-  return live === deployed;
-}
-
-function queuedMeaning(source: SourceObservation): boolean | null {
-  const hinted = measuredOrNull(source, 'queued');
-  if (hinted != null) return hinted;
-  if (source.counts.queued.state === 'not-measured') return null;
-  return source.counts.queued.value !== null && source.counts.queued.value > 0
-    ? true
-    : source.counts.queued.state === 'measured-zero'
-      ? false
-      : null;
-}
-
-function mergedMeaning(source: SourceObservation): boolean | null {
-  const hinted = measuredOrNull(source, 'merged');
+  const hinted = measuredOrNull(source, key);
   if (hinted != null) return hinted;
   if (!SUCCESS_STATES.has(source.state)) return null;
-  if (source.lastError?.code === 'not-merged') return false;
-  return null;
+  if (source.lastError?.code === falseCode) return false;
+  return fallback();
 }
 
 export function projectMeanings(
   sources: Readonly<Record<ShippingSourceId, SourceObservation>>
 ): ShipMeanings {
-  const fleet = sources['fleet-receipt'];
   const queue = sources['github-native-merge-queue'];
   const ci = sources['exact-sha-ci'];
   const controller = sources['production-controller'];
   const build = sources['live-build-info'];
-
-  const merged = mergedMeaning(fleet);
-  const queued = queuedMeaning(queue);
-  const green = ciGreen(ci);
-  const verified = productionVerified(controller);
-  const live = exactLiveBuild(build, controller);
-
+  const queuedCount = queue.counts.queued;
+  const liveSha = build.correlation.sha;
+  const deployedSha = controller.correlation.sha;
+  const exactHint = measuredOrNull(build, 'exactLiveBuild');
+  const exact =
+    exactHint != null
+      ? exactHint
+      : isExactSha(liveSha) && isExactSha(deployedSha)
+        ? liveSha === deployedSha
+        : SUCCESS_STATES.has(build.state) &&
+            SUCCESS_STATES.has(controller.state)
+          ? false
+          : null;
+  const queuedHint = measuredOrNull(queue, 'queued');
+  const queued =
+    queuedHint != null
+      ? queuedHint
+      : queuedCount.state === 'not-measured'
+        ? null
+        : queuedCount.value != null && queuedCount.value > 0
+          ? true
+          : queuedCount.state === 'measured-zero'
+            ? false
+            : null;
+  const wrap = (value: boolean | null) =>
+    value == null ? NOT_MEASURED_BOOLEAN : measuredBoolean(value);
   return {
-    merged: merged == null ? NOT_MEASURED_BOOLEAN : measuredBoolean(merged),
-    queued: queued == null ? NOT_MEASURED_BOOLEAN : measuredBoolean(queued),
-    ciGreen: green == null ? NOT_MEASURED_BOOLEAN : measuredBoolean(green),
-    productionVerified:
-      verified == null ? NOT_MEASURED_BOOLEAN : measuredBoolean(verified),
-    exactLiveBuild: live == null ? NOT_MEASURED_BOOLEAN : measuredBoolean(live),
+    merged: wrap(
+      meaningFromHint(
+        sources['fleet-receipt'],
+        'merged',
+        'not-merged',
+        () => null
+      )
+    ),
+    queued: wrap(queued),
+    ciGreen: wrap(
+      meaningFromHint(ci, 'ciGreen', 'ci-not-green', () =>
+        ci.correlation.ciRunId == null ? null : ci.lastError == null
+      )
+    ),
+    productionVerified: wrap(
+      meaningFromHint(controller, 'productionVerified', 'not-verified', () =>
+        controller.correlation.deploymentId == null ? null : true
+      )
+    ),
+    exactLiveBuild: wrap(exact),
   };
 }
 
@@ -191,9 +167,9 @@ function pickCount(
 function timeToShip(
   sources: Readonly<Record<ShippingSourceId, SourceObservation>>
 ) {
-  const queue = sources['github-native-merge-queue'];
-  const fleet = sources['fleet-receipt'];
-  const start = queue.sourceTimestamp ?? fleet.sourceTimestamp;
+  const start =
+    sources['github-native-merge-queue'].sourceTimestamp ??
+    sources['fleet-receipt'].sourceTimestamp;
   const end =
     sources['live-build-info'].sourceTimestamp ??
     sources['production-controller'].sourceTimestamp;
@@ -238,43 +214,19 @@ export function projectShippingState(input: {
     : input.lastKnown
       ? 'stale'
       : 'unavailable';
-
   const successful = SHIPPING_SOURCE_IDS.some(sourceId =>
     SUCCESS_STATES.has(input.sources[sourceId].state)
   );
-  const lastSuccess = successful
-    ? {
-        at: input.observationTimestamp,
-        sequence: input.sequence,
-        eventId: projectionIdFor(
-          input.sequence,
-          revisionFingerprint(input.sources)
-        ),
-      }
-    : (input.lastKnown?.lastSuccess ?? null);
-
-  const lastError =
-    SHIPPING_SOURCE_IDS.map(sourceId => input.sources[sourceId].lastError).find(
-      error => error != null
-    ) ??
-    (input.publishing
-      ? null
-      : {
-          at: input.observationTimestamp,
-          code: 'publisher-stopped',
-          message: 'Publishing stopped; last-known marker retained',
-        });
-
   const revision = revisionFingerprint(input.sources);
-
+  const eventId = projectionIdFor(input.sequence, revision);
   return {
     producerId: SHIPPING_STATE_PRODUCER_ID,
     producerVersion: SHIPPING_STATE_PRODUCER_VERSION,
     sourceId: 'fleet-receipt',
     entityId: 'ovie.shipping-state',
     schema: SHIPPING_STATE_SCHEMA,
-    eventId: projectionIdFor(input.sequence, revision),
-    projectionId: projectionIdFor(input.sequence, revision),
+    eventId,
+    projectionId: eventId,
     sequence: input.sequence,
     cursor: cursorFor(input.sequence),
     sourceRevision: revision,
@@ -283,8 +235,20 @@ export function projectShippingState(input: {
     emissionTimestamp: input.emissionTimestamp,
     freshnessDeadline: deadline,
     correlation: mergeAllCorrelation(input.sources),
-    lastSuccess,
-    lastError,
+    lastSuccess: successful
+      ? { at: input.observationTimestamp, sequence: input.sequence, eventId }
+      : (input.lastKnown?.lastSuccess ?? null),
+    lastError:
+      SHIPPING_SOURCE_IDS.map(id => input.sources[id].lastError).find(
+        error => error != null
+      ) ??
+      (input.publishing
+        ? null
+        : {
+            at: input.observationTimestamp,
+            code: 'publisher-stopped',
+            message: 'Publishing stopped; last-known marker retained',
+          }),
     state,
     publishing: input.publishing,
     latencyMs: input.latencyMs,
@@ -307,20 +271,44 @@ export function retainLastKnownOnFailure(
   if (lastKnown == null) return null;
   return {
     ...lastKnown,
-    state: publishing ? 'stale' : 'stale',
+    state: 'stale',
     publishing,
-    emissionTimestamp: lastKnown.emissionTimestamp,
-    observationTimestamp: lastKnown.observationTimestamp,
-    freshnessDeadline: lastKnown.freshnessDeadline,
     lastError: lastError ?? lastKnown.lastError,
-    meanings: lastKnown.meanings,
-    retrying: lastKnown.retrying,
-    terminalFailures: lastKnown.terminalFailures,
-    capacityAvailable: lastKnown.capacityAvailable,
-    timeToShipSeconds: lastKnown.timeToShipSeconds,
-    latencyMs: lastKnown.latencyMs,
-    withinM1Budget: lastKnown.withinM1Budget,
-    sourceTimestamp: lastKnown.sourceTimestamp,
+  };
+}
+
+function emptyObservation(
+  sourceId: ShippingSourceId,
+  observationTimestamp: string,
+  emissionTimestamp: string,
+  lastError: ShippingStateProjection['lastError']
+): SourceObservation {
+  return {
+    ...identityFields({
+      sourceId,
+      entityId: sourceId,
+      sequence: 0,
+      observationTimestamp,
+      emissionTimestamp,
+      lastError,
+      schema: SHIPPING_STATE_SCHEMA,
+      producerId: sourceId,
+    }),
+    state: 'unknown',
+    truncated: false,
+    clockSkew: false,
+    recovered: false,
+    sequenceGap: false,
+    ingest: 'accepted',
+    measuredMeanings: {
+      merged: null,
+      queued: null,
+      ciGreen: null,
+      productionVerified: null,
+      exactLiveBuild: null,
+    },
+    entities: [],
+    counts: emptyCounts(),
   };
 }
 
@@ -340,21 +328,19 @@ export function unknownProjection(input: {
     input.publishing
   );
   if (retained) {
+    const eventId = projectionIdFor(
+      input.sequence,
+      retained.sourceRevision ?? 'unknown'
+    );
     return {
       ...retained,
       sequence: input.sequence,
       cursor: cursorFor(input.sequence),
-      eventId: projectionIdFor(
-        input.sequence,
-        retained.sourceRevision ?? 'unknown'
-      ),
-      projectionId: projectionIdFor(
-        input.sequence,
-        retained.sourceRevision ?? 'unknown'
-      ),
+      eventId,
+      projectionId: eventId,
       publishing: input.publishing,
       lastError: input.lastError ?? retained.lastError,
-      state: input.publishing ? 'stale' : 'stale',
+      state: 'stale',
       latencyMs: input.latencyMs,
       withinM1Budget: input.latencyMs <= M1_SOURCE_TO_PROJECTION_BUDGET_MS,
     };
@@ -362,57 +348,22 @@ export function unknownProjection(input: {
 
   const emptySources = {} as Record<ShippingSourceId, SourceObservation>;
   for (const sourceId of SHIPPING_SOURCE_IDS) {
-    emptySources[sourceId] = {
-      producerId: sourceId,
-      producerVersion: SHIPPING_STATE_PRODUCER_VERSION,
+    emptySources[sourceId] = emptyObservation(
       sourceId,
-      entityId: sourceId,
-      schema: SHIPPING_STATE_SCHEMA,
-      eventId: `${sourceId}:0:none`,
-      sequence: 0,
-      cursor: cursorFor(0),
-      sourceRevision: null,
-      sourceTimestamp: null,
-      observationTimestamp: input.observationTimestamp,
-      emissionTimestamp: input.emissionTimestamp,
-      freshnessDeadline: freshnessDeadline(input.observationTimestamp),
-      correlation: {
-        workId: null,
-        leaseId: null,
-        prNumber: null,
-        ciRunId: null,
-        deploymentId: null,
-        buildId: null,
-        sha: null,
-      },
-      lastSuccess: null,
-      lastError: input.lastError,
-      state: 'unknown' as const,
-      truncated: false,
-      clockSkew: false,
-      recovered: false,
-      sequenceGap: false,
-      ingest: 'accepted' as const,
-      measuredMeanings: {
-        merged: null,
-        queued: null,
-        ciGreen: null,
-        productionVerified: null,
-        exactLiveBuild: null,
-      },
-      entities: [],
-      counts: emptyCounts(),
-    } satisfies SourceObservation;
+      input.observationTimestamp,
+      input.emissionTimestamp,
+      input.lastError
+    );
   }
-
+  const eventId = projectionIdFor(input.sequence, 'unknown');
   return {
     producerId: SHIPPING_STATE_PRODUCER_ID,
     producerVersion: SHIPPING_STATE_PRODUCER_VERSION,
     sourceId: 'fleet-receipt',
     entityId: 'ovie.shipping-state',
     schema: SHIPPING_STATE_SCHEMA,
-    eventId: projectionIdFor(input.sequence, 'unknown'),
-    projectionId: projectionIdFor(input.sequence, 'unknown'),
+    eventId,
+    projectionId: eventId,
     sequence: input.sequence,
     cursor: cursorFor(input.sequence),
     sourceRevision: null,

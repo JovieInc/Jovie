@@ -9,14 +9,8 @@
 export const SHIPPING_STATE_SCHEMA = 'ovie.shipping-state.v1' as const;
 export const SHIPPING_STATE_PRODUCER_ID = 'ubuntu-operational-truth' as const;
 export const SHIPPING_STATE_PRODUCER_VERSION = '1' as const;
-
-/** M1 source-to-projection budget. Measured latency is always reported. */
 export const M1_SOURCE_TO_PROJECTION_BUDGET_MS = 10_000;
-
-/** Freshness window for a successful observation. */
 export const SHIPPING_STATE_FRESHNESS_MS = 10_000;
-
-/** Source timestamps this far in the future of observation are clock skew. */
 export const SHIPPING_STATE_CLOCK_SKEW_MS = 60_000;
 
 export const SHIPPING_SOURCE_IDS = [
@@ -71,7 +65,6 @@ export const OBSERVATION_STATES = [
 
 export type ObservationState = (typeof OBSERVATION_STATES)[number];
 
-/** Distinct ship meanings — never collapsed into each other. */
 export const SHIP_MEANING_KEYS = [
   'merged',
   'queued',
