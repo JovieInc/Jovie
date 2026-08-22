@@ -85,10 +85,8 @@ vi.mock('@/components/organisms/user-button', () => ({
         data-sidebar-identity-action={
           props.embeddedInIdentityGroup ? 'account-menu' : undefined
         }
-        className={
-          props.embeddedInIdentityGroup
-            ? 'focus-visible:shadow-none'
-            : undefined
+        data-focus-treatment={
+          props.embeddedInIdentityGroup ? 'underline-only' : undefined
         }
         onClick={() => props.onMenuOpenChange?.(true)}
       >
@@ -268,7 +266,10 @@ describe('UnifiedSidebar library route', () => {
         identityGroup.querySelectorAll<HTMLElement>(
           '[data-sidebar-identity-action]'
         )
-      ).every(action => action.classList.contains('focus-visible:shadow-none'))
+      ).every(
+        action =>
+          action.getAttribute('data-focus-treatment') === 'underline-only'
+      )
     ).toBe(true);
     expect(identityGroup).toHaveAttribute(
       'data-sidebar-identity-boundary',
@@ -368,8 +369,9 @@ describe('UnifiedSidebar library route', () => {
     ]);
     expect(actions.every(action => action.tabIndex >= 0)).toBe(true);
     expect(
-      actions.every(action =>
-        action.classList.contains('focus-visible:shadow-none')
+      actions.every(
+        action =>
+          action.getAttribute('data-focus-treatment') === 'underline-only'
       )
     ).toBe(true);
     expect(

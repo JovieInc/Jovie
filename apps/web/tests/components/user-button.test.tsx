@@ -848,10 +848,10 @@ describe('UserButton billing actions', () => {
       'data-sidebar-identity-action',
       'account-menu'
     );
+    expect(trigger).toHaveAttribute('data-focus-treatment', 'underline-only');
     expect(trigger).toHaveClass(
       'rounded-none',
       'hover:bg-transparent',
-      'focus-visible:shadow-none',
       'focus-visible:[&_[data-user-button-display-name]]:text-primary-token'
     );
     expect(trigger).not.toHaveClass(
