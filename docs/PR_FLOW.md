@@ -236,6 +236,9 @@ existed. Contract:
    stale or duplicate deliveries are rejected.
 4. One remediation writer holds the PR lease. Implementer first.
    FX is the recovery tier after handoff or abandonment.
+   `Rolling CI Dispatch` subscribes to `check_suite`, `workflow_run`, and
+   `check_run` failures and launches Cursor-direct exact-head repair when
+   the implementer lease is not live. It does not check out PR code.
 5. A new commit or green rerun supersedes obsolete repairs.
 6. Moving on requires an explicit handoff receipt (draft PR, current head,
    acceptance criteria, remaining checks, fingerprints, remediation owner).

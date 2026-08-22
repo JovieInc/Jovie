@@ -26,6 +26,7 @@ Scheduled workflows in `.github/workflows/`. Not Vercel crons — these run on G
 | `CI Duration Ratchet` | `25 6 * * *` UTC | Measures rolling p95 of recent PR merge-gate CI runs and fails + Slack-alerts when p95 exceeds the committed baseline + margin. | `.github/workflows/ci-duration-ratchet.yml` |
 | `Merge Queue Ruleset Verify` | `17 6 * * *` UTC | Live GitHub ruleset 10512119 parity (`pnpm ci:merge-queue:verify`). Also runs on `main` pushes to the ruleset/source files. Slack on failure. Not a source-PR or merge-group gate. | `.github/workflows/merge-queue-ruleset-verify.yml` |
 | `Neon Ephemeral Branch Cleanup` | (see workflow) | Reaps Neon branches created by per-PR ephemeral DB tests. | `.github/workflows/neon-ephemeral-branch-cleanup.yml` |
+| `Actions Cache GC` | `53 4 * * *` UTC | Evicts stale/duplicate turbo caches (`Linux-turbo-*`) without deleting live pnpm, node-cache, or playwright caches. GitHub has no cache-size webhook, so a bounded daily sweep is the control plane. Manual dispatch defaults to dry-run. | `.github/workflows/actions-cache-gc.yml` |
 
 ## Local Hermes Launchd Schedule
 

@@ -1,0 +1,70 @@
+name: Actions Cache GC
+
+# Automatic GitHub Actions cache garbage collection. Evicts stale/duplicate
+# turbo caches (Linux-turbo-* and other OS turbo keys) without deleting live
+# pnpm, node-cache, or playwright caches. There is no cache-size webhook, so
+# a bounded daily schedule is the control plane.
+
+on:
+  schedule:
+    - cron: '53 4 * * *'
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Delete planned turbo caches (false = dry-run)'
+        required: false
+        default: 'false'
+
+permissions: {}
+
+concurrency:
+  group: actions-cache-gc
+  cancel-in-progress: false
+
+jobs:
+  gc:
+    name: Evict stale turbo caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Checkout trusted cache GC policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/lib/actions-cache-gc.mjs
+            scripts/actions-cache-gc.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+
+      - name: Plan and optionally apply turbo cache GC
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          APPLY: ${{ github.event_name == 'schedule' || github.event.inputs.apply == 'true' }}
+        run: |
+          set -euo pipefail
+          ARGS=(--repository "$GITHUB_REPOSITORY")
+          if [[ "$APPLY" == "true" ]]; then
+            ARGS+=(--apply)
+          else
+            ARGS+=(--dry-run)
+          fi
+          node scripts/actions-cache-gc.mjs "${ARGS[@]}" | tee "$RUNNER_TEMP/actions-cache-gc.json"
+          {
+            echo "## Actions Cache GC"
+            echo ""
+            echo "- Apply: \`$APPLY\`"
+            echo "- Scanned: $(jq -r '.scanned' "$RUNNER_TEMP/actions-cache-gc.json")"
+            echo "- Turbo: $(jq -r '.turbo' "$RUNNER_TEMP/actions-cache-gc.json")"
+            echo "- Protected pnpm/node/playwright: $(jq -r '.protected' "$RUNNER_TEMP/actions-cache-gc.json")"
+            echo "- Planned deletes: $(jq -r '.deleteCount' "$RUNNER_TEMP/actions-cache-gc.json")"
+          } >> "$GITHUB_STEP_SUMMARY"

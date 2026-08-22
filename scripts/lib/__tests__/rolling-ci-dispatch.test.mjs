@@ -100,7 +100,7 @@ describe('rolling CI failure dispatch', () => {
           trustedPolicyRef: 'feature-branch',
         },
       })
-    ).toThrow('failure source is not an authenticated CI workflow_run');
+    ).toThrow('failure source is not an authenticated CI failure webhook');
     expect(() =>
       event({
         source: {
@@ -108,7 +108,7 @@ describe('rolling CI failure dispatch', () => {
           workflowPath: '.github/workflows/agent-pipeline.yml',
         },
       })
-    ).toThrow('failure source is not an authenticated CI workflow_run');
+    ).toThrow('failure source is not an authenticated CI failure webhook');
   });
 
   it('deliberate red: rejects checks that do not attest the exact head and suite', () => {
@@ -257,21 +257,25 @@ describe('rolling CI dispatch CLI and workflow', () => {
     });
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain(
-      'failure source is not an authenticated CI workflow_run'
+      'failure source is not an authenticated CI failure webhook'
     );
   });
 
   it('uses native workflow_run/check provenance with minimal permissions', () => {
     for (const token of [
       "workflows: ['CI']",
+      'check_suite:',
+      'check_run:',
       "github.event.workflow_run.event == 'pull_request'",
       "github.event.workflow_run.path == '.github/workflows/ci.yml'",
       "github.event.workflow_run.conclusion == 'failure'",
       "github.event.workflow_run.conclusion == 'success'",
+      "github.event.check_suite.app.slug == 'github-actions'",
+      "github.event.check_run.app.slug == 'github-actions'",
       'EVENT_NAME: ${{ github.event_name }}',
-      'WORKFLOW_PATH: ${{ github.event.workflow_run.path }}',
-      'CHECK_SUITE_ID: ${{ github.event.workflow_run.check_suite_id }}',
-      'EXPECTED_HEAD: ${{ github.event.workflow_run.head_sha }}',
+      'WORKFLOW_PATH_EVENT: ${{ github.event.workflow_run.path }}',
+      'CHECK_SUITE_ID_EVENT: ${{ github.event.workflow_run.check_suite_id }}',
+      'EXPECTED_HEAD_EVENT: ${{ github.event.workflow_run.head_sha }}',
       'ref: ${{ github.sha }}',
       'persist-credentials: false',
       'actions: read',
@@ -280,6 +284,9 @@ describe('rolling CI dispatch CLI and workflow', () => {
       'pull-requests: write',
       'GH_TOKEN: ${{ github.token }}',
       'node scripts/rolling-ci-dispatch.mjs',
+      'node scripts/rolling-ci-fx-launch.mjs',
+      'secrets.CURSOR_API_KEY',
+      'scripts/lib/rolling-ci-handoff.mjs',
       'runs-on: ubuntu-latest',
     ]) {
       expect(WORKFLOW, token).toContain(token);
@@ -287,9 +294,83 @@ describe('rolling CI dispatch CLI and workflow', () => {
     expect(WORKFLOW).toMatch(/^permissions: \{\}$/m);
     expect(WORKFLOW).not.toContain('contents: write');
     expect(WORKFLOW).not.toContain('JOVIE_BOT_PRIVATE_KEY');
-    expect(WORKFLOW).not.toContain('scripts/lib/rolling-ci-handoff.mjs');
     expect(WORKFLOW).not.toContain(
       'ref: ${{ github.event.workflow_run.head_sha }}'
     );
+    expect(WORKFLOW).not.toContain('queue-deferred');
+  });
+
+  it('accepts authenticated check_suite and check_run sources for trusted CI', () => {
+    for (const eventName of ['check_suite', 'check_run']) {
+      expect(
+        event({ source: { ...trustedSource, eventName } }).source.eventName
+      ).toBe(eventName);
+    }
+  });
+
+  it('launches FX Cursor-direct when the implementer lease is not live', () => {
+    const result = runDispatch(
+      dispatchInput({
+        branch: 'fallback/jov-5285-fix',
+        fxAdapter: { name: 'fx', authConfigured: true },
+        cursorApiKey: 'cursor-key',
+      })
+    );
+    expect(result.action).toBe('dispatch_implementer');
+    expect(result.state.claim.writer).toBe('fx');
+    expect(result.fx).toMatchObject({
+      action: 'launch',
+      launch: true,
+      request: {
+        source: {
+          repository: 'https://github.com/JovieInc/Jovie',
+          ref: 'fallback/jov-5285-fix',
+        },
+        target: { autoCreatePr: false },
+      },
+    });
+    expect(result.body).toContain('Cursor-direct exact-head repair');
+    expect(result.body).not.toContain('@fx');
+  });
+
+  it('defers FX while an implementer lease is live', () => {
+    const receipt = Buffer.from(
+      JSON.stringify({
+        schema: 'jovie-rolling-ci-handoff/v1',
+        pr: 17,
+        head,
+        status: 'active',
+        leaseExpiresAt: '2099-01-01T00:00:00Z',
+        acceptanceCriteria: ['exact-head green'],
+        remainingChecks: ['ci-fast'],
+        failureFingerprints: ['ci:policy'],
+        remediationOwner: 'tim',
+      })
+    ).toString('base64url');
+    const result = runDispatch(
+      dispatchInput({
+        fxAdapter: { name: 'fx', authConfigured: true },
+        priorHandoffBody: `<!-- jovie-rolling-ci-handoff:${receipt} -->`,
+      })
+    );
+    expect(result.state.claim.writer).toBe('tim');
+    expect(result.fx).toMatchObject({
+      action: 'defer_to_implementer',
+      launch: false,
+    });
+    expect(result.body).toContain('@tim (active implementer)');
+  });
+
+  it('fails closed when FX would launch without Cursor auth', () => {
+    const result = runDispatch(
+      dispatchInput({
+        fxAdapter: { name: 'fx', authConfigured: false },
+      })
+    );
+    expect(result).toMatchObject({
+      action: 'fx_auth_missing',
+      mutate: false,
+      fx: { action: 'fail_closed', launch: false },
+    });
   });
 });

@@ -4,22 +4,41 @@ on:
   workflow_run:
     workflows: ['CI']
     types: [completed]
+  check_suite:
+    types: [completed]
+  check_run:
+    types: [completed]
 
 permissions: {}
 
 concurrency:
-  group: rolling-ci-dispatch-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha }}
+  group: rolling-ci-dispatch-${{ github.event.workflow_run.pull_requests[0].number || github.event.check_run.pull_requests[0].number || github.event.check_suite.pull_requests[0].number || github.event.workflow_run.head_sha || github.event.check_run.head_sha || github.event.check_suite.head_sha }}
   cancel-in-progress: true
 
 jobs:
   dispatch:
     name: Dispatch exact-head CI failure
     if: >-
-      github.event.workflow_run.event == 'pull_request' &&
-      github.event.workflow_run.path == '.github/workflows/ci.yml' &&
-      github.event.workflow_run.conclusion != 'cancelled' &&
-      (github.event.workflow_run.conclusion == 'failure' ||
-      github.event.workflow_run.conclusion == 'success')
+      (
+        github.event_name == 'workflow_run' &&
+        github.event.workflow_run.event == 'pull_request' &&
+        github.event.workflow_run.path == '.github/workflows/ci.yml' &&
+        github.event.workflow_run.conclusion != 'cancelled' &&
+        (github.event.workflow_run.conclusion == 'failure' ||
+        github.event.workflow_run.conclusion == 'success')
+      ) ||
+      (
+        github.event_name == 'check_suite' &&
+        github.event.check_suite.app.slug == 'github-actions' &&
+        github.event.check_suite.conclusion != 'cancelled' &&
+        (github.event.check_suite.conclusion == 'failure' ||
+        github.event.check_suite.conclusion == 'success')
+      ) ||
+      (
+        github.event_name == 'check_run' &&
+        github.event.check_run.app.slug == 'github-actions' &&
+        github.event.check_run.conclusion == 'failure'
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -35,8 +54,11 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             scripts/lib/rolling-ci-dispatch.mjs
+            scripts/lib/rolling-ci-handoff.mjs
+            scripts/lib/rolling-ci-fx.mjs
             scripts/lib/upsert-pr-comment.sh
             scripts/rolling-ci-dispatch.mjs
+            scripts/rolling-ci-fx-launch.mjs
           sparse-checkout-cone-mode: false
 
       - name: Setup Node.js
@@ -48,65 +70,161 @@ jobs:
         id: plan
         env:
           GH_TOKEN: ${{ github.token }}
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
           REPOSITORY: ${{ github.repository }}
           EVENT_NAME: ${{ github.event_name }}
-          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
-          WORKFLOW_PATH: ${{ github.event.workflow_run.path }}
-          PRODUCER_EVENT: ${{ github.event.workflow_run.event }}
           TRUSTED_REF: ${{ github.ref_name }}
-          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
-          EXPECTED_HEAD: ${{ github.event.workflow_run.head_sha }}
-          WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
-          WORKFLOW_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
-          CHECK_SUITE_ID: ${{ github.event.workflow_run.check_suite_id }}
-          PR_NUMBER_EVENT: ${{ github.event.workflow_run.pull_requests[0].number }}
+          WORKFLOW_NAME_EVENT: ${{ github.event.workflow_run.name }}
+          WORKFLOW_PATH_EVENT: ${{ github.event.workflow_run.path }}
+          PRODUCER_EVENT: ${{ github.event.workflow_run.event }}
+          CONCLUSION_EVENT: ${{ github.event.workflow_run.conclusion }}
+          EXPECTED_HEAD_EVENT: ${{ github.event.workflow_run.head_sha }}
+          WORKFLOW_RUN_ID_EVENT: ${{ github.event.workflow_run.id }}
+          WORKFLOW_RUN_ATTEMPT_EVENT: ${{ github.event.workflow_run.run_attempt }}
+          CHECK_SUITE_ID_EVENT: ${{ github.event.workflow_run.check_suite_id }}
+          PR_NUMBER_WORKFLOW: ${{ github.event.workflow_run.pull_requests[0].number }}
+          CHECK_SUITE_CONCLUSION: ${{ github.event.check_suite.conclusion }}
+          CHECK_SUITE_HEAD: ${{ github.event.check_suite.head_sha }}
+          CHECK_SUITE_ID_DIRECT: ${{ github.event.check_suite.id }}
+          PR_NUMBER_SUITE: ${{ github.event.check_suite.pull_requests[0].number }}
+          CHECK_RUN_CONCLUSION: ${{ github.event.check_run.conclusion }}
+          CHECK_RUN_HEAD: ${{ github.event.check_run.head_sha }}
+          CHECK_RUN_SUITE_ID: ${{ github.event.check_run.check_suite.id }}
+          PR_NUMBER_RUN: ${{ github.event.check_run.pull_requests[0].number }}
         run: |
           set -euo pipefail
+
+          WORKFLOW_NAME=""
+          WORKFLOW_PATH=""
+          PRODUCER=""
+          CONCLUSION=""
+          EXPECTED_HEAD=""
+          WORKFLOW_RUN_ID=""
+          WORKFLOW_RUN_ATTEMPT=""
+          CHECK_SUITE_ID=""
+          PR_NUMBER_EVENT=""
+
+          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
+            WORKFLOW_NAME="$WORKFLOW_NAME_EVENT"
+            WORKFLOW_PATH="$WORKFLOW_PATH_EVENT"
+            PRODUCER="$PRODUCER_EVENT"
+            CONCLUSION="$CONCLUSION_EVENT"
+            EXPECTED_HEAD="$EXPECTED_HEAD_EVENT"
+            WORKFLOW_RUN_ID="$WORKFLOW_RUN_ID_EVENT"
+            WORKFLOW_RUN_ATTEMPT="$WORKFLOW_RUN_ATTEMPT_EVENT"
+            CHECK_SUITE_ID="$CHECK_SUITE_ID_EVENT"
+            PR_NUMBER_EVENT="$PR_NUMBER_WORKFLOW"
+          else
+            if [[ "$EVENT_NAME" == "check_suite" ]]; then
+              CONCLUSION="$CHECK_SUITE_CONCLUSION"
+              EXPECTED_HEAD="$CHECK_SUITE_HEAD"
+              CHECK_SUITE_ID="$CHECK_SUITE_ID_DIRECT"
+              PR_NUMBER_EVENT="$PR_NUMBER_SUITE"
+            else
+              CONCLUSION="$CHECK_RUN_CONCLUSION"
+              EXPECTED_HEAD="$CHECK_RUN_HEAD"
+              CHECK_SUITE_ID="$CHECK_RUN_SUITE_ID"
+              PR_NUMBER_EVENT="$PR_NUMBER_RUN"
+            fi
+            CI_RUN=$(gh api "repos/$REPOSITORY/actions/runs?check_suite_id=$CHECK_SUITE_ID&per_page=20" \
+              --jq '[.workflow_runs[] | select(.path == ".github/workflows/ci.yml" and .event == "pull_request")] | first')
+            if [[ -z "$CI_RUN" || "$CI_RUN" == "null" ]]; then
+              echo "Authenticated check event is not the trusted CI pull_request workflow. Skipping."
+              echo "should_record=false" >> "$GITHUB_OUTPUT"
+              echo "should_launch_fx=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            WORKFLOW_NAME=$(jq -r '.name' <<<"$CI_RUN")
+            WORKFLOW_PATH=$(jq -r '.path' <<<"$CI_RUN")
+            PRODUCER=$(jq -r '.event' <<<"$CI_RUN")
+            WORKFLOW_RUN_ID=$(jq -r '.id' <<<"$CI_RUN")
+            WORKFLOW_RUN_ATTEMPT=$(jq -r '.run_attempt // 1' <<<"$CI_RUN")
+            EXPECTED_HEAD=$(jq -r '.head_sha' <<<"$CI_RUN")
+            if [[ "$EVENT_NAME" == "check_run" ]]; then
+              CONCLUSION="failure"
+            else
+              CONCLUSION=$(jq -r '.conclusion // empty' <<<"$CI_RUN")
+              if [[ -z "$CONCLUSION" ]]; then
+                CONCLUSION="$CHECK_SUITE_CONCLUSION"
+              fi
+            fi
+          fi
+
+          if [[ -z "$PR_NUMBER_EVENT" ]]; then
+            PR_NUMBER_EVENT=$(gh api "repos/$REPOSITORY/commits/$EXPECTED_HEAD/pulls" \
+              --jq '[.[] | select(.state == "open" and .head.sha == "'"$EXPECTED_HEAD"'" and (.head.repo.fork // false) == false and .head.repo.full_name == .base.repo.full_name)] | if length == 1 then .[0].number else empty end')
+          fi
+
           if [[ -z "${PR_NUMBER_EVENT:-}" || ! "$CHECK_SUITE_ID" =~ ^[0-9]+$ ]]; then
-            echo "No unique open pull request or authenticated check suite owns this workflow_run head."
+            echo "No unique open pull request or authenticated check suite owns this failure webhook head."
             echo "should_record=false" >> "$GITHUB_OUTPUT"
+            echo "should_launch_fx=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           LIVE_PR=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER_EVENT" \
-            --jq '{head: .head.sha, author: .user.login, state: .state, fork: (.head.repo.fork // false), same_repo: (.head.repo.full_name == .base.repo.full_name)}')
+            --jq '{head: .head.sha, ref: .head.ref, author: .user.login, state: .state, fork: (.head.repo.fork // false), same_repo: (.head.repo.full_name == .base.repo.full_name)}')
           LIVE_HEAD=$(jq -r '.head' <<<"$LIVE_PR")
           LIVE_AUTHOR=$(jq -r '.author' <<<"$LIVE_PR")
+          LIVE_BRANCH=$(jq -r '.ref' <<<"$LIVE_PR")
           if [[ "$(jq -r '.state' <<<"$LIVE_PR")" != "open" || "$LIVE_HEAD" != "$EXPECTED_HEAD" || "$(jq -r '.fork' <<<"$LIVE_PR")" == "true" || "$(jq -r '.same_repo' <<<"$LIVE_PR")" != "true" ]]; then
             echo "Failure event is stale, forked, or no longer open; refusing dispatch."
             echo "should_record=false" >> "$GITHUB_OUTPUT"
+            echo "should_launch_fx=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           FAILED_JOBS=$(gh api "repos/$REPOSITORY/actions/runs/$WORKFLOW_RUN_ID/jobs" \
             --jq '[.jobs[] | select(.conclusion == "failure") | {name: .name, steps: [.steps[]? | select(.conclusion == "failure") | .name]}]')
+          if [[ "$CONCLUSION" != "success" && "$FAILED_JOBS" == "[]" ]]; then
+            echo "No failed CI jobs on this exact head yet. Skipping."
+            echo "should_record=false" >> "$GITHUB_OUTPUT"
+            echo "should_launch_fx=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           CHECKS=$(gh api --paginate "repos/$REPOSITORY/commits/$EXPECTED_HEAD/check-runs" \
             --jq '.check_runs[] | {name: .name, conclusion: .conclusion, headSha: .head_sha, checkSuiteId: .check_suite.id}' \
             | jq -s '.')
           PRIOR_COMMENT=$(gh api "repos/$REPOSITORY/issues/$PR_NUMBER_EVENT/comments" --paginate \
             --jq '[.[] | select(.body | contains("<!-- bot-comment:rolling-ci-dispatch -->"))] | last | .body // ""')
+          PRIOR_HANDOFF=$(gh api "repos/$REPOSITORY/issues/$PR_NUMBER_EVENT/comments" --paginate \
+            --jq '[.[] | select(.body | contains("<!-- jovie-rolling-ci-handoff:"))] | last | .body // ""')
+
+          FX_AUTH=false
+          if [[ -n "${CURSOR_API_KEY:-}" ]]; then
+            FX_AUTH=true
+          fi
 
           jq -n \
             --arg repository "$REPOSITORY" \
             --argjson prNumber "$PR_NUMBER_EVENT" \
             --arg headSha "$EXPECTED_HEAD" \
             --arg liveHead "$LIVE_HEAD" \
+            --arg branch "$LIVE_BRANCH" \
             --arg workflowRunId "$WORKFLOW_RUN_ID" \
             --argjson workflowRunAttempt "$WORKFLOW_RUN_ATTEMPT" \
             --argjson failedJobs "$FAILED_JOBS" \
             --arg writer "$LIVE_AUTHOR" \
             --arg priorCommentBody "$PRIOR_COMMENT" \
+            --arg priorHandoffBody "$PRIOR_HANDOFF" \
             --arg conclusion "$CONCLUSION" \
             --argjson checkSuiteId "$CHECK_SUITE_ID" \
             --argjson checks "$CHECKS" \
             --arg eventName "$EVENT_NAME" \
             --arg workflow "$WORKFLOW_NAME" \
             --arg workflowPath "$WORKFLOW_PATH" \
-            --arg producerEvent "$PRODUCER_EVENT" \
+            --arg producerEvent "$PRODUCER" \
             --arg trustedPolicyRef "$TRUSTED_REF" \
-            '{repository,prNumber,headSha,liveHead,workflowRunId,workflowRunAttempt,failedJobs,writer,priorCommentBody,conclusion,checkSuiteId,checks,source:{eventName:$eventName,workflow:$workflow,workflowPath:$workflowPath,producerEvent:$producerEvent,trustedPolicyRef:$trustedPolicyRef}}' \
+            --argjson fxAuth "$FX_AUTH" \
+            '{repository,prNumber,headSha,liveHead,branch,workflowRunId,workflowRunAttempt,failedJobs,writer,priorCommentBody,priorHandoffBody,conclusion,checkSuiteId,checks,source:{eventName:$eventName,workflow:$workflow,workflowPath:$workflowPath,producerEvent:$producerEvent,trustedPolicyRef:$trustedPolicyRef},fxAdapter:{name:"fx",authConfigured:$fxAuth}}' \
             | node scripts/rolling-ci-dispatch.mjs > "$RUNNER_TEMP/rolling-ci-plan.json"
 
           cat "$RUNNER_TEMP/rolling-ci-plan.json"
+          FX_ACTION=$(jq -r '.fx.action // "skip"' "$RUNNER_TEMP/rolling-ci-plan.json")
+          if [[ "$FX_ACTION" == "fail_closed" ]]; then
+            echo "::error::CURSOR_API_KEY is missing. FX cannot remediate CI failures."
+            exit 1
+          fi
           echo "should_record=$(jq -r '.mutate' "$RUNNER_TEMP/rolling-ci-plan.json")" >> "$GITHUB_OUTPUT"
+          echo "should_launch_fx=$(jq -r '.fx.launch' "$RUNNER_TEMP/rolling-ci-plan.json")" >> "$GITHUB_OUTPUT"
           {
             echo "comment_body<<ROLLING_CI_COMMENT"
             jq -r '.body' "$RUNNER_TEMP/rolling-ci-plan.json"
@@ -118,8 +236,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number || github.event.check_run.pull_requests[0].number || github.event.check_suite.pull_requests[0].number }}
           COMMENT_BODY: ${{ steps.plan.outputs.comment_body }}
         run: |
           set -euo pipefail
+          PR_NUMBER="${PR_NUMBER:-}"
+          if [[ -z "$PR_NUMBER" ]]; then
+            PR_NUMBER=$(jq -r '.events[0].pr // .fx.pr // empty' "$RUNNER_TEMP/rolling-ci-plan.json")
+          fi
           bash scripts/lib/upsert-pr-comment.sh "$PR_NUMBER" "rolling-ci-dispatch" "$COMMENT_BODY"
+
+      - name: Launch FX Cursor-direct exact-head repair
+        if: steps.plan.outputs.should_launch_fx == 'true'
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${CURSOR_API_KEY:-}" ]]; then
+            echo "::error::CURSOR_API_KEY is missing. FX cannot remediate CI failures."
+            exit 1
+          fi
+          node scripts/rolling-ci-fx-launch.mjs "$RUNNER_TEMP/rolling-ci-plan.json"
