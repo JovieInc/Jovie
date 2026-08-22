@@ -240,23 +240,43 @@ export function planFailureDispatch({
     check: event.check,
     fingerprint: event.fingerprint,
     deliveryCount: 0,
+    status: 'active',
   };
+  if (priorFailure.status === 'terminal') {
+    return {
+      action: 'deduplicate_terminal_incident',
+      mutate: false,
+      dispatch: false,
+      state,
+      incident: priorFailure.incident,
+    };
+  }
   if (priorFailure.deliveryCount >= maxNonProgressDeliveries) {
+    const incident = {
+      type: 'non_progressing_failure_dispatch',
+      repository: event.repository,
+      pr: event.pr,
+      head: event.head,
+      check: event.check,
+      fingerprint: event.fingerprint,
+      attempts: priorFailure.deliveryCount,
+      remedy:
+        'classify the execution path or repair the runner/policy; do not loosen a product gate',
+    };
+    state.deliveries.push(event.deliveryKey);
+    state.failures[event.failureKey] = {
+      ...priorFailure,
+      status: 'terminal',
+      lastAttempt: event.attempt,
+      lastWorkflowRunId: event.workflowRunId,
+      incident,
+    };
     return {
       action: 'terminal_configuration_incident',
-      mutate: false,
+      mutate: true,
+      dispatch: false,
       state,
-      incident: {
-        type: 'non_progressing_failure_dispatch',
-        repository: event.repository,
-        pr: event.pr,
-        head: event.head,
-        check: event.check,
-        fingerprint: event.fingerprint,
-        attempts: priorFailure.deliveryCount,
-        remedy:
-          'classify the execution path or repair the runner/policy; do not loosen a product gate',
-      },
+      incident,
     };
   }
 
@@ -265,6 +285,7 @@ export function planFailureDispatch({
     check: event.check,
     fingerprint: event.fingerprint,
     deliveryCount: priorFailure.deliveryCount + 1,
+    status: 'active',
     lastAttempt: event.attempt,
     lastWorkflowRunId: event.workflowRunId,
   };
@@ -274,6 +295,7 @@ export function planFailureDispatch({
       ? 'dispatch_superseding_head'
       : 'dispatch_exact_head_failure',
     mutate: true,
+    dispatch: true,
     state,
   };
 }

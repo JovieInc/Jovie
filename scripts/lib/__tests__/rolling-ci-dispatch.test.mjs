@@ -152,11 +152,23 @@ describe('rolling CI dispatch idempotency and supersession', () => {
     });
     expect(blocked).toMatchObject({
       action: 'terminal_configuration_incident',
-      mutate: false,
+      mutate: true,
+      dispatch: false,
       incident: {
         type: 'non_progressing_failure_dispatch',
         attempts: MAX_NON_PROGRESS_DELIVERIES,
       },
+    });
+
+    const duplicateIncident = planFailureDispatch({
+      event: failure({ workflowRunId: 9011, workflowRunAttempt: 5 }),
+      liveHead: head,
+      priorState: blocked.state,
+    });
+    expect(duplicateIncident).toMatchObject({
+      action: 'deduplicate_terminal_incident',
+      mutate: false,
+      dispatch: false,
     });
   });
 
