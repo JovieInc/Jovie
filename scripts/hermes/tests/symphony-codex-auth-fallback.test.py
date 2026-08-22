@@ -2898,12 +2898,21 @@ class FallbackLockGcTests(unittest.TestCase):
             ),
             "open_pr_inflight",
         )
+        self.assertIsNone(
+            self.module.pickup_refuse_reason(
+                "JOV-5257",
+                issue={"state": {"name": "In Review"}},
+                pr_verdict="none",
+                held=False,
+            )
+        )
         self.assertEqual(
             self.module.pickup_refuse_reason(
                 "JOV-5257",
                 issue={"state": {"name": "In Review"}},
                 pr_verdict="none",
                 held=False,
+                codex_writer=True,
             ),
             "issue_in_review",
         )

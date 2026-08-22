@@ -1441,8 +1441,13 @@ def pickup_refuse_reason(
     issue: dict | None,
     pr_verdict: str,
     held: bool | None,
+    codex_writer: bool = False,
 ) -> str | None:
-    """Typed reason to refuse a new writer. None means the issue may start."""
+    """Typed reason to refuse a new writer. None means the issue may start.
+
+    Codex is never a second writer on In Review (lease-guard + router). The
+    sidecar may continue an In Review remount or receipt-less claimed head.
+    """
     if not IDENTIFIER.fullmatch(identifier):
         return "malformed_identifier"
     if pr_verdict == "skip":
@@ -1456,12 +1461,12 @@ def pickup_refuse_reason(
             "cancelled": "issue_canceled",
             "duplicate": "issue_duplicate",
         }[state]
-    if state == "in review" and pr_verdict != "remount":
-        return "issue_in_review"
     if held is True:
         return "fallback_lease_held"
     if held is None:
         return "lock_gc_unverifiable"
+    if state == "in review" and (codex_writer or pr_verdict == "skip"):
+        return "issue_in_review"
     return None
 
 
@@ -1480,7 +1485,9 @@ def pickup_check_command(identifier: str) -> int:
     verdict, _pr = _open_pr_verdict(identifier, open_prs)
     lock_path = _fallback_lease_dir() / f"{identifier}.lock"
     held = _lock_held(lock_path) if lock_path.is_file() else False
-    reason = pickup_refuse_reason(identifier, issue=issue, pr_verdict=verdict, held=held)
+    reason = pickup_refuse_reason(
+        identifier, issue=issue, pr_verdict=verdict, held=held, codex_writer=True
+    )
     lock_count = _fallback_lock_count()
     if reason is not None:
         _emit_pickup(
@@ -1552,7 +1559,13 @@ def _launch_fallback_workers(
             identifier, issue=issue, pr_verdict=verdict, held=held
         )
         if refuse is not None:
-            if next_eligible == "" and refuse not in {"open_pr_inflight", "issue_in_review", "issue_done", "issue_canceled", "issue_duplicate"}:
+            if next_eligible == "" and refuse not in {
+                "open_pr_inflight",
+                "issue_in_review",
+                "issue_done",
+                "issue_canceled",
+                "issue_duplicate",
+            }:
                 next_eligible = identifier
             _emit_pickup(
                 "refuse",
@@ -1561,7 +1574,12 @@ def _launch_fallback_workers(
                 lock_count=lock_count,
                 next_issue=next_eligible,
             )
-            print(f"fallback skip {identifier} {refuse}", file=sys.stderr, flush=True)
+            skip_label = (
+                "not admitted"
+                if refuse in {"not_admitted", "blocked", "state_not_admitted"}
+                else refuse
+            )
+            print(f"fallback skip {identifier} {skip_label}", file=sys.stderr, flush=True)
             continue
         if issue is None:
             _emit_pickup(
@@ -1587,7 +1605,12 @@ def _launch_fallback_workers(
                 lock_count=lock_count,
                 next_issue=next_eligible,
             )
-            print(f"fallback skip {identifier} {reason}", file=sys.stderr, flush=True)
+            skip_label = (
+                "not admitted"
+                if reason in {"not_admitted", "blocked", "state_not_admitted"}
+                else reason
+            )
+            print(f"fallback skip {identifier} {skip_label}", file=sys.stderr, flush=True)
             continue
         command = _grok_command(
             identifier,
