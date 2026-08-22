@@ -41,7 +41,7 @@ Registry status is singular and machine-recomputed: `metadataStatus` on each reg
 ## Tool Versions
 
 ```bash
-node --version   # MUST be 22.x (22.13+)
+node --version   # MUST be 22.x (22.23.1+ — matches engines in package.json and .nvmrc)
 pnpm --version   # MUST be 9.15.4
 ```
 
@@ -89,7 +89,7 @@ Skip issues labeled `human-review-required` or containing "This issue requires h
 
 ## Scoped Rules
 
-Read the relevant `.claude/rules/*` file before touching that area: environment, auth, db, ui, security, release, ci-branching, testing, infra, ios, code-style, linear, gstack, swarm, hermes-air, pen.
+Read the relevant `.claude/rules/*` file before touching that area: environment, auth, db, ui, motion, security, release, pr-stacking, ci-branching, testing, infra, ios, code-style, linear, gstack, swarm, hermes-air, pen.
 
 ## Skill Routing
 
@@ -103,6 +103,8 @@ Match a skill → invoke it first. Full routing table: [`.claude/rules/gstack.md
 | `DESIGN.md` | Operational design-system execution |
 | `docs/design-system/GOVERNANCE.md` | Design drift audit, standing initiative |
 | `docs/PR_FLOW.md` | Shipping, CI tiers, taste gate |
+| `.github/MERGE_QUEUE.md` | How PRs actually land: native merge queue semantics, `merge-queue` label is intent/audit evidence — never queue truth |
+| `.github/BRANCH_PROTECTION.md` | Which status checks are required (PR Ready, Migration Guard, Fork PR Gate, PR Size Guard) |
 | `docs/marketing/AGENT_GUIDE.md` | Generating or editing any marketing/landing page |
 | `docs/AI_AGENT_GUIDE.md` | API routes, cron, webhooks inventory |
 | `docs/company/operating-principles.md` | Product prioritization canon |

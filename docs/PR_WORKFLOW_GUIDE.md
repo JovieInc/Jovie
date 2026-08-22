@@ -9,7 +9,7 @@ Todo → [agent: In Progress] → [PR opened: In Review] → [PR merged: Done]
          ^ manual              ^ auto (orchestrator)    ^ auto (sync-on-merge)
 ```
 
-- **In Progress** — the agent marks the issue before editing files. Dispatched work (via `linear-ai-orchestrator.yml`) sets this automatically; ad-hoc work is the agent's responsibility. See `AGENTS.md` → "Linear Ownership Contract".
+- **In Progress** — the agent marks the issue before editing files. Dispatched work (via `linear-ai-orchestrator.yml`) sets this automatically; ad-hoc work is the agent's responsibility. See `.claude/rules/linear.md` → "Linear Ownership Contract".
 - **In Review** — `.github/workflows/linear-ai-orchestrator.yml` (`sync_linear_in_review` job) sets this when the PR is opened.
 - **Done** — `.github/workflows/linear-sync-on-merge.yml` sets this when the PR merges.
 
