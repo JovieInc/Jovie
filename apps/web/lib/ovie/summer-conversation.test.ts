@@ -9,7 +9,10 @@ import {
   enqueueOvieSummerTurn,
   OvieSummerTurnError,
 } from '@/lib/ovie/summer-conversation';
-import { respondToOvieSummerAction } from '@/lib/ovie/summer-http';
+import {
+  respondToOvieSummerAction,
+  respondToOvieSummerPending,
+} from '@/lib/ovie/summer-http';
 import { createCurrentSummerQueueSpeaker } from '@/lib/ovie/summer-queue-speaker';
 import { resetSummerTransportRuntime } from '@/lib/ovie/summer-transport';
 
@@ -119,6 +122,38 @@ describe('Ovie Summer conversation handoff', () => {
     ]);
     await expect(store.getSummerTurn('turn_live')).resolves.toMatchObject({
       tool: { receiptId: 'tool_ok_1' },
+    });
+  });
+
+  it('keeps the Mac lander founder-gated and lists Eve-bound pending turns', async () => {
+    const store = new DurableOperatingStore(memoryRecordBackend());
+    await enqueueOvieSummerTurn(store, {
+      id: 'turn_pending',
+      userText: 'Status?',
+      receipts: [
+        {
+          text: 'x',
+          lane: 'heavy',
+          destination: 'kanban',
+          ack: 'stored',
+          destinationHandle: null,
+          workerSpawned: false,
+          workId: 'ini_work_pending',
+        },
+      ],
+    });
+    const guest = { authenticated: false, isAdmin: false, scopes: [] as const };
+    expect(
+      (await respondToOvieSummerPending({ principal: guest, store })).status
+    ).toBe(401);
+    const listed = await respondToOvieSummerPending({
+      principal: founder,
+      store,
+    });
+    expect(listed.status).toBe(200);
+    await expect(listed.json()).resolves.toMatchObject({
+      ok: true,
+      turns: [{ id: 'turn_pending', eve_work_id: 'ini_work_pending' }],
     });
   });
 });
