@@ -494,6 +494,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/automation-verify.test.mjs',
         'scripts/lib/__tests__/pr-visual-review.test.mjs',
         'scripts/lib/__tests__/ci-harness.test.mjs',
+        'scripts/lib/__tests__/changed-test-coverage.test.mjs',
         'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
         'scripts/lib/__tests__/ci-branching-guard.test.mjs',
         'scripts/lib/__tests__/merge-queue-guard.test.mjs',

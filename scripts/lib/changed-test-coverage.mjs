@@ -8,7 +8,7 @@ export const MIN_CHANGED_LINE_COVERAGE = 60;
 
 const SOURCE_PATH = /^apps\/web\/.*\.(?:[cm]?[jt]sx?)$/;
 const EXCLUDED_SOURCE_PATH =
-  /(?:^|\/)(?:__tests__|__mocks__|tests)(?:\/|$)|\.(?:test|spec)\.[cm]?[jt]sx?$|\.d\.ts$|\.config\.[cm]?[jt]s$|(?:^|\/)types?(?:\/|\.[cm]?ts$)|(?:^|\/)(?:layout|loading|not-found)\.tsx$/;
+  /(?:^|\/)(?:__tests__|__mocks__|tests)(?:\/|$)|\.(?:test|spec)\.[cm]?[jt]sx?$|\.d\.ts$|\.config(?:\.[^./]+)*\.[cm]?[jt]s$|(?:^|\/)types?(?:\/|\.[cm]?ts$)|(?:^|\/)(?:layout|loading|not-found)\.tsx$/;
 
 export function isCoverageSourcePath(path) {
   return SOURCE_PATH.test(path) && !EXCLUDED_SOURCE_PATH.test(path);
