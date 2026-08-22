@@ -237,6 +237,10 @@ existed. Contract:
    queue repeats it on the synthetic combined head. Non-web heads emit an
    explicit non-applicable receipt. Nightly retains the global risk-surface
    debt check, so stale unrelated debt cannot deadlock promotion.
+   Regression receipt: source run 32547855063 spent 3180.55 seconds collecting
+   V8 coverage before a static coverage-ownership assertion failed. That exact
+   assertion now runs in the cheap structural selector; expensive coverage is
+   reserved for diffs that can affect web runtime or its coverage substrate.
 3. Normalize failures (PR, exact head, check, attempt, fingerprint);
    stale or duplicate deliveries are rejected.
 4. One remediation writer holds the PR lease. Implementer first.

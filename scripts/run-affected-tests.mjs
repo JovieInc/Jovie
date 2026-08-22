@@ -220,6 +220,12 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/agent-qc-wires.test.mjs',
   'scripts/lib/__tests__/needs-human-autoclose.test.mjs',
 ];
+// Run 32547855063 spent 3180.55s collecting V8 coverage before this static
+// ownership contract failed. Keep it in the cheap structural selector so
+// coverage-lane drift fails before an expensive changed-surface collection.
+const CI_CONTROL_WEB_TESTS = [
+  'apps/web/tests/unit/ci/test-coverage-audit-workflow.test.ts',
+];
 const MERGE_QUEUE_CONTROLLER_INPUTS = new Set([
   '.github/workflows/merge-queue-autoenroll.yml',
   'docs/PR_FLOW.md',
@@ -1642,15 +1648,41 @@ export function buildFullSuiteCommands(maxWorkers, shardCount = 8) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   if (args.includes('--control')) {
-    await runCommand('pnpm', [
-      'exec',
-      'vitest',
-      '--root',
-      'scripts',
-      ...['--config', 'vitest.config.mts'],
-      'run',
-      ...CI_CONTROL_SCRIPT_TESTS.map(file => file.replace(/^scripts\//, '')),
-    ]);
+    await runCommands(
+      [
+        [
+          'pnpm',
+          [
+            'exec',
+            'vitest',
+            '--root',
+            'scripts',
+            ...['--config', 'vitest.config.mts'],
+            'run',
+            ...CI_CONTROL_SCRIPT_TESTS.map(file =>
+              file.replace(/^scripts\//, '')
+            ),
+          ],
+        ],
+        [
+          'pnpm',
+          [
+            '--filter',
+            '@jovie/web',
+            'exec',
+            'vitest',
+            'run',
+            ...CI_CONTROL_WEB_TESTS.map(file =>
+              file.replace(/^apps\/web\//, '')
+            ),
+            '--maxWorkers',
+            '1',
+          ],
+        ],
+      ],
+      1,
+      { labelPrefix: 'ci-control' }
+    );
   }
   const base = argValue(args, '--base', 'origin/main');
   const maxWorkers = argValue(args, '--max-workers', '2');

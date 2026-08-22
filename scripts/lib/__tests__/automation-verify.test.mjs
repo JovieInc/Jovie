@@ -482,6 +482,14 @@ describe('automation-verify affected scope', () => {
     expect(script).not.toContain('turbo-local.mjs test --affected');
   });
 
+  it('runs the coverage ownership contract before expensive V8 collection', () => {
+    expect(runner).toContain('CI_CONTROL_WEB_TESTS');
+    expect(runner).toContain(
+      'apps/web/tests/unit/ci/test-coverage-audit-workflow.test.ts'
+    );
+    expect(runner).toContain('...CI_CONTROL_WEB_TESTS.map');
+  });
+
   it('routes the exact JOV-5006 ops diff to focused infrastructure contracts', () => {
     const plan = buildAffectedTestPlan(EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST);
 
