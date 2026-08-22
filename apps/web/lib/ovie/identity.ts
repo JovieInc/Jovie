@@ -9,6 +9,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { assertModelMustNotSelfIdentifyAsOvie } from '@/lib/ovie/program';
 
 export type EveIdentityId = 'jovie' | 'ovie';
 
@@ -157,7 +158,8 @@ export function applyEveIdentityToSystemPrompt(
   const identityBlock =
     instructions.length > 0
       ? instructions
-      : 'You are Ovie, the founder door. You are not Jovie.';
+      : 'Eve on the Ovie door. Ingest and ack. Do not self-identify as Ovie. Do not answer as Summer.';
+  assertModelMustNotSelfIdentifyAsOvie(identityBlock);
   return `${identityBlock}\n\nThe following artist-product context is available when you drive Jovie tools. Do not identify as Jovie.\n\n${systemPrompt}`;
 }
 

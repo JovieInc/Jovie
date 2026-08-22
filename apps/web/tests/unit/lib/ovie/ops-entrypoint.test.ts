@@ -7,6 +7,7 @@ import {
   OVIE_OPS_PRODUCT_NAME,
   OVIE_OPS_ROUTE,
   OVIE_PACKAGED_DEFAULT_ROUTE,
+  OVIE_PACKAGED_TALK_ROUTE,
   ovieOpsFullscreenHref,
   ovieOpsKioskHref,
 } from '@/lib/ovie/ops-entrypoint';
@@ -18,6 +19,8 @@ describe('Ovie Ops packaged-app entry contract', () => {
     expect(OVIE_OPS_COMPONENT).toBe('HudDashboardClient');
     expect(OVIE_PACKAGED_DEFAULT_ROUTE).toBe(APP_ROUTES.HUD);
     expect(OVIE_OPS_ENTRY.packagedDefaultRoute).toBe('/hud');
+    expect(OVIE_PACKAGED_TALK_ROUTE).toBe(APP_ROUTES.ADMIN_CHAT);
+    expect(OVIE_OPS_ENTRY.packagedTalkRoute).toBe('/app/ov/chat');
   });
 
   it('keeps fullscreen and kiosk as presentation inputs, not products', () => {

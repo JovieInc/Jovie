@@ -20,13 +20,18 @@ import {
 import { applyOvieDumpBeforeModel } from '@/lib/ovie/persist';
 import {
   type OvieDoorGeneration,
+  type ResolveOvieDoorGenerationOptions,
   resolveOvieDoorGeneration,
 } from '@/lib/ovie/summer-transport';
 
 export async function prepareOvieChatTurn(
   chatMode: 'ov' | null | undefined,
   userText: string | null,
-  options?: { readonly spawn?: SpawnFn; readonly store?: OperatingStore }
+  options?: {
+    readonly spawn?: SpawnFn;
+    readonly store?: OperatingStore;
+    readonly summer?: ResolveOvieDoorGenerationOptions;
+  }
 ): Promise<{
   readonly eveTurn: EveBoundTurn;
   readonly receipts: OvieReceipt[];
@@ -34,15 +39,16 @@ export async function prepareOvieChatTurn(
 }> {
   const eveTurn = bindEveIdentityForChatMode(chatMode);
   assertEveChatFactoryLock(eveTurn);
+  const store = options?.store ?? getDefaultOperatingStore();
   const receipts = eveTurn.pack.canIngestAck
     ? await applyOvieDumpBeforeModel(userText, {
         spawn: options?.spawn,
-        store: options?.store ?? getDefaultOperatingStore(),
+        store,
       })
     : [];
   return {
     eveTurn,
     receipts,
-    generation: resolveOvieDoorGeneration(chatMode, receipts),
+    generation: resolveOvieDoorGeneration(chatMode, receipts, options?.summer),
   };
 }

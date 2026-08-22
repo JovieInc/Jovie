@@ -1,7 +1,20 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import type { ChatAccountContext } from '@/lib/chat/account-context';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { MemoryOperatingStore } from '@/lib/ovie/mcp/store';
+import {
+  bindCurrentSummerSpeaker,
+  resetSummerTransportRuntime,
+  type SummerSpeaker,
+} from '@/lib/ovie/summer-transport';
 
 const hoisted = vi.hoisted(() => ({
   tryHandleAnonymousOnboardingChatMock: vi.fn(),
@@ -351,6 +364,10 @@ describe('POST /api/chat guard wiring', () => {
     );
   });
 
+  afterEach(() => {
+    resetSummerTransportRuntime();
+  });
+
   it('returns 401 for unauthenticated requests without touching billing, rate limits, or the LLM', async () => {
     hoisted.getOptionalAuthMock.mockResolvedValue({ userId: null });
 
@@ -493,11 +510,53 @@ describe('POST /api/chat guard wiring', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('x-ovie-door')).toBe('1');
     expect(response.headers.get('x-ovie-summer-state')).toBe('unavailable');
+    expect(response.headers.get('x-ovie-summer-speaker')).toBeNull();
     expect(response.headers.get('x-ovie-m1')).toBe('not-passed');
     const body = await response.text();
     expect(body).toMatch(/unavailable/i);
     expect(body.toLowerCase()).not.toMatch(/i am ovie/);
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
     expect(hoisted.checkAiChatRateLimitForPlanMock).not.toHaveBeenCalled();
+  });
+
+  it('streams bound current Summer on OV turns without artist Jovie generation', async () => {
+    hoisted.isAdminMock.mockResolvedValue(true);
+    const speaker: SummerSpeaker = {
+      id: 'summer',
+      runtime: 'mac',
+      async *speak() {
+        yield { type: 'text-delta', text: 'Summer current session.' };
+      },
+    };
+    bindCurrentSummerSpeaker(speaker);
+
+    const response = await POST(
+      chatRequest(
+        validBody({
+          chatMode: 'ov',
+          clientTurnId: 'ov-turn-1',
+          messages: [
+            {
+              id: 'm1',
+              role: 'user',
+              parts: [{ type: 'text', text: 'status of the kanban' }],
+            },
+          ],
+        })
+      )
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-ovie-door')).toBe('1');
+    expect(response.headers.get('x-ovie-summer-state')).toBe('fresh');
+    expect(response.headers.get('x-ovie-summer-speaker')).toBe('summer');
+    expect(response.headers.get('x-ovie-summer-session')).toBe(
+      'summer-session:current'
+    );
+    const body = await response.text();
+    expect(body).toContain('Summer current session.');
+    expect(body.toLowerCase()).not.toMatch(/i am ovie/);
+    expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+    expect(hoisted.reserveChatTurnMock).not.toHaveBeenCalled();
   });
 });

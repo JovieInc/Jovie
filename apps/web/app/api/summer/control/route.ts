@@ -11,9 +11,20 @@ import {
   getPromotedDumpAckSnapshot,
   type PromotedDumpAckInput,
 } from '@/lib/ovie/promoted-workflows';
+import {
+  disableSummerTransport,
+  enableSummerTransport,
+  isSummerTransportEnabled,
+} from '@/lib/ovie/summer-transport';
 
 type SummerControlBody = {
-  readonly action?: 'status' | 'disable' | 'enable' | 'execute';
+  readonly action?:
+    | 'status'
+    | 'disable'
+    | 'enable'
+    | 'execute'
+    | 'disable-transport'
+    | 'enable-transport';
   readonly workId?: string;
   readonly items?: readonly string[];
   readonly sequence?: number;
@@ -37,6 +48,10 @@ export function respondToSummerControl(
     disablePromotedDumpAck();
   } else if (action === 'enable') {
     enablePromotedDumpAck();
+  } else if (action === 'disable-transport') {
+    disableSummerTransport();
+  } else if (action === 'enable-transport') {
+    enableSummerTransport();
   } else if (action === 'execute') {
     if (typeof body?.workId !== 'string' || !Array.isArray(body.items)) {
       return NextResponse.json({ ok: false }, { status: 400 });
@@ -54,6 +69,7 @@ export function respondToSummerControl(
         customerFacingRequiresEvalGreen: true,
         lybHealthNeverEntersJovieOrOvieMemory: true,
         promotedWorkflow: getPromotedDumpAckSnapshot(),
+        summerTransportEnabled: isSummerTransportEnabled(),
         receipt,
       });
     } catch {
@@ -69,6 +85,7 @@ export function respondToSummerControl(
     customerFacingRequiresEvalGreen: true,
     lybHealthNeverEntersJovieOrOvieMemory: true,
     promotedWorkflow: getPromotedDumpAckSnapshot(),
+    summerTransportEnabled: isSummerTransportEnabled(),
   });
 }
 

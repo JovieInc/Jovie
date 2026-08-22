@@ -38,6 +38,7 @@ export const OVIE_OPS_COMPAT_ALIASES = {
 } as const;
 
 export const OVIE_PACKAGED_DEFAULT_ROUTE = APP_ROUTES.HUD;
+export const OVIE_PACKAGED_TALK_ROUTE = APP_ROUTES.ADMIN_CHAT;
 
 export const OVIE_OPS_ENTRY = {
   productName: OVIE_OPS_PRODUCT_NAME,
@@ -46,6 +47,7 @@ export const OVIE_OPS_ENTRY = {
   presentations: OVIE_OPS_PRESENTATIONS,
   aliases: OVIE_OPS_COMPAT_ALIASES,
   packagedDefaultRoute: OVIE_PACKAGED_DEFAULT_ROUTE,
+  packagedTalkRoute: OVIE_PACKAGED_TALK_ROUTE,
 } as const;
 
 export function ovieOpsFullscreenHref(): string {

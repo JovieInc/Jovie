@@ -448,22 +448,19 @@ describe('executeChatTurn — parity assertions', () => {
     expect(ctx.extra.conversationId).toBe('conv-1');
   });
 
-  it('applies Ovie identity instructions so self-id follows the selected pack', async () => {
-    const turn = await executeChatTurn({
-      ...baseInput,
-      uiMessages: [userMessage('hello')],
-      planLimits: paidPlanLimits,
-      identity: {
-        id: 'ovie',
-        instructions: "You are Ovie, Tim's only talk door.",
-      },
-    });
-
-    expect(
-      turn.systemPrompt.startsWith("You are Ovie, Tim's only talk door.")
-    ).toBe(true);
-    expect(turn.systemPrompt).toContain('Do not identify as Jovie.');
-    expect(turn.systemPrompt).toContain('Aurora');
+  it('refuses to run the artist Jovie turn on the Ovie door', async () => {
+    await expect(
+      executeChatTurn({
+        ...baseInput,
+        uiMessages: [userMessage('hello')],
+        planLimits: paidPlanLimits,
+        identity: {
+          id: 'ovie',
+          instructions:
+            'Eve on the Ovie door. Ingest and ack. Do not self-identify as Ovie.',
+        },
+      })
+    ).rejects.toThrow(/cannot execute the artist Jovie turn/);
   });
 
   it('keeps Jovie self-id when the jovie pack is bound', async () => {

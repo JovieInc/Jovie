@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Mac Ovie door talks to the current Summer through Eve (JOV-5212):** entitled OV turns persist Eve receipts, bind the current Mac Summer session, and stream Summer only. Missing transport stays explicit unavailable with no Jovie, Eve, Ovie-persona, or mock fallback. Operator memory and tools stay isolated from customer Jovie.
+
 - [internal] **Spotify credit bounding no longer files Linear as `Error: {"source":"spotify_release_credit",...}` (JOV-5263):** catalogs larger than the per-run cap retry on the next import or backfill. Context-only `captureWarning` bags stay on extra, not the Sentry title.
 
 - [internal] **Fan email cannot invent metrics or auto-send (JOV-5261):** `fan_email_send` drafts or queues for approval, skips unknown/empty lists, omits unverifiable ESP numbers, and never sends without a human.

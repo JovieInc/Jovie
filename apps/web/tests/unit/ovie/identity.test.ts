@@ -81,12 +81,17 @@ describe('Eve identity packs (JOV-5216)', () => {
     ).toBe('jovie');
   });
 
-  it('prepends Ovie self-id and does not leave Jovie copy in charge of the door', () => {
+  it('prepends Eve-on-door instructions and does not leave Jovie copy in charge of the door', () => {
     const prompt = applyEveIdentityToSystemPrompt(
       'You are Jovie, an AI music career assistant.',
-      { id: 'ovie', instructions: "You are Ovie, Tim's only talk door." }
+      {
+        id: 'ovie',
+        instructions:
+          'Eve on the Ovie door. Ingest and ack. Do not self-identify as Ovie.',
+      }
     );
-    expect(prompt.startsWith("You are Ovie, Tim's only talk door.")).toBe(true);
+    expect(prompt.startsWith('Eve on the Ovie door.')).toBe(true);
+    expect(prompt.toLowerCase()).not.toMatch(/i am ovie|you are ovie/);
     expect(prompt).toContain('Do not identify as Jovie.');
     expect(
       applyEveIdentityToSystemPrompt('You are Jovie.', {
@@ -94,5 +99,11 @@ describe('Eve identity packs (JOV-5216)', () => {
         instructions: 'You are Jovie, the artist-facing product agent.',
       })
     ).toBe('You are Jovie.');
+    const fallback = applyEveIdentityToSystemPrompt('You are Jovie.', {
+      id: 'ovie',
+      instructions: '',
+    });
+    expect(fallback.toLowerCase()).not.toMatch(/you are ovie/);
+    expect(fallback).toMatch(/ingest and ack/i);
   });
 });

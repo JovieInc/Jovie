@@ -155,6 +155,12 @@ import {
   assertOvieDoorDoesNotUseArtistJovieGeneration,
   OVIE_PROGRAM,
 } from '@/lib/ovie/program';
+import { createSummerAssistantStreamResponse } from '@/lib/ovie/summer-stream';
+import {
+  getBoundSummerSpeaker,
+  isSummerTransportEnabled,
+  runOvieSummerTurn,
+} from '@/lib/ovie/summer-transport';
 import {
   albumArtGenerationBurstLimiter,
   albumArtGenerationLimiter,
@@ -2494,7 +2500,7 @@ export async function POST(req: Request) {
     turnId: string;
   } | null = null;
 
-  if (clientTurnId) {
+  if (clientTurnId && chatMode !== 'ov') {
     if (!resolvedProfileId) {
       return NextResponse.json(
         {
@@ -2721,16 +2727,53 @@ export async function POST(req: Request) {
   }
 
   if (generation.kind === 'summer-transport') {
-    const replyText = generation.text;
-    assertModelMustNotSelfIdentifyAsOvie(replyText);
-    if (reservedTurn) {
-      await persistTerminalAssistantMessage({
-        conversationId: reservedTurn.conversationId,
-        turnId: reservedTurn.turnId,
-        status: 'completed',
-        content: replyText,
+    const ingestMeta = ovieIngestReceipts.map(receipt => ({
+      lane: receipt.lane,
+      destination: receipt.destination,
+      ack: receipt.ack,
+    }));
+    const speaker = getBoundSummerSpeaker();
+    const summerSession = generation.session;
+    const summerLive =
+      summerSession !== null &&
+      generation.state === 'fresh' &&
+      isSummerTransportEnabled() &&
+      speaker !== null;
+    if (summerLive && speaker && summerSession) {
+      const firstReceipt = ovieIngestReceipts[0];
+      return createSummerAssistantStreamResponse({
+        events: runOvieSummerTurn({
+          receipts: ovieIngestReceipts,
+          userText: userText || '',
+          speaker,
+          store: getOvieOperatingStore(),
+          signal: req.signal,
+          clientTurnId,
+        }),
+        requestId,
+        corsHeaders,
+        headers: {
+          'x-ovie-door': '1',
+          'x-ovie-summer-state': generation.state,
+          'x-ovie-summer-speaker': 'summer',
+          'x-ovie-summer-session': summerSession.sessionId,
+          'x-ovie-m1': OVIE_PROGRAM.m1Status,
+          ...(firstReceipt?.workId
+            ? { 'x-ovie-eve-work-id': firstReceipt.workId }
+            : {}),
+        },
+        metadata: {
+          requestId,
+          chatMode: 'ov',
+          eveIdentity: eveTurn.pack.id,
+          ovieIngest: ingestMeta,
+          summerSpeaker: 'summer',
+          summerSession: summerSession.sessionId,
+        },
       });
     }
+    const replyText = generation.text;
+    assertModelMustNotSelfIdentifyAsOvie(replyText);
     return createAssistantTextStreamResponse({
       text: replyText,
       requestId,
@@ -2739,27 +2782,13 @@ export async function POST(req: Request) {
         'x-ovie-door': '1',
         'x-ovie-summer-state': generation.state,
         'x-ovie-m1': OVIE_PROGRAM.m1Status,
-        ...(reservedTurn
-          ? {
-              'x-conversation-id': reservedTurn.conversationId,
-              'x-chat-turn-id': reservedTurn.turnId,
-            }
-          : {}),
       },
-      metadata: reservedTurn
-        ? buildChatTurnMetadata({
-            conversationId: reservedTurn.conversationId,
-            turnId: reservedTurn.turnId,
-            requestId,
-            chatMode: 'ov',
-            eveIdentity: eveTurn.pack.id,
-            ovieIngest: ovieIngestReceipts.map(receipt => ({
-              lane: receipt.lane,
-              destination: receipt.destination,
-              ack: receipt.ack,
-            })),
-          })
-        : undefined,
+      metadata: {
+        requestId,
+        chatMode: 'ov',
+        eveIdentity: eveTurn.pack.id,
+        ovieIngest: ingestMeta,
+      },
     });
   }
 
