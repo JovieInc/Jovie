@@ -9,6 +9,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - **Homepage conversion is one Get started pill:** the root homepage now has a single 32px Satoshi 14/510 Get started action, text-only Log in in the nav, and the product shot uses the live `jov.ie/calvinharris/im-not-alone-remixes` URL.
 
+- [internal] **Jovie, Symphony, and Summer/ops CI lanes no longer block each other (JOV-5288):** this repo's required checks stay the Jovie aggregates. Exclusive Symphony/control-plane or Summer/ops diffs skip Jovie app unit/build/typecheck suites; exclusive product diffs skip Symphony scripts typecheck. Mixed and unknown non-doc files fail closed onto the product lane. Migration Guard and secret scanning stay on.
+
 - **Home and Artist Profiles now show live artist sites and the platform spec grid:** a dark shipped-sites gallery and a blue / pink / purple platform bento sit below the fold on jov.ie and /artist-profiles, using real Jovie profile and product shots.
 
 - [internal] **Summer invariant stewardship now has a weekly plus event-driven audit (JOV-5309):** Current-week candidates are normalized with source, date, and authority, semantic duplicates/conflicts/missing consumers fail visible, and Ovie projects only actionable exceptions. Cadence reuses the existing governance workflow. The executable registry remains `canon/invariants.jsonl` under JOV-5306.
