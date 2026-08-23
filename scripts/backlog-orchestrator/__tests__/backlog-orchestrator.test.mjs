@@ -982,6 +982,15 @@ describe('deterministic Symphony admission boundary', () => {
         scope: admitter.INDEPENDENT_REVIEW_SCOPE,
         observedAt: '2026-08-09T05:00:00.000Z',
       },
+      concurrencyEvidence: {
+        schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
+        target: 4,
+        approved: true,
+        cleanRuns: 1,
+        severeIncidents: 0,
+        observedAt: '2026-08-09T05:00:00.000Z',
+        accepted: true,
+      },
       observedAt: '2026-08-09T05:00:00.000Z',
       ...overrides,
     };
@@ -1358,7 +1367,36 @@ describe('deterministic Symphony admission boundary', () => {
     assert.ok(stale.reasons.some(reason => reason.code === 'controller-stale'));
   });
 
-  it('keeps Gem at four unless recent clean evidence explicitly proves eight', () => {
+  it('blocks a new lease when capacity evidence is missing or stale', () => {
+    const now = '2026-08-09T05:01:00.000Z';
+    const approved = {
+      schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
+      target: 8,
+      approved: true,
+      cleanRuns: 20,
+      severeIncidents: 0,
+      observedAt: '2026-08-09T05:00:00.000Z',
+    };
+    const missing = admitter.resolveGemConcurrency(null, { now });
+    const stale = admitter.resolveGemConcurrency(
+      { ...approved, observedAt: '2026-08-07T05:00:00.000Z' },
+      { now }
+    );
+    assert.equal(missing.maxConcurrent, 0);
+    assert.equal(missing.newMutationAllowed, false);
+    assert.equal(missing.preserveQueuedWork, true);
+    assert.equal(stale.maxConcurrent, 0);
+    assert.equal(stale.newMutationAllowed, false);
+    const gate = admitter.evaluateFleetGate(
+      fleetEvidence({ concurrencyEvidence: null }),
+      { now }
+    );
+    assert.equal(gate.workAdmission.allowed, true);
+    assert.equal(gate.workAdmission.newIssueLeaseAllowed, false);
+    assert.ok(gate.workAdmission.activities.includes('isolated-implementation'));
+  });
+
+  it('accepts only fresh measured capacity and requires twenty clean runs above baseline', () => {
     const now = '2026-08-09T05:01:00.000Z';
     const approved = {
       schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
@@ -1369,13 +1407,9 @@ describe('deterministic Symphony admission boundary', () => {
       observedAt: '2026-08-09T05:00:00.000Z',
     };
     assert.equal(
-      admitter.resolveGemConcurrency(null, { now }).maxConcurrent,
-      4
-    );
-    assert.equal(
       admitter.resolveGemConcurrency({ ...approved, cleanRuns: 19 }, { now })
         .maxConcurrent,
-      4
+      0
     );
     assert.equal(
       admitter.resolveGemConcurrency(approved, { now }).maxConcurrent,
