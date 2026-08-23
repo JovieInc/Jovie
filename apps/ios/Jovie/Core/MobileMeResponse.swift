@@ -104,10 +104,7 @@ enum MobileWorkspaceMode: String, Codable, Equatable, Sendable, CaseIterable {
 enum MobileWorkspaceStore {
   static let defaultsKey = "ie.jov.Jovie.workspaceMode"
 
-  static func load(
-    isAdmin: Bool,
-    defaults: UserDefaults = .standard
-  ) -> MobileWorkspaceMode {
+  static func load(isAdmin: Bool, defaults: UserDefaults = .standard) -> MobileWorkspaceMode {
     guard isAdmin else { return .jovie }
     guard
       let raw = defaults.string(forKey: defaultsKey),
@@ -118,11 +115,7 @@ enum MobileWorkspaceStore {
     return mode
   }
 
-  static func save(
-    _ mode: MobileWorkspaceMode,
-    isAdmin: Bool,
-    defaults: UserDefaults = .standard
-  ) {
+  static func save(_ mode: MobileWorkspaceMode, isAdmin: Bool, defaults: UserDefaults = .standard) {
     defaults.set((isAdmin ? mode : .jovie).rawValue, forKey: defaultsKey)
   }
 }

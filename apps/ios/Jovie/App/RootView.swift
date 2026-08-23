@@ -623,10 +623,7 @@ actor ActionLoopCache {
     self.defaults = defaults
   }
 
-  func loadInbox(
-    for userID: String,
-    workspace: MobileWorkspaceMode = .jovie
-  ) -> MobileActionLoopInboxResponse? {
+  func loadInbox(for userID: String, workspace: MobileWorkspaceMode = .jovie) -> MobileActionLoopInboxResponse? {
     let key = inboxCacheKey(for: userID, workspace: workspace)
     if let snapshot = inboxMemory[key] {
       return snapshot.response
@@ -643,11 +640,7 @@ actor ActionLoopCache {
     return snapshot.response
   }
 
-  func storeInbox(
-    _ response: MobileActionLoopInboxResponse,
-    for userID: String,
-    workspace: MobileWorkspaceMode = .jovie
-  ) {
+  func storeInbox(_ response: MobileActionLoopInboxResponse, for userID: String, workspace: MobileWorkspaceMode = .jovie) {
     let key = inboxCacheKey(for: userID, workspace: workspace)
     let snapshot = CachedActionLoopInboxSnapshot(response: response, cachedAt: Date())
     inboxMemory[key] = snapshot
@@ -693,16 +686,10 @@ actor ActionLoopCache {
     defaults.removeObject(forKey: key)
   }
 
-  private func inboxCacheKey(
-    for userID: String,
-    workspace: MobileWorkspaceMode
-  ) -> String {
-    switch workspace {
-    case .jovie:
-      return "ie.jov.Jovie.actionLoopInbox.\(userID)"
-    case .ovie:
-      return "ie.jov.Jovie.actionLoopInbox.\(userID).ov"
-    }
+  private func inboxCacheKey(for userID: String, workspace: MobileWorkspaceMode) -> String {
+    workspace == .ovie
+      ? "ie.jov.Jovie.actionLoopInbox.\(userID).ov"
+      : "ie.jov.Jovie.actionLoopInbox.\(userID)"
   }
 
   private func calendarCacheKey(for userID: String) -> String {

@@ -211,12 +211,9 @@ struct ChatComposerView: View {
   }
 
   private var composerPlaceholder: String {
-    if workspaceMode == .ovie {
-      return isOffline
-        ? workspaceMode.composerOfflinePlaceholder
-        : workspaceMode.askChatLabel
-    }
-    return ChatComposerCopy.emptyPlaceholder
+    workspaceMode == .ovie
+      ? (isOffline ? workspaceMode.composerOfflinePlaceholder : workspaceMode.askChatLabel)
+      : ChatComposerCopy.emptyPlaceholder
   }
 }
 

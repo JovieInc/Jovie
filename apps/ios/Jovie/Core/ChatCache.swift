@@ -10,10 +10,7 @@ actor ChatCache {
     self.defaults = defaults
   }
 
-  func load(
-    for userID: String,
-    workspace: MobileWorkspaceMode = .jovie
-  ) -> CachedChatSnapshot? {
+  func load(for userID: String, workspace: MobileWorkspaceMode = .jovie) -> CachedChatSnapshot? {
     let key = cacheKey(for: userID, workspace: workspace)
     if let snapshot = memory[key] {
       return snapshot
@@ -30,11 +27,7 @@ actor ChatCache {
     return snapshot
   }
 
-  func store(
-    _ snapshot: CachedChatSnapshot,
-    for userID: String,
-    workspace: MobileWorkspaceMode = .jovie
-  ) {
+  func store(_ snapshot: CachedChatSnapshot, for userID: String, workspace: MobileWorkspaceMode = .jovie) {
     let key = cacheKey(for: userID, workspace: workspace)
     memory[key] = snapshot
     if let data = try? encoder.encode(snapshot) {
@@ -54,11 +47,8 @@ actor ChatCache {
   }
 
   private func cacheKey(for userID: String, workspace: MobileWorkspaceMode) -> String {
-    switch workspace {
-    case .jovie:
-      return "ie.jov.Jovie.mobileChat.\(userID)"
-    case .ovie:
-      return "ie.jov.Jovie.mobileChat.\(userID).ov"
-    }
+    workspace == .ovie
+      ? "ie.jov.Jovie.mobileChat.\(userID).ov"
+      : "ie.jov.Jovie.mobileChat.\(userID)"
   }
 }
