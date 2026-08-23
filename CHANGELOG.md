@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Ovie Mac HUD is one screen with three YC metrics (JOV-5298):** Packaged Jovie.app opens `/hud?ovie=mac` so the operator sees default alive/dead, week-over-week growth, and dogfood-receipted shipping only. Eve stays the talk door. Customer chat stays `/app/chat`.
+
 - [internal] **FX remediates failed native merge_group CI (JOV-5303):** Rolling CI Dispatch now accepts completed `CI` `workflow_run` events whose producer is `merge_group`, resolves the source PR from the queue front ref, and launches FX against that branch. The previous pull_request-only gate left merge-queue failures unrepaired after UNMERGEABLE eject.
 
 - [internal] **ALLGREEN merge groups no longer UNMERGEABLE siblings on shrink-only design-system ratchets (JOV-5300):** `--linear-*` usage may drop below the JSON floor on `merge_group` without failing required unit shards. Growth still fails. Local / pull_request authorship still fail-closes until the changing PR lowers the baseline. Source `PR Ready` stays cheap (no unit/e2e ruleset expansion).
