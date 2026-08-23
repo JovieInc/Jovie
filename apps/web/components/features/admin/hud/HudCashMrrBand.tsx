@@ -5,6 +5,8 @@ import type { HudMetrics } from '@/types/hud';
 
 export function HudCashMrrBand({
   metrics,
+  mrrValueClass,
+  runwayValueClass,
   onRetry,
 }: Readonly<{
   readonly metrics: HudMetrics;
@@ -12,5 +14,12 @@ export function HudCashMrrBand({
   readonly runwayValueClass: string;
   readonly onRetry: () => void;
 }>) {
-  return <OvieCeoOverview metrics={metrics} onRetry={onRetry} />;
+  return (
+    <OvieCeoOverview
+      metrics={metrics}
+      onRetry={onRetry}
+      primaryValueClassName={mrrValueClass}
+      secondaryValueClassName={runwayValueClass}
+    />
+  );
 }

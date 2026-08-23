@@ -148,6 +148,8 @@ describe('composeHudForPresentation', () => {
       'utf8'
     );
     expect(source).toContain('OvieCeoOverview');
+    expect(source).toContain('primaryValueClassName={mrrValueClass}');
+    expect(source).toContain('secondaryValueClassName={runwayValueClass}');
     expect(source).not.toContain('ContentMetricCard');
   });
 
