@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Invariant consumer: JOV-INV-009.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import {
