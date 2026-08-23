@@ -7,18 +7,24 @@ Canonical program: [`docs/OVIE_PROGRAM.md`](OVIE_PROGRAM.md) (JOV-5214).
 
 `Tim -> Ovie -> Eve intake/ack -> durable Kanban -> Summer -> Symphony -> identified coding worker on Gem Ubuntu`
 
-## Canonical Ops contract (JOV-5256)
+## Canonical product and Ops contract (JOV-5256)
 
-Packaged-app M1 consumes this exact contract. Do not add a second dashboard,
-shell, or Overview/HUD/TV product.
+The packaged product is Jovie and opens the canonical shared chat first. Ovie
+is an authorized-admin secondary agent and operations surface inside Jovie's
+shared shell and components. Do not add a second app, chat presentation,
+dashboard, shell, or Overview/HUD/TV product.
 
 | Field | Value |
 |---|---|
-| Product name | Ops |
-| Route | `/hud` (`APP_ROUTES.HUD`) |
+| Packaged product identity | Jovie |
+| Packaged default | `/app/chat` (`APP_ROUTES.CHAT`) |
+| Secondary Ops name | Ops |
+| Secondary Ops route | `/hud` (`APP_ROUTES.HUD`) |
 | Component | `HudDashboardClient` |
 | Module | `apps/web/lib/ovie/ops-entrypoint.ts` |
-| Packaged default | `/hud` (zero extra clicks; no `/app/chat` fallback) |
+
+The packaged Mac source owner is `apps/desktop/src/main.ts`, where
+`APP_ENTRY_URL` defaults to `/app/chat`. `/hud` is never a packaged default.
 
 Presentation modes of the same component and metrics contract:
 
@@ -44,9 +50,22 @@ walk capture, dispatch, and developer controls stay in disclosure.
 
 | Surface | Role |
 |---|---|
-| Packaged Mac/iOS door | Talk + ops presentation. Conversational authority is Summer, after Eve intake. Default installed entry is `/hud`. |
-| `/hud` | One Ops screen. Fullscreen `?fs=1`. Unattended TV `?kiosk=TOKEN`. |
-| `/app/ov/chat` | Entitled operator door. Must not fall through to artist Jovie chat or self-identify as Ovie. |
+| Packaged Mac/iOS door | Jovie opens `/app/chat`. Conversational authority is Summer after Eve intake; Ovie and Ops remain secondary authorized-admin destinations. |
+| `/app/chat` | Canonical shared chat presentation. Jovie is the default identity; an authorized founder-door selection may bind typed Ovie identity and permissions without forking the chat surface. |
+| `/hud` | Secondary Ops screen, linked from canonical admin navigation and protected by admin authorization (or an explicitly provisioned kiosk token). Fullscreen `?fs=1`; unattended display `?kiosk=TOKEN`. |
+| `/app/ov/chat` | Admin compatibility entry owned by JOV-5211 authorization reconciliation. It is not a packaged default or an independent shell. |
+
+## Shared chat invariant
+
+Jovie and Ovie use the same canonical chat presentation and behavior. Any Ovie
+variation must enter through typed agent identity, permission, data scope, or
+capability. Route-specific component forks, competing shells, and duplicated
+chat state are forbidden. JOV-5211 owns authorization and route convergence;
+this contract does not duplicate that work.
+
+Exact packaged-runtime proof of the `/app/chat` first screen remains pending
+host permission. Source, contract, and unit evidence do not substitute for that
+runtime receipt.
 
 ## Ubuntu operational truth (JOV-5248)
 

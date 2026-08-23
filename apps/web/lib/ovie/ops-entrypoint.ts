@@ -1,11 +1,12 @@
 import { APP_ROUTES } from '@/constants/routes';
 
 /**
- * Canonical Ops entry for web and the packaged-app M1 owner.
+ * Canonical secondary Ops entry for web and the packaged Jovie app.
  *
- * One product: the authenticated `/hud` Ops screen. Fullscreen and kiosk are
- * presentation modes of the same `HudDashboardClient` + metrics contract.
- * This module is the handoff surface — do not add a desktop shell here.
+ * Jovie launches at `/app/chat`; authorized admins can then enter `/hud` from
+ * the canonical shell. Fullscreen and kiosk are presentation modes of the same
+ * `HudDashboardClient` + metrics contract. This module is the handoff surface
+ * — do not add a desktop shell or make Ops the packaged default here.
  */
 export const OVIE_OPS_PRODUCT_NAME = 'Ops' as const;
 
@@ -37,7 +38,7 @@ export const OVIE_OPS_COMPAT_ALIASES = {
   [APP_ROUTES.HUD_TV]: `${APP_ROUTES.HUD}?fs=1`,
 } as const;
 
-export const OVIE_PACKAGED_DEFAULT_ROUTE = APP_ROUTES.HUD;
+export const OVIE_PACKAGED_DEFAULT_ROUTE = APP_ROUTES.CHAT;
 export const OVIE_PACKAGED_TALK_ROUTE = APP_ROUTES.ADMIN_CHAT;
 
 export const OVIE_OPS_ENTRY = {

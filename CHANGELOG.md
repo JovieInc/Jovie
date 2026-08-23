@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Packaged route canon converges on Jovie chat:** Desktop source, Ovie canon, and the Ops entry contract now agree on `/app/chat` as the packaged default. `/hud` remains secondary, and canon restricts Ovie chat variation to typed identity, permission, data, or capability differences.
+
 - [internal] **MenuMonitor reports freshness instead of fake zeros:** Initial loading hides counts, stale values say Last known, and action/error state reaches the accessible status item.
 
 - [internal] **FX remediates failed native merge_group CI (JOV-5303):** Rolling CI Dispatch now accepts completed `CI` `workflow_run` events whose producer is `merge_group`, resolves the source PR from the queue front ref, and launches FX against that branch. The previous pull_request-only gate left merge-queue failures unrepaired after UNMERGEABLE eject.
