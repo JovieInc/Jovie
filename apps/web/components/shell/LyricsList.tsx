@@ -2,6 +2,7 @@
 
 import { memo } from 'react';
 import { cn } from '@/lib/utils';
+import { SHELL_CAPTION_CLASSNAME } from './shell-caption';
 
 export interface LyricsListLine {
   /** Time offset into the track in seconds — used for the timestamp prefix. */
@@ -93,14 +94,15 @@ export function LyricsList({
   return (
     <div className={cn('px-4 py-4', className)}>
       <div className='flex items-center justify-between pb-2'>
-        <p className='text-3xs uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
-          {title}
-        </p>
+        <p className={SHELL_CAPTION_CLASSNAME}>{title}</p>
         {onEdit && (
           <button
             type='button'
             onClick={onEdit}
-            className='text-3xs uppercase tracking-[0.06em] text-quaternary-token hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) rounded transition-colors duration-subtle ease-subtle'
+            className={cn(
+              SHELL_CAPTION_CLASSNAME,
+              'hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) rounded transition-colors duration-subtle ease-subtle'
+            )}
           >
             {editLabel}
           </button>

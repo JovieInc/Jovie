@@ -1,7 +1,8 @@
 import { cn } from '@/lib/utils';
+import { SHELL_CAPTION_CLASSNAME } from './shell-caption';
 
 export interface StatProps {
-  /** Caption above the value (uppercase tracking-wide). */
+  /** Caption above the value (Title Case, tracking-normal). */
   readonly label: string;
   /** Pre-formatted value string. The component does not format numbers. */
   readonly value: string;
@@ -31,9 +32,7 @@ export interface StatProps {
 export function Stat({ label, value, mono, tabular, className }: StatProps) {
   return (
     <div className={cn('flex flex-col gap-0.5', className)}>
-      <span className='text-3xs uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
-        {label}
-      </span>
+      <span className={SHELL_CAPTION_CLASSNAME}>{label}</span>
       <span
         className={cn(
           'text-app text-primary-token',

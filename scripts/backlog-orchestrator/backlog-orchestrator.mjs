@@ -485,6 +485,16 @@ async function admissionPreflight(team, candidate = null) {
   const symphonyIssues = await linear.fetchTeamSymphonyIssues(team.id);
   const load = deterministicGates.admissionIntentLoad(symphonyIssues);
   const maxConcurrent = fleetGate.concurrency?.gem?.maxConcurrent ?? 0;
+  if (!Number.isInteger(maxConcurrent) || maxConcurrent < 1) {
+    return {
+      open: false,
+      reason:
+        fleetGate.concurrency?.gem?.reason ||
+        'measured admission capacity unavailable',
+      load,
+      fleetGate,
+    };
+  }
   if (load.count >= maxConcurrent) {
     return {
       open: false,
