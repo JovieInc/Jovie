@@ -9,16 +9,31 @@ struct PublicProfileBrowserDestination: Identifiable, Equatable {
 
 struct PublicProfileURLPolicy: Equatable {
   let allowedHost: String
+  let allowedProfileRoot: String
+
+  private static let reservedRootSegments: Set<String> = [
+    "admin",
+    "api",
+    "app",
+    "auth",
+    "hud",
+    "hud-tv",
+  ]
+
+  private static let usernamePattern = /^[A-Za-z][A-Za-z0-9._-]{1,28}[A-Za-z0-9]$/
+  private static let childSegmentPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$/
 
   init?(webBaseURL: URL) {
     guard webBaseURL.scheme?.lowercased() == "https",
           let host = webBaseURL.host?.lowercased(),
-          !host.isEmpty
+          !host.isEmpty,
+          let profileRoot = Self.validatedProfileRoot(for: webBaseURL)
     else {
       return nil
     }
 
     allowedHost = host
+    allowedProfileRoot = profileRoot
   }
 
   init?(publicProfileURL: String) {
@@ -38,7 +53,33 @@ struct PublicProfileURLPolicy: Equatable {
   }
 
   func allows(_ url: URL) -> Bool {
-    url.scheme?.lowercased() == "https" && url.host?.lowercased() == allowedHost
+    url.scheme?.lowercased() == "https"
+      && url.host?.lowercased() == allowedHost
+      && Self.validatedProfileRoot(for: url) == allowedProfileRoot
+  }
+
+  private static func validatedProfileRoot(for url: URL) -> String? {
+    guard let decodedPath = url.path.removingPercentEncoding,
+          !decodedPath.contains("\\"),
+          !decodedPath.contains("//")
+    else {
+      return nil
+    }
+
+    let segments = decodedPath.split(separator: "/", omittingEmptySubsequences: true)
+      .map(String.init)
+    guard let root = segments.first,
+          segments.count <= 4,
+          root.wholeMatch(of: usernamePattern) != nil,
+          !reservedRootSegments.contains(root.lowercased()),
+          segments.dropFirst().allSatisfy({
+            $0.wholeMatch(of: childSegmentPattern) != nil
+          })
+    else {
+      return nil
+    }
+
+    return root.lowercased()
   }
 }
 
@@ -60,7 +101,7 @@ final class PublicProfileBrowserModel: NSObject, ObservableObject, WKNavigationD
     self.policy = policy
 
     let configuration = WKWebViewConfiguration()
-    configuration.websiteDataStore = .default()
+    configuration.websiteDataStore = .nonPersistent()
     webView = WKWebView(frame: .zero, configuration: configuration)
 
     super.init()
