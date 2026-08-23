@@ -21,6 +21,23 @@ describe('mobile chat contract', () => {
       clientMessageId: 'msg_1',
       text: 'Help me launch',
       source: 'typed',
+      chatMode: null,
+    });
+  });
+
+  it('keeps parsed chatMode null so the route layer owns ov vs artist routing', () => {
+    expect(
+      parseMobileChatTurnRequest({
+        conversationId: 'conv_1',
+        clientTurnId: 'turn_1',
+        clientMessageId: 'msg_1',
+        text: 'Summer, what is blocked?',
+        source: 'typed',
+        chatMode: 'ov',
+      })
+    ).toMatchObject({
+      text: 'Summer, what is blocked?',
+      chatMode: null,
     });
   });
 
