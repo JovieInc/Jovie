@@ -78,11 +78,11 @@ class LeaseDecisionTests(unittest.TestCase):
         )
         self.assertEqual((decision, reason, clear), ("admit", "active", False))
 
-    def test_indeterminate_read_admits_without_tombstoning(self):
+    def test_indeterminate_read_suppresses_without_tombstoning(self):
         decision, reason, _stored, clear = MODULE.lease_decision(
             "JOV-5031", None, None, ACTIVE, now=2000
         )
-        self.assertEqual((decision, reason, clear), ("admit", "indeterminate", False))
+        self.assertEqual((decision, reason, clear), ("suppress", "indeterminate", False))
 
     def test_tombstone_observed_at_is_monotonic(self):
         future_tombstone = {
@@ -147,9 +147,9 @@ class CheckCommandTests(unittest.TestCase):
         self.assertNotIn("JOV-5029", state["tombstones"])
         self.assertEqual(state["counters"]["reopened"], 1)
 
-    def test_check_indeterminate_admits_and_counts(self):
+    def test_check_indeterminate_suppresses_and_counts(self):
         rc = self.run_check("JOV-5031", None)
-        self.assertEqual(rc, 0)
+        self.assertEqual(rc, 1)
         state = self.load_state()
         self.assertEqual(state["counters"]["indeterminate"], 1)
         self.assertEqual(state["tombstones"], {})

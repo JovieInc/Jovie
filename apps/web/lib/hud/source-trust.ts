@@ -13,12 +13,29 @@ import type {
 /** Client-side staleness threshold aligned with HUD poll cadence and Sentry cache TTL. */
 export const HUD_SOURCE_STALE_AFTER_MS = 5 * 60 * 1000;
 
+export type HudSourceFreshnessState = 'fresh' | 'stale' | 'unknown';
+
+export function getSourceFreshnessState(
+  fetchedAtIso: string,
+  now = Date.now()
+): HudSourceFreshnessState {
+  const observedAt = Date.parse(fetchedAtIso);
+  if (
+    !Number.isFinite(now) ||
+    !Number.isFinite(observedAt) ||
+    observedAt > now
+  ) {
+    return 'unknown';
+  }
+  return now - observedAt > HUD_SOURCE_STALE_AFTER_MS ? 'stale' : 'fresh';
+}
+
 export function formatSourceFreshness(
   fetchedAtIso: string,
   now = Date.now()
 ): string {
   const diff = now - new Date(fetchedAtIso).getTime();
-  if (!Number.isFinite(diff) || diff < 0) return 'just now';
+  if (!Number.isFinite(diff) || diff < 0) return 'time unknown';
 
   const minutes = Math.floor(diff / 60_000);
   if (minutes < 1) return 'just now';
@@ -31,39 +48,58 @@ export function formatSourceFreshness(
 }
 
 export function isSourceStale(fetchedAtIso: string, now = Date.now()): boolean {
-  const diff = now - new Date(fetchedAtIso).getTime();
-  return Number.isFinite(diff) && diff > HUD_SOURCE_STALE_AFTER_MS;
+  return getSourceFreshnessState(fetchedAtIso, now) === 'stale';
 }
 
 function resolveExternalState(
   isConfigured: boolean,
-  isAvailable: boolean
+  isAvailable: boolean,
+  errorMessage?: string
 ): HudMetricSourceState {
   if (!isConfigured) return 'not_configured';
-  if (!isAvailable) return 'unavailable';
+  if (!isAvailable) {
+    return /\b(?:401|403|unauthori[sz]ed|forbidden)\b/i.test(errorMessage ?? '')
+      ? 'unauthorized'
+      : 'unavailable';
+  }
   return 'ok';
+}
+
+function resolveProviderNextStep(
+  state: HudMetricSourceState,
+  configureStep: string,
+  retryStep: string,
+  degradedStep?: string
+): string | null {
+  if (state === 'not_configured') return configureStep;
+  if (state === 'unavailable' || state === 'unauthorized') return retryStep;
+  if (state === 'degraded') return degradedStep ?? retryStep;
+  return null;
 }
 
 function buildStripeSourceTrust(
   stripe: AdminStripeOverviewMetrics,
   fetchedAtIso: string
 ): HudMetricSourceTrust {
-  const state = resolveExternalState(stripe.isConfigured, stripe.isAvailable);
+  const state = resolveExternalState(
+    stripe.isConfigured,
+    stripe.isAvailable,
+    stripe.errorMessage
+  );
 
   return {
     key: 'stripe',
     label: 'Stripe',
     state,
-    fetchedAtIso,
+    fetchedAtIso: stripe.observedAtIso ?? fetchedAtIso,
     errorMessage: stripe.errorMessage ?? null,
     dashboardUrl: 'https://dashboard.stripe.com/',
     configureUrl: null,
-    nextStep:
-      state === 'not_configured'
-        ? 'Add STRIPE_SECRET_KEY to load MRR from Stripe.'
-        : state === 'unavailable'
-          ? 'Check Stripe API credentials and retry.'
-          : null,
+    nextStep: resolveProviderNextStep(
+      state,
+      'Add STRIPE_SECRET_KEY to load MRR from Stripe.',
+      'Check Stripe API credentials and retry.'
+    ),
   };
 }
 
@@ -71,22 +107,30 @@ function buildMercurySourceTrust(
   mercury: AdminMercuryMetrics,
   fetchedAtIso: string
 ): HudMetricSourceTrust {
-  const state = resolveExternalState(mercury.isConfigured, mercury.isAvailable);
+  const externalState = resolveExternalState(
+    mercury.isConfigured,
+    mercury.isAvailable,
+    mercury.errorMessage
+  );
+  const state =
+    externalState === 'ok' && mercury.burnRateAvailable === false
+      ? 'degraded'
+      : externalState;
 
   return {
     key: 'mercury',
     label: 'Mercury',
     state,
-    fetchedAtIso,
+    fetchedAtIso: mercury.observedAtIso ?? fetchedAtIso,
     errorMessage: mercury.errorMessage ?? null,
     dashboardUrl: 'https://app.mercury.com/',
     configureUrl: null,
-    nextStep:
-      state === 'not_configured'
-        ? 'Add MERCURY_API_TOKEN and MERCURY_CHECKING_ACCOUNT_ID to load runway.'
-        : state === 'unavailable'
-          ? 'Check Mercury API credentials and retry.'
-          : null,
+    nextStep: resolveProviderNextStep(
+      state,
+      'Add MERCURY_API_TOKEN and MERCURY_CHECKING_ACCOUNT_ID to load runway.',
+      'Check Mercury API credentials and retry.',
+      'Retry Mercury transactions before using burn or runway.'
+    ),
   };
 }
 
@@ -119,7 +163,11 @@ function buildSentrySourceTrust(
   fetchedAtIso: string,
   orgSlug: string | undefined
 ): HudMetricSourceTrust {
-  const state = resolveExternalState(sentry.isConfigured, sentry.isAvailable);
+  const state = resolveExternalState(
+    sentry.isConfigured,
+    sentry.isAvailable,
+    sentry.errorMessage
+  );
   const dashboardUrl =
     orgSlug && state !== 'not_configured'
       ? `https://${orgSlug}.sentry.io/issues/?query=is%3Aunresolved`
@@ -133,12 +181,11 @@ function buildSentrySourceTrust(
     errorMessage: sentry.errorMessage ?? null,
     dashboardUrl,
     configureUrl: null,
-    nextStep:
-      state === 'not_configured'
-        ? 'Add SENTRY_AUTH_TOKEN and SENTRY_ORG_SLUG to load incident metrics.'
-        : state === 'unavailable'
-          ? 'Check Sentry API credentials and retry.'
-          : null,
+    nextStep: resolveProviderNextStep(
+      state,
+      'Add SENTRY_AUTH_TOKEN and SENTRY_ORG_SLUG to load incident metrics.',
+      'Check Sentry API credentials and retry.'
+    ),
   };
 }
 

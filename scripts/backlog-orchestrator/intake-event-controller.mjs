@@ -2,6 +2,7 @@
 
 /**
  * Durable, event-first intake receipt controller.
+ * Invariant consumer: JOV-INV-005.
  *
  * This boundary deliberately does not mutate Linear, GitHub, a queue, or a
  * deployment. A webhook/Actions delivery becomes an idempotent receipt first;
