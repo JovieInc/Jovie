@@ -1,3 +1,4 @@
+import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { ContentSectionHeader } from './ContentSectionHeader';
 
@@ -26,5 +27,15 @@ export const RouteHeading: Story = {
     headingLevel: 'h1',
     title: 'All artists',
     subtitle: 'Use the registered primitive as the route-level heading.',
+  },
+};
+
+export const CompactPlainWithAction: Story = {
+  args: {
+    density: 'compact',
+    variant: 'plain',
+    title: 'Campaign controls',
+    subtitle: 'Compact and responsive without creating a second owner.',
+    actions: <Button size='sm'>Review</Button>,
   },
 };
