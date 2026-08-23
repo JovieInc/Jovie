@@ -96,6 +96,218 @@ export const BOTTOM_TAB_KEYS = [
 
 export type BottomTabKey = (typeof BOTTOM_TAB_KEYS)[number];
 
+export type PublicProfileNavigationAvailability = 'always' | 'fan-capture';
+
+export interface PublicProfileNavigationDestination {
+  /** Stable semantic identity shared by compact and wide presentations. */
+  readonly id: BottomTabKey;
+  /** Route entry used to build canonical deep links. */
+  readonly routeKey:
+    | 'profile-root'
+    | 'mode-listen'
+    | 'mode-tour'
+    | 'mode-subscribe';
+  readonly label: 'Home' | 'Music' | 'Events' | 'Alerts';
+  readonly availability: PublicProfileNavigationAvailability;
+  readonly audience: 'public';
+  readonly badge: null;
+  readonly compactPlacement: 'bottom-bar';
+  readonly widePlacement: 'bottom-bar';
+  readonly collapse: 'none';
+  /** Every route mode that selects this destination. */
+  readonly activeModes: readonly ProfileMode[];
+}
+
+/**
+ * Canonical semantic navigation contract for public profiles.
+ *
+ * Platform/presentation components own icons and native primitives only. They
+ * must derive destination identity, order, labels, authorization/visibility,
+ * active state, badges, deep-link ownership, and collapse behavior here.
+ */
+export const PUBLIC_PROFILE_NAVIGATION = [
+  {
+    id: 'profile',
+    routeKey: 'profile-root',
+    label: 'Home',
+    availability: 'always',
+    audience: 'public',
+    badge: null,
+    compactPlacement: 'bottom-bar',
+    widePlacement: 'bottom-bar',
+    collapse: 'none',
+    activeModes: ['profile', 'about', 'contact', 'pay'],
+  },
+  {
+    id: 'listen',
+    routeKey: 'mode-listen',
+    label: 'Music',
+    availability: 'always',
+    audience: 'public',
+    badge: null,
+    compactPlacement: 'bottom-bar',
+    widePlacement: 'bottom-bar',
+    collapse: 'none',
+    activeModes: ['listen', 'releases'],
+  },
+  {
+    id: 'tour',
+    routeKey: 'mode-tour',
+    label: 'Events',
+    availability: 'always',
+    audience: 'public',
+    badge: null,
+    compactPlacement: 'bottom-bar',
+    widePlacement: 'bottom-bar',
+    collapse: 'none',
+    activeModes: ['tour'],
+  },
+  {
+    id: 'subscribe',
+    routeKey: 'mode-subscribe',
+    label: 'Alerts',
+    availability: 'fan-capture',
+    audience: 'public',
+    badge: null,
+    compactPlacement: 'bottom-bar',
+    widePlacement: 'bottom-bar',
+    collapse: 'none',
+    activeModes: ['subscribe'],
+  },
+] as const satisfies readonly PublicProfileNavigationDestination[];
+
+const REQUIRED_PUBLIC_PROFILE_DESTINATION_ORDER: readonly BottomTabKey[] =
+  BOTTOM_TAB_KEYS;
+const REQUIRED_PUBLIC_PROFILE_MODES: readonly ProfileMode[] = [
+  'profile',
+  'listen',
+  'pay',
+  'subscribe',
+  'about',
+  'contact',
+  'tour',
+  'releases',
+];
+const REQUIRED_PUBLIC_PROFILE_ROUTE_KEYS: Readonly<
+  Record<BottomTabKey, PublicProfileNavigationDestination['routeKey']>
+> = {
+  profile: 'profile-root',
+  listen: 'mode-listen',
+  tour: 'mode-tour',
+  subscribe: 'mode-subscribe',
+};
+
+export function validatePublicProfileNavigation(
+  destinations: readonly PublicProfileNavigationDestination[]
+): readonly string[] {
+  const issues: string[] = [];
+  const ids = destinations.map(destination => destination.id);
+
+  if (
+    ids.length !== REQUIRED_PUBLIC_PROFILE_DESTINATION_ORDER.length ||
+    ids.some(
+      (id, index) => id !== REQUIRED_PUBLIC_PROFILE_DESTINATION_ORDER[index]
+    )
+  ) {
+    issues.push('destination-order');
+  }
+
+  if (new Set(ids).size !== ids.length) {
+    issues.push('duplicate-destination');
+  }
+
+  if (destinations.some(destination => destination.audience !== 'public')) {
+    issues.push('audience-leak');
+  }
+
+  if (
+    destinations.some(
+      destination =>
+        destination.routeKey !==
+        REQUIRED_PUBLIC_PROFILE_ROUTE_KEYS[destination.id]
+    )
+  ) {
+    issues.push('route-owner-drift');
+  }
+
+  if (
+    destinations.some(
+      destination =>
+        destination.compactPlacement !== destination.widePlacement ||
+        destination.collapse !== 'none'
+    )
+  ) {
+    issues.push('responsive-drift');
+  }
+
+  const activeModes = destinations.flatMap(destination =>
+    destination.activeModes.map(mode => `${mode}:${destination.id}`)
+  );
+  const ownedModes = activeModes.map(entry => entry.split(':')[0]);
+  if (new Set(ownedModes).size !== ownedModes.length) {
+    issues.push('ambiguous-active-state');
+  }
+  if (REQUIRED_PUBLIC_PROFILE_MODES.some(mode => !ownedModes.includes(mode))) {
+    issues.push('missing-active-state');
+  }
+
+  return issues;
+}
+
+const PUBLIC_PROFILE_NAVIGATION_ISSUES = validatePublicProfileNavigation(
+  PUBLIC_PROFILE_NAVIGATION
+);
+if (PUBLIC_PROFILE_NAVIGATION_ISSUES.length > 0) {
+  throw new Error(
+    `[profile/route-config] Invalid public navigation: ${PUBLIC_PROFILE_NAVIGATION_ISSUES.join(', ')}`
+  );
+}
+
+export function getPermittedPublicProfileNavigation(options: {
+  readonly fanCaptureEnabled: boolean;
+}): readonly PublicProfileNavigationDestination[] {
+  return PUBLIC_PROFILE_NAVIGATION.filter(
+    destination =>
+      destination.availability === 'always' || options.fanCaptureEnabled
+  );
+}
+
+function resolveEffectivePublicProfileMode(options: {
+  readonly mode: ProfileMode;
+  readonly overlayView?: string | null;
+}): ProfileMode {
+  switch (options.overlayView) {
+    case 'listen':
+    case 'releases':
+    case 'tour':
+    case 'subscribe':
+      return options.overlayView;
+    case 'notifications':
+      return 'subscribe';
+    case 'about':
+    case 'contact':
+    case 'pay':
+    case 'menu':
+      return 'profile';
+    default:
+      return options.mode;
+  }
+}
+
+export function resolvePublicProfileActiveDestination(options: {
+  readonly mode: ProfileMode;
+  readonly overlayView?: string | null;
+}): BottomTabKey {
+  const effectiveMode = resolveEffectivePublicProfileMode(options);
+
+  return (
+    PUBLIC_PROFILE_NAVIGATION.find(destination => {
+      const activeModes: readonly ProfileMode[] = destination.activeModes;
+      return activeModes.includes(effectiveMode);
+    })?.id ?? 'profile'
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Route config entry
 // ---------------------------------------------------------------------------
@@ -647,15 +859,10 @@ export const REDIRECT_SINK_ROUTE_KEYS: readonly ProfileRouteKey[] = [
  */
 export function resolveActiveTab(
   mode: string | null | undefined,
-  options?: { readonly hasTourDates?: boolean }
+  _options?: { readonly hasTourDates?: boolean }
 ): BottomTabKey {
   const config = getRouteConfigForMode(mode);
-  const activeTab = config.activeTab ?? 'profile';
-
-  // §2.3 + §2.4: Events tab falls back to Home when no tour dates
-  if (activeTab === 'tour' && !(options?.hasTourDates ?? true)) {
-    return 'profile';
-  }
-
-  return activeTab;
+  return resolvePublicProfileActiveDestination({
+    mode: config.profileMode ?? 'profile',
+  });
 }

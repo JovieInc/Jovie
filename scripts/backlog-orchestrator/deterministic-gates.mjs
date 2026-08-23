@@ -196,11 +196,18 @@ function priorityValue(priority) {
 
 export function selectDeterministicPlanCandidate(
   issues,
-  { issueIdentifier = null, now = new Date().toISOString() } = {}
+  {
+    issueIdentifier = null,
+    now = new Date().toISOString(),
+    excludeIdentifiers = [],
+  } = {}
 ) {
+  const excluded = new Set(excludeIdentifiers);
   const decisions = issues.map(issue => ({
     issue,
-    reason: validateDeterministicPlanCandidate(issue, { now }),
+    reason: excluded.has(issue.identifier)
+      ? 'issue-specific-hold'
+      : validateDeterministicPlanCandidate(issue, { now }),
   }));
   const eligible = decisions
     .filter(decision => !decision.reason)

@@ -46,12 +46,9 @@ import {
 import type { PublicMerchCard } from '@/lib/merch/types';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { CONTENT_SAFE_AREA_BOTTOM_PADDING } from '@/lib/profile/nav-constants';
-import {
-  markPacTabBarReturnVisit,
-  readPacTabBarReturnVisit,
-  shouldShowColdVisitorTabBar,
-} from '@/lib/profile/pac-tab-bar-experiment';
+import { shouldShowColdVisitorTabBar } from '@/lib/profile/pac-tab-bar-experiment';
 import { resolvePublicHeroObjectPosition } from '@/lib/profile/public-hero-media';
+import { resolvePublicProfileActiveDestination } from '@/lib/profile/route-config';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import { buildProfileShareContext } from '@/lib/share/context';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
@@ -386,24 +383,17 @@ export function ProfileCompactSurface({
   const activeNotificationSourceContext =
     notificationSourceContext ?? defaultNotificationSourceContext;
   const isHomeMode = activeVisiblePrimaryTab === 'profile';
-  // JOV-3907: cold-visitor tab bar experiment — hide vs visible 50/50.
-  // Tab bar always restored after first interaction or on return visits.
-  const [tabBarRestoredThisSession, setTabBarRestoredThisSession] =
-    useState(false);
-  const [isTabBarReturnVisit, setIsTabBarReturnVisit] = useState(false);
-  useEffect(() => {
-    setIsTabBarReturnVisit(readPacTabBarReturnVisit(globalThis.localStorage));
-  }, []);
-  const restoreTabBar = useCallback(() => {
-    setTabBarRestoredThisSession(true);
-    markPacTabBarReturnVisit(globalThis.localStorage);
-    setIsTabBarReturnVisit(true);
-  }, []);
+  const activeNavTab = resolvePublicProfileActiveDestination({
+    mode: activeMode,
+    overlayView: isDrawerOverlayActive ? drawerView : null,
+  });
+  const visibleNavTab =
+    !allowFanCapture && activeNavTab === 'subscribe' ? 'profile' : activeNavTab;
   const showBottomNav = shouldShowColdVisitorTabBar({
     tabBarArm: profilePacAssignment.tabBar,
     isSubscribed,
-    restoredThisSession: tabBarRestoredThisSession,
-    isReturnVisit: isTabBarReturnVisit,
+    restoredThisSession: false,
+    isReturnVisit: false,
     isInteractive: renderMode === 'interactive',
   });
   const isPreviewEmbedded =
@@ -554,7 +544,6 @@ export function ProfileCompactSurface({
   const handleTabSelect = useCallback(
     (tab: ProfilePrimaryTab) => {
       if (!allowFanCapture && tab === 'subscribe') return;
-      restoreTabBar();
       const nextTab = mapPrimaryTabToAnalyticsTab(tab);
       track('profile_tab_click', {
         artist_id: artist.id,
@@ -573,7 +562,6 @@ export function ProfileCompactSurface({
       artist.id,
       currentAnalyticsTab,
       onModeSelect,
-      restoreTabBar,
     ]
   );
   const handleSocialClick = useCallback(
@@ -609,13 +597,6 @@ export function ProfileCompactSurface({
       data-profile-mode={activeMode}
       data-tab-bar-arm={profilePacAssignment.tabBar}
       data-tab-bar-visible={showBottomNav ? 'true' : 'false'}
-      onPointerDownCapture={
-        showBottomNav
-          ? undefined
-          : () => {
-              restoreTabBar();
-            }
-      }
     >
       <div
         ref={setNotificationsPortalContainer}
@@ -884,8 +865,7 @@ export function ProfileCompactSurface({
               // (percentage heights fail against flexed parents).
               isHomeMode && 'flex flex-col',
               // Exactly one stable reservation. The navigation material floats
-              // above this region, while the padding keeps actionable content
-              // clear whether the experiment initially shows or hides it.
+              // above this region; authorized destinations stay visible.
               CONTENT_SAFE_AREA_BOTTOM_PADDING,
               !isHomeMode &&
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70'
@@ -948,11 +928,7 @@ export function ProfileCompactSurface({
 
         {showBottomNav ? (
           <BottomTabBar
-            activeTab={
-              activeVisiblePrimaryTab === 'about'
-                ? 'profile'
-                : activeVisiblePrimaryTab
-            }
+            activeTab={visibleNavTab}
             hasTourDates={hasTourDates}
             showAlerts={allowFanCapture}
             isMenuOpen={isMenuActive}
