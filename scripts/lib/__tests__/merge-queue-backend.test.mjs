@@ -62,6 +62,20 @@ const VALID_LIVE_QUEUE_CONFIGURATION = Object.freeze({
   minimumEntriesToMerge: 5,
   minimumEntriesToMergeWaitTime: 10,
 });
+/** Live GitHub GraphQL returns seconds despite documenting minutes (JOV-5315). */
+const LIVE_GRAPHQL_TIMEOUT_SECONDS = Object.freeze({
+  checkResponseTimeout: 3600,
+  maximumEntriesToBuild: 3,
+  maximumEntriesToMerge: 10,
+  mergeMethod: 'SQUASH',
+  minimumEntriesToMerge: 1,
+  minimumEntriesToMergeWaitTime: 0,
+});
+const LIVE_REST_UNTIL_COHORT_CUTOVER = Object.freeze(
+  JSON.parse(
+    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":60,"grouping_strategy":"ALLGREEN","max_entries_to_build":3,"max_entries_to_merge":10,"merge_method":"SQUASH","min_entries_to_merge":1,"min_entries_to_merge_wait_minutes":0}}]}`
+  )
+);
 function prState(overrides = {}) {
   return {
     id: PR_ID,
@@ -802,6 +816,59 @@ describe('native live preflight', () => {
       policyReadback: {
         matched: true,
         observed: { max_entries_to_build: 3 },
+      },
+    });
+  });
+
+  it('does not fail enroll preflight when GraphQL checkResponseTimeout is 3600s for live REST 60', async () => {
+    const liveGraphqlSeconds = validateNativePreflightEvidence({
+      ruleset: LIVE_REST_UNTIL_COHORT_CUTOVER,
+      repository: VALID_REPOSITORY,
+      workflowYaml: VALID_WORKFLOW,
+      branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
+      liveQueueConfiguration: LIVE_GRAPHQL_TIMEOUT_SECONDS,
+    });
+    expect(liveGraphqlSeconds.ok).toBe(true);
+    expect(liveGraphqlSeconds.errors).not.toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('check_response_timeout_minutes'),
+      ])
+    );
+    expect(liveGraphqlSeconds.policyReadback).toMatchObject({
+      matched: false,
+      drift: ['min_entries_to_merge', 'min_entries_to_merge_wait_minutes'],
+      observed: { check_response_timeout_minutes: 60 },
+    });
+
+    const omittedGraphqlTimeout = validateNativePreflightEvidence({
+      ruleset: LIVE_REST_UNTIL_COHORT_CUTOVER,
+      repository: VALID_REPOSITORY,
+      workflowYaml: VALID_WORKFLOW,
+      branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
+      liveQueueConfiguration: {
+        ...LIVE_GRAPHQL_TIMEOUT_SECONDS,
+        checkResponseTimeout: null,
+      },
+    });
+    expect(omittedGraphqlTimeout.ok).toBe(true);
+    expect(omittedGraphqlTimeout.policyReadback.observed).toMatchObject({
+      check_response_timeout_minutes: 60,
+    });
+
+    const runner = createNativeRunner({
+      ruleset: LIVE_REST_UNTIL_COHORT_CUTOVER,
+      liveQueueConfiguration: LIVE_GRAPHQL_TIMEOUT_SECONDS,
+    });
+    await expect(
+      preflightMergeQueue({
+        repository: REPOSITORY,
+        runner,
+      })
+    ).resolves.toMatchObject({
+      ready: true,
+      policyReadback: {
+        observed: { check_response_timeout_minutes: 60 },
+        drift: ['min_entries_to_merge', 'min_entries_to_merge_wait_minutes'],
       },
     });
   });

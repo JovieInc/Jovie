@@ -2116,6 +2116,125 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     expect(graphqlReadback.observed.max_entries_to_build).toBe(3);
   });
 
+  it('does not fail-close timeout drift when GraphQL checkResponseTimeout is seconds for a 60-minute REST lock', () => {
+    expect(
+      normalizeNativeQueuePolicyParameters({ checkResponseTimeout: 3600 })
+    ).toMatchObject({ check_response_timeout_minutes: 60 });
+    expect(
+      normalizeNativeQueuePolicyParameters({
+        check_response_timeout_minutes: 60,
+      })
+    ).toMatchObject({ check_response_timeout_minutes: 60 });
+    expect(
+      normalizeNativeQueuePolicyParameters({
+        check_response_timeout_minutes: '60',
+      })
+    ).toMatchObject({ check_response_timeout_minutes: 60 });
+    expect(
+      mergeNativeQueuePolicyObservations(
+        {
+          ...NATIVE_QUEUE_POLICY,
+          min_entries_to_merge: 1,
+          min_entries_to_merge_wait_minutes: 0,
+        },
+        {
+          checkResponseTimeout: 3600,
+          maximumEntriesToBuild: 3,
+          maximumEntriesToMerge: 10,
+          mergeMethod: 'SQUASH',
+          minimumEntriesToMerge: 1,
+          minimumEntriesToMergeWaitTime: 0,
+        }
+      )
+    ).toMatchObject({
+      check_response_timeout_minutes: 60,
+      min_entries_to_merge: 1,
+      min_entries_to_merge_wait_minutes: 0,
+    });
+    expect(
+      mergeNativeQueuePolicyObservations(
+        { ...NATIVE_QUEUE_POLICY },
+        { checkResponseTimeout: null }
+      )
+    ).toMatchObject({ check_response_timeout_minutes: 60 });
+
+    const liveUntilCutover = validateLiveMergeQueueRuleset(
+      {
+        bypass_actors: [],
+        rules: [
+          {
+            type: 'required_status_checks',
+            parameters: {
+              strict_required_status_checks_policy: false,
+              required_status_checks: [
+                'PR Ready',
+                'Migration Guard',
+                'Fork PR Gate',
+                'PR Size Guard',
+              ].map(context => ({ context })),
+            },
+          },
+          {
+            type: 'merge_queue',
+            parameters: {
+              ...NATIVE_QUEUE_POLICY,
+              min_entries_to_merge: 1,
+              min_entries_to_merge_wait_minutes: 0,
+            },
+          },
+        ],
+      },
+      {
+        backend: 'native',
+        liveQueueConfiguration: { checkResponseTimeout: 3600 },
+      }
+    );
+    expect(NATIVE_QUEUE_COHORT_POLICY.liveRulesetCutover).toBe('pending');
+    expect(liveUntilCutover.ok).toBe(true);
+    expect(liveUntilCutover.errors).not.toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('check_response_timeout_minutes'),
+      ])
+    );
+
+    const wrongTimeout = validateLiveMergeQueueRuleset(
+      {
+        bypass_actors: [],
+        rules: [
+          {
+            type: 'required_status_checks',
+            parameters: {
+              strict_required_status_checks_policy: false,
+              required_status_checks: [
+                'PR Ready',
+                'Migration Guard',
+                'Fork PR Gate',
+                'PR Size Guard',
+              ].map(context => ({ context })),
+            },
+          },
+          {
+            type: 'merge_queue',
+            parameters: {
+              ...NATIVE_QUEUE_POLICY,
+              check_response_timeout_minutes: 15,
+            },
+          },
+        ],
+      },
+      {
+        backend: 'native',
+        liveQueueConfiguration: { checkResponseTimeout: 900 },
+      }
+    );
+    expect(wrongTimeout.ok).toBe(false);
+    expect(wrongTimeout.errors).toEqual(
+      expect.arrayContaining([
+        'live native merge_queue check_response_timeout_minutes must be 60',
+      ])
+    );
+  });
+
   it('ejects UNMERGEABLE native entries and refuses to re-enqueue the same head', () => {
     const head = 'a'.repeat(40);
     expect(

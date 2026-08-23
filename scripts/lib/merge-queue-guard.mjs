@@ -137,6 +137,10 @@ export function evaluateNativeCohortMergeDecision({
  * (`maximumEntriesToBuild`). Enroll must treat GraphQL as live truth so a
  * stale REST readback cannot fail the product PR check after the lock already
  * matches (JOV-5291 / PR #16370).
+ *
+ * GraphQL documents `checkResponseTimeout` as minutes, but live GitHub returns
+ * seconds (REST 60 → GraphQL 3600). Convert only the GraphQL key; REST minutes
+ * stay minutes. JOV-5315.
  */
 export const NATIVE_QUEUE_GRAPHQL_POLICY_FIELDS = Object.freeze({
   checkResponseTimeout: 'check_response_timeout_minutes',
@@ -152,14 +156,47 @@ export const NATIVE_QUEUE_GRAPHQL_POLICY_FIELDS = Object.freeze({
   minimumEntriesToMergeWaitTime: 'min_entries_to_merge_wait_minutes',
 });
 
+/** GitHub REST maximum for `check_response_timeout_minutes`. */
+export const GITHUB_MERGE_QUEUE_CHECK_RESPONSE_TIMEOUT_MAX_MINUTES = 360;
+
 export const UNMERGEABLE_EJECT_SCHEMA = 'jovie-native-unmergeable/v1';
 export const CHANGELOG_COLLISION_PATH = 'CHANGELOG.md';
 
 const ENUM_POLICY_FIELDS = new Set(['merge_method', 'grouping_strategy']);
+const NUMERIC_POLICY_FIELDS = new Set(
+  Object.entries(NATIVE_QUEUE_POLICY)
+    .filter(([, value]) => typeof value === 'number')
+    .map(([field]) => field)
+);
+
+function coerceNativeQueuePolicyValue(restKey, key, value) {
+  let mapped = value;
+  if (ENUM_POLICY_FIELDS.has(restKey) && typeof mapped === 'string') {
+    return mapped.toUpperCase();
+  }
+  if (
+    NUMERIC_POLICY_FIELDS.has(restKey) &&
+    typeof mapped === 'string' &&
+    /^-?[0-9]+$/.test(mapped.trim())
+  ) {
+    mapped = Number(mapped);
+  }
+  // Live GraphQL checkResponseTimeout is seconds despite the minutes docs.
+  if (
+    key === 'checkResponseTimeout' &&
+    Number.isInteger(mapped) &&
+    mapped > GITHUB_MERGE_QUEUE_CHECK_RESPONSE_TIMEOUT_MAX_MINUTES &&
+    mapped % 60 === 0
+  ) {
+    return mapped / 60;
+  }
+  return mapped;
+}
 
 /**
  * Normalize REST snake_case or GraphQL camelCase queue parameters onto the
- * canonical `NATIVE_QUEUE_POLICY` keys. Unknown keys are dropped.
+ * canonical `NATIVE_QUEUE_POLICY` keys. Unknown keys are dropped. Null or
+ * empty GraphQL fields are omitted so they cannot clobber a REST minutes lock.
  *
  * @param {Record<string, unknown> | null | undefined} observed
  * @returns {Record<string, unknown>}
@@ -171,20 +208,19 @@ export function normalizeNativeQueuePolicyParameters(observed = {}) {
   /** @type {Record<string, unknown>} */
   const normalized = Object.create(null);
   for (const [key, value] of Object.entries(observed)) {
+    if (value == null || value === '') continue;
     const restKey = NATIVE_QUEUE_GRAPHQL_POLICY_FIELDS[key] ?? key;
     if (!Object.hasOwn(NATIVE_QUEUE_POLICY, restKey)) continue;
-    let mapped = value;
-    if (ENUM_POLICY_FIELDS.has(restKey) && typeof value === 'string') {
-      mapped = value.toUpperCase();
-    }
-    normalized[restKey] = mapped;
+    normalized[restKey] = coerceNativeQueuePolicyValue(restKey, key, value);
   }
   return normalized;
 }
 
 /**
  * GraphQL live configuration wins for every field it actually returns. REST
- * keeps fields GraphQL omits (notably `grouping_strategy`).
+ * keeps fields GraphQL omits (notably `grouping_strategy`). GraphQL
+ * `checkResponseTimeout` is normalized from live seconds onto minutes before
+ * overlay so a 60-minute REST lock is not fail-closed as 3600 (JOV-5315).
  *
  * @param {Record<string, unknown> | null | undefined} restParameters
  * @param {Record<string, unknown> | null | undefined} liveQueueConfiguration
