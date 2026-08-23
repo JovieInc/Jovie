@@ -189,6 +189,7 @@ describe('JovieChat empty state', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
+    window.sessionStorage.clear();
     mockSearchParams = new URLSearchParams();
     mockPendingOpportunityCards.length = 0;
     mockChatState.input = '';
@@ -212,13 +213,13 @@ describe('JovieChat empty state', () => {
     expect(emptyViewport.className).toContain('flex-1');
     expect(emptyViewport).toHaveAttribute('data-empty-affordance', 'none');
     expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
-    // Clean start screen (JOV-4878): ambient brand logo + action-forward
-    // invitation centered above the docked composer.
+    // Clean start screen (JOV-5319): one locked rotating greeting, no mark.
     expect(getByTestId('chat-empty-state-welcome')).toBeTruthy();
-    expect(getByTestId('chat-empty-state-logo')).toBeTruthy();
+    expect(queryByTestId('chat-empty-state-logo')).toBeNull();
     expect(getByTestId('chat-empty-state-greeting').textContent).toBe(
-      "What's next?"
+      "Let's get it"
     );
+    expect(queryByText("What's next?")).toBeNull();
     expect(getByTestId('chat-empty-state-centered-composer')).toBeTruthy();
     expect(getByTestId('feature-intro-card')).toHaveAttribute(
       'data-mode',
@@ -230,9 +231,7 @@ describe('JovieChat empty state', () => {
     expect(queryByTestId('chat-empty-state-soft-suggestions-slot')).toBeNull();
     expect(queryByTestId('suggested-prompts-rail')).toBeNull();
     expect(getByTestId('chat-input')).toBeTruthy();
-    expect(getByTestId('chat-input').getAttribute('data-placeholder')).toBe(
-      'Ask Jovie to plan your next release...'
-    );
+    expect(getByTestId('chat-input').getAttribute('data-placeholder')).toBe('');
     expect(getByTestId('chat-input').getAttribute('data-variant')).toBe('hero');
     const fileInput =
       container.querySelector<HTMLInputElement>('input[type="file"]');
@@ -518,7 +517,7 @@ describe('JovieChat empty state', () => {
     expect(getAllByTestId('chat-message')).toHaveLength(2);
     expect(
       screen.getByTestId('chat-input').getAttribute('data-placeholder')
-    ).toBe('Ask Jovie to plan your next release...');
+    ).toBe('');
     expect(screen.getByTestId('chat-input').getAttribute('data-variant')).toBe(
       'compact'
     );
