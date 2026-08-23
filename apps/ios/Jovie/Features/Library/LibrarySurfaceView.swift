@@ -75,17 +75,7 @@ struct LibrarySurfaceView: View {
           home = segment
           openCollection = nil
         } label: {
-          Text(segment.title)
-            .font(JovieFont.body(size: 13, weight: .semibold))
-            .foregroundStyle(
-              home == segment ? JovieColor.backgroundBase : JovieColor.textSecondary
-            )
-            .padding(.horizontal, JovieSpacing.medium)
-            .padding(.vertical, 8)
-            .background(
-              home == segment ? Color.white : JovieColor.surface1,
-              in: Capsule()
-            )
+          LibraryPillLabel(title: segment.title, isSelected: home == segment)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(home == segment ? [.isSelected] : [])
@@ -107,6 +97,8 @@ struct LibrarySurfaceView: View {
       .overlay {
         Capsule().stroke(JovieColor.borderSubtle, lineWidth: 1)
       }
+      .frame(minHeight: LibraryControlMetrics.minimumTouchTarget)
+      .contentShape(Rectangle())
       .padding(.horizontal, JovieSpacing.large)
       .padding(.bottom, JovieSpacing.small)
       .accessibilityIdentifier("library-search")
@@ -119,17 +111,7 @@ struct LibrarySurfaceView: View {
           Button {
             filter = chip
           } label: {
-            Text(chip.title)
-              .font(JovieFont.body(size: 13, weight: .semibold))
-              .foregroundStyle(
-                filter == chip ? JovieColor.backgroundBase : JovieColor.textSecondary
-              )
-              .padding(.horizontal, JovieSpacing.medium)
-              .padding(.vertical, 8)
-              .background(
-                filter == chip ? Color.white : JovieColor.surface1,
-                in: Capsule()
-              )
+            LibraryPillLabel(title: chip.title, isSelected: filter == chip)
           }
           .buttonStyle(.plain)
           .accessibilityAddTraits(filter == chip ? [.isSelected] : [])
@@ -150,7 +132,10 @@ struct LibrarySurfaceView: View {
         Image(systemName: "chevron.left")
           .font(.system(size: 16, weight: .semibold))
           .foregroundStyle(JovieColor.textPrimary)
-          .frame(width: 44, height: 44)
+          .frame(
+            width: LibraryControlMetrics.minimumTouchTarget,
+            height: LibraryControlMetrics.minimumTouchTarget
+          )
       }
       .buttonStyle(.plain)
       .accessibilityLabel("Back to collections")
@@ -266,6 +251,26 @@ struct LibrarySurfaceView: View {
       store.recent()
     }.value
     localVideoAssets = LibraryVlogVideos.assets(from: sessions, store: store)
+  }
+}
+
+private enum LibraryControlMetrics {
+  static let minimumTouchTarget: CGFloat = 44
+}
+
+private struct LibraryPillLabel: View {
+  let title: String
+  let isSelected: Bool
+
+  var body: some View {
+    Text(title)
+      .font(JovieFont.body(size: 13, weight: .semibold))
+      .foregroundStyle(isSelected ? JovieColor.backgroundBase : JovieColor.textSecondary)
+      .padding(.horizontal, JovieSpacing.medium)
+      .padding(.vertical, JovieSpacing.small)
+      .background(isSelected ? Color.white : JovieColor.surface1, in: Capsule())
+      .frame(minHeight: LibraryControlMetrics.minimumTouchTarget)
+      .contentShape(Rectangle())
   }
 }
 

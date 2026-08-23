@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- **iPhone Library controls are easier to tap without looking larger (JOV-5202):** Catalog, Collections, Ideas, filters, and search keep their compact native styling while exposing 44-point touch targets in portrait and landscape.
+
 - [internal] **FX remediates failed native merge_group CI (JOV-5303):** Rolling CI Dispatch now accepts completed `CI` `workflow_run` events whose producer is `merge_group`, resolves the source PR from the queue front ref, and launches FX against that branch. The previous pull_request-only gate left merge-queue failures unrepaired after UNMERGEABLE eject.
 
 - [internal] **ALLGREEN merge groups no longer UNMERGEABLE siblings on shrink-only design-system ratchets (JOV-5300):** `--linear-*` usage may drop below the JSON floor on `merge_group` without failing required unit shards. Growth still fails. Local / pull_request authorship still fail-closes until the changing PR lowers the baseline. Source `PR Ready` stays cheap (no unit/e2e ruleset expansion).
