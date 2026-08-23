@@ -59,13 +59,16 @@ describe('release downloads shell contract', () => {
       "import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';"
     );
     expect(source).toContain(
-      "import { PageContent, PageShell } from '@/components/organisms/PageShell';"
+      "import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';"
     );
-    expect(source).toContain('<PageShell');
+    expect(source).toContain('<AppShellContentPanel');
+    expect(source).toContain("frame='content-container'");
+    expect(source).toContain("scroll='page'");
     expect(source).toContain("data-testid='release-downloads-shell'");
-    expect(source).toContain('<PageContent>');
     expect(source).toContain('<ContentSectionHeader');
     expect(source).toContain('<ContentSurfaceCard');
+    expect(source).not.toContain('<PageContent>');
+    expect(source).not.toContain('import { PageShell }');
     expect(source).not.toContain("className='space-y-6'");
     expect(source).not.toContain(
       "className='flex min-h-0 flex-1 flex-col gap-4 px-3 py-3 sm:px-4 sm:py-4'"
