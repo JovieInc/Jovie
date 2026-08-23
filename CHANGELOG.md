@@ -9,6 +9,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - [internal] **Gem Fleet and Intake admission now share one host lock (JOV-5257):** mutating `reconcile -> gate-next` and issue-scoped `gate-next` take the same Gem `flock`. A contested lock fails closed with no Linear writes. Child timeout after possible effect requires receipt/lease reconciliation, never an automatic replay.
 
+- **Empty chat greets you and waits:** new conversations show one of Let's get it, Ready to start?, or Ready when you are above a blank input. No placeholder, logo, or What's next? line.
+
 - [internal] **MenuMonitor reports freshness instead of fake zeros (JOV-5305):** Initial loading hides counts, stale values say Last known, and action/error state reaches the accessible status item.
 
 - [internal] **Jovie, Symphony, and Summer/ops CI lanes no longer block each other (JOV-5288):** this repo's required checks stay the Jovie aggregates. Exclusive Symphony/control-plane or Summer/ops diffs skip Jovie app unit/build/typecheck suites; exclusive product diffs skip Symphony scripts typecheck. Mixed and unknown non-doc files fail closed onto the product lane. Migration Guard and secret scanning stay on.
