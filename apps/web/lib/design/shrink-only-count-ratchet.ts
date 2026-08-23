@@ -53,8 +53,17 @@ function isFiniteCount(value: number): boolean {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
+/**
+ * Map an event name onto the shrink-only policy.
+ *
+ * The argument is the source of truth. Explicit `undefined`, empty, or
+ * unknown names are `local` and never consult `GITHUB_EVENT_NAME`. A
+ * merge_group unit shard must not leak into those cases (JOV-5300).
+ * Production callers that want the live GitHub event pass
+ * `process.env.GITHUB_EVENT_NAME` themselves.
+ */
 export function resolveShrinkOnlyCountEvent(
-  eventName: string | undefined = process.env.GITHUB_EVENT_NAME
+  eventName: string | undefined
 ): ShrinkOnlyCountEvent {
   if (eventName === SHRINK_ONLY_COUNT_EVENTS.MERGE_GROUP) {
     return SHRINK_ONLY_COUNT_EVENTS.MERGE_GROUP;
@@ -74,7 +83,8 @@ export function evaluateShrinkOnlyCount(
     );
   }
 
-  const event = input.event ?? resolveShrinkOnlyCountEvent();
+  const event =
+    input.event ?? resolveShrinkOnlyCountEvent(process.env.GITHUB_EVENT_NAME);
   const metric = input.metric ?? 'count';
   const { count, baseline } = input;
 
