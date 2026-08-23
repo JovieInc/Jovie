@@ -45,26 +45,18 @@ describe('composeHudForPresentation', () => {
     for (const { sections } of composed) {
       expect(needSignalIds(sections)).toEqual([...HUD_NEED_SECTION_IDS]);
       expect(getHudNeedBand(sections).map(entry => entry.id)).toEqual([
-        'action-required',
         'cash-mrr',
-        'bottleneck',
-        'shipper',
-        'factory-health',
       ]);
       expect(getHudNeedBand(sections).map(entry => entry.testId)).toEqual([
-        HUD_SECTION_TEST_IDS['action-required'],
         HUD_SECTION_TEST_IDS['cash-mrr'],
-        HUD_SECTION_TEST_IDS.bottleneck,
-        HUD_SECTION_TEST_IDS.shipper,
-        HUD_SECTION_TEST_IDS['factory-health'],
       ]);
 
       const noiseIds = getHudNoiseBand(sections).map(entry => entry.id);
       expect(noiseIds.slice(0, 4)).toEqual([
-        'morning-walk',
-        'design-jury',
-        'velocity',
-        'agent-runs',
+        'action-required',
+        'bottleneck',
+        'shipper',
+        'factory-health',
       ]);
       expect(noiseIds).toEqual([...HUD_NOISE_SECTION_IDS]);
 
@@ -87,10 +79,7 @@ describe('composeHudForPresentation', () => {
       const needIds = needSignalIds(sections);
       expect(new Set(needIds).size).toBe(needIds.length);
       expect(needIds.filter(id => id === 'cash-mrr')).toHaveLength(1);
-      expect(needIds.filter(id => id === 'shipper')).toHaveLength(1);
-      expect(needIds.filter(id => id === 'factory-health')).toHaveLength(1);
-      expect(needIds.filter(id => id === 'action-required')).toHaveLength(1);
-      expect(needIds.filter(id => id === 'bottleneck')).toHaveLength(1);
+      expect(needIds).toHaveLength(1);
     }
   });
 
@@ -139,6 +128,18 @@ describe('composeHudForPresentation', () => {
     expect(source).not.toContain('FounderConversionHud');
     expect(source).not.toContain('founder-hud-mrr');
     expect(source).not.toContain('founder-hud-shipping-velocity');
+  });
+
+  it('routes the legacy cash band through the three-answer CEO overview', () => {
+    const source = readFileSync(
+      join(
+        TEST_DIR,
+        '../../../../components/features/admin/hud/HudCashMrrBand.tsx'
+      ),
+      'utf8'
+    );
+    expect(source).toContain('OvieCeoOverview');
+    expect(source).not.toContain('ContentMetricCard');
   });
 
   it('reuses FounderFunnelBand instead of a second funnel flowchart', () => {

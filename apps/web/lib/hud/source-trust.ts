@@ -71,7 +71,14 @@ function buildMercurySourceTrust(
   mercury: AdminMercuryMetrics,
   fetchedAtIso: string
 ): HudMetricSourceTrust {
-  const state = resolveExternalState(mercury.isConfigured, mercury.isAvailable);
+  const externalState = resolveExternalState(
+    mercury.isConfigured,
+    mercury.isAvailable
+  );
+  const state =
+    externalState === 'ok' && mercury.burnRateAvailable === false
+      ? 'degraded'
+      : externalState;
 
   return {
     key: 'mercury',
@@ -86,7 +93,9 @@ function buildMercurySourceTrust(
         ? 'Add MERCURY_API_TOKEN and MERCURY_CHECKING_ACCOUNT_ID to load runway.'
         : state === 'unavailable'
           ? 'Check Mercury API credentials and retry.'
-          : null,
+          : state === 'degraded'
+            ? 'Retry Mercury transactions before using burn or runway.'
+            : null,
   };
 }
 

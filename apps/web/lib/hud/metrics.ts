@@ -114,7 +114,10 @@ function calculateFinancialStatus(
   stripeMetrics: Awaited<ReturnType<typeof getAdminStripeOverviewMetrics>>,
   mercuryMetrics: Awaited<ReturnType<typeof getAdminMercuryMetrics>>
 ): FinancialStatus {
-  const canCalculate = stripeMetrics.isAvailable && mercuryMetrics.isAvailable;
+  const canCalculate =
+    stripeMetrics.isAvailable &&
+    mercuryMetrics.isAvailable &&
+    mercuryMetrics.burnRateAvailable !== false;
 
   if (!canCalculate) {
     const missingServices = [
@@ -197,6 +200,7 @@ export function buildDegradedHudMetrics(
     balanceUsd: 0,
     burnRateUsd: 0,
     burnWindowDays: 30,
+    burnRateAvailable: false,
     isConfigured: true,
     isAvailable: false,
     defaultStatus: 'unknown' as const,
@@ -359,7 +363,9 @@ async function fetchHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     mercuryMetrics
   );
   const financialDataAvailable =
-    stripeMetrics.isAvailable && mercuryMetrics.isAvailable;
+    stripeMetrics.isAvailable &&
+    mercuryMetrics.isAvailable &&
+    mercuryMetrics.burnRateAvailable !== false;
 
   const operationsStatus: HudMetrics['operations'] = {
     status: dbHealth.healthy ? 'ok' : 'degraded',

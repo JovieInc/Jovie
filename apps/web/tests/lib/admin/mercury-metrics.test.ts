@@ -3,6 +3,7 @@ import {
   clearAdminMercuryMetricsCache,
   getAdminMercuryMetrics,
 } from '@/lib/admin/mercury-metrics';
+import { ServerFetchTimeoutError } from '@/lib/http/server-fetch';
 
 const mockCaptureError = vi.hoisted(() => vi.fn());
 const fetchMock = vi.hoisted(() => vi.fn());
@@ -53,6 +54,7 @@ describe('getAdminMercuryMetrics', () => {
       balanceUsd: 0,
       burnRateUsd: 0,
       burnWindowDays: 30,
+      burnRateAvailable: false,
       isConfigured: false,
       isAvailable: false,
       defaultStatus: 'unknown',
@@ -91,6 +93,7 @@ describe('getAdminMercuryMetrics', () => {
     expect(metrics.balanceUsd).toBe(2500);
     expect(metrics.burnRateUsd).toBe(75);
     expect(metrics.burnWindowDays).toBe(30);
+    expect(metrics.burnRateAvailable).toBe(true);
     expect(metrics.isConfigured).toBe(true);
     expect(metrics.isAvailable).toBe(true);
     expect(metrics.defaultStatus).toBe('alive');
@@ -116,6 +119,7 @@ describe('getAdminMercuryMetrics', () => {
     expect(metrics.burnRateUsd).toBe(0);
     expect(metrics.isConfigured).toBe(true);
     expect(metrics.isAvailable).toBe(false);
+    expect(metrics.burnRateAvailable).toBe(false);
     expect(metrics.defaultStatus).toBe('unknown');
     expect(metrics.errorMessage).toContain('Mercury API error');
     expect(mockCaptureError).toHaveBeenCalledOnce();
@@ -204,6 +208,34 @@ describe('getAdminMercuryMetrics', () => {
     await getAdminMercuryMetrics();
 
     expect(fetchMock).toHaveBeenCalledOnce();
+    expect(mockCaptureError).toHaveBeenCalledOnce();
+  });
+
+  it('fails closed when balance succeeds but the burn window times out', async () => {
+    process.env.MERCURY_API_TOKEN = 'token';
+    process.env.MERCURY_CHECKING_ACCOUNT_ID = 'acct_123';
+
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ availableBalance: 2500 }),
+      })
+      .mockRejectedValueOnce(
+        new ServerFetchTimeoutError(
+          'Mercury transactions timed out',
+          5000,
+          'mercury-transactions'
+        )
+      );
+
+    const metrics = await getAdminMercuryMetrics();
+
+    expect(metrics.balanceUsd).toBe(2500);
+    expect(metrics.burnRateUsd).toBe(0);
+    expect(metrics.burnRateAvailable).toBe(false);
+    expect(metrics.isAvailable).toBe(true);
+    expect(metrics.defaultStatus).toBe('unknown');
+    expect(metrics.errorMessage).toContain('transaction window timed out');
     expect(mockCaptureError).toHaveBeenCalledOnce();
   });
 });

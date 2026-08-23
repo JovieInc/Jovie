@@ -6,15 +6,13 @@
  * `composeHudForPresentation` so the two densities cannot drift.
  */
 
-export const HUD_NEED_SECTION_IDS = [
+export const HUD_NEED_SECTION_IDS = ['cash-mrr'] as const;
+
+export const HUD_NOISE_SECTION_IDS = [
   'action-required',
-  'cash-mrr',
   'bottleneck',
   'shipper',
   'factory-health',
-] as const;
-
-export const HUD_NOISE_SECTION_IDS = [
   'morning-walk',
   'design-jury',
   'velocity',
@@ -46,7 +44,7 @@ export const HUD_SECTION_TEST_IDS = {
 
 export const HUD_SECTION_LABELS = {
   'action-required': 'Needs Tim',
-  'cash-mrr': 'Survival',
+  'cash-mrr': 'Company Now',
   bottleneck: 'Bottleneck',
   shipper: 'Delivery',
   'factory-health': 'Operating chain',

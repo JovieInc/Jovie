@@ -59,6 +59,8 @@ export interface AdminMercuryMetrics {
   balanceUsd: number;
   burnRateUsd: number;
   burnWindowDays: number;
+  /** False when the balance loaded but the transaction window did not. */
+  burnRateAvailable?: boolean;
   /** Indicates whether Mercury credentials are configured */
   isConfigured: boolean;
   /** Indicates whether the Mercury API call succeeded */
@@ -99,6 +101,7 @@ function buildUnconfiguredResponse(): AdminMercuryMetrics {
     balanceUsd: 0,
     burnRateUsd: 0,
     burnWindowDays: 30,
+    burnRateAvailable: false,
     isConfigured: false,
     isAvailable: false,
     defaultStatus: 'unknown',
@@ -112,6 +115,7 @@ function buildErrorResponse(message: string): AdminMercuryMetrics {
     balanceUsd: 0,
     burnRateUsd: 0,
     burnWindowDays: 30,
+    burnRateAvailable: false,
     isConfigured: true,
     isAvailable: false,
     defaultStatus: 'unknown',
@@ -293,10 +297,11 @@ async function loadAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
     // Fetch balance first — it's fast and most important for the HUD.
     const balanceUsd = await getCheckingBalanceUsd();
 
-    // Transactions can be slow (30-day pagination). If they time out, degrade
-    // gracefully: show the balance as available with burnRateUsd=0 rather than
-    // marking Mercury as unavailable entirely.
+    // Transactions can be slow (30-day pagination). Preserve the accurate
+    // balance when they time out, but never present missing burn as measured
+    // zero or use it to calculate company survival.
     let burnRateUsd = 0;
+    let burnRateAvailable = true;
     try {
       const transactions = await getCheckingTransactions(startDate, endDate);
       burnRateUsd = transactions.reduce((total, transaction) => {
@@ -308,6 +313,7 @@ async function loadAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
     } catch (txError) {
       if (txError instanceof ServerFetchTimeoutError) {
         // Degraded mode: balance is still accurate, burn rate unavailable.
+        burnRateAvailable = false;
         reportMercuryMetricsErrorOnce(
           'Mercury transactions timed out — burn rate unavailable',
           txError,
@@ -323,9 +329,15 @@ async function loadAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
       balanceUsd,
       burnRateUsd,
       burnWindowDays: 30,
+      burnRateAvailable,
       isConfigured: true,
       isAvailable: true,
-      defaultStatus: computeMercuryDefaultStatus(true, balanceUsd, burnRateUsd),
+      defaultStatus: burnRateAvailable
+        ? computeMercuryDefaultStatus(true, balanceUsd, burnRateUsd)
+        : 'unknown',
+      ...(burnRateAvailable
+        ? {}
+        : { errorMessage: 'Mercury transaction window timed out.' }),
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

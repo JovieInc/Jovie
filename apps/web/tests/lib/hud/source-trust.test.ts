@@ -124,6 +124,27 @@ describe('buildHudMetricSources', () => {
     expect(sources.mercury.nextStep).toContain('MERCURY_API_TOKEN');
   });
 
+  it('marks Mercury degraded when the balance loaded without burn', () => {
+    const sources = buildHudMetricSources(
+      buildInput({
+        mercury: {
+          balanceUsd: 5000,
+          burnRateUsd: 0,
+          burnWindowDays: 30,
+          burnRateAvailable: false,
+          isConfigured: true,
+          isAvailable: true,
+          defaultStatus: 'unknown',
+          errorMessage: 'Mercury transaction window timed out.',
+        },
+      })
+    );
+
+    expect(sources.mercury.state).toBe('degraded');
+    expect(sources.mercury.nextStep).toContain('Retry Mercury transactions');
+    expect(isHudMetricValueAvailable(sources.mercury)).toBe(false);
+  });
+
   it('marks GitHub as no_data when configured but empty', () => {
     const sources = buildHudMetricSources(
       buildInput({

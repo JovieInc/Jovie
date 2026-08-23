@@ -58,6 +58,7 @@ export type HudMetricSourceKey =
 
 export type HudMetricSourceState =
   | 'ok'
+  | 'degraded'
   | 'unavailable'
   | 'not_configured'
   | 'no_data';

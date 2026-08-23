@@ -7,6 +7,7 @@ import type { HudMetricSourceTrust as HudMetricSourceTrustType } from '@/types/h
 
 const STATE_LABELS = {
   ok: null,
+  degraded: 'Degraded',
   no_data: 'No data',
   unavailable: 'Fetch failed',
   not_configured: 'Not configured',
@@ -17,6 +18,7 @@ function getStatusTone(
   stale: boolean
 ): string {
   if (source.state === 'unavailable') return 'text-error';
+  if (source.state === 'degraded') return 'text-warning';
   if (source.state === 'not_configured') return 'text-warning';
   if (source.state === 'no_data') return 'text-tertiary-token';
   if (stale) return 'text-warning';
@@ -37,7 +39,9 @@ export function HudMetricSourceTrust({
   const stateLabel = STATE_LABELS[source.state];
   const showFreshness = source.state === 'ok' || source.state === 'no_data';
   const showReason =
-    source.state === 'unavailable' || source.state === 'not_configured';
+    source.state === 'unavailable' ||
+    source.state === 'not_configured' ||
+    source.state === 'degraded';
   const linkLabel = `Open ${source.label}`;
 
   return (
@@ -57,7 +61,10 @@ export function HudMetricSourceTrust({
           )}
         </p>
         <div className='flex shrink-0 items-center gap-2'>
-          {onRetry && (source.state === 'unavailable' || stale) ? (
+          {onRetry &&
+          (source.state === 'unavailable' ||
+            source.state === 'degraded' ||
+            stale) ? (
             <Button
               type='button'
               variant='link'
