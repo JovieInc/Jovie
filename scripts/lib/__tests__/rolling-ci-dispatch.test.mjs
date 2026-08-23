@@ -229,6 +229,50 @@ describe('rolling CI failure dispatch', () => {
     ).toBeNull();
   });
 
+  it('deliberate red: rejects the old pull_request-only producer gate', () => {
+    expect(TRUSTED_PRODUCER_EVENTS).toEqual(['pull_request', 'merge_group']);
+    expect(() =>
+      event({
+        source: { ...trustedSource, producerEvent: 'push' },
+      })
+    ).toThrow('failure source is not an authenticated CI workflow_run');
+    expect(() =>
+      event({
+        source: { ...trustedSource, producerEvent: 'workflow_dispatch' },
+      })
+    ).toThrow('failure source is not an authenticated CI workflow_run');
+    const queueSha = 'c'.repeat(40);
+    const bound = bindDispatchLiveHead({
+      producerEvent: 'merge_group',
+      liveHead: nextHead,
+      expectedHead: queueSha,
+    });
+    expect(bound).toEqual({
+      liveHead: queueSha,
+      reason: 'merge_group_synthetic_head',
+    });
+    expect(
+      runDispatch(
+        dispatchInput({
+          source: { ...trustedSource, producerEvent: 'merge_group' },
+          liveHead: bound?.liveHead,
+          headSha: queueSha,
+          checks: [
+            {
+              name: 'ci-fast',
+              conclusion: 'failure',
+              headSha: queueSha,
+              checkSuiteId: 44,
+            },
+          ],
+        })
+      )
+    ).toMatchObject({
+      action: 'dispatch_implementer',
+      mutate: true,
+    });
+  });
+
   it('deliberate red: rejects unauthenticated or PR-controlled events', () => {
     expect(() =>
       event({
@@ -452,6 +496,9 @@ describe('rolling CI dispatch CLI and workflow', () => {
     expect(WORKFLOW).not.toContain('JOVIE_BOT_PRIVATE_KEY');
     expect(WORKFLOW).not.toContain(
       'ref: ${{ github.event.workflow_run.head_sha }}'
+    );
+    expect(WORKFLOW).not.toMatch(
+      /github\.event\.workflow_run\.event == 'pull_request' &&\s*\n\s*github\.event\.workflow_run\.path == '\.github\/workflows\/ci\.yml'/
     );
   });
 });
