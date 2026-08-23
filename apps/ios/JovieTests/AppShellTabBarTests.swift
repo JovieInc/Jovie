@@ -273,6 +273,63 @@ struct LibraryFeedTests {
   }
 }
 
+struct LibraryItemScreenTests {
+  @Test func catalogTapOpensDedicatedScreenNotSheet() {
+    let asset = LibraryFeed.previewAssets[0]
+    #expect(LibraryItemPresentationPolicy.presentation(for: asset) == .dedicatedScreen)
+    #expect(LibraryItemPresentationPolicy.shouldOpenSheet(for: asset) == false)
+    #expect(LibraryItemPresentationPolicy.usesExistingRails())
+    #expect(AppShellPanePolicy.showsBottomTabBar() == false)
+  }
+
+  @Test func localVideoOpensDedicatedScreenNotPlayerSheet() {
+    let asset = LibraryAsset(
+      id: "vlog-ferry",
+      name: "Ferry vlog",
+      type: .video,
+      isPublic: false,
+      coverURL: nil,
+      liveStatLabel: "Recorded just now",
+      publicURL: nil,
+      localVideoURL: URL(fileURLWithPath: "/tmp/ferry.mp4")
+    )
+    #expect(LibraryItemPresentationPolicy.presentation(for: asset) == .dedicatedScreen)
+    #expect(LibraryItemPresentationPolicy.shouldOpenSheet(for: asset) == false)
+  }
+
+  @Test func itemScreenReusesExistingLeftAndRightPanes() {
+    #expect(LibraryItemPresentationPolicy.usesExistingRails())
+    #expect(AppShellPanePolicy.paneAfterLeadingSwipe(current: .none) == .sidebar)
+    #expect(AppShellPanePolicy.paneAfterTrailingSwipe(current: .none) == .rail)
+    #expect(AppShellPanePolicy.paneAfterDismiss() == .none)
+  }
+
+  @Test func entityMappingKeepsReleaseKindAndLabel() {
+    let asset = LibraryFeed.previewAssets[0]
+    let item = EntityContextItem.fromLibraryAsset(asset)
+    #expect(item.kind == .release)
+    #expect(item.entityID == "lib-release-midnight")
+    #expect(item.label == "Midnight Drive")
+    #expect(item.id == "release:lib-release-midnight")
+  }
+
+  @Test func merchMapsToTrackEntityWithoutInventingAKind() {
+    let asset = LibraryFeed.previewAssets[1]
+    let item = EntityContextItem.fromLibraryAsset(asset)
+    #expect(asset.type == .merch)
+    #expect(item.kind == .track)
+    #expect(item.label == "Tour Tee")
+  }
+
+  @Test func accessibilityIdentifiersStayStable() {
+    #expect(LibraryItemScreenMetrics.accessibilityIdentifier == "library-item-screen")
+    #expect(LibraryItemScreenMetrics.backAccessibilityIdentifier == "library-item-back")
+    #expect(LibraryItemScreenMetrics.titleAccessibilityIdentifier == "library-item-title")
+    #expect(LibraryItemScreenMetrics.coverSize == 72)
+    #expect(LibraryItemScreenMetrics.videoAspect == 16.0 / 9.0)
+  }
+}
+
 struct LibraryInboxCalendarLaunchModeTests {
   @Test func libraryArgumentsParseToLibraryFixtures() {
     #expect(LaunchMode.resolving(arguments: ["-ui-testing-library"], isXCTest: false) == .uiTestingLibrary)

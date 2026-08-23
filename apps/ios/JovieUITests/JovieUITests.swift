@@ -1269,6 +1269,54 @@ final class JovieUITests: XCTestCase {
     attachScreenshot(named: "library-populated", app: app)
   }
 
+  func testLibraryAssetTapOpensDedicatedItemScreen() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-library",
+      expectedElementDescription: "\"library-surface\""
+    ) {
+      $0.descendants(matching: .any)["library-surface"]
+    }
+
+    let asset = app.descendants(matching: .any)["library-asset-lib-release-midnight"]
+    XCTAssertTrue(
+      waitForHittable(asset, timeout: 3),
+      "Library asset was not hittable.\n\(app.debugDescription)"
+    )
+    asset.tap()
+
+    XCTAssertTrue(
+      app.descendants(matching: .any)["library-item-screen"].waitForExistence(timeout: 3),
+      "Library tap must open the dedicated left/main/right item screen.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      app.descendants(matching: .any)["entity-context-sheet"].exists,
+      "Library tap must not present the entity sheet.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      app.descendants(matching: .any)["library-video-player"].exists,
+      "Library tap must not present the video sheet.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      shellControlExists(app, identifier: "shell-tab-bar"),
+      "Library item screen must not restore bottom tabs.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.buttons["Open navigation drawer"].exists,
+      "Existing left rail must stay reachable on the item screen.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.buttons["library-item-back"].exists,
+      "Item screen must expose back to the library list.\n\(app.debugDescription)"
+    )
+
+    app.buttons["Open navigation drawer"].tap()
+    XCTAssertTrue(
+      app.buttons["shell-drawer-surface-shell-tab-chat"].waitForExistence(timeout: 3),
+      "Item screen must reuse the existing sidebar, not a new nav.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "library-item-screen", app: app)
+  }
+
   func testLibraryEmptyLaunchShowsEmptyFilterCopy() {
     let app = launchMockApp(
       launchArgument: "-ui-testing-library-empty",

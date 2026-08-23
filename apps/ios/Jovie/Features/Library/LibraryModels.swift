@@ -42,6 +42,47 @@ enum LibraryAssetType: String, CaseIterable, Identifiable, Sendable {
     case .video: return "Video"
     }
   }
+
+  var coverSymbol: String {
+    switch self {
+    case .release: return "opticaldisc"
+    case .merch: return "tshirt"
+    case .smartLink: return "link"
+    case .photo: return "photo"
+    case .press: return "doc.richtext"
+    case .video: return "video.fill"
+    }
+  }
+}
+
+enum LibraryItemPresentation: Equatable, Sendable {
+  case dedicatedScreen
+  case sheet
+}
+
+/// Library list tap owns a dedicated left/main/right screen inside the
+/// existing shell. Sheets are not the item destination (JOV-5210).
+enum LibraryItemPresentationPolicy {
+  static func presentation(for _: LibraryAsset) -> LibraryItemPresentation {
+    .dedicatedScreen
+  }
+
+  static func shouldOpenSheet(for asset: LibraryAsset) -> Bool {
+    presentation(for: asset) == .sheet
+  }
+
+  static func usesExistingRails() -> Bool {
+    true
+  }
+}
+
+enum LibraryItemScreenMetrics {
+  static let coverSize: CGFloat = 72
+  static let videoAspect: CGFloat = 16.0 / 9.0
+  static let accessibilityIdentifier = "library-item-screen"
+  static let backAccessibilityIdentifier = "library-item-back"
+  static let titleAccessibilityIdentifier = "library-item-title"
+  static let videoAccessibilityIdentifier = "library-item-video"
 }
 
 enum LibraryLandingPolicy {

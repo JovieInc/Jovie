@@ -1,4 +1,6 @@
+import AVKit
 import SwiftUI
+import UIKit
 
 /// Library homes: Catalog (releases/merch/docs), Collections (auto-bundled
 /// takes), Ideas (untagged dumps). Full-width native list. Smart links are
@@ -332,14 +334,7 @@ private struct LibraryAssetRow: View {
   }
 
   private var coverSymbol: String {
-    switch asset.type {
-    case .release: return "opticaldisc"
-    case .merch: return "tshirt"
-    case .smartLink: return "link"
-    case .photo: return "photo"
-    case .press: return "doc.richtext"
-    case .video: return "video.fill"
-    }
+    asset.type.coverSymbol
   }
 }
 
@@ -379,5 +374,199 @@ private struct LibraryCollectionRow: View {
         .padding(.leading, 76)
     }
     .accessibilityLabel("\(collection.name), \(collection.subtitle)")
+  }
+}
+
+/// Dedicated library item destination inside the existing left/main/right
+/// shell. Not a sheet — rails stay the existing drawer and entity rail.
+struct LibraryItemScreen: View {
+  let asset: LibraryAsset
+  let onBack: () -> Void
+  let onEditInChat: (String) -> Void
+
+  @State private var videoPlayer: AVPlayer?
+  @State private var didCopyLink = false
+
+  private var entity: EntityContextItem {
+    EntityContextItem.fromLibraryAsset(asset)
+  }
+
+  private var stats: EntityContextStats.Snapshot {
+    EntityContextStats.snapshot(for: entity)
+  }
+
+  private var linkURL: String {
+    asset.publicURL ?? entity.publicURL
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      backHeader
+      ScrollView {
+        VStack(alignment: .leading, spacing: JovieSpacing.xLarge) {
+          if asset.localVideoURL != nil {
+            videoSlot
+          }
+          identityRow
+          statsGrid
+          actions
+        }
+        .padding(JovieSpacing.xLarge)
+      }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .background(JovieColor.backgroundBase)
+    .accessibilityIdentifier(LibraryItemScreenMetrics.accessibilityIdentifier)
+    .onAppear {
+      if let url = asset.localVideoURL, videoPlayer == nil {
+        videoPlayer = AVPlayer(url: url)
+      }
+    }
+    .onDisappear {
+      videoPlayer?.pause()
+      videoPlayer = nil
+    }
+  }
+
+  private var backHeader: some View {
+    HStack(spacing: JovieSpacing.medium) {
+      Button(action: onBack) {
+        Image(systemName: "chevron.left")
+          .font(.system(size: 16, weight: .semibold))
+          .foregroundStyle(JovieColor.textPrimary)
+          .frame(width: 44, height: 44)
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel("Back to library")
+      .accessibilityIdentifier(LibraryItemScreenMetrics.backAccessibilityIdentifier)
+
+      VStack(alignment: .leading, spacing: 2) {
+        Text(asset.name)
+          .font(JovieFont.display(size: 20))
+          .foregroundStyle(JovieColor.textPrimary)
+          .lineLimit(1)
+          .accessibilityIdentifier(LibraryItemScreenMetrics.titleAccessibilityIdentifier)
+        Text(asset.typeBadge)
+          .font(JovieFont.body(size: 13))
+          .foregroundStyle(JovieColor.textTertiary)
+      }
+      Spacer(minLength: 0)
+    }
+    .padding(.horizontal, JovieSpacing.large)
+    .padding(.top, JovieSpacing.small)
+    .padding(.bottom, JovieSpacing.small)
+  }
+
+  private var videoSlot: some View {
+    ZStack {
+      Color.black
+      if let videoPlayer {
+        VideoPlayer(player: videoPlayer)
+      }
+    }
+    .aspectRatio(LibraryItemScreenMetrics.videoAspect, contentMode: .fit)
+    .frame(maxWidth: .infinity)
+    .clipShape(RoundedRectangle(cornerRadius: JovieRadius.large, style: .continuous))
+    .accessibilityIdentifier(LibraryItemScreenMetrics.videoAccessibilityIdentifier)
+  }
+
+  private var identityRow: some View {
+    HStack(alignment: .top, spacing: JovieSpacing.medium) {
+      ZStack {
+        RoundedRectangle(cornerRadius: JovieRadius.large, style: .continuous)
+          .fill(JovieColor.surface2)
+        if let coverURL = asset.coverURL {
+          CachedRemoteImageView(imageURL: coverURL, size: LibraryItemScreenMetrics.coverSize) {
+            coverFallback
+          }
+          .clipShape(RoundedRectangle(cornerRadius: JovieRadius.large, style: .continuous))
+        } else {
+          coverFallback
+        }
+      }
+      .frame(
+        width: LibraryItemScreenMetrics.coverSize,
+        height: LibraryItemScreenMetrics.coverSize
+      )
+
+      VStack(alignment: .leading, spacing: 4) {
+        Text(asset.visibilityBadge)
+          .font(JovieFont.body(size: 16, weight: .semibold))
+          .foregroundStyle(JovieColor.textPrimary)
+        Text(asset.isPublic ? linkURL : "Only you can see this.")
+          .font(JovieFont.body(size: 13))
+          .foregroundStyle(JovieColor.textTertiary)
+          .lineLimit(1)
+        Text(asset.liveStatLabel)
+          .font(JovieFont.body(size: 13))
+          .foregroundStyle(JovieColor.textTertiary)
+          .lineLimit(1)
+      }
+      Spacer(minLength: 0)
+    }
+    .frame(maxWidth: .infinity, minHeight: LibraryItemScreenMetrics.coverSize, alignment: .leading)
+    .padding(JovieSpacing.medium)
+    .background(JovieColor.surface1, in: RoundedRectangle(cornerRadius: JovieRadius.large, style: .continuous))
+  }
+
+  private var coverFallback: some View {
+    Image(systemName: asset.type.coverSymbol)
+      .font(.system(size: 22, weight: .semibold))
+      .foregroundStyle(JovieColor.textTertiary)
+  }
+
+  private var statsGrid: some View {
+    LazyVGrid(
+      columns: [
+        GridItem(.flexible(), spacing: JovieSpacing.medium),
+        GridItem(.flexible(), spacing: JovieSpacing.medium),
+      ],
+      spacing: JovieSpacing.medium
+    ) {
+      statTile(title: "Visits", value: stats.visits)
+      statTile(title: "Merch", value: stats.attachedMerch)
+      statTile(title: "Retargeting", value: stats.retargeting)
+      statTile(title: "Top Platform", value: stats.topPlatform)
+    }
+    .accessibilityIdentifier("library-item-stats")
+  }
+
+  private func statTile(title: String, value: String) -> some View {
+    VStack(alignment: .leading, spacing: JovieSpacing.xSmall) {
+      Text(title)
+        .font(JovieFont.body(size: 12, weight: .medium))
+        .foregroundStyle(JovieColor.textTertiary)
+      Text(value)
+        .font(JovieFont.body(size: 18, weight: .semibold))
+        .foregroundStyle(JovieColor.textPrimary)
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
+    }
+    .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+    .padding(JovieSpacing.medium)
+    .background(JovieColor.surface1, in: RoundedRectangle(cornerRadius: JovieRadius.large, style: .continuous))
+  }
+
+  private var actions: some View {
+    VStack(spacing: JovieSpacing.medium) {
+      Button {
+        onEditInChat("Edit \(asset.name) in chat")
+      } label: {
+        Text("Edit In Chat")
+          .frame(maxWidth: .infinity)
+      }
+      .buttonStyle(JoviePillButtonStyle(filled: true))
+      .accessibilityIdentifier("library-item-edit-in-chat")
+
+      Button {
+        UIPasteboard.general.string = linkURL
+        didCopyLink = true
+      } label: {
+        Text(didCopyLink ? "Copied" : "Copy Link")
+          .frame(maxWidth: .infinity)
+      }
+      .buttonStyle(JoviePillButtonStyle(filled: false))
+      .accessibilityIdentifier("library-item-copy-link")
+    }
   }
 }

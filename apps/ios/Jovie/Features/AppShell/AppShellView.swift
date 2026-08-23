@@ -178,6 +178,7 @@ struct AppShellView<
   @State private var talkVoiceService = VoiceCaptureService()
   @State private var teleprompterProposal: MobileChatVideoProposalPayload?
   @State private var libraryHome: LibraryHome = .catalog
+  @State private var selectedLibraryAsset: LibraryAsset?
   @State private var videoPlaybackAsset: LibraryAsset?
   @State private var publicProfileBrowserItem: PublicProfileBrowserDestination?
   @State private var isShowingProfileQR = false
@@ -624,6 +625,9 @@ struct AppShellView<
   }
 
   private func selectTab(_ tab: AppShellTab) {
+    if tab != .library {
+      selectedLibraryAsset = nil
+    }
     withAnimation(JovieMotion.easeOut(duration: JovieMotion.slowDuration)) {
       selectedTab = tab
     }
@@ -703,21 +707,20 @@ struct AppShellView<
   }
 
   private func presentEntityFromLibrary(_ asset: LibraryAsset) {
-    // Locally recorded teleprompter videos play back in place; every other
-    // asset maps into the entity sheet for a shared context surface.
-    if asset.type == .video, asset.localVideoURL != nil {
-      videoPlaybackAsset = asset
+    lastEntityContext = EntityContextItem.fromLibraryAsset(asset)
+    entityContext = nil
+    videoPlaybackAsset = nil
+
+    if LibraryItemPresentationPolicy.shouldOpenSheet(for: asset) {
+      entityContext = lastEntityContext
+      if asset.type == .video, asset.localVideoURL != nil {
+        videoPlaybackAsset = asset
+      }
       return
     }
 
-    let kind: MobileChatEntityKind
-    switch asset.type {
-    case .release: kind = .release
-    case .merch, .smartLink, .photo, .press, .video: kind = .track
-    }
-    presentEntity(
-      EntityContextItem(kind: kind, entityID: asset.id, label: asset.name)
-    )
+    selectedLibraryAsset = asset
+    applyOpenPane(.none)
   }
 
   static func resolvedInitialTab(
@@ -794,6 +797,9 @@ struct AppShellView<
   }
 
   private func closeDrawerThenSelect(_ tab: AppShellTab) {
+    if tab == .library {
+      selectedLibraryAsset = nil
+    }
     closeDrawer()
     DispatchQueue.main.asyncAfter(deadline: .now() + JovieMotion.cinematicDuration) {
       selectTab(tab)
@@ -838,7 +844,7 @@ struct AppShellView<
     case .chat:
       profileContent
     case .library:
-      libraryContent(presentEntityFromLibrary, $libraryHome)
+      libraryPagedContent
     case .calendar:
       calendarContent(openAudienceChat)
     case .inbox:
@@ -847,6 +853,32 @@ struct AppShellView<
       profileContent
     case .audience:
       audienceContent(openAudienceChat)
+    }
+  }
+
+  @ViewBuilder
+  private var libraryPagedContent: some View {
+    ZStack {
+      libraryContent(presentEntityFromLibrary, $libraryHome)
+        .opacity(selectedLibraryAsset == nil ? 1 : 0)
+        .allowsHitTesting(selectedLibraryAsset == nil)
+        .accessibilityHidden(selectedLibraryAsset != nil)
+
+      if let asset = selectedLibraryAsset {
+        LibraryItemScreen(
+          asset: asset,
+          onBack: {
+            selectedLibraryAsset = nil
+          },
+          onEditInChat: { prompt in
+            selectedLibraryAsset = nil
+            applyOpenPane(.none)
+            chatDraft = prompt
+            selectTab(.chat)
+          }
+        )
+        .id(asset.id)
+      }
     }
   }
 
