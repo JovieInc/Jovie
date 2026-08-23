@@ -3,11 +3,14 @@ import {
   classifyDesktopLoadFailure,
   decideAbortedMainFrameRecovery,
   decideHostedLoadRetry,
+  decideRecoveryUnlatch,
   decideRendererBootWatchdogAfterLoad,
   decideRendererLoadStart,
   decideRendererRecovery,
   decideRendererWatchdogExpiry,
   describeDesktopLoadFailure,
+  hostedUrlCandidates,
+  isLocalDevSiblingOrigin,
   isLoopbackAppUrl,
   LOCAL_RENDERER_BOOT_WATCHDOG_MS,
   LOCAL_RENDERER_LOAD_WATCHDOG_MS,
@@ -94,6 +97,12 @@ test('boot watchdog arms only for real hosted app-origin navigations', () => {
       'http://localhost:3112'
     )
   ).toBe(true);
+  expect(
+    shouldArmRendererBootWatchdog(
+      'http://localhost:3100/app/chat',
+      'http://localhost:3112'
+    )
+  ).toBe(true);
 
   // Only the app origin ever sends app-booted — any other http(s) origin must
   // not arm the watchdog or it is a guaranteed false-positive.
@@ -122,6 +131,57 @@ test('load watchdog covers hung navigation before did-finish-load', () => {
   expect(RENDERER_LOAD_WATCHDOG_MS).toBeGreaterThanOrEqual(15_000);
   expect(RENDERER_LOAD_WATCHDOG_MS).toBeLessThanOrEqual(20_000);
   expect(RENDERER_LOAD_WATCHDOG_MS).toBeGreaterThan(RENDERER_BOOT_WATCHDOG_MS);
+});
+
+test('recovery unlatches onto a warm local host without a Retry click', () => {
+  expect(
+    hostedUrlCandidates(
+      'http://localhost:3112',
+      'http://localhost:3112/app/chat'
+    )
+  ).toEqual([
+    'http://localhost:3112/app/chat',
+    'http://localhost:3100/app/chat',
+  ]);
+  expect(
+    hostedUrlCandidates('https://jov.ie', 'https://jov.ie/app/chat')
+  ).toEqual(['https://jov.ie/app/chat']);
+  expect(
+    isLocalDevSiblingOrigin(
+      'http://localhost:3100/app/chat',
+      'http://localhost:3112'
+    )
+  ).toBe(true);
+  expect(
+    isLocalDevSiblingOrigin(
+      'http://localhost:3999/app',
+      'http://localhost:3112'
+    )
+  ).toBe(false);
+  expect(
+    decideRecoveryUnlatch({
+      showingFailurePage: true,
+      booted: false,
+      windowDestroyed: false,
+      reachableHostedUrl: 'http://localhost:3100/app/chat',
+    })
+  ).toBe('reload-hosted');
+  expect(
+    decideRecoveryUnlatch({
+      showingFailurePage: true,
+      booted: true,
+      windowDestroyed: false,
+      reachableHostedUrl: 'http://localhost:3100/app/chat',
+    })
+  ).toBe('ignore');
+  expect(
+    decideRecoveryUnlatch({
+      showingFailurePage: true,
+      booted: false,
+      windowDestroyed: false,
+      reachableHostedUrl: null,
+    })
+  ).toBe('ignore');
 });
 
 test('local watchdogs wait out first Turbopack compile instead of painting recovery', () => {

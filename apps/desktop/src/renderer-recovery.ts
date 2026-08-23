@@ -154,6 +154,74 @@ export function isLoopbackAppUrl(appUrl: string): boolean {
   }
 }
 
+/** `dev:web:local` is :3100; older Jovie Local binaries baked :3112. */
+export const LOCAL_DEV_FALLBACK_PORTS = [3100, 3112] as const;
+
+/** Recapture 5:52 PT: recovery stayed up after GET / 200 in 0.73s. */
+export const RECOVERY_UNLATCH_POLL_MS = 1_000;
+
+export function hostedUrlCandidates(
+  appUrl: string,
+  hostedUrl: string
+): readonly string[] {
+  const unique = new Set<string>([hostedUrl]);
+  if (!isLoopbackAppUrl(appUrl)) {
+    return [...unique];
+  }
+
+  try {
+    const base = new URL(hostedUrl);
+    for (const port of LOCAL_DEV_FALLBACK_PORTS) {
+      const next = new URL(base.toString());
+      next.port = String(port);
+      unique.add(next.toString());
+    }
+  } catch {
+    return [...unique];
+  }
+
+  return [...unique];
+}
+
+export function isLocalDevSiblingOrigin(url: string, appUrl: string): boolean {
+  try {
+    const target = new URL(url);
+    const app = new URL(appUrl);
+    if (target.protocol !== 'http:' || app.protocol !== 'http:') {
+      return false;
+    }
+    if (target.hostname.toLowerCase() !== app.hostname.toLowerCase()) {
+      return false;
+    }
+    if (!isLoopbackAppUrl(appUrl)) {
+      return false;
+    }
+    const targetPort = Number(target.port || '80');
+    const appPort = Number(app.port || '80');
+    const allowed = new Set<number>([...LOCAL_DEV_FALLBACK_PORTS, appPort]);
+    return allowed.has(targetPort);
+  } catch {
+    return false;
+  }
+}
+
+export function decideRecoveryUnlatch(input: {
+  readonly showingFailurePage: boolean;
+  readonly booted: boolean;
+  readonly windowDestroyed: boolean;
+  readonly reachableHostedUrl: string | null;
+}): 'ignore' | 'reload-hosted' {
+  if (
+    input.windowDestroyed ||
+    input.booted ||
+    !input.showingFailurePage ||
+    !input.reachableHostedUrl
+  ) {
+    return 'ignore';
+  }
+  return 'reload-hosted';
+}
+
 export function classifyDesktopLoadFailure(input: {
   readonly reason: DesktopLoadFailureReason;
   readonly errorCode?: number;
@@ -317,7 +385,9 @@ export function shouldArmRendererBootWatchdog(
 
   try {
     const parsed = new URL(url);
-    return parsed.origin === appOrigin;
+    return (
+      parsed.origin === appOrigin || isLocalDevSiblingOrigin(url, appOrigin)
+    );
   } catch {
     return false;
   }

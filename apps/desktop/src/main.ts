@@ -61,12 +61,15 @@ import {
   classifyDesktopLoadFailure,
   decideAbortedMainFrameRecovery,
   decideHostedLoadRetry,
+  decideRecoveryUnlatch,
   decideRendererBootWatchdogAfterLoad,
   decideRendererLoadStart,
   decideRendererRecovery,
   decideRendererWatchdogExpiry,
   describeDesktopLoadFailure,
+  hostedUrlCandidates,
   parseDidStartNavigation,
+  RECOVERY_UNLATCH_POLL_MS,
   rendererWatchdogMs,
   shouldRecoverAuthHandoffToCanonicalShell,
   shouldSkipRendererWatchdogForAuthHandoff,
@@ -224,6 +227,7 @@ const rendererBootControllers = new Map<
   number,
   {
     readonly markBooted: () => void;
+    readonly beginRecoveryUnlatch: () => void;
     readonly dispose: () => void;
   }
 >();
@@ -1117,6 +1121,7 @@ function showDesktopLoadFailure(
 ): void {
   if (win.isDestroyed()) return;
   void win.loadURL(buildDesktopLoadFailureUrl(failure));
+  rendererBootControllers.get(win.webContents.id)?.beginRecoveryUnlatch();
 }
 
 async function probeAppUrl(url: string): Promise<boolean> {
@@ -1135,11 +1140,26 @@ async function probeAppUrl(url: string): Promise<boolean> {
   }
 }
 
-async function isAppOriginReachable(): Promise<boolean> {
-  if (await probeAppUrl(new URL('/api/health/build-info', APP_URL).toString())) {
-    return true;
+async function findReachableHostedUrl(
+  hostedUrl: string
+): Promise<string | null> {
+  for (const candidate of hostedUrlCandidates(APP_URL, hostedUrl)) {
+    const origin = new URL(candidate).origin;
+    if (await probeAppUrl(new URL('/api/health/build-info', origin).toString())) {
+      return candidate;
+    }
+    if (await probeAppUrl(origin)) {
+      return candidate;
+    }
+    if (await probeAppUrl(candidate)) {
+      return candidate;
+    }
   }
-  return probeAppUrl(APP_URL);
+  return null;
+}
+
+async function isAppOriginReachable(): Promise<boolean> {
+  return (await findReachableHostedUrl(APP_ENTRY_URL)) !== null;
 }
 
 function resolveLoadFailureView(
@@ -1310,6 +1330,7 @@ function attachRendererRecovery(
   let lastHostedUrl = APP_ENTRY_URL;
   let bootWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
   let loadWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
+  let recoveryUnlatchTimer: ReturnType<typeof setTimeout> | null = null;
   const webContentsId = win.webContents.id;
 
   const clearBootWatchdog = (): void => {
@@ -1329,6 +1350,48 @@ function attachRendererRecovery(
   const clearAllWatchdogs = (): void => {
     clearBootWatchdog();
     clearLoadWatchdog();
+  };
+
+  const stopRecoveryUnlatch = (): void => {
+    if (recoveryUnlatchTimer !== null) {
+      clearTimeout(recoveryUnlatchTimer);
+      recoveryUnlatchTimer = null;
+    }
+  };
+
+  const beginRecoveryUnlatch = (): void => {
+    stopRecoveryUnlatch();
+    // First probe does not wait for the data: URL to commit. Recapture 5:52
+    // PT had :3100 already warm while the recovery shell stayed latched.
+    let recoveryArmed = true;
+    const poll = (): void => {
+      if (win.isDestroyed() || rendererBooted) {
+        stopRecoveryUnlatch();
+        return;
+      }
+      void findReachableHostedUrl(lastHostedUrl).then(reachableHostedUrl => {
+        if (win.isDestroyed() || rendererBooted) {
+          stopRecoveryUnlatch();
+          return;
+        }
+        const action = decideRecoveryUnlatch({
+          showingFailurePage:
+            recoveryArmed ||
+            win.webContents.getURL().startsWith('data:text/html'),
+          booted: rendererBooted,
+          windowDestroyed: win.isDestroyed(),
+          reachableHostedUrl,
+        });
+        if (action === 'reload-hosted' && reachableHostedUrl) {
+          recoveryArmed = false;
+          lastHostedUrl = reachableHostedUrl;
+          void win.loadURL(reachableHostedUrl);
+          return;
+        }
+        recoveryUnlatchTimer = setTimeout(poll, RECOVERY_UNLATCH_POLL_MS);
+      });
+    };
+    poll();
   };
 
   const recoverOrShowFailure = (
@@ -1459,12 +1522,15 @@ function attachRendererRecovery(
     rendererCrashReloadCount = 0;
     hostedLoadRetryCount = 0;
     clearAllWatchdogs();
+    stopRecoveryUnlatch();
   };
 
   rendererBootControllers.set(webContentsId, {
     markBooted: markRendererBooted,
+    beginRecoveryUnlatch,
     dispose: () => {
       clearAllWatchdogs();
+      stopRecoveryUnlatch();
       rendererBootControllers.delete(webContentsId);
     },
   });

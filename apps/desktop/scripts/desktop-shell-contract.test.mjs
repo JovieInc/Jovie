@@ -101,6 +101,10 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /decideHostedLoadRetry/);
   assert.match(mainSource, /rendererEverBooted/);
   assert.match(mainSource, /function isAppOriginReachable\(\)/);
+  assert.match(mainSource, /function findReachableHostedUrl\(/);
+  assert.match(mainSource, /beginRecoveryUnlatch/);
+  assert.match(mainSource, /decideRecoveryUnlatch/);
+  assert.match(recoverySource, /hostedUrlCandidates/);
   assert.match(recoverySource, /Jovie couldn’t load/);
   assert.match(recoverySource, /Check your connection, then try again\./);
   assert.match(recoverySource, /Local Jovie isn’t running at/);
