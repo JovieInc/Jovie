@@ -34,6 +34,7 @@ struct MobileChatView: View {
   @FocusState private var isComposerFocused: Bool
   @State private var isAtBottom = true
   @State private var userEditedSinceSend = false
+  @State private var emptyGreeting = ChatEmptyGreeting.takeNext()
 
   init(
     repository: ChatRepository,
@@ -204,7 +205,6 @@ struct MobileChatView: View {
         draft: $draft,
         isComposerFocused: $isComposerFocused,
         isSending: repository.isSending,
-        isOffline: repository.isOffline,
         onSend: {
           let text = draft
           draft = ""
@@ -249,28 +249,13 @@ struct MobileChatView: View {
       VStack(spacing: JovieSpacing.large) {
         Spacer(minLength: 120)
 
-        VStack(spacing: JovieSpacing.large) {
-          JovieLogoMark(size: 34)
-
-          VStack(spacing: JovieSpacing.small) {
-            Text("Ask Jovie")
-              .font(JovieFont.display(size: 28))
-              .foregroundStyle(JovieColor.textPrimary)
-              .multilineTextAlignment(.center)
-
-            Text(
-              repository.isOffline
-                ? "Offline. Drafts stay on this device and cached history remains available."
-                : "Ask Jovie about your profile, releases, and next moves."
-            )
-            .font(JovieFont.body(size: 15))
-            .foregroundStyle(JovieColor.textTertiary)
-            .multilineTextAlignment(.center)
-            .fixedSize(horizontal: false, vertical: true)
-          }
-        }
-        .frame(maxWidth: 330)
-        .padding(.horizontal, JovieSpacing.xLarge)
+        Text(emptyGreeting)
+          .font(JovieFont.display(size: 28))
+          .foregroundStyle(JovieColor.textPrimary)
+          .multilineTextAlignment(.center)
+          .frame(maxWidth: 330)
+          .padding(.horizontal, JovieSpacing.xLarge)
+          .accessibilityIdentifier("chat-empty-state-greeting")
 
         Spacer(minLength: 48)
       }

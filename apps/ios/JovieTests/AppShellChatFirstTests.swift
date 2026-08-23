@@ -127,6 +127,24 @@ struct AppShellChatFirstTests {
     #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "Ask Jovie", isSending: false))
   }
 
+  @Test func emptyChatGreetingLocksTheExactRotateSet() {
+    let suiteName = "chat-empty-greeting-tests"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.removePersistentDomain(forName: suiteName)
+
+    #expect(ChatEmptyGreeting.all == [
+      "Let's get it",
+      "Ready to start?",
+      "Ready when you are",
+    ])
+    #expect(ChatEmptyGreeting.still == "Let's get it")
+    #expect(ChatEmptyGreeting.takeNext(defaults: defaults) == "Let's get it")
+    #expect(ChatEmptyGreeting.takeNext(defaults: defaults) == "Ready to start?")
+    #expect(ChatEmptyGreeting.takeNext(defaults: defaults) == "Ready when you are")
+    #expect(ChatEmptyGreeting.takeNext(defaults: defaults) == "Let's get it")
+    #expect(ChatEmptyGreeting.all.contains("What's next?") == false)
+  }
+
   @Test func composerPlusDisablesWhileSending() {
     #expect(ChatComposerMetrics.isPlusEnabled(isSending: false))
     #expect(ChatComposerMetrics.isPlusEnabled(isSending: true) == false)
