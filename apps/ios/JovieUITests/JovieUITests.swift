@@ -650,8 +650,13 @@ final class JovieUITests: XCTestCase {
       "Offline chat launch showed more than one standalone offline status indicator.\n\(app.debugDescription)"
     )
     XCTAssertTrue(
-      app.staticTexts["Offline. Drafts stay on this device and cached history remains available."].exists,
-      "Offline chat empty state did not explain draft/cache behavior.\n\(app.debugDescription)"
+      app.staticTexts["chat-empty-greeting"].exists,
+      "Empty chat must show one locked rotating greeting.\n\(app.debugDescription)"
+    )
+    let greeting = app.staticTexts["chat-empty-greeting"].label
+    XCTAssertTrue(
+      ["Let's get it", "Ready to start?", "Ready when you are"].contains(greeting),
+      "Empty chat greeting drifted off the locked rotate set: \(greeting)\n\(app.debugDescription)"
     )
     XCTAssertTrue(app.textFields["chat-composer-input"].exists)
 
