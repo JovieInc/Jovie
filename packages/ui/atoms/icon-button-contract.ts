@@ -4,7 +4,8 @@
  * One size/variant registry for every icon-only button in the product.
  * The client `IconButton` (./icon-button) is the only implementation; the
  * legacy web atoms (CircleIconButton, AppIconButton, HeaderIconButton,
- * InlineIconButton, DrawerInlineIconButton) are thin compat wrappers over it.
+ * InlineIconButton, DrawerInlineIconButton, TableIconButton) are thin compat
+ * wrappers over it.
  *
  * Sizes map 1:1 onto the base Button `icon-*` sizes (24/28/32/40/44px
  * containers). Every size below 44px keeps the Button 44px pseudo-element
@@ -21,6 +22,10 @@ export const ICON_BUTTON_VARIANT_NAMES = [
   'pearlQuiet',
   'control',
   'inline',
+  'overflowDrawer',
+  'overflowSegment',
+  'railToggle',
+  'destructive',
 ] as const;
 
 export const ICON_BUTTON_SIZE_NAMES = ['xs', 'sm', 'md', 'lg', 'xl'] as const;

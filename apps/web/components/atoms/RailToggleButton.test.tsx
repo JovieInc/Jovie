@@ -46,11 +46,11 @@ describe('RailToggleButton', () => {
 
     const button = screen.getByTestId('left-toggle');
     expect(button).toHaveAttribute('data-rail-toggle', 'left');
-    expect(button).toHaveAttribute('data-icon-button-variant', 'secondary');
+    expect(button).toHaveAttribute('data-icon-button-variant', 'railToggle');
     expect(button).toHaveAttribute('data-icon-button-size', 'sm');
     expect(button).toHaveAttribute('aria-expanded', 'true');
     expect(button).toHaveAttribute('aria-pressed', 'true');
-    expect(button.className).toContain('aria-pressed:bg-interactive-active');
+    expect(button).not.toHaveClass('aria-pressed:bg-interactive-active');
     expect(button.className).not.toContain('active:scale');
     expect(screen.getByTestId('left-icon')).toHaveAttribute(
       'aria-hidden',
@@ -78,7 +78,7 @@ describe('RailToggleButton', () => {
     expect(button).toHaveAttribute('aria-expanded', 'false');
     expect(button).toHaveAttribute('aria-pressed', 'false');
     expect(button).toHaveAttribute('aria-label', 'Show profile');
-    expect(button).toHaveAttribute('data-icon-button-variant', 'secondary');
+    expect(button).toHaveAttribute('data-icon-button-variant', 'railToggle');
     expect(button).toHaveAttribute('data-icon-button-size', 'sm');
   });
 });

@@ -61,6 +61,30 @@ test('founder-locked state fails closed without a verified Pen export and receip
   assert.ok(issueCodes(input).includes('unverified-founder-lock'));
 });
 
+test('source-bound components may remain authoritative without a Pen master', () => {
+  const input = fixture();
+  const iconButton = input.manifest.components.find(
+    component => component.id === 'atom.icon-button'
+  );
+
+  assert.equal(iconButton.state, 'source-bound');
+  assert.equal(iconButton.penRootId, null);
+  assert.equal(issueCodes(input).includes('invalid-pen-root'), false);
+  assert.equal(
+    issueCodes(input).includes('registry-pen-binding-missing'),
+    false
+  );
+
+  for (const state of ['candidate', 'deprecated', 'draft', 'founder-locked']) {
+    iconButton.state = state;
+    const nonSourceBoundCodes = issueCodes(input);
+    assert.ok(nonSourceBoundCodes.includes('invalid-pen-root'), state);
+    if (state === 'founder-locked') {
+      assert.ok(nonSourceBoundCodes.includes('registry-pen-binding-missing'));
+    }
+  }
+});
+
 test('source changes require an explicit source digest revision', () => {
   const input = fixture();
   input.manifest.components[0].sourceDigest = '0'.repeat(64);
@@ -196,6 +220,13 @@ test('family-map Button bindings count as a Pen root and reject the retired scal
   );
   input.manifest.components[0].penRootId = 'L2SRKu';
   assert.ok(issueCodes(input).includes('contract-pen-root-mismatch'));
+});
+
+test('a reference-eligible source component cannot drop its manifest Pen binding', () => {
+  const input = fixture();
+  input.manifest.components[0].penRootId = null;
+
+  assert.ok(issueCodes(input).includes('registry-pen-binding-missing'));
 });
 
 test('unsafe or ambiguous changed paths fail selector validation', () => {

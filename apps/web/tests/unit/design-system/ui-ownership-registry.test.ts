@@ -78,6 +78,28 @@ describe('cross-surface UI ownership registry', () => {
     }
   });
 
+  it('proves the native icon-button adapter symbol and attached consumers', () => {
+    const themeSource = fs.readFileSync(
+      path.join(root, 'apps/ios/Jovie/DesignSystem/JovieTheme.swift'),
+      'utf8'
+    );
+    expect(themeSource).toMatch(/struct JovieIconButtonStyle:\s*ButtonStyle/);
+
+    for (const consumerPath of [
+      'apps/ios/Jovie/Features/Dashboard/PublicProfileBrowserView.swift',
+      'apps/ios/Jovie/Features/Chat/MobileChatView.swift',
+      'apps/ios/Jovie/Features/Settings/SettingsView.swift',
+    ]) {
+      const consumerSource = fs.readFileSync(
+        path.join(root, consumerPath),
+        'utf8'
+      );
+      expect(consumerSource, consumerPath).toContain(
+        '.buttonStyle(JovieIconButtonStyle())'
+      );
+    }
+  });
+
   it('resolves authenticated recipes and ownership to one content-panel owner', () => {
     const registeredOwner = APP_SCREEN_COMPONENT_REGISTRY.find(
       entry => entry.id === 'component.app-shell-content-panel'

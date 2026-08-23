@@ -19,8 +19,8 @@ import {
  * Single size/variant contract for every icon button in the product, built on
  * the base Button so the focus ring, disabled state, and 44px hit target are
  * identical everywhere. The legacy web atoms (CircleIconButton,
- * AppIconButton, HeaderIconButton, InlineIconButton, DrawerInlineIconButton)
- * are thin compat wrappers over this component.
+ * AppIconButton, HeaderIconButton, InlineIconButton, DrawerInlineIconButton,
+ * TableIconButton) are thin compat wrappers over this component.
  */
 
 const ICON_BUTTON_SIZE_TO_BUTTON_SIZE: Record<IconButtonSize, ButtonSize> = {
@@ -44,12 +44,23 @@ const ICON_BUTTON_VARIANT_TO_BUTTON_VARIANT: Record<
   pearlQuiet: 'ghost',
   control: 'ghost',
   inline: 'ghost',
+  overflowDrawer: 'ghost',
+  overflowSegment: 'ghost',
+  railToggle: 'ghost',
+  destructive: 'primary',
 };
 
 // Shared chrome for the circular surface family (profile chrome, auth back
 // buttons): soft-material layering plus the legacy circular transition.
 const CIRCLE_CHROME_CLASSNAME =
   'relative isolate cursor-pointer overflow-hidden transition-colors duration-subtle ease-subtle';
+
+const OVERFLOW_CHROME_CLASSNAME = cn(
+  CIRCLE_CHROME_CLASSNAME,
+  'relative shrink-0 w-auto overflow-visible border border-subtle bg-transparent px-2 text-tertiary-token shadow-none',
+  'hover:border-default hover:bg-surface-0 hover:text-primary-token',
+  'aria-expanded:border-default aria-expanded:bg-interactive-active aria-expanded:text-primary-token'
+);
 
 const iconButtonVariants = cva(
   // Shared base: uniform reduced-motion + touch behavior. Focus ring and
@@ -117,6 +128,13 @@ const iconButtonVariants = cva(
         // Inline - transparent drawer/edit affordance
         inline:
           'shrink-0 p-0.5 text-secondary-token leading-none shadow-none transition-[opacity,background-color,color,box-shadow,transform] duration-subtle ease-subtle hover:bg-surface-1 focus-visible:bg-surface-1 [&_svg]:block',
+        // Overflow menu adapters keep their reviewed drawer/segment density,
+        // while Button remains the only owner of focus and hit-target state.
+        overflowDrawer: cn(OVERFLOW_CHROME_CLASSNAME, 'min-h-7'),
+        overflowSegment: cn(OVERFLOW_CHROME_CLASSNAME, 'h-7'),
+        railToggle:
+          'border-transparent bg-transparent text-tertiary-token shadow-none transition-[background-color,color,box-shadow] duration-subtle hover:border-transparent hover:bg-surface-0 hover:text-primary-token focus-visible:border-transparent focus-visible:bg-surface-0 active:border-transparent active:bg-surface-0',
+        destructive: cn(CIRCLE_CHROME_CLASSNAME, 'overflow-visible'),
       },
       size: {
         // Glyph sizing is only enforced for the compact control/header
@@ -136,7 +154,10 @@ const iconButtonVariants = cva(
   }
 );
 
-export type IconButtonProps = Omit<ButtonProps, 'size' | 'variant'> & {
+export type IconButtonProps = Omit<
+  ButtonProps,
+  'destructive' | 'size' | 'variant'
+> & {
   /** Visual variant from the canonical icon-button contract. */
   readonly variant?: IconButtonVariant;
   /** Container size: xs 24 / sm 28 / md 32 / lg 40 / xl 44px. */
@@ -166,11 +187,12 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
     return (
       <Button
         ref={ref}
+        {...props}
         variant={ICON_BUTTON_VARIANT_TO_BUTTON_VARIANT[variant]}
+        destructive={variant === 'destructive'}
         size={ICON_BUTTON_SIZE_TO_BUTTON_SIZE[size]}
         className={cn(iconButtonVariants({ variant, size }), className)}
         aria-label={resolvedAriaLabel}
-        {...props}
       >
         {children}
       </Button>

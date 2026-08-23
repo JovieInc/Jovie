@@ -2,10 +2,6 @@
 
 import { IconButton, TooltipShortcut } from '@jovie/ui';
 import { Icon, type IconName } from '@/components/atoms/Icon';
-import { cn } from '@/lib/utils';
-
-export const RAIL_TOGGLE_BUTTON_CLASS =
-  'text-tertiary-token aria-pressed:bg-interactive-active aria-pressed:text-primary-token';
 
 interface RailToggleButtonProps {
   readonly side: 'left' | 'right';
@@ -49,7 +45,7 @@ export function RailToggleButton({
   const button = (
     <IconButton
       type='button'
-      variant='secondary'
+      variant='railToggle'
       size='sm'
       aria-label={label}
       aria-expanded={open}
@@ -58,7 +54,7 @@ export function RailToggleButton({
       disabled={disabled}
       data-testid={dataTestId}
       data-rail-toggle={side}
-      className={cn(RAIL_TOGGLE_BUTTON_CLASS, className)}
+      className={className}
     >
       <Icon
         name={iconName}

@@ -12,7 +12,7 @@ export {
   designSystemCanonicalPenRoot,
   designSystemVariantKey,
   getDesignSystemComponent,
-  validateDesignSystemCompatibilityConsumerSource,
+  ICON_BUTTON_LEGACY_RAW_CONSUMER_SOURCES,
   validateDesignSystemComponentRegistry,
 } from './componentRegistry';
 export type {

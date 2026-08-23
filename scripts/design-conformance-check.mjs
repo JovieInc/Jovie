@@ -31,7 +31,6 @@ const FOUNDER_LOCK_REQUIREMENTS = Object.freeze([
 ]);
 const LEGACY_UNBOUND_CEILING = new Set([
   'atom.brand-logo',
-  'atom.icon-button',
   'atom.link',
   'atom.logo',
   'atom.logo-link',
@@ -255,7 +254,11 @@ export function validateDesignConformance({
     if (!Number.isInteger(component.revision) || component.revision < 1) {
       add('invalid-component-revision', component.id);
     }
-    if (!PEN_ROOT_PATTERN.test(component.penRootId ?? '')) {
+    if (component.penRootId === null) {
+      if (component.state !== 'source-bound') {
+        add('invalid-pen-root', component.id);
+      }
+    } else if (!PEN_ROOT_PATTERN.test(component.penRootId ?? '')) {
       add('invalid-pen-root', component.id);
     } else if (penRoots.has(component.penRootId)) {
       add('duplicate-pen-root', component.penRootId);
@@ -319,7 +322,10 @@ export function validateDesignConformance({
       const contractRoots = [
         ...contractSource.matchAll(/\brootId:\s*'([^']+)'/g),
       ].map(item => item[1]);
-      if (!contractRoots.includes(component.penRootId)) {
+      if (
+        component.penRootId !== null &&
+        !contractRoots.includes(component.penRootId)
+      ) {
         add('contract-pen-root-mismatch', component.id);
       }
     }
@@ -372,7 +378,11 @@ export function validateDesignConformance({
     if (entry.source !== component.source) {
       add('registry-source-mismatch', component.id);
     }
-    if (!entry.referenceEligible || !entry.hasPenRoot) {
+    if (
+      (component.penRootId === null && entry.referenceEligible) ||
+      (component.state === 'founder-locked' &&
+        (!entry.referenceEligible || !entry.hasPenRoot))
+    ) {
       add('registry-pen-binding-missing', component.id);
     }
   }

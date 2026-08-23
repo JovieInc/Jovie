@@ -3,9 +3,19 @@ import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { OverflowMenuTrigger } from './overflow-menu-trigger';
+import {
+  OverflowMenuTrigger,
+  type OverflowMenuTriggerProps,
+} from './overflow-menu-trigger';
+
+type OverflowTriggerOwnsItsChildren =
+  'asChild' extends keyof OverflowMenuTriggerProps ? false : true;
+const overflowTriggerOwnsItsChildren: OverflowTriggerOwnsItsChildren = true;
 
 describe('OverflowMenuTrigger', () => {
+  it('does not expose asChild while it owns the trigger glyph', () => {
+    expect(overflowTriggerOwnsItsChildren).toBe(true);
+  });
   it('renders a button with a safe default label and type', () => {
     render(<OverflowMenuTrigger />);
 
@@ -46,6 +56,12 @@ describe('OverflowMenuTrigger', () => {
       'drawer'
     );
     expect(screen.getByRole('button')).toHaveAttribute('data-size', 'icon-sm');
+    expect(screen.getByRole('button')).toHaveClass(
+      'min-h-7',
+      'w-auto',
+      'border-subtle',
+      'px-2'
+    );
 
     rerender(
       <OverflowMenuTrigger variant='segment' aria-label='Segment overflow' />
@@ -54,7 +70,12 @@ describe('OverflowMenuTrigger', () => {
       'data-overflow-context',
       'segment'
     );
-    expect(screen.getByRole('button')).toHaveClass('h-7', 'w-7');
+    expect(screen.getByRole('button')).toHaveClass(
+      'h-7',
+      'w-auto',
+      'border-subtle',
+      'px-2'
+    );
   });
 
   it('inherits the 44px target and interaction states from IconButton', () => {
@@ -63,15 +84,23 @@ describe('OverflowMenuTrigger', () => {
 
     expect(trigger.className).toContain('before:h-11');
     expect(trigger.className).toContain('before:w-11');
+    expect(trigger.className).toContain('overflow-visible');
     expect(trigger.className).toContain('duration-subtle');
     expect(trigger.className).toContain('ease-subtle');
     expect(trigger.className).toContain('motion-reduce:transition-none');
-    expect(trigger.className).toContain('hover:bg-interactive-hover');
-    expect(trigger.className).toContain('focus-visible:bg-interactive-hover');
-    expect(trigger.className).toContain('active:bg-interactive-active');
-    expect(trigger.className).toContain(
-      'data-[state=open]:bg-interactive-active'
-    );
+    expect(trigger.className).toContain('hover:border-default');
+    expect(trigger.className).toContain('hover:bg-surface-0');
+    expect(trigger.className).toContain('aria-expanded:bg-interactive-active');
+  });
+
+  it('uses aria-expanded for the menu-open visual state', () => {
+    render(<OverflowMenuTrigger aria-expanded />);
+    const trigger = screen.getByRole('button');
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(trigger.className).toContain('aria-expanded:border-default');
+    expect(trigger.className).toContain('aria-expanded:bg-interactive-active');
+    expect(trigger.className).toContain('aria-expanded:text-primary-token');
   });
 
   it('forwards refs, custom classes, and click behavior', async () => {

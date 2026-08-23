@@ -22,6 +22,55 @@ export type DesignSystemComponentId =
 
 export type DesignSystemLayer = 'atom' | 'molecule' | 'organism';
 
+/**
+ * Shrink-only inventory of production web sources that still render the base
+ * Button's icon sizes directly. These are migration candidates, not canonical
+ * owners; new paths fail the registry test until they attach to IconButton.
+ */
+export const ICON_BUTTON_LEGACY_RAW_CONSUMER_SOURCES = [
+  'apps/web/app/app/(shell)/admin/investors/TokenCopyButton.tsx',
+  'apps/web/app/app/(shell)/admin/ops/HudDashboardClient.tsx',
+  'apps/web/app/app/(shell)/calendar/CalendarPageClient.tsx',
+  'apps/web/app/app/(shell)/chat/ChatEntityRightPanelHost.tsx',
+  'apps/web/app/app/(shell)/library/LibrarySurface.tsx',
+  'apps/web/app/investor-portal/_components/InvestorNav.tsx',
+  'apps/web/app/investor-portal/_components/InvestorThemeToggle.tsx',
+  'apps/web/app/ui/buttons/page.tsx',
+  'apps/web/components/features/admin/admin-users-table/AdminUserDetailDrawer.tsx',
+  'apps/web/components/features/admin/agent-os/AgentOsRunsPanel.tsx',
+  'apps/web/components/features/admin/leads/LeadKeywordsManager.tsx',
+  'apps/web/components/features/admin/leads/LeadTable.tsx',
+  'apps/web/components/features/chat/navigation-rail/ChatThreadNavigationRail.tsx',
+  'apps/web/components/features/dashboard/atoms/CopyLinkInput.tsx',
+  'apps/web/components/features/dashboard/organisms/DashboardFeedbackModal.tsx',
+  'apps/web/components/features/dashboard/organisms/dashboard-audience-table/DashboardAudienceTableUnified.tsx',
+  'apps/web/components/features/dashboard/organisms/profile-contact-sidebar/ProfileAboutTab.tsx',
+  'apps/web/components/features/dev/DevToolbarRows.tsx',
+  'apps/web/components/features/feedback/ErrorBanner.tsx',
+  'apps/web/components/features/library-asset-share/LibraryAssetShareUrlCell.tsx',
+  'apps/web/components/features/opportunity-inbox/OpportunityInboxCard.tsx',
+  'apps/web/components/feedback/Banner.tsx',
+  'apps/web/components/homepage/MeetJovieCarousel.tsx',
+  'apps/web/components/jovie/components/ChatComposerToolbar.tsx',
+  'apps/web/components/jovie/components/ChatFeedbackControl.tsx',
+  'apps/web/components/jovie/components/ChatFileChips.tsx',
+  'apps/web/components/jovie/components/ChatMessage.tsx',
+  'apps/web/components/jovie/components/ChatPitchCard.tsx',
+  'apps/web/components/jovie/components/ChatUploadManifest.tsx',
+  'apps/web/components/jovie/components/FeatureIntroCard.tsx',
+  'apps/web/components/jovie/components/ImagePreviewStrip.tsx',
+  'apps/web/components/molecules/drawer/DrawerSplitButton.tsx',
+  'apps/web/components/molecules/drawer/SidebarLinkRow.tsx',
+  'apps/web/components/organisms/RichTextEditor.tsx',
+  'apps/web/components/organisms/keyboard-shortcuts-sheet/KeyboardShortcutsSheet.tsx',
+  'apps/web/components/organisms/sidebar/controls.tsx',
+  'apps/web/components/organisms/user-button/UserButton.tsx',
+  'apps/web/components/shell/HeaderSearchSurface.tsx',
+  'apps/web/components/shell/PillSearch.tsx',
+  'apps/web/components/shell/SidebarThreadsSection.tsx',
+  'apps/web/components/shell/ThreadVideoCard.tsx',
+] as const;
+
 export interface DesignSystemCompatibilityConsumer {
   readonly source: string;
   readonly exportName: string;
@@ -121,6 +170,11 @@ export const DESIGN_SYSTEM_COMPONENT_REGISTRY = [
       {
         source: 'apps/web/components/atoms/RailToggleButton.tsx',
         exportName: 'RailToggleButton',
+        canonicalImportSource: '@jovie/ui',
+      },
+      {
+        source: 'apps/web/components/organisms/table/atoms/TableIconButton.tsx',
+        exportName: 'TableIconButton',
         canonicalImportSource: '@jovie/ui',
       },
     ],
@@ -284,7 +338,6 @@ export type DesignSystemRegistryIssueCode =
   | 'duplicate-component-id'
   | 'duplicate-compatibility-consumer'
   | 'invalid-compatibility-consumer'
-  | 'detached-canonical-consumer'
   | 'duplicate-pen-root'
   | 'missing-dependency'
   | 'missing-source-evidence'
@@ -294,36 +347,6 @@ export type DesignSystemRegistryIssueCode =
 export interface DesignSystemRegistryIssue {
   readonly code: DesignSystemRegistryIssueCode;
   readonly id: string;
-}
-
-const escapeRegExp = (value: string) =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-/**
- * Source-level admission check for a declared compatibility API. Metadata is
- * insufficient: the consumer must import and render the canonical owner.
- */
-export function validateDesignSystemCompatibilityConsumerSource(
-  entry: DesignSystemComponentRegistryEntry,
-  consumer: DesignSystemCompatibilityConsumer,
-  sourceText: string
-): readonly DesignSystemRegistryIssue[] {
-  const owner = escapeRegExp(entry.exportName);
-  const importSource = escapeRegExp(consumer.canonicalImportSource);
-  const importsOwner = new RegExp(
-    `import\\s*\\{[^}]*\\b${owner}\\b[^}]*\\}\\s*from\\s*['\"]${importSource}['\"]`,
-    'm'
-  ).test(sourceText);
-  const rendersOwner = new RegExp(`<${owner}(?:\\s|>)`, 'm').test(sourceText);
-
-  return importsOwner && rendersOwner
-    ? []
-    : [
-        {
-          code: 'detached-canonical-consumer',
-          id: `${entry.id}:${consumer.exportName}`,
-        },
-      ];
 }
 
 export function validateDesignSystemComponentRegistry(

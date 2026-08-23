@@ -31,7 +31,12 @@ import * as React from 'react';
 export type CircleIconButtonSize = 'xs' | 'sm' | 'md' | 'lg';
 export type CircleIconButtonVariant = Exclude<
   IconButtonVariant,
-  'control' | 'inline'
+  | 'control'
+  | 'inline'
+  | 'overflowDrawer'
+  | 'overflowSegment'
+  | 'railToggle'
+  | 'destructive'
 >;
 
 export interface CircleIconButtonProps

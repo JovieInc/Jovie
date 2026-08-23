@@ -41,12 +41,24 @@
       "testSources": ["packages/ui/atoms/button.test.tsx"],
       "penRootId": "g3IC1",
       "sourceDigest": "0a211ccfb8226b568c475757b9fdc58ba2cf8ece22dfcb870b258fe8f3380eb3"
+    },
+    {
+      "id": "atom.icon-button",
+      "state": "source-bound",
+      "revision": 1,
+      "platforms": ["web"],
+      "source": "packages/ui/atoms/icon-button.tsx",
+      "contractSource": "packages/ui/atoms/icon-button-contract.ts",
+      "tokenSources": ["packages/ui/theme/tokens.ts"],
+      "storySources": ["packages/ui/atoms/icon-button.stories.tsx"],
+      "testSources": ["packages/ui/atoms/icon-button.test.tsx"],
+      "penRootId": null,
+      "sourceDigest": "87516cbdb313caee6cc93f228a46698a9382e48b458d3ea17bfc2175e83a190f"
     }
   ],
   "legacy": {
     "unboundComponentIds": [
       "atom.brand-logo",
-      "atom.icon-button",
       "atom.link",
       "atom.logo",
       "atom.logo-link"

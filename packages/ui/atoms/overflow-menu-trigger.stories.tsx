@@ -21,7 +21,7 @@ export const ActiveOverflow: Story = {
 export const MenuOpen: Story = {
   args: {
     'aria-label': 'More actions',
-    'data-state': 'open',
+    'aria-expanded': true,
     hasActiveOverflow: true,
   },
 };

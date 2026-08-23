@@ -169,6 +169,49 @@ describe('IconButton', () => {
     }
   });
 
+  it('keeps destructive ownership on the variant despite unsafe passthrough props', () => {
+    const unsafeDisable = { destructive: false };
+    const { rerender } = render(
+      <IconButton {...unsafeDisable} ariaLabel='Delete' variant='destructive'>
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+
+    const button = screen.getByRole('button', { name: 'Delete' });
+    expect(button).toHaveAttribute('data-destructive', 'true');
+    expect(button).toHaveClass('bg-error');
+
+    rerender(
+      <IconButton
+        {...({ destructive: true } as Record<string, boolean>)}
+        ariaLabel='Ghost'
+        variant='ghost'
+      >
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+    expect(screen.getByRole('button', { name: 'Ghost' })).not.toHaveAttribute(
+      'data-destructive'
+    );
+  });
+
+  it('preserves rail interaction surfaces without an open-state fill', () => {
+    render(
+      <IconButton ariaLabel='Toggle rail' aria-pressed variant='railToggle'>
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+
+    const button = screen.getByRole('button', { name: 'Toggle rail' });
+    expect(button).toHaveClass(
+      'hover:bg-surface-0',
+      'focus-visible:bg-surface-0',
+      'active:bg-surface-0'
+    );
+    expect(button).not.toHaveClass('aria-pressed:bg-interactive-active');
+    expect(button).toHaveClass('focus-visible:ring-focus/55');
+  });
+
   it('accepts aria-label as an alternative to ariaLabel', () => {
     render(
       <IconButton aria-label='Close'>

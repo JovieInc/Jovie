@@ -1,7 +1,6 @@
 'use client';
 
-import { Button, SimpleTooltip } from '@jovie/ui';
-import { cn } from '@/lib/utils';
+import { IconButton, SimpleTooltip } from '@jovie/ui';
 
 export interface TableIconButtonProps {
   readonly icon: React.ReactNode;
@@ -21,15 +20,15 @@ export function TableIconButton({
   className,
 }: TableIconButtonProps) {
   const button = (
-    <Button
+    <IconButton
       variant={variant === 'danger' ? 'destructive' : 'ghost'}
-      size='icon'
+      size='lg'
       onClick={onClick}
-      aria-label={ariaLabel}
-      className={cn('h-10 w-10', className)}
+      ariaLabel={ariaLabel}
+      className={className}
     >
       {icon}
-    </Button>
+    </IconButton>
   );
 
   if (tooltip) {

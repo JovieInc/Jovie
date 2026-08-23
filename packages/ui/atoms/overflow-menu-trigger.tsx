@@ -7,7 +7,10 @@ import { cn } from '../lib/utils';
 import { IconButton, type IconButtonProps } from './icon-button';
 
 export interface OverflowMenuTriggerProps
-  extends Omit<IconButtonProps, 'ariaLabel' | 'children' | 'size' | 'variant'> {
+  extends Omit<
+    IconButtonProps,
+    'ariaLabel' | 'asChild' | 'children' | 'size' | 'variant'
+  > {
   /** Whether the active tab is hidden in the overflow menu */
   readonly hasActiveOverflow?: boolean;
   /** Retained for TabBar API compatibility; both contexts use one atom. */
@@ -20,7 +23,7 @@ export interface OverflowMenuTriggerProps
  */
 export const OverflowMenuTrigger = React.forwardRef<
   HTMLButtonElement,
-  OverflowMenuTriggerProps & React.ButtonHTMLAttributes<HTMLButtonElement>
+  OverflowMenuTriggerProps
 >(
   (
     {
@@ -42,12 +45,9 @@ export const OverflowMenuTrigger = React.forwardRef<
       }
       data-active-overflow={hasActiveOverflow ? 'true' : undefined}
       data-overflow-context={variant ?? 'drawer'}
-      variant='secondary'
+      variant={variant === 'segment' ? 'overflowSegment' : 'overflowDrawer'}
       size='sm'
-      className={cn(
-        'relative shrink-0 data-[state=open]:bg-interactive-active data-[state=open]:text-primary-token',
-        className
-      )}
+      className={cn('relative shrink-0', className)}
     >
       <MoreHorizontal
         className='size-3.5'

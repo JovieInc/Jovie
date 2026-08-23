@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
@@ -11,9 +12,11 @@ import {
   BUTTON_PEN_PROPAGATION_FIXTURES,
   DESIGN_SYSTEM_COMPONENT_IDS,
   DESIGN_SYSTEM_COMPONENT_REGISTRY,
+  type DesignSystemCompatibilityConsumer,
+  type DesignSystemComponentRegistryEntry,
   designSystemVariantKey,
+  ICON_BUTTON_LEGACY_RAW_CONSUMER_SOURCES,
   normalizeButtonPenRef,
-  validateDesignSystemCompatibilityConsumerSource,
   validateDesignSystemComponentRegistry,
 } from '@/data/designSystem';
 import {
@@ -63,6 +66,163 @@ function parseTsx(absolutePath: string, source: string): ts.SourceFile {
     true,
     ts.ScriptKind.TSX
   );
+}
+
+function hasRawIconSizedButton(sourcePath: string, source: string): boolean {
+  if (!/size\s*=\s*(?:['"]icon|\{\s*['"]icon)/.test(source)) return false;
+  const sourceFile = parseTsx(sourcePath, source);
+  const buttonNames = new Set<string>();
+
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement)) continue;
+    const bindings = statement.importClause?.namedBindings;
+    if (!bindings || !ts.isNamedImports(bindings)) continue;
+    for (const element of bindings.elements) {
+      if ((element.propertyName?.text ?? element.name.text) === 'Button') {
+        buttonNames.add(element.name.text);
+      }
+    }
+  }
+
+  let found = false;
+  const visit = (node: ts.Node): void => {
+    if (
+      !found &&
+      (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
+      buttonNames.has(node.tagName.getText(sourceFile))
+    ) {
+      const size = node.attributes.properties.find(
+        property =>
+          ts.isJsxAttribute(property) &&
+          property.name.getText(sourceFile) === 'size'
+      );
+      if (size && ts.isJsxAttribute(size)) {
+        const initializer = size.initializer;
+        const value =
+          initializer && ts.isStringLiteral(initializer)
+            ? initializer.text
+            : initializer &&
+                ts.isJsxExpression(initializer) &&
+                initializer.expression &&
+                ts.isStringLiteral(initializer.expression)
+              ? initializer.expression.text
+              : null;
+        found = value === 'icon' || value?.startsWith('icon-') === true;
+      }
+    }
+    if (!found) ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return found;
+}
+
+function rawIconButtonConsumerIssue(
+  sourcePath: string,
+  source: string
+): 'unregistered-raw-icon-button-consumer' | null {
+  return hasRawIconSizedButton(sourcePath, source) &&
+    !ICON_BUTTON_LEGACY_RAW_CONSUMER_SOURCES.includes(
+      sourcePath as (typeof ICON_BUTTON_LEGACY_RAW_CONSUMER_SOURCES)[number]
+    )
+    ? 'unregistered-raw-icon-button-consumer'
+    : null;
+}
+
+function canonicalConsumerAttachmentIssue(
+  entry: DesignSystemComponentRegistryEntry,
+  consumer: DesignSystemCompatibilityConsumer,
+  source: string
+): 'detached-canonical-consumer' | null {
+  const sourceFile = parseTsx(consumer.source, source);
+  let localOwnerName: string | null = null;
+  let consumerDeclaration: ts.Node | null = null;
+  const competingOwnerNames = new Set<string>();
+
+  for (const statement of sourceFile.statements) {
+    if (
+      ts.isImportDeclaration(statement) &&
+      ts.isStringLiteral(statement.moduleSpecifier) &&
+      statement.moduleSpecifier.text === consumer.canonicalImportSource
+    ) {
+      const bindings = statement.importClause?.namedBindings;
+      if (bindings && ts.isNamedImports(bindings)) {
+        const ownerImport = bindings.elements.find(
+          element =>
+            (element.propertyName?.text ?? element.name.text) ===
+            entry.exportName
+        );
+        localOwnerName = ownerImport?.name.text ?? null;
+        for (const element of bindings.elements) {
+          if ((element.propertyName?.text ?? element.name.text) === 'Button') {
+            competingOwnerNames.add(element.name.text);
+          }
+        }
+      }
+    }
+
+    const exported = statement.modifiers?.some(
+      modifier => modifier.kind === ts.SyntaxKind.ExportKeyword
+    );
+    if (
+      exported &&
+      ts.isFunctionDeclaration(statement) &&
+      statement.name?.text === consumer.exportName
+    ) {
+      consumerDeclaration = statement;
+    }
+    if (exported && ts.isVariableStatement(statement)) {
+      const declaration = statement.declarationList.declarations.find(
+        item =>
+          ts.isIdentifier(item.name) && item.name.text === consumer.exportName
+      );
+      if (declaration) consumerDeclaration = declaration;
+    }
+  }
+
+  if (!localOwnerName || !consumerDeclaration) {
+    return 'detached-canonical-consumer';
+  }
+
+  let rendersOwner = false;
+  let shadowsOwner = false;
+  let rendersCompetingOwner = false;
+  const bindingNameIncludesOwner = (name: ts.BindingName): boolean => {
+    if (ts.isIdentifier(name)) return name.text === localOwnerName;
+    return name.elements.some(
+      element =>
+        !ts.isOmittedExpression(element) &&
+        bindingNameIncludesOwner(element.name)
+    );
+  };
+  const visit = (node: ts.Node) => {
+    if (
+      ((ts.isVariableDeclaration(node) || ts.isParameter(node)) &&
+        bindingNameIncludesOwner(node.name)) ||
+      ((ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) &&
+        node !== consumerDeclaration &&
+        node.name?.text === localOwnerName)
+    ) {
+      shadowsOwner = true;
+    }
+    if (
+      (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
+      node.tagName.getText(sourceFile) === localOwnerName
+    ) {
+      rendersOwner = true;
+    }
+    if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+      const tagName = node.tagName.getText(sourceFile);
+      if (tagName === 'button' || competingOwnerNames.has(tagName)) {
+        rendersCompetingOwner = true;
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(consumerDeclaration);
+
+  return rendersOwner && !shadowsOwner && !rendersCompetingOwner
+    ? null
+    : 'detached-canonical-consumer';
 }
 
 function countReturnedRootBindings(
@@ -530,6 +690,41 @@ describe('current-main Pen source contracts (JOV-4961)', () => {
 });
 
 describe('canonical shared source atom registry', () => {
+  it('keeps raw icon-sized Button consumers on a shrink-only inventory', () => {
+    const trackedTsxSources = execFileSync('git', ['ls-files', 'apps/web'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    })
+      .split('\n')
+      .filter(
+        sourcePath =>
+          sourcePath.endsWith('.tsx') &&
+          !sourcePath.endsWith('.test.tsx') &&
+          !sourcePath.endsWith('.stories.tsx')
+      );
+    const actualRawConsumers = trackedTsxSources
+      .filter(sourcePath =>
+        hasRawIconSizedButton(
+          sourcePath,
+          fs.readFileSync(path.join(repoRoot, sourcePath), 'utf8')
+        )
+      )
+      .sort();
+
+    expect(actualRawConsumers).toEqual([
+      ...ICON_BUTTON_LEGACY_RAW_CONSUMER_SOURCES,
+    ]);
+    expect(
+      rawIconButtonConsumerIssue(
+        'apps/web/components/NewThemeToggle.tsx',
+        `import { Button } from '@jovie/ui';
+         export function NewThemeToggle() {
+           return <Button size='icon' aria-label='Toggle theme' />;
+         }`
+      )
+    ).toBe('unregistered-raw-icon-button-consumer');
+  });
+
   it('resolves source, story, contract, and test ownership', () => {
     for (const entry of DESIGN_SYSTEM_COMPONENT_REGISTRY) {
       expect(fs.existsSync(path.join(repoRoot, entry.source)), entry.id).toBe(
@@ -568,13 +763,9 @@ describe('canonical shared source atom registry', () => {
           'utf8'
         );
         expect(
-          validateDesignSystemCompatibilityConsumerSource(
-            entry,
-            consumer,
-            consumerSource
-          ),
+          canonicalConsumerAttachmentIssue(entry, consumer, consumerSource),
           `${entry.id}:${consumer.exportName}`
-        ).toEqual([]);
+        ).toBeNull();
       }
     }
 
@@ -607,24 +798,98 @@ describe('canonical shared source atom registry', () => {
     expect(overflow).toBeDefined();
     if (!iconButton || !overflow) return;
 
-    const detachedSource = `
-      import { Button } from './button';
-      export function OverflowMenuTrigger() {
-        return <Button aria-label='More tabs' />;
-      }
-    `;
+    const detachedSources = [
+      `
+        import { Button } from './button';
+        export function OverflowMenuTrigger() {
+          return <Button aria-label='More tabs' />;
+        }
+      `,
+      `
+        import { IconButton } from './icon-button';
+        export function OverflowMenuTrigger() {
+          return <button aria-label='More tabs' />;
+        }
+      `,
+      `
+        import { Button } from './button';
+        export function OverflowMenuTrigger() {
+          return <IconButton aria-label='More tabs' />;
+        }
+      `,
+      `
+        import { IconButton } from './icon-button';
+        export function OverflowMenuTrigger() {
+          return <button aria-label='More tabs' />;
+        }
+        export function UnrelatedIconAction() {
+          return <IconButton aria-label='Unrelated action' />;
+        }
+      `,
+      `
+        import { IconButton } from './icon-button';
+        export function OverflowMenuTrigger() {
+          const IconButton = (props) => <button {...props} />;
+          return <IconButton aria-label='More tabs' />;
+        }
+      `,
+      `
+        import { Button, IconButton } from './icon-button';
+        export function OverflowMenuTrigger() {
+          return <><Button aria-label='More tabs' /><span hidden><IconButton aria-label='Decoy' /></span></>;
+        }
+      `,
+    ];
+    for (const detachedSource of detachedSources) {
+      expect(
+        canonicalConsumerAttachmentIssue(iconButton, overflow, detachedSource)
+      ).toBe('detached-canonical-consumer');
+    }
+  });
+
+  it('fails closed on invalid or duplicate compatibility consumers', () => {
+    const iconButton = DESIGN_SYSTEM_COMPONENT_REGISTRY.find(
+      entry => entry.id === 'atom.icon-button'
+    );
+    const button = DESIGN_SYSTEM_COMPONENT_REGISTRY.find(
+      entry => entry.id === 'atom.button'
+    );
+    const appIconButton = iconButton?.compatibilityConsumers[0];
+    expect(iconButton).toBeDefined();
+    expect(button).toBeDefined();
+    expect(appIconButton).toBeDefined();
+    if (!iconButton || !button || !appIconButton) return;
+
+    const duplicateEntries = DESIGN_SYSTEM_COMPONENT_REGISTRY.map(entry =>
+      entry.id === button.id
+        ? { ...entry, compatibilityConsumers: [appIconButton] }
+        : entry
+    ) as readonly DesignSystemComponentRegistryEntry[];
     expect(
-      validateDesignSystemCompatibilityConsumerSource(
-        iconButton,
-        overflow,
-        detachedSource
+      validateDesignSystemComponentRegistry(duplicateEntries).map(
+        issue => issue.code
       )
-    ).toEqual([
-      {
-        code: 'detached-canonical-consumer',
-        id: 'atom.icon-button:OverflowMenuTrigger',
-      },
-    ]);
+    ).toContain('duplicate-compatibility-consumer');
+
+    const invalidEntries = DESIGN_SYSTEM_COMPONENT_REGISTRY.map(entry =>
+      entry.id === iconButton.id
+        ? {
+            ...entry,
+            compatibilityConsumers: [
+              {
+                ...appIconButton,
+                canonicalImportSource: '',
+                source: 'proposal.pen',
+              },
+            ],
+          }
+        : entry
+    ) as readonly DesignSystemComponentRegistryEntry[];
+    expect(
+      validateDesignSystemComponentRegistry(invalidEntries).map(
+        issue => issue.code
+      )
+    ).toContain('invalid-compatibility-consumer');
   });
 
   it('keeps atom.logo raw until it has a source-mapped Pen origin', () => {
