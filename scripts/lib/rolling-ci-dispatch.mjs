@@ -12,13 +12,48 @@ export const TRUSTED_FAILURE_EVENTS = Object.freeze([
   'check_suite',
   'check_run',
 ]);
+export const TRUSTED_CI_PRODUCER_EVENTS = Object.freeze([
+  'pull_request',
+  'merge_group',
+]);
 
 const SHA_RE = /^[0-9a-f]{40}$/i;
 const CI_FAMILY_CHECK_NAME =
   /^(?:CI\b|Test\b|Typecheck\b|Lint\b|E2E\b|e2e\b|ci-fast\b)/i;
+const MERGE_QUEUE_FRONT_RE =
+  /^(?:refs\/heads\/)?gh-readonly-queue\/main\/pr-([1-9][0-9]*)-([0-9a-f]{40})$/;
 
 export function isCiFamilyCheckName(name) {
   return CI_FAMILY_CHECK_NAME.test(String(name ?? '').trim());
+}
+
+export function isTrustedCiProducerEvent(event) {
+  return TRUSTED_CI_PRODUCER_EVENTS.includes(String(event ?? ''));
+}
+
+export function resolveMergeGroupSourcePr(headBranch) {
+  const match = MERGE_QUEUE_FRONT_RE.exec(String(headBranch ?? '').trim());
+  if (!match) return null;
+  return { prNumber: Number(match[1]), baseSha: match[2] };
+}
+
+/** @param {Record<string, any>} [input] */
+export function resolveFailurePrNumber(input = {}) {
+  const { prNumber, producerEvent, headBranch } = input;
+  if (String(producerEvent ?? '') === 'merge_group') {
+    return resolveMergeGroupSourcePr(headBranch)?.prNumber ?? null;
+  }
+  const n = Number(prNumber);
+  return Number.isInteger(n) && n >= 1 ? n : null;
+}
+
+/** @param {Record<string, any>} [input] */
+export function resolveDispatchLiveHead(input = {}) {
+  const { producerEvent, expectedHead, livePrHead } = input;
+  if (String(producerEvent ?? '') === 'merge_group') {
+    return String(expectedHead ?? '').toLowerCase();
+  }
+  return String(livePrHead ?? '').toLowerCase();
 }
 
 function isTrustedPolicyRef(source) {
@@ -30,7 +65,7 @@ function isAuthenticatedWorkflowRun(source) {
   return (
     source?.eventName === 'workflow_run' &&
     source?.workflow === TRUSTED_CI_WORKFLOW &&
-    source?.producerEvent === 'pull_request' &&
+    isTrustedCiProducerEvent(source?.producerEvent) &&
     isTrustedPolicyRef(source) &&
     (workflowPath == null || workflowPath === TRUSTED_CI_WORKFLOW_PATH)
   );
@@ -71,7 +106,7 @@ export function resolveCiWorkflowRun(input = {}) {
         return (
           run?.name === TRUSTED_CI_WORKFLOW &&
           path === TRUSTED_CI_WORKFLOW_PATH &&
-          run?.event === 'pull_request' &&
+          isTrustedCiProducerEvent(run?.event) &&
           runHead === head &&
           (suite == null || runSuite === suite)
         );
@@ -382,12 +417,18 @@ export function runDispatch(input) {
     checks: input.checks,
   });
 
+  const liveHead = resolveDispatchLiveHead({
+    producerEvent: input?.source?.producerEvent,
+    expectedHead: input.headSha,
+    livePrHead: input.liveHead,
+  });
+
   let state = parseRollingCiState(input.priorCommentBody);
 
   if (input.conclusion === 'success') {
     const plan = planGreenRecovery({
       headSha: input.headSha,
-      liveHead: input.liveHead,
+      liveHead,
       priorState: state,
     });
     return {
@@ -396,7 +437,7 @@ export function runDispatch(input) {
       mutate: Boolean(plan.mutate),
       state: plan.state,
       body: plan.mutate
-        ? renderGreenRecoveryComment({ head: input.liveHead, plan })
+        ? renderGreenRecoveryComment({ head: liveHead, plan })
         : '',
     };
   }
@@ -407,7 +448,7 @@ export function runDispatch(input) {
   for (const event of events) {
     finalPlan = planFailureDispatch({
       event,
-      liveHead: input.liveHead,
+      liveHead,
       writer: input.writer,
       priorState: state,
     });

@@ -21,7 +21,8 @@ jobs:
     if: >-
       (
         github.event_name == 'workflow_run' &&
-        github.event.workflow_run.event == 'pull_request' &&
+        (github.event.workflow_run.event == 'pull_request' ||
+        github.event.workflow_run.event == 'merge_group') &&
         github.event.workflow_run.path == '.github/workflows/ci.yml' &&
         github.event.workflow_run.conclusion != 'cancelled' &&
         (github.event.workflow_run.conclusion == 'failure' ||
@@ -80,6 +81,7 @@ jobs:
           TRUSTED_REF: ${{ github.ref_name }}
           CONCLUSION: ${{ github.event.workflow_run.conclusion || github.event.check_suite.conclusion || github.event.check_run.conclusion }}
           EXPECTED_HEAD: ${{ github.event.workflow_run.head_sha || github.event.check_suite.head_sha || github.event.check_run.head_sha }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch || github.event.check_suite.head_branch || '' }}
           WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
           WORKFLOW_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
           CHECK_SUITE_ID: ${{ github.event.workflow_run.check_suite_id || github.event.check_suite.id || github.event.check_run.check_suite.id }}
@@ -88,6 +90,18 @@ jobs:
           CHECK_RUN_NAME: ${{ github.event.check_run.name }}
         run: |
           set -euo pipefail
+          RESOLVED_PR=$(node --input-type=module -e '
+            import { resolveFailurePrNumber } from "./scripts/lib/rolling-ci-dispatch.mjs";
+            const n = resolveFailurePrNumber({
+              prNumber: process.env.PR_NUMBER_EVENT,
+              producerEvent: process.env.PRODUCER_EVENT,
+              headBranch: process.env.HEAD_BRANCH,
+            });
+            if (!n) process.exit(2);
+            process.stdout.write(String(n));
+          ') || RESOLVED_PR=""
+          PR_NUMBER_EVENT="$RESOLVED_PR"
+          echo "pr_number=${PR_NUMBER_EVENT}" >> "$GITHUB_OUTPUT"
           if [[ -z "${PR_NUMBER_EVENT:-}" || ! "${CHECK_SUITE_ID:-}" =~ ^[0-9]+$ || -z "${EXPECTED_HEAD:-}" ]]; then
             echo "No unique open pull request or authenticated check suite owns this failure head."
             echo "should_record=false" >> "$GITHUB_OUTPUT"
@@ -111,7 +125,11 @@ jobs:
           LIVE_HEAD=$(jq -r '.head' <<<"$LIVE_PR")
           LIVE_AUTHOR=$(jq -r '.author' <<<"$LIVE_PR")
           LIVE_REF=$(jq -r '.ref' <<<"$LIVE_PR")
-          if [[ "$(jq -r '.state' <<<"$LIVE_PR")" != "open" || "$LIVE_HEAD" != "$EXPECTED_HEAD" || "$(jq -r '.fork' <<<"$LIVE_PR")" == "true" || "$(jq -r '.same_repo' <<<"$LIVE_PR")" != "true" ]]; then
+          HEAD_MATCHES=true
+          if [[ "$PRODUCER_EVENT" != "merge_group" && "$LIVE_HEAD" != "$EXPECTED_HEAD" ]]; then
+            HEAD_MATCHES=false
+          fi
+          if [[ "$(jq -r '.state' <<<"$LIVE_PR")" != "open" || "$HEAD_MATCHES" != "true" || "$(jq -r '.fork' <<<"$LIVE_PR")" == "true" || "$(jq -r '.same_repo' <<<"$LIVE_PR")" != "true" ]]; then
             echo "Failure event is stale, forked, or no longer open; refusing dispatch."
             echo "should_record=false" >> "$GITHUB_OUTPUT"
             echo "launch_action=skip" >> "$GITHUB_OUTPUT"
@@ -168,7 +186,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number || github.event.check_suite.pull_requests[0].number || github.event.check_run.pull_requests[0].number }}
+          PR_NUMBER: ${{ steps.plan.outputs.pr_number }}
           COMMENT_BODY: ${{ steps.plan.outputs.comment_body }}
         run: |
           set -euo pipefail

@@ -159,6 +159,42 @@ describe('rolling CI FX webhook remediation', () => {
     expect(planned.launch.request.prompt.text).toContain(head);
   });
 
+  it('launches FX for a failed merge_group CI run on the source PR branch', () => {
+    const queueSha = 'c'.repeat(40);
+    const sourceHead = 'b'.repeat(40);
+    const planned = planFxWebhookRemediation({
+      dispatch: dispatch({
+        writer: FX_ADAPTER_NAME,
+        source: { ...trustedSource, producerEvent: 'merge_group' },
+        headSha: queueSha,
+        liveHead: sourceHead,
+        checks: [
+          {
+            name: 'ci-fast',
+            conclusion: 'failure',
+            headSha: queueSha,
+            checkSuiteId: 44,
+          },
+        ],
+      }),
+      receipt: null,
+      liveHead: sourceHead,
+      implementer: 'tim',
+      fxAdapter,
+      cursorApiKey: 'cursor-key',
+      repository: 'JovieInc/Jovie',
+      prNumber: 16180,
+      headSha: queueSha,
+      headRef: 'cursor/fx-merge-group-remediator-7038',
+    });
+    expect(planned.dispatch.action).toBe('dispatch_implementer');
+    expect(planned.launch.action).toBe('launch');
+    expect(planned.launch.request.source.ref).toBe(
+      'cursor/fx-merge-group-remediator-7038'
+    );
+    expect(planned.launch.request.target.autoCreatePr).toBe(false);
+  });
+
   it('deduplicates when a Cursor agent already owns the fingerprint', () => {
     const events = normalizeFailureEvents({
       repository: 'JovieInc/Jovie',
