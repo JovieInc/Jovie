@@ -12,7 +12,7 @@ export const DEFAULT_AUDIT_PATH = path.join(
   ROOT,
   'apps/web/lib/ovie/generated/invariant-stewardship.current-week.json'
 );
-export const CANONICAL_REGISTRY_PATH = 'canon/invariants.json';
+export const CANONICAL_REGISTRY_PATH = 'canon/invariants.jsonl';
 export const STEWARDSHIP_SCHEMA = 'jovie-invariant-stewardship-audit/v1';
 
 const CLASSIFICATIONS = new Set([

@@ -8,7 +8,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'canon/invariants.json'
+      - 'canon/invariants.jsonl'
       - 'apps/web/lib/ovie/generated/invariant-stewardship.current-week.json'
       - 'scripts/invariant-stewardship/**'
       - '.github/workflows/design-governance.yml'

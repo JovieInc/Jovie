@@ -9,10 +9,10 @@
     "timezone": "America/Los_Angeles"
   },
   "canonicalRegistry": {
-    "path": "canon/invariants.json",
+    "path": "canon/invariants.jsonl",
     "owner": "JOV-5306",
-    "status": "active-lane-unmerged",
-    "note": "This audit is provenance and stewardship state, never a competing runtime registry. JOV-5306 owns canon/invariants.json."
+    "status": "merged",
+    "note": "This audit is provenance and stewardship state, never a competing runtime registry. JOV-5306 owns canon/invariants.jsonl."
   },
   "sources": [
     {
@@ -850,23 +850,28 @@
       "semanticValue": "repo-registry-only",
       "scope": ["company"],
       "owner": "summer",
-      "classification": "missing-consumer",
+      "classification": "approved",
       "authorityStatus": "founder-approved",
       "implementationAuthority": "JOV-5306",
       "provenance": ["user:2026-08-22", "linear:JOV-5306"],
       "consumers": [
         {
           "name": "canonical registry",
-          "path": "canon/invariants.json",
-          "status": "pending"
+          "path": "canon/invariants.jsonl",
+          "status": "active"
+        },
+        {
+          "name": "registry validator",
+          "path": "scripts/invariants/registry.mjs",
+          "status": "active"
         }
       ],
       "tests": [
         {
-          "name": "registry validator deliberate red",
-          "path": "scripts/invariants",
+          "name": "rejects a second executable registry declaration",
+          "path": "scripts/invariants/registry.test.mjs",
           "kind": "deliberate-red",
-          "status": "pending"
+          "status": "active"
         }
       ],
       "relations": {
@@ -875,7 +880,7 @@
         "supersedes": [],
         "scopeSeparated": []
       },
-      "lifecycle": "blocked-on-owned-lane",
+      "lifecycle": "active",
       "source": {
         "kind": "linear",
         "ref": "user:2026-08-22",
@@ -967,7 +972,7 @@
       "semanticValue": "measured-coding-capacity",
       "scope": ["coding-orchestration"],
       "owner": "symphony",
-      "classification": "missing-consumer",
+      "classification": "approved",
       "authorityStatus": "founder-approved",
       "implementationAuthority": "JOV-5306",
       "provenance": [
@@ -976,17 +981,17 @@
       ],
       "consumers": [
         {
-          "name": "capacity-aware dispatch",
+          "name": "Symphony admission gate",
           "path": "scripts/backlog-orchestrator/admitter.mjs",
-          "status": "pending"
+          "status": "active"
         }
       ],
       "tests": [
         {
-          "name": "fresh-capacity bounds",
-          "path": "scripts/invariants",
+          "name": "blocks a new lease when capacity evidence is missing or stale",
+          "path": "scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs",
           "kind": "deliberate-red",
-          "status": "pending"
+          "status": "active"
         }
       ],
       "relations": {
@@ -995,7 +1000,7 @@
         "supersedes": [],
         "scopeSeparated": ["OPS-stewardship-wip-one"]
       },
-      "lifecycle": "blocked-on-owned-lane",
+      "lifecycle": "active",
       "source": {
         "kind": "gbrain",
         "ref": "gbrain:jovie/coordination/closed-loop-invariants-20260822",
@@ -1009,7 +1014,7 @@
       "semanticValue": "summer-governs-symphony-codes",
       "scope": ["company"],
       "owner": "summer",
-      "classification": "missing-consumer",
+      "classification": "approved",
       "authorityStatus": "founder-approved",
       "implementationAuthority": "JOV-5306",
       "provenance": [
@@ -1018,17 +1023,17 @@
       ],
       "consumers": [
         {
-          "name": "Summer-to-Symphony dispatch",
+          "name": "Symphony route validator",
           "path": "scripts/backlog-orchestrator/symphony-routing.mjs",
-          "status": "pending"
+          "status": "active"
         }
       ],
       "tests": [
         {
-          "name": "Summer cannot code",
-          "path": "scripts/invariants",
+          "name": "rejects or reroutes a Jovie packet with no Jovie artifact",
+          "path": "scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs",
           "kind": "deliberate-red",
-          "status": "pending"
+          "status": "active"
         }
       ],
       "relations": {
@@ -1037,7 +1042,7 @@
         "supersedes": [],
         "scopeSeparated": []
       },
-      "lifecycle": "blocked-on-owned-lane",
+      "lifecycle": "active",
       "source": {
         "kind": "gbrain",
         "ref": "gbrain:coordination/ovie-summer-ubuntu-master-orchestration-2026-08-19",
@@ -1238,32 +1243,11 @@
       "action": "Bind the typed proof vocabulary to the current receipt reducer and a later-tier backfill deliberate-red fixture."
     },
     {
-      "id": "missing-consumer:CORE-one-executable-registry",
-      "kind": "missing-consumer",
-      "candidateIds": ["CORE-one-executable-registry"],
-      "owner": "JOV-5306",
-      "action": "Land the owned canonical registry and deliberate-red validator."
-    },
-    {
       "id": "unknown-authority:P08-company-identity",
       "kind": "unknown",
       "candidateIds": ["P08-company-identity"],
       "owner": "summer",
       "action": "Refresh current first-party legal and product identity evidence before adoption."
-    },
-    {
-      "id": "missing-consumer:OPS-symphony-measured-capacity",
-      "kind": "missing-consumer",
-      "candidateIds": ["OPS-symphony-measured-capacity"],
-      "owner": "JOV-5306",
-      "action": "Land measured-capacity dispatch and its exact failure tests."
-    },
-    {
-      "id": "missing-consumer:OPS-summer-symphony-boundary",
-      "kind": "missing-consumer",
-      "candidateIds": ["OPS-summer-symphony-boundary"],
-      "owner": "JOV-5306",
-      "action": "Land the Summer-to-Symphony dispatch boundary and deliberate-red authority test."
     },
     {
       "id": "missing-consumer:OPS-linear-ships",

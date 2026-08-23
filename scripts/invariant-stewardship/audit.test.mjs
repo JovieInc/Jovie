@@ -229,7 +229,7 @@ test('cadence composes the existing workflow and does not create another schedul
 test('generated audit artifact remains evidence-only beside executable authority', () => {
   const audit = JSON.parse(fs.readFileSync(DEFAULT_AUDIT_PATH, 'utf8'));
   assert.equal(audit.authority, 'evidence-only');
-  assert.equal(audit.canonicalRegistry.path, 'canon/invariants.json');
+  assert.equal(audit.canonicalRegistry.path, 'canon/invariants.jsonl');
   assert.equal(audit.canonicalRegistry.owner, 'JOV-5306');
   const personal = audit.sources.find(
     source => source.kind === 'personal-communications'

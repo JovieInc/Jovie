@@ -192,6 +192,25 @@ describe('deterministic no-model gates', () => {
     assert.equal(result.selected.identifier, 'JOV-4305');
   });
 
+  it('skips hash-bound issue-specific holds without selecting them', () => {
+    const result = deterministicGates.selectDeterministicPlanCandidate(
+      [
+        issue({ identifier: 'JOV-4304', priority: 3 }),
+        issue({ identifier: 'JOV-4305', priority: 2 }),
+      ],
+      {
+        now: '2026-08-05T00:00:00.000Z',
+        excludeIdentifiers: ['JOV-4305'],
+      }
+    );
+    assert.equal(result.selected.identifier, 'JOV-4304');
+    assert.equal(
+      result.decisions.find(decision => decision.identifier === 'JOV-4305')
+        .reason,
+      'issue-specific-hold'
+    );
+  });
+
   it('materializes admission receipt and label with authoritative rereads', async () => {
     const original = plannedIssue();
     const receipt = admissionGate.buildAdmissionGateReceipt(original);
