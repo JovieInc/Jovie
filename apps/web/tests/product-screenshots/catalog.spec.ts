@@ -5,6 +5,7 @@ import {
   APP_FLAG_OVERRIDES_COOKIE,
   FF_OVERRIDES_KEY,
 } from '@/lib/flags/overrides';
+import { orderScreenshotScenariosForCapture } from '../../lib/screenshots/capture-order';
 import {
   getScreenshotScenario,
   SCREENSHOT_SCENARIOS,
@@ -301,7 +302,9 @@ test.describe('Screenshot Catalog', () => {
     await writeManifest(manifestEntriesById);
   });
 
-  for (const scenario of SCREENSHOT_SCENARIOS) {
+  for (const scenario of orderScreenshotScenariosForCapture(
+    SCREENSHOT_SCENARIOS
+  )) {
     test(`captures ${scenario.id}`, async ({ page }) => {
       test.setTimeout(120_000);
       const previousEntry = manifestEntriesById.get(scenario.id) ?? null;

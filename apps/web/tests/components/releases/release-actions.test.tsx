@@ -87,20 +87,20 @@ describe('buildReleaseActions', () => {
 
     expect(items[0]).toMatchObject({
       id: 'edit',
-      label: 'Edit release links',
+      label: 'Edit Release Links',
     });
     expect(items[1]).toEqual({ type: 'separator' });
     expect(separators).toHaveLength(1);
     expect(items[2]).toMatchObject({
       id: 'copy-smart-link',
-      label: 'Copy smart link',
+      label: 'Copy Smart Link',
     });
     const shareMenu = items.find(
       item => 'id' in item && item.id === 'share-link'
     );
     expect(shareMenu).toMatchObject({
       id: 'share-link',
-      label: 'Share link',
+      label: 'Share Link',
     });
     const metadataItem = items.find(
       item => 'id' in item && item.id === 'copy-metadata'
@@ -108,7 +108,7 @@ describe('buildReleaseActions', () => {
 
     expect(metadataItem).toMatchObject({
       id: 'copy-metadata',
-      label: 'Copy metadata',
+      label: 'Copy Metadata',
     });
   });
 
@@ -128,7 +128,7 @@ describe('buildReleaseActions', () => {
 
     expect(generatePitch).toMatchObject({
       id: 'generate-pitch',
-      label: 'Generate pitch',
+      label: 'Generate Pitch',
     });
     if (!generatePitch || !('onClick' in generatePitch)) {
       throw new Error('Expected generate pitch action');
@@ -192,7 +192,7 @@ describe('buildReleaseActions', () => {
     }
   });
 
-  it('keeps Open in as a submenu when multiple providers are present', () => {
+  it('keeps Open In as a submenu when multiple providers are present', () => {
     const items = buildReleaseActions({
       release: createRelease({
         providers: [
@@ -226,7 +226,7 @@ describe('buildReleaseActions', () => {
 
     expect(openMenu).toMatchObject({
       id: 'open-release',
-      label: 'Open in',
+      label: 'Open In',
     });
     if (!openMenu || !('items' in openMenu)) {
       throw new Error('Expected open submenu');

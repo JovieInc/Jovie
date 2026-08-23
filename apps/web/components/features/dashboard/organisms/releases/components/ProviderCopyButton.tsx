@@ -2,8 +2,8 @@
 
 import { Icon } from '@/components/atoms/Icon';
 import { DrawerButton } from '@/components/molecules/drawer';
+import { getSmartLinkUrl } from '@/constants/domains';
 import { cn } from '@/lib/utils';
-import { getBaseUrl } from '@/lib/utils/platform-detection';
 
 export interface ProviderCopyButtonProps {
   readonly testId: string;
@@ -42,7 +42,7 @@ export function ProviderCopyButton({
   return (
     <DrawerButton
       data-testid={testId}
-      data-url={path ? `${getBaseUrl()}${path}` : undefined}
+      data-url={path ? getSmartLinkUrl(path) : undefined}
       onClick={() => {
         if (!path) return;
         void onCopy(path, `${releaseTitle} – ${providerLabel}`, testId);

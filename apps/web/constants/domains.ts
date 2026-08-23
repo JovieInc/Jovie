@@ -51,6 +51,17 @@ export function getProfileUrl(handle: string): string {
 }
 
 /**
+ * Build the canonical public URL for a release or track smart-link path.
+ *
+ * Public links must keep the jov.ie origin in local development and preview
+ * deployments; the current browser origin is only an app runtime location.
+ */
+export function getSmartLinkUrl(path: string): string {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${BASE_URL}${normalizedPath}`;
+}
+
+/**
  * Build a pay page URL for a given handle
  * @returns Full URL like https://jov.ie/handle/pay?source=qr
  */

@@ -23,6 +23,7 @@ import {
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { convertToCommonDropdownItems } from '@/components/organisms/table';
+import { getSmartLinkUrl } from '@/constants/domains';
 import { buildReleaseTasksRoute } from '@/constants/routes';
 import { buildReleaseActions } from '@/features/dashboard/organisms/releases/release-actions';
 import { CompactReleasePlanUpgradeCard } from '@/features/dashboard/tasks/TasksUpgradeInterstitial';
@@ -33,7 +34,6 @@ import { usePlanGate } from '@/lib/queries';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { buildReleasePitchChatPrompt } from '@/lib/services/pitch/targets';
 import { cn } from '@/lib/utils';
-import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { ReleaseDspLinks } from './ReleaseDspLinks';
 import { ReleaseLyricsSection } from './ReleaseLyricsSection';
 import { ReleasePropertiesPanel } from './ReleasePropertiesPanel';
@@ -242,11 +242,12 @@ export function ReleaseSidebar({
 
   const handleCopyReleasePath = useCallback(
     async (path: string, label: string) => {
-      const copied = await copyToClipboard(`${getBaseUrl()}${path}`);
+      const smartLinkUrl = getSmartLinkUrl(path);
+      const copied = await copyToClipboard(smartLinkUrl);
 
       if (copied) {
         toast.success(`${label} copied`);
-        return `${getBaseUrl()}${path}`;
+        return smartLinkUrl;
       }
 
       toast.error(`Failed to copy ${label.toLowerCase()}`);

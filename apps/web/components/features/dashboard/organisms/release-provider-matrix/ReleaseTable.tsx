@@ -64,6 +64,7 @@ export function ReleaseTable({
   isSmartLinkLocked,
   getSmartLinkLockReason,
   onTrackClick,
+  dropDateReferenceIso,
 }: ReleaseTableProps) {
   // Mobile detection - render list view on small screens
   const isMobile = useBreakpointDown('md');
@@ -156,7 +157,8 @@ export function ReleaseTable({
       cell: createRightMetaCellRenderer(
         isSmartLinkLocked,
         getSmartLinkLockReason,
-        designV1
+        designV1,
+        dropDateReferenceIso
       ),
       size: designV1 ? 390 : 260,
       minSize: 100,
@@ -168,7 +170,14 @@ export function ReleaseTable({
     });
 
     return [releaseColumn, rightMetaColumn];
-  }, [artistName, onEdit, designV1, isSmartLinkLocked, getSmartLinkLockReason]);
+  }, [
+    artistName,
+    onEdit,
+    designV1,
+    isSmartLinkLocked,
+    getSmartLinkLockReason,
+    dropDateReferenceIso,
+  ]);
 
   // Transform columnVisibility to TanStack format (always show release)
   const tanstackColumnVisibility = useMemo(() => {
@@ -228,6 +237,7 @@ export function ReleaseTable({
           isSmartLinkLocked={isSmartLinkLocked}
           getSmartLinkLockReason={getSmartLinkLockReason}
           onTrackClick={onTrackClick}
+          dropDateReferenceIso={dropDateReferenceIso}
         />
       </Suspense>
     );

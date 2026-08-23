@@ -9,6 +9,7 @@ import {
   DrawerInlineIconButton,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
+import { getSmartLinkUrl } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import {
   TEST_AUTH_BYPASS_MODE,
@@ -21,7 +22,6 @@ import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import { env } from '@/lib/env-client';
 import { buildTrackedShareDropdownItems } from '@/lib/share/tracked-sources';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
-import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { buildUTMContext } from '@/lib/utm';
 import type { Release, ReleaseSidebarAnalytics } from './types';
 
@@ -125,7 +125,7 @@ function ReleaseSmartLinkControl({
   readonly artistName?: string | null;
   readonly helperText?: string;
 }) {
-  const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
+  const smartLinkUrl = getSmartLinkUrl(release.smartLinkPath);
   const smartLinkLabel = smartLinkUrl.replace(/^https?:\/\//u, '');
   const shareItems = useMemo(() => {
     const items = buildTrackedShareDropdownItems({

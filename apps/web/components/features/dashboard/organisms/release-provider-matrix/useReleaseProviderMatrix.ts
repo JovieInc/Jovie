@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from '@/components/feedback';
+import { getSmartLinkUrl } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
@@ -19,7 +20,6 @@ import {
   useSyncReleasesFromSpotifyMutation,
 } from '@/lib/queries';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
-import { getBaseUrl } from '@/lib/utils/platform-detection';
 import type {
   DraftState,
   ReleaseProviderMatrixProps,
@@ -91,11 +91,13 @@ export function useReleaseProviderMatrix({
 
   // Refs for stable callback access (prevents recreation on state changes)
   const rawRowsRef = useRef(rawRows);
-  rawRowsRef.current = rawRows;
   const providerConfigRef = useRef(providerConfig);
-  providerConfigRef.current = providerConfig;
   const saveProviderMutateRef = useRef(saveProviderMutation.mutate);
-  saveProviderMutateRef.current = saveProviderMutation.mutate;
+  useEffect(() => {
+    rawRowsRef.current = rawRows;
+    providerConfigRef.current = providerConfig;
+    saveProviderMutateRef.current = saveProviderMutation.mutate;
+  }, [providerConfig, rawRows, saveProviderMutation.mutate]);
 
   // No custom sorting needed - UnifiedTable handles this
   const rows = rawRows;
@@ -195,7 +197,7 @@ export function useReleaseProviderMatrix({
 
   const handleCopy = useCallback(
     async (path: string, label: string, testId: string) => {
-      const absoluteUrl = `${getBaseUrl()}${path}`;
+      const absoluteUrl = getSmartLinkUrl(path);
       const success = await copyToClipboard(absoluteUrl);
       if (success) {
         toast.success(`${label} copied`, { id: testId });
@@ -313,7 +315,9 @@ export function useReleaseProviderMatrix({
 
   // Use ref for profileId to avoid recreation when it changes
   const profileIdRef = useRef(profileId);
-  profileIdRef.current = profileId;
+  useEffect(() => {
+    profileIdRef.current = profileId;
+  }, [profileId]);
 
   // CRITICAL: Use syncMutation.mutate directly (it's stable from TanStack Query)
   // Don't depend on the whole syncMutation object which changes every render

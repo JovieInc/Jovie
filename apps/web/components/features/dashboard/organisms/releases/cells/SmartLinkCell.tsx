@@ -4,9 +4,9 @@ import { memo, useCallback } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { toast } from '@/components/feedback';
 import { CopyableUrlRow } from '@/components/molecules/CopyableUrlRow';
+import { getSmartLinkUrl } from '@/constants/domains';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
-import { getBaseUrl } from '@/lib/utils/platform-detection';
 
 interface SmartLinkCellProps {
   readonly release: ReleaseViewModel;
@@ -21,7 +21,7 @@ export const SmartLinkCell = memo(function SmartLinkCell({
   locked = false,
   lockReason,
 }: SmartLinkCellProps) {
-  const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
+  const smartLinkUrl = getSmartLinkUrl(release.smartLinkPath);
 
   const handleCopySuccess = useCallback(() => {
     toast.success(`${release.title} smart link copied`, {

@@ -9,10 +9,10 @@ import {
   DrawerSurfaceCard,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
+import { getSmartLinkUrl } from '@/constants/domains';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import type { ProviderKey } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
-import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { TrackMetaSummary } from './TrackMetaSummary';
 import { TrackPlatformLinksSection } from './TrackPlatformLinksSection';
 
@@ -39,7 +39,7 @@ export function TrackDetailPanel({
   releaseTitle,
   onBack,
 }: TrackDetailPanelProps) {
-  const smartLinkUrl = `${getBaseUrl()}${track.smartLinkPath}`;
+  const smartLinkUrl = getSmartLinkUrl(track.smartLinkPath);
   const streamingProviders = track.providers.filter(p => p.url);
 
   const handleCopyIsrc = useCallback(() => {

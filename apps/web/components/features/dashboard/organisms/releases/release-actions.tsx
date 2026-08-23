@@ -3,13 +3,13 @@ import type { ReactNode } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import type { ContextMenuItemType } from '@/components/organisms/table';
+import { BASE_URL, getSmartLinkUrl } from '@/constants/domains';
 import { buildCopyMenuItems } from '@/features/ui/CopyableField';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import {
   getTrackedShareIcon,
   groupTrackedPresetsBySource,
 } from '@/lib/share/tracked-sources';
-import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { ALL_UTM_PRESETS, buildUTMContext, buildUTMUrl } from '@/lib/utm';
 
 const menuIcon = (
@@ -119,7 +119,7 @@ function buildPrimaryCopySmartLinkItem(
 
   return {
     id: 'copy-smart-link',
-    label: 'Copy smart link',
+    label: 'Copy Smart Link',
     icon: menuIcon('Copy'),
     onClick: () => {
       void onCopy(
@@ -182,7 +182,7 @@ function buildShareItems(
                 context: trackedContext,
               });
               void onCopy(
-                result.url.replace(getBaseUrl(), ''),
+                result.url.replace(BASE_URL, ''),
                 preset.label,
                 `tracked-share-${preset.id}-${release.id}`
               );
@@ -208,7 +208,7 @@ function buildShareItems(
                     context: trackedContext,
                   });
                   void onCopy(
-                    result.url.replace(getBaseUrl(), ''),
+                    result.url.replace(BASE_URL, ''),
                     preset.label,
                     `tracked-share-${preset.id}-${release.id}`
                   );
@@ -227,7 +227,7 @@ function buildShareItems(
   if (release.hasVideoLinks) {
     items.push({
       id: 'copy-sounds-link',
-      label: 'Copy Use Sound link',
+      label: 'Copy Use Sound Link',
       icon: menuIcon('Music'),
       onClick: () => {
         void onCopy(
@@ -242,7 +242,7 @@ function buildShareItems(
   if (onCopyQrCode) {
     items.push({
       id: 'copy-qr-code',
-      label: 'Copy QR code',
+      label: 'Copy QR Code',
       icon: qrCodeIcon,
       onClick: onCopyQrCode,
     });
@@ -276,7 +276,7 @@ export function buildReleaseActions({
 }: BuildReleaseActionsOptions): ContextMenuItemType[] {
   const locked = isSmartLinkLocked?.(release.id) ?? false;
   const lockReason = getSmartLinkLockReason?.(release.id) ?? null;
-  const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
+  const smartLinkUrl = getSmartLinkUrl(release.smartLinkPath);
   const copySmartLinkItem = buildPrimaryCopySmartLinkItem({
     release,
     onCopy,
@@ -308,7 +308,7 @@ export function buildReleaseActions({
   const items: ContextMenuItemType[] = [
     {
       id: 'edit',
-      label: 'Edit release links',
+      label: 'Edit Release Links',
       icon: menuIcon('PencilLine'),
       onClick: () => onEdit(release),
     },
@@ -326,7 +326,7 @@ export function buildReleaseActions({
       ? [
           {
             id: 'generate-pitch',
-            label: 'Generate pitch',
+            label: 'Generate Pitch',
             icon: menuIcon('Sparkles'),
             onClick: () => onGeneratePitch(release),
           } satisfies ContextMenuItemType,
@@ -342,7 +342,7 @@ export function buildReleaseActions({
   if (shareItems.length > 0) {
     items.push({
       id: 'share-link',
-      label: 'Share link',
+      label: 'Share Link',
       icon: menuIcon('Link2'),
       items: shareItems,
     });
@@ -350,7 +350,7 @@ export function buildReleaseActions({
 
   items.push({
     id: 'copy-metadata',
-    label: 'Copy metadata',
+    label: 'Copy Metadata',
     icon: menuIcon('Hash'),
     items: metadataItems,
   });
@@ -409,7 +409,7 @@ export function buildReleaseActions({
   } else if (externalProviders.length > 1) {
     items.push({
       id: 'open-release',
-      label: 'Open in',
+      label: 'Open In',
       icon: menuIcon('ExternalLink'),
       items: externalProviders.map(provider => ({
         id: `open-${provider.key}`,
@@ -428,7 +428,7 @@ export function buildReleaseActions({
       { type: 'separator' },
       {
         id: 'delete',
-        label: 'Delete release',
+        label: 'Delete Release',
         icon: menuIcon('Trash2'),
         destructive: true,
         onClick: () => onDelete(release.id),

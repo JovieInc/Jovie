@@ -6,12 +6,13 @@ import {
   DEMO_RELEASE_VIEW_MODELS,
 } from '@/components/features/demo/mock-release-data';
 import { toast } from '@/components/feedback';
+import { getSmartLinkUrl } from '@/constants/domains';
 import { ReleaseTable } from '@/features/dashboard/organisms/release-provider-matrix/ReleaseTable';
 import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
+import { DEMO_REFERENCE_CLOCK_ISO } from '@/lib/demo-reference-clock';
 
 async function copyDemoLink(path: string, label: string): Promise<string> {
-  const origin = globalThis.location?.origin ?? 'https://jov.ie';
-  const absoluteUrl = new URL(path, `${origin}/`).toString();
+  const absoluteUrl = getSmartLinkUrl(path);
   try {
     await navigator.clipboard.writeText(absoluteUrl);
     toast.success(`${label} copied (demo)`);
@@ -59,6 +60,7 @@ export function DashboardReleasesDemo() {
         artistName={INTERNAL_DJ_DEMO_PERSONA.profile.displayName}
         onCopy={copyDemoLink}
         onEdit={noop}
+        dropDateReferenceIso={DEMO_REFERENCE_CLOCK_ISO}
       />
     </div>
   );

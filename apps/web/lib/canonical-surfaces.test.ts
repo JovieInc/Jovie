@@ -77,6 +77,16 @@ describe('canonical surface registry', () => {
     ]);
   });
 
+  it('pins the mounted homepage route owner instead of a detached narrative', () => {
+    const homepage = getCanonicalSurface('homepage');
+
+    expect(homepage.sourceComponent).toBe('app/(home)/page.tsx -> HomePage');
+    expect(homepage.routeOwner).toBe('app/(home)/page.tsx -> HomePage');
+    expect(homepage.componentFamily).toBe(
+      'components/homepage + components/marketing'
+    );
+  });
+
   it('tracks live source ownership for every mirrored demo surface', () => {
     for (const surface of CANONICAL_SURFACES) {
       expect(surface.sourceRoute.length).toBeGreaterThan(0);

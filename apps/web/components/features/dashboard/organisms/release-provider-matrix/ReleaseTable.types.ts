@@ -44,6 +44,8 @@ export interface ReleaseTableProps {
   readonly selectedTrackId?: string | null;
   readonly tracksByReleaseId?: Record<string, TrackViewModel[]>;
   readonly designV1?: boolean;
+  /** Stable reference instant for static/demo relative-date labels. */
+  readonly dropDateReferenceIso?: string;
   readonly isSmartLinkLocked?: (releaseId: string) => boolean;
   readonly getSmartLinkLockReason?: (
     releaseId: string

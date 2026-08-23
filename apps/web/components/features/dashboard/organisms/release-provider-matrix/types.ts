@@ -38,6 +38,8 @@ export interface ReleaseSidebarFixtureData {
 
 export interface ReleaseExperienceAdapter {
   readonly mode?: 'live' | 'demo';
+  /** Stable clock used by static demo fixtures during SSR and hydration. */
+  readonly referenceNowIso?: string;
   readonly entitlements?: Partial<PlanGateEntitlements>;
   readonly onCopy?: (
     path: string,

@@ -4,6 +4,7 @@
 
 import { join, resolve } from 'node:path';
 import { Page } from '@playwright/test';
+import { DEMO_REFERENCE_CLOCK_ISO } from '@/lib/demo-reference-clock';
 
 export const TIMEOUTS = {
   NAVIGATION: 90_000,
@@ -24,7 +25,7 @@ export const PUBLIC_EXPORT_DIR = join(
   'public',
   'product-screenshots'
 );
-export const SCREENSHOT_CLOCK_ISO = '2026-04-15T16:00:00.000Z';
+export const SCREENSHOT_CLOCK_ISO = DEMO_REFERENCE_CLOCK_ISO;
 
 /**
  * Selectors for dev overlays that must be hidden before capturing screenshots.

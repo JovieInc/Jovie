@@ -115,7 +115,8 @@ export function createExpandableReleaseCellRenderer(
 export function createRightMetaCellRenderer(
   isSmartLinkLocked?: (releaseId: string) => boolean,
   getSmartLinkLockReason?: (releaseId: string) => 'scheduled' | 'cap' | null,
-  designV1 = false
+  designV1 = false,
+  dropDateReferenceIso?: string
 ) {
   return function RightMetaCellRenderer({
     row,
@@ -133,7 +134,10 @@ export function createRightMetaCellRenderer(
         ? getReleaseTypeStyle(release.releaseType)
         : null;
       const dropMeta = release.releaseDate
-        ? dropDateMeta(release.releaseDate)
+        ? dropDateMeta(
+            release.releaseDate,
+            dropDateReferenceIso ? new Date(dropDateReferenceIso) : undefined
+          )
         : null;
 
       return (

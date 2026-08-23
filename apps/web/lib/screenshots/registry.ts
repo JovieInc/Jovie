@@ -173,6 +173,7 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       title: 'Homepage',
       route: '/',
       waitFor: 'main',
+      captureAfter: ['dashboard-releases-sidebar-desktop'],
     },
     {
       id: 'release-landing-desktop',

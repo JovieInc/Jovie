@@ -6,10 +6,10 @@ This document and [apps/web/lib/canonical-surfaces.ts](../apps/web/lib/canonical
 
 | ID | Label | Live Route(s) | Review Route | Screenshot ID(s) | Current Owner | Component Family | Description |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `homepage` | Homepage | `/` | `/` | `marketing-home-desktop` | `app/(home)/page.tsx -> HomePageNarrative` | `features/home` | Primary marketing homepage and current live review surface. |
+| `homepage` | Homepage | `/` | `/` | `marketing-home-desktop` | `app/(home)/page.tsx -> HomePage` | `components/homepage + components/marketing` | Primary marketing homepage and current live review surface. |
 | `public-profile` | Public Profile | `/[username]` | `/demo/showcase/public-profile` | `public-profile-desktop`, `public-profile-mobile` | `app/[username]/page.tsx -> StaticArtistPage` | `features/profile` | Canonical public artist profile surface rendered from `StaticArtistPage` and `ProfileCompactTemplate`. |
 | `release-landing` | Release Landing | `/r/[slug]`, `/[username]/[slug]` | `/demo/showcase/release-landing` | `release-landing-desktop`, `release-landing-mobile` | `app/r/[slug]/ReleaseLandingPage.tsx -> ReleaseLandingPage` | `features/release` | Canonical smart-link release destination sharing the public shell direction. |
-| `dashboard-releases` | Dashboard Releases | `/app/dashboard/releases` | `/demo` | `dashboard-releases-desktop`, `dashboard-releases-sidebar-desktop`, `dashboard-release-sidebar-detail-desktop` | `app/app/(shell)/dashboard/releases/page.tsx -> ReleasesPageClient` | `features/dashboard/organisms/release-provider-matrix` | Canonical authenticated releases workspace and current dashboard review/capture surface. |
+| `dashboard-releases` | Dashboard Releases | `/app/dashboard/releases` | `/demo` | `dashboard-releases-desktop`, `dashboard-releases-sidebar-desktop`, `dashboard-release-sidebar-detail-desktop`, `dashboard-release-sidebar-platforms-desktop` | `app/app/(shell)/dashboard/releases/page.tsx -> ReleasesPageClient` | `features/dashboard/organisms/release-provider-matrix` | Canonical authenticated releases workspace and current dashboard review/capture surface. |
 
 ## What Is Not A Canonical Surface
 

@@ -17,6 +17,7 @@ import {
 } from '@/components/molecules/drawer';
 import { EntityHeaderCard } from '@/components/molecules/drawer/EntityHeaderCard';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { getSmartLinkUrl } from '@/constants/domains';
 import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import type {
   PreviewSource,
@@ -26,7 +27,6 @@ import type {
   ProviderKey,
 } from '@/lib/discography/types';
 import { formatDuration } from '@/lib/utils/formatDuration';
-import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { TrackPlatformLinksSection } from './TrackPlatformLinksSection';
 import { useTrackAudioPlayer } from './useTrackAudioPlayer';
 
@@ -194,7 +194,7 @@ export function TrackSidebar({
     setActiveTab('playback');
   }, [track?.id]);
 
-  const smartLinkUrl = track ? `${getBaseUrl()}${track.smartLinkPath}` : '';
+  const smartLinkUrl = track ? getSmartLinkUrl(track.smartLinkPath) : '';
 
   const showSmartLinkCopied = useCallback(() => {
     toast.success('Track link copied');

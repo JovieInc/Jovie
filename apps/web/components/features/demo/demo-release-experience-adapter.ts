@@ -1,10 +1,12 @@
 'use client';
 
 import { toast } from '@/components/feedback';
+import { getSmartLinkUrl } from '@/constants/domains';
 import type {
   ReleaseExperienceAdapter,
   ReleaseSidebarFixtureData,
 } from '@/features/dashboard/organisms/release-provider-matrix/types';
+import { DEMO_REFERENCE_CLOCK_ISO } from '@/lib/demo-reference-clock';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 
@@ -14,8 +16,7 @@ interface DemoReleaseExperienceAdapterOptions {
 }
 
 async function copyDemoLink(path: string, label: string, _testId: string) {
-  const origin = globalThis.location?.origin ?? 'https://jov.ie';
-  const absoluteUrl = new URL(path, `${origin}/`).toString();
+  const absoluteUrl = getSmartLinkUrl(path);
   try {
     await navigator.clipboard.writeText(absoluteUrl);
     toast.success(`${label} copied (demo)`);
@@ -72,6 +73,7 @@ export function createDemoReleaseExperienceAdapter({
 }: DemoReleaseExperienceAdapterOptions): ReleaseExperienceAdapter {
   return {
     mode: 'demo',
+    referenceNowIso: DEMO_REFERENCE_CLOCK_ISO,
     entitlements: {
       isPro: true,
       canCreateManualReleases: true,

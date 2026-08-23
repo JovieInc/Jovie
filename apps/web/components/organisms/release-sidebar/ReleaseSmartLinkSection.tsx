@@ -1,7 +1,7 @@
 'use client';
 
 import { ShareableLinkRow } from '@/components/molecules/drawer';
-import { getBaseUrl } from '@/lib/utils/platform-detection';
+import { getSmartLinkUrl } from '@/constants/domains';
 
 interface ReleaseSmartLinkSectionProps {
   readonly smartLinkPath: string;
@@ -10,7 +10,7 @@ interface ReleaseSmartLinkSectionProps {
 export function ReleaseSmartLinkSection({
   smartLinkPath,
 }: ReleaseSmartLinkSectionProps) {
-  const smartLinkUrl = `${getBaseUrl()}${smartLinkPath}`;
+  const smartLinkUrl = getSmartLinkUrl(smartLinkPath);
   const smartLinkLabel = smartLinkUrl.replace(/^https?:\/\//u, '');
 
   return (

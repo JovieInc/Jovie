@@ -3,6 +3,7 @@
  * Defines column mapping and formatting for CSV export.
  */
 
+import { getSmartLinkUrl } from '@/constants/domains';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import type { CSVColumn } from '@/lib/utils/csv';
 
@@ -82,10 +83,7 @@ export const RELEASES_CSV_COLUMNS: CSVColumn<ReleaseViewModel>[] = [
   },
   {
     header: 'Smart Link',
-    accessor: row =>
-      typeof window === 'undefined'
-        ? row.smartLinkPath
-        : `${globalThis.location.origin}${row.smartLinkPath}`,
+    accessor: row => getSmartLinkUrl(row.smartLinkPath),
   },
   {
     header: 'Spotify URL',

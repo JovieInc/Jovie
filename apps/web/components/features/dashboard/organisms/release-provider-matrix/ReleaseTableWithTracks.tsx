@@ -63,6 +63,7 @@ export function ReleaseTableWithTracks({
   isSmartLinkLocked,
   getSmartLinkLockReason,
   onTrackClick,
+  dropDateReferenceIso,
 }: ReleaseTableProps) {
   const isMobile = useBreakpointDown('md');
   const {
@@ -173,7 +174,8 @@ export function ReleaseTableWithTracks({
       cell: createRightMetaCellRenderer(
         isSmartLinkLocked,
         getSmartLinkLockReason,
-        designV1
+        designV1,
+        dropDateReferenceIso
       ),
       size: designV1 ? 390 : 260,
       minSize: 100,
@@ -194,6 +196,7 @@ export function ReleaseTableWithTracks({
     designV1,
     isSmartLinkLocked,
     getSmartLinkLockReason,
+    dropDateReferenceIso,
   ]);
 
   const tanstackColumnVisibility = useMemo(() => {

@@ -1098,6 +1098,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 isSmartLinkLocked={isSmartLinkLocked}
                 getSmartLinkLockReason={getSmartLinkLockReason}
                 onTrackClick={openTrackDrawer}
+                dropDateReferenceIso={experienceAdapter?.referenceNowIso}
               />
             </PageShell>
           </QueryErrorBoundary>

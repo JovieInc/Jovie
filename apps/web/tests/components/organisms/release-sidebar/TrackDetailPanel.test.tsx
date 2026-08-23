@@ -44,6 +44,10 @@ describe('TrackDetailPanel', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Midnight Echo')).toBeInTheDocument();
     expect(screen.getByText('Smart link')).toBeInTheDocument();
+    expect(screen.getByText('jov.ie/t/midnight-echo')).toHaveAttribute(
+      'title',
+      'https://jov.ie/t/midnight-echo'
+    );
     expect(screen.getByText('Actions')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /copy isrc/i })

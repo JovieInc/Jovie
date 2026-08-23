@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  getSmartLinkUrl,
   HOSTNAME,
   isMainDomain,
   isPreviewEnvironment,
@@ -21,5 +22,14 @@ describe('domains', () => {
     expect(isPreviewEnvironment(HOSTNAME)).toBe(false);
     expect(isProductionEnvironment(HOSTNAME)).toBe(true);
     expect(isProductionEnvironment(`staging.${HOSTNAME}`)).toBe(false);
+  });
+
+  it('keeps public smart links on the canonical origin', () => {
+    expect(getSmartLinkUrl('/calvin-demo/summer')).toBe(
+      'https://jov.ie/calvin-demo/summer'
+    );
+    expect(getSmartLinkUrl('calvin-demo/summer')).toBe(
+      'https://jov.ie/calvin-demo/summer'
+    );
   });
 });

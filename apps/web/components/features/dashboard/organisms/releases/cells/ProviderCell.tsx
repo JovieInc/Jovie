@@ -11,9 +11,9 @@ import {
 import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { Icon } from '@/components/atoms/Icon';
 import { DrawerInlineIconButton } from '@/components/molecules/drawer';
+import { getSmartLinkUrl } from '@/constants/domains';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
-import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { AddProviderUrlPopover, ProviderStatusDot } from '../components';
 
 interface ProviderConfig {
@@ -55,7 +55,7 @@ function ProviderActionButtons({
       <DrawerInlineIconButton
         title={isCopied ? 'Copied' : 'Copy'}
         data-testid={testId}
-        data-url={provider.path ? `${getBaseUrl()}${provider.path}` : undefined}
+        data-url={provider.path ? getSmartLinkUrl(provider.path) : undefined}
         onClick={onCopyClick}
         className={cn(
           'p-1 text-secondary-token',
