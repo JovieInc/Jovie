@@ -92,6 +92,7 @@ jobs:
           set -euo pipefail
           echo "should_record=false" >> "$GITHUB_OUTPUT"
           echo "launch_action=skip" >> "$GITHUB_OUTPUT"
+          echo "fx_outcome=needs_human" >> "$GITHUB_OUTPUT"
           echo "pr_number=" >> "$GITHUB_OUTPUT"
           RESOLVED_PR=$(node --input-type=module <<'EOF'
           import { resolveDispatchPullRequest } from './scripts/lib/rolling-ci-dispatch.mjs';
@@ -105,10 +106,12 @@ jobs:
           EOF
           ) || {
             echo "No unique open pull request or authenticated check suite owns this failure head."
+            echo "fx_outcome=needs_human" >> "$GITHUB_OUTPUT"
             exit 0
           }
           if [[ ! "${CHECK_SUITE_ID:-}" =~ ^[0-9]+$ || -z "${EXPECTED_HEAD:-}" ]]; then
             echo "No unique open pull request or authenticated check suite owns this failure head."
+            echo "fx_outcome=needs_human" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if [[ -z "${WORKFLOW_RUN_ID:-}" ]]; then
@@ -119,6 +122,7 @@ jobs:
           fi
           if [[ -z "${WORKFLOW_RUN_ID:-}" || ! "${WORKFLOW_RUN_ATTEMPT:-}" =~ ^[0-9]+$ ]]; then
             echo "Failure event is not an authenticated CI workflow_run for this suite."
+            echo "fx_outcome=needs_human" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           LIVE_PR=$(gh api "repos/$REPOSITORY/pulls/$RESOLVED_PR" \
@@ -139,15 +143,17 @@ jobs:
           EOF
           ) || {
             echo "Failure event is stale, forked, or no longer open; refusing dispatch."
+            echo "fx_outcome=skipped_stale" >> "$GITHUB_OUTPUT"
             exit 0
           }
           if [[ "$(jq -r '.state' <<<"$LIVE_PR")" != "open" || "$(jq -r '.fork' <<<"$LIVE_PR")" == "true" || "$(jq -r '.same_repo' <<<"$LIVE_PR")" != "true" ]]; then
             echo "Failure event is stale, forked, or no longer open; refusing dispatch."
+            echo "fx_outcome=skipped_stale" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "pr_number=$RESOLVED_PR" >> "$GITHUB_OUTPUT"
           FAILED_JOBS=$(gh api "repos/$REPOSITORY/actions/runs/$WORKFLOW_RUN_ID/jobs" \
-            --jq '[.jobs[] | select(.conclusion == "failure") | {name: .name, steps: [.steps[]? | select(.conclusion == "failure") | .name]}]')
+            --jq '[.jobs[] | select(.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "startup_failure") | {name: .name, conclusion: .conclusion, steps: [.steps[]? | select(.conclusion == "failure" or .conclusion == "timed_out") | .name]}]')
           CHECKS=$(gh api --paginate "repos/$REPOSITORY/commits/$EXPECTED_HEAD/check-runs" \
             --jq '.check_runs[] | {name: .name, conclusion: .conclusion, headSha: .head_sha, checkSuiteId: .check_suite.id}' \
             | jq -s '.')
@@ -186,6 +192,7 @@ jobs:
           cat "$RUNNER_TEMP/rolling-ci-plan.json"
           echo "should_record=$(jq -r '.dispatch.mutate' "$RUNNER_TEMP/rolling-ci-plan.json")" >> "$GITHUB_OUTPUT"
           echo "launch_action=$(jq -r '.launch.action' "$RUNNER_TEMP/rolling-ci-plan.json")" >> "$GITHUB_OUTPUT"
+          echo "fx_outcome=$(jq -r '.outcome // "needs_human"' "$RUNNER_TEMP/rolling-ci-plan.json")" >> "$GITHUB_OUTPUT"
           echo "launch_request=$(jq -c '.launch.request // {}' "$RUNNER_TEMP/rolling-ci-plan.json")" >> "$GITHUB_OUTPUT"
           {
             echo "comment_body<<ROLLING_CI_COMMENT"
@@ -205,6 +212,7 @@ jobs:
           bash scripts/lib/upsert-pr-comment.sh "$PR_NUMBER" "rolling-ci-dispatch" "$COMMENT_BODY"
 
       - name: Launch FX remediator
+        id: launch
         if: steps.plan.outputs.launch_action == 'launch'
         env:
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
@@ -229,3 +237,19 @@ jobs:
           });
           console.log(JSON.stringify({ id: launched?.id ?? null, ok: true }));
           EOF
+
+      - name: Record FX outcome
+        if: always() && steps.plan.outcome != 'skipped'
+        env:
+          PLAN_OUTCOME: ${{ steps.plan.outputs.fx_outcome }}
+          LAUNCH_RESULT: ${{ steps.launch.outcome }}
+        run: |
+          set -euo pipefail
+          outcome="${PLAN_OUTCOME:-needs_human}"
+          if [[ "${LAUNCH_RESULT:-}" == 'success' ]]; then
+            outcome='launched'
+          elif [[ "${LAUNCH_RESULT:-}" == 'failure' && "$outcome" == 'launched' ]]; then
+            outcome='needs_human'
+          fi
+          echo "::notice::FX outcome=${outcome}"
+          echo "FX outcome: \`${outcome}\`" >> "$GITHUB_STEP_SUMMARY"

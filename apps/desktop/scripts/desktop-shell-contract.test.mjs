@@ -91,9 +91,25 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
     mainSource,
     /const APP_BACKGROUND_COLOR = SYSTEM_B_DESKTOP_TOKENS\.backgroundColor;/
   );
-  assert.match(mainSource, /function buildDesktopLoadFailureUrl\(\): string/);
-  assert.match(mainSource, /Jovie couldn’t load/);
-  assert.match(mainSource, /Check your connection, then try again\./);
+  const recoverySource = await readFile(
+    join(desktopRoot, 'src/renderer-recovery.ts'),
+    'utf8'
+  );
+  assert.match(mainSource, /function buildDesktopLoadFailureUrl\(/);
+  assert.match(mainSource, /classifyDesktopLoadFailure/);
+  assert.match(mainSource, /describeDesktopLoadFailure/);
+  assert.match(mainSource, /decideHostedLoadRetry/);
+  assert.match(mainSource, /rendererEverBooted/);
+  assert.match(mainSource, /function isAppOriginReachable\(\)/);
+  assert.match(mainSource, /function findReachableHostedUrl\(/);
+  assert.match(mainSource, /beginRecoveryUnlatch/);
+  assert.match(mainSource, /decideRecoveryUnlatch/);
+  assert.match(recoverySource, /hostedUrlCandidates/);
+  assert.match(recoverySource, /Jovie couldn’t load/);
+  assert.match(recoverySource, /Check your connection, then try again\./);
+  assert.match(recoverySource, /Local Jovie isn’t running at/);
+  assert.match(recoverySource, /Jovie didn’t finish starting/);
+  assert.match(recoverySource, /Jovie crashed/);
   assert.doesNotMatch(mainSource, /Desktop shell runtime:/);
   assert.doesNotMatch(mainSource, /Built for artists/);
   assert.match(mainSource, /data:text\/html;charset=utf-8/);
@@ -129,6 +145,7 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /APP_BOOTED_CHANNEL/);
   assert.match(mainSource, /RENDERER_BOOT_WATCHDOG_MS/);
   assert.match(mainSource, /RENDERER_LOAD_WATCHDOG_MS/);
+  assert.match(mainSource, /rendererWatchdogMs\(APP_ENV\)/);
   assert.match(mainSource, /decideRendererBootWatchdogAfterLoad/);
   assert.match(mainSource, /shouldSkipRendererWatchdogForAuthHandoff/);
   assert.match(mainSource, /decideRendererLoadStart/);
@@ -154,6 +171,12 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   // JOV-5086: did-start-loading must not clear the watchdog without re-arming.
   // That hole left hung / intercepted first navigations on a black canvas.
   assert.doesNotMatch(mainSource, /'did-start-loading'/);
+  // JOV-5339: Jovie Local must not trip packaged recovery on compile/HMR.
+  assert.match(mainSource, /shouldArmRendererWatchdogsForAppEnv\(APP_ENV\)/);
+  assert.match(mainSource, /decideLocalMainFrameLoadFailure/);
+  assert.match(mainSource, /host-resolver-rules/);
+  assert.match(mainSource, /MAP localhost 127\.0\.0\.1/);
+  assert.match(mainSource, /if \(!armWatchdogs\) return;/);
   assert.match(mainSource, /viewBox="0 0 353\.68 347\.97"/);
   assert.match(mainSource, /START_DESKTOP_AUTH_HANDOFF_CHANNEL/);
   assert.match(mainSource, /OPEN_DESKTOP_AUTH_URL_CHANNEL/);
@@ -480,7 +503,7 @@ test('desktop dev defaults to the local app shell and packaged builds keep produ
     });
     assert.match(localStdout, /APP_ENV='local'/);
     assert.match(localEnv, /APP_ENV: 'production' \| 'staging' \| 'local'/);
-    assert.match(localEnv, /APP_URL = 'http:\/\/localhost:3112'/);
+    assert.match(localEnv, /APP_URL = 'http:\/\/localhost:3100'/);
 
     const { stdout: localOverrideStdout } = await execFileAsync(
       process.execPath,
@@ -668,6 +691,18 @@ test('desktop main-window hub regression contracts (desktop QA)', async () => {
   // Fix: doc references must point at files that exist.
   assert.doesNotMatch(mainSource, /BUILDS\.md/);
   assert.match(mainSource, /apps\/desktop\/SIGNING\.md/);
+});
+
+test('hud layout pings the desktop boot watchdog', async () => {
+  const webRoot = join(desktopRoot, '..', 'web');
+  const hudLayout = await readFile(join(webRoot, 'app/hud/layout.tsx'), 'utf8');
+  const hudBoot = await readFile(
+    join(webRoot, 'app/hud/HudDesktopBootSignal.tsx'),
+    'utf8'
+  );
+
+  assert.match(hudLayout, /HudDesktopBootSignal/);
+  assert.match(hudBoot, /useDesktopAppBootSignal/);
 });
 
 test('hosted web app has an early Electron runtime marker before first paint', async () => {

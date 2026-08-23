@@ -14,5 +14,10 @@ let package = Package(
       name: "MenuMonitor",
       path: "Sources/MenuMonitor"
     ),
+    .testTarget(
+      name: "MenuMonitorTests",
+      dependencies: ["MenuMonitor"],
+      path: "Tests/MenuMonitorTests"
+    ),
   ]
 )
