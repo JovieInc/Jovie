@@ -174,6 +174,12 @@ export function normalizeNativeQueuePolicyParameters(observed = {}) {
     const restKey = NATIVE_QUEUE_GRAPHQL_POLICY_FIELDS[key] ?? key;
     if (!Object.hasOwn(NATIVE_QUEUE_POLICY, restKey)) continue;
     let mapped = value;
+    // REST names this field in minutes; GraphQL exposes the same setting in
+    // seconds (for example, the canonical 60-minute timeout is returned as
+    // 3600). Normalize before GraphQL overrides the REST observation.
+    if (key === 'checkResponseTimeout' && typeof value === 'number') {
+      mapped = value / 60;
+    }
     if (ENUM_POLICY_FIELDS.has(restKey) && typeof value === 'string') {
       mapped = value.toUpperCase();
     }

@@ -2093,13 +2093,15 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     expect(liveUntilCutover.ok).toBe(true);
   });
 
-  it('normalizes GraphQL maximumEntriesToBuild onto the REST lock key', () => {
+  it('normalizes GraphQL fields and timeout units onto REST lock keys', () => {
     expect(
       normalizeNativeQueuePolicyParameters({
+        checkResponseTimeout: 3600,
         maximumEntriesToBuild: 3,
         grouping_strategy: 'ALLGREEN',
       })
     ).toMatchObject({
+      check_response_timeout_minutes: 60,
       max_entries_to_build: 3,
       grouping_strategy: 'ALLGREEN',
     });
