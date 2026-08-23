@@ -340,7 +340,8 @@ The handoff is complete only when all of these remain true:
 3. Chat and Calendar remain founder-locked and source-mapped only.
 4. The elevation invariant is visible in the mapped anatomy.
 5. State coverage distinguishes source-verified states from proposed states.
-6. Preview-backed Library, placeholder-backed Entity Context, audience route
-   split, and macOS action feedback gap remain explicitly labeled.
+6. Preview-backed Library, placeholder-backed Entity Context, and the audience
+   route split remain explicitly labeled; macOS action feedback stays mapped to
+   its tested native presentation owner.
 7. No new SwiftUI view, modifier, token, or Pen component is created merely to
    make the registry look complete.
