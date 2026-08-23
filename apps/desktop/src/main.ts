@@ -1338,6 +1338,7 @@ function attachRendererRecovery(
       readonly hostReachable?: boolean;
     } = {}
   ): void => {
+    if (rendererBooted || win.isDestroyed()) return;
     const failure = resolveLoadFailureView(reason, failureOptions);
     const retryAction = decideHostedLoadRetry({
       kind: failure.kind,
@@ -1390,6 +1391,19 @@ function attachRendererRecovery(
     );
     void isAppOriginReachable().then(hostReachable => {
       if (win.isDestroyed()) return;
+      // The probe is async. A healthy first compile can send app-booted
+      // while it is in flight — do not replace that painted session.
+      if (
+        decideRendererWatchdogExpiry({
+          booted: rendererBooted,
+          everBooted: rendererEverBooted,
+          reason,
+          windowDestroyed: win.isDestroyed(),
+          skipForAuthHandoff: options.shouldSkipWatchdog(),
+        }) === 'ignore'
+      ) {
+        return;
+      }
       recoverOrShowFailure(
         reason === 'load' ? 'load-watchdog' : 'boot-watchdog',
         { hostReachable }

@@ -330,6 +330,15 @@ test('200-but-blank and hung load both expire to the failure page', () => {
   ).toBe('ignore');
   expect(
     decideRendererWatchdogExpiry({
+      booted: true,
+      everBooted: true,
+      reason: 'load',
+      windowDestroyed: false,
+      skipForAuthHandoff: false,
+    })
+  ).toBe('ignore');
+  expect(
+    decideRendererWatchdogExpiry({
       booted: false,
       windowDestroyed: true,
       skipForAuthHandoff: false,
