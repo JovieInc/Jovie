@@ -41,12 +41,15 @@ export function normalizeIntakeEvent(raw) {
     nonEmpty(payload.issue_identifier) || nonEmpty(payload.identifier);
   const state = nonEmpty(payload.state_name) || nonEmpty(payload.state);
   const deliveryId =
-    nonEmpty(raw?.delivery_id) ||
-    nonEmpty(raw?.id) ||
     nonEmpty(payload.delivery_id) ||
+    nonEmpty(raw?.delivery_id) ||
     nonEmpty(payload.event_id);
   const clusterKey =
     nonEmpty(payload.dedupe_key) || nonEmpty(payload.cluster_key);
+  const action =
+    nonEmpty(payload.intake_action) ||
+    nonEmpty(payload.action) ||
+    nonEmpty(raw?.action);
   const eventKey =
     deliveryId ||
     digest({
@@ -55,20 +58,21 @@ export function normalizeIntakeEvent(raw) {
       state,
       updatedAt:
         nonEmpty(payload.issue_updated_at) || nonEmpty(payload.updated_at),
-      action: nonEmpty(raw?.action) || nonEmpty(payload.action),
+      action,
       clusterKey,
     });
   return {
     schema: INTAKE_EVENT_SCHEMA,
     source,
     eventKey,
+    deliveryId,
     issue,
     teamKey: nonEmpty(payload.team_key)?.toUpperCase() || null,
     state,
     updatedAt:
       nonEmpty(payload.issue_updated_at) || nonEmpty(payload.updated_at),
     clusterKey,
-    action: nonEmpty(raw?.action) || nonEmpty(payload.action),
+    action,
   };
 }
 
@@ -83,6 +87,8 @@ export function dispositionForIntakeEvent(event) {
   }
   if (event.source !== 'linear')
     return { status: 'held', reason: 'unsupported-event-source' };
+  if (!event.deliveryId)
+    return { status: 'held', reason: 'provider-delivery-identity-missing' };
   if (event.teamKey !== 'JOV')
     return { status: 'ignored', reason: 'non-jov-team' };
   if (!event.issue)

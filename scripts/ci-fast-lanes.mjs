@@ -434,6 +434,8 @@ function runStructural() {
     // adapter, deadline, ledger, and receipt regressions executable in CI.
     'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs',
+    'node --test scripts/backlog-orchestrator/__tests__/intake-event-controller.test.mjs',
+    'node --test scripts/backlog-orchestrator/__tests__/jovie-intake-controller-workflow.test.mjs',
     // CI installs the hash-pinned pytest + coverage toolchain. The pure policy
     // is the safety boundary for holds, retry budgets, exact-head leases, and
     // bounded fanout, so branch-aware coverage is a hard structural gate.

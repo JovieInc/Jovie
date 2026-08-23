@@ -15,9 +15,10 @@ permissions:
   contents: read
 
 concurrency:
-  # One controller writer for all events. The durable receipt is idempotent,
-  # while the governor independently bounds implementation leases to four.
-  group: jovie-intake-admission
+  # Per-issue groups keep unrelated deliveries pending. GitHub keeps only one
+  # pending run per group, so a global key would collapse later events.
+  # Mutating gate-next still takes one host flock below.
+  group: jovie-intake-${{ github.event_name == 'repository_dispatch' && github.event.client_payload.issue_identifier || github.event_name }}
   cancel-in-progress: false
 
 jobs:
@@ -63,14 +64,21 @@ jobs:
         env:
           JOVIE_AGENT_PROFILE: no_agent
           ISSUE_IDENTIFIER: ${{ github.event.client_payload.issue_identifier }}
+          GEM_WORKSPACE: /home/timwhite/gem-workspace
         run: |
           set -euo pipefail
           test -n "$ISSUE_IDENTIFIER"
           # gate-next rereads the exact issue, requires the canonical fleet
           # receipt, plan and admission receipts, then verifies its single
           # lease. A hold is a successful no-op, never a retry bypass.
+          # The host flock is the one shared admission writer across concurrent
+          # per-issue workflows on this runner.
           receipt="$RUNNER_TEMP/intake-admission.json"
-          scripts/backlog-orchestrator/run-backlog.sh gate-next --issue="$ISSUE_IDENTIFIER" | tee "$receipt"
+          lock="$GEM_WORKSPACE/state/jovie-intake-gate-next.lock"
+          mkdir -p "$(dirname "$lock")"
+          flock --exclusive "$lock" \
+            scripts/backlog-orchestrator/run-backlog.sh gate-next --issue="$ISSUE_IDENTIFIER" \
+            | tee "$receipt"
           if jq -e --arg issue "$ISSUE_IDENTIFIER" '
             .status == "admitted" and
             any(.teams[]; .status == "admitted" and .issue == $issue and .mutations == "verified")

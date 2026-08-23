@@ -14,14 +14,17 @@
  * Auth: HMAC-SHA256 verification against LINEAR_WEBHOOK_SECRET via the
  * `linear-signature` header. Missing → 400, invalid → 401.
  *
- * Dedupe: per (issueId × updatedAt × kind) lock held in Redis for 60s. Lock
- * release on dispatch failure ensures Linear's retry can succeed. If Redis is
- * unavailable, we 503 rather than risk double-dispatching.
+ * Dedupe: provider `Linear-Delivery` identity is locked in Redis for six
+ * hours. Known GitHub dispatch failures release the lock so Linear can retry.
+ * An ambiguous timeout keeps the lock and returns a stable 200
+ * reconcile-required acknowledgement so the delivery is not replayed. If Redis
+ * is unavailable, we 503 rather than risk double-dispatching.
  *
  * Side effects: POSTs to
  * `https://api.github.com/repos/{owner}/{repo}/dispatches` with
  * GH_DISPATCH_TOKEN. Repo defaults to JovieInc/Jovie unless
- * VERCEL_GIT_REPO_OWNER / VERCEL_GIT_REPO_SLUG override.
+ * VERCEL_GIT_REPO_OWNER / VERCEL_GIT_REPO_SLUG override. `client_payload`
+ * stays within GitHub's 10 top-level key bound.
  */
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
@@ -39,8 +42,60 @@ import {
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-const DEDUPE_TTL_SECONDS = 60;
+export const LINEAR_DISPATCH_DEDUPE_TTL_SECONDS = 6 * 60 * 60;
+export const GITHUB_REPOSITORY_DISPATCH_MAX_CLIENT_PAYLOAD_KEYS = 10;
 const DISPATCH_TIMEOUT_MS = 10000;
+
+export interface LinearGithubDispatchContract {
+  verify_required: boolean;
+  simplify_bounded: boolean;
+  model_tier: 'premium' | 'economy';
+}
+
+export interface LinearGithubDispatchPayload {
+  delivery_id: string;
+  issue_id: string;
+  issue_identifier: string | null;
+  issue_updated_at: string | null;
+  team_key: string | null;
+  state_name: string | null;
+  intake_action: string | null;
+  plan_ready: boolean;
+  contract: LinearGithubDispatchContract;
+}
+
+export function buildLinearGithubDispatchPayload(input: {
+  deliveryId: string;
+  issueId: string;
+  issueIdentifier: string | null;
+  issueUpdatedAt: string | null;
+  teamKey: string | null;
+  stateName: string | null;
+  intakeAction: string | null;
+  planReady: boolean;
+  contract: LinearGithubDispatchContract;
+}): LinearGithubDispatchPayload {
+  const clientPayload: LinearGithubDispatchPayload = {
+    delivery_id: input.deliveryId,
+    issue_id: input.issueId,
+    issue_identifier: input.issueIdentifier,
+    issue_updated_at: input.issueUpdatedAt,
+    team_key: input.teamKey,
+    state_name: input.stateName,
+    intake_action: input.intakeAction,
+    plan_ready: input.planReady,
+    contract: input.contract,
+  };
+  if (
+    Object.keys(clientPayload).length >
+    GITHUB_REPOSITORY_DISPATCH_MAX_CLIENT_PAYLOAD_KEYS
+  ) {
+    throw new Error(
+      'GitHub repository_dispatch client_payload exceeds the 10-key bound'
+    );
+  }
+  return clientPayload;
+}
 
 interface LinearIssueState {
   id?: string;
@@ -240,12 +295,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const dedupeKey = `${issueId}:${issueData?.updatedAt ?? payload.createdAt ?? ''}:${isPlanReadyEvent ? 'plan' : 'intake'}`;
+    const deliveryId = request.headers.get('linear-delivery')?.trim() ?? '';
+    if (!deliveryId) {
+      return NextResponse.json(
+        { error: 'Missing delivery identity' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const dedupeKey = deliveryId;
     dedupeKeyForRetry = dedupeKey;
     const dedupeResult = await acquireRecentDispatch(
       'linear',
       dedupeKey,
-      DEDUPE_TTL_SECONDS
+      LINEAR_DISPATCH_DEDUPE_TTL_SECONDS
     );
     dedupeAcquired = dedupeResult.acquired;
 
@@ -271,6 +334,21 @@ export async function POST(request: NextRequest) {
     const owner = env.VERCEL_GIT_REPO_OWNER ?? 'JovieInc';
     const repo = env.VERCEL_GIT_REPO_SLUG ?? 'Jovie';
     const automationContract = getAutomationContract(payload, isPlanReadyEvent);
+    const clientPayload = buildLinearGithubDispatchPayload({
+      deliveryId,
+      issueId,
+      issueIdentifier: issueData?.identifier ?? null,
+      issueUpdatedAt: issueData?.updatedAt ?? null,
+      teamKey: issueData?.team?.key ?? null,
+      stateName: issueData?.state?.name ?? null,
+      intakeAction: payload.action ?? null,
+      planReady: isPlanReadyEvent,
+      contract: {
+        verify_required: automationContract.verifyRequired,
+        simplify_bounded: automationContract.simplifyBounded,
+        model_tier: automationContract.modelTier,
+      },
+    });
 
     const dispatchResponse = await serverFetch(
       `https://api.github.com/repos/${owner}/${repo}/dispatches`,
@@ -285,21 +363,7 @@ export async function POST(request: NextRequest) {
           event_type: isPlanReadyEvent
             ? 'linear_plan_ready'
             : 'linear-intake-changed',
-          client_payload: {
-            issue_id: issueId,
-            issue_identifier: issueData?.identifier ?? null,
-            issue_title: issueData?.title ?? 'Untitled Linear Issue',
-            issue_description: issueData?.description ?? '',
-            issue_url: issueData?.url ?? null,
-            issue_updated_at: issueData?.updatedAt ?? null,
-            team_key: issueData?.team?.key ?? null,
-            state_name: issueData?.state?.name ?? null,
-            intake_action: payload.action ?? null,
-            plan_ready: isPlanReadyEvent,
-            verify_required: automationContract.verifyRequired,
-            simplify_bounded: automationContract.simplifyBounded,
-            model_tier: automationContract.modelTier,
-          },
+          client_payload: clientPayload,
         }),
         timeoutMs: DISPATCH_TIMEOUT_MS,
         context: 'GitHub repository dispatch for Linear webhook',
@@ -335,16 +399,18 @@ async function handleLinearWebhookError(
   dedupeKeyForRetry: string | null
 ): Promise<NextResponse> {
   if (error instanceof ServerFetchTimeoutError) {
-    if (dedupeAcquired && dedupeKeyForRetry) {
-      await clearRecentDispatch('linear', dedupeKeyForRetry);
-    }
     await captureCriticalError('Linear webhook dispatch timed out', error, {
       route: '/api/webhooks/linear',
       timeoutMs: error.timeoutMs,
+      deliveryId: dedupeKeyForRetry,
     });
     return NextResponse.json(
-      { error: 'Dispatch timed out' },
-      { status: 502, headers: NO_STORE_HEADERS }
+      {
+        received: true,
+        dispatched: 'ambiguous',
+        reconcile_required: true,
+      },
+      { headers: NO_STORE_HEADERS }
     );
   }
 

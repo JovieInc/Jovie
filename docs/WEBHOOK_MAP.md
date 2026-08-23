@@ -14,7 +14,7 @@
 | `/api/webhooks/stripe-tips` | Stripe (tips) | Stripe signature (`STRIPE_WEBHOOK_SECRET_TIPS`) | `checkout.session.completed`, `charge.refunded` | **checkout:** inserts into `tips` (idempotent on `paymentIntentId`). **refunded:** updates tip status. |
 | `/api/webhooks/resend` | Resend (delivery) | HMAC-SHA256 over `svix-timestamp.body` with `RESEND_WEBHOOK_SECRET` (timing-safe) | `email.bounced`, `email.complained`, `email.delivered`, `email.opened`, `email.clicked`, `email.sent`, `email.delivery_delayed` | Idempotent via `webhookEvents` table. **bounced/complained:** adds to suppression list, updates sender reputation, stops campaign enrollments. **delivered/opened/clicked:** logs engagement. |
 | `/api/webhooks/resend-inbound` | Resend (inbound email) | Svix-style HMAC (`RESEND_INBOUND_WEBHOOK_SECRET`, 5-min timestamp window) | `email.received` | Parses recipient, looks up creator, creates/updates `emailThreads`, inserts `inboundEmails`, runs AI classification (category, priority, summary). |
-| `/api/webhooks/linear` | Linear | HMAC-SHA256 (`linear-signature` + `LINEAR_WEBHOOK_SECRET`, timing-safe) | Issue → "Todo" state, CodeRabbit plan-ready comment | Deduplication via Redis (60s TTL). Fires GitHub `repository_dispatch` (`linear_todo_ready` or `linear_plan_ready`) to trigger CI automation. |
+| `/api/webhooks/linear` | Linear | HMAC-SHA256 (`linear-signature` + `LINEAR_WEBHOOK_SECRET`, timing-safe); requires `Linear-Delivery` | JOV create/update in Triage/Backlog/Todo, CodeRabbit plan-ready comment | Deduplication via Redis (6h TTL) on provider delivery identity. Fires GitHub `repository_dispatch` (`linear-intake-changed` or `linear_plan_ready`) with ≤10 `client_payload` keys. Ambiguous dispatch timeout returns 200 `reconcile_required` and is not replayed. |
 | `/api/webhooks/sentry` | Sentry | HMAC-SHA256 (`sentry-hook-signature` + `SENTRY_WEBHOOK_SECRET`, timing-safe) | Issue alerts | Deduplication via Redis (60s TTL). Fires GitHub `repository_dispatch` (`sentry-issue`) to trigger autofix workflow with stack frames. |
 | `/api/webhooks/stripe-merch` | Stripe (merch) | Stripe signature (`stripe-signature` + `STRIPE_WEBHOOK_SECRET_MERCH`) | `checkout.session.completed`, `charge.refunded` | **checkout:** marks merch orders paid, stores shipping details, enqueues Printful fulfillment, accrues manual payout ledger. **full refund:** reverses ledger liability. **partial refund:** holds fulfillment/payout for manual review. |
 | `/api/webhooks/printful` | Printful | HMAC-SHA256 (`x-pf-webhook-signature` + `PRINTFUL_WEBHOOK_SECRET`, timing-safe) | Order shipment, delivery, cancellation, failure, hold events | Idempotent via `webhookEvents`. Updates merch order fulfillment status and keeps failed/hold states from becoming payout-ready. |
@@ -24,7 +24,7 @@
 **Idempotency:**
 - Stripe webhooks use the `stripeWebhookEvents` table (unique constraint on event ID) to prevent double-processing
 - Resend delivery and Printful webhooks use the `webhookEvents` table for the same purpose
-- Linear/Sentry webhooks use Redis-backed `acquireRecentDispatch` with 60s TTL
+- Linear webhooks use Redis-backed `acquireRecentDispatch` keyed by `Linear-Delivery` with a 6-hour TTL. Sentry webhooks keep a 60s TTL.
 
 **Verification methods:**
 - **Svix:** Used by Clerk. Verifies `svix-id`, `svix-timestamp`, `svix-signature` headers via `new Webhook(secret).verify()`

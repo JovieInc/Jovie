@@ -43,8 +43,48 @@ vi.mock('@/lib/webhooks/recent-dispatch', () => ({
   clearRecentDispatch: mockClearRecentDispatch,
 }));
 
+const DELIVERY_ID = 'linear-delivery-abc';
+
 function sign(body: string): string {
   return createHmac('sha256', 'linear-secret').update(body).digest('hex');
+}
+
+function intakePayload(
+  overrides: Record<string, unknown> = {}
+): Record<string, unknown> {
+  return {
+    type: 'Issue',
+    action: 'update',
+    createdAt: '2026-03-10T00:00:00.000Z',
+    updatedFrom: { stateId: 'old' },
+    data: {
+      id: 'issue_123',
+      identifier: 'JOV-5313',
+      updatedAt: '2026-03-10T00:00:01.000Z',
+      stateId: 'new',
+      state: { name: 'Todo' },
+      team: { key: 'JOV' },
+    },
+    ...overrides,
+  };
+}
+
+function signedRequest(
+  payload: Record<string, unknown>,
+  { deliveryId = DELIVERY_ID }: { deliveryId?: string | null } = {}
+): Request {
+  const body = JSON.stringify(payload);
+  const headers = new Headers({
+    'linear-signature': sign(body),
+  });
+  if (deliveryId) {
+    headers.set('linear-delivery', deliveryId);
+  }
+  return new Request('https://example.com/api/webhooks/linear', {
+    method: 'POST',
+    headers,
+    body,
+  });
 }
 
 describe('POST /api/webhooks/linear', () => {
@@ -59,36 +99,36 @@ describe('POST /api/webhooks/linear', () => {
       reason: 'duplicate',
     });
 
-    const { POST } = await import('@/app/api/webhooks/linear/route');
-    const payload = {
-      type: 'Issue',
-      action: 'update',
-      createdAt: '2026-03-10T00:00:00.000Z',
-      updatedFrom: { stateId: 'old' },
-      data: {
-        id: 'issue_123',
-        updatedAt: '2026-03-10T00:00:01.000Z',
-        stateId: 'new',
-        state: { name: 'Todo' },
-        team: { key: 'JOV' },
-      },
-    };
-    const body = JSON.stringify(payload);
-    const request = new Request('https://example.com/api/webhooks/linear', {
-      method: 'POST',
-      headers: {
-        'linear-signature': sign(body),
-      },
-      body,
-    });
-
-    const response = await POST(request as never);
+    const { POST, LINEAR_DISPATCH_DEDUPE_TTL_SECONDS } = await import(
+      '@/app/api/webhooks/linear/route'
+    );
+    const response = await POST(signedRequest(intakePayload()) as never);
     const data = await response.json();
 
     expect(response.status).toBe(200);
     expect(data).toEqual({ received: true, deduplicated: true });
+    expect(mockAcquireRecentDispatch).toHaveBeenCalledWith(
+      'linear',
+      DELIVERY_ID,
+      LINEAR_DISPATCH_DEDUPE_TTL_SECONDS
+    );
+    expect(LINEAR_DISPATCH_DEDUPE_TTL_SECONDS).toBe(6 * 60 * 60);
     expect(mockServerFetch).not.toHaveBeenCalled();
     expect(mockClearRecentDispatch).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when provider delivery identity is missing', async () => {
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const response = await POST(
+      signedRequest(intakePayload(), { deliveryId: null }) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Missing delivery identity',
+    });
+    expect(mockAcquireRecentDispatch).not.toHaveBeenCalled();
+    expect(mockServerFetch).not.toHaveBeenCalled();
   });
 
   it('returns 503 when webhook dedupe backend is unavailable', async () => {
@@ -98,29 +138,7 @@ describe('POST /api/webhooks/linear', () => {
     });
 
     const { POST } = await import('@/app/api/webhooks/linear/route');
-    const payload = {
-      type: 'Issue',
-      action: 'update',
-      createdAt: '2026-03-10T00:00:00.000Z',
-      updatedFrom: { stateId: 'old' },
-      data: {
-        id: 'issue_123',
-        updatedAt: '2026-03-10T00:00:01.000Z',
-        stateId: 'new',
-        state: { name: 'Todo' },
-        team: { key: 'JOV' },
-      },
-    };
-    const body = JSON.stringify(payload);
-    const request = new Request('https://example.com/api/webhooks/linear', {
-      method: 'POST',
-      headers: {
-        'linear-signature': sign(body),
-      },
-      body,
-    });
-
-    const response = await POST(request as never);
+    const response = await POST(signedRequest(intakePayload()) as never);
 
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({
@@ -137,7 +155,7 @@ describe('POST /api/webhooks/linear', () => {
     );
   });
 
-  it('returns 502 when the GitHub dispatch times out', async () => {
+  it('acknowledges an ambiguous GitHub dispatch timeout without replay', async () => {
     const { ServerFetchTimeoutError } = await import('@/lib/http/server-fetch');
 
     mockAcquireRecentDispatch.mockResolvedValue({
@@ -149,45 +167,40 @@ describe('POST /api/webhooks/linear', () => {
     );
 
     const { POST } = await import('@/app/api/webhooks/linear/route');
-    const payload = {
-      type: 'Issue',
-      action: 'update',
-      createdAt: '2026-03-10T00:00:00.000Z',
-      updatedFrom: { stateId: 'old' },
-      data: {
-        id: 'issue_123',
-        updatedAt: '2026-03-10T00:00:01.000Z',
-        stateId: 'new',
-        state: { name: 'Todo' },
-        team: { key: 'JOV' },
-      },
-    };
-    const body = JSON.stringify(payload);
-    const request = new Request('https://example.com/api/webhooks/linear', {
-      method: 'POST',
-      headers: {
-        'linear-signature': sign(body),
-      },
-      body,
-    });
-
-    const response = await POST(request as never);
+    const response = await POST(signedRequest(intakePayload()) as never);
     const data = await response.json();
 
-    expect(response.status).toBe(502);
-    expect(data).toEqual({ error: 'Dispatch timed out' });
-    expect(mockClearRecentDispatch).toHaveBeenCalledWith(
-      'linear',
-      'issue_123:2026-03-10T00:00:01.000Z:intake'
-    );
+    expect(response.status).toBe(200);
+    expect(data).toEqual({
+      received: true,
+      dispatched: 'ambiguous',
+      reconcile_required: true,
+    });
+    expect(mockClearRecentDispatch).not.toHaveBeenCalled();
     expect(mockCaptureCriticalError).toHaveBeenCalledWith(
       'Linear webhook dispatch timed out',
       expect.any(ServerFetchTimeoutError),
       expect.objectContaining({
         route: '/api/webhooks/linear',
         timeoutMs: 10000,
+        deliveryId: DELIVERY_ID,
       })
     );
+  });
+
+  it('releases the delivery lock when GitHub reports a known dispatch failure', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+    mockServerFetch.mockResolvedValue(new Response('boom', { status: 500 }));
+
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const response = await POST(signedRequest(intakePayload()) as never);
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: 'Dispatch failed' });
+    expect(mockClearRecentDispatch).toHaveBeenCalledWith('linear', DELIVERY_ID);
   });
 
   it('does not retry the GitHub dispatch POST', async () => {
@@ -202,29 +215,7 @@ describe('POST /api/webhooks/linear', () => {
     );
 
     const { POST } = await import('@/app/api/webhooks/linear/route');
-    const payload = {
-      type: 'Issue',
-      action: 'update',
-      createdAt: '2026-03-10T00:00:00.000Z',
-      updatedFrom: { stateId: 'old' },
-      data: {
-        id: 'issue_123',
-        updatedAt: '2026-03-10T00:00:01.000Z',
-        stateId: 'new',
-        state: { name: 'Todo' },
-        team: { key: 'JOV' },
-      },
-    };
-    const body = JSON.stringify(payload);
-    const request = new Request('https://example.com/api/webhooks/linear', {
-      method: 'POST',
-      headers: {
-        'linear-signature': sign(body),
-      },
-      body,
-    });
-
-    const response = await POST(request as never);
+    const response = await POST(signedRequest(intakePayload()) as never);
 
     expect(response.status).toBe(200);
     expect(mockServerFetch).toHaveBeenCalledWith(
@@ -237,14 +228,15 @@ describe('POST /api/webhooks/linear', () => {
     expect(mockServerFetch.mock.calls[0]?.[1]).not.toHaveProperty('retry');
   });
 
-  it('dispatches a label-free JOV backlog create as an intake event', async () => {
+  it('dispatches a label-free JOV backlog create within GitHub payload bounds', async () => {
     mockAcquireRecentDispatch.mockResolvedValue({
       acquired: true,
       reason: 'acquired',
     });
     mockServerFetch.mockResolvedValue(new Response(null, { status: 204 }));
 
-    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const { POST, GITHUB_REPOSITORY_DISPATCH_MAX_CLIENT_PAYLOAD_KEYS } =
+      await import('@/app/api/webhooks/linear/route');
     const payload = {
       type: 'Issue',
       action: 'create',
@@ -253,29 +245,44 @@ describe('POST /api/webhooks/linear', () => {
         id: 'issue_backlog',
         identifier: 'JOV-100',
         title: 'Bounded ordinary fix',
+        description: 'x'.repeat(80_000),
         updatedAt: '2026-08-15T00:00:00.000Z',
         team: { key: 'JOV' },
         state: { name: 'Backlog' },
       },
     };
-    const body = JSON.stringify(payload);
-    const response = await POST(
-      new Request('https://example.com/api/webhooks/linear', {
-        method: 'POST',
-        headers: { 'linear-signature': sign(body) },
-        body,
-      }) as never
-    );
+    const response = await POST(signedRequest(payload) as never);
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ received: true, dispatched: true });
-    expect(mockServerFetch.mock.calls[0]?.[1]).toEqual(
-      expect.objectContaining({
-        body: expect.stringContaining('"event_type":"linear-intake-changed"'),
-      })
+    const dispatched = JSON.parse(
+      String(mockServerFetch.mock.calls[0]?.[1]?.body)
+    ) as {
+      event_type: string;
+      client_payload: Record<string, unknown>;
+    };
+    expect(dispatched.event_type).toBe('linear-intake-changed');
+    expect(Object.keys(dispatched.client_payload)).toHaveLength(9);
+    expect(Object.keys(dispatched.client_payload).length).toBeLessThanOrEqual(
+      GITHUB_REPOSITORY_DISPATCH_MAX_CLIENT_PAYLOAD_KEYS
     );
-    expect(mockServerFetch.mock.calls[0]?.[1]?.body).toContain(
-      '"team_key":"JOV"'
+    expect(dispatched.client_payload).toEqual({
+      delivery_id: DELIVERY_ID,
+      issue_id: 'issue_backlog',
+      issue_identifier: 'JOV-100',
+      issue_updated_at: '2026-08-15T00:00:00.000Z',
+      team_key: 'JOV',
+      state_name: 'Backlog',
+      intake_action: 'create',
+      plan_ready: false,
+      contract: {
+        verify_required: true,
+        simplify_bounded: true,
+        model_tier: 'premium',
+      },
+    });
+    expect(JSON.stringify(dispatched.client_payload)).not.toContain(
+      'issue_description'
     );
   });
 });

@@ -163,10 +163,10 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(structuralDecision).not.toContain('apps/ios/');
     expect(structuralDecision).toContain('echo "skip=true"');
     expect(structuralDecision).toContain(
-      'scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|ownership-inventory)'
+      'scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|ownership-inventory|intake-event-controller)'
     );
     expect(structuralDecision).toContain(
-      'scripts/backlog-orchestrator/__tests__/(pre-lease-gates|ownership-inventory)'
+      'scripts/backlog-orchestrator/__tests__/(pre-lease-gates|ownership-inventory|intake-event-controller|jovie-intake-controller-workflow)'
     );
     expect(CI_FAST_SOURCE).toMatch(
       /function runDesignConformance\(\)[\s\S]*LANE_COMMANDS\['design-conformance'\]/
@@ -215,6 +215,12 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     expect(CI_FAST_SOURCE).toContain(
       'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'node --test scripts/backlog-orchestrator/__tests__/intake-event-controller.test.mjs'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'node --test scripts/backlog-orchestrator/__tests__/jovie-intake-controller-workflow.test.mjs'
     );
   });
 
