@@ -3,22 +3,21 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  bindDispatchLiveHead,
   emptyRollingCiState,
   failureFingerprint,
   isCiFamilyCheckName,
-  isTrustedCiProducerEvent,
   normalizeFailureEvents,
+  parseMergeQueueFrontBranch,
   parseRollingCiState,
   planFailureDispatch,
   planGreenRecovery,
   renderDispatchComment,
   resolveCiWorkflowRun,
-  resolveDispatchLiveHead,
-  resolveFailurePrNumber,
-  resolveMergeGroupSourcePr,
+  resolveDispatchPullRequest,
   runDispatch,
-  TRUSTED_CI_PRODUCER_EVENTS,
   TRUSTED_CI_WORKFLOW_PATH,
+  TRUSTED_PRODUCER_EVENTS,
 } from '../rolling-ci-dispatch.mjs';
 
 const head = 'a'.repeat(40);
@@ -167,36 +166,13 @@ describe('rolling CI failure dispatch', () => {
     expect(run?.id).toBe(11);
   });
 
-  it('accepts a failed merge_group CI workflow_run as an authenticated source', () => {
-    const mergeGroupSource = {
-      ...trustedSource,
-      producerEvent: 'merge_group',
-    };
-    expect(event({ source: mergeGroupSource }).source.producerEvent).toBe(
-      'merge_group'
-    );
-    const queueSha = 'c'.repeat(40);
-    const sourceHead = nextHead;
+  it('accepts native merge_group CI as an authenticated producer', () => {
+    expect(TRUSTED_PRODUCER_EVENTS).toEqual(['pull_request', 'merge_group']);
     expect(
-      runDispatch(
-        dispatchInput({
-          source: mergeGroupSource,
-          liveHead: sourceHead,
-          headSha: queueSha,
-          checks: [
-            {
-              name: 'ci-fast',
-              conclusion: 'failure',
-              headSha: queueSha,
-              checkSuiteId: 44,
-            },
-          ],
-        })
-      )
-    ).toMatchObject({
-      action: 'dispatch_implementer',
-      mutate: true,
-    });
+      event({
+        source: { ...trustedSource, producerEvent: 'merge_group' },
+      }).source.producerEvent
+    ).toBe('merge_group');
     expect(
       resolveCiWorkflowRun({
         headSha: head,
@@ -216,58 +192,85 @@ describe('rolling CI failure dispatch', () => {
     ).toBe(13);
   });
 
+  it('resolves the merge-queue front PR when workflow_run leaves pull_requests empty', () => {
+    const baseSha = 'c'.repeat(40);
+    expect(
+      parseMergeQueueFrontBranch(`gh-readonly-queue/main/pr-16180-${baseSha}`)
+    ).toEqual({ prNumber: 16180, baseSha });
+    expect(
+      resolveDispatchPullRequest({
+        producerEvent: 'merge_group',
+        headBranch: `refs/heads/gh-readonly-queue/main/pr-16180-${baseSha}`,
+      })
+    ).toEqual({
+      prNumber: 16180,
+      source: 'merge_queue_front_ref',
+      baseSha,
+    });
+    expect(
+      resolveDispatchPullRequest({
+        producerEvent: 'pull_request',
+        headBranch: `gh-readonly-queue/main/pr-16180-${baseSha}`,
+      })
+    ).toBeNull();
+    expect(
+      bindDispatchLiveHead({
+        producerEvent: 'merge_group',
+        liveHead: nextHead,
+        expectedHead: head,
+      })
+    ).toEqual({ liveHead: head, reason: 'merge_group_synthetic_head' });
+    expect(
+      bindDispatchLiveHead({
+        producerEvent: 'pull_request',
+        liveHead: nextHead,
+        expectedHead: head,
+      })
+    ).toBeNull();
+  });
+
   it('deliberate red: rejects the old pull_request-only producer gate', () => {
-    expect(TRUSTED_CI_PRODUCER_EVENTS).toEqual(['pull_request', 'merge_group']);
-    expect(isTrustedCiProducerEvent('pull_request')).toBe(true);
-    expect(isTrustedCiProducerEvent('merge_group')).toBe(true);
-    expect(isTrustedCiProducerEvent('push')).toBe(false);
-    expect(isTrustedCiProducerEvent('workflow_dispatch')).toBe(false);
+    expect(TRUSTED_PRODUCER_EVENTS).toEqual(['pull_request', 'merge_group']);
     expect(() =>
       event({
         source: { ...trustedSource, producerEvent: 'push' },
       })
     ).toThrow('failure source is not an authenticated CI workflow_run');
-  });
-
-  it('resolves the source PR from a native merge-queue head ref', () => {
-    const baseSha = 'd'.repeat(40);
+    expect(() =>
+      event({
+        source: { ...trustedSource, producerEvent: 'workflow_dispatch' },
+      })
+    ).toThrow('failure source is not an authenticated CI workflow_run');
+    const queueSha = 'c'.repeat(40);
+    const bound = bindDispatchLiveHead({
+      producerEvent: 'merge_group',
+      liveHead: nextHead,
+      expectedHead: queueSha,
+    });
+    expect(bound).toEqual({
+      liveHead: queueSha,
+      reason: 'merge_group_synthetic_head',
+    });
     expect(
-      resolveMergeGroupSourcePr(`gh-readonly-queue/main/pr-16180-${baseSha}`)
-    ).toEqual({ prNumber: 16180, baseSha });
-    expect(
-      resolveMergeGroupSourcePr(
-        `refs/heads/gh-readonly-queue/main/pr-16380-${baseSha}`
+      runDispatch(
+        dispatchInput({
+          source: { ...trustedSource, producerEvent: 'merge_group' },
+          liveHead: bound?.liveHead,
+          headSha: queueSha,
+          checks: [
+            {
+              name: 'ci-fast',
+              conclusion: 'failure',
+              headSha: queueSha,
+              checkSuiteId: 44,
+            },
+          ],
+        })
       )
-    ).toEqual({ prNumber: 16380, baseSha });
-    expect(resolveMergeGroupSourcePr('cursor/fx-merge-group')).toBeNull();
-    expect(
-      resolveFailurePrNumber({
-        prNumber: 17,
-        producerEvent: 'merge_group',
-        headBranch: `gh-readonly-queue/main/pr-16180-${baseSha}`,
-      })
-    ).toBe(16180);
-    expect(
-      resolveFailurePrNumber({
-        prNumber: 17,
-        producerEvent: 'pull_request',
-        headBranch: `gh-readonly-queue/main/pr-16180-${baseSha}`,
-      })
-    ).toBe(17);
-    expect(
-      resolveDispatchLiveHead({
-        producerEvent: 'merge_group',
-        expectedHead: head,
-        livePrHead: nextHead,
-      })
-    ).toBe(head);
-    expect(
-      resolveDispatchLiveHead({
-        producerEvent: 'pull_request',
-        expectedHead: head,
-        livePrHead: nextHead,
-      })
-    ).toBe(nextHead);
+    ).toMatchObject({
+      action: 'dispatch_implementer',
+      mutate: true,
+    });
   });
 
   it('deliberate red: rejects unauthenticated or PR-controlled events', () => {
@@ -438,17 +441,6 @@ describe('rolling CI dispatch CLI and workflow', () => {
     });
     expect(ok.status).toBe(0);
     expect(JSON.parse(ok.stdout).action).toBe('dispatch_implementer');
-    const mergeGroup = spawnSync(process.execPath, [CLI], {
-      input: JSON.stringify(
-        dispatchInput({
-          source: { ...trustedSource, producerEvent: 'merge_group' },
-          liveHead: nextHead,
-        })
-      ),
-      encoding: 'utf8',
-    });
-    expect(mergeGroup.status).toBe(0);
-    expect(JSON.parse(mergeGroup.stdout).action).toBe('dispatch_implementer');
     const result = spawnSync(process.execPath, [CLI], {
       input: JSON.stringify(
         dispatchInput({
@@ -471,6 +463,11 @@ describe('rolling CI dispatch CLI and workflow', () => {
       "github.event.workflow_run.event == 'pull_request'",
       "github.event.workflow_run.event == 'merge_group'",
       "github.event.workflow_run.path == '.github/workflows/ci.yml'",
+      'HEAD_BRANCH:',
+      'resolveDispatchPullRequest',
+      'bindDispatchLiveHead',
+      'steps.plan.outputs.pr_number',
+      '.event == "pull_request" or .event == "merge_group"',
       "github.event.workflow_run.conclusion == 'failure'",
       "github.event.workflow_run.conclusion == 'success'",
       "github.event.check_suite.conclusion == 'failure'",
@@ -479,8 +476,6 @@ describe('rolling CI dispatch CLI and workflow', () => {
       'WORKFLOW_PATH: ${{ github.event.workflow_run.path',
       'CHECK_SUITE_ID: ${{ github.event.workflow_run.check_suite_id',
       'EXPECTED_HEAD: ${{ github.event.workflow_run.head_sha',
-      'HEAD_BRANCH: ${{ github.event.workflow_run.head_branch',
-      'steps.plan.outputs.pr_number',
       'ref: ${{ github.sha }}',
       'persist-credentials: false',
       'actions: read',
