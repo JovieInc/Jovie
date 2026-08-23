@@ -92,6 +92,15 @@ struct MobileMeResponseTests {
     #expect(MobileWorkspaceStore.load(isAdmin: true, defaults: defaults) == .ovie)
   }
 
+  @Test func ovieCopyTalksToSummerAndJovieComposerStaysEmpty() {
+    #expect(MobileWorkspaceMode.ovie.askChatLabel == "Ask Summer")
+    #expect(MobileWorkspaceMode.ovie.composerOfflinePlaceholder == "Ask Summer (offline)")
+    #expect(MobileWorkspaceMode.ovie.emptyChatSubtitle.contains("Summer"))
+    #expect(MobileWorkspaceMode.jovie.askChatLabel == "Ask Jovie")
+    #expect(ChatComposerCopy.emptyPlaceholder.isEmpty)
+    #expect(ChatEmptyGreeting.lockedCopy.contains("Ask Jovie") == false)
+  }
+
   @Test func inboxStillImageURLOnlyForStillType() {
     func item(_ type: String, url: String) -> MobileActionLoopInboxItem {
       MobileActionLoopInboxItem(
