@@ -169,6 +169,45 @@ describe('rolling CI FX webhook remediation', () => {
     );
   });
 
+  it('launches FX for a failed merge_group CI run on the source PR branch', () => {
+    const queueSha = 'c'.repeat(40);
+    const planned = planFxWebhookRemediation({
+      dispatch: dispatch({
+        writer: FX_ADAPTER_NAME,
+        source: { ...trustedSource, producerEvent: 'merge_group' },
+        headSha: queueSha,
+        liveHead: queueSha,
+        checks: [
+          {
+            name: 'ci-fast',
+            conclusion: 'failure',
+            headSha: queueSha,
+            checkSuiteId: 44,
+          },
+        ],
+      }),
+      receipt: null,
+      liveHead: queueSha,
+      implementer: 'tim',
+      fxAdapter,
+      cursorApiKey: 'cursor-key',
+      repository: 'JovieInc/Jovie',
+      prNumber: 16180,
+      headSha: queueSha,
+      sourceHead: 'b'.repeat(40),
+      headRef: 'cursor/fx-merge-group-remediator-7038',
+    });
+    expect(planned.dispatch.action).toBe('dispatch_implementer');
+    expect(planned.launch.action).toBe('launch');
+    expect(planned.launch.request.source.ref).toBe(
+      'cursor/fx-merge-group-remediator-7038'
+    );
+    expect(planned.launch.request.target.autoCreatePr).toBe(false);
+    expect(planned.launch.request.prompt.text).toContain(
+      'native merge_group CI failure'
+    );
+  });
+
   it('launches Cursor-direct repair against the current PR without a sibling PR', () => {
     const planned = planFxWebhookRemediation({
       dispatch: dispatch({ writer: FX_ADAPTER_NAME }),

@@ -9,6 +9,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - [internal] **iOS public-profile browser stays on the published creator page (JOV-5148):** Open Public Profile still uses the full-screen embedded browser, but navigation is now limited to HTTPS `jov.ie` / `staging.jov.ie` and the server-provided username root. App, admin, HUD, auth, and other reserved routes cannot load inside it.
 
+- [internal] **Pool `gate-next` continues past issue-specific context/research misses (JOV-5292):** a targeted `context-no-results` or `research-evidence-required` hold no longer starves the fleet-gate event. Admission still takes at most one later verified candidate. Targeted `--issue` reports that issue's hold. Systemic holds (`gbrain-unavailable`, org-chart missing, ownership conflict, fleet-gate closed) still fail closed. Hash-bound holds persist outside the git tree until content changes or 24h elapses. Hourly intake-readiness stays dry-run / receipt-only.
+
 - [internal] **FX remediates failed native merge_group CI (JOV-5303):** Rolling CI Dispatch now accepts completed `CI` `workflow_run` events whose producer is `merge_group`, resolves the source PR from the queue front ref, and launches FX against that branch. The previous pull_request-only gate left merge-queue failures unrepaired after UNMERGEABLE eject.
 
 - [internal] **ALLGREEN merge groups no longer UNMERGEABLE siblings on shrink-only design-system ratchets (JOV-5300):** `--linear-*` usage may drop below the JSON floor on `merge_group` without failing required unit shards. Growth still fails. Local / pull_request authorship still fail-closes until the changing PR lowers the baseline. Source `PR Ready` stays cheap (no unit/e2e ruleset expansion).

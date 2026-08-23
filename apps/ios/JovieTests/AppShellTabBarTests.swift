@@ -169,8 +169,12 @@ struct AppShellDrawerProfilePolicyTests {
 }
 
 struct SharedPressFeedbackStyleTests {
-  @Test func plainRowPressFeedbackHasOneCanonicalDefaultOpacity() {
+  @Test func canonicalButtonStylesExposeTheirPressedStateAndTargetContracts() {
+    #expect(JoviePillButtonStyle.pressedOpacity == 0.8)
+    #expect(JovieIconButtonStyle.pressedOpacity == 0.72)
+    #expect(JovieIconButtonStyle.targetSize == 44)
     #expect(JoviePressFeedbackButtonStyle.defaultPressedOpacity == 0.72)
+    #expect(SettingsInteraction.rowPressedOpacity == 0.7)
   }
 }
 

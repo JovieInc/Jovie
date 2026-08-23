@@ -15,6 +15,8 @@ export interface AdminStripeOverviewMetrics {
   isConfigured: boolean;
   /** Indicates whether the Stripe API call succeeded */
   isAvailable: boolean;
+  /** Provider observation time for source provenance. */
+  observedAtIso?: string;
   /** Error message if Stripe API call failed */
   errorMessage?: string;
 }
@@ -190,6 +192,7 @@ function buildSuccessResponse(
     mrrGrowth30dUsd: (accumulator.mrrCents - accumulator.pastMrrCents) / 100,
     isConfigured: true,
     isAvailable: true,
+    observedAtIso: new Date().toISOString(),
   };
 }
 
@@ -202,6 +205,7 @@ function buildUnconfiguredResponse(): AdminStripeOverviewMetrics {
     mrrGrowth30dUsd: 0,
     isConfigured: false,
     isAvailable: false,
+    observedAtIso: new Date().toISOString(),
     errorMessage:
       'Stripe credentials not configured (STRIPE_SECRET_KEY required)',
   };
@@ -216,6 +220,7 @@ function buildErrorResponse(message: string): AdminStripeOverviewMetrics {
     mrrGrowth30dUsd: 0,
     isConfigured: true,
     isAvailable: false,
+    observedAtIso: new Date().toISOString(),
     errorMessage: `Stripe API error: ${message}`,
   };
 }

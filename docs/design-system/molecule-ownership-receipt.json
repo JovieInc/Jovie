@@ -1,0 +1,144 @@
+{
+  "schema": "jovie.ui-molecule-ownership/v1",
+  "scope": "JOV-5308",
+  "families": [
+    {
+      "id": "molecule.settings-panel",
+      "owner": {
+        "source": "apps/web/components/molecules/settings/SettingsPanel.tsx",
+        "exportName": "SettingsPanel",
+        "importPath": "@/components/molecules/settings/SettingsPanel"
+      },
+      "statesAndModes": [
+        "header-present",
+        "header-absent",
+        "body-direct",
+        "body-wrapped",
+        "compact",
+        "wide"
+      ],
+      "behaviorEvidence": [
+        "apps/web/tests/unit/dashboard/SettingsPanel.test.tsx"
+      ],
+      "visualEvidence": [
+        "apps/web/components/molecules/settings/SettingsPanel.stories.tsx"
+      ],
+      "consumers": [
+        "apps/web/app/app/(shell)/settings/artist-profile/ArtistProfileContent.tsx",
+        "apps/web/app/app/(shell)/settings/connectors/ConnectorsClient.tsx",
+        "apps/web/app/app/(shell)/settings/retargeting-ads/page.tsx",
+        "apps/web/app/app/(shell)/settings/touring/TouringContent.tsx",
+        "apps/web/components/features/admin/OperationalControlPanel.tsx",
+        "apps/web/components/features/admin/WaitlistSettingsPanel.tsx",
+        "apps/web/components/features/admin/campaigns/CampaignSettingsPanel.tsx",
+        "apps/web/components/features/dashboard/organisms/DataPrivacySection.tsx",
+        "apps/web/components/features/dashboard/organisms/SettingsAdPixelsSection.tsx",
+        "apps/web/components/features/dashboard/organisms/SettingsAnalyticsSection.tsx",
+        "apps/web/components/features/dashboard/organisms/SettingsAppearanceSection.tsx",
+        "apps/web/components/features/dashboard/organisms/SettingsBillingSection.tsx",
+        "apps/web/components/features/dashboard/organisms/SettingsContactsSection.tsx",
+        "apps/web/components/features/dashboard/organisms/SettingsNotificationsSection.tsx",
+        "apps/web/components/features/dashboard/organisms/SettingsPaySection.tsx",
+        "apps/web/components/features/dashboard/organisms/SettingsPaymentsSection.tsx",
+        "apps/web/components/features/dashboard/organisms/SettingsSection.stories.tsx",
+        "apps/web/components/features/dashboard/organisms/SettingsSmsAccessSection.tsx",
+        "apps/web/components/features/dashboard/organisms/SettingsTouringSection.tsx",
+        "apps/web/components/features/dashboard/organisms/SettingsUsageStatsSection.tsx",
+        "apps/web/components/features/dashboard/organisms/account-settings/AccountSettingsSection.tsx",
+        "apps/web/components/features/dashboard/organisms/settings-artist-profile-section/ConnectedDspList.tsx",
+        "apps/web/components/features/dashboard/organisms/settings-profile-section/SettingsProfileSection.tsx"
+      ],
+      "retiredOwners": [
+        "apps/web/components/features/dashboard/molecules/SettingsPanel.tsx"
+      ],
+      "compositionDependencies": [
+        {
+          "id": "molecule.content-surface-card",
+          "source": "apps/web/components/molecules/ContentSurfaceCard.tsx",
+          "status": "canonical-external"
+        },
+        {
+          "id": "atom.card",
+          "source": "packages/ui/atoms/card.tsx",
+          "status": "typed-dependency",
+          "reason": "Atom registration is owned by the parallel atom-consolidation lane."
+        }
+      ]
+    },
+    {
+      "id": "molecule.content-section-header",
+      "owner": {
+        "source": "apps/web/components/molecules/ContentSectionHeader.tsx",
+        "exportName": "ContentSectionHeader",
+        "importPath": "@/components/molecules/ContentSectionHeader"
+      },
+      "statesAndModes": [
+        "h1",
+        "h2",
+        "default",
+        "compact",
+        "bordered",
+        "plain",
+        "compact-breakpoint",
+        "wide-breakpoint"
+      ],
+      "behaviorEvidence": [
+        "apps/web/tests/unit/components/molecules/ContentSectionHeader.test.tsx"
+      ],
+      "visualEvidence": [
+        "apps/web/components/molecules/ContentSectionHeader.stories.tsx"
+      ],
+      "consumers": [
+        "apps/web/app/app/(shell)/admin/_components/AdminBraggingRightsSection.tsx",
+        "apps/web/app/app/(shell)/admin/_components/AdminConversionFunnelSection.tsx",
+        "apps/web/app/app/(shell)/admin/_components/AdminScoreboardSection.tsx",
+        "apps/web/app/app/(shell)/admin/agent-runs/[id]/page.tsx",
+        "apps/web/app/app/(shell)/admin/ingest/AdminIngestPageClient.tsx",
+        "apps/web/app/app/(shell)/admin/investors/settings/InvestorSettingsForm.tsx",
+        "apps/web/app/app/(shell)/dashboard/release-plan/page.tsx",
+        "apps/web/app/app/(shell)/dashboard/releases/[releaseId]/downloads/page.tsx",
+        "apps/web/app/artists/page.tsx",
+        "apps/web/app/billing/cancel/page.tsx",
+        "apps/web/app/billing/success/page.tsx",
+        "apps/web/app/out/[id]/page.tsx",
+        "apps/web/app/sandbox/page.tsx",
+        "apps/web/app/sentry-example-page/SentryExamplePageClient.tsx",
+        "apps/web/app/spinner-test/page.tsx",
+        "apps/web/components/features/admin/FunnelMetricsStrip.tsx",
+        "apps/web/components/features/admin/OperationalControlPanel.tsx",
+        "apps/web/components/features/admin/OutreachPipelineCard.tsx",
+        "apps/web/components/features/admin/ReliabilityCard.tsx",
+        "apps/web/components/features/admin/SentryMetricsCard.tsx",
+        "apps/web/components/features/admin/agent-os/AgentOsRunsPanel.tsx",
+        "apps/web/components/features/admin/campaigns/InviteCampaignManager.tsx",
+        "apps/web/components/features/admin/hud/FounderFunnelBand.tsx",
+        "apps/web/components/features/admin/leads/GrowthStatusPanel.tsx",
+        "apps/web/components/features/admin/leads/LeadGtmInsights.tsx",
+        "apps/web/components/features/admin/leads/LeadKeywordsManager.tsx",
+        "apps/web/components/features/admin/leads/LeadPipelineControls.tsx",
+        "apps/web/components/features/admin/leads/UnifiedUrlIntake.tsx",
+        "apps/web/components/features/admin/outreach/DmQueuePanel.tsx",
+        "apps/web/components/features/admin/outreach/EmailQueuePanel.tsx",
+        "apps/web/components/features/admin/outreach/OutreachKpis.tsx",
+        "apps/web/components/features/admin/outreach/ReviewQueuePanel.tsx",
+        "apps/web/components/features/admin/table/AdminTableHeader.tsx",
+        "apps/web/components/features/dashboard/organisms/contact-mode/ContactMode.tsx",
+        "apps/web/components/features/demo/DemoSettingsPanel.tsx",
+        "apps/web/components/features/profile/ProfileRedirectSurface.tsx",
+        "apps/web/components/organisms/AccountDashboard.tsx",
+        "apps/web/components/organisms/ArtistsDirectory.tsx",
+        "apps/web/components/organisms/PageShell.tsx",
+        "apps/web/components/organisms/WorkspaceTabsSurface.tsx",
+        "apps/web/components/organisms/WrappedLinkMissingState.tsx",
+        "apps/web/components/organisms/billing/BillingActionsSection.tsx",
+        "apps/web/components/organisms/billing/BillingHistorySection.tsx",
+        "apps/web/components/organisms/billing/PlanComparisonSection.tsx"
+      ],
+      "retiredOwners": [
+        "apps/web/components/features/dashboard/molecules/SectionHeader.tsx",
+        "apps/web/components/features/dashboard/molecules/SectionHeader.stories.tsx"
+      ],
+      "compositionDependencies": []
+    }
+  ]
+}
