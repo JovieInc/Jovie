@@ -44,7 +44,6 @@ export const VISUAL_QA_SURFACES = [
     description:
       'Global shell chrome at desktop idle for proposal validation against JOV-1605 shell parity rows.',
     parityLedgerGroup: 'Shell',
-    canonicalSurfaceId: 'dashboard-releases',
     baseline: {
       route: '/exp/shell-v1?capture=marketing',
       waitFor: '.shell-v1',
@@ -60,7 +59,6 @@ export const VISUAL_QA_SURFACES = [
     description:
       'Authenticated releases list at default density for proposal validation against JOV-1605 list parity rows.',
     parityLedgerGroup: 'List',
-    canonicalSurfaceId: 'dashboard-releases',
     baseline: {
       route: '/exp/shell-v1?view=releases&capture=marketing',
       waitFor: '[data-testid="releases-matrix"]',
@@ -76,7 +74,6 @@ export const VISUAL_QA_SURFACES = [
     description:
       'Right drawer with an open release detail state for proposal validation against JOV-1605 drawer parity rows.',
     parityLedgerGroup: 'Drawer',
-    canonicalSurfaceId: 'dashboard-releases',
     baseline: {
       route:
         '/exp/shell-v1?view=releases&release=the-deep-end&capture=marketing',
@@ -93,10 +90,69 @@ export const VISUAL_QA_SURFACES = [
     description:
       'Authenticated home inbox feed for open suggested_actions with System B card grammar.',
     parityLedgerGroup: 'Shell',
-    canonicalSurfaceId: 'dashboard-releases',
     baseline: {
       route: '/app',
       waitFor: '[data-testid="opportunity-inbox-page"]',
+      viewport: 'desktop',
+      captureTarget: 'page',
+      fullPage: false,
+      reducedMotion: true,
+    },
+  }),
+  defineSurface({
+    id: 'canonical-homepage',
+    title: 'Canonical homepage',
+    description:
+      'Live marketing homepage capture aligned to the screenshot registry.',
+    canonicalSurfaceId: 'homepage',
+    baseline: {
+      route: '/',
+      waitFor: 'main',
+      viewport: 'desktop',
+      captureTarget: 'page',
+      fullPage: false,
+      reducedMotion: true,
+    },
+  }),
+  defineSurface({
+    id: 'canonical-public-profile',
+    title: 'Canonical public profile',
+    description:
+      'Demo public-profile capture aligned to the screenshot registry.',
+    canonicalSurfaceId: 'public-profile',
+    baseline: {
+      route: '/demo/showcase/public-profile',
+      waitFor: '[data-testid="profile-compact-shell"]',
+      viewport: 'desktop',
+      captureTarget: 'page',
+      fullPage: false,
+      reducedMotion: true,
+    },
+  }),
+  defineSurface({
+    id: 'canonical-release-landing',
+    title: 'Canonical release landing',
+    description:
+      'Demo release-landing capture aligned to the screenshot registry.',
+    canonicalSurfaceId: 'release-landing',
+    baseline: {
+      route: '/demo/showcase/release-landing',
+      waitFor: '[data-testid="demo-showcase-release-landing"]',
+      viewport: 'desktop',
+      captureTarget: 'page',
+      fullPage: false,
+      reducedMotion: true,
+    },
+  }),
+  defineSurface({
+    id: 'canonical-dashboard-releases',
+    title: 'Canonical dashboard releases',
+    description:
+      'Demo releases workspace capture aligned to the screenshot registry.',
+    canonicalSurfaceId: 'dashboard-releases',
+    baseline: {
+      route: '/demo',
+      waitFor: '[data-testid="releases-matrix"]',
       viewport: 'desktop',
       captureTarget: 'page',
       fullPage: false,

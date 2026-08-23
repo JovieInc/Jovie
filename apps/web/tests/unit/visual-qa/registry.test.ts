@@ -42,6 +42,40 @@ describe('visual-qa registry', () => {
     expect(afterConfig.flagOverrides).toEqual({});
   });
 
+  it('tags canonical review surfaces to screenshot-registry routes', () => {
+    expect(getVisualQaSurface('canonical-homepage')).toMatchObject({
+      canonicalSurfaceId: 'homepage',
+      baseline: { route: '/', waitFor: 'main' },
+    });
+    expect(getVisualQaSurface('canonical-public-profile')).toMatchObject({
+      canonicalSurfaceId: 'public-profile',
+      baseline: {
+        route: '/demo/showcase/public-profile',
+        waitFor: '[data-testid="profile-compact-shell"]',
+      },
+    });
+    expect(getVisualQaSurface('canonical-release-landing')).toMatchObject({
+      canonicalSurfaceId: 'release-landing',
+      baseline: {
+        route: '/demo/showcase/release-landing',
+        waitFor: '[data-testid="demo-showcase-release-landing"]',
+      },
+    });
+    expect(getVisualQaSurface('canonical-dashboard-releases')).toMatchObject({
+      canonicalSurfaceId: 'dashboard-releases',
+      baseline: {
+        route: '/demo',
+        waitFor: '[data-testid="releases-matrix"]',
+      },
+    });
+    expect(
+      getVisualQaSurface('opportunity-inbox-home')?.canonicalSurfaceId
+    ).toBeUndefined();
+    expect(
+      getVisualQaSurface('shell-desktop-idle')?.canonicalSurfaceId
+    ).toBeUndefined();
+  });
+
   it('filters requested themes by surface support', () => {
     const surface = getVisualQaSurface('shell-desktop-idle');
     expect(surface).toBeDefined();
