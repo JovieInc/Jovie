@@ -155,6 +155,33 @@ Write the inventory later slices consume.
     assert.equal(result.reason, 'no-jovie-artifact');
   });
 
+  it('writes target fields onto a new admission receipt', () => {
+    const candidate = withPreLeaseReceipts(issue(), { now: NOW });
+    const { evidence } =
+      deterministicGates.buildDeterministicPlanEvidence(candidate);
+    const ready = {
+      ...candidate,
+      comments: {
+        nodes: [
+          ...candidate.comments.nodes,
+          {
+            body: planGate.buildPlanGateReceipt(candidate, evidence, {
+              now: NOW,
+            }),
+          },
+        ],
+      },
+    };
+    const payload = JSON.parse(
+      admissionGate
+        .buildAdmissionGateReceipt(ready, { now: NOW })
+        .split('\n')[1]
+    );
+    for (const field of ADMISSION_TARGET_FIELDS) {
+      assert.equal(payload[field], evidence.target[field]);
+    }
+  });
+
   it('rejects a lease collision while allowing unrelated product concurrency', () => {
     const jovieWeb = resolveAdmissionTarget(
       issue({
@@ -190,33 +217,6 @@ Change JovieInc/LogYourBody.
     assert.equal(admissionTargetsCollide(jovieWeb, jovieWebPeer), true);
     assert.equal(admissionTargetsCollide(jovieWeb, logYourBody), false);
     assert.ok(jovieWeb.collision_domains.length > 0);
-  });
-
-  it('writes target fields onto a new admission receipt', () => {
-    const candidate = withPreLeaseReceipts(issue(), { now: NOW });
-    const { evidence } =
-      deterministicGates.buildDeterministicPlanEvidence(candidate);
-    const ready = {
-      ...candidate,
-      comments: {
-        nodes: [
-          ...candidate.comments.nodes,
-          {
-            body: planGate.buildPlanGateReceipt(candidate, evidence, {
-              now: NOW,
-            }),
-          },
-        ],
-      },
-    };
-    const payload = JSON.parse(
-      admissionGate
-        .buildAdmissionGateReceipt(ready, { now: NOW })
-        .split('\n')[1]
-    );
-    for (const field of ADMISSION_TARGET_FIELDS) {
-      assert.equal(payload[field], evidence.target[field]);
-    }
   });
 
   it('keeps LYB packets on LogYourBody', () => {
