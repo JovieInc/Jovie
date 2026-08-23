@@ -121,4 +121,3 @@ jobs:
           path: invariant-stewardship-audit.json
           retention-days: 30
           if-no-files-found: error
-
