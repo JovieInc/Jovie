@@ -12,10 +12,6 @@ vi.mock('@/components/atoms/SocialIcon', () => ({
   ),
 }));
 
-vi.mock('@/lib/utils/platform-detection', () => ({
-  getBaseUrl: () => 'https://jov.ie',
-}));
-
 vi.mock('@/lib/utm', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/utm')>();
 

@@ -14,6 +14,7 @@
  * waitlist recipe (currently stub tier).
  */
 
+import { getComparisonSlugs } from '@/content/comparisons';
 import type { ProposedSectionId } from './designGaps';
 import type { RecipeId } from './recipes';
 import { getMarketingRecipe } from './recipes';
@@ -116,6 +117,8 @@ export interface RouteManifestEntry {
     readonly expected: 'page' | 'redirect';
     readonly allowedFinalPaths?: readonly string[];
   };
+  /** Known concrete destinations for navigation into a wildcard route. */
+  readonly resolvablePaths?: readonly string[];
   /** noindex flag — true if the route is noindex today (e.g. /ai, /investors, /demo/video). */
   readonly noindex?: boolean;
   /** Alias-of — when this route is an alias of another (e.g. /artist-profile → /artist-profiles). */
@@ -448,6 +451,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       path: '/compare/linktree',
       expected: 'page',
     },
+    resolvablePaths: getComparisonSlugs().map(slug => `/compare/${slug}`),
   },
   {
     glob: '(marketing)/alternatives/[slug]/page.tsx',
@@ -758,6 +762,10 @@ export function isMarketingNavigationDestinationResolvable(
 
   return manifest.some(entry => {
     if (!entry.url.includes('*')) return entry.url === path;
+
+    if (entry.resolvablePaths) {
+      return entry.resolvablePaths.includes(path);
+    }
 
     const wildcardIndex = entry.url.indexOf('*');
     const prefix = entry.url.slice(0, wildcardIndex);

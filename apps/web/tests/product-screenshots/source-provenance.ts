@@ -1,4 +1,8 @@
 import { execFileSync } from 'node:child_process';
+import type {
+  ScreenshotManifestEntry,
+  ScreenshotScenario,
+} from '../../lib/screenshots/types';
 
 const FULL_GIT_SHA = /^[0-9a-f]{40}$/i;
 
@@ -70,5 +74,31 @@ export function resolveScreenshotEvidence({
     gitSha: imageChanged
       ? currentProvenance
       : (previousProvenance ?? currentProvenance),
+  };
+}
+
+export function buildScreenshotManifestEntry({
+  scenario,
+  evidence,
+}: Readonly<{
+  scenario: ScreenshotScenario;
+  evidence: Readonly<{ capturedAt: string; gitSha: string | null }>;
+}>): ScreenshotManifestEntry {
+  return {
+    id: scenario.id,
+    title: scenario.title,
+    group: scenario.group,
+    groupLabel: scenario.groupLabel,
+    canonicalSurfaceId: scenario.canonicalSurfaceId,
+    canonicalSurfaceLabel: scenario.canonicalSurfaceLabel,
+    canonicalSurfaceReviewRoute: scenario.canonicalSurfaceReviewRoute,
+    route: scenario.route,
+    viewport: scenario.viewport,
+    theme: scenario.theme,
+    consumers: scenario.consumers,
+    capturedAt: evidence.capturedAt,
+    gitSha: evidence.gitSha,
+    imagePath: `${scenario.id}.png`,
+    publicExportPath: scenario.publicExportPath,
   };
 }

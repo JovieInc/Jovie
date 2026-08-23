@@ -7,32 +7,56 @@ const WEB_ROOT = resolve(__dirname, '../../..');
 interface SurfaceCompositionContract {
   readonly id: string;
   readonly sourcePath: string;
-  readonly requiredReferences: readonly string[];
+  readonly requiredBindings: readonly {
+    readonly modulePath: string;
+    readonly identifier: string;
+  }[];
 }
 
 const SURFACE_CONTRACTS: readonly SurfaceCompositionContract[] = [
   {
     id: 'homepage',
     sourcePath: 'app/(home)/page.tsx',
-    requiredReferences: [
-      "from '@/components/homepage/HomepageHeroCommandCenter'",
-      "from '@/components/marketing'",
+    requiredBindings: [
+      {
+        modulePath: '@/components/homepage/HomepageHeroCommandCenter',
+        identifier: 'HomepageHeroCommandCenter',
+      },
+      {
+        modulePath: '@/components/marketing',
+        identifier: 'MarketingPosterHero',
+      },
     ],
   },
   {
     id: 'public-profile',
     sourcePath: 'app/[username]/page.tsx',
-    requiredReferences: ["from '@/features/profile/StaticArtistPage'"],
+    requiredBindings: [
+      {
+        modulePath: '@/features/profile/StaticArtistPage',
+        identifier: 'StaticArtistPage',
+      },
+    ],
   },
   {
     id: 'release-landing',
     sourcePath: 'app/r/[slug]/ReleaseLandingPage.tsx',
-    requiredReferences: ["from '@/features/release/SmartLinkShell'"],
+    requiredBindings: [
+      {
+        modulePath: '@/features/release/SmartLinkShell',
+        identifier: 'SmartLinkShell',
+      },
+    ],
   },
   {
     id: 'dashboard-releases',
     sourcePath: 'app/app/(shell)/dashboard/releases/page.tsx',
-    requiredReferences: ["from '../../releases/ReleasesRoute'"],
+    requiredBindings: [
+      {
+        modulePath: '../../releases/ReleasesRoute',
+        identifier: 'ReleasesRoute',
+      },
+    ],
   },
 ] as const;
 
@@ -40,9 +64,30 @@ function findCompositionDrift(
   source: string,
   contract: SurfaceCompositionContract
 ): string[] {
-  const missingReferences = contract.requiredReferences
-    .filter(reference => !source.includes(reference))
-    .map(reference => `missing canonical reference: ${reference}`);
+  const executableSource = source
+    .replace(/\/\*[\s\S]*?\*\//gu, '')
+    .replace(/\/\/.*$/gmu, '');
+  const missingReferences = contract.requiredBindings.flatMap(binding => {
+    const escapedModulePath = binding.modulePath.replace(
+      /[.*+?^${}()|[\]\\]/gu,
+      '\\$&'
+    );
+    const importPattern = new RegExp(
+      `import[\\s\\S]*?\\b${binding.identifier}\\b[\\s\\S]*?from ['"]${escapedModulePath}['"]`,
+      'u'
+    );
+    const usagePattern = new RegExp(
+      `<${binding.identifier}\\b|\\b${binding.identifier}\\s*\\(`,
+      'u'
+    );
+
+    return importPattern.test(executableSource) &&
+      usagePattern.test(executableSource)
+      ? []
+      : [
+          `missing canonical binding: ${binding.identifier} from ${binding.modulePath}`,
+        ];
+  });
   const routeLocalTokenFork =
     /(?:import\s+['"]|from\s+['"])[^'"]*(?:tokens?|theme)\.(?:css|ts|tsx)['"]/u.test(
       source
@@ -64,7 +109,7 @@ describe('canonical surface composition', () => {
 
   it('fails closed when a canonical route introduces detached tokens', () => {
     const contract = SURFACE_CONTRACTS[0];
-    const deliberateDrift = `${contract.requiredReferences.join('\n')}\nimport './homepage.tokens.css';`;
+    const deliberateDrift = `import './homepage.tokens.css';`;
 
     expect(findCompositionDrift(deliberateDrift, contract)).toContain(
       'route-local token or theme fork'
@@ -77,7 +122,20 @@ describe('canonical surface composition', () => {
     expect(
       findCompositionDrift('export default function Page() {}', contract)
     ).toContain(
-      "missing canonical reference: from '@/features/release/SmartLinkShell'"
+      'missing canonical binding: SmartLinkShell from @/features/release/SmartLinkShell'
+    );
+  });
+
+  it('rejects a commented or unused canonical import (deliberate red)', () => {
+    const contract = SURFACE_CONTRACTS[3];
+    const deliberateDrift = `
+      // import { ReleasesRoute } from '../../releases/ReleasesRoute';
+      import { ReleasesRoute } from '../../releases/ReleasesRoute';
+      export default function ReleasesPage() { return null; }
+    `;
+
+    expect(findCompositionDrift(deliberateDrift, contract)).toContain(
+      'missing canonical binding: ReleasesRoute from ../../releases/ReleasesRoute'
     );
   });
 });

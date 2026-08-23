@@ -72,7 +72,16 @@ describe('marketing route health contract', () => {
   it('rejects a wildcard base without a real page (deliberate red)', () => {
     expect(isMarketingNavigationDestinationResolvable('/compare')).toBe(false);
     expect(
+      isMarketingNavigationDestinationResolvable('/compare/not-real')
+    ).toBe(false);
+    expect(
+      isMarketingNavigationDestinationResolvable('/compare/linktree/extra')
+    ).toBe(false);
+    expect(
       isMarketingNavigationDestinationResolvable('/compare/linktree')
+    ).toBe(true);
+    expect(
+      isMarketingNavigationDestinationResolvable('/compare/linkfire')
     ).toBe(true);
   });
 });

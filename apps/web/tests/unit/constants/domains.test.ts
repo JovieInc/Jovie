@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   getSmartLinkUrl,
   HOSTNAME,
@@ -6,6 +6,17 @@ import {
   isPreviewEnvironment,
   isProductionEnvironment,
 } from '@/constants/domains';
+
+const originalProfileUrl = process.env.NEXT_PUBLIC_PROFILE_URL;
+
+afterEach(() => {
+  if (originalProfileUrl === undefined) {
+    delete process.env.NEXT_PUBLIC_PROFILE_URL;
+  } else {
+    process.env.NEXT_PUBLIC_PROFILE_URL = originalProfileUrl;
+  }
+  vi.resetModules();
+});
 
 describe('domains', () => {
   it('treats staging and legacy staging hostnames as main-domain hosts', () => {
@@ -30,6 +41,18 @@ describe('domains', () => {
     );
     expect(getSmartLinkUrl('calvin-demo/summer')).toBe(
       'https://jov.ie/calvin-demo/summer'
+    );
+  });
+
+  it('does not leak a staging or preview origin into copied public links', async () => {
+    process.env.NEXT_PUBLIC_PROFILE_URL = 'https://staging.jov.ie';
+    vi.resetModules();
+    const { getSmartLinkUrl: getSmartLinkUrlWithStagingEnv } = await import(
+      '@/constants/domains'
+    );
+
+    expect(getSmartLinkUrlWithStagingEnv('/artist/release')).toBe(
+      'https://jov.ie/artist/release'
     );
   });
 });

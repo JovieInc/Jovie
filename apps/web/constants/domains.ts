@@ -32,6 +32,9 @@ export const ADMIN_EMAIL_DOMAIN = publicEnv.NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN;
 /** Base URL (https://jov.ie) */
 export const BASE_URL = publicEnv.NEXT_PUBLIC_PROFILE_URL;
 
+/** Production origin for public links copied or exported by creator tools. */
+export const CANONICAL_PUBLIC_ORIGIN = 'https://jov.ie';
+
 /** @deprecated Use BASE_URL instead */
 export const PROFILE_URL = BASE_URL;
 
@@ -58,7 +61,7 @@ export function getProfileUrl(handle: string): string {
  */
 export function getSmartLinkUrl(path: string): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  return `${BASE_URL}${normalizedPath}`;
+  return `${CANONICAL_PUBLIC_ORIGIN}${normalizedPath}`;
 }
 
 /**

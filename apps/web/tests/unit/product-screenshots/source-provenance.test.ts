@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import type { ScreenshotScenario } from '../../../lib/screenshots/types';
 import {
+  buildScreenshotManifestEntry,
   resolveScreenshotEvidence,
   resolveScreenshotSourceGitSha,
 } from '../../../tests/product-screenshots/source-provenance';
@@ -62,6 +64,35 @@ describe('resolveScreenshotEvidence', () => {
     ).toEqual({
       capturedAt: '2026-08-01T18:00:00.000Z',
       gitSha: LOCAL_SHA,
+    });
+  });
+
+  it('persists a provenance backfill into the next manifest entry', () => {
+    const scenario: ScreenshotScenario = {
+      id: 'dashboard-release',
+      title: 'Dashboard release',
+      group: 'dashboard',
+      groupLabel: 'Dashboard',
+      route: '/demo/releases',
+      waitFor: 'main',
+      viewport: 'desktop',
+      theme: 'dark',
+      consumers: ['admin'],
+      fullPage: false,
+    };
+    const evidence = resolveScreenshotEvidence({
+      capturedAt: '2026-08-01T18:00:00.000Z',
+      imageChanged: false,
+      previousCapturedAt: '2026-08-01T13:17:35.434Z',
+      previousGitSha: null,
+      sourceGitSha: LOCAL_SHA,
+    });
+
+    expect(buildScreenshotManifestEntry({ scenario, evidence })).toMatchObject({
+      id: 'dashboard-release',
+      capturedAt: '2026-08-01T18:00:00.000Z',
+      gitSha: LOCAL_SHA,
+      imagePath: 'dashboard-release.png',
     });
   });
 

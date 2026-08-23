@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import type { ContextMenuItemType } from '@/components/organisms/table';
-import { BASE_URL, getSmartLinkUrl } from '@/constants/domains';
+import { CANONICAL_PUBLIC_ORIGIN, getSmartLinkUrl } from '@/constants/domains';
 import { buildCopyMenuItems } from '@/features/ui/CopyableField';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import {
@@ -182,7 +182,7 @@ function buildShareItems(
                 context: trackedContext,
               });
               void onCopy(
-                result.url.replace(BASE_URL, ''),
+                result.url.replace(CANONICAL_PUBLIC_ORIGIN, ''),
                 preset.label,
                 `tracked-share-${preset.id}-${release.id}`
               );
@@ -208,7 +208,7 @@ function buildShareItems(
                     context: trackedContext,
                   });
                   void onCopy(
-                    result.url.replace(BASE_URL, ''),
+                    result.url.replace(CANONICAL_PUBLIC_ORIGIN, ''),
                     preset.label,
                     `tracked-share-${preset.id}-${release.id}`
                   );

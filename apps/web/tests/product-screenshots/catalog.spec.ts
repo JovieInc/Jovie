@@ -17,6 +17,7 @@ import {
 } from '../../lib/screenshots/types';
 import { pruneFixedOwnedOutputFiles } from '../../scripts/owned-output-path';
 import { replaceWithAtomicSibling } from './atomic-output';
+import { getAnimationFrozenScreenshotOptions } from './capture-policy';
 import {
   assertNoDevOverlays,
   CATALOG_OUTPUT_DIR,
@@ -28,6 +29,7 @@ import {
   waitForSettle,
 } from './helpers';
 import {
+  buildScreenshotManifestEntry,
   resolveScreenshotEvidence,
   resolveScreenshotSourceGitSha,
 } from './source-provenance';
@@ -118,17 +120,17 @@ async function captureCatalogImage(
   catalogPath: string
 ) {
   return replaceWithAtomicSibling(catalogPath, async nextPath => {
+    const screenshotOptions = getAnimationFrozenScreenshotOptions(nextPath);
     if (scenario.captureTarget === 'locator' && scenario.captureSelector) {
-      await page.locator(scenario.captureSelector).first().screenshot({
-        animations: 'disabled',
-        path: nextPath,
-        type: 'png',
-      });
+      await page
+        .locator(scenario.captureSelector)
+        .first()
+        .screenshot({
+          ...screenshotOptions,
+        });
     } else {
       await page.screenshot({
-        animations: 'disabled',
-        path: nextPath,
-        type: 'png',
+        ...screenshotOptions,
         fullPage: scenario.fullPage,
       });
     }
@@ -304,24 +306,10 @@ test.describe('Screenshot Catalog', () => {
         sourceGitSha: gitSha,
       });
 
-      const nextManifestEntry: ScreenshotManifestEntry = {
-        id: preparedScenario.id,
-        title: preparedScenario.title,
-        group: preparedScenario.group,
-        groupLabel: preparedScenario.groupLabel,
-        canonicalSurfaceId: preparedScenario.canonicalSurfaceId,
-        canonicalSurfaceLabel: preparedScenario.canonicalSurfaceLabel,
-        canonicalSurfaceReviewRoute:
-          preparedScenario.canonicalSurfaceReviewRoute,
-        route: preparedScenario.route,
-        viewport: preparedScenario.viewport,
-        theme: preparedScenario.theme,
-        consumers: preparedScenario.consumers,
-        capturedAt: evidence.capturedAt,
-        gitSha: evidence.gitSha,
-        imagePath: `${preparedScenario.id}.png`,
-        publicExportPath: preparedScenario.publicExportPath,
-      };
+      const nextManifestEntry = buildScreenshotManifestEntry({
+        scenario: preparedScenario,
+        evidence,
+      });
 
       manifestEntriesById.set(preparedScenario.id, nextManifestEntry);
 
