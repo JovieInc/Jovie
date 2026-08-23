@@ -287,11 +287,17 @@ export async function handleProxyRequest(
         return NextResponse.redirect(url);
       }
 
-      // Anonymous waitlist visitors start in chat onboarding. Keep this in
-      // middleware so local/dev auth outages do not expose a 503 or legacy
-      // view.
+      // /waitlist is the founder-locked public front door. Let the page render
+      // the canonical auth entry; authenticated state routing remains page-owned.
       if (isNavigationMethod && pathname === APP_ROUTES.WAITLIST) {
-        return NextResponse.redirect(new URL(APP_ROUTES.START, req.url));
+        return buildFinalResponse(
+          req,
+          NextResponse.next({ request: { headers: requestHeaders } }),
+          pathInfo,
+          startTime,
+          null,
+          nonce
+        );
       }
 
       // Check if path requires authentication

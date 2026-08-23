@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { CanonicalUserState } from '@/lib/auth/canonical-user-state';
 
 const {
@@ -31,6 +31,10 @@ vi.mock('@/lib/auth/gate', () => ({
 }));
 
 describe('WaitlistPage', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   test.each([
     { state: CanonicalUserState.BANNED, expectedRedirect: '/unavailable' },
     {
@@ -39,7 +43,6 @@ describe('WaitlistPage', () => {
     },
     { state: CanonicalUserState.ACTIVE, expectedRedirect: '/app' },
     { state: CanonicalUserState.NEEDS_ONBOARDING, expectedRedirect: '/start' },
-    { state: CanonicalUserState.UNAUTHENTICATED, expectedRedirect: '/start' },
     { state: CanonicalUserState.NEEDS_DB_USER, expectedRedirect: '/start' },
     {
       state: CanonicalUserState.NEEDS_WAITLIST_SUBMISSION,
@@ -62,6 +65,45 @@ describe('WaitlistPage', () => {
     expect(mockRedirect).toHaveBeenCalledTimes(1);
     expect(mockRedirect).toHaveBeenCalledWith(expectedRedirect);
     expect(mockNotFound).not.toHaveBeenCalled();
+  });
+
+  test('renders the public waitlist entry for signed-out visitors', async () => {
+    mockRedirect.mockClear();
+    mockNotFound.mockClear();
+    mockResolveUserState.mockResolvedValue({
+      state: CanonicalUserState.UNAUTHENTICATED,
+      context: { email: null },
+    });
+
+    const { default: WaitlistPage } = await import('../../app/waitlist/page');
+    const { WaitlistEntryView } = await import(
+      '@/components/features/waitlist/WaitlistEntryView'
+    );
+
+    const result = await WaitlistPage();
+
+    expect(result.type).toBe(WaitlistEntryView);
+    expect(mockRedirect).not.toHaveBeenCalled();
+    expect(mockNotFound).not.toHaveBeenCalled();
+    expect(mockGetWaitlistAccess).not.toHaveBeenCalled();
+  });
+
+  test('renders the anonymous entry during the DB-less public route smoke', async () => {
+    vi.stubEnv('PUBLIC_NOAUTH_SMOKE', '1');
+    mockRedirect.mockClear();
+    mockNotFound.mockClear();
+    mockResolveUserState.mockClear();
+
+    const { default: WaitlistPage } = await import('../../app/waitlist/page');
+    const { WaitlistEntryView } = await import(
+      '@/components/features/waitlist/WaitlistEntryView'
+    );
+
+    const result = await WaitlistPage();
+
+    expect(result.type).toBe(WaitlistEntryView);
+    expect(mockResolveUserState).not.toHaveBeenCalled();
+    expect(mockRedirect).not.toHaveBeenCalled();
   });
 
   test('renders the waitlist confirmation view without redirecting for WAITLIST_PENDING', async () => {

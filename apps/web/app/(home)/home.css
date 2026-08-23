@@ -4234,9 +4234,9 @@ body:has(.home-viewport)::-webkit-scrollbar {
   min-width: 0;
   aspect-ratio: 9 / 16;
   overflow: hidden;
-  border-radius: var(--radius-2xl);
-  background: var(--system-b-primary-bg);
-  color: var(--system-b-primary-fg);
+  border-top: var(--space-px) solid var(--system-b-app-frame-seam);
+  background: transparent;
+  color: var(--color-text-primary-token);
   grid-template-rows:
     var(--homepage-artist-outcome-copy-track)
     var(--homepage-artist-outcome-media-track);
@@ -4253,7 +4253,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-artist-outcome h3 {
   margin: 0;
-  color: var(--system-b-primary-fg);
+  color: var(--color-text-primary-token);
   font-size: var(--text-2xl);
   font-weight: var(--font-weight-semibold);
   line-height: var(--leading-tight);
@@ -4264,7 +4264,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-artist-outcome__copy p {
   max-width: 31ch;
   margin: var(--space-3) 0 0;
-  color: color-mix(in oklab, var(--system-b-primary-fg) 62%, transparent);
+  color: var(--color-text-tertiary-token);
   font-size: var(--text-sm);
   font-weight: var(--font-weight-normal);
   line-height: var(--leading-relaxed);

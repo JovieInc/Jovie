@@ -67,6 +67,8 @@ interface AuthShellProps {
    * /start for sign-up).
    */
   readonly fallbackRedirectUrl?: string;
+  /** Keep public landing surfaces from opening Google-owned prompt chrome. */
+  readonly suppressOneTap?: boolean;
   /**
    * Override the link target for the opposite auth mode. Defaults to the
    * canonical `/signin` / `/support` route with the current search params
@@ -118,6 +120,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
   const {
     mode,
     fallbackRedirectUrl,
+    suppressOneTap = false,
     oppositeModeUrl,
     forceOppositeModeHardNavigation = false,
     compact = false,
@@ -282,7 +285,12 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
     >
       <GoogleOneTap
         mode={mode}
-        suppress={!hasHydrated || pendingProvider !== null || otpStepActive}
+        suppress={
+          suppressOneTap ||
+          !hasHydrated ||
+          pendingProvider !== null ||
+          otpStepActive
+        }
         callbackURL={fallbackRedirectUrl}
       />
       <AuthOAuthStartSurface

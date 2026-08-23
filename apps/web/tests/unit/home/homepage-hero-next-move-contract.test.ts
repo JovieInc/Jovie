@@ -17,6 +17,9 @@ describe('homepage hero next-move contract (JOV-4475)', () => {
 
   it('keeps Get started as the sole primary conversion path', () => {
     expect(HOMEPAGE_LAUNCH_COPY.hero.primaryCta.label).toBe('Get started');
+    expect(HOMEPAGE_LAUNCH_COPY.hero.primaryCta.href).toBe(
+      'https://jov.ie/waitlist'
+    );
     expect(HOMEPAGE_LAUNCH_COPY.hero.secondaryCta.label).toBe(
       'See a live profile'
     );
@@ -94,5 +97,34 @@ describe('homepage hero next-move contract (JOV-4475)', () => {
 
     expect(profilesSource).toContain('ArtistProfilePhoneFrame');
     expect(profilesSource).toContain('homepage-artist-outcome__device');
+  });
+
+  it('presents registered Artist Profile states without the light editorial chassis', () => {
+    const pageSource = readFileSync(
+      path.join(webRoot, 'app/(home)/page.tsx'),
+      'utf8'
+    );
+    const css = readFileSync(path.join(webRoot, 'app/(home)/home.css'), 'utf8');
+    const outcomeCssStart = css.indexOf(
+      'HOMEPAGE ARTIST OUTCOMES SYSTEM B START'
+    );
+    const outcomeCssEnd = css.indexOf(
+      '.homepage-artist-outcome__copy',
+      outcomeCssStart
+    );
+    const outcomeCss = css.slice(outcomeCssStart, outcomeCssEnd);
+
+    for (const scenarioId of [
+      'tim-white-profile-tour-mobile',
+      'tim-white-profile-subscribe-mobile',
+      'tim-white-profile-pay-mobile',
+      'tim-white-profile-presave-mobile',
+    ]) {
+      expect(pageSource).toContain(`getMarketingExportImage('${scenarioId}')`);
+    }
+
+    expect(outcomeCss).toContain('background: transparent;');
+    expect(outcomeCss).toContain('color: var(--color-text-primary-token);');
+    expect(outcomeCss).not.toContain('background: var(--system-b-primary-bg);');
   });
 });

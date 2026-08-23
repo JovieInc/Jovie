@@ -47,11 +47,21 @@ describe('marketing route health contract', () => {
     ).toThrow(/concrete absolute path/);
   });
 
-  it('only permits the explicit waitlist redirect', () => {
+  it('keeps the public waitlist route renderable without redirect exceptions', () => {
     const redirects = MARKETING_ROUTE_HEALTH_TARGETS.filter(
       target => target.expected === 'redirect'
     );
-    expect(redirects.map(target => target.glob)).toEqual(['waitlist/page.tsx']);
-    expect(redirects[0]?.allowedFinalPaths).toEqual(['/start']);
+    expect(redirects).toEqual([]);
+
+    expect(
+      MARKETING_ROUTE_HEALTH_TARGETS.find(
+        target => target.glob === 'waitlist/page.tsx'
+      )
+    ).toMatchObject({
+      path: '/waitlist',
+      expected: 'page',
+      allowsAuthShell: true,
+      requiresSharedChrome: false,
+    });
   });
 });

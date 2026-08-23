@@ -147,7 +147,7 @@ describe('AuthLayout', () => {
     expect(document.querySelector('.auth-showcase-panel')).not.toBeNull();
   });
 
-  it('reserves a desktop footer slot for legal disclosure without changing mobile flow', async () => {
+  it('keeps legal disclosure in flow below the form on desktop and mobile', async () => {
     const { AuthLayout } = await import('@/features/auth/AuthLayout');
 
     const { container } = render(
@@ -157,13 +157,12 @@ describe('AuthLayout', () => {
     );
 
     const authColumn = Array.from(container.querySelectorAll('div')).find(
-      element => element.className.includes('lg:pb-18')
+      element => element.className.includes('lg:max-w-120')
     );
 
-    expect(authColumn?.className).toContain('lg:pb-18');
-    expect(authColumn?.className).toContain(
-      'lg:[&_[data-auth-legal-copy]]:absolute'
-    );
+    expect(authColumn?.className).not.toContain('lg:pb-18');
+    expect(authColumn?.className).not.toContain('data-auth-legal-copy');
+    expect(container.querySelector('[data-auth-legal-copy]')).toBeVisible();
   });
 
   it('hides non-form chrome while the mobile keyboard is visible', async () => {

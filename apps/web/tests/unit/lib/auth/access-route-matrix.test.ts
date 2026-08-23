@@ -127,7 +127,7 @@ describe('access route matrix (JOV-3087)', () => {
     const allStates = Object.values(CanonicalUserState);
 
     it.each([
-      [CanonicalUserState.UNAUTHENTICATED, APP_ROUTES.START],
+      [CanonicalUserState.UNAUTHENTICATED, null],
       [CanonicalUserState.NEEDS_DB_USER, APP_ROUTES.START],
       [CanonicalUserState.NEEDS_WAITLIST_SUBMISSION, APP_ROUTES.START],
       [CanonicalUserState.WAITLIST_PENDING, null],

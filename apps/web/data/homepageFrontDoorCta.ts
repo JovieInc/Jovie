@@ -3,6 +3,9 @@ import { APP_ROUTES } from '@/constants/routes';
 export const HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT =
   'Hey, I want to get access to Jovie.';
 
+/** Founder-locked public waitlist destination for the prelaunch front door. */
+export const PUBLIC_WAITLIST_URL = 'https://jov.ie/waitlist';
+
 export function buildHomepageStartHref(starterPrompt?: string): string {
   if (!starterPrompt) return APP_ROUTES.START;
   const params = new URLSearchParams({ starter_prompt: starterPrompt });
@@ -28,7 +31,7 @@ export function getHomepageFrontDoorCtaContract(
     return {
       primary: {
         label: 'Get started',
-        href: buildHomepageStartHref(HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT),
+        href: PUBLIC_WAITLIST_URL,
       },
       secondary: null,
       fallbackSupport:
