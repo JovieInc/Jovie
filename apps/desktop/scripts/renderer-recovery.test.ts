@@ -9,9 +9,12 @@ import {
   decideRendererWatchdogExpiry,
   describeDesktopLoadFailure,
   isLoopbackAppUrl,
+  LOCAL_RENDERER_BOOT_WATCHDOG_MS,
+  LOCAL_RENDERER_LOAD_WATCHDOG_MS,
   parseDidStartNavigation,
   RENDERER_BOOT_WATCHDOG_MS,
   RENDERER_LOAD_WATCHDOG_MS,
+  rendererWatchdogMs,
   shouldArmRendererBootWatchdog,
   shouldRecoverAuthHandoffToCanonicalShell,
   shouldSkipRendererWatchdogForAuthHandoff,
@@ -119,6 +122,26 @@ test('load watchdog covers hung navigation before did-finish-load', () => {
   expect(RENDERER_LOAD_WATCHDOG_MS).toBeGreaterThanOrEqual(15_000);
   expect(RENDERER_LOAD_WATCHDOG_MS).toBeLessThanOrEqual(20_000);
   expect(RENDERER_LOAD_WATCHDOG_MS).toBeGreaterThan(RENDERER_BOOT_WATCHDOG_MS);
+});
+
+test('local watchdogs wait out first Turbopack compile instead of painting recovery', () => {
+  const measuredFirstCompileMs = 15_500;
+  const local = rendererWatchdogMs('local');
+  const production = rendererWatchdogMs('production');
+  const staging = rendererWatchdogMs('staging');
+
+  expect(local.loadMs).toBe(LOCAL_RENDERER_LOAD_WATCHDOG_MS);
+  expect(local.bootMs).toBe(LOCAL_RENDERER_BOOT_WATCHDOG_MS);
+  expect(local.loadMs).toBeGreaterThan(measuredFirstCompileMs);
+  expect(local.bootMs).toBeGreaterThan(measuredFirstCompileMs);
+  expect(local.loadMs).toBeGreaterThan(RENDERER_LOAD_WATCHDOG_MS);
+  expect(local.bootMs).toBeGreaterThan(RENDERER_BOOT_WATCHDOG_MS);
+
+  expect(production).toEqual({
+    bootMs: RENDERER_BOOT_WATCHDOG_MS,
+    loadMs: RENDERER_LOAD_WATCHDOG_MS,
+  });
+  expect(staging).toEqual(production);
 });
 
 test('a hung or intercepted hosted navigation arms the load watchdog', () => {

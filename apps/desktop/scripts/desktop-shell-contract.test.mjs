@@ -141,6 +141,7 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /APP_BOOTED_CHANNEL/);
   assert.match(mainSource, /RENDERER_BOOT_WATCHDOG_MS/);
   assert.match(mainSource, /RENDERER_LOAD_WATCHDOG_MS/);
+  assert.match(mainSource, /rendererWatchdogMs\(APP_ENV\)/);
   assert.match(mainSource, /decideRendererBootWatchdogAfterLoad/);
   assert.match(mainSource, /shouldSkipRendererWatchdogForAuthHandoff/);
   assert.match(mainSource, /decideRendererLoadStart/);
@@ -492,7 +493,7 @@ test('desktop dev defaults to the local app shell and packaged builds keep produ
     });
     assert.match(localStdout, /APP_ENV='local'/);
     assert.match(localEnv, /APP_ENV: 'production' \| 'staging' \| 'local'/);
-    assert.match(localEnv, /APP_URL = 'http:\/\/localhost:3112'/);
+    assert.match(localEnv, /APP_URL = 'http:\/\/localhost:3100'/);
 
     const { stdout: localOverrideStdout } = await execFileAsync(
       process.execPath,

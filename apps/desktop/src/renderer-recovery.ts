@@ -27,16 +27,52 @@ export type RendererRecoveryAction = 'ignore' | 'reload' | 'failure-page';
 // abnormal-exit, launch-failed, integrity-failure) is a real loss of the view.
 const NON_CRASH_REASONS = new Set(['clean-exit']);
 
-/** How long to wait after did-finish-load for the renderer app-booted ping. */
+/**
+ * Production / preview wait after did-finish-load for `app-booted`.
+ * Local first-compile is longer — see `LOCAL_RENDERER_BOOT_WATCHDOG_MS`.
+ */
 export const RENDERER_BOOT_WATCHDOG_MS = 14_000;
 
 /**
- * How long to wait after a main-frame hosted navigation *starts* for the load
- * to finish or fail. JOV-3595 only armed after `did-finish-load`, so a hung
- * or intercepted first navigation (ready-to-show already revealed the near-
- * black backgroundColor) stayed black forever. This deadline covers that gap.
+ * Production / preview wait after a main-frame hosted navigation starts.
+ * JOV-3595 only armed after `did-finish-load`, so a hung first navigation
+ * stayed black. Local first-compile is longer — see
+ * `LOCAL_RENDERER_LOAD_WATCHDOG_MS`.
  */
 export const RENDERER_LOAD_WATCHDOG_MS = 18_000;
+
+/**
+ * Measured on Tim's Mac 5:42 PT (JOV-5339): Next.js printed Ready in
+ * 457ms, then first GET / sat in "Compiling / ..." and returned HTTP
+ * 200 only after ~15.5s. An 8s curl got 0 bytes. An 18s load watchdog
+ * plus a following 14s boot watchdog paints recovery on a healthy
+ * `dev:web:local` compile.
+ */
+export const LOCAL_RENDERER_LOAD_WATCHDOG_MS = 60_000;
+
+/**
+ * Local boot wait after Chromium commits. First compile can still be
+ * hydrating / streaming after the 200.
+ */
+export const LOCAL_RENDERER_BOOT_WATCHDOG_MS = 45_000;
+
+export function rendererWatchdogMs(
+  appEnv: 'production' | 'staging' | 'local'
+): {
+  bootMs: number;
+  loadMs: number;
+} {
+  if (appEnv === 'local') {
+    return {
+      bootMs: LOCAL_RENDERER_BOOT_WATCHDOG_MS,
+      loadMs: LOCAL_RENDERER_LOAD_WATCHDOG_MS,
+    };
+  }
+  return {
+    bootMs: RENDERER_BOOT_WATCHDOG_MS,
+    loadMs: RENDERER_LOAD_WATCHDOG_MS,
+  };
+}
 
 export type RendererWatchdogExpiryAction = 'ignore' | 'failure-page';
 

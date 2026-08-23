@@ -67,8 +67,7 @@ import {
   decideRendererWatchdogExpiry,
   describeDesktopLoadFailure,
   parseDidStartNavigation,
-  RENDERER_BOOT_WATCHDOG_MS,
-  RENDERER_LOAD_WATCHDOG_MS,
+  rendererWatchdogMs,
   shouldRecoverAuthHandoffToCanonicalShell,
   shouldSkipRendererWatchdogForAuthHandoff,
   type DesktopLoadFailureReason,
@@ -101,8 +100,10 @@ const NAVIGATION_ABORTED_ERROR_CODE = -3;
 // the window black. Reset to 0 only after a confirmed app-booted ping so a
 // renderer that crashes deterministically after load still hits the cap.
 const MAX_RENDERER_CRASH_RELOADS = 2;
-const MAX_HOSTED_LOAD_RETRIES = APP_ENV === 'local' ? 2 : 1;
-const HOSTED_LOAD_RETRY_DELAY_MS = APP_ENV === 'local' ? 750 : 0;
+const MAX_HOSTED_LOAD_RETRIES = APP_ENV === 'local' ? 3 : 1;
+const HOSTED_LOAD_RETRY_DELAY_MS = APP_ENV === 'local' ? 2_000 : 0;
+const { bootMs: RENDERER_BOOT_WATCHDOG_MS, loadMs: RENDERER_LOAD_WATCHDOG_MS } =
+  rendererWatchdogMs(APP_ENV);
 const HUD_BUILD_INFO_POLL_INTERVAL_MS = 60 * 1000;
 // electron-builder.local.yml and electron-builder.staging.yml both package the
 // staging icon assets; only the production config ships icon.png.
