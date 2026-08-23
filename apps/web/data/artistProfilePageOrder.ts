@@ -7,6 +7,8 @@ export type ArtistProfileSectionId =
   | 'capture'
   | 'opinionated'
   | 'specWall'
+  | 'showcase'
+  | 'specBento'
   | 'howItWorks'
   | 'releaseCycle'
   | 'faq'
@@ -62,6 +64,16 @@ export const ARTIST_PROFILE_SECTION_ORDER: readonly ArtistProfileSectionOrderEnt
       label: 'Product Truth',
       testId: 'artist-profile-section-spec-wall',
       screenshotScenarioId: 'artist-profile-spec-wall-section-desktop',
+    },
+    {
+      id: 'showcase',
+      label: 'Live Artist Sites',
+      testId: 'artist-profile-section-showcase',
+    },
+    {
+      id: 'specBento',
+      label: 'Platform Spec',
+      testId: 'artist-profile-section-spec-bento',
     },
     {
       id: 'howItWorks',

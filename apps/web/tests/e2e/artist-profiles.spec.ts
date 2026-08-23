@@ -317,6 +317,8 @@ test.describe('Artist Profiles Landing', () => {
       'artist-profile-section-capture',
       'artist-profile-section-opinionated',
       'artist-profile-section-spec-wall',
+      'artist-profile-section-showcase',
+      'artist-profile-section-spec-bento',
       'artist-profile-section-how-it-works',
       'artist-profile-section-release-cycle',
       'artist-profile-section-faq',

@@ -1,0 +1,36 @@
+/*
+ * Framer-like shipped-sites gallery. Tokens only.
+ * Accent is reserved for the platform spec bento titles.
+ */
+
+.m-shipped-sites {
+  background: var(--color-bg-base);
+}
+
+.m-shipped-sites__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+.m-shipped-sites__frame {
+  aspect-ratio: 4 / 5;
+  background: var(--color-bg-surface-0);
+}
+
+.m-shipped-sites__frame--desktop {
+  aspect-ratio: 4 / 5;
+}
+
+@media (min-width: 640px) {
+  .m-shipped-sites__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .m-shipped-sites__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-4);
+  }
+}
