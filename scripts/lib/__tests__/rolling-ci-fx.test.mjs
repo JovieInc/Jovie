@@ -432,9 +432,9 @@ describe('rolling CI FX webhook remediation', () => {
     expect(
       classifyRunnerFailure([{ name: 'ci-fast', steps: ['Typecheck'] }])
     ).toBeNull();
-    expect(
-      resolveFxNamedOutcome({ launch: { action: 'launch' } })
-    ).toBe('launched');
+    expect(resolveFxNamedOutcome({ launch: { action: 'launch' } })).toBe(
+      'launched'
+    );
     expect(
       resolveFxNamedOutcome({
         launch: { action: 'configuration_incident', reason: 'fx-auth-missing' },
@@ -459,7 +459,9 @@ describe('rolling CI FX webhook remediation', () => {
     expect(planned.launch.action).toBe('launch');
     expect(planned.runnerClass).toBe('checkout');
     expect(planned.outcome).toBe('launched');
-    expect(planned.launch.request.prompt.text).toContain('Runner-class failure');
+    expect(planned.launch.request.prompt.text).toContain(
+      'Runner-class failure'
+    );
     expect(planned.launch.request.prompt.text).toContain(
       FX_RUNNER_IDEMPOTENCY_KEY
     );

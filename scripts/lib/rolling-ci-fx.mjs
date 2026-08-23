@@ -137,8 +137,7 @@ export function classifyRunnerFailure(failedJobs = []) {
   if (
     jobs.some(
       job =>
-        job?.conclusion === 'startup_failure' ||
-        job?.conclusion === 'timed_out'
+        job?.conclusion === 'startup_failure' || job?.conclusion === 'timed_out'
     )
   ) {
     return 'infra';
@@ -152,10 +151,7 @@ export function resolveFxNamedOutcome(input = {}) {
   const reason = String(input.launch?.reason ?? '');
   const dispatchAction = String(input.dispatch?.action ?? '');
   if (action === 'launch' || action === 'dedup') return 'launched';
-  if (
-    action === 'configuration_incident' ||
-    reason === 'fx-auth-missing'
-  ) {
+  if (action === 'configuration_incident' || reason === 'fx-auth-missing') {
     return 'no_key';
   }
   if (action === 'writer_missing') return 'writer_missing';
@@ -291,7 +287,10 @@ export function planFxLaunch(input = {}) {
   };
 }
 
-/** @param {Record<string, any>} [input] */
+/**
+ * @param {Record<string, any>} [input]
+ * @returns {Record<string, any>}
+ */
 export function planFxWebhookRemediation(input = {}) {
   const {
     dispatch,
@@ -307,7 +306,6 @@ export function planFxWebhookRemediation(input = {}) {
     headSha,
     sourceHead,
     headRef,
-    failedJobs,
   } = input;
   const runnerClass = classifyRunnerFailure(
     failedJobsFrom({ ...input, dispatch })
@@ -329,7 +327,10 @@ export function planFxWebhookRemediation(input = {}) {
     action === 'reject_competing_writer';
   const allowRunnerClassFx = Boolean(runnerClass);
 
-  /** @param {Record<string, any>} result */
+  /**
+   * @param {Record<string, any>} result
+   * @returns {Record<string, any>}
+   */
   const withOutcome = result => ({
     ...result,
     runnerClass,
