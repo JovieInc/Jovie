@@ -72,19 +72,33 @@ export function resolveWebhookRemediationRoute(input = {}) {
   };
 }
 
-/** @param {Record<string, any>} [input] */
+function sourcePrWriter(value) {
+  return String(value ?? '').trim();
+}
+
+/**
+ * Webhook writer for `runDispatch`. merge_group LIVE_AUTHOR can be blank
+ * (`gh api pulls/$PR .user.login`). Prefer the source PR author; if still
+ * blank on an FX-owned route (`fx` or `configuration_incident`), use the
+ * adapter name so planning reaches `launch_action` instead of throwing
+ * `writer is required`.
+ *
+ * @param {Record<string, any>} [input]
+ */
 export function resolveDispatchWriter(input = {}) {
   const { route, priorClaimWriter, implementer } = input;
+  const sourceWriter = sourcePrWriter(implementer);
   if (route?.route === 'implementer') {
-    return route.writer || implementer;
+    return sourcePrWriter(route.writer) || sourceWriter;
   }
   if (route?.route === 'fx') {
-    if (priorClaimWriter && priorClaimWriter !== FX_ADAPTER_NAME) {
-      return priorClaimWriter;
+    const prior = sourcePrWriter(priorClaimWriter);
+    if (prior && prior !== FX_ADAPTER_NAME) {
+      return prior;
     }
-    return FX_ADAPTER_NAME;
+    return sourceWriter || FX_ADAPTER_NAME;
   }
-  return implementer;
+  return sourceWriter || FX_ADAPTER_NAME;
 }
 
 /** @param {Record<string, any>} [input] */
