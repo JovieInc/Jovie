@@ -188,6 +188,7 @@ struct ChatComposerView: View {
   @Binding var draft: String
   @FocusState.Binding var isComposerFocused: Bool
   let isSending: Bool
+  let isOffline: Bool
   let onSend: () -> Void
   var onMic: () -> Void = {}
   let onSelectWorkflow: (ComposerWorkflowAction) -> Void
@@ -197,6 +198,7 @@ struct ChatComposerView: View {
     ChatComposerBar(
       draft: $draft,
       isFocused: $isComposerFocused,
+      placeholder: ChatComposerCopy.emptyPlaceholder,
       isSending: isSending,
       isPlusEnabled: ChatComposerMetrics.isPlusEnabled(isSending: isSending),
       onSend: onSend,
@@ -204,6 +206,7 @@ struct ChatComposerView: View {
       onSelectWorkflow: onSelectWorkflow,
       onDraftEdited: onDraftEdited
     )
+    .accessibilityValue(isOffline ? "Offline" : "")
   }
 }
 

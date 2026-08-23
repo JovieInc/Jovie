@@ -1,5 +1,23 @@
 import SwiftUI
 
+enum ChatEmptyGreeting: String, CaseIterable, Sendable {
+  case letsGetIt = "Let's get it"
+  case readyToStart = "Ready to start?"
+  case readyWhenYouAre = "Ready when you are"
+
+  static let lockedCopy = allCases.map(\.rawValue)
+
+  /// Day-stable rotate. Product shows one of the three; the still is Let's get it.
+  static func current(at date: Date = .now, calendar: Calendar = .current) -> String {
+    let day = calendar.ordinality(of: .day, in: .era, for: date) ?? 0
+    return lockedCopy[day % lockedCopy.count]
+  }
+
+  static func isLocked(_ copy: String) -> Bool {
+    lockedCopy.contains(copy)
+  }
+}
+
 enum MobileChatEmptyHomePolicy {
   enum GreetingPlacement: Equatable {
     /// Vertically centered in the remaining space above the docked composer.
@@ -28,11 +46,18 @@ struct MobileChatEmptyGreetingView: View {
 
   var body: some View {
     Text(greeting)
-      .font(JovieFont.display(size: 28))
+      .font(
+        JovieFont.display(
+          size: JovieFont.emptyGreetingSize,
+          numericWeight: JovieFont.emptyGreetingWeight
+        )
+      )
       .foregroundStyle(JovieColor.textPrimary)
       .multilineTextAlignment(.center)
       .frame(maxWidth: .infinity)
-      .accessibilityIdentifier("chat-empty-state-greeting")
+      .frame(minHeight: 40)
+      .accessibilityAddTraits(.isHeader)
+      .accessibilityIdentifier("chat-empty-greeting")
   }
 }
 
@@ -70,7 +95,6 @@ struct MobileChatView: View {
   @FocusState private var isComposerFocused: Bool
   @State private var isAtBottom = true
   @State private var userEditedSinceSend = false
-  @State private var emptyGreeting = ChatEmptyGreeting.takeNext()
 
   init(
     repository: ChatRepository,
@@ -230,6 +254,7 @@ struct MobileChatView: View {
         draft: $draft,
         isComposerFocused: $isComposerFocused,
         isSending: repository.isSending,
+        isOffline: repository.isOffline,
         onSend: {
           let text = draft
           draft = ""
@@ -272,7 +297,7 @@ struct MobileChatView: View {
   private var emptyState: some View {
     VStack(spacing: 0) {
       Spacer(minLength: 0)
-      MobileChatEmptyGreetingView(greeting: emptyGreeting)
+      MobileChatEmptyGreetingView(greeting: ChatEmptyGreeting.current())
         .padding(.horizontal, JovieSpacing.xLarge)
       Spacer(minLength: 0)
     }

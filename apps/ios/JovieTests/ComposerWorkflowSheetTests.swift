@@ -189,7 +189,9 @@ struct ChatComposerAccessibilityGuardTests {
     #expect(source.contains(".accessibilityElement(children: .contain)"))
     #expect(source.contains("accessibilityIdentifier(\"mobile-chat\")"))
     #expect(source.contains("accessibilityIdentifier(\"chat-scroll-to-latest\")"))
-    #expect(source.contains("accessibilityIdentifier(\"chat-empty-state-greeting\")"))
+    #expect(source.contains("accessibilityIdentifier(\"chat-empty-greeting\")"))
+    #expect(source.contains("enum MobileChatEmptyHomePolicy"))
+    #expect(source.contains("centeredAboveDockedComposer"))
     #expect(source.contains("JovieLogoMark") == false)
     #expect(source.contains("Ask Jovie") == false)
     #expect(source.contains("FeatureIntroHost") == false)
@@ -205,6 +207,7 @@ struct ChatComposerAccessibilityGuardTests {
     let source = try String(contentsOf: sourceURL, encoding: .utf8)
 
     #expect(source.contains("MobileChatEmptyGreetingView"))
+    #expect(source.contains("ChatEmptyGreeting.current()"))
     #expect(source.contains("JovieLogoMark") == false)
     #expect(source.contains("Ask Jovie") == false)
     #expect(source.contains("Spacer(minLength: 0)"))

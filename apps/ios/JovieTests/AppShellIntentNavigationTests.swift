@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import Jovie
 
@@ -159,6 +160,45 @@ struct AppShellIntentNavigationTests {
     #expect(state.chatDraft == "existing draft")
     #expect(state.shouldStartVoiceCapture == false)
     #expect(state.pendingRequest == nil)
+  }
+
+  @Test func openSettingsOpensSettingsEvenWhenChatDisabled() {
+    var state = AppShellIntentNavigationState(
+      selectedTab: .chat,
+      chatDraft: "keep draft",
+      autoSendMessage: nil,
+      openConversationID: nil,
+      pendingRequest: .openSettings
+    )
+
+    #expect(
+      AppShellIntentNavigation.applyPendingRequest(
+        chatEnabled: false,
+        state: &state
+      ) == true
+    )
+    #expect(state.shouldOpenSettings)
+    #expect(state.selectedTab == .chat)
+    #expect(state.chatDraft == "keep draft")
+    #expect(state.pendingRequest == nil)
+  }
+
+  @Test func signedInSettingsURLOpensSettingsAndStartStaysOnChat() {
+    #expect(
+      MobileSignedInLinkRoute.resolve(URL(string: "https://jov.ie/settings")!) == .settings
+    )
+    #expect(
+      MobileSignedInLinkRoute.resolve(URL(string: "https://jov.ie/app/settings/account")!)
+        == .settings
+    )
+    #expect(
+      MobileSignedInLinkRoute.resolve(URL(string: "https://jov.ie/start")!) == .chatHome
+    )
+    #expect(
+      MobileSignedInLinkRoute.resolve(URL(string: "https://jov.ie/auth/start")!) == nil
+    )
+    #expect(MobileSignedInLinkRoute.settings.intent == .openSettings)
+    #expect(MobileSignedInLinkRoute.chatHome.intent == .openChat)
   }
 
   @Test func consumedRequestDoesNotApplyTwice() {

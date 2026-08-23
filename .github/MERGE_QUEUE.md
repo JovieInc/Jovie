@@ -127,6 +127,10 @@ It fails closed if an open PR is missing from that authoritative snapshot.
   resolves the source PR from `gh-readonly-queue/main/pr-<n>-<baseSha>`, and
   launches FX against that source branch. Tell it worked: a failed merge_group
   CI run starts Rolling CI Dispatch and reaches `Launch FX remediator`.
+  Runner-class failures (checkout, infra, flake) still launch FX and record a
+  named Actions outcome (`launched` / `repaired` / `skipped_stale` /
+  `writer_missing` / `no_key` / `needs_human`) even when an implementer lease
+  is live or `LIVE_AUTHOR` is blank (JOV-5335).
 - CHANGELOG ALLGREEN collision (JOV-5291): GitHub's server merge ignores local
   union drivers. Two Unreleased `CHANGELOG.md` edits in one group park the
   later entry. Admission skips a CHANGELOG-touching PR while another CHANGELOG
