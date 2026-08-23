@@ -104,14 +104,20 @@ function routePath(route: string): string {
   return path || route;
 }
 
-function screenshotRouteMatchesSurface(
-  scenario: ScreenshotScenario,
+function uniqueTokens(tokens: readonly string[]): readonly string[] {
+  return [...new Set(tokens)];
+}
+
+function surfaceOwnsRoute(
+  route: string,
   surface: CanonicalSurfaceDefinition
 ): boolean {
-  const scenarioPath = routePath(scenario.route);
-  if (scenarioPath === surface.demoRoute) return true;
-  if (scenarioPath === surface.reviewRoute) return true;
-  return surface.liveRoutes.includes(scenarioPath);
+  const path = routePath(route);
+  return (
+    path === surface.demoRoute ||
+    path === surface.reviewRoute ||
+    surface.liveRoutes.includes(path)
+  );
 }
 
 function visualQaRouteBelongsToSurface(
@@ -119,13 +125,10 @@ function visualQaRouteBelongsToSurface(
   surface: CanonicalSurfaceDefinition,
   screenshotScenarios: readonly ScreenshotScenario[]
 ): boolean {
+  if (surfaceOwnsRoute(route, surface)) {
+    return true;
+  }
   const path = routePath(route);
-  if (path === surface.demoRoute || path === surface.reviewRoute) {
-    return true;
-  }
-  if (surface.liveRoutes.includes(path)) {
-    return true;
-  }
   return screenshotScenarios.some(
     scenario =>
       surface.screenshotIds.includes(scenario.id) &&
@@ -187,7 +190,7 @@ export function validateCanonicalSurfaceDrift({
         pushIssue(issues, 'unknown-screenshot', id, screenshotId);
         continue;
       }
-      if (!screenshotRouteMatchesSurface(scenario, surface)) {
+      if (!surfaceOwnsRoute(scenario.route, surface)) {
         pushIssue(issues, 'screenshot-route-mismatch', id, screenshotId);
       }
     }
@@ -207,7 +210,10 @@ export function validateCanonicalSurfaceDrift({
       .map(file => file.source ?? '')
       .join('\n');
 
-    for (const token of ownership.requiredTokens) {
+    for (const token of uniqueTokens([
+      ...ownership.requiredTokens,
+      ...ownership.moleculeOwners,
+    ])) {
       if (!combinedSource.includes(token)) {
         pushIssue(issues, 'detached-canonical-owner', id, token);
       }
@@ -216,12 +222,6 @@ export function validateCanonicalSurfaceDrift({
     for (const token of ownership.forbiddenTokens) {
       if (combinedSource.includes(token)) {
         pushIssue(issues, 'retired-canonical-owner', id, token);
-      }
-    }
-
-    for (const molecule of ownership.moleculeOwners) {
-      if (!combinedSource.includes(molecule)) {
-        pushIssue(issues, 'detached-canonical-owner', id, molecule);
       }
     }
 

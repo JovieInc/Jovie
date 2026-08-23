@@ -74,6 +74,14 @@ describe('visual-qa registry', () => {
     expect(
       getVisualQaSurface('shell-desktop-idle')?.canonicalSurfaceId
     ).toBeUndefined();
+
+    const homepage = getVisualQaSurface('canonical-homepage');
+    expect(homepage?.baseline).toMatchObject({
+      viewport: 'desktop',
+      captureTarget: 'page',
+      fullPage: false,
+      reducedMotion: true,
+    });
   });
 
   it('filters requested themes by surface support', () => {
