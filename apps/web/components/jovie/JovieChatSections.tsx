@@ -130,7 +130,7 @@ export function ChatComposerSurface({
 
       <ChatInput
         {...chatInputProps}
-        placeholder={composerPlaceholderForChatMode(chatMode)} // ui-casing-allow: brand placeholder
+        placeholder={composerPlaceholderForChatMode(chatMode)}
         variant={showThreadView ? 'compact' : 'hero'}
       />
     </div>

@@ -25,7 +25,6 @@ import { useEntityRecents } from '@/lib/queries/useEntityRecents';
 import { cn } from '@/lib/utils';
 
 import {
-  CHAT_COMPOSER_EMPTY_PLACEHOLDER,
   CHAT_COMPOSER_FORM_ARIA_LABEL,
   CHAT_COMPOSER_INPUT_ARIA_LABEL,
 } from '../chat-composer-copy';
@@ -225,7 +224,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       onInterruptAndSend,
       isLoading,
       isSubmitting,
-      placeholder = CHAT_COMPOSER_EMPTY_PLACEHOLDER,
+      placeholder = '',
       variant = 'default',
       onFileAttach,
       onAudioAttach,
@@ -1160,7 +1159,7 @@ function InputRow({
             ref={internalTextareaRef}
             value={value}
             onChange={e => onChange(e.target.value)}
-            placeholder={placeholder}
+            placeholder={placeholder || undefined}
             rows={1}
             animate={reducedMotion ? undefined : { height: measuredHeight }}
             transition={reducedMotion ? undefined : SPRING_HEIGHT}

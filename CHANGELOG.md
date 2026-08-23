@@ -9,6 +9,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - [internal] **iOS public-profile browser stays on the published creator page (JOV-5148):** Open Public Profile still uses the full-screen embedded browser, but navigation is now limited to HTTPS `jov.ie` / `staging.jov.ie` and the server-provided username root. App, admin, HUD, auth, and other reserved routes cannot load inside it.
 
+- **Empty chat greets you and waits:** new conversations show one of Let's get it, Ready to start?, or Ready when you are above a blank input. No placeholder, logo, or What's next? line.
+
 - [internal] **MenuMonitor reports freshness instead of fake zeros (JOV-5305):** Initial loading hides counts, stale values say Last known, and action/error state reaches the accessible status item.
 
 - [internal] **Jovie, Symphony, and Summer/ops CI lanes no longer block each other (JOV-5288):** this repo's required checks stay the Jovie aggregates. Exclusive Symphony/control-plane or Summer/ops diffs skip Jovie app unit/build/typecheck suites; exclusive product diffs skip Symphony scripts typecheck. Mixed and unknown non-doc files fail closed onto the product lane. Migration Guard and secret scanning stay on.

@@ -74,10 +74,11 @@ describe('ChatLoading (chat home)', () => {
 
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.queryByRole('button')).toBeNull();
-    // Product-voice placeholder is decorative under the busy shell.
-    const placeholder = screen.getByText(
-      'Ask Jovie to plan your next release...'
+    expect(
+      screen.queryByText('Ask Jovie to plan your next release...')
+    ).toBeNull();
+    expect(screen.getByTestId('chat-empty-state-greeting').textContent).toBe(
+      "Let's get it"
     );
-    expect(placeholder.closest('[aria-hidden="true"]')).not.toBeNull();
   });
 });
