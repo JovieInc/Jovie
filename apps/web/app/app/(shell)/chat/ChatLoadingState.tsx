@@ -1,17 +1,15 @@
-import { Skeleton } from '@jovie/ui';
-import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
 import { ChatWorkspaceSurface } from '@/components/jovie/ChatWorkspaceSurface';
 import {
   CHAT_COMPOSER_ATTACH_ARIA_LABEL,
-  CHAT_COMPOSER_EMPTY_PLACEHOLDER,
   CHAT_COMPOSER_SEND_ARIA_LABEL,
 } from '@/components/jovie/chat-composer-copy';
+import { CHAT_EMPTY_STILL_GREETING } from '@/components/jovie/chat-empty-greeting';
 import { CHAT_CONTENT_SHELL_CLASSNAME } from '@/components/jovie/chat-layout';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
 /**
  * Chat page loading skeleton.
- * Matches the JovieChat empty state layout: centered logo space and composer.
+ * Matches the JovieChat empty state layout: rotating-greeting slot and empty composer.
  */
 export default function ChatLoading() {
   return (
@@ -26,18 +24,17 @@ export default function ChatLoading() {
           <div
             className={`${CHAT_CONTENT_SHELL_CLASSNAME} relative flex min-h-0 flex-1 flex-col items-center justify-center px-1 py-8`}
           >
-            <div
-              className='pointer-events-none absolute left-1/2 top-1/2 h-[min(46vw,28rem)] w-[min(46vw,28rem)] -translate-x-1/2 -translate-y-[60%] opacity-45 max-sm:h-[min(72vw,18rem)] max-sm:w-[min(72vw,18rem)]'
+            <h2
+              className='relative z-10 text-2xl font-semibold text-primary-token'
               aria-hidden='true'
+              data-testid='chat-empty-state-greeting'
             >
-              <JovieMarkElectric className='h-full w-full' />
-            </div>
+              {CHAT_EMPTY_STILL_GREETING}
+            </h2>
           </div>
 
           {/* Reserve the loaded route's bottom composer allocation. */}
-          <div
-            className={`${CHAT_CONTENT_SHELL_CLASSNAME} relative z-10 space-y-2`}
-          >
+          <div className={`${CHAT_CONTENT_SHELL_CLASSNAME} relative z-10`}>
             {/* Decorative only — parent is aria-busy; hide control stubs from AT. */}
             <div className='system-b-shell-loading-composer' aria-hidden='true'>
               <div className='relative flex items-end gap-2 px-3 py-2.5'>
@@ -47,9 +44,7 @@ export default function ChatLoading() {
                 >
                   <LoadingSkeleton height='h-4' width='w-4' rounded='full' />
                 </div>
-                <div className='min-w-0 flex-1 py-1.5 text-sm leading-6 text-tertiary-token'>
-                  {CHAT_COMPOSER_EMPTY_PLACEHOLDER}
-                </div>
+                <div className='min-h-6 min-w-0 flex-1 py-1.5 text-sm leading-6' />
                 <div
                   className='system-b-chat-composer-primary-action flex h-9 w-9 shrink-0 cursor-not-allowed items-center justify-center rounded-full opacity-80'
                   data-label={CHAT_COMPOSER_SEND_ARIA_LABEL}
@@ -58,7 +53,6 @@ export default function ChatLoading() {
                 </div>
               </div>
             </div>
-            <Skeleton className='mx-auto h-3 w-32' rounded='lg' />
           </div>
         </div>
       </div>

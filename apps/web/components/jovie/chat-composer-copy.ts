@@ -3,19 +3,16 @@
  * Keep loading skeleton, ChatInput defaults, and live surface in lockstep.
  */
 
-/** Empty-state placeholder — product voice, brand casing allowed. */
-export const CHAT_COMPOSER_EMPTY_PLACEHOLDER =
-  'Ask Jovie to plan your next release...';
-
-/** Ovie door placeholder — founder talk door, not artist-release copy. */
+/** Ovie door placeholder — founder talk door, not artist empty-chat copy. */
 export const CHAT_COMPOSER_OVIE_EMPTY_PLACEHOLDER = 'Ask Ovie...';
 
+/**
+ * Artist empty chat has no placeholder (JOV-5319). Ovie keeps its door copy.
+ */
 export function composerPlaceholderForChatMode(
   chatMode: 'ov' | null | undefined
 ): string {
-  return chatMode === 'ov'
-    ? CHAT_COMPOSER_OVIE_EMPTY_PLACEHOLDER
-    : CHAT_COMPOSER_EMPTY_PLACEHOLDER;
+  return chatMode === 'ov' ? CHAT_COMPOSER_OVIE_EMPTY_PLACEHOLDER : '';
 }
 
 /** Form region accessible name (Title Case product UI). */

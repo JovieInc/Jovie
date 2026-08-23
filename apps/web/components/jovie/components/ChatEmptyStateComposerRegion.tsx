@@ -1,84 +1,57 @@
 'use client';
 
-import type { ReactNode } from 'react';
-import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { type ReactNode, useState } from 'react';
 
+import { takeNextEmptyChatGreeting } from '../chat-empty-greeting';
 import { CHAT_CONTENT_SHELL_CLASSNAME } from '../chat-layout';
 
-const AMBIENT_LOGO_OPACITY = 0.18;
-
-function resolveInvitationCopy(greetingName?: string | null): string {
-  const trimmedName = greetingName?.trim();
-  if (!trimmedName) return "What's next?";
-  const firstName = trimmedName.split(/\s+/)[0];
-  return `What's next, ${firstName}?`;
-}
-
 /**
- * Ambient brand logo + action-forward invitation copy. Centered, low-noise,
- * and layout-stable: it only ever renders inside reserved space (the centered
- * welcome stack or the docked layout's scroll region), never between the
- * composer and the viewport edge, so it cannot move the composer.
+ * One locked rotating greeting. Centered, low-noise, and layout-stable: it
+ * only ever renders inside reserved space (the centered welcome stack or the
+ * docked layout's scroll region), never between the composer and the viewport
+ * edge, so it cannot move the composer.
  */
-export function ChatEmptyStateWelcome({
-  greetingName,
-}: {
-  readonly greetingName?: string | null;
-}) {
+export function ChatEmptyStateWelcome() {
+  const [greeting] = useState(() => takeNextEmptyChatGreeting());
+
   return (
-    <>
-      <div
-        aria-hidden='true'
-        className='relative z-10 mb-4'
-        style={{ opacity: AMBIENT_LOGO_OPACITY }}
-        data-testid='chat-empty-state-logo'
-      >
-        <BrandLogo
-          size={56}
-          className='text-primary-token'
-          aria-hidden={true}
-        />
-      </div>
-      <h2
-        className='relative z-10 text-2xl font-semibold text-primary-token'
-        data-testid='chat-empty-state-greeting'
-      >
-        {resolveInvitationCopy(greetingName)}
-      </h2>
-    </>
+    <h2
+      className='relative z-10 text-2xl font-semibold text-primary-token'
+      data-testid='chat-empty-state-greeting'
+    >
+      {greeting}
+    </h2>
   );
 }
 
 /**
  * Empty-chat scaffold.
  *
- * - Welcome (no `above`): logo + invitation + composer centered in the viewport.
+ * - Welcome (no `above`): rotating greeting + composer centered in the viewport.
  * - Task/scaffold (`above`): cards scroll in the upper region; the composer
  *   (and any quick-action rail passed as children) docks to the bottom of the
  *   usable area so the first card is never clipped by mid-viewport absolute
  *   positioning and chips stay reachable without overlapping the dock.
- * - Docked welcome (`showDockedWelcome`, no `above`): the logo + invitation
- *   render centered inside the scroll region while the composer keeps its
+ * - Docked welcome (`showDockedWelcome`, no `above`): the greeting renders
+ *   centered inside the scroll region while the composer keeps its
  *   bottom-docked geometry, so transient affordances can come and go without
  *   moving the composer.
  */
 export function ChatEmptyStateComposerRegion({
   above,
   children,
-  greetingName,
   hideWelcomeHeader = false,
   stableDocked = false,
   showDockedWelcome = false,
 }: {
   readonly above?: ReactNode;
   readonly children: ReactNode;
-  readonly greetingName?: string | null;
   readonly hideWelcomeHeader?: boolean;
   /** Keep composer geometry docked when transient empty-state affordances hide. */
   readonly stableDocked?: boolean;
   /**
    * In the docked layout with no `above` content, fill the scroll region with
-   * the centered welcome (ambient logo + invitation) instead of blank space.
+   * the centered welcome (rotating greeting) instead of blank space.
    */
   readonly showDockedWelcome?: boolean;
 }) {
@@ -102,7 +75,7 @@ export function ChatEmptyStateComposerRegion({
                 className='flex min-h-full flex-col items-center justify-center text-center'
                 data-testid='chat-empty-state-welcome'
               >
-                <ChatEmptyStateWelcome greetingName={greetingName} />
+                <ChatEmptyStateWelcome />
               </div>
             ) : (
               <div className='h-full' aria-hidden='true' />
@@ -126,9 +99,7 @@ export function ChatEmptyStateComposerRegion({
       data-testid='chat-empty-state-composer-region'
       data-layout='centered'
     >
-      {showWelcomeHeader ? (
-        <ChatEmptyStateWelcome greetingName={greetingName} />
-      ) : null}
+      {showWelcomeHeader ? <ChatEmptyStateWelcome /> : null}
       <div
         className={`relative z-10 w-full${showWelcomeHeader ? ' mt-6' : ''}`}
         data-testid='chat-empty-state-centered-composer'
