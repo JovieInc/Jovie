@@ -83,6 +83,19 @@ vi.mock(
   })
 );
 
+vi.mock('@/components/marketing/framer-kit/MarketingFramerKit', () => ({
+  MarketingShippedSitesShowcase: () => (
+    <section>
+      <h2>Live Artist Sites</h2>
+    </section>
+  ),
+  MarketingPlatformSpecBento: () => (
+    <section>
+      <h2>The Platform Under Every Profile</h2>
+    </section>
+  ),
+}));
+
 vi.mock(
   '@/components/marketing/artist-profile/ArtistProfileOutcomesCarousel',
   () => ({

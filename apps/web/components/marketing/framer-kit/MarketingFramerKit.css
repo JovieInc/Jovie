@@ -1,0 +1,124 @@
+/*
+ * Shared Framer-grade marketing kit (JOV-5333).
+ * Showcase grid + platform spec bento. Dark canvas, Jovie accents only.
+ */
+
+.framer-kit-showcase {
+  background: var(--system-b-bg-page);
+  color: var(--system-b-text-primary);
+}
+
+.framer-kit-showcase__grid {
+  display: grid;
+  gap: var(--space-4);
+  margin: var(--space-10) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 768px) {
+  .framer-kit-showcase__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-5);
+  }
+}
+
+@media (min-width: 1280px) {
+  .framer-kit-showcase__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.framer-kit-showcase__tile {
+  min-width: 0;
+}
+
+.framer-kit-showcase__link,
+.framer-kit-showcase__static {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.framer-kit-showcase__link:focus-visible {
+  outline: var(--space-px) solid var(--color-accent-blue);
+  outline-offset: var(--space-1);
+}
+
+.framer-kit-showcase__media {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 3 / 4;
+  border-radius: 0.9rem;
+  background:
+    radial-gradient(
+      circle at 50% 12%,
+      color-mix(in oklab, var(--color-accent-purple) 14%, transparent),
+      transparent 42%
+    ),
+    var(--system-b-cinematic-black);
+  box-shadow: inset 0 0 0 var(--space-px)
+    color-mix(in oklab, var(--color-text-primary-token) 8%, transparent);
+  transition: box-shadow var(--duration-subtle) var(--ease-subtle);
+}
+
+.framer-kit-showcase__tile:nth-child(3n + 2) .framer-kit-showcase__media {
+  background:
+    radial-gradient(
+      circle at 50% 12%,
+      color-mix(in oklab, var(--color-accent-pink) 14%, transparent),
+      transparent 42%
+    ),
+    var(--system-b-cinematic-black);
+}
+
+.framer-kit-showcase__tile:nth-child(3n) .framer-kit-showcase__media {
+  background:
+    radial-gradient(
+      circle at 50% 12%,
+      color-mix(in oklab, var(--color-accent-blue) 14%, transparent),
+      transparent 42%
+    ),
+    var(--system-b-cinematic-black);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .framer-kit-showcase__link:hover .framer-kit-showcase__media {
+    box-shadow: inset 0 0 0 var(--space-px)
+      color-mix(in oklab, var(--color-text-primary-token) 18%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .framer-kit-showcase__link,
+  .framer-kit-showcase__media {
+    transition: none;
+  }
+}
+
+.framer-kit-showcase__copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-top: var(--space-4);
+}
+
+.framer-kit-showcase__title {
+  margin: 0;
+  color: var(--color-text-primary-token);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: normal;
+}
+
+.framer-kit-showcase__site {
+  margin: 0;
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-xs);
+}
+
+.framer-kit-spec-bento {
+  background: var(--system-b-bg-page);
+}

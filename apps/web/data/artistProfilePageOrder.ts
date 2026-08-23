@@ -4,6 +4,8 @@ export type ArtistProfileSectionId =
   | 'hero'
   | 'adaptive'
   | 'outcomes'
+  | 'shippedSites'
+  | 'platformBento'
   | 'capture'
   | 'opinionated'
   | 'specWall'
@@ -44,6 +46,16 @@ export const ARTIST_PROFILE_SECTION_ORDER: readonly ArtistProfileSectionOrderEnt
       label: 'Fan Outcomes',
       testId: 'artist-profile-section-outcomes',
       screenshotScenarioId: 'artist-profile-outcomes-section-desktop',
+    },
+    {
+      id: 'shippedSites',
+      label: 'Live Artist Sites',
+      testId: 'artist-profile-section-shipped-sites',
+    },
+    {
+      id: 'platformBento',
+      label: 'Platform Spec',
+      testId: 'artist-profile-section-platform-bento',
     },
     {
       id: 'capture',

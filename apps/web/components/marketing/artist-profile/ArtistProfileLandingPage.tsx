@@ -2,6 +2,10 @@
 import { ArrowUpRight } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import {
+  MarketingPlatformSpecBento,
+  MarketingShippedSitesShowcase,
+} from '@/components/marketing/framer-kit/MarketingFramerKit';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { ARTIST_PROFILE_SECTION_TEST_IDS } from '@/data/artistProfilePageOrder';
 import type { ArtistProfileSectionFlags } from '@/lib/featureFlags';
@@ -191,6 +195,12 @@ export function ArtistProfileLandingPage({
       />
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.outcomes}>
         <ArtistProfileOutcomesCarousel outcomes={copy.outcomes} />
+      </div>
+      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.shippedSites}>
+        <MarketingShippedSitesShowcase />
+      </div>
+      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.platformBento}>
+        <MarketingPlatformSpecBento />
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.capture}>
         <ArtistProfileCaptureSection

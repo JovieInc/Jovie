@@ -17,6 +17,10 @@ export { FaqSection } from './FaqSection';
 export { FeatureAccordion } from './FeatureAccordion';
 export type { FigCardProps } from './FigCard';
 export { FigCard } from './FigCard';
+export {
+  MarketingPlatformSpecBento,
+  MarketingShippedSitesShowcase,
+} from './framer-kit/MarketingFramerKit';
 export type { MarketingContainerProps } from './MarketingContainer';
 export { MarketingContainer } from './MarketingContainer';
 export type { MarketingContentShellProps } from './MarketingContentShell';

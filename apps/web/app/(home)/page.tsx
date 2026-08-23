@@ -13,7 +13,9 @@ import { HERO_COPY } from '@/components/homepage/intent';
 import {
   FaqSection,
   MarketingElectricSeam,
+  MarketingPlatformSpecBento,
   MarketingPosterHero,
+  MarketingShippedSitesShowcase,
 } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
@@ -262,6 +264,8 @@ function HomepageUnlockedSections() {
     <>
       <HomepageMeetJovie />
       <HomepageArtistProfiles cards={ARTIST_OUTCOME_CARDS} />
+      <MarketingShippedSitesShowcase />
+      <MarketingPlatformSpecBento />
       <HomepageClosedLoop />
       <HomepageFaq />
     </>
