@@ -79,6 +79,20 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain('**/tsconfig*.json');
   });
 
+  it('isolates Jovie product typecheck from Symphony/control-plane suites', () => {
+    expect(CI_FAST_SOURCE).toContain("from './lib/ci-repo-lanes.mjs'");
+    expect(CI_FAST_SOURCE).toContain(
+      'Jovie product typecheck skipped (no product files changed)'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'Scripts typecheck skipped (no Symphony/control-plane files changed)'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'Guardrails skipped (no Jovie product files changed)'
+    );
+    expect(CI_FAST_SOURCE).toContain('files === null || files.length === 0');
+  });
+
   it('maps the exact hosted selector set to dedicated parallel jobs', () => {
     const hostedSelectors = HOSTED_GROUP_JOBS.map(({ jobId, nextJobId }) => {
       const block = jobBlock(jobId, nextJobId);
