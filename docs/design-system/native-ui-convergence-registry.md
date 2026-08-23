@@ -163,16 +163,16 @@ macOS rendering of the iOS product surface.
 
 | ID | Surface and owner | Source evidence | States verified in source | Adaptive behavior | Parity/proof |
 | --- | --- | --- | --- | --- | --- |
-| `macos.menu-monitor` | Menu bar label and menu; `MenuMonitorApp`, `MenuMonitorMenu` | `apps/macos/MenuMonitor/Sources/MenuMonitor/MenuMonitorApp.swift:L4-L20,L23-L43,L45-L100`; target platform `Package.swift:L4-L17` | Count badge 0/positive/99+, refreshed timestamp, error text, status output, restart/status/dashboard/refresh/quit actions | Menu-bar-only accessory app; no responsive width/size-class contract; macOS 14 target | `verified-source`; not product UI parity. |
-| `macos.shipping-store` | Poll/fail-closed/action state model; `ShippingStatusStore` | `apps/macos/MenuMonitor/Sources/MenuMonitor/ShippingStatusStore.swift:L4-L71,L73-L111` | Counts loaded from Linear-backed Symphony status; status errors remain explicit with no GitHub Issue fallback; action message, status output, 30-second polling | Main-actor state with detached utility work; shell/process output is operator-only | `verified-source`; `actionMessage` is published but not rendered by `MenuMonitorMenu` (state gap). |
+| `macos.menu-monitor` | Menu bar label and menu; `MenuMonitorApp`, `MenuMonitorMenu`, `MenuMonitorPresentation` | `apps/macos/MenuMonitor/Sources/MenuMonitor/MenuMonitorApp.swift`; `apps/macos/MenuMonitor/Sources/MenuMonitor/MenuMonitorPresentation.swift`; target platform `Package.swift` | Initial loading, fresh zero/positive/99+ count states, unavailable `!`, stale metrics qualified as last known, refreshed timestamp, explicit error cue, action feedback, status output, restart/status/dashboard/refresh/quit actions | Menu-bar-only accessory app; no responsive width/size-class contract; macOS 14 target | `verified-source-and-test`; native presentation semantics are covered by `MenuMonitorConformanceTests`. |
+| `macos.shipping-store` | Poll/fail-closed/action state model; `ShippingStatusStore` | `apps/macos/MenuMonitor/Sources/MenuMonitor/ShippingStatusStore.swift` | Counts loaded from Linear-backed Symphony status; status errors remain explicit with no GitHub Issue fallback; action message, status output, 30-second polling | Main-actor state with detached utility work; shell/process output is operator-only | `verified-source`; the menu consumes every published presentation field without changing operational ownership. |
 
-### macOS state gap
+### macOS presentation ownership
 
-`ShippingStatusStore.actionMessage` is set during restart and status actions at
-`ShippingStatusStore.swift:L62-L106`, but `MenuMonitorMenu` renders only counts,
-`lastError`, `statusOutput`, and timestamps at `MenuMonitorApp.swift:L48-L83`.
-The source therefore has an unpresented action-progress/completion state. This
-is a source finding, not an implementation request in this slice.
+`MenuMonitorPresentation` is the single macOS owner for count grammar, initial
+loading, last-success/error, action feedback, status output, and menu-bar
+accessibility copy. `ShippingStatusStore` remains the sole owner of polling,
+counts, freshness data, and operator actions. The conformance test fails if raw
+metric strings or an unrendered presentation state are reintroduced.
 
 ## Cross-platform and public/app parity
 
@@ -277,9 +277,6 @@ opacity or geometry differs; no broad style rewrite was performed.
    web audience route redirects to Contacts, `audience/page.tsx:L7-L31`. This
    is a semantic/IA mismatch that should remain visible in any cross-platform
    mapping.
-8. **macOS feedback gap.** `actionMessage` is published and updated but not
-   rendered, as described in [macOS state gap](#macos-state-gap).
-
 ## State coverage and missing-state register
 
 | Surface | Default/loaded | Loading | Empty | Error/retry | Offline/stale | Interaction states | Missing or constrained state |
@@ -294,7 +291,7 @@ opacity or geometry differs; no broad style rewrite was performed.
 | Chat | Empty/transcript | Thinking/streaming | Online/offline empty copy | Failed turn retry and composer error slot | Offline cached history/draft guidance | Scroll, slash palette, workflow sheet, entity chips, web handoff | No native public chat route; ready profile required. |
 | Settings | Loaded | Logout spinner | Not applicable | External link failure is delegated to system/browser | Not explicit | Disabled logout, rows, close | No explicit in-view link failure state. |
 | Talk/entity/workflow overlays | Default/review | Starting/recording | Empty transcript error | Reserved error slot / permission copy | Not explicit | Sheets, detents, review, editable draft | Pen presence and persistence unknown. |
-| macOS MenuMonitor | Counts/status | No explicit loading state | Zero-count badge | Kanban fallback/error text | Fallback is explicit | Actions/status output | `actionMessage` is not rendered; no loading indicator. |
+| macOS MenuMonitor | Counts/status | Explicit initial refresh label; metrics withheld until first success | Zero-count state without a badge | Explicit unavailable cue plus retry | Last-success metrics are qualified as last known and unavailable `!` remains visible | Native buttons, action feedback, status output, menu-bar accessibility value | No public-product parity; this remains a compact operator-only menu. |
 
 ## Deterministic Pen handoff contract
 

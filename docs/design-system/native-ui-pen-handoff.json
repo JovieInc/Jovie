@@ -409,7 +409,11 @@
       "source": [
         {
           "file": "apps/macos/MenuMonitor/Sources/MenuMonitor/MenuMonitorApp.swift",
-          "lines": "4-100"
+          "lines": "4-126"
+        },
+        {
+          "file": "apps/macos/MenuMonitor/Sources/MenuMonitor/MenuMonitorPresentation.swift",
+          "lines": "3-136"
         },
         {
           "file": "apps/macos/MenuMonitor/Sources/MenuMonitor/ShippingStatusStore.swift",
@@ -426,12 +430,14 @@
         "status output"
       ],
       "states": [
+        "initial_loading",
         "zero",
         "positive",
         "ninety_nine_plus",
         "refreshed",
-        "error",
-        "github_fallback",
+        "unavailable",
+        "stale_last_known",
+        "action_feedback",
         "action_output"
       ],
       "responsive": ["menu_bar_only", "macos_14", "no product-shell geometry"],
