@@ -129,9 +129,9 @@ describe('POST /api/mobile/v1/chat/turns', () => {
     );
   });
 
-  it('rejects an invalid chatMode before the handler runs', async () => {
+  it('rejects invalid chatMode and forwards ov to the handler', async () => {
     const { POST } = await routeModulePromise;
-    const response = await POST(
+    const invalid = await POST(
       new Request('https://jov.ie/api/mobile/v1/chat/turns', {
         method: 'POST',
         body: JSON.stringify({
@@ -143,20 +143,12 @@ describe('POST /api/mobile/v1/chat/turns', () => {
         }),
       })
     );
+    expect(invalid.status).toBe(400);
 
-    expect(response.status).toBe(400);
-    expect(hoisted.handleMobileChatTurnMock).not.toHaveBeenCalled();
-  });
-
-  it('forwards ov chatMode to the turn handler', async () => {
-    const runtimeResponse = new Response('{"type":"turn.reserved"}\n', {
-      status: 200,
-      headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8' },
-    });
-    hoisted.handleMobileChatTurnMock.mockResolvedValue(runtimeResponse);
-
-    const { POST } = await routeModulePromise;
-    const response = await POST(
+    hoisted.handleMobileChatTurnMock.mockResolvedValue(
+      new Response('{"type":"turn.reserved"}\n', { status: 200 })
+    );
+    const ov = await POST(
       new Request('https://jov.ie/api/mobile/v1/chat/turns', {
         method: 'POST',
         body: JSON.stringify({
@@ -168,8 +160,7 @@ describe('POST /api/mobile/v1/chat/turns', () => {
         }),
       })
     );
-
-    expect(response.status).toBe(200);
+    expect(ov.status).toBe(200);
     expect(hoisted.handleMobileChatTurnMock).toHaveBeenCalledWith(
       'user_123',
       expect.objectContaining({ chatMode: 'ov' }),

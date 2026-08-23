@@ -23,9 +23,6 @@ describe('mobile chat contract', () => {
       source: 'typed',
       chatMode: null,
     });
-  });
-
-  it('keeps parsed chatMode null so the route layer owns ov vs artist routing', () => {
     expect(
       parseMobileChatTurnRequest({
         conversationId: 'conv_1',
@@ -34,11 +31,8 @@ describe('mobile chat contract', () => {
         text: 'Summer, what is blocked?',
         source: 'typed',
         chatMode: 'ov',
-      })
-    ).toMatchObject({
-      text: 'Summer, what is blocked?',
-      chatMode: null,
-    });
+      })?.chatMode
+    ).toBeNull();
   });
 
   it('rejects invalid mobile turn requests', () => {

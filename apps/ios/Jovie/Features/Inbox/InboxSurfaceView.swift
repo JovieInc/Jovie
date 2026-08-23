@@ -278,7 +278,7 @@ private struct InboxStillImage: View {
         if let image {
           Image(uiImage: image)
             .resizable()
-            .scaledToFill()
+            .scaledToFit()
         } else {
           JovieColor.surface0
         }
@@ -287,7 +287,10 @@ private struct InboxStillImage: View {
       .clipShape(RoundedRectangle(cornerRadius: JovieRadius.small, style: .continuous))
       .task(id: url.absoluteString) {
         guard image == nil else { return }
-        image = await AvatarImageLoader.loadStill(url)
+        image = await AvatarImageLoader.load(
+          url,
+          thumbnailSize: CGSize(width: 780, height: 439)
+        )
       }
   }
 }

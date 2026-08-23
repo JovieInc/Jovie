@@ -115,44 +115,17 @@ enum MobileWorkspaceMode: String, Codable, Equatable, Sendable, CaseIterable {
   case jovie = "customer"
   case ovie = "ov"
 
-  var displayName: String {
-    switch self {
-    case .jovie: return "Jovie"
-    case .ovie: return "Ovie"
-    }
-  }
-
-  var toggled: MobileWorkspaceMode {
-    self == .jovie ? .ovie : .jovie
-  }
-
-  var chatMode: String? {
-    self == .ovie ? "ov" : nil
-  }
-
-  var askChatLabel: String {
-    self == .ovie ? "Ask Summer" : "Ask Jovie"
-  }
-
-  var composerPlaceholder: String {
-    self == .ovie ? "Ask Summer" : "Ask Jovie"
-  }
-
-  var composerOfflinePlaceholder: String {
-    self == .ovie ? "Ask Summer (offline)" : "Ask Jovie (offline)"
-  }
-
-  var emptyChatTitle: String {
-    askChatLabel
-  }
-
+  var displayName: String { self == .ovie ? "Ovie" : "Jovie" }
+  var toggled: MobileWorkspaceMode { self == .jovie ? .ovie : .jovie }
+  var chatMode: String? { self == .ovie ? "ov" : nil }
+  var askChatLabel: String { self == .ovie ? "Ask Summer" : "Ask Jovie" }
+  var composerPlaceholder: String { askChatLabel }
+  var composerOfflinePlaceholder: String { "\(askChatLabel) (offline)" }
+  var emptyChatTitle: String { askChatLabel }
   var emptyChatSubtitle: String {
-    switch self {
-    case .jovie:
-      return "Ask Jovie about your profile, releases, and next moves."
-    case .ovie:
-      return "Taste cards, stills, and ops. Summer is the speaker."
-    }
+    self == .ovie
+      ? "Taste cards, stills, and ops. Summer is the speaker."
+      : "Ask Jovie about your profile, releases, and next moves."
   }
 }
 

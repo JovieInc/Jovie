@@ -82,11 +82,10 @@ struct MobileMeResponseTests {
         "continueOnWebUrl": "https://jov.ie/app"
       }
       """.data(using: .utf8)!
-
     let response = try JSONDecoder().decode(MobileMeResponse.self, from: data)
-
     #expect(response.isAdmin == nil)
     #expect(response.showsAdminWorkspaceSwitch == false)
+    #expect(MobileMeResponse.previewReady.showsAdminWorkspaceSwitch == false)
   }
 
   @Test func isAdminTrueShowsWorkspaceSwitch() throws {
@@ -104,34 +103,19 @@ struct MobileMeResponseTests {
         "isAdmin": true
       }
       """.data(using: .utf8)!
-
     let response = try JSONDecoder().decode(MobileMeResponse.self, from: data)
-
     #expect(response.isAdmin == true)
     #expect(response.showsAdminWorkspaceSwitch)
   }
 
-  @Test func previewReadyHidesWorkspaceSwitch() {
-    #expect(MobileMeResponse.previewReady.showsAdminWorkspaceSwitch == false)
-  }
-
-  @Test func workspaceStoreForcesJovieForNonAdmin() {
-    let suiteName = "MobileWorkspaceStoreTests-non-admin"
+  @Test func workspaceStoreForcesJovieForNonAdminAndPersistsOvieForAdmin() {
+    let suiteName = "MobileWorkspaceStoreTests"
     let defaults = UserDefaults(suiteName: suiteName)!
     defaults.removePersistentDomain(forName: suiteName)
     defaults.set(MobileWorkspaceMode.ovie.rawValue, forKey: MobileWorkspaceStore.defaultsKey)
-
     #expect(MobileWorkspaceStore.load(isAdmin: false, defaults: defaults) == .jovie)
-
     MobileWorkspaceStore.save(.ovie, isAdmin: false, defaults: defaults)
     #expect(defaults.string(forKey: MobileWorkspaceStore.defaultsKey) == MobileWorkspaceMode.jovie.rawValue)
-  }
-
-  @Test func workspaceStorePersistsOvieForAdmin() {
-    let suiteName = "MobileWorkspaceStoreTests-admin"
-    let defaults = UserDefaults(suiteName: suiteName)!
-    defaults.removePersistentDomain(forName: suiteName)
-
     MobileWorkspaceStore.save(.ovie, isAdmin: true, defaults: defaults)
     #expect(MobileWorkspaceStore.load(isAdmin: true, defaults: defaults) == .ovie)
   }
@@ -157,7 +141,6 @@ struct MobileMeResponseTests {
       status: "pending",
       imageURL: "https://cdn.jov.ie/cards/local.png"
     )
-
     #expect(still.stillImageURL?.absoluteString == "https://cdn.jov.ie/stills/16197.jpg")
     #expect(card.stillImageURL == nil)
   }

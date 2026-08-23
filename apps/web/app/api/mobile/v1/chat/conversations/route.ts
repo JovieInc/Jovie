@@ -1,13 +1,9 @@
 import { NextResponse } from 'next/server';
-import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { listMobileConversations } from '@/lib/mobile/chat/conversations';
 import { requireMobileProfileSession } from '@/lib/mobile/session-auth';
-import {
-  isOvConversationTitle,
-  parseMobileWorkspace,
-} from '@/lib/mobile/workspace';
+import { authorizeMobileWorkspace } from '@/lib/mobile/workspace';
 
 export const runtime = 'nodejs';
 
@@ -19,22 +15,14 @@ export async function GET(request: Request) {
     }
 
     const url = new URL(request.url);
-    const workspaceResult = parseMobileWorkspace(
-      url.searchParams.get('workspace')
+    const workspace = await authorizeMobileWorkspace(
+      url.searchParams.get('workspace'),
+      auth.userId
     );
-    if (!workspaceResult.ok) {
+    if (!workspace.ok) {
       return NextResponse.json(
-        { error: 'Invalid workspace' },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
-    }
-    if (
-      workspaceResult.workspace === 'ov' &&
-      !(await checkAdminRole(auth.userId))
-    ) {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403, headers: NO_STORE_HEADERS }
+        { error: workspace.error },
+        { status: workspace.status, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -44,16 +32,13 @@ export async function GET(request: Request) {
 
     const conversations = await listMobileConversations({
       creatorProfileId: auth.profile.id,
-      limit: 50,
-    });
-    const scoped = conversations.filter(conversation => {
-      const isOv = isOvConversationTitle(conversation.title);
-      return workspaceResult.workspace === 'ov' ? isOv : !isOv;
+      limit,
+      workspace: workspace.workspace,
     });
 
     return NextResponse.json(
       {
-        conversations: scoped.slice(0, limit).map(conversation => ({
+        conversations: conversations.map(conversation => ({
           id: conversation.id,
           title: conversation.title,
           createdAt: conversation.createdAt.toISOString(),

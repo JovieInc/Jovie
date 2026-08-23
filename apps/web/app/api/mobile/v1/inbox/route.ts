@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
-import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { buildMobileInbox } from '@/lib/mobile/action-loop-inbox';
 import { resolveMobileReadyProfile } from '@/lib/mobile/ready-profile-route';
 import { buildMobileTasteInbox } from '@/lib/mobile/taste-inbox';
-import { parseMobileWorkspace } from '@/lib/mobile/workspace';
+import { authorizeMobileWorkspace } from '@/lib/mobile/workspace';
 
 export const runtime = 'nodejs';
 
@@ -16,23 +15,18 @@ export async function GET(request: Request) {
       return resolved.response;
     }
 
-    const workspaceResult = parseMobileWorkspace(
-      new URL(request.url).searchParams.get('workspace')
+    const workspace = await authorizeMobileWorkspace(
+      new URL(request.url).searchParams.get('workspace'),
+      resolved.context.clerkUserId
     );
-    if (!workspaceResult.ok) {
+    if (!workspace.ok) {
       return NextResponse.json(
-        { error: 'Invalid workspace' },
-        { status: 400, headers: NO_STORE_HEADERS }
+        { error: workspace.error },
+        { status: workspace.status, headers: NO_STORE_HEADERS }
       );
     }
 
-    if (workspaceResult.workspace === 'ov') {
-      if (!(await checkAdminRole(resolved.context.clerkUserId))) {
-        return NextResponse.json(
-          { error: 'Forbidden' },
-          { status: 403, headers: NO_STORE_HEADERS }
-        );
-      }
+    if (workspace.workspace === 'ov') {
       const ovPayload = await buildMobileTasteInbox();
       return NextResponse.json(ovPayload, {
         status: 200,

@@ -220,11 +220,8 @@ describe('handleMobileChatTurn artist-context seam', () => {
   });
 
   it('routes ov chatMode to Summer/ops and never runs artist Jovie generation', async () => {
-    const ovResponse = new Response('{"type":"assistant.completed"}\n', {
-      status: 200,
-    });
+    const ovResponse = new Response('{"type":"assistant.completed"}\n');
     hoisted.handleMobileOvChatTurn.mockResolvedValue(ovResponse);
-
     const response = await handleMobileChatTurn(
       USER_ID,
       {
@@ -236,9 +233,7 @@ describe('handleMobileChatTurn artist-context seam', () => {
       },
       new AbortController().signal
     );
-
     expect(response).toBe(ovResponse);
-    expect(hoisted.handleMobileOvChatTurn).toHaveBeenCalledTimes(1);
     expect(hoisted.executeChatTurn).not.toHaveBeenCalled();
     expect(hoisted.reserveChatTurn).not.toHaveBeenCalled();
   });

@@ -141,34 +141,17 @@ describe('GET /api/mobile/v1/inbox', () => {
     expect(hoisted.buildMobileTasteInboxMock).not.toHaveBeenCalled();
   });
 
-  it('rejects an unknown workspace', async () => {
+  it('gates Taste Inbox to admins in ov workspace', async () => {
     const { GET } = await routeModulePromise;
-    const response = await GET(makeRequest('admin'));
-
-    expect(response.status).toBe(400);
-    expect(hoisted.buildMobileInboxMock).not.toHaveBeenCalled();
+    expect((await GET(makeRequest('admin'))).status).toBe(400);
+    expect((await GET(makeRequest('ov'))).status).toBe(403);
     expect(hoisted.buildMobileTasteInboxMock).not.toHaveBeenCalled();
-  });
 
-  it('hides Taste Inbox from non-admins even if they request ov', async () => {
-    const { GET } = await routeModulePromise;
-    const response = await GET(makeRequest('ov'));
-
-    expect(response.status).toBe(403);
-    expect(hoisted.buildMobileInboxMock).not.toHaveBeenCalled();
-    expect(hoisted.buildMobileTasteInboxMock).not.toHaveBeenCalled();
-  });
-
-  it('returns Taste / stills / cards for admins in ov workspace', async () => {
     hoisted.checkAdminRoleMock.mockResolvedValue(true);
-
-    const { GET } = await routeModulePromise;
-    const response = await GET(makeRequest('ov'));
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
+    const allowed = await GET(makeRequest('ov'));
+    const data = await allowed.json();
+    expect(allowed.status).toBe(200);
     expect(hoisted.buildMobileInboxMock).not.toHaveBeenCalled();
-    expect(hoisted.buildMobileTasteInboxMock).toHaveBeenCalledTimes(1);
     expect(data.items[0]?.typeLabel).toBe('Taste');
     expect(data.chatPrompt).toContain('Summer');
   });

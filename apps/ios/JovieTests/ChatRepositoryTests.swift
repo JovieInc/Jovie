@@ -566,34 +566,21 @@ struct ChatRepositoryTests {
     #expect(repository.isOffline == false)
   }
 
-  @Test func ovieWorkspaceSendIncludesChatMode() async {
-    let client = RecordingTurnChatClient()
-    let repository = ChatRepository(
-      client: client,
-      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-ov-mode")!),
-      userID: "user_repo_ov",
-      webBaseURL: URL(string: "https://preview.example")!,
-      workspace: .ovie
-    )
-
-    await repository.send(text: "Need a taste decision")
-
-    #expect(client.lastRequest?.chatMode == "ov")
-  }
-
-  @Test func jovieWorkspaceSendOmitsChatMode() async {
-    let client = RecordingTurnChatClient()
-    let repository = ChatRepository(
-      client: client,
-      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-jovie-mode")!),
-      userID: "user_repo_jovie",
-      webBaseURL: URL(string: "https://preview.example")!,
-      workspace: .jovie
-    )
-
-    await repository.send(text: "Help me launch")
-
-    #expect(client.lastRequest?.chatMode == nil)
+  @Test func workspaceSendIncludesChatModeOnlyForOvie() async {
+    func send(workspace: MobileWorkspaceMode, suite: String) async -> String? {
+      let client = RecordingTurnChatClient()
+      let repository = ChatRepository(
+        client: client,
+        cache: ChatCache(defaults: UserDefaults(suiteName: suite)!),
+        userID: "user_repo_ws",
+        webBaseURL: URL(string: "https://preview.example")!,
+        workspace: workspace
+      )
+      await repository.send(text: "Need a taste decision")
+      return client.lastRequest?.chatMode
+    }
+    #expect(await send(workspace: .ovie, suite: "ie.jov.Jovie.tests.chat-repo-ov-mode") == "ov")
+    #expect(await send(workspace: .jovie, suite: "ie.jov.Jovie.tests.chat-repo-jovie-mode") == nil)
   }
 
   @Test func sendOnTransportFailureMarksOfflineAndDoesNotExpireSession() async {

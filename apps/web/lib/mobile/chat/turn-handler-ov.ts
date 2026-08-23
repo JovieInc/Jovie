@@ -3,7 +3,6 @@ import 'server-only';
 import { eq } from 'drizzle-orm';
 import { canUseOvChatMode } from '@/lib/chat/ov-mode';
 import {
-  markChatTurnStreaming,
   persistTerminalAssistantMessage,
   reserveChatTurn,
   TURN_IN_PROGRESS_ERROR_CODE,
@@ -12,6 +11,7 @@ import { db } from '@/lib/db';
 import { chatConversations } from '@/lib/db/schema/chat';
 import {
   encodeMobileChatNdjsonEvent,
+  MOBILE_CHAT_NDJSON_HEADERS,
   type MobileChatNdjsonEvent,
   type ParsedMobileChatTurnRequest,
 } from '@/lib/mobile/chat/contract';
@@ -24,49 +24,24 @@ import { prepareOvieChatTurn } from '@/lib/ovie/chat-entry';
 import { getOvieOperatingStore } from '@/lib/ovie/mcp/runtime-store';
 import { assertModelMustNotSelfIdentifyAsOvie } from '@/lib/ovie/program';
 import { bindCurrentSummerQueueSpeaker } from '@/lib/ovie/summer-queue-speaker';
-import {
-  getBoundSummerSpeaker,
-  isSummerTransportEnabled,
-  runOvieSummerTurn,
-} from '@/lib/ovie/summer-transport';
+import { isSummerTransportEnabled } from '@/lib/ovie/summer-transport';
 
-function ndjsonResponse(events: readonly MobileChatNdjsonEvent[]): Response {
-  const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
-      const encoder = new TextEncoder();
-      for (const event of events) {
-        controller.enqueue(encoder.encode(encodeMobileChatNdjsonEvent(event)));
-      }
-      controller.close();
-    },
-  });
-
-  return new Response(stream, {
-    status: 200,
-    headers: {
-      'Cache-Control': 'no-store, no-cache, must-revalidate',
-      Pragma: 'no-cache',
-      'Content-Type': 'application/x-ndjson; charset=utf-8',
-    },
+function ndjson(
+  events: readonly MobileChatNdjsonEvent[],
+  status = 200
+): Response {
+  return new Response(events.map(encodeMobileChatNdjsonEvent).join(''), {
+    status,
+    headers: MOBILE_CHAT_NDJSON_HEADERS,
   });
 }
 
-function errorNdjsonResponse(
+function ndjsonError(
   status: number,
   errorCode: string,
   message: string
 ): Response {
-  return new Response(
-    encodeMobileChatNdjsonEvent({ type: 'error', errorCode, message }),
-    {
-      status,
-      headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
-        Pragma: 'no-cache',
-        'Content-Type': 'application/x-ndjson; charset=utf-8',
-      },
-    }
-  );
+  return ndjson([{ type: 'error', errorCode, message }], status);
 }
 
 async function tagOvConversationTitle(conversationId: string): Promise<void> {
@@ -75,31 +50,26 @@ async function tagOvConversationTitle(conversationId: string): Promise<void> {
     .from(chatConversations)
     .where(eq(chatConversations.id, conversationId))
     .limit(1);
-
   if (!conversation) return;
   const nextTitle = withOvConversationTitle(conversation.title);
   if (nextTitle === conversation.title) return;
-
   await db
     .update(chatConversations)
     .set({ title: nextTitle })
     .where(eq(chatConversations.id, conversationId));
 }
 
-/**
- * Admin-only Summer/ops chat. Must never call fetchMobileArtistContext or
- * executeChatTurn (artist Jovie generation).
- */
+/** Admin-only Summer/ops chat. Never calls fetchMobileArtistContext. */
 export async function handleMobileOvChatTurn(input: {
   readonly userId: string;
   readonly profileId: string;
   readonly parsed: ParsedMobileChatTurnRequest;
   readonly signal: AbortSignal;
 }): Promise<Response> {
-  const { userId, profileId, parsed, signal } = input;
+  const { userId, profileId, parsed } = input;
 
   if (!(await canUseOvChatMode(userId))) {
-    return errorNdjsonResponse(
+    return ndjsonError(
       403,
       'OV_CHAT_FORBIDDEN',
       'Admin role required for Ovie chat.'
@@ -113,14 +83,14 @@ export async function handleMobileOvChatTurn(input: {
       limit: 1,
     });
     if (!existing) {
-      return errorNdjsonResponse(
+      return ndjsonError(
         404,
         'CONVERSATION_NOT_FOUND',
         'Conversation not found.'
       );
     }
     if (!isOvConversationTitle(existing.conversation.title)) {
-      return errorNdjsonResponse(
+      return ndjsonError(
         400,
         'WORKSPACE_MISMATCH',
         'That conversation belongs to Jovie mode.'
@@ -139,7 +109,7 @@ export async function handleMobileOvChatTurn(input: {
   });
 
   if (reservation.outcome === 'duplicate_in_progress') {
-    return errorNdjsonResponse(
+    return ndjsonError(
       409,
       TURN_IN_PROGRESS_ERROR_CODE,
       'This chat action is still in progress.'
@@ -150,7 +120,7 @@ export async function handleMobileOvChatTurn(input: {
     const assistantMessage = [...reservation.messages]
       .reverse()
       .find(message => message.role === 'assistant');
-    return ndjsonResponse([
+    return ndjson([
       {
         type: 'assistant.completed',
         clientTurnId: parsed.clientTurnId,
@@ -174,6 +144,23 @@ export async function handleMobileOvChatTurn(input: {
     store: ovieStore,
   });
 
+  const completed = (text: string) =>
+    ndjson([
+      {
+        type: 'turn.reserved',
+        conversationId: reservation.conversationId,
+        turnId: reservation.turn.id,
+        clientTurnId: parsed.clientTurnId,
+      },
+      {
+        type: 'assistant.completed',
+        clientTurnId: parsed.clientTurnId,
+        conversationId: reservation.conversationId,
+        turnId: reservation.turn.id,
+        text,
+      },
+    ]);
+
   if (generation.kind !== 'summer-transport') {
     const message =
       'Ovie chat cannot fall through to artist Jovie. Summer is the speaker.';
@@ -184,126 +171,18 @@ export async function handleMobileOvChatTurn(input: {
       content: message,
       errorCode: 'OVIE_DOOR_ARTIST_FALLTHROUGH',
     });
-    return ndjsonResponse([
-      {
-        type: 'assistant.completed',
-        clientTurnId: parsed.clientTurnId,
-        conversationId: reservation.conversationId,
-        turnId: reservation.turn.id,
-        text: message,
-      },
-    ]);
+    return completed(message);
   }
 
-  const speaker = getBoundSummerSpeaker();
-  const summerLive =
-    generation.session !== null &&
-    generation.state === 'fresh' &&
-    isSummerTransportEnabled() &&
-    speaker !== null;
-
-  if (!summerLive || !speaker) {
-    const replyText = generation.text;
-    assertModelMustNotSelfIdentifyAsOvie(replyText);
-    await persistTerminalAssistantMessage({
-      conversationId: reservation.conversationId,
-      turnId: reservation.turn.id,
-      status: 'completed',
-      content: replyText,
-    });
-    return ndjsonResponse([
-      {
-        type: 'turn.reserved',
-        conversationId: reservation.conversationId,
-        turnId: reservation.turn.id,
-        clientTurnId: parsed.clientTurnId,
-      },
-      {
-        type: 'assistant.completed',
-        clientTurnId: parsed.clientTurnId,
-        conversationId: reservation.conversationId,
-        turnId: reservation.turn.id,
-        text: replyText,
-      },
-    ]);
-  }
-
-  await markChatTurnStreaming(reservation.turn.id);
-
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      const enqueue = (event: MobileChatNdjsonEvent) => {
-        controller.enqueue(encoder.encode(encodeMobileChatNdjsonEvent(event)));
-      };
-
-      enqueue({
-        type: 'turn.reserved',
-        conversationId: reservation.conversationId,
-        turnId: reservation.turn.id,
-        clientTurnId: parsed.clientTurnId,
-      });
-
-      let fullText = '';
-      try {
-        for await (const event of runOvieSummerTurn({
-          receipts: [],
-          userText: parsed.text,
-          speaker,
-          store: ovieStore,
-          signal,
-          clientTurnId: parsed.clientTurnId,
-        })) {
-          if (event.type === 'text-delta' && event.text) {
-            fullText += event.text;
-            enqueue({
-              type: 'assistant.delta',
-              clientTurnId: parsed.clientTurnId,
-              text: event.text,
-            });
-          }
-        }
-
-        const finalText =
-          fullText.trim().length > 0
-            ? fullText.trim()
-            : generation.text ||
-              'Conversation with the current Summer is unavailable on this door.';
-        assertModelMustNotSelfIdentifyAsOvie(finalText);
-
-        await persistTerminalAssistantMessage({
-          conversationId: reservation.conversationId,
-          turnId: reservation.turn.id,
-          status: 'completed',
-          content: finalText,
-        });
-
-        enqueue({
-          type: 'assistant.completed',
-          clientTurnId: parsed.clientTurnId,
-          conversationId: reservation.conversationId,
-          turnId: reservation.turn.id,
-          text: finalText,
-        });
-      } catch {
-        enqueue({
-          type: 'error',
-          errorCode: 'CHAT_STREAM_FAILED',
-          message:
-            'Summer hit a temporary issue while processing your message. Please retry.',
-        });
-      } finally {
-        controller.close();
-      }
-    },
+  const replyText =
+    generation.text ||
+    'Conversation with the current Summer is unavailable on this door.';
+  assertModelMustNotSelfIdentifyAsOvie(replyText);
+  await persistTerminalAssistantMessage({
+    conversationId: reservation.conversationId,
+    turnId: reservation.turn.id,
+    status: 'completed',
+    content: replyText,
   });
-
-  return new Response(stream, {
-    status: 200,
-    headers: {
-      'Cache-Control': 'no-store, no-cache, must-revalidate',
-      Pragma: 'no-cache',
-      'Content-Type': 'application/x-ndjson; charset=utf-8',
-    },
-  });
+  return completed(replyText);
 }

@@ -1,9 +1,8 @@
+import 'server-only';
+
+import { isAdmin } from '@/lib/admin/roles';
 import type { AppShellMode } from '@/types/app-shell';
 
-/**
- * Mobile workspace ids match web `APP_SHELL_WORKSPACES` (`customer` / `ov`).
- * Absent/empty = artist (Jovie) mode so existing clients stay unchanged.
- */
 export type MobileWorkspaceParseResult =
   | { readonly ok: true; readonly workspace: AppShellMode }
   | { readonly ok: false };
@@ -30,8 +29,25 @@ export function isOvConversationTitle(
 
 export function withOvConversationTitle(title: string | null): string {
   const base = title?.trim() || 'Summer';
-  if (base.startsWith(MOBILE_OV_CONVERSATION_TITLE_PREFIX)) {
-    return base;
+  return base.startsWith(MOBILE_OV_CONVERSATION_TITLE_PREFIX)
+    ? base
+    : `${MOBILE_OV_CONVERSATION_TITLE_PREFIX}${base}`;
+}
+
+export type MobileWorkspaceAccess =
+  | { readonly ok: true; readonly workspace: AppShellMode }
+  | { readonly ok: false; readonly status: 400 | 403; readonly error: string };
+
+export async function authorizeMobileWorkspace(
+  raw: string | null,
+  userId: string
+): Promise<MobileWorkspaceAccess> {
+  const parsed = parseMobileWorkspace(raw);
+  if (!parsed.ok) {
+    return { ok: false, status: 400, error: 'Invalid workspace' };
   }
-  return `${MOBILE_OV_CONVERSATION_TITLE_PREFIX}${base}`;
+  if (parsed.workspace === 'ov' && !(await isAdmin(userId))) {
+    return { ok: false, status: 403, error: 'Forbidden' };
+  }
+  return { ok: true, workspace: parsed.workspace };
 }
