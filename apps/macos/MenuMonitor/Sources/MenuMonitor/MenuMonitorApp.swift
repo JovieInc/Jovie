@@ -14,7 +14,14 @@ struct MenuMonitorApp: App {
     MenuBarExtra {
       MenuMonitorMenu(store: store)
     } label: {
-      MenuBarLabel(count: store.inProgressCount)
+      MenuBarLabel(
+        presentation: MenuBarPresentation(
+          count: store.inProgressCount,
+          hasLoaded: store.lastRefresh != nil,
+          hasError: store.lastError != nil,
+          actionMessage: store.actionMessage
+        )
+      )
     }
     .menuBarExtraStyle(.menu)
   }
@@ -22,23 +29,21 @@ struct MenuMonitorApp: App {
 
 /// Menu bar icon + optional red badge with shipping count.
 struct MenuBarLabel: View {
-  let count: Int
+  let presentation: MenuBarPresentation
 
   var body: some View {
     // Template image so macOS renders correctly in light/dark menu bar.
     Label {
-      if count > 0 {
+      if let badgeText = presentation.badgeText {
         Text(badgeText)
       }
     } icon: {
       Image(systemName: "shippingbox.fill")
     }
     .labelStyle(.titleAndIcon)
-    .help(count == 0 ? "No issues shipping" : "\(count) issues shipping")
-  }
-
-  private var badgeText: String {
-    count > 99 ? "99+" : "\(count)"
+    .help(presentation.helpText)
+    .accessibilityLabel(presentation.accessibilityLabel)
+    .accessibilityValue(presentation.accessibilityValue)
   }
 }
 
@@ -46,18 +51,33 @@ struct MenuMonitorMenu: View {
   @ObservedObject var store: ShippingStatusStore
 
   var body: some View {
-    Group {
-      Text("In Progress: \(store.inProgressCount) issues shipping")
-      Text("Ready: \(store.readyCount) cards waiting")
-      Text("Blocked: \(store.blockedCount) cards blocked")
+    let presentation = MenuMonitorPresentation(
+      inProgressCount: store.inProgressCount,
+      readyCount: store.readyCount,
+      blockedCount: store.blockedCount,
+      lastRefreshDescription: store.lastRefreshDescription,
+      lastError: store.lastError,
+      actionMessage: store.actionMessage,
+      statusOutput: store.statusOutput
+    )
 
-      if let refreshed = store.lastRefreshDescription {
-        Text("Updated \(refreshed)")
+    Group {
+      ForEach(presentation.metrics) { metric in
+        Text(presentation.text(for: metric))
+      }
+
+      if presentation.showsInitialLoading {
+        Label("Refreshing shipping status…", systemImage: "arrow.triangle.2.circlepath")
           .foregroundStyle(.secondary)
       }
 
-      if let error = store.lastError {
-        Text(error)
+      if let refreshed = presentation.lastRefreshDescription {
+        Label("Updated \(refreshed)", systemImage: "clock")
+          .foregroundStyle(.secondary)
+      }
+
+      if let error = presentation.lastError {
+        Label(error, systemImage: "exclamationmark.triangle.fill")
           .foregroundStyle(.secondary)
           .lineLimit(2)
       }
@@ -74,7 +94,13 @@ struct MenuMonitorMenu: View {
         Task { await store.runStatusCheck() }
       }
 
-      if let status = store.statusOutput, !status.isEmpty {
+      if let actionMessage = presentation.actionMessage {
+        Label(actionMessage, systemImage: "info.circle")
+          .foregroundStyle(.secondary)
+          .lineLimit(2)
+      }
+
+      if let status = presentation.statusOutput, !status.isEmpty {
         Divider()
         Text(status)
           .font(.system(.caption, design: .monospaced))
@@ -90,9 +116,10 @@ struct MenuMonitorMenu: View {
       Button("Refresh Now") {
         Task { await store.refresh() }
       }
-      Button("Quit") {
+      Button("Quit MenuMonitor") {
         NSApplication.shared.terminate(nil)
       }
+      .keyboardShortcut("q")
     }
     .task {
       await store.start()
