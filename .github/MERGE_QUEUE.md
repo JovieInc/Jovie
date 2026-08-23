@@ -116,6 +116,27 @@ It fails closed if an open PR is missing from that authoritative snapshot.
   backlog. New issue intake pauses until the count returns to target, while
   existing implementation and the native drain continue. Unknown or malformed
   queue evidence still fails closed.
+- UNMERGEABLE auto-eject (JOV-5291): a parked `UNMERGEABLE` native entry is
+  dequeued with a typed exact-head success receipt
+  (`jovie-native-unmergeable/v1`). The source PR can stay MERGEABLE/CLEAN —
+  GitHub parked the group, not the PR. The same head is not re-enqueued.
+  Tell it worked: `list-state` shows no `UNMERGEABLE` members, and the eject
+  receipt's description starts with `ejected:`.
+- FX remediator on failed merge_group (JOV-5303): Rolling CI Dispatch accepts
+  completed `CI` `workflow_run` events whose producer is `merge_group`,
+  resolves the source PR from `gh-readonly-queue/main/pr-<n>-<baseSha>`, and
+  launches FX against that source branch. Tell it worked: a failed merge_group
+  CI run starts Rolling CI Dispatch and reaches `Launch FX remediator`.
+- CHANGELOG ALLGREEN collision (JOV-5291): GitHub's server merge ignores local
+  union drivers. Two Unreleased `CHANGELOG.md` edits in one group park the
+  later entry. Admission skips a CHANGELOG-touching PR while another CHANGELOG
+  member is already queued. This is a classified skip, not an `enroll` product
+  failure (it must not mark the PR UNSTABLE).
+- Enroll live policy (JOV-5291): preflight reads GraphQL
+  `mergeQueue.configuration.maximumEntriesToBuild` as live truth. Stale REST
+  `max_entries_to_build` drift cannot fail `enroll` after the lock already
+  matches 3. Tell it worked: a CLEAN PR's `enroll` check stays green while
+  GraphQL reads 3.
 - Front-item churn guard (JOV-5030): every native group build runs on
   `gh-readonly-queue/main/pr-<front>-<exactBaseSha>`, so recent `merge_group`
   CI runs identify which PR fronted each failed attempt and against which

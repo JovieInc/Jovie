@@ -111,6 +111,8 @@ DRAIN_RECONCILE_QUEUE_REENTRY="${DRAIN_RECONCILE_QUEUE_REENTRY:-0}"
 DRAIN_RECONCILE_MISSED_ADMISSION="${DRAIN_RECONCILE_MISSED_ADMISSION:-0}"
 DRAIN_QUEUE_REENTRY_MAX_PER_RUN="${DRAIN_QUEUE_REENTRY_MAX_PER_RUN:-2}"
 QUEUE_REENTRY_CONTEXT="jovie-queue-reentry/v1"
+UNMERGEABLE_EJECT_CONTEXT="jovie-native-unmergeable/v1"
+LAST_ENROLL_SKIP_REASON=""
 # JOV-5276: no-auto* is a durable tombstone. Unlike queue-deferred, this
 # controller never strips these labels, including hold-intake missed-admission
 # recovery. Splice into every eligibility, dequeue, re-entry, and postcondition
@@ -546,6 +548,103 @@ record_queue_reentry_receipt() {  # <pr> <expected-head>
   echo "    +$QUEUE_REENTRY_CONTEXT on #$n at $live_head"
 }
 
+# Typed UNMERGEABLE eject receipts are success statuses so they cannot mark a
+# CLEAN source PR UNSTABLE. They bind the exact head and refuse re-enrollment
+# until that head moves (JOV-5291).
+unmergeable_eject_receipt_head() {  # <head>
+  local head="$1" statuses
+  [[ "$head" =~ ^[0-9a-f]{40}$ ]] || return 0
+  if ! statuses="$(gh_retry api "repos/$REPO/commits/$head/status" 2>/dev/null)"; then
+    return 0
+  fi
+  jq -r --arg context "$UNMERGEABLE_EJECT_CONTEXT" --arg head "$head" --arg repo "$REPO" '
+    [ .statuses[]? | select(.context == $context) ]
+    | sort_by(.updated_at)
+    | last
+    | select(
+        . != null
+        and .state == "success"
+        and (.creator.type == "Bot")
+        and (.description | startswith("ejected:"))
+        and (.target_url | test("^https://github\\.com/" + $repo + "/actions/runs/[1-9][0-9]*$"))
+      )
+    | $head
+  ' <<<"$statuses"
+}
+
+record_unmergeable_eject_receipt() {  # <pr> <expected-head> <reason>
+  local n="$1" expected_head="$2" reason="$3" current live_head target_url description
+  if [[ ! "$expected_head" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "    !! cannot record UNMERGEABLE eject for #$n without an exact head" >&2
+    return 1
+  fi
+  if [[ ! "$reason" =~ ^[a-z0-9-]{1,40}$ ]]; then
+    echo "    !! refusing untyped UNMERGEABLE eject reason for #$n" >&2
+    return 1
+  fi
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "    [dry-run] would record $UNMERGEABLE_EJECT_CONTEXT ejected:$reason on #$n at $expected_head"
+    return 0
+  fi
+  if [[ "$(unmergeable_eject_receipt_head "$expected_head")" == "$expected_head" ]]; then
+    echo "    =$UNMERGEABLE_EJECT_CONTEXT on #$n at $expected_head (already recorded)"
+    return 0
+  fi
+  if ! target_url="$(fleet_hold_target_url)"; then
+    echo "    !! canonical workflow run identity is missing for UNMERGEABLE eject #$n" >&2
+    return 1
+  fi
+  if ! current="$(gh_retry pr view "$n" -R "$REPO" --json state,headRefOid 2>/dev/null)"; then
+    echo "    !! could not refresh #$n before recording UNMERGEABLE eject" >&2
+    return 1
+  fi
+  live_head="$(jq -r '(.headRefOid // "") | ascii_downcase' <<<"$current")"
+  if ! jq -e --arg head "$expected_head" '
+    .state == "OPEN" and ((.headRefOid // "") | ascii_downcase) == $head
+  ' <<<"$current" >/dev/null; then
+    echo "    ⏸ #$n head changed before UNMERGEABLE eject receipt"
+    return 2
+  fi
+  description="ejected:${reason}"
+  if ! gh_retry api -X POST "repos/$REPO/statuses/$live_head" \
+    -f state=success \
+    -f context="$UNMERGEABLE_EJECT_CONTEXT" \
+    -f description="$description" \
+    -f target_url="$target_url" >/dev/null; then
+    echo "    !! failed to record exact-head UNMERGEABLE eject for #$n" >&2
+    return 1
+  fi
+  echo "    +$UNMERGEABLE_EJECT_CONTEXT $description on #$n at $live_head"
+}
+
+pr_changed_paths_json() {  # <num> → JSON string array or null
+  local n="$1" files
+  if ! files="$(gh_retry pr view "$n" -R "$REPO" --json files --jq '[.files[].path]' 2>/dev/null)"; then
+    echo 'null'
+    return 0
+  fi
+  if ! jq -e 'type == "array"' <<<"$files" >/dev/null 2>&1; then
+    echo 'null'
+    return 0
+  fi
+  printf '%s' "$files"
+}
+
+changelog_collision_decision_for_pr() {  # <num>
+  local n="$1" candidate queued members='[]' files
+  candidate="$(pr_changed_paths_json "$n")"
+  while read -r queued; do
+    [[ -n "$queued" ]] || continue
+    files="$(pr_changed_paths_json "$queued")"
+    members="$(jq -c --argjson pr "$queued" --argjson files "$files" \
+      '. + [{prNumber:$pr, files:$files}]' <<<"$members")"
+  done < <(echo "$SNAP" | jq -r --argjson self "$n" \
+    '.[] | select(.q == true) | select(.n != $self) | .n')
+  CHANGELOG_COLLISION_JSON="$(jq -nc --argjson candidateFiles "$candidate" --argjson queuedMemberFiles "$members" \
+    '{candidateFiles:$candidateFiles, queuedMemberFiles:$queuedMemberFiles}')" \
+    node scripts/ci-merge-queue-check.mjs changelog-collision
+}
+
 deferred_state_is_releasable() {  # state json <expected head> <expected base>
   jq -e --arg expected_head "$2" --arg expected_base "$3" '
     .state == "OPEN"
@@ -688,6 +787,7 @@ reconcile_deferred_auto_merge_after_main_push() {
 enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr authorized-head]
   local n="$1" authorized_pr="${2:-$DRAIN_ADMISSION_PR}" authorized_head="${3:-$DRAIN_ADMISSION_HEAD}"
   local current enrollment_receipt head_oid expected_head json_fields queue_position queue_state
+  LAST_ENROLL_SKIP_REASON=""
   json_fields="state,isDraft,mergeable,labels,headRefOid,baseRefName,body"
   if ! current="$(gh_retry pr view "$n" -R "$REPO" \
     --json "$json_fields" 2>/dev/null)"; then
@@ -746,7 +846,30 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
   churn_action="$(front_churn_action "$n" "$expected_head")"
   if [[ "$churn_action" == "block" ]]; then
     echo "    ⏸ unchanged head has a classified/repeated merge-group failure; refusing re-enrollment for #$n until recovery policy allows it"
+    LAST_ENROLL_SKIP_REASON="front-churn"
     return 2
+  fi
+  if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
+    local eject_head reenqueue_decision reenqueue_action collision_decision collision_action
+    eject_head="$(unmergeable_eject_receipt_head "$expected_head")"
+    reenqueue_decision="$(UNMERGEABLE_REENQUEUE_JSON="$(jq -nc \
+      --arg headSha "$expected_head" \
+      --arg ejectReceiptHeadSha "$eject_head" \
+      '{headSha:$headSha, ejectReceiptHeadSha:$ejectReceiptHeadSha}')" \
+      node scripts/ci-merge-queue-check.mjs unmergeable-reenqueue)"
+    reenqueue_action="$(jq -r '.action // empty' <<<"$reenqueue_decision")"
+    if [[ "$reenqueue_action" == "block" ]]; then
+      echo "    ⏸ unchanged head already received a typed UNMERGEABLE eject; refusing re-enrollment for #$n"
+      LAST_ENROLL_SKIP_REASON="unmergeable-tombstone"
+      return 2
+    fi
+    collision_decision="$(changelog_collision_decision_for_pr "$n")"
+    collision_action="$(jq -r '.action // empty' <<<"$collision_decision")"
+    if [[ "$collision_action" == "skip" ]]; then
+      echo "    ⏸ CHANGELOG.md already queued with $(jq -r '.collidingPrs | join(",")' <<<"$collision_decision"); refusing ALLGREEN group collision for #$n"
+      LAST_ENROLL_SKIP_REASON="changelog-collision"
+      return 2
+    fi
   fi
   if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ]]; then
     local isolated_receipt isolated_rc
@@ -1080,6 +1203,7 @@ if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
   SNAP="$(jq -c --argjson states "$NATIVE_QUEUE_STATE" '
     map(. + {
       q: ($states[(.n | tostring)].queued == true),
+      qs: ($states[(.n | tostring)].mergeQueueEntry.state // null),
       oid: $states[(.n | tostring)].headRefOid
     })
   ' <<<"$SNAP")"
@@ -1308,6 +1432,47 @@ if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" || "$DRAIN_FREEZE_EXISTING_QUEU
     | select(.q == true)
     | select(.draft | not)
     | select(([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)')
+fi
+
+# --- DEQUEUE: parked UNMERGEABLE native entries (JOV-5291) ---
+# GitHub leaves an UNMERGEABLE group member in the queue forever. The source
+# PR can stay MERGEABLE/CLEAN (CHANGELOG ALLGREEN collision is the measured
+# case). Eject with a typed exact-head receipt and do not re-enqueue that head.
+echo "=== DEQUEUE (UNMERGEABLE native entry → typed eject) ==="
+if waiting_lane_allows_clean_enroll \
+  || [[ "$DRAIN_PROMOTION_MODE" == "blocked" && "$DRAIN_FREEZE_EXISTING_QUEUE" == "0" ]]; then
+  while read -r pr; do
+    n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
+    head_oid="$(jq -r '.headOid // ""' <<<"$pr" | tr '[:upper:]' '[:lower:]')"
+    decision="$(UNMERGEABLE_EJECT_JSON="$(jq -nc \
+      --argjson queued true \
+      --arg queueEntryState "$(jq -r '.qs // empty' <<<"$pr")" \
+      --arg mergeable "$(jq -r '.m // empty' <<<"$pr")" \
+      --arg headSha "$head_oid" \
+      '{queued:$queued, queueEntryState:$queueEntryState, mergeable:$mergeable, headSha:$headSha}')" \
+      node scripts/ci-merge-queue-check.mjs unmergeable-eject)"
+    action="$(jq -r '.action // empty' <<<"$decision")"
+    reason="$(jq -r '.reason // empty' <<<"$decision")"
+    if [[ "$action" != "eject" ]]; then
+      if [[ "$action" == "unknown" ]]; then
+        echo "  #$n  $t  ~ UNMERGEABLE evidence unavailable ($reason); leaving queued"
+      fi
+      continue
+    fi
+    echo "  #$n  $t  ✗ $reason"
+    if ! dequeue_strict "$n"; then
+      echo "::error::Failed to prove UNMERGEABLE PR #$n is outside native merge queue" >&2
+      exit 1
+    fi
+    if ! record_unmergeable_eject_receipt "$n" "$head_oid" "$reason"; then
+      echo "::error::Failed to record typed UNMERGEABLE eject for #$n at $head_oid" >&2
+      exit 1
+    fi
+  done < <(echo "$SNAP" | jq -c '.[]
+    | select(.q == true)
+    | select(.qs == "UNMERGEABLE")
+    | select(.draft | not)
+    | select(([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)')
 fi
 
 # --- DEQUEUE: only GENUINELY un-mergeable PRs (conflict or real failing checks) ---
@@ -1558,12 +1723,16 @@ if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 ]]; then
     fi
   fi
   if [[ "$DRY_RUN" != "1" && "$ADMISSION_TARGET_OBSERVED" == "true" && "$ADMISSION_ALREADY_QUEUED" != "true" ]]; then
-    if [[ "$ADMISSION_ELIGIBLE" == "true" ]]; then
+    if [[ "$LAST_ENROLL_SKIP_REASON" == "changelog-collision" \
+      || "$LAST_ENROLL_SKIP_REASON" == "unmergeable-tombstone" ]]; then
+      echo "  #$DRAIN_ADMISSION_PR  ⏸ $LAST_ENROLL_SKIP_REASON (classified skip; enroll is not a product-quality failure)"
+    elif [[ "$ADMISSION_ELIGIBLE" == "true" ]]; then
       echo "::error::queue-noop: missing receipt: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD (${ADMISSION_MISSING_REASON:-missing-receipt})" >&2
+      exit 3
     else
       echo "::error::queue-noop: selector: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD ($ADMISSION_SELECTOR_REASON)" >&2
+      exit 3
     fi
-    exit 3
   fi
 fi
 

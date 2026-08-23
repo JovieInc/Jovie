@@ -38,6 +38,7 @@ import * as gateNextHold from './gate-next-hold.mjs';
 import { cliGbrainClient } from './gbrain-client.mjs';
 import * as intakeReadiness from './intake-readiness.mjs';
 import * as linear from './linear-client.mjs';
+import * as ownershipInventory from './ownership-inventory.mjs';
 import * as planGate from './plan-gate.mjs';
 import * as reconciler from './reconcile.mjs';
 import * as reporter from './reporter.mjs';
@@ -469,7 +470,7 @@ async function recoverStaleLeases(team, isDryRun) {
   };
 }
 
-async function admissionPreflight(team) {
+async function admissionPreflight(team, candidate = null) {
   const fleetGate = await fleetGateForTeam(team);
   if (
     !fleetGate.workAdmission.allowed ||
@@ -484,6 +485,45 @@ async function admissionPreflight(team) {
   }
   const symphonyIssues = await linear.fetchTeamSymphonyIssues(team.id);
   const load = deterministicGates.admissionIntentLoad(symphonyIssues);
+  const maxConcurrent = fleetGate.concurrency?.gem?.maxConcurrent ?? 0;
+  if (load.count >= maxConcurrent) {
+    return {
+      open: false,
+      reason: `measured admission capacity exhausted (${load.count}/${maxConcurrent})`,
+      load,
+      fleetGate,
+    };
+  }
+  if (candidate) {
+    const candidateTarget =
+      ownershipInventory.resolveAdmissionTarget(candidate);
+    const active = symphonyIssues.filter(issue =>
+      load.identifiers.includes(issue.identifier)
+    );
+    const collisions = active
+      .map(issue => ({
+        issue: issue.identifier,
+        target: ownershipInventory.resolveAdmissionTarget(issue),
+      }))
+      .filter(
+        entry =>
+          candidateTarget.decision === 'admit' &&
+          entry.target.decision === 'admit' &&
+          ownershipInventory.admissionTargetsCollide(
+            candidateTarget.target,
+            entry.target.target
+          )
+      )
+      .map(entry => entry.issue);
+    if (collisions.length > 0) {
+      return {
+        open: false,
+        reason: `collision domain already leased by ${collisions.join(', ')}`,
+        load,
+        fleetGate,
+      };
+    }
+  }
   return {
     open: true,
     reason: 'open',
@@ -542,6 +582,20 @@ async function evaluateGateCandidate(
   preflight,
   staleLeaseRecovery
 ) {
+  const collisionPreflight = await admissionPreflight(team, selected);
+  if (!collisionPreflight.open) {
+    return {
+      status: 'blocked',
+      stage: 'collision-preflight',
+      issue: selected.identifier,
+      reason: collisionPreflight.reason,
+      active: collisionPreflight.load.identifiers,
+      fleetGate: collisionPreflight.fleetGate,
+      staleLeaseRecovery,
+      mutations: 0,
+    };
+  }
+
   const plan = deterministicGates.buildDeterministicPlanEvidence(selected);
   const planReason =
     plan.reason || planGate.validatePlanCandidate(selected, plan.evidence);
@@ -670,7 +724,7 @@ async function evaluateGateCandidate(
     throw new Error(`plan gate rejected: ${planResult.reason}`);
 
   current = await linear.fetchIssue(selected.identifier);
-  const finalPreflight = await admissionPreflight(team);
+  const finalPreflight = await admissionPreflight(team, current);
   if (!finalPreflight.open)
     throw new Error(`admission preflight blocked: ${finalPreflight.reason}`);
 

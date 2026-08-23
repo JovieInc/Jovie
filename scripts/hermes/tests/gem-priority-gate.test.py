@@ -233,7 +233,15 @@ GREEN_SIGNALS: dict[str, object] = {
         "scope": "exact-main-head",
         "observedAt": MODULE.isoformat(MODULE.utc_now()),
     },
-    "concurrencyEvidence": None,
+    "concurrencyEvidence": {
+        "schema": "gem-concurrency-evidence/v1",
+        "target": 4,
+        "approved": True,
+        "cleanRuns": 1,
+        "severeIncidents": 0,
+        "observedAt": MODULE.isoformat(MODULE.utc_now()),
+        "accepted": True,
+    },
 }
 
 
