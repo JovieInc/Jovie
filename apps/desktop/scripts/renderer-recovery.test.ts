@@ -3,6 +3,7 @@ import {
   classifyDesktopLoadFailure,
   decideAbortedMainFrameRecovery,
   decideHostedLoadRetry,
+  decideLocalMainFrameLoadFailure,
   decideRecoveryUnlatch,
   decideRendererBootWatchdogAfterLoad,
   decideRendererLoadStart,
@@ -12,6 +13,8 @@ import {
   hostedUrlCandidates,
   isLocalDevSiblingOrigin,
   isLoopbackAppUrl,
+  LOCAL_HOSTED_LOAD_RETRY_DELAY_MS,
+  LOCAL_HOSTED_LOAD_RETRY_LIMIT,
   LOCAL_RENDERER_BOOT_WATCHDOG_MS,
   LOCAL_RENDERER_LOAD_WATCHDOG_MS,
   parseDidStartNavigation,
@@ -19,6 +22,7 @@ import {
   RENDERER_LOAD_WATCHDOG_MS,
   rendererWatchdogMs,
   shouldArmRendererBootWatchdog,
+  shouldArmRendererWatchdogsForAppEnv,
   shouldRecoverAuthHandoffToCanonicalShell,
   shouldSkipRendererWatchdogForAuthHandoff,
 } from '../src/renderer-recovery.ts';
@@ -125,6 +129,36 @@ test('boot watchdog arms only for real hosted app-origin navigations', () => {
     false
   );
   expect(shouldArmRendererBootWatchdog('not a url', appOrigin)).toBe(false);
+});
+
+test('local shells skip packaged boot/load watchdogs', () => {
+  expect(shouldArmRendererWatchdogsForAppEnv('local')).toBe(false);
+  expect(shouldArmRendererWatchdogsForAppEnv('staging')).toBe(true);
+  expect(shouldArmRendererWatchdogsForAppEnv('production')).toBe(true);
+});
+
+test('local connection-refused retries until the budget is exhausted', () => {
+  expect(LOCAL_HOSTED_LOAD_RETRY_LIMIT).toBe(30);
+  expect(LOCAL_HOSTED_LOAD_RETRY_DELAY_MS).toBe(2_000);
+
+  expect(
+    decideLocalMainFrameLoadFailure({ errorCode: -102, retryCount: 0 })
+  ).toBe('retry');
+  expect(
+    decideLocalMainFrameLoadFailure({
+      errorCode: -102,
+      retryCount: LOCAL_HOSTED_LOAD_RETRY_LIMIT - 1,
+    })
+  ).toBe('retry');
+  expect(
+    decideLocalMainFrameLoadFailure({
+      errorCode: -102,
+      retryCount: LOCAL_HOSTED_LOAD_RETRY_LIMIT,
+    })
+  ).toBe('failure-page');
+  expect(
+    decideLocalMainFrameLoadFailure({ errorCode: -2, retryCount: 0 })
+  ).toBe('failure-page');
 });
 
 test('load watchdog covers hung navigation before did-finish-load', () => {

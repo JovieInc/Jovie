@@ -171,6 +171,12 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   // JOV-5086: did-start-loading must not clear the watchdog without re-arming.
   // That hole left hung / intercepted first navigations on a black canvas.
   assert.doesNotMatch(mainSource, /'did-start-loading'/);
+  // JOV-5339: Jovie Local must not trip packaged recovery on compile/HMR.
+  assert.match(mainSource, /shouldArmRendererWatchdogsForAppEnv\(APP_ENV\)/);
+  assert.match(mainSource, /decideLocalMainFrameLoadFailure/);
+  assert.match(mainSource, /host-resolver-rules/);
+  assert.match(mainSource, /MAP localhost 127\.0\.0\.1/);
+  assert.match(mainSource, /if \(!armWatchdogs\) return;/);
   assert.match(mainSource, /viewBox="0 0 353\.68 347\.97"/);
   assert.match(mainSource, /START_DESKTOP_AUTH_HANDOFF_CHANNEL/);
   assert.match(mainSource, /OPEN_DESKTOP_AUTH_URL_CHANNEL/);
