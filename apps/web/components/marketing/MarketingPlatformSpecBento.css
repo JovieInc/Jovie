@@ -1,0 +1,49 @@
+/*
+ * Framer-like platform spec bento. Title accents are blue / pink / purple
+ * only. Product shots sit in a dark stage.
+ */
+
+.m-spec-bento {
+  background: var(--color-bg-base);
+}
+
+.m-spec-bento__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+.m-spec-bento__title--blue {
+  color: var(--color-accent-blue);
+}
+
+.m-spec-bento__title--pink {
+  color: var(--color-accent-pink);
+}
+
+.m-spec-bento__title--purple {
+  color: var(--color-accent-purple);
+}
+
+.m-spec-bento__stage {
+  aspect-ratio: 4 / 3;
+  background: var(--color-bg-surface-0);
+}
+
+.m-spec-bento__stage--phone {
+  aspect-ratio: 4 / 5;
+}
+
+@media (min-width: 768px) {
+  .m-spec-bento__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .m-spec-bento__grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-auto-rows: minmax(16rem, auto);
+    gap: var(--space-4);
+  }
+}
