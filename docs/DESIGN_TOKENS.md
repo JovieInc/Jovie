@@ -131,12 +131,12 @@ The four current canonical design-system surfaces are defined in
 
 This contract is used to align design review and screenshot/admin tooling.
 
-Routes that are explicitly not design-system surfaces:
+Routes that are explicitly not in the canonical review set:
 
 - `/ai`
 - `/investors`
 
-Both are redirects, not designed review surfaces.
+Both are live marketing pages, not canonical design-system review surfaces.
 
 ## Rules
 
@@ -244,6 +244,6 @@ re-render the route title (JOV-3527;
 - Creating a second reusable marketing component family outside
   `components/marketing/*`
 - Treating `/artist-profiles` as the public profile canonical surface
-- Treating `/ai` or `/investors` as design surfaces instead of redirects
+- Treating `/ai` or `/investors` as canonical review surfaces
 - Adding bare `borderRadius: N` or `rounded-[Npx]` on composer/header surfaces
   (use `SYSTEM_B_RADIUS_PX` / named utilities; see source guards above)
