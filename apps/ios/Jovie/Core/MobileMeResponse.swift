@@ -16,9 +16,8 @@ struct MobileMeResponse: Codable, Equatable, Sendable {
   let appleWalletProfilePassAvailable: Bool
   let chatEnabled: Bool
   let continueOnWebURL: String
-  /// Absent on cached `/me` payloads from older app versions. Never treat
-  /// missing as admin — the Settings switch must stay hidden.
-  let isAdmin: Bool?
+  /// Missing `isAdmin` must hide the Settings switch.
+  let isAdmin: Bool? = nil
 
   enum CodingKeys: String, CodingKey {
     case state
@@ -31,30 +30,6 @@ struct MobileMeResponse: Codable, Equatable, Sendable {
     case chatEnabled
     case continueOnWebURL = "continueOnWebUrl"
     case isAdmin
-  }
-
-  init(
-    state: State,
-    displayName: String?,
-    username: String?,
-    publicProfileURL: String?,
-    qrPayload: String?,
-    avatarURL: String?,
-    appleWalletProfilePassAvailable: Bool,
-    chatEnabled: Bool,
-    continueOnWebURL: String,
-    isAdmin: Bool? = false
-  ) {
-    self.state = state
-    self.displayName = displayName
-    self.username = username
-    self.publicProfileURL = publicProfileURL
-    self.qrPayload = qrPayload
-    self.avatarURL = avatarURL
-    self.appleWalletProfilePassAvailable = appleWalletProfilePassAvailable
-    self.chatEnabled = chatEnabled
-    self.continueOnWebURL = continueOnWebURL
-    self.isAdmin = isAdmin
   }
 
   var showsAdminWorkspaceSwitch: Bool {
@@ -119,12 +94,9 @@ enum MobileWorkspaceMode: String, Codable, Equatable, Sendable, CaseIterable {
   var toggled: MobileWorkspaceMode { self == .jovie ? .ovie : .jovie }
   var chatMode: String? { self == .ovie ? "ov" : nil }
   var askChatLabel: String { self == .ovie ? "Ask Summer" : "Ask Jovie" }
-  var composerPlaceholder: String { askChatLabel }
   var composerOfflinePlaceholder: String { "\(askChatLabel) (offline)" }
-  var emptyChatTitle: String { askChatLabel }
   var emptyChatSubtitle: String {
-    self == .ovie
-      ? "Taste cards, stills, and ops. Summer is the speaker."
+    self == .ovie ? "Taste cards, stills, and ops. Summer is the speaker."
       : "Ask Jovie about your profile, releases, and next moves."
   }
 }

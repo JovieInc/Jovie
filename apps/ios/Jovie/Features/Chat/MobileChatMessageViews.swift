@@ -201,7 +201,7 @@ struct ChatComposerView: View {
       isFocused: $isComposerFocused,
       placeholder: isOffline
         ? workspaceMode.composerOfflinePlaceholder
-        : workspaceMode.composerPlaceholder,
+        : workspaceMode.askChatLabel,
       isSending: isSending,
       isPlusEnabled: workspaceMode == .jovie && ChatComposerMetrics.isPlusEnabled(isSending: isSending),
       onSend: onSend,

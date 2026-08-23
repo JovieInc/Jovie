@@ -66,7 +66,6 @@ export async function requireMobileWorkspaceSession(
 ): Promise<
   | {
       readonly profile: MobileProfileSession['profile'];
-      readonly userId: string;
       readonly workspace: AppShellMode;
       readonly url: URL;
       readonly limit: number;
@@ -92,12 +91,10 @@ export async function requireMobileWorkspaceSession(
     };
   }
 
-  const limitParam = url.searchParams.get('limit');
-  const parsed = limitParam ? Number.parseInt(limitParam, 10) : defaultLimit;
+  const parsed = Number.parseInt(url.searchParams.get('limit') ?? '', 10);
 
   return {
     profile: auth.profile,
-    userId: auth.userId,
     workspace: workspace.workspace,
     url,
     limit: Number.isFinite(parsed) ? parsed : defaultLimit,

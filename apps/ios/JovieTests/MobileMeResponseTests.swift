@@ -24,6 +24,8 @@ struct MobileMeResponseTests {
     #expect(response.publicProfileURL == "https://jov.ie/tim")
     #expect(response.appleWalletProfilePassAvailable == true)
     #expect(response.chatEnabled == true)
+    #expect(response.isAdmin == nil)
+    #expect(response.showsAdminWorkspaceSwitch == false)
   }
 
   @Test func decodesNeedsOnboardingResponse() throws {
@@ -68,44 +70,14 @@ struct MobileMeResponseTests {
     #expect(response.state == .waitlistPending)
   }
 
-  @Test func missingIsAdminDoesNotShowWorkspaceSwitch() throws {
-    let data = """
-      {
-        "state": "ready",
-        "displayName": "Tim White",
-        "username": "tim",
-        "publicProfileUrl": "https://jov.ie/tim",
-        "qrPayload": "https://jov.ie/tim",
-        "avatarUrl": null,
-        "appleWalletProfilePassAvailable": true,
-        "chatEnabled": true,
-        "continueOnWebUrl": "https://jov.ie/app"
-      }
-      """.data(using: .utf8)!
-    let response = try JSONDecoder().decode(MobileMeResponse.self, from: data)
-    #expect(response.isAdmin == nil)
-    #expect(response.showsAdminWorkspaceSwitch == false)
-    #expect(MobileMeResponse.previewReady.showsAdminWorkspaceSwitch == false)
-  }
-
   @Test func isAdminTrueShowsWorkspaceSwitch() throws {
-    let data = """
-      {
-        "state": "ready",
-        "displayName": "Tim White",
-        "username": "tim",
-        "publicProfileUrl": "https://jov.ie/tim",
-        "qrPayload": "https://jov.ie/tim",
-        "avatarUrl": null,
-        "appleWalletProfilePassAvailable": true,
-        "chatEnabled": true,
-        "continueOnWebUrl": "https://jov.ie/app",
-        "isAdmin": true
-      }
-      """.data(using: .utf8)!
+    let data = Data(
+      #"{"state":"ready","displayName":"Tim","username":"tim","publicProfileUrl":"https://jov.ie/tim","qrPayload":"https://jov.ie/tim","avatarUrl":null,"appleWalletProfilePassAvailable":true,"chatEnabled":true,"continueOnWebUrl":"https://jov.ie/app","isAdmin":true}"#.utf8
+    )
     let response = try JSONDecoder().decode(MobileMeResponse.self, from: data)
     #expect(response.isAdmin == true)
     #expect(response.showsAdminWorkspaceSwitch)
+    #expect(MobileMeResponse.previewReady.showsAdminWorkspaceSwitch == false)
   }
 
   @Test func workspaceStoreForcesJovieForNonAdminAndPersistsOvieForAdmin() {
@@ -121,27 +93,22 @@ struct MobileMeResponseTests {
   }
 
   @Test func inboxStillImageURLOnlyForStillType() {
-    let still = MobileActionLoopInboxItem(
-      id: "still-1",
-      typeLabel: "Still",
-      createdAt: "2026-08-02T00:00:00.000Z",
-      title: "Merch still",
-      why: "Existing Telegram still — do not regenerate.",
-      primaryActionLabel: "Review",
-      status: "pending",
-      imageURL: "https://cdn.jov.ie/stills/16197.jpg"
+    func item(_ type: String, url: String) -> MobileActionLoopInboxItem {
+      MobileActionLoopInboxItem(
+        id: type,
+        typeLabel: type,
+        createdAt: "2026-08-02T00:00:00.000Z",
+        title: type,
+        why: "x",
+        primaryActionLabel: "Review",
+        status: "pending",
+        imageURL: url
+      )
+    }
+    #expect(
+      item("Still", url: "https://cdn.jov.ie/stills/16197.jpg").stillImageURL?.absoluteString
+        == "https://cdn.jov.ie/stills/16197.jpg"
     )
-    let card = MobileActionLoopInboxItem(
-      id: "card-1",
-      typeLabel: "Card",
-      createdAt: "2026-08-01T00:00:00.000Z",
-      title: "Taste card",
-      why: "Approve the quiet hero treatment.",
-      primaryActionLabel: "Review",
-      status: "pending",
-      imageURL: "https://cdn.jov.ie/cards/local.png"
-    )
-    #expect(still.stillImageURL?.absoluteString == "https://cdn.jov.ie/stills/16197.jpg")
-    #expect(card.stillImageURL == nil)
+    #expect(item("Card", url: "https://cdn.jov.ie/cards/local.png").stillImageURL == nil)
   }
 }

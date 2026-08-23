@@ -254,7 +254,7 @@ struct MobileChatView: View {
           JovieLogoMark(size: 34)
 
           VStack(spacing: JovieSpacing.small) {
-            Text(repository.workspace.emptyChatTitle)
+            Text(repository.workspace.askChatLabel)
               .font(JovieFont.display(size: 28))
               .foregroundStyle(JovieColor.textPrimary)
               .multilineTextAlignment(.center)
