@@ -81,32 +81,6 @@ async function readManifestEntries() {
   }
 }
 
-function sameValueArray(a: readonly string[], b: readonly string[]) {
-  return a.length === b.length && a.every((value, index) => value === b[index]);
-}
-
-function hasSameStableManifestFields(
-  previousEntry: ScreenshotManifestEntry,
-  nextEntry: ScreenshotManifestEntry
-) {
-  return (
-    previousEntry.id === nextEntry.id &&
-    previousEntry.title === nextEntry.title &&
-    previousEntry.group === nextEntry.group &&
-    previousEntry.groupLabel === nextEntry.groupLabel &&
-    previousEntry.canonicalSurfaceId === nextEntry.canonicalSurfaceId &&
-    previousEntry.canonicalSurfaceLabel === nextEntry.canonicalSurfaceLabel &&
-    previousEntry.canonicalSurfaceReviewRoute ===
-      nextEntry.canonicalSurfaceReviewRoute &&
-    previousEntry.route === nextEntry.route &&
-    previousEntry.viewport === nextEntry.viewport &&
-    previousEntry.theme === nextEntry.theme &&
-    sameValueArray(previousEntry.consumers, nextEntry.consumers) &&
-    previousEntry.imagePath === nextEntry.imagePath &&
-    previousEntry.publicExportPath === nextEntry.publicExportPath
-  );
-}
-
 async function writeManifest(
   manifestEntriesById: ReadonlyMap<string, ScreenshotManifestEntry>
 ) {
@@ -347,14 +321,7 @@ test.describe('Screenshot Catalog', () => {
         publicExportPath: preparedScenario.publicExportPath,
       };
 
-      manifestEntriesById.set(
-        preparedScenario.id,
-        !imageChanged &&
-          previousEntry &&
-          hasSameStableManifestFields(previousEntry, nextManifestEntry)
-          ? previousEntry
-          : nextManifestEntry
-      );
+      manifestEntriesById.set(preparedScenario.id, nextManifestEntry);
 
       await writeManifest(manifestEntriesById);
     });
