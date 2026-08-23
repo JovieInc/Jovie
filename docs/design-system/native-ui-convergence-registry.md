@@ -142,7 +142,7 @@ Profile is historical ledger drift, not a reason to change the current code.
 | Atom | `JovieIconButtonStyle` | Shell gear, settings close, chat scroll-to-bottom | Canonical 44-point circular icon target; `JovieTheme.swift:L208-L222`. |
 | Atom | `JovieLogoMark` and QR plate modifier | Splash, auth, QR surfaces | Logo and QR plate are shared source owners; `JovieTheme.swift:L124-L180,L244-L256`. |
 | Atom | `EntityAccent` | Inline chat entity chips | Only for entity-kind parity; do not reuse as generic iOS accents; `JovieTheme.swift:L26-L53`. |
-| Atom | `JoviePressFeedbackButtonStyle` | AppShell tab bar and drawer rows | Canonical owner for the exact `.72`/scale/subtle recipe; `JovieTheme.swift:L224-L242`; verified by `AppShellTabBarTests.swift:L69-L72`. |
+| Atom | `JoviePressFeedbackButtonStyle` | AppShell tab bar, drawer rows, and Settings rows | Canonical owner for the opacity/scale/subtle recipe; Settings preserves its intentional `.7` opacity through the style parameter; verified by `AppShellTabBarTests.swift`. |
 | Molecule | `DashboardAvatarView` | Shell toolbar, drawer account, dashboard | Cached avatar with surface fallback; `apps/ios/Jovie/Features/Dashboard/DashboardView.swift:L5-L20`. |
 | Molecule | `QRCodeCardView` | Dashboard and venue mode | One square QR/loading/unavailable footprint; `QRCodeCardView.swift:L4-L65`. |
 | Molecule | `DrawerThreadRow`/`DrawerSurfaceButton` | Left drawer | Drawer-local rows; do not copy into another navigation surface; `AppShellLeftDrawer.swift:L243-L280,L378-L425`. |
@@ -221,14 +221,13 @@ not treated as interchangeable:
 | --- | --- | --- |
 | `JoviePressFeedbackButtonStyle` | `JovieTheme.swift:L224-L242` | Canonical `.72`/scale/animation recipe used by the tab bar and drawer |
 | `JovieIconButtonStyle` | `JovieTheme.swift:L208-L222` | Same `.72`/scale/animation plus 44-point circular icon geometry |
-| `SettingsRowButtonStyle` | `SettingsView.swift:L211-L221` | Same scale/animation but opacity `.7` |
 | `LibraryCardButtonStyle` | `LibrarySurfaceView.swift:L168-L175` | Same scale/animation but opacity `.8` |
 | `ComposerSlashRowButtonStyle` | `ChatComposerBar.swift:L352-L362` | Intentionally different: background highlight only, no scale |
 
 The exact duplicate consolidation is implemented in this slice and its
-canonical default is covered by `SharedPressFeedbackStyleTests`. The `.7`/`.8`
-variants and the filled/icon geometry styles remain separate because their
-opacity or geometry differs; no broad style rewrite was performed.
+canonical default is covered by `SharedPressFeedbackStyleTests`. Settings keeps
+its `.7` behavior through `JoviePressFeedbackButtonStyle(pressedOpacity: 0.7)`;
+the `.8` and filled/icon geometry variants retain their distinct semantics.
 
 ### Verification result
 

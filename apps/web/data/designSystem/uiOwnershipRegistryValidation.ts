@@ -1,3 +1,5 @@
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { APP_SCREEN_COMPONENT_REGISTRY } from '@/data/appScreens';
 import { MARKETING_SHELL_REGISTRY } from '@/data/marketing';
 import { DESIGN_SYSTEM_COMPONENT_REGISTRY } from './componentRegistry';
@@ -8,12 +10,17 @@ import {
   UI_OWNERSHIP_REGISTRY,
   UI_OWNERSHIP_STATES,
   UI_OWNERSHIP_SURFACES,
+  type UINativeAdapterBinding,
   type UIOwnershipRegistryEntry,
 } from './uiOwnershipRegistry';
 
 export type UIOwnershipRegistryIssue = {
   readonly code: string;
   readonly id: string;
+};
+export type UINativeSwiftSource = {
+  readonly path: string;
+  readonly source: string;
 };
 const appExports = Object.fromEntries(
   'component.app-shell-frame=AppShellFrame;component.app-shell-content-panel=AppShellContentPanel;component.settings-panel=SettingsPanel;component.unified-table=UnifiedTable;component.entity-sidebar=EntitySidebarShell;component.empty-state=EmptyState;component.error-fallback=DashboardErrorFallback'
@@ -42,6 +49,182 @@ const badEntry = (
   entry: UIOwnershipRegistryEntry,
   code: string
 ) => bad(issues, code, entry.id);
+
+const toRepoPath = (value: string) => value.split('\\').join('/');
+const findRepoRoot = (start: string): string | null => {
+  let current = resolve(start);
+  while (true) {
+    if (existsSync(join(current, 'apps/ios/Jovie'))) return current;
+    const parent = dirname(current);
+    if (parent === current) return null;
+    current = parent;
+  }
+};
+const collectSwiftSources = (
+  directory: string,
+  repoRoot: string,
+  sources: UINativeSwiftSource[]
+) => {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const absolutePath = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      collectSwiftSources(absolutePath, repoRoot, sources);
+    } else if (entry.isFile() && entry.name.endsWith('.swift')) {
+      sources.push({
+        path: toRepoPath(relative(repoRoot, absolutePath)),
+        source: readFileSync(absolutePath, 'utf8'),
+      });
+    }
+  }
+};
+export const loadProductionSwiftSources = (
+  start = process.cwd()
+): readonly UINativeSwiftSource[] => {
+  const repoRoot = findRepoRoot(start);
+  if (!repoRoot) return [];
+  const sources: UINativeSwiftSource[] = [];
+  collectSwiftSources(join(repoRoot, 'apps/ios/Jovie'), repoRoot, sources);
+  return sources.sort((left, right) => left.path.localeCompare(right.path));
+};
+
+type SwiftButtonStyleDeclaration = {
+  readonly path: string;
+  readonly name: string;
+  readonly isFilePrivate: boolean;
+  readonly body: string;
+};
+const swiftButtonStyleDeclarations = (
+  swiftSources: readonly UINativeSwiftSource[]
+): readonly SwiftButtonStyleDeclaration[] => {
+  const declarations: SwiftButtonStyleDeclaration[] = [];
+  const pattern =
+    /\b(?:(private|fileprivate)\s+)?struct\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*ButtonStyle\s*\{/g;
+  for (const swiftSource of swiftSources) {
+    for (const match of swiftSource.source.matchAll(pattern)) {
+      const openingBrace = (match.index ?? 0) + match[0].length - 1;
+      let depth = 1;
+      let cursor = openingBrace + 1;
+      while (cursor < swiftSource.source.length && depth > 0) {
+        if (swiftSource.source[cursor] === '{') depth += 1;
+        if (swiftSource.source[cursor] === '}') depth -= 1;
+        cursor += 1;
+      }
+      declarations.push({
+        path: swiftSource.path,
+        name: match[2],
+        isFilePrivate: Boolean(match[1]),
+        body: swiftSource.source.slice(openingBrace + 1, cursor - 1),
+      });
+    }
+  }
+  return declarations;
+};
+const ownsCanonicalPressRecipe = (body: string) =>
+  /\.opacity\s*\(\s*configuration\.isPressed\s*\?/.test(body) &&
+  /\.scaleEffect\s*\(\s*configuration\.isPressed\s*\?\s*JovieMotion\.pressScale\s*:\s*1\s*\)/.test(
+    body
+  ) &&
+  /\.animation\s*\(\s*JovieMotion\.subtle\s*,\s*value:\s*configuration\.isPressed\s*\)/.test(
+    body
+  );
+const nativeBindingsFor = (entries: readonly UIOwnershipRegistryEntry[]) =>
+  entries.flatMap(entry =>
+    entry.platformAdapters.flatMap(adapterEntry =>
+      (adapterEntry.nativeBindings ?? []).map(binding => ({ entry, binding }))
+    )
+  );
+const bindingUsagePattern = (binding: UINativeAdapterBinding) =>
+  new RegExp(
+    `\\.buttonStyle\\(\\s*${binding.swiftType.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`
+  );
+
+function validateNativeButtonOwnership(
+  entries: readonly UIOwnershipRegistryEntry[],
+  swiftSources: readonly UINativeSwiftSource[],
+  issues: UIOwnershipRegistryIssue[],
+  repoRoot: string | null
+) {
+  const bindings = nativeBindingsFor(entries);
+  if (!bindings.length) return;
+  if (!swiftSources.length) {
+    bad(issues, 'native-source-unavailable', 'ios');
+    return;
+  }
+  const declarations = swiftButtonStyleDeclarations(swiftSources);
+  const registeredTypes = new Set<string>();
+
+  for (const { entry, binding } of bindings) {
+    if (registeredTypes.has(binding.swiftType)) {
+      bad(issues, 'duplicate-native-family-owner', binding.swiftType);
+    }
+    registeredTypes.add(binding.swiftType);
+    const owners = declarations.filter(
+      declaration => declaration.name === binding.swiftType
+    );
+    if (
+      owners.length !== 1 ||
+      owners.some(owner => owner.path !== binding.sourcePath)
+    ) {
+      bad(issues, 'missing-native-owner', `${entry.id}:${binding.swiftType}`);
+    }
+    if (!binding.testEvidence.length) {
+      bad(issues, 'missing-native-test', `${entry.id}:${binding.swiftType}`);
+    }
+    for (const testPath of binding.testEvidence) {
+      if (!repoRoot || !existsSync(resolve(repoRoot, testPath))) {
+        bad(issues, 'missing-native-test', `${entry.id}:${binding.swiftType}`);
+        continue;
+      }
+      const testSource = readFileSync(resolve(repoRoot, testPath), 'utf8');
+      if (!testSource.includes(binding.swiftType)) {
+        bad(issues, 'missing-native-test', `${entry.id}:${binding.swiftType}`);
+      }
+    }
+    const usagePattern = bindingUsagePattern(binding);
+    const registeredConsumers = new Set(binding.consumerPaths);
+    for (const swiftSource of swiftSources) {
+      if (
+        usagePattern.test(swiftSource.source) &&
+        !registeredConsumers.has(swiftSource.path)
+      ) {
+        bad(
+          issues,
+          'detached-native-consumer',
+          `${binding.swiftType}:${swiftSource.path}`
+        );
+      }
+    }
+    for (const consumerPath of binding.consumerPaths) {
+      const consumer = swiftSources.find(
+        source => source.path === consumerPath
+      );
+      if (!consumer || !usagePattern.test(consumer.source)) {
+        bad(
+          issues,
+          'missing-native-consumer',
+          `${binding.swiftType}:${consumerPath}`
+        );
+      }
+    }
+  }
+
+  for (const declaration of declarations) {
+    if (registeredTypes.has(declaration.name)) continue;
+    if (ownsCanonicalPressRecipe(declaration.body)) {
+      bad(
+        issues,
+        'duplicate-native-family-owner',
+        `${declaration.name}:${declaration.path}`
+      );
+    } else if (!declaration.isFilePrivate) {
+      bad(
+        issues,
+        'unregistered-reusable-native-style',
+        `${declaration.name}:${declaration.path}`
+      );
+    }
+  }
+}
 
 function validateAuthority(
   entry: UIOwnershipRegistryEntry,
@@ -126,6 +309,19 @@ function validateAdapters(
       badEntry(issues, entry, 'invalid-platform-adapter');
     if (adapter.sourcePaths.some(sourcePath => sourcePath.includes('.pen')))
       badEntry(issues, entry, 'invalid-platform-adapter');
+    for (const binding of adapter.nativeBindings ?? []) {
+      if (
+        adapter.platform !== 'ios' ||
+        adapter.status !== 'implemented' ||
+        !has(binding.sourcePath) ||
+        !has(binding.swiftType) ||
+        !has(binding.semanticRole) ||
+        !adapter.sourcePaths.includes(binding.sourcePath) ||
+        binding.consumerPaths.some(path => !adapter.sourcePaths.includes(path))
+      ) {
+        badEntry(issues, entry, 'invalid-native-binding');
+      }
+    }
   }
   for (const platform of UI_OWNERSHIP_PLATFORMS)
     if (!seen.has(platform))
@@ -157,8 +353,12 @@ function validateStates(
 
 export function validateUIOwnershipRegistry({
   entries = UI_OWNERSHIP_REGISTRY,
+  swiftSources = loadProductionSwiftSources(),
+  repoRoot = findRepoRoot(process.cwd()),
 }: {
   entries?: readonly UIOwnershipRegistryEntry[];
+  swiftSources?: readonly UINativeSwiftSource[];
+  repoRoot?: string | null;
 } = {}): readonly UIOwnershipRegistryIssue[] {
   const issues: UIOwnershipRegistryIssue[] = [];
   const ids = new Set<string>();
@@ -234,5 +434,6 @@ export function validateUIOwnershipRegistry({
     for (const alias of entry.duplicateAliases)
       if (ids.has(alias))
         badEntry(issues, entry, 'alias-collides-with-entry-id');
+  validateNativeButtonOwnership(entries, swiftSources, issues, repoRoot);
   return issues;
 }

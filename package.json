@@ -229,7 +229,7 @@
     "design:logo-assets:test": "pnpm --filter @jovie/web exec node --test ../../scripts/logo-asset-normalization.test.mjs",
     "design:authority:check": "node scripts/design-authority-guard.mjs",
     "design:conformance:check": "node scripts/design-conformance-check.mjs",
-    "design:conformance:test": "node --test scripts/design-conformance-check.test.mjs scripts/generate-design-tokens-export.test.mjs scripts/design-governance-audit.test.mjs",
+    "design:conformance:test": "node --test scripts/design-conformance-check.test.mjs scripts/generate-design-tokens-export.test.mjs scripts/design-governance-audit.test.mjs && pnpm --filter web exec vitest run tests/unit/design-system/ui-ownership-registry.test.ts",
     "design:conformance:gate": "pnpm design:conformance:test && pnpm design:conformance:check",
     "design:governance:audit": "node scripts/design-governance-audit.mjs",
     "golden-path-lock": "node scripts/golden-path-lock.mjs",

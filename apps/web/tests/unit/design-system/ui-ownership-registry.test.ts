@@ -6,12 +6,14 @@ import {
   APP_SCREEN_RECIPE_REGISTRY,
 } from '@/data/appScreens';
 import {
+  loadProductionSwiftSources,
   UI_OWNERSHIP_ENTRY_IDS,
   UI_OWNERSHIP_PLATFORMS,
   UI_OWNERSHIP_REGISTRY,
   UI_OWNERSHIP_REGISTRY_SCHEMA,
   UI_OWNERSHIP_STATES,
   UI_OWNERSHIP_SURFACES,
+  type UINativeSwiftSource,
   type UIOwnershipRegistryEntry,
   validateUIOwnershipRegistry,
 } from '@/data/designSystem';
@@ -28,6 +30,16 @@ const item = (id: Entry['id']) =>
   UI_OWNERSHIP_REGISTRY.find(entry => entry.id === id) as Entry;
 const expectIssue = (entries: readonly Entry[], code: string) =>
   expect(codes(entries)).toContain(code);
+const nativeFixture = (
+  filename: string,
+  productionPath: string
+): UINativeSwiftSource => ({
+  path: productionPath,
+  source: fs.readFileSync(
+    path.join(__dirname, 'fixtures/native-ui-ownership', filename),
+    'utf8'
+  ),
+});
 
 describe('cross-surface UI ownership registry', () => {
   it('is source-backed, closed-world, and complete', () => {
@@ -67,6 +79,34 @@ describe('cross-surface UI ownership registry', () => {
     expect(item('molecule.profile-primary-cta').visibleControlGeometry).toEqual(
       { visiblePx: 32, hitTargetPx: 44, appliesTo: 'marketing-control' }
     );
+    const nativeButtonBindings = item('atom.button').platformAdapters.find(
+      adapter => adapter.platform === 'ios'
+    )?.nativeBindings;
+    const nativeIconBindings = item('atom.icon-button').platformAdapters.find(
+      adapter => adapter.platform === 'ios'
+    )?.nativeBindings;
+    expect(nativeButtonBindings).toMatchObject([
+      {
+        sourcePath: 'apps/ios/Jovie/DesignSystem/JovieTheme.swift',
+        swiftType: 'JoviePillButtonStyle',
+        semanticRole: 'pill-action',
+        testEvidence: ['apps/ios/JovieTests/AppShellTabBarTests.swift'],
+      },
+      {
+        sourcePath: 'apps/ios/Jovie/DesignSystem/JovieTheme.swift',
+        swiftType: 'JoviePressFeedbackButtonStyle',
+        semanticRole: 'plain-content-press-feedback',
+        testEvidence: ['apps/ios/JovieTests/AppShellTabBarTests.swift'],
+      },
+    ]);
+    expect(nativeIconBindings).toMatchObject([
+      {
+        sourcePath: 'apps/ios/Jovie/DesignSystem/JovieTheme.swift',
+        swiftType: 'JovieIconButtonStyle',
+        semanticRole: 'icon-action',
+        testEvidence: ['apps/ios/JovieTests/AppShellTabBarTests.swift'],
+      },
+    ]);
   });
 
   it('resolves authenticated recipes and ownership to one content-panel owner', () => {
@@ -142,6 +182,68 @@ describe('cross-surface UI ownership registry', () => {
       })),
       'missing-platform-adapter'
     );
+  });
+
+  it('RED: rejects a detached native pill-style consumer', () => {
+    const swiftSources = [
+      ...loadProductionSwiftSources(root),
+      nativeFixture(
+        'detached-pill-consumer.swift',
+        'apps/ios/Jovie/Features/DetachedPillConsumer.swift'
+      ),
+    ];
+
+    expect(
+      validateUIOwnershipRegistry({
+        entries: UI_OWNERSHIP_REGISTRY,
+        swiftSources,
+      }).map(issue => issue.code)
+    ).toContain('detached-native-consumer');
+  });
+
+  it('RED: rejects a duplicate Settings-style native family owner', () => {
+    const swiftSources = [
+      ...loadProductionSwiftSources(root),
+      nativeFixture(
+        'duplicate-settings-style-owner.swift',
+        'apps/ios/Jovie/Features/Settings/DuplicateSettingsStyleOwner.swift'
+      ),
+    ];
+
+    expect(
+      validateUIOwnershipRegistry({
+        entries: UI_OWNERSHIP_REGISTRY,
+        swiftSources,
+      }).map(issue => issue.code)
+    ).toContain('duplicate-native-family-owner');
+  });
+
+  it('fails closed on unregistered reusable native styles and missing tests', () => {
+    const swiftSources = [
+      ...loadProductionSwiftSources(root),
+      {
+        path: 'apps/ios/Jovie/DesignSystem/UnregisteredButtonStyle.swift',
+        source:
+          'struct UnregisteredButtonStyle: ButtonStyle { func makeBody(configuration: Configuration) -> some View { configuration.label } }',
+      },
+    ];
+    expect(
+      validateUIOwnershipRegistry({
+        entries: UI_OWNERSHIP_REGISTRY,
+        swiftSources,
+      }).map(issue => issue.code)
+    ).toContain('unregistered-reusable-native-style');
+
+    const withoutTests = mutate('atom.button', entry => ({
+      platformAdapters: entry.platformAdapters.map(adapter => ({
+        ...adapter,
+        nativeBindings: adapter.nativeBindings?.map(binding => ({
+          ...binding,
+          testEvidence: [],
+        })),
+      })),
+    }));
+    expectIssue(withoutTests, 'missing-native-test');
   });
 
   it('fails closed on serif policy and Pen proposal/canonical confusion', () => {

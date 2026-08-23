@@ -232,19 +232,7 @@ private struct SettingsLinkRow: View {
       .padding(.horizontal, JovieSpacing.medium)
       .padding(.vertical, 12)
     }
-    .buttonStyle(SettingsRowButtonStyle())
-  }
-}
-
-/// Subtle tactile press feedback for tappable settings rows: opacity + the
-/// canonical 0.96 press scale on the SUBTLE (150ms) curve. Interruptible via
-/// SwiftUI's isPressed-driven animation (.claude/rules/motion.md section 4).
-private struct SettingsRowButtonStyle: ButtonStyle {
-  func makeBody(configuration: Configuration) -> some View {
-    configuration.label
-      .opacity(configuration.isPressed ? 0.7 : 1)
-      .scaleEffect(configuration.isPressed ? JovieMotion.pressScale : 1)
-      .animation(JovieMotion.subtle, value: configuration.isPressed)
+    .buttonStyle(JoviePressFeedbackButtonStyle(pressedOpacity: 0.7))
   }
 }
 
