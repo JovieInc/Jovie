@@ -20,6 +20,7 @@ Scheduled workflows in `.github/workflows/`. Not Vercel crons — these run on G
 
 | Workflow | Schedule | Purpose | Source |
 |----------|----------|---------|--------|
+| `Design Governance` | `17 8 * * 1` UTC | Weekly design-governance audit plus invariant-stewardship receipt. Also triggered by registry/evidence pushes to `main` and `founder-decision-recorded` / `invariant-enforcement-failed` repository events. Not a merge gate. | `.github/workflows/design-governance.yml` |
 | `Nightly Tests` | `30 23 * * *` America/Los_Angeles | Full unit + E2E suite, Knip dead-code audit. Starts at least 90 minutes before the fixed 09:00 UTC screenshot/Tuesday harness lanes. Alerts on failure. | `.github/workflows/nightly-tests.yml` |
 | `Nightly Testing Agent` | `30 4 * * *` PT | Risk-ranked target selection, unit telemetry, Stryker mutation hotspots, daily report commit + Redis ops snapshot. LLM-free. | `.github/workflows/nightly-testing-agent.yml` |
 | `Test Coverage Audit` | `30 18 * * *` UTC | Regenerates [`docs/TEST_COVERAGE_HEATMAP.md`](TEST_COVERAGE_HEATMAP.md) from [`TEST_RISK_REGISTER.md`](TEST_RISK_REGISTER.md) + v8 coverage after the deterministic nightly lanes. Fails on RED-surface ≥3pp drops (`test:coverage:diff`), commits if changed, Slack on failure. | `.github/workflows/test-coverage-audit.yml` |
