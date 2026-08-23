@@ -17,9 +17,10 @@ const footerCtaCssBlock = (source: string) => {
   return source.slice(start, end);
 };
 
-describe('mounted homepage footer CTA System B source contract', () => {
-  it('keeps mounted footer CTA markup on named System B primitives', () => {
+describe('homepage footer CTA System B source contract', () => {
+  it('keeps the reusable footer CTA tokenized but off the one-CTA homepage', () => {
     const layoutSource = readSource('app/(home)/layout.tsx');
+    const pageSource = readSource('app/(home)/page.tsx');
     const finalCtaSource = readSource(
       'components/marketing/homepage-v2/HomepageV2Ctas.tsx'
     );
@@ -29,6 +30,7 @@ describe('mounted homepage footer CTA System B source contract', () => {
     expect(layoutSource).toContain(
       "footerClassName='system-b-mounted-home-footer'"
     );
+    expect(pageSource).not.toContain('HomepageV2FinalCta');
     expect(finalCtaSource).toMatch(
       /(?=.*system-b-mounted-home-footer-cta(?!-))(?=.*system-b-mounted-home-footer-cta-container)(?=.*system-b-mounted-home-footer-cta-copy)(?=.*system-b-mounted-home-footer-cta-heading)(?=.*system-b-mounted-home-footer-cta-action)/s
     );

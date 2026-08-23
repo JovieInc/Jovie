@@ -219,8 +219,9 @@ export function MarketingHeader({
       authMode='public-static'
       hideNav={isMinimal}
       hideDesktopNav={hideCenterNav}
-      minimalAuth={isMinimal}
+      minimalAuth={isMinimal || isHomepage}
       minimalAuthVariant='link'
+      minimalAuthLabel={isHomepage ? 'Log in' : 'Sign in'}
       includePublicLoginInMobileNav
       containerSize='homepage'
       presentation={presentation}

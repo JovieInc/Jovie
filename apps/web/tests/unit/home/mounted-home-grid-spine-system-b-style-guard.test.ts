@@ -73,7 +73,6 @@ describe('mounted homepage grid spine System B source contract', () => {
       '<HomepageMeetJovie',
       '<HomepageArtistProfiles',
       '<HomepageClosedLoop',
-      '<HomepageV2FinalCta',
       '<FaqSection',
     ]) {
       expect(
@@ -86,6 +85,7 @@ describe('mounted homepage grid spine System B source contract', () => {
       countOccurrences(pageSource, "data-testid='homepage-story-stack'")
     ).toBe(1);
     expect(countOccurrences(pageSource, "data-testid='homepage-faq'")).toBe(1);
+    expect(countOccurrences(pageSource, '<HomepageV2FinalCta')).toBe(0);
   });
 
   it('locks the page-level CSS spine onto the shared content column', () => {

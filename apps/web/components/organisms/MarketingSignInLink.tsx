@@ -13,8 +13,10 @@ import { cn } from '@/lib/utils';
  */
 export function MarketingSignInLink({
   variant = 'ghost',
+  label = 'Sign in',
 }: Readonly<{
   readonly variant?: 'ghost' | 'pill';
+  readonly label?: 'Sign in' | 'Log in';
 }>) {
   if (variant === 'pill') {
     return (
@@ -24,7 +26,7 @@ export function MarketingSignInLink({
         className='focus-ring-themed h-9 px-4 sm:h-10 sm:px-5 sm:text-sm'
       >
         <Link href={APP_ROUTES.SIGNIN} prefetch>
-          Sign in
+          {label}
         </Link>
       </Button>
     );
@@ -39,7 +41,7 @@ export function MarketingSignInLink({
         'text-app text-neutral-700 hover:text-neutral-950 dark:text-white/60 dark:hover:text-white/90'
       )}
     >
-      Sign in
+      {label}
     </Link>
   );
 }

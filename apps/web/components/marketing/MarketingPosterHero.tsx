@@ -63,7 +63,13 @@ export function MarketingPosterHero({
         <p className='homepage-poster-hero__subtitle'>{subtitle}</p>
         {lede ? <p className='homepage-poster-hero__lede'>{lede}</p> : null}
         <div className='homepage-poster-hero__actions'>
-          <Button asChild static size='md' variant='primary'>
+          <Button
+            asChild
+            static
+            size='marketing'
+            variant='primary'
+            className='homepage-poster-hero__action-button text-sm'
+          >
             <LinkComponent
               href={primaryCta.href}
               prefetch={primaryCta.prefetch}
@@ -77,7 +83,13 @@ export function MarketingPosterHero({
             </LinkComponent>
           </Button>
           {secondaryCta ? (
-            <Button asChild static size='md' variant='ghost'>
+            <Button
+              asChild
+              static
+              size='marketing'
+              variant='ghost'
+              className='homepage-poster-hero__action-button text-sm'
+            >
               <LinkComponent
                 href={secondaryCta.href}
                 prefetch={secondaryCta.prefetch}

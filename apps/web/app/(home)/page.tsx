@@ -1,8 +1,7 @@
 import type { Metadata } from 'next';
-import dynamic from 'next/dynamic';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import {
-  type HomepageArtistProfileCards,
+  type HomepageArtistProfilePreviews,
   HomepageArtistProfiles,
 } from '@/components/homepage/HomepageArtistProfiles';
 import { HomepageClosedLoop } from '@/components/homepage/HomepageClosedLoop';
@@ -27,54 +26,34 @@ import { publicEnv } from '@/lib/env-public';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 
-// Below-the-fold sections are dynamic-loaded so their `motion/react`
-// hydration cost doesn't compete with above-the-fold work.
-//
-// JOV-1835: cuts homepage TBT from ~1365ms toward the 300ms budget.
-//
-// Sections that are not motion-heavy keep `ssr: true` so their HTML stays in
-// the initial document for SEO. The motion-driven workspace lives behind a
-// client `*Lazy.tsx` shim with reserved placeholder geometry, so its chunk and
-// scroll subscriptions do not compete with hero hydration or shift the page.
-const HomepageV2FinalCta = dynamic(
-  () =>
-    import('@/components/marketing/homepage-v2/HomepageV2Ctas').then(m => ({
-      default: m.HomepageV2FinalCta,
-    })),
-  { ssr: true }
-);
 const HERO_PRODUCT_IMAGES = {
   // Use the canonical populated workspace state so the first product proof
   // shows a real decision surface (including the detail rail), not an empty
   // demo canvas.
   product: getMarketingExportImage('dashboard-releases-sidebar-desktop'),
 };
-const ARTIST_OUTCOME_CARDS = [
+const ARTIST_PROFILE_PREVIEWS = [
   {
-    id: 'sell-out',
-    title: 'Sell Out',
-    body: 'Put your next show or tour date where fans can get tickets.',
+    id: 'tour',
+    label: 'Tour',
     image: getMarketingExportImage('tim-white-profile-tour-mobile'),
   },
   {
-    id: 'capture-fans',
-    title: 'Capture Fans',
-    body: 'Fan capture builds a list you can use again.',
+    id: 'subscribe',
+    label: 'Subscribe',
     image: getMarketingExportImage('tim-white-profile-subscribe-mobile'),
   },
   {
-    id: 'get-paid',
-    title: 'Get Paid',
-    body: 'Make direct support feel native to the artist profile.',
+    id: 'pay',
+    label: 'Pay',
     image: getMarketingExportImage('tim-white-profile-pay-mobile'),
   },
   {
-    id: 'drop-music',
-    title: 'Drop Music',
-    body: 'Give fans one link for the release before it lands.',
+    id: 'presave',
+    label: 'Presave',
     image: getMarketingExportImage('tim-white-profile-presave-mobile'),
   },
-] as const satisfies HomepageArtistProfileCards;
+] as const satisfies HomepageArtistProfilePreviews;
 
 export const revalidate = false;
 
@@ -261,7 +240,7 @@ function HomepageUnlockedSections() {
   return (
     <>
       <HomepageMeetJovie />
-      <HomepageArtistProfiles cards={ARTIST_OUTCOME_CARDS} />
+      <HomepageArtistProfiles previews={ARTIST_PROFILE_PREVIEWS} />
       <HomepageClosedLoop />
       <HomepageFaq />
     </>
@@ -276,7 +255,6 @@ function HomepageStoryStack() {
       data-testid='homepage-story-stack'
     >
       <HomepageUnlockedSections />
-      <HomepageV2FinalCta />
     </div>
   );
 }
