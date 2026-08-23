@@ -43,9 +43,15 @@ demo adapters, tests, and owned screenshot artifacts.
 ## Verification receipt
 
 - Focused behavior and contract tests: 58 assertions passed.
+- Compare navigation route contract: 5/5 passed, including the deliberate-red
+  `/compare` wildcard-base case.
+- Screenshot provenance helper contract: 6/6 passed.
 - Web TypeScript gate: passed.
 - Canonical Playwright screenshot lane: 9/9 scenarios passed after the fix;
   the prior dashboard hydration mismatch did not recur.
+- Source-attested affected-surface recapture: 5/5 passed. A repeat 2/2 capture
+  of the formerly animated dashboard views produced byte-identical SHA-256
+  hashes after screenshot-only animation disabling.
 - Production recheck on 2026-08-23: `/ai` returned 200 but still rendered
   `href="/compare"`; `/compare` returned 404, while `/compare/linktree`
   returned 200. This proves the currently deployed build remains affected and

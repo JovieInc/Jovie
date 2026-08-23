@@ -11,8 +11,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-23T01:46:48.872Z",
-    "gitSha": null,
+    "capturedAt": "2026-08-23T02:29:47.790Z",
+    "gitSha": "9653fc3b92dc0d39ba7ae815e721b65d967195b5",
     "imagePath": "marketing-home-desktop.png"
   },
   {
@@ -609,8 +609,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-23T01:47:17.786Z",
-    "gitSha": null,
+    "capturedAt": "2026-08-23T02:30:17.266Z",
+    "gitSha": "9653fc3b92dc0d39ba7ae815e721b65d967195b5",
     "imagePath": "dashboard-releases-desktop.png",
     "publicExportPath": "releases-dashboard-full.png"
   },
@@ -626,8 +626,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-23T01:46:21.192Z",
-    "gitSha": null,
+    "capturedAt": "2026-08-23T02:29:12.650Z",
+    "gitSha": "9653fc3b92dc0d39ba7ae815e721b65d967195b5",
     "imagePath": "dashboard-releases-sidebar-desktop.png",
     "publicExportPath": "releases-dashboard-sidebar.png"
   },
@@ -643,8 +643,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-23T01:47:54.605Z",
-    "gitSha": null,
+    "capturedAt": "2026-08-23T02:30:55.223Z",
+    "gitSha": "9653fc3b92dc0d39ba7ae815e721b65d967195b5",
     "imagePath": "dashboard-release-sidebar-detail-desktop.png",
     "publicExportPath": "release-sidebar-detail.png"
   },
@@ -660,8 +660,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-23T01:48:31.204Z",
-    "gitSha": null,
+    "capturedAt": "2026-08-23T02:31:26.393Z",
+    "gitSha": "9653fc3b92dc0d39ba7ae815e721b65d967195b5",
     "imagePath": "dashboard-release-sidebar-platforms-desktop.png",
     "publicExportPath": "release-sidebar-platforms.png"
   },
