@@ -1,16 +1,26 @@
 import { expect, test } from 'vitest';
 import {
+  classifyDesktopLoadFailure,
   decideAbortedMainFrameRecovery,
+  decideHostedLoadRetry,
   decideLocalMainFrameLoadFailure,
+  decideRecoveryUnlatch,
   decideRendererBootWatchdogAfterLoad,
   decideRendererLoadStart,
   decideRendererRecovery,
   decideRendererWatchdogExpiry,
+  describeDesktopLoadFailure,
+  hostedUrlCandidates,
+  isLocalDevSiblingOrigin,
+  isLoopbackAppUrl,
   LOCAL_HOSTED_LOAD_RETRY_DELAY_MS,
   LOCAL_HOSTED_LOAD_RETRY_LIMIT,
+  LOCAL_RENDERER_BOOT_WATCHDOG_MS,
+  LOCAL_RENDERER_LOAD_WATCHDOG_MS,
   parseDidStartNavigation,
   RENDERER_BOOT_WATCHDOG_MS,
   RENDERER_LOAD_WATCHDOG_MS,
+  rendererWatchdogMs,
   shouldArmRendererBootWatchdog,
   shouldArmRendererWatchdogsForAppEnv,
   shouldRecoverAuthHandoffToCanonicalShell,
@@ -91,6 +101,12 @@ test('boot watchdog arms only for real hosted app-origin navigations', () => {
       'http://localhost:3112'
     )
   ).toBe(true);
+  expect(
+    shouldArmRendererBootWatchdog(
+      'http://localhost:3100/app/chat',
+      'http://localhost:3112'
+    )
+  ).toBe(true);
 
   // Only the app origin ever sends app-booted — any other http(s) origin must
   // not arm the watchdog or it is a guaranteed false-positive.
@@ -151,6 +167,77 @@ test('load watchdog covers hung navigation before did-finish-load', () => {
   expect(RENDERER_LOAD_WATCHDOG_MS).toBeGreaterThan(RENDERER_BOOT_WATCHDOG_MS);
 });
 
+test('recovery unlatches onto a warm local host without a Retry click', () => {
+  expect(
+    hostedUrlCandidates(
+      'http://localhost:3112',
+      'http://localhost:3112/app/chat'
+    )
+  ).toEqual([
+    'http://localhost:3112/app/chat',
+    'http://localhost:3100/app/chat',
+  ]);
+  expect(
+    hostedUrlCandidates('https://jov.ie', 'https://jov.ie/app/chat')
+  ).toEqual(['https://jov.ie/app/chat']);
+  expect(
+    isLocalDevSiblingOrigin(
+      'http://localhost:3100/app/chat',
+      'http://localhost:3112'
+    )
+  ).toBe(true);
+  expect(
+    isLocalDevSiblingOrigin(
+      'http://localhost:3999/app',
+      'http://localhost:3112'
+    )
+  ).toBe(false);
+  expect(
+    decideRecoveryUnlatch({
+      showingFailurePage: true,
+      booted: false,
+      windowDestroyed: false,
+      reachableHostedUrl: 'http://localhost:3100/app/chat',
+    })
+  ).toBe('reload-hosted');
+  expect(
+    decideRecoveryUnlatch({
+      showingFailurePage: true,
+      booted: true,
+      windowDestroyed: false,
+      reachableHostedUrl: 'http://localhost:3100/app/chat',
+    })
+  ).toBe('ignore');
+  expect(
+    decideRecoveryUnlatch({
+      showingFailurePage: true,
+      booted: false,
+      windowDestroyed: false,
+      reachableHostedUrl: null,
+    })
+  ).toBe('ignore');
+});
+
+test('local watchdogs wait out first Turbopack compile instead of painting recovery', () => {
+  const measuredFirstCompileMs = 15_500;
+  const local = rendererWatchdogMs('local');
+  const production = rendererWatchdogMs('production');
+  const staging = rendererWatchdogMs('staging');
+
+  expect(local.loadMs).toBe(LOCAL_RENDERER_LOAD_WATCHDOG_MS);
+  expect(local.bootMs).toBe(LOCAL_RENDERER_BOOT_WATCHDOG_MS);
+  expect(local.loadMs).toBeGreaterThan(measuredFirstCompileMs);
+  expect(local.bootMs).toBeGreaterThan(measuredFirstCompileMs);
+  expect(local.loadMs).toBeGreaterThan(RENDERER_LOAD_WATCHDOG_MS);
+  expect(local.bootMs).toBeGreaterThan(RENDERER_BOOT_WATCHDOG_MS);
+
+  expect(production).toEqual({
+    bootMs: RENDERER_BOOT_WATCHDOG_MS,
+    loadMs: RENDERER_LOAD_WATCHDOG_MS,
+  });
+  expect(staging).toEqual(production);
+});
+
 test('a hung or intercepted hosted navigation arms the load watchdog', () => {
   const appOrigin = 'https://jov.ie';
   expect(
@@ -204,6 +291,122 @@ test('a hung or intercepted hosted navigation arms the load watchdog', () => {
   ).toBe('ignore');
 });
 
+test('a previously painted session is not replaced by a false offline page', () => {
+  expect(
+    decideRendererWatchdogExpiry({
+      booted: false,
+      everBooted: true,
+      reason: 'boot',
+      windowDestroyed: false,
+      skipForAuthHandoff: false,
+    })
+  ).toBe('ignore');
+  expect(
+    decideRendererWatchdogExpiry({
+      booted: false,
+      everBooted: true,
+      reason: 'load',
+      windowDestroyed: false,
+      skipForAuthHandoff: false,
+    })
+  ).toBe('failure-page');
+  expect(
+    decideRendererWatchdogExpiry({
+      booted: false,
+      everBooted: false,
+      reason: 'boot',
+      windowDestroyed: false,
+      skipForAuthHandoff: false,
+    })
+  ).toBe('failure-page');
+});
+
+test('load failures are classified honestly instead of as generic offline', () => {
+  expect(isLoopbackAppUrl('http://localhost:3112')).toBe(true);
+  expect(isLoopbackAppUrl('https://jov.ie')).toBe(false);
+
+  expect(
+    classifyDesktopLoadFailure({
+      reason: 'did-fail-load',
+      errorCode: -106,
+      appEnv: 'local',
+      appUrl: 'http://localhost:3112',
+    })
+  ).toBe('offline');
+  expect(
+    classifyDesktopLoadFailure({
+      reason: 'did-fail-load',
+      errorCode: -102,
+      appEnv: 'local',
+      appUrl: 'http://localhost:3112',
+    })
+  ).toBe('local-server-down');
+  expect(
+    classifyDesktopLoadFailure({
+      reason: 'did-fail-load',
+      errorCode: -102,
+      appEnv: 'production',
+      appUrl: 'https://jov.ie',
+    })
+  ).toBe('host-unreachable');
+  expect(
+    classifyDesktopLoadFailure({
+      reason: 'boot-watchdog',
+      appEnv: 'local',
+      appUrl: 'http://localhost:3112',
+      hostReachable: true,
+    })
+  ).toBe('timed-out');
+  expect(
+    classifyDesktopLoadFailure({
+      reason: 'load-watchdog',
+      appEnv: 'local',
+      appUrl: 'http://localhost:3112',
+      hostReachable: false,
+    })
+  ).toBe('local-server-down');
+  expect(
+    classifyDesktopLoadFailure({
+      reason: 'crashed',
+      appEnv: 'local',
+      appUrl: 'http://localhost:3112',
+    })
+  ).toBe('crashed');
+
+  expect(
+    describeDesktopLoadFailure('offline', 'http://localhost:3112').body
+  ).toBe('Check your connection, then try again.');
+  expect(
+    describeDesktopLoadFailure('local-server-down', 'http://localhost:3112')
+      .body
+  ).toBe('Local Jovie isn’t running at localhost:3112.');
+  expect(
+    describeDesktopLoadFailure('timed-out', 'http://localhost:3112').heading
+  ).toBe('Jovie didn’t finish starting');
+
+  expect(
+    decideHostedLoadRetry({
+      kind: 'local-server-down',
+      retryCount: 0,
+      maxRetries: 2,
+    })
+  ).toBe('retry');
+  expect(
+    decideHostedLoadRetry({
+      kind: 'offline',
+      retryCount: 0,
+      maxRetries: 2,
+    })
+  ).toBe('failure-page');
+  expect(
+    decideHostedLoadRetry({
+      kind: 'local-server-down',
+      retryCount: 2,
+      maxRetries: 2,
+    })
+  ).toBe('failure-page');
+});
+
 test('200-but-blank and hung load both expire to the failure page', () => {
   expect(
     decideRendererWatchdogExpiry({
@@ -215,6 +418,15 @@ test('200-but-blank and hung load both expire to the failure page', () => {
   expect(
     decideRendererWatchdogExpiry({
       booted: true,
+      windowDestroyed: false,
+      skipForAuthHandoff: false,
+    })
+  ).toBe('ignore');
+  expect(
+    decideRendererWatchdogExpiry({
+      booted: true,
+      everBooted: true,
+      reason: 'load',
       windowDestroyed: false,
       skipForAuthHandoff: false,
     })

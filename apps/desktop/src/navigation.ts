@@ -1,3 +1,5 @@
+import { isLocalDevSiblingOrigin } from './renderer-recovery';
+
 export type AppEnvironment = 'production' | 'staging' | 'local';
 
 export type UrlDisposition =
@@ -159,7 +161,13 @@ function hasSafePathname(pathname: string): boolean {
 
 function isAppOriginUrl(parsed: URL, options: UrlDispositionOptions): boolean {
   const appOrigin = getOrigin(options.appUrl);
-  if (!appOrigin || parsed.origin !== appOrigin) return false;
+  if (!appOrigin) return false;
+
+  const sameOrigin = parsed.origin === appOrigin;
+  const localSibling =
+    options.appEnv === 'local' &&
+    isLocalDevSiblingOrigin(parsed.toString(), options.appUrl);
+  if (!sameOrigin && !localSibling) return false;
 
   return (
     parsed.protocol === 'https:' ||
