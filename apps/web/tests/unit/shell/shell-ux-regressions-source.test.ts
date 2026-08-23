@@ -94,8 +94,12 @@ describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
     expect(sharedToggle).toContain('PanelLeftOpen');
     expect(sharedToggle).toContain('PanelRightClose');
     expect(sharedToggle).toContain('PanelRightOpen');
-    expect(sharedToggle).toContain('h-7 w-7 rounded-full');
-    expect(sharedToggle).toContain("size='icon'");
+    expect(sharedToggle).toContain(
+      "import { IconButton, TooltipShortcut } from '@jovie/ui'"
+    );
+    expect(sharedToggle).toContain("variant='railToggle'");
+    expect(sharedToggle).toContain("size='sm'");
+    expect(sharedToggle).not.toContain('h-7 w-7 rounded-full');
     expect(sharedToggle).not.toContain('active:scale');
     expect(sharedToggle).toContain("from '@/components/atoms/Icon'");
   });
