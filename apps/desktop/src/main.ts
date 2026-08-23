@@ -66,6 +66,9 @@ import {
   parseDidStartNavigation,
   RENDERER_BOOT_WATCHDOG_MS,
   RENDERER_LOAD_WATCHDOG_MS,
+  LOCAL_HOSTED_LOAD_RETRY_DELAY_MS,
+  decideLocalMainFrameLoadFailure,
+  shouldArmRendererWatchdogsForAppEnv,
   shouldRecoverAuthHandoffToCanonicalShell,
   shouldSkipRendererWatchdogForAuthHandoff,
 } from './renderer-recovery';
@@ -249,6 +252,20 @@ if (remoteDebuggingGuard.blocked) {
   // (and its authenticated session) is created.
   app.exit(1);
 }
+
+function applyLocalChromiumLoopbackResolver(): void {
+  if (APP_ENV !== 'local') return;
+  // Chromium resolves localhost to ::1 first. Next on macOS often binds
+  // IPv4-only 127.0.0.1, so the hosted shell fails with ERR_CONNECTION_REFUSED
+  // and JOV-3595 recovery replaces the app. Keep the localhost origin (auth
+  // cookies stay) but force IPv4 resolution.
+  app.commandLine.appendSwitch(
+    'host-resolver-rules',
+    'MAP localhost 127.0.0.1'
+  );
+}
+
+applyLocalChromiumLoopbackResolver();
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
@@ -1250,6 +1267,9 @@ function attachRendererRecovery(
   let rendererBooted = false;
   let bootWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
   let loadWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
+  let localHostedLoadRetryCount = 0;
+  let localHostedLoadRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  const armWatchdogs = shouldArmRendererWatchdogsForAppEnv(APP_ENV);
   const webContentsId = win.webContents.id;
 
   const clearBootWatchdog = (): void => {
@@ -1266,9 +1286,17 @@ function attachRendererRecovery(
     }
   };
 
+  const clearLocalHostedLoadRetry = (): void => {
+    if (localHostedLoadRetryTimer !== null) {
+      clearTimeout(localHostedLoadRetryTimer);
+      localHostedLoadRetryTimer = null;
+    }
+  };
+
   const clearAllWatchdogs = (): void => {
     clearBootWatchdog();
     clearLoadWatchdog();
+    clearLocalHostedLoadRetry();
   };
 
   const expireWatchdog = (reason: string, url: string): void => {
@@ -1301,6 +1329,7 @@ function attachRendererRecovery(
   const armLoadWatchdog = (url: string): void => {
     clearAllWatchdogs();
     rendererBooted = false;
+    if (!armWatchdogs) return;
     if (win.isDestroyed()) return;
     if (
       decideRendererLoadStart({
@@ -1321,6 +1350,7 @@ function attachRendererRecovery(
 
   const armBootWatchdog = (): void => {
     clearAllWatchdogs();
+    if (!armWatchdogs) return;
     if (win.isDestroyed()) return;
     const url = win.webContents.getURL();
     const action = decideRendererBootWatchdogAfterLoad({
@@ -1339,6 +1369,7 @@ function attachRendererRecovery(
   const markRendererBooted = (): void => {
     rendererBooted = true;
     rendererCrashReloadCount = 0;
+    localHostedLoadRetryCount = 0;
     clearAllWatchdogs();
   };
 
@@ -1370,6 +1401,7 @@ function attachRendererRecovery(
   });
 
   win.webContents.on('did-finish-load', () => {
+    localHostedLoadRetryCount = 0;
     armBootWatchdog();
   });
 
@@ -1408,6 +1440,34 @@ function attachRendererRecovery(
           armLoadWatchdog(resolveNavigationUrl(validatedURL));
         }
         return;
+      }
+
+      if (APP_ENV === 'local') {
+        const retryUrl =
+          typeof validatedURL === 'string' && validatedURL.startsWith('http')
+            ? resolveNavigationUrl(validatedURL)
+            : APP_ENTRY_URL;
+        const localAction = decideLocalMainFrameLoadFailure({
+          errorCode,
+          retryCount: localHostedLoadRetryCount,
+        });
+        if (localAction === 'retry') {
+          localHostedLoadRetryCount += 1;
+          console.warn('[Jovie Desktop] Local hosted load not ready, retrying', {
+            errorCode,
+            attempt: localHostedLoadRetryCount,
+            validatedURL:
+              typeof validatedURL === 'string'
+                ? validatedURL.split('?')[0]
+                : validatedURL,
+          });
+          localHostedLoadRetryTimer = setTimeout(() => {
+            localHostedLoadRetryTimer = null;
+            if (win.isDestroyed()) return;
+            void win.loadURL(retryUrl);
+          }, LOCAL_HOSTED_LOAD_RETRY_DELAY_MS);
+          return;
+        }
       }
 
       console.error('[Jovie Desktop] Shell load failure (graceful recovery)', {
@@ -1449,6 +1509,7 @@ function attachRendererRecovery(
       url: win.webContents.getURL().split('?')[0],
     });
     if (win.isDestroyed()) return;
+    if (!armWatchdogs) return;
     if (options.shouldSkipWatchdog()) return;
     clearAllWatchdogs();
     showDesktopLoadFailure(win);

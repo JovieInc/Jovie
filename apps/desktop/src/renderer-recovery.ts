@@ -33,6 +33,52 @@ export const RENDERER_BOOT_WATCHDOG_MS = 14_000;
  */
 export const RENDERER_LOAD_WATCHDOG_MS = 18_000;
 
+/**
+ * Local Next compiles and Fast Refresh routinely exceed the packaged
+ * watchdogs. Keep recovery for production/staging (JOV-5086); Jovie Local
+ * must wait for the hosted shell instead of swapping in the failure page.
+ */
+export function shouldArmRendererWatchdogsForAppEnv(appEnv: string): boolean {
+  return appEnv !== 'local';
+}
+
+/**
+ * Chromium net errors that mean "the local Next server is not reachable yet"
+ * rather than a broken app. Electron often wins the race with `next dev`.
+ */
+const TRANSIENT_LOCAL_NET_ERROR_CODES = new Set([
+  -7, // ERR_TIMED_OUT
+  -21, // ERR_NETWORK_CHANGED
+  -100, // ERR_CONNECTION_CLOSED
+  -101, // ERR_CONNECTION_RESET
+  -102, // ERR_CONNECTION_REFUSED
+  -103, // ERR_CONNECTION_ABORTED
+  -104, // ERR_CONNECTION_FAILED
+  -106, // ERR_INTERNET_DISCONNECTED
+  -109, // ERR_ADDRESS_UNREACHABLE
+  -118, // ERR_CONNECTION_TIMED_OUT
+  -324, // ERR_EMPTY_RESPONSE
+]);
+
+/** Stay on splash and retry while local Next is still coming up (~60s). */
+export const LOCAL_HOSTED_LOAD_RETRY_LIMIT = 30;
+export const LOCAL_HOSTED_LOAD_RETRY_DELAY_MS = 2_000;
+
+export type LocalMainFrameLoadFailureAction = 'retry' | 'failure-page';
+
+export function decideLocalMainFrameLoadFailure(input: {
+  readonly errorCode: number;
+  readonly retryCount: number;
+}): LocalMainFrameLoadFailureAction {
+  if (
+    TRANSIENT_LOCAL_NET_ERROR_CODES.has(input.errorCode) &&
+    input.retryCount < LOCAL_HOSTED_LOAD_RETRY_LIMIT
+  ) {
+    return 'retry';
+  }
+  return 'failure-page';
+}
+
 export type RendererWatchdogExpiryAction = 'ignore' | 'failure-page';
 
 export type RendererBootWatchdogAfterLoadAction =
