@@ -114,20 +114,27 @@ function calculateFinancialStatus(
   stripeMetrics: Awaited<ReturnType<typeof getAdminStripeOverviewMetrics>>,
   mercuryMetrics: Awaited<ReturnType<typeof getAdminMercuryMetrics>>
 ): FinancialStatus {
-  const canCalculate = stripeMetrics.isAvailable && mercuryMetrics.isAvailable;
+  const canCalculate =
+    stripeMetrics.isAvailable &&
+    mercuryMetrics.isAvailable &&
+    mercuryMetrics.burnRateAvailable === true;
 
   if (!canCalculate) {
+    const mercuryStatus =
+      mercuryMetrics.isAvailable && mercuryMetrics.burnRateAvailable === false
+        ? 'Mercury transactions (degraded)'
+        : getServiceStatus(
+            'Mercury',
+            mercuryMetrics.isConfigured,
+            mercuryMetrics.isAvailable
+          );
     const missingServices = [
       getServiceStatus(
         'Stripe',
         stripeMetrics.isConfigured,
         stripeMetrics.isAvailable
       ),
-      getServiceStatus(
-        'Mercury',
-        mercuryMetrics.isConfigured,
-        mercuryMetrics.isAvailable
-      ),
+      mercuryStatus,
     ].filter((s): s is string => s !== null);
 
     return {
@@ -197,6 +204,7 @@ export function buildDegradedHudMetrics(
     balanceUsd: 0,
     burnRateUsd: 0,
     burnWindowDays: 30,
+    burnRateAvailable: false,
     isConfigured: true,
     isAvailable: false,
     defaultStatus: 'unknown' as const,
@@ -359,7 +367,9 @@ async function fetchHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     mercuryMetrics
   );
   const financialDataAvailable =
-    stripeMetrics.isAvailable && mercuryMetrics.isAvailable;
+    stripeMetrics.isAvailable &&
+    mercuryMetrics.isAvailable &&
+    mercuryMetrics.burnRateAvailable === true;
 
   const operationsStatus: HudMetrics['operations'] = {
     status: dbHealth.healthy ? 'ok' : 'degraded',

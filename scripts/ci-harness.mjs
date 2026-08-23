@@ -2,6 +2,7 @@
 // Invariant consumer: JOV-INV-009.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { invariantPolicy } from './invariants/registry.mjs';
 import {
   buildCiHarnessArtifact,
   classifyCiRisk,
@@ -12,6 +13,13 @@ import {
   parseJobResultsFromEnv,
   validateCiHarnessManifest,
 } from './lib/ci-harness.mjs';
+
+const RUNNER_AUTHORITY = invariantPolicy('JOV-INV-009');
+if (RUNNER_AUTHORITY !== 'validation-only') {
+  throw new Error(
+    'JOV-INV-009 forbids runner authority other than validation-only'
+  );
+}
 
 function argValue(args, name, fallback = undefined) {
   const index = args.indexOf(name);

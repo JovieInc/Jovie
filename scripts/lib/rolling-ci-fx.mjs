@@ -11,6 +11,28 @@ import {
 } from './rolling-ci-handoff.mjs';
 
 export const CURSOR_AGENTS_URL = 'https://api.cursor.com/v0/agents';
+export const FX_NAMED_OUTCOMES = Object.freeze([
+  'launched',
+  'repaired',
+  'skipped_stale',
+  'writer_missing',
+  'no_key',
+  'needs_human',
+]);
+export const RUNNER_FAILURE_CLASSES = Object.freeze([
+  'checkout',
+  'infra',
+  'flake',
+]);
+export const FX_RUNNER_IDEMPOTENCY_KEY = 'jov-fx-ci-runners-20260822';
+
+const CHECKOUT_FAILURE_RE = /checkout/i;
+const INFRA_FAILURE_RE =
+  /startup_failure|timed_out|heartbeat|hosted runner|lost communication|set up job|initialize containers|\brunner\b/i;
+const FLAKE_FAILURE_RE =
+  /flake|eagain|etimedout|rate.?limit|\b50[23]\b|spurious/i;
+const PRODUCT_FAILURE_RE =
+  /typecheck|unit tests|knip|eval|brand safety|overflow|layout|\blint\b|promptfoo/i;
 
 export function cursorAuthHeader(apiKey) {
   return `Basic ${Buffer.from(`${apiKey}:`, 'utf8').toString('base64')}`;
@@ -72,19 +94,100 @@ export function resolveWebhookRemediationRoute(input = {}) {
   };
 }
 
+function sourcePrWriter(value) {
+  return String(value ?? '').trim();
+}
+
+function failureLabels(failedJobs = []) {
+  const labels = [];
+  for (const job of failedJobs) {
+    labels.push(String(job?.name ?? ''), String(job?.conclusion ?? ''));
+    for (const step of job?.steps ?? []) {
+      labels.push(String(step?.name ?? step));
+    }
+  }
+  return labels.filter(Boolean);
+}
+
+function failedJobsFrom(input = {}) {
+  if (Array.isArray(input.failedJobs) && input.failedJobs.length > 0) {
+    return input.failedJobs;
+  }
+  return (input.dispatch?.events ?? []).map(event => ({
+    name: event.check,
+    steps: event.failedSteps ?? [],
+    conclusion: event.conclusion,
+  }));
+}
+
+/**
+ * Runner-class CI failures are checkout, infra, or flake — not product
+ * assertions. Mixed product steps stay on the implementer path.
+ *
+ * @param {unknown} failedJobs
+ * @returns {'checkout' | 'infra' | 'flake' | null}
+ */
+export function classifyRunnerFailure(failedJobs = []) {
+  const jobs = Array.isArray(failedJobs) ? failedJobs : [];
+  const labels = failureLabels(jobs);
+  if (labels.some(label => PRODUCT_FAILURE_RE.test(label))) return null;
+  if (labels.some(label => CHECKOUT_FAILURE_RE.test(label))) return 'checkout';
+  if (labels.some(label => FLAKE_FAILURE_RE.test(label))) return 'flake';
+  if (labels.some(label => INFRA_FAILURE_RE.test(label))) return 'infra';
+  if (
+    jobs.some(
+      job =>
+        job?.conclusion === 'startup_failure' || job?.conclusion === 'timed_out'
+    )
+  ) {
+    return 'infra';
+  }
+  return null;
+}
+
 /** @param {Record<string, any>} [input] */
+export function resolveFxNamedOutcome(input = {}) {
+  const action = input.launch?.action;
+  const reason = String(input.launch?.reason ?? '');
+  const dispatchAction = String(input.dispatch?.action ?? '');
+  if (action === 'launch' || action === 'dedup') return 'launched';
+  if (action === 'configuration_incident' || reason === 'fx-auth-missing') {
+    return 'no_key';
+  }
+  if (action === 'writer_missing') return 'writer_missing';
+  if (
+    (action === 'skip' && /stale/.test(reason)) ||
+    /stale/.test(dispatchAction)
+  ) {
+    return 'skipped_stale';
+  }
+  if (dispatchAction === 'supersede_repairs_green') return 'repaired';
+  return 'needs_human';
+}
+
+/**
+ * Webhook writer for `runDispatch`. merge_group LIVE_AUTHOR can be blank
+ * (`gh api pulls/$PR .user.login`). Prefer the source PR author; if still
+ * blank, including a live implementer lease with an empty owner, use the
+ * adapter name so planning reaches `launch_action` instead of throwing
+ * `writer is required`.
+ *
+ * @param {Record<string, any>} [input]
+ */
 export function resolveDispatchWriter(input = {}) {
   const { route, priorClaimWriter, implementer } = input;
+  const sourceWriter = sourcePrWriter(implementer);
   if (route?.route === 'implementer') {
-    return route.writer || implementer;
+    return sourcePrWriter(route.writer) || sourceWriter || FX_ADAPTER_NAME;
   }
   if (route?.route === 'fx') {
-    if (priorClaimWriter && priorClaimWriter !== FX_ADAPTER_NAME) {
-      return priorClaimWriter;
+    const prior = sourcePrWriter(priorClaimWriter);
+    if (prior && prior !== FX_ADAPTER_NAME) {
+      return prior;
     }
-    return FX_ADAPTER_NAME;
+    return sourceWriter || FX_ADAPTER_NAME;
   }
-  return implementer;
+  return sourceWriter || FX_ADAPTER_NAME;
 }
 
 /** @param {Record<string, any>} [input] */
@@ -97,12 +200,16 @@ export function buildFxPrompt(input = {}) {
     fingerprint,
     failedChecks = [],
     producerEvent,
+    runnerClass = null,
   } = input;
   const mergeGroup = producerEvent === 'merge_group';
   return [
     mergeGroup
       ? 'Repair the source pull request after a native merge_group CI failure. Do not open a sibling PR.'
       : 'Repair the current pull request at the exact failed head. Do not open a sibling PR.',
+    runnerClass
+      ? `Runner-class failure (${runnerClass}): checkout, infra, or flake. Remediate the runner/CI wiring at the exact head. Do not change product tests or weaken gates. Idempotency: ${FX_RUNNER_IDEMPOTENCY_KEY}.`
+      : '',
     `Repository: ${repository}`,
     `PR: #${prNumber}`,
     mergeGroup
@@ -134,6 +241,7 @@ export function planFxLaunch(input = {}) {
     cursorAgents = [],
     cursorApiKey,
     producerEvent,
+    runnerClass = null,
   } = input;
   if (typeof cursorApiKey !== 'string' || cursorApiKey.trim().length === 0) {
     return {
@@ -163,6 +271,7 @@ export function planFxLaunch(input = {}) {
           fingerprint,
           failedChecks,
           producerEvent,
+          runnerClass,
         }),
       },
       source: {
@@ -178,7 +287,10 @@ export function planFxLaunch(input = {}) {
   };
 }
 
-/** @param {Record<string, any>} [input] */
+/**
+ * @param {Record<string, any>} [input]
+ * @returns {Record<string, any>}
+ */
 export function planFxWebhookRemediation(input = {}) {
   const {
     dispatch,
@@ -195,6 +307,9 @@ export function planFxWebhookRemediation(input = {}) {
     sourceHead,
     headRef,
   } = input;
+  const runnerClass = classifyRunnerFailure(
+    failedJobsFrom({ ...input, dispatch })
+  );
   const route = resolveWebhookRemediationRoute({
     receipt,
     liveHead,
@@ -210,16 +325,30 @@ export function planFxWebhookRemediation(input = {}) {
     action === 'dispatch_implementer' ||
     action === 'dispatch_superseding_head' ||
     action === 'reject_competing_writer';
+  const allowRunnerClassFx = Boolean(runnerClass);
 
-  if (route.route === 'implementer') {
-    return {
+  /**
+   * @param {Record<string, any>} result
+   * @returns {Record<string, any>}
+   */
+  const withOutcome = result => ({
+    ...result,
+    runnerClass,
+    outcome: resolveFxNamedOutcome({
+      launch: result.launch,
+      dispatch,
+    }),
+  });
+
+  if (route.route === 'implementer' && !allowRunnerClassFx) {
+    return withOutcome({
       dispatch,
       route,
       launch: { action: 'skip', reason: 'implementer_lease_live' },
-    };
+    });
   }
   if (route.route === 'configuration_incident') {
-    return {
+    return withOutcome({
       dispatch,
       route,
       launch: {
@@ -227,17 +356,17 @@ export function planFxWebhookRemediation(input = {}) {
         reason: 'fx-auth-missing',
         incident: route.incident,
       },
-    };
+    });
   }
-  if (route.route !== 'fx' || !isFailureDispatch) {
-    return {
+  if ((route.route !== 'fx' && !allowRunnerClassFx) || !isFailureDispatch) {
+    return withOutcome({
       dispatch,
       route,
       launch: { action: 'skip', reason: action || route.route },
-    };
+    });
   }
 
-  return {
+  return withOutcome({
     dispatch,
     route,
     launch: planFxLaunch({
@@ -254,8 +383,9 @@ export function planFxWebhookRemediation(input = {}) {
       failedChecks: (dispatch?.events ?? []).map(event => event.check),
       cursorAgents,
       cursorApiKey,
+      runnerClass,
     }),
-  };
+  });
 }
 
 /** @param {Record<string, any>} [input] */
@@ -339,7 +469,25 @@ async function main() {
     priorClaimWriter,
     implementer: input.writer,
   });
-  const dispatch = runDispatch({ ...input, writer });
+  const runnerClass = classifyRunnerFailure(input.failedJobs);
+  let dispatch;
+  try {
+    dispatch = runDispatch({ ...input, writer });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message === 'writer is required') {
+      const result = {
+        route,
+        runnerClass,
+        dispatch: { action: 'writer_missing', mutate: false },
+        launch: { action: 'writer_missing', reason: 'writer is required' },
+        outcome: 'writer_missing',
+      };
+      process.stdout.write(`${JSON.stringify(result)}\n`);
+      return;
+    }
+    throw error;
+  }
   const result = planFxWebhookRemediation({
     dispatch,
     receipt,
@@ -354,6 +502,7 @@ async function main() {
     headSha: input.headSha,
     sourceHead: input.sourceHead,
     headRef: input.headRef,
+    failedJobs: input.failedJobs,
   });
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }

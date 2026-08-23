@@ -562,6 +562,10 @@ struct AppShellView<
       voiceCaptureTrigger += 1
     }
 
+    if state.shouldOpenSettings, navigationPath.last != .settings {
+      navigationPath.append(.settings)
+    }
+
     if state.selectedTab != previousTab {
       withAnimation(JovieMotion.easeOut(duration: JovieMotion.slowDuration)) {
         selectedTab = state.selectedTab

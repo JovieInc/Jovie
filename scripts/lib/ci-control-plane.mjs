@@ -20,7 +20,13 @@ export {
   riskLocalCommands,
   validateCiHarnessManifest,
 } from './ci-harness.mjs';
-
+export {
+  CI_LANES,
+  classifyCiRepoLanes,
+  FOREIGN_REQUIRED_CHECK_CONTEXTS,
+  JOVIE_REQUIRED_CHECK_CONTEXTS,
+  jovieRequiredChecksAreLocal,
+} from './ci-repo-lanes.mjs';
 export {
   ALLOWED_REQUIRED_CHECK_CONTEXTS,
   FORBIDDEN_PINNED_JOB_CONTEXTS,

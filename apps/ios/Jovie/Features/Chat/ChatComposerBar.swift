@@ -1,9 +1,16 @@
 import SwiftUI
 
+enum ChatComposerCopy {
+  /// Visible placeholder is deleted (JOV-5319). Accessibility name stays.
+  static let emptyPlaceholder = ""
+  static let inputAccessibilityLabel = "Chat message"
+  static let inputAccessibilityIdentifier = "chat-composer-input"
+}
+
 enum ChatComposerMetrics {
   static let barHeight: CGFloat = 52
-  static let sendSlotSize: CGFloat = 36
-  static let plusButtonSize: CGFloat = 36
+  static let sendSlotSize = JovieActionButtonMetrics.height
+  static let plusButtonSize = JovieActionButtonMetrics.height
 
   static func isPlusEnabled(isSending: Bool) -> Bool {
     !isSending
@@ -84,6 +91,8 @@ struct ChatComposerBar: View {
         .disableAutocorrection(false)
         .font(JovieFont.body(size: 16))
         .foregroundStyle(JovieColor.textPrimary)
+        .accessibilityLabel(ChatComposerCopy.inputAccessibilityLabel)
+        .accessibilityIdentifier(ChatComposerCopy.inputAccessibilityIdentifier)
         .onChange(of: draft) {
           onDraftEdited()
         }
@@ -174,7 +183,7 @@ struct ChatComposerBar: View {
       Image(systemName: "mic.fill")
         .font(.system(size: 15, weight: .semibold))
         .foregroundStyle(JovieColor.textPrimary)
-        .frame(width: 36, height: 36)
+        .frame(width: ChatComposerMetrics.sendSlotSize, height: ChatComposerMetrics.sendSlotSize)
     }
     .buttonStyle(.plain)
     .accessibilityLabel(ChatComposerTrailingAction.mic.accessibilityLabel)

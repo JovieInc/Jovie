@@ -166,6 +166,20 @@ describe('rolling CI failure dispatch', () => {
     expect(run?.id).toBe(11);
   });
 
+  it('deliberate red: dispatch CLI still requires a writer on merge_group', () => {
+    const result = spawnSync(process.execPath, [CLI], {
+      input: JSON.stringify(
+        dispatchInput({
+          writer: '',
+          source: { ...trustedSource, producerEvent: 'merge_group' },
+        })
+      ),
+      encoding: 'utf8',
+    });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('writer is required');
+  });
+
   it('accepts native merge_group CI as an authenticated producer', () => {
     expect(TRUSTED_PRODUCER_EVENTS).toEqual(['pull_request', 'merge_group']);
     expect(
@@ -487,6 +501,10 @@ describe('rolling CI dispatch CLI and workflow', () => {
       'node scripts/lib/rolling-ci-fx.mjs',
       'scripts/lib/rolling-ci-handoff.mjs',
       'Launch FX remediator',
+      'Record FX outcome',
+      'fx_outcome',
+      '::notice::FX outcome=',
+      'startup_failure',
       'runs-on: ubuntu-latest',
     ]) {
       expect(WORKFLOW, token).toContain(token);

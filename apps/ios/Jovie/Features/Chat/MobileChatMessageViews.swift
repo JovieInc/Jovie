@@ -199,9 +199,7 @@ struct ChatComposerView: View {
     ChatComposerBar(
       draft: $draft,
       isFocused: $isComposerFocused,
-      placeholder: isOffline
-        ? workspaceMode.composerOfflinePlaceholder
-        : workspaceMode.askChatLabel,
+      placeholder: composerPlaceholder,
       isSending: isSending,
       isPlusEnabled: workspaceMode == .jovie && ChatComposerMetrics.isPlusEnabled(isSending: isSending),
       onSend: onSend,
@@ -209,6 +207,16 @@ struct ChatComposerView: View {
       onSelectWorkflow: onSelectWorkflow,
       onDraftEdited: onDraftEdited
     )
+    .accessibilityValue(isOffline ? "Offline" : "")
+  }
+
+  private var composerPlaceholder: String {
+    if workspaceMode == .ovie {
+      return isOffline
+        ? workspaceMode.composerOfflinePlaceholder
+        : workspaceMode.askChatLabel
+    }
+    return ChatComposerCopy.emptyPlaceholder
   }
 }
 

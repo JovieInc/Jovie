@@ -7,10 +7,13 @@ import {
   TRUSTED_CI_WORKFLOW_PATH,
 } from '../rolling-ci-dispatch.mjs';
 import {
+  classifyRunnerFailure,
+  FX_RUNNER_IDEMPOTENCY_KEY,
   findOwnedAgents,
   planFxLaunch,
   planFxWebhookRemediation,
   resolveDispatchWriter,
+  resolveFxNamedOutcome,
   resolveWebhookRemediationRoute,
 } from '../rolling-ci-fx.mjs';
 import {
@@ -269,6 +272,95 @@ describe('rolling CI FX webhook remediation', () => {
     ).toBe('tim');
   });
 
+  it('uses the source PR author when present, else FX on blank merge_group LIVE_AUTHOR', () => {
+    expect(
+      resolveDispatchWriter({
+        route: { route: 'fx', writer: FX_ADAPTER_NAME },
+        implementer: 'tim',
+      })
+    ).toBe('tim');
+    expect(
+      resolveDispatchWriter({
+        route: { route: 'fx', writer: FX_ADAPTER_NAME },
+        implementer: '',
+      })
+    ).toBe(FX_ADAPTER_NAME);
+    expect(
+      resolveDispatchWriter({
+        route: { route: 'configuration_incident', writer: null },
+        implementer: '   ',
+      })
+    ).toBe(FX_ADAPTER_NAME);
+    expect(
+      resolveDispatchWriter({
+        route: { route: 'configuration_incident', writer: null },
+        implementer: 'tim',
+      })
+    ).toBe('tim');
+    expect(
+      resolveDispatchWriter({
+        route: { route: 'implementer', writer: '' },
+        implementer: '',
+      })
+    ).toBe(FX_ADAPTER_NAME);
+  });
+
+  it('plans merge_group FX launch when LIVE_AUTHOR is empty', () => {
+    const input = {
+      repository: 'JovieInc/Jovie',
+      prNumber: 16418,
+      headSha: head,
+      liveHead: head,
+      sourceHead: 'b'.repeat(40),
+      headRef: 'cursor/measured-merge-group',
+      workflowRunId: 32621638955,
+      workflowRunAttempt: 1,
+      failedJobs: [{ name: 'ci-fast', steps: ['Typecheck'] }],
+      source: { ...trustedSource, producerEvent: 'merge_group' },
+      checkSuiteId: 44,
+      checks: [
+        {
+          name: 'ci-fast',
+          conclusion: 'failure',
+          headSha: head,
+          checkSuiteId: 44,
+        },
+      ],
+      writer: '',
+      priorCommentBody: '',
+      conclusion: 'failure',
+      cursorApiKey: 'cursor-key',
+      listCursorAgents: false,
+    };
+    const launched = spawnSync(process.execPath, [CLI], {
+      input: JSON.stringify(input),
+      encoding: 'utf8',
+    });
+    expect(launched.status).toBe(0);
+    expect(launched.stderr).not.toContain('writer is required');
+    const planned = JSON.parse(launched.stdout);
+    expect(planned).toMatchObject({
+      route: { route: 'fx' },
+      launch: { action: 'launch' },
+      dispatch: { mutate: true, action: 'dispatch_implementer' },
+      outcome: 'launched',
+    });
+    expect(planned.dispatch.state.claim.writer).toBe(FX_ADAPTER_NAME);
+
+    const missingAuth = spawnSync(process.execPath, [CLI], {
+      input: JSON.stringify({ ...input, cursorApiKey: '' }),
+      encoding: 'utf8',
+    });
+    expect(missingAuth.status).toBe(0);
+    expect(missingAuth.stderr).not.toContain('writer is required');
+    expect(JSON.parse(missingAuth.stdout)).toMatchObject({
+      route: { route: 'configuration_incident' },
+      launch: { action: 'configuration_incident' },
+      dispatch: { mutate: true },
+      outcome: 'no_key',
+    });
+  });
+
   it('CLI plans an FX launch from a trusted failure event', () => {
     const input = {
       repository: 'JovieInc/Jovie',
@@ -320,6 +412,124 @@ describe('rolling CI FX webhook remediation', () => {
     expect(JSON.parse(held.stdout).launch).toMatchObject({
       action: 'skip',
       reason: 'implementer_lease_live',
+    });
+  });
+
+  it('classifies checkout, infra, and flake separately from product failures', () => {
+    expect(
+      classifyRunnerFailure([
+        { name: 'ci-fast', steps: ['Checkout exact PR head'] },
+      ])
+    ).toBe('checkout');
+    expect(
+      classifyRunnerFailure([
+        { name: 'ci-fast', conclusion: 'startup_failure', steps: [] },
+      ])
+    ).toBe('infra');
+    expect(
+      classifyRunnerFailure([{ name: 'ci-fast', steps: ['flake retry'] }])
+    ).toBe('flake');
+    expect(
+      classifyRunnerFailure([{ name: 'ci-fast', steps: ['Typecheck'] }])
+    ).toBeNull();
+    expect(resolveFxNamedOutcome({ launch: { action: 'launch' } })).toBe(
+      'launched'
+    );
+    expect(
+      resolveFxNamedOutcome({
+        launch: { action: 'configuration_incident', reason: 'fx-auth-missing' },
+      })
+    ).toBe('no_key');
+  });
+
+  it('launches FX for checkout failures even while an implementer lease is live', () => {
+    const checkoutJobs = [
+      { name: 'ci-fast', steps: ['Checkout exact PR head'] },
+    ];
+    const planned = planFxWebhookRemediation({
+      dispatch: dispatch({ failedJobs: checkoutJobs }),
+      receipt: activeReceipt,
+      liveHead: head,
+      implementer: 'tim',
+      fxAdapter,
+      cursorApiKey: 'cursor-key',
+      now: '2026-08-22T01:00:00Z',
+      failedJobs: checkoutJobs,
+    });
+    expect(planned.launch.action).toBe('launch');
+    expect(planned.runnerClass).toBe('checkout');
+    expect(planned.outcome).toBe('launched');
+    expect(planned.launch.request.prompt.text).toContain(
+      'Runner-class failure'
+    );
+    expect(planned.launch.request.prompt.text).toContain(
+      FX_RUNNER_IDEMPOTENCY_KEY
+    );
+    expect(planned.launch.request.prompt.text).toContain(
+      'Do not change product tests or weaken gates'
+    );
+  });
+
+  it('CLI launches FX for checkout failures when LIVE_AUTHOR is empty', () => {
+    const input = {
+      repository: 'JovieInc/Jovie',
+      prNumber: 17,
+      headSha: head,
+      liveHead: head,
+      headRef: 'fix/ci',
+      workflowRunId: 9001,
+      workflowRunAttempt: 1,
+      failedJobs: [{ name: 'ci-fast', steps: ['Checkout exact PR head'] }],
+      source: trustedSource,
+      checkSuiteId: 44,
+      checks: [
+        {
+          name: 'ci-fast',
+          conclusion: 'failure',
+          headSha: head,
+          checkSuiteId: 44,
+        },
+      ],
+      writer: '',
+      priorCommentBody: '',
+      conclusion: 'failure',
+      cursorApiKey: 'cursor-key',
+      listCursorAgents: false,
+    };
+    const launched = spawnSync(process.execPath, [CLI], {
+      input: JSON.stringify(input),
+      encoding: 'utf8',
+    });
+    expect(launched.status).toBe(0);
+    expect(launched.stderr).not.toContain('writer is required');
+    expect(JSON.parse(launched.stdout)).toMatchObject({
+      launch: { action: 'launch' },
+      outcome: 'launched',
+      runnerClass: 'checkout',
+      dispatch: { mutate: true },
+    });
+    expect(JSON.parse(launched.stdout).dispatch.state.claim.writer).toBe(
+      FX_ADAPTER_NAME
+    );
+
+    const heldCheckout = spawnSync(process.execPath, [CLI], {
+      input: JSON.stringify({
+        ...input,
+        writer: 'tim',
+        handoffCommentBody: receiptMarker(
+          'jovie-rolling-ci-handoff',
+          activeReceipt
+        ),
+        now: '2026-08-22T01:00:00Z',
+      }),
+      encoding: 'utf8',
+    });
+    expect(heldCheckout.status).toBe(0);
+    expect(heldCheckout.stderr).not.toContain('writer is required');
+    expect(JSON.parse(heldCheckout.stdout)).toMatchObject({
+      launch: { action: 'launch' },
+      outcome: 'launched',
+      runnerClass: 'checkout',
     });
   });
 });

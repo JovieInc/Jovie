@@ -468,6 +468,9 @@ jobs:
       run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}
       has_code_changes: ${{ steps.detect.outputs.has_code_changes || 'false' }}
       is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}
+      run_jovie_product: ${{ steps.detect.outputs.run_jovie_product || 'false' }}
+      run_symphony_control: ${{ steps.detect.outputs.run_symphony_control || 'false' }}
+      run_summer_ops: ${{ steps.detect.outputs.run_summer_ops || 'false' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -526,6 +529,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          emit_ci_lanes() {
+            local mode="${1:-}"
+            if [[ "$mode" == "all" ]]; then
+              node scripts/lib/ci-repo-lanes.mjs --emit-github-output --all
+            elif [[ "$mode" == "none" ]]; then
+              node scripts/lib/ci-repo-lanes.mjs --emit-github-output --none
+            else
+              printf '%s\n' "${CHANGED_FILES:-}" | node scripts/lib/ci-repo-lanes.mjs --emit-github-output
+            fi
+          }
           IS_FORK="${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}"
           # Determine changed files
           if [[ "${{ github.event_name }}" == "merge_group" ]]; then
@@ -565,6 +578,7 @@ jobs:
               for output in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios has_code_changes; do
                 echo "$output=false" >> "$GITHUB_OUTPUT"
               done
+              emit_ci_lanes none
               exit 0
             fi
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
@@ -587,6 +601,7 @@ jobs:
             for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
+            emit_ci_lanes all
             exit 0
           elif [[ "${{ github.event_name }}" == "push" ]]; then
             PUSH_BASE_SHA="${{ github.event.before }}"
@@ -628,6 +643,7 @@ jobs:
             for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_golden_path run_drizzle run_neon; do
               echo "$t=false" >> "$GITHUB_OUTPUT"
             done
+            emit_ci_lanes
             exit 0
           fi
 
@@ -638,6 +654,7 @@ jobs:
             for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
               echo "$t=false" >> "$GITHUB_OUTPUT"
             done
+            emit_ci_lanes
             exit 0
           fi
 
@@ -771,6 +788,8 @@ jobs:
             echo "run_test=false" >> "$GITHUB_OUTPUT"
             echo "run_test_performance=false" >> "$GITHUB_OUTPUT"
           fi
+
+          emit_ci_lanes
 
   # Do not allocate unit/build/Xcode/eval capacity after a required external
   # queue gate has already failed or GitHub has deleted the synthetic ref.
@@ -1179,7 +1198,7 @@ jobs:
           # origin/<base>; a --depth=1 fetch leaves the base tip shallow and fails
           # desktop-release-guard / version-fanout-guard on PRs.
           git fetch origin "${{ github.base_ref }}" --no-tags
-          if git diff --name-only "origin/${{ github.base_ref }}" HEAD | grep -qE '^(\.github/|\.claude/rules/(ci-branching|release|testing|gstack)\.md|AGENTS\.md|CODEX\.md|canon/invariants\.jsonl|scripts/invariants/|scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|ownership-inventory)|scripts/backlog-orchestrator/__tests__/(pre-lease-gates|ownership-inventory)|scripts/lib/(ci-|merge-queue)|scripts/lib/__tests__/(ci-fast-workflow-contract|merge-group-workflow-contract)\.test\.mjs|scripts/ci-|scripts/hermes/(gem-|gem_|install-gem-pr-rehabilitation)|scripts/brand-scrub\.py|scripts/tests/test_(brand_scrub|agent_workflow_hygiene|vercel_prebuilt_deploy)\.py)'; then
+          if git diff --name-only "origin/${{ github.base_ref }}" HEAD | grep -qE '^(\.github/|\.claude/rules/(ci-branching|release|testing|gstack)\.md|AGENTS\.md|CODEX\.md|canon/invariants\.jsonl|scripts/invariants/|scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|ownership-inventory)|scripts/backlog-orchestrator/__tests__/(pre-lease-gates|gate-next-hold|ownership-inventory)|scripts/lib/(ci-|merge-queue)|scripts/lib/__tests__/(ci-fast-workflow-contract|merge-group-workflow-contract)\.test\.mjs|scripts/ci-|scripts/hermes/(gem-|gem_|install-gem-pr-rehabilitation)|scripts/brand-scrub\.py|scripts/tests/test_(brand_scrub|agent_workflow_hygiene|vercel_prebuilt_deploy)\.py)'; then
             echo "skip=false" >> "$GITHUB_OUTPUT"
           else
             echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -1705,7 +1724,8 @@ jobs:
       (
         (
           github.event_name == 'merge_group' &&
-          needs.ci-path-changes.outputs.is_noop_merge_group != 'true'
+          needs.ci-path-changes.outputs.is_noop_merge_group != 'true' &&
+          needs.ci-path-changes.outputs.run_jovie_product == 'true'
         ) ||
         (github.event_name == 'push' && github.ref == 'refs/heads/main')
       )
@@ -3195,7 +3215,8 @@ jobs:
       (
         (
           github.event_name == 'merge_group' &&
-          needs.ci-path-changes.outputs.is_noop_merge_group != 'true'
+          needs.ci-path-changes.outputs.is_noop_merge_group != 'true' &&
+          needs.ci-path-changes.outputs.run_jovie_product == 'true'
         ) ||
         (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
         github.event_name == 'workflow_dispatch'
@@ -4710,6 +4731,7 @@ jobs:
           GOLDEN_PATH_LOCK_RESULT="${{ needs.ci-golden-path-lock.result }}"
           MIGRATION_RESULT="${{ needs.drizzle-migration-guard.result }}"
           NOOP_GROUP="${{ needs.ci-path-changes.outputs.is_noop_merge_group }}"
+          RUN_JOVIE_PRODUCT="${{ needs.ci-path-changes.outputs.run_jovie_product }}"
           RUN_IOS="${{ needs.ci-path-changes.outputs.run_ios }}"
           RUN_PROMPTFOO="${{ needs.ci-path-changes.outputs.run_promptfoo_evals }}"
           RUN_GOLDEN_EVAL="${{ needs.ci-path-changes.outputs.run_golden_eval_set }}"
@@ -4723,6 +4745,7 @@ jobs:
             echo "| --- | --- |"
             echo "| Path Changes | $PATH_RESULT |"
             echo "| Typed no-op merge group | $NOOP_GROUP |"
+            echo "| Jovie product suites | $RUN_JOVIE_PRODUCT |"
             echo "| Merge Group Admission | $ADMISSION_RESULT |"
             echo "| CI Risk Classifier | $RISK_RESULT |"
             echo "| ci-fast | $FAST_RESULT |"
@@ -4757,6 +4780,11 @@ jobs:
           if [[ "$NOOP_GROUP" == "true" ]]; then
             if [[ "$UNIT_RESULT" != "skipped" || "$BUILD_LAYOUT_RESULT" != "skipped" ]]; then
               echo "::error::Typed no-op merge group must skip Unit Tests and Build + Layout (unit: $UNIT_RESULT, build: $BUILD_LAYOUT_RESULT)"
+              exit 1
+            fi
+          elif [[ "$RUN_JOVIE_PRODUCT" != "true" ]]; then
+            if [[ "$UNIT_RESULT" != "skipped" || "$BUILD_LAYOUT_RESULT" != "skipped" ]]; then
+              echo "::error::Non-product merge group must skip Unit Tests and Build + Layout (unit: $UNIT_RESULT, build: $BUILD_LAYOUT_RESULT, product: $RUN_JOVIE_PRODUCT)"
               exit 1
             fi
           else

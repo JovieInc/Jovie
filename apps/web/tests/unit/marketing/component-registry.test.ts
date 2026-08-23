@@ -736,6 +736,34 @@ describe('canonical molecule ownership receipt', () => {
       id: 'atom.card',
     });
   });
+
+  it('fails closed when ownership evidence is missing', () => {
+    const missingEvidence: MoleculeOwnershipReceipt = {
+      ...receipt,
+      families: receipt.families.map((family, index) =>
+        index === 0
+          ? {
+              ...family,
+              statesAndModes: [],
+              behaviorEvidence: [],
+              visualEvidence: [],
+              consumers: [],
+            }
+          : family
+      ),
+    };
+
+    expect(
+      validateMoleculeOwnershipReceipt({
+        receipt: missingEvidence,
+        sourceByPath,
+        existingPaths,
+      })
+    ).toContainEqual({
+      code: 'missing-ownership-evidence',
+      id: 'molecule.settings-panel',
+    });
+  });
 });
 
 describe('canonical shared source atom registry', () => {

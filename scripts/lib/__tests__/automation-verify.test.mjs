@@ -25,9 +25,11 @@ const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = [
   'scripts/automation-verify.sh',
   'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
   'scripts/backlog-orchestrator/__tests__/deterministic-gates.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
   'scripts/backlog-orchestrator/admitter.mjs',
   'scripts/backlog-orchestrator/backlog-orchestrator.mjs',
   'scripts/backlog-orchestrator/deterministic-gates.mjs',
+  'scripts/backlog-orchestrator/gate-next-hold.mjs',
   'scripts/hermes/codex-rotate',
   'scripts/hermes/tests/codex-rotate.test.py',
   'scripts/lib/__tests__/automation-verify.test.mjs',
@@ -516,6 +518,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/pr-check-failures.test.mjs',
         'scripts/lib/__tests__/pr-conflict-handler.test.mjs',
         'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+        'scripts/lib/__tests__/ci-repo-lanes.test.mjs',
         'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
         'scripts/lib/__tests__/lockfile-specifier-preflight.test.mjs',
         'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
@@ -604,6 +607,7 @@ describe('automation-verify affected scope', () => {
       nodeTests: [
         'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
         'scripts/backlog-orchestrator/__tests__/deterministic-gates.test.mjs',
+        'scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
       ],
       scriptVitestTests: [
         'scripts/lib/__tests__/automation-verify.test.mjs',

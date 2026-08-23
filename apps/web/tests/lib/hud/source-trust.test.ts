@@ -25,6 +25,7 @@ function buildInput(
       balanceUsd: 5000,
       burnRateUsd: 2000,
       burnWindowDays: 30,
+      burnRateAvailable: true,
       isConfigured: true,
       isAvailable: true,
       defaultStatus: 'alive' as const,
@@ -76,6 +77,16 @@ describe('source-trust freshness helpers', () => {
     const now = Date.parse(fetchedAtIso) + HUD_SOURCE_STALE_AFTER_MS + 1;
     expect(isSourceStale(fetchedAtIso, now)).toBe(true);
   });
+
+  it.each([
+    'invalid',
+    '2026-06-08T12:01:00.000Z',
+  ])('does not format invalid or future timestamps as fresh: %s', value => {
+    expect(formatSourceFreshness(value, Date.parse(fetchedAtIso))).toBe(
+      'time unknown'
+    );
+    expect(isSourceStale(value, Date.parse(fetchedAtIso))).toBe(false);
+  });
 });
 
 describe('buildHudMetricSources', () => {
@@ -91,6 +102,24 @@ describe('buildHudMetricSources', () => {
     expect(sources.github.dashboardUrl).toBe(
       'https://github.com/JovieInc/Jovie/actions'
     );
+  });
+
+  it('preserves provider observation timestamps instead of restamping cache hits', () => {
+    const sources = buildHudMetricSources(
+      buildInput({
+        stripe: {
+          ...buildInput().stripe,
+          observedAtIso: '2026-06-08T11:58:00.000Z',
+        },
+        mercury: {
+          ...buildInput().mercury,
+          observedAtIso: '2026-06-08T11:57:00.000Z',
+        },
+      })
+    );
+
+    expect(sources.stripe.fetchedAtIso).toBe('2026-06-08T11:58:00.000Z');
+    expect(sources.mercury.fetchedAtIso).toBe('2026-06-08T11:57:00.000Z');
   });
 
   it('distinguishes unavailable Stripe from not configured Mercury', () => {
@@ -109,6 +138,7 @@ describe('buildHudMetricSources', () => {
           balanceUsd: 0,
           burnRateUsd: 0,
           burnWindowDays: 30,
+          burnRateAvailable: false,
           isConfigured: false,
           isAvailable: false,
           defaultStatus: 'unknown',
@@ -122,6 +152,46 @@ describe('buildHudMetricSources', () => {
     expect(sources.stripe.errorMessage).toContain('Stripe API error');
     expect(sources.mercury.state).toBe('not_configured');
     expect(sources.mercury.nextStep).toContain('MERCURY_API_TOKEN');
+  });
+
+  it('marks Mercury degraded when the balance loaded without burn', () => {
+    const sources = buildHudMetricSources(
+      buildInput({
+        mercury: {
+          balanceUsd: 5000,
+          burnRateUsd: 0,
+          burnWindowDays: 30,
+          burnRateAvailable: false,
+          isConfigured: true,
+          isAvailable: true,
+          defaultStatus: 'unknown',
+          errorMessage: 'Mercury transaction window timed out.',
+        },
+      })
+    );
+
+    expect(sources.mercury.state).toBe('degraded');
+    expect(sources.mercury.nextStep).toContain('Retry Mercury transactions');
+    expect(isHudMetricValueAvailable(sources.mercury)).toBe(false);
+  });
+
+  it('classifies provider authorization failures without leaking them as generic outages', () => {
+    const sources = buildHudMetricSources(
+      buildInput({
+        stripe: {
+          mrrUsd: 0,
+          activeSubscribers: 0,
+          mrrUsd30dAgo: 0,
+          mrrGrowth30dUsd: 0,
+          isConfigured: true,
+          isAvailable: false,
+          errorMessage: 'Stripe API error (401): unauthorized',
+        },
+      })
+    );
+
+    expect(sources.stripe.state).toBe('unauthorized');
+    expect(isHudMetricValueAvailable(sources.stripe)).toBe(false);
   });
 
   it('marks GitHub as no_data when configured but empty', () => {

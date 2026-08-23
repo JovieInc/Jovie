@@ -33,6 +33,7 @@ vi.mock('@/lib/admin/mercury-metrics', () => ({
     balanceUsd: 10000,
     burnRateUsd: 2000,
     burnWindowDays: 30,
+    burnRateAvailable: true,
     isConfigured: true,
     isAvailable: true,
   })),
@@ -300,5 +301,55 @@ describe('getHudMetrics', () => {
     );
     expect(metrics.sources.stripe.state).toBe('unavailable');
     expect(metrics.sources.stripe.nextStep).toContain('retry');
+  });
+
+  it('fails the composed financial status closed when Mercury burn is degraded', async () => {
+    mockGetHudDeployments.mockResolvedValueOnce({
+      availability: 'not_configured',
+      current: null,
+      recent: [],
+    });
+    vi.mocked(getAdminMercuryMetrics).mockResolvedValueOnce({
+      balanceUsd: 10_000,
+      burnRateUsd: 0,
+      burnWindowDays: 30,
+      burnRateAvailable: false,
+      isConfigured: true,
+      isAvailable: true,
+      defaultStatus: 'unknown',
+      errorMessage: 'Mercury transaction window timed out.',
+    });
+
+    const metrics = await getHudMetrics('admin');
+
+    expect(metrics.overview.financialDataAvailable).toBe(false);
+    expect(metrics.overview.defaultStatus).toBe('unknown');
+    expect(metrics.overview.runwayMonths).toBeNull();
+    expect(metrics.overview.defaultStatusDetail).toContain(
+      'Mercury transactions (degraded)'
+    );
+    expect(metrics.sources.mercury.state).toBe('degraded');
+  });
+
+  it('fails closed when a legacy Mercury producer omits completeness metadata', async () => {
+    mockGetHudDeployments.mockResolvedValueOnce({
+      availability: 'not_configured',
+      current: null,
+      recent: [],
+    });
+    vi.mocked(getAdminMercuryMetrics).mockResolvedValueOnce({
+      balanceUsd: 10_000,
+      burnRateUsd: 0,
+      burnWindowDays: 30,
+      isConfigured: true,
+      isAvailable: true,
+      defaultStatus: 'alive',
+    } as never);
+
+    const metrics = await getHudMetrics('admin');
+
+    expect(metrics.overview.financialDataAvailable).toBe(false);
+    expect(metrics.overview.defaultStatus).toBe('unknown');
+    expect(metrics.overview.runwayMonths).toBeNull();
   });
 });

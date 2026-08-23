@@ -36,11 +36,11 @@ export const CANONICAL_SURFACES = [
     liveRoutes: ['/'],
     reviewRoute: '/',
     sourceRoute: '/',
-    sourceComponent: 'app/(home)/page.tsx -> HomePageNarrative',
+    sourceComponent: 'app/(home)/page.tsx -> MarketingPosterHero',
     demoRoute: '/',
     fixtureSetId: 'marketing-static',
     screenshotIds: ['marketing-home-desktop'],
-    routeOwner: 'app/(home)/page.tsx -> HomePageNarrative',
+    routeOwner: 'app/(home)/layout.tsx -> PublicPageShell',
     componentFamily: 'features/home',
     description: 'Primary marketing homepage and current live review surface.',
   },
@@ -82,7 +82,7 @@ export const CANONICAL_SURFACES = [
     reviewRoute: '/demo',
     sourceRoute: APP_ROUTES.RELEASES,
     sourceComponent:
-      'features/dashboard/organisms/release-provider-matrix/ReleasesExperience',
+      'features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView',
     demoRoute: '/demo',
     fixtureSetId: 'dashboard-releases-demo',
     screenshotIds: [

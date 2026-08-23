@@ -110,6 +110,7 @@ function asClaimedTurn(
 /** Keep aligned with apps/web/lib/ovie/isolation.ts SUMMER_SAFE_TOOLS. */
 const SUMMER_SAFE_TOOLS = [
   'get_org_state',
+  'get_invariant_stewardship',
   'inspect_kanban',
   'search_gbrain',
 ] as const;

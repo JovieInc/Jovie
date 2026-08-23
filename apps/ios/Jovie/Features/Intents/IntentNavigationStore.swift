@@ -17,6 +17,8 @@ enum IntentNavigationRequest: Equatable, Sendable {
   case continueLastConversation
   /// Open chat and load a specific conversation (Spotlight / Siri Suggestions).
   case openConversation(String)
+  /// Open native Settings. Signed-in /settings URLs must not stay on Chat.
+  case openSettings
 }
 
 @MainActor
