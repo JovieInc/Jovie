@@ -15,9 +15,10 @@ permissions:
   contents: read
 
 concurrency:
-  # One controller writer for all events. The durable receipt is idempotent,
-  # while the governor independently bounds implementation leases to four.
-  group: jovie-intake-admission
+  # Serialize duplicate updates for one issue while allowing unrelated issue
+  # receipts/classification to use measured runner capacity. The mutating
+  # admission command retains a shared host lock below.
+  group: jovie-intake-${{ github.event.client_payload.issue_identifier || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -63,11 +64,12 @@ jobs:
         env:
           JOVIE_AGENT_PROFILE: no_agent
           ISSUE_IDENTIFIER: ${{ github.event.client_payload.issue_identifier }}
+          GEM_WORKSPACE: /home/timwhite/gem-workspace
         run: |
           set -euo pipefail
           test -n "$ISSUE_IDENTIFIER"
-          # The wrapper holds the shared Gem flock around issue-scoped
-          # gate-next. Child stdout remains the admission receipt.
+          # The shared Gem wrapper serializes issue-scoped gate-next with
+          # Fleet. Child stdout remains the admission receipt.
           receipt="$RUNNER_TEMP/intake-admission.json"
           python3 scripts/hermes/gem-gate-next-admission.py --mode=intake --issue="$ISSUE_IDENTIFIER" | tee "$receipt"
           if jq -e --arg issue "$ISSUE_IDENTIFIER" '

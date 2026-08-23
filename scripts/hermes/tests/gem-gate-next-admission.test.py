@@ -239,7 +239,12 @@ class GemGateNextAdmissionTests(unittest.TestCase):
         intake = (ROOT / ".github/workflows/jovie-intake-controller.yml").read_text()
         wrapper = SOURCE.read_text()
         self.assertIn("group: fleet-gate-event-admission", fleet)
-        self.assertIn("group: jovie-intake-admission", intake)
+        self.assertIn(
+            "group: jovie-intake-${{ github.event.client_payload.issue_identifier || github.run_id }}",
+            intake,
+        )
+        self.assertNotIn("group: jovie-intake-admission", intake)
+        self.assertNotIn("group: fleet-gate-event-admission", intake)
         self.assertIn("gem-gate-next-admission.py --mode=fleet", fleet)
         self.assertIn('gem-gate-next-admission.py --mode=intake --issue="$ISSUE_IDENTIFIER"', intake)
         self.assertNotIn("run-backlog.sh gate-next", fleet + intake)

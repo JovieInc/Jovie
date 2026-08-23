@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed Symphony lease guard (JOV-5031).
+"""Fail-closed Symphony lease guard (JOV-5031, JOV-INV-007).
 
 Two duties:
 
@@ -11,9 +11,8 @@ Two duties:
    active state cannot redispatch it. Only a newer explicit active-state
    transition (issue.updatedAt newer than the tombstoned observation) reopens
    the lease. A run is aborted (exit 1) only on positive evidence of a
-   non-active or stale state; an indeterminate tracker read admits the run and
-   is counted, matching the fleet rule that a failed observation is not proof
-   of a state change.
+   non-active or stale state. An indeterminate tracker read suppresses a new
+   session for reconciliation; it never erases or kills already-running work.
 
 2. `report` — emits the live lease health receipt consumed by the fleet gate:
    tombstone/counter state, orphan-launcher count (codex-rotate app-server
@@ -269,7 +268,7 @@ def lease_decision(
     not None; clear_existing removes the entry (deliberate reopen).
     """
     if issue is None:
-        return "admit", "indeterminate", tombstone, False
+        return "suppress", "indeterminate", tombstone, False
     state_name = issue["state"]
     if state_name.strip().lower() in active_states:
         if tombstone is None:
@@ -312,7 +311,7 @@ def check(identifier: str) -> int:
     elif tombstone is not None:
         state["tombstones"][identifier] = tombstone
     counter_key = {
-        ("admit", "indeterminate"): "indeterminate",
+        ("suppress", "indeterminate"): "indeterminate",
         ("admit", "active"): "admitted",
         ("admit", "reopened"): "reopened",
     }.get((decision, reason))

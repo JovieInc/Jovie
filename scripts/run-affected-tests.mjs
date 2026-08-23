@@ -400,6 +400,7 @@ export const GATE_NEXT_ADMISSION_LANE = new Set([
   'scripts/tests/test_symphony_ui_pilot_runtime.py',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/backlog-orchestrator/intake-controller-workflow.test.mjs',
   'scripts/ci-fast-lanes.mjs',
   'scripts/run-affected-tests.mjs',
   'CHANGELOG.md',
@@ -763,7 +764,9 @@ export function buildAffectedTestPlan(
         'scripts/lib/__tests__/automation-verify.test.mjs',
         'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
       ],
-      nodeTests: [],
+      nodeTests: [
+        'scripts/backlog-orchestrator/intake-controller-workflow.test.mjs',
+      ],
     };
   }
   const ciUiDriftGuardrailInputCount = files.filter(file =>

@@ -1,11 +1,13 @@
 /**
  * Deterministic admission boundary for Symphony.
+ * Invariant consumers: JOV-INV-007 and JOV-INV-008.
  *
  * Workstream bundles are useful reports, but only a bounded number of concrete
  * issues per routed product team may cross this boundary. Admission is
  * fail-closed on ownership, plan evidence, and mutation read-back.
  */
 
+import { invariantPolicy } from '../invariants/registry.mjs';
 import { admissionGateReceipt } from './admission-gate.mjs';
 import { preAdmissionDecision } from './admission-policy.mjs';
 import { contextGateReceipt } from './context-gate.mjs';
@@ -59,10 +61,12 @@ const SEVERE_INTEGRITY_REASONS = new Set([
   FLEET_GATE_REASON.REPOSITORY_CORRUPTION,
   FLEET_GATE_REASON.SEVERE_INTEGRITY_INCIDENT,
 ]);
-const DEFAULT_GEM_CONCURRENCY = 4;
-const MAX_EVIDENCE_BACKED_GEM_CONCURRENCY = 8;
+const CAPACITY_POLICY = invariantPolicy('JOV-INV-007');
+const DEFAULT_GEM_CONCURRENCY = CAPACITY_POLICY.baseline;
+const MAX_EVIDENCE_BACKED_GEM_CONCURRENCY = CAPACITY_POLICY.maximum;
 const CONTROLLER_RECEIPT_MAX_AGE_MS = 10 * 60 * 1000;
-const CONCURRENCY_EVIDENCE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const CONCURRENCY_EVIDENCE_MAX_AGE_MS =
+  CAPACITY_POLICY.freshnessHours * 60 * 60 * 1000;
 export const FLEET_PROMOTION_MODE = Object.freeze({
   NORMAL: 'normal',
   ISOLATED_ONLY: 'isolated-only',
@@ -288,9 +292,9 @@ function deploymentBound(mainSha, deployedSha) {
 }
 
 /**
- * Gem stays at four workers by default. Eight is accepted only from a recent,
- * explicit evidence receipt with enough clean observations and no severe
- * incidents. Missing, malformed, or stale evidence fails closed to four.
+ * Runtime may preserve already-queued work at its safe floor, but a new Linear
+ * mutation requires a fresh approved capacity receipt. Missing, malformed, or
+ * stale evidence therefore grants zero new leases rather than inventing four.
  */
 export function resolveGemConcurrency(
   evidence,
@@ -300,23 +304,32 @@ export function resolveGemConcurrency(
   } = {}
 ) {
   const nowMs = Date.parse(now);
-  const eligibleForEight =
+  const measuredTarget = evidence?.target;
+  const requiredCleanRuns =
+    measuredTarget > DEFAULT_GEM_CONCURRENCY
+      ? CAPACITY_POLICY.cleanRunsForMaximum
+      : 1;
+  const evidenceAccepted =
     evidence?.schema === GEM_CONCURRENCY_EVIDENCE_SCHEMA &&
-    evidence?.target === MAX_EVIDENCE_BACKED_GEM_CONCURRENCY &&
+    Number.isInteger(measuredTarget) &&
+    measuredTarget >= CAPACITY_POLICY.minimum &&
+    measuredTarget <= MAX_EVIDENCE_BACKED_GEM_CONCURRENCY &&
     evidence?.approved === true &&
     Number.isInteger(evidence?.cleanRuns) &&
-    evidence.cleanRuns >= 20 &&
+    evidence.cleanRuns >= requiredCleanRuns &&
     evidence?.severeIncidents === 0 &&
     isFreshTimestamp(evidence?.observedAt, nowMs, maxAgeMs);
 
   return {
-    maxConcurrent: eligibleForEight
-      ? MAX_EVIDENCE_BACKED_GEM_CONCURRENCY
-      : DEFAULT_GEM_CONCURRENCY,
-    evidenceAccepted: eligibleForEight,
-    reason: eligibleForEight
-      ? 'recent-approved-clean-run-evidence'
-      : 'default-four-until-eight-is-proven',
+    maxConcurrent: evidenceAccepted ? measuredTarget : 0,
+    runtimeFloor: CAPACITY_POLICY.minimum,
+    baseline: DEFAULT_GEM_CONCURRENCY,
+    evidenceAccepted,
+    newMutationAllowed: evidenceAccepted,
+    preserveQueuedWork: CAPACITY_POLICY.preserveQueuedWork,
+    reason: evidenceAccepted
+      ? 'recent-approved-measured-capacity'
+      : 'capacity-evidence-missing-malformed-or-stale',
   };
 }
 
@@ -529,7 +542,8 @@ export function evaluateFleetGate(
     state === FLEET_GATE_STATE.RED
       ? []
       : [
-          ...(!queueShapeValid || queueBelowBackpressure
+          ...(concurrency.newMutationAllowed &&
+          (!queueShapeValid || queueBelowBackpressure)
             ? ['approved-issue-lease']
             : []),
           'isolated-implementation',

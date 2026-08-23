@@ -14,7 +14,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { PageContent, PageShell } from '@/components/organisms/PageShell';
+import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
 import { useAuthSafe } from '@/hooks/useJovieAuth';
 import { buildAudioBlobPath } from '@/lib/audio/blob-path';
 import {
@@ -206,104 +206,103 @@ export default function PromoDownloadsPage() {
   }, []);
 
   return (
-    <PageShell
-      frame='none'
-      contentPadding='none'
+    <AppShellContentPanel
+      frame='content-container'
+      contentPadding='default'
+      scroll='page'
       aria-label='Promo Downloads'
       data-testid='release-downloads-shell'
     >
-      <PageContent>
-        <div className='flex h-full min-h-0 flex-col gap-4'>
-          <ContentSurfaceCard as='section' className='overflow-hidden p-0'>
-            <ContentSectionHeader
-              title='Promo downloads'
-              subtitle='Upload audio files for email-gated fan downloads.'
-              subtitleClassName='whitespace-normal'
-            />
-            <div className='p-3 sm:p-4'>
-              <button
-                type='button'
-                aria-disabled={uploading || undefined}
-                aria-label='Drop Or Choose A Promo Download Audio File'
-                onClick={() => {
-                  if (!uploading) {
-                    fileInputRef.current?.click();
-                  }
-                }}
-                onDragEnter={e => {
-                  e.preventDefault();
-                  setIsDragging(true);
-                }}
-                onDragOver={e => {
-                  e.preventDefault();
-                  setIsDragging(true);
-                }}
-                onDragLeave={e => {
-                  e.preventDefault();
-                  setIsDragging(false);
-                }}
-                onDrop={handleDrop}
-                className={cn(
-                  'flex min-h-39 flex-col items-center justify-center rounded-lg border border-dashed border-subtle bg-surface-0 px-4 py-6 text-center transition-[background-color,border-color,box-shadow]',
-                  isDragging && 'border-focus bg-surface-1 ring-2 ring-focus/20'
-                )}
-                data-testid='promo-download-dropzone'
-              >
-                <Icon
-                  name='Upload'
-                  className='h-8 w-8 text-tertiary-token'
-                  aria-hidden='true'
-                />
-                <p className='mt-3 text-sm font-medium text-primary-token'>
-                  {uploading ? 'Uploading audio...' : 'Drop an audio file here'}
-                </p>
-                <p className='mt-1 text-2xs text-tertiary-token'>
-                  {SUPPORTED_AUDIO_FORMAT_LABELS.join(', ')}. Max 150 MB.
-                </p>
-                <span
-                  className={buttonVariants({
-                    variant: 'secondary',
-                    size: 'sm',
-                    className: 'mt-3',
-                  })}
-                >
-                  Choose file
-                </span>
-              </button>
-            </div>
-            <input
-              ref={fileInputRef}
-              type='file'
-              accept={AUDIO_FILE_ACCEPT}
-              onChange={handleFileSelect}
-              disabled={uploading}
-              className='sr-only'
-              aria-label='Upload Promo Download Audio File'
-            />
-            <output
-              className='block min-h-9 border-t border-transparent px-3 py-2.5 text-xs sm:px-4'
-              aria-live='polite'
-            >
-              {uploadError ? <p className='text-error'>{uploadError}</p> : null}
-            </output>
-          </ContentSurfaceCard>
-
-          <output className='block min-h-10' aria-live='polite'>
-            {listError || operationError ? (
-              <ContentSurfaceCard className='border-error/20 bg-error-subtle px-3 py-2.5 text-xs text-error'>
-                {operationError ?? listError}
-              </ContentSurfaceCard>
-            ) : null}
-          </output>
-
-          <PromoDownloadsTable
-            files={files}
-            loaded={loaded}
-            onToggleActive={handleToggleActive}
-            onDelete={handleDelete}
+      <div className='flex h-full min-h-0 flex-col gap-4'>
+        <ContentSurfaceCard as='section' className='overflow-hidden p-0'>
+          <ContentSectionHeader
+            title='Promo downloads'
+            subtitle='Upload audio files for email-gated fan downloads.'
+            subtitleClassName='whitespace-normal'
           />
-        </div>
-      </PageContent>
-    </PageShell>
+          <div className='p-3 sm:p-4'>
+            <button
+              type='button'
+              aria-disabled={uploading || undefined}
+              aria-label='Drop Or Choose A Promo Download Audio File'
+              onClick={() => {
+                if (!uploading) {
+                  fileInputRef.current?.click();
+                }
+              }}
+              onDragEnter={e => {
+                e.preventDefault();
+                setIsDragging(true);
+              }}
+              onDragOver={e => {
+                e.preventDefault();
+                setIsDragging(true);
+              }}
+              onDragLeave={e => {
+                e.preventDefault();
+                setIsDragging(false);
+              }}
+              onDrop={handleDrop}
+              className={cn(
+                'flex min-h-39 flex-col items-center justify-center rounded-lg border border-dashed border-subtle bg-surface-0 px-4 py-6 text-center transition-[background-color,border-color,box-shadow]',
+                isDragging && 'border-focus bg-surface-1 ring-2 ring-focus/20'
+              )}
+              data-testid='promo-download-dropzone'
+            >
+              <Icon
+                name='Upload'
+                className='h-8 w-8 text-tertiary-token'
+                aria-hidden='true'
+              />
+              <p className='mt-3 text-sm font-medium text-primary-token'>
+                {uploading ? 'Uploading audio...' : 'Drop an audio file here'}
+              </p>
+              <p className='mt-1 text-2xs text-tertiary-token'>
+                {SUPPORTED_AUDIO_FORMAT_LABELS.join(', ')}. Max 150 MB.
+              </p>
+              <span
+                className={buttonVariants({
+                  variant: 'secondary',
+                  size: 'sm',
+                  className: 'mt-3',
+                })}
+              >
+                Choose file
+              </span>
+            </button>
+          </div>
+          <input
+            ref={fileInputRef}
+            type='file'
+            accept={AUDIO_FILE_ACCEPT}
+            onChange={handleFileSelect}
+            disabled={uploading}
+            className='sr-only'
+            aria-label='Upload Promo Download Audio File'
+          />
+          <output
+            className='block min-h-9 border-t border-transparent px-3 py-2.5 text-xs sm:px-4'
+            aria-live='polite'
+          >
+            {uploadError ? <p className='text-error'>{uploadError}</p> : null}
+          </output>
+        </ContentSurfaceCard>
+
+        <output className='block min-h-10' aria-live='polite'>
+          {listError || operationError ? (
+            <ContentSurfaceCard className='border-error/20 bg-error-subtle px-3 py-2.5 text-xs text-error'>
+              {operationError ?? listError}
+            </ContentSurfaceCard>
+          ) : null}
+        </output>
+
+        <PromoDownloadsTable
+          files={files}
+          loaded={loaded}
+          onToggleActive={handleToggleActive}
+          onDelete={handleDelete}
+        />
+      </div>
+    </AppShellContentPanel>
   );
 }

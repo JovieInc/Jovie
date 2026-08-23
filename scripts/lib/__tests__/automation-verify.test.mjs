@@ -695,6 +695,9 @@ describe('automation-verify affected scope', () => {
         'scripts/hermes/tests/gem-gate-next-admission.test.py',
         'scripts/hermes/tests/gem-priority-gate.test.py',
       ],
+      nodeTests: [
+        'scripts/backlog-orchestrator/intake-controller-workflow.test.mjs',
+      ],
     });
     expect(
       buildAffectedTestPlan(['scripts/hermes/gem-gate-next-admission.py']).mode

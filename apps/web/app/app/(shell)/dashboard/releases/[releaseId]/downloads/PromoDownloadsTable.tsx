@@ -1,8 +1,12 @@
 'use client';
 
+// @coverage-via apps/web/app/app/(shell)/dashboard/releases/[releaseId]/downloads/PromoDownloadsTable.test.tsx
+
+import { IconButton, Switch } from '@jovie/ui';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Music, Trash2 } from 'lucide-react';
 import { useMemo } from 'react';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { TableEmptyState, UnifiedTable } from '@/components/organisms/table';
 import { cn } from '@/lib/utils';
 
@@ -90,19 +94,21 @@ export function PromoDownloadsTable({
           const file = row.original;
 
           return (
-            <button
-              type='button'
-              onClick={() => onToggleActive(file.id, !file.isActive)}
-              aria-pressed={file.isActive}
-              className={cn(
-                'inline-flex h-6 items-center rounded-full border px-2 text-2xs font-medium transition-colors',
-                file.isActive
-                  ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-500'
-                  : 'border-subtle bg-surface-0 text-tertiary-token'
-              )}
-            >
-              {file.isActive ? 'Active' : 'Hidden'}
-            </button>
+            <div className='inline-flex items-center gap-2'>
+              <Switch
+                checked={file.isActive}
+                onCheckedChange={checked => onToggleActive(file.id, checked)}
+                aria-label={`Toggle ${file.title} visibility`}
+              />
+              <span
+                className={cn(
+                  'text-2xs font-medium',
+                  file.isActive ? 'text-emerald-500' : 'text-tertiary-token'
+                )}
+              >
+                {file.isActive ? 'Active' : 'Hidden'}
+              </span>
+            </div>
           );
         },
         size: 96,
@@ -119,14 +125,15 @@ export function PromoDownloadsTable({
           const file = row.original;
 
           return (
-            <button
-              type='button'
+            <IconButton
               onClick={() => onDelete(file.id)}
-              className='inline-flex h-6 w-6 items-center justify-center rounded-full text-tertiary-token transition-colors hover:text-red-400'
-              aria-label={`Delete ${file.title}`}
+              variant='inline'
+              size='xs'
+              ariaLabel={`Delete ${file.title}`}
+              className='hover:text-error'
             >
               <Trash2 className='h-3.5 w-3.5' aria-hidden='true' />
-            </button>
+            </IconButton>
           );
         },
         size: 72,
@@ -160,7 +167,11 @@ export function PromoDownloadsTable({
   }
 
   return (
-    <div className='overflow-hidden rounded-xl border border-subtle bg-surface-1'>
+    <ContentSurfaceCard
+      surface='table'
+      className='overflow-hidden p-0'
+      data-testid='promo-downloads-table-surface'
+    >
       <UnifiedTable
         data={files}
         columns={columns}
@@ -169,6 +180,6 @@ export function PromoDownloadsTable({
         minWidth='100%'
         className='text-xs [&_thead_th]:py-1 [&_thead_th]:text-3xs [&_thead_th]:tracking-normal'
       />
-    </div>
+    </ContentSurfaceCard>
   );
 }

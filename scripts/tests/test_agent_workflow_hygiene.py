@@ -1020,7 +1020,11 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     assert "run-backlog.sh gate-next" not in block
     assert "timeout-minutes: 12" in block
     intake = (WORKFLOWS / "jovie-intake-controller.yml").read_text(encoding="utf-8")
-    assert "group: jovie-intake-admission" in intake
+    assert (
+        "group: jovie-intake-${{ github.event.client_payload.issue_identifier || github.run_id }}"
+        in intake
+    )
+    assert "group: jovie-intake-admission" not in intake
     assert "group: fleet-gate-event-admission" not in intake
     assert "scripts/hermes/gem-gate-next-admission.py --mode=intake --issue=" in intake
     assert 'run-backlog.sh gate-next --issue="$ISSUE_IDENTIFIER"' not in intake
