@@ -766,7 +766,6 @@ export function JovieChat({
                 data-testid='chat-empty-state-viewport'
               >
                 <ChatEmptyStateComposerRegion
-                  greetingName={displayName ?? username ?? null}
                   stableDocked
                   showDockedWelcome={
                     showEmptyWelcome && emptyStateAffordance === 'none'
@@ -794,11 +793,7 @@ export function JovieChat({
                         data-testid='chat-empty-state-soft-suggestions-slot'
                       >
                         <div className='flex min-h-0 flex-1 flex-col items-center justify-center py-2 text-center'>
-                          {showEmptyWelcome ? (
-                            <ChatEmptyStateWelcome
-                              greetingName={displayName ?? username ?? null}
-                            />
-                          ) : null}
+                          {showEmptyWelcome ? <ChatEmptyStateWelcome /> : null}
                         </div>
                         <SuggestedPrompts
                           onSelect={handleSuggestedPrompt}

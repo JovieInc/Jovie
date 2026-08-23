@@ -426,7 +426,7 @@ test('records David Guetta Spotify-first onboarding demo', async ({
   await suppressDevToolbar(emptyPage);
   await emptyPage.goto('/start', { waitUntil: 'domcontentloaded' });
   await waitForHydration(emptyPage);
-  await expect(emptyPage.getByTestId('chat-empty-state-logo')).toBeVisible();
+  await expect(emptyPage.getByTestId('chat-empty-state-logo')).toHaveCount(0);
   await expect(
     emptyPage.getByTestId('chat-empty-state-centered-composer')
   ).toBeVisible();
