@@ -21,6 +21,22 @@ describe('canonical invariant registry', () => {
     });
   });
 
+  it('resolves the canonical registry independently of process cwd', () => {
+    const originalCwd = process.cwd();
+    process.chdir('scripts/backlog-orchestrator');
+    try {
+      const fromControllerCwd = readInvariantRegistry();
+      assert.equal(fromControllerCwd.schema, canonical.schema);
+      assert.deepEqual(validateInvariantRegistry(fromControllerCwd), {
+        ok: true,
+        errors: [],
+        blockers: [],
+      });
+    } finally {
+      process.chdir(originalCwd);
+    }
+  });
+
   it('rejects a second executable registry declaration', () => {
     const candidate = clone();
     candidate.invariants[0].policy.value = 'docs/another-registry.jsonl';

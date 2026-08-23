@@ -1,9 +1,12 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export const INVARIANT_REGISTRY_PATH = 'canon/invariants.jsonl';
 export const INVARIANT_REGISTRY_SCHEMA = 'jovie-invariant-registry/v1';
 export const INVARIANT_STATES = new Set(['binding', 'adopted', 'superseded']);
+
+const DEFAULT_REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 const REQUIRED_FIELDS = [
   'id',
@@ -53,7 +56,7 @@ function push(errors, invariant, detail) {
   errors.push(`${invariant?.id || '<unknown>'}: ${detail}`);
 }
 
-export function readInvariantRegistry(repoRoot = process.cwd()) {
+export function readInvariantRegistry(repoRoot = DEFAULT_REPO_ROOT) {
   const rows = readFileSync(resolve(repoRoot, INVARIANT_REGISTRY_PATH), 'utf8')
     .split(/\r?\n/)
     .filter(Boolean)
@@ -64,7 +67,7 @@ export function readInvariantRegistry(repoRoot = process.cwd()) {
 
 export function validateInvariantRegistry(
   registry,
-  { repoRoot = process.cwd(), verifyBindings = true } = {}
+  { repoRoot = DEFAULT_REPO_ROOT, verifyBindings = true } = {}
 ) {
   const errors = [];
   const blockers = [];
