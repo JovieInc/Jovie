@@ -62,6 +62,7 @@ const SEVERE_INTEGRITY_REASONS = new Set([
   FLEET_GATE_REASON.SEVERE_INTEGRITY_INCIDENT,
 ]);
 const CAPACITY_POLICY = invariantPolicy('JOV-INV-007');
+const FLEET_AUTHORITY = invariantPolicy('JOV-INV-008');
 const DEFAULT_GEM_CONCURRENCY = CAPACITY_POLICY.baseline;
 const MAX_EVIDENCE_BACKED_GEM_CONCURRENCY = CAPACITY_POLICY.maximum;
 const CONTROLLER_RECEIPT_MAX_AGE_MS = 10 * 60 * 1000;
@@ -540,16 +541,13 @@ export function evaluateFleetGate(
     );
   const workActivities =
     state === FLEET_GATE_STATE.RED
-      ? []
+      ? [...FLEET_AUTHORITY.RED]
       : [
           ...(concurrency.newMutationAllowed &&
           (!queueShapeValid || queueBelowBackpressure)
             ? ['approved-issue-lease']
             : []),
-          'isolated-implementation',
-          'tests',
-          'review',
-          'draft-pr',
+          ...FLEET_AUTHORITY.AMBER,
         ];
   const holdIntakeAllowed =
     state === FLEET_GATE_STATE.AMBER &&

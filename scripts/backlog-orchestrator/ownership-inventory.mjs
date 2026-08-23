@@ -1,4 +1,4 @@
-/** Repository-aware ownership inventory for JOV-5278 slice 1. */
+/** Repository-aware ownership inventory for JOV-5278 slice 1. JOV-INV-007. */
 
 import { readFileSync } from 'node:fs';
 

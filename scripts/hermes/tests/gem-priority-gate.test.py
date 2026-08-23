@@ -960,6 +960,12 @@ class IndependentReviewTests(unittest.TestCase):
     def evaluate(self, review: object) -> dict[str, object]:
         signals = dict(GREEN_SIGNALS)
         signals["independentReview"] = review
+        evidence = signals.get("concurrencyEvidence")
+        if isinstance(evidence, dict):
+            signals["concurrencyEvidence"] = {
+                **evidence,
+                "observedAt": MODULE.isoformat(self.NOW),
+            }
         return MODULE.evaluate(signals, MODULE.isoformat(self.NOW))
 
     def test_valid_receipt_is_exact_head_and_explicitly_authorized(self):

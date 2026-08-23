@@ -1,7 +1,7 @@
 'use client';
 
 import { MessageSquare } from 'lucide-react';
-import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { SettingsStatusPill } from '@/features/dashboard/molecules/SettingsStatusPill';
 import { useSmsAccessRequestMutation } from '@/lib/queries/useSmsAccessRequestMutation';
 

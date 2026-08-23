@@ -9,9 +9,9 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { PixelsSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { useSaveStatus } from '@/features/dashboard/hooks/useSaveStatus';
 import { SettingsErrorState } from '@/features/dashboard/molecules/SettingsErrorState';
 import { SettingsStatusPill } from '@/features/dashboard/molecules/SettingsStatusPill';
