@@ -38,6 +38,7 @@ export type { MarketingMetricCardProps } from './MarketingMetricCard';
 export { MarketingMetricCard } from './MarketingMetricCard';
 export type { MarketingPageShellProps } from './MarketingPageShell';
 export { MarketingPageShell } from './MarketingPageShell';
+export { MarketingPlatformSpecBento } from './MarketingPlatformSpecBento';
 export type {
   MarketingPosterHeroCta,
   MarketingPosterHeroProps,
@@ -50,6 +51,7 @@ export type {
   MarketingSectionIntroProps,
 } from './MarketingSectionIntro';
 export { MarketingSectionIntro } from './MarketingSectionIntro';
+export { MarketingShippedSitesShowcase } from './MarketingShippedSitesShowcase';
 export type { MarketingSnapRailProps } from './MarketingSnapRail';
 export { MarketingSnapRail } from './MarketingSnapRail';
 export type {
