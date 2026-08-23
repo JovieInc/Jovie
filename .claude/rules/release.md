@@ -359,7 +359,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 | Structural Contract | Mechanical architecture, workflow, docs, and repo-rule checks. | `CI Risk Classifier` (both) |
 | Explicit Deep Evidence | Manual, scheduled, or event-driven deep evidence that never starts from or delays ordinary PR Ready. | none |
 | Preview Evidence | Hosted manual/event visual, a11y, performance, and preview evidence outside the source-PR event. | none |
-| Combined Integration | Affected unit, one hosted build-plus-layout workspace, path-selected Xcode, and model-free semantic evals for GitHub's exact merge-group head. | `Build + Layout (combined)` (merge-group), `iOS Build + Test (combined)` (merge-group), `Promptfoo Evals (deterministic)` (merge-group), `Golden Eval Set (deterministic)` (merge-group) |
+| Combined Integration | Path-selected Web unit/build, Mac test/package, iOS Xcode, shared-contract integration, and model-free semantic evidence for GitHub's exact merge-group head. | `Build + Layout (combined)` (merge-group), `iOS Build + Test (combined)` (merge-group), `Mac Build + Test (combined)` (merge-group), `Cross-Product Integration (combined)` (merge-group), `Promptfoo Evals (deterministic)` (merge-group), `Golden Eval Set (deterministic)` (merge-group) |
 | Production Release | Each exact successful main CI attempt feeds one fixed production-mutation FIFO from authorization through staging, promotion, centralized rollback, immutable probes, canonical proof, marker, and best-effort notification; one hosted monitor retry is bounded to controller attempt 1. | none |
 | Post-deploy Verification | Hosted public, homepage, and Lighthouse probes target the immutable release URL under the controller lease; authenticated exact-build smoke uses one allowlisted Better Auth identity and a fresh protected verification-store OTP before promotion, while public Better Auth/OAuth gates remain blocking. When a controller generation is superseded before those in-lease probes run, a read-only follow-up re-probes the landed canonical production deployment outside the lease. | none |
 | Scheduled Cleanup | Report-first cleanup loops for flakes, coverage drift, harness health, and main-CI repair. | none |
@@ -379,6 +379,8 @@ Source `PR Ready` may require only `source-pr`/`both` jobs below. Merge-group `P
 | `Unit Tests` | merge-group | fast-gate | `pnpm --filter=@jovie/web run test:fast` |
 | `Build + Layout (combined)` | merge-group | combined-integration | `pnpm run build:web && pnpm --filter @jovie/web exec playwright test tests/e2e/hud-scroll.spec.ts --config=playwright.config.noauth.ts --project=chromium` |
 | `iOS Build + Test (combined)` | merge-group | combined-integration | `pnpm run ios:lint && pnpm run ios:test` |
+| `Mac Build + Test (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test && pnpm --filter @jovie/desktop run package:staging` |
+| `Cross-Product Integration (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test` |
 | `Promptfoo Evals (deterministic)` | merge-group | combined-integration | `pnpm run evals` |
 | `Golden Eval Set (deterministic)` | merge-group | combined-integration | `pnpm run evals:golden` |
 
