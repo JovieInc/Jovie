@@ -91,9 +91,21 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
     mainSource,
     /const APP_BACKGROUND_COLOR = SYSTEM_B_DESKTOP_TOKENS\.backgroundColor;/
   );
-  assert.match(mainSource, /function buildDesktopLoadFailureUrl\(\): string/);
-  assert.match(mainSource, /Jovie couldn’t load/);
-  assert.match(mainSource, /Check your connection, then try again\./);
+  const recoverySource = await readFile(
+    join(desktopRoot, 'src/renderer-recovery.ts'),
+    'utf8'
+  );
+  assert.match(mainSource, /function buildDesktopLoadFailureUrl\(/);
+  assert.match(mainSource, /classifyDesktopLoadFailure/);
+  assert.match(mainSource, /describeDesktopLoadFailure/);
+  assert.match(mainSource, /decideHostedLoadRetry/);
+  assert.match(mainSource, /rendererEverBooted/);
+  assert.match(mainSource, /function isAppOriginReachable\(\)/);
+  assert.match(recoverySource, /Jovie couldn’t load/);
+  assert.match(recoverySource, /Check your connection, then try again\./);
+  assert.match(recoverySource, /Local Jovie isn’t running at/);
+  assert.match(recoverySource, /Jovie didn’t finish starting/);
+  assert.match(recoverySource, /Jovie crashed/);
   assert.doesNotMatch(mainSource, /Desktop shell runtime:/);
   assert.doesNotMatch(mainSource, /Built for artists/);
   assert.match(mainSource, /data:text\/html;charset=utf-8/);
@@ -668,6 +680,18 @@ test('desktop main-window hub regression contracts (desktop QA)', async () => {
   // Fix: doc references must point at files that exist.
   assert.doesNotMatch(mainSource, /BUILDS\.md/);
   assert.match(mainSource, /apps\/desktop\/SIGNING\.md/);
+});
+
+test('hud layout pings the desktop boot watchdog', async () => {
+  const webRoot = join(desktopRoot, '..', 'web');
+  const hudLayout = await readFile(join(webRoot, 'app/hud/layout.tsx'), 'utf8');
+  const hudBoot = await readFile(
+    join(webRoot, 'app/hud/HudDesktopBootSignal.tsx'),
+    'utf8'
+  );
+
+  assert.match(hudLayout, /HudDesktopBootSignal/);
+  assert.match(hudBoot, /useDesktopAppBootSignal/);
 });
 
 test('hosted web app has an early Electron runtime marker before first paint', async () => {

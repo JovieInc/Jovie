@@ -1,10 +1,14 @@
 import { expect, test } from 'vitest';
 import {
+  classifyDesktopLoadFailure,
   decideAbortedMainFrameRecovery,
+  decideHostedLoadRetry,
   decideRendererBootWatchdogAfterLoad,
   decideRendererLoadStart,
   decideRendererRecovery,
   decideRendererWatchdogExpiry,
+  describeDesktopLoadFailure,
+  isLoopbackAppUrl,
   parseDidStartNavigation,
   RENDERER_BOOT_WATCHDOG_MS,
   RENDERER_LOAD_WATCHDOG_MS,
@@ -168,6 +172,122 @@ test('a hung or intercepted hosted navigation arms the load watchdog', () => {
       isInPlace: false,
     })
   ).toBe('ignore');
+});
+
+test('a previously painted session is not replaced by a false offline page', () => {
+  expect(
+    decideRendererWatchdogExpiry({
+      booted: false,
+      everBooted: true,
+      reason: 'boot',
+      windowDestroyed: false,
+      skipForAuthHandoff: false,
+    })
+  ).toBe('ignore');
+  expect(
+    decideRendererWatchdogExpiry({
+      booted: false,
+      everBooted: true,
+      reason: 'load',
+      windowDestroyed: false,
+      skipForAuthHandoff: false,
+    })
+  ).toBe('failure-page');
+  expect(
+    decideRendererWatchdogExpiry({
+      booted: false,
+      everBooted: false,
+      reason: 'boot',
+      windowDestroyed: false,
+      skipForAuthHandoff: false,
+    })
+  ).toBe('failure-page');
+});
+
+test('load failures are classified honestly instead of as generic offline', () => {
+  expect(isLoopbackAppUrl('http://localhost:3112')).toBe(true);
+  expect(isLoopbackAppUrl('https://jov.ie')).toBe(false);
+
+  expect(
+    classifyDesktopLoadFailure({
+      reason: 'did-fail-load',
+      errorCode: -106,
+      appEnv: 'local',
+      appUrl: 'http://localhost:3112',
+    })
+  ).toBe('offline');
+  expect(
+    classifyDesktopLoadFailure({
+      reason: 'did-fail-load',
+      errorCode: -102,
+      appEnv: 'local',
+      appUrl: 'http://localhost:3112',
+    })
+  ).toBe('local-server-down');
+  expect(
+    classifyDesktopLoadFailure({
+      reason: 'did-fail-load',
+      errorCode: -102,
+      appEnv: 'production',
+      appUrl: 'https://jov.ie',
+    })
+  ).toBe('host-unreachable');
+  expect(
+    classifyDesktopLoadFailure({
+      reason: 'boot-watchdog',
+      appEnv: 'local',
+      appUrl: 'http://localhost:3112',
+      hostReachable: true,
+    })
+  ).toBe('timed-out');
+  expect(
+    classifyDesktopLoadFailure({
+      reason: 'load-watchdog',
+      appEnv: 'local',
+      appUrl: 'http://localhost:3112',
+      hostReachable: false,
+    })
+  ).toBe('local-server-down');
+  expect(
+    classifyDesktopLoadFailure({
+      reason: 'crashed',
+      appEnv: 'local',
+      appUrl: 'http://localhost:3112',
+    })
+  ).toBe('crashed');
+
+  expect(
+    describeDesktopLoadFailure('offline', 'http://localhost:3112').body
+  ).toBe('Check your connection, then try again.');
+  expect(
+    describeDesktopLoadFailure('local-server-down', 'http://localhost:3112')
+      .body
+  ).toBe('Local Jovie isn’t running at localhost:3112.');
+  expect(
+    describeDesktopLoadFailure('timed-out', 'http://localhost:3112').heading
+  ).toBe('Jovie didn’t finish starting');
+
+  expect(
+    decideHostedLoadRetry({
+      kind: 'local-server-down',
+      retryCount: 0,
+      maxRetries: 2,
+    })
+  ).toBe('retry');
+  expect(
+    decideHostedLoadRetry({
+      kind: 'offline',
+      retryCount: 0,
+      maxRetries: 2,
+    })
+  ).toBe('failure-page');
+  expect(
+    decideHostedLoadRetry({
+      kind: 'local-server-down',
+      retryCount: 2,
+      maxRetries: 2,
+    })
+  ).toBe('failure-page');
 });
 
 test('200-but-blank and hung load both expire to the failure page', () => {
