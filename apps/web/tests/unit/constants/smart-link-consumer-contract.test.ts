@@ -3,6 +3,12 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const WEB_ROOT = resolve(__dirname, '../../..');
+const RELEASE_SIDEBAR_SOURCE =
+  'components/organisms/release-sidebar/ReleaseSidebar.tsx';
+const RELEASE_SMART_LINK_ANALYTICS_SOURCE =
+  'components/organisms/release-sidebar/ReleaseSmartLinkAnalytics.tsx';
+const RELEASE_SMART_LINK_SECTION_SOURCE =
+  'components/organisms/release-sidebar/ReleaseSmartLinkSection.tsx';
 const SMART_LINK_CONSUMERS = [
   'components/features/dashboard/organisms/release-provider-matrix/useReleaseProviderMatrix.ts',
   'components/features/dashboard/organisms/release-provider-matrix/utils/exportReleases.ts',
@@ -27,5 +33,24 @@ describe('smart-link consumer contract', () => {
 
     expect(source).toContain('getSmartLinkUrl');
     expect(source).not.toContain('getBaseUrl');
+  });
+
+  it('keeps the release sidebar family on the canonical builder', () => {
+    const releaseSidebarSource = readFileSync(
+      resolve(WEB_ROOT, RELEASE_SIDEBAR_SOURCE),
+      'utf8'
+    );
+    const analyticsSource = readFileSync(
+      resolve(WEB_ROOT, RELEASE_SMART_LINK_ANALYTICS_SOURCE),
+      'utf8'
+    );
+    const sectionSource = readFileSync(
+      resolve(WEB_ROOT, RELEASE_SMART_LINK_SECTION_SOURCE),
+      'utf8'
+    );
+
+    expect(releaseSidebarSource).toContain('getSmartLinkUrl');
+    expect(analyticsSource).toContain('getSmartLinkUrl');
+    expect(sectionSource).toContain('getSmartLinkUrl');
   });
 });

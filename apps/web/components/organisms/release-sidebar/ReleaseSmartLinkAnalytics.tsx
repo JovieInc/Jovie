@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/constants/smart-link-consumer-contract.test.ts
+
 import { CommonDropdown } from '@jovie/ui';
 import { Share2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';

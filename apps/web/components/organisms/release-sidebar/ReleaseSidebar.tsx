@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/constants/smart-link-consumer-contract.test.ts
+
 /**
  * ReleaseSidebar Component
  *

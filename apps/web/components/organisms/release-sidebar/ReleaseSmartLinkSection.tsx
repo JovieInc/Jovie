@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/constants/smart-link-consumer-contract.test.ts
+
 import { ShareableLinkRow } from '@/components/molecules/drawer';
 import { getSmartLinkUrl } from '@/constants/domains';
 

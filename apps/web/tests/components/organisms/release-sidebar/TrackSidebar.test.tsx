@@ -99,6 +99,10 @@ describe('TrackSidebar', () => {
 
     expect(screen.getAllByText('Midnight Echo').length).toBeGreaterThan(0);
     expect(screen.getByTitle('Copy Track Link')).toBeInTheDocument();
+    expect(screen.getByText('jov.ie/r/midnight-echo/track-1')).toHaveAttribute(
+      'title',
+      'https://jov.ie/r/midnight-echo/track-1'
+    );
     expect(screen.getByText(/Preview Unverified/i)).toBeInTheDocument();
     const header = screen.getByTestId('track-entity-header');
     const details = screen.getByTestId('track-tabbed-card');

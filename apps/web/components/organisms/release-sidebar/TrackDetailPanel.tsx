@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/organisms/release-sidebar/TrackDetailPanel.test.tsx
+
 import { Copy } from 'lucide-react';
 import { useCallback } from 'react';
 import { toast } from '@/components/feedback';
