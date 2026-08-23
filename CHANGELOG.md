@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- **Primary buttons use a lighter label:** CTA text is medium (510) instead of semibold, with the same size, fill, and 32px chrome.
+
 - **Empty chat greets you and waits:** new conversations show one of Let's get it, Ready to start?, or Ready when you are above a blank input. No placeholder, logo, or What's next? line.
 
 - [internal] **MenuMonitor reports freshness instead of fake zeros (JOV-5305):** Initial loading hides counts, stale values say Last known, and action/error state reaches the accessible status item.
