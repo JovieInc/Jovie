@@ -7,6 +7,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **ALLGREEN merge groups no longer UNMERGEABLE siblings on shrink-only design-system ratchets (JOV-5300):** `--linear-*` usage may drop below the JSON floor on `merge_group` without failing required unit shards. Growth still fails. Local / pull_request authorship still fail-closes until the changing PR lowers the baseline. Source `PR Ready` stays cheap (no unit/e2e ruleset expansion).
 - [internal] **Native merge-queue UNMERGEABLE entries auto-eject and CHANGELOG collisions no longer poison CLEAN PRs (JOV-5291):** parked UNMERGEABLE group members dequeue with a typed exact-head receipt and are not re-enqueued; enroll trusts live GraphQL `maximumEntriesToBuild=3` instead of stale REST drift; two Unreleased CHANGELOG edits are serialized instead of failing the later PR's `enroll` check.
 
 - [internal] **Stale Symphony fallback locks can no longer permanently own pickup (JOV-5297):** the sidecar GCs leftover `JOV-*.lock` files when the Linear issue is In Review / Done / has an inflight open PR, or when an unlocked lock is older than the typed TTL, and writes a receipt. Pickup now emits lease start, a typed refuse reason, lock count, and the next eligible issue; an unknown refuse reason is red. Codex refuses a second writer on In Review / open PR.
