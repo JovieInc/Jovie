@@ -1,5 +1,9 @@
 import SwiftUI
 
+enum SettingsInteraction {
+  static let rowPressedOpacity: Double = 0.7
+}
+
 struct AppBuildInfo: Equatable {
   let version: String
   let build: String
@@ -10,6 +14,20 @@ struct AppBuildInfo: Equatable {
       build: bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
     )
   }
+}
+
+enum SettingsLayout {
+  static let reservedActionMinHeight: CGFloat = 48
+
+  static func logoutTitle(isLoggingOut: Bool) -> String {
+    isLoggingOut ? "Logging Out" : "Log Out"
+  }
+}
+
+enum SettingsExternalURL {
+  static let support = URL(string: "https://jov.ie/support")
+  static let privacy = URL(string: "https://jov.ie/legal/privacy")
+  static let terms = URL(string: "https://jov.ie/legal/terms")
 }
 
 struct SettingsView: View {
@@ -23,7 +41,6 @@ struct SettingsView: View {
   var workspaceMode: MobileWorkspaceMode = .jovie
   var onSelectWorkspace: (MobileWorkspaceMode) -> Void = { _ in }
 
-  @Environment(\.openURL) private var openURL
   @State private var isLoggingOut = false
   @State private var isShowingLogoutConfirmation = false
 
@@ -87,12 +104,12 @@ struct SettingsView: View {
       }
       .accessibilityElement(children: .combine)
 
-      Button {
-        openURL(accountURL)
-      } label: {
-        Label("Manage Account", systemImage: "person.crop.circle")
-          .foregroundStyle(JovieColor.textPrimary)
-      }
+      SettingsLinkRow(
+        title: "Manage Account",
+        systemImage: "person.crop.circle",
+        destination: accountURL
+      )
+      .jovieSurface(radius: JovieRadius.medium, interactive: true)
 
       if showsWorkspaceSwitch {
         Button {
@@ -100,6 +117,11 @@ struct SettingsView: View {
         } label: {
           LabeledContent("Workspace", value: workspaceMode.displayName)
         }
+        .buttonStyle(
+          JoviePressFeedbackButtonStyle(
+            pressedOpacity: SettingsInteraction.rowPressedOpacity
+          )
+        )
         .accessibilityIdentifier("settings-workspace-switch")
         .accessibilityLabel("Workspace \(workspaceMode.displayName)")
         .accessibilityHint("Switches between Jovie and Ovie")
@@ -109,32 +131,18 @@ struct SettingsView: View {
 
   private var linksSection: some View {
     Section("Jovie") {
-      Button {
-        openURL(URL(string: "https://jov.ie/support")!)
-      } label: {
-        Label("Support", systemImage: "questionmark.circle")
-          .foregroundStyle(JovieColor.textPrimary)
+      if let support = SettingsExternalURL.support {
+        SettingsLinkRow(title: "Support", systemImage: "questionmark.circle", destination: support)
       }
 
-      Button {
-        openURL(billingURL)
-      } label: {
-        Label("Billing", systemImage: "creditcard")
-          .foregroundStyle(JovieColor.textPrimary)
+      SettingsLinkRow(title: "Billing", systemImage: "creditcard", destination: billingURL)
+
+      if let privacy = SettingsExternalURL.privacy {
+        SettingsLinkRow(title: "Privacy", systemImage: "hand.raised", destination: privacy)
       }
 
-      Button {
-        openURL(URL(string: "https://jov.ie/legal/privacy")!)
-      } label: {
-        Label("Privacy", systemImage: "hand.raised")
-          .foregroundStyle(JovieColor.textPrimary)
-      }
-
-      Button {
-        openURL(URL(string: "https://jov.ie/legal/terms")!)
-      } label: {
-        Label("Terms", systemImage: "doc.text")
-          .foregroundStyle(JovieColor.textPrimary)
+      if let terms = SettingsExternalURL.terms {
+        SettingsLinkRow(title: "Terms", systemImage: "doc.text", destination: terms)
       }
     }
   }
@@ -155,7 +163,7 @@ struct SettingsView: View {
         // Reserve a stable footprint across Log Out / Logging Out so the
         // row never reflows (layout-shift prevention).
         HStack(spacing: JovieSpacing.small) {
-          Text(isLoggingOut ? "Logging Out" : "Log Out")
+          Text(SettingsLayout.logoutTitle(isLoggingOut: isLoggingOut))
             .lineLimit(1)
             .minimumScaleFactor(0.85)
 
@@ -172,7 +180,7 @@ struct SettingsView: View {
           .frame(width: 20, height: 20)
           .accessibilityHidden(!isLoggingOut)
         }
-        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: SettingsLayout.reservedActionMinHeight, alignment: .leading)
       }
       .disabled(isLoggingOut)
       .accessibilityLabel("Log Out")
@@ -192,5 +200,35 @@ struct SettingsView: View {
       await onLogout()
       isLoggingOut = false
     }
+  }
+}
+
+private struct SettingsLinkRow: View {
+  let title: String
+  let systemImage: String
+  let destination: URL
+
+  var body: some View {
+    Link(destination: destination) {
+      HStack(spacing: JovieSpacing.medium) {
+        Image(systemName: systemImage)
+          .frame(width: 20)
+
+        Text(title)
+
+        Spacer()
+
+        Image(systemName: "arrow.up.right")
+          .font(.system(size: 12, weight: .semibold))
+          .foregroundStyle(JovieColor.textTertiary)
+      }
+      .font(JovieFont.body(size: 14, weight: .medium))
+      .foregroundStyle(JovieColor.textPrimary)
+      .padding(.horizontal, JovieSpacing.medium)
+      .padding(.vertical, JovieSpacing.medium)
+    }
+    .buttonStyle(JoviePressFeedbackButtonStyle())
+    .tint(JovieColor.textPrimary)
+    .accessibilityLabel(title)
   }
 }

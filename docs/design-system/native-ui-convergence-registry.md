@@ -106,7 +106,7 @@ consistent with the web shell source comments at
 | `ios.shell` | Chat-first shell organism; `AppShellView` | `apps/ios/Jovie/Features/AppShell/AppShellView.swift:L99-L201,L203-L394,L537-L654` | Selected tab, drawer closed/open/dragging, keyboard visible, offline label, settings navigation, entity sheet, Talk overlay, reduce motion | Drawer width is `min(320, UIScreen.main.bounds.width * 0.86)`; content moves as one plane; safe-area toolbar/tab insets; no horizontal tab paging | `verified-source`. Current chat-first tests are the active launch authority: `apps/ios/JovieTests/AppShellChatFirstTests.swift:L4-L49`. |
 | `ios.drawer` | Surface switcher and recent threads; `AppShellLeftDrawer` | `apps/ios/Jovie/Features/AppShell/AppShellLeftDrawer.swift:L38-L147,L206-L280,L308-L465` | Surface selected, loading skeleton, no threads, filtered-empty, populated/active thread, settings row, reduce motion | Drawer width is supplied by shell; rows remain interactive during decorative reveal; search clears on close | `verified-source`; the comments claim opacity-only while the modifier also offsets, recorded as drift below. |
 | `ios.tabbar` | Primary navigation and Talk FAB; `AppShellTabBar` | `apps/ios/Jovie/Features/AppShell/AppShellTabBar.swift:L3-L69,L71-L128` | Four primary tabs, selected, pressed, Talk action; drawer-only Profile/Audience | 56-point bar; 58-point Talk FAB lifted 18 points; bottom safe-area inset belongs to shell | `verified-source`; historical coverage in `feature-status.csv:L7`. |
-| `ios.settings` | Account/settings organism; `SettingsView` | `apps/ios/Jovie/Features/Settings/SettingsView.swift:L15-L165,L168-L250` | Loaded account, external link rows, build/version, logout idle/busy/disabled | Scroll view with full-width rows; icon button has a 44-point frame; no separate iPad/macOS layout | `verified-source`; historical coverage in `feature-status.csv:L14`. |
+| `ios.settings` | Account/settings organism; `SettingsView` | `apps/ios/Jovie/Features/Settings/SettingsView.swift` | Loaded account, native `Link` rows, `LabeledContent` version/build, logout idle/busy/disabled with reserved height | Scroll view with Liquid Glass (`jovieSurface`) grouped plates; icon button has a 44-point frame; no separate iPad/macOS layout | `verified-source`; historical coverage in `feature-status.csv:L14`. Ranked remaining families live in [`ios-drift-inventory.md`](ios-drift-inventory.md). |
 
 The current source/test decision is **chat-first for live/unspecified launch
 modes** and **profile-first for profile-specific deterministic UI-test modes**.
@@ -142,7 +142,7 @@ Profile is historical ledger drift, not a reason to change the current code.
 | Atom | `JovieIconButtonStyle` | Shell gear, settings close, chat scroll-to-bottom | Canonical 44-point circular icon target in `JovieTheme.swift`. |
 | Atom | `JovieLogoMark` and QR plate modifier | Splash, auth, QR surfaces | Logo and QR plate are shared source owners; `JovieTheme.swift:L124-L180,L244-L256`. |
 | Atom | `EntityAccent` | Inline chat entity chips | Only for entity-kind parity; do not reuse as generic iOS accents; `JovieTheme.swift:L26-L53`. |
-| Atom | `JoviePressFeedbackButtonStyle` | AppShell tab bar, drawer rows, and Settings rows | Canonical owner for the opacity/scale/subtle recipe in `JovieTheme.swift`; Settings preserves `.7` through the style parameter, verified by `AppShellTabBarTests.swift`. |
+| Atom | `JoviePressFeedbackButtonStyle` | AppShell tab bar, drawer rows, and Settings rows | Canonical owner for the opacity/scale/subtle recipe in `JovieTheme.swift`; Settings preserves `.7` through the style parameter, verified by `AppShellTabBarTests.swift` and `SettingsStyleGuardTests.swift`. |
 | Molecule | `DashboardAvatarView` | Shell toolbar, drawer account, dashboard | Cached avatar with surface fallback; `apps/ios/Jovie/Features/Dashboard/DashboardView.swift:L5-L20`. |
 | Molecule | `QRCodeCardView` | Dashboard and venue mode | One square QR/loading/unavailable footprint; `QRCodeCardView.swift:L4-L65`. |
 | Molecule | `DrawerThreadRow`/`DrawerSurfaceButton` | Left drawer | Drawer-local rows; do not copy into another navigation surface; `AppShellLeftDrawer.swift:L243-L280,L378-L425`. |
@@ -153,7 +153,7 @@ Profile is historical ledger drift, not a reason to change the current code.
 | Organism | `AudienceHighlightsView` | Drawer-only audience surface | Read-only highlights and chat handoff; `AudienceHighlightsView.swift:L36-L71,L96-L164`. |
 | Organism | `MobileChatView` + composer/message/tool cards | Chat | One transcript/composer owner; `MobileChatView.swift:L35-L171`. |
 | Organism | `EntityContextSheet`, `ComposerWorkflowSheet`, `TalkOverlayView` | Contextual actions | Semantic surfaces above the raised content plane; source lines listed above. |
-| Organism | `SettingsView` | Settings route | Full-screen settings stack within shell navigation; `SettingsView.swift:L15-L165`. |
+| Organism | `SettingsView` | Settings route | Full-screen settings stack within shell navigation; native `Link` / `LabeledContent` on `jovieSurface`; `SettingsView.swift`. |
 
 ## macOS screen and state registry
 
@@ -221,7 +221,7 @@ not treated as interchangeable:
 
 | Owner | Evidence | Difference |
 | --- | --- | --- |
-| `JoviePressFeedbackButtonStyle` | `JovieTheme.swift` | Canonical `.72`/scale/animation recipe used by the tab bar and drawer |
+| `JoviePressFeedbackButtonStyle` | `JovieTheme.swift` | Canonical `.72`/scale/animation recipe used by the tab bar, drawer, and Settings links |
 | `JovieIconButtonStyle` | `JovieTheme.swift` | Same `.72`/scale/animation plus 44-point circular icon geometry |
 | `MobileChatMerchActionButtonStyle` | `MobileChatMerchOptionsView.swift` | Intentionally different: capsule fill opacity only, no scale |
 | `ComposerSlashRowButtonStyle` | `ChatComposerBar.swift` | Intentionally different: background highlight only, no scale |
@@ -263,10 +263,9 @@ merch, composer, and filled/icon geometry variants retain distinct semantics.
    `JovieTheme.swift:L4-L24`; web resolves CSS variables in `tokens.ts:L17-L30`.
    The semantic names overlap, but no cross-platform generated token contract
    is proven by source.
-4. **Settings capitalization.** `SettingsSectionTitle` applies
-   `.textCase(.uppercase)` at `SettingsView.swift:L168-L180`; this is a source
-   style decision to review against the no-default-all-caps rule, not a reason
-   to rewrite settings during this inventory.
+4. **Settings capitalization.** Resolved in the JOV-5202 Settings slice:
+   section titles are Title Case and no longer use `.textCase(.uppercase)`.
+   Remaining families are ranked in [`ios-drift-inventory.md`](ios-drift-inventory.md).
 5. **Entity context is partly placeholder.** The sheet itself says its stats
    are stable placeholders until asset-graph pages are wired and its
    visibility toggle has no backend save, `EntityContextSheet.swift:L33-L55,
@@ -328,7 +327,7 @@ frame is a source-mapped review target. The companion machine-readable file is
 | `ios-calendar-locked` | Compact/medium founder-locked Calendar | Header, sections, rows, Ask Jovie | loaded/empty/loading/error/offline/pending | Keep current source anatomy; no visual proposal | `locked source reference` |
 | `ios-inbox-locked` | Compact/medium founder-locked Inbox | Header, action cards, Ask Jovie | loaded/empty/loading/error/offline/triage | Keep swipe semantics and reserved card footprint | `locked source reference` |
 | `ios-chat-locked` | Compact/medium founder-locked Chat | Transcript, composer, empty copy, tool/entity cards | empty/offline/streaming/retry/handoff | Composer bottom inset; no source drift | `locked source reference` |
-| `ios-settings` | Compact/medium settings route | Account card, links, build rows, logout | loaded/logout busy/disabled | Scrollable single-column rows; 44-point icon target | `source-mapped` |
+| `ios-settings` | Compact/medium settings route | Account card, native links, LabeledContent, logout, Liquid Glass plates | loaded/logout busy/disabled | Scrollable single-column rows; 44-point icon target; reserved logout height | `source-mapped` |
 | `ios-talk-context` | Compact/medium semantic overlays | Talk full-screen review, entity sheet, workflow sheet | starting/recording/reviewing, medium/large sheet, workflow actions | Overlay above raised content plane; reserve transcript/error areas | `source-mapped` |
 | `macos-menu-monitor` | macOS menu-bar operator surface | Shipping label, counts, last-known/error, action feedback, status output | initial loading, zero/positive/99+, refreshed, unavailable, stale last-known, action feedback/output | No iOS/web frame reuse; menu-bar-only | `source-mapped`, operator-only |
 

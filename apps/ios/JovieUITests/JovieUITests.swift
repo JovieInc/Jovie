@@ -329,8 +329,8 @@ final class JovieUITests: XCTestCase {
     attachScreenshot(named: "settings", app: app)
     for linkTitle in ["Manage Account", "Support", "Billing", "Privacy", "Terms"] {
       XCTAssertTrue(
-        app.buttons[linkTitle].waitForExistence(timeout: 2),
-        "Settings row \(linkTitle) did not appear.\n\(app.debugDescription)"
+        app.buttons[linkTitle].exists || app.links[linkTitle].exists,
+        "Settings row \(linkTitle) did not appear as a button or link.\n\(app.debugDescription)"
       )
     }
     for valueTitle in ["Version", "Build"] {

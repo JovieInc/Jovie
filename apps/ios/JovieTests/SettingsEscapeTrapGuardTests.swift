@@ -81,3 +81,43 @@ struct SettingsEscapeTrapGuardTests {
     )
   }
 }
+
+struct SettingsStyleGuardTests {
+  private var settingsSource: String {
+    get throws {
+      let url = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .appendingPathComponent("Jovie/Features/Settings/SettingsView.swift")
+      return try String(contentsOf: url, encoding: .utf8)
+    }
+  }
+
+  @Test func settingsUsesNativeLinksLabeledContentAndLiquidGlass() throws {
+    let source = try settingsSource
+
+    #expect(source.contains("Link(destination:"))
+    #expect(source.contains("LabeledContent"))
+    #expect(source.contains(".jovieSurface(radius: JovieRadius.medium"))
+    #expect(source.contains(".jovieSurface(radius: JovieRadius.medium, interactive: true)"))
+    #expect(source.contains("JoviePressFeedbackButtonStyle()"))
+    #expect(source.contains("SettingsLayout.reservedActionMinHeight"))
+    #expect(!source.contains(".textCase(.uppercase)"))
+    #expect(!source.contains("SettingsRowButtonStyle"))
+    #expect(!source.contains("JovieColor.surface0, in: RoundedRectangle"))
+    #expect(!source.contains("if isLoggingOut {\n          ProgressView()"))
+    #expect(!source.contains("URL(string: \"https://jov.ie/support\")!"))
+  }
+
+  @Test func logoutCopyAndReservedHeightStayStableAcrossBusyState() {
+    #expect(SettingsLayout.logoutTitle(isLoggingOut: false) == "Log Out")
+    #expect(SettingsLayout.logoutTitle(isLoggingOut: true) == "Logging Out")
+    #expect(SettingsLayout.reservedActionMinHeight == 48)
+  }
+
+  @Test func settingsExternalURLsAreWellFormed() {
+    #expect(SettingsExternalURL.support?.absoluteString == "https://jov.ie/support")
+    #expect(SettingsExternalURL.privacy?.absoluteString == "https://jov.ie/legal/privacy")
+    #expect(SettingsExternalURL.terms?.absoluteString == "https://jov.ie/legal/terms")
+  }
+}
