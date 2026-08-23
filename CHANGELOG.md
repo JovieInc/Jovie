@@ -9,6 +9,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - [internal] **Ovie Mac HUD is one screen with three YC metrics (JOV-5298):** Packaged Jovie.app opens `/hud?ovie=mac` so the operator sees default alive/dead, week-over-week growth, and dogfood-receipted shipping only. Eve stays the talk door. Customer chat stays `/app/chat`.
 
+- [internal] **MenuMonitor reports freshness instead of fake zeros (JOV-5305):** Initial loading hides counts, stale values say Last known, and action/error state reaches the accessible status item.
+
 - [internal] **Jovie, Symphony, and Summer/ops CI lanes no longer block each other (JOV-5288):** this repo's required checks stay the Jovie aggregates. Exclusive Symphony/control-plane or Summer/ops diffs skip Jovie app unit/build/typecheck suites; exclusive product diffs skip Symphony scripts typecheck. Mixed and unknown non-doc files fail closed onto the product lane. Migration Guard and secret scanning stay on.
 
 - **Home and Artist Profiles now show live artist sites and the platform spec grid:** a dark shipped-sites gallery and a blue / pink / purple platform bento sit below the fold on jov.ie and /artist-profiles, using real Jovie profile and product shots.
@@ -77,6 +79,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- **Jovie Local no longer says you’re offline while the local server is compiling (JOV-5339):** first compile can take ~15 seconds with no bytes yet. Local waits, talks to localhost:3100, and reloads on its own when the host is warm — no Retry click. It only says “check your connection” when the machine is actually offline.
+- **Jovie Local keeps the app shell during hot reload (JOV-5339):** packaged 14s/18s boot and load timers no longer replace a compiling local window with “couldn’t load”. Chromium maps `localhost` to `127.0.0.1` without changing the origin, so sign-in cookies stay, and transient loopback misses retry until Next is up.
 - **iPhone and Mac sign-in return to the app instead of the website:** after browser login, iOS and macOS bounce through an allowlisted return page and reopen Jovie. Signed-in native sessions no longer dump into the web dashboard.
 - **iPhone sign-in can open the browser when SwiftUI has no key window (JOV-5198):** Continue in Browser waits for a foreground-active window, presents from a visible or scene-backed window when needed, and a failed session start is no longer reported as `invalidAuthURL`.
 - [internal] **Ovie eval review persists a durable row and records `judge:absent` as a verdict:** enqueue reports success only after `ovie_operating_kv` write, missing rubric judges are not scored as pass, word count is a `word-count:N` signal unless a verbosity budget is set, and Slack feedback redacts emails in the message body.

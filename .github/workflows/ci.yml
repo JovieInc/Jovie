@@ -466,6 +466,7 @@ jobs:
       run_drizzle: ${{ steps.detect.outputs.run_drizzle || 'false' }}
       run_neon: ${{ steps.detect.outputs.run_neon || 'false' }}
       run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}
+      run_macos: ${{ steps.detect.outputs.run_macos || 'false' }}
       has_code_changes: ${{ steps.detect.outputs.has_code_changes || 'false' }}
       is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}
       run_jovie_product: ${{ steps.detect.outputs.run_jovie_product || 'false' }}
@@ -575,7 +576,7 @@ jobs:
               # still validate the exact combined head. The typed no-op output
               # lets only unit and build/layout skip their expensive work.
               echo "is_noop_merge_group=true" >> "$GITHUB_OUTPUT"
-              for output in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios has_code_changes; do
+              for output in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios run_macos has_code_changes; do
                 echo "$output=false" >> "$GITHUB_OUTPUT"
               done
               emit_ci_lanes none
@@ -598,7 +599,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
-            for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios has_code_changes; do
+            for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios run_macos has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             emit_ci_lanes all
@@ -622,6 +623,13 @@ jobs:
             echo "run_ios=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_ios=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          MACOS_PATTERN='^apps/macos/MenuMonitor/(Package\.swift|Sources/|Tests/)'
+          if echo "$CHANGED_FILES" | grep -q -E "$MACOS_PATTERN"; then
+            echo "run_macos=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_macos=false" >> "$GITHUB_OUTPUT"
           fi
 
           TEST_PERFORMANCE_PATTERN='^apps/web/scripts/test-performance-(guard\.ts|profiler(\.test)?\.ts)$'
@@ -1865,6 +1873,35 @@ jobs:
         (github.event_name == 'push' && github.ref == 'refs/heads/main')
       )
     uses: ./.github/workflows/ios-ci.yml
+
+  # MenuMonitor is a small native Swift package. Keep its hosted build/test off
+  # source PRs and require it only for path-selected combined heads or a
+  # direct-main fallback, matching the existing native integration contract.
+  ci-macos:
+    name: macOS MenuMonitor Build + Test (combined)
+    needs: [ci-path-changes, ci-merge-group-admission]
+    if: >-
+      always() &&
+      needs.ci-path-changes.result == 'success' &&
+      (
+        github.event_name != 'merge_group' ||
+        needs.ci-merge-group-admission.result == 'success'
+      ) &&
+      needs.ci-path-changes.outputs.run_macos == 'true' &&
+      (
+        github.event_name == 'merge_group' ||
+        (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      )
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+      - name: Run MenuMonitor tests with coverage
+        run: swift test --package-path apps/macos/MenuMonitor --enable-code-coverage
+      - name: Build MenuMonitor release binary
+        run: swift build --package-path apps/macos/MenuMonitor -c release
 
   ci-build-public:
     name: Build (public routes)
@@ -4704,6 +4741,7 @@ jobs:
         ci-unit-tests,
         ci-build-layout,
         ci-ios,
+        ci-macos,
         ci-promptfoo-evals,
         ci-golden-eval-set,
         ci-secret-scan,
@@ -4725,6 +4763,7 @@ jobs:
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
           BUILD_LAYOUT_RESULT="${{ needs.ci-build-layout.result }}"
           IOS_RESULT="${{ needs.ci-ios.result }}"
+          MACOS_RESULT="${{ needs.ci-macos.result }}"
           PROMPTFOO_RESULT="${{ needs.ci-promptfoo-evals.result }}"
           GOLDEN_EVAL_RESULT="${{ needs.ci-golden-eval-set.result }}"
           SECRET_RESULT="${{ needs.ci-secret-scan.result }}"
@@ -4733,6 +4772,7 @@ jobs:
           NOOP_GROUP="${{ needs.ci-path-changes.outputs.is_noop_merge_group }}"
           RUN_JOVIE_PRODUCT="${{ needs.ci-path-changes.outputs.run_jovie_product }}"
           RUN_IOS="${{ needs.ci-path-changes.outputs.run_ios }}"
+          RUN_MACOS="${{ needs.ci-path-changes.outputs.run_macos }}"
           RUN_PROMPTFOO="${{ needs.ci-path-changes.outputs.run_promptfoo_evals }}"
           RUN_GOLDEN_EVAL="${{ needs.ci-path-changes.outputs.run_golden_eval_set }}"
           {
@@ -4752,6 +4792,7 @@ jobs:
             echo "| Unit Tests | $UNIT_RESULT |"
             echo "| Build + Layout (same hosted workspace) | $BUILD_LAYOUT_RESULT |"
             echo "| iOS Build + Test | $IOS_RESULT |"
+            echo "| macOS MenuMonitor Build + Test | $MACOS_RESULT |"
             echo "| Promptfoo Evals (path-selected) | $PROMPTFOO_RESULT |"
             echo "| Golden Eval Set (path-selected) | $GOLDEN_EVAL_RESULT |"
             echo "| Secret Scan | $SECRET_RESULT |"
@@ -4804,6 +4845,15 @@ jobs:
           fi
           if [[ "$RUN_IOS" != "true" && "$IOS_RESULT" != "skipped" ]]; then
             echo "::error::iOS Build + Test ran without an iOS path selection (result: $IOS_RESULT)"
+            exit 1
+          fi
+
+          if [[ "$RUN_MACOS" == "true" && "$MACOS_RESULT" != "success" ]]; then
+            echo "::error::macOS MenuMonitor Build + Test did not pass for a macOS-changing combined head (result: $MACOS_RESULT)"
+            exit 1
+          fi
+          if [[ "$RUN_MACOS" != "true" && "$MACOS_RESULT" != "skipped" ]]; then
+            echo "::error::macOS MenuMonitor Build + Test ran without a macOS path selection (result: $MACOS_RESULT)"
             exit 1
           fi
 
@@ -5439,6 +5489,7 @@ jobs:
         ci-unit-tests,
         ci-build-layout,
         ci-ios,
+        ci-macos,
         ci-promptfoo-evals,
         ci-golden-eval-set,
       ]
@@ -5477,9 +5528,11 @@ jobs:
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
           BUILD_LAYOUT_RESULT="${{ needs.ci-build-layout.result }}"
           IOS_RESULT="${{ needs.ci-ios.result }}"
+          MACOS_RESULT="${{ needs.ci-macos.result }}"
           PROMPTFOO_RESULT="${{ needs.ci-promptfoo-evals.result }}"
           GOLDEN_EVAL_RESULT="${{ needs.ci-golden-eval-set.result }}"
           RUN_IOS="${{ needs.ci-path-changes.outputs.run_ios }}"
+          RUN_MACOS="${{ needs.ci-path-changes.outputs.run_macos }}"
           RUN_PROMPTFOO="${{ needs.ci-path-changes.outputs.run_promptfoo_evals }}"
           RUN_GOLDEN_EVAL="${{ needs.ci-path-changes.outputs.run_golden_eval_set }}"
 
@@ -5494,6 +5547,7 @@ jobs:
               "Unit Tests:$UNIT_RESULT" \
               "Build + Layout:$BUILD_LAYOUT_RESULT" \
               "iOS Build + Test:$IOS_RESULT" \
+              "macOS MenuMonitor Build + Test:$MACOS_RESULT" \
               "Promptfoo Evals:$PROMPTFOO_RESULT" \
               "Golden Eval Set:$GOLDEN_EVAL_RESULT"; do
               name="${lane%%:*}"
@@ -5534,6 +5588,16 @@ jobs:
             fi
           elif [ "$IOS_RESULT" != "skipped" ]; then
             echo "::error::Main fallback ran iOS Build + Test without an iOS path selection (result $IOS_RESULT)."
+            exit 1
+          fi
+
+          if [ "$RUN_MACOS" = "true" ]; then
+            if [ "$MACOS_RESULT" != "success" ]; then
+              echo "::error::Main fallback macOS MenuMonitor Build + Test did not pass (result $MACOS_RESULT)."
+              exit 1
+            fi
+          elif [ "$MACOS_RESULT" != "skipped" ]; then
+            echo "::error::Main fallback ran macOS MenuMonitor Build + Test without a macOS path selection (result $MACOS_RESULT)."
             exit 1
           fi
 
