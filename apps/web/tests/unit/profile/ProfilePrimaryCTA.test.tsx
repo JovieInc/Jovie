@@ -95,9 +95,12 @@ describe('ProfilePrimaryCTA', () => {
       </ProfileShell>
     );
 
-    expect(
-      screen.getByRole('link', { name: /open listen page/i })
-    ).toBeInTheDocument();
+    const listenCta = screen.getByRole('link', {
+      name: /open listen page/i,
+    });
+    expect(listenCta).toHaveClass('h-8');
+    expect(listenCta.className).toContain('before:h-11');
+    expect(listenCta.className).toContain('before:min-w-11');
     expect(
       screen.queryByRole('button', { name: /^subscribe$/i })
     ).not.toBeInTheDocument();

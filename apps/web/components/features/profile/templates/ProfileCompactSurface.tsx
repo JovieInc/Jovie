@@ -736,7 +736,7 @@ export function ProfileCompactSurface({
               data-testid='profile-hero-identity-block'
             >
               <div
-                className='grid min-w-0 gap-0.5 [overflow-wrap:anywhere]'
+                className='grid min-w-0 gap-1 [overflow-wrap:anywhere]'
                 data-testid='profile-hero-identity-content'
               >
                 <IdentityHeading
@@ -773,7 +773,10 @@ export function ProfileCompactSurface({
                 </IdentityHeading>
 
                 <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2'>
-                  <p className='flex min-h-11 min-w-0 items-center gap-1.5 text-xs font-medium leading-4 tracking-normal text-white/74 [@media(max-height:820px)]:text-2xs'>
+                  <p
+                    className='flex min-w-0 self-start items-center gap-1.5 text-xs font-medium leading-4 tracking-normal text-white/74 [@media(max-height:820px)]:text-2xs'
+                    data-testid='profile-hero-metadata-row'
+                  >
                     <span className='min-w-0 truncate'>{heroSubtitle}</span>
                     {locationLabel ? (
                       <>

@@ -423,7 +423,7 @@ describe('ProfileCompactTemplate', () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
-        artist={mockArtist}
+        artist={{ ...mockArtist, location: 'Los Angeles' }}
         socialLinks={[
           {
             id: 'instagram',
@@ -440,14 +440,39 @@ describe('ProfileCompactTemplate', () => {
 
     const identity = screen.getByTestId('profile-hero-identity-block');
     expect(identity).toHaveClass('py-1');
+    expect(screen.getByTestId('profile-hero-identity-content')).toHaveClass(
+      'gap-1'
+    );
     expect(screen.getByRole('link', { name: mockArtist.name })).toHaveClass(
       'min-h-11',
       'items-center',
       'py-0'
     );
+    expect(screen.getByTestId('profile-hero-metadata-row')).not.toHaveClass(
+      'min-h-11'
+    );
+    expect(screen.getByTestId('profile-hero-metadata-row')).toHaveClass(
+      'self-start'
+    );
+    expect(screen.getByText('Los Angeles')).toBeVisible();
     expect(
       within(screen.getByTestId('profile-hero-social-row')).getByRole('link')
     ).toHaveClass('h-11', 'w-11');
+  });
+
+  it('keeps identity metadata compact when optional location is absent', () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={{ ...mockArtist, location: null }}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    const metadata = screen.getByTestId('profile-hero-metadata-row');
+    expect(metadata).not.toHaveClass('min-h-11');
+    expect(metadata.querySelector('svg')).toBeNull();
   });
 
   it('keeps the artist photo in color with profile text over the image', async () => {
