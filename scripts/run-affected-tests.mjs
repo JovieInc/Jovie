@@ -258,6 +258,7 @@ const PRODUCT_LANE_FOUNDATION_LANE = new Set([
   'docs/PR_FLOW.md',
   'docs/TESTING_STRATEGY.md',
   'scripts/lib/ci-harness.mjs',
+  'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
   'scripts/lib/merge-queue-guard.mjs',
   'scripts/lib/resolve-merge-group-path-diff.mjs',
 ]);

@@ -400,6 +400,7 @@ describe('automation-verify affected scope', () => {
       'docs/PR_FLOW.md',
       'docs/TESTING_STRATEGY.md',
       'scripts/lib/__tests__/automation-verify.test.mjs',
+      'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
       'scripts/lib/__tests__/product-lane-classifier.test.mjs',
       'scripts/lib/ci-harness.mjs',
       'scripts/lib/merge-queue-guard.mjs',
