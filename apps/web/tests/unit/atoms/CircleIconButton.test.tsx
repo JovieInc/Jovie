@@ -3,10 +3,31 @@ import Link from 'next/link';
 import { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { CircleIconButton } from '@/components/atoms/CircleIconButton';
+import {
+  CircleIconButton,
+  type CircleIconButtonVariant,
+} from '@/components/atoms/CircleIconButton';
 import { expectNoA11yViolations } from '../../utils/a11y';
 
+type InternalIconButtonVariant = Extract<
+  CircleIconButtonVariant,
+  | 'control'
+  | 'destructive'
+  | 'inline'
+  | 'overflowDrawer'
+  | 'overflowSegment'
+  | 'railToggle'
+>;
+const circleVariantContractIsPublicOnly: [InternalIconButtonVariant] extends [
+  never,
+]
+  ? true
+  : false = true;
+
 describe('CircleIconButton', () => {
+  it('does not expose compatibility-only canonical variants', () => {
+    expect(circleVariantContractIsPublicOnly).toBe(true);
+  });
   it('renders with the provided aria-label', () => {
     render(
       <CircleIconButton ariaLabel='Go back'>
