@@ -9,6 +9,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - [internal] **iOS public-profile browser stays on the published creator page (JOV-5148):** Open Public Profile still uses the full-screen embedded browser, but navigation is now limited to HTTPS `jov.ie` / `staging.jov.ie` and the server-provided username root. App, admin, HUD, auth, and other reserved routes cannot load inside it.
 
+- [internal] **Canonical homepage and dashboard-releases owners stay attached to screenshot and visual-qa registries (JOV-5304):** live `/` is `MarketingPosterHero` + `PublicPageShell`, live releases is `ShellReleasesView` with demo `/demo` still `ReleasesExperience`, and a fail-closed drift guard rejects `/ai`/`/investors` promotion plus a deliberate-red fixture.
+
 - [internal] **Settings and section-header molecules have one owner (JOV-5308):** dashboard SettingsPanel/SectionHeader aliases are gone, remaining settings consumers import the canonical molecule, and a machine-readable ownership receipt fails closed on duplicate owners, detached consumers, and malformed typed atom dependencies.
 
 - [internal] **Pool `gate-next` continues past issue-specific context/research misses (JOV-5292):** a targeted `context-no-results` or `research-evidence-required` hold no longer starves the fleet-gate event. Admission still takes at most one later verified candidate. Targeted `--issue` reports that issue's hold. Systemic holds (`gbrain-unavailable`, org-chart missing, ownership conflict, fleet-gate closed) still fail closed. Hash-bound holds persist outside the git tree until content changes or 24h elapses. Hourly intake-readiness stays dry-run / receipt-only.

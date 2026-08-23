@@ -1036,8 +1036,8 @@ mark intentional marketing sentence-case headlines with
 
 | Surface | Routes / entrypoints | Layout / shell | Design system |
 |---------|---------------------|----------------|---------------|
-| Homepage / chat-intake | `(home)/*`, `components/homepage/*` | `(home)/layout.tsx` with `MarketingHeader` (minimal) + `MarketingFooter` | System B |
-| Secondary marketing | `(marketing)/blog/*`, `changelog/*`, `support/*`, `pricing/*`, `launch/*`, `ai/*`, `engagement-engine/*`, `investors/*`, `tips/*` | `(marketing)/layout.tsx` + page-specific nested layouts | Unified system, editorial language |
+| Homepage / chat-intake | `(home)/*`, `components/homepage/*` | `(home)/layout.tsx` with `PublicPageShell` | System B |
+| Secondary marketing | `(marketing)/blog/*`, `changelog/*`, `support/*`, `pricing/*`, `launch/*`, `ai/*`, `engagement-engine/*`, `investors/*`, `tips/*` | `(marketing)/layout.tsx` + page-specific nested layouts. `/ai` and `/investors` are live marketing pages excluded from the canonical review set. | Unified system, editorial language |
 | Legal / informational | `(dynamic)/legal/*` | Legal layout | Unified system, editorial language |
 | Product app shell | `app/(shell)/*` | Authenticated app shell | System B |
 | Auth funnel | `(auth)/*` | `AuthLayout` | System B |
@@ -1079,7 +1079,7 @@ mark intentional marketing sentence-case headlines with
 | `apps/web/components/organisms/table/molecules/PageToolbar.tsx` | Canonical workspace toolbar and action hierarchy |
 | `apps/web/components/homepage/*` | Homepage chat-intake implementation (System B) |
 | `apps/web/components/features/home/*` | Legacy marketing-home components (still used by `(marketing)/new/*`) |
-| `apps/web/app/(home)/layout.tsx` | Homepage shell — `MarketingHeader` (minimal) + `MarketingFooter` |
+| `apps/web/app/(home)/layout.tsx` | Homepage shell — `PublicPageShell` |
 
 ---
 
