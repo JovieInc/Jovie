@@ -245,6 +245,22 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/agent-qc-wires.test.mjs',
   'scripts/lib/__tests__/needs-human-autoclose.test.mjs',
 ];
+const PRODUCT_LANE_FOUNDATION_PRIMARY_INPUTS = new Set([
+  'scripts/lib/product-lane-classifier.mjs',
+  'scripts/lib/product-lane-finalize.mjs',
+  'scripts/lib/__tests__/product-lane-classifier.test.mjs',
+]);
+const PRODUCT_LANE_FOUNDATION_LANE = new Set([
+  ...PRODUCT_LANE_FOUNDATION_PRIMARY_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  '.claude/rules/release.md',
+  '.github/workflows/README.md',
+  'docs/PR_FLOW.md',
+  'docs/TESTING_STRATEGY.md',
+  'scripts/lib/ci-harness.mjs',
+  'scripts/lib/merge-queue-guard.mjs',
+  'scripts/lib/resolve-merge-group-path-diff.mjs',
+]);
 const MERGE_QUEUE_CONTROLLER_INPUTS = new Set([
   '.github/workflows/merge-queue-autoenroll.yml',
   'docs/PR_FLOW.md',
@@ -655,6 +671,25 @@ export function buildAffectedTestPlan(
   const files = unique(changedFiles.filter(Boolean)).sort();
   if (files.some(file => GLOBAL_TEST_INPUTS.has(file))) {
     return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+  }
+  const isBoundedProductLaneFoundation =
+    files.some(file => PRODUCT_LANE_FOUNDATION_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => PRODUCT_LANE_FOUNDATION_LANE.has(file));
+  if (isBoundedProductLaneFoundation) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: unique([
+        ...CI_CONTROL_SCRIPT_TESTS,
+        'scripts/lib/__tests__/product-lane-classifier.test.mjs',
+      ]),
+      nodeTests: ['scripts/typecheck-scripts.mjs'],
+    };
   }
   const isExactSymphonyThroughputControl =
     files.length === SYMPHONY_THROUGHPUT_CONTROL_MANIFEST.size &&
