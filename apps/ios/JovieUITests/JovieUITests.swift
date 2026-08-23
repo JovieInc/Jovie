@@ -52,7 +52,7 @@ final class JovieUITests: XCTestCase {
 
     app.buttons["whats-new-done"].tap()
     XCTAssertTrue(
-      app.textFields["Ask Jovie"].waitForExistence(timeout: 5),
+      app.textFields["chat-composer-input"].waitForExistence(timeout: 5),
       "Dismissing What’s New must land on chat home.\n\(app.debugDescription)"
     )
     attachScreenshot(named: "chat-first-home", app: app)
@@ -352,14 +352,32 @@ final class JovieUITests: XCTestCase {
   }
 
   func testDrawerSwitchesBetweenChatAndProfile() {
-    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
-      $0.staticTexts["Ask Jovie"]
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"chat-composer-input\"") {
+      $0.textFields["chat-composer-input"]
     }
 
-    XCTAssertTrue(app.textFields["Ask Jovie"].exists)
+    XCTAssertTrue(app.textFields["chat-composer-input"].exists)
     XCTAssertTrue(
+      app.staticTexts["chat-empty-greeting"].exists,
+      "Empty chat must show one locked rotating greeting.\n\(app.debugDescription)"
+    )
+    let greeting = app.staticTexts["chat-empty-greeting"].label
+    XCTAssertTrue(
+      ["Let's get it", "Ready to start?", "Ready when you are"].contains(greeting),
+      "Empty chat greeting drifted off the locked rotate set: \(greeting)\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      app.staticTexts["Ask Jovie"].exists,
+      "Ask Jovie is dead on empty chat.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
       app.staticTexts["Ask Jovie about your profile, releases, and next moves."].exists,
-      "Chat empty state did not explain the online intro behavior.\n\(app.debugDescription)"
+      "Empty chat must not ship helper copy.\n\(app.debugDescription)"
+    )
+    XCTAssertEqual(
+      app.textFields["chat-composer-input"].placeholderValue ?? "",
+      "",
+      "Empty composer must have no placeholder.\n\(app.debugDescription)"
     )
     attachScreenshot(named: "chat", app: app)
 
@@ -383,11 +401,11 @@ final class JovieUITests: XCTestCase {
   // GH-12949: with the drawer closed, the recessed base plane must be fully
   // occluded — no drawer chrome hittable under the composer/content card.
   func testDrawerBasePlaneOccludedWhenClosed() {
-    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
-      $0.textFields["Ask Jovie"]
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"chat-composer-input\"") {
+      $0.textFields["chat-composer-input"]
     }
 
-    let composer = app.textFields["Ask Jovie"]
+    let composer = app.textFields["chat-composer-input"]
     XCTAssertTrue(
       waitForHittable(composer, timeout: 3),
       "Chat composer did not become hittable with drawer closed.\n\(app.debugDescription)"
@@ -415,8 +433,8 @@ final class JovieUITests: XCTestCase {
 
   // Chat-first shell: no bottom tab bar. Talk lives in the toolbar/sidebar.
   func testPrimaryTabBarAndTalkFAB() {
-    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
-      $0.textFields["Ask Jovie"]
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"chat-composer-input\"") {
+      $0.textFields["chat-composer-input"]
     }
 
     XCTAssertFalse(
@@ -453,8 +471,8 @@ final class JovieUITests: XCTestCase {
   }
 
   func testShellVlogControlOpensPromptCaptureDirectly() {
-    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
-      $0.textFields["Ask Jovie"]
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"chat-composer-input\"") {
+      $0.textFields["chat-composer-input"]
     }
 
     let vlogControl = app.descendants(matching: .any)["shell-vlog-open"]
@@ -522,10 +540,10 @@ final class JovieUITests: XCTestCase {
   func testNoGhostFootprintAfterPillRemovalAcrossStates() {
     // chatEnabled == true (ready dashboard loaded): composer sits at the true
     // safe-area bottom, not floating above a reserved-but-empty pill gap.
-    let chatApp = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
-      $0.textFields["Ask Jovie"]
+    let chatApp = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"chat-composer-input\"") {
+      $0.textFields["chat-composer-input"]
     }
-    let composerInput = chatApp.textFields["Ask Jovie"]
+    let composerInput = chatApp.textFields["chat-composer-input"]
     XCTAssertTrue(waitForHittable(composerInput, timeout: 3))
     let chatWindowMaxY = chatApp.windows.firstMatch.frame.maxY
     // Composer sits above the primary tab bar (~56pt) + home indicator.
@@ -581,8 +599,8 @@ final class JovieUITests: XCTestCase {
   }
 
   func testTalkFABAppearsOnPrimaryTabBar() {
-    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
-      $0.textFields["Ask Jovie"]
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"chat-composer-input\"") {
+      $0.textFields["chat-composer-input"]
     }
 
     let talkFAB = firstMatchingButton(
@@ -611,9 +629,9 @@ final class JovieUITests: XCTestCase {
   func testOfflineChatLaunchShowsCachedHistoryIntro() {
     let app = launchMockApp(
       launchArgument: "-ui-testing-chat-offline",
-      expectedElementDescription: "\"Ask Jovie (offline)\""
+      expectedElementDescription: "\"chat-composer-input\""
     ) {
-      $0.textFields["Ask Jovie (offline)"]
+      $0.textFields["chat-composer-input"]
     }
 
     let offlineStatusPredicate = NSPredicate(format: "label == %@", "Offline")
@@ -635,7 +653,7 @@ final class JovieUITests: XCTestCase {
       app.staticTexts["Offline. Drafts stay on this device and cached history remains available."].exists,
       "Offline chat empty state did not explain draft/cache behavior.\n\(app.debugDescription)"
     )
-    XCTAssertTrue(app.textFields["Ask Jovie (offline)"].exists)
+    XCTAssertTrue(app.textFields["chat-composer-input"].exists)
 
     app.buttons["Open navigation drawer"].tap()
     XCTAssertTrue(
@@ -723,10 +741,10 @@ final class JovieUITests: XCTestCase {
   func testAllChatComponentsRenderLabelsNotRawMarkup() {
     let app = launchMockApp(
       launchArgument: "-ui-testing-chat-all-components",
-      expectedElementDescription: "\"Ask Jovie\"",
+      expectedElementDescription: "\"chat-composer-input\"",
       timeout: 10
     ) {
-      $0.textFields["Ask Jovie"]
+      $0.textFields["chat-composer-input"]
     }
 
     if app.buttons["whats-new-done"].waitForExistence(timeout: 1) {
@@ -734,7 +752,7 @@ final class JovieUITests: XCTestCase {
     }
 
     XCTAssertTrue(
-      app.textFields["Ask Jovie"].exists,
+      app.textFields["chat-composer-input"].exists,
       "Composer did not appear on the all-components fixture.\n\(app.debugDescription)"
     )
     attachScreenshot(named: "chat-all-components-composer", app: app)
@@ -866,10 +884,10 @@ final class JovieUITests: XCTestCase {
       Double(testEnvironmentValue("JOVIE_IOS_RUNTIME_TIMEOUT_SECONDS") ?? "") ?? 3
     let app = launchMockApp(
       launchArgument: "-ui-testing-chat-all-components",
-      expectedElementDescription: "\"Ask Jovie\"",
+      expectedElementDescription: "\"chat-composer-input\"",
       timeout: 10
     ) {
-      $0.textFields["Ask Jovie"]
+      $0.textFields["chat-composer-input"]
     }
 
     XCTAssertTrue(
@@ -885,7 +903,7 @@ final class JovieUITests: XCTestCase {
       app.swipeUp()
       app.swipeDown()
       XCTAssertTrue(
-        app.textFields["Ask Jovie"].waitForExistence(timeout: timeoutSeconds),
+        app.textFields["chat-composer-input"].waitForExistence(timeout: timeoutSeconds),
         "Composer disappeared during all-components scroll measurement.\n\(app.debugDescription)"
       )
     }
@@ -894,14 +912,14 @@ final class JovieUITests: XCTestCase {
   // JOV-3635: horizontal page-swipes between tabs are banned. Profile is
   // drawer-only — open the drawer, pick Profile, then return via Chat tab.
   func testSwipeNavigatesBetweenProfileAndChat() {
-    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
-      $0.textFields["Ask Jovie"]
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"chat-composer-input\"") {
+      $0.textFields["chat-composer-input"]
     }
 
     // Full-width swipe must NOT switch tabs (gesture ownership: edges only).
     app.swipeRight()
     XCTAssertTrue(
-      app.textFields["Ask Jovie"].waitForExistence(timeout: 2),
+      app.textFields["chat-composer-input"].waitForExistence(timeout: 2),
       "Horizontal swipe incorrectly left Chat.\n\(app.debugDescription)"
     )
     XCTAssertFalse(
@@ -929,14 +947,14 @@ final class JovieUITests: XCTestCase {
     )
     chatSurfaceAfterProfile.tap()
     XCTAssertTrue(
-      app.textFields["Ask Jovie"].waitForExistence(timeout: 3),
+      app.textFields["chat-composer-input"].waitForExistence(timeout: 3),
       "Drawer Chat did not return to Chat.\n\(app.debugDescription)"
     )
   }
 
   func testChatComposerWorkflowSheetShowsWorkflowGrid() {
-    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
-      $0.textFields["Ask Jovie"]
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"chat-composer-input\"") {
+      $0.textFields["chat-composer-input"]
     }
 
     let plusButton = app.buttons["Open workflow sheet"]
@@ -967,7 +985,7 @@ final class JovieUITests: XCTestCase {
 
     app.buttons["Make merch"].tap()
 
-    let input = app.textFields["Ask Jovie"]
+    let input = app.textFields["chat-composer-input"]
     XCTAssertTrue(
       waitForHittable(input, timeout: 3),
       "Chat composer input did not become hittable after workflow selection.\n\(app.debugDescription)"
@@ -980,8 +998,8 @@ final class JovieUITests: XCTestCase {
   }
 
   func testChatComposerSendSlotDoesNotShiftBarHeight() {
-    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
-      $0.textFields["Ask Jovie"]
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"chat-composer-input\"") {
+      $0.textFields["chat-composer-input"]
     }
 
     let composer = app.descendants(matching: .any)["chat-composer"]
@@ -1001,7 +1019,7 @@ final class JovieUITests: XCTestCase {
       "Send control must stay out of the tree while the reserved slot is empty.\n\(app.debugDescription)"
     )
 
-    let input = app.textFields["Ask Jovie"]
+    let input = app.textFields["chat-composer-input"]
     XCTAssertTrue(waitForHittable(input, timeout: 3))
     input.tap()
     input.typeText("Draft a follow-up")
@@ -1020,12 +1038,12 @@ final class JovieUITests: XCTestCase {
   }
 
   func testChatComposerSlashPaletteOpensAboveBar() {
-    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
-      $0.textFields["Ask Jovie"]
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"chat-composer-input\"") {
+      $0.textFields["chat-composer-input"]
     }
 
     let plus = app.buttons["chat-composer-plus"]
-    let input = app.textFields["Ask Jovie"]
+    let input = app.textFields["chat-composer-input"]
     XCTAssertTrue(waitForHittable(input, timeout: 3))
     XCTAssertTrue(plus.exists)
 
@@ -1050,12 +1068,12 @@ final class JovieUITests: XCTestCase {
   }
 
   func testChatComposerPreservesDraftAcrossShellNavigation() {
-    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
-      $0.textFields["Ask Jovie"]
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"chat-composer-input\"") {
+      $0.textFields["chat-composer-input"]
     }
 
     let draft = "Draft the launch follow-up"
-    let input = app.textFields["Ask Jovie"]
+    let input = app.textFields["chat-composer-input"]
     XCTAssertTrue(
       waitForHittable(input, timeout: 3),
       "Chat composer input did not become hittable.\n\(app.debugDescription)"
@@ -1100,7 +1118,7 @@ final class JovieUITests: XCTestCase {
       "Chat surface stayed covered after returning from Profile.\n\(app.debugDescription)"
     )
     chatSurface.tap()
-    let restoredInput = app.textFields["Ask Jovie"]
+    let restoredInput = app.textFields["chat-composer-input"]
     XCTAssertTrue(
       waitForHittable(restoredInput, timeout: 10),
       "Shell navigation did not return to the chat composer.\n\(app.debugDescription)"
@@ -1120,15 +1138,15 @@ final class JovieUITests: XCTestCase {
 
     let timeoutSeconds =
       Double(testEnvironmentValue("JOVIE_IOS_RUNTIME_TIMEOUT_SECONDS") ?? "") ?? 3
-    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
-      $0.textFields["Ask Jovie"]
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"chat-composer-input\"") {
+      $0.textFields["chat-composer-input"]
     }
 
     let drawerOpenButton = app.buttons["Open navigation drawer"]
     let profileSurface = app.buttons["shell-drawer-surface-shell-tab-profile"]
     let chatSurface = app.buttons["shell-drawer-surface-shell-tab-chat"]
     let profileReady = app.buttons["Copy URL"]
-    let chatReady = app.textFields["Ask Jovie"]
+    let chatReady = app.textFields["chat-composer-input"]
 
     XCTAssertTrue(
       drawerOpenButton.waitForExistence(timeout: timeoutSeconds),
@@ -1215,7 +1233,7 @@ final class JovieUITests: XCTestCase {
 
     app.buttons["Ask Jovie about your audience"].tap()
 
-    let chatInput = app.textFields["Ask Jovie"]
+    let chatInput = app.textFields["chat-composer-input"]
     XCTAssertTrue(
       waitForHittable(chatInput, timeout: 3),
       "Audience CTA did not open chat.\n\(app.debugDescription)"
@@ -1442,11 +1460,11 @@ final class JovieUITests: XCTestCase {
   // JOV-3672 (eng F11): an edge-drag starting while the composer has focus
   // must not open the drawer — it would fight text selection/cursor placement.
   func testEdgeDragDoesNotOpenDrawerWhileComposerFocused() {
-    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
-      $0.textFields["Ask Jovie"]
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"chat-composer-input\"") {
+      $0.textFields["chat-composer-input"]
     }
 
-    let input = app.textFields["Ask Jovie"]
+    let input = app.textFields["chat-composer-input"]
     XCTAssertTrue(
       waitForHittable(input, timeout: 3),
       "Chat composer input did not become hittable.\n\(app.debugDescription)"
@@ -1554,7 +1572,7 @@ final class JovieUITests: XCTestCase {
       return
     }
 
-    let composer = app.textFields["Ask Jovie"]
+    let composer = app.textFields["chat-composer-input"]
     XCTAssertTrue(
       composer.waitForExistence(timeout: 45),
       "Live auth did not reach the chat composer.\n\(app.debugDescription)"
@@ -1765,6 +1783,10 @@ final class JovieUITests: XCTestCase {
       if [
         "Ask Jovie",
         "Ask Jovie about your profile, releases, and next moves.",
+        "Let's get it",
+        "Ready to start?",
+        "Ready when you are",
+        "Chat message",
         "Send",
         "Chat",
         "Library",

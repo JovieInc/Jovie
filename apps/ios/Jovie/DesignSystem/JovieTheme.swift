@@ -54,12 +54,26 @@ enum JovieColor {
 }
 
 enum JovieFont {
+  /// Locked empty-chat greeting: 28 / 620.
+  static let emptyGreetingSize: CGFloat = 28
+  static let emptyGreetingWeight: CGFloat = 620
+  /// ActionButton label weight (medium).
+  static let actionLabelWeight: CGFloat = 510
+
   static func display(size: CGFloat, weight: Font.Weight = .semibold) -> Font {
     font(size: size, weight: weight)
   }
 
+  static func display(size: CGFloat, numericWeight: CGFloat) -> Font {
+    font(size: size, numericWeight: numericWeight)
+  }
+
   static func body(size: CGFloat, weight: Font.Weight = .regular) -> Font {
     font(size: size, weight: weight)
+  }
+
+  static func body(size: CGFloat, numericWeight: CGFloat) -> Font {
+    font(size: size, numericWeight: numericWeight)
   }
 
   private static func font(size: CGFloat, weight: Font.Weight) -> Font {
@@ -73,6 +87,50 @@ enum JovieFont {
 
     return .system(size: size, weight: weight)
   }
+
+  private static func font(size: CGFloat, numericWeight: CGFloat) -> Font {
+    let uiWeight = UIFont.Weight(rawValue: uiFontWeightRawValue(forCSSWeight: numericWeight))
+    let descriptorBase =
+      UIFont(name: "Inter Variable", size: size)
+      ?? UIFont(name: "Inter", size: size)
+      ?? UIFont.systemFont(ofSize: size)
+    let descriptor = descriptorBase.fontDescriptor.addingAttributes([
+      .traits: [UIFontDescriptor.TraitKey.weight: uiWeight.rawValue]
+    ])
+    return Font(UIFont(descriptor: descriptor, size: size))
+  }
+
+  /// Maps CSS/Satoshi weights onto UIFont.Weight raw values.
+  static func uiFontWeightRawValue(forCSSWeight cssWeight: CGFloat) -> CGFloat {
+    let anchors: [(css: CGFloat, ui: CGFloat)] = [
+      (100, -0.8),
+      (200, -0.6),
+      (300, -0.4),
+      (400, 0.0),
+      (500, 0.23),
+      (600, 0.3),
+      (700, 0.4),
+      (800, 0.56),
+      (900, 0.62),
+    ]
+    if cssWeight <= anchors[0].css { return anchors[0].ui }
+    if cssWeight >= anchors[anchors.count - 1].css { return anchors[anchors.count - 1].ui }
+    for index in 1..<anchors.count {
+      let upper = anchors[index]
+      let lower = anchors[index - 1]
+      if cssWeight <= upper.css {
+        let t = (cssWeight - lower.css) / (upper.css - lower.css)
+        return lower.ui + ((upper.ui - lower.ui) * t)
+      }
+    }
+    return 0
+  }
+}
+
+enum JovieActionButtonMetrics {
+  static let height: CGFloat = 32
+  static let labelWeight = JovieFont.actionLabelWeight
+  static let radius = JovieRadius.pill
 }
 
 enum JovieSpacing {
@@ -179,6 +237,39 @@ extension View {
   }
 }
 
+struct JovieActionButtonStyle: ButtonStyle {
+  static let pressedOpacity: Double = 0.8
+
+  let filled: Bool
+  var isSuccess = false
+
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .font(JovieFont.body(size: 14, numericWeight: JovieActionButtonMetrics.labelWeight))
+      .foregroundStyle(filled ? JovieColor.backgroundBase : JovieColor.textPrimary)
+      .frame(height: JovieActionButtonMetrics.height)
+      .padding(.horizontal, JovieSpacing.medium)
+      .background(
+        RoundedRectangle(cornerRadius: JovieActionButtonMetrics.radius, style: .continuous)
+          .fill(filledFill)
+      )
+      .overlay {
+        RoundedRectangle(cornerRadius: JovieActionButtonMetrics.radius, style: .continuous)
+          .stroke(
+            filled ? Color.clear : JovieColor.borderDefault,
+            lineWidth: 1
+          )
+      }
+      .opacity(configuration.isPressed ? JovieActionButtonStyle.pressedOpacity : 1)
+      .animation(JovieMotion.subtle, value: configuration.isPressed)
+  }
+
+  private var filledFill: Color {
+    if !filled { return JovieColor.surface1 }
+    return isSuccess ? JovieColor.accentBlue : Color.white
+  }
+}
+
 struct JoviePillButtonStyle: ButtonStyle {
   static let pressedOpacity: Double = 0.8
 
@@ -186,7 +277,7 @@ struct JoviePillButtonStyle: ButtonStyle {
 
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
-      .font(JovieFont.body(size: 14, weight: .semibold))
+      .font(JovieFont.body(size: 14, numericWeight: JovieActionButtonMetrics.labelWeight))
       .foregroundStyle(filled ? JovieColor.backgroundBase : JovieColor.textPrimary)
       .frame(maxWidth: .infinity)
       .padding(.vertical, 14)
