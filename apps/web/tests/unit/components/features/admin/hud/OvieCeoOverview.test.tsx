@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OvieCeoOverview } from '@/components/features/admin/hud/OvieCeoOverview';
 import type { HudMetrics } from '@/types/hud';
 
@@ -48,6 +48,10 @@ function buildMetrics(): HudMetrics {
 }
 
 describe('OvieCeoOverview', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('renders exactly three scan-first metrics with provenance and drill-downs', () => {
     render(<OvieCeoOverview metrics={buildMetrics()} />);
 
@@ -57,7 +61,7 @@ describe('OvieCeoOverview', () => {
     expect(screen.getAllByText('Not Measured')).toHaveLength(2);
     expect(screen.getAllByText('Summer')).toHaveLength(3);
     expect(
-      screen.getByRole('link', { name: /Inspect Revenue Source/i })
+      screen.getByRole('link', { name: /Inspect Stripe/i })
     ).toHaveAttribute('href', 'https://dashboard.stripe.com/');
     expect(
       screen.getByRole('link', { name: /Inspect Customers/i })
@@ -69,7 +73,10 @@ describe('OvieCeoOverview', () => {
 
   it('reserves the same three rows when financial telemetry degrades', () => {
     const metrics = buildMetrics();
-    const { rerender } = render(<OvieCeoOverview metrics={metrics} />);
+    const onRetry = vi.fn();
+    const { rerender } = render(
+      <OvieCeoOverview metrics={metrics} onRetry={onRetry} />
+    );
 
     metrics.overview = {
       ...metrics.overview,
@@ -83,7 +90,7 @@ describe('OvieCeoOverview', () => {
       ...metrics.sources.mercury,
       state: 'degraded',
     };
-    rerender(<OvieCeoOverview metrics={metrics} />);
+    rerender(<OvieCeoOverview metrics={metrics} onRetry={onRetry} />);
 
     const rows = screen.getAllByTestId(/^ovie-core-metric-/);
     expect(rows).toHaveLength(3);
@@ -94,5 +101,29 @@ describe('OvieCeoOverview', () => {
       screen.getByTestId('ovie-core-metric-company-survival')
     ).toHaveAttribute('data-state', 'degraded');
     expect(screen.getByText('Unknown')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /Inspect Mercury/i })
+    ).toHaveAttribute('href', 'https://app.mercury.com/');
+    fireEvent.click(screen.getByRole('button', { name: /Retry/i }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('ages retained metrics from fresh to stale on the live client clock', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-22T18:00:00.000Z'));
+    const metrics = buildMetrics();
+    render(<OvieCeoOverview metrics={metrics} onRetry={() => {}} />);
+
+    expect(
+      screen.getByTestId('ovie-core-metric-company-survival')
+    ).toHaveAttribute('data-state', 'fresh');
+
+    act(() => {
+      vi.advanceTimersByTime(6 * 60 * 1000);
+    });
+
+    expect(
+      screen.getByTestId('ovie-core-metric-company-survival')
+    ).toHaveAttribute('data-state', 'stale');
   });
 });

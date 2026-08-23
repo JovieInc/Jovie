@@ -117,20 +117,24 @@ function calculateFinancialStatus(
   const canCalculate =
     stripeMetrics.isAvailable &&
     mercuryMetrics.isAvailable &&
-    mercuryMetrics.burnRateAvailable !== false;
+    mercuryMetrics.burnRateAvailable === true;
 
   if (!canCalculate) {
+    const mercuryStatus =
+      mercuryMetrics.isAvailable && mercuryMetrics.burnRateAvailable === false
+        ? 'Mercury transactions (degraded)'
+        : getServiceStatus(
+            'Mercury',
+            mercuryMetrics.isConfigured,
+            mercuryMetrics.isAvailable
+          );
     const missingServices = [
       getServiceStatus(
         'Stripe',
         stripeMetrics.isConfigured,
         stripeMetrics.isAvailable
       ),
-      getServiceStatus(
-        'Mercury',
-        mercuryMetrics.isConfigured,
-        mercuryMetrics.isAvailable
-      ),
+      mercuryStatus,
     ].filter((s): s is string => s !== null);
 
     return {
@@ -365,7 +369,7 @@ async function fetchHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
   const financialDataAvailable =
     stripeMetrics.isAvailable &&
     mercuryMetrics.isAvailable &&
-    mercuryMetrics.burnRateAvailable !== false;
+    mercuryMetrics.burnRateAvailable === true;
 
   const operationsStatus: HudMetrics['operations'] = {
     status: dbHealth.healthy ? 'ok' : 'degraded',

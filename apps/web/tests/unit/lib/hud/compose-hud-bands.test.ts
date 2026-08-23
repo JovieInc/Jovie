@@ -46,17 +46,23 @@ describe('composeHudForPresentation', () => {
       expect(needSignalIds(sections)).toEqual([...HUD_NEED_SECTION_IDS]);
       expect(getHudNeedBand(sections).map(entry => entry.id)).toEqual([
         'cash-mrr',
+        'action-required',
+        'shipper',
+        'factory-health',
       ]);
       expect(getHudNeedBand(sections).map(entry => entry.testId)).toEqual([
         HUD_SECTION_TEST_IDS['cash-mrr'],
+        HUD_SECTION_TEST_IDS['action-required'],
+        HUD_SECTION_TEST_IDS.shipper,
+        HUD_SECTION_TEST_IDS['factory-health'],
       ]);
 
       const noiseIds = getHudNoiseBand(sections).map(entry => entry.id);
       expect(noiseIds.slice(0, 4)).toEqual([
-        'action-required',
         'bottleneck',
-        'shipper',
-        'factory-health',
+        'morning-walk',
+        'design-jury',
+        'velocity',
       ]);
       expect(noiseIds).toEqual([...HUD_NOISE_SECTION_IDS]);
 
@@ -79,7 +85,10 @@ describe('composeHudForPresentation', () => {
       const needIds = needSignalIds(sections);
       expect(new Set(needIds).size).toBe(needIds.length);
       expect(needIds.filter(id => id === 'cash-mrr')).toHaveLength(1);
-      expect(needIds).toHaveLength(1);
+      expect(needIds.filter(id => id === 'action-required')).toHaveLength(1);
+      expect(needIds.filter(id => id === 'shipper')).toHaveLength(1);
+      expect(needIds.filter(id => id === 'factory-health')).toHaveLength(1);
+      expect(needIds).toHaveLength(4);
     }
   });
 

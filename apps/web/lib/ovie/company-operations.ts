@@ -1,5 +1,8 @@
 import { APP_ROUTES } from '@/constants/routes';
-import { isSourceStale } from '@/lib/hud/source-trust';
+import {
+  HUD_SOURCE_STALE_AFTER_MS,
+  isSourceStale,
+} from '@/lib/hud/source-trust';
 import type { HudMetricSourceTrust, HudMetrics } from '@/types/hud';
 
 export const COMPANY_METRIC_STATES = [
@@ -42,9 +45,16 @@ export interface OvieCompanyOverview {
   ];
 }
 
-const SOURCE_FRESHNESS_MS = 5 * 60 * 1000;
 const NOT_OBSERVED = 'Not observed';
 const DEADLINE_NOT_DECLARED = 'Not declared — source disconnected';
+const STATE_PRECEDENCE = [
+  'unauthorized',
+  'unavailable',
+  'disconnected',
+  'degraded',
+  'stale',
+  'unknown',
+] as const satisfies readonly CompanyMetricState[];
 
 function formatUsd(value: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -57,7 +67,23 @@ function formatUsd(value: number): string {
 function freshnessDeadline(source: HudMetricSourceTrust): string {
   const observedAt = Date.parse(source.fetchedAtIso);
   if (!Number.isFinite(observedAt)) return 'Unknown';
-  return new Date(observedAt + SOURCE_FRESHNESS_MS).toISOString();
+  return new Date(observedAt + HUD_SOURCE_STALE_AFTER_MS).toISOString();
+}
+
+function metricObservedAt(sources: readonly HudMetricSourceTrust[]): string {
+  const timestamps = sources.map(source => Date.parse(source.fetchedAtIso));
+  if (timestamps.some(timestamp => !Number.isFinite(timestamp))) {
+    return 'Unknown';
+  }
+  return new Date(Math.min(...timestamps)).toISOString();
+}
+
+function metricFreshnessDeadline(
+  sources: readonly HudMetricSourceTrust[]
+): string {
+  const deadlines = sources.map(freshnessDeadline);
+  if (deadlines.includes('Unknown')) return 'Unknown';
+  return deadlines.sort()[0] as string;
 }
 
 function unavailableState(
@@ -66,15 +92,21 @@ function unavailableState(
 ): CompanyMetricState {
   if (source.state === 'not_configured') return 'disconnected';
   if (source.state === 'degraded') return 'degraded';
-  if (source.state === 'unavailable') {
-    return /\b(?:401|403|unauthori[sz]ed|forbidden)\b/i.test(
-      source.errorMessage ?? ''
-    )
-      ? 'unauthorized'
-      : 'unavailable';
-  }
+  if (source.state === 'unauthorized') return 'unauthorized';
+  if (source.state === 'unavailable') return 'unavailable';
   if (source.state === 'no_data') return 'unknown';
+  const observedAt = Date.parse(source.fetchedAtIso);
+  if (!Number.isFinite(now) || !Number.isFinite(observedAt) || observedAt > now)
+    return 'unknown';
   return isSourceStale(source.fetchedAtIso, now) ? 'stale' : 'fresh';
+}
+
+function combineSourceStates(
+  states: readonly CompanyMetricState[]
+): CompanyMetricState {
+  return (
+    STATE_PRECEDENCE.find(candidate => states.includes(candidate)) ?? 'fresh'
+  );
 }
 
 function survivalMetric(metrics: HudMetrics, now: number): CompanyCoreMetric {
@@ -82,11 +114,18 @@ function survivalMetric(metrics: HudMetrics, now: number): CompanyCoreMetric {
   const mercury = metrics.sources.mercury;
   const stripeState = unavailableState(stripe, now);
   const mercuryState = unavailableState(mercury, now);
-  const sourceStates = [stripeState, mercuryState];
-  const failedState = sourceStates.find(state => state !== 'fresh');
+  const sourceState = combineSourceStates([stripeState, mercuryState]);
+  const drillDownSource =
+    sourceState === 'fresh'
+      ? stripe
+      : ([mercury, stripe].find(
+          source => unavailableState(source, now) === sourceState
+        ) ?? stripe);
   const state = metrics.overview.financialDataAvailable
-    ? (failedState ?? 'fresh')
-    : (failedState ?? 'unknown');
+    ? sourceState
+    : sourceState === 'fresh'
+      ? 'unknown'
+      : sourceState;
 
   if (!metrics.overview.financialDataAvailable) {
     return {
@@ -97,13 +136,11 @@ function survivalMetric(metrics: HudMetrics, now: number): CompanyCoreMetric {
       state,
       authoritativeSource:
         'Stripe recurring revenue + Mercury cash and outflow',
-      observedAt: metrics.generatedAtIso,
-      freshnessDeadline: [stripe, mercury]
-        .map(freshnessDeadline)
-        .sort()[0] as string,
+      observedAt: metricObservedAt([stripe, mercury]),
+      freshnessDeadline: metricFreshnessDeadline([stripe, mercury]),
       owner: 'Summer',
-      drillDownHref: 'https://dashboard.stripe.com/',
-      drillDownLabel: 'Inspect Revenue Source',
+      drillDownHref: drillDownSource.dashboardUrl ?? APP_ROUTES.HUD,
+      drillDownLabel: `Inspect ${drillDownSource.label}`,
     };
   }
 
@@ -123,21 +160,19 @@ function survivalMetric(metrics: HudMetrics, now: number): CompanyCoreMetric {
         : metrics.overview.defaultStatus === 'dead'
           ? 'Dead'
           : 'Unknown',
-    detail: `${formatUsd(metrics.overview.balanceUsd)} cash · ${formatUsd(weeklyOutflow)} 7-day outflow pace · ${formatUsd(weeklyRecurringRunRate)} weekly recurring revenue run rate · ${runway}.`,
+    detail: `${formatUsd(metrics.overview.balanceUsd)} cash · ${formatUsd(weeklyOutflow)} 7-day outflow pace · ${formatUsd(weeklyRecurringRunRate)} weekly recurring revenue run rate · ${runway}. ${metrics.overview.defaultStatusDetail}`,
     state,
     authoritativeSource:
       'Stripe recurring revenue + Mercury cash and 30-day outflow',
-    observedAt: metrics.generatedAtIso,
-    freshnessDeadline: [stripe, mercury]
-      .map(freshnessDeadline)
-      .sort()[0] as string,
+    observedAt: metricObservedAt([stripe, mercury]),
+    freshnessDeadline: metricFreshnessDeadline([stripe, mercury]),
     owner: 'Summer',
-    drillDownHref: 'https://dashboard.stripe.com/',
-    drillDownLabel: 'Inspect Revenue Source',
+    drillDownHref: drillDownSource.dashboardUrl ?? APP_ROUTES.HUD,
+    drillDownLabel: `Inspect ${drillDownSource.label}`,
   };
 }
 
-function primaryOutcomeMetric(metrics: HudMetrics): CompanyCoreMetric {
+function primaryOutcomeMetric(): CompanyCoreMetric {
   return {
     id: 'primary-outcome',
     label: 'Week Over Week',
@@ -180,13 +215,13 @@ function dogfoodReceiptsMetric(metrics: HudMetrics): CompanyCoreMetric {
 
 export function deriveOvieCompanyOverview(
   metrics: HudMetrics,
-  now = Date.now()
+  now = Date.parse(metrics.generatedAtIso)
 ): OvieCompanyOverview {
   return {
     generatedAtIso: metrics.generatedAtIso,
     metrics: [
       survivalMetric(metrics, now),
-      primaryOutcomeMetric(metrics),
+      primaryOutcomeMetric(),
       dogfoodReceiptsMetric(metrics),
     ],
   };

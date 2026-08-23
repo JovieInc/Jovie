@@ -38,6 +38,7 @@ describe('getAdminMercuryMetrics', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     clearAdminMercuryMetricsCache();
     process.env = originalEnv;
   });
@@ -58,6 +59,7 @@ describe('getAdminMercuryMetrics', () => {
       isConfigured: false,
       isAvailable: false,
       defaultStatus: 'unknown',
+      observedAtIso: expect.any(String),
       errorMessage:
         'Mercury credentials not configured (set MERCURY_API_TOKEN or MERCURY_API_KEY and MERCURY_CHECKING_ACCOUNT_ID or MERCURY_ACCOUNT_ID)',
     });
@@ -235,7 +237,89 @@ describe('getAdminMercuryMetrics', () => {
     expect(metrics.burnRateAvailable).toBe(false);
     expect(metrics.isAvailable).toBe(true);
     expect(metrics.defaultStatus).toBe('unknown');
-    expect(metrics.errorMessage).toContain('transaction window timed out');
+    expect(metrics.errorMessage).toContain('transaction window unavailable');
     expect(mockCaptureError).toHaveBeenCalledOnce();
+  });
+
+  it('rejects a successful response with a missing balance instead of measuring zero', async () => {
+    process.env.MERCURY_API_TOKEN = 'token';
+    process.env.MERCURY_CHECKING_ACCOUNT_ID = 'acct_123';
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+
+    const metrics = await getAdminMercuryMetrics();
+
+    expect(metrics.isAvailable).toBe(false);
+    expect(metrics.burnRateAvailable).toBe(false);
+    expect(metrics.defaultStatus).toBe('unknown');
+    expect(metrics.errorMessage).toContain('balance is missing or invalid');
+  });
+
+  it('preserves balance but degrades malformed transaction collections', async () => {
+    process.env.MERCURY_API_TOKEN = 'token';
+    process.env.MERCURY_CHECKING_ACCOUNT_ID = 'acct_123';
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ availableBalance: 2500 }),
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+
+    const metrics = await getAdminMercuryMetrics();
+
+    expect(metrics.balanceUsd).toBe(2500);
+    expect(metrics.burnRateAvailable).toBe(false);
+    expect(metrics.defaultStatus).toBe('unknown');
+    expect(metrics.errorMessage).toContain('collection is missing');
+  });
+
+  it('degrades rather than returning a truncated burn window at the page cap', async () => {
+    process.env.MERCURY_API_TOKEN = 'token';
+    process.env.MERCURY_CHECKING_ACCOUNT_ID = 'acct_123';
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ availableBalance: 2500 }),
+    });
+    for (let page = 1; page <= 20; page++) {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          transactions: [{ amount: 1, direction: 'debit', currency: 'USD' }],
+          hasMore: true,
+          nextCursor: `cursor-${page}`,
+        }),
+      });
+    }
+
+    const metrics = await getAdminMercuryMetrics();
+
+    expect(metrics.balanceUsd).toBe(2500);
+    expect(metrics.burnRateUsd).toBe(0);
+    expect(metrics.burnRateAvailable).toBe(false);
+    expect(metrics.defaultStatus).toBe('unknown');
+    expect(metrics.errorMessage).toContain('exceeded 20 pages');
+  });
+
+  it('preserves the producer observation time across cache hits', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-22T18:00:00.000Z'));
+    process.env.MERCURY_API_TOKEN = 'token';
+    process.env.MERCURY_CHECKING_ACCOUNT_ID = 'acct_123';
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ availableBalance: 2500 }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ transactions: [] }),
+      });
+
+    const first = await getAdminMercuryMetrics();
+    vi.setSystemTime(new Date('2026-08-22T18:01:00.000Z'));
+    const cached = await getAdminMercuryMetrics();
+
+    expect(cached.observedAtIso).toBe('2026-08-22T18:00:00.000Z');
+    expect(cached.observedAtIso).toBe(first.observedAtIso);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

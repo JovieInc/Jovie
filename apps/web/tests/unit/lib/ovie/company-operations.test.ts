@@ -119,13 +119,74 @@ describe('deriveOvieCompanyOverview', () => {
     });
     metrics.sources.stripe = {
       ...metrics.sources.stripe,
-      state: 'unavailable',
+      state: 'unauthorized',
       errorMessage: 'Stripe API error (401): unauthorized',
     };
 
     expect(deriveOvieCompanyOverview(metrics, NOW).metrics[0].state).toBe(
       'unauthorized'
     );
+  });
+
+  it('uses fail-closed severity instead of source order for contradictions', () => {
+    const metrics = buildMetrics({
+      financialDataAvailable: false,
+      defaultStatus: 'unknown',
+    });
+    metrics.sources.stripe = {
+      ...metrics.sources.stripe,
+      fetchedAtIso: '2026-08-22T17:50:00.000Z',
+    };
+    metrics.sources.mercury = {
+      ...metrics.sources.mercury,
+      state: 'unauthorized',
+      errorMessage: 'Mercury API error (403): forbidden',
+    };
+
+    expect(deriveOvieCompanyOverview(metrics, NOW).metrics[0].state).toBe(
+      'unauthorized'
+    );
+  });
+
+  it.each([
+    'invalid',
+    '2026-08-22T18:02:00.000Z',
+  ])('does not treat an invalid or future observation timestamp as fresh: %s', fetchedAtIso => {
+    const metrics = buildMetrics();
+    metrics.sources.stripe = {
+      ...metrics.sources.stripe,
+      fetchedAtIso,
+    };
+
+    const survival = deriveOvieCompanyOverview(metrics, NOW).metrics[0];
+    expect(survival.state).toBe('unknown');
+    expect(survival.observedAt).toBe(
+      fetchedAtIso === 'invalid' ? 'Unknown' : '2026-08-22T18:00:00.000Z'
+    );
+    expect(survival.freshnessDeadline).toBe(
+      fetchedAtIso === 'invalid' ? 'Unknown' : '2026-08-22T18:05:00.000Z'
+    );
+  });
+
+  it('fails closed when the aggregate generation timestamp is invalid', () => {
+    const metrics = buildMetrics();
+    metrics.generatedAtIso = 'invalid';
+
+    expect(deriveOvieCompanyOverview(metrics).metrics[0].state).toBe('unknown');
+  });
+
+  it.each([
+    { blocked: 1, failed: 0, expected: '1 blocked or failed execution item' },
+    { blocked: 1, failed: 1, expected: '2 blocked or failed execution items' },
+  ])('surfaces execution exceptions without counting them as ships', testCase => {
+    const metrics = buildMetrics();
+    metrics.aiOps.counts.blocked = testCase.blocked;
+    metrics.aiOps.counts.failed = testCase.failed;
+
+    const shipping = deriveOvieCompanyOverview(metrics, NOW).metrics[2];
+    expect(shipping.state).toBe('disconnected');
+    expect(shipping.value).toBe('Not Measured');
+    expect(shipping.detail).toContain(testCase.expected);
   });
 
   it('keeps stale last-known financials visibly stale', () => {

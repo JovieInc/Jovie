@@ -2,12 +2,16 @@
 
 import { Button } from '@jovie/ui';
 import { ExternalLink, RefreshCw } from 'lucide-react';
-import { formatSourceFreshness, isSourceStale } from '@/lib/hud/source-trust';
+import {
+  formatSourceFreshness,
+  getSourceFreshnessState,
+} from '@/lib/hud/source-trust';
 import type { HudMetricSourceTrust as HudMetricSourceTrustType } from '@/types/hud';
 
 const STATE_LABELS = {
   ok: null,
   degraded: 'Degraded',
+  unauthorized: 'Unauthorized',
   no_data: 'No data',
   unavailable: 'Fetch failed',
   not_configured: 'Not configured',
@@ -18,6 +22,7 @@ function getStatusTone(
   stale: boolean
 ): string {
   if (source.state === 'unavailable') return 'text-error';
+  if (source.state === 'unauthorized') return 'text-error';
   if (source.state === 'degraded') return 'text-warning';
   if (source.state === 'not_configured') return 'text-warning';
   if (source.state === 'no_data') return 'text-tertiary-token';
@@ -34,12 +39,16 @@ export function HudMetricSourceTrust({
   source,
   onRetry,
 }: Readonly<HudMetricSourceTrustProps>) {
-  const stale = isSourceStale(source.fetchedAtIso);
-  const statusTone = getStatusTone(source, stale);
+  const freshnessState = getSourceFreshnessState(source.fetchedAtIso);
+  const stale = freshnessState === 'stale';
+  const timestampUnknown = freshnessState === 'unknown';
+  const statusTone = getStatusTone(source, stale || timestampUnknown);
   const stateLabel = STATE_LABELS[source.state];
-  const showFreshness = source.state === 'ok' || source.state === 'no_data';
+  const showFreshness =
+    (source.state === 'ok' || source.state === 'no_data') && !timestampUnknown;
   const showReason =
     source.state === 'unavailable' ||
+    source.state === 'unauthorized' ||
     source.state === 'not_configured' ||
     source.state === 'degraded';
   const linkLabel = `Open ${source.label}`;
@@ -51,7 +60,10 @@ export function HudMetricSourceTrust({
     >
       <div className='flex items-center justify-between gap-2'>
         <p className={`text-2xs leading-4 ${statusTone}`}>
-          {showFreshness ? (
+          {timestampUnknown &&
+          (source.state === 'ok' || source.state === 'no_data') ? (
+            <span className='font-medium'>Timestamp unknown</span>
+          ) : showFreshness ? (
             <>
               {stale ? <span className='font-medium'>Stale · </span> : null}
               Updated {formatSourceFreshness(source.fetchedAtIso)}
@@ -63,7 +75,9 @@ export function HudMetricSourceTrust({
         <div className='flex shrink-0 items-center gap-2'>
           {onRetry &&
           (source.state === 'unavailable' ||
+            source.state === 'unauthorized' ||
             source.state === 'degraded' ||
+            timestampUnknown ||
             stale) ? (
             <Button
               type='button'

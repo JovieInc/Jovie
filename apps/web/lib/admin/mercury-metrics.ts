@@ -31,14 +31,6 @@ interface MercuryEnv {
   checkingAccountId: string;
 }
 
-interface MercuryAccountResponse {
-  availableBalance?: number;
-  currentBalance?: number;
-  balance?: number;
-  accountNumber?: string;
-  name?: string;
-}
-
 interface MercuryTransaction {
   id?: string;
   amount?: number | string;
@@ -60,7 +52,9 @@ export interface AdminMercuryMetrics {
   burnRateUsd: number;
   burnWindowDays: number;
   /** False when the balance loaded but the transaction window did not. */
-  burnRateAvailable?: boolean;
+  burnRateAvailable: boolean;
+  /** Provider observation time. Preserved across cache hits. */
+  observedAtIso?: string;
   /** Indicates whether Mercury credentials are configured */
   isConfigured: boolean;
   /** Indicates whether the Mercury API call succeeded */
@@ -105,6 +99,7 @@ function buildUnconfiguredResponse(): AdminMercuryMetrics {
     isConfigured: false,
     isAvailable: false,
     defaultStatus: 'unknown',
+    observedAtIso: new Date().toISOString(),
     errorMessage:
       'Mercury credentials not configured (set MERCURY_API_TOKEN or MERCURY_API_KEY and MERCURY_CHECKING_ACCOUNT_ID or MERCURY_ACCOUNT_ID)',
   };
@@ -119,6 +114,7 @@ function buildErrorResponse(message: string): AdminMercuryMetrics {
     isConfigured: true,
     isAvailable: false,
     defaultStatus: 'unknown',
+    observedAtIso: new Date().toISOString(),
     errorMessage: `Mercury API error: ${message}`,
   };
 }
@@ -201,9 +197,64 @@ async function fetchMercury<T>(
 }
 
 function normalizeAmount(amount: MercuryTransaction['amount']): number {
-  if (typeof amount === 'number') return amount;
-  if (typeof amount === 'string') return Number(amount);
-  return 0;
+  const normalized =
+    typeof amount === 'number'
+      ? amount
+      : typeof amount === 'string' && amount.trim().length > 0
+        ? Number(amount)
+        : Number.NaN;
+  if (!Number.isFinite(normalized)) {
+    throw new TypeError('Mercury transaction amount is missing or invalid.');
+  }
+  return normalized;
+}
+
+function asRecord(value: unknown, label: string): Record<string, unknown> {
+  if (value == null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError(`${label} is missing or invalid.`);
+  }
+  return value as Record<string, unknown>;
+}
+
+function validateTransaction(value: unknown): MercuryTransaction {
+  const transaction = asRecord(value, 'Mercury transaction');
+  const amount = normalizeAmount(transaction.amount as number | string);
+  const currency = transaction.currency;
+  if (
+    currency != null &&
+    (typeof currency !== 'string' || currency.toUpperCase() !== 'USD')
+  ) {
+    throw new TypeError('Mercury transaction currency is not USD.');
+  }
+  for (const field of ['direction', 'type'] as const) {
+    if (transaction[field] != null && typeof transaction[field] !== 'string') {
+      throw new TypeError(`Mercury transaction ${field} is invalid.`);
+    }
+  }
+  return { ...transaction, amount } as MercuryTransaction;
+}
+
+function validateTransactionsResponse(
+  value: unknown
+): MercuryTransactionsResponse & { transactions: MercuryTransaction[] } {
+  const response = asRecord(value, 'Mercury transactions response');
+  const rawTransactions = response.transactions ?? response.data;
+  if (!Array.isArray(rawTransactions)) {
+    throw new TypeError('Mercury transactions collection is missing.');
+  }
+  if (response.nextCursor != null && typeof response.nextCursor !== 'string') {
+    throw new TypeError('Mercury transaction cursor is invalid.');
+  }
+  if (response.hasMore != null && typeof response.hasMore !== 'boolean') {
+    throw new TypeError('Mercury transaction pagination state is invalid.');
+  }
+  return {
+    transactions: rawTransactions.map(validateTransaction),
+    ...(response.nextCursor ? { nextCursor: response.nextCursor } : {}),
+    ...(typeof response.hasMore === 'boolean'
+      ? { hasMore: response.hasMore }
+      : {}),
+  };
 }
 
 function isDebit(transaction: MercuryTransaction, amount: number): boolean {
@@ -228,14 +279,18 @@ async function getCheckingBalanceUsd(): Promise<number> {
 
   // Mercury's current API uses singular `/account/{id}` (list-all remains
   // `/accounts`). Plural `/accounts/{id}` 404s with errors.notFound.
-  const account = await fetchMercury<MercuryAccountResponse>(
+  const account = await fetchMercury<unknown>(
     `/account/${mercuryEnv.checkingAccountId}`
   );
-
-  const balanceUsd = Number(
-    account.availableBalance ?? account.currentBalance ?? account.balance ?? 0
-  );
-
+  const accountRecord = asRecord(account, 'Mercury account response');
+  const rawBalance =
+    accountRecord.availableBalance ??
+    accountRecord.currentBalance ??
+    accountRecord.balance;
+  const balanceUsd = Number(rawBalance);
+  if (rawBalance == null || !Number.isFinite(balanceUsd)) {
+    throw new TypeError('Mercury account balance is missing or invalid.');
+  }
   return balanceUsd;
 }
 
@@ -257,27 +312,36 @@ async function getCheckingTransactions(
     if (pageCount >= MAX_PAGES) break;
     pageCount++;
 
-    const response = await fetchMercury<MercuryTransactionsResponse>(
-      `/account/${mercuryEnv.checkingAccountId}/transactions`,
-      {
-        start: startDate.toISOString(),
-        end: endDate.toISOString(),
-        ...(cursor ? { cursor } : {}),
-      }
+    const response = validateTransactionsResponse(
+      await fetchMercury<unknown>(
+        `/account/${mercuryEnv.checkingAccountId}/transactions`,
+        {
+          start: startDate.toISOString(),
+          end: endDate.toISOString(),
+          ...(cursor ? { cursor } : {}),
+        }
+      )
     );
 
-    const page = response.transactions ?? response.data ?? [];
-    transactions.push(...page);
+    transactions.push(...response.transactions);
 
     if (!response.nextCursor && !response.hasMore) {
       break;
     }
-
-    if (response.nextCursor) {
-      cursor = response.nextCursor;
-    } else {
-      break;
+    if (!response.nextCursor) {
+      throw new TypeError(
+        'Mercury transaction pagination is incomplete: next cursor missing.'
+      );
     }
+    if (pageCount >= MAX_PAGES) {
+      throw new TypeError(
+        `Mercury transaction pagination exceeded ${MAX_PAGES} pages.`
+      );
+    }
+    if (response.nextCursor === cursor) {
+      throw new TypeError('Mercury transaction pagination cursor repeated.');
+    }
+    cursor = response.nextCursor;
   }
 
   return transactions;
@@ -302,27 +366,27 @@ async function loadAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
     // zero or use it to calculate company survival.
     let burnRateUsd = 0;
     let burnRateAvailable = true;
+    let burnErrorMessage: string | undefined;
     try {
       const transactions = await getCheckingTransactions(startDate, endDate);
       burnRateUsd = transactions.reduce((total, transaction) => {
         const amount = normalizeAmount(transaction.amount);
-        if (Number.isNaN(amount)) return total;
         if (!isDebit(transaction, amount)) return total;
         return total + Math.abs(amount);
       }, 0);
     } catch (txError) {
-      if (txError instanceof ServerFetchTimeoutError) {
-        // Degraded mode: balance is still accurate, burn rate unavailable.
-        burnRateAvailable = false;
-        reportMercuryMetricsErrorOnce(
-          'Mercury transactions timed out — burn rate unavailable',
-          txError,
-          txError.message
-        );
-      } else {
-        // Re-throw non-timeout errors so the outer catch handles them.
-        throw txError;
-      }
+      // Degraded mode: balance is still accurate, but incomplete or malformed
+      // transactions must never become measured-zero burn.
+      burnRateAvailable = false;
+      burnErrorMessage =
+        txError instanceof Error ? txError.message : 'Unknown error';
+      reportMercuryMetricsErrorOnce(
+        txError instanceof ServerFetchTimeoutError
+          ? 'Mercury transactions timed out — burn rate unavailable'
+          : 'Mercury transactions unavailable — burn rate unavailable',
+        txError,
+        burnErrorMessage
+      );
     }
 
     return {
@@ -330,6 +394,7 @@ async function loadAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
       burnRateUsd,
       burnWindowDays: 30,
       burnRateAvailable,
+      observedAtIso: new Date().toISOString(),
       isConfigured: true,
       isAvailable: true,
       defaultStatus: burnRateAvailable
@@ -337,7 +402,9 @@ async function loadAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
         : 'unknown',
       ...(burnRateAvailable
         ? {}
-        : { errorMessage: 'Mercury transaction window timed out.' }),
+        : {
+            errorMessage: `Mercury transaction window unavailable: ${burnErrorMessage}.`,
+          }),
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

@@ -1,9 +1,9 @@
 'use client';
 
-import { ExternalLink } from 'lucide-react';
+import { ChevronRight, ExternalLink, RefreshCw } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
-  COMPANY_METRIC_STATES,
   type CompanyMetricState,
   deriveOvieCompanyOverview,
 } from '@/lib/ovie/company-operations';
@@ -39,14 +39,28 @@ function formatObservationTime(value: string): string {
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+    timeZone: 'UTC',
     timeZoneName: 'short',
   });
 }
 
 export function OvieCeoOverview({
   metrics,
-}: Readonly<{ readonly metrics: HudMetrics }>) {
-  const overview = deriveOvieCompanyOverview(metrics);
+  onRetry,
+}: Readonly<{
+  readonly metrics: HudMetrics;
+  readonly onRetry?: () => void;
+}>) {
+  const [now, setNow] = useState(() => Date.parse(metrics.generatedAtIso));
+
+  useEffect(() => {
+    const updateNow = () => setNow(Date.now());
+    updateNow();
+    const interval = globalThis.setInterval(updateNow, 30_000);
+    return () => globalThis.clearInterval(interval);
+  }, [metrics.generatedAtIso]);
+
+  const overview = deriveOvieCompanyOverview(metrics, now);
 
   return (
     <ContentSurfaceCard
@@ -56,16 +70,12 @@ export function OvieCeoOverview({
     >
       <div className='border-b border-subtle px-4 py-3 sm:px-5'>
         <p className='text-xs font-semibold text-primary-token'>Company Now</p>
-        <p className='mt-1 text-app text-secondary-token'>
-          Three answers by default. Source detail and operating tools stay
-          below.
-        </p>
       </div>
       <div className='divide-y divide-subtle'>
         {overview.metrics.map(metric => (
           <section
             key={metric.id}
-            className='grid min-h-32 gap-3 px-4 py-4 sm:grid-cols-[minmax(9rem,0.7fr)_minmax(12rem,1fr)_minmax(16rem,1.5fr)] sm:items-start sm:px-5'
+            className='grid min-h-32 gap-3 px-4 py-4 sm:px-5 lg:grid-cols-[minmax(9rem,0.7fr)_minmax(12rem,1fr)_minmax(16rem,1.5fr)] lg:items-start'
             data-testid={`ovie-core-metric-${metric.id}`}
             data-state={metric.state}
           >
@@ -115,9 +125,26 @@ export function OvieCeoOverview({
                 <dd className='inline'>{metric.owner}</dd>
               </div>
               <div className='pt-1'>
+                {onRetry &&
+                [
+                  'stale',
+                  'unavailable',
+                  'unauthorized',
+                  'degraded',
+                  'unknown',
+                ].includes(metric.state) ? (
+                  <button
+                    type='button'
+                    onClick={onRetry}
+                    className='mr-3 inline-flex min-h-11 items-center gap-1 font-medium text-secondary-token transition-colors hover:text-primary-token'
+                  >
+                    <RefreshCw className='h-3 w-3' aria-hidden='true' />
+                    Retry
+                  </button>
+                ) : null}
                 <a
                   href={metric.drillDownHref}
-                  className='inline-flex items-center gap-1 font-medium text-secondary-token transition-colors hover:text-primary-token'
+                  className='inline-flex min-h-11 items-center gap-1 font-medium text-secondary-token transition-colors hover:text-primary-token'
                   target={
                     metric.drillDownHref.startsWith('http')
                       ? '_blank'
@@ -130,16 +157,17 @@ export function OvieCeoOverview({
                   }
                 >
                   {metric.drillDownLabel}
-                  <ExternalLink className='h-3 w-3' aria-hidden='true' />
+                  {metric.drillDownHref.startsWith('http') ? (
+                    <ExternalLink className='h-3 w-3' aria-hidden='true' />
+                  ) : (
+                    <ChevronRight className='h-3 w-3' aria-hidden='true' />
+                  )}
                 </a>
               </div>
             </dl>
           </section>
         ))}
       </div>
-      <span className='sr-only'>
-        Supported states: {COMPANY_METRIC_STATES.join(', ')}
-      </span>
     </ContentSurfaceCard>
   );
 }
