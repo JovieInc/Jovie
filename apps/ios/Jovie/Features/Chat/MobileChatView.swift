@@ -1,5 +1,41 @@
 import SwiftUI
 
+enum MobileChatEmptyHomePolicy {
+  enum GreetingPlacement: Equatable {
+    /// Vertically centered in the remaining space above the docked composer.
+    case centeredAboveDockedComposer
+  }
+
+  static func greetingPlacement() -> GreetingPlacement {
+    .centeredAboveDockedComposer
+  }
+
+  static func composerIsDockedToBottom() -> Bool {
+    true
+  }
+
+  static func showsBrandMark() -> Bool {
+    false
+  }
+
+  static func showsFeatureIntroOnEmptyHome() -> Bool {
+    false
+  }
+}
+
+struct MobileChatEmptyGreetingView: View {
+  let greeting: String
+
+  var body: some View {
+    Text(greeting)
+      .font(JovieFont.display(size: 28))
+      .foregroundStyle(JovieColor.textPrimary)
+      .multilineTextAlignment(.center)
+      .frame(maxWidth: .infinity)
+      .accessibilityIdentifier("chat-empty-state-greeting")
+  }
+}
+
 enum MobileChatKeyboardPolicy {
   /// Dismiss when the assistant starts streaming only if the user has not typed since send.
   static func shouldDismissOnStreamingStart(userEditedSinceSend: Bool) -> Bool {
@@ -34,6 +70,7 @@ struct MobileChatView: View {
   @FocusState private var isComposerFocused: Bool
   @State private var isAtBottom = true
   @State private var userEditedSinceSend = false
+  @State private var emptyGreeting = ChatEmptyGreeting.takeNext()
 
   init(
     repository: ChatRepository,
@@ -63,18 +100,7 @@ struct MobileChatView: View {
         }
       }
       .safeAreaInset(edge: .bottom, spacing: 0) {
-        VStack(spacing: JovieSpacing.medium) {
-          if repository.timeline.isEmpty {
-            FeatureIntroHost(
-              catalog: .current,
-              changelogURL: FeatureIntroCatalog.changelogURL(from: webBaseURL),
-              onHighlightCTA: { isComposerFocused = true }
-            )
-            .padding(.horizontal, JovieSpacing.large)
-          }
-
-          composerChrome
-        }
+        composerChrome
       }
     }
     .accessibilityElement(children: .contain)
@@ -204,7 +230,6 @@ struct MobileChatView: View {
         draft: $draft,
         isComposerFocused: $isComposerFocused,
         isSending: repository.isSending,
-        isOffline: repository.isOffline,
         onSend: {
           let text = draft
           draft = ""
@@ -245,38 +270,13 @@ struct MobileChatView: View {
   }
 
   private var emptyState: some View {
-    ScrollView {
-      VStack(spacing: JovieSpacing.large) {
-        Spacer(minLength: 120)
-
-        VStack(spacing: JovieSpacing.large) {
-          JovieLogoMark(size: 34)
-
-          VStack(spacing: JovieSpacing.small) {
-            Text("Ask Jovie")
-              .font(JovieFont.display(size: 28))
-              .foregroundStyle(JovieColor.textPrimary)
-              .multilineTextAlignment(.center)
-
-            Text(
-              repository.isOffline
-                ? "Offline. Drafts stay on this device and cached history remains available."
-                : "Ask Jovie about your profile, releases, and next moves."
-            )
-            .font(JovieFont.body(size: 15))
-            .foregroundStyle(JovieColor.textTertiary)
-            .multilineTextAlignment(.center)
-            .fixedSize(horizontal: false, vertical: true)
-          }
-        }
-        .frame(maxWidth: 330)
+    VStack(spacing: 0) {
+      Spacer(minLength: 0)
+      MobileChatEmptyGreetingView(greeting: emptyGreeting)
         .padding(.horizontal, JovieSpacing.xLarge)
-
-        Spacer(minLength: 48)
-      }
-      .frame(maxWidth: .infinity)
+      Spacer(minLength: 0)
     }
-    .scrollDismissesKeyboard(.interactively)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
     .contentShape(Rectangle())
     .onTapGesture {
       isComposerFocused = false

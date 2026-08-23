@@ -123,8 +123,36 @@ struct AppShellChatFirstTests {
 
   @Test func composerSendStaysDisabledForEmptyOrInFlightDrafts() {
     #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "", isSending: false) == false)
-    #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "Ask Jovie", isSending: true) == false)
-    #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "Ask Jovie", isSending: false))
+    #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "Let's get it", isSending: true) == false)
+    #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "Let's get it", isSending: false))
+  }
+
+  @Test func emptyChatHomeLocksGreetingAndDocksComposer() {
+    let defaults = UserDefaults(suiteName: "jov-5341-empty-chat-greeting")!
+    defaults.removePersistentDomain(forName: "jov-5341-empty-chat-greeting")
+
+    #expect(
+      ChatEmptyGreeting.all == [
+        "Let's get it",
+        "Ready to start?",
+        "Ready when you are",
+      ]
+    )
+    #expect(ChatEmptyGreeting.still == "Let's get it")
+    #expect(ChatEmptyGreeting.takeNext(defaults: defaults) == "Let's get it")
+    #expect(ChatEmptyGreeting.takeNext(defaults: defaults) == "Ready to start?")
+    #expect(ChatEmptyGreeting.takeNext(defaults: defaults) == "Ready when you are")
+    #expect(ChatEmptyGreeting.takeNext(defaults: defaults) == "Let's get it")
+    #expect(ChatEmptyGreeting.all.contains("What's next?") == false)
+    #expect(ChatEmptyGreeting.all.contains("Ask Jovie") == false)
+    #expect(ChatComposerCopy.emptyPlaceholder.isEmpty)
+    #expect(ChatComposerCopy.inputAccessibilityIdentifier == "chat-composer-input")
+    #expect(
+      MobileChatEmptyHomePolicy.greetingPlacement() == .centeredAboveDockedComposer
+    )
+    #expect(MobileChatEmptyHomePolicy.composerIsDockedToBottom())
+    #expect(MobileChatEmptyHomePolicy.showsBrandMark() == false)
+    #expect(MobileChatEmptyHomePolicy.showsFeatureIntroOnEmptyHome() == false)
   }
 
   @Test func composerPlusDisablesWhileSending() {

@@ -1,5 +1,41 @@
 import SwiftUI
 
+/// Locked empty-chat greeting rotate set (JOV-5319). Exact three strings.
+enum ChatEmptyGreeting {
+  static let all = [
+    "Let's get it",
+    "Ready to start?",
+    "Ready when you are",
+  ]
+  static let still = all[0]
+  static let storageKey = "jovie.chat-empty-rotate-greeting-index"
+
+  static var isUITesting: Bool {
+    ProcessInfo.processInfo.arguments.contains("-ui-testing-allow-exit")
+  }
+
+  static func greeting(at index: Int) -> String {
+    let count = all.count
+    let safe = ((index % count) + count) % count
+    return all[safe]
+  }
+
+  static func takeNext(defaults: UserDefaults = .standard) -> String {
+    if isUITesting { return still }
+    let index = defaults.integer(forKey: storageKey)
+    let greeting = greeting(at: index)
+    defaults.set(index + 1, forKey: storageKey)
+    return greeting
+  }
+}
+
+enum ChatComposerCopy {
+  /// Visible placeholder is deleted (JOV-5319). Accessibility name stays.
+  static let emptyPlaceholder = ""
+  static let inputAccessibilityLabel = "Chat message"
+  static let inputAccessibilityIdentifier = "chat-composer-input"
+}
+
 enum ChatComposerMetrics {
   static let barHeight: CGFloat = 52
   static let sendSlotSize: CGFloat = 36
@@ -40,7 +76,6 @@ enum ChatComposerTrailingAction: Equatable {
 struct ChatComposerBar: View {
   @Binding var draft: String
   @FocusState.Binding var isFocused: Bool
-  let placeholder: String
   let isSending: Bool
   let isPlusEnabled: Bool
   let onSend: () -> Void
@@ -78,12 +113,14 @@ struct ChatComposerBar: View {
       .accessibilityIdentifier("chat-composer-plus")
       .accessibilityElement(children: .ignore)
 
-      TextField(placeholder, text: $draft)
+      TextField(ChatComposerCopy.emptyPlaceholder, text: $draft)
         .focused($isFocused)
         .textInputAutocapitalization(.sentences)
         .disableAutocorrection(false)
         .font(JovieFont.body(size: 16))
         .foregroundStyle(JovieColor.textPrimary)
+        .accessibilityLabel(ChatComposerCopy.inputAccessibilityLabel)
+        .accessibilityIdentifier(ChatComposerCopy.inputAccessibilityIdentifier)
         .onChange(of: draft) {
           onDraftEdited()
         }
