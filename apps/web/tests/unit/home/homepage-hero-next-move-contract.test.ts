@@ -118,6 +118,11 @@ describe('homepage hero next-move contract (JOV-4475)', () => {
     expect(pageSource).not.toContain('HomepageV2FinalCta');
     expect(headerSource).toContain('minimalAuth={isMinimal || isHomepage}');
     expect(headerSource).toContain("isHomepage ? 'Log in' : 'Sign in'");
+
+    const css = readFileSync(path.join(webRoot, 'app/(home)/home.css'), 'utf8');
+    expect(css).not.toMatch(
+      /\.homepage-header-auth a:last-child\s*\{[\s\S]*?background:/
+    );
   });
 
   it('uses the production release URL in the captured product surface', () => {

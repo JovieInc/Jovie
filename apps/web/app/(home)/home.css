@@ -152,13 +152,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   color: var(--color-text-primary-token);
 }
 
-.homepage-header-auth a:last-child {
-  padding-inline: 24px;
-  border-color: rgba(255, 255, 255, 0.9);
-  background: #f4f6ff;
-  color: #050506;
-}
-
 .homepage-hero-stage {
   background: #000;
 }
@@ -1604,11 +1597,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .home-viewport .homepage-header-auth a {
   min-height: calc(var(--space-8) + var(--space-1));
   font-size: var(--text-app);
-}
-
-.home-viewport .homepage-header-auth a:last-child {
-  width: auto;
-  padding-inline: var(--space-4);
 }
 
 .home-viewport[data-scrolled="true"]
