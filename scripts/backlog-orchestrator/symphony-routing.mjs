@@ -1,4 +1,4 @@
-/** Deterministic, pre-lease routing for Symphony issues. */
+/** Deterministic, pre-lease routing for Symphony issues. JOV-INV-006. */
 
 import { createHash } from 'node:crypto';
 import {
@@ -7,6 +7,7 @@ import {
   readdirSync,
   readFileSync,
   renameSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { homedir } from 'node:os';
@@ -114,6 +115,7 @@ function capacityEvidence(capacity) {
     accounts: capacity.accounts,
     ready: capacity.ready,
     active: capacity.active || null,
+    observedAt: capacity.observedAt || null,
     readable: true,
   };
 }
@@ -128,7 +130,8 @@ export function selectSymphonyRoute({
   const classification = classifySymphonyIssue(issue);
   const preferred = preferredModels(classification);
   const capacityBlocked =
-    capacity !== undefined && (!capacity || capacity.accounts === 0);
+    capacity !== undefined &&
+    (!capacity || capacity.accounts === 0 || capacity.ready === 0);
   const candidates = [];
   for (const id of preferred) {
     const model = availableModels[id] || MODEL_BY_ID[id];
@@ -218,6 +221,7 @@ export function readCodexRotateCapacity({
   statePath = process.env.CODEX_ACCOUNTS_STATE ||
     join(accountsRoot, 'state.json'),
   now = Date.now(),
+  maxAgeMs = 5 * 60 * 1000,
 } = {}) {
   try {
     const accounts = readdirSync(accountsRoot, { withFileTypes: true })
@@ -228,6 +232,14 @@ export function readCodexRotateCapacity({
       )
       .map(entry => entry.name);
     const state = JSON.parse(readFileSync(statePath, 'utf8'));
+    const observedAtMs = statSync(statePath).mtimeMs;
+    if (
+      !Number.isFinite(observedAtMs) ||
+      observedAtMs > now + 60_000 ||
+      now - observedAtMs > maxAgeMs
+    ) {
+      return null;
+    }
     const cooldowns = state.cooldowns || {};
     const nowSeconds = Math.floor(now / 1000);
     const ready = accounts.filter(
@@ -238,6 +250,7 @@ export function readCodexRotateCapacity({
       ready: ready.length,
       active: state.active || null,
       cooldowns,
+      observedAt: new Date(observedAtMs).toISOString(),
     };
   } catch {
     return null;
@@ -342,7 +355,7 @@ async function runLauncher(argv) {
   }
   if (!issue) fail(`issue not found: ${issueArg}`);
   const capacity = readCodexRotateCapacity();
-  if (!capacity || capacity.accounts === 0)
+  if (!capacity || capacity.accounts === 0 || capacity.ready === 0)
     fail('codex-rotate capacity is unavailable; refusing to route');
   const materialized = materializeRoutingReceipt(issue, workspace, {
     requireCapacityEvidence: true,

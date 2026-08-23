@@ -46,6 +46,15 @@ def signals(**overrides):
             "target": 15,
         },
         "independentReview": review,
+        "concurrencyEvidence": {
+            "schema": "gem-concurrency-evidence/v1",
+            "target": 4,
+            "approved": True,
+            "cleanRuns": 1,
+            "severeIncidents": 0,
+            "observedAt": now_iso(),
+            "accepted": True,
+        },
     }
     payload.update(overrides)
     return payload

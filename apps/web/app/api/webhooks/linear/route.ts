@@ -1,6 +1,8 @@
 /**
  * Linear Webhook Handler
  *
+ * Invariant consumer: JOV-INV-005.
+ *
  * Bridges Linear → GitHub repository_dispatch so Claude Code can pick up work
  * autonomously. Two trigger types:
  *
@@ -14,9 +16,9 @@
  * Auth: HMAC-SHA256 verification against LINEAR_WEBHOOK_SECRET via the
  * `linear-signature` header. Missing → 400, invalid → 401.
  *
- * Dedupe: per (issueId × updatedAt × kind) lock held in Redis for 60s. Lock
- * release on dispatch failure ensures Linear's retry can succeed. If Redis is
- * unavailable, we 503 rather than risk double-dispatching.
+ * Dedupe: provider webhook identity (with a deterministic fallback) held for
+ * six hours. Definite dispatch rejection releases the lock; an ambiguous
+ * timeout stays locked for the reconciliation backstop instead of replaying.
  *
  * Side effects: POSTs to
  * `https://api.github.com/repos/{owner}/{repo}/dispatches` with
@@ -39,8 +41,9 @@ import {
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-const DEDUPE_TTL_SECONDS = 60;
-const DISPATCH_TIMEOUT_MS = 10000;
+const DEDUPE_TTL_SECONDS = 6 * 60 * 60;
+const DISPATCH_TIMEOUT_MS = 4500;
+const MAX_PROVIDER_EVENT_AGE_MS = 6 * 60 * 60 * 1000;
 
 interface LinearIssueState {
   id?: string;
@@ -82,6 +85,8 @@ interface LinearWebhookPayload {
   updatedFrom?: {
     stateId?: string;
   };
+  webhookId?: string;
+  webhookTimestamp?: string | number;
 }
 
 interface AutomationContract {
@@ -184,6 +189,26 @@ function getAutomationContract(
   return parseAutomationContract(commentData?.body ?? '');
 }
 
+function providerTimestamp(payload: LinearWebhookPayload): string | null {
+  if (payload.webhookTimestamp === undefined) return null;
+  const numeric = Number(payload.webhookTimestamp);
+  const parsed = Number.isFinite(numeric)
+    ? numeric < 10_000_000_000
+      ? numeric * 1000
+      : numeric
+    : Date.parse(String(payload.webhookTimestamp));
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
+}
+
+function staleProviderEvent(
+  timestamp: string | null,
+  now = Date.now()
+): boolean {
+  if (!timestamp) return false;
+  const observed = Date.parse(timestamp);
+  return observed > now + 60_000 || now - observed > MAX_PROVIDER_EVENT_AGE_MS;
+}
+
 export async function POST(request: NextRequest) {
   const webhookSecret = env.LINEAR_WEBHOOK_SECRET;
   const dispatchToken = env.GH_DISPATCH_TOKEN;
@@ -240,7 +265,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const dedupeKey = `${issueId}:${issueData?.updatedAt ?? payload.createdAt ?? ''}:${isPlanReadyEvent ? 'plan' : 'intake'}`;
+    const observedAt = providerTimestamp(payload);
+    if (payload.webhookTimestamp !== undefined && !observedAt) {
+      return NextResponse.json(
+        { error: 'Invalid provider timestamp' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+    if (staleProviderEvent(observedAt)) {
+      return NextResponse.json(
+        { received: true, ignored: true, reason: 'stale-provider-event' },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const providerDeliveryId =
+      payload.webhookId?.trim() ||
+      request.headers.get('linear-delivery')?.trim() ||
+      request.headers.get('linear-event')?.trim();
+    const dedupeKey = `${providerDeliveryId || `${issueId}:${issueData?.updatedAt ?? payload.createdAt ?? ''}`}:${isPlanReadyEvent ? 'plan' : 'intake'}`;
     dedupeKeyForRetry = dedupeKey;
     const dedupeResult = await acquireRecentDispatch(
       'linear',
@@ -263,7 +306,7 @@ export async function POST(request: NextRequest) {
 
     if (!dedupeAcquired) {
       return NextResponse.json(
-        { received: true, deduplicated: true },
+        { received: true, deduplicated: true, eventId: dedupeKey },
         { headers: NO_STORE_HEADERS }
       );
     }
@@ -286,19 +329,20 @@ export async function POST(request: NextRequest) {
             ? 'linear_plan_ready'
             : 'linear-intake-changed',
           client_payload: {
+            delivery_id: providerDeliveryId ?? dedupeKey,
+            provider_timestamp: observedAt ?? payload.createdAt ?? null,
             issue_id: issueId,
             issue_identifier: issueData?.identifier ?? null,
-            issue_title: issueData?.title ?? 'Untitled Linear Issue',
-            issue_description: issueData?.description ?? '',
-            issue_url: issueData?.url ?? null,
             issue_updated_at: issueData?.updatedAt ?? null,
             team_key: issueData?.team?.key ?? null,
             state_name: issueData?.state?.name ?? null,
-            intake_action: payload.action ?? null,
-            plan_ready: isPlanReadyEvent,
-            verify_required: automationContract.verifyRequired,
-            simplify_bounded: automationContract.simplifyBounded,
-            model_tier: automationContract.modelTier,
+            action: payload.action ?? null,
+            automation: {
+              plan_ready: isPlanReadyEvent,
+              verify_required: automationContract.verifyRequired,
+              simplify_bounded: automationContract.simplifyBounded,
+              model_tier: automationContract.modelTier,
+            },
           },
         }),
         timeoutMs: DISPATCH_TIMEOUT_MS,
@@ -321,7 +365,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { received: true, dispatched: true },
+      { received: true, dispatched: true, eventId: dedupeKey },
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
@@ -335,16 +379,18 @@ async function handleLinearWebhookError(
   dedupeKeyForRetry: string | null
 ): Promise<NextResponse> {
   if (error instanceof ServerFetchTimeoutError) {
-    if (dedupeAcquired && dedupeKeyForRetry) {
-      await clearRecentDispatch('linear', dedupeKeyForRetry);
-    }
     await captureCriticalError('Linear webhook dispatch timed out', error, {
       route: '/api/webhooks/linear',
       timeoutMs: error.timeoutMs,
     });
     return NextResponse.json(
-      { error: 'Dispatch timed out' },
-      { status: 502, headers: NO_STORE_HEADERS }
+      {
+        received: true,
+        dispatchState: 'ambiguous',
+        reconcileRequired: true,
+        eventId: dedupeKeyForRetry,
+      },
+      { status: 202, headers: NO_STORE_HEADERS }
     );
   }
 
