@@ -28,7 +28,7 @@ function aliveLabel(status: OvieMacHudSnapshot['alive']['status']): string {
 }
 
 const VALUE_CLASS =
-  'min-h-8 text-3xl font-[620] leading-none tracking-[-0.03em]';
+  'min-h-8 text-3xl font-semibold leading-none tracking-tight';
 
 export function OvieMacHud({
   snapshot,
@@ -48,7 +48,7 @@ export function OvieMacHud({
       <DesktopTitlebar />
       <main className='mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 px-6 py-6'>
         <header className='flex min-h-10 items-center justify-between gap-3'>
-          <h1 className='text-lg font-[620] tracking-[-0.02em]'>Ovie</h1>
+          <h1 className='text-lg font-semibold tracking-tight'>Ovie</h1>
           <HudStatusPill
             label={status}
             tone={getDefaultStatusTone(alive.status)}
