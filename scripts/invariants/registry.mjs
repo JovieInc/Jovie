@@ -54,10 +54,7 @@ function push(errors, invariant, detail) {
 }
 
 export function readInvariantRegistry(repoRoot = process.cwd()) {
-  const rows = readFileSync(
-    resolve(repoRoot, INVARIANT_REGISTRY_PATH),
-    'utf8'
-  )
+  const rows = readFileSync(resolve(repoRoot, INVARIANT_REGISTRY_PATH), 'utf8')
     .split(/\r?\n/)
     .filter(Boolean)
     .map(line => JSON.parse(line));

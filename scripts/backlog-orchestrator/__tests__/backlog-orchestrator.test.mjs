@@ -1393,7 +1393,9 @@ describe('deterministic Symphony admission boundary', () => {
     );
     assert.equal(gate.workAdmission.allowed, true);
     assert.equal(gate.workAdmission.newIssueLeaseAllowed, false);
-    assert.ok(gate.workAdmission.activities.includes('isolated-implementation'));
+    assert.ok(
+      gate.workAdmission.activities.includes('isolated-implementation')
+    );
   });
 
   it('accepts only fresh measured capacity and requires twenty clean runs above baseline', () => {
