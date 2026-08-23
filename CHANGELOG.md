@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Jovie, Symphony, and Summer/ops CI lanes no longer block each other (JOV-5288):** this repo's required checks stay the Jovie aggregates. Exclusive Symphony/control-plane or Summer/ops diffs skip Jovie app unit/build/typecheck suites; exclusive product diffs skip Symphony scripts typecheck. Mixed and unknown non-doc files fail closed onto the product lane. Migration Guard and secret scanning stay on.
+
 - [internal] **Native merge-queue UNMERGEABLE entries auto-eject and CHANGELOG collisions no longer poison CLEAN PRs (JOV-5291):** parked UNMERGEABLE group members dequeue with a typed exact-head receipt and are not re-enqueued; enroll trusts live GraphQL `maximumEntriesToBuild=3` instead of stale REST drift; two Unreleased CHANGELOG edits are serialized instead of failing the later PR's `enroll` check.
 
 - [internal] **Stale Symphony fallback locks can no longer permanently own pickup (JOV-5297):** the sidecar GCs leftover `JOV-*.lock` files when the Linear issue is In Review / Done / has an inflight open PR, or when an unlocked lock is older than the typed TTL, and writes a receipt. Pickup now emits lease start, a typed refuse reason, lock count, and the next eligible issue; an unknown refuse reason is red. Codex refuses a second writer on In Review / open PR.
