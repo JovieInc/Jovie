@@ -455,6 +455,12 @@ describe('merge_group workflow contract', () => {
       "is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}"
     );
     expect(pathChanges).toContain(
+      "run_jovie_product: ${{ steps.detect.outputs.run_jovie_product || 'false' }}"
+    );
+    expect(pathChanges).toContain(
+      'node scripts/lib/ci-repo-lanes.mjs --emit-github-output'
+    );
+    expect(pathChanges).toContain(
       'echo "is_noop_merge_group=true" >> "$GITHUB_OUTPUT"'
     );
     expect(pathChanges).toContain(
@@ -543,6 +549,9 @@ describe('merge_group workflow contract', () => {
       expect(job, name).toContain(
         "needs.ci-path-changes.outputs.is_noop_merge_group != 'true'"
       );
+      expect(job, name).toContain(
+        "needs.ci-path-changes.outputs.run_jovie_product == 'true'"
+      );
       expect(job, name).toContain("github.event_name == 'merge_group'");
     }
 
@@ -551,6 +560,12 @@ describe('merge_group workflow contract', () => {
     );
     expect(aggregate).toContain(
       'Typed no-op merge group must skip Unit Tests and Build + Layout'
+    );
+    expect(aggregate).toContain(
+      'Non-product merge group must skip Unit Tests and Build + Layout'
+    );
+    expect(aggregate).toContain(
+      'RUN_JOVIE_PRODUCT="${{ needs.ci-path-changes.outputs.run_jovie_product }}"'
     );
     expect(aggregate).toContain(
       'Build + Layout did not pass on the non-empty merge-group combined head'
@@ -612,6 +627,22 @@ describe('merge_group workflow contract', () => {
         status: 0,
       },
       {
+        name: 'non-product group skips Jovie app suites',
+        noop: 'false',
+        unit: 'skipped',
+        build: 'skipped',
+        product: 'false',
+        status: 0,
+      },
+      {
+        name: 'non-product group rejects a unit success placeholder',
+        noop: 'false',
+        unit: 'success',
+        build: 'skipped',
+        product: 'false',
+        status: 1,
+      },
+      {
         name: 'unset output fails closed as a non-empty group',
         noop: '',
         unit: 'skipped',
@@ -635,11 +666,13 @@ describe('merge_group workflow contract', () => {
           `NOOP_GROUP="$1"
 UNIT_RESULT="$2"
 BUILD_LAYOUT_RESULT="$3"
+RUN_JOVIE_PRODUCT="$4"
 ${heavyGateScript}`,
           'merge-group-heavy-gate',
           testCase.noop,
           testCase.unit,
           testCase.build,
+          testCase.product ?? 'true',
         ],
         { encoding: 'utf8' }
       );

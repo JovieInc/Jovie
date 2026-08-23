@@ -27,6 +27,7 @@ import { spawnSync } from 'node:child_process';
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { classifyCiRepoLanes } from './lib/ci-repo-lanes.mjs';
 
 const REPO_ROOT = process.cwd();
 
@@ -220,6 +221,46 @@ function changedFiles(patterns) {
     .filter(Boolean);
 }
 
+function listAllChangedFiles() {
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  let diffBase = 'HEAD^1';
+  if (event === 'pull_request') {
+    const base = process.env.GITHUB_BASE_REF || 'main';
+    const probe = shell(`git rev-parse --verify origin/${base}`);
+    diffBase =
+      probe.code === 0
+        ? `origin/${base}`
+        : process.env.TURBO_SCM_BASE || diffBase;
+  } else if (process.env.TURBO_SCM_BASE) {
+    diffBase = process.env.TURBO_SCM_BASE;
+  }
+  const result = shell(
+    `git diff --diff-filter=ACDMRT --name-only ${diffBase} HEAD`
+  );
+  if (result.code !== 0) return null;
+  return result.output
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean);
+}
+
+let cachedRepoLanes = null;
+function repoLanes() {
+  if (cachedRepoLanes) return cachedRepoLanes;
+  const files = listAllChangedFiles();
+  // Empty or unreadable diffs fail closed onto every lane so typed no-op
+  // merge groups still run ci-fast against the combined head (JOV-5288).
+  cachedRepoLanes =
+    files === null || files.length === 0
+      ? {
+          runJovieProduct: true,
+          runSymphonyControl: true,
+          runSummerOps: true,
+        }
+      : classifyCiRepoLanes(files);
+  return cachedRepoLanes;
+}
+
 function excerpt(text, max = 1200) {
   const trimmed = (text || '').trim();
   if (trimmed.length <= max) return trimmed;
@@ -283,6 +324,13 @@ function runEslintServerBoundaries() {
 function runTypecheck() {
   // --force is mandatory (JOV-3499). Gate guard scans this file + ci.yml.
   const event = process.env.GITHUB_EVENT_NAME || '';
+  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+    return {
+      code: 0,
+      output: 'Jovie product typecheck skipped (no product files changed)\n',
+      skipped: true,
+    };
+  }
   if (event === 'pull_request') {
     const files = changedFiles([
       '**/*.ts',
@@ -306,13 +354,29 @@ function runTypecheck() {
 }
 
 function runScriptsTypecheck() {
-  // JOV-4327: scripts/ tree typecheck vs shrink-only baseline. Runs
-  // unconditionally (no path gating) — the baseline comparison is ~6s and the
-  // error graph also covers imported files outside scripts/.
+  // JOV-4327: scripts/ tree typecheck vs shrink-only baseline. Exclusive
+  // Jovie product PRs skip this Symphony/control-plane suite (JOV-5288).
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (event !== 'workflow_dispatch' && !repoLanes().runSymphonyControl) {
+    return {
+      code: 0,
+      output:
+        'Scripts typecheck skipped (no Symphony/control-plane files changed)\n',
+      skipped: true,
+    };
+  }
   return shell('pnpm run typecheck:scripts');
 }
 
 function runGuardrails() {
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+    return {
+      code: 0,
+      output: 'Guardrails skipped (no Jovie product files changed)\n',
+      skipped: true,
+    };
+  }
   const base = process.env.GITHUB_BASE_REF || 'main';
   const originBase = `origin/${base}`;
   const parts = [

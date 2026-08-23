@@ -519,6 +519,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/pr-check-failures.test.mjs',
         'scripts/lib/__tests__/pr-conflict-handler.test.mjs',
         'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+        'scripts/lib/__tests__/ci-repo-lanes.test.mjs',
         'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
         'scripts/lib/__tests__/lockfile-specifier-preflight.test.mjs',
         'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
