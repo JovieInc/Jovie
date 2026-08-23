@@ -171,6 +171,12 @@ describe('Symphony routing receipts', () => {
       capacity: { accounts: 0, ready: 0, active: null, cooldowns: {} },
     });
     assert.equal(empty.status, 'blocked');
+    const saturated = selectSymphonyRoute({
+      issue: issue('Add profile validation'),
+      availableModels: models,
+      capacity: { accounts: 2, ready: 0, active: 'a', cooldowns: {} },
+    });
+    assert.equal(saturated.status, 'blocked');
     const healthy = selectSymphonyRoute({
       issue: issue('Add profile validation'),
       availableModels: models,
@@ -181,6 +187,7 @@ describe('Symphony routing receipts', () => {
       accounts: 2,
       ready: 1,
       active: 'a',
+      observedAt: null,
       readable: true,
     });
   });

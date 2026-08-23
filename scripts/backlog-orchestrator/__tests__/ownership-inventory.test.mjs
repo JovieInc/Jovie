@@ -5,6 +5,7 @@ import * as admissionGate from '../admission-gate.mjs';
 import * as deterministicGates from '../deterministic-gates.mjs';
 import {
   ADMISSION_TARGET_FIELDS,
+  admissionTargetsCollide,
   authoritativeBehaviorOwners,
   loadOwnershipInventory,
   resolveAdmissionTarget,
@@ -152,6 +153,43 @@ Write the inventory later slices consume.
     });
     assert.equal(result.status, 'rejected');
     assert.equal(result.reason, 'no-jovie-artifact');
+  });
+
+  it('rejects a lease collision while allowing unrelated product concurrency', () => {
+    const jovieWeb = resolveAdmissionTarget(
+      issue({
+        description: `## Proposed fix
+Change apps/web/lib/ovie/summer-kanban.ts.
+
+## Acceptance criteria
+* Focused test passes.`,
+      })
+    ).target;
+    const jovieWebPeer = resolveAdmissionTarget(
+      issue({
+        identifier: 'JOV-5307',
+        description: `## Proposed fix
+Change apps/web/lib/ovie/summer-transport.ts.
+
+## Acceptance criteria
+* Focused test passes.`,
+      })
+    ).target;
+    const logYourBody = resolveAdmissionTarget(
+      issue({
+        identifier: 'LYB-900',
+        team: { key: 'LYB' },
+        description: `## Proposed fix
+Change JovieInc/LogYourBody.
+
+## Acceptance criteria
+* Focused test passes.`,
+      })
+    ).target;
+
+    assert.equal(admissionTargetsCollide(jovieWeb, jovieWebPeer), true);
+    assert.equal(admissionTargetsCollide(jovieWeb, logYourBody), false);
+    assert.ok(jovieWeb.collision_domains.length > 0);
   });
 
   it('writes target fields onto a new admission receipt', () => {
