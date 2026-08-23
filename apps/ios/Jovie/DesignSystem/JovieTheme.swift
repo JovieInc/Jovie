@@ -237,39 +237,6 @@ extension View {
   }
 }
 
-struct JovieActionButtonStyle: ButtonStyle {
-  static let pressedOpacity: Double = 0.8
-
-  let filled: Bool
-  var isSuccess = false
-
-  func makeBody(configuration: Configuration) -> some View {
-    configuration.label
-      .font(JovieFont.body(size: 14, numericWeight: JovieActionButtonMetrics.labelWeight))
-      .foregroundStyle(filled ? JovieColor.backgroundBase : JovieColor.textPrimary)
-      .frame(height: JovieActionButtonMetrics.height)
-      .padding(.horizontal, JovieSpacing.medium)
-      .background(
-        RoundedRectangle(cornerRadius: JovieActionButtonMetrics.radius, style: .continuous)
-          .fill(filledFill)
-      )
-      .overlay {
-        RoundedRectangle(cornerRadius: JovieActionButtonMetrics.radius, style: .continuous)
-          .stroke(
-            filled ? Color.clear : JovieColor.borderDefault,
-            lineWidth: 1
-          )
-      }
-      .opacity(configuration.isPressed ? JovieActionButtonStyle.pressedOpacity : 1)
-      .animation(JovieMotion.subtle, value: configuration.isPressed)
-  }
-
-  private var filledFill: Color {
-    if !filled { return JovieColor.surface1 }
-    return isSuccess ? JovieColor.accentBlue : Color.white
-  }
-}
-
 struct JoviePillButtonStyle: ButtonStyle {
   static let pressedOpacity: Double = 0.8
 
