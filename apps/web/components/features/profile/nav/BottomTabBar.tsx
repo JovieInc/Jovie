@@ -27,6 +27,10 @@ import {
   Music2,
   UserRound,
 } from 'lucide-react';
+import {
+  type BottomTabKey,
+  getPermittedPublicProfileNavigation,
+} from '@/lib/profile/route-config';
 import { cn } from '@/lib/utils';
 import type { ProfilePrimaryTab } from '../contracts';
 
@@ -34,22 +38,13 @@ import type { ProfilePrimaryTab } from '../contracts';
 // Tab definitions — fixed order per spec §2.1
 // ---------------------------------------------------------------------------
 
-interface TabDefinition {
-  readonly mode: ProfilePrimaryTab;
-  readonly label: string;
-  readonly icon: LucideIcon;
-}
-
-/**
- * All four primary tab definitions, in canonical order.
- */
-const ALL_PRIMARY_TABS: ReadonlyArray<TabDefinition> = [
+const TAB_ICONS: Readonly<Record<BottomTabKey, LucideIcon>> = {
   // UserRound = profile home (not a separate "person" destination).
-  { mode: 'profile', label: 'Home', icon: UserRound },
-  { mode: 'listen', label: 'Music', icon: Music2 },
-  { mode: 'tour', label: 'Events', icon: CalendarDays },
-  { mode: 'subscribe', label: 'Alerts', icon: Bell },
-] as const;
+  profile: UserRound,
+  listen: Music2,
+  tour: CalendarDays,
+  subscribe: Bell,
+};
 
 // ---------------------------------------------------------------------------
 // Props
@@ -109,10 +104,9 @@ export function BottomTabBar({
   showAlertsTab = true,
   className,
 }: BottomTabBarProps) {
-  const visibleTabs =
-    showAlerts && showAlertsTab
-      ? ALL_PRIMARY_TABS
-      : ALL_PRIMARY_TABS.filter(tab => tab.mode !== 'subscribe');
+  const visibleTabs = getPermittedPublicProfileNavigation({
+    fanCaptureEnabled: showAlerts && showAlertsTab,
+  });
   const columnCount = visibleTabs.length;
 
   return (
@@ -135,15 +129,15 @@ export function BottomTabBar({
           }}
         >
           {visibleTabs.map(tab => {
-            const Icon = tab.icon;
+            const Icon = TAB_ICONS[tab.id];
             // Active when the tab's mode matches and the menu is not open
-            const isActive = !isMenuOpen && tab.mode === activeTab;
+            const isActive = !isMenuOpen && tab.id === activeTab;
 
             return (
               <button
-                key={tab.mode}
+                key={tab.id}
                 type='button'
-                onClick={() => onTabSelect(tab.mode)}
+                onClick={() => onTabSelect(tab.id)}
                 className={cn(
                   'profile-liquid-glass-nav__item relative flex h-full min-w-0 touch-manipulation items-center justify-center rounded-full text-center transition-colors duration-subtle ease-subtle',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
