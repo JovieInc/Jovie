@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Versioned Gem fleet gate with separate work and promotion admission.
 
+Invariant consumers: JOV-INV-007 and JOV-INV-008.
+
 Gem observes main, production, queue, controller, and explicit integrity
 receipts. Symphony remains the only implementation owner, so the legacy direct
 Gem ship loop is held even while the fleet work-admission gate permits approved
@@ -431,12 +433,16 @@ def observe_concurrency(path: Path, now: datetime) -> dict[str, Any] | None:
     except (OSError, ValueError, json.JSONDecodeError):
         return None
     observed_at = parse_time(receipt.get("observedAt"))
+    target = receipt.get("target")
+    required_clean_runs = 20 if isinstance(target, int) and target > 4 else 1
     eligible = (
         receipt.get("schema") == CONCURRENCY_SCHEMA
-        and receipt.get("target") == 8
+        and isinstance(target, int)
+        and not isinstance(target, bool)
+        and 1 <= target <= 8
         and receipt.get("approved") is True
         and isinstance(receipt.get("cleanRuns"), int)
-        and receipt["cleanRuns"] >= 20
+        and receipt["cleanRuns"] >= required_clean_runs
         and receipt.get("severeIncidents") == 0
         and observed_at is not None
         and timedelta(0) <= now - observed_at <= timedelta(hours=24)
@@ -914,7 +920,16 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and valid_commit_sha(production.get("deployedSha"))
     )
     evidence = signals.get("concurrencyEvidence") or {}
-    gem_concurrency = 8 if evidence.get("accepted") is True else DEFAULT_GEM_CONCURRENCY
+    capacity_fresh = evidence.get("accepted") is True
+    measured_target = evidence.get("target")
+    gem_concurrency = (
+        measured_target
+        if capacity_fresh
+        and isinstance(measured_target, int)
+        and not isinstance(measured_target, bool)
+        and 1 <= measured_target <= 8
+        else 0
+    )
     green_ready_prs = queue.get("greenReadyPrs", queue.get("eligiblePrs"))
     queue_target = queue.get("target")
     queue_shape_valid = (
@@ -973,7 +988,8 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         else (
             (
                 ["approved-issue-lease"]
-                if not queue_shape_valid or queue_below_backpressure
+                if capacity_fresh
+                and (not queue_shape_valid or queue_below_backpressure)
                 else []
             )
             + ["isolated-implementation", "tests", "review", "draft-pr"]
@@ -1072,7 +1088,14 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         "concurrency": {
             "gem": {
                 "maxConcurrent": gem_concurrency,
-                "evidenceAccepted": gem_concurrency == 8,
+                "runtimeFloor": 1,
+                "baseline": DEFAULT_GEM_CONCURRENCY,
+                "evidenceAccepted": capacity_fresh,
+                "newMutationAllowed": capacity_fresh,
+                "preserveQueuedWork": True,
+                "reason": "recent-approved-measured-capacity"
+                if capacity_fresh
+                else "capacity-evidence-missing-malformed-or-stale",
             },
             "symphonyImplementation": "event-driven-backpressure",
         },
