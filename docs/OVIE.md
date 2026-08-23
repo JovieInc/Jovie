@@ -27,6 +27,7 @@ Presentation modes of the same component and metrics contract:
 | Shell | `/hud` | `shell` | `shell` |
 | Fullscreen | `/hud?fs=1` | `kiosk` | `shell` |
 | Kiosk | `/hud?kiosk=<token>` | `kiosk` | `token` |
+| Packaged Mac Ovie (JOV-5298) | `/hud?ovie=mac` | `shell` | `mac` (`OvieMacHud`) |
 
 Compatibility aliases, never independent screens:
 
@@ -44,7 +45,7 @@ walk capture, dispatch, and developer controls stay in disclosure.
 
 | Surface | Role |
 |---|---|
-| Packaged Mac/iOS door | Talk + ops presentation. Conversational authority is Summer, after Eve intake. Default installed entry is `/hud`. |
+| Packaged Mac/iOS door | Talk + ops presentation. Conversational authority is Summer, after Eve intake. Packaged Ovie menu opens `/hud?ovie=mac`. |
 | `/hud` | One Ops screen. Fullscreen `?fs=1`. Unattended TV `?kiosk=TOKEN`. |
 | `/app/ov/chat` | Entitled operator door. Must not fall through to artist Jovie chat or self-identify as Ovie. |
 

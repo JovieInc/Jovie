@@ -4,6 +4,7 @@ export const PRODUCTION_DESKTOP_APP_ID = 'app.jov.ie' as const;
 export const STAGING_DESKTOP_APP_ID = 'app.jov.ie.staging' as const;
 export const OVIE_OPERATOR_TALK_ROUTE = '/app/ov/chat' as const;
 export const OVIE_OPERATOR_OPS_ROUTE = '/hud' as const;
+export const OVIE_OPERATOR_OPS_SEARCH = 'ovie=mac' as const;
 export const CUSTOMER_JOVIE_ENTRY_ROUTE = '/app/chat' as const;
 
 export const OVIE_PACKAGE_PROOF_CHECKS = [
@@ -40,8 +41,13 @@ export function ovieOperatorDoorRoutes() {
   return {
     talk: OVIE_OPERATOR_TALK_ROUTE,
     ops: OVIE_OPERATOR_OPS_ROUTE,
+    opsSearch: OVIE_OPERATOR_OPS_SEARCH,
     customerJovie: CUSTOMER_JOVIE_ENTRY_ROUTE,
   } as const;
+}
+
+export function ovieOperatorOpsHref(): string {
+  return `${OVIE_OPERATOR_OPS_ROUTE}?${OVIE_OPERATOR_OPS_SEARCH}`;
 }
 
 export function evaluateOviePackageProof(input: {
