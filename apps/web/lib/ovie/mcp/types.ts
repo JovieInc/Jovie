@@ -6,6 +6,7 @@ export const OVIE_MCP_IDENTITY = 'ovie' as const;
 
 export const OVIE_MCP_TOOLS = [
   'get_org_state',
+  'get_invariant_stewardship',
   'record_decision',
   'create_initiative',
   'get_initiative',
@@ -22,6 +23,9 @@ export const OVIE_WRITE_TOOLS = [
   'create_initiative',
   'certify_feature',
 ] as const;
+
+/** Read-only operating detail that is still founder-private. */
+export const OVIE_FOUNDER_TOOLS = ['get_invariant_stewardship'] as const;
 
 export type CertLevel =
   | 'discovered'

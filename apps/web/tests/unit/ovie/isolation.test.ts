@@ -38,6 +38,15 @@ describe('operator/customer isolation (JOV-5212)', () => {
       authorizeIsolatedTool(SUMMER_MEMORY_NAMESPACE, 'get_org_state')
     ).toEqual({ allowed: true });
     expect(
+      authorizeIsolatedTool(JOVIE_ARTIST_NAMESPACE, 'get_invariant_stewardship')
+    ).toEqual({ allowed: false });
+    expect(
+      authorizeIsolatedTool(
+        SUMMER_MEMORY_NAMESPACE,
+        'get_invariant_stewardship'
+      )
+    ).toEqual({ allowed: true });
+    expect(
       authorizeIsolatedTool(SUMMER_MEMORY_NAMESPACE, ARTIST_JOVIE_TOOLS[0])
     ).toEqual({ allowed: false });
     expect(() =>

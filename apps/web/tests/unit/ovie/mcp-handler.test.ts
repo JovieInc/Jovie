@@ -335,6 +335,39 @@ describe('Ovie MCP handler', () => {
     expect(toolResult<{ identity: string }>(result.body).identity).toBe('ovie');
   });
 
+  it('projects invariant exceptions to Ovie for the founder without dumping healthy detail', async () => {
+    const denied = await handleOvieMcpRequest({
+      principal: user,
+      body: rpc('tools/call', {
+        name: 'get_invariant_stewardship',
+        arguments: {},
+      }),
+    });
+    expect(denied.status).toBe(403);
+
+    const result = await handleOvieMcpRequest({
+      principal: founder,
+      body: rpc('tools/call', {
+        name: 'get_invariant_stewardship',
+        arguments: {},
+      }),
+    });
+    expect(result.status).toBe(200);
+    const body = toolResult<{
+      summary: { candidates: number; actionableExceptions: number };
+      summerQueue: Array<{ kind: string; owner: string }>;
+      founderQueue: unknown[];
+      candidates?: unknown[];
+      drillDown: string;
+    }>(result.body);
+    expect(body.summary.candidates).toBeGreaterThan(10);
+    expect(body.summary.actionableExceptions).toBe(body.summerQueue.length);
+    expect(body.summerQueue.every(item => item.kind !== 'approved')).toBe(true);
+    expect(body.founderQueue).toEqual([]);
+    expect(body.candidates).toBeUndefined();
+    expect(body.drillDown).toContain('invariant-stewardship.current-week.json');
+  });
+
   it('searches gbrain read-only through the Ovie pack', async () => {
     const result = await handleOvieMcpRequest({
       principal: founder,
