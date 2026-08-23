@@ -8,13 +8,18 @@ import { describe, expect, it } from 'vitest';
 import {
   BOTTOM_TAB_KEYS,
   categoryShowsTabBar,
+  getPermittedPublicProfileNavigation,
   getProfileRouteConfig,
   getRouteConfigForMode,
   PROFILE_ROUTE_CONFIG,
   type ProfileRouteKey,
+  PUBLIC_PROFILE_NAVIGATION,
+  type PublicProfileNavigationDestination,
   REDIRECT_SINK_ROUTE_KEYS,
   resolveActiveTab,
+  resolvePublicProfileActiveDestination,
   TOP_LEVEL_ROUTE_KEYS,
+  validatePublicProfileNavigation,
 } from './route-config';
 
 // ---------------------------------------------------------------------------
@@ -251,8 +256,8 @@ describe('resolveActiveTab', () => {
     expect(resolveActiveTab('tour', { hasTourDates: true })).toBe('tour');
   });
 
-  it('tour mode with hasTourDates=false → fallback to "profile" tab', () => {
-    expect(resolveActiveTab('tour', { hasTourDates: false })).toBe('profile');
+  it('tour mode with hasTourDates=false keeps the authorized Events destination active', () => {
+    expect(resolveActiveTab('tour', { hasTourDates: false })).toBe('tour');
   });
 
   it('tour mode with no hasTourDates option → "tour" tab (defaults to true)', () => {
@@ -390,5 +395,103 @@ describe('REDIRECT_SINK_ROUTE_KEYS', () => {
 describe('BOTTOM_TAB_KEYS', () => {
   it('contains exactly four primary tab keys in spec order', () => {
     expect(BOTTOM_TAB_KEYS).toEqual(['profile', 'listen', 'tour', 'subscribe']);
+  });
+});
+
+describe('PUBLIC_PROFILE_NAVIGATION', () => {
+  it('defines the one ordered semantic contract for compact and wide shells', () => {
+    expect(
+      PUBLIC_PROFILE_NAVIGATION.map(destination => destination.id)
+    ).toEqual(['profile', 'listen', 'tour', 'subscribe']);
+    expect(
+      PUBLIC_PROFILE_NAVIGATION.every(
+        destination =>
+          destination.compactPlacement === destination.widePlacement &&
+          destination.collapse === 'none' &&
+          destination.badge === null
+      )
+    ).toBe(true);
+    expect(validatePublicProfileNavigation(PUBLIC_PROFILE_NAVIGATION)).toEqual(
+      []
+    );
+  });
+
+  it('filters only the typed fan-capture destination', () => {
+    expect(
+      getPermittedPublicProfileNavigation({ fanCaptureEnabled: false }).map(
+        destination => destination.id
+      )
+    ).toEqual(['profile', 'listen', 'tour']);
+    expect(
+      getPermittedPublicProfileNavigation({ fanCaptureEnabled: true }).map(
+        destination => destination.id
+      )
+    ).toEqual(['profile', 'listen', 'tour', 'subscribe']);
+  });
+
+  it('owns active-state mapping for route and overlay modes', () => {
+    expect(resolvePublicProfileActiveDestination({ mode: 'about' })).toBe(
+      'profile'
+    );
+    expect(
+      resolvePublicProfileActiveDestination({
+        mode: 'profile',
+        overlayView: 'releases',
+      })
+    ).toBe('listen');
+    expect(
+      resolvePublicProfileActiveDestination({
+        mode: 'profile',
+        overlayView: 'notifications',
+      })
+    ).toBe('subscribe');
+  });
+
+  it('deliberately rejects missing, reordered, duplicated, operator, and responsive-drift contracts', () => {
+    const clone = (): PublicProfileNavigationDestination[] =>
+      structuredClone([...PUBLIC_PROFILE_NAVIGATION]);
+
+    expect(validatePublicProfileNavigation(clone().slice(1))).toContain(
+      'destination-order'
+    );
+
+    const reordered = clone();
+    [reordered[0], reordered[1]] = [reordered[1], reordered[0]];
+    expect(validatePublicProfileNavigation(reordered)).toContain(
+      'destination-order'
+    );
+
+    const duplicated = clone();
+    duplicated[1] = duplicated[0];
+    expect(validatePublicProfileNavigation(duplicated)).toContain(
+      'duplicate-destination'
+    );
+
+    const operatorLeak = clone();
+    operatorLeak[0] = {
+      ...operatorLeak[0],
+      audience: 'operator',
+    } as unknown as PublicProfileNavigationDestination;
+    expect(validatePublicProfileNavigation(operatorLeak)).toContain(
+      'audience-leak'
+    );
+
+    const operatorRouteLeak = clone();
+    operatorRouteLeak[0] = {
+      ...operatorRouteLeak[0],
+      routeKey: 'admin-ovie',
+    } as unknown as PublicProfileNavigationDestination;
+    expect(validatePublicProfileNavigation(operatorRouteLeak)).toContain(
+      'route-owner-drift'
+    );
+
+    const responsiveDrift = clone();
+    responsiveDrift[0] = {
+      ...responsiveDrift[0],
+      widePlacement: 'sidebar',
+    } as unknown as PublicProfileNavigationDestination;
+    expect(validatePublicProfileNavigation(responsiveDrift)).toContain(
+      'responsive-drift'
+    );
   });
 });

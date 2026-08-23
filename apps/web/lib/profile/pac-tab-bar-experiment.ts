@@ -1,16 +1,10 @@
 /**
- * Cold-visitor tab bar experiment helpers (JOV-3907).
+ * Public-profile navigation visibility guard.
  *
- * Hypothesis: hiding the bottom tab bar for cold (S0) visitors reduces choice
- * surface and raises play-rate → capture-rate.
- *
- * Rules:
- * - Only cold, unsubscribed visitors on the `hidden` arm start without the bar.
- * - First interaction restores the bar for the rest of the session.
- * - Return visits always see the bar (localStorage-marked), regardless of arm.
+ * The historical PAC assignment is retained for analytics compatibility, but
+ * an experiment may not remove authorized navigation. Visual experiments can
+ * change presentation only; the semantic destination set remains reachable.
  */
-
-export const PAC_TAB_BAR_RETURN_VISIT_KEY = 'jv_pac_tab_bar_return';
 
 export interface ColdTabBarVisibilityInput {
   /** Statsig-assigned arm (`hidden` | `visible`). */
@@ -30,34 +24,7 @@ export interface ColdTabBarVisibilityInput {
  * Pure — storage reads happen at the call site.
  */
 export function shouldShowColdVisitorTabBar(
-  input: ColdTabBarVisibilityInput
+  _input: ColdTabBarVisibilityInput
 ): boolean {
-  if (input.isInteractive === false) return true;
-  if (input.isSubscribed) return true;
-  if (input.restoredThisSession) return true;
-  if (input.isReturnVisit) return true;
-  if (input.tabBarArm === 'visible') return true;
-  return false;
-}
-
-export function readPacTabBarReturnVisit(
-  storage: Pick<Storage, 'getItem'> | null | undefined
-): boolean {
-  if (!storage) return false;
-  try {
-    return storage.getItem(PAC_TAB_BAR_RETURN_VISIT_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-export function markPacTabBarReturnVisit(
-  storage: Pick<Storage, 'setItem'> | null | undefined
-): void {
-  if (!storage) return;
-  try {
-    storage.setItem(PAC_TAB_BAR_RETURN_VISIT_KEY, '1');
-  } catch {
-    // Best-effort — return-visit restore degrades to per-session only.
-  }
+  return true;
 }

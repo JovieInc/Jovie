@@ -46,12 +46,9 @@ import {
 import type { PublicMerchCard } from '@/lib/merch/types';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { CONTENT_SAFE_AREA_BOTTOM_PADDING } from '@/lib/profile/nav-constants';
-import {
-  markPacTabBarReturnVisit,
-  readPacTabBarReturnVisit,
-  shouldShowColdVisitorTabBar,
-} from '@/lib/profile/pac-tab-bar-experiment';
+import { shouldShowColdVisitorTabBar } from '@/lib/profile/pac-tab-bar-experiment';
 import { resolvePublicHeroObjectPosition } from '@/lib/profile/public-hero-media';
+import { resolvePublicProfileActiveDestination } from '@/lib/profile/route-config';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import { buildProfileShareContext } from '@/lib/share/context';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
@@ -217,43 +214,6 @@ interface ProfileCompactSurfaceProps {
   readonly renderSemanticHeading?: boolean;
 }
 
-function resolveActivePrimaryTab(params: {
-  readonly mode: ProfileMode;
-  readonly drawerOpen: boolean;
-  readonly drawerView: DrawerView;
-}): ProfilePrimaryTab {
-  if (params.drawerOpen) {
-    switch (params.drawerView) {
-      case 'listen':
-      case 'releases':
-        return 'listen';
-      case 'tour':
-        return 'tour';
-      case 'subscribe':
-      case 'notifications':
-        return 'subscribe';
-      default:
-        return 'profile';
-    }
-  }
-
-  const { mode } = params;
-  switch (mode) {
-    case 'listen':
-    case 'releases':
-      return 'listen';
-    case 'tour':
-    case 'subscribe':
-    case 'about':
-      return mode;
-    case 'profile':
-    case 'pay':
-    case 'contact':
-    default:
-      return 'profile';
-  }
-}
-
 function subscribeToPublicProfileHistory() {
   return () => {};
 }
@@ -352,10 +312,9 @@ export function ProfileCompactSurface({
     artistHandle: artist.handle,
   });
   const isDrawerOverlayActive = renderMode === 'interactive' && drawerOpen;
-  const requestedPrimaryTab = resolveActivePrimaryTab({
+  const requestedPrimaryTab = resolvePublicProfileActiveDestination({
     mode: activeMode,
-    drawerOpen: isDrawerOverlayActive,
-    drawerView,
+    overlayView: isDrawerOverlayActive ? drawerView : null,
   });
   const activePrimaryTab =
     !allowFanCapture && requestedPrimaryTab === 'subscribe'
@@ -386,24 +345,11 @@ export function ProfileCompactSurface({
   const activeNotificationSourceContext =
     notificationSourceContext ?? defaultNotificationSourceContext;
   const isHomeMode = activeVisiblePrimaryTab === 'profile';
-  // JOV-3907: cold-visitor tab bar experiment — hide vs visible 50/50.
-  // Tab bar always restored after first interaction or on return visits.
-  const [tabBarRestoredThisSession, setTabBarRestoredThisSession] =
-    useState(false);
-  const [isTabBarReturnVisit, setIsTabBarReturnVisit] = useState(false);
-  useEffect(() => {
-    setIsTabBarReturnVisit(readPacTabBarReturnVisit(globalThis.localStorage));
-  }, []);
-  const restoreTabBar = useCallback(() => {
-    setTabBarRestoredThisSession(true);
-    markPacTabBarReturnVisit(globalThis.localStorage);
-    setIsTabBarReturnVisit(true);
-  }, []);
   const showBottomNav = shouldShowColdVisitorTabBar({
     tabBarArm: profilePacAssignment.tabBar,
     isSubscribed,
-    restoredThisSession: tabBarRestoredThisSession,
-    isReturnVisit: isTabBarReturnVisit,
+    restoredThisSession: false,
+    isReturnVisit: false,
     isInteractive: renderMode === 'interactive',
   });
   const isPreviewEmbedded =
@@ -554,7 +500,6 @@ export function ProfileCompactSurface({
   const handleTabSelect = useCallback(
     (tab: ProfilePrimaryTab) => {
       if (!allowFanCapture && tab === 'subscribe') return;
-      restoreTabBar();
       const nextTab = mapPrimaryTabToAnalyticsTab(tab);
       track('profile_tab_click', {
         artist_id: artist.id,
@@ -573,7 +518,6 @@ export function ProfileCompactSurface({
       artist.id,
       currentAnalyticsTab,
       onModeSelect,
-      restoreTabBar,
     ]
   );
   const handleSocialClick = useCallback(
@@ -609,13 +553,6 @@ export function ProfileCompactSurface({
       data-profile-mode={activeMode}
       data-tab-bar-arm={profilePacAssignment.tabBar}
       data-tab-bar-visible={showBottomNav ? 'true' : 'false'}
-      onPointerDownCapture={
-        showBottomNav
-          ? undefined
-          : () => {
-              restoreTabBar();
-            }
-      }
     >
       <div
         ref={setNotificationsPortalContainer}
@@ -948,11 +885,7 @@ export function ProfileCompactSurface({
 
         {showBottomNav ? (
           <BottomTabBar
-            activeTab={
-              activeVisiblePrimaryTab === 'about'
-                ? 'profile'
-                : activeVisiblePrimaryTab
-            }
+            activeTab={activeVisiblePrimaryTab}
             hasTourDates={hasTourDates}
             showAlerts={allowFanCapture}
             isMenuOpen={isMenuActive}
