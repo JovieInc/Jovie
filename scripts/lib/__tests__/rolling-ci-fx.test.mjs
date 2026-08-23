@@ -138,6 +138,37 @@ describe('rolling CI FX webhook remediation', () => {
     });
   });
 
+  it('launches Cursor-direct repair for a failed merge_group against the source PR', () => {
+    const planned = planFxWebhookRemediation({
+      dispatch: dispatch({
+        writer: FX_ADAPTER_NAME,
+        source: { ...trustedSource, producerEvent: 'merge_group' },
+      }),
+      receipt: null,
+      liveHead: head,
+      implementer: 'tim',
+      fxAdapter,
+      cursorApiKey: 'cursor-key',
+      repository: 'JovieInc/Jovie',
+      prNumber: 16180,
+      headSha: head,
+      sourceHead: 'b'.repeat(40),
+      headRef: 'cursor/arbitrary-values-fix',
+    });
+    expect(planned.launch.action).toBe('launch');
+    expect(planned.launch.request.target.autoCreatePr).toBe(false);
+    expect(planned.launch.request.source.ref).toBe(
+      'cursor/arbitrary-values-fix'
+    );
+    expect(planned.launch.request.prompt.text).toContain(
+      'native merge_group CI failure'
+    );
+    expect(planned.launch.request.prompt.text).toContain('PR: #16180');
+    expect(planned.launch.request.prompt.text).toContain(
+      'Do not waive ratchet growth'
+    );
+  });
+
   it('launches Cursor-direct repair against the current PR without a sibling PR', () => {
     const planned = planFxWebhookRemediation({
       dispatch: dispatch({ writer: FX_ADAPTER_NAME }),

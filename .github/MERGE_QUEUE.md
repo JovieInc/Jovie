@@ -122,6 +122,11 @@ It fails closed if an open PR is missing from that authoritative snapshot.
   GitHub parked the group, not the PR. The same head is not re-enqueued.
   Tell it worked: `list-state` shows no `UNMERGEABLE` members, and the eject
   receipt's description starts with `ejected:`.
+- FX remediator on failed merge_group (JOV-5303): Rolling CI Dispatch accepts
+  completed `CI` `workflow_run` events whose producer is `merge_group`,
+  resolves the source PR from `gh-readonly-queue/main/pr-<n>-<baseSha>`, and
+  launches FX against that source branch. Tell it worked: a failed merge_group
+  CI run starts Rolling CI Dispatch and reaches `Launch FX remediator`.
 - CHANGELOG ALLGREEN collision (JOV-5291): GitHub's server merge ignores local
   union drivers. Two Unreleased `CHANGELOG.md` edits in one group park the
   later entry. Admission skips a CHANGELOG-touching PR while another CHANGELOG
