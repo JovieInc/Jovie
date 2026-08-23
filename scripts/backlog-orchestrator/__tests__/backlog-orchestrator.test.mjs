@@ -1846,6 +1846,25 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
     assert.ok(
       body.indexOf('recoverStaleLeases') < body.indexOf('admissionPreflight')
     );
+    assert.match(body, /gateNextHold\.admitNextFromPool/);
+    assert.match(body, /gateNextHold\.loadIssueHolds/);
+  });
+
+  it('collision-checks each pool candidate before plan or context', async () => {
+    const source = await readFile(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs'),
+      'utf8'
+    );
+    const start = source.indexOf('async function evaluateGateCandidate');
+    const end = source.indexOf('async function runTeamGateNext', start);
+    const body = source.slice(start, end);
+    assert.ok(start >= 0 && end > start);
+    assert.match(body, /stage: 'collision-preflight'/);
+    assert.ok(
+      body.indexOf('admissionPreflight(team, selected)') <
+        body.indexOf('buildDeterministicPlanEvidence')
+    );
+    assert.match(body, /admissionPreflight\(team, current\)/);
   });
 
   it('rejects synthetic workstream bundles and admits no member', async () => {
