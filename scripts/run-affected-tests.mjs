@@ -1536,7 +1536,7 @@ export async function runCommandStatus(
   const child = spawn(command, args, {
     cwd: REPO_ROOT,
     stdio: 'inherit',
-    env: process.env,
+    env: buildVerificationEnv(),
     detached: process.platform !== 'win32',
   });
   const startedAt = Date.now();
@@ -1592,6 +1592,30 @@ export async function runCommandStatus(
     `[affected-tests] complete ${label} status=${status} elapsedMs=${Date.now() - startedAt} pid=${child.pid ?? 'unknown'} command=${commandText}`
   );
   return status;
+}
+
+export function buildVerificationEnv(source = process.env) {
+  const env = { ...source };
+  // Git exports repository-local variables to hooks. Verification tests create
+  // their own fixture repositories, so inheriting the caller's GIT_DIR (or a
+  // linked-worktree equivalent) redirects those fixtures back into this repo.
+  for (const name of [
+    'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+    'GIT_COMMON_DIR',
+    'GIT_CONFIG',
+    'GIT_CONFIG_COUNT',
+    'GIT_CONFIG_PARAMETERS',
+    'GIT_DIR',
+    'GIT_IMPLICIT_WORK_TREE',
+    'GIT_INDEX_FILE',
+    'GIT_OBJECT_DIRECTORY',
+    'GIT_PREFIX',
+    'GIT_SHALLOW_FILE',
+    'GIT_WORK_TREE',
+  ]) {
+    delete env[name];
+  }
+  return env;
 }
 
 export async function runCommand(command, args) {

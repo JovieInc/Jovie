@@ -7,6 +7,7 @@ import {
   buildAffectedTestPlan,
   buildFullSuiteCommands,
   buildSelectedTestCommands,
+  buildVerificationEnv,
   runCommandStatus,
 } from '../../run-affected-tests.mjs';
 
@@ -19,6 +20,19 @@ const script = readFileSync(
   resolve(import.meta.dirname, '../../automation-verify.sh'),
   'utf8'
 );
+
+describe('verification child environment', () => {
+  it('removes hook-local Git routing while preserving unrelated variables', () => {
+    expect(
+      buildVerificationEnv({
+        GIT_DIR: '.',
+        GIT_WORK_TREE: '/wrong/worktree',
+        GIT_INDEX_FILE: '/wrong/index',
+        PATH: '/repo/bin',
+      })
+    ).toEqual({ PATH: '/repo/bin' });
+  });
+});
 
 const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = [
   '.husky/pre-push',
