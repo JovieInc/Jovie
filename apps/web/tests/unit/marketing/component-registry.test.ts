@@ -13,6 +13,7 @@ import {
   DESIGN_SYSTEM_COMPONENT_REGISTRY,
   designSystemVariantKey,
   normalizeButtonPenRef,
+  validateDesignSystemCompatibilityConsumerSource,
   validateDesignSystemComponentRegistry,
 } from '@/data/designSystem';
 import {
@@ -561,6 +562,20 @@ describe('canonical shared source atom registry', () => {
           true
         );
       }
+      for (const consumer of entry.compatibilityConsumers) {
+        const consumerSource = fs.readFileSync(
+          path.join(repoRoot, consumer.source),
+          'utf8'
+        );
+        expect(
+          validateDesignSystemCompatibilityConsumerSource(
+            entry,
+            consumer,
+            consumerSource
+          ),
+          `${entry.id}:${consumer.exportName}`
+        ).toEqual([]);
+      }
     }
 
     expect(
@@ -579,6 +594,37 @@ describe('canonical shared source atom registry', () => {
       DESIGN_SYSTEM_COMPONENT_IDS
     );
     expect(validateDesignSystemComponentRegistry()).toEqual([]);
+  });
+
+  it('fails closed when an IconButton compatibility consumer detaches', () => {
+    const iconButton = DESIGN_SYSTEM_COMPONENT_REGISTRY.find(
+      entry => entry.id === 'atom.icon-button'
+    );
+    expect(iconButton).toBeDefined();
+    const overflow = iconButton?.compatibilityConsumers.find(
+      consumer => consumer.exportName === 'OverflowMenuTrigger'
+    );
+    expect(overflow).toBeDefined();
+    if (!iconButton || !overflow) return;
+
+    const detachedSource = `
+      import { Button } from './button';
+      export function OverflowMenuTrigger() {
+        return <Button aria-label='More tabs' />;
+      }
+    `;
+    expect(
+      validateDesignSystemCompatibilityConsumerSource(
+        iconButton,
+        overflow,
+        detachedSource
+      )
+    ).toEqual([
+      {
+        code: 'detached-canonical-consumer',
+        id: 'atom.icon-button:OverflowMenuTrigger',
+      },
+    ]);
   });
 
   it('keeps atom.logo raw until it has a source-mapped Pen origin', () => {

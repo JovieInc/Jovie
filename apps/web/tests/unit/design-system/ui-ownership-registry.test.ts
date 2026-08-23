@@ -67,6 +67,15 @@ describe('cross-surface UI ownership registry', () => {
     expect(item('molecule.profile-primary-cta').visibleControlGeometry).toEqual(
       { visiblePx: 32, hitTargetPx: 44, appliesTo: 'marketing-control' }
     );
+    for (const id of ['atom.button', 'atom.icon-button'] as const) {
+      expect(
+        item(id).platformAdapters.find(adapter => adapter.platform === 'ios')
+      ).toMatchObject({
+        role: 'adapter',
+        status: 'implemented',
+        sourcePaths: ['apps/ios/Jovie/DesignSystem/JovieTheme.swift'],
+      });
+    }
   });
 
   it('resolves authenticated recipes and ownership to one content-panel owner', () => {
