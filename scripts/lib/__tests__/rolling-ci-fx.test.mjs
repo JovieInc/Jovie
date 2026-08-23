@@ -269,6 +269,87 @@ describe('rolling CI FX webhook remediation', () => {
     ).toBe('tim');
   });
 
+  it('uses the source PR author when present, else FX on blank merge_group LIVE_AUTHOR', () => {
+    expect(
+      resolveDispatchWriter({
+        route: { route: 'fx', writer: FX_ADAPTER_NAME },
+        implementer: 'tim',
+      })
+    ).toBe('tim');
+    expect(
+      resolveDispatchWriter({
+        route: { route: 'fx', writer: FX_ADAPTER_NAME },
+        implementer: '',
+      })
+    ).toBe(FX_ADAPTER_NAME);
+    expect(
+      resolveDispatchWriter({
+        route: { route: 'configuration_incident', writer: null },
+        implementer: '   ',
+      })
+    ).toBe(FX_ADAPTER_NAME);
+    expect(
+      resolveDispatchWriter({
+        route: { route: 'configuration_incident', writer: null },
+        implementer: 'tim',
+      })
+    ).toBe('tim');
+  });
+
+  it('plans merge_group FX launch when LIVE_AUTHOR is empty', () => {
+    const input = {
+      repository: 'JovieInc/Jovie',
+      prNumber: 16418,
+      headSha: head,
+      liveHead: head,
+      sourceHead: 'b'.repeat(40),
+      headRef: 'cursor/measured-merge-group',
+      workflowRunId: 32621638955,
+      workflowRunAttempt: 1,
+      failedJobs: [{ name: 'ci-fast', steps: ['Typecheck'] }],
+      source: { ...trustedSource, producerEvent: 'merge_group' },
+      checkSuiteId: 44,
+      checks: [
+        {
+          name: 'ci-fast',
+          conclusion: 'failure',
+          headSha: head,
+          checkSuiteId: 44,
+        },
+      ],
+      writer: '',
+      priorCommentBody: '',
+      conclusion: 'failure',
+      cursorApiKey: 'cursor-key',
+      listCursorAgents: false,
+    };
+    const launched = spawnSync(process.execPath, [CLI], {
+      input: JSON.stringify(input),
+      encoding: 'utf8',
+    });
+    expect(launched.status).toBe(0);
+    expect(launched.stderr).not.toContain('writer is required');
+    const planned = JSON.parse(launched.stdout);
+    expect(planned).toMatchObject({
+      route: { route: 'fx' },
+      launch: { action: 'launch' },
+      dispatch: { mutate: true, action: 'dispatch_implementer' },
+    });
+    expect(planned.dispatch.state.claim.writer).toBe(FX_ADAPTER_NAME);
+
+    const missingAuth = spawnSync(process.execPath, [CLI], {
+      input: JSON.stringify({ ...input, cursorApiKey: '' }),
+      encoding: 'utf8',
+    });
+    expect(missingAuth.status).toBe(0);
+    expect(missingAuth.stderr).not.toContain('writer is required');
+    expect(JSON.parse(missingAuth.stdout)).toMatchObject({
+      route: { route: 'configuration_incident' },
+      launch: { action: 'configuration_incident' },
+      dispatch: { mutate: true },
+    });
+  });
+
   it('CLI plans an FX launch from a trusted failure event', () => {
     const input = {
       repository: 'JovieInc/Jovie',
