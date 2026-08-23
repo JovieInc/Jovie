@@ -414,6 +414,8 @@ describe('automation-verify affected scope', () => {
       'docs/PR_FLOW.md',
       'docs/TESTING_STRATEGY.md',
       'scripts/lib/__tests__/automation-verify.test.mjs',
+      'scripts/lib/__tests__/merge-queue-backend.test.mjs',
+      'scripts/lib/__tests__/merge-queue-guard.test.mjs',
       'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
       'scripts/lib/__tests__/product-lane-classifier.test.mjs',
       'scripts/lib/ci-harness.mjs',
@@ -428,6 +430,9 @@ describe('automation-verify affected scope', () => {
     expect(plan.selectedTests).toEqual([]);
     expect(plan.scriptVitestTests).toContain(
       'scripts/lib/__tests__/product-lane-classifier.test.mjs'
+    );
+    expect(plan.scriptVitestTests).toContain(
+      'scripts/lib/__tests__/merge-queue-backend.test.mjs'
     );
     expect(plan.nodeTests).toEqual(['scripts/typecheck-scripts.mjs']);
   });
