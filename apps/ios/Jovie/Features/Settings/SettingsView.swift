@@ -1,5 +1,9 @@
 import SwiftUI
 
+enum SettingsInteraction {
+  static let rowPressedOpacity: Double = 0.7
+}
+
 struct AppBuildInfo: Equatable {
   let version: String
   let build: String
@@ -232,7 +236,11 @@ private struct SettingsLinkRow: View {
       .padding(.horizontal, JovieSpacing.medium)
       .padding(.vertical, 12)
     }
-    .buttonStyle(JoviePressFeedbackButtonStyle(pressedOpacity: 0.7))
+    .buttonStyle(
+      JoviePressFeedbackButtonStyle(
+        pressedOpacity: SettingsInteraction.rowPressedOpacity
+      )
+    )
   }
 }
 

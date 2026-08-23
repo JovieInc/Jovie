@@ -22,6 +22,15 @@ export type UINativeSwiftSource = {
   readonly path: string;
   readonly source: string;
 };
+const REQUIRED_NATIVE_BUTTON_BINDINGS = [
+  ['atom.button', 'JoviePillButtonStyle', 'pill-action'],
+  [
+    'atom.button',
+    'JoviePressFeedbackButtonStyle',
+    'plain-content-press-feedback',
+  ],
+  ['atom.icon-button', 'JovieIconButtonStyle', 'icon-action'],
+] as const;
 const appExports = Object.fromEntries(
   'component.app-shell-frame=AppShellFrame;component.app-shell-content-panel=AppShellContentPanel;component.settings-panel=SettingsPanel;component.unified-table=UnifiedTable;component.entity-sidebar=EntitySidebarShell;component.empty-state=EmptyState;component.error-fallback=DashboardErrorFallback'
     .split(';')
@@ -93,50 +102,222 @@ type SwiftButtonStyleDeclaration = {
   readonly isFilePrivate: boolean;
   readonly body: string;
 };
+const swiftDeclarationPattern =
+  /(?:@[_A-Za-z][_A-Za-z0-9]*(?:\([^)]*\))?\s*)*(?<modifiers>(?:(?:open|public|package|internal|private|fileprivate|final|nonisolated)\s+)*)(?:struct|class|enum|extension)\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)(?:\s*<[^>{}]*>)?\s*:\s*(?<inheritance>[^{}]+)\{/g;
+const maskSwiftNonCode = (source: string): string => {
+  const masked = source.split('');
+  let cursor = 0;
+  let blockCommentDepth = 0;
+  let stringEnd: string | null = null;
+  let stringIsRaw = false;
+  const blank = (start: number, length = 1) => {
+    for (let offset = 0; offset < length; offset += 1) {
+      if (masked[start + offset] !== '\n') masked[start + offset] = ' ';
+    }
+  };
+
+  while (cursor < source.length) {
+    if (blockCommentDepth > 0) {
+      if (source.startsWith('/*', cursor)) {
+        blockCommentDepth += 1;
+        blank(cursor, 2);
+        cursor += 2;
+      } else if (source.startsWith('*/', cursor)) {
+        blockCommentDepth -= 1;
+        blank(cursor, 2);
+        cursor += 2;
+      } else {
+        blank(cursor);
+        cursor += 1;
+      }
+      continue;
+    }
+    if (stringEnd) {
+      if (source.startsWith(stringEnd, cursor)) {
+        blank(cursor, stringEnd.length);
+        cursor += stringEnd.length;
+        stringEnd = null;
+      } else if (!stringIsRaw && source[cursor] === '\\') {
+        blank(cursor, Math.min(2, source.length - cursor));
+        cursor += 2;
+      } else {
+        blank(cursor);
+        cursor += 1;
+      }
+      continue;
+    }
+    if (source.startsWith('//', cursor)) {
+      const lineEnd = source.indexOf('\n', cursor);
+      const length = (lineEnd === -1 ? source.length : lineEnd) - cursor;
+      blank(cursor, length);
+      cursor += length;
+      continue;
+    }
+    if (source.startsWith('/*', cursor)) {
+      blockCommentDepth = 1;
+      blank(cursor, 2);
+      cursor += 2;
+      continue;
+    }
+    const stringStart = source.slice(cursor).match(/^(#+)?("""|")/);
+    if (stringStart) {
+      const hashes = stringStart[1] ?? '';
+      const quote = stringStart[2];
+      stringEnd = `${quote}${hashes}`;
+      stringIsRaw = hashes.length > 0;
+      blank(cursor, stringStart[0].length);
+      cursor += stringStart[0].length;
+      continue;
+    }
+    cursor += 1;
+  }
+
+  return masked.join('');
+};
 const swiftButtonStyleDeclarations = (
   swiftSources: readonly UINativeSwiftSource[]
 ): readonly SwiftButtonStyleDeclaration[] => {
   const declarations: SwiftButtonStyleDeclaration[] = [];
-  const pattern =
-    /\b(?:(private|fileprivate)\s+)?struct\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*ButtonStyle\s*\{/g;
   for (const swiftSource of swiftSources) {
-    for (const match of swiftSource.source.matchAll(pattern)) {
+    const code = maskSwiftNonCode(swiftSource.source);
+    for (const match of code.matchAll(swiftDeclarationPattern)) {
+      const inheritance = match.groups?.inheritance ?? '';
+      if (
+        !/(?:^|,)\s*(?:SwiftUI\.)?(?:ButtonStyle|PrimitiveButtonStyle)\s*(?:,|$)/.test(
+          inheritance
+        )
+      ) {
+        continue;
+      }
       const openingBrace = (match.index ?? 0) + match[0].length - 1;
       let depth = 1;
       let cursor = openingBrace + 1;
-      while (cursor < swiftSource.source.length && depth > 0) {
-        if (swiftSource.source[cursor] === '{') depth += 1;
-        if (swiftSource.source[cursor] === '}') depth -= 1;
+      while (cursor < code.length && depth > 0) {
+        if (code[cursor] === '{') depth += 1;
+        if (code[cursor] === '}') depth -= 1;
         cursor += 1;
       }
       declarations.push({
         path: swiftSource.path,
-        name: match[2],
-        isFilePrivate: Boolean(match[1]),
-        body: swiftSource.source.slice(openingBrace + 1, cursor - 1),
+        name: match.groups?.name ?? '',
+        isFilePrivate: /\b(?:private|fileprivate)\b/.test(
+          match.groups?.modifiers ?? ''
+        ),
+        body: code.slice(openingBrace + 1, cursor - 1),
       });
     }
   }
   return declarations;
 };
-const ownsCanonicalPressRecipe = (body: string) =>
-  /\.opacity\s*\(\s*configuration\.isPressed\s*\?/.test(body) &&
-  /\.scaleEffect\s*\(\s*configuration\.isPressed\s*\?\s*JovieMotion\.pressScale\s*:\s*1\s*\)/.test(
-    body
-  ) &&
-  /\.animation\s*\(\s*JovieMotion\.subtle\s*,\s*value:\s*configuration\.isPressed\s*\)/.test(
+const swiftFunctionBody = (body: string, functionName: string): string => {
+  const escapedName = functionName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = new RegExp(
+    `\\bfunc\\s+${escapedName}\\s*\\([^)]*\\)[^{]*\\{`
+  ).exec(body);
+  if (!match) return '';
+  const openingBrace = (match.index ?? 0) + match[0].length - 1;
+  let depth = 1;
+  let cursor = openingBrace + 1;
+  while (cursor < body.length && depth > 0) {
+    if (body[cursor] === '{') depth += 1;
+    if (body[cursor] === '}') depth -= 1;
+    cursor += 1;
+  }
+  return depth === 0 ? body.slice(openingBrace + 1, cursor - 1) : '';
+};
+const ownsCanonicalPressRecipe = (declarationBody: string) => {
+  const body = swiftFunctionBody(declarationBody, 'makeBody');
+  return (
+    /\.opacity\s*\(\s*configuration\.isPressed\s*\?/.test(body) &&
+    /\.scaleEffect\s*\(\s*configuration\.isPressed\s*\?\s*JovieMotion\.pressScale\s*:\s*1\s*\)/.test(
+      body
+    ) &&
+    /\.animation\s*\(\s*JovieMotion\.subtle\s*,\s*value:\s*configuration\.isPressed\s*\)/.test(
+      body
+    )
+  );
+};
+const ownsRegisteredNativeRecipe = (
+  declaration: SwiftButtonStyleDeclaration,
+  binding: UINativeAdapterBinding
+) => {
+  if (!ownsCanonicalPressRecipe(declaration.body)) return false;
+  const body = swiftFunctionBody(declaration.body, 'makeBody');
+  if (binding.semanticRole === 'pill-action') {
+    return /\.opacity\s*\(\s*configuration\.isPressed\s*\?\s*JoviePillButtonStyle\.pressedOpacity\s*:\s*1\s*\)/.test(
+      body
+    );
+  }
+  if (binding.semanticRole === 'icon-action') {
+    return (
+      /\.opacity\s*\(\s*configuration\.isPressed\s*\?\s*JovieIconButtonStyle\.pressedOpacity\s*:\s*1\s*\)/.test(
+        body
+      ) &&
+      /width:\s*JovieIconButtonStyle\.targetSize/.test(body) &&
+      /height:\s*JovieIconButtonStyle\.targetSize/.test(body)
+    );
+  }
+  return /\.opacity\s*\(\s*configuration\.isPressed\s*\?\s*pressedOpacity\s*:\s*1\s*\)/.test(
     body
   );
+};
 const nativeBindingsFor = (entries: readonly UIOwnershipRegistryEntry[]) =>
   entries.flatMap(entry =>
     entry.platformAdapters.flatMap(adapterEntry =>
       (adapterEntry.nativeBindings ?? []).map(binding => ({ entry, binding }))
     )
   );
-const bindingUsagePattern = (binding: UINativeAdapterBinding) =>
+const bindingReferencePattern = (binding: UINativeAdapterBinding) =>
   new RegExp(
-    `\\.buttonStyle\\(\\s*${binding.swiftType.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`
+    `\\b${binding.swiftType.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`
   );
+const nativeTestAssertionPatterns = (
+  binding: UINativeAdapterBinding
+): readonly RegExp[] => {
+  if (binding.semanticRole === 'pill-action') {
+    return [/JoviePillButtonStyle\.pressedOpacity\s*==\s*0\.8\b/];
+  }
+  if (binding.semanticRole === 'icon-action') {
+    return [
+      /JovieIconButtonStyle\.pressedOpacity\s*==\s*0\.72\b/,
+      /JovieIconButtonStyle\.targetSize\s*==\s*44\b/,
+    ];
+  }
+  return [
+    /JoviePressFeedbackButtonStyle\.defaultPressedOpacity\s*==\s*0\.72\b/,
+  ];
+};
+const testIsInNativeTarget = (repoRoot: string, testPath: string): boolean => {
+  const projectPath = resolve(
+    repoRoot,
+    'apps/ios/Jovie.xcodeproj/project.pbxproj'
+  );
+  if (!existsSync(projectPath)) return false;
+  const fileName = testPath.split('/').at(-1);
+  if (!fileName) return false;
+  const escapedFileName = fileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const project = readFileSync(projectPath, 'utf8');
+  const testTarget = project.match(
+    /[A-F0-9]+ \/\* JovieTests \*\/ = \{\s*isa = PBXNativeTarget;([\s\S]*?)\n\t\t\};/
+  );
+  const buildFile = project.match(
+    new RegExp(
+      `([A-F0-9]+) /\\* ${escapedFileName} in Sources \\*/ = \\{isa = PBXBuildFile;`
+    )
+  );
+  const testSourcePhaseId = testTarget?.[1].match(
+    /buildPhases = \([\s\S]*?([A-F0-9]+) \/\* Sources \*\//
+  )?.[1];
+  if (!testSourcePhaseId || !buildFile?.[1]) return false;
+  const sourcePhase = project.match(
+    new RegExp(
+      `${testSourcePhaseId} /\\* Sources \\*/ = \\{[\\s\\S]*?isa = PBXSourcesBuildPhase;[\\s\\S]*?files = \\(([\\s\\S]*?)\\);`
+    )
+  );
+  return Boolean(
+    sourcePhase?.[1].includes(`${buildFile[1]} /* ${fileName} in Sources */`)
+  );
+};
 
 function validateNativeButtonOwnership(
   entries: readonly UIOwnershipRegistryEntry[],
@@ -145,12 +326,41 @@ function validateNativeButtonOwnership(
   repoRoot: string | null
 ) {
   const bindings = nativeBindingsFor(entries);
+  for (const [
+    entryId,
+    swiftType,
+    semanticRole,
+  ] of REQUIRED_NATIVE_BUTTON_BINDINGS) {
+    if (
+      !bindings.some(
+        ({ entry, binding }) =>
+          entry.id === entryId &&
+          binding.swiftType === swiftType &&
+          binding.semanticRole === semanticRole
+      )
+    ) {
+      bad(issues, 'missing-native-binding', `${entryId}:${swiftType}`);
+    }
+  }
   if (!bindings.length) return;
   if (!swiftSources.length) {
     bad(issues, 'native-source-unavailable', 'ios');
     return;
   }
   const declarations = swiftButtonStyleDeclarations(swiftSources);
+  const declarationsByName = new Map<string, SwiftButtonStyleDeclaration[]>();
+  for (const declaration of declarations) {
+    const matches = declarationsByName.get(declaration.name) ?? [];
+    matches.push(declaration);
+    declarationsByName.set(declaration.name, matches);
+  }
+  const sourceByPath = new Map(
+    swiftSources.map(source => [
+      source.path,
+      { ...source, code: maskSwiftNonCode(source.source) },
+    ])
+  );
+  const testSourceByPath = new Map<string, string>();
   const registeredTypes = new Set<string>();
   const registeredRoles = new Map<string, string>();
 
@@ -168,33 +378,62 @@ function validateNativeButtonOwnership(
       );
     }
     registeredRoles.set(binding.semanticRole, binding.swiftType);
-    const owners = declarations.filter(
-      declaration => declaration.name === binding.swiftType
-    );
+    const owners = declarationsByName.get(binding.swiftType) ?? [];
     if (
       owners.length !== 1 ||
       owners.some(owner => owner.path !== binding.sourcePath)
     ) {
       bad(issues, 'missing-native-owner', `${entry.id}:${binding.swiftType}`);
     }
+    if (
+      owners.length === 1 &&
+      owners[0].path === binding.sourcePath &&
+      !ownsRegisteredNativeRecipe(owners[0], binding)
+    ) {
+      bad(
+        issues,
+        'invalid-native-owner-recipe',
+        `${entry.id}:${binding.swiftType}`
+      );
+    }
     if (!binding.testEvidence.length) {
       bad(issues, 'missing-native-test', `${entry.id}:${binding.swiftType}`);
     }
     for (const testPath of binding.testEvidence) {
-      if (!repoRoot || !existsSync(resolve(repoRoot, testPath))) {
+      if (
+        !testPath.startsWith('apps/ios/JovieTests/') ||
+        !testPath.endsWith('.swift') ||
+        !repoRoot ||
+        !existsSync(resolve(repoRoot, testPath)) ||
+        !testIsInNativeTarget(repoRoot, testPath)
+      ) {
         bad(issues, 'missing-native-test', `${entry.id}:${binding.swiftType}`);
         continue;
       }
-      const testSource = readFileSync(resolve(repoRoot, testPath), 'utf8');
-      if (!testSource.includes(binding.swiftType)) {
+      let testSource = testSourceByPath.get(testPath);
+      if (!testSource) {
+        testSource = maskSwiftNonCode(
+          readFileSync(resolve(repoRoot, testPath), 'utf8')
+        );
+        testSourceByPath.set(testPath, testSource);
+      }
+      const assertionPatterns = nativeTestAssertionPatterns(binding);
+      if (
+        !assertionPatterns.every(pattern =>
+          new RegExp(`#expect\\s*\\(\\s*${pattern.source}\\s*\\)`).test(
+            testSource
+          )
+        )
+      ) {
         bad(issues, 'missing-native-test', `${entry.id}:${binding.swiftType}`);
       }
     }
-    const usagePattern = bindingUsagePattern(binding);
+    const referencePattern = bindingReferencePattern(binding);
     const registeredConsumers = new Set(binding.consumerPaths);
-    for (const swiftSource of swiftSources) {
+    for (const swiftSource of sourceByPath.values()) {
       if (
-        usagePattern.test(swiftSource.source) &&
+        swiftSource.path !== binding.sourcePath &&
+        referencePattern.test(swiftSource.code) &&
         !registeredConsumers.has(swiftSource.path)
       ) {
         bad(
@@ -205,10 +444,8 @@ function validateNativeButtonOwnership(
       }
     }
     for (const consumerPath of binding.consumerPaths) {
-      const consumer = swiftSources.find(
-        source => source.path === consumerPath
-      );
-      if (!consumer || !usagePattern.test(consumer.source)) {
+      const consumer = sourceByPath.get(consumerPath);
+      if (!consumer || !referencePattern.test(consumer.code)) {
         bad(
           issues,
           'missing-native-consumer',
