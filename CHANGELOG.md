@@ -75,6 +75,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- **Jovie Local no longer says you’re offline while the local server is compiling (JOV-5339):** first compile can take ~15 seconds with no bytes yet. Local waits, talks to localhost:3100, and reloads on its own when the host is warm — no Retry click. It only says “check your connection” when the machine is actually offline.
 - **iPhone and Mac sign-in return to the app instead of the website:** after browser login, iOS and macOS bounce through an allowlisted return page and reopen Jovie. Signed-in native sessions no longer dump into the web dashboard.
 - **iPhone sign-in can open the browser when SwiftUI has no key window (JOV-5198):** Continue in Browser waits for a foreground-active window, presents from a visible or scene-backed window when needed, and a failed session start is no longer reported as `invalidAuthURL`.
 - [internal] **Ovie eval review persists a durable row and records `judge:absent` as a verdict:** enqueue reports success only after `ovie_operating_kv` write, missing rubric judges are not scored as pass, word count is a `word-count:N` signal unless a verbosity budget is set, and Slack feedback redacts emails in the message body.
