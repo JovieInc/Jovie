@@ -5,6 +5,7 @@ struct InboxSurfaceView: View {
   let response: MobileActionLoopInboxResponse?
   let isLoading: Bool
   let isOffline: Bool
+  var workspaceMode: MobileWorkspaceMode = .jovie
   let onRetry: () async -> Void
   let onAskJovie: (String) -> Void
 
@@ -47,6 +48,9 @@ struct InboxSurfaceView: View {
       return "Offline — showing cached actions when available."
     }
     if let count = response?.pendingCount {
+      if workspaceMode == .ovie {
+        return count == 1 ? "1 pending approval" : "\(count) pending approvals"
+      }
       return count == 1 ? "1 pending action" : "\(count) pending actions"
     }
     return " "
@@ -80,11 +84,13 @@ struct InboxSurfaceView: View {
         Button {
           onAskJovie(response.chatPrompt)
         } label: {
-          Text("Ask Jovie")
+          Text(workspaceMode.askChatLabel)
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(JoviePillButtonStyle(filled: false))
-        .accessibilityIdentifier("inbox-ask-jovie")
+        .accessibilityIdentifier(
+          workspaceMode == .ovie ? "inbox-ask-summer" : "inbox-ask-jovie"
+        )
       }
     } else if isLoading {
       skeleton
@@ -128,7 +134,7 @@ struct InboxSurfaceView: View {
       Button {
         onAskJovie(response.chatPrompt)
       } label: {
-        Text("Ask Jovie")
+        Text(workspaceMode.askChatLabel)
           .frame(maxWidth: .infinity)
       }
       .buttonStyle(JoviePillButtonStyle(filled: true))
@@ -146,7 +152,7 @@ struct InboxSurfaceView: View {
       Button {
         onAskJovie("Help me triage my inbox.")
       } label: {
-        Text("Ask Jovie")
+        Text(workspaceMode.askChatLabel)
           .frame(maxWidth: .infinity)
       }
       .buttonStyle(JoviePillButtonStyle(filled: false))
@@ -204,6 +210,9 @@ private struct InboxActionCard: View {
           .font(JovieFont.body(size: 12, weight: .medium))
           .foregroundStyle(JovieColor.textSecondary)
       }
+      if let stillURL = item.stillImageURL {
+        InboxStillImage(url: stillURL)
+      }
       Text(item.title)
         .font(JovieFont.body(size: 16, weight: .semibold))
         .foregroundStyle(JovieColor.textPrimary)
@@ -249,6 +258,36 @@ private struct InboxActionCard: View {
         } else if horizontal < -80 {
           onTriage(.down)
         }
+      }
+  }
+}
+
+private struct InboxStillImage: View {
+  let url: URL
+  @State private var image: UIImage?
+
+  init(url: URL) {
+    self.url = url
+    _image = State(initialValue: AvatarImageCache.image(for: url))
+  }
+
+  var body: some View {
+    Color.clear
+      .aspectRatio(16 / 9, contentMode: .fit)
+      .overlay {
+        if let image {
+          Image(uiImage: image)
+            .resizable()
+            .scaledToFill()
+        } else {
+          JovieColor.surface0
+        }
+      }
+      .clipped()
+      .clipShape(RoundedRectangle(cornerRadius: JovieRadius.small, style: .continuous))
+      .task(id: url.absoluteString) {
+        guard image == nil else { return }
+        image = await AvatarImageLoader.loadStill(url)
       }
   }
 }

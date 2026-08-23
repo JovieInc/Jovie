@@ -10,35 +10,55 @@ actor ChatCache {
     self.defaults = defaults
   }
 
-  func load(for userID: String) -> CachedChatSnapshot? {
-    if let snapshot = memory[userID] {
+  func load(
+    for userID: String,
+    workspace: MobileWorkspaceMode = .jovie
+  ) -> CachedChatSnapshot? {
+    let key = cacheKey(for: userID, workspace: workspace)
+    if let snapshot = memory[key] {
       return snapshot
     }
 
     guard
-      let data = defaults.data(forKey: cacheKey(for: userID)),
+      let data = defaults.data(forKey: key),
       let snapshot = try? decoder.decode(CachedChatSnapshot.self, from: data)
     else {
       return nil
     }
 
-    memory[userID] = snapshot
+    memory[key] = snapshot
     return snapshot
   }
 
-  func store(_ snapshot: CachedChatSnapshot, for userID: String) {
-    memory[userID] = snapshot
+  func store(
+    _ snapshot: CachedChatSnapshot,
+    for userID: String,
+    workspace: MobileWorkspaceMode = .jovie
+  ) {
+    let key = cacheKey(for: userID, workspace: workspace)
+    memory[key] = snapshot
     if let data = try? encoder.encode(snapshot) {
-      defaults.set(data, forKey: cacheKey(for: userID))
+      defaults.set(data, forKey: key)
     }
   }
 
   func remove(for userID: String) {
-    memory[userID] = nil
-    defaults.removeObject(forKey: cacheKey(for: userID))
+    remove(for: userID, workspace: .jovie)
+    remove(for: userID, workspace: .ovie)
   }
 
-  private func cacheKey(for userID: String) -> String {
-    "ie.jov.Jovie.mobileChat.\(userID)"
+  func remove(for userID: String, workspace: MobileWorkspaceMode) {
+    let key = cacheKey(for: userID, workspace: workspace)
+    memory[key] = nil
+    defaults.removeObject(forKey: key)
+  }
+
+  private func cacheKey(for userID: String, workspace: MobileWorkspaceMode) -> String {
+    switch workspace {
+    case .jovie:
+      return "ie.jov.Jovie.mobileChat.\(userID)"
+    case .ovie:
+      return "ie.jov.Jovie.mobileChat.\(userID).ov"
+    }
   }
 }

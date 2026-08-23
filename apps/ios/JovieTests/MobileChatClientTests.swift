@@ -475,4 +475,71 @@ struct MobileChatClientTests {
 
     #expect(loaded == snapshot)
   }
+
+  @Test func ovieChatCacheDoesNotCollideWithArtistCache() async {
+    let cache = ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-cache-ws")!)
+    await cache.remove(for: "user_ws")
+
+    let artist = CachedChatSnapshot(
+      conversations: [
+        MobileConversationSummary(
+          id: "conv_artist",
+          title: "Launch plan",
+          createdAt: "2026-06-01T00:00:00.000Z",
+          updatedAt: "2026-06-02T00:00:00.000Z",
+          latestMessageRole: "assistant",
+          latestTurnStatus: "completed"
+        ),
+      ],
+      messagesByConversationID: [:],
+      cachedAt: Date(timeIntervalSince1970: 1_700_000_000)
+    )
+    let ovie = CachedChatSnapshot(
+      conversations: [
+        MobileConversationSummary(
+          id: "conv_ov",
+          title: "OV | Summer",
+          createdAt: "2026-06-01T00:00:00.000Z",
+          updatedAt: "2026-06-02T00:00:00.000Z",
+          latestMessageRole: "assistant",
+          latestTurnStatus: "completed"
+        ),
+      ],
+      messagesByConversationID: [:],
+      cachedAt: Date(timeIntervalSince1970: 1_700_000_000)
+    )
+
+    await cache.store(artist, for: "user_ws", workspace: .jovie)
+    await cache.store(ovie, for: "user_ws", workspace: .ovie)
+
+    #expect(await cache.load(for: "user_ws", workspace: .jovie) == artist)
+    #expect(await cache.load(for: "user_ws", workspace: .ovie) == ovie)
+  }
+
+  @Test func artistTurnRequestOmitsChatMode() throws {
+    let request = MobileChatTurnRequest(
+      conversationId: nil,
+      clientTurnId: "client_turn_1",
+      clientMessageId: "client_message_1",
+      text: "What should I do next?",
+      source: "typed"
+    )
+    let data = try JSONEncoder().encode(request)
+    let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+    #expect(json?["chatMode"] == nil)
+  }
+
+  @Test func ovieTurnRequestEncodesChatMode() throws {
+    let request = MobileChatTurnRequest(
+      conversationId: nil,
+      clientTurnId: "client_turn_1",
+      clientMessageId: "client_message_1",
+      text: "Need a taste decision",
+      source: "typed",
+      chatMode: "ov"
+    )
+    let data = try JSONEncoder().encode(request)
+    let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+    #expect(json?["chatMode"] as? String == "ov")
+  }
 }

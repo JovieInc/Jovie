@@ -64,7 +64,7 @@ struct MobileChatView: View {
       }
       .safeAreaInset(edge: .bottom, spacing: 0) {
         VStack(spacing: JovieSpacing.medium) {
-          if repository.timeline.isEmpty {
+          if repository.timeline.isEmpty, repository.workspace == .jovie {
             FeatureIntroHost(
               catalog: .current,
               changelogURL: FeatureIntroCatalog.changelogURL(from: webBaseURL),
@@ -205,6 +205,7 @@ struct MobileChatView: View {
         isComposerFocused: $isComposerFocused,
         isSending: repository.isSending,
         isOffline: repository.isOffline,
+        workspaceMode: repository.workspace,
         onSend: {
           let text = draft
           draft = ""
@@ -253,7 +254,7 @@ struct MobileChatView: View {
           JovieLogoMark(size: 34)
 
           VStack(spacing: JovieSpacing.small) {
-            Text("Ask Jovie")
+            Text(repository.workspace.emptyChatTitle)
               .font(JovieFont.display(size: 28))
               .foregroundStyle(JovieColor.textPrimary)
               .multilineTextAlignment(.center)
@@ -261,7 +262,7 @@ struct MobileChatView: View {
             Text(
               repository.isOffline
                 ? "Offline. Drafts stay on this device and cached history remains available."
-                : "Ask Jovie about your profile, releases, and next moves."
+                : repository.workspace.emptyChatSubtitle
             )
             .font(JovieFont.body(size: 15))
             .foregroundStyle(JovieColor.textTertiary)

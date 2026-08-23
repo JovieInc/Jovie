@@ -17,6 +17,7 @@ private struct AppContentView: View {
   @State private var inboxResponse: MobileActionLoopInboxResponse?
   @State private var isLoadingCalendar = false
   @State private var isLoadingInbox = false
+  @State private var workspaceMode: MobileWorkspaceMode = .jovie
   @State private var showWhatsNew = false
 #if DEBUG
   @State private var didSendLiveChatProbe = false
@@ -120,7 +121,10 @@ private struct AppContentView: View {
             chatRepository?.startNewConversation()
           },
           onAutoSendMessage: handleAutoSendMessage,
-          onLogout: onLogout
+          onLogout: onLogout,
+          showsWorkspaceSwitch: showsWorkspaceSwitch,
+          workspaceMode: workspaceMode,
+          onSelectWorkspace: selectWorkspace
         ) {
           NeedsOnboardingView(
             initialDisplayName: appState.loadedDashboardResponse?.displayName ?? "",
@@ -201,7 +205,10 @@ private struct AppContentView: View {
             chatRepository?.startNewConversation()
           },
           onAutoSendMessage: handleAutoSendMessage,
-          onLogout: onLogout
+          onLogout: onLogout,
+          showsWorkspaceSwitch: showsWorkspaceSwitch,
+          workspaceMode: workspaceMode,
+          onSelectWorkspace: selectWorkspace
         ) {
           DashboardView(
             state: appState.dashboardState,
@@ -239,9 +246,10 @@ private struct AppContentView: View {
           )
         } inboxContent: { askJovie in
           InboxSurfaceView(
-            response: inboxResponse ?? (usesPreviewActionLoops ? .preview : nil),
+            response: inboxResponse ?? (usesPreviewActionLoops && workspaceMode == .jovie ? .preview : nil),
             isLoading: isLoadingInbox && inboxResponse == nil,
             isOffline: appState.isOffline,
+            workspaceMode: workspaceMode,
             onRetry: { await reloadActionLoops(for: appState.activeUserID) },
             onAskJovie: askJovie
           )
@@ -272,7 +280,7 @@ private struct AppContentView: View {
         items: WhatsNewCatalog.items(for: currentAppVersion)
       )
     }
-    .task(id: "\(appState.route)-\(appState.launchMode)-\(appState.activeUserID ?? "")") {
+    .task(id: "\(appState.route)-\(appState.launchMode)-\(appState.activeUserID ?? "")-\(workspaceMode.rawValue)") {
       guard appState.route == .ready else { return }
       // Live What’s New is FeatureIntro in chat. The versioned sheet is the
       // UITest fixture so chat-first cases can name what to tap.
@@ -282,7 +290,13 @@ private struct AppContentView: View {
       await reloadAudienceHighlights(for: appState.activeUserID)
       await reloadActionLoops(for: appState.activeUserID)
     }
-    .task(id: appState.activeUserID) {
+    .task(id: "\(appState.activeUserID ?? "")-\(workspaceMode.rawValue)-\(showsWorkspaceSwitch)") {
+      let resolved = MobileWorkspaceStore.load(isAdmin: showsWorkspaceSwitch)
+      if workspaceMode != resolved {
+        workspaceMode = resolved
+        inboxResponse = nil
+      }
+
       guard let activeUserID = appState.activeUserID else {
         chatRepository = nil
         if Self.previewAudienceHighlightsState(for: appState.launchMode) == .idle {
@@ -299,16 +313,10 @@ private struct AppContentView: View {
         return
       }
 
-      if chatRepository == nil, appState.launchMode.needsChatRepository {
-        let repository = ChatRepository(
-          client: MobileChatClient(
-            baseURL: appState.configuration.apiBaseURL,
-            tokenProvider: NativeSessionTokenProvider()
-          ),
-          cache: ChatCache(),
-          userID: activeUserID,
-          webBaseURL: appState.configuration.webBaseURL
-        )
+      if appState.launchMode.needsChatRepository,
+         chatRepository == nil || chatRepository?.workspace != workspaceMode
+      {
+        let repository = makeChatRepository(userID: activeUserID)
         chatRepository = repository
 
         if let fixtureTimeline = appState.launchMode.chatEntityFixture {
@@ -353,6 +361,31 @@ private struct AppContentView: View {
 
   private func handleAutoSendMessage(_ text: String) {
     Task { await chatRepository?.send(text: text) }
+  }
+
+  private var showsWorkspaceSwitch: Bool {
+    appState.loadedDashboardResponse?.showsAdminWorkspaceSwitch == true
+  }
+
+  private func selectWorkspace(_ mode: MobileWorkspaceMode) {
+    guard showsWorkspaceSwitch else { return }
+    MobileWorkspaceStore.save(mode, isAdmin: true)
+    workspaceMode = mode
+    inboxResponse = nil
+  }
+
+  private func makeChatRepository(userID: String) -> ChatRepository {
+    ChatRepository(
+      client: MobileChatClient(
+        baseURL: appState.configuration.apiBaseURL,
+        tokenProvider: NativeSessionTokenProvider(),
+        workspace: workspaceMode
+      ),
+      cache: ChatCache(),
+      userID: userID,
+      webBaseURL: appState.configuration.webBaseURL,
+      workspace: workspaceMode
+    )
   }
 
   private var usesPreviewActionLoops: Bool {
@@ -411,7 +444,7 @@ private struct AppContentView: View {
       calendarResponse = await cache.loadCalendar(for: userID)
     }
     if inboxResponse == nil {
-      inboxResponse = await cache.loadInbox(for: userID)
+      inboxResponse = await cache.loadInbox(for: userID, workspace: workspaceMode)
     }
 
     let client = APIClient(
@@ -423,7 +456,7 @@ private struct AppContentView: View {
     isLoadingInbox = inboxResponse == nil
 
     async let fetchedCalendar = client.fetchActionLoopCalendar()
-    async let fetchedInbox = client.fetchActionLoopInbox()
+    async let fetchedInbox = client.fetchActionLoopInbox(workspace: workspaceMode)
 
     if let calendar = try? await fetchedCalendar {
       calendarResponse = calendar
@@ -433,7 +466,7 @@ private struct AppContentView: View {
 
     if let inbox = try? await fetchedInbox {
       inboxResponse = inbox
-      await cache.storeInbox(inbox, for: userID)
+      await cache.storeInbox(inbox, for: userID, workspace: workspaceMode)
     }
     isLoadingInbox = false
   }
@@ -590,27 +623,36 @@ actor ActionLoopCache {
     self.defaults = defaults
   }
 
-  func loadInbox(for userID: String) -> MobileActionLoopInboxResponse? {
-    if let snapshot = inboxMemory[userID] {
+  func loadInbox(
+    for userID: String,
+    workspace: MobileWorkspaceMode = .jovie
+  ) -> MobileActionLoopInboxResponse? {
+    let key = inboxCacheKey(for: userID, workspace: workspace)
+    if let snapshot = inboxMemory[key] {
       return snapshot.response
     }
 
     guard
-      let data = defaults.data(forKey: inboxCacheKey(for: userID)),
+      let data = defaults.data(forKey: key),
       let snapshot = try? decoder.decode(CachedActionLoopInboxSnapshot.self, from: data)
     else {
       return nil
     }
 
-    inboxMemory[userID] = snapshot
+    inboxMemory[key] = snapshot
     return snapshot.response
   }
 
-  func storeInbox(_ response: MobileActionLoopInboxResponse, for userID: String) {
+  func storeInbox(
+    _ response: MobileActionLoopInboxResponse,
+    for userID: String,
+    workspace: MobileWorkspaceMode = .jovie
+  ) {
+    let key = inboxCacheKey(for: userID, workspace: workspace)
     let snapshot = CachedActionLoopInboxSnapshot(response: response, cachedAt: Date())
-    inboxMemory[userID] = snapshot
+    inboxMemory[key] = snapshot
     if let data = try? encoder.encode(snapshot) {
-      defaults.set(data, forKey: inboxCacheKey(for: userID))
+      defaults.set(data, forKey: key)
     }
   }
 
@@ -639,14 +681,28 @@ actor ActionLoopCache {
   }
 
   func remove(for userID: String) {
-    inboxMemory[userID] = nil
     calendarMemory[userID] = nil
-    defaults.removeObject(forKey: inboxCacheKey(for: userID))
     defaults.removeObject(forKey: calendarCacheKey(for: userID))
+    removeInbox(for: userID, workspace: .jovie)
+    removeInbox(for: userID, workspace: .ovie)
   }
 
-  private func inboxCacheKey(for userID: String) -> String {
-    "ie.jov.Jovie.actionLoopInbox.\(userID)"
+  private func removeInbox(for userID: String, workspace: MobileWorkspaceMode) {
+    let key = inboxCacheKey(for: userID, workspace: workspace)
+    inboxMemory[key] = nil
+    defaults.removeObject(forKey: key)
+  }
+
+  private func inboxCacheKey(
+    for userID: String,
+    workspace: MobileWorkspaceMode
+  ) -> String {
+    switch workspace {
+    case .jovie:
+      return "ie.jov.Jovie.actionLoopInbox.\(userID)"
+    case .ovie:
+      return "ie.jov.Jovie.actionLoopInbox.\(userID).ov"
+    }
   }
 
   private func calendarCacheKey(for userID: String) -> String {

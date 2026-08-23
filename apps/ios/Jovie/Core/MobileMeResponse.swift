@@ -16,6 +16,9 @@ struct MobileMeResponse: Codable, Equatable, Sendable {
   let appleWalletProfilePassAvailable: Bool
   let chatEnabled: Bool
   let continueOnWebURL: String
+  /// Absent on cached `/me` payloads from older app versions. Never treat
+  /// missing as admin — the Settings switch must stay hidden.
+  let isAdmin: Bool?
 
   enum CodingKeys: String, CodingKey {
     case state
@@ -27,6 +30,35 @@ struct MobileMeResponse: Codable, Equatable, Sendable {
     case appleWalletProfilePassAvailable
     case chatEnabled
     case continueOnWebURL = "continueOnWebUrl"
+    case isAdmin
+  }
+
+  init(
+    state: State,
+    displayName: String?,
+    username: String?,
+    publicProfileURL: String?,
+    qrPayload: String?,
+    avatarURL: String?,
+    appleWalletProfilePassAvailable: Bool,
+    chatEnabled: Bool,
+    continueOnWebURL: String,
+    isAdmin: Bool? = false
+  ) {
+    self.state = state
+    self.displayName = displayName
+    self.username = username
+    self.publicProfileURL = publicProfileURL
+    self.qrPayload = qrPayload
+    self.avatarURL = avatarURL
+    self.appleWalletProfilePassAvailable = appleWalletProfilePassAvailable
+    self.chatEnabled = chatEnabled
+    self.continueOnWebURL = continueOnWebURL
+    self.isAdmin = isAdmin
+  }
+
+  var showsAdminWorkspaceSwitch: Bool {
+    isAdmin == true
   }
 
   static let previewReady = MobileMeResponse(
@@ -76,4 +108,76 @@ struct MobileMeResponse: Codable, Equatable, Sendable {
     chatEnabled: false,
     continueOnWebURL: "https://jov.ie/app"
   )
+}
+
+/// Mobile workspace ids match web `APP_SHELL_WORKSPACES` (`customer` / `ov`).
+enum MobileWorkspaceMode: String, Codable, Equatable, Sendable, CaseIterable {
+  case jovie = "customer"
+  case ovie = "ov"
+
+  var displayName: String {
+    switch self {
+    case .jovie: return "Jovie"
+    case .ovie: return "Ovie"
+    }
+  }
+
+  var toggled: MobileWorkspaceMode {
+    self == .jovie ? .ovie : .jovie
+  }
+
+  var chatMode: String? {
+    self == .ovie ? "ov" : nil
+  }
+
+  var askChatLabel: String {
+    self == .ovie ? "Ask Summer" : "Ask Jovie"
+  }
+
+  var composerPlaceholder: String {
+    self == .ovie ? "Ask Summer" : "Ask Jovie"
+  }
+
+  var composerOfflinePlaceholder: String {
+    self == .ovie ? "Ask Summer (offline)" : "Ask Jovie (offline)"
+  }
+
+  var emptyChatTitle: String {
+    askChatLabel
+  }
+
+  var emptyChatSubtitle: String {
+    switch self {
+    case .jovie:
+      return "Ask Jovie about your profile, releases, and next moves."
+    case .ovie:
+      return "Taste cards, stills, and ops. Summer is the speaker."
+    }
+  }
+}
+
+enum MobileWorkspaceStore {
+  static let defaultsKey = "ie.jov.Jovie.workspaceMode"
+
+  static func load(
+    isAdmin: Bool,
+    defaults: UserDefaults = .standard
+  ) -> MobileWorkspaceMode {
+    guard isAdmin else { return .jovie }
+    guard
+      let raw = defaults.string(forKey: defaultsKey),
+      let mode = MobileWorkspaceMode(rawValue: raw)
+    else {
+      return .jovie
+    }
+    return mode
+  }
+
+  static func save(
+    _ mode: MobileWorkspaceMode,
+    isAdmin: Bool,
+    defaults: UserDefaults = .standard
+  ) {
+    defaults.set((isAdmin ? mode : .jovie).rawValue, forKey: defaultsKey)
+  }
 }

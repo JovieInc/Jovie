@@ -47,6 +47,28 @@ enum AvatarImageLoader {
     AvatarImageCache.store(thumbnail, for: url)
     return thumbnail
   }
+
+  static func loadStill(_ url: URL) async -> UIImage? {
+    guard let (data, response) = try? await URLSession.shared.data(from: url) else {
+      return nil
+    }
+
+    if let http = response as? HTTPURLResponse,
+       !(200 ... 299).contains(http.statusCode)
+    {
+      return nil
+    }
+
+    guard let image = UIImage(data: data) else {
+      return nil
+    }
+
+    let thumbnail = await image.byPreparingThumbnail(
+      ofSize: CGSize(width: 780, height: 439)
+    ) ?? image
+    AvatarImageCache.store(thumbnail, for: url)
+    return thumbnail
+  }
 }
 
 /// Cache-first remote image view shared by dashboard avatars and chat entity

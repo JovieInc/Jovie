@@ -58,7 +58,7 @@ struct ChatComposerBar: View {
     let slashItems = slashQuery.map {
       ComposerSlashPalette.items(matching: $0, skills: ComposerSlashPalette.defaultSkills)
     } ?? []
-    let isSlashPaletteVisible = slashQuery != nil && !slashItems.isEmpty
+    let isSlashPaletteVisible = isPlusEnabled && slashQuery != nil && !slashItems.isEmpty
 
     // Web hero pill: full capsule, plus left, mic/send inside the right.
     HStack(spacing: JovieSpacing.small) {

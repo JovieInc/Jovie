@@ -566,6 +566,36 @@ struct ChatRepositoryTests {
     #expect(repository.isOffline == false)
   }
 
+  @Test func ovieWorkspaceSendIncludesChatMode() async {
+    let client = RecordingTurnChatClient()
+    let repository = ChatRepository(
+      client: client,
+      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-ov-mode")!),
+      userID: "user_repo_ov",
+      webBaseURL: URL(string: "https://preview.example")!,
+      workspace: .ovie
+    )
+
+    await repository.send(text: "Need a taste decision")
+
+    #expect(client.lastRequest?.chatMode == "ov")
+  }
+
+  @Test func jovieWorkspaceSendOmitsChatMode() async {
+    let client = RecordingTurnChatClient()
+    let repository = ChatRepository(
+      client: client,
+      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-jovie-mode")!),
+      userID: "user_repo_jovie",
+      webBaseURL: URL(string: "https://preview.example")!,
+      workspace: .jovie
+    )
+
+    await repository.send(text: "Help me launch")
+
+    #expect(client.lastRequest?.chatMode == nil)
+  }
+
   @Test func sendOnTransportFailureMarksOfflineAndDoesNotExpireSession() async {
     let client = ScriptedChatClient(
       sendTurnResult: .failure(MobileChatClientError.transportFailed(code: -1009)),
@@ -598,6 +628,26 @@ private final class RecordingConversationActivityDonator: ConversationActivityDo
 
   func donate(conversationID: String, title: String) {
     donations.append(Donation(conversationID: conversationID, title: title))
+  }
+}
+
+private final class RecordingTurnChatClient: MobileChatClientProtocol, @unchecked Sendable {
+  private(set) var lastRequest: MobileChatTurnRequest?
+
+  func listConversations(limit: Int) async throws -> [MobileConversationSummary] {
+    []
+  }
+
+  func fetchConversation(id: String, limit: Int) async throws -> MobileConversationDetailResponse {
+    throw MobileChatClientError.requestFailed(statusCode: 404)
+  }
+
+  func sendTurn(
+    _ request: MobileChatTurnRequest,
+    onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?
+  ) async throws -> [MobileChatStreamEvent] {
+    lastRequest = request
+    return []
   }
 }
 
