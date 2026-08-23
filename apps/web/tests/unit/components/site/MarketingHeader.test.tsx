@@ -122,6 +122,11 @@ describe('MarketingHeader', () => {
     expect(screen.getByTestId('header-nav')).not.toHaveClass(
       'artist-profiles-home-header'
     );
+    expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute(
+      'href',
+      '/signin'
+    );
+    expect(screen.queryByRole('link', { name: 'Get started' })).toBeNull();
   });
 
   it('applies and cleans up homepage-style scroll treatment', () => {

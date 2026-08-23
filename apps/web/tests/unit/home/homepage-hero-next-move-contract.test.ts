@@ -8,15 +8,18 @@ const webRoot = path.resolve(__dirname, '../../..');
 describe('homepage hero next-move contract (JOV-4475)', () => {
   it('uses the exact approved headline and supporting line', () => {
     expect(HOMEPAGE_LAUNCH_COPY.hero.headline).toBe(
-      'Jovie helps you move your music forward.'
+      'Drop more music.\nCrush every release.'
     );
     expect(HOMEPAGE_LAUNCH_COPY.hero.subhead).toBe(
-      'It uses your catalog, audience, and artist presence to surface the one action most likely to pay off.'
+      'One system to make every release count, every time.'
     );
   });
 
   it('keeps Get started as the sole primary conversion path', () => {
     expect(HOMEPAGE_LAUNCH_COPY.hero.primaryCta.label).toBe('Get started');
+    expect(HOMEPAGE_LAUNCH_COPY.hero.primaryCta.href).toBe(
+      'https://jov.ie/waitlist'
+    );
     expect(HOMEPAGE_LAUNCH_COPY.hero.secondaryCta.label).toBe(
       'See a live profile'
     );
@@ -30,15 +33,20 @@ describe('homepage hero next-move contract (JOV-4475)', () => {
       path.join(webRoot, 'components/marketing/MarketingPosterHero.tsx'),
       'utf8'
     );
+    const css = readFileSync(path.join(webRoot, 'app/(home)/home.css'), 'utf8');
 
     expect(heroSource).toContain("data-testid='homepage-primary-cta'");
     expect(heroSource).toContain("data-testid='homepage-secondary-cta'");
     expect(heroSource).toContain("variant='primary'");
     expect(heroSource).toContain("variant='ghost'");
+    expect(heroSource.match(/size='marketing'/gu)).toHaveLength(2);
     expect(heroSource).not.toMatch(
       /secondaryCta[\s\S]*?variant=['"]tertiary['"]/
     );
     expect(heroSource).not.toContain('active:scale');
+    expect(css).toMatch(
+      /\.homepage-poster-hero__action-button\s*\{[\s\S]*?border-radius: var\(--radius-pill\);[\s\S]*?var\(--font-satoshi\)[\s\S]*?font-size: 14px;[\s\S]*?font-weight: 510;[\s\S]*?\}/
+    );
   });
 
   it('uses a 100ms opacity-only ready reveal with reduced-motion parity', () => {
@@ -86,13 +94,51 @@ describe('homepage hero next-move contract (JOV-4475)', () => {
     );
   });
 
-  it('mounts Artist Profiles cards in iPhone device frames', () => {
+  it('mounts registry Artist Profile previews directly in phone frames', () => {
     const profilesSource = readFileSync(
       path.join(webRoot, 'components/homepage/MeetJovieCarousel.tsx'),
       'utf8'
     );
 
     expect(profilesSource).toContain('ArtistProfilePhoneFrame');
-    expect(profilesSource).toContain('homepage-artist-outcome__device');
+    expect(profilesSource).toContain('homepage-artist-profile-preview__device');
+    expect(profilesSource).not.toContain('homepage-artist-outcome__copy');
+  });
+
+  it('keeps one Get started on the root homepage and removes the footer duplicate', () => {
+    const pageSource = readFileSync(
+      path.join(webRoot, 'app/(home)/page.tsx'),
+      'utf8'
+    );
+    const headerSource = readFileSync(
+      path.join(webRoot, 'components/site/MarketingHeader.tsx'),
+      'utf8'
+    );
+
+    expect(pageSource).not.toContain('HomepageV2FinalCta');
+    expect(headerSource).toContain('minimalAuth={isMinimal || isHomepage}');
+    expect(headerSource).toContain("isHomepage ? 'Log in' : 'Sign in'");
+  });
+
+  it('uses the production release URL in the captured product surface', () => {
+    const smartLinkSource = readFileSync(
+      path.join(
+        webRoot,
+        'components/organisms/release-sidebar/ReleaseSmartLinkAnalytics.tsx'
+      ),
+      'utf8'
+    );
+    const demoDataSource = readFileSync(
+      path.join(webRoot, 'components/features/demo/mock-release-data.ts'),
+      'utf8'
+    );
+
+    expect(smartLinkSource).toContain(
+      '`${PROFILE_URL}${release.smartLinkPath}`'
+    );
+    expect(demoDataSource).toContain("? 'calvinharris'");
+    expect(demoDataSource).toContain(
+      'smartLinkPath: `/${publicHandle}/${release.slug}`'
+    );
   });
 });

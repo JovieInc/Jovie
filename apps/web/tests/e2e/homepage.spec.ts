@@ -64,17 +64,15 @@ test.describe('Homepage', () => {
     await expect(hero.getByText('operating system')).toHaveCount(0);
     await expect(
       hero.getByRole('heading', {
-        name: 'Jovie helps you move your music forward.',
+        name: 'Drop more music. Crush every release.',
       })
     ).toBeVisible();
     await expect(
-      hero.getByText(
-        'It uses your catalog, audience, and artist presence to surface the one action most likely to pay off.'
-      )
+      hero.getByText('One system to make every release count, every time.')
     ).toBeVisible();
     await expect(
       hero.getByRole('link', { name: 'Get started', exact: true })
-    ).toHaveAttribute('href', /\/start\?starter_prompt=/);
+    ).toHaveAttribute('href', 'https://jov.ie/waitlist');
     await expect(
       hero.getByRole('link', {
         name: 'See a live profile',
@@ -84,7 +82,7 @@ test.describe('Homepage', () => {
     await expect(hero.getByPlaceholder('Ask Jovie...')).toHaveCount(0);
   });
 
-  test('header uses compact homepage presentation and waitlist CTA', async ({
+  test('header uses compact homepage presentation and text-only login', async ({
     page,
   }) => {
     const header = page.getByTestId('header-nav');
@@ -107,9 +105,9 @@ test.describe('Homepage', () => {
       'href',
       '/signin'
     );
-    await expect(
-      header.getByRole('link', { name: 'Get started' })
-    ).toHaveAttribute('href', /\/start\?starter_prompt=/);
+    await expect(header.getByRole('link', { name: 'Get started' })).toHaveCount(
+      0
+    );
 
     await page.evaluate(() =>
       window.scrollTo({ top: 320, behavior: 'instant' })
@@ -126,11 +124,7 @@ test.describe('Homepage', () => {
     const floatingRadius = await floatingShell.evaluate(element =>
       Number.parseFloat(getComputedStyle(element).borderRadius)
     );
-    const ctaHeight = await header
-      .getByRole('link', { name: 'Get started' })
-      .evaluate(element => element.getBoundingClientRect().height);
     expect(floatingRadius).toBe(22);
-    expect(ctaHeight).toBe(36);
   });
 
   test('header flyouts are not mounted by default', async ({ page }) => {
@@ -320,7 +314,6 @@ test.describe('Homepage', () => {
         'homepage-workspace-section',
         'homepage-closed-loop',
         'homepage-faq',
-        'homepage-v2-final-cta',
       ];
       return testIds.map(testId => {
         const element = document.querySelector(`[data-testid="${testId}"]`);
@@ -361,15 +354,8 @@ test.describe('Homepage', () => {
         name: 'Jovie is the AI workspace for artists. Built around your artist presence.',
       })
     ).toBeVisible();
-    for (const outcome of [
-      'Sell Out',
-      'Capture Fans',
-      'Get Paid',
-      'Drop Music',
-    ]) {
-      await expect(
-        artistProfiles.getByRole('heading', { name: outcome })
-      ).toBeVisible();
+    for (const preview of ['Tour', 'Subscribe', 'Pay', 'Presave']) {
+      await expect(artistProfiles.getByText(preview)).toBeVisible();
     }
     await artistProfiles.scrollIntoViewIfNeeded();
     await page.waitForFunction(() => {
@@ -395,7 +381,7 @@ test.describe('Homepage', () => {
         })
       );
 
-    expect(profileImageQuality).toHaveLength(3);
+    expect(profileImageQuality).toHaveLength(4);
     for (const image of profileImageQuality) {
       expect(
         image.naturalWidth,
@@ -414,18 +400,10 @@ test.describe('Homepage', () => {
     // Spec wall section removed — JOV-2073
     await expect(page.getByTestId('homepage-v2-pricing')).toHaveCount(0);
     await expect(page.getByTestId('homepage-faq')).toBeVisible();
-    const finalCta = page.getByTestId('homepage-v2-final-cta');
-    await finalCta.scrollIntoViewIfNeeded();
-    await expect(finalCta).toBeVisible();
-    await expect(page.getByTestId('homepage-v2-final-cta-heading')).toHaveText(
-      'Keep your music moving.'
-    );
-    await expect(page.getByTestId('homepage-v2-final-cta-primary')).toHaveText(
-      'Get started'
-    );
+    await expect(page.getByTestId('homepage-v2-final-cta')).toHaveCount(0);
     await expect(
-      page.getByTestId('homepage-v2-final-cta-primary')
-    ).toHaveAttribute('href', /\/start\?starter_prompt=/);
+      page.getByRole('link', { name: 'Get started', exact: true })
+    ).toHaveCount(1);
     const footer = page.getByTestId('marketing-footer');
     await expect(footer).toBeVisible();
     await expect(footer.getByRole('link', { name: 'Privacy' })).toHaveAttribute(
@@ -487,7 +465,6 @@ test.describe('Homepage', () => {
       'homepage-artist-profiles',
       'homepage-closed-loop',
       'homepage-faq',
-      'homepage-v2-final-cta',
     ];
     const sectionTops = await page.evaluate(
       ids =>
@@ -504,7 +481,7 @@ test.describe('Homepage', () => {
     const profiles = page.getByTestId('homepage-artist-profiles');
     await profiles.scrollIntoViewIfNeeded();
     await expect(
-      profiles.locator('.homepage-artist-outcome__device')
+      profiles.locator('.homepage-artist-profile-preview__device')
     ).toHaveCount(4);
     await expect(profiles.locator('img')).toHaveCount(4);
     const profileRailGeometry = await profiles.evaluate(section => {
@@ -634,7 +611,7 @@ test.describe('Homepage', () => {
 
     await expect(
       page.getByRole('heading', {
-        name: 'Jovie helps you move your music forward.',
+        name: 'Drop more music. Crush every release.',
       })
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
@@ -720,14 +697,7 @@ test.describe('Homepage', () => {
     expect(errors).toEqual([]);
   });
 
-  /**
-   * JOV-2065: Public CTAs with data-cta-sign-up="true" route through the
-   * canonical /start product entry before authenticated signup.
-   *
-   * Finds every element marked with data-cta-sign-up="true" and verifies it
-   * has an href starting with /start.
-   */
-  test('all data-cta-sign-up elements navigate to /start (JOV-2065)', async ({
+  test('the sole signup CTA uses the locked production waitlist URL', async ({
     page,
   }) => {
     await gotoHomepage(page);
@@ -735,24 +705,15 @@ test.describe('Homepage', () => {
     const ctaLinks = page.locator('[data-cta-sign-up="true"]');
     const count = await ctaLinks.count();
 
-    // Must have at least one CTA on the homepage
-    expect(
-      count,
-      'Homepage must have at least one data-cta-sign-up CTA'
-    ).toBeGreaterThan(0);
+    expect(count, 'Homepage must have exactly one signup CTA').toBe(1);
 
-    // Every anchor CTA must point to /start (or /start?...)
     for (let i = 0; i < count; i += 1) {
       const cta = ctaLinks.nth(i);
       const tagName = await cta.evaluate(el => el.tagName.toLowerCase());
 
       if (tagName === 'a') {
         const href = await cta.getAttribute('href');
-        const isStartRoute = href?.startsWith('/start') ?? false;
-        expect(
-          isStartRoute,
-          `CTA at index ${i} (href="${href}") must route to /start`
-        ).toBe(true);
+        expect(href).toBe('https://jov.ie/waitlist');
       }
     }
   });
