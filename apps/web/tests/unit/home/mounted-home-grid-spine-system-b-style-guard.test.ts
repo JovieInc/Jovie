@@ -72,6 +72,8 @@ describe('mounted homepage grid spine System B source contract', () => {
       '<HomeTrustSection',
       '<HomepageMeetJovie',
       '<HomepageArtistProfiles',
+      '<MarketingShippedSitesShowcase',
+      '<MarketingPlatformSpecBento',
       '<HomepageClosedLoop',
       '<HomepageV2FinalCta',
       '<FaqSection',
