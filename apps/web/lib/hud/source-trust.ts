@@ -65,6 +65,18 @@ function resolveExternalState(
   return 'ok';
 }
 
+function resolveProviderNextStep(
+  state: HudMetricSourceState,
+  configureStep: string,
+  retryStep: string,
+  degradedStep?: string
+): string | null {
+  if (state === 'not_configured') return configureStep;
+  if (state === 'unavailable' || state === 'unauthorized') return retryStep;
+  if (state === 'degraded') return degradedStep ?? retryStep;
+  return null;
+}
+
 function buildStripeSourceTrust(
   stripe: AdminStripeOverviewMetrics,
   fetchedAtIso: string
@@ -83,12 +95,11 @@ function buildStripeSourceTrust(
     errorMessage: stripe.errorMessage ?? null,
     dashboardUrl: 'https://dashboard.stripe.com/',
     configureUrl: null,
-    nextStep:
-      state === 'not_configured'
-        ? 'Add STRIPE_SECRET_KEY to load MRR from Stripe.'
-        : state === 'unavailable' || state === 'unauthorized'
-          ? 'Check Stripe API credentials and retry.'
-          : null,
+    nextStep: resolveProviderNextStep(
+      state,
+      'Add STRIPE_SECRET_KEY to load MRR from Stripe.',
+      'Check Stripe API credentials and retry.'
+    ),
   };
 }
 
@@ -114,14 +125,12 @@ function buildMercurySourceTrust(
     errorMessage: mercury.errorMessage ?? null,
     dashboardUrl: 'https://app.mercury.com/',
     configureUrl: null,
-    nextStep:
-      state === 'not_configured'
-        ? 'Add MERCURY_API_TOKEN and MERCURY_CHECKING_ACCOUNT_ID to load runway.'
-        : state === 'unavailable' || state === 'unauthorized'
-          ? 'Check Mercury API credentials and retry.'
-          : state === 'degraded'
-            ? 'Retry Mercury transactions before using burn or runway.'
-            : null,
+    nextStep: resolveProviderNextStep(
+      state,
+      'Add MERCURY_API_TOKEN and MERCURY_CHECKING_ACCOUNT_ID to load runway.',
+      'Check Mercury API credentials and retry.',
+      'Retry Mercury transactions before using burn or runway.'
+    ),
   };
 }
 
@@ -172,12 +181,11 @@ function buildSentrySourceTrust(
     errorMessage: sentry.errorMessage ?? null,
     dashboardUrl,
     configureUrl: null,
-    nextStep:
-      state === 'not_configured'
-        ? 'Add SENTRY_AUTH_TOKEN and SENTRY_ORG_SLUG to load incident metrics.'
-        : state === 'unavailable' || state === 'unauthorized'
-          ? 'Check Sentry API credentials and retry.'
-          : null,
+    nextStep: resolveProviderNextStep(
+      state,
+      'Add SENTRY_AUTH_TOKEN and SENTRY_ORG_SLUG to load incident metrics.',
+      'Check Sentry API credentials and retry.'
+    ),
   };
 }
 

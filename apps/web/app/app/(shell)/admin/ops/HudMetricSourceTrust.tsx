@@ -2,6 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { ExternalLink, RefreshCw } from 'lucide-react';
+import type { ReactNode } from 'react';
 import {
   formatSourceFreshness,
   getSourceFreshnessState,
@@ -35,6 +36,28 @@ export interface HudMetricSourceTrustProps {
   readonly onRetry?: () => void;
 }
 
+function freshnessStatus(
+  source: HudMetricSourceTrustType,
+  stale: boolean,
+  timestampUnknown: boolean
+): ReactNode {
+  if (
+    timestampUnknown &&
+    (source.state === 'ok' || source.state === 'no_data')
+  ) {
+    return <span className='font-medium'>Timestamp unknown</span>;
+  }
+  if (source.state === 'ok' || source.state === 'no_data') {
+    return (
+      <>
+        {stale ? <span className='font-medium'>Stale · </span> : null}
+        Updated {formatSourceFreshness(source.fetchedAtIso)}
+      </>
+    );
+  }
+  return <span className='font-medium'>{STATE_LABELS[source.state]}</span>;
+}
+
 export function HudMetricSourceTrust({
   source,
   onRetry,
@@ -43,9 +66,6 @@ export function HudMetricSourceTrust({
   const stale = freshnessState === 'stale';
   const timestampUnknown = freshnessState === 'unknown';
   const statusTone = getStatusTone(source, stale || timestampUnknown);
-  const stateLabel = STATE_LABELS[source.state];
-  const showFreshness =
-    (source.state === 'ok' || source.state === 'no_data') && !timestampUnknown;
   const showReason =
     source.state === 'unavailable' ||
     source.state === 'unauthorized' ||
@@ -60,17 +80,7 @@ export function HudMetricSourceTrust({
     >
       <div className='flex items-center justify-between gap-2'>
         <p className={`text-2xs leading-4 ${statusTone}`}>
-          {timestampUnknown &&
-          (source.state === 'ok' || source.state === 'no_data') ? (
-            <span className='font-medium'>Timestamp unknown</span>
-          ) : showFreshness ? (
-            <>
-              {stale ? <span className='font-medium'>Stale · </span> : null}
-              Updated {formatSourceFreshness(source.fetchedAtIso)}
-            </>
-          ) : (
-            <span className='font-medium'>{stateLabel}</span>
-          )}
+          {freshnessStatus(source, stale, timestampUnknown)}
         </p>
         <div className='flex shrink-0 items-center gap-2'>
           {onRetry &&

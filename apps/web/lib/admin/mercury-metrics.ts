@@ -197,12 +197,12 @@ async function fetchMercury<T>(
 }
 
 function normalizeAmount(amount: MercuryTransaction['amount']): number {
-  const normalized =
-    typeof amount === 'number'
-      ? amount
-      : typeof amount === 'string' && amount.trim().length > 0
-        ? Number(amount)
-        : Number.NaN;
+  let normalized = Number.NaN;
+  if (typeof amount === 'number') {
+    normalized = amount;
+  } else if (typeof amount === 'string' && amount.trim().length > 0) {
+    normalized = Number(amount);
+  }
   if (!Number.isFinite(normalized)) {
     throw new TypeError('Mercury transaction amount is missing or invalid.');
   }
