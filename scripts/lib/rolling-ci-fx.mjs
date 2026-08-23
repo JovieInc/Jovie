@@ -93,16 +93,27 @@ export function buildFxPrompt(input = {}) {
     repository,
     prNumber,
     headSha,
+    sourceHead,
     fingerprint,
     failedChecks = [],
+    producerEvent,
   } = input;
+  const mergeGroup = producerEvent === 'merge_group';
   return [
-    'Repair the current pull request at the exact failed head. Do not open a sibling PR.',
+    mergeGroup
+      ? 'Repair the source pull request after a native merge_group CI failure. Do not open a sibling PR.'
+      : 'Repair the current pull request at the exact failed head. Do not open a sibling PR.',
     `Repository: ${repository}`,
     `PR: #${prNumber}`,
-    `Exact head: ${headSha}`,
+    mergeGroup
+      ? `Failed merge_group head: ${headSha}`
+      : `Exact head: ${headSha}`,
+    mergeGroup && sourceHead ? `Source PR head: ${sourceHead}` : '',
     `Failure fingerprint: ${fingerprint}`,
     failedChecks.length ? `Failed checks: ${failedChecks.join(', ')}` : '',
+    mergeGroup
+      ? 'The failure reproduced on the combined queue head versus current main. Fix the source PR so the next merge_group succeeds. Do not waive ratchet growth.'
+      : '',
     'Add or update the smallest regression test. Do not skip drafts. Do not merge.',
     'Do not invent a second fleet hold. Area collision holds only.',
   ]
@@ -116,11 +127,13 @@ export function planFxLaunch(input = {}) {
     repository,
     prNumber,
     headSha,
+    sourceHead,
     headRef,
     fingerprint,
     failedChecks = [],
     cursorAgents = [],
     cursorApiKey,
+    producerEvent,
   } = input;
   if (typeof cursorApiKey !== 'string' || cursorApiKey.trim().length === 0) {
     return {
@@ -146,8 +159,10 @@ export function planFxLaunch(input = {}) {
           repository,
           prNumber,
           headSha,
+          sourceHead,
           fingerprint,
           failedChecks,
+          producerEvent,
         }),
       },
       source: {
@@ -177,6 +192,7 @@ export function planFxWebhookRemediation(input = {}) {
     repository,
     prNumber,
     headSha,
+    sourceHead,
     headRef,
   } = input;
   const route = resolveWebhookRemediationRoute({
@@ -228,7 +244,9 @@ export function planFxWebhookRemediation(input = {}) {
       repository: repository ?? dispatch?.events?.[0]?.repository,
       prNumber: prNumber ?? dispatch?.events?.[0]?.pr,
       headSha: headSha ?? liveHead ?? dispatch?.state?.head,
+      sourceHead,
       headRef,
+      producerEvent: dispatch?.events?.[0]?.source?.producerEvent,
       fingerprint:
         dispatch?.state?.claim?.fingerprint ||
         dispatch?.events?.[0]?.fingerprint ||
@@ -334,6 +352,7 @@ async function main() {
     repository: input.repository,
     prNumber: input.prNumber,
     headSha: input.headSha,
+    sourceHead: input.sourceHead,
     headRef: input.headRef,
   });
   process.stdout.write(`${JSON.stringify(result)}\n`);

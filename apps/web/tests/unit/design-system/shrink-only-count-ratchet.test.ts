@@ -103,18 +103,26 @@ describe('shrink-only count ratchet (merge-group safe)', () => {
   });
 
   it('maps GitHub event names and treats unknown/empty as local', () => {
-    expect(resolveShrinkOnlyCountEvent('merge_group')).toBe(
-      SHRINK_ONLY_COUNT_EVENTS.MERGE_GROUP
-    );
-    expect(resolveShrinkOnlyCountEvent('pull_request')).toBe(
-      SHRINK_ONLY_COUNT_EVENTS.PULL_REQUEST
-    );
-    expect(resolveShrinkOnlyCountEvent('workflow_dispatch')).toBe(
-      SHRINK_ONLY_COUNT_EVENTS.LOCAL
-    );
-    expect(resolveShrinkOnlyCountEvent(undefined)).toBe(
-      SHRINK_ONLY_COUNT_EVENTS.LOCAL
-    );
+    vi.stubEnv('GITHUB_EVENT_NAME', 'merge_group');
+    try {
+      expect(resolveShrinkOnlyCountEvent('merge_group')).toBe(
+        SHRINK_ONLY_COUNT_EVENTS.MERGE_GROUP
+      );
+      expect(resolveShrinkOnlyCountEvent('pull_request')).toBe(
+        SHRINK_ONLY_COUNT_EVENTS.PULL_REQUEST
+      );
+      expect(resolveShrinkOnlyCountEvent('workflow_dispatch')).toBe(
+        SHRINK_ONLY_COUNT_EVENTS.LOCAL
+      );
+      expect(resolveShrinkOnlyCountEvent('')).toBe(
+        SHRINK_ONLY_COUNT_EVENTS.LOCAL
+      );
+      expect(resolveShrinkOnlyCountEvent(undefined)).toBe(
+        SHRINK_ONLY_COUNT_EVENTS.LOCAL
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('rejects non-finite measurements', () => {
