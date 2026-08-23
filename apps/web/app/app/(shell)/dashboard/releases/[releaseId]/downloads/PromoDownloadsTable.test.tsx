@@ -63,23 +63,38 @@ describe('PromoDownloadsTable', () => {
 
     expect(screen.getByText('Radio Edit')).toBeInTheDocument();
     expect(screen.getByText('MP3 · 2.0 MB')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Active' })).toBeInTheDocument();
+    expect(screen.getByText('Active')).toBeInTheDocument();
+    expect(
+      screen.getByRole('switch', { name: 'Toggle Radio Edit visibility' })
+    ).toBeChecked();
     expect(
       screen.getByRole('button', { name: 'Delete Radio Edit' })
     ).toBeInTheDocument();
 
     expect(screen.getByText('Instrumental')).toBeInTheDocument();
     expect(screen.getByText('WAV')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Hidden' })).toBeInTheDocument();
+    expect(screen.getByText('Hidden')).toBeInTheDocument();
+    expect(
+      screen.getByRole('switch', { name: 'Toggle Instrumental visibility' })
+    ).not.toBeChecked();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Active' }));
+    fireEvent.click(
+      screen.getByRole('switch', { name: 'Toggle Radio Edit visibility' })
+    );
     expect(onToggleActive).toHaveBeenCalledWith('download_1', false);
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete Radio Edit' }));
     expect(onDelete).toHaveBeenCalledWith('download_1');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Hidden' }));
+    fireEvent.click(
+      screen.getByRole('switch', { name: 'Toggle Instrumental visibility' })
+    );
     expect(onToggleActive).toHaveBeenCalledWith('download_2', true);
+
+    expect(screen.getByTestId('promo-downloads-table-surface')).toHaveClass(
+      'rounded-xl',
+      'border'
+    );
   });
 
   it('renders the shared empty state after loading with no files', () => {

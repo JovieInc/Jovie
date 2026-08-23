@@ -78,6 +78,7 @@ describe('LyricsPageClient', () => {
   it('renders the server-resolved track when audio is not active', () => {
     render(<LyricsPageClient {...baseProps} />);
 
+    expect(screen.getByTestId('lyrics-page-surface')).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'Server Track' })
     ).toBeInTheDocument();
