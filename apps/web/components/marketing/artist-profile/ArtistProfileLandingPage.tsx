@@ -6,6 +6,8 @@ import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { ARTIST_PROFILE_SECTION_TEST_IDS } from '@/data/artistProfilePageOrder';
 import type { ArtistProfileSectionFlags } from '@/lib/featureFlags';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
+import { MarketingPlatformSpecBento } from '../MarketingPlatformSpecBento';
+import { MarketingShippedSitesShowcase } from '../MarketingShippedSitesShowcase';
 import { ArtistProfileCaptureSection } from './ArtistProfileCaptureSection';
 import { ArtistProfileFaq } from './ArtistProfileFaq';
 import { ArtistProfileFinalCta } from './ArtistProfileFinalCta';
@@ -203,6 +205,12 @@ export function ArtistProfileLandingPage({
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.specWall}>
         <ArtistProfileAnnotatedTruth specWall={copy.specWall} />
+      </div>
+      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.showcase}>
+        <MarketingShippedSitesShowcase testId='artist-profile-shipped-sites-showcase' />
+      </div>
+      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.specBento}>
+        <MarketingPlatformSpecBento testId='artist-profile-platform-spec-bento' />
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.howItWorks}>
         <ArtistProfileHowItWorks howItWorks={copy.howItWorks} />

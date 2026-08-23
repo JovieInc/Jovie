@@ -305,6 +305,12 @@ describe('ArtistProfilesPage', () => {
     ).toHaveAttribute('href', '/instant-merch');
     expect(ARTIST_PROFILE_COPY.faq.items).toHaveLength(4);
     expect(
+      screen.getByRole('heading', { name: 'Live Artist Sites' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'The Artist Platform' })
+    ).toBeInTheDocument();
+    expect(
       screen.getByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.releaseCycle)
     ).toBeInTheDocument();
     expect(
