@@ -9,6 +9,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - [internal] **Gem Fleet and Intake admission now share one host lock (JOV-5257):** mutating `reconcile -> gate-next` and issue-scoped `gate-next` take the same Gem `flock`. A contested lock fails closed with no Linear writes. Child timeout after possible effect requires receipt/lease reconciliation, never an automatic replay.
 
+- **Home and Artist Profiles now show live artist sites and the platform spec grid:** a dark shipped-sites gallery and a blue / pink / purple platform bento sit below the fold on jov.ie and /artist-profiles, using real Jovie profile and product shots.
+
 - [internal] **Summer invariant stewardship now has a weekly plus event-driven audit (JOV-5309):** Current-week candidates are normalized with source, date, and authority, semantic duplicates/conflicts/missing consumers fail visible, and Ovie projects only actionable exceptions. Cadence reuses the existing governance workflow. The executable registry remains `canon/invariants.jsonl` under JOV-5306.
 
 - [internal] **Canonical homepage and dashboard-releases owners stay attached to screenshot and visual-qa registries (JOV-5304):** live `/` is `MarketingPosterHero` + `PublicPageShell`, live releases is `ShellReleasesView` with demo `/demo` still `ReleasesExperience`, and a fail-closed drift guard rejects `/ai`/`/investors` promotion plus a deliberate-red fixture.
