@@ -114,6 +114,11 @@ describe('cross-surface UI ownership registry', () => {
     const nativeIconBindings = iconButton.platformAdapters.find(
       adapter => adapter.platform === 'ios'
     )?.nativeBindings;
+    expect(
+      nativeButtonBindings?.find(
+        binding => binding.swiftType === 'JoviePillButtonStyle'
+      )?.consumerPaths
+    ).toContain('apps/ios/Jovie/Features/Library/LibrarySurfaceView.swift');
     expect(nativeButtonBindings).toMatchObject([
       {
         sourcePath: 'apps/ios/Jovie/DesignSystem/JovieTheme.swift',
