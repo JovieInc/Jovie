@@ -152,12 +152,22 @@ function validateNativeButtonOwnership(
   }
   const declarations = swiftButtonStyleDeclarations(swiftSources);
   const registeredTypes = new Set<string>();
+  const registeredRoles = new Map<string, string>();
 
   for (const { entry, binding } of bindings) {
     if (registeredTypes.has(binding.swiftType)) {
       bad(issues, 'duplicate-native-family-owner', binding.swiftType);
     }
     registeredTypes.add(binding.swiftType);
+    const roleOwner = registeredRoles.get(binding.semanticRole);
+    if (roleOwner && roleOwner !== binding.swiftType) {
+      bad(
+        issues,
+        'duplicate-native-family-owner',
+        `${binding.semanticRole}:${roleOwner}:${binding.swiftType}`
+      );
+    }
+    registeredRoles.set(binding.semanticRole, binding.swiftType);
     const owners = declarations.filter(
       declaration => declaration.name === binding.swiftType
     );

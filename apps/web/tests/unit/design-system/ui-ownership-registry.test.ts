@@ -244,6 +244,17 @@ describe('cross-surface UI ownership registry', () => {
       })),
     }));
     expectIssue(withoutTests, 'missing-native-test');
+
+    const duplicateRegisteredRole = mutate('atom.icon-button', entry => ({
+      platformAdapters: entry.platformAdapters.map(adapter => ({
+        ...adapter,
+        nativeBindings: adapter.nativeBindings?.map(binding => ({
+          ...binding,
+          semanticRole: 'pill-action',
+        })),
+      })),
+    }));
+    expectIssue(duplicateRegisteredRole, 'duplicate-native-family-owner');
   });
 
   it('fails closed on serif policy and Pen proposal/canonical confusion', () => {
