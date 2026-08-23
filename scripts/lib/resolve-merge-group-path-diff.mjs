@@ -102,7 +102,7 @@ export function diffNameOnlyThreeDot(git, baseSha, headSha) {
   if (mergeBase.status !== 0) {
     return { ok: false, files: [] };
   }
-  const diff = git(['diff', '--name-only', `${baseSha}...${headSha}`], {
+  const diff = git(['diff', '--no-renames', '--name-only', `${baseSha}...${headSha}`], {
     allowFailure: true,
   });
   if (diff.status !== 0) {

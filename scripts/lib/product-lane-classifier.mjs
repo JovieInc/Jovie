@@ -18,7 +18,7 @@ const GATE_RECEIPTS = {
   },
   web: {
     tests:
-      'pnpm --filter @jovie/web run test:fast (10 shards) && pnpm turbo build --filter=@jovie/web && deterministic layout guards',
+      'Web unit shards, Web build/layout, extension typecheck/test/build, and observability worker typecheck/test',
     artifact: 'apps/web/.next exact combined-head build workspace',
     releaseWorkflow: '.github/workflows/production-release.yml',
   },
@@ -75,13 +75,13 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     'web-product',
     'web',
     ['web'],
-    /^(apps\/(web|extension)\/|packages\/(action-contracts|audio-contracts|extension-contracts|ui)\/|workers\/|app\/|content\/|lib\/|trigger\/|creator_profiles\/|vercel\.json$|\.vercelignore$|\.github\/workflows\/(production-release|production-marker-recovery|postdeploy-probes|canary-health-gate)\.yml$)/,
+    /^(apps\/(web|extension)\/|packages\/(action-contracts|audio-contracts|extension-contracts|ui)\/|workers\/observability-ingest\/|app\/|content\/|lib\/|trigger\/|creator_profiles\/|vercel\.json$|\.vercelignore$|\.github\/workflows\/(production-release|production-marker-recovery|postdeploy-probes|canary-health-gate)\.yml$)/,
   ],
   [
     'operations-tooling',
     'operations-tooling',
     [],
-    /^(\.github\/|scripts\/|apps\/(console|docs|eve-pilot|should-i-make)\/|\.agents\/|\.claude\/|\.codex\/|\.conductor\/|\.context\/|\.cursor\/|\.design-sync(?:-marketing)?\/|\.grok\/|\.hermes\/|\.husky\/|\.lavish\/|\.neon(?:\/|$)|\.no-mistakes\/|\.orchestrator\/|\.sonarlint\/|\.vscode\/|\.windsurf\/|\.zap\/|agentos\/|architecture\/|audits\/|canon\/|creator_profiles(?:\/|$)|docs\/|github\/|ideation\/|infra\/|prompts\/|tests\/|tools\/)/,
+    /^(\.github\/|scripts\/|apps\/(console|docs|eve-pilot|should-i-make)\/|workers\/x402-artist-resource-proxy\/wrangler\.example\.jsonc$|\.agents\/|\.claude\/|\.codex\/|\.conductor\/|\.context\/|\.cursor\/|\.design-sync(?:-marketing)?\/|\.grok\/|\.hermes\/|\.husky\/|\.lavish\/|\.neon(?:\/|$)|\.no-mistakes\/|\.orchestrator\/|\.sonarlint\/|\.vscode\/|\.windsurf\/|\.zap\/|agentos\/|architecture\/|audits\/|canon\/|creator_profiles(?:\/|$)|docs\/|github\/|ideation\/|infra\/|prompts\/|tests\/|tools\/)/,
   ],
   [
     'operations-root-file',
