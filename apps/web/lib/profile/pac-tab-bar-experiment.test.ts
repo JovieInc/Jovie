@@ -18,7 +18,7 @@ describe('shouldShowColdVisitorTabBar', () => {
     ).toBe(true);
   });
 
-  it('hides the bar only for cold first-visit visitors on the hidden arm', () => {
+  it('keeps authorized navigation visible for cold visitors on the hidden arm', () => {
     expect(
       shouldShowColdVisitorTabBar({
         tabBarArm: 'hidden',
@@ -26,7 +26,7 @@ describe('shouldShowColdVisitorTabBar', () => {
         restoredThisSession: false,
         isReturnVisit: false,
       })
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('always restores after first interaction, on return visits, or when subscribed', () => {

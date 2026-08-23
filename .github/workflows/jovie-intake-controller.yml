@@ -15,9 +15,10 @@ permissions:
   contents: read
 
 concurrency:
-  # One controller writer for all events. The durable receipt is idempotent,
-  # while the governor independently bounds implementation leases to four.
-  group: jovie-intake-admission
+  # Serialize duplicate updates for one issue while allowing unrelated issue
+  # receipts/classification to use measured runner capacity. The mutating
+  # admission command retains a shared host lock below.
+  group: jovie-intake-${{ github.event.client_payload.issue_identifier || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -63,6 +64,7 @@ jobs:
         env:
           JOVIE_AGENT_PROFILE: no_agent
           ISSUE_IDENTIFIER: ${{ github.event.client_payload.issue_identifier }}
+          GEM_WORKSPACE: /home/timwhite/gem-workspace
         run: |
           set -euo pipefail
           test -n "$ISSUE_IDENTIFIER"
@@ -70,7 +72,11 @@ jobs:
           # receipt, plan and admission receipts, then verifies its single
           # lease. A hold is a successful no-op, never a retry bypass.
           receipt="$RUNNER_TEMP/intake-admission.json"
-          scripts/backlog-orchestrator/run-backlog.sh gate-next --issue="$ISSUE_IDENTIFIER" | tee "$receipt"
+          mkdir -p "$GEM_WORKSPACE/state/jovie-intake-controller"
+          flock --exclusive --wait 120 \
+            "$GEM_WORKSPACE/state/jovie-intake-controller/admission.lock" \
+            scripts/backlog-orchestrator/run-backlog.sh gate-next --issue="$ISSUE_IDENTIFIER" \
+            | tee "$receipt"
           if jq -e --arg issue "$ISSUE_IDENTIFIER" '
             .status == "admitted" and
             any(.teams[]; .status == "admitted" and .issue == $issue and .mutations == "verified")

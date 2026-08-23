@@ -19,7 +19,10 @@ export default defineConfig({
       'node_modules/**',
       '.next/**',
     ],
-    include: ['tests/unit/lib/sentry/**/*.test.ts'],
+    include: [
+      'tests/unit/lib/sentry/**/*.test.ts',
+      'tests/unit/design-system/ui-ownership-registry.test.ts',
+    ],
     pool: 'forks',
     testTimeout: 10000,
     hookTimeout: 5000,

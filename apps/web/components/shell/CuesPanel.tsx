@@ -3,7 +3,8 @@
 import { Play } from 'lucide-react';
 import { memo } from 'react';
 import { cn } from '@/lib/utils';
-import type { Cue } from './cues.types';
+import type { Cue, CueKind } from './cues.types';
+import { SHELL_CAPTION_CLASSNAME } from './shell-caption';
 
 export interface CuesPanelProps {
   /** Cue list ordered by `at` ascending. */
@@ -23,6 +24,15 @@ function formatCueTime(seconds: number): string {
   const s = Math.floor(seconds % 60);
   return `${m}:${String(s).padStart(2, '0')}`;
 }
+
+const CUE_KIND_LABEL: Record<CueKind, string> = {
+  intro: 'Intro',
+  verse: 'Verse',
+  chorus: 'Chorus',
+  drop: 'Drop',
+  bridge: 'Bridge',
+  outro: 'Outro',
+};
 
 // Memoized row renderer for drawer cue list (high-churn over real prod Cue data
 // in entity drawers / waveform siblings). DS subtle + canonical focus rings
@@ -64,9 +74,7 @@ const CueRow = memo(function CueRow({
         )}
       </span>
       <span className='flex-1 text-left truncate'>{c.label}</span>
-      <span className='text-3xs uppercase tracking-[0.06em] text-quaternary-token capitalize'>
-        {c.kind}
-      </span>
+      <span className={SHELL_CAPTION_CLASSNAME}>{CUE_KIND_LABEL[c.kind]}</span>
     </button>
   );
 });
@@ -104,9 +112,7 @@ export function CuesPanel({
   return (
     <div className={cn('px-4 py-4', className)}>
       <div className='flex items-center justify-between pb-2'>
-        <p className='text-3xs uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
-          {title}
-        </p>
+        <p className={SHELL_CAPTION_CLASSNAME}>{title}</p>
         <span className='text-3xs tabular-nums text-tertiary-token'>
           {cues.length}
         </span>

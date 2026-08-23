@@ -86,7 +86,11 @@ describe('POST /api/webhooks/linear', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data).toEqual({ received: true, deduplicated: true });
+    expect(data).toEqual({
+      received: true,
+      deduplicated: true,
+      eventId: 'issue_123:2026-03-10T00:00:01.000Z:intake',
+    });
     expect(mockServerFetch).not.toHaveBeenCalled();
     expect(mockClearRecentDispatch).not.toHaveBeenCalled();
   });
@@ -137,7 +141,7 @@ describe('POST /api/webhooks/linear', () => {
     );
   });
 
-  it('returns 502 when the GitHub dispatch times out', async () => {
+  it('holds an ambiguous timeout for reconciliation without replay', async () => {
     const { ServerFetchTimeoutError } = await import('@/lib/http/server-fetch');
 
     mockAcquireRecentDispatch.mockResolvedValue({
@@ -145,7 +149,7 @@ describe('POST /api/webhooks/linear', () => {
       reason: 'acquired',
     });
     mockServerFetch.mockRejectedValue(
-      new ServerFetchTimeoutError('timed out', 10000, 'Linear dispatch')
+      new ServerFetchTimeoutError('timed out', 4500, 'Linear dispatch')
     );
 
     const { POST } = await import('@/app/api/webhooks/linear/route');
@@ -174,18 +178,20 @@ describe('POST /api/webhooks/linear', () => {
     const response = await POST(request as never);
     const data = await response.json();
 
-    expect(response.status).toBe(502);
-    expect(data).toEqual({ error: 'Dispatch timed out' });
-    expect(mockClearRecentDispatch).toHaveBeenCalledWith(
-      'linear',
-      'issue_123:2026-03-10T00:00:01.000Z:intake'
-    );
+    expect(response.status).toBe(202);
+    expect(data).toEqual({
+      received: true,
+      dispatchState: 'ambiguous',
+      reconcileRequired: true,
+      eventId: 'issue_123:2026-03-10T00:00:01.000Z:intake',
+    });
+    expect(mockClearRecentDispatch).not.toHaveBeenCalled();
     expect(mockCaptureCriticalError).toHaveBeenCalledWith(
       'Linear webhook dispatch timed out',
       expect.any(ServerFetchTimeoutError),
       expect.objectContaining({
         route: '/api/webhooks/linear',
-        timeoutMs: 10000,
+        timeoutMs: 4500,
       })
     );
   });
@@ -231,7 +237,7 @@ describe('POST /api/webhooks/linear', () => {
       'https://api.github.com/repos/JovieInc/Jovie/dispatches',
       expect.objectContaining({
         method: 'POST',
-        timeoutMs: 10000,
+        timeoutMs: 4500,
       })
     );
     expect(mockServerFetch.mock.calls[0]?.[1]).not.toHaveProperty('retry');
@@ -268,7 +274,11 @@ describe('POST /api/webhooks/linear', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ received: true, dispatched: true });
+    expect(await response.json()).toEqual({
+      received: true,
+      dispatched: true,
+      eventId: 'issue_backlog:2026-08-15T00:00:00.000Z:intake',
+    });
     expect(mockServerFetch.mock.calls[0]?.[1]).toEqual(
       expect.objectContaining({
         body: expect.stringContaining('"event_type":"linear-intake-changed"'),
@@ -276,6 +286,49 @@ describe('POST /api/webhooks/linear', () => {
     );
     expect(mockServerFetch.mock.calls[0]?.[1]?.body).toContain(
       '"team_key":"JOV"'
+    );
+  });
+
+  it('carries provider delivery identity in a bounded durable payload', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+    mockServerFetch.mockResolvedValue(new Response(null, { status: 204 }));
+
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const payload = {
+      type: 'Issue',
+      action: 'update',
+      webhookId: 'linear-delivery-5306',
+      data: {
+        id: 'issue_5306',
+        identifier: 'JOV-5306',
+        updatedAt: '2026-08-22T00:00:00.000Z',
+        team: { key: 'JOV' },
+        state: { name: 'Todo' },
+      },
+    };
+    const body = JSON.stringify(payload);
+    const response = await POST(
+      new Request('https://example.com/api/webhooks/linear', {
+        method: 'POST',
+        headers: { 'linear-signature': sign(body) },
+        body,
+      }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      eventId: 'linear-delivery-5306:intake',
+    });
+    const dispatch = JSON.parse(mockServerFetch.mock.calls[0]?.[1]?.body);
+    expect(Object.keys(dispatch.client_payload).length).toBeLessThanOrEqual(10);
+    expect(dispatch.client_payload.delivery_id).toBe('linear-delivery-5306');
+    expect(mockAcquireRecentDispatch).toHaveBeenCalledWith(
+      'linear',
+      'linear-delivery-5306:intake',
+      21_600
     );
   });
 });
