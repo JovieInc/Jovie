@@ -358,12 +358,26 @@ final class JovieUITests: XCTestCase {
 
     XCTAssertTrue(app.textFields["chat-composer-input"].exists)
     XCTAssertTrue(
-      app.staticTexts["Let's get it"].exists,
-      "Chat empty state did not show a locked rotating greeting.\n\(app.debugDescription)"
+      app.staticTexts["chat-empty-greeting"].exists,
+      "Empty chat must show one locked rotating greeting.\n\(app.debugDescription)"
     )
-    XCTAssertFalse(app.staticTexts["What's next?"].exists)
+    let greeting = app.staticTexts["chat-empty-greeting"].label
+    XCTAssertTrue(
+      ["Let's get it", "Ready to start?", "Ready when you are"].contains(greeting),
+      "Empty chat greeting drifted off the locked rotate set: \(greeting)\n\(app.debugDescription)"
+    )
     XCTAssertFalse(
-      app.staticTexts["Ask Jovie about your profile, releases, and next moves."].exists
+      app.staticTexts["Ask Jovie"].exists,
+      "Ask Jovie is dead on empty chat.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      app.staticTexts["Ask Jovie about your profile, releases, and next moves."].exists,
+      "Empty chat must not ship helper copy.\n\(app.debugDescription)"
+    )
+    XCTAssertEqual(
+      app.textFields["chat-composer-input"].placeholderValue ?? "",
+      "",
+      "Empty composer must have no placeholder.\n\(app.debugDescription)"
     )
     attachScreenshot(named: "chat", app: app)
 
@@ -635,9 +649,14 @@ final class JovieUITests: XCTestCase {
       1,
       "Offline chat launch showed more than one standalone offline status indicator.\n\(app.debugDescription)"
     )
-    XCTAssertTrue(app.staticTexts["Let's get it"].exists)
-    XCTAssertFalse(
-      app.staticTexts["Offline. Drafts stay on this device and cached history remains available."].exists
+    XCTAssertTrue(
+      app.staticTexts["chat-empty-greeting"].exists,
+      "Empty chat must show one locked rotating greeting.\n\(app.debugDescription)"
+    )
+    let greeting = app.staticTexts["chat-empty-greeting"].label
+    XCTAssertTrue(
+      ["Let's get it", "Ready to start?", "Ready when you are"].contains(greeting),
+      "Empty chat greeting drifted off the locked rotate set: \(greeting)\n\(app.debugDescription)"
     )
     XCTAssertTrue(app.textFields["chat-composer-input"].exists)
 
@@ -1768,10 +1787,11 @@ final class JovieUITests: XCTestCase {
       }
       if [
         "Ask Jovie",
+        "Ask Jovie about your profile, releases, and next moves.",
         "Let's get it",
         "Ready to start?",
         "Ready when you are",
-        "Ask Jovie about your profile, releases, and next moves.",
+        "Chat message",
         "Send",
         "Chat",
         "Library",

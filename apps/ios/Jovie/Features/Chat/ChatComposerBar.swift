@@ -1,37 +1,16 @@
 import SwiftUI
 
-enum ChatEmptyGreeting {
-  static let all = [
-    "Let's get it",
-    "Ready to start?",
-    "Ready when you are",
-  ]
-  static let still = all[0]
-  static let storageKey = "jovie.chat-empty-rotate-greeting-index"
-
-  static var isUITesting: Bool {
-    ProcessInfo.processInfo.arguments.contains("-ui-testing-allow-exit")
-  }
-
-  static func greeting(at index: Int) -> String {
-    let count = all.count
-    let safe = ((index % count) + count) % count
-    return all[safe]
-  }
-
-  static func takeNext(defaults: UserDefaults = .standard) -> String {
-    if isUITesting { return still }
-    let index = defaults.integer(forKey: storageKey)
-    let greeting = greeting(at: index)
-    defaults.set(index + 1, forKey: storageKey)
-    return greeting
-  }
+enum ChatComposerCopy {
+  /// Visible placeholder is deleted (JOV-5319). Accessibility name stays.
+  static let emptyPlaceholder = ""
+  static let inputAccessibilityLabel = "Chat message"
+  static let inputAccessibilityIdentifier = "chat-composer-input"
 }
 
 enum ChatComposerMetrics {
   static let barHeight: CGFloat = 52
-  static let sendSlotSize: CGFloat = 36
-  static let plusButtonSize: CGFloat = 36
+  static let sendSlotSize = JovieActionButtonMetrics.height
+  static let plusButtonSize = JovieActionButtonMetrics.height
 
   static func isPlusEnabled(isSending: Bool) -> Bool {
     !isSending
@@ -68,6 +47,7 @@ enum ChatComposerTrailingAction: Equatable {
 struct ChatComposerBar: View {
   @Binding var draft: String
   @FocusState.Binding var isFocused: Bool
+  let placeholder: String
   let isSending: Bool
   let isPlusEnabled: Bool
   let onSend: () -> Void
@@ -105,14 +85,14 @@ struct ChatComposerBar: View {
       .accessibilityIdentifier("chat-composer-plus")
       .accessibilityElement(children: .ignore)
 
-      TextField("", text: $draft)
+      TextField(placeholder, text: $draft)
         .focused($isFocused)
         .textInputAutocapitalization(.sentences)
         .disableAutocorrection(false)
         .font(JovieFont.body(size: 16))
         .foregroundStyle(JovieColor.textPrimary)
-        .accessibilityLabel("Chat Message Input")
-        .accessibilityIdentifier("chat-composer-input")
+        .accessibilityLabel(ChatComposerCopy.inputAccessibilityLabel)
+        .accessibilityIdentifier(ChatComposerCopy.inputAccessibilityIdentifier)
         .onChange(of: draft) {
           onDraftEdited()
         }
@@ -203,7 +183,7 @@ struct ChatComposerBar: View {
       Image(systemName: "mic.fill")
         .font(.system(size: 15, weight: .semibold))
         .foregroundStyle(JovieColor.textPrimary)
-        .frame(width: 36, height: 36)
+        .frame(width: ChatComposerMetrics.sendSlotSize, height: ChatComposerMetrics.sendSlotSize)
     }
     .buttonStyle(.plain)
     .accessibilityLabel(ChatComposerTrailingAction.mic.accessibilityLabel)

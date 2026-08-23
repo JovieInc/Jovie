@@ -2,26 +2,20 @@ import SwiftUI
 
 // Rendered by AppContentView while the ChatRepository is unavailable
 // (signed-out, offline bootstrap, or launch modes without a repository).
+// Signed-in empty Chat uses the same greeting + composer lock as MobileChatView.
 struct MobileChatPlaceholderView: View {
+  let isOffline: Bool
   @Binding var draft: String
-  @State private var greeting = ChatEmptyGreeting.takeNext()
 
   var body: some View {
     ZStack {
       JovieColor.backgroundBase.ignoresSafeArea()
 
       VStack(spacing: 0) {
-        Spacer(minLength: 120)
-
-        Text(greeting)
-          .font(JovieFont.display(size: 28))
-          .foregroundStyle(JovieColor.textPrimary)
-          .multilineTextAlignment(.center)
-          .frame(maxWidth: 330)
+        Spacer(minLength: 0)
+        MobileChatEmptyGreetingView(greeting: ChatEmptyGreeting.current())
           .padding(.horizontal, JovieSpacing.xLarge)
-          .accessibilityIdentifier("chat-empty-state-greeting")
-
-        Spacer(minLength: 48)
+        Spacer(minLength: 0)
       }
       .safeAreaInset(edge: .bottom, spacing: 0) {
         ChatComposerPreview(draft: $draft)
@@ -32,6 +26,7 @@ struct MobileChatPlaceholderView: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("mobile-chat")
+    .accessibilityValue(isOffline ? "Offline" : "")
   }
 }
 
@@ -43,6 +38,7 @@ private struct ChatComposerPreview: View {
     ChatComposerBar(
       draft: $draft,
       isFocused: $isComposerFocused,
+      placeholder: ChatComposerCopy.emptyPlaceholder,
       isSending: false,
       isPlusEnabled: true,
       onSend: { draft = "" },

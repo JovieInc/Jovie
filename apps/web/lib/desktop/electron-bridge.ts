@@ -291,15 +291,13 @@ export function useIsElectronRuntime(): boolean {
   return isElectron;
 }
 
-let desktopAppBootedSent = false;
-
 /**
  * Notify the Electron main process that the hosted web app painted successfully.
- * Idempotent per full document load. No-ops in the browser and on stale binaries
- * that predate the app-booted channel (those builds also lack the watchdog).
+ * Send on every call so Fast Refresh / HMR can re-arm after the shell resets
+ * its boot flag. No-ops in the browser and on stale binaries that predate the
+ * app-booted channel (those builds also lack the watchdog).
  */
 export function notifyDesktopAppBooted(): void {
-  if (desktopAppBootedSent) return;
   if (!isElectronRuntime()) return;
 
   const api = getRawElectronAPI();
@@ -310,7 +308,6 @@ export function notifyDesktopAppBooted(): void {
 
   try {
     api.notifyAppBooted();
-    desktopAppBootedSent = true;
   } catch {
     // Non-fatal — the watchdog remains armed if send fails.
   }
@@ -639,7 +636,6 @@ export function onDesktopTrayAction(cb: (action: string) => void): () => void {
 export const __testing = {
   reset: () => {
     reportedMissing.clear();
-    desktopAppBootedSent = false;
   },
   safeInstallUpdateAndRestart,
   safeGetDictationStatus,

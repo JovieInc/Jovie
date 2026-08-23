@@ -172,7 +172,7 @@ private struct AppContentView: View {
               webBaseURL: appState.configuration.webBaseURL
             )
           } else {
-            MobileChatPlaceholderView(draft: draft)
+            MobileChatPlaceholderView(isOffline: false, draft: draft)
           }
         }
         .transition(.opacity)
@@ -256,7 +256,7 @@ private struct AppContentView: View {
               onRecordVideo: onRecordVideo
             )
           } else {
-            MobileChatPlaceholderView(draft: draft)
+            MobileChatPlaceholderView(isOffline: appState.isOffline, draft: draft)
           }
         }
         .transition(.opacity)
