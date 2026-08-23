@@ -1,6 +1,9 @@
 import 'server-only';
 
+import { NextResponse } from 'next/server';
 import { isAdmin } from '@/lib/admin/roles';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { requireMobileProfileSession } from '@/lib/mobile/session-auth';
 import type { AppShellMode } from '@/types/app-shell';
 
 export type MobileWorkspaceParseResult =
@@ -50,4 +53,53 @@ export async function authorizeMobileWorkspace(
     return { ok: false, status: 403, error: 'Forbidden' };
   }
   return { ok: true, workspace: parsed.workspace };
+}
+
+type MobileProfileSession = Exclude<
+  Awaited<ReturnType<typeof requireMobileProfileSession>>,
+  { errorResponse: NextResponse }
+>;
+
+export async function requireMobileWorkspaceSession(
+  request: Request,
+  defaultLimit: number
+): Promise<
+  | {
+      readonly profile: MobileProfileSession['profile'];
+      readonly userId: string;
+      readonly workspace: AppShellMode;
+      readonly url: URL;
+      readonly limit: number;
+    }
+  | { readonly errorResponse: NextResponse }
+> {
+  const auth = await requireMobileProfileSession(request);
+  if ('errorResponse' in auth) {
+    return auth;
+  }
+
+  const url = new URL(request.url);
+  const workspace = await authorizeMobileWorkspace(
+    url.searchParams.get('workspace'),
+    auth.userId
+  );
+  if (!workspace.ok) {
+    return {
+      errorResponse: NextResponse.json(
+        { error: workspace.error },
+        { status: workspace.status, headers: NO_STORE_HEADERS }
+      ),
+    };
+  }
+
+  const limitParam = url.searchParams.get('limit');
+  const parsed = limitParam ? Number.parseInt(limitParam, 10) : defaultLimit;
+
+  return {
+    profile: auth.profile,
+    userId: auth.userId,
+    workspace: workspace.workspace,
+    url,
+    limit: Number.isFinite(parsed) ? parsed : defaultLimit,
+  };
 }
