@@ -1,7 +1,10 @@
 'use client';
 
+// @coverage-via apps/web/components/jovie/release-calendar/ReleaseCalendar.test.tsx
+
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { RELEASE_PLAN_MOVE_REMIX_NEAR_LA } from '@/lib/release-planning/demo-events';
 import {
   addDaysIso,
@@ -118,9 +121,10 @@ export function ReleaseCalendar({
   }, [plan, onPlanChange]);
 
   return (
-    <div
+    <ContentSurfaceCard
+      surface='table'
       data-testid='release-calendar'
-      className='overflow-x-auto rounded-lg border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'
+      className='overflow-x-auto p-0'
     >
       <LayoutGroup>
         <div className='flex min-w-max gap-3 p-4'>
@@ -195,6 +199,6 @@ export function ReleaseCalendar({
           ))}
         </div>
       </LayoutGroup>
-    </div>
+    </ContentSurfaceCard>
   );
 }

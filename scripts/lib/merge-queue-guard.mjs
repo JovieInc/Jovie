@@ -158,6 +158,31 @@ export const CHANGELOG_COLLISION_PATH = 'CHANGELOG.md';
 const ENUM_POLICY_FIELDS = new Set(['merge_method', 'grouping_strategy']);
 
 /**
+ * REST `check_response_timeout_minutes` max is 360. Live GraphQL
+ * `checkResponseTimeout` returns seconds (3600 for a 60-minute ruleset).
+ * Docs claim minutes; Auto-Enroll fail-closed on that mismatch (JOV-5315).
+ */
+export const REST_CHECK_RESPONSE_TIMEOUT_MAX_MINUTES = 360;
+
+/**
+ * Map GraphQL `checkResponseTimeout` onto REST minutes. Values inside the
+ * REST minute range stay as minutes so docs-shaped fixtures keep working.
+ * Values above that range that are whole minutes-in-seconds convert.
+ *
+ * @param {unknown} value
+ * @returns {unknown}
+ */
+export function mapGraphqlCheckResponseTimeoutToMinutes(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    return value;
+  }
+  if (value > REST_CHECK_RESPONSE_TIMEOUT_MAX_MINUTES && value % 60 === 0) {
+    return value / 60;
+  }
+  return value;
+}
+
+/**
  * Normalize REST snake_case or GraphQL camelCase queue parameters onto the
  * canonical `NATIVE_QUEUE_POLICY` keys. Unknown keys are dropped.
  *
@@ -173,9 +198,13 @@ export function normalizeNativeQueuePolicyParameters(observed = {}) {
   for (const [key, value] of Object.entries(observed)) {
     const restKey = NATIVE_QUEUE_GRAPHQL_POLICY_FIELDS[key] ?? key;
     if (!Object.hasOwn(NATIVE_QUEUE_POLICY, restKey)) continue;
+    if (value === null || value === undefined) continue;
     let mapped = value;
     if (ENUM_POLICY_FIELDS.has(restKey) && typeof value === 'string') {
       mapped = value.toUpperCase();
+    }
+    if (key === 'checkResponseTimeout') {
+      mapped = mapGraphqlCheckResponseTimeoutToMinutes(mapped);
     }
     normalized[restKey] = mapped;
   }
@@ -184,7 +213,8 @@ export function normalizeNativeQueuePolicyParameters(observed = {}) {
 
 /**
  * GraphQL live configuration wins for every field it actually returns. REST
- * keeps fields GraphQL omits (notably `grouping_strategy`).
+ * keeps fields GraphQL omits (notably `grouping_strategy`) or returns as
+ * null. GraphQL `checkResponseTimeout` is converted from seconds first.
  *
  * @param {Record<string, unknown> | null | undefined} restParameters
  * @param {Record<string, unknown> | null | undefined} liveQueueConfiguration

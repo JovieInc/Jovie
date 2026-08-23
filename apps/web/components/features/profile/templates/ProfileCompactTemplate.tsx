@@ -41,6 +41,7 @@ import {
   buildProfileAccentCssVars,
   readProfileAccentTheme,
 } from '@/lib/profile/profile-theme';
+import { getPermittedPublicProfileNavigation } from '@/lib/profile/route-config';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import {
   useUnsubscribeNotificationsMutation,
@@ -250,6 +251,11 @@ export function ProfileCompactTemplate({
   const hasTip =
     showPayButton && socialLinks.some(link => link.platform === 'venmo');
   const hasReleases = (releases?.length ?? 0) >= 2;
+  const publicProfileNavIds = getPermittedPublicProfileNavigation({
+    fanCaptureEnabled: allowFanCapture,
+  })
+    .map(destination => destination.id)
+    .join(',');
   const initialDrawerView = resolveDrawerView(
     mode,
     { hasContacts, hasTip, hasReleases },
@@ -813,6 +819,7 @@ export function ProfileCompactTemplate({
             ref={compactShellRef}
             className='public-profile-compact-shell relative flex h-full min-w-0 w-full flex-col overflow-hidden bg-(--profile-content-bg) md:mx-auto md:rounded-(--profile-shell-card-radius) md:border md:border-(--profile-panel-border) md:shadow-(--profile-panel-shadow)'
             data-testid='profile-compact-shell'
+            data-public-profile-nav={publicProfileNavIds}
           >
             {profileBanner ? (
               <div

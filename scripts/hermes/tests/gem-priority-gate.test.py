@@ -233,7 +233,15 @@ GREEN_SIGNALS: dict[str, object] = {
         "scope": "exact-main-head",
         "observedAt": MODULE.isoformat(MODULE.utc_now()),
     },
-    "concurrencyEvidence": None,
+    "concurrencyEvidence": {
+        "schema": "gem-concurrency-evidence/v1",
+        "target": 4,
+        "approved": True,
+        "cleanRuns": 1,
+        "severeIncidents": 0,
+        "observedAt": MODULE.isoformat(MODULE.utc_now()),
+        "accepted": True,
+    },
 }
 
 
@@ -952,6 +960,12 @@ class IndependentReviewTests(unittest.TestCase):
     def evaluate(self, review: object) -> dict[str, object]:
         signals = dict(GREEN_SIGNALS)
         signals["independentReview"] = review
+        evidence = signals.get("concurrencyEvidence")
+        if isinstance(evidence, dict):
+            signals["concurrencyEvidence"] = {
+                **evidence,
+                "observedAt": MODULE.isoformat(self.NOW),
+            }
         return MODULE.evaluate(signals, MODULE.isoformat(self.NOW))
 
     def test_valid_receipt_is_exact_head_and_explicitly_authorized(self):

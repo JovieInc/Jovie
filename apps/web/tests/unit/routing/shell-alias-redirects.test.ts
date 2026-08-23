@@ -100,6 +100,8 @@ describe('shell alias redirects', () => {
   });
 
   it('routes tipping aliases through shell pages to artist pay settings', () => {
+    expect(DashboardTippingPage).toBe(CanonicalTippingPage);
+
     for (const Page of [CanonicalTippingPage, DashboardTippingPage]) {
       expect(() => Page()).toThrow(
         `REDIRECT:${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`
@@ -107,6 +109,13 @@ describe('shell alias redirects', () => {
     }
 
     expect(redirectMock).toHaveBeenCalledTimes(2);
+    const destination = new URL(
+      redirectMock.mock.calls[0]?.[0] ?? '',
+      'https://jov.ie'
+    );
+    expect(destination.pathname).toBe(APP_ROUTES.SETTINGS_ARTIST_PROFILE);
+    expect(destination.searchParams.get('tab')).toBe('earn');
+    expect(destination.hash).toBe('#pay');
   });
 
   it('routes legacy dashboard chat through the shell and preserves query params', async () => {

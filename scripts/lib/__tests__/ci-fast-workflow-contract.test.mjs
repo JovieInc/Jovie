@@ -153,7 +153,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'profile-admission':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts',
       structural:
-        'pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm component-ship-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
+        'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm component-ship-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
     });
   });
 
@@ -177,11 +177,13 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(structuralDecision).not.toContain('apps/ios/');
     expect(structuralDecision).toContain('echo "skip=true"');
     expect(structuralDecision).toContain(
-      'scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|ownership-inventory)'
+      'scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|ownership-inventory)'
     );
     expect(structuralDecision).toContain(
-      'scripts/backlog-orchestrator/__tests__/(pre-lease-gates|ownership-inventory)'
+      'scripts/backlog-orchestrator/__tests__/(pre-lease-gates|gate-next-hold|ownership-inventory)'
     );
+    expect(structuralDecision).toContain('canon/invariants\\.jsonl');
+    expect(structuralDecision).toContain('scripts/invariants/');
     expect(CI_FAST_SOURCE).toMatch(
       /function runDesignConformance\(\)[\s\S]*LANE_COMMANDS\['design-conformance'\]/
     );
@@ -226,6 +228,9 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     expect(CI_FAST_SOURCE).toContain(
       'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'node --test scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs'
     );
     expect(CI_FAST_SOURCE).toContain(
       'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs'

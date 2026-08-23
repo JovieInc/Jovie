@@ -7,7 +7,7 @@ import { ReleaseCalendar } from '@/components/jovie/release-calendar/ReleaseCale
 import { ReleaseMomentDrawer } from '@/components/jovie/release-calendar/ReleaseMomentDrawer';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { PageShell } from '@/components/organisms/PageShell';
+import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
 import { useAppFlag } from '@/lib/flags/client';
 import {
   type DemoMoment,
@@ -32,9 +32,9 @@ export default function ReleasePlanPage() {
   }
 
   return (
-    <PageShell
+    <AppShellContentPanel
       aria-label='Release Plan'
-      frame='none'
+      frame='content-container'
       contentPadding='default'
       className='h-full'
       data-testid='release-plan-shell'
@@ -90,6 +90,6 @@ export default function ReleasePlanPage() {
         moment={selected}
         onClose={() => setSelectedSlug(null)}
       />
-    </PageShell>
+    </AppShellContentPanel>
   );
 }
