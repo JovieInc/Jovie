@@ -250,6 +250,7 @@ describe('merge_group workflow contract', () => {
       'ci-unit-tests',
       'ci-build-layout',
       'ci-ios',
+      'ci-macos',
       'ci-promptfoo-evals',
       'ci-golden-eval-set',
     ]) {
@@ -313,6 +314,7 @@ describe('merge_group workflow contract', () => {
     expect(aggregate).toContain('ci-unit-tests');
     expect(aggregate).toContain('ci-build-layout');
     expect(aggregate).toContain('ci-ios');
+    expect(aggregate).toContain('ci-macos');
     expect(aggregate).toContain('ci-promptfoo-evals');
     expect(aggregate).toContain('ci-golden-eval-set');
     expect(aggregate).toContain('ci-golden-path-lock');
@@ -357,6 +359,7 @@ describe('merge_group workflow contract', () => {
       'ci-unit-tests',
       'ci-build-layout',
       'ci-ios',
+      'ci-macos',
       'ci-promptfoo-evals',
       'ci-golden-eval-set',
     ]) {
@@ -375,6 +378,21 @@ describe('merge_group workflow contract', () => {
     expect(buildLayout).not.toContain('actions/download-artifact');
     expect(unitTests).toContain(
       "shard: ['1/10', '2/10', '3/10', '4/10', '5/10', '6/10', '7/10', '8/10', '9/10', '10/10']"
+    );
+
+    const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
+    expect(macos).toContain('runs-on: macos-26');
+    expect(CI_WORKFLOW).toContain(
+      "MACOS_PATTERN='^apps/macos/MenuMonitor/(Package\\.swift|Sources/|Tests/)'"
+    );
+    expect(CI_WORKFLOW).not.toContain('.github/workflows/macos-ci.yml');
+    expect(macos).toContain("github.event_name == 'merge_group'");
+    expect(macos).not.toContain("github.event_name == 'pull_request'");
+    expect(macos).toContain(
+      'swift test --package-path apps/macos/MenuMonitor --enable-code-coverage'
+    );
+    expect(macos).toContain(
+      'swift build --package-path apps/macos/MenuMonitor -c release'
     );
     expect(unitTests).toContain(
       "github.event_name == 'merge_group' && matrix.shard == '4/10'"
@@ -1021,6 +1039,7 @@ ${heavyGateScript}`,
       'ci-fast',
       'ci-build-layout',
       'ci-ios',
+      'ci-macos',
       'ci-promptfoo-evals',
       'ci-golden-eval-set',
       'ci-secret-scan',

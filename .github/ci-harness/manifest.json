@@ -139,6 +139,15 @@
       "remediation": "Repair the path-selected Xcode build or test regression on the exact combined head; source PRs run only the portable iOS fast contract."
     },
     {
+      "id": "ci-macos",
+      "name": "macOS MenuMonitor Build + Test (combined)",
+      "tier": "combined-integration",
+      "mergeGate": true,
+      "gateStage": "merge-group",
+      "nextLocalCommand": "swift test --package-path apps/macos/MenuMonitor --enable-code-coverage && swift build --package-path apps/macos/MenuMonitor -c release",
+      "remediation": "Repair the path-selected MenuMonitor Swift test, coverage, or release-build regression on the exact combined head; source PRs keep the hosted native build off their fast gate."
+    },
+    {
       "id": "ci-promptfoo-evals",
       "name": "Promptfoo Evals (deterministic)",
       "tier": "combined-integration",
