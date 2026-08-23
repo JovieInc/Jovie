@@ -120,11 +120,13 @@ async function captureCatalogImage(
   return replaceWithAtomicSibling(catalogPath, async nextPath => {
     if (scenario.captureTarget === 'locator' && scenario.captureSelector) {
       await page.locator(scenario.captureSelector).first().screenshot({
+        animations: 'disabled',
         path: nextPath,
         type: 'png',
       });
     } else {
       await page.screenshot({
+        animations: 'disabled',
         path: nextPath,
         type: 'png',
         fullPage: scenario.fullPage,
