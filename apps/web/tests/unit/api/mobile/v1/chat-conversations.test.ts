@@ -6,6 +6,11 @@ const hoisted = vi.hoisted(() => ({
   requireMobileProfileSessionMock: vi.fn(),
   listMobileConversationsMock: vi.fn(),
   getMobileConversationDetailMock: vi.fn(),
+  checkAdminRoleMock: vi.fn(),
+}));
+
+vi.mock('@/lib/admin/roles', () => ({
+  isAdmin: hoisted.checkAdminRoleMock,
 }));
 
 vi.mock('@/lib/mobile/session-auth', () => ({
@@ -38,7 +43,16 @@ describe('GET /api/mobile/v1/chat/conversations', () => {
         latestMessageRole: 'assistant',
         latestTurnStatus: 'completed',
       },
+      {
+        id: 'conv_ov',
+        title: 'OV | Taste cards',
+        createdAt: new Date('2026-06-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-06-03T00:00:00.000Z'),
+        latestMessageRole: 'assistant',
+        latestTurnStatus: 'completed',
+      },
     ]);
+    hoisted.checkAdminRoleMock.mockResolvedValue(false);
   });
 
   it('returns 401 without a mobile session token', async () => {
@@ -65,7 +79,7 @@ describe('GET /api/mobile/v1/chat/conversations', () => {
     expect(response.status).toBe(200);
     expect(hoisted.listMobileConversationsMock).toHaveBeenCalledWith({
       creatorProfileId: 'profile_123',
-      limit: 5,
+      limit: 50,
     });
     await expect(response.json()).resolves.toEqual({
       conversations: [
@@ -80,6 +94,45 @@ describe('GET /api/mobile/v1/chat/conversations', () => {
       ],
     });
   });
+
+  it('hides OV conversations from the artist list', async () => {
+    const { GET } = await listRoutePromise;
+    const response = await GET(
+      new Request('https://jov.ie/api/mobile/v1/chat/conversations')
+    );
+    const data = await response.json();
+
+    expect(data.conversations.map((row: { id: string }) => row.id)).toEqual([
+      'conv_1',
+    ]);
+  });
+
+  it('forbids ov workspace conversation lists for non-admins', async () => {
+    const { GET } = await listRoutePromise;
+    const response = await GET(
+      new Request(
+        'https://jov.ie/api/mobile/v1/chat/conversations?workspace=ov'
+      )
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it('lists only OV conversations for admins in ov workspace', async () => {
+    hoisted.checkAdminRoleMock.mockResolvedValue(true);
+    const { GET } = await listRoutePromise;
+    const response = await GET(
+      new Request(
+        'https://jov.ie/api/mobile/v1/chat/conversations?workspace=ov'
+      )
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.conversations.map((row: { id: string }) => row.id)).toEqual([
+      'conv_ov',
+    ]);
+  });
 });
 
 describe('GET /api/mobile/v1/chat/conversations/[id]', () => {
@@ -89,6 +142,7 @@ describe('GET /api/mobile/v1/chat/conversations/[id]', () => {
       profile: { id: 'profile_123' },
       userId: 'user_123',
     });
+    hoisted.checkAdminRoleMock.mockResolvedValue(false);
     hoisted.getMobileConversationDetailMock.mockResolvedValue({
       conversation: {
         id: 'conv_1',

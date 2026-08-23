@@ -9,6 +9,7 @@ export type MobileInboxActionItem = {
   readonly why: string;
   readonly primaryActionLabel: string;
   readonly status: 'pending';
+  readonly imageUrl?: string | null;
 };
 
 export type MobileInboxEmptyActionCard = {

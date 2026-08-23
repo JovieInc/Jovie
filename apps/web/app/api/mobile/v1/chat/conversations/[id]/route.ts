@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server';
+import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { getMobileConversationDetail } from '@/lib/mobile/chat/conversations';
 import { requireMobileProfileSession } from '@/lib/mobile/session-auth';
+import {
+  isOvConversationTitle,
+  parseMobileWorkspace,
+} from '@/lib/mobile/workspace';
 
 export const runtime = 'nodejs';
 
@@ -19,6 +24,25 @@ export async function GET(request: Request, { params }: RouteParams) {
     }
 
     const url = new URL(request.url);
+    const workspaceResult = parseMobileWorkspace(
+      url.searchParams.get('workspace')
+    );
+    if (!workspaceResult.ok) {
+      return NextResponse.json(
+        { error: 'Invalid workspace' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+    if (
+      workspaceResult.workspace === 'ov' &&
+      !(await checkAdminRole(auth.userId))
+    ) {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
     const limitParam = url.searchParams.get('limit');
     const parsed = limitParam ? Number.parseInt(limitParam, 10) : 100;
     const limit = Number.isFinite(parsed) ? parsed : 100;
@@ -46,6 +70,14 @@ export async function GET(request: Request, { params }: RouteParams) {
     }
 
     if (!detail) {
+      return NextResponse.json(
+        { error: 'Conversation not found' },
+        { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const isOv = isOvConversationTitle(detail.conversation.title);
+    if (workspaceResult.workspace === 'ov' ? !isOv : isOv) {
       return NextResponse.json(
         { error: 'Conversation not found' },
         { status: 404, headers: NO_STORE_HEADERS }

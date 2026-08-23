@@ -15,6 +15,7 @@ const hoisted = vi.hoisted(() => ({
   getMobileConversationDetail: vi.fn(),
   fetchReleasesForChat: vi.fn(),
   dbLimit: vi.fn(),
+  handleMobileOvChatTurn: vi.fn(),
 }));
 
 vi.mock('@/lib/auth/session', () => ({
@@ -48,6 +49,10 @@ vi.mock('@/lib/chat/run', () => ({
 
 vi.mock('@/lib/mobile/chat/conversations', () => ({
   getMobileConversationDetail: hoisted.getMobileConversationDetail,
+}));
+
+vi.mock('@/lib/mobile/chat/turn-handler-ov', () => ({
+  handleMobileOvChatTurn: hoisted.handleMobileOvChatTurn,
 }));
 
 vi.mock('@/lib/chat/releases', () => ({
@@ -188,6 +193,7 @@ describe('handleMobileChatTurn artist-context seam', () => {
         clientMessageId: 'client_msg_1',
         text: 'What should I post this week?',
         source: 'typed',
+        chatMode: null,
       },
       new AbortController().signal
     );
@@ -210,5 +216,30 @@ describe('handleMobileChatTurn artist-context seam', () => {
     const body = await response.text();
     expect(body).not.toContain(GENERIC_ARTIST_CONTEXT_ERROR);
     expect(body).toContain('Here is a real reply.');
+    expect(hoisted.handleMobileOvChatTurn).not.toHaveBeenCalled();
+  });
+
+  it('routes ov chatMode to Summer/ops and never runs artist Jovie generation', async () => {
+    const ovResponse = new Response('{"type":"assistant.completed"}\n', {
+      status: 200,
+    });
+    hoisted.handleMobileOvChatTurn.mockResolvedValue(ovResponse);
+
+    const response = await handleMobileChatTurn(
+      USER_ID,
+      {
+        clientTurnId: 'client_turn_ov',
+        clientMessageId: 'client_msg_ov',
+        text: 'What stills need a taste decision?',
+        source: 'typed',
+        chatMode: 'ov',
+      },
+      new AbortController().signal
+    );
+
+    expect(response).toBe(ovResponse);
+    expect(hoisted.handleMobileOvChatTurn).toHaveBeenCalledTimes(1);
+    expect(hoisted.executeChatTurn).not.toHaveBeenCalled();
+    expect(hoisted.reserveChatTurn).not.toHaveBeenCalled();
   });
 });

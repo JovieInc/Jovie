@@ -41,6 +41,8 @@ import {
   embedMobileMerchArtifactsInContent,
   mobileMerchToolEventsFromResults,
 } from '@/lib/mobile/chat/tool-artifacts';
+import { handleMobileOvChatTurn } from '@/lib/mobile/chat/turn-handler-ov';
+import { isOvConversationTitle } from '@/lib/mobile/workspace';
 import { checkAiChatRateLimitForPlan } from '@/lib/rate-limit';
 
 function buildUiMessagesFromHistory(
@@ -126,7 +128,32 @@ export async function handleMobileChatTurn(
     );
   }
 
+  if (parsed.chatMode === 'ov') {
+    return handleMobileOvChatTurn({
+      userId,
+      profileId: session.profile.id,
+      parsed,
+      signal,
+    });
+  }
+
   const profileId = session.profile.id;
+
+  if (parsed.conversationId) {
+    const existing = await getMobileConversationDetail({
+      conversationId: parsed.conversationId,
+      creatorProfileId: profileId,
+      limit: 1,
+    });
+    if (existing && isOvConversationTitle(existing.conversation.title)) {
+      return errorNdjsonResponse(
+        400,
+        'WORKSPACE_MISMATCH',
+        'That conversation belongs to Ovie mode.'
+      );
+    }
+  }
+
   const reservation = await reserveChatTurn({
     conversationId: parsed.conversationId ?? null,
     clientTurnId: parsed.clientTurnId,
