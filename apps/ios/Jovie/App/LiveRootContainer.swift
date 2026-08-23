@@ -155,6 +155,15 @@ struct LiveRootContainer: View {
       }
 
       guard MobileAuthReturnParser.isCodeCallback(url) else {
+        if let signedInRoute = MobileSignedInLinkRoute.resolve(url) {
+          Observability.addBreadcrumb(
+            .deepLinkRouteMatched,
+            context: ["route": signedInRoute.rawValue, "url": url]
+          )
+          IntentNavigationStore.shared.submit(signedInRoute.intent)
+          return
+        }
+
         Observability.addBreadcrumb(
           .deepLinkRouteUnmatched,
           level: .warning,

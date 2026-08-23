@@ -121,6 +121,7 @@ test('desktop disposition blocks unsafe protocols and foreign hosts', () => {
 test('desktop disposition allows local app origin only when running locally', () => {
   assertDisposition(localPolicy, 'in-app', [
     'http://127.0.0.1:3112/app',
+    'http://127.0.0.1:3100/app',
     'http://127.0.0.1:3112/signin/sso-callback?desktop_return=%2Fapp',
   ]);
   assertDisposition(localPolicy, 'external', [

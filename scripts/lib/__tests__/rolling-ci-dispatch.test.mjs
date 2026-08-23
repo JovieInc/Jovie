@@ -501,6 +501,10 @@ describe('rolling CI dispatch CLI and workflow', () => {
       'node scripts/lib/rolling-ci-fx.mjs',
       'scripts/lib/rolling-ci-handoff.mjs',
       'Launch FX remediator',
+      'Record FX outcome',
+      'fx_outcome',
+      '::notice::FX outcome=',
+      'startup_failure',
       'runs-on: ubuntu-latest',
     ]) {
       expect(WORKFLOW, token).toContain(token);

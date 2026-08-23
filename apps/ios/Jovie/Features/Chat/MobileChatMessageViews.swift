@@ -198,7 +198,7 @@ struct ChatComposerView: View {
     ChatComposerBar(
       draft: $draft,
       isFocused: $isComposerFocused,
-      placeholder: isOffline ? "Ask Jovie (offline)" : "Ask Jovie",
+      placeholder: ChatComposerCopy.emptyPlaceholder,
       isSending: isSending,
       isPlusEnabled: ChatComposerMetrics.isPlusEnabled(isSending: isSending),
       onSend: onSend,
@@ -206,6 +206,7 @@ struct ChatComposerView: View {
       onSelectWorkflow: onSelectWorkflow,
       onDraftEdited: onDraftEdited
     )
+    .accessibilityValue(isOffline ? "Offline" : "")
   }
 }
 
