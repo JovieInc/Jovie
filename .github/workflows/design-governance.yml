@@ -1,10 +1,19 @@
 name: Design Governance
 
-# Standing design-governance audit (docs/design-system/GOVERNANCE.md).
-# Weekly + workflow_dispatch only. Not a ci-fast / PR Ready merge gate.
-# Informational / standing-issue only — must not grow into a heavy PR lane.
+# Standing governance reconciliation. Reuses one weekly scheduler for design and
+# invariant stewardship; founder-decision, registry-change, and enforcement-failure
+# events run the invariant audit immediately. Not a ci-fast / PR Ready merge gate.
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'canon/invariants.json'
+      - 'apps/web/lib/ovie/generated/invariant-stewardship.current-week.json'
+      - 'scripts/invariant-stewardship/**'
+      - '.github/workflows/design-governance.yml'
+  repository_dispatch:
+    types: [founder-decision-recorded, invariant-enforcement-failed]
   schedule:
     # Monday 08:17 UTC, offset from the :00/:30 scheduled-suite pileup.
     - cron: '17 8 * * 1'
@@ -15,11 +24,13 @@ permissions:
   issues: write
 
 concurrency:
-  group: design-governance-${{ github.ref }}
+  # One author/reconciler at a time; this does not limit Symphony coding lanes.
+  group: governance-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   audit:
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     name: Design Governance Audit
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -84,3 +95,30 @@ jobs:
       - name: Fail on audit failure
         if: ${{ steps.audit.outputs.exit_code != '0' }}
         run: exit 1
+
+  invariant-stewardship:
+    name: Invariant Stewardship Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Validate current-week invariant stewardship state
+        # Pure node + checked-in evidence. No external API calls, database,
+        # queue, credentials, or package install.
+        run: node scripts/invariant-stewardship/audit.mjs | tee invariant-stewardship-audit.json
+
+      - name: Upload invariant stewardship receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: invariant-stewardship-${{ github.run_id }}
+          path: invariant-stewardship-audit.json
+          retention-days: 30
+          if-no-files-found: error
+

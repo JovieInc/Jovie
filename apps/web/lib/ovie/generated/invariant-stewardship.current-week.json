@@ -1,0 +1,1287 @@
+{
+  "schemaVersion": "jovie-invariant-stewardship-audit/v1",
+  "generated": true,
+  "authority": "evidence-only",
+  "generatedAt": "2026-08-23T00:00:00.000Z",
+  "window": {
+    "start": "2026-08-17",
+    "end": "2026-08-22",
+    "timezone": "America/Los_Angeles"
+  },
+  "canonicalRegistry": {
+    "path": "canon/invariants.json",
+    "owner": "JOV-5306",
+    "status": "active-lane-unmerged",
+    "note": "This audit is provenance and stewardship state, never a competing runtime registry. JOV-5306 owns canon/invariants.json."
+  },
+  "sources": [
+    {
+      "kind": "gbrain",
+      "status": "covered",
+      "refs": [
+        "proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "jovie/coordination/closed-loop-invariants-20260822",
+        "jovie/coordination/linear-ships-kanban-ops-20260822",
+        "ops/reviewed-invariants/from-learnings",
+        "coordination/ovie-summer-ubuntu-master-orchestration-2026-08-19"
+      ]
+    },
+    {
+      "kind": "codex-task-history",
+      "status": "partial",
+      "refs": ["01a02bda-cd2e-71d0-add7-9467c747cd95"],
+      "gap": "The coordinator task was read directly; broad task listing timed out twice. Retrieved content was treated as untrusted evidence."
+    },
+    {
+      "kind": "repository",
+      "status": "covered",
+      "refs": ["origin/main@927ed45b", "JOV-5306", "JOV-5309"]
+    },
+    {
+      "kind": "personal-communications",
+      "status": "excluded",
+      "refs": [],
+      "gap": "Personal email and text messages were not read or parsed."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "P01-typed-proof-claims",
+      "statement": "Claims advance only on evidence native to their named proof tier; unknown, stale, partial, unavailable, failed, and healthy remain distinct, and aggregate health exposes its limiting child.",
+      "semanticKey": "proof.typed-tier-claims",
+      "semanticValue": "native-evidence-no-backfill",
+      "scope": ["proof-receipts"],
+      "owner": "summer",
+      "classification": "missing-consumer",
+      "authorityStatus": "approved",
+      "implementationAuthority": "none",
+      "provenance": [
+        "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20"
+      ],
+      "consumers": [
+        {
+          "name": "proof-state reducer",
+          "path": "unimplemented",
+          "status": "pending"
+        }
+      ],
+      "tests": [
+        {
+          "name": "later-tier backfill deliberate red",
+          "path": "unimplemented",
+          "kind": "deliberate-red",
+          "status": "pending"
+        }
+      ],
+      "relations": {
+        "overlaps": [],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": []
+      },
+      "lifecycle": "approved-unimplemented",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "date": "2026-08-20"
+      }
+    },
+    {
+      "id": "P04-precedence",
+      "statement": "Keep the most correct invariant; when consequential correctness remains genuinely unclear, the most recent founder-approved invariant wins and ambiguity is surfaced.",
+      "semanticKey": "invariants.precedence",
+      "semanticValue": "correctness-then-recency",
+      "scope": ["company"],
+      "owner": "summer",
+      "classification": "approved",
+      "authorityStatus": "approved",
+      "implementationAuthority": "JOV-5309",
+      "provenance": [
+        "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "user:2026-08-22"
+      ],
+      "consumers": [
+        {
+          "name": "semantic audit",
+          "path": "scripts/invariant-stewardship/audit.mjs",
+          "status": "active"
+        }
+      ],
+      "tests": [
+        {
+          "name": "undeclared contradiction deliberate red",
+          "path": "scripts/invariant-stewardship/audit.test.mjs",
+          "kind": "deliberate-red",
+          "status": "active"
+        }
+      ],
+      "relations": {
+        "overlaps": [],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": []
+      },
+      "lifecycle": "active",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "date": "2026-08-22"
+      }
+    },
+    {
+      "id": "P02-hot-runtime-proof",
+      "statement": "Changed user-visible routes and states require authenticated hot-runtime proof bound to the exact source and process before remote CI; that proof cannot substitute for later tiers.",
+      "semanticKey": "proof.visible-surface-hot-runtime",
+      "semanticValue": "exact-source-authenticated-before-ci",
+      "scope": ["user-visible-surfaces"],
+      "owner": "symphony",
+      "classification": "missing-consumer",
+      "authorityStatus": "approved",
+      "implementationAuthority": "none",
+      "provenance": [
+        "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20"
+      ],
+      "consumers": [
+        {
+          "name": "changed-surface proof admission",
+          "path": "scripts",
+          "status": "pending"
+        }
+      ],
+      "tests": [
+        {
+          "name": "wrong worktree and omitted route deliberate red",
+          "path": "scripts",
+          "kind": "deliberate-red",
+          "status": "pending"
+        }
+      ],
+      "relations": {
+        "overlaps": [],
+        "conflicts": [],
+        "supersedes": ["local-browser-review-advisory-only"],
+        "scopeSeparated": []
+      },
+      "lifecycle": "approved-unimplemented",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "date": "2026-08-20"
+      }
+    },
+    {
+      "id": "P03-collision-scoped-admission",
+      "statement": "Incident repair admits one owner per intersecting collision chain and gives every intersecting PR, run, or lease an explicit disposition without freezing disjoint work.",
+      "semanticKey": "incidents.collision-admission",
+      "semanticValue": "one-owner-scoped-disposition",
+      "scope": ["incident-repair"],
+      "owner": "summer",
+      "classification": "missing-consumer",
+      "authorityStatus": "approved",
+      "implementationAuthority": "none",
+      "provenance": [
+        "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20"
+      ],
+      "consumers": [
+        {
+          "name": "incident admission receipt",
+          "path": "scripts",
+          "status": "pending"
+        }
+      ],
+      "tests": [
+        {
+          "name": "two owners and global hold deliberate red",
+          "path": "scripts",
+          "kind": "deliberate-red",
+          "status": "pending"
+        }
+      ],
+      "relations": {
+        "overlaps": [],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": []
+      },
+      "lifecycle": "approved-unimplemented",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "date": "2026-08-20"
+      }
+    },
+    {
+      "id": "P05-provenance-drift",
+      "statement": "Every adopted invariant retains source, date, authority, owner, scope, lifecycle, and enforcement provenance; stale or unbound policy stays visible.",
+      "semanticKey": "invariants.provenance",
+      "semanticValue": "required-and-drift-visible",
+      "scope": ["company"],
+      "owner": "summer",
+      "classification": "approved",
+      "authorityStatus": "approved",
+      "implementationAuthority": "JOV-5309",
+      "provenance": [
+        "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "user:2026-08-22"
+      ],
+      "consumers": [
+        {
+          "name": "audit validator",
+          "path": "scripts/invariant-stewardship/audit.mjs",
+          "status": "active"
+        }
+      ],
+      "tests": [
+        {
+          "name": "missing provenance deliberate red",
+          "path": "scripts/invariant-stewardship/audit.test.mjs",
+          "kind": "deliberate-red",
+          "status": "active"
+        }
+      ],
+      "relations": {
+        "overlaps": [],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": []
+      },
+      "lifecycle": "active",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "date": "2026-08-22"
+      }
+    },
+    {
+      "id": "P06-canonical-stewardship-receipt",
+      "statement": "Each stewardship run emits one canonical index receipt for corpus snapshots, source gaps, candidate dispositions, provenance, founder disposition, and no-op reason without substituting for tier-specific proof.",
+      "semanticKey": "invariants.stewardship-receipt",
+      "semanticValue": "canonical-index-no-proof-collapse",
+      "scope": ["company"],
+      "owner": "summer",
+      "classification": "approved",
+      "authorityStatus": "approved",
+      "implementationAuthority": "JOV-5309",
+      "provenance": [
+        "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "user:2026-08-22"
+      ],
+      "consumers": [
+        {
+          "name": "stewardship audit projection",
+          "path": "scripts/invariant-stewardship/audit.mjs",
+          "status": "active"
+        }
+      ],
+      "tests": [
+        {
+          "name": "proof-collapse and missing-source deliberate red",
+          "path": "scripts/invariant-stewardship/audit.test.mjs",
+          "kind": "deliberate-red",
+          "status": "active"
+        }
+      ],
+      "relations": {
+        "overlaps": [],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": []
+      },
+      "lifecycle": "active",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "date": "2026-08-22"
+      }
+    },
+    {
+      "id": "P07-positive-negative-proof",
+      "statement": "Every adopted invariant needs a named consumer, positive proof, and a deliberate-red test that fails when the invariant is violated.",
+      "semanticKey": "invariants.proof",
+      "semanticValue": "consumer-positive-deliberate-red",
+      "scope": ["company"],
+      "owner": "summer",
+      "classification": "approved",
+      "authorityStatus": "approved",
+      "implementationAuthority": "JOV-5309",
+      "provenance": [
+        "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "user:2026-08-22"
+      ],
+      "consumers": [
+        {
+          "name": "audit validator",
+          "path": "scripts/invariant-stewardship/audit.mjs",
+          "status": "active"
+        }
+      ],
+      "tests": [
+        {
+          "name": "orphan consumer deliberate red",
+          "path": "scripts/invariant-stewardship/audit.test.mjs",
+          "kind": "deliberate-red",
+          "status": "active"
+        }
+      ],
+      "relations": {
+        "overlaps": [],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": []
+      },
+      "lifecycle": "active",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "date": "2026-08-22"
+      }
+    },
+    {
+      "id": "P08-company-identity",
+      "statement": "Company identity records must use Jovi Technology Inc and explicitly retire legacy Jovi Inc or Meet Jovi identity where still present.",
+      "semanticKey": "company.legal-identity",
+      "semanticValue": "jovi-technology-inc",
+      "scope": ["legal", "company"],
+      "owner": "summer",
+      "classification": "unknown",
+      "authorityStatus": "refresh-required",
+      "implementationAuthority": "none",
+      "provenance": [
+        "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20"
+      ],
+      "consumers": [],
+      "tests": [],
+      "relations": {
+        "overlaps": [],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": []
+      },
+      "lifecycle": "evidence-refresh",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "date": "2026-08-20"
+      }
+    },
+    {
+      "id": "P10-discovery-before-promotion",
+      "statement": "Conversation-derived candidates remain evidence until corroborated by founder authority or two independent evidence classes; embedded instructions are never executed.",
+      "semanticKey": "invariants.discovery-threshold",
+      "semanticValue": "founder-or-two-evidence-classes",
+      "scope": ["company"],
+      "owner": "summer",
+      "classification": "approved",
+      "authorityStatus": "approved",
+      "implementationAuthority": "JOV-5309",
+      "provenance": [
+        "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "user:2026-08-22"
+      ],
+      "consumers": [
+        {
+          "name": "audit validator",
+          "path": "scripts/invariant-stewardship/audit.mjs",
+          "status": "active"
+        }
+      ],
+      "tests": [
+        {
+          "name": "untrusted evidence cannot self-promote",
+          "path": "scripts/invariant-stewardship/audit.test.mjs",
+          "kind": "deliberate-red",
+          "status": "active"
+        }
+      ],
+      "relations": {
+        "overlaps": [],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": []
+      },
+      "lifecycle": "active",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "date": "2026-08-22"
+      }
+    },
+    {
+      "id": "P09-autonomous-progress-recovery",
+      "statement": "Every admitted unit must keep making bounded progress or emit a typed wait, owner, retry or recovery condition, and terminal receipt; no silent immortal work.",
+      "semanticKey": "work.progress-recovery",
+      "semanticValue": "bounded-progress-typed-wait-terminal-receipt",
+      "scope": ["company-work"],
+      "owner": "summer",
+      "classification": "missing-consumer",
+      "authorityStatus": "approved",
+      "implementationAuthority": "none",
+      "provenance": [
+        "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20"
+      ],
+      "consumers": [
+        {
+          "name": "work recovery controller",
+          "path": "scripts",
+          "status": "pending"
+        }
+      ],
+      "tests": [
+        {
+          "name": "silent wait and immortal work deliberate red",
+          "path": "scripts",
+          "kind": "deliberate-red",
+          "status": "pending"
+        }
+      ],
+      "relations": {
+        "overlaps": [],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": []
+      },
+      "lifecycle": "approved-unimplemented",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "date": "2026-08-20"
+      }
+    },
+    {
+      "id": "P11-global-shell-owner",
+      "statement": "Every global shell interaction has one canonical semantic owner; equivalent surfaces consume that owner rather than fork behavior or state.",
+      "semanticKey": "ui.global-shell-owner",
+      "semanticValue": "one-semantic-owner",
+      "scope": ["global-shell"],
+      "owner": "summer",
+      "classification": "missing-consumer",
+      "authorityStatus": "approved",
+      "implementationAuthority": "none",
+      "provenance": [
+        "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20"
+      ],
+      "consumers": [
+        {
+          "name": "global shell contract",
+          "path": "apps/web",
+          "status": "pending"
+        }
+      ],
+      "tests": [
+        {
+          "name": "second semantic writer deliberate red",
+          "path": "apps/web/tests",
+          "kind": "deliberate-red",
+          "status": "pending"
+        }
+      ],
+      "relations": {
+        "overlaps": ["OPS-canonical-design-source"],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": []
+      },
+      "lifecycle": "approved-unimplemented",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "date": "2026-08-20"
+      }
+    },
+    {
+      "id": "P12-notification-identity-convergence",
+      "statement": "Notifications would use canonical event-backed identity and converge delivery, read, dismissal, and resolution without treating presentation state as work completion.",
+      "semanticKey": "notifications.event-identity-convergence",
+      "semanticValue": "event-backed-no-presentation-collapse",
+      "scope": ["notifications"],
+      "owner": "summer",
+      "classification": "proposed",
+      "authorityStatus": "not-approved",
+      "implementationAuthority": "none",
+      "provenance": [
+        "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20"
+      ],
+      "consumers": [],
+      "tests": [],
+      "relations": {
+        "overlaps": [],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": []
+      },
+      "lifecycle": "proposal",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "date": "2026-08-20"
+      }
+    },
+    {
+      "id": "P18-durable-loop-placement",
+      "statement": "Every durable loop would require one typed placement, one active registry entry, one authority boundary, and one promotion state; unavailable destinations fail closed rather than fall back to an incompatible runtime.",
+      "semanticKey": "work.durable-loop-placement",
+      "semanticValue": "typed-placement-readiness-no-fallback",
+      "scope": ["durable-loops"],
+      "owner": "summer",
+      "classification": "proposed",
+      "authorityStatus": "pending-founder-decision",
+      "implementationAuthority": "none",
+      "provenance": [
+        "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20"
+      ],
+      "consumers": [],
+      "tests": [],
+      "relations": {
+        "overlaps": [],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": []
+      },
+      "lifecycle": "proposal",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "date": "2026-08-20"
+      }
+    },
+    {
+      "id": "P13-proportional-adversarial-diligence",
+      "statement": "Research and adversarial proof scale with consequence, reversibility, uncertainty, and blast radius; source independence and stop conditions remain explicit.",
+      "semanticKey": "decisions.proportional-diligence",
+      "semanticValue": "risk-scaled-evidence",
+      "scope": ["company-decisions"],
+      "owner": "summer",
+      "classification": "missing-consumer",
+      "authorityStatus": "approved",
+      "implementationAuthority": "none",
+      "provenance": [
+        "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20"
+      ],
+      "consumers": [
+        {
+          "name": "decision research admission",
+          "path": "scripts",
+          "status": "pending"
+        }
+      ],
+      "tests": [
+        {
+          "name": "under-researched irreversible decision deliberate red",
+          "path": "scripts",
+          "kind": "deliberate-red",
+          "status": "pending"
+        }
+      ],
+      "relations": {
+        "overlaps": [],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": []
+      },
+      "lifecycle": "approved-unimplemented",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "date": "2026-08-20"
+      }
+    },
+    {
+      "id": "P14-state-driven-flow",
+      "statement": "Work advances on typed state transitions and evidence, not arbitrary elapsed time; timers are bounded safety nets rather than authority.",
+      "semanticKey": "work.state-driven-flow",
+      "semanticValue": "events-not-arbitrary-time",
+      "scope": ["company-work"],
+      "owner": "summer",
+      "classification": "missing-consumer",
+      "authorityStatus": "approved",
+      "implementationAuthority": "none",
+      "provenance": [
+        "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20"
+      ],
+      "consumers": [
+        {
+          "name": "work transition controller",
+          "path": "scripts",
+          "status": "pending"
+        }
+      ],
+      "tests": [
+        {
+          "name": "timer-only promotion deliberate red",
+          "path": "scripts",
+          "kind": "deliberate-red",
+          "status": "pending"
+        }
+      ],
+      "relations": {
+        "overlaps": ["CORE-stewardship-cadence"],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": ["CORE-stewardship-cadence"]
+      },
+      "lifecycle": "approved-unimplemented",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "date": "2026-08-20"
+      }
+    },
+    {
+      "id": "P15-nonterminal-artifact-lifecycle",
+      "statement": "Every nonterminal artifact has an owner, current state, next transition, expiry or review trigger, and cleanup or archival disposition.",
+      "semanticKey": "artifacts.lifecycle",
+      "semanticValue": "owned-stateful-expiring",
+      "scope": ["company-artifacts"],
+      "owner": "summer",
+      "classification": "missing-consumer",
+      "authorityStatus": "approved",
+      "implementationAuthority": "none",
+      "provenance": [
+        "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20"
+      ],
+      "consumers": [
+        {
+          "name": "artifact lifecycle validator",
+          "path": "scripts",
+          "status": "pending"
+        }
+      ],
+      "tests": [
+        {
+          "name": "ownerless immortal artifact deliberate red",
+          "path": "scripts",
+          "kind": "deliberate-red",
+          "status": "pending"
+        }
+      ],
+      "relations": {
+        "overlaps": [],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": []
+      },
+      "lifecycle": "approved-unimplemented",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "date": "2026-08-20"
+      }
+    },
+    {
+      "id": "P16-evidence-default-autonomy",
+      "statement": "Summer acts autonomously within explicit evidence-backed authority and stops at protected actions or exact uncertainty boundaries; an override is explicit and durable.",
+      "semanticKey": "agents.evidence-default-autonomy",
+      "semanticValue": "act-within-boundary-escalate-protected",
+      "scope": ["summer-operations"],
+      "owner": "summer",
+      "classification": "missing-consumer",
+      "authorityStatus": "approved",
+      "implementationAuthority": "none",
+      "provenance": [
+        "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20"
+      ],
+      "consumers": [
+        {
+          "name": "Summer authority gate",
+          "path": "apps/web/lib/ovie/control.ts",
+          "status": "pending"
+        }
+      ],
+      "tests": [
+        {
+          "name": "protected action without authority deliberate red",
+          "path": "apps/web/tests",
+          "kind": "deliberate-red",
+          "status": "pending"
+        }
+      ],
+      "relations": {
+        "overlaps": ["OPS-summer-symphony-boundary"],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": []
+      },
+      "lifecycle": "approved-unimplemented",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "date": "2026-08-20"
+      }
+    },
+    {
+      "id": "P17-delegated-human-outreach",
+      "statement": "Human outreach requires an active recipient-, channel-, purpose-, and expiry-bound authority record, truthful Summer identity, minimum context, and an exact send receipt; access never implies authority.",
+      "semanticKey": "communications.delegated-outreach",
+      "semanticValue": "registered-bounded-no-impersonation",
+      "scope": ["external-communications"],
+      "owner": "summer",
+      "classification": "missing-consumer",
+      "authorityStatus": "approved",
+      "implementationAuthority": "none",
+      "provenance": [
+        "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20"
+      ],
+      "consumers": [
+        {
+          "name": "outbound communication admission",
+          "path": "unimplemented",
+          "status": "pending"
+        }
+      ],
+      "tests": [
+        {
+          "name": "tool access without send authority deliberate red",
+          "path": "unimplemented",
+          "kind": "deliberate-red",
+          "status": "pending"
+        }
+      ],
+      "relations": {
+        "overlaps": [],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": []
+      },
+      "lifecycle": "approved-unimplemented",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "date": "2026-08-20"
+      }
+    },
+    {
+      "id": "P19-provenance-bound-security",
+      "statement": "Security-relevant effects are denied unless an exact, active, provenance-bound authority chain is validated before capability use and again at the effect boundary with least practical capability.",
+      "semanticKey": "security.provenance-bound-authority",
+      "semanticValue": "deny-default-revalidate-least-capability",
+      "scope": ["security-relevant-actions"],
+      "owner": "summer",
+      "classification": "missing-consumer",
+      "authorityStatus": "approved",
+      "implementationAuthority": "none",
+      "provenance": [
+        "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20"
+      ],
+      "consumers": [
+        {
+          "name": "security effect admission",
+          "path": "unimplemented",
+          "status": "pending"
+        }
+      ],
+      "tests": [
+        {
+          "name": "ambient capability without exact authority deliberate red",
+          "path": "unimplemented",
+          "kind": "deliberate-red",
+          "status": "pending"
+        }
+      ],
+      "relations": {
+        "overlaps": [],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": []
+      },
+      "lifecycle": "approved-unimplemented",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "date": "2026-08-20"
+      }
+    },
+    {
+      "id": "OPS-linear-ships",
+      "statement": "Linear is the shipping system of record; Summer's Kanban is operations-only and engineering intake must not land there.",
+      "semanticKey": "work.shipping-system",
+      "semanticValue": "linear-ships-kanban-ops",
+      "scope": ["shipping", "ovie-intake"],
+      "owner": "summer",
+      "classification": "missing-consumer",
+      "authorityStatus": "founder-approved",
+      "implementationAuthority": "none",
+      "provenance": [
+        "gbrain:jovie/coordination/linear-ships-kanban-ops-20260822",
+        "user:2026-08-22"
+      ],
+      "consumers": [
+        {
+          "name": "Ovie classifier",
+          "path": "apps/web/lib/ovie/ingest.ts",
+          "status": "pending"
+        },
+        {
+          "name": "Mac Kanban lander",
+          "path": "scripts/ovie-intake-to-kanban.py",
+          "status": "pending"
+        }
+      ],
+      "tests": [
+        {
+          "name": "engineering routes to Linear",
+          "path": "apps/web/tests/unit/ovie/persist.test.ts",
+          "kind": "deliberate-red",
+          "status": "pending"
+        },
+        {
+          "name": "lander rejects engineering",
+          "path": "scripts/tests/test_ovie_intake_to_kanban.py",
+          "kind": "deliberate-red",
+          "status": "pending"
+        }
+      ],
+      "relations": {
+        "overlaps": [],
+        "conflicts": [],
+        "supersedes": ["company-work-all-kanban"],
+        "scopeSeparated": []
+      },
+      "lifecycle": "approved-unimplemented",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:jovie/coordination/linear-ships-kanban-ops-20260822",
+        "date": "2026-08-22"
+      }
+    },
+    {
+      "id": "CORE-one-executable-registry",
+      "statement": "One versioned machine-readable invariant registry is executable authority; GBrain holds provenance and policy, not a competing runtime registry.",
+      "semanticKey": "invariants.executable-authority",
+      "semanticValue": "repo-registry-only",
+      "scope": ["company"],
+      "owner": "summer",
+      "classification": "missing-consumer",
+      "authorityStatus": "founder-approved",
+      "implementationAuthority": "JOV-5306",
+      "provenance": ["user:2026-08-22", "linear:JOV-5306"],
+      "consumers": [
+        {
+          "name": "canonical registry",
+          "path": "canon/invariants.json",
+          "status": "pending"
+        }
+      ],
+      "tests": [
+        {
+          "name": "registry validator deliberate red",
+          "path": "scripts/invariants",
+          "kind": "deliberate-red",
+          "status": "pending"
+        }
+      ],
+      "relations": {
+        "overlaps": [],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": []
+      },
+      "lifecycle": "blocked-on-owned-lane",
+      "source": {
+        "kind": "linear",
+        "ref": "user:2026-08-22",
+        "date": "2026-08-22"
+      }
+    },
+    {
+      "id": "CORE-stewardship-cadence",
+      "statement": "Discovery and enforcement re-run on new founder decisions, registry changes, enforcement failures, and bounded weekly reconciliation using the existing scheduler and event substrate.",
+      "semanticKey": "invariants.stewardship-cadence",
+      "semanticValue": "event-driven-plus-weekly",
+      "scope": ["company"],
+      "owner": "summer",
+      "classification": "approved",
+      "authorityStatus": "founder-approved",
+      "implementationAuthority": "JOV-5309",
+      "provenance": ["user:2026-08-22"],
+      "consumers": [
+        {
+          "name": "existing governance workflow",
+          "path": ".github/workflows/design-governance.yml",
+          "status": "active"
+        }
+      ],
+      "tests": [
+        {
+          "name": "missing cadence binding deliberate red",
+          "path": "scripts/invariant-stewardship/audit.test.mjs",
+          "kind": "deliberate-red",
+          "status": "active"
+        }
+      ],
+      "relations": {
+        "overlaps": ["P14-state-driven-flow"],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": ["P14-state-driven-flow"]
+      },
+      "lifecycle": "active",
+      "source": {
+        "kind": "founder",
+        "ref": "user:2026-08-22",
+        "date": "2026-08-22"
+      }
+    },
+    {
+      "id": "OPS-stewardship-wip-one",
+      "statement": "Summer admits one invariant-authoring worker at a time so semantic reconciliation remains singular.",
+      "semanticKey": "work.admission-limit",
+      "semanticValue": "one-stewardship-author",
+      "scope": ["invariant-stewardship"],
+      "owner": "summer",
+      "classification": "approved",
+      "authorityStatus": "approved-operating-rule",
+      "implementationAuthority": "JOV-5309",
+      "provenance": ["gbrain:ops/reviewed-invariants/from-learnings"],
+      "consumers": [
+        {
+          "name": "governance workflow concurrency",
+          "path": ".github/workflows/design-governance.yml",
+          "status": "active"
+        }
+      ],
+      "tests": [
+        {
+          "name": "single stewardship concurrency deliberate red",
+          "path": "scripts/invariant-stewardship/audit.test.mjs",
+          "kind": "deliberate-red",
+          "status": "active"
+        }
+      ],
+      "relations": {
+        "overlaps": ["OPS-symphony-measured-capacity"],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": ["OPS-symphony-measured-capacity"]
+      },
+      "lifecycle": "active",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:ops/reviewed-invariants/from-learnings",
+        "date": "2026-08-22"
+      }
+    },
+    {
+      "id": "OPS-symphony-measured-capacity",
+      "statement": "Symphony should maximize coding parallelism within fresh measured capacity and bounded verification, rather than use a global company WIP of one.",
+      "semanticKey": "work.admission-limit",
+      "semanticValue": "measured-coding-capacity",
+      "scope": ["coding-orchestration"],
+      "owner": "symphony",
+      "classification": "missing-consumer",
+      "authorityStatus": "founder-approved",
+      "implementationAuthority": "JOV-5306",
+      "provenance": [
+        "gbrain:jovie/coordination/closed-loop-invariants-20260822",
+        "codex:01a02bda-cd2e-71d0-add7-9467c747cd95"
+      ],
+      "consumers": [
+        {
+          "name": "capacity-aware dispatch",
+          "path": "scripts/backlog-orchestrator/admitter.mjs",
+          "status": "pending"
+        }
+      ],
+      "tests": [
+        {
+          "name": "fresh-capacity bounds",
+          "path": "scripts/invariants",
+          "kind": "deliberate-red",
+          "status": "pending"
+        }
+      ],
+      "relations": {
+        "overlaps": ["OPS-stewardship-wip-one"],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": ["OPS-stewardship-wip-one"]
+      },
+      "lifecycle": "blocked-on-owned-lane",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:jovie/coordination/closed-loop-invariants-20260822",
+        "date": "2026-08-22"
+      }
+    },
+    {
+      "id": "OPS-summer-symphony-boundary",
+      "statement": "Summer owns priorities, approvals, follow-up, and invariant stewardship; Symphony is the sole coding orchestrator and Summer does not edit product code.",
+      "semanticKey": "agents.summer-symphony-boundary",
+      "semanticValue": "summer-governs-symphony-codes",
+      "scope": ["company"],
+      "owner": "summer",
+      "classification": "missing-consumer",
+      "authorityStatus": "founder-approved",
+      "implementationAuthority": "JOV-5306",
+      "provenance": [
+        "gbrain:coordination/ovie-summer-ubuntu-master-orchestration-2026-08-19",
+        "user:2026-08-22"
+      ],
+      "consumers": [
+        {
+          "name": "Summer-to-Symphony dispatch",
+          "path": "scripts/backlog-orchestrator/symphony-routing.mjs",
+          "status": "pending"
+        }
+      ],
+      "tests": [
+        {
+          "name": "Summer cannot code",
+          "path": "scripts/invariants",
+          "kind": "deliberate-red",
+          "status": "pending"
+        }
+      ],
+      "relations": {
+        "overlaps": ["P16-evidence-default-autonomy"],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": []
+      },
+      "lifecycle": "blocked-on-owned-lane",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:coordination/ovie-summer-ubuntu-master-orchestration-2026-08-19",
+        "date": "2026-08-22"
+      }
+    },
+    {
+      "id": "OPS-product-lane-isolation",
+      "statement": "Jovie, LogYourBody, and agent-control work remain isolated unless a founder-approved manifest explicitly composes them.",
+      "semanticKey": "work.product-lane-isolation",
+      "semanticValue": "isolated-unless-manifested",
+      "scope": ["company"],
+      "owner": "summer",
+      "classification": "inferred",
+      "authorityStatus": "conversation-supported",
+      "implementationAuthority": "separate-lane",
+      "provenance": [
+        "codex:01a02bda-cd2e-71d0-add7-9467c747cd95",
+        "gbrain:jovie/coordination/ui-hyperagent-lane-20260822"
+      ],
+      "consumers": [],
+      "tests": [],
+      "relations": {
+        "overlaps": [],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": []
+      },
+      "lifecycle": "candidate",
+      "source": {
+        "kind": "gbrain",
+        "ref": "codex:01a02bda-cd2e-71d0-add7-9467c747cd95",
+        "date": "2026-08-22"
+      }
+    },
+    {
+      "id": "OPS-canonical-design-source",
+      "statement": "Canonical Pen is the single design source; implementation may consume approved intent but may not become a second design writer.",
+      "semanticKey": "design.canonical-source",
+      "semanticValue": "pen-single-writer",
+      "scope": ["design"],
+      "owner": "summer",
+      "classification": "inferred",
+      "authorityStatus": "corroborated-current-week",
+      "implementationAuthority": "separate-lanes",
+      "provenance": [
+        "gbrain:design/conform-tim-lock-2026-08-22-company-wide-marketing",
+        "codex:01a02bda-cd2e-71d0-add7-9467c747cd95"
+      ],
+      "consumers": [],
+      "tests": [],
+      "relations": {
+        "overlaps": ["P11-global-shell-owner"],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": []
+      },
+      "lifecycle": "candidate",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:design/conform-tim-lock-2026-08-22-company-wide-marketing",
+        "date": "2026-08-22"
+      }
+    },
+    {
+      "id": "local-browser-review-advisory-only",
+      "statement": "Local browser review is advisory and cannot certify a changed surface.",
+      "semanticKey": "proof.visible-surface-hot-runtime",
+      "semanticValue": "local-browser-review-advisory",
+      "scope": ["user-visible-surfaces"],
+      "owner": "summer",
+      "classification": "superseded",
+      "authorityStatus": "superseded",
+      "implementationAuthority": "none",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20",
+        "date": "2026-08-20"
+      },
+      "provenance": [
+        "gbrain:proposals/invariant-stewardship-implementation-slate-2026-08-20"
+      ],
+      "consumers": [],
+      "tests": [],
+      "relations": {
+        "overlaps": [],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": []
+      },
+      "lifecycle": "superseded"
+    },
+    {
+      "id": "company-work-all-kanban",
+      "statement": "All company work lands on Summer Kanban, including engineering.",
+      "semanticKey": "work.shipping-system",
+      "semanticValue": "all-kanban",
+      "scope": ["shipping", "ovie-intake"],
+      "owner": "summer",
+      "classification": "superseded",
+      "authorityStatus": "superseded",
+      "implementationAuthority": "none",
+      "source": {
+        "kind": "gbrain",
+        "ref": "gbrain:jovie/coordination/linear-ships-kanban-ops-20260822",
+        "date": "2026-08-22"
+      },
+      "provenance": [
+        "gbrain:jovie/coordination/linear-ships-kanban-ops-20260822"
+      ],
+      "consumers": [],
+      "tests": [],
+      "relations": {
+        "overlaps": [],
+        "conflicts": [],
+        "supersedes": [],
+        "scopeSeparated": []
+      },
+      "lifecycle": "superseded"
+    }
+  ],
+  "declaredFindings": [
+    {
+      "id": "missing-consumer:P02-hot-runtime-proof",
+      "kind": "missing-consumer",
+      "candidateIds": ["P02-hot-runtime-proof"],
+      "owner": "summer",
+      "action": "Name the existing hot-runtime admission path and bind the exact deliberate-red route fixtures before implementation."
+    },
+    {
+      "id": "missing-consumer:P03-collision-scoped-admission",
+      "kind": "missing-consumer",
+      "candidateIds": ["P03-collision-scoped-admission"],
+      "owner": "summer",
+      "action": "Bind incident disposition receipts to the existing repair admission controller."
+    },
+    {
+      "id": "missing-consumer:P09-autonomous-progress-recovery",
+      "kind": "missing-consumer",
+      "candidateIds": ["P09-autonomous-progress-recovery"],
+      "owner": "summer",
+      "action": "Inventory current progress and recovery consumers before selecting an enforcement point."
+    },
+    {
+      "id": "missing-consumer:P11-global-shell-owner",
+      "kind": "missing-consumer",
+      "candidateIds": ["P11-global-shell-owner"],
+      "owner": "summer",
+      "action": "Bind the canonical shell owner and equivalent-surface deliberate-red test."
+    },
+    {
+      "id": "missing-consumer:P13-proportional-adversarial-diligence",
+      "kind": "missing-consumer",
+      "candidateIds": ["P13-proportional-adversarial-diligence"],
+      "owner": "summer",
+      "action": "Bind risk-scaled diligence to the current decision intake path."
+    },
+    {
+      "id": "missing-consumer:P14-state-driven-flow",
+      "kind": "missing-consumer",
+      "candidateIds": ["P14-state-driven-flow"],
+      "owner": "summer",
+      "action": "Map current timer-driven movement and bind state-transition enforcement."
+    },
+    {
+      "id": "missing-consumer:P15-nonterminal-artifact-lifecycle",
+      "kind": "missing-consumer",
+      "candidateIds": ["P15-nonterminal-artifact-lifecycle"],
+      "owner": "summer",
+      "action": "Inventory nonterminal artifact classes and their cleanup owners."
+    },
+    {
+      "id": "missing-consumer:P16-evidence-default-autonomy",
+      "kind": "missing-consumer",
+      "candidateIds": ["P16-evidence-default-autonomy"],
+      "owner": "summer",
+      "action": "Map approved autonomy classes to existing Summer authority gates."
+    },
+    {
+      "id": "missing-consumer:P17-delegated-human-outreach",
+      "kind": "missing-consumer",
+      "candidateIds": ["P17-delegated-human-outreach"],
+      "owner": "summer",
+      "action": "Keep outreach disabled until a separately authorized recipient registry and admission consumer exist."
+    },
+    {
+      "id": "missing-consumer:P19-provenance-bound-security",
+      "kind": "missing-consumer",
+      "candidateIds": ["P19-provenance-bound-security"],
+      "owner": "summer",
+      "action": "Inventory current effect-bound security gates without changing credentials or permissions."
+    },
+    {
+      "id": "missing-consumer:P01-typed-proof-claims",
+      "kind": "missing-consumer",
+      "candidateIds": ["P01-typed-proof-claims"],
+      "owner": "summer",
+      "action": "Bind the typed proof vocabulary to the current receipt reducer and a later-tier backfill deliberate-red fixture."
+    },
+    {
+      "id": "missing-consumer:CORE-one-executable-registry",
+      "kind": "missing-consumer",
+      "candidateIds": ["CORE-one-executable-registry"],
+      "owner": "JOV-5306",
+      "action": "Land the owned canonical registry and deliberate-red validator."
+    },
+    {
+      "id": "unknown-authority:P08-company-identity",
+      "kind": "unknown",
+      "candidateIds": ["P08-company-identity"],
+      "owner": "summer",
+      "action": "Refresh current first-party legal and product identity evidence before adoption."
+    },
+    {
+      "id": "missing-consumer:OPS-symphony-measured-capacity",
+      "kind": "missing-consumer",
+      "candidateIds": ["OPS-symphony-measured-capacity"],
+      "owner": "JOV-5306",
+      "action": "Land measured-capacity dispatch and its exact failure tests."
+    },
+    {
+      "id": "missing-consumer:OPS-summer-symphony-boundary",
+      "kind": "missing-consumer",
+      "candidateIds": ["OPS-summer-symphony-boundary"],
+      "owner": "JOV-5306",
+      "action": "Land the Summer-to-Symphony dispatch boundary and deliberate-red authority test."
+    },
+    {
+      "id": "missing-consumer:OPS-linear-ships",
+      "kind": "missing-consumer",
+      "candidateIds": ["OPS-linear-ships"],
+      "owner": "summer",
+      "action": "Bind Linear-ships / Kanban-ops to the current Ovie classifier and Mac lander without inventing a second shipping control plane."
+    }
+  ],
+  "founderQueue": [],
+  "researchDecision": {
+    "decision": "compose",
+    "options": [
+      "new scheduler service",
+      "new database or queue",
+      "existing GitHub Actions event and weekly governance workflow"
+    ],
+    "chosenBoundary": "Extend the existing governance workflow with repository events and one weekly reconciliation; keep GBrain and the executable registry in their existing roles.",
+    "revisitWhen": "GitHub Actions cannot deliver or retain the required receipts, or event latency becomes a measured operating blocker."
+  }
+}
