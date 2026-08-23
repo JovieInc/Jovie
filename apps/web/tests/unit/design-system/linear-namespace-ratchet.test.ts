@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { evaluateShrinkOnlyCount } from '@/lib/design/shrink-only-count-ratchet';
 
 /**
  * `--linear-*` namespace shrink-only ratchet (JOV #12009 / #10158).
@@ -18,8 +19,12 @@ import { describe, expect, it } from 'vitest';
  * linear-namespace.baseline.json in the same PR so the floor follows the
  * work down.
  *
+ * Unbaselined shrink fail-closes on local / pull_request authorship. Native
+ * merge_group must pass so a sibling's token removal cannot UNMERGEABLE a
+ * source-green changelog/UI PR (JOV-5300). Growth still fails every event.
+ *
  * Pattern mirrors arbitrary-values-ratchet.test.ts (baseline JSON + source
- * scan; shrink-only).
+ * scan; shrink-only) plus the shared merge-group-safe count policy.
  */
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -74,8 +79,13 @@ describe('--linear-* namespace ratchet (shrink-only)', () => {
       count: number;
     };
     const { count, perFile } = countLinearNamespaceUsage();
+    const verdict = evaluateShrinkOnlyCount({
+      count,
+      baseline: baseline.count,
+      metric: '--linear-* usage',
+    });
 
-    if (count > baseline.count) {
+    if (!verdict.ok && verdict.status === 'regression') {
       const top = [...perFile.entries()]
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10)
@@ -88,15 +98,14 @@ describe('--linear-* namespace ratchet (shrink-only)', () => {
       );
     }
 
-    // Nudge the floor down when progress lands.
-    if (count < baseline.count) {
+    if (!verdict.ok) {
       expect.fail(
-        `--linear-* usage dropped to ${count} (baseline ${baseline.count}). ` +
-          `Great — lower "count" in linear-namespace.baseline.json to ${count} ` +
-          `in this PR so the ratchet locks in the progress.`
+        `${verdict.message} Lower "count" in linear-namespace.baseline.json ` +
+          `to ${count} in this PR.`
       );
     }
 
-    expect(count).toBe(baseline.count);
+    expect(verdict.ok).toBe(true);
+    expect(count).toBeLessThanOrEqual(baseline.count);
   });
 });
