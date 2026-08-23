@@ -466,6 +466,8 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Build + Layout (combined)',
   'CI / iOS Build + Test (combined)',
   'iOS Build + Test (combined)',
+  'CI / macOS MenuMonitor Build + Test (combined)',
+  'macOS MenuMonitor Build + Test (combined)',
   'CI / Promptfoo Evals (deterministic)',
   'Promptfoo Evals (deterministic)',
   'CI / Golden Eval Set (deterministic)',
