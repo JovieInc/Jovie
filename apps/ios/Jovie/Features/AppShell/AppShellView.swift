@@ -588,8 +588,7 @@ struct AppShellView<
     applyOpenPane(.none)
     guard
       let urlString = profile.publicProfileURL,
-      let policy = PublicProfileURLPolicy(publicProfileURL: urlString)
-        ?? PublicProfileURLPolicy(webBaseURL: webBaseURL),
+      let policy = PublicProfileURLPolicy(publicProfileURL: urlString),
       let url = policy.validatedURL(from: urlString)
     else { return }
     publicProfileBrowserItem = PublicProfileBrowserDestination(url: url, policy: policy)
