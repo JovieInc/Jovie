@@ -32,16 +32,8 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   }),
 }));
 
-vi.mock('@jovie/ui', () => ({
-  Button: ({
-    children,
-    pressFeedback: _pressFeedback,
-    static: _static,
-    ...props
-  }: React.ComponentProps<'button'> & {
-    readonly pressFeedback?: boolean;
-    readonly static?: boolean;
-  }) => <button {...props}>{children}</button>,
+vi.mock('@jovie/ui', async importOriginal => ({
+  ...(await importOriginal<typeof import('@jovie/ui')>()),
   TooltipShortcut: ({ children }: { children: React.ReactNode }) => children,
 }));
 
