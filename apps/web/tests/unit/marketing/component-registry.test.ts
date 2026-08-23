@@ -28,6 +28,113 @@ import {
 
 const repoRoot = path.resolve(__dirname, '../../../../..');
 
+interface MoleculeOwnershipFamily {
+  readonly id: string;
+  readonly owner: {
+    readonly source: string;
+    readonly exportName: string;
+    readonly importPath: string;
+  };
+  readonly statesAndModes: readonly string[];
+  readonly behaviorEvidence: readonly string[];
+  readonly visualEvidence: readonly string[];
+  readonly consumers: readonly string[];
+  readonly retiredOwners: readonly string[];
+  readonly compositionDependencies: readonly {
+    readonly id: string;
+    readonly source: string;
+    readonly status: 'canonical-external' | 'typed-dependency';
+    readonly reason?: string;
+  }[];
+}
+
+interface MoleculeOwnershipReceipt {
+  readonly schema: 'jovie.ui-molecule-ownership/v1';
+  readonly scope: string;
+  readonly families: readonly MoleculeOwnershipFamily[];
+}
+
+function validateMoleculeOwnershipReceipt({
+  receipt,
+  sourceByPath,
+  existingPaths,
+}: {
+  readonly receipt: MoleculeOwnershipReceipt;
+  readonly sourceByPath: Readonly<Record<string, string>>;
+  readonly existingPaths: ReadonlySet<string>;
+}): readonly { readonly code: string; readonly id: string }[] {
+  const issues: { code: string; id: string }[] = [];
+  const ids = new Set<string>();
+  const owners = new Set<string>();
+
+  for (const family of receipt.families) {
+    if (ids.has(family.id)) {
+      issues.push({ code: 'duplicate-family-id', id: family.id });
+    }
+    ids.add(family.id);
+
+    const ownerKey = `${family.owner.source}#${family.owner.exportName}`;
+    if (owners.has(ownerKey)) {
+      issues.push({ code: 'duplicate-component-owner', id: family.id });
+    }
+    owners.add(ownerKey);
+
+    const escapedExport = family.owner.exportName.replace(
+      /[.*+?^${}()|[\]\\]/g,
+      '\\$&'
+    );
+    const escapedImportPath = family.owner.importPath.replace(
+      /[.*+?^${}()|[\]\\]/g,
+      '\\$&'
+    );
+    const canonicalImport = new RegExp(
+      `import\\s*{[^}]*\\b${escapedExport}\\b[^}]*}\\s*from\\s*['"]${escapedImportPath}['"]`,
+      's'
+    );
+
+    if (
+      !existingPaths.has(family.owner.source) ||
+      family.statesAndModes.length === 0 ||
+      family.behaviorEvidence.length === 0 ||
+      family.visualEvidence.length === 0 ||
+      family.consumers.length === 0
+    ) {
+      issues.push({ code: 'missing-ownership-evidence', id: family.id });
+    }
+    for (const evidence of [
+      ...family.behaviorEvidence,
+      ...family.visualEvidence,
+    ]) {
+      if (!existingPaths.has(evidence)) {
+        issues.push({ code: 'missing-evidence-source', id: evidence });
+      }
+    }
+    for (const consumer of family.consumers) {
+      if (!canonicalImport.test(sourceByPath[consumer] ?? '')) {
+        issues.push({ code: 'detached-consumer', id: consumer });
+      }
+    }
+    for (const retiredOwner of family.retiredOwners) {
+      if (existingPaths.has(retiredOwner)) {
+        issues.push({ code: 'retired-owner-still-present', id: retiredOwner });
+      }
+    }
+    for (const dependency of family.compositionDependencies) {
+      if (
+        !existingPaths.has(dependency.source) ||
+        (dependency.status === 'typed-dependency' && !dependency.reason)
+      ) {
+        issues.push({
+          code: 'invalid-composition-dependency',
+          id: dependency.id,
+        });
+      }
+    }
+  }
+
+  return issues;
+}
+
 /**
  * Source exports whose root identity is covered by this registry test instead
  * of a component-local interaction test. Keep this list literal so the ship
@@ -525,6 +632,109 @@ describe('current-main Pen source contracts (JOV-4961)', () => {
       'specWall={ARTIST_NOTIFICATIONS_COPY.specWall}'
     );
     expect(storySource).not.toContain('truthTiles=');
+  });
+});
+
+describe('canonical molecule ownership receipt', () => {
+  const receipt = JSON.parse(
+    fs.readFileSync(
+      path.join(repoRoot, 'docs/design-system/molecule-ownership-receipt.json'),
+      'utf8'
+    )
+  ) as MoleculeOwnershipReceipt;
+  const receiptPaths = receipt.families.flatMap(family => [
+    family.owner.source,
+    ...family.behaviorEvidence,
+    ...family.visualEvidence,
+    ...family.consumers,
+    ...family.retiredOwners,
+    ...family.compositionDependencies.map(dependency => dependency.source),
+  ]);
+  const existingPaths = new Set(
+    receiptPaths.filter(relativePath =>
+      fs.existsSync(path.join(repoRoot, relativePath))
+    )
+  );
+  const sourceByPath = Object.fromEntries(
+    receipt.families.flatMap(family =>
+      family.consumers.map(source => [
+        source,
+        fs.readFileSync(path.join(repoRoot, source), 'utf8'),
+      ])
+    )
+  );
+
+  it('binds one canonical owner to every inventoried consumer', () => {
+    expect(receipt.schema).toBe('jovie.ui-molecule-ownership/v1');
+    expect(receipt.scope).toBe('JOV-5308');
+    expect(receipt.families.map(family => family.consumers.length)).toEqual([
+      23, 44,
+    ]);
+    expect(
+      validateMoleculeOwnershipReceipt({
+        receipt,
+        sourceByPath,
+        existingPaths,
+      })
+    ).toEqual([]);
+  });
+
+  it('fails closed on duplicate owners and detached consumers', () => {
+    const duplicateOwner: MoleculeOwnershipReceipt = {
+      ...receipt,
+      families: [
+        ...receipt.families,
+        {
+          ...(receipt.families[0] as MoleculeOwnershipFamily),
+          id: 'molecule.settings-panel-copy',
+        },
+      ],
+    };
+    expect(
+      validateMoleculeOwnershipReceipt({
+        receipt: duplicateOwner,
+        sourceByPath,
+        existingPaths,
+      })
+    ).toContainEqual({
+      code: 'duplicate-component-owner',
+      id: 'molecule.settings-panel-copy',
+    });
+
+    const detachedConsumer = receipt.families[0]?.consumers[0] as string;
+    expect(
+      validateMoleculeOwnershipReceipt({
+        receipt,
+        sourceByPath: { ...sourceByPath, [detachedConsumer]: '' },
+        existingPaths,
+      })
+    ).toContainEqual({ code: 'detached-consumer', id: detachedConsumer });
+  });
+
+  it('fails closed when a cross-lane dependency loses its typed reason', () => {
+    const invalidDependency: MoleculeOwnershipReceipt = {
+      ...receipt,
+      families: receipt.families.map(family => ({
+        ...family,
+        compositionDependencies: family.compositionDependencies.map(
+          dependency =>
+            dependency.status === 'typed-dependency'
+              ? { ...dependency, reason: undefined }
+              : dependency
+        ),
+      })),
+    };
+
+    expect(
+      validateMoleculeOwnershipReceipt({
+        receipt: invalidDependency,
+        sourceByPath,
+        existingPaths,
+      })
+    ).toContainEqual({
+      code: 'invalid-composition-dependency',
+      id: 'atom.card',
+    });
   });
 });
 
