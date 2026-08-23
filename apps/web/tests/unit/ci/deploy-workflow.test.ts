@@ -66,6 +66,10 @@ const iosTestFlightArtifactValidatorPath = resolve(
 );
 const fastlanePath = resolve(repoRoot, 'fastlane/Fastfile');
 const ciFastLanesPath = resolve(repoRoot, 'scripts/ci-fast-lanes.mjs');
+const productLaneClassifierPath = resolve(
+  repoRoot,
+  'scripts/lib/product-lane-classifier.mjs'
+);
 const canaryWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/canary-health-gate.yml'
@@ -704,8 +708,8 @@ describe('deploy workflow Vercel env resolution', () => {
       'git diff --name-only "$BASELINE_SHA" "$RELEASE_SHA" -- "${release_paths[@]}"'
     );
     expect(authorization).not.toContain('--diff-filter=d');
-    expect(readFileSync(workflowPath, 'utf8')).toContain(
-      '.github/workflows/ios-(ci|testflight)\\.yml'
+    expect(readFileSync(productLaneClassifierPath, 'utf8')).toContain(
+      'ios-(ci|testflight|signing-bootstrap)'
     );
     expect(readFileSync(ciFastLanesPath, 'utf8')).toContain(
       "'.github/workflows/ios-testflight.yml'"
@@ -1152,7 +1156,7 @@ describe('deploy workflow Vercel env resolution', () => {
       'node .github/scripts/verify-main-release-readiness.mjs'
     );
     expect(readinessJob).toContain('QUEUE_PROVEN');
-    expect(readinessJob).toContain('Unit Tests (ten shards)');
+    expect(readinessJob).toContain('Web Unit Tests:$RUN_WEB:$UNIT_RESULT');
     expect(readinessJob).toContain('Build + Layout');
     expect(readinessJob).toContain('Promptfoo Evals');
     expect(readinessJob).toContain('Golden Eval Set');
@@ -1167,6 +1171,16 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(readinessJob).toContain('did not pass (result $result)');
     expect(releaseCaller).toContain(
       'uses: ./.github/workflows/production-release.yml'
+    );
+    expect(releaseCaller).toContain(
+      "needs.authorize-production.outputs.run_web == 'true'"
+    );
+    expect(authorization).toContain(
+      'product-lane-release-${EXPECTED_SHA}-${source_run_attempt}'
+    );
+    expect(authorization).toContain('.aggregatePassed == true');
+    expect(verified).toContain(
+      'Web release skipped by the sealed product-lane receipt.'
     );
     expect(controllerHeader).toContain('group: production-mutation');
     expect(controllerHeader).toContain('queue: max');
@@ -2133,7 +2147,9 @@ describe('iOS stage contract', () => {
     expect(pathChanges).toContain(
       "run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}"
     );
-    expect(pathChanges).toContain("IOS_PATTERN='^(apps/ios/");
+    expect(pathChanges).toContain(
+      'node scripts/lib/product-lane-classifier.mjs'
+    );
     expect(ios).toContain("needs.ci-path-changes.outputs.run_ios == 'true'");
     expect(ios).toContain("github.event_name == 'merge_group'");
     expect(ios).toContain(

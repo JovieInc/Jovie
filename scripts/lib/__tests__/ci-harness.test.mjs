@@ -37,6 +37,8 @@ const EXPECTED_MERGE_GATE_NAMES = [
   'Unit Tests',
   'Build + Layout (combined)',
   'iOS Build + Test (combined)',
+  'Mac Build + Test (combined)',
+  'Cross-Product Integration (combined)',
   'Promptfoo Evals (deterministic)',
   'Golden Eval Set (deterministic)',
 ];
@@ -518,12 +520,14 @@ describe('ci-harness manifest', () => {
     expect(mergeReady).toContain('ci-unit-tests');
     expect(mergeReady).toContain('ci-build-layout');
     expect(mergeReady).toContain('ci-ios');
+    expect(mergeReady).toContain('ci-mac');
+    expect(mergeReady).toContain('ci-cross-product-integration');
     expect(mergeReady).toContain('drizzle-migration-guard');
     expect(mergeReady).not.toContain(
       'RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"'
     );
     expect(mergeReady).toContain(
-      'Unit Test shards did not pass on the non-empty merge-group combined head'
+      '$name did not pass for its selected product lane'
     );
     expect(unitTests).toContain('run: echo "run_full_ci=true"');
   });
