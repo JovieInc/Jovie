@@ -57,6 +57,11 @@ describe('release plan shell contract', () => {
     expect(source).toContain(
       "import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';"
     );
+    expect(source).toContain(
+      "import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';"
+    );
+    expect(source).toContain('<AppShellContentPanel');
+    expect(source).toContain("frame='content-container'");
     expect(source).toContain('<ContentSurfaceCard');
     expect(source).toContain('<ContentSectionHeader');
     expect(source).toContain('font-caption text-tertiary-token');
@@ -65,5 +70,6 @@ describe('release plan shell contract', () => {
     expect(source).not.toContain('bg-(--linear-bg-surface-0)');
     expect(source).not.toContain('text-(--linear-text-primary)');
     expect(source).not.toContain('text-(--linear-text-secondary)');
+    expect(source).not.toContain('import { PageShell }');
   });
 });

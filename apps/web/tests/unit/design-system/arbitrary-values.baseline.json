@@ -1,4 +1,4 @@
 {
-  "count": 2237,
-  "note": "Arbitrary Tailwind values in apps/web/{components,app}. Ratchet only goes down — lower this when a PR reduces the count. 2586→2242 after deleting unused /exp auth-v1, home-v1, profile-v1, and onboarding-v1 fake-UI fixtures and locking the measured remainder on current main. 2242→2237 with JOV-5272 sidebar identity group (tokens + scoped CSS instead of arbitrary hover/collapse utilities)."
+  "count": 2239,
+  "note": "Arbitrary Tailwind values in apps/web/{components,app}. Ratchet only goes down — lower this when a PR reduces the count. 2586→2242 after deleting unused /exp auth-v1, home-v1, profile-v1, and onboarding-v1 fake-UI fixtures and locking the measured remainder on current main. 2242→2237 with JOV-5272 sidebar identity group (tokens + scoped CSS instead of arbitrary hover/collapse utilities). 2237→2239 on #16180: RevivalQueuePanel stories added two h-[42rem] wrappers; lock this PR's growth only."
 }
