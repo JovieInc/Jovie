@@ -2,6 +2,7 @@ import { authorizeSummerControl } from '@/lib/ovie/control';
 import { bindEveIdentityForTurn } from '@/lib/ovie/identity';
 import { initiativeAckView } from '@/lib/ovie/persist';
 import { getPage, searchPages } from '@/lib/wiki/gbrain-client';
+import stewardshipAudit from '../generated/invariant-stewardship.current-week.json';
 import {
   findProfileCapability,
   loadProfileCapabilitiesFromDisk,
@@ -16,6 +17,7 @@ import {
 import { newRecordId, type OperatingStore } from './store';
 import {
   type InitiativeStatus,
+  OVIE_FOUNDER_TOOLS,
   OVIE_MCP_IDENTITY,
   OVIE_MCP_TOOLS,
   OVIE_WRITE_TOOLS,
@@ -27,6 +29,10 @@ export function isOvieWriteTool(name: string): boolean {
   return (OVIE_WRITE_TOOLS as readonly string[]).includes(name);
 }
 
+export function isOvieFounderTool(name: string): boolean {
+  return (OVIE_FOUNDER_TOOLS as readonly string[]).includes(name);
+}
+
 export function authorizeOvieMcpTool(
   principal: OvieMcpPrincipal,
   tool: string
@@ -34,7 +40,7 @@ export function authorizeOvieMcpTool(
   if (!principal.authenticated) {
     return { ok: false, status: 401, message: 'authentication required' };
   }
-  if (isOvieWriteTool(tool)) {
+  if (isOvieWriteTool(tool) || isOvieFounderTool(tool)) {
     const gate = authorizeSummerControl({
       authenticated: principal.authenticated,
       isAdmin: principal.isAdmin,
@@ -43,7 +49,9 @@ export function authorizeOvieMcpTool(
       return {
         ok: false,
         status: gate.status,
-        message: 'founder authorization required for writes',
+        message: isOvieWriteTool(tool)
+          ? 'founder authorization required for writes'
+          : 'founder authorization required for operating detail',
       };
     }
   }
@@ -62,6 +70,8 @@ function toolDescription(name: OvieMcpToolName): string {
   switch (name) {
     case 'get_org_state':
       return 'Concise Ovie org/product state for a query.';
+    case 'get_invariant_stewardship':
+      return 'Current Summer invariant exceptions and founder decision queue; healthy detail stays in drill-down.';
     case 'record_decision':
       return 'Persist a decision. Does not execute.';
     case 'create_initiative':
@@ -100,6 +110,8 @@ export async function callOvieMcpTool(
   switch (name) {
     case 'get_org_state':
       return { ok: true, result: await getOrgState(store, args) };
+    case 'get_invariant_stewardship':
+      return { ok: true, result: getInvariantStewardship() };
     case 'record_decision':
       return { ok: true, result: await recordDecision(store, args) };
     case 'create_initiative':
@@ -117,6 +129,27 @@ export async function callOvieMcpTool(
     default:
       return { ok: false, message: `Unknown tool: ${name}` };
   }
+}
+
+function getInvariantStewardship() {
+  return {
+    schemaVersion: stewardshipAudit.schemaVersion,
+    generatedAt: stewardshipAudit.generatedAt,
+    window: stewardshipAudit.window,
+    canonicalRegistry: stewardshipAudit.canonicalRegistry,
+    summary: {
+      candidates: stewardshipAudit.candidates.length,
+      actionableExceptions: stewardshipAudit.declaredFindings.length,
+      founderDecisions: stewardshipAudit.founderQueue.length,
+      sourceGaps: stewardshipAudit.sources.filter(
+        source => source.status !== 'covered' && source.status !== 'excluded'
+      ).length,
+    },
+    summerQueue: stewardshipAudit.declaredFindings,
+    founderQueue: stewardshipAudit.founderQueue,
+    drillDown:
+      'apps/web/lib/ovie/generated/invariant-stewardship.current-week.json' as const,
+  };
 }
 
 async function getOrgState(

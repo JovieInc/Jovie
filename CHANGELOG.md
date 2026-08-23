@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Summer invariant stewardship now has a weekly plus event-driven audit (JOV-5309):** Current-week candidates are normalized with source, date, and authority, semantic duplicates/conflicts/missing consumers fail visible, and Ovie projects only actionable exceptions. Cadence reuses the existing governance workflow. The executable registry remains `canon/invariants.jsonl` under JOV-5306.
+
 - [internal] **Canonical homepage and dashboard-releases owners stay attached to screenshot and visual-qa registries (JOV-5304):** live `/` is `MarketingPosterHero` + `PublicPageShell`, live releases is `ShellReleasesView` with demo `/demo` still `ReleasesExperience`, and a fail-closed drift guard rejects `/ai`/`/investors` promotion plus a deliberate-red fixture.
 
 - [internal] **Settings and section-header molecules have one owner (JOV-5308):** dashboard SettingsPanel/SectionHeader aliases are gone, remaining settings consumers import the canonical molecule, and a machine-readable ownership receipt fails closed on duplicate owners, detached consumers, and malformed typed atom dependencies.

@@ -18,7 +18,10 @@ or PR Ready merge gate.
 - **Weekly:** `.github/workflows/design-governance.yml` — Monday 08:17 UTC +
   `workflow_dispatch`. Informational / standing-issue only — **not** a required
   merge-gate workflow. Scheduled runs `exit 0` and file a standing issue on
-  drift.
+  drift. The same workflow also runs the invariant-stewardship audit as a
+  periodic safety net and on `founder-decision-recorded` /
+  `invariant-enforcement-failed` repository events plus registry/evidence
+  pushes to `main`. Do not add a second scheduler.
 - **Escalation:** a failing scheduled run opens (or updates) one standing
   GitHub issue titled **"Design governance drift detected"** — deduped by
   title, so there is never more than one open drift issue.

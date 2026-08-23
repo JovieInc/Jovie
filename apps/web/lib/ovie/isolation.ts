@@ -14,6 +14,7 @@ export type IsolationNamespace =
 
 export const SUMMER_SAFE_TOOLS = [
   'get_org_state',
+  'get_invariant_stewardship',
   'inspect_kanban',
   'search_gbrain',
 ] as const;
