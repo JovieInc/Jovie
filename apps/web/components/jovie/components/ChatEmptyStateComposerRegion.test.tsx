@@ -1,46 +1,63 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
+import {
+  CHAT_EMPTY_GREETING_STORAGE_KEY,
+  CHAT_EMPTY_ROTATE_GREETINGS,
+} from '../chat-empty-greeting';
 import { ChatEmptyStateComposerRegion } from './ChatEmptyStateComposerRegion';
 
 describe('ChatEmptyStateComposerRegion', () => {
-  it('renders the circle brand logo as ambient texture', () => {
+  beforeEach(() => {
+    sessionStorage.removeItem(CHAT_EMPTY_GREETING_STORAGE_KEY);
+  });
+
+  it('renders one locked greeting and no brand logo', () => {
     render(
       <ChatEmptyStateComposerRegion>
         <div data-testid='composer-child' />
       </ChatEmptyStateComposerRegion>
     );
 
-    const logo = screen.getByTestId('chat-empty-state-logo');
-    expect(logo.style.opacity).toBe('0.18');
-    expect(logo.getAttribute('aria-hidden')).toBe('true');
+    expect(screen.queryByTestId('chat-empty-state-logo')).toBeNull();
+    expect(screen.getByTestId('chat-empty-state-greeting').textContent).toBe(
+      "Let's get it"
+    );
   });
 
-  it('invites action by first name when provided', () => {
+  it('rotates through the locked set across empty-chat mounts', () => {
+    const { unmount } = render(
+      <ChatEmptyStateComposerRegion>
+        <div data-testid='composer-child' />
+      </ChatEmptyStateComposerRegion>
+    );
+    expect(screen.getByTestId('chat-empty-state-greeting').textContent).toBe(
+      CHAT_EMPTY_ROTATE_GREETINGS[0]
+    );
+    unmount();
+
     render(
-      <ChatEmptyStateComposerRegion greetingName='Tim White'>
+      <ChatEmptyStateComposerRegion>
+        <div data-testid='composer-child' />
+      </ChatEmptyStateComposerRegion>
+    );
+    expect(screen.getByTestId('chat-empty-state-greeting').textContent).toBe(
+      CHAT_EMPTY_ROTATE_GREETINGS[1]
+    );
+  });
+
+  it("never ships What's next? as the empty greeting", () => {
+    render(
+      <ChatEmptyStateComposerRegion>
         <div data-testid='composer-child' />
       </ChatEmptyStateComposerRegion>
     );
 
-    expect(screen.getByTestId('chat-empty-state-greeting').textContent).toBe(
-      "What's next, Tim?"
-    );
+    expect(screen.queryByText("What's next?")).toBeNull();
+    expect(screen.queryByText("What's next, Tim?")).toBeNull();
   });
 
-  it('falls back to a generic invitation without a display name', () => {
-    render(
-      <ChatEmptyStateComposerRegion greetingName='  '>
-        <div data-testid='composer-child' />
-      </ChatEmptyStateComposerRegion>
-    );
-
-    expect(screen.getByTestId('chat-empty-state-greeting').textContent).toBe(
-      "What's next?"
-    );
-  });
-
-  it('staggers the enter animation across logo, greeting, and composer', () => {
+  it('staggers the enter animation across greeting and composer', () => {
     render(
       <ChatEmptyStateComposerRegion>
         <div data-testid='composer-child' />
@@ -140,9 +157,9 @@ describe('ChatEmptyStateComposerRegion', () => {
     expect(aboveScroll.className).not.toContain('absolute');
     const welcome = screen.getByTestId('chat-empty-state-welcome');
     expect(welcome.className).toContain('items-center');
-    expect(screen.getByTestId('chat-empty-state-logo')).toBeTruthy();
+    expect(screen.queryByTestId('chat-empty-state-logo')).toBeNull();
     expect(screen.getByTestId('chat-empty-state-greeting').textContent).toBe(
-      "What's next?"
+      "Let's get it"
     );
   });
 
