@@ -35,6 +35,10 @@ demo adapters, tests, and owned screenshot artifacts.
 - The homepage registry test prevents detached owner metadata from returning.
 - Screenshot capture dependencies refresh the dashboard export before the
   homepage that embeds it, preventing a one-run stale marketing proof.
+- Public navigation points Compare at the concrete `/compare/linktree` route.
+  The route-contract guard deliberately rejects `/compare`, because the
+  canonical manifest declares only `/compare/*`; `/ai` remains outside the
+  visual-review scope.
 
 ## Verification receipt
 
@@ -42,6 +46,11 @@ demo adapters, tests, and owned screenshot artifacts.
 - Web TypeScript gate: passed.
 - Canonical Playwright screenshot lane: 9/9 scenarios passed after the fix;
   the prior dashboard hydration mismatch did not recur.
+- Production recheck on 2026-08-23: `/ai` returned 200 but still rendered
+  `href="/compare"`; `/compare` returned 404, while `/compare/linktree`
+  returned 200. This proves the currently deployed build remains affected and
+  identifies the post-admission production assertion; no production-fix claim
+  is made before merge and deployment.
 - Layout-shift risk: no geometry, atom, molecule, shell, token, or responsive
   breakpoint changed. Smart-link rows retain their existing fixed-height,
   truncating container semantics.

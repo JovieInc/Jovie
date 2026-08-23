@@ -166,6 +166,7 @@ export {
   getRouteManifestEntry,
   getRouteRecipeParity,
   isExempt,
+  isMarketingNavigationDestinationResolvable,
   isRecipeRoute,
   MARKETING_ROUTE_HEALTH_TARGETS,
   MARKETING_ROUTE_MANIFEST,

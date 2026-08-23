@@ -184,7 +184,7 @@ function resolveAlternativesPath(): string {
 }
 
 function resolveComparePath(): string {
-  return `${APP_ROUTES.COMPARE}/linktree`;
+  return APP_ROUTES.COMPARE;
 }
 
 const MARKETING_SURFACES = [

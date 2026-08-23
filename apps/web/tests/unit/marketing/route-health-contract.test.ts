@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   getMarketingRouteHealthTarget,
+  isMarketingNavigationDestinationResolvable,
   MARKETING_ROUTE_HEALTH_TARGETS,
   MARKETING_ROUTE_MANIFEST,
 } from '@/data/marketing';
+import { MARKETING_FOOTER_COLUMNS } from '@/data/marketingNavigation';
 
 describe('marketing route health contract', () => {
   it('has one concrete target per manifest entry', () => {
@@ -53,5 +56,23 @@ describe('marketing route health contract', () => {
     );
     expect(redirects.map(target => target.glob)).toEqual(['waitlist/page.tsx']);
     expect(redirects[0]?.allowedFinalPaths).toEqual(['/start']);
+  });
+
+  it('keeps the Compare navigation destination on a concrete resolvable route', () => {
+    const compareLink = MARKETING_FOOTER_COLUMNS.flatMap(
+      column => column.links
+    ).find(link => link.label === 'Compare');
+
+    expect(compareLink?.href).toBe(APP_ROUTES.COMPARE);
+    expect(isMarketingNavigationDestinationResolvable(APP_ROUTES.COMPARE)).toBe(
+      true
+    );
+  });
+
+  it('rejects a wildcard base without a real page (deliberate red)', () => {
+    expect(isMarketingNavigationDestinationResolvable('/compare')).toBe(false);
+    expect(
+      isMarketingNavigationDestinationResolvable('/compare/linktree')
+    ).toBe(true);
   });
 });

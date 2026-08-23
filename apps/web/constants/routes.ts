@@ -152,7 +152,8 @@ export const APP_ROUTES = {
   BLOG_THE_CONTACT_PROBLEM: '/blog/the-contact-problem',
   BRAND: '/brand',
   BLOG_THE_MYSPACE_PROBLEM: '/blog/the-myspace-problem',
-  COMPARE: '/compare',
+  /** Concrete comparison page. The /compare index route does not exist. */
+  COMPARE: '/compare/linktree',
   DEMO: '/demo',
   DEMO_VIDEO: '/demovideo',
   ENGAGEMENT_ENGINE: '/engagement-engine',

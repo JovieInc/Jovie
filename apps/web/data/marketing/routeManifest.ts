@@ -744,6 +744,32 @@ export function getRouteManifestEntry(glob: string): RouteManifestEntry | null {
   return MANIFEST_BY_GLOB[glob] ?? null;
 }
 
+/**
+ * Return whether a concrete internal navigation destination is represented by
+ * a real marketing route. Wildcard manifest entries require a non-empty value
+ * after their prefix, so `/compare` cannot masquerade as `/compare/*`.
+ */
+export function isMarketingNavigationDestinationResolvable(
+  destination: string,
+  manifest: readonly RouteManifestEntry[] = MARKETING_ROUTE_MANIFEST
+): boolean {
+  const [path] = destination.split(/[?#]/, 1);
+  if (!path?.startsWith('/') || path.includes('*')) return false;
+
+  return manifest.some(entry => {
+    if (!entry.url.includes('*')) return entry.url === path;
+
+    const wildcardIndex = entry.url.indexOf('*');
+    const prefix = entry.url.slice(0, wildcardIndex);
+    const suffix = entry.url.slice(wildcardIndex + 1);
+    return (
+      path.startsWith(prefix) &&
+      path.endsWith(suffix) &&
+      path.length > prefix.length + suffix.length
+    );
+  });
+}
+
 export function isExempt(glob: string): boolean {
   return MANIFEST_BY_GLOB[glob]?.exempt !== undefined;
 }
