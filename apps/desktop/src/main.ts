@@ -58,16 +58,23 @@ import {
 } from './ovie-door';
 import { evaluateRemoteDebuggingGuard } from './remote-debugging-guard';
 import {
+  classifyDesktopLoadFailure,
   decideAbortedMainFrameRecovery,
+  decideHostedLoadRetry,
+  decideRecoveryUnlatch,
   decideRendererBootWatchdogAfterLoad,
   decideRendererLoadStart,
   decideRendererRecovery,
   decideRendererWatchdogExpiry,
+  describeDesktopLoadFailure,
+  hostedUrlCandidates,
   parseDidStartNavigation,
-  RENDERER_BOOT_WATCHDOG_MS,
-  RENDERER_LOAD_WATCHDOG_MS,
+  RECOVERY_UNLATCH_POLL_MS,
+  rendererWatchdogMs,
   shouldRecoverAuthHandoffToCanonicalShell,
   shouldSkipRendererWatchdogForAuthHandoff,
+  type DesktopLoadFailureReason,
+  type DesktopLoadFailureView,
 } from './renderer-recovery';
 import {
   createSummerRuntimeBridge,
@@ -96,6 +103,10 @@ const NAVIGATION_ABORTED_ERROR_CODE = -3;
 // the window black. Reset to 0 only after a confirmed app-booted ping so a
 // renderer that crashes deterministically after load still hits the cap.
 const MAX_RENDERER_CRASH_RELOADS = 2;
+const MAX_HOSTED_LOAD_RETRIES = APP_ENV === 'local' ? 3 : 1;
+const HOSTED_LOAD_RETRY_DELAY_MS = APP_ENV === 'local' ? 2_000 : 0;
+const { bootMs: RENDERER_BOOT_WATCHDOG_MS, loadMs: RENDERER_LOAD_WATCHDOG_MS } =
+  rendererWatchdogMs(APP_ENV);
 const HUD_BUILD_INFO_POLL_INTERVAL_MS = 60 * 1000;
 // electron-builder.local.yml and electron-builder.staging.yml both package the
 // staging icon assets; only the production config ships icon.png.
@@ -216,6 +227,7 @@ const rendererBootControllers = new Map<
   number,
   {
     readonly markBooted: () => void;
+    readonly beginRecoveryUnlatch: () => void;
     readonly dispose: () => void;
   }
 >();
@@ -1058,13 +1070,15 @@ function buildDesktopShellHtml(input: {
 </html>`;
 }
 
-function buildDesktopLoadFailureUrl(): string {
+function buildDesktopLoadFailureUrl(
+  failure: DesktopLoadFailureView
+): string {
   const retryUrl = escapeHtmlAttribute(APP_ENTRY_URL);
   const appOrigin = escapeHtmlAttribute(APP_ORIGIN);
   const html = buildDesktopShellHtml({
     title: 'Jovie Desktop',
-    heading: 'Jovie couldn’t load',
-    body: 'Check your connection, then try again.',
+    heading: failure.heading,
+    body: failure.body,
     actions: `<div class="actions">
         <a class="primary" href="${retryUrl}">Retry</a>
         <a class="secondary" href="${appOrigin}">Open Jovie</a>
@@ -1098,9 +1112,71 @@ function loadHostedUrlAfterSplash(win: BrowserWindow, hostedUrl: string): void {
   void win.loadURL(buildDesktopBootSplashUrl());
 }
 
-function showDesktopLoadFailure(win: BrowserWindow): void {
+function showDesktopLoadFailure(
+  win: BrowserWindow,
+  failure: DesktopLoadFailureView = describeDesktopLoadFailure(
+    'unknown',
+    APP_URL
+  )
+): void {
   if (win.isDestroyed()) return;
-  void win.loadURL(buildDesktopLoadFailureUrl());
+  void win.loadURL(buildDesktopLoadFailureUrl(failure));
+  rendererBootControllers.get(win.webContents.id)?.beginRecoveryUnlatch();
+}
+
+async function probeAppUrl(url: string): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 2500);
+  try {
+    const response = await fetch(url, {
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    return response.status > 0;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function findReachableHostedUrl(
+  hostedUrl: string
+): Promise<string | null> {
+  for (const candidate of hostedUrlCandidates(APP_URL, hostedUrl)) {
+    const origin = new URL(candidate).origin;
+    if (await probeAppUrl(new URL('/api/health/build-info', origin).toString())) {
+      return candidate;
+    }
+    if (await probeAppUrl(origin)) {
+      return candidate;
+    }
+    if (await probeAppUrl(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+async function isAppOriginReachable(): Promise<boolean> {
+  return (await findReachableHostedUrl(APP_ENTRY_URL)) !== null;
+}
+
+function resolveLoadFailureView(
+  reason: DesktopLoadFailureReason,
+  options: {
+    readonly errorCode?: number;
+    readonly hostReachable?: boolean;
+  } = {}
+): DesktopLoadFailureView {
+  const kind = classifyDesktopLoadFailure({
+    reason,
+    errorCode: options.errorCode,
+    appEnv: APP_ENV,
+    appUrl: APP_URL,
+    hostReachable: options.hostReachable,
+  });
+  return describeDesktopLoadFailure(kind, APP_URL);
 }
 
 function isHudWindow(win: BrowserWindow): boolean {
@@ -1247,9 +1323,14 @@ function attachRendererRecovery(
   }
 ): void {
   let rendererCrashReloadCount = 0;
+  let hostedLoadRetryCount = 0;
+  let retryingHostedLoad = false;
   let rendererBooted = false;
+  let rendererEverBooted = false;
+  let lastHostedUrl = APP_ENTRY_URL;
   let bootWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
   let loadWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
+  let recoveryUnlatchTimer: ReturnType<typeof setTimeout> | null = null;
   const webContentsId = win.webContents.id;
 
   const clearBootWatchdog = (): void => {
@@ -1271,9 +1352,88 @@ function attachRendererRecovery(
     clearLoadWatchdog();
   };
 
-  const expireWatchdog = (reason: string, url: string): void => {
+  const stopRecoveryUnlatch = (): void => {
+    if (recoveryUnlatchTimer !== null) {
+      clearTimeout(recoveryUnlatchTimer);
+      recoveryUnlatchTimer = null;
+    }
+  };
+
+  const beginRecoveryUnlatch = (): void => {
+    stopRecoveryUnlatch();
+    // First probe does not wait for the data: URL to commit. Recapture 5:52
+    // PT had :3100 already warm while the recovery shell stayed latched.
+    let recoveryArmed = true;
+    const poll = (): void => {
+      if (win.isDestroyed() || rendererBooted) {
+        stopRecoveryUnlatch();
+        return;
+      }
+      void findReachableHostedUrl(lastHostedUrl).then(reachableHostedUrl => {
+        if (win.isDestroyed() || rendererBooted) {
+          stopRecoveryUnlatch();
+          return;
+        }
+        const action = decideRecoveryUnlatch({
+          showingFailurePage:
+            recoveryArmed ||
+            win.webContents.getURL().startsWith('data:text/html'),
+          booted: rendererBooted,
+          windowDestroyed: win.isDestroyed(),
+          reachableHostedUrl,
+        });
+        if (action === 'reload-hosted' && reachableHostedUrl) {
+          recoveryArmed = false;
+          lastHostedUrl = reachableHostedUrl;
+          void win.loadURL(reachableHostedUrl);
+          return;
+        }
+        recoveryUnlatchTimer = setTimeout(poll, RECOVERY_UNLATCH_POLL_MS);
+      });
+    };
+    poll();
+  };
+
+  const recoverOrShowFailure = (
+    reason: DesktopLoadFailureReason,
+    failureOptions: {
+      readonly errorCode?: number;
+      readonly hostReachable?: boolean;
+    } = {}
+  ): void => {
+    if (rendererBooted || win.isDestroyed()) return;
+    const failure = resolveLoadFailureView(reason, failureOptions);
+    const retryAction = decideHostedLoadRetry({
+      kind: failure.kind,
+      retryCount: hostedLoadRetryCount,
+      maxRetries: MAX_HOSTED_LOAD_RETRIES,
+    });
+    if (retryAction === 'retry' && !win.isDestroyed()) {
+      hostedLoadRetryCount += 1;
+      retryingHostedLoad = true;
+      const retryUrl = lastHostedUrl;
+      const reload = (): void => {
+        if (win.isDestroyed()) return;
+        void win.loadURL(retryUrl);
+      };
+      if (HOSTED_LOAD_RETRY_DELAY_MS > 0) {
+        setTimeout(reload, HOSTED_LOAD_RETRY_DELAY_MS);
+      } else {
+        reload();
+      }
+      return;
+    }
+    showDesktopLoadFailure(win, failure);
+    if (win === mainWindow) {
+      showWindowNow(win);
+    }
+  };
+
+  const expireWatchdog = (reason: 'load' | 'boot', url: string): void => {
     const action = decideRendererWatchdogExpiry({
       booted: rendererBooted,
+      everBooted: rendererEverBooted,
+      reason,
       windowDestroyed: win.isDestroyed(),
       skipForAuthHandoff: options.shouldSkipWatchdog(),
     });
@@ -1292,15 +1452,35 @@ function attachRendererRecovery(
             : RENDERER_BOOT_WATCHDOG_MS,
       }
     );
-    showDesktopLoadFailure(win);
-    if (win === mainWindow) {
-      showWindowNow(win);
-    }
+    void isAppOriginReachable().then(hostReachable => {
+      if (win.isDestroyed()) return;
+      // The probe is async. A healthy first compile can send app-booted
+      // while it is in flight — do not replace that painted session.
+      if (
+        decideRendererWatchdogExpiry({
+          booted: rendererBooted,
+          everBooted: rendererEverBooted,
+          reason,
+          windowDestroyed: win.isDestroyed(),
+          skipForAuthHandoff: options.shouldSkipWatchdog(),
+        }) === 'ignore'
+      ) {
+        return;
+      }
+      recoverOrShowFailure(
+        reason === 'load' ? 'load-watchdog' : 'boot-watchdog',
+        { hostReachable }
+      );
+    });
   };
 
   const armLoadWatchdog = (url: string): void => {
     clearAllWatchdogs();
     rendererBooted = false;
+    if (!retryingHostedLoad) {
+      hostedLoadRetryCount = 0;
+    }
+    retryingHostedLoad = false;
     if (win.isDestroyed()) return;
     if (
       decideRendererLoadStart({
@@ -1338,14 +1518,19 @@ function attachRendererRecovery(
 
   const markRendererBooted = (): void => {
     rendererBooted = true;
+    rendererEverBooted = true;
     rendererCrashReloadCount = 0;
+    hostedLoadRetryCount = 0;
     clearAllWatchdogs();
+    stopRecoveryUnlatch();
   };
 
   rendererBootControllers.set(webContentsId, {
     markBooted: markRendererBooted,
+    beginRecoveryUnlatch,
     dispose: () => {
       clearAllWatchdogs();
+      stopRecoveryUnlatch();
       rendererBootControllers.delete(webContentsId);
     },
   });
@@ -1365,6 +1550,7 @@ function attachRendererRecovery(
         isInPlace: navigation.isInPlace,
       }) === 'arm-load-watchdog'
     ) {
+      lastHostedUrl = navigation.url;
       armLoadWatchdog(navigation.url);
     }
   });
@@ -1419,7 +1605,7 @@ function attachRendererRecovery(
             : validatedURL,
         appEntry: APP_ENTRY_URL,
       });
-      showDesktopLoadFailure(win);
+      recoverOrShowFailure('did-fail-load', { errorCode });
     }
   );
 
@@ -1441,7 +1627,7 @@ function attachRendererRecovery(
       win.webContents.reload();
       return;
     }
-    showDesktopLoadFailure(win);
+    recoverOrShowFailure('crashed');
   });
 
   win.webContents.on('unresponsive', () => {
@@ -1451,7 +1637,7 @@ function attachRendererRecovery(
     if (win.isDestroyed()) return;
     if (options.shouldSkipWatchdog()) return;
     clearAllWatchdogs();
-    showDesktopLoadFailure(win);
+    recoverOrShowFailure('unresponsive');
   });
 }
 
