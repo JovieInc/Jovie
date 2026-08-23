@@ -34,9 +34,11 @@ import * as backlogReduction from './backlog-reduction.mjs';
 import * as classifier from './classifier.mjs';
 import * as contextGate from './context-gate.mjs';
 import * as deterministicGates from './deterministic-gates.mjs';
+import * as gateNextHold from './gate-next-hold.mjs';
 import { cliGbrainClient } from './gbrain-client.mjs';
 import * as intakeReadiness from './intake-readiness.mjs';
 import * as linear from './linear-client.mjs';
+import * as ownershipInventory from './ownership-inventory.mjs';
 import * as planGate from './plan-gate.mjs';
 import * as reconciler from './reconcile.mjs';
 import * as reporter from './reporter.mjs';
@@ -468,7 +470,7 @@ async function recoverStaleLeases(team, isDryRun) {
   };
 }
 
-async function admissionPreflight(team) {
+async function admissionPreflight(team, candidate = null) {
   const fleetGate = await fleetGateForTeam(team);
   if (
     !fleetGate.workAdmission.allowed ||
@@ -483,6 +485,55 @@ async function admissionPreflight(team) {
   }
   const symphonyIssues = await linear.fetchTeamSymphonyIssues(team.id);
   const load = deterministicGates.admissionIntentLoad(symphonyIssues);
+  const maxConcurrent = fleetGate.concurrency?.gem?.maxConcurrent ?? 0;
+  if (!Number.isInteger(maxConcurrent) || maxConcurrent < 1) {
+    return {
+      open: false,
+      reason:
+        fleetGate.concurrency?.gem?.reason ||
+        'measured admission capacity unavailable',
+      load,
+      fleetGate,
+    };
+  }
+  if (load.count >= maxConcurrent) {
+    return {
+      open: false,
+      reason: `measured admission capacity exhausted (${load.count}/${maxConcurrent})`,
+      load,
+      fleetGate,
+    };
+  }
+  if (candidate) {
+    const candidateTarget =
+      ownershipInventory.resolveAdmissionTarget(candidate);
+    const active = symphonyIssues.filter(issue =>
+      load.identifiers.includes(issue.identifier)
+    );
+    const collisions = active
+      .map(issue => ({
+        issue: issue.identifier,
+        target: ownershipInventory.resolveAdmissionTarget(issue),
+      }))
+      .filter(
+        entry =>
+          candidateTarget.decision === 'admit' &&
+          entry.target.decision === 'admit' &&
+          ownershipInventory.admissionTargetsCollide(
+            candidateTarget.target,
+            entry.target.target
+          )
+      )
+      .map(entry => entry.issue);
+    if (collisions.length > 0) {
+      return {
+        open: false,
+        reason: `collision domain already leased by ${collisions.join(', ')}`,
+        load,
+        fleetGate,
+      };
+    }
+  }
   return {
     open: true,
     reason: 'open',
@@ -534,51 +585,32 @@ async function runGateNext(isDryRun, issueArg) {
   deterministicGates.assertNoTeamControllerErrors(results);
 }
 
-async function runTeamGateNext(team, isDryRun, issueArg) {
-  const staleLeaseRecovery = await recoverStaleLeases(team, isDryRun);
-  const preflight = await admissionPreflight(team);
-  if (!preflight.open) {
+async function evaluateGateCandidate(
+  team,
+  selected,
+  isDryRun,
+  preflight,
+  staleLeaseRecovery
+) {
+  const collisionPreflight = await admissionPreflight(team, selected);
+  if (!collisionPreflight.open) {
     return {
-      team: team.key,
       status: 'blocked',
-      stage: 'preflight',
-      reason: preflight.reason,
-      active: preflight.load.identifiers,
-      fleetGate: preflight.fleetGate,
+      stage: 'collision-preflight',
+      issue: selected.identifier,
+      reason: collisionPreflight.reason,
+      active: collisionPreflight.load.identifiers,
+      fleetGate: collisionPreflight.fleetGate,
       staleLeaseRecovery,
       mutations: 0,
     };
   }
 
-  const issues = issueArg
-    ? [await linear.fetchIssue(issueArg)].filter(Boolean)
-    : await linear.fetchTeamGateCandidates(team.id);
-  const selection = deterministicGates.selectDeterministicPlanCandidate(
-    issues,
-    { issueIdentifier: issueArg }
-  );
-  if (!selection.selected) {
-    return {
-      team: team.key,
-      status: 'blocked',
-      stage: 'selection',
-      reason: issueArg
-        ? 'requested issue is not eligible'
-        : 'no eligible issue',
-      decisions: selection.decisions,
-      fleetGate: preflight.fleetGate,
-      staleLeaseRecovery,
-      mutations: 0,
-    };
-  }
-
-  const selected = selection.selected;
   const plan = deterministicGates.buildDeterministicPlanEvidence(selected);
   const planReason =
     plan.reason || planGate.validatePlanCandidate(selected, plan.evidence);
   if (planReason) {
     return {
-      team: team.key,
       status: 'blocked',
       stage: 'plan',
       issue: selected.identifier,
@@ -590,11 +622,40 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
   }
 
   const researchNeed = researchGate.classifyResearchNeed(selected);
+  if (
+    researchNeed.decision === 'required' &&
+    !researchGate.researchGateReceipt(selected)
+  ) {
+    return {
+      status: 'blocked',
+      stage: 'research',
+      issue: selected.identifier,
+      reason: 'research-evidence-required',
+      fleetGate: preflight.fleetGate,
+      staleLeaseRecovery,
+      mutations: 0,
+    };
+  }
 
   if (isDryRun) {
+    const contextProbe = await contextGate.collectContextEvidence({
+      issue: selected,
+      gbrain: cliGbrainClient,
+    });
+    if (contextProbe.reason) {
+      return {
+        status: 'blocked',
+        stage: 'context',
+        issue: selected.identifier,
+        reason: contextProbe.reason,
+        detail: contextProbe.detail || null,
+        fleetGate: preflight.fleetGate,
+        staleLeaseRecovery,
+        mutations: 0,
+      };
+    }
     const routing = await approveSymphonyRoute(selected, true);
     return {
-      team: team.key,
       status: 'would-admit',
       issue: selected.identifier,
       plan: plan.evidence,
@@ -613,7 +674,6 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
   });
   if (contextResult.status === 'rejected') {
     return {
-      team: team.key,
       status: 'blocked',
       stage: 'context',
       issue: selected.identifier,
@@ -643,21 +703,15 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
       },
       client: linear,
     });
-  } else if (researchGate.researchGateReceipt(current)) {
+  } else {
     researchResult = {
       status: 'already-approved',
       fingerprint:
         researchGate.researchGateReceipt(current).payload.fingerprint,
     };
-  } else {
-    researchResult = {
-      status: 'rejected',
-      reason: 'research-evidence-required',
-    };
   }
   if (researchResult.status === 'rejected') {
     return {
-      team: team.key,
       status: 'blocked',
       stage: 'research',
       issue: selected.identifier,
@@ -680,7 +734,7 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
     throw new Error(`plan gate rejected: ${planResult.reason}`);
 
   current = await linear.fetchIssue(selected.identifier);
-  const finalPreflight = await admissionPreflight(team);
+  const finalPreflight = await admissionPreflight(team, current);
   if (!finalPreflight.open)
     throw new Error(`admission preflight blocked: ${finalPreflight.reason}`);
 
@@ -720,7 +774,6 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
     throw new Error('final gate-and-lease verification failed');
 
   return {
-    team: team.key,
     status: 'admitted',
     issue: selected.identifier,
     contextGate: contextResult.status,
@@ -735,6 +788,53 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
     staleLeaseRecovery,
     routing,
     mutations: 'verified',
+  };
+}
+
+async function runTeamGateNext(team, isDryRun, issueArg) {
+  const staleLeaseRecovery = await recoverStaleLeases(team, isDryRun);
+  const preflight = await admissionPreflight(team);
+  if (!preflight.open) {
+    return {
+      team: team.key,
+      status: 'blocked',
+      stage: 'preflight',
+      reason: preflight.reason,
+      active: preflight.load.identifiers,
+      fleetGate: preflight.fleetGate,
+      staleLeaseRecovery,
+      mutations: 0,
+    };
+  }
+
+  const issues = issueArg
+    ? [await linear.fetchIssue(issueArg)].filter(Boolean)
+    : await linear.fetchTeamGateCandidates(team.id);
+  const holdFile = gateNextHold.resolveIssueHoldFile();
+  const holds = gateNextHold.loadIssueHolds(holdFile);
+  const result = await gateNextHold.admitNextFromPool({
+    issues,
+    issueIdentifier: issueArg || null,
+    holds,
+    isDryRun,
+    persistHolds: isDryRun
+      ? null
+      : nextHolds => gateNextHold.saveIssueHolds(holdFile, nextHolds),
+    evaluateCandidate: selected =>
+      evaluateGateCandidate(
+        team,
+        selected,
+        isDryRun,
+        preflight,
+        staleLeaseRecovery
+      ),
+  });
+
+  return {
+    ...result,
+    team: team.key,
+    fleetGate: result.fleetGate || preflight.fleetGate,
+    staleLeaseRecovery: result.staleLeaseRecovery || staleLeaseRecovery,
   };
 }
 

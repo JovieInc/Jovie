@@ -49,11 +49,22 @@ export type UICanonicalOwner = {
   readonly exportName: string;
   readonly registryId: string | null;
 };
+export type UINativeAdapterBinding = {
+  readonly sourcePath: string;
+  readonly swiftType: string;
+  readonly semanticRole:
+    | 'pill-action'
+    | 'icon-action'
+    | 'plain-content-press-feedback';
+  readonly consumerPaths: readonly string[];
+  readonly testEvidence: readonly string[];
+};
 export type UIPlatformAdapter = {
   readonly platform: UIOwnershipPlatform;
   readonly role: 'owner' | 'adapter' | 'host-adapter';
   readonly status: 'implemented' | 'not-applicable' | 'planned';
   readonly sourcePaths: readonly string[];
+  readonly nativeBindings?: readonly UINativeAdapterBinding[];
   readonly reason?: string;
 };
 type SerifException = {
@@ -256,10 +267,94 @@ const appShellIos = [
   'apps/ios/Jovie/Features/AppShell/AppShellLeftDrawer.swift',
   'apps/ios/Jovie/Features/AppShell/AppShellTabBar.swift',
 ] as const;
+const nativeButtonStyleSource =
+  'apps/ios/Jovie/DesignSystem/JovieTheme.swift' as const;
+const nativeButtonStyleTests = [
+  'apps/ios/JovieTests/AppShellTabBarTests.swift',
+] as const;
+const nativeBindingsByEntry: Partial<
+  Readonly<Record<UIOwnershipEntryId, readonly UINativeAdapterBinding[]>>
+> = {
+  'atom.button': [
+    {
+      sourcePath: nativeButtonStyleSource,
+      swiftType: 'JoviePillButtonStyle',
+      semanticRole: 'pill-action',
+      consumerPaths: [
+        'apps/ios/Jovie/App/RootView.swift',
+        'apps/ios/Jovie/Features/AppShell/EntityContextSheet.swift',
+        'apps/ios/Jovie/Features/AppShell/TalkOverlayView.swift',
+        'apps/ios/Jovie/Features/Audience/AudienceHighlightsView.swift',
+        'apps/ios/Jovie/Features/Calendar/CalendarSurfaceView.swift',
+        'apps/ios/Jovie/Features/Chat/FeatureIntroCard.swift',
+        'apps/ios/Jovie/Features/Dashboard/DashboardView.swift',
+        'apps/ios/Jovie/Features/Dashboard/PublicProfileBrowserView.swift',
+        'apps/ios/Jovie/Features/Dashboard/VenueModeView.swift',
+        'apps/ios/Jovie/Features/Inbox/InboxSurfaceView.swift',
+        'apps/ios/Jovie/Features/NeedsOnboarding/NeedsOnboardingView.swift',
+        'apps/ios/Jovie/Features/Settings/SettingsView.swift',
+        'apps/ios/Jovie/Features/Teleprompter/TeleprompterProposal.swift',
+      ],
+      testEvidence: nativeButtonStyleTests,
+    },
+    {
+      sourcePath: nativeButtonStyleSource,
+      swiftType: 'JoviePressFeedbackButtonStyle',
+      semanticRole: 'plain-content-press-feedback',
+      consumerPaths: [
+        'apps/ios/Jovie/Features/AppShell/AppShellLeftDrawer.swift',
+        'apps/ios/Jovie/Features/AppShell/AppShellTabBar.swift',
+        'apps/ios/Jovie/Features/Settings/SettingsView.swift',
+      ],
+      testEvidence: nativeButtonStyleTests,
+    },
+  ],
+  'atom.icon-button': [
+    {
+      sourcePath: nativeButtonStyleSource,
+      swiftType: 'JovieIconButtonStyle',
+      semanticRole: 'icon-action',
+      consumerPaths: [
+        'apps/ios/Jovie/Features/AppShell/AppShellView.swift',
+        'apps/ios/Jovie/Features/Chat/MobileChatView.swift',
+        'apps/ios/Jovie/Features/Dashboard/PublicProfileBrowserView.swift',
+        'apps/ios/Jovie/Features/Settings/SettingsView.swift',
+        'apps/ios/Jovie/Features/Teleprompter/TeleprompterOverlayView.swift',
+      ],
+      testEvidence: nativeButtonStyleTests,
+    },
+  ],
+};
+const attachNativeBindings = (
+  id: UIOwnershipEntryId,
+  platformAdapters: readonly UIPlatformAdapter[]
+): readonly UIPlatformAdapter[] => {
+  const nativeBindings = nativeBindingsByEntry[id];
+  if (!nativeBindings) return platformAdapters;
+  const sourcePaths = [
+    ...new Set(
+      nativeBindings.flatMap(binding => [
+        binding.sourcePath,
+        ...binding.consumerPaths,
+      ])
+    ),
+  ];
+  return platformAdapters.map(adapterEntry =>
+    adapterEntry.platform === 'ios'
+      ? {
+          ...adapterEntry,
+          status: 'implemented',
+          sourcePaths,
+          nativeBindings,
+          reason: undefined,
+        }
+      : adapterEntry
+  );
+};
 const one = (sourcePath: string): readonly [string] => [sourcePath];
 const familySpecs = {
-  button: 'ds|atom.button|Button|i=theme',
-  iconButton: 'ds|atom.icon-button|IconButton|i=theme',
+  button: 'ds|atom.button',
+  iconButton: 'ds|atom.icon-button',
   link: 'ds|atom.link',
   brand: 'ds|atom.brand-logo',
   logo: 'ds|atom.logo',
@@ -291,7 +386,6 @@ const refs = {
   desktop,
   security,
   appShellIos,
-  theme: one('apps/ios/Jovie/DesignSystem/JovieTheme.swift'),
   view: one('apps/ios/Jovie/Features/AppShell/AppShellView.swift'),
   tokens: one('apps/desktop/src/system-b-tokens.ts'),
   entity: one('apps/ios/Jovie/Features/AppShell/EntityContextSheet.swift'),
@@ -368,7 +462,7 @@ const stateSets = packed(
 );
 type Row = string;
 const rows =
-  'atom.button|atom|all|button|control|default focus-visible disabled loading|44px-hit-target|32px-visible|32px-visible|CTAButton PrimaryCTA marketing-cta;atom.icon-button|atom|all|iconButton|control|default focus-visible pressed disabled loading|icon-only|icon-only|icon-only|AppIconButton CircleIconButton HeaderIconButton InlineIconButton OverflowMenuTrigger RailToggleButton;atom.link|atom|all|link|controlVisited|default focus-visible disabled|inline|inline|inline|TextLink InlineLink;atom.brand-logo|atom|authProfile|brand|logo|default|compact-mark|wordmark|wordmark|JovieLogo BrandMark;atom.logo|atom|authProfile|logo|logo|default|icon|word|word|LogoIcon Wordmark;atom.logo-link|atom|authProfile|logoLink|logoLink|default focus-visible|icon-link|word-link|word-link|LogoAnchor BrandLink;molecule.auth-actions|molecule|auth|authActions|control|default focus-visible loading|stacked|inline|inline|AuthButtons SignInActions;organism.public-page-shell|organism|public|publicPage|shell|default loading error|single-column|contained|contained|PublicShell MarketingPageFrame;organism.marketing-header|organism|public|header|shell|default focus-visible collapsed expanded|icon-only|compact-nav|full-nav|PublicHeader MarketingNav;organism.marketing-footer|organism|public|footer|shell|default collapsed expanded|stacked|grouped|multi-column|PublicFooter SiteFooter;organism.app-shell-frame|organism|workspace|shell|shell|default loading error offline|drawer|rail|rail-and-panel|DashboardShell AppShell;organism.app-shell-content-panel|organism|workspace|content|content|default loading empty error|stacked|split|split|MainContentPanel WorkspacePanel PageShell;molecule.entity-sidebar|molecule|workspace|sidebar|sidebar|default focus-visible selected expanded|sheet|rail|rail|RightDrawer EntityRail;organism.auth-layout|organism|auth|authLayout|content|default loading error recovery|keyboard-aware|centered|centered|AuthShell AuthFormFrame;organism.onboarding-chat|organism|onboarding|onboarding|content|default loading empty error recovery|composer-stacked|chat-with-rail|chat-with-rail|StartChat OnboardingAssistant;organism.waitlist-intake-chat|organism|waitlist|waitlist|waitlist|default loading pending success error recovery|single-column|single-column|contained|WaitlistForm AccessRequestChat;organism.profile-shell|organism|profile|profile|profile|default loading empty error|drawer-driven|single-column|expanded|ArtistPageShell ProfileLayout;molecule.profile-primary-cta|molecule|public|cta|cta|default focus-visible disabled loading error|full-width|inline|inline|ProfileAction ArtistProfileCTA;organism.chat-workspace|organism|chat|chat|expanded|default loading empty error recovery|composer-stacked|split-panel|split-panel|ConversationWorkspace ChatSurface;organism.calendar-surface|organism|calendar|calendar|expanded|default loading empty error|agenda|grid|grid|CalendarView ReleaseCalendar;organism.admin-shell|organism|admin|admin|content|default loading empty error recovery|stacked|table-with-panel|table-with-panel|AdminFrame OperatorShell'.split(
+  'atom.button|atom|all|button|control|default focus-visible disabled loading|44px-hit-target|32px-visible|32px-visible|CTAButton PrimaryCTA marketing-cta;atom.icon-button|atom|all|iconButton|control|default focus-visible pressed disabled loading|44px-hit-target|32px-visible|32px-visible|CircleIconButton AppIconButton HeaderIconButton InlineIconButton DrawerInlineIconButton OverflowMenuTrigger RailToggleButton;atom.link|atom|all|link|controlVisited|default focus-visible disabled|inline|inline|inline|TextLink InlineLink;atom.brand-logo|atom|authProfile|brand|logo|default|compact-mark|wordmark|wordmark|JovieLogo BrandMark;atom.logo|atom|authProfile|logo|logo|default|icon|word|word|LogoIcon Wordmark;atom.logo-link|atom|authProfile|logoLink|logoLink|default focus-visible|icon-link|word-link|word-link|LogoAnchor BrandLink;molecule.auth-actions|molecule|auth|authActions|control|default focus-visible loading|stacked|inline|inline|AuthButtons SignInActions;organism.public-page-shell|organism|public|publicPage|shell|default loading error|single-column|contained|contained|PublicShell MarketingPageFrame;organism.marketing-header|organism|public|header|shell|default focus-visible collapsed expanded|icon-only|compact-nav|full-nav|PublicHeader MarketingNav;organism.marketing-footer|organism|public|footer|shell|default collapsed expanded|stacked|grouped|multi-column|PublicFooter SiteFooter;organism.app-shell-frame|organism|workspace|shell|shell|default loading error offline|drawer|rail|rail-and-panel|DashboardShell AppShell;organism.app-shell-content-panel|organism|workspace|content|content|default loading empty error|stacked|split|split|MainContentPanel WorkspacePanel PageShell;molecule.entity-sidebar|molecule|workspace|sidebar|sidebar|default focus-visible selected expanded|sheet|rail|rail|RightDrawer EntityRail;organism.auth-layout|organism|auth|authLayout|content|default loading error recovery|keyboard-aware|centered|centered|AuthShell AuthFormFrame;organism.onboarding-chat|organism|onboarding|onboarding|content|default loading empty error recovery|composer-stacked|chat-with-rail|chat-with-rail|StartChat OnboardingAssistant;organism.waitlist-intake-chat|organism|waitlist|waitlist|waitlist|default loading pending success error recovery|single-column|single-column|contained|WaitlistForm AccessRequestChat;organism.profile-shell|organism|profile|profile|profile|default loading empty error|drawer-driven|single-column|expanded|ArtistPageShell ProfileLayout;molecule.profile-primary-cta|molecule|public|cta|cta|default focus-visible disabled loading error|full-width|inline|inline|ProfileAction ArtistProfileCTA;organism.chat-workspace|organism|chat|chat|expanded|default loading empty error recovery|composer-stacked|split-panel|split-panel|ConversationWorkspace ChatSurface;organism.calendar-surface|organism|calendar|calendar|expanded|default loading empty error|agenda|grid|grid|CalendarView ReleaseCalendar;organism.admin-shell|organism|admin|admin|content|default loading empty error recovery|stacked|table-with-panel|table-with-panel|AdminFrame OperatorShell'.split(
     ';'
   ) as readonly Row[];
 
@@ -404,7 +498,7 @@ const makeEntry = (row: Row): UIOwnershipRegistryEntry => {
     sourceAuthority: f.sourceAuthority,
     canonicalOwner: f.owner,
     sourcePaths: [f.owner.sourcePath],
-    platformAdapters: adapters(f.owner, f.options.a),
+    platformAdapters: attachNativeBindings(id, adapters(f.owner, f.options.a)),
     states: list<UIOwnershipState>(stateSets[stateKey]),
     requiredStates: list<UIOwnershipState>(required),
     breakpoints: UI_OWNERSHIP_BREAKPOINTS,

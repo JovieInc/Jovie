@@ -54,6 +54,14 @@ const VALID_BRANCH_PROTECTION_REF = Object.freeze({
   name: 'main',
   branchProtectionRule: null,
 });
+/** @type {{
+  checkResponseTimeout: number,
+  maximumEntriesToBuild: number,
+  maximumEntriesToMerge: number,
+  mergeMethod: string,
+  minimumEntriesToMerge: number,
+  minimumEntriesToMergeWaitTime: number,
+}} */
 const VALID_LIVE_QUEUE_CONFIGURATION = Object.freeze({
   checkResponseTimeout: 60,
   maximumEntriesToBuild: 3,
@@ -774,6 +782,89 @@ describe('native live preflight', () => {
       expect.arrayContaining(['-f', 'branch=main'])
     );
     expect(queryText(liveConfigCall)).toContain('maximumEntriesToBuild');
+  });
+
+  it('does not fail enroll preflight when GraphQL checkResponseTimeout is seconds for a 60-minute lock', () => {
+    const liveUntilCutover = {
+      ...VALID_RULESET,
+      rules: VALID_RULESET.rules.map(rule =>
+        rule.type === 'merge_queue'
+          ? {
+              ...rule,
+              parameters: {
+                ...rule.parameters,
+                min_entries_to_merge: 1,
+                min_entries_to_merge_wait_minutes: 0,
+              },
+            }
+          : rule
+      ),
+    };
+    const falseDrift = validateNativePreflightEvidence({
+      ruleset: liveUntilCutover,
+      repository: VALID_REPOSITORY,
+      workflowYaml: VALID_WORKFLOW,
+      branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
+      liveQueueConfiguration: {
+        ...VALID_LIVE_QUEUE_CONFIGURATION,
+        checkResponseTimeout: 3600,
+        minimumEntriesToMerge: 1,
+        minimumEntriesToMergeWaitTime: 0,
+      },
+    });
+    expect(falseDrift.ok).toBe(true);
+    expect(
+      falseDrift.policyReadback.observed.check_response_timeout_minutes
+    ).toBe(60);
+    expect(falseDrift.policyReadback.drift).toEqual([
+      'min_entries_to_merge',
+      'min_entries_to_merge_wait_minutes',
+    ]);
+    expect(
+      falseDrift.errors.some(error =>
+        error.includes('check_response_timeout_minutes')
+      )
+    ).toBe(false);
+
+    const actualTimeoutDrift = validateNativePreflightEvidence({
+      ruleset: liveUntilCutover,
+      repository: VALID_REPOSITORY,
+      workflowYaml: VALID_WORKFLOW,
+      branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
+      liveQueueConfiguration: {
+        ...VALID_LIVE_QUEUE_CONFIGURATION,
+        checkResponseTimeout: 1800,
+        minimumEntriesToMerge: 1,
+        minimumEntriesToMergeWaitTime: 0,
+      },
+    });
+    expect(actualTimeoutDrift.ok).toBe(false);
+    expect(actualTimeoutDrift.errors).toContain(
+      'merge_queue check_response_timeout_minutes must be 60'
+    );
+    expect(actualTimeoutDrift.errors).toContain(
+      'native queue policy readback drifted: check_response_timeout_minutes'
+    );
+  });
+
+  it('reads live GraphQL checkResponseTimeout seconds as 60 minutes', async () => {
+    const runner = createNativeRunner({
+      liveQueueConfiguration: {
+        ...VALID_LIVE_QUEUE_CONFIGURATION,
+        checkResponseTimeout: 3600,
+      },
+    });
+    await expect(
+      preflightMergeQueue({
+        repository: REPOSITORY,
+        runner,
+      })
+    ).resolves.toMatchObject({
+      ready: true,
+      policyReadback: {
+        observed: { check_response_timeout_minutes: 60 },
+      },
+    });
   });
 
   it('prefers GraphQL maximumEntriesToBuild over stale REST max_entries_to_build', async () => {

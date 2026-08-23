@@ -12,15 +12,19 @@ const SAMPLE_CUES: readonly Cue[] = [
 describe('CuesPanel', () => {
   it('renders the title and cue count', () => {
     render(<CuesPanel cues={SAMPLE_CUES} durationSec={213} />);
-    expect(screen.getByText('Cues')).toBeInTheDocument();
+    const header = screen.getByText('Cues');
+    expect(header).toBeInTheDocument();
+    expect(header.className).toContain('tracking-normal');
+    expect(header.className).not.toMatch(/\buppercase\b/);
     expect(screen.getByText('3')).toBeInTheDocument();
   });
 
   it('renders a row for every cue', () => {
     render(<CuesPanel cues={SAMPLE_CUES} durationSec={213} />);
     expect(screen.getAllByRole('button').length).toBe(3);
-    expect(screen.getByText('Intro')).toBeInTheDocument();
-    expect(screen.getByText('Chorus')).toBeInTheDocument();
+    expect(screen.getAllByText('Intro')).toHaveLength(2);
+    expect(screen.getAllByText('Chorus')).toHaveLength(2);
+    expect(screen.getByText('Verse')).toBeInTheDocument();
   });
 
   it('formats cue times as m:ss', () => {

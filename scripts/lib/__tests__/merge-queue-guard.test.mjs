@@ -25,6 +25,7 @@ import {
   isAutonomousBranch,
   MERGE_QUEUE_ENROLL_HOT_PATH_FORBIDDEN,
   MERGE_QUEUE_REPO_PATHS,
+  mapGraphqlCheckResponseTimeoutToMinutes,
   mergeNativeQueuePolicyObservations,
   NATIVE_BRANCH_PROTECTION_POLICY,
   NATIVE_QUEUE_COHORT_POLICY,
@@ -2114,6 +2115,83 @@ describe('native merge-queue cohort (JOV-5047)', () => {
       maximumEntriesToBuild: 3,
     });
     expect(graphqlReadback.observed.max_entries_to_build).toBe(3);
+  });
+
+  it('converts GraphQL checkResponseTimeout seconds onto REST minutes (JOV-5315)', () => {
+    expect(mapGraphqlCheckResponseTimeoutToMinutes(3600)).toBe(60);
+    expect(mapGraphqlCheckResponseTimeoutToMinutes(60)).toBe(60);
+    expect(mapGraphqlCheckResponseTimeoutToMinutes(1800)).toBe(30);
+    expect(
+      normalizeNativeQueuePolicyParameters({ checkResponseTimeout: 3600 })
+    ).toMatchObject({ check_response_timeout_minutes: 60 });
+    expect(
+      normalizeNativeQueuePolicyParameters({ checkResponseTimeout: 60 })
+    ).toMatchObject({ check_response_timeout_minutes: 60 });
+    expect(
+      mergeNativeQueuePolicyObservations(
+        { ...NATIVE_QUEUE_POLICY },
+        { checkResponseTimeout: 3600 }
+      )
+    ).toMatchObject({ check_response_timeout_minutes: 60 });
+    expect(
+      mergeNativeQueuePolicyObservations(
+        { ...NATIVE_QUEUE_POLICY },
+        { checkResponseTimeout: null }
+      )
+    ).toMatchObject({ check_response_timeout_minutes: 60 });
+    const secondsReadback = buildNativeQueuePolicyReadback({
+      ...NATIVE_QUEUE_POLICY,
+      checkResponseTimeout: 3600,
+    });
+    expect(secondsReadback.observed.check_response_timeout_minutes).toBe(60);
+    expect(secondsReadback.drift).not.toContain(
+      'check_response_timeout_minutes'
+    );
+    const liveGraphql = validateLiveMergeQueueRuleset(
+      {
+        bypass_actors: [],
+        rules: [
+          {
+            type: 'required_status_checks',
+            parameters: {
+              strict_required_status_checks_policy: false,
+              required_status_checks: [
+                'PR Ready',
+                'Migration Guard',
+                'Fork PR Gate',
+                'PR Size Guard',
+              ].map(context => ({ context })),
+            },
+          },
+          {
+            type: 'merge_queue',
+            parameters: {
+              ...NATIVE_QUEUE_POLICY,
+              min_entries_to_merge: 1,
+              min_entries_to_merge_wait_minutes: 0,
+            },
+          },
+        ],
+      },
+      {
+        backend: 'native',
+        liveQueueConfiguration: {
+          checkResponseTimeout: 3600,
+          maximumEntriesToBuild: 3,
+          maximumEntriesToMerge: 10,
+          mergeMethod: 'SQUASH',
+          minimumEntriesToMerge: 1,
+          minimumEntriesToMergeWaitTime: 0,
+        },
+      }
+    );
+    expect(NATIVE_QUEUE_COHORT_POLICY.liveRulesetCutover).toBe('pending');
+    expect(liveGraphql.ok).toBe(true);
+    expect(
+      liveGraphql.errors.some(error =>
+        error.includes('check_response_timeout_minutes')
+      )
+    ).toBe(false);
   });
 
   it('ejects UNMERGEABLE native entries and refuses to re-enqueue the same head', () => {

@@ -180,6 +180,8 @@ extension View {
 }
 
 struct JoviePillButtonStyle: ButtonStyle {
+  static let pressedOpacity: Double = 0.8
+
   let filled: Bool
 
   func makeBody(configuration: Configuration) -> some View {
@@ -199,23 +201,29 @@ struct JoviePillButtonStyle: ButtonStyle {
             lineWidth: 1
           )
       }
-      .opacity(configuration.isPressed ? 0.8 : 1)
+      .opacity(configuration.isPressed ? JoviePillButtonStyle.pressedOpacity : 1)
       .scaleEffect(configuration.isPressed ? JovieMotion.pressScale : 1)
       .animation(JovieMotion.subtle, value: configuration.isPressed)
   }
 }
 
 struct JovieIconButtonStyle: ButtonStyle {
+  static let pressedOpacity: Double = 0.72
+  static let targetSize: CGFloat = 44
+
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
       .font(.system(size: 17, weight: .semibold))
       .foregroundStyle(JovieColor.textPrimary)
-      .frame(width: 44, height: 44)
+      .frame(
+        width: JovieIconButtonStyle.targetSize,
+        height: JovieIconButtonStyle.targetSize
+      )
       .background(JovieColor.surface1, in: Circle())
       .overlay {
         Circle().stroke(JovieColor.borderDefault, lineWidth: 1)
       }
-      .opacity(configuration.isPressed ? 0.72 : 1)
+      .opacity(configuration.isPressed ? JovieIconButtonStyle.pressedOpacity : 1)
       .scaleEffect(configuration.isPressed ? JovieMotion.pressScale : 1)
       .animation(JovieMotion.subtle, value: configuration.isPressed)
   }

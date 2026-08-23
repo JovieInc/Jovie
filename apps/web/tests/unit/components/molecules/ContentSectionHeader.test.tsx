@@ -18,4 +18,21 @@ describe('ContentSectionHeader', () => {
       screen.getByRole('heading', { level: 1, name: 'Route title' })
     ).toBeInTheDocument();
   });
+
+  it('keeps compact plain headers action-ready without a second owner', () => {
+    render(
+      <ContentSectionHeader
+        density='compact'
+        variant='plain'
+        title='Campaign controls'
+        subtitle='Compact and responsive without creating a second owner.'
+        actions={<button type='button'>Review</button>}
+      />
+    );
+
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Campaign controls' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Review' })).toBeInTheDocument();
+  });
 });

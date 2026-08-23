@@ -1,13 +1,9 @@
 /**
- * Cold-visitor tab bar experiment helpers (JOV-3907).
+ * Cold-visitor tab bar experiment helpers (JOV-3907 / JOV-5318).
  *
- * Hypothesis: hiding the bottom tab bar for cold (S0) visitors reduces choice
- * surface and raises play-rate → capture-rate.
- *
- * Rules:
- * - Only cold, unsubscribed visitors on the `hidden` arm start without the bar.
- * - First interaction restores the bar for the rest of the session.
- * - Return visits always see the bar (localStorage-marked), regardless of arm.
+ * The historical PAC `hidden` arm removed the entire authorized destination
+ * set before first interaction. That arm now fails closed: authorized public
+ * navigation stays visible for every visitor state.
  */
 
 export const PAC_TAB_BAR_RETURN_VISIT_KEY = 'jv_pac_tab_bar_return';
@@ -27,17 +23,15 @@ export interface ColdTabBarVisibilityInput {
 
 /**
  * Whether the bottom tab bar should render for this visitor state.
- * Pure — storage reads happen at the call site.
+ *
+ * The historical PAC `hidden` arm hid the entire authorized destination set
+ * before first interaction. That arm now fails closed: authorized navigation
+ * stays visible for cold visitors, return visits, and subscribed fans.
  */
 export function shouldShowColdVisitorTabBar(
-  input: ColdTabBarVisibilityInput
+  _input: ColdTabBarVisibilityInput
 ): boolean {
-  if (input.isInteractive === false) return true;
-  if (input.isSubscribed) return true;
-  if (input.restoredThisSession) return true;
-  if (input.isReturnVisit) return true;
-  if (input.tabBarArm === 'visible') return true;
-  return false;
+  return true;
 }
 
 export function readPacTabBarReturnVisit(
