@@ -15,6 +15,12 @@ export const ADMISSION_TARGET_FIELDS = Object.freeze([
 ]);
 export const JOVIE_EXECUTION_REPO = 'JovieInc/Jovie';
 export const LOGYOURBODY_EXECUTION_REPO = 'JovieInc/LogYourBody';
+const CONTROL_PLANE_PREFIXES = [
+  '.github/workflows/',
+  'canon/',
+  'scripts/backlog-orchestrator/',
+  'scripts/hermes/',
+];
 
 const WORK_SECTION_NAMES = [
   'Proposed fix',
@@ -118,7 +124,40 @@ export function admissionTargetPacket(value) {
     verification_authority: String(value.verification_authority || '').trim(),
   };
   if (ADMISSION_TARGET_FIELDS.some(field => !packet[field])) return null;
-  return packet;
+  return {
+    ...packet,
+    collision_domains: collisionDomainsForTarget(packet),
+  };
+}
+
+export function collisionDomainsForTarget(target) {
+  const repo = String(target?.target_repo || '').trim();
+  const artifact = String(target?.artifact || '')
+    .trim()
+    .replace(/\/$/, '');
+  if (!repo || !artifact) return [];
+  const segments = artifact.split('/').filter(Boolean);
+  const surface =
+    segments.length > 1 ? segments.slice(0, 2).join('/') : artifact;
+  const domains = [`artifact:${repo}:${surface}`];
+  if (
+    CONTROL_PLANE_PREFIXES.some(prefix => artifactMatches(prefix, artifact))
+  ) {
+    domains.push(`risk:${repo}:control-plane`);
+  }
+  if (/\b(?:drizzle\/migrations|migration|schema)\b/i.test(artifact)) {
+    domains.push(`risk:${repo}:database-schema`);
+  }
+  return domains.sort();
+}
+
+export function admissionTargetsCollide(left, right) {
+  const leftDomains = new Set(
+    left?.collision_domains || collisionDomainsForTarget(left)
+  );
+  return (right?.collision_domains || collisionDomainsForTarget(right)).some(
+    domain => leftDomains.has(domain)
+  );
 }
 
 export function sameAdmissionTarget(left, right) {
@@ -245,12 +284,12 @@ function packetForSystem(system, artifact) {
       (system.adapter_artifacts || []).some(prefix =>
         artifactMatches(prefix, artifact)
       ));
-  return {
+  return admissionTargetPacket({
     target_system: system.target_system,
     target_repo: jovieExecutable ? system.current_repo : system.intended_repo,
     artifact: artifact || system.default_artifact,
     verification_authority: system.verification_authority,
-  };
+  });
 }
 
 function canAdmitToJovie(system, artifact) {
