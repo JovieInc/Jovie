@@ -1,3 +1,4 @@
+import type { CanonicalSurfaceId } from '@/lib/canonical-surfaces';
 import {
   VISUAL_QA_COLOR_SCHEMES,
   type VisualQaColorScheme,
@@ -7,16 +8,30 @@ import type {
   VisualQaSurface,
 } from '@/lib/visual-qa/types';
 
+const DEFAULT_VISUAL_QA_BASELINE = {
+  viewport: 'desktop',
+  captureTarget: 'page',
+  fullPage: false,
+  reducedMotion: true,
+} as const satisfies Partial<VisualQaCaptureConfig>;
+
 interface VisualQaSurfaceSeed
   extends Omit<VisualQaSurface, 'baseline' | 'after'> {
-  readonly baseline: Omit<VisualQaCaptureConfig, 'flagOverrides'> & {
+  readonly baseline: Omit<
+    VisualQaCaptureConfig,
+    'flagOverrides' | 'viewport'
+  > & {
+    readonly viewport?: VisualQaCaptureConfig['viewport'];
     readonly flagOverrides?: Readonly<Record<string, boolean>>;
   };
   readonly after?: Partial<VisualQaCaptureConfig>;
 }
 
 function defineSurface(seed: VisualQaSurfaceSeed): VisualQaSurface {
-  const baseline: VisualQaCaptureConfig = { ...seed.baseline };
+  const baseline: VisualQaCaptureConfig = {
+    ...DEFAULT_VISUAL_QA_BASELINE,
+    ...seed.baseline,
+  };
 
   return {
     id: seed.id,
@@ -28,6 +43,56 @@ function defineSurface(seed: VisualQaSurfaceSeed): VisualQaSurface {
     baseline,
     after: seed.after,
   };
+}
+
+const CANONICAL_REVIEW_VISUAL_QA = [
+  [
+    'canonical-homepage',
+    'Canonical homepage',
+    'Live marketing homepage capture aligned to the screenshot registry.',
+    'homepage',
+    '/',
+    'main',
+  ],
+  [
+    'canonical-public-profile',
+    'Canonical public profile',
+    'Demo public-profile capture aligned to the screenshot registry.',
+    'public-profile',
+    '/demo/showcase/public-profile',
+    '[data-testid="profile-compact-shell"]',
+  ],
+  [
+    'canonical-release-landing',
+    'Canonical release landing',
+    'Demo release-landing capture aligned to the screenshot registry.',
+    'release-landing',
+    '/demo/showcase/release-landing',
+    '[data-testid="demo-showcase-release-landing"]',
+  ],
+  [
+    'canonical-dashboard-releases',
+    'Canonical dashboard releases',
+    'Demo releases workspace capture aligned to the screenshot registry.',
+    'dashboard-releases',
+    '/demo',
+    '[data-testid="releases-matrix"]',
+  ],
+] as const satisfies ReadonlyArray<
+  readonly [string, string, string, CanonicalSurfaceId, string, string]
+>;
+
+function defineCanonicalReviewSurface(
+  seed: (typeof CANONICAL_REVIEW_VISUAL_QA)[number]
+): VisualQaSurface {
+  const [id, title, description, canonicalSurfaceId, route, waitFor] = seed;
+  return defineSurface({
+    id,
+    title,
+    description,
+    canonicalSurfaceId,
+    baseline: { route, waitFor },
+  });
 }
 
 /**
@@ -44,14 +109,9 @@ export const VISUAL_QA_SURFACES = [
     description:
       'Global shell chrome at desktop idle for proposal validation against JOV-1605 shell parity rows.',
     parityLedgerGroup: 'Shell',
-    canonicalSurfaceId: 'dashboard-releases',
     baseline: {
       route: '/exp/shell-v1?capture=marketing',
       waitFor: '.shell-v1',
-      viewport: 'desktop',
-      captureTarget: 'page',
-      fullPage: false,
-      reducedMotion: true,
     },
   }),
   defineSurface({
@@ -60,14 +120,9 @@ export const VISUAL_QA_SURFACES = [
     description:
       'Authenticated releases list at default density for proposal validation against JOV-1605 list parity rows.',
     parityLedgerGroup: 'List',
-    canonicalSurfaceId: 'dashboard-releases',
     baseline: {
       route: '/exp/shell-v1?view=releases&capture=marketing',
       waitFor: '[data-testid="releases-matrix"]',
-      viewport: 'desktop',
-      captureTarget: 'page',
-      fullPage: false,
-      reducedMotion: true,
     },
   }),
   defineSurface({
@@ -76,15 +131,10 @@ export const VISUAL_QA_SURFACES = [
     description:
       'Right drawer with an open release detail state for proposal validation against JOV-1605 drawer parity rows.',
     parityLedgerGroup: 'Drawer',
-    canonicalSurfaceId: 'dashboard-releases',
     baseline: {
       route:
         '/exp/shell-v1?view=releases&release=the-deep-end&capture=marketing',
       waitFor: '[data-testid="shell-v1-release-drawer"]',
-      viewport: 'desktop',
-      captureTarget: 'page',
-      fullPage: false,
-      reducedMotion: true,
     },
   }),
   defineSurface({
@@ -93,16 +143,12 @@ export const VISUAL_QA_SURFACES = [
     description:
       'Authenticated home inbox feed for open suggested_actions with System B card grammar.',
     parityLedgerGroup: 'Shell',
-    canonicalSurfaceId: 'dashboard-releases',
     baseline: {
       route: '/app',
       waitFor: '[data-testid="opportunity-inbox-page"]',
-      viewport: 'desktop',
-      captureTarget: 'page',
-      fullPage: false,
-      reducedMotion: true,
     },
   }),
+  ...CANONICAL_REVIEW_VISUAL_QA.map(defineCanonicalReviewSurface),
   defineSurface({
     id: 'settings-root-hierarchy',
     title: 'Settings — root hierarchy',
@@ -113,10 +159,6 @@ export const VISUAL_QA_SURFACES = [
     baseline: {
       route: '/demo/showcase/settings?capture=quality',
       waitFor: '[data-testid="demo-settings-audience-quality-capture"]',
-      viewport: 'desktop',
-      captureTarget: 'page',
-      fullPage: false,
-      reducedMotion: true,
     },
   }),
 ] as const satisfies readonly VisualQaSurface[];
