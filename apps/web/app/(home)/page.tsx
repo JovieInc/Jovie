@@ -12,7 +12,9 @@ import { HERO_COPY } from '@/components/homepage/intent';
 import {
   FaqSection,
   MarketingElectricSeam,
+  MarketingPlatformSpecBento,
   MarketingPosterHero,
+  MarketingShippedSitesShowcase,
 } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
@@ -241,6 +243,8 @@ function HomepageUnlockedSections() {
     <>
       <HomepageMeetJovie />
       <HomepageArtistProfiles previews={ARTIST_PROFILE_PREVIEWS} />
+      <MarketingShippedSitesShowcase testId='homepage-shipped-sites-showcase' />
+      <MarketingPlatformSpecBento testId='homepage-platform-spec-bento' />
       <HomepageClosedLoop />
       <HomepageFaq />
     </>
