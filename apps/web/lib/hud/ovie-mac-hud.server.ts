@@ -47,7 +47,9 @@ export async function getOvieMacHudSnapshot(
   ]);
   const shipping = readShippingEntries();
   const financialAvailable =
-    stripeMetrics.isAvailable && mercuryMetrics.isAvailable;
+    stripeMetrics.isAvailable &&
+    mercuryMetrics.isAvailable &&
+    mercuryMetrics.burnRateAvailable === true;
   const weeklyRevenueUsd = financialAvailable
     ? monthlyToWeeklyUsd(stripeMetrics.mrrUsd)
     : null;
