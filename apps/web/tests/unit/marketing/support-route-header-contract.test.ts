@@ -40,6 +40,16 @@ describe('support route header contract', () => {
     }
   });
 
+  it('keeps the homepage header as Log in text without a second Get started', () => {
+    const headerSource = readWebSource('components/site/MarketingHeader.tsx');
+
+    expect(headerSource).toContain('minimalAuth={isMinimal || isHomepage}');
+    expect(headerSource).toContain(
+      "minimalAuthLabel={isHomepage ? 'Log in' : 'Sign in'}"
+    );
+    expect(headerSource).not.toContain('HOMEPAGE_LAUNCH_COPY.hero.primaryCta');
+  });
+
   it('inherits landing from the shared marketing shell and shell story', () => {
     const marketingLayout = readWebSource('app/(marketing)/layout.tsx');
     const publicPageShell = readWebSource(

@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/components/organisms/MarketingSignInLink.test.tsx
 'use client';
 
 import { Button } from '@jovie/ui';
