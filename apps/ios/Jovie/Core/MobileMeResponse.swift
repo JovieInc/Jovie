@@ -17,7 +17,9 @@ struct MobileMeResponse: Codable, Equatable, Sendable {
   let chatEnabled: Bool
   let continueOnWebURL: String
   /// Missing `isAdmin` must hide the Settings switch.
-  let isAdmin: Bool? = nil
+  /// `var` is required: synthesized Codable skips a `let` that already has a
+  /// default, so `"isAdmin": true` would never decode.
+  var isAdmin: Bool? = nil
 
   enum CodingKeys: String, CodingKey {
     case state
