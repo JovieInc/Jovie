@@ -124,8 +124,19 @@ struct AppShellChatFirstTests {
 
   @Test func composerSendStaysDisabledForEmptyOrInFlightDrafts() {
     #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "", isSending: false) == false)
-    #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "Ask Jovie", isSending: true) == false)
-    #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "Ask Jovie", isSending: false))
+    #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "Let's get it", isSending: true) == false)
+    #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "Let's get it", isSending: false))
+  }
+
+  @Test func emptyChatHomeLocksGreetingAndDocksComposer() {
+    #expect(
+      MobileChatEmptyHomePolicy.greetingPlacement() == .centeredAboveDockedComposer
+    )
+    #expect(MobileChatEmptyHomePolicy.composerIsDockedToBottom())
+    #expect(MobileChatEmptyHomePolicy.showsBrandMark() == false)
+    #expect(MobileChatEmptyHomePolicy.showsFeatureIntroOnEmptyHome() == false)
+    #expect(ChatComposerCopy.emptyPlaceholder.isEmpty)
+    #expect(ChatComposerCopy.inputAccessibilityIdentifier == "chat-composer-input")
   }
 
   @Test func composerPlusDisablesWhileSending() {

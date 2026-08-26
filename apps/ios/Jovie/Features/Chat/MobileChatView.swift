@@ -18,6 +18,29 @@ enum ChatEmptyGreeting: String, CaseIterable, Sendable {
   }
 }
 
+enum MobileChatEmptyHomePolicy {
+  enum GreetingPlacement: Equatable {
+    /// Vertically centered in the remaining space above the docked composer.
+    case centeredAboveDockedComposer
+  }
+
+  static func greetingPlacement() -> GreetingPlacement {
+    .centeredAboveDockedComposer
+  }
+
+  static func composerIsDockedToBottom() -> Bool {
+    true
+  }
+
+  static func showsBrandMark() -> Bool {
+    false
+  }
+
+  static func showsFeatureIntroOnEmptyHome() -> Bool {
+    false
+  }
+}
+
 struct MobileChatEmptyGreetingView: View {
   let greeting: String
 
