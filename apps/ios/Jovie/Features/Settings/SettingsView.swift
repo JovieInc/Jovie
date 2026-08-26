@@ -23,6 +23,9 @@ struct SettingsView: View {
   let billingURL: URL
   var onClose: (() -> Void)?
   let onLogout: @MainActor () async -> Void
+  var showsWorkspaceSwitch: Bool = false
+  var workspaceMode: MobileWorkspaceMode = .jovie
+  var onSelectWorkspace: (MobileWorkspaceMode) -> Void = { _ in }
 
   @Environment(\.openURL) private var openURL
   @State private var isLoggingOut = false
@@ -111,6 +114,24 @@ struct SettingsView: View {
       }
       .padding(.vertical, JovieSpacing.xSmall)
       .background(JovieColor.surface0, in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
+
+      if showsWorkspaceSwitch {
+        Button {
+          onSelectWorkspace(workspaceMode.toggled)
+        } label: {
+          SettingsValueRow(title: "Workspace", value: workspaceMode.displayName)
+        }
+        .buttonStyle(
+          JoviePressFeedbackButtonStyle(
+            pressedOpacity: SettingsInteraction.rowPressedOpacity
+          )
+        )
+        .padding(.vertical, JovieSpacing.xSmall)
+        .background(JovieColor.surface0, in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
+        .accessibilityIdentifier("settings-workspace-switch")
+        .accessibilityLabel("Workspace \(workspaceMode.displayName)")
+        .accessibilityHint("Switches between Jovie and Ovie")
+      }
     }
   }
 

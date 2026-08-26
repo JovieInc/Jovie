@@ -9,6 +9,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - [internal] **iOS public-profile browser stays on the published creator page (JOV-5148):** Open Public Profile still uses the full-screen embedded browser, but navigation is now limited to HTTPS `jov.ie` / `staging.jov.ie` and the server-provided username root. App, admin, HUD, auth, and other reserved routes cannot load inside it.
 
+- **Empty iPhone chat home is a centered greeting with the composer docked at the bottom:** signed-in empty chat shows Let's get it / Ready to start? / Ready when you are, with no mark, no placeholder, and no extra tab bar.
+
 - **Primary buttons use a lighter label:** CTA text is medium (510) instead of semibold, with the same size, fill, and 32px chrome.
 
 - **Empty chat greets you and waits:** new conversations show one of Let's get it, Ready to start?, or Ready when you are above a blank input. No placeholder, logo, or What's next? line.
