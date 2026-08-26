@@ -258,7 +258,7 @@
     "@tiptap/starter-kit": "3.30.1",
     "@types/ws": "^8.18.1",
     "@upstash/ratelimit": "^2.0.8",
-    "@upstash/redis": "^1.37.0",
+    "@upstash/redis": "^1.38.2",
     "@vercel/analytics": "^2.0.1",
     "@vercel/blob": "^2.5.0",
     "@vercel/toolbar": "^0.2.5",
