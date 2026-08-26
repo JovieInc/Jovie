@@ -1,14 +1,14 @@
 #!/usr/bin/env sh
 set -e  # Required: ensures check-conflict-markers.sh failure actually blocks commits
-# Universal gate ladder (JOV-3210): conflict → secrets → proxy → lint/typecheck.
+# Universal gate ladder (JOV-3210): conflict → secrets → proxy → lint.
 # Source of truth: scripts/gate-ladder/ladder.json (`pnpm gate-ladder:validate`).
+# Typecheck runs in CI (turbo typecheck --affected) per JOV-5058, not per commit.
 
 bash scripts/check-conflict-markers.sh
 bash scripts/security/scan-secrets.sh pre-commit
 node scripts/repo-hygiene-guard.mjs --staged
 pnpm run skill-governance:check -- --staged
 pnpm run next:proxy-guard
-node scripts/turbo-warm-precommit-cache.mjs
 pnpm exec lint-staged
 
 # iOS adapter: when Swift sources are staged, run the portable best-practices lint.

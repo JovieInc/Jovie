@@ -151,6 +151,7 @@ struct AppShellChatFirstTests {
     #expect(JovieActionButtonMetrics.height == 32)
     #expect(JovieActionButtonMetrics.radius == 999)
     #expect(JovieActionButtonMetrics.labelWeight == 510)
+    #expect(JovieFont.actionLabelWeight == 510)
     #expect(ChatComposerMetrics.sendSlotSize <= ChatComposerMetrics.barHeight)
   }
 
