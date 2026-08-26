@@ -35,6 +35,34 @@ describe('Button', () => {
         expect(button.className).not.toMatch(/\btracking-\[-[^\]]+\]/);
       }
     });
+
+    it('locks CTA label weight at medium (510) without dropping to book', () => {
+      const source = readFileSync(
+        path.join(process.cwd(), 'atoms/button.tsx'),
+        {
+          encoding: 'utf8',
+        }
+      );
+
+      expect(source).toContain('[font-weight:var(--font-weight-medium)]');
+      expect(source).not.toMatch(/\bfont-(?:semibold|bold|book|normal)\b/);
+      expect(source).not.toMatch(/font-\[(?:400|450|590|600|650)\]/);
+
+      render(
+        <>
+          <Button>Primary</Button>
+          <Button variant='secondary'>Secondary</Button>
+          <Button variant='tertiary'>Tertiary</Button>
+        </>
+      );
+
+      for (const button of screen.getAllByRole('button')) {
+        expect(button.className).toContain(
+          '[font-weight:var(--font-weight-medium)]'
+        );
+        expect(button.className).not.toMatch(/\bfont-(?:semibold|bold)\b/);
+      }
+    });
   });
 
   it('renders with text', () => {
