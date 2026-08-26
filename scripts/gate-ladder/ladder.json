@@ -69,7 +69,7 @@
       "intent": "Fail closed on TypeScript errors before push/merge.",
       "hardBlock": true,
       "preCommit": {
-        "web": "lint-staged → turbo typecheck --filter=@jovie/web (staged TS)",
+        "web": null,
         "ios": null
       },
       "prePush": {
