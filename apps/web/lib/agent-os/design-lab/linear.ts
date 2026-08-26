@@ -18,7 +18,7 @@ interface LinearTeamState {
   readonly name: string;
 }
 
-async function linearGraphql<T>(
+export async function linearGraphql<T>(
   query: string,
   variables: Record<string, unknown>
 ): Promise<T> {

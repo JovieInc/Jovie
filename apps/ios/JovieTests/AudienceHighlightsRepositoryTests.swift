@@ -213,4 +213,19 @@ struct ActionLoopCacheTests {
     #expect(await reader.loadInbox(for: "user_keep") == nil)
     #expect(await reader.loadCalendar(for: "user_keep") == nil)
   }
+
+  @Test func ovieInboxCacheDoesNotCollideWithArtistInbox() async {
+    let suiteName = "ActionLoopCacheTests-workspace-isolation"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.removePersistentDomain(forName: suiteName)
+    let cache = ActionLoopCache(defaults: defaults)
+
+    await cache.storeInbox(.preview, for: "user_ws", workspace: .jovie)
+    await cache.storeInbox(otherActionLoopInbox, for: "user_ws", workspace: .ovie)
+
+    #expect(await cache.loadInbox(for: "user_ws", workspace: .jovie) == .preview)
+    #expect(await cache.loadInbox(for: "user_ws", workspace: .ovie) == otherActionLoopInbox)
+    #expect(defaults.data(forKey: "ie.jov.Jovie.actionLoopInbox.user_ws") != nil)
+    #expect(defaults.data(forKey: "ie.jov.Jovie.actionLoopInbox.user_ws.ov") != nil)
+  }
 }

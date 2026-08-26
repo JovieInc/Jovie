@@ -179,8 +179,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-23T13:28:04.137Z",
-    "gitSha": "394f6a899763a1bfc87c5bfd0a07dc6bcd5086e6",
+    "capturedAt": "2026-08-26T09:44:55.131Z",
+    "gitSha": "3d588eac5389efe95949d9fb68969634845ae34f",
     "imagePath": "artist-profile-spec-wall-section-desktop.png"
   },
   {
@@ -218,8 +218,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-23T18:45:41.241Z",
-    "gitSha": "4e08dc96f7a6c2fc3f04d215673993e397fa93ad",
+    "capturedAt": "2026-08-26T09:46:08.710Z",
+    "gitSha": "3d588eac5389efe95949d9fb68969634845ae34f",
     "imagePath": "artist-profile-final-cta-section-desktop.png"
   },
   {
@@ -609,8 +609,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-23T18:54:45.621Z",
-    "gitSha": "4e08dc96f7a6c2fc3f04d215673993e397fa93ad",
+    "capturedAt": "2026-08-26T09:55:12.247Z",
+    "gitSha": "3d588eac5389efe95949d9fb68969634845ae34f",
     "imagePath": "dashboard-releases-desktop.png",
     "publicExportPath": "releases-dashboard-full.png"
   },
@@ -677,8 +677,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-23T18:56:31.730Z",
-    "gitSha": "4e08dc96f7a6c2fc3f04d215673993e397fa93ad",
+    "capturedAt": "2026-08-26T09:56:58.296Z",
+    "gitSha": "3d588eac5389efe95949d9fb68969634845ae34f",
     "imagePath": "dashboard-audience-desktop.png",
     "publicExportPath": "audience-crm.png"
   },
@@ -710,8 +710,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-23T18:56:59.650Z",
-    "gitSha": "4e08dc96f7a6c2fc3f04d215673993e397fa93ad",
+    "capturedAt": "2026-08-26T09:57:26.143Z",
+    "gitSha": "3d588eac5389efe95949d9fb68969634845ae34f",
     "imagePath": "dashboard-earnings-desktop.png"
   },
   {
