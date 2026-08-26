@@ -121,7 +121,11 @@ struct SettingsView: View {
         } label: {
           SettingsValueRow(title: "Workspace", value: workspaceMode.displayName)
         }
-        .buttonStyle(SettingsRowButtonStyle())
+        .buttonStyle(
+          JoviePressFeedbackButtonStyle(
+            pressedOpacity: SettingsInteraction.rowPressedOpacity
+          )
+        )
         .padding(.vertical, JovieSpacing.xSmall)
         .background(JovieColor.surface0, in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
         .accessibilityIdentifier("settings-workspace-switch")
