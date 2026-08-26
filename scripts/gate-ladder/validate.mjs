@@ -63,9 +63,7 @@ function main() {
     );
   }
   if (!preCommit.includes('lint-staged')) {
-    errors.push(
-      '.husky/pre-commit must invoke lint-staged (format/lint/typecheck)'
-    );
+    errors.push('.husky/pre-commit must invoke lint-staged (format/lint)');
   }
 
   const prePush = existsSync(resolve(REPO_ROOT, '.husky/pre-push'))

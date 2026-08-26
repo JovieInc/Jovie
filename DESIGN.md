@@ -809,6 +809,8 @@ Destructive actions use `destructive` on any variant. Examples: primary destruct
 
 Marketing text pills use a 32px visible control with a 44px minimum hit target.
 Do not change the generic app scale to reproduce that marketing geometry.
+CTA labels use medium (`--font-weight-medium` / 510). Do not keep them at
+semibold (~590) and do not drop medium surfaces to book/400.
 
 ### Sidebar (App Shell)
 
