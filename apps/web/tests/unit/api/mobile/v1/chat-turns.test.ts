@@ -123,7 +123,47 @@ describe('POST /api/mobile/v1/chat/turns', () => {
         clientMessageId: 'msg_123',
         text: 'Help me launch my release',
         source: 'typed',
+        chatMode: null,
       }),
+      expect.anything()
+    );
+  });
+
+  it('rejects invalid chatMode and forwards ov to the handler', async () => {
+    const { POST } = await routeModulePromise;
+    const invalid = await POST(
+      new Request('https://jov.ie/api/mobile/v1/chat/turns', {
+        method: 'POST',
+        body: JSON.stringify({
+          clientTurnId: 'turn_123',
+          clientMessageId: 'msg_123',
+          text: 'Help me launch my release',
+          source: 'typed',
+          chatMode: 'admin',
+        }),
+      })
+    );
+    expect(invalid.status).toBe(400);
+
+    hoisted.handleMobileChatTurnMock.mockResolvedValue(
+      new Response('{"type":"turn.reserved"}\n', { status: 200 })
+    );
+    const ov = await POST(
+      new Request('https://jov.ie/api/mobile/v1/chat/turns', {
+        method: 'POST',
+        body: JSON.stringify({
+          clientTurnId: 'turn_ov',
+          clientMessageId: 'msg_ov',
+          text: 'What stills need a decision?',
+          source: 'typed',
+          chatMode: 'ov',
+        }),
+      })
+    );
+    expect(ov.status).toBe(200);
+    expect(hoisted.handleMobileChatTurnMock).toHaveBeenCalledWith(
+      'user_123',
+      expect.objectContaining({ chatMode: 'ov' }),
       expect.anything()
     );
   });

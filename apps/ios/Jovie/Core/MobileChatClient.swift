@@ -135,12 +135,14 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
   private let decoder: JSONDecoder
   private let encoder: JSONEncoder
   private let requestTimeout: TimeInterval
+  private let workspace: MobileWorkspaceMode
 
   init(
     baseURL: URL,
     session: URLSession = URLSession(configuration: .jovieMobile),
     tokenProvider: TokenProviding,
-    requestTimeout: TimeInterval = 30
+    requestTimeout: TimeInterval = 30,
+    workspace: MobileWorkspaceMode = .jovie
   ) {
     self.baseURL = baseURL
     self.session = session
@@ -148,17 +150,13 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
     self.decoder = JSONDecoder()
     self.encoder = JSONEncoder()
     self.requestTimeout = requestTimeout
+    self.workspace = workspace
   }
 
   func listConversations(limit: Int = 20) async throws -> [MobileConversationSummary] {
-    var components = URLComponents(
-      url: baseURL.appending(path: "/api/mobile/v1/chat/conversations"),
-      resolvingAgainstBaseURL: false
-    )
-    components?.queryItems = [URLQueryItem(name: "limit", value: String(limit))]
-    guard let url = components?.url else {
-      throw MobileChatClientError.invalidResponse
-    }
+    var queryItems = [URLQueryItem(name: "limit", value: String(limit))]
+    appendWorkspaceQuery(to: &queryItems)
+    let url = try makeURL(path: "/api/mobile/v1/chat/conversations", queryItems: queryItems)
 
     let response: MobileConversationListResponse = try await sendJSON(
       request: try await authorizedRequest(url: url, method: "GET"),
@@ -168,14 +166,12 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
   }
 
   func fetchConversation(id: String, limit: Int = 100) async throws -> MobileConversationDetailResponse {
-    var components = URLComponents(
-      url: baseURL.appending(path: "/api/mobile/v1/chat/conversations/\(id)"),
-      resolvingAgainstBaseURL: false
+    var queryItems = [URLQueryItem(name: "limit", value: String(limit))]
+    appendWorkspaceQuery(to: &queryItems)
+    let url = try makeURL(
+      path: "/api/mobile/v1/chat/conversations/\(id)",
+      queryItems: queryItems
     )
-    components?.queryItems = [URLQueryItem(name: "limit", value: String(limit))]
-    guard let url = components?.url else {
-      throw MobileChatClientError.invalidResponse
-    }
 
     return try await sendJSON(
       request: try await authorizedRequest(url: url, method: "GET"),
@@ -230,6 +226,25 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
 
     NativeSessionTokenStore.refresh(from: response)
     return try await readStreamEvents(from: bytes, onEvent: onEvent)
+  }
+
+  private func appendWorkspaceQuery(to queryItems: inout [URLQueryItem]) {
+    guard workspace == .ovie else { return }
+    queryItems.append(URLQueryItem(name: "workspace", value: workspace.rawValue))
+  }
+
+  private func makeURL(path: String, queryItems: [URLQueryItem]) throws -> URL {
+    var components = URLComponents(
+      url: baseURL.appending(path: path),
+      resolvingAgainstBaseURL: false
+    )
+    if !queryItems.isEmpty {
+      components?.queryItems = queryItems
+    }
+    guard let url = components?.url else {
+      throw MobileChatClientError.invalidResponse
+    }
+    return url
   }
 
   private func authorizedRequest(

@@ -151,7 +151,11 @@ struct APIClient: APIClientProtocol, Sendable {
   }
 
   func fetchActionLoopInbox() async throws -> MobileActionLoopInboxResponse {
-    try await sendActionLoopInboxRequest(forceRefresh: false)
+    try await fetchActionLoopInbox(workspace: .jovie)
+  }
+
+  func fetchActionLoopInbox(workspace: MobileWorkspaceMode) async throws -> MobileActionLoopInboxResponse {
+    try await sendActionLoopInboxRequest(workspace: workspace, forceRefresh: false)
   }
 
   func fetchActionLoopCalendar() async throws -> MobileActionLoopCalendarResponse {
@@ -388,11 +392,22 @@ struct APIClient: APIClientProtocol, Sendable {
   }
 
   private func sendActionLoopInboxRequest(
+    workspace: MobileWorkspaceMode,
     forceRefresh: Bool,
     tokenOverride: String? = nil
   ) async throws -> MobileActionLoopInboxResponse {
     let token = try await resolveToken(forceRefresh: forceRefresh, tokenOverride: tokenOverride)
-    var request = URLRequest(url: baseURL.appending(path: "/api/mobile/v1/inbox"))
+    var components = URLComponents(
+      url: baseURL.appending(path: "/api/mobile/v1/inbox"),
+      resolvingAgainstBaseURL: false
+    )
+    if workspace == .ovie {
+      components?.queryItems = [URLQueryItem(name: "workspace", value: workspace.rawValue)]
+    }
+    guard let url = components?.url else {
+      throw APIClientError.invalidResponse
+    }
+    var request = URLRequest(url: url)
     request.httpMethod = "GET"
     request.timeoutInterval = requestTimeout
     request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -415,7 +430,11 @@ struct APIClient: APIClientProtocol, Sendable {
 
     if httpResponse.statusCode == 401, !forceRefresh {
       let refreshed = try await retryTokenOrTerminal(after: token)
-      return try await sendActionLoopInboxRequest(forceRefresh: true, tokenOverride: refreshed)
+      return try await sendActionLoopInboxRequest(
+        workspace: workspace,
+        forceRefresh: true,
+        tokenOverride: refreshed
+      )
     }
     if httpResponse.statusCode == 401, forceRefresh {
       handleTerminalUnauthorized()

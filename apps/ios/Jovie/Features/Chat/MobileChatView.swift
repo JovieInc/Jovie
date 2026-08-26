@@ -232,6 +232,7 @@ struct MobileChatView: View {
         isComposerFocused: $isComposerFocused,
         isSending: repository.isSending,
         isOffline: repository.isOffline,
+        workspaceMode: repository.workspace,
         onSend: {
           let text = draft
           draft = ""
@@ -274,8 +275,21 @@ struct MobileChatView: View {
   private var emptyState: some View {
     VStack(spacing: 0) {
       Spacer(minLength: 0)
-      MobileChatEmptyGreetingView(greeting: ChatEmptyGreeting.current())
-        .padding(.horizontal, JovieSpacing.xLarge)
+      VStack(spacing: JovieSpacing.small) {
+        MobileChatEmptyGreetingView(greeting: ChatEmptyGreeting.current())
+        if repository.workspace == .ovie {
+          Text(
+            repository.isOffline
+              ? "Offline. Drafts stay on this device and cached history remains available."
+              : repository.workspace.emptyChatSubtitle
+          )
+          .font(JovieFont.body(size: 15))
+          .foregroundStyle(JovieColor.textTertiary)
+          .multilineTextAlignment(.center)
+          .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+      .padding(.horizontal, JovieSpacing.xLarge)
       Spacer(minLength: 0)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
