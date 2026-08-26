@@ -6,6 +6,11 @@ const hoisted = vi.hoisted(() => ({
   requireMobileProfileSessionMock: vi.fn(),
   listMobileConversationsMock: vi.fn(),
   getMobileConversationDetailMock: vi.fn(),
+  checkAdminRoleMock: vi.fn(),
+}));
+
+vi.mock('@/lib/admin/roles', () => ({
+  isAdmin: hoisted.checkAdminRoleMock,
 }));
 
 vi.mock('@/lib/mobile/session-auth', () => ({
@@ -39,6 +44,7 @@ describe('GET /api/mobile/v1/chat/conversations', () => {
         latestTurnStatus: 'completed',
       },
     ]);
+    hoisted.checkAdminRoleMock.mockResolvedValue(false);
   });
 
   it('returns 401 without a mobile session token', async () => {
@@ -66,6 +72,7 @@ describe('GET /api/mobile/v1/chat/conversations', () => {
     expect(hoisted.listMobileConversationsMock).toHaveBeenCalledWith({
       creatorProfileId: 'profile_123',
       limit: 5,
+      workspace: 'customer',
     });
     await expect(response.json()).resolves.toEqual({
       conversations: [
@@ -80,6 +87,42 @@ describe('GET /api/mobile/v1/chat/conversations', () => {
       ],
     });
   });
+
+  it('lists OV conversations only for admins', async () => {
+    const { GET } = await listRoutePromise;
+    const forbidden = await GET(
+      new Request(
+        'https://jov.ie/api/mobile/v1/chat/conversations?workspace=ov'
+      )
+    );
+    expect(forbidden.status).toBe(403);
+
+    hoisted.checkAdminRoleMock.mockResolvedValue(true);
+    hoisted.listMobileConversationsMock.mockResolvedValue([
+      {
+        id: 'conv_ov',
+        title: 'OV | Taste cards',
+        createdAt: new Date('2026-06-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-06-03T00:00:00.000Z'),
+        latestMessageRole: 'assistant',
+        latestTurnStatus: 'completed',
+      },
+    ]);
+    const allowed = await GET(
+      new Request(
+        'https://jov.ie/api/mobile/v1/chat/conversations?workspace=ov'
+      )
+    );
+    expect(allowed.status).toBe(200);
+    expect(hoisted.listMobileConversationsMock).toHaveBeenCalledWith({
+      creatorProfileId: 'profile_123',
+      limit: 20,
+      workspace: 'ov',
+    });
+    await expect(allowed.json()).resolves.toMatchObject({
+      conversations: [{ id: 'conv_ov' }],
+    });
+  });
 });
 
 describe('GET /api/mobile/v1/chat/conversations/[id]', () => {
@@ -89,6 +132,7 @@ describe('GET /api/mobile/v1/chat/conversations/[id]', () => {
       profile: { id: 'profile_123' },
       userId: 'user_123',
     });
+    hoisted.checkAdminRoleMock.mockResolvedValue(false);
     hoisted.getMobileConversationDetailMock.mockResolvedValue({
       conversation: {
         id: 'conv_1',

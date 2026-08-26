@@ -17,6 +17,7 @@ struct MobileChatPlaceholderView: View {
           .padding(.horizontal, JovieSpacing.xLarge)
         Spacer(minLength: 0)
       }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
       .safeAreaInset(edge: .bottom, spacing: 0) {
         ChatComposerPreview(draft: $draft)
           .padding(.horizontal, JovieSpacing.large)

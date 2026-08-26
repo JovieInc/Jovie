@@ -24,6 +24,8 @@ struct MobileMeResponseTests {
     #expect(response.publicProfileURL == "https://jov.ie/tim")
     #expect(response.appleWalletProfilePassAvailable == true)
     #expect(response.chatEnabled == true)
+    #expect(response.isAdmin == nil)
+    #expect(response.showsAdminWorkspaceSwitch == false)
   }
 
   @Test func decodesNeedsOnboardingResponse() throws {
@@ -66,5 +68,50 @@ struct MobileMeResponseTests {
     let response = try JSONDecoder().decode(MobileMeResponse.self, from: data)
 
     #expect(response.state == .waitlistPending)
+  }
+
+  @Test func isAdminTrueShowsWorkspaceSwitch() throws {
+    let data = Data(
+      #"{"state":"ready","displayName":"Tim","username":"tim","publicProfileUrl":"https://jov.ie/tim","qrPayload":"https://jov.ie/tim","avatarUrl":null,"appleWalletProfilePassAvailable":true,"chatEnabled":true,"continueOnWebUrl":"https://jov.ie/app","isAdmin":true}"#.utf8
+    )
+    let response = try JSONDecoder().decode(MobileMeResponse.self, from: data)
+    #expect(response.isAdmin == true)
+    #expect(response.showsAdminWorkspaceSwitch)
+    #expect(MobileMeResponse.previewReady.showsAdminWorkspaceSwitch == false)
+    #expect(MobileWorkspaceMode.ovie.askChatLabel == "Ask Summer")
+    #expect(MobileWorkspaceMode.ovie.emptyChatSubtitle.contains("Summer"))
+    #expect(ChatComposerCopy.emptyPlaceholder.isEmpty)
+  }
+
+  @Test func workspaceStoreForcesJovieForNonAdminAndPersistsOvieForAdmin() {
+    let suiteName = "MobileWorkspaceStoreTests"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.removePersistentDomain(forName: suiteName)
+    defaults.set(MobileWorkspaceMode.ovie.rawValue, forKey: MobileWorkspaceStore.defaultsKey)
+    #expect(MobileWorkspaceStore.load(isAdmin: false, defaults: defaults) == .jovie)
+    MobileWorkspaceStore.save(.ovie, isAdmin: false, defaults: defaults)
+    #expect(defaults.string(forKey: MobileWorkspaceStore.defaultsKey) == MobileWorkspaceMode.jovie.rawValue)
+    MobileWorkspaceStore.save(.ovie, isAdmin: true, defaults: defaults)
+    #expect(MobileWorkspaceStore.load(isAdmin: true, defaults: defaults) == .ovie)
+  }
+
+  @Test func inboxStillImageURLOnlyForStillType() {
+    func item(_ type: String, url: String) -> MobileActionLoopInboxItem {
+      MobileActionLoopInboxItem(
+        id: type,
+        typeLabel: type,
+        createdAt: "2026-08-02T00:00:00.000Z",
+        title: type,
+        why: "x",
+        primaryActionLabel: "Review",
+        status: "pending",
+        imageURL: url
+      )
+    }
+    #expect(
+      item("Still", url: "https://cdn.jov.ie/stills/16197.jpg").stillImageURL?.absoluteString
+        == "https://cdn.jov.ie/stills/16197.jpg"
+    )
+    #expect(item("Card", url: "https://cdn.jov.ie/cards/local.png").stillImageURL == nil)
   }
 }

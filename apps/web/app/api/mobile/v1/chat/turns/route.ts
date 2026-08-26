@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { parseChatMode } from '@/lib/chat/ov-mode';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
   type MobileChatTurnRequest,
@@ -28,8 +29,20 @@ export async function POST(request: Request) {
     );
   }
 
+  const chatModeResult = parseChatMode(payload.chatMode);
+  if (!chatModeResult.ok) {
+    return NextResponse.json(
+      { error: 'Invalid chatMode' },
+      { status: 400, headers: NO_STORE_HEADERS }
+    );
+  }
+
   const { handleMobileChatTurn } = await import(
     '@/lib/mobile/chat/turn-handler'
   );
-  return handleMobileChatTurn(userId, parsed, request.signal);
+  return handleMobileChatTurn(
+    userId,
+    { ...parsed, chatMode: chatModeResult.chatMode },
+    request.signal
+  );
 }

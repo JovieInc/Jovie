@@ -8,6 +8,11 @@ const hoisted = vi.hoisted(() => ({
   getSessionContextMock: vi.fn(),
   isProfileCompleteMock: vi.fn(),
   isAppleWalletProfilePassAvailableMock: vi.fn(),
+  checkAdminRoleMock: vi.fn(),
+}));
+
+vi.mock('@/lib/admin/roles', () => ({
+  isAdmin: hoisted.checkAdminRoleMock,
 }));
 
 vi.mock('@/constants/domains', () => ({
@@ -64,6 +69,7 @@ describe('GET /api/mobile/v1/me', () => {
     );
     hoisted.isProfileCompleteMock.mockReturnValue(true);
     hoisted.isAppleWalletProfilePassAvailableMock.mockResolvedValue(true);
+    hoisted.checkAdminRoleMock.mockResolvedValue(false);
     vi.stubEnv('MOBILE_CHAT_RUNTIME_ENABLED', 'true');
   });
 
@@ -151,6 +157,7 @@ describe('GET /api/mobile/v1/me', () => {
       continueOnWebUrl: 'https://jov.ie/app',
       appleWalletProfilePassAvailable: true,
       chatEnabled: true,
+      isAdmin: false,
     });
     expect(hoisted.isProfileCompleteMock).toHaveBeenCalledWith({
       username: 'djshadow',
@@ -188,6 +195,32 @@ describe('GET /api/mobile/v1/me', () => {
     expect(data.chatEnabled).toBe(true);
   });
 
+  it('returns isAdmin true only when the admin role check passes', async () => {
+    hoisted.checkAdminRoleMock.mockResolvedValue(true);
+    hoisted.getSessionContextMock.mockResolvedValue({
+      user: {
+        userStatus: 'active',
+      },
+      profile: {
+        id: 'profile_123',
+        username: 'tim',
+        usernameNormalized: 'tim',
+        displayName: 'Tim White',
+        avatarUrl: null,
+        isPublic: true,
+        onboardingCompletedAt: new Date('2026-04-01T00:00:00.000Z'),
+      },
+    });
+
+    const { GET } = await routeModulePromise;
+    const response = await GET(makeRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.isAdmin).toBe(true);
+    expect(hoisted.checkAdminRoleMock).toHaveBeenCalledWith('user_123');
+  });
+
   it('returns needs_onboarding when the DB user is missing', async () => {
     hoisted.getSessionContextMock.mockRejectedValue(
       new TypeError('User not found')
@@ -208,6 +241,7 @@ describe('GET /api/mobile/v1/me', () => {
       continueOnWebUrl: 'https://jov.ie/app',
       appleWalletProfilePassAvailable: false,
       chatEnabled: false,
+      isAdmin: false,
     });
   });
 
@@ -234,6 +268,7 @@ describe('GET /api/mobile/v1/me', () => {
       continueOnWebUrl: 'https://jov.ie/app',
       appleWalletProfilePassAvailable: false,
       chatEnabled: false,
+      isAdmin: false,
     });
   });
 
@@ -260,6 +295,7 @@ describe('GET /api/mobile/v1/me', () => {
       continueOnWebUrl: 'https://jov.ie/app',
       appleWalletProfilePassAvailable: false,
       chatEnabled: false,
+      isAdmin: false,
     });
   });
 
@@ -295,6 +331,7 @@ describe('GET /api/mobile/v1/me', () => {
       continueOnWebUrl: 'https://jov.ie/app',
       appleWalletProfilePassAvailable: false,
       chatEnabled: false,
+      isAdmin: false,
     });
   });
 

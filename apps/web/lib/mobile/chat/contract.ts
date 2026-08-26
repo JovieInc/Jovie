@@ -13,6 +13,7 @@ export interface MobileChatTurnRequest {
   readonly clientMessageId?: unknown;
   readonly text?: unknown;
   readonly source?: unknown;
+  readonly chatMode?: unknown;
 }
 
 export interface ParsedMobileChatTurnRequest {
@@ -21,6 +22,7 @@ export interface ParsedMobileChatTurnRequest {
   readonly clientMessageId: string;
   readonly text: string;
   readonly source: MobileChatTurnSource;
+  readonly chatMode: 'ov' | null;
 }
 
 export type MobileChatNdjsonEvent =
@@ -92,6 +94,7 @@ export function parseMobileChatTurnRequest(
     clientMessageId: value.clientMessageId,
     text: value.text.trim(),
     source: value.source,
+    chatMode: null,
   };
 }
 

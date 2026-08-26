@@ -30,6 +30,7 @@ final class ChatRepository {
   private let cache: ChatCache
   private let userID: String
   private let webBaseURL: URL
+  let workspace: MobileWorkspaceMode
   private let activityDonator: (any ConversationActivityDonating)?
 
   /// Set by `seedTimelineForUITesting`. When `true`, network-backed methods
@@ -45,12 +46,14 @@ final class ChatRepository {
     cache: ChatCache,
     userID: String,
     webBaseURL: URL,
+    workspace: MobileWorkspaceMode = .jovie,
     activityDonator: (any ConversationActivityDonating)? = LiveConversationActivityDonator()
   ) {
     self.client = client
     self.cache = cache
     self.userID = userID
     self.webBaseURL = webBaseURL
+    self.workspace = workspace
     self.activityDonator = activityDonator
   }
 
@@ -165,7 +168,8 @@ final class ChatRepository {
           clientTurnId: clientTurnId,
           clientMessageId: clientMessageId,
           text: trimmed,
-          source: "typed"
+          source: "typed",
+          chatMode: workspace.chatMode
         )
       ) { [weak self] event in
         await self?.apply(events: [event], clientTurnId: clientTurnId)
@@ -310,7 +314,7 @@ final class ChatRepository {
   }
 
   private func hydrateFromCache() async {
-    guard let snapshot = await cache.load(for: userID) else { return }
+    guard let snapshot = await cache.load(for: userID, workspace: workspace) else { return }
     conversations = snapshot.conversations
     if let activeConversationID,
        let cachedMessages = snapshot.messagesByConversationID[activeConversationID]
@@ -321,7 +325,7 @@ final class ChatRepository {
 
   private func hydrateConversationFromCache(_ conversationID: String) async {
     guard
-      let snapshot = await cache.load(for: userID),
+      let snapshot = await cache.load(for: userID, workspace: workspace),
       let cachedMessages = snapshot.messagesByConversationID[conversationID]
     else {
       return
@@ -334,7 +338,7 @@ final class ChatRepository {
     conversationID: String? = nil
   ) async {
     var messagesByConversationID =
-      (await cache.load(for: userID))?.messagesByConversationID ?? [:]
+      (await cache.load(for: userID, workspace: workspace))?.messagesByConversationID ?? [:]
 
     if let messages, let conversationID {
       messagesByConversationID[conversationID] = messages
@@ -347,7 +351,7 @@ final class ChatRepository {
       messagesByConversationID: messagesByConversationID,
       cachedAt: Date()
     )
-    await cache.store(snapshot, for: userID)
+    await cache.store(snapshot, for: userID, workspace: workspace)
   }
 
   private func timelineItem(from message: MobileConversationMessage) -> MobileChatTimelineItem {
