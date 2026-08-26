@@ -295,6 +295,30 @@ struct APIClientTests {
     #expect(response.items.count == 1)
   }
 
+  @Test func fetchesOvieInboxWithWorkspaceQuery() async throws {
+    let tokenProvider = MockTokenProvider(tokens: ["token-1"])
+    MockURLProtocol.requestHandler = { request in
+      #expect(request.url?.path == "/api/mobile/v1/inbox")
+      #expect(request.url?.query?.contains("workspace=ov") == true)
+      let response = HTTPURLResponse(
+        url: request.url!,
+        statusCode: 200,
+        httpVersion: nil,
+        headerFields: nil
+      )!
+      let data = try JSONEncoder().encode(MobileActionLoopInboxResponse.preview)
+      return (response, data)
+    }
+
+    let client = APIClient(
+      baseURL: URL(string: "https://jov.ie")!,
+      session: makeSession(),
+      tokenProvider: tokenProvider
+    )
+
+    _ = try await client.fetchActionLoopInbox(workspace: .ovie)
+  }
+
   @Test func fetchesActionLoopCalendarWithBearerToken() async throws {
     let tokenProvider = MockTokenProvider(tokens: ["token-1"])
     MockURLProtocol.requestHandler = { request in

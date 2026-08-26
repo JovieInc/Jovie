@@ -475,4 +475,59 @@ struct MobileChatClientTests {
 
     #expect(loaded == snapshot)
   }
+
+  @Test func ovieChatCacheDoesNotCollideWithArtistCache() async {
+    let cache = ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-cache-ws")!)
+    await cache.remove(for: "user_ws")
+    func snapshot(_ id: String, _ title: String) -> CachedChatSnapshot {
+      CachedChatSnapshot(
+        conversations: [
+          MobileConversationSummary(
+            id: id,
+            title: title,
+            createdAt: "2026-06-01T00:00:00.000Z",
+            updatedAt: "2026-06-02T00:00:00.000Z",
+            latestMessageRole: "assistant",
+            latestTurnStatus: "completed"
+          ),
+        ],
+        messagesByConversationID: [:],
+        cachedAt: Date(timeIntervalSince1970: 1_700_000_000)
+      )
+    }
+    let artist = snapshot("conv_artist", "Launch plan")
+    let ovie = snapshot("conv_ov", "OV | Summer")
+    await cache.store(artist, for: "user_ws", workspace: .jovie)
+    await cache.store(ovie, for: "user_ws", workspace: .ovie)
+    #expect(await cache.load(for: "user_ws", workspace: .jovie) == artist)
+    #expect(await cache.load(for: "user_ws", workspace: .ovie) == ovie)
+  }
+
+  @Test func turnRequestEncodesChatModeOnlyWhenOvie() throws {
+    func json(_ request: MobileChatTurnRequest) throws -> [String: Any] {
+      let data = try JSONEncoder().encode(request)
+      return try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+    }
+    let artist = try json(
+      MobileChatTurnRequest(
+        conversationId: nil,
+        clientTurnId: "client_turn_1",
+        clientMessageId: "client_message_1",
+        text: "What should I do next?",
+        source: "typed"
+      )
+    )
+    let ovie = try json(
+      MobileChatTurnRequest(
+        conversationId: nil,
+        clientTurnId: "client_turn_1",
+        clientMessageId: "client_message_1",
+        text: "Need a taste decision",
+        source: "typed",
+        chatMode: "ov"
+      )
+    )
+    #expect(artist["chatMode"] == nil)
+    #expect(ovie["chatMode"] as? String == "ov")
+  }
 }
