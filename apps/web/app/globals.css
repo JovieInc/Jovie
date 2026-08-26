@@ -996,7 +996,8 @@ body {
     border-color: var(--color-border-subtle);
   }
   .marketing-cta {
-    @apply relative inline-flex items-center justify-center rounded bg-btn-primary text-btn-primary-foreground px-6 py-3 text-sm font-semibold transition-colors duration-normal;
+    @apply relative inline-flex items-center justify-center rounded bg-btn-primary text-btn-primary-foreground px-6 py-3 text-sm transition-colors duration-normal;
+    font-weight: var(--font-weight-medium);
   }
   .public-action-primary {
     display: inline-flex;
@@ -1009,7 +1010,7 @@ body {
     color: rgb(6, 7, 10);
     padding: 0 1.45rem;
     font-size: 14px;
-    font-weight: 650;
+    font-weight: var(--font-weight-medium);
     letter-spacing: 0;
     text-decoration: none;
     transition:
@@ -1046,7 +1047,7 @@ body {
     color: var(--linear-text-primary);
     padding: 0 1.35rem;
     font-size: 14px;
-    font-weight: 620;
+    font-weight: var(--font-weight-medium);
     letter-spacing: 0;
     text-decoration: none;
     transition:

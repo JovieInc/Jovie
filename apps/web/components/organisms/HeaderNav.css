@@ -205,7 +205,7 @@
   color: #050506;
   font-family: var(--marketing-font-body);
   font-size: 0.79rem;
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
   letter-spacing: 0;
   line-height: 1;
   text-decoration: none;
