@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **`smart_link_switch_live` now has the same evidence floor as the other catalog skills (JOV-5345):** no placeholder jov.ie URL, only switch an existing smart link, already-live is a no-op keep, failed lookup/switch STOPs, and only resolved DSPs are cited. Missing link skips; the run still succeeds.
+
 - **Empty iPhone chat home is a centered greeting with the composer docked at the bottom:** signed-in empty chat shows Let's get it / Ready to start? / Ready when you are, with no mark, no placeholder, and no extra tab bar.
 
 - **Primary buttons use a lighter label:** CTA text is medium (510) instead of semibold, with the same size, fill, and 32px chrome.
