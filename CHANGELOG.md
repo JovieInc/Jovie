@@ -7,8 +7,6 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
-- [internal] **Terminal marketing CTAs share one Button action (JOV-4954):** Footer and final CTAs render primary and optional secondary actions through the canonical Button primitive, with Storybook coverage at 1024 and 390.
-
 - **Library is one catalog with Ideas, In Progress, and Out:** documents, YouTube videos, releases, and merch share stage, type, and release filters. Ideas is a stage, not a separate destination.
 
 - [internal] **YouTube channel import and artist rules land on the existing content graph (JOV-5362):** channel videos, thumbnails, metrics, and ISRC/collaborator claims write the youtube_* tables; unmatched credits fail closed; thumbnail winners need locked metrics and explicit promotion; memory can only propose artist rules until they are confirmed and typed.
