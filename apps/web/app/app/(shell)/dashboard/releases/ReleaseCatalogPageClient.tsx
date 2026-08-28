@@ -160,6 +160,11 @@ export function ReleaseCatalogPageClient({
         profileId={profileId}
         artistHandle={artistHandle}
         canSyncSpotify={spotifyConnected}
+        merchProducts={merchCards.map(card => ({
+          id: card.id,
+          title: card.title,
+        }))}
+        relationships={libraryRelationships}
         postReleaseBundle={postReleaseBundle}
         assets={[
           ...buildLibraryReleaseAssets(
@@ -186,7 +191,6 @@ export function ReleaseCatalogPageClient({
             profileVisibilityMap
           ).map(withShare),
         ]}
-        relationships={libraryRelationships}
       />
     );
   }

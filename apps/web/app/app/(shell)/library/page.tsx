@@ -1,15 +1,21 @@
+import { and, eq } from 'drizzle-orm';
 import { APP_ROUTES } from '@/constants/routes';
 import { listArtistRulesForProfile } from '@/lib/artist-rules/store';
 import type { ArtistRuleView } from '@/lib/artist-rules/types';
+import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
 import { requireCreatorDocumentAccess } from '@/lib/creator-documents/access';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
+import { db } from '@/lib/db';
 import { listCreatorDocuments } from '@/lib/db/creator-documents/store';
+import { connectorAccounts } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
 import {
   getLibraryAssetShareMapForProfile,
   loadArtistHandleForProfile,
 } from '@/lib/library/asset-share.server';
+import { listLibraryRelationshipsForProfile } from '@/lib/library/graph-store';
+import type { LibraryRelationshipView } from '@/lib/library/graph-types';
 import { listLibraryPostReleaseBundle } from '@/lib/library/post-release-store';
 import type { LibraryPostReleaseBundle } from '@/lib/library/post-release-types';
 import type { LibraryProfileVisibility } from '@/lib/library/profile-visibility';
@@ -74,10 +80,12 @@ export default async function LibraryPage({
   let creatorDocuments: CreatorDocumentListItem[] = [];
   let creatorDocumentsNextCursor: string | null = null;
   let creatorDocumentsLoadFailed = false;
-  let artistRules: ArtistRuleView[] = [];
   let youtubeVideos: PublicVideoListItem[] = [];
+  let youtubeConnected = false;
+  let artistRules: ArtistRuleView[] = [];
+  let libraryRelationships: LibraryRelationshipView[] = [];
   if (profileId && selectedProfile) {
-    {
+    const loadDocuments = async () => {
       try {
         await requireCreatorDocumentAccess({
           userId: routeContext.userId,
@@ -94,15 +102,9 @@ export default async function LibraryPage({
         );
         creatorDocumentsLoadFailed = true;
       }
-    }
-    try {
-      artistRules = await listArtistRulesForProfile(profileId);
-    } catch (error) {
-      void captureError('Artist rules load failed on library page', error, {
-        route: APP_ROUTES.LIBRARY,
-      });
-    }
-    {
+    };
+
+    const loadAssets = async () => {
       const queryClient = getQueryClient();
       try {
         const assetSharesPromise = loadArtistHandleForProfile(profileId).then(
@@ -179,7 +181,59 @@ export default async function LibraryPage({
           }
         );
       }
-    }
+    };
+
+    const loadYouTube = async () => {
+      try {
+        const account = await db
+          .select({ id: connectorAccounts.id })
+          .from(connectorAccounts)
+          .where(
+            and(
+              eq(connectorAccounts.userId, routeContext.userId),
+              eq(connectorAccounts.creatorProfileId, profileId),
+              eq(connectorAccounts.provider, CONNECTOR_PROVIDERS.youtube),
+              eq(connectorAccounts.status, 'connected')
+            )
+          )
+          .limit(1)
+          .then(rows => rows[0] ?? null);
+        youtubeConnected = Boolean(account);
+      } catch (error) {
+        void captureError('YouTube Library projection failed', error, {
+          route: APP_ROUTES.LIBRARY,
+        });
+      }
+    };
+
+    const loadArtistRules = async () => {
+      try {
+        artistRules = await listArtistRulesForProfile(profileId);
+      } catch (error) {
+        void captureError('Artist rules load failed on library page', error, {
+          route: APP_ROUTES.LIBRARY,
+        });
+      }
+    };
+
+    const loadRelationships = async () => {
+      try {
+        libraryRelationships =
+          await listLibraryRelationshipsForProfile(profileId);
+      } catch (error) {
+        void captureError('Library relationships load failed', error, {
+          route: APP_ROUTES.LIBRARY,
+        });
+      }
+    };
+
+    await Promise.all([
+      loadDocuments(),
+      loadAssets(),
+      loadYouTube(),
+      loadArtistRules(),
+      loadRelationships(),
+    ]);
   }
 
   return (
@@ -192,12 +246,14 @@ export default async function LibraryPage({
         approvalStatusByAssetId={approvalStatusByAssetId}
         profileVisibilityByAssetId={profileVisibilityByAssetId}
         assetShareByAssetId={assetShareByAssetId}
-        postReleaseBundle={postReleaseBundle}
         creatorDocuments={creatorDocuments}
         creatorDocumentsNextCursor={creatorDocumentsNextCursor}
         creatorDocumentsLoadFailed={creatorDocumentsLoadFailed}
         initialArtistRules={artistRules}
         youtubeVideos={youtubeVideos}
+        youtubeConnected={youtubeConnected}
+        libraryRelationships={libraryRelationships}
+        postReleaseBundle={postReleaseBundle}
       />
     </HydrateClient>
   );
