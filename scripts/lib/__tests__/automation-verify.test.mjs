@@ -190,6 +190,15 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = [
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const SENTRY_AUTOFIX_RECURRENCE_LANE = [
+  '.github/workflows/sentry-autofix-recurrence.yml',
+  '.github/workflows/sentry-autofix.yml',
+  'scripts/sentry-autofix-recurrence.mjs',
+  'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
+  'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
+  'scripts/tests/test_agent_workflow_hygiene.py',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+];
 const SAFE_PR_REMEDIATION_LANE = [
   '.github/workflows/safe-pr-remediation.yml',
   'scripts/lib/safe-pr-remediation.mjs',
@@ -579,6 +588,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
         'scripts/lib/__tests__/lockfile-specifier-preflight.test.mjs',
         'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
+        'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
         'scripts/lib/__tests__/golden-path-lock.test.mjs',
         'scripts/lib/__tests__/golden-path-prod-autofix-workflow-contract.test.mjs',
         'scripts/lib/__tests__/queue-deferral-receipt.test.mjs',
@@ -766,6 +776,28 @@ describe('automation-verify affected scope', () => {
       buildAffectedTestPlan([
         ...ROLLING_CI_FX_CACHE_GC_LANE,
         'apps/web/lib/unknown-fx-cache-peer.ts',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('selects the bounded sentry autofix recurrence contract and fails closed on unrelated files', () => {
+    expect(buildAffectedTestPlan(SENTRY_AUTOFIX_RECURRENCE_LANE)).toMatchObject(
+      {
+        mode: 'selected',
+        selectedTests: [],
+        pythonUnittestTests: ['scripts/tests/test_agent_workflow_hygiene.py'],
+        scriptVitestTests: [
+          'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
+          'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
+          'scripts/lib/__tests__/automation-verify.test.mjs',
+        ],
+        nodeTests: ['scripts/typecheck-scripts.mjs'],
+      }
+    );
+    expect(
+      buildAffectedTestPlan([
+        ...SENTRY_AUTOFIX_RECURRENCE_LANE,
+        'apps/web/lib/unknown-sentry-recurrence-peer.ts',
       ]).mode
     ).toBe('full');
   });

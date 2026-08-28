@@ -8,10 +8,7 @@ import {
   expectedDesktopAssetNames,
   validateReleaseAssets,
 } from './desktop-release-assets.mjs';
-import {
-  evaluateDesktopReleaseGuard,
-  hasRecordedDesktopReleaseEvidence,
-} from './desktop-release-guard.mjs';
+import { evaluateDesktopReleaseGuard } from './desktop-release-guard.mjs';
 
 const desktopRequire = createRequire(
   new URL('../apps/desktop/package.json', import.meta.url)
@@ -134,14 +131,14 @@ test('passes when no desktop files changed', () => {
   assert.deepEqual(result.desktopFiles, []);
 });
 
-test('fails when desktop files changed without a release trigger', () => {
+test('passes when desktop files defer release state to the post-land publisher', () => {
   const result = evaluateDesktopReleaseGuard([
     'apps/desktop/src/main.ts',
     'apps/desktop/electron-builder.yml',
   ]);
 
-  assert.equal(result.passed, false);
-  assert.deepEqual(result.releaseHandlingFiles, []);
+  assert.equal(result.passed, true);
+  assert.deepEqual(result.prelandReleaseStateFiles, []);
 });
 
 test('passes when only desktop contract tests changed', () => {
@@ -164,112 +161,24 @@ test('passes when only desktop smoke harnesses changed', () => {
   assert.deepEqual(result.desktopFiles, []);
 });
 
-test('still fails when a desktop test changes with release-impacting desktop code', () => {
+test('still passes when a desktop test changes with release-impacting desktop code', () => {
   const result = evaluateDesktopReleaseGuard([
     'apps/desktop/scripts/desktop-icon-contract.test.mjs',
     'apps/desktop/src/main.ts',
   ]);
 
-  assert.equal(result.passed, false);
+  assert.equal(result.passed, true);
   assert.deepEqual(result.desktopFiles, ['apps/desktop/src/main.ts']);
 });
 
-test('changelog notes are not a feature-branch desktop release trigger', () => {
+test('fails when desktop changes include a pre-land changelog artifact', () => {
   const result = evaluateDesktopReleaseGuard([
     'apps/desktop/src/main.ts',
     'CHANGELOG.md',
   ]);
 
   assert.equal(result.passed, false);
-  assert.deepEqual(result.releaseHandlingFiles, []);
-  assert.equal(result.recordedEvidence, false);
-  assert.equal(result.changelogTouched, true);
-});
-
-test('recorded Linear/PR handoff evidence is machine-checkable', () => {
-  assert.equal(
-    hasRecordedDesktopReleaseEvidence(
-      '<!-- linear-issue-id:JOV-5374 -->\n<!-- desktop-release-handoff -->'
-    ),
-    true
-  );
-  assert.equal(
-    hasRecordedDesktopReleaseEvidence('<!-- linear-issue-id:JOV-5374 -->'),
-    false
-  );
-  assert.equal(
-    hasRecordedDesktopReleaseEvidence('<!-- desktop-release-handoff -->'),
-    false
-  );
-});
-
-test('passes when Linear/PR desktop release evidence is recorded', () => {
-  const result = evaluateDesktopReleaseGuard(['apps/desktop/src/main.ts'], {
-    releaseEvidenceText:
-      '<!-- linear-issue-id:JOV-5374 -->\n<!-- desktop-release-handoff -->',
-  });
-
-  assert.equal(result.passed, true);
-  assert.equal(result.recordedEvidence, true);
-  assert.deepEqual(result.releaseHandlingFiles, []);
-});
-
-test('recorded handoff evidence does not allow a pre-land CHANGELOG.md edit', () => {
-  const result = evaluateDesktopReleaseGuard(
-    ['apps/desktop/src/main.ts', 'CHANGELOG.md'],
-    {
-      releaseEvidenceText:
-        '<!-- linear-issue-id:JOV-5374 -->\n<!-- desktop-release-handoff -->',
-    }
-  );
-
-  assert.equal(result.passed, false);
-  assert.equal(result.recordedEvidence, true);
-  assert.equal(result.changelogTouched, true);
-});
-
-test('queue heads reuse source-PR desktop release evidence', () => {
-  const result = evaluateDesktopReleaseGuard(['apps/desktop/src/main.ts'], {
-    branch: 'gh-readonly-queue/main/pr-16486-abc',
-  });
-
-  assert.equal(result.passed, true);
-  assert.equal(result.queueHead, true);
-});
-
-test('queue heads do not allow a pre-land CHANGELOG.md edit', () => {
-  const result = evaluateDesktopReleaseGuard(
-    ['apps/desktop/src/main.ts', 'CHANGELOG.md'],
-    {
-      branch: 'gh-readonly-queue/main/pr-16486-abc',
-    }
-  );
-
-  assert.equal(result.passed, false);
-  assert.equal(result.queueHead, true);
-  assert.equal(result.changelogTouched, true);
-});
-
-test('passes when desktop changes include VERSION on the release path', () => {
-  const result = evaluateDesktopReleaseGuard([
-    'apps/desktop/src/main.ts',
-    'VERSION',
-  ]);
-
-  assert.equal(result.passed, true);
-  assert.deepEqual(result.releaseHandlingFiles, ['VERSION']);
-});
-
-test('stamp-path VERSION still allows CHANGELOG.md with desktop files', () => {
-  const result = evaluateDesktopReleaseGuard([
-    'apps/desktop/src/main.ts',
-    'VERSION',
-    'CHANGELOG.md',
-  ]);
-
-  assert.equal(result.passed, true);
-  assert.equal(result.changelogTouched, true);
-  assert.deepEqual(result.releaseHandlingFiles, ['VERSION']);
+  assert.deepEqual(result.prelandReleaseStateFiles, ['CHANGELOG.md']);
 });
 
 test('passes when desktop changes include explicit release workflow handling', () => {
@@ -279,9 +188,17 @@ test('passes when desktop changes include explicit release workflow handling', (
   ]);
 
   assert.equal(result.passed, true);
-  assert.deepEqual(result.releaseHandlingFiles, [
-    '.github/workflows/desktop-release.yml',
+  assert.deepEqual(result.prelandReleaseStateFiles, []);
+});
+
+test('fails when desktop changes include a pre-land version artifact', () => {
+  const result = evaluateDesktopReleaseGuard([
+    'apps/desktop/src/main.ts',
+    'VERSION',
   ]);
+
+  assert.equal(result.passed, false);
+  assert.deepEqual(result.prelandReleaseStateFiles, ['VERSION']);
 });
 
 test('desktop publishing follows verified production instead of raw main pushes', () => {

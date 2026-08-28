@@ -304,10 +304,11 @@ BOT REVIEWS
 - Edit `package.json` for dependency/script changes — only the `version` field is protected.
 - Record factual release evidence in the Linear issue and PR body. They may not
   create a branch-local changelog or release-note fragment.
-- Desktop PRs add `<!-- desktop-release-handoff -->` next to the Linear issue
-  marker. `scripts/desktop-release-guard.mjs` accepts that handoff; `CHANGELOG.md`
-  is not a valid trigger, and recorded handoff evidence does not override the
-  pre-land CHANGELOG ban.
+- Desktop PRs may change `apps/desktop` without `CHANGELOG.md` or `VERSION`.
+  `scripts/desktop-release-guard.mjs` admits that desktop-only shape, fails
+  closed on those pre-land artifacts, and still allows explicit
+  `.github/workflows/desktop-release.yml` maintenance. Recorded handoff
+  evidence does not override the pre-land CHANGELOG ban.
 
 **Enforcement:** `scripts/version-fanout-guard.mjs` runs in CI (`ci-deterministic` job) and fails any non-`main` branch that writes the fan-out, including any `CHANGELOG.md` edit. Pre-land CHANGELOG diffs also fail merge-queue admission (`scripts/lib/pre-land-changelog.mjs`); native admission independently rejects every PR that touches `CHANGELOG.md`, including legacy/release-prefixed branches. The fan-out guard auto-skips on `main`, `master`, `production`, and `release/*`, `hotfix/*`, `train/*`, `integration/*` branches (the release/integration path). Run locally with `pnpm version:fanout-guard`.
 
@@ -376,7 +377,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 | Structural Contract | Mechanical architecture, workflow, docs, and repo-rule checks. | `CI Risk Classifier` (both) |
 | Explicit Deep Evidence | Manual, scheduled, or event-driven deep evidence that never starts from or delays ordinary PR Ready. | none |
 | Preview Evidence | Hosted manual/event visual, a11y, performance, and preview evidence outside the source-PR event. | none |
-| Combined Integration | Affected unit, one hosted build-plus-layout workspace, path-selected Xcode, and model-free semantic evals for GitHub's exact merge-group head. | `Build + Layout (combined)` (merge-group), `iOS Build + Test (combined)` (merge-group), `macOS MenuMonitor Build + Test (combined)` (merge-group), `Promptfoo Evals (deterministic)` (merge-group), `Golden Eval Set (deterministic)` (merge-group) |
+| Combined Integration | Affected unit, one hosted build-plus-layout workspace, path-selected Xcode, and model-free semantic evals for GitHub's exact merge-group head. | `Build + Layout (combined)` (merge-group), `iOS Build + Test (combined)` (merge-group), `Mac Build + Test (combined)` (merge-group), `Cross-Product Integration (combined)` (merge-group), `Promptfoo Evals (deterministic)` (merge-group), `Golden Eval Set (deterministic)` (merge-group) |
 | Production Release | Each exact successful main CI attempt feeds one fixed production-mutation FIFO from authorization through staging, promotion, centralized rollback, immutable probes, canonical proof, marker, and best-effort notification; one hosted monitor retry is bounded to controller attempt 1. | none |
 | Post-deploy Verification | Hosted public, homepage, and Lighthouse probes target the immutable release URL under the controller lease; authenticated exact-build smoke uses one allowlisted Better Auth identity and a fresh protected verification-store OTP before promotion, while public Better Auth/OAuth gates remain blocking. When a controller generation is superseded before those in-lease probes run, a read-only follow-up re-probes the landed canonical production deployment outside the lease. | none |
 | Scheduled Cleanup | Report-first cleanup loops for flakes, coverage drift, harness health, and main-CI repair. | none |
@@ -396,7 +397,8 @@ Source `PR Ready` may require only `source-pr`/`both` jobs below. Merge-group `P
 | `Unit Tests` | merge-group | fast-gate | `pnpm --filter=@jovie/web run test:fast` |
 | `Build + Layout (combined)` | merge-group | combined-integration | `pnpm run build:web && pnpm --filter @jovie/web exec playwright test tests/e2e/hud-scroll.spec.ts --config=playwright.config.noauth.ts --project=chromium` |
 | `iOS Build + Test (combined)` | merge-group | combined-integration | `pnpm run ios:lint && pnpm run ios:test` |
-| `macOS MenuMonitor Build + Test (combined)` | merge-group | combined-integration | `swift test --package-path apps/macos/MenuMonitor --enable-code-coverage && swift build --package-path apps/macos/MenuMonitor -c release` |
+| `Mac Build + Test (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test && pnpm --filter @jovie/desktop run package:staging` |
+| `Cross-Product Integration (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test` |
 | `Promptfoo Evals (deterministic)` | merge-group | combined-integration | `pnpm run evals` |
 | `Golden Eval Set (deterministic)` | merge-group | combined-integration | `pnpm run evals:golden` |
 
