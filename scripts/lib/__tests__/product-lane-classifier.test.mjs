@@ -48,6 +48,42 @@ describe('product lane classifier', () => {
     expect(receipt.selectedLanes.join(',')).toBe('ios,mac,web,cross-product');
   });
 
+  it('bootstraps admission-control repairs through operations evidence only', () => {
+    const receipt = classifyProductLanes([
+      '.github/workflows/ci.yml',
+      '.github/ci-harness/manifest.json',
+      'scripts/ci-fast-lanes.mjs',
+      'scripts/lib/product-lane-classifier.mjs',
+      'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
+      'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+    ]);
+
+    expect(receipt.selectedLanes).toEqual(['operations']);
+    expect(receipt.sharedContract).toEqual({
+      changed: false,
+      affectedProducts: [],
+      paths: [],
+    });
+    expect(receipt.skippedLanes.map(item => item.lane)).toEqual([
+      'ios',
+      'mac',
+      'web',
+      'cross-product',
+    ]);
+
+    expect(
+      classifyProductLanes(['.github/workflows/ios-ci.yml']).selectedLanes
+    ).toEqual(['ios']);
+    expect(
+      classifyProductLanes(['.github/workflows/desktop-release.yml'])
+        .selectedLanes
+    ).toEqual(['mac']);
+    expect(
+      classifyProductLanes(['.github/workflows/production-release.yml'])
+        .selectedLanes
+    ).toEqual(['web']);
+  });
+
   it('keeps a broken isolated product from blocking unrelated unselected lanes', () => {
     for (const [broken, path] of Object.entries({
       ios: 'apps/ios/Jovie/App.swift',
