@@ -19,6 +19,7 @@ import { useAppFlag } from '@/lib/flags/client';
 import { usePendingOpportunityCardsQuery, usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { deriveChatRailContextTargets } from './chat-context-rail';
+import { DESKTOP_CONTENT_GRID_ANCHOR } from './chat-empty-starters';
 import { resolveChatEmptyStateAffordance } from './chat-empty-state-contract';
 import { ChatDropZoneOverlay } from './components/ChatDropZoneOverlay';
 import { ChatEmptyStateWelcome } from './components/ChatEmptyStateComposerRegion';
@@ -42,6 +43,8 @@ import {
   CHAT_COMPOSER_DOCK_CLASSNAME,
   CHAT_COMPOSER_SCROLL_FADE_CLASSNAME,
   CHAT_COMPOSER_THREAD_SCROLL_PADDING_CLASSNAME,
+  CHAT_EMPTY_TOP_SPACING_OWNER,
+  CHAT_EMPTY_VIEWPORT_CLASSNAME,
   ChatComposerSurface,
   ChatEmptyStateComposerRegion,
   ChatInlineError,
@@ -753,8 +756,10 @@ export function JovieChat({
             ref={scrollContainerRef}
             data-testid='chat-message-scroll'
             className={cn(
-              'absolute inset-0 overflow-y-auto px-4 py-5 sm:px-5',
-              !showThreadView && 'flex flex-col',
+              'absolute inset-0 overflow-y-auto',
+              showThreadView
+                ? 'px-4 py-5 sm:px-5'
+                : CHAT_EMPTY_VIEWPORT_CLASSNAME,
               showBottomComposer &&
                 CHAT_COMPOSER_THREAD_SCROLL_PADDING_CLASSNAME
             )}
@@ -763,13 +768,16 @@ export function JovieChat({
               <div
                 className='flex min-h-0 flex-1 flex-col'
                 data-empty-affordance={emptyStateAffordance}
+                data-grid-anchor={DESKTOP_CONTENT_GRID_ANCHOR}
                 data-testid='chat-empty-state-viewport'
+                data-top-spacing-owner={CHAT_EMPTY_TOP_SPACING_OWNER}
               >
                 <ChatEmptyStateComposerRegion
                   stableDocked
                   showDockedWelcome={
                     showEmptyWelcome && emptyStateAffordance === 'none'
                   }
+                  onSelectSample={handleSuggestedPrompt}
                   above={
                     showEmptyOpportunityCards ? (
                       <ChatEmptyStateOpportunityCards
@@ -793,7 +801,11 @@ export function JovieChat({
                         data-testid='chat-empty-state-soft-suggestions-slot'
                       >
                         <div className='flex min-h-0 flex-1 flex-col items-center justify-center py-2 text-center'>
-                          {showEmptyWelcome ? <ChatEmptyStateWelcome /> : null}
+                          {showEmptyWelcome ? (
+                            <ChatEmptyStateWelcome
+                              onSelectSample={handleSuggestedPrompt}
+                            />
+                          ) : null}
                         </div>
                         <SuggestedPrompts
                           onSelect={handleSuggestedPrompt}

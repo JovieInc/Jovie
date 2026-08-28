@@ -213,14 +213,31 @@ describe('JovieChat empty state', () => {
     expect(emptyViewport.className).toContain('flex-1');
     expect(emptyViewport).toHaveAttribute('data-empty-affordance', 'none');
     expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
-    // Clean start screen (JOV-5319): one locked rotating greeting, no mark.
+    // Clean start screen (JOV-5387): Just ask + executable sample, no mark.
     expect(getByTestId('chat-empty-state-welcome')).toBeTruthy();
     expect(queryByTestId('chat-empty-state-logo')).toBeNull();
     expect(getByTestId('chat-empty-state-greeting').textContent).toBe(
-      "Let's get it"
+      'Just ask'
+    );
+    expect(queryByText(/artist/i)).toBeNull();
+    expect(getByTestId('chat-empty-state-sample-user').textContent).toBe(
+      'Plan my next release'
+    );
+    expect(getByTestId('chat-empty-state-viewport')).toHaveAttribute(
+      'data-top-spacing-owner',
+      'chat-empty-viewport'
+    );
+    expect(getByTestId('chat-empty-state-viewport')).toHaveAttribute(
+      'data-grid-anchor',
+      'desktop-content'
+    );
+    expect(getByTestId('chat-empty-state-composer-region')).toHaveAttribute(
+      'data-top-spacing-owner',
+      'none'
     );
     expect(queryByText("What's next?")).toBeNull();
     expect(getByTestId('chat-empty-state-centered-composer')).toBeTruthy();
+    expect(getByTestId('chat-message-scroll').className).toContain('pt-0');
     expect(getByTestId('feature-intro-card')).toHaveAttribute(
       'data-mode',
       'highlight'
@@ -249,6 +266,20 @@ describe('JovieChat empty state', () => {
     expect(queryByText('Preview profile')).toBeNull();
     expect(queryByText('Change photo')).toBeNull();
     expect(queryByText('Release link')).toBeNull();
+  });
+
+  it('launches the visible sample prompt exactly when the sample is selected', () => {
+    const { getByRole, getByTestId } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    const sample = getByTestId('chat-empty-state-sample');
+    const prompt = sample.getAttribute('data-sample-prompt');
+    expect(prompt).toBe('Plan my next release');
+    fireEvent.click(getByRole('button', { name: `Ask “${prompt}”` }));
+    expect(mockChatState.handleSuggestedPrompt).toHaveBeenCalledExactlyOnceWith(
+      prompt
+    );
   });
 
   it('uses Ovie composer copy when chatMode is ov', () => {
