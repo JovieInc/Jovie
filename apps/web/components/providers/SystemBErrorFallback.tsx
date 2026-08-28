@@ -26,7 +26,8 @@ interface SystemBErrorFallbackProps {
   readonly description: string;
   /** Support-path diagnostic. Rendered only behind an opt-in disclosure. */
   readonly digest?: string;
-  readonly actions: readonly SystemBErrorFallbackAction[];
+  /** One authoritative recovery action. Competing actions are not supported. */
+  readonly action: SystemBErrorFallbackAction;
   readonly role?: 'alert';
   readonly ariaLive?: 'assertive' | 'polite';
   readonly className?: string;
@@ -42,7 +43,7 @@ export function SystemBErrorFallback({
   title = RECOVERY_COPY.title,
   description,
   digest,
-  actions,
+  action,
   role,
   ariaLive,
   className,
@@ -64,41 +65,29 @@ export function SystemBErrorFallback({
         <p className='system-b-error-fallback__description'>{description}</p>
 
         <div className='system-b-error-fallback__actions'>
-          {actions.map(action => {
-            if (action.type === 'link') {
-              return (
-                <a
-                  key={`${action.type}-${action.label}`}
-                  href={action.href}
-                  className='system-b-error-fallback__action-link'
-                >
-                  <Button
-                    type='button'
-                    variant={
-                      action.variant === 'secondary' ? 'secondary' : 'primary'
-                    }
-                    size='sm'
-                  >
-                    {action.label}
-                  </Button>
-                </a>
-              );
-            }
-
-            return (
-              <Button
-                key={`${action.type}-${action.label}`}
-                type='button'
-                variant={
-                  action.variant === 'secondary' ? 'secondary' : 'primary'
-                }
-                size='sm'
-                onClick={action.onClick}
+          {action.type === 'link' ? (
+            <Button
+              asChild
+              variant={action.variant === 'secondary' ? 'secondary' : 'primary'}
+              size='sm'
+            >
+              <a
+                href={action.href}
+                className='system-b-error-fallback__action-link'
               >
-                {action.label || 'Action'}
-              </Button>
-            );
-          })}
+                {action.label}
+              </a>
+            </Button>
+          ) : (
+            <Button
+              type='button'
+              variant={action.variant === 'secondary' ? 'secondary' : 'primary'}
+              size='sm'
+              onClick={action.onClick}
+            >
+              {action.label || 'Action'}
+            </Button>
+          )}
         </div>
 
         {digest ? (

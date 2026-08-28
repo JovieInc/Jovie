@@ -1,10 +1,8 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-import { AlertTriangle } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { ErrorDetails } from '@/features/feedback/ErrorDetails';
+import { PageErrorState } from '@/features/feedback/PageErrorState';
+import { RECOVERY_COPY } from '@/features/feedback/recovery-contract';
 import { captureErrorInSentry } from '@/lib/errors/capture';
 
 interface ErrorBoundaryProps {
@@ -36,9 +34,8 @@ export default function ErrorBoundary({
   error,
   reset,
   context,
-  message = "We couldn't load this page. Give it another try, or head home.",
+  message = "We couldn't load this page. Give it another try.",
 }: ErrorBoundaryProps) {
-  const router = useRouter();
   const isSkewError = isDeploymentSkewError(error);
 
   useEffect(() => {
@@ -56,52 +53,12 @@ export default function ErrorBoundary({
     : message;
 
   return (
-    <div
-      className='flex flex-1 flex-col items-center justify-center px-4 py-12 text-center'
-      role='alert'
-      aria-live='polite'
-    >
-      <div className='w-full max-w-sm space-y-4'>
-        <div className='flex justify-center'>
-          <div className='flex h-10 w-10 items-center justify-center text-destructive'>
-            <AlertTriangle className='h-6 w-6' aria-hidden='true' />
-          </div>
-        </div>
-
-        <div className='space-y-1.5'>
-          <h3 className='text-sm font-medium text-secondary-token'>
-            {isSkewError ? 'App Updated' : 'Something went wrong'}
-          </h3>
-          <p className='text-app text-tertiary-token'>{displayMessage}</p>
-        </div>
-
-        <div className='flex justify-center gap-3'>
-          {isSkewError ? (
-            <Button
-              variant='primary'
-              size='sm'
-              onClick={() => globalThis.location.reload()}
-            >
-              Reload
-            </Button>
-          ) : (
-            <Button variant='primary' size='sm' onClick={reset}>
-              Try Again
-            </Button>
-          )}
-          <Button
-            variant='secondary'
-            size='sm'
-            onClick={() => router.push('/')}
-          >
-            Go Home
-          </Button>
-        </div>
-
-        {!isSkewError && (
-          <ErrorDetails error={error} extraContext={{ Context: context }} />
-        )}
-      </div>
-    </div>
+    <PageErrorState
+      title={isSkewError ? 'App updated' : RECOVERY_COPY.title}
+      message={displayMessage}
+      error={isSkewError ? undefined : error}
+      onRetry={isSkewError ? () => globalThis.location.reload() : reset}
+      extraContext={{ Context: context }}
+    />
   );
 }

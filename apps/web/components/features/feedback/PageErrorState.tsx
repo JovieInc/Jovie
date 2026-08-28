@@ -32,7 +32,6 @@ interface PageErrorStateProps {
  *   error={error}
  *   actionLabel="Reload dashboard"
  *   onRetry={resetErrorBoundary}
- *   secondaryAction={{ label: 'Go home', onClick: () => router.push('/') }}
  *   extraContext={{ Context: 'Dashboard' }}
  * />
  */
