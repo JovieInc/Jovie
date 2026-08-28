@@ -142,6 +142,27 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = new Set([
 const AFFECTED_TEST_SELECTOR_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const SENTRY_AUTOFIX_RECURRENCE_PRIMARY_INPUTS = new Set([
+  '.github/workflows/sentry-autofix-recurrence.yml',
+  '.github/workflows/sentry-autofix.yml',
+  'scripts/sentry-autofix-recurrence.mjs',
+  'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
+  'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
+]);
+const SENTRY_AUTOFIX_RECURRENCE_LANE = new Set([
+  ...SENTRY_AUTOFIX_RECURRENCE_PRIMARY_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  'scripts/tests/test_agent_workflow_hygiene.py',
+]);
+const SENTRY_AUTOFIX_RECURRENCE_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
+  'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+];
+const SENTRY_AUTOFIX_RECURRENCE_PYTHON_TESTS = [
+  'scripts/tests/test_agent_workflow_hygiene.py',
+];
+const SENTRY_AUTOFIX_RECURRENCE_NODE_TESTS = ['scripts/typecheck-scripts.mjs'];
 const SAFE_PR_REMEDIATION_PRIMARY_INPUTS = new Set([
   '.github/workflows/safe-pr-remediation.yml',
   'scripts/lib/safe-pr-remediation.mjs',
@@ -232,6 +253,7 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
   'scripts/lib/__tests__/lockfile-specifier-preflight.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
   'scripts/lib/__tests__/golden-path-lock.test.mjs',
   'scripts/lib/__tests__/golden-path-prod-autofix-workflow-contract.test.mjs',
   'scripts/lib/__tests__/queue-deferral-receipt.test.mjs',
@@ -729,6 +751,22 @@ export function buildAffectedTestPlan(
       pythonUnittestTests: [],
       scriptVitestTests: ROLLING_CI_FX_CACHE_GC_SCRIPT_TESTS,
       nodeTests: ROLLING_CI_FX_CACHE_GC_NODE_TESTS,
+    };
+  }
+  const isBoundedSentryAutofixRecurrenceChange =
+    files.some(file => SENTRY_AUTOFIX_RECURRENCE_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => SENTRY_AUTOFIX_RECURRENCE_LANE.has(file));
+  if (isBoundedSentryAutofixRecurrenceChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: SENTRY_AUTOFIX_RECURRENCE_PYTHON_TESTS,
+      scriptVitestTests: SENTRY_AUTOFIX_RECURRENCE_SCRIPT_TESTS,
+      nodeTests: SENTRY_AUTOFIX_RECURRENCE_NODE_TESTS,
     };
   }
   const isBoundedSafePrRemediationChange =
