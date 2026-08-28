@@ -195,15 +195,16 @@ private struct ContinueInBrowserButton: View {
       .font(JovieFont.body(size: 16, weight: .semibold))
       .foregroundStyle(isDisabled ? JovieColor.textSecondary : JovieColor.backgroundBase)
       .frame(maxWidth: .infinity)
-      .frame(height: 56)
+      .frame(height: JovieActionButtonMetrics.height)
+      .background(
+        Capsule(style: .continuous)
+          .fill(isDisabled ? JovieColor.surface2 : Color.white)
+      )
       .contentShape(Rectangle())
     }
+    .padding(.vertical, 6)
     .disabled(mobileAuthButtonIsDisabled(isDisabled: isDisabled, isOpening: isOpening))
     .buttonStyle(.plain)
-    .background(
-      Capsule(style: .continuous)
-        .fill(isDisabled ? JovieColor.surface2 : Color.white)
-    )
     .accessibilityIdentifier("auth-continue-browser-button")
   }
 
@@ -229,7 +230,7 @@ func mobileAuthButtonTitle(
     return "Opening Browser..."
   }
 
-  return hasRecoveryMessage ? "Sign In Again" : "Continue in Browser"
+  return hasRecoveryMessage ? "Sign In Again" : "Continue to Jovie"
 }
 
 func canStartMobileAuth(isMock: Bool, isOpening: Bool) -> Bool {
