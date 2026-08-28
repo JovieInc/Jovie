@@ -2076,9 +2076,10 @@ export function frontItemChurnDecision({
       RETRYABLE_PRODUCT_FAILURE_STEPS.has(step)
     )
   );
-  // Drain historically attached failedSteps only to the latest run. Count
-  // sibling failed attempts for this unchanged head so a moving main SHA
-  // cannot reset the one-retry allowance forever (#16238).
+  // Count sibling failed attempts once any run proves a retryable product
+  // failure. Some sibling runs expose only aggregate Build and test failures;
+  // a moving main SHA must not reset the one-retry allowance forever (#16238,
+  // reproduced by #16441 on 2026-08-27).
   const retryableAttemptCount =
     retryableProductFailures.length === 0
       ? 0

@@ -1233,7 +1233,8 @@ fi
 # front_churn_action <num> <head_oid> → prints allow|block|unknown.
 # Annotate recent failed fronts, not only the latest run. A single-run
 # failedSteps payload never reaches MERGE_GROUP_CHURN_FAILURE_THRESHOLD=2, so
-# unit-test merge_group failures re-enrolled forever as main moved (#16238).
+# unit-test merge_group failures re-enrolled forever as main moved (#16238,
+# reproduced by #16441 on 2026-08-27).
 front_churn_action() {
   local n="$1" head_oid="$2" committed run_id jobs_json runs_json
   if [[ "$MERGE_QUEUE_BACKEND" != "native" || ! "$MAIN_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then

@@ -1842,30 +1842,32 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
     expect(decision.action).toBe('allow');
   });
 
-  it('blocks when drain evidence only annotates the latest of repeated unit-test failures', () => {
-    // Live #16238: drain attached failedSteps to the latest merge_group run
-    // only. Each ejection retried on a new main SHA, so the unclassified
-    // exact-base path re-enrolled the same head after every product failure.
+  it('blocks repeated aggregate failures after one run proves the unchanged head fails unit tests', () => {
+    // Reproduced by live #16441 on 2026-08-27: one merge_group run exposed the
+    // unit-test failure while sibling attempts exposed only aggregate failures.
+    // Each ejection retried on a new main SHA, so the unclassified exact-base
+    // path re-enrolled the same head after every product failure.
     const decision = frontItemChurnDecision({
-      prNumber: 16238,
+      prNumber: 16441,
       currentBaseSha: NEW_BASE,
       headCommittedAt: '2026-08-20T00:00:00.000Z',
       observedAt: '2026-08-20T03:30:00.000Z',
       mergeGroupRuns: [
         groupRun(
-          16238,
+          16441,
           BASE,
           'failure',
           '2026-08-20T02:41:31.000Z',
-          'completed'
+          'completed',
+          ['Run unit tests']
         ),
         groupRun(
-          16238,
+          16441,
           NEW_BASE,
           'failure',
           '2026-08-20T03:21:50.000Z',
           'completed',
-          ['Run unit tests']
+          ['Build and test', 'Evaluate combined-head checks']
         ),
       ],
     });
@@ -1880,9 +1882,7 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
       resolve(REPO_ROOT, 'scripts/drain-pr-queue.sh'),
       'utf8'
     );
-    expect(drain).toContain(
-      'sort_by(.createdAt) | reverse | .[0:8][]? | .id'
-    );
+    expect(drain).toContain('sort_by(.createdAt) | reverse | .[0:8][]? | .id');
     expect(drain).not.toContain(
       'sort_by(.createdAt) | reverse | .[0].id // empty'
     );
