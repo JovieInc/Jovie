@@ -168,7 +168,7 @@ function casApprovedRow(overrides: Record<string, unknown> = {}) {
   return {
     id: ACTION_ID,
     payload: BOOKING_PAYLOAD,
-    kind: 'calendar_booking',
+    kind: 'calendar.create_event',
     signalType: null,
     ...overrides,
   };
@@ -230,6 +230,7 @@ describe('POST approve (real handler)', () => {
     dbMockState.insertError = null;
     mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
     mockRecordInboxDecision.mockResolvedValue({ id: 'feedback-1' });
+    dbMockState.selectResultQueue.push([casApprovedRow()]);
   });
 
   it('returns 401 and touches no DB bindings when unauthenticated', async () => {
@@ -286,25 +287,26 @@ describe('POST approve (real handler)', () => {
       suggestedActionId: ACTION_ID,
       userId: USER_ID,
       verdict: 'approved',
-      cardKind: 'calendar_booking',
+      cardKind: 'calendar.create_event',
       surface: 'opportunity-inbox',
     });
   });
 
-  it('persists stepOutputs.eventPayload as null when the action row has no payload', async () => {
-    dbMockState.updateReturningQueue.push([casApprovedRow({ payload: null })]);
+  it('leaves a malformed calendar action unchanged', async () => {
+    dbMockState.selectResultQueue.length = 0;
+    dbMockState.selectResultQueue.push([casApprovedRow({ payload: null })]);
 
     const response = await approvePOST(
       makeApproveRequest(),
       makeParams(ACTION_ID)
     );
 
-    expect(response.status).toBe(200);
-    expect(dbMockState.insertedRows).toHaveLength(1);
-    expect(dbMockState.insertedRows[0].stepOutputs).toEqual({
-      approvalId: ACTION_ID,
-      eventPayload: null,
+    expect(response.status).toBe(422);
+    expect(await response.json()).toEqual({
+      error: 'invalid-calendar-payload',
     });
+    expect(dbMockState.updateSetCalls).toHaveLength(0);
+    expect(dbMockState.insertedRows).toHaveLength(0);
   });
 
   it('second approve after a completed first approve: recovery finds the run → 200 approved-pending-enqueue, no new insert', async () => {
@@ -349,8 +351,8 @@ describe('POST approve (real handler)', () => {
   });
 
   it('approve of an unknown action id: 404 not-found', async () => {
-    dbMockState.updateReturningQueue.push([]); // CAS missed
-    dbMockState.selectResultQueue.push([]); // recovery select finds nothing
+    dbMockState.selectResultQueue.length = 0;
+    dbMockState.selectResultQueue.push([]);
 
     const response = await approvePOST(
       makeApproveRequest(),
@@ -407,6 +409,7 @@ describe('concurrent approve (real handler): exactly one workflow_runs row', () 
     dbMockState.insertError = null;
     mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
     mockRecordInboxDecision.mockResolvedValue({ id: 'feedback-1' });
+    dbMockState.selectResultQueue.push([casApprovedRow()], [casApprovedRow()]);
   });
 
   it('two concurrent POSTs: one wins the CAS and inserts, the loser recovers as already-queued', async () => {
