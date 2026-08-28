@@ -54,7 +54,7 @@ describe('MarketingShippedSitesShowcase', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('is mounted on the homepage and artist profiles landing', () => {
+  it('stays on artist profiles and off the umbrella homepage', () => {
     const repoRoot = path.resolve(
       path.dirname(new URL(import.meta.url).pathname),
       '../../../..'
@@ -71,8 +71,8 @@ describe('MarketingShippedSitesShowcase', () => {
       'utf8'
     );
 
-    expect(homePage).toContain('MarketingShippedSitesShowcase');
-    expect(homePage).toContain('MarketingPlatformSpecBento');
+    expect(homePage).not.toContain('MarketingShippedSitesShowcase');
+    expect(homePage).not.toContain('MarketingPlatformSpecBento');
     expect(artistProfiles).toContain('MarketingShippedSitesShowcase');
     expect(artistProfiles).toContain('MarketingPlatformSpecBento');
   });

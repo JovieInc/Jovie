@@ -11,6 +11,7 @@
  * or opening the document, so the baseline stays fail-closed.
  */
 
+import { auditHomepageRootComposition } from '@/lib/homepage-role-invariants';
 import { MARKETING_GENERATION_STAGES } from './generation';
 
 export const HOMEPAGE_REDESIGN_CONTRACT_VERSION = 'homepage-redesign/v1';
@@ -360,6 +361,13 @@ export function auditLiveHomepageSource(
         message: `Live \`/\` must not reference isolated proposal token \`${forbidden}\`.`,
       });
     }
+  }
+
+  for (const finding of auditHomepageRootComposition(pageSource)) {
+    findings.push({
+      code: finding.code,
+      message: finding.message,
+    });
   }
 
   return findings;
