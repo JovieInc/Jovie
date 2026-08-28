@@ -970,8 +970,8 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     collision_decision="$(changelog_collision_decision_for_pr "$n")"
     collision_action="$(jq -r '.action // empty' <<<"$collision_decision")"
     if [[ "$collision_action" == "skip" ]]; then
-      echo "    ⏸ CHANGELOG.md already queued with $(jq -r '.collidingPrs | join(",")' <<<"$collision_decision"); refusing ALLGREEN group collision for #$n"
-      LAST_ENROLL_SKIP_REASON="changelog-collision"
+      echo "    ⏸ pre-land CHANGELOG.md edit is prohibited; refusing native queue admission for #$n"
+      LAST_ENROLL_SKIP_REASON="preland-changelog"
       return 2
     fi
   fi

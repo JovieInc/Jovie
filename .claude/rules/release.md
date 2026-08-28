@@ -155,7 +155,7 @@ Not all PRs are safe for auto-merge. PRs touching high-risk paths require manual
 
 | Change Type | Examples |
 |-------------|---------|
-| Docs / copy / README | Markdown files, changelog, legal copy |
+| Docs / copy / README | Markdown files and legal copy; never pre-land `CHANGELOG.md` |
 | Tests (unit, integration, e2e) | `*.test.ts`, `*.spec.ts`, test fixtures |
 | Style-only | CSS, design tokens, Tailwind config |
 | Dependency bumps (non-breaking) | Lockfile-only, patch/minor version bumps |
@@ -168,7 +168,7 @@ When in doubt, skip auto-merge and request review.
 1. **Open a draft PR early** — push your first meaningful commit and create a draft PR immediately.
 2. **Iterate** — push frequently, let CI catch issues, fix and push again.
 3. **When ready to ship:** run `/qa` → `/review` → `/ship` (skip `/qa` or `/review` if already run manually).
-4. `/ship` handles: tests, review, CHANGELOG `[Unreleased]` notes, commit, push, PR creation/update. It must **not** bump the version fan-out (`VERSION`, `version.json`, `package.json` versions, dated CHANGELOG headings) — see "Version Stamping (main-only)" below.
+4. `/ship` handles tests, review, commit, push, and PR creation/update. It must **not** edit `CHANGELOG.md` or bump the version fan-out (`VERSION`, `version.json`, package versions) — see "Version Stamping (main-only)" below.
 5. `/land-and-deploy` handles: merge, CI wait, deploy verification.
 6. Apply `merge-queue` after the PR is ready. The live
    `MERGE_QUEUE_BACKEND=native` controller treats the label as intent/audit
@@ -297,14 +297,15 @@ BOT REVIEWS
 - `VERSION`
 - `version.json`
 - the `version` field of root + workspace `package.json` files (`apps/*`, `packages/*`)
-- dated release headings in `CHANGELOG.md` (e.g. `## [26.6.61] - 2026-06-28`)
+- any `CHANGELOG.md` edit
 
 **What feature branches MAY do:**
 
-- Add release notes under the `## [Unreleased]` section of `CHANGELOG.md`.
 - Edit `package.json` for dependency/script changes — only the `version` field is protected.
+- Record factual release evidence in the Linear issue and PR body. They may not
+  create a branch-local changelog or release-note fragment.
 
-**Enforcement:** `scripts/version-fanout-guard.mjs` runs in CI (`ci-deterministic` job) and fails any non-`main` branch that writes the fan-out. It auto-skips on `main`, `master`, `production`, and `release/*`, `hotfix/*`, `train/*`, `integration/*` branches (the release/integration path). Run locally with `pnpm version:fanout-guard`.
+**Enforcement:** `scripts/version-fanout-guard.mjs` runs in CI (`ci-deterministic` job) and fails normal feature branches that write the fan-out, including any `CHANGELOG.md` edit. Native queue admission independently rejects every PR that touches `CHANGELOG.md`, including legacy/release-prefixed branches. Run locally with `pnpm version:fanout-guard`.
 
 **Stamping on main:** After merge to `main` (or from the release workflow), run:
 
@@ -317,9 +318,15 @@ pnpm version:check        # validate consistency
 
 ## Changelog
 
-**During development, only add notes under the `## [Unreleased]` section of `CHANGELOG.md`.** The `/ship` workflow appends `[Unreleased]` entries automatically from the diff and commit history. The dated release heading is stamped on the main/release path by `pnpm version:stamp` — never add a dated `## [X.Y.Z] - DATE` heading on a feature branch.
+**Implementation PRs never edit `CHANGELOG.md`.** The file is release state,
+not branch state. After a land and runtime proof, the existing release/UI path
+may lock exactly one user-visible What's New bullet when the change warrants
+one. Internal-only work emits no vanity bullet. Linear and the landed PR remain
+the source evidence; no changelog fragments or parallel release-note store.
 
-`CHANGELOG.md` uses `merge=union` in `.gitattributes` to auto-resolve merge conflicts between concurrent PRs.
+The legacy `merge=union` attribute is not admission authority. GitHub's native
+merge queue does not honor it, and native admission rejects the file before a
+group can collide.
 
 **Customer-friendly format:** The changelog is rendered on the public `/changelog` page, RSS feed, and subscriber emails. Follow these conventions:
 
