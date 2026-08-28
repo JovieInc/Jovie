@@ -8,6 +8,11 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Sheet,
   SheetContent,
   SheetDescription,
@@ -43,6 +48,7 @@ import {
   Table2,
   Video,
 } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -123,10 +129,12 @@ import {
   libraryApprovalStatusDotClasses,
 } from '@/lib/library/approval-status';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
+import type { LibraryRelationshipView } from '@/lib/library/graph-types';
 import {
   libraryAssetMatchesStage,
   parseLibraryStageParam,
 } from '@/lib/library/lifecycle-stage';
+import type { LibraryPostReleaseBundle } from '@/lib/library/post-release-types';
 import { updateLibraryProfileVisibility } from '@/lib/library/profile-visibility/client-mutations';
 import {
   releaseStatusClasses,
@@ -134,6 +142,7 @@ import {
 } from '@/lib/library/release-status';
 import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
+import type { YouTubeOptimizationSnapshot } from '@/lib/youtube-library/optimization-types';
 import {
   archiveLibraryRelease,
   restoreRelease,
@@ -175,6 +184,7 @@ import {
   persistLibrarySavedView,
   readPersistedLibrarySavedView,
 } from './library-saved-views';
+import { PostReleasePanel } from './PostReleasePanel';
 
 const LIBRARY_TABLE_ROW_HEIGHT = 56;
 const LIBRARY_TABLE_MIN_WIDTH = '0';
@@ -1944,6 +1954,322 @@ function ApprovalStatusEditor({
   );
 }
 
+function YouTubeMerchRelationshipEditor({
+  profileId,
+  videoId,
+  merchProducts,
+  relationships,
+  disabled,
+}: {
+  readonly profileId: string | null;
+  readonly videoId: string;
+  readonly merchProducts: readonly {
+    readonly id: string;
+    readonly title: string;
+  }[];
+  readonly relationships: readonly LibraryRelationshipView[];
+  readonly disabled: boolean;
+}) {
+  const [localRelationships, setLocalRelationships] = useState(relationships);
+  const [selectedMerchId, setSelectedMerchId] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setLocalRelationships(relationships);
+  }, [relationships]);
+
+  const tagged = localRelationships.filter(
+    relationship =>
+      relationship.status === 'active' &&
+      relationship.kind === 'features_merch' &&
+      relationship.subjectType === 'youtube_video' &&
+      relationship.subjectId === videoId &&
+      relationship.objectType === 'merch_product'
+  );
+  const taggedIds = new Set(tagged.map(relationship => relationship.objectId));
+  const availableProducts = merchProducts.filter(
+    product => !taggedIds.has(product.id)
+  );
+
+  const updateTag = async (method: 'POST' | 'DELETE', merchCardId: string) => {
+    if (!profileId) return;
+    setIsSaving(true);
+    try {
+      const response = await fetch('/api/library/relationships', {
+        method,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          creatorProfileId: profileId,
+          videoId,
+          merchCardId,
+        }),
+      });
+      const result = (await response.json()) as {
+        relationship?: LibraryRelationshipView;
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(result.error ?? 'Relationship could not be saved');
+      }
+      if (method === 'POST' && result.relationship) {
+        setLocalRelationships(current => [
+          ...current.filter(
+            relationship =>
+              !(
+                relationship.kind === 'features_merch' &&
+                relationship.subjectId === videoId &&
+                relationship.objectId === merchCardId
+              )
+          ),
+          result.relationship as LibraryRelationshipView,
+        ]);
+        setSelectedMerchId('');
+        toast.success('Merch tagged in video');
+      } else {
+        setLocalRelationships(current =>
+          current.filter(
+            relationship =>
+              !(
+                relationship.kind === 'features_merch' &&
+                relationship.subjectId === videoId &&
+                relationship.objectId === merchCardId
+              )
+          )
+        );
+        toast.success('Merch tag removed');
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Relationship could not be saved'
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className='space-y-3'>
+      <p className='system-b-library-drawer-panel-copy leading-5 text-secondary-token'>
+        Tag products worn or featured in this video. YouTube shelf placement is
+        tracked separately from this confirmed content relationship.
+      </p>
+      {tagged.length > 0 ? (
+        <div className='space-y-1.5'>
+          {tagged.map(relationship => {
+            const product = merchProducts.find(
+              item => item.id === relationship.objectId
+            );
+            return (
+              <div
+                key={relationship.id}
+                className='flex min-h-8 items-center justify-between gap-2 rounded-(--linear-radius-sm) bg-surface-1 px-2'
+              >
+                <span className='system-b-library-drawer-panel-copy truncate text-primary-token'>
+                  {product?.title ?? 'Merch product'}
+                </span>
+                <Button
+                  type='button'
+                  size='sm'
+                  variant='ghost'
+                  disabled={disabled || isSaving}
+                  onClick={() => {
+                    void updateTag('DELETE', relationship.objectId);
+                  }}
+                >
+                  Remove
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className='system-b-library-drawer-panel-copy text-tertiary-token'>
+          No merch tagged yet.
+        </p>
+      )}
+      {availableProducts.length > 0 ? (
+        <div className='flex items-center gap-2'>
+          <Select value={selectedMerchId} onValueChange={setSelectedMerchId}>
+            <SelectTrigger
+              className='system-b-library-drawer-panel-copy h-8 min-w-0 flex-1'
+              disabled={disabled || isSaving}
+            >
+              <SelectValue placeholder='Choose merch' />
+            </SelectTrigger>
+            <SelectContent>
+              {availableProducts.map(product => (
+                <SelectItem key={product.id} value={product.id}>
+                  {product.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type='button'
+            size='sm'
+            variant='secondary'
+            disabled={disabled || isSaving || !selectedMerchId}
+            onClick={() => {
+              void updateTag('POST', selectedMerchId);
+            }}
+          >
+            Tag
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function YouTubeOptimizationPanel({
+  profileId,
+  videoId,
+}: {
+  readonly profileId: string | null;
+  readonly videoId: string;
+}) {
+  const [snapshot, setSnapshot] = useState<YouTubeOptimizationSnapshot | null>(
+    null
+  );
+  const [loadState, setLoadState] = useState<
+    'idle' | 'loading' | 'loaded' | 'error'
+  >('idle');
+
+  useEffect(() => {
+    if (!profileId) return;
+    const abortController = new AbortController();
+    setLoadState('loading');
+    fetch(
+      `/api/youtube-library/videos/${encodeURIComponent(videoId)}/optimization?creatorProfileId=${encodeURIComponent(profileId)}`,
+      { signal: abortController.signal }
+    )
+      .then(async response => {
+        const result = (await response.json()) as {
+          snapshot?: YouTubeOptimizationSnapshot;
+        };
+        if (!response.ok || !result.snapshot) {
+          throw new Error('Optimization history could not be loaded');
+        }
+        setSnapshot(result.snapshot);
+        setLoadState('loaded');
+      })
+      .catch(error => {
+        if (error instanceof DOMException && error.name === 'AbortError')
+          return;
+        setLoadState('error');
+      });
+    return () => abortController.abort();
+  }, [profileId, videoId]);
+
+  const latestMetric = snapshot?.metrics[0] ?? null;
+
+  return (
+    <div className='min-h-32 space-y-3'>
+      {loadState === 'loading' || loadState === 'idle' ? (
+        <p className='system-b-library-drawer-panel-copy text-secondary-token'>
+          Loading test history…
+        </p>
+      ) : loadState === 'error' ? (
+        <p className='system-b-library-drawer-panel-copy text-destructive'>
+          Optimization history could not be loaded.
+        </p>
+      ) : snapshot ? (
+        <>
+          {snapshot.thumbnails.length > 0 ? (
+            <div className='grid grid-cols-3 gap-2'>
+              {snapshot.thumbnails.slice(0, 6).map(thumbnail => (
+                <div key={thumbnail.id} className='space-y-1'>
+                  <ArtworkFrame
+                    size='thumbnail'
+                    className='aspect-video w-full'
+                  >
+                    <Image
+                      src={thumbnail.imageUrl}
+                      alt=''
+                      width={160}
+                      height={90}
+                      unoptimized
+                      className='h-full w-full object-cover'
+                    />
+                  </ArtworkFrame>
+                  <p className='system-b-library-status-bar truncate text-tertiary-token'>
+                    {thumbnail.kind}
+                    {thumbnail.approvalStatus === 'approved'
+                      ? ' · approved'
+                      : ''}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className='system-b-library-drawer-panel-copy text-tertiary-token'>
+              No thumbnail history yet.
+            </p>
+          )}
+
+          {snapshot.experiments.length > 0 ? (
+            <div className='space-y-1.5'>
+              {snapshot.experiments.map(experiment => (
+                <div
+                  key={experiment.id}
+                  className='rounded-(--linear-radius-sm) bg-surface-1 px-2 py-1.5'
+                >
+                  <div className='system-b-library-drawer-panel-copy flex items-center justify-between gap-2'>
+                    <span className='truncate text-primary-token'>
+                      {experiment.objective}
+                    </span>
+                    <span className='shrink-0 text-tertiary-token'>
+                      {experiment.status}
+                    </span>
+                  </div>
+                  {experiment.winnerVariantKey ? (
+                    <p className='system-b-library-status-bar mt-1 text-success'>
+                      Winner · {experiment.winnerVariantKey}
+                    </p>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className='system-b-library-drawer-panel-copy text-tertiary-token'>
+              No test is running. Candidates remain proposals until a measured
+              winner is explicitly accepted.
+            </p>
+          )}
+
+          {latestMetric ? (
+            <dl className='grid grid-cols-2 gap-x-3'>
+              <MetadataRow label='Window' value={latestMetric.window} />
+              <MetadataRow
+                label='Views'
+                value={latestMetric.views?.toLocaleString() ?? 'Unavailable'}
+              />
+              <MetadataRow
+                label='Watch Time'
+                value={
+                  latestMetric.watchTimeMinutes === null
+                    ? 'Unavailable'
+                    : `${Math.round(latestMetric.watchTimeMinutes)} min`
+                }
+              />
+              <MetadataRow
+                label='Avg View'
+                value={
+                  latestMetric.avgViewDurationSeconds === null
+                    ? 'Unavailable'
+                    : `${Math.round(latestMetric.avgViewDurationSeconds)} sec`
+                }
+              />
+            </dl>
+          ) : null}
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function AssetDrawer({
   asset,
   open,
@@ -1959,6 +2285,9 @@ function AssetDrawer({
   pressKitCandidates,
   onApprovalStatusChange,
   onShareChange,
+  merchProducts,
+  relationships,
+  postReleaseBundle,
 }: {
   readonly asset: LibraryReleaseAsset | null;
   readonly open: boolean;
@@ -1980,6 +2309,12 @@ function AssetDrawer({
     assetId: string,
     share: LibraryAssetShareViewModel
   ) => void;
+  readonly merchProducts: readonly {
+    readonly id: string;
+    readonly title: string;
+  }[];
+  readonly relationships: readonly LibraryRelationshipView[];
+  readonly postReleaseBundle: LibraryPostReleaseBundle;
 }) {
   const [stickyAsset, setStickyAsset] = useState<LibraryReleaseAsset | null>(
     asset
@@ -1991,6 +2326,7 @@ function AssetDrawer({
 
   const current = asset ?? stickyAsset;
   const isMerch = current ? getLibraryItemKind(current) === 'merch' : false;
+  const isYouTubeVideo = current?.source?.provider === 'youtube';
   const closedInteractiveProps = open ? {} : { tabIndex: -1 };
   const closedTabIndex = open ? undefined : -1;
   const currentId = current?.id ?? null;
@@ -2108,6 +2444,51 @@ function AssetDrawer({
                 </DrawerSection>
               ) : (
                 <>
+                  {getLibraryItemKind(current) === 'release' ||
+                  current.relatedReleaseId ? (
+                    <DrawerSection
+                      sectionId='post-release'
+                      surface='card'
+                      title='Post-release'
+                      defaultOpen
+                    >
+                      <PostReleasePanel
+                        asset={current}
+                        creatorProfileId={profileId}
+                        bundle={postReleaseBundle}
+                        disabled={!open}
+                      />
+                    </DrawerSection>
+                  ) : null}
+                  {isYouTubeVideo && current.source ? (
+                    <>
+                      <DrawerSection
+                        sectionId='relationships'
+                        surface='card'
+                        title='Relationships'
+                        defaultOpen
+                      >
+                        <YouTubeMerchRelationshipEditor
+                          profileId={profileId}
+                          videoId={current.source.canonicalId}
+                          merchProducts={merchProducts}
+                          relationships={relationships}
+                          disabled={!open}
+                        />
+                      </DrawerSection>
+                      <DrawerSection
+                        sectionId='optimization'
+                        surface='card'
+                        title='Optimization'
+                        defaultOpen={false}
+                      >
+                        <YouTubeOptimizationPanel
+                          profileId={profileId}
+                          videoId={current.source.canonicalId}
+                        />
+                      </DrawerSection>
+                    </>
+                  ) : null}
                   <DrawerSection
                     sectionId='share-link'
                     surface='card'
@@ -2325,10 +2706,19 @@ export function LibrarySurface({
   assets,
   profileId = null,
   artistHandle = null,
+  merchProducts = [],
+  relationships = [],
+  postReleaseBundle = { downloads: [], findings: [], rightsholders: [] },
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
   readonly profileId?: string | null;
   readonly artistHandle?: string | null;
+  readonly merchProducts?: readonly {
+    readonly id: string;
+    readonly title: string;
+  }[];
+  readonly relationships?: readonly LibraryRelationshipView[];
+  readonly postReleaseBundle?: LibraryPostReleaseBundle;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -2885,6 +3275,9 @@ export function LibrarySurface({
         )}
         onApprovalStatusChange={handleApprovalStatusChange}
         onShareChange={handleShareChange}
+        merchProducts={merchProducts}
+        relationships={relationships}
+        postReleaseBundle={postReleaseBundle}
       />
     ),
     [
@@ -2900,6 +3293,9 @@ export function LibrarySurface({
       handleTogglePreview,
       playingPreviewId,
       profileId,
+      merchProducts,
+      postReleaseBundle,
+      relationships,
       selectedAsset,
     ]
   );
