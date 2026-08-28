@@ -55,9 +55,15 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
   ],
   [
     'shared-release-admission',
-    'shared-contract',
-    PRODUCT_LANES,
+    'operations-tooling',
+    [],
     /^(\.github\/(workflows\/(ci|production-controller)\.yml|ci-harness\/)|scripts\/ci-fast-lanes\.mjs|scripts\/lib\/(ci-harness|merge-queue-guard|product-lane-(classifier|finalize))\.mjs|scripts\/lib\/__tests__\/(ci-harness|merge-group-workflow-contract|product-lane-classifier)\.test\.mjs)$/,
+  ],
+  [
+    'operations-release-contract-test',
+    'operations-tooling',
+    [],
+    /^apps\/web\/tests\/unit\/ci\/deploy-workflow\.test\.ts$/,
   ],
   [
     'ios-product',
@@ -270,7 +276,7 @@ export function runProductLaneClassifier(argv = process.argv.slice(2)) {
     const selected = new Set(receipt.selectedLanes);
     const outputs = [
       `run_web=${selected.has('web')}`,
-      `run_mac=${selected.has('mac')}`,
+      `run_macos=${selected.has('mac')}`,
       `run_ios=${selected.has('ios')}`,
       `run_operations=${selected.has('operations')}`,
       `run_cross_product=${selected.has('cross-product')}`,
