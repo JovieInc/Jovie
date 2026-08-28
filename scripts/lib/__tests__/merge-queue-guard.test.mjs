@@ -1842,6 +1842,52 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
     expect(decision.action).toBe('allow');
   });
 
+  it('blocks repeated aggregate failures after one run proves the unchanged head fails unit tests', () => {
+    // Reproduced by live #16441 on 2026-08-27: one merge_group run exposed the
+    // unit-test failure while sibling attempts exposed only aggregate failures.
+    // Each ejection retried on a new main SHA, so the unclassified exact-base
+    // path re-enrolled the same head after every product failure.
+    const decision = frontItemChurnDecision({
+      prNumber: 16441,
+      currentBaseSha: NEW_BASE,
+      headCommittedAt: '2026-08-20T00:00:00.000Z',
+      observedAt: '2026-08-20T03:30:00.000Z',
+      mergeGroupRuns: [
+        groupRun(
+          16441,
+          BASE,
+          'failure',
+          '2026-08-20T02:41:31.000Z',
+          'completed',
+          ['Run unit tests']
+        ),
+        groupRun(
+          16441,
+          NEW_BASE,
+          'failure',
+          '2026-08-20T03:21:50.000Z',
+          'completed',
+          ['Build and test', 'Evaluate combined-head checks']
+        ),
+      ],
+    });
+    expect(decision.action).toBe('block');
+    expect(decision.reason).toContain('unchanged head');
+    expect(decision.evidence.failureClass).toBe('repeated-product-check');
+    expect(decision.evidence.failedAttempts).toBe(2);
+  });
+
+  it('annotates recent failed merge-group fronts, not only the latest run', () => {
+    const drain = readFileSync(
+      resolve(REPO_ROOT, 'scripts/drain-pr-queue.sh'),
+      'utf8'
+    );
+    expect(drain).toContain('sort_by(.createdAt) | reverse | .[0:8][]? | .id');
+    expect(drain).not.toContain(
+      'sort_by(.createdAt) | reverse | .[0].id // empty'
+    );
+  });
+
   it('clears an earlier failure when the latest unchanged-head attempt succeeds', () => {
     const decision = frontItemChurnDecision({
       prNumber: 15849,

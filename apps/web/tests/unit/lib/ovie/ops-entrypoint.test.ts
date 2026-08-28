@@ -30,6 +30,8 @@ describe('Ovie Ops packaged-app entry contract', () => {
     );
     expect(OVIE_OPS_ENTRY.presentations.fullscreen.density).toBe('kiosk');
     expect(OVIE_OPS_ENTRY.presentations.kiosk.presentationMode).toBe('token');
+    expect(OVIE_OPS_ENTRY.presentations.mac.search).toBe('ovie=mac');
+    expect(OVIE_OPS_ENTRY.presentations.mac.component).toBe('OvieMacHud');
   });
 
   it('maps compatibility aliases onto /hud', () => {

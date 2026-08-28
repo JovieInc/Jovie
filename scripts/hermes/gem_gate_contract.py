@@ -14,6 +14,8 @@ INDEPENDENT_REVIEW_SCHEMA = "jovie-independent-review/v1"
 INDEPENDENT_REVIEW_AUTHORITY = "Gem"
 INDEPENDENT_REVIEWER = "Gem"
 INDEPENDENT_REVIEW_SCOPE = "exact-main-head"
+CLOSURE_HEALTH_SCHEMA = "jovie-closure-health/v1"
+CLOSURE_HEALTH_AUTHORITY = "Summer"
 JOVIE_REPO = "JovieInc/Jovie"
 
 
@@ -137,6 +139,53 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
     new_issue_lease = receipt.get("workAdmission", {}).get("newIssueLeaseAllowed")
     if not isinstance(new_issue_lease, bool):
         raise GateContractError("new issue lease admission is missing or is not boolean")
+    closure_signal = receipt.get("signals", {}).get("closureHealth")
+    closure_admission = receipt.get("closureAdmission")
+    if not isinstance(closure_signal, dict):
+        raise GateContractError("closure health signal is missing")
+    if closure_signal.get("schema") != CLOSURE_HEALTH_SCHEMA:
+        raise GateContractError("closure health signal schema is invalid")
+    if closure_signal.get("authority") != CLOSURE_HEALTH_AUTHORITY:
+        raise GateContractError("closure health authority is not Summer")
+    closure_status = closure_signal.get("status")
+    if closure_status not in {"healthy", "grace", "red"}:
+        raise GateContractError("closure health status is invalid")
+    closure_signal_allowed = closure_signal.get("newIssueIntakeAllowed")
+    if not isinstance(closure_signal_allowed, bool):
+        raise GateContractError("closure health intake signal must be boolean")
+    if closure_signal_allowed is not (closure_status == "healthy"):
+        raise GateContractError("closure health status contradicts intake signal")
+    if closure_signal.get("promotionContinues") is not True:
+        raise GateContractError("closure health signal must preserve promotion")
+    if closure_signal.get("remediationContinues") is not True:
+        raise GateContractError("closure health signal must preserve remediation")
+    closure_reasons = closure_signal.get("reasons")
+    if not isinstance(closure_reasons, list) or not all(
+        isinstance(reason, str) for reason in closure_reasons
+    ):
+        raise GateContractError("closure health reasons are malformed")
+    if not isinstance(closure_admission, dict):
+        raise GateContractError("closure admission is missing")
+    closure_allowed = closure_admission.get("newIssueIntakeAllowed")
+    if not isinstance(closure_allowed, bool):
+        raise GateContractError("closure intake admission must be boolean")
+    if closure_admission.get("authority") != CLOSURE_HEALTH_AUTHORITY:
+        raise GateContractError("closure admission authority is not Summer")
+    if closure_admission.get("promotionContinues") is not True:
+        raise GateContractError("closure stop-line must preserve promotion")
+    if closure_admission.get("remediationContinues") is not True:
+        raise GateContractError("closure stop-line must preserve remediation")
+    for field in (
+        "allowed",
+        "newImplementationAllowed",
+        "fallbackPrGenerationAllowed",
+    ):
+        if closure_admission.get(field) is not closure_allowed:
+            raise GateContractError(f"closure admission {field} contradicts intake")
+    if closure_allowed is not closure_signal_allowed:
+        raise GateContractError("closure signal and admission disagree")
+    if new_issue_lease and not closure_allowed:
+        raise GateContractError("new issue lease bypasses Summer closure admission")
     if promotion_allowed and not review_allowed:
         raise GateContractError("promotion admission bypasses independent review")
     if direct_gem_allowed:
