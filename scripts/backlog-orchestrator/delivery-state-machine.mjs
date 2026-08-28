@@ -3,9 +3,11 @@
 /**
  * The single receipt contract for delivery-control events.
  *
- * This module deliberately creates evidence and bounded repair tasks only. It
- * never changes Linear, a pull request, a merge-queue entry, or a deployment.
- * Those mutations remain owned by their existing guarded controllers.
+ * JOV-INV-017: every unhealthy or not-proven signal also enters Summer's
+ * No Unattended Red loop. This module deliberately creates evidence and
+ * bounded repair tasks only. It never changes Linear, a pull request, a
+ * merge-queue entry, or a deployment. Those mutations remain owned by their
+ * existing guarded controllers.
  */
 
 import { createHash } from 'node:crypto';
@@ -15,6 +17,13 @@ import {
   FX_BACKSTOP_FAILURES,
   fxBackstopRoute,
 } from '../lib/rolling-ci-handoff.mjs';
+import {
+  classifyAndOpenFromDelivery,
+  DELIVERY_WORKFLOW_FAILURES,
+  persistLoopOutcome,
+  STALL_AUTOMATED_FAILURES,
+  STALL_EVIDENCE_FAILURES,
+} from './no-unattended-red.mjs';
 
 export const DELIVERY_RECEIPT_SCHEMA = 'jovie-delivery-receipt/v1';
 export const REPAIR_TASK_SCHEMA = 'jovie-symphony-repair-task/v1';
@@ -49,7 +58,10 @@ const AUTOMATED_FAILURES = Object.freeze({
     owner: 'gem',
     action: 'restore-event-trigger-and-reconcile',
   },
+  ...STALL_AUTOMATED_FAILURES,
 });
+
+const EVIDENCE_FAILURES = STALL_EVIDENCE_FAILURES;
 
 const STAGES = new Set([
   'received',
@@ -64,6 +76,7 @@ const STAGES = new Set([
   'deployment-pending',
   'production-proven',
   'repair-pending',
+  'evidence-pending',
   'external-blocked',
 ]);
 
@@ -92,6 +105,8 @@ function failureRoute(failure, externalAction) {
     }
     return { owner: 'human', action, mode: 'external' };
   }
+  const evidence = EVIDENCE_FAILURES[failure];
+  if (evidence) return { ...evidence, mode: 'evidence' };
   const route = AUTOMATED_FAILURES[failure];
   if (!route) throw new Error(`unsupported delivery failure: ${failure}`);
   return { ...route, mode: 'automated' };
@@ -105,12 +120,15 @@ function failureRoute(failure, externalAction) {
 export function normalizeDeliveryEvent(raw = {}) {
   const payload = raw.client_payload || raw.payload || raw;
   const workflow = raw.workflow_run || payload.workflow_run || {};
+  const workflowName = nonEmpty(workflow.name);
   const failure =
     nonEmpty(payload.failure) ||
     (workflow.conclusion === 'cancelled'
-      ? 'workflow-cancelled'
-      : workflow.conclusion === 'failure'
-        ? 'queue-noop'
+      ? workflowName && workflowName !== 'Merge Queue Auto-Enroll'
+        ? 'dropped-controller-event'
+        : 'workflow-cancelled'
+      : workflow.conclusion === 'failure' || workflow.conclusion === 'timed_out'
+        ? DELIVERY_WORKFLOW_FAILURES[workflowName] || 'queue-noop'
         : null);
   const pr = exactPositiveInteger(payload.pr_number ?? payload.pr);
   const headSha = exactSha(
@@ -162,7 +180,9 @@ export function buildDeliveryReceipt(
   const stage = failure
     ? route.mode === 'external'
       ? 'external-blocked'
-      : 'repair-pending'
+      : route.mode === 'evidence'
+        ? 'evidence-pending'
+        : 'repair-pending'
     : 'received';
   return {
     schema: DELIVERY_RECEIPT_SCHEMA,
@@ -203,7 +223,9 @@ export function transitionDeliveryReceipt(
   const stage = transition.failure
     ? next.mode === 'external'
       ? 'external-blocked'
-      : 'repair-pending'
+      : next.mode === 'evidence'
+        ? 'evidence-pending'
+        : 'repair-pending'
     : transition.stage;
   const prBoundStages = new Set([
     'draft-pr',
@@ -301,6 +323,9 @@ export async function persistDeliveryOutcome(
   const taskDestination = task
     ? join(stateDir, 'repair-tasks', `${task.taskKey}.json`)
     : null;
+  const loopRecord = classifyAndOpenFromDelivery(receipt.event, {
+    now: receipt.observedAt,
+  });
   if (dryRun) {
     return {
       status: 'dry-run',
@@ -308,18 +333,23 @@ export async function persistDeliveryOutcome(
       receiptPath: receiptDestination,
       task,
       taskPath: taskDestination,
+      loop: loopRecord,
     };
   }
   const persistedReceipt = await atomicPersist(receiptDestination, receipt);
   const persistedTask = task
     ? await atomicPersist(taskDestination, task)
     : null;
+  const persistedLoop = await persistLoopOutcome(loopRecord, { stateDir });
   return {
     status: persistedReceipt.status,
     receipt: persistedReceipt.value,
     receiptPath: receiptDestination,
     task: persistedTask?.value || null,
     taskPath: taskDestination,
+    loop: persistedLoop.record,
+    queue: persistedLoop.queue,
+    queuePath: persistedLoop.queuePath,
   };
 }
 

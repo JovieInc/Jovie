@@ -3,11 +3,17 @@ name: Delivery Control Receipts
 # This workflow is evidence and repair-task ingress only. It is deliberately
 # separate from the native queue mutex so a cancelled/competing queue workflow
 # still leaves a durable next-owner receipt instead of silently stalling.
+# JOV-INV-017: event-trigger classification is immediate; the hourly schedule
+# recovers missed events only.
 on:
   repository_dispatch:
     types: [delivery-control-failure]
   workflow_run:
-    workflows: ['Merge Queue Auto-Enroll']
+    workflows:
+      - Merge Queue Auto-Enroll
+      - PR Size Guard
+      - CI
+      - Production Controller
     types: [completed]
   schedule:
     # Missed-event reconciliation only; it does not select or admit work.

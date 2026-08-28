@@ -312,39 +312,25 @@ class VersionedHudContractTests(unittest.TestCase):
                 HUD,
                 "fetch_github_issues",
                 return_value={"open": 11, "backlog": 11, "ready": 2},
-            ),
+            ) as github,
         ):
             result = HUD.fetch_issue_source()
 
-        self.assertEqual(result["source"], "github")
+        self.assertEqual(result["source"], "linear")
         self.assertTrue(result["degraded"])
-        self.assertEqual(result["linear_error"], "unauthorized")
+        self.assertEqual(result["error"], "linear_unauthorized")
+        github.assert_not_called()
 
         state = fixture_state()
         state["issues"] = result
         with mock.patch.dict(HUD.os.environ, {"HUD_COLOR": "never"}):
             output = HUD.render(state)
-        self.assertIn("GITHUB", output)
-        self.assertIn("DEGRADED", output)
-        self.assertIn("read-only GitHub fallback", output)
+        self.assertIn("LINEAR", output)
+        self.assertIn("UNAVAILABLE", output)
 
     def test_github_counts_only_issues_and_ready_labels(self):
-        pages = [
-            [
-                {"number": 1, "labels": [{"name": "agent-ready"}]},
-                {"number": 2, "labels": [{"name": "ready-for-intake"}]},
-                {"number": 3, "labels": [{"name": "infra"}]},
-                {
-                    "number": 4,
-                    "pull_request": {"url": "ignored"},
-                    "labels": [{"name": "agent-ready"}],
-                },
-            ]
-        ]
-        with mock.patch.object(HUD, "run_json", return_value=pages):
-            result = HUD.fetch_github_issues()
-
-        self.assertEqual(result, {"open": 3, "backlog": 3, "ready": 2})
+        with self.assertRaisesRegex(RuntimeError, "GitHub Issue fallback retired"):
+            HUD.fetch_github_issues()
 
     def test_refresh_retains_last_good_counts_when_both_sources_fail(self):
         state = fixture_state()
@@ -390,6 +376,39 @@ class VersionedHudContractTests(unittest.TestCase):
             output = HUD.render(result)
         self.assertIn("UNAVAILABLE", output)
         self.assertIn("both read-only sources unavailable", output)
+
+    def test_hud_renders_persisted_summer_queue_without_inventing_items(self):
+        state = fixture_state()
+        state["delivery"]["summer_queue"] = {
+            "schema": "jovie-summer-red-queue/v1",
+            "authority": "Summer",
+            "items": [{
+                "issue": "JOV-5390", "stallClass": "size-guard", "outcome": "escalated",
+                "reason": "retry-budget-exhausted:size-guard",
+            }],
+            "error": None,
+        }
+        with mock.patch.dict(HUD.os.environ, {"HUD_COLOR": "never"}):
+            output = HUD.render(state)
+        self.assertIn("JOV-5390", output)
+        self.assertIn("retry-budget-exhausted:size-guard", output)
+        self.assertIn("canonical persisted stall state", output)
+
+    def test_hud_is_display_only_for_summer_queue(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "summer-queue.json"
+            path.write_text(json.dumps({
+                "schema": "jovie-summer-red-queue/v1",
+                "authority": "Summer",
+                "items": [{"issue": "JOV-12", "stallClass": "queue-eviction"}],
+            }), encoding="utf-8")
+            before = path.read_text(encoding="utf-8")
+            loaded = HUD.load_summer_queue(path)
+            self.assertEqual(before, path.read_text(encoding="utf-8"))
+            self.assertEqual(loaded["items"][0]["issue"], "JOV-12")
+            missing = HUD.load_summer_queue(pathlib.Path(tmp) / "missing.json")
+        self.assertEqual(missing["items"], [])
+        self.assertIn("summer-queue-unavailable", missing["error"])
 
 
 if __name__ == "__main__":
