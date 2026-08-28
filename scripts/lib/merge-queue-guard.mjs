@@ -1955,6 +1955,38 @@ export function parseMergeQueueFrontBranch(branch) {
   return { prNumber: Number(match[1]), baseSha: match[2] };
 }
 
+function pickRunString(preferred, fallback) {
+  if (typeof preferred === 'string') return preferred;
+  if (typeof fallback === 'string') return fallback;
+  return preferred ?? fallback ?? null;
+}
+
+/**
+ * GitHub Actions REST workflow runs are snake_case (`head_branch`, `head_sha`,
+ * `created_at`, `updated_at`). The churn guard's internal contract is
+ * camelCase. Selecting camelCase keys from the REST payload drops identity
+ * and time, so failed `gh-readonly-queue/main/pr-<n>-<base>` fronts never
+ * match and the unchanged head is re-enrolled (JOV-5364).
+ */
+export function normalizeMergeGroupWorkflowRun(run) {
+  if (run == null || typeof run !== 'object' || Array.isArray(run)) {
+    return run;
+  }
+  const failedSteps = Array.isArray(run.failedSteps)
+    ? run.failedSteps
+    : Array.isArray(run.failed_steps)
+      ? run.failed_steps
+      : undefined;
+  return {
+    ...run,
+    headBranch: pickRunString(run.headBranch, run.head_branch),
+    headSha: pickRunString(run.headSha, run.head_sha),
+    createdAt: pickRunString(run.createdAt, run.created_at),
+    updatedAt: pickRunString(run.updatedAt, run.updated_at),
+    ...(failedSteps ? { failedSteps } : {}),
+  };
+}
+
 /**
  * Decide whether enrolling (or keeping enrolled) a PR would repeat an
  * already-failed native merge-group attempt with no new information.
@@ -1990,7 +2022,8 @@ export function frontItemChurnDecision({
     };
   }
 
-  const allFailedFrontedRuns = mergeGroupRuns
+  const normalizedRuns = mergeGroupRuns.map(normalizeMergeGroupWorkflowRun);
+  const allFailedFrontedRuns = normalizedRuns
     .map(run => ({ run, front: parseMergeQueueFrontBranch(run?.headBranch) }))
     .filter(
       ({ run, front }) =>
@@ -2029,7 +2062,7 @@ export function frontItemChurnDecision({
     };
   }
 
-  const latestCompletedForCurrentHead = mergeGroupRuns
+  const latestCompletedForCurrentHead = normalizedRuns
     .map(run => ({ run, front: parseMergeQueueFrontBranch(run?.headBranch) }))
     .filter(
       ({ run, front }) =>

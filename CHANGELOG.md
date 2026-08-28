@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Merge-queue REST snapshots keep branch, SHA, and time (JOV-5364):** GitHub Actions REST fields are snake_case. The drain controller now maps `head_branch` / `head_sha` / `created_at` / `updated_at` onto its camelCase contract so failed `gh-readonly-queue` fronts match retained history and write `jovie-queue-product-failure/v1` instead of re-enrolling the unchanged head.
+
 - [internal] **Ovie Mac HUD is one screen with three YC metrics (JOV-5298):** Packaged Jovie.app opens `/hud?ovie=mac` so the operator sees default alive/dead, week-over-week growth, and dogfood-receipted shipping only. Eve stays the talk door. Customer chat stays `/app/chat`.
 
 - **Empty iPhone chat home is a centered greeting with the composer docked at the bottom:** signed-in empty chat shows Let's get it / Ready to start? / Ready when you are, with no mark, no placeholder, and no extra tab bar.

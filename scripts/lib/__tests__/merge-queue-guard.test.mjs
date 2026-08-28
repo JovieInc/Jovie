@@ -31,6 +31,7 @@ import {
   NATIVE_QUEUE_COHORT_POLICY,
   NATIVE_QUEUE_POLICY,
   normalizeBranchProtectionSource,
+  normalizeMergeGroupWorkflowRun,
   normalizeNativeQueuePolicyParameters,
   parseMergeQueueFrontBranch,
   parseMergeQueueTimeline,
@@ -1921,11 +1922,275 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
       'sort_by(.createdAt) | reverse | .[0].id // empty'
     );
     expect(drain).toContain('runs?event=merge_group&per_page=100');
+    expect(drain).toContain('headBranch: .head_branch');
+    expect(drain).toContain('headSha: .head_sha');
+    expect(drain).toContain('createdAt: .created_at');
+    expect(drain).toContain('updatedAt: .updated_at');
+    expect(drain).not.toContain(
+      '{id, headBranch, status, conclusion, headSha, createdAt, updatedAt}'
+    );
     expect(drain).toContain(
       'PRODUCT_FAILURE_CONTEXT="jovie-queue-product-failure/v1"'
     );
     expect(drain).toContain('block-product');
     expect(drain).toContain('block-transient');
+  });
+
+  it('deliberate red: camelCase REST field selectors drop snake_case merge_group identity', () => {
+    // Live GitHub Actions REST shape for merge_group run 33187507367
+    // (PR #16441 front on 2026-08-28). jq `{id, headBranch, headSha,
+    // createdAt, updatedAt}` looks up camelCase keys that do not exist.
+    const restRun = {
+      id: 33187507367,
+      status: 'completed',
+      conclusion: 'failure',
+      head_branch:
+        'gh-readonly-queue/main/pr-16441-4ed4e8782c44014bbf7bbc215f8ebc335a88bdb3',
+      head_sha: '8a9d43b4aa80424668d6be2209ae23448ad255ab',
+      created_at: '2026-08-28T15:55:42Z',
+      updated_at: '2026-08-28T16:04:25Z',
+      failedSteps: ['Build and test', 'Evaluate combined-head checks'],
+    };
+    const dropped = {
+      id: restRun.id,
+      headBranch: restRun.headBranch,
+      status: restRun.status,
+      conclusion: restRun.conclusion,
+      headSha: restRun.headSha,
+      createdAt: restRun.createdAt,
+      updatedAt: restRun.updatedAt,
+      failedSteps: restRun.failedSteps,
+    };
+    expect(dropped.headBranch).toBeUndefined();
+    expect(dropped.headSha).toBeUndefined();
+    expect(dropped.createdAt).toBeUndefined();
+    expect(dropped.updatedAt).toBeUndefined();
+    expect(parseMergeQueueFrontBranch(dropped.headBranch)).toBeNull();
+    const reenroll = frontItemChurnDecision({
+      prNumber: 16441,
+      currentBaseSha: '4ed4e8782c44014bbf7bbc215f8ebc335a88bdb3',
+      headCommittedAt: '2026-08-23T14:49:13Z',
+      observedAt: '2026-08-28T16:10:00.000Z',
+      mergeGroupRuns: [dropped],
+    });
+    expect(reenroll.action).toBe('allow');
+    expect(reenroll.reason).toContain('no failed merge-group attempt');
+  });
+
+  it('normalizes GitHub REST snake_case merge_group runs onto the camelCase contract', () => {
+    const restRun = {
+      id: 33187507367,
+      status: 'completed',
+      conclusion: 'failure',
+      head_branch:
+        'gh-readonly-queue/main/pr-16441-4ed4e8782c44014bbf7bbc215f8ebc335a88bdb3',
+      head_sha: '8a9d43b4aa80424668d6be2209ae23448ad255ab',
+      created_at: '2026-08-28T15:55:42Z',
+      updated_at: '2026-08-28T16:04:25Z',
+      failed_steps: ['Build and test'],
+    };
+    expect(normalizeMergeGroupWorkflowRun(restRun)).toEqual(
+      expect.objectContaining({
+        id: 33187507367,
+        headBranch:
+          'gh-readonly-queue/main/pr-16441-4ed4e8782c44014bbf7bbc215f8ebc335a88bdb3',
+        headSha: '8a9d43b4aa80424668d6be2209ae23448ad255ab',
+        createdAt: '2026-08-28T15:55:42Z',
+        updatedAt: '2026-08-28T16:04:25Z',
+        failedSteps: ['Build and test'],
+      })
+    );
+    expect(
+      parseMergeQueueFrontBranch(
+        normalizeMergeGroupWorkflowRun(restRun).headBranch
+      )
+    ).toEqual({
+      prNumber: 16441,
+      baseSha: '4ed4e8782c44014bbf7bbc215f8ebc335a88bdb3',
+    });
+  });
+
+  it('tombstones unchanged #16441 and #16398 REST fronts as durable product failures', () => {
+    // Live 2026-08-28 snapshot: GitHub REST retained seven+ failed
+    // merge_group fronts for #16441 at 8684fd4f and five for #16398 at
+    // 2ccdce87. Both heads were re-enrolled because camelCase selectors
+    // dropped snake_case identity. After normalization they must stay
+    // blocked so drain writes jovie-queue-product-failure/v1.
+    const pr16441Runs = [
+      {
+        id: 33187507367,
+        status: 'completed',
+        conclusion: 'failure',
+        head_branch:
+          'gh-readonly-queue/main/pr-16441-4ed4e8782c44014bbf7bbc215f8ebc335a88bdb3',
+        head_sha: '8a9d43b4aa80424668d6be2209ae23448ad255ab',
+        created_at: '2026-08-28T15:55:42Z',
+        updated_at: '2026-08-28T16:04:25Z',
+        failedSteps: ['Build and test', 'Evaluate combined-head checks'],
+      },
+      {
+        id: 33175545298,
+        status: 'completed',
+        conclusion: 'failure',
+        head_branch:
+          'gh-readonly-queue/main/pr-16441-c53be96bca7bbc2f6758cb209b08a27782ae7d2f',
+        head_sha: 'a0d5ff997e200e03b51e058743a4de76e3393228',
+        created_at: '2026-08-28T13:28:30Z',
+        updated_at: '2026-08-28T13:39:42Z',
+        failedSteps: ['Build and test', 'Evaluate combined-head checks'],
+      },
+      {
+        id: 33175055722,
+        status: 'completed',
+        conclusion: 'failure',
+        head_branch:
+          'gh-readonly-queue/main/pr-16441-3ea7e95dd37de4993dc39b70de8cbf53aa9bdad1',
+        head_sha: '844ec681fcbd884c0af13faf5491c17aae7b5c2a',
+        created_at: '2026-08-28T13:21:57Z',
+        updated_at: '2026-08-28T13:30:03Z',
+        failedSteps: [
+          'Run unit tests',
+          'Build and test',
+          'Evaluate combined-head checks',
+        ],
+      },
+      {
+        id: 33174215342,
+        status: 'completed',
+        conclusion: 'failure',
+        head_branch:
+          'gh-readonly-queue/main/pr-16441-648a8d331468f161b7bef56dacb45f18b479a09d',
+        head_sha: 'b0a38703b2e6a1930f42285df62836d2f9067ddb',
+        created_at: '2026-08-28T13:10:32Z',
+        updated_at: '2026-08-28T13:19:32Z',
+        failedSteps: ['Build and test', 'Evaluate combined-head checks'],
+      },
+      {
+        id: 33173575624,
+        status: 'completed',
+        conclusion: 'failure',
+        head_branch:
+          'gh-readonly-queue/main/pr-16441-667676374b32abca7512c46e1d5621ebd6af72ff',
+        head_sha: '27787ce14ab66d0337495bbf50201dfa730036f0',
+        created_at: '2026-08-28T13:01:50Z',
+        updated_at: '2026-08-28T13:10:06Z',
+        failedSteps: ['Build and test', 'Evaluate combined-head checks'],
+      },
+      {
+        id: 33145938771,
+        status: 'completed',
+        conclusion: 'failure',
+        head_branch:
+          'gh-readonly-queue/main/pr-16441-e2b7d14ff4cb7c0f0420f8de44da6feceb4cae29',
+        head_sha: '4c29e9629fdf75626d2598ddf1fc79b51cda6b08',
+        created_at: '2026-08-28T05:49:38Z',
+        updated_at: '2026-08-28T06:01:09Z',
+        failedSteps: ['Build and test'],
+      },
+      {
+        id: 33145227120,
+        status: 'completed',
+        conclusion: 'failure',
+        head_branch:
+          'gh-readonly-queue/main/pr-16441-771c48248c7202cd0b4bf382f011426161f52fc4',
+        head_sha: '71e7510043237e4a12de40a15c88ecfa9c8c19e4',
+        created_at: '2026-08-28T05:35:32Z',
+        updated_at: '2026-08-28T05:43:18Z',
+        failedSteps: ['Build and test'],
+      },
+    ];
+    const pr16398Runs = [
+      {
+        id: 33174891065,
+        status: 'completed',
+        conclusion: 'failure',
+        head_branch:
+          'gh-readonly-queue/main/pr-16398-c53be96bca7bbc2f6758cb209b08a27782ae7d2f',
+        head_sha: '3ea7e95dd37de4993dc39b70de8cbf53aa9bdad1',
+        created_at: '2026-08-28T13:19:46Z',
+        updated_at: '2026-08-28T13:27:33Z',
+        failedSteps: ['Run unit tests', 'Evaluate combined-head checks'],
+      },
+      {
+        id: 33174328178,
+        status: 'completed',
+        conclusion: 'failure',
+        head_branch:
+          'gh-readonly-queue/main/pr-16398-fd270cf385a195e4b5cfc1180f8f03e58c5d9629',
+        head_sha: 'efd9068044e859aceeafc00cce568ce13db68400',
+        created_at: '2026-08-28T13:12:04Z',
+        updated_at: '2026-08-28T13:20:08Z',
+        failedSteps: ['Run unit tests', 'Evaluate combined-head checks'],
+      },
+      {
+        id: 33148531490,
+        status: 'completed',
+        conclusion: 'failure',
+        head_branch:
+          'gh-readonly-queue/main/pr-16398-2021e5919b5cd497b2e0ae24b95945b6863406dc',
+        head_sha: 'a264d2f8f503ef33ac2e1a732fa8c19e2b20d8b9',
+        created_at: '2026-08-28T06:37:04Z',
+        updated_at: '2026-08-28T06:44:43Z',
+        failedSteps: ['Run unit tests', 'Evaluate combined-head checks'],
+      },
+      {
+        id: 33147231008,
+        status: 'completed',
+        conclusion: 'failure',
+        head_branch:
+          'gh-readonly-queue/main/pr-16398-46506493b7495abd16c9bc0218d09ac32e393f04',
+        head_sha: '45e7d5a40a9bfc07e10dcec7c01df4e7de5e9cdf',
+        created_at: '2026-08-28T06:13:49Z',
+        updated_at: '2026-08-28T06:21:55Z',
+        failedSteps: ['Run unit tests', 'Evaluate combined-head checks'],
+      },
+      {
+        id: 33146096552,
+        status: 'completed',
+        conclusion: 'failure',
+        head_branch:
+          'gh-readonly-queue/main/pr-16398-49f11666b0d98129103514216bdfaf4546292028',
+        head_sha: '54bf5b783de7aa9a84204d6bbc55c5b3dd6d8aec',
+        created_at: '2026-08-28T05:52:43Z',
+        updated_at: '2026-08-28T06:00:42Z',
+        failedSteps: ['Run unit tests', 'Evaluate combined-head checks'],
+      },
+    ];
+
+    const pr16441 = frontItemChurnDecision({
+      prNumber: 16441,
+      currentBaseSha: '4ed4e8782c44014bbf7bbc215f8ebc335a88bdb3',
+      headCommittedAt: '2026-08-23T14:49:13Z',
+      observedAt: '2026-08-28T16:10:00.000Z',
+      mergeGroupRuns: pr16441Runs,
+    });
+    expect(pr16441.action).toBe('block');
+    expect(pr16441.evidence.failureClass).toBe('repeated-product-check');
+    expect(pr16441.evidence.failedAttempts).toBe(7);
+
+    const pr16398 = frontItemChurnDecision({
+      prNumber: 16398,
+      currentBaseSha: 'c53be96bca7bbc2f6758cb209b08a27782ae7d2f',
+      headCommittedAt: '2026-08-23T07:39:24Z',
+      observedAt: '2026-08-28T16:10:00.000Z',
+      mergeGroupRuns: pr16398Runs,
+    });
+    expect(pr16398.action).toBe('block');
+    expect(pr16398.evidence.failureClass).toBe('repeated-product-check');
+    expect(pr16398.evidence.failedAttempts).toBe(5);
+
+    const drain = readFileSync(
+      resolve(REPO_ROOT, 'scripts/drain-pr-queue.sh'),
+      'utf8'
+    );
+    expect(drain).toContain(
+      'PRODUCT_FAILURE_CONTEXT="jovie-queue-product-failure/v1"'
+    );
+    expect(drain).toContain('block-product)');
+    expect(drain).toContain('record_product_failure_receipt "$n"');
+    expect(drain).toContain(
+      'LAST_ENROLL_SKIP_REASON="product-failure-tombstone"'
+    );
   });
 
   it('clears an earlier failure when the latest unchanged-head attempt succeeds', () => {
