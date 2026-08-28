@@ -11,8 +11,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-28T07:06:57.641Z",
-    "gitSha": "91e9f44e041896ff4035b7a2887d68af479a4069",
+    "capturedAt": "2026-08-28T20:51:28.998Z",
+    "gitSha": "45d246458df1f6865a13a98262d8eb080e13bb3e",
     "imagePath": "marketing-home-desktop.png"
   },
   {
@@ -114,8 +114,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-27T19:30:37.005Z",
-    "gitSha": "27bdbdc8558dd1925f561d42dbd3f3e5df00ed6c",
+    "capturedAt": "2026-08-28T20:53:18.791Z",
+    "gitSha": "45d246458df1f6865a13a98262d8eb080e13bb3e",
     "imagePath": "artist-profile-hero-section-desktop.png"
   },
   {
@@ -127,8 +127,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-28T19:24:57.932Z",
-    "gitSha": "bab7d210fed96a2d5b758e7f17100555e1bc6a4a",
+    "capturedAt": "2026-08-28T20:53:43.246Z",
+    "gitSha": "45d246458df1f6865a13a98262d8eb080e13bb3e",
     "imagePath": "artist-profile-adaptive-section-desktop.png"
   },
   {
@@ -153,8 +153,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-11T04:58:59.764Z",
-    "gitSha": "0aea793b160362c6815044d9d5e6179b9a142cae",
+    "capturedAt": "2026-08-28T20:54:32.505Z",
+    "gitSha": "45d246458df1f6865a13a98262d8eb080e13bb3e",
     "imagePath": "artist-profile-capture-section-desktop.png"
   },
   {
@@ -179,8 +179,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-27T19:32:38.572Z",
-    "gitSha": "27bdbdc8558dd1925f561d42dbd3f3e5df00ed6c",
+    "capturedAt": "2026-08-28T20:55:22.408Z",
+    "gitSha": "45d246458df1f6865a13a98262d8eb080e13bb3e",
     "imagePath": "artist-profile-spec-wall-section-desktop.png"
   },
   {
@@ -218,8 +218,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-28T19:27:50.788Z",
-    "gitSha": "bab7d210fed96a2d5b758e7f17100555e1bc6a4a",
+    "capturedAt": "2026-08-28T20:56:36.005Z",
+    "gitSha": "45d246458df1f6865a13a98262d8eb080e13bb3e",
     "imagePath": "artist-profile-final-cta-section-desktop.png"
   },
   {
@@ -626,8 +626,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-28T19:37:21.705Z",
-    "gitSha": "bab7d210fed96a2d5b758e7f17100555e1bc6a4a",
+    "capturedAt": "2026-08-28T21:06:07.246Z",
+    "gitSha": "45d246458df1f6865a13a98262d8eb080e13bb3e",
     "imagePath": "dashboard-releases-sidebar-desktop.png",
     "publicExportPath": "releases-dashboard-sidebar.png"
   },
@@ -643,8 +643,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-18T18:19:12.807Z",
-    "gitSha": "dfe4483ea9ab7ec529f8b3002f4d1f6b3af67f37",
+    "capturedAt": "2026-08-28T21:06:33.572Z",
+    "gitSha": "45d246458df1f6865a13a98262d8eb080e13bb3e",
     "imagePath": "dashboard-release-sidebar-detail-desktop.png",
     "publicExportPath": "release-sidebar-detail.png"
   },
@@ -710,8 +710,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-28T07:23:21.129Z",
-    "gitSha": "91e9f44e041896ff4035b7a2887d68af479a4069",
+    "capturedAt": "2026-08-28T21:07:54.955Z",
+    "gitSha": "45d246458df1f6865a13a98262d8eb080e13bb3e",
     "imagePath": "dashboard-earnings-desktop.png"
   },
   {
@@ -726,8 +726,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin"],
-    "capturedAt": "2026-08-28T19:39:32.886Z",
-    "gitSha": "bab7d210fed96a2d5b758e7f17100555e1bc6a4a",
+    "capturedAt": "2026-08-28T21:08:18.877Z",
+    "gitSha": "45d246458df1f6865a13a98262d8eb080e13bb3e",
     "imagePath": "settings-profile-desktop.png"
   },
   {
