@@ -1,5 +1,7 @@
 import { get } from '@vercel/blob';
-import { requireAuth } from '@/lib/auth/require-auth';
+import { NextResponse } from 'next/server';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { resolveOviePrincipal } from '@/lib/ovie/mcp/principal';
 import { WorkflowCaptureExecutionResultSchema } from '@/lib/workflow-capture/contract';
 import { workflowCaptureErrorResponse } from '@/lib/workflow-capture/route-error';
 import {
@@ -14,8 +16,14 @@ interface RouteParams {
 }
 
 export async function GET(request: Request, { params }: RouteParams) {
-  const { userId, error } = await requireAuth();
-  if (error) return error;
+  const principal = await resolveOviePrincipal(request);
+  if (!principal.authenticated || !principal.subject) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401, headers: NO_STORE_HEADERS }
+    );
+  }
+  const userId = principal.subject;
   const { id } = await params;
   try {
     const capture = await loadOwnedWorkflowCapture(id, userId);
