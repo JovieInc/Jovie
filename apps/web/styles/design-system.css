@@ -1169,8 +1169,8 @@ html[data-profile-initial-mode]
 
   /* Accent palette rotation — Noir Ion semantics
      blue/Ion: primary action · purple/Ultra: agent · pink/Pulse: creative
-     teal/Aqua: system · green/Mint: success · orange/Gold: warning
-     red/Flare: danger */
+     teal/Aqua: system · green/Mint: success · orange: warning
+     red: danger */
   --color-accent-gray: #8d8d93;
   --color-accent-gray-subtle: rgb(127 127 133 / 0.18);
   --color-accent-blue: #11afff;
@@ -1839,6 +1839,8 @@ html[data-profile-initial-mode]
   --color-error: var(--color-accent-red);
   --color-error-subtle: var(--color-accent-red-subtle);
   --color-error-foreground: oklch(100% 0 0);
+  --color-danger: var(--color-error);
+  --color-danger-subtle: var(--color-error-subtle);
 
   /* Info */
   --color-info: var(--color-accent-blue);
@@ -1851,13 +1853,15 @@ html[data-profile-initial-mode]
   --color-success: var(--color-accent-green);
   --color-success-subtle: var(--color-accent-green-subtle);
 
-  /* Warning — Gold */
+  /* Warning — Orange */
   --color-warning: var(--color-accent-orange);
   --color-warning-subtle: var(--color-accent-orange-subtle);
 
-  /* Error — Flare */
+  /* Error — Red (danger) */
   --color-error: var(--color-accent-red);
   --color-error-subtle: var(--color-accent-red-subtle);
+  --color-danger: var(--color-error);
+  --color-danger-subtle: var(--color-error-subtle);
 
   /* Info — Aqua/system signal (not Ion blue; Ion is action/focus) */
   --color-info: var(--color-accent-teal);
@@ -1868,8 +1872,8 @@ html[data-profile-initial-mode]
    FEATURE ACCENT COLORS (OKLCH)
    ============================================
 
-   Perceptually uniform feature colors
-   All have ~same perceived brightness
+   Perceptually uniform named endpoints. Dark accents use hue-specific
+   energy bands (not a shared lightness target, not a pastel chroma cap).
 */
 :root {
   --accent-conv: var(--color-accent-purple);
