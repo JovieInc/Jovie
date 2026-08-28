@@ -28,7 +28,7 @@ HOLD_EXPIRY = timedelta(days=7)
 UTC = timezone.utc
 ISSUE_REFERENCE = re.compile(r"\b(?:JOV|LYB)-\d+\b", re.IGNORECASE)
 HOLD_LABELS = {"hold", "gated", "queue-deferred", "needs-human"}
-CLOSE_LABELS = {"close", "duplicate", "superseded"}
+CLOSE_LABELS = {"duplicate"}
 
 
 def isoformat(value: datetime) -> str:

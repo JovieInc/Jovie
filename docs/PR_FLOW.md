@@ -148,8 +148,8 @@ control-plane changes, and a path-only classification is insufficient.
 Summer owns closure health; Gem remains the only native-queue and promotion
 writer. The closure observer classifies every open PR as `close`, `repair`,
 `promote`, `queued`, or `held` with an owner, reason, and seven-day expiry.
-`close` requires an explicit `duplicate`, `superseded`, or `close` lifecycle
-label; matching titles or Linear issue IDs never prove semantic redundancy.
+`close` requires the repository's explicit `duplicate` lifecycle label;
+matching titles or Linear issue IDs never prove semantic redundancy.
 Summer grants no new issue lease, new implementation, or fallback PR generation
 unless the typed closure receipt is healthy. Missing or malformed closure
 evidence fails new intake closed.

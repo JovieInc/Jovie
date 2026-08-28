@@ -114,7 +114,7 @@ class ClosureClassificationTests(unittest.TestCase):
 
     def test_close_requires_an_explicit_lifecycle_label(self):
         result = MODULE.classify_open_prs(
-            [pr(10, title="feat: superseded JOV-778", labels=("superseded",))],
+            [pr(10, title="feat: superseded JOV-778", labels=("duplicate",))],
             NOW,
         )
 
@@ -125,7 +125,7 @@ class ClosureClassificationTests(unittest.TestCase):
                     "number": 10,
                     "issue": "JOV-778",
                     "state": "close",
-                    "reason": "superseded",
+                    "reason": "duplicate",
                 }
             ],
         )
