@@ -426,7 +426,6 @@ export const GATE_NEXT_ADMISSION_LANE = new Set([
   'scripts/backlog-orchestrator/intake-controller-workflow.test.mjs',
   'scripts/ci-fast-lanes.mjs',
   'scripts/run-affected-tests.mjs',
-  'CHANGELOG.md',
 ]);
 const AUTHENTICATED_A11Y_REPAIR_CORE = new Set([
   'apps/web/app/exp/shell-v1/page.tsx',
