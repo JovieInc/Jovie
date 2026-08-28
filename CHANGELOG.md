@@ -7,9 +7,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
-- **Library is one catalog with Ideas, In Progress, and Out:** documents, YouTube videos, releases, and merch share stage, type, and release filters. Ideas is a stage, not a separate destination.
+- **Library is one post-release presence catalog with Ideas, In Progress, and Out (JOV-5362):** documents, YouTube videos, releases, merch, collaborator credits, and presence findings share independent stage, type, and release-link axes. Ideas is a stage, not a separate destination.
 
-- [internal] **YouTube channel import and artist rules land on the existing content graph (JOV-5362):** channel videos, thumbnails, metrics, and ISRC/collaborator claims write the youtube_* tables; unmatched credits fail closed; thumbnail winners need locked metrics and explicit promotion; memory can only propose artist rules until they are confirmed and typed.
+- [internal] **The Library graph fails closed on rights, evidence, and optimization:** stats remain disconnected until a real source is wired; public society data stays observed rather than legal title; downloads require explicit recording-control attestation; repairs remain draft-only until approval; unmatched credits stay unresolved; thumbnail winners require locked metrics and explicit promotion; and memory can only propose artist rules until they are confirmed and typed. Library does not sell licenses or invent metrics.
 
 - [internal] **Ovie Mac HUD is one screen with three YC metrics (JOV-5298):** Packaged Jovie.app opens `/hud?ovie=mac` so the operator sees default alive/dead, week-over-week growth, and dogfood-receipted shipping only. Eve stays the talk door. Customer chat stays `/app/chat`.
 
