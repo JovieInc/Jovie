@@ -325,6 +325,8 @@ export const ServerEnvSchema = z.object({
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
   /** Base URL for the Google OAuth redirect URI, e.g. https://jov.ie/api/connectors/google */
   GOOGLE_OAUTH_REDIRECT_URI_BASE: z.string().url().optional(),
+  /** Base URL for the YouTube OAuth redirect URI, e.g. https://jov.ie/api/connectors/youtube */
+  YOUTUBE_OAUTH_REDIRECT_URI_BASE: z.string().url().optional(),
   /** Days before/after today to fetch Calendar events (default: 90 past, 365 future) */
   GOOGLE_CALENDAR_DEFAULT_WINDOW_DAYS: z.string().optional(),
   /** Days of Gmail history to scan for booking signals (default: 30) */
@@ -610,6 +612,7 @@ export const ENV_KEYS = [
   'GOOGLE_OAUTH_CLIENT_ID',
   'GOOGLE_OAUTH_CLIENT_SECRET',
   'GOOGLE_OAUTH_REDIRECT_URI_BASE',
+  'YOUTUBE_OAUTH_REDIRECT_URI_BASE',
   'GOOGLE_CALENDAR_DEFAULT_WINDOW_DAYS',
   'GMAIL_HISTORY_WINDOW_DAYS',
   'AI_CONNECTORS_DAILY_TOKEN_BUDGET',

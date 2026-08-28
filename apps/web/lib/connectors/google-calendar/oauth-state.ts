@@ -8,6 +8,7 @@ const STATE_MAX_AGE_MS = 15 * 60 * 1000;
 interface GoogleOAuthState {
   readonly userId: string;
   readonly returnTo: string;
+  readonly creatorProfileId?: string;
   readonly ts: number;
 }
 
