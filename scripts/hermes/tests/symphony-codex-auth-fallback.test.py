@@ -292,7 +292,9 @@ class FallbackTests(unittest.TestCase):
         self.gate.write_text(json.dumps({
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
-            "workAdmission": {"allowed": True, "newIssueLeaseAllowed": False},
+            "closureAdmission": {"newIssueIntakeAllowed": True},
+            "workAdmission": {"allowed": True, "newIssueLeaseAllowed": True},
+            "remediationAdmission": {"allowed": True, "pushAllowed": True},
         }))
         self.environment = mock.patch.dict(os.environ, {
             "SYMPHONY_OPEN_PR_INDEX": "empty",
@@ -1609,6 +1611,34 @@ class FallbackTests(unittest.TestCase):
         self.assertIn("fleet gate blocks isolated work", result.stderr)
         self.assertFalse(self.events.exists())
 
+    def test_closure_stop_line_blocks_new_fallback_before_workspace_or_provider(self):
+        self.command("git", 'printf "git %s\\n" "$*" >> "$GEM_EVENTS"')
+        self.command("gh", "echo 0")
+        self.command("grok", 'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"')
+        self.gate.write_text(json.dumps({
+            "schema": "jovie-fleet-gate/v1",
+            "state": "GREEN",
+            "closureAdmission": {"newIssueIntakeAllowed": False},
+            "workAdmission": {"allowed": True, "newIssueLeaseAllowed": False},
+            "remediationAdmission": {"allowed": True, "pushAllowed": True},
+        }))
+
+        result = subprocess.run(
+            [self.install_runtime() / GROK_SHIP.name, "JOV-7"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_EVENTS=self.events,
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.grok_linear_url(),
+            ),
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Summer closure stop-line blocks new fallback work", result.stderr)
+        self.assertFalse(self.events.exists())
+
     def test_revision_scoped_unit_names_prevent_same_revision_duplicates(self):
         module = self.load_controller_module()
         first = module._fallback_unit("JOV-1", "revision-a")
@@ -2589,6 +2619,15 @@ class FallbackTests(unittest.TestCase):
     def test_grok_ship_one_remounts_dirty_head_without_admission_receipt(self):
         created = self.root / "pr-created"
         GrokLinearHandler.omit_receipt = {"JOV-7"}
+        # Summer's closure stop-line blocks only new fallback implementation;
+        # an exact existing PR remount remains bounded remediation.
+        self.gate.write_text(json.dumps({
+            "schema": "jovie-fleet-gate/v1",
+            "state": "GREEN",
+            "closureAdmission": {"newIssueIntakeAllowed": False},
+            "workAdmission": {"allowed": True, "newIssueLeaseAllowed": False},
+            "remediationAdmission": {"allowed": True, "pushAllowed": True},
+        }))
         self.command(
             "gh",
             'case "$*" in\n'

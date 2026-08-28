@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Versioned Gem fleet gate with separate work and promotion admission.
 
-Invariant consumers: JOV-INV-007 and JOV-INV-008.
+Invariant consumers: JOV-INV-007, JOV-INV-008, and JOV-INV-011.
 
 Gem observes main, production, queue, controller, and explicit integrity
 receipts. Symphony remains the only implementation owner, so the legacy direct
@@ -23,6 +23,17 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+
+
+HERMES_DIR = str(Path(__file__).resolve().parent)
+if HERMES_DIR not in sys.path:
+    sys.path.insert(0, HERMES_DIR)
+
+from closure_health import (  # noqa: E402 - sibling executable module
+    AUTHORITY as CLOSURE_HEALTH_AUTHORITY,
+)
+from closure_health import SCHEMA as CLOSURE_HEALTH_SCHEMA  # noqa: E402
+from closure_health import observe_closure_health  # noqa: E402
 
 
 SCHEMA = "jovie-fleet-gate/v1"
@@ -112,6 +123,53 @@ def read_json(path: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError("receipt must be a JSON object")
     return value
+
+
+def previous_closure_health(state_dir: Path) -> dict[str, Any] | None:
+    """Read only the prior typed episode state; malformed history is ignored."""
+    try:
+        receipt = read_json(state_dir / "latest.json")
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
+    candidate = receipt.get("signals", {}).get("closureHealth")
+    if not isinstance(candidate, dict) or candidate.get("schema") != CLOSURE_HEALTH_SCHEMA:
+        return None
+    return candidate
+
+
+def validate_closure_health(candidate: object) -> dict[str, Any]:
+    """Fail new intake closed without converting closure debt into a queue hold."""
+    valid = (
+        isinstance(candidate, dict)
+        and candidate.get("schema") == CLOSURE_HEALTH_SCHEMA
+        and candidate.get("authority") == CLOSURE_HEALTH_AUTHORITY
+        and candidate.get("status") in {"healthy", "grace", "red"}
+        and isinstance(candidate.get("newIssueIntakeAllowed"), bool)
+        and candidate.get("promotionContinues") is True
+        and candidate.get("remediationContinues") is True
+        and isinstance(candidate.get("reasons"), list)
+        and all(isinstance(reason, str) for reason in candidate.get("reasons", []))
+        and (
+            candidate.get("newIssueIntakeAllowed")
+            is (candidate.get("status") == "healthy")
+        )
+    )
+    if valid:
+        return dict(candidate)
+    return {
+        "schema": CLOSURE_HEALTH_SCHEMA,
+        "status": "red",
+        "authority": CLOSURE_HEALTH_AUTHORITY,
+        "newIssueIntakeAllowed": False,
+        "promotionContinues": True,
+        "remediationContinues": True,
+        "blockedActivities": [
+            "new-issue-lease",
+            "new-implementation",
+            "fallback-pr-generation",
+        ],
+        "reasons": ["closure-health-receipt-missing-or-malformed"],
+    }
 
 
 def gh_json(repo: str, endpoint: str) -> dict[str, Any]:
@@ -797,6 +855,9 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     )
     queue_value = signals.get("queue")
     queue = queue_value if isinstance(queue_value, dict) else {"status": "unknown"}
+    closure_health = validate_closure_health(signals.get("closureHealth"))
+    closure_intake_allowed = closure_health["newIssueIntakeAllowed"] is True
+    normalized_signals = {**signals, "closureHealth": closure_health}
     review = validate_independent_review(
         signals.get("independentReview"),
         main.get("sha"),
@@ -988,19 +1049,19 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         promotion_mode = "hold-intake"
     else:
         promotion_mode = "blocked"
-    work_activities = (
-        []
-        if state == "RED"
-        else (
-            (
-                ["approved-issue-lease"]
-                if capacity_fresh
-                and (not queue_shape_valid or queue_below_backpressure)
-                else []
-            )
-            + ["isolated-implementation", "tests", "review", "draft-pr"]
-        )
-    )
+    if state == "RED":
+        work_activities: list[str] = []
+    elif not closure_intake_allowed:
+        # Existing validation/review work remains useful, but no new
+        # implementation or fallback PR may begin while Summer holds intake.
+        work_activities = ["tests", "review"]
+    else:
+        work_activities = (
+            ["approved-issue-lease"]
+            if capacity_fresh
+            and (not queue_shape_valid or queue_below_backpressure)
+            else []
+        ) + ["isolated-implementation", "tests", "review", "draft-pr"]
     # Remediation is a liveness capability, not issue intake or promotion.
     # A fleet hold must never hide the evidence or disable the bounded local
     # work needed to diagnose and repair the hold.  Only a non-RED receipt may
@@ -1014,13 +1075,20 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         "review",
     ]
     remediation_push_allowed = state != "RED"
+    cohort = already_admitted_cohort_semantics(promotion_mode)
+    if not closure_intake_allowed:
+        cohort = {
+            **cohort,
+            "newIntakeAllowed": False,
+            "semantics": "preserve-cohort-and-stop-new-implementation-intake",
+        }
     return {
         "schema": SCHEMA,
         "observedAt": observed_at,
         "state": state,
         "promotionMode": promotion_mode,
-        "alreadyAdmittedCohort": already_admitted_cohort_semantics(promotion_mode),
-        "signals": signals,
+        "alreadyAdmittedCohort": cohort,
+        "signals": normalized_signals,
         "reasons": reasons,
         "reviewAdmission": {
             "allowed": review_allowed,
@@ -1033,10 +1101,22 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             "reviewer": review.get("reviewer"),
             "reason": review.get("reason"),
         },
+        "closureAdmission": {
+            "allowed": closure_intake_allowed,
+            "newIssueIntakeAllowed": closure_intake_allowed,
+            "newImplementationAllowed": closure_intake_allowed,
+            "fallbackPrGenerationAllowed": closure_intake_allowed,
+            "authority": CLOSURE_HEALTH_AUTHORITY,
+            "status": closure_health["status"],
+            "reasons": closure_health["reasons"],
+            "promotionContinues": True,
+            "remediationContinues": True,
+        },
         "workAdmission": {
             "allowed": state != "RED",
             "activities": work_activities,
             "newIssueLeaseAllowed": "approved-issue-lease" in work_activities,
+            "newImplementationAllowed": "approved-issue-lease" in work_activities,
         },
         "promotionAdmission": {
             "allowed": state == "GREEN" and review_allowed,
@@ -1235,6 +1315,15 @@ def failed_evaluation_receipt(
             "controller": {"status": "unknown"},
             "integrity": {"status": "invalid", "detail": str(error)},
             "queue": {"status": "unknown", "eligiblePrs": None, "target": 0},
+            "closureHealth": {
+                "schema": CLOSURE_HEALTH_SCHEMA,
+                "status": "red",
+                "authority": CLOSURE_HEALTH_AUTHORITY,
+                "newIssueIntakeAllowed": False,
+                "promotionContinues": True,
+                "remediationContinues": True,
+                "reasons": ["gate-evaluation-failed"],
+            },
             "independentReview": {
                 "schema": INDEPENDENT_REVIEW_SCHEMA,
                 "status": "unknown",
@@ -1261,10 +1350,22 @@ def failed_evaluation_receipt(
             "reviewer": None,
             "reason": "independent-review-receipt-malformed",
         },
+        "closureAdmission": {
+            "allowed": False,
+            "newIssueIntakeAllowed": False,
+            "newImplementationAllowed": False,
+            "fallbackPrGenerationAllowed": False,
+            "authority": CLOSURE_HEALTH_AUTHORITY,
+            "status": "red",
+            "reasons": ["gate-evaluation-failed"],
+            "promotionContinues": True,
+            "remediationContinues": True,
+        },
         "workAdmission": {
             "allowed": False,
             "activities": [],
             "newIssueLeaseAllowed": False,
+            "newImplementationAllowed": False,
         },
         "promotionAdmission": {"allowed": False, "activities": []},
         "remediationAdmission": {
@@ -1430,6 +1531,11 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
             args.queue_target,
             snapshot_path=args.state_dir.parent / "queue-snapshot.json",
             now=now,
+        ),
+        "closureHealth": observe_closure_health(
+            args.repo,
+            previous_closure_health(args.state_dir),
+            now,
         ),
         "concurrencyEvidence": observe_concurrency(concurrency_path, now),
         "independentReview": refresh_independent_review_receipt(

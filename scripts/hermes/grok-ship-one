@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Ship one already-admitted Linear issue through the canonical model-router fallback.
+# Invariant consumer: JOV-INV-011.
 set -euo pipefail
 
 ID="${1:?issue identifier required}"
@@ -135,6 +136,7 @@ if [ "$ISSUE_REVISION" != "$SYMPHONY_FALLBACK_ISSUE_REVISION" ]; then
 fi
 
 GEM_FLEET_GATE_RECEIPT="${GEM_FLEET_GATE_RECEIPT:-$HOME/gem-workspace/state/gem-priority-gate/latest.json}" \
+REMOUNT="$REMOUNT" \
 python3 - <<'PY'
 import json, os, pathlib
 try:
@@ -149,6 +151,22 @@ if (
     or admission.get("allowed") is not True
 ):
     raise SystemExit("fleet gate blocks isolated work")
+if os.environ.get("REMOUNT") == "1":
+    remediation = receipt.get("remediationAdmission")
+    if (
+        not isinstance(remediation, dict)
+        or remediation.get("allowed") is not True
+        or remediation.get("pushAllowed") is not True
+    ):
+        raise SystemExit("fleet gate blocks fallback PR remediation")
+else:
+    closure = receipt.get("closureAdmission")
+    if (
+        not isinstance(closure, dict)
+        or closure.get("newIssueIntakeAllowed") is not True
+        or admission.get("newIssueLeaseAllowed") is not True
+    ):
+        raise SystemExit("Summer closure stop-line blocks new fallback work")
 PY
 
 if [ ! -d "$WS/.git" ]; then

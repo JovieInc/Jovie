@@ -45,6 +45,15 @@ def signals(**overrides):
             "greenReadyPrs": 0,
             "target": 15,
         },
+        "closureHealth": {
+            "schema": "jovie-closure-health/v1",
+            "status": "healthy",
+            "authority": "Summer",
+            "newIssueIntakeAllowed": True,
+            "promotionContinues": True,
+            "remediationContinues": True,
+            "reasons": [],
+        },
         "independentReview": review,
         "concurrencyEvidence": {
             "schema": "gem-concurrency-evidence/v1",
@@ -103,6 +112,7 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(receipt["state"], "AMBER")
         self.assertEqual(outputs["work_allowed"], "true")
+        self.assertEqual(outputs["new_issue_intake_allowed"], "true")
         self.assertEqual(outputs["promotion_allowed"], "false")
         self.assertEqual(outputs["gate_rc"], "0")
 
@@ -110,6 +120,7 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(receipt["state"], "GREEN")
         self.assertEqual(outputs["work_allowed"], "true")
+        self.assertEqual(outputs["new_issue_intake_allowed"], "true")
         self.assertEqual(outputs["promotion_allowed"], "true")
         self.assertEqual(outputs["mode"], "normal")
 
@@ -125,6 +136,7 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(receipt["state"], "RED")
         self.assertEqual(outputs["work_allowed"], "false")
+        self.assertEqual(outputs["new_issue_intake_allowed"], "false")
         self.assertEqual(outputs["gate_rc"], "2")
 
     def test_missing_review_still_allows_isolated_lease(self):
@@ -140,6 +152,25 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertEqual(outputs["promotion_allowed"], "false")
+
+    def test_summer_closure_stop_line_emits_no_new_intake_but_keeps_work_lane_live(self):
+        closure = {
+            "schema": "jovie-closure-health/v1",
+            "status": "red",
+            "authority": "Summer",
+            "newIssueIntakeAllowed": False,
+            "promotionContinues": True,
+            "remediationContinues": True,
+            "reasons": ["duplicate-issue-lanes-unresolved"],
+        }
+
+        code, outputs, receipt = run_wrapper(signals(closureHealth=closure))
+
+        self.assertEqual(code, 0)
+        self.assertEqual(outputs["work_allowed"], "true")
+        self.assertEqual(outputs["new_issue_intake_allowed"], "false")
+        self.assertEqual(outputs["promotion_allowed"], "true")
+        self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
 
     def test_unknown_main_with_exact_sha_is_schema_valid_and_blocks_promotion(self):
         code, outputs, receipt = run_wrapper(
