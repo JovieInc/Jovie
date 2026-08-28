@@ -3,6 +3,7 @@
 Read this before touching `apps/desktop`, `apps/macos`, or any proposed Mac
 Swift/WKWebView shell. Detail and evidence:
 [`docs/macos/swift-control-invariants.md`](../../docs/macos/swift-control-invariants.md).
+Ops-receipt sibling: [`docs/MACOS_SWIFT_CONTROL_ADR.md`](../../docs/MACOS_SWIFT_CONTROL_ADR.md).
 
 The Mac product is **Electron**, not Swift. iOS SwiftUI is not a Mac rewrite
 template. Standalone Swift Ovie (`JovieInc/ovie`) is deprecated (JOV-3854).
@@ -22,10 +23,10 @@ Proposed slugs, not adopted into `canon/invariants.jsonl`:
 
 | Slug | Rule |
 | --- | --- |
-| `JOV-INV-012` | Packaged Mac Ovie is `apps/desktop` Chromium `BrowserWindow` loading hosted `/hud?ovie=mac`; do not start a Swift or WKWebView Mac product shell or revive `JovieInc/ovie`. |
-| `JOV-INV-013` | `apps/macos/MenuMonitor` stays a menu-bar shipping accessory; do not expand it into product UI, Ovie HUD, or iOS-parity SwiftUI. |
-| `JOV-INV-014` | iOS Swift extends `JovieTheme` and existing organisms; Mac Swift stays inside MenuMonitor presentation owners; do not invent a parallel token or atom family. |
-| `JOV-INV-015` | iOS and Mac Swift UI land with the existing path-selected lint/unit/MenuMonitor gates; do not require full Xcode, device, or E2E suites as a merge condition for a UI change. |
+| `JOV-INV-013` | Packaged Mac Ovie is `apps/desktop` Chromium `BrowserWindow` loading hosted `/hud?ovie=mac`; do not start a Swift or WKWebView Mac product shell or revive `JovieInc/ovie`. |
+| `JOV-INV-014` | `apps/macos/MenuMonitor` stays a menu-bar shipping accessory; do not expand it into product UI, Ovie HUD, or iOS-parity SwiftUI. |
+| `JOV-INV-015` | iOS Swift extends `JovieTheme` and existing organisms; Mac Swift stays inside MenuMonitor presentation owners; do not invent a parallel token or atom family. |
+| `JOV-INV-016` | iOS and Mac Swift UI land with the existing path-selected lint/unit/MenuMonitor gates; do not require full Xcode, device, or E2E suites as a merge condition for a UI change. |
 
 ## Do not
 

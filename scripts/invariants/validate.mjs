@@ -5,7 +5,8 @@ import {
   validateInvariantRegistry,
 } from './registry.mjs';
 
-const result = validateInvariantRegistry(readInvariantRegistry());
+const registry = readInvariantRegistry();
+const result = validateInvariantRegistry(registry);
 if (!result.ok) {
   for (const error of result.errors)
     process.stderr.write(`invariant-error: ${error}\n`);
@@ -13,5 +14,10 @@ if (!result.ok) {
     process.stderr.write(`invariant-blocker: ${blocker}\n`);
   process.exitCode = 1;
 } else {
-  process.stdout.write('Invariant registry valid: 10 adopted, 0 blocked.\n');
+  const adopted = registry.invariants.filter(
+    item => item.lifecycle?.state === 'adopted'
+  ).length;
+  process.stdout.write(
+    `Invariant registry valid: ${adopted} adopted, ${result.blockers.length} blocked.\n`
+  );
 }

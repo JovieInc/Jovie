@@ -7,7 +7,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
-- [internal] **Mac Swift-control invariants are named, not a rewrite (JOV-5359):** Packaged Mac stays Electron `/hud?ovie=mac`; MenuMonitor stays the only Swift accessory; four proposed slugs (`JOV-INV-012`..`015`) stop a Swift HUD, remocked atoms, and full-suite UI gates. No Swift rewrite.
+- [internal] **Mac Swift-control invariants are named, not a rewrite (JOV-5359):** Packaged Mac stays Electron `/hud?ovie=mac`; MenuMonitor stays the only Swift accessory; four proposed slugs (`JOV-INV-013`..`016`) stop a Swift HUD, remocked atoms, and full-suite UI gates. No Swift rewrite.
 
 - [internal] **Ovie Mac HUD is one screen with three YC metrics (JOV-5298):** Packaged Jovie.app opens `/hud?ovie=mac` so the operator sees default alive/dead, week-over-week growth, and dogfood-receipted shipping only. Eve stays the talk door. Customer chat stays `/app/chat`.
 

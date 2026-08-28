@@ -67,17 +67,21 @@ as the Mac product.
 ## Proposed reviewed invariants
 
 These slugs are **proposed**, not adopted. They are not in
-`canon/invariants.jsonl`. Adoption still needs founder approval plus a
-production consumer and a deliberate-red test
+`canon/invariants.jsonl`. `JOV-INV-012` is already adopted for optimization
+contracts (#16478), so these candidates start at `JOV-INV-013`. Adoption still
+needs founder approval plus a production consumer and a deliberate-red test
 ([JOV-INV-004](../../canon/invariants.jsonl)). Candidate follow-up:
 [JOV-5361](https://linear.app/jovie/issue/JOV-5361).
 
 | Slug | Title | One-sentence rule |
 | --- | --- | --- |
-| `JOV-INV-012` | Mac product shell is Electron, not Swift | Packaged Mac Ovie is `apps/desktop` Chromium `BrowserWindow` loading hosted `/hud?ovie=mac`; do not start a Swift or WKWebView Mac product shell or revive `JovieInc/ovie`. |
-| `JOV-INV-013` | MenuMonitor is operator-only, not a second HUD | `apps/macos/MenuMonitor` stays a menu-bar shipping accessory; do not expand it into product UI, Ovie HUD, or iOS-parity SwiftUI. |
-| `JOV-INV-014` | Swift extends existing owners; do not remock atoms | iOS Swift extends `JovieTheme` and existing organisms; Mac Swift stays inside MenuMonitor presentation owners; do not invent a parallel token or atom family. |
-| `JOV-INV-015` | Path-selected native suites land Swift UI | iOS and Mac Swift UI land with the existing path-selected lint/unit/MenuMonitor gates; do not require full Xcode, device, or E2E suites as a merge condition for a UI change. |
+| `JOV-INV-013` | Mac product shell is Electron, not Swift | Packaged Mac Ovie is `apps/desktop` Chromium `BrowserWindow` loading hosted `/hud?ovie=mac`; do not start a Swift or WKWebView Mac product shell or revive `JovieInc/ovie`. |
+| `JOV-INV-014` | MenuMonitor is operator-only, not a second HUD | `apps/macos/MenuMonitor` stays a menu-bar shipping accessory; do not expand it into product UI, Ovie HUD, or iOS-parity SwiftUI. |
+| `JOV-INV-015` | Swift extends existing owners; do not remock atoms | iOS Swift extends `JovieTheme` and existing organisms; Mac Swift stays inside MenuMonitor presentation owners; do not invent a parallel token or atom family. |
+| `JOV-INV-016` | Path-selected native suites land Swift UI | iOS and Mac Swift UI land with the existing path-selected lint/unit/MenuMonitor gates; do not require full Xcode, device, or E2E suites as a merge condition for a UI change. |
 
 Agent-facing copy: [`.claude/rules/macos.md`](../../.claude/rules/macos.md).
 Stack assertions: `scripts/invariants/macos-swift-control.test.mjs`.
+Ops-receipt naming for the same investigation already landed in
+[`docs/MACOS_SWIFT_CONTROL_ADR.md`](../MACOS_SWIFT_CONTROL_ADR.md) (#16473).
+That ADR does not adopt these slugs into `canon/invariants.jsonl`.

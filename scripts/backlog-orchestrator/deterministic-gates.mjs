@@ -1,5 +1,9 @@
 /** No-model plan and admission gate orchestration. */
 
+import {
+  resolveOptimizationContract,
+  validateOptimizationContract,
+} from '../invariants/optimization-contract.mjs';
 import { admissionGateReceipt } from './admission-gate.mjs';
 import { hasProtectedAdmissionLabel } from './admission-policy.mjs';
 import { resolveAdmissionTarget } from './ownership-inventory.mjs';
@@ -166,6 +170,9 @@ export function buildDeterministicPlanEvidence(issue) {
   );
   const route = teamRouteForIssue(issue);
   const target = targeting.target;
+  const optimization = resolveOptimizationContract(issue);
+  const optimizationReason = validateOptimizationContract(optimization);
+  if (optimizationReason) return { evidence: null, reason: optimizationReason };
   return {
     reason: null,
     evidence: {
@@ -186,6 +193,7 @@ export function buildDeterministicPlanEvidence(issue) {
       rollback:
         'Revert the single issue-scoped commit or pull request. This gate does not merge or deploy.',
       target,
+      optimization,
     },
   };
 }

@@ -689,6 +689,7 @@ export function boundedUntrustedMarkdown(
 }
 
 export function buildAgentPrompt(input: BuildPromptInput): string {
+  // Invariant consumer: JOV-INV-012.
   const issueTitle = boundedUntrustedMarkdown(input.issue.title, 300);
   const issueBody = boundedUntrustedMarkdown(input.issue.body);
   const route = input.route;
@@ -718,6 +719,7 @@ export function buildAgentPrompt(input: BuildPromptInput): string {
     '## Hard Requirements',
     '- Set `JOVIE_AGENT_PROFILE=coder` before editing files.',
     '- Read `AGENTS.md` and the scoped rules for any files you touch.',
+    '- Satisfy the issue optimization contract (stable variant identity, exposure, outcome, attribution, eligible context dimensions, hypothesis and primary metric, guardrails, privacy and consent, optimizer owner and cadence, decision writeback, and rollback or control) using the existing analytics, model-experiment, audience event, YouTube experiment, and release-to-revenue surfaces. If the work is non-product or non-optimizable, explicitly declare a justified exception instead of omitting the contract.',
     '- Use gbrain before planning: fetch `gbrain:agent-org-chart` when available, check `shared-skills/coordination-basics/SKILL.md` when present, and run a targeted `gbrain query` for existing work/ownership if the context below is not enough.',
     '- If another agent owns the area, delegate via the coordination inbox instead of starting overlapping work. If gbrain is unreachable, stop and alert with a `system-blocker`.',
     '- Use gstack workflows. For complex work run `/autoplan`; for bugs run `/investigate`; before shipping run exhaustive `/qa`; for PR creation use `/ship`.',

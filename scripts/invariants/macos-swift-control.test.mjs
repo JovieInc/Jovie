@@ -6,10 +6,10 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const PROPOSED_SLUGS = [
-  'JOV-INV-012',
   'JOV-INV-013',
   'JOV-INV-014',
   'JOV-INV-015',
+  'JOV-INV-016',
 ];
 const REPORT_PATH = 'docs/macos/swift-control-invariants.md';
 const RULE_PATH = '.claude/rules/macos.md';
