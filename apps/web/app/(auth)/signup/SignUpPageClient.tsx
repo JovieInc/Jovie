@@ -278,7 +278,8 @@ export function SignUpPageClient() {
       formTitle='Create your account'
       showFormTitle={false}
       showFooterPrompt={false}
-      layoutVariant='split'
+      layoutVariant='stack'
+      chrome='splash-b'
     >
       <AuthRoutePrefetch href={signInUrl} />
       <SignUpOauthErrorBanner signInUrl={signInUrl} />

@@ -107,7 +107,7 @@ function PublicAuthActions({
       </Button>
       <Button
         asChild
-        size='md'
+        size='marketing'
         variant='primary'
         className='focus-ring-themed shrink-0 whitespace-nowrap'
       >

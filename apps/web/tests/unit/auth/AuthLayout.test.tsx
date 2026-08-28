@@ -147,7 +147,7 @@ describe('AuthLayout', () => {
     expect(document.querySelector('.auth-showcase-panel')).not.toBeNull();
   });
 
-  it('reserves a desktop footer slot for legal disclosure without changing mobile flow', async () => {
+  it('keeps legal disclosure in document flow so it cannot overlay Need help', async () => {
     const { AuthLayout } = await import('@/features/auth/AuthLayout');
 
     const { container } = render(
@@ -156,14 +156,27 @@ describe('AuthLayout', () => {
       </AuthLayout>
     );
 
-    const authColumn = Array.from(container.querySelectorAll('div')).find(
-      element => element.className.includes('lg:pb-18')
-    );
-
-    expect(authColumn?.className).toContain('lg:pb-18');
-    expect(authColumn?.className).toContain(
+    expect(container.innerHTML).not.toContain(
       'lg:[&_[data-auth-legal-copy]]:absolute'
     );
+    expect(screen.getByText('Legal disclosure')).toBeInTheDocument();
+  });
+
+  it('centers the 32px mark on splash-B chrome without film grain', async () => {
+    const { AuthLayout } = await import('@/features/auth/AuthLayout');
+
+    const { container } = render(
+      <AuthLayout formTitle='Sign In' chrome='splash-b'>
+        <div>Auth form body</div>
+      </AuthLayout>
+    );
+
+    expect(
+      container.querySelector('[data-auth-chrome="splash-b"]')
+    ).not.toBeNull();
+    expect(container.querySelector('.auth-shell-grain')).toBeNull();
+    expect(container.querySelector('.auth-showcase-panel')).toBeNull();
+    expect(screen.getByLabelText('Go to homepage')).toBeInTheDocument();
   });
 
   it('hides non-form chrome while the mobile keyboard is visible', async () => {

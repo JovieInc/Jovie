@@ -54,7 +54,7 @@ describe('MarketingPosterHero', () => {
     expect(screen.getAllByTestId('homepage-primary-cta')).toHaveLength(1);
     const primaryLink = screen.getByRole('link', { name: 'Enter Jovie' });
     expect(primaryLink).toHaveAttribute('href', '/signup');
-    expect(primaryLink).toHaveAttribute('data-size', 'md');
+    expect(primaryLink).toHaveAttribute('data-size', 'marketing');
     expect(primaryLink).toHaveAttribute('data-variant', 'primary');
     expect(primaryLink).not.toHaveClass('active:scale-[0.98]');
 
