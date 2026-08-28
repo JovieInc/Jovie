@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-
+import { validateOptimizationContract } from '../../invariants/optimization-contract.mjs';
 import * as admissionGate from '../admission-gate.mjs';
 import * as admitter from '../admitter.mjs';
 import * as deterministicGates from '../deterministic-gates.mjs';
@@ -68,6 +68,11 @@ describe('deterministic no-model gates', () => {
     assert.equal(result.evidence.repo, 'JovieInc/Jovie');
     assert.equal(result.evidence.target.target_repo, 'JovieInc/Jovie');
     assert.equal(result.evidence.project, 'Infra & CI/CD');
+    assert.equal(result.evidence.optimization.kind, 'exception');
+    assert.equal(
+      validateOptimizationContract(result.evidence.optimization),
+      null
+    );
     assert.deepEqual(result.evidence.acceptance, [
       'Repeated events group into one issue.',
       'Focused normalizer tests pass.',

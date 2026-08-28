@@ -4,9 +4,12 @@
  * This is intentionally narrower than classification and admission: only a
  * verified, concrete, bounded issue may receive one stable plan-gate/v1
  * evidence comment. All writes are followed by an authoritative Linear reread.
+ *
+ * Invariant consumer: JOV-INV-012.
  */
 
 import { createHash } from 'node:crypto';
+import { validateOptimizationContract } from '../invariants/optimization-contract.mjs';
 import { hasProtectedAdmissionLabel } from './admission-policy.mjs';
 import { contextGateReceipt } from './context-gate.mjs';
 import {
@@ -178,6 +181,7 @@ function normalizedEvidence(evidence) {
       ? evidence.test.map(item => item.trim())
       : [evidence.test.trim()],
     rollback: evidence.rollback.trim(),
+    ...(evidence.optimization ? { optimization: evidence.optimization } : {}),
     ...(target ? { target } : {}),
   });
 }
@@ -281,6 +285,11 @@ export async function approvePlan({
 }) {
   const reason = validatePlanCandidate(issue, evidence);
   if (reason) return { status: 'rejected', reason };
+  const optimizationReason = validateOptimizationContract(
+    evidence.optimization
+  );
+  if (optimizationReason)
+    return { status: 'rejected', reason: optimizationReason };
   if (!contextGateReceipt(issue, { now }))
     return { status: 'rejected', reason: 'context-receipt-missing-or-invalid' };
   if (!researchGateReceipt(issue, { now }))
