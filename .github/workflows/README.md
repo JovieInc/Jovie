@@ -6,7 +6,7 @@ This repository uses trunk-based development with a single long-lived branch:
 
 - **`main`** → releases to **jov.ie** only after exact queue provenance or the fail-closed direct-main fallback
 - Source PRs run deterministic fast checks only (typecheck, lint, portable iOS contract, boundaries, policy, diff secret scan)
-- GitHub's native `merge_group` head adds five affected unit shards, one hosted build + layout workspace, path-selected hosted Xcode build/test, and path-selected model-free Promptfoo/golden evals
+- GitHub's native `merge_group` head adds only path-selected Web unit/build, Mac test/package, iOS Xcode build/test, shared-contract integration, and model-free Promptfoo/golden evidence
 - A hosted secretless route job uses the fixed unit pool only after a fresh successful Runner Heartbeat; stale, malformed, timed-out, or API-uncertain evidence selects `ubuntu-latest` before unit shards queue
 - Heavy evidence runs only through hosted manual, scheduled, or repository events; no PR label fans out CI
 - Every exact successful `main` CI attempt enters one fixed `production-mutation` FIFO; the controller revalidates the CI attempt and current SHA before staging or production mutation, with one bounded hosted recovery rerun. A completed-success controller plus exact successful `Production Verified` job makes a generation marker authoritative; one interrupted post-upload marker can consume one SHA-bound recovery lease before any repeated mutation.
@@ -61,7 +61,7 @@ Explicit Vercel preview deployments for a dispatched ref are handled by the `ci.
 The main CI workflow `ci.yml` is the gatekeeper for PRs to `main`. It includes:
 
 - **Fast PR gate** (typecheck, lint, boundaries, guardrails, diff secret scan) - required on every source PR
-- **Combined integration gate** (fast checks, five affected unit shards, migration policy, build + layout, path-selected Xcode build/test, path-selected model-free Promptfoo/golden evals) - required on GitHub's exact `merge_group` SHA
+- **Combined integration gate** (fast checks, migration policy, path-selected Web unit/build, Mac test/package, iOS Xcode build/test, shared-contract integration, and model-free Promptfoo/golden evidence) - required on GitHub's exact `merge_group` SHA
 - **Direct-main fallback** - reruns the complete combined-head contract when an exact successful queue proof is unavailable
 - **Explicit deep evidence** (preview, Neon, E2E, Lighthouse, a11y, Storybook, smoke) - hosted manual/scheduled/event work only; never a source-PR event
 - **Production release** - `production-controller.yml` owns exact CI authorization and the repo-wide FIFO; `.github/workflows/production-release.yml` owns staging, canary, promotion, observational Sentry/OAuth gates, and the only rollback job
@@ -168,9 +168,9 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 | Stage | Exact responsibility |
 | --- | --- |
 | Source PR | Deterministic path + brand classification, risk classification, `ci-fast`, diff secret scan, and `Golden Path Lock`. `Migration Guard`, `Fork PR Gate`, and `PR Size Guard` remain separate required contexts. |
-| Native merge queue | Re-run deterministic gates on the exact `merge_group` head, then require five affected unit shards, one hosted build + layout workspace, path-selected Xcode, and model-free semantic evals. |
+| Native merge queue | Re-run deterministic gates on the exact `merge_group` head, then require only path-selected Web unit/build, Mac test/package, iOS Xcode, shared-contract integration, and model-free semantic evidence. |
 | Queue-proven main | Reuse the exact successful merge-group `PR Ready` proof and skip duplicate fallback work. |
-| Direct/admin main | Fail closed through path/risk/fast/secret/migration, all five unit shards, and the combined hosted build + layout job; skipped placeholders are invalid. |
+| Direct/admin main | Fail closed through path/risk/fast/secret/migration plus every product lane selected by the exact push diff; skipped selected lanes and executed unselected lanes are invalid. |
 | Production release | One reusable staging/canary/promotion/rollback DAG under one non-cancelling caller lease. |
 | Post-deploy | Hosted public, auth, homepage, and explicitly provisioned Lighthouse probes settle into `Production Verified` before notification. |
 | Scheduled/manual/event | Exhaustive E2E, Neon, a11y, performance, eval, visual, slop, brand, and repair/report loops. |

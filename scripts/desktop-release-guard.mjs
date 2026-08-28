@@ -110,7 +110,7 @@ function main() {
     '[desktop-release-guard] apps/desktop changed with a pre-land CHANGELOG.md edit.'
   );
   console.error(
-    'Do not add or edit CHANGELOG.md on implementation PRs. Desktop release handling is post-land after Production Verified.'
+    "Do not add or edit CHANGELOG.md on implementation PRs. Record release evidence in Linear/the PR; the post-land release path owns What's New and VERSION. Or update .github/workflows/desktop-release.yml with explicit release workflow handling."
   );
   console.error('Desktop files:');
   for (const file of result.desktopFiles) {

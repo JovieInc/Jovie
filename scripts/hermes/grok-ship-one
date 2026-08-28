@@ -207,63 +207,39 @@ if [ "$REMOUNT" = 1 ]; then
     fi
     echo "$(date -u +%FT%TZ) $ID remount_merge_conflicts" >> "$LOG"
     unmerged="$(git -C "$WS" diff --name-only --diff-filter=U | sort -u)"
-    # Exact-only: mixed product+CHANGELOG conflicts still go to grok. Union
-    # failure must not abort the remount (live JOV-5238 died after
+    # Exact-only: mixed product+CHANGELOG conflicts still go to grok. A
+    # CHANGELOG-only conflict keeps main's release state and drops the branch
+    # artifact. Strip failure must not abort the remount (live JOV-5238 died after
     # remount_merge_conflicts with no START).
     if [ "$unmerged" = "CHANGELOG.md" ]; then
-      union_ok=0
-      if git -C "$WS" show :2:CHANGELOG.md > "$WS/.changelog.ours" \
-        && git -C "$WS" show :3:CHANGELOG.md > "$WS/.changelog.theirs" \
-        && python3 - "$WS/.changelog.ours" "$WS/.changelog.theirs" "$WS/CHANGELOG.md" <<'PY'
-import pathlib, sys
-
-def unreleased_bullets(text: str) -> list[str]:
-    bullets: list[str] = []
-    in_unreleased = False
-    for line in text.splitlines():
-        if line.startswith("## [Unreleased]"):
-            in_unreleased = True
-            continue
-        if in_unreleased and line.startswith("## ["):
-            break
-        if in_unreleased and line.startswith("- "):
-            bullets.append(line)
-    return bullets
-
-ours = pathlib.Path(sys.argv[1]).read_text()
-theirs = pathlib.Path(sys.argv[2]).read_text()
-missing = [bullet for bullet in unreleased_bullets(ours) if bullet not in theirs]
-if not missing:
-    pathlib.Path(sys.argv[3]).write_text(theirs)
-    raise SystemExit(0)
-lines = theirs.splitlines(keepends=True)
-out: list[str] = []
-inserted = False
-for line in lines:
-    out.append(line)
-    if not inserted and line.startswith("## [Unreleased]"):
-        out.append("\n")
-        for bullet in missing:
-            out.append(bullet + "\n")
-        inserted = True
-pathlib.Path(sys.argv[3]).write_text("".join(out))
-PY
-      then
+      strip_ok=0
+      if git -C "$WS" show :3:CHANGELOG.md > "$WS/CHANGELOG.md"; then
         git -C "$WS" add CHANGELOG.md
-        union_ok=1
+        strip_ok=1
       else
-        echo "$(date -u +%FT%TZ) $ID remount_changelog_union_failed" >> "$LOG"
+        echo "$(date -u +%FT%TZ) $ID remount_changelog_strip_failed" >> "$LOG"
       fi
-      rm -f "$WS/.changelog.ours" "$WS/.changelog.theirs"
-      if [ "$union_ok" = 1 ] && [ -z "$(git -C "$WS" ls-files -u)" ]; then
+      if [ "$strip_ok" = 1 ] && [ -z "$(git -C "$WS" ls-files -u)" ]; then
         if GIT_EDITOR=true git -C "$WS" commit --no-edit >"$WS/.changelog.commit.err" 2>&1; then
-          echo "$(date -u +%FT%TZ) $ID remount_changelog_autoresolved" >> "$LOG"
+          echo "$(date -u +%FT%TZ) $ID remount_changelog_stripped" >> "$LOG"
           CHANGELOG_ONLY_REMOUNT=1
         else
           echo "$(date -u +%FT%TZ) $ID remount_changelog_commit_failed $(tr '\n' ' ' < "$WS/.changelog.commit.err")" >> "$LOG"
         fi
         rm -f "$WS/.changelog.commit.err"
       fi
+    fi
+  fi
+  if [ "$CHANGELOG_ONLY_REMOUNT" != 1 ] \
+    && [ -z "$(git -C "$WS" ls-files -u)" ] \
+    && ! git -C "$WS" diff --quiet origin/main...HEAD -- CHANGELOG.md; then
+    if git -C "$WS" restore --source=origin/main -- CHANGELOG.md \
+      && git -C "$WS" add CHANGELOG.md \
+      && git -C "$WS" commit -m "chore: remove pre-land changelog artifact"; then
+      echo "$(date -u +%FT%TZ) $ID remount_changelog_stripped" >> "$LOG"
+      CHANGELOG_ONLY_REMOUNT=1
+    else
+      echo "$(date -u +%FT%TZ) $ID remount_changelog_strip_failed" >> "$LOG"
     fi
   fi
 else

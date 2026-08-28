@@ -343,9 +343,10 @@ export function unmergeableReenqueueDecision({
 }
 
 /**
- * ALLGREEN groups merge queued PRs together. GitHub's server merge ignores
- * local `merge=union`, so two Unreleased CHANGELOG edits park the later
- * entry UNMERGEABLE while the source PR stays MERGEABLE vs main.
+ * CHANGELOG.md is post-land release state, never a PR artifact. Historical
+ * PRs may predate the source-CI guard, so native admission independently
+ * rejects every candidate that still touches it. Queued members are retained
+ * only as diagnostic evidence while the legacy backlog drains.
  *
  * Implementation PRs that touch CHANGELOG.md are skipped at admission
  * (JOV-5378). Stamp/release heads still serialize against a queued
@@ -385,12 +386,9 @@ export function changelogGroupCollisionDecision({
       Array.isArray(member.files) &&
       member.files.includes(CHANGELOG_COLLISION_PATH)
   );
-  if (colliding.length === 0) {
-    return { action: 'allow', reason: 'no-queued-changelog-member' };
-  }
   return {
     action: 'skip',
-    reason: 'changelog-collision',
+    reason: 'preland-changelog-prohibited',
     collidingPrs: colliding.map(member => member.prNumber),
   };
 }
@@ -511,6 +509,10 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Build + Layout (combined)',
   'CI / iOS Build + Test (combined)',
   'iOS Build + Test (combined)',
+  'CI / Mac Build + Test (combined)',
+  'Mac Build + Test (combined)',
+  'CI / Cross-Product Integration (combined)',
+  'Cross-Product Integration (combined)',
   'CI / macOS MenuMonitor Build + Test (combined)',
   'macOS MenuMonitor Build + Test (combined)',
   'CI / Promptfoo Evals (deterministic)',

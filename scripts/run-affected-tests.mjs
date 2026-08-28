@@ -247,6 +247,25 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/agent-qc-wires.test.mjs',
   'scripts/lib/__tests__/needs-human-autoclose.test.mjs',
 ];
+const PRODUCT_LANE_FOUNDATION_PRIMARY_INPUTS = new Set([
+  'scripts/lib/product-lane-classifier.mjs',
+  'scripts/lib/product-lane-finalize.mjs',
+  'scripts/lib/__tests__/product-lane-classifier.test.mjs',
+]);
+const PRODUCT_LANE_FOUNDATION_LANE = new Set([
+  ...PRODUCT_LANE_FOUNDATION_PRIMARY_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  '.claude/rules/release.md',
+  '.github/workflows/README.md',
+  'docs/PR_FLOW.md',
+  'docs/TESTING_STRATEGY.md',
+  'scripts/lib/ci-harness.mjs',
+  'scripts/lib/__tests__/merge-queue-backend.test.mjs',
+  'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
+  'scripts/lib/merge-queue-guard.mjs',
+  'scripts/lib/resolve-merge-group-path-diff.mjs',
+]);
 const MERGE_QUEUE_CONTROLLER_INPUTS = new Set([
   '.github/workflows/merge-queue-autoenroll.yml',
   'docs/PR_FLOW.md',
@@ -663,6 +682,26 @@ export function buildAffectedTestPlan(
   const files = unique(changedFiles.filter(Boolean)).sort();
   if (files.some(file => GLOBAL_TEST_INPUTS.has(file))) {
     return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+  }
+  const isBoundedProductLaneFoundation =
+    files.some(file => PRODUCT_LANE_FOUNDATION_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => PRODUCT_LANE_FOUNDATION_LANE.has(file));
+  if (isBoundedProductLaneFoundation) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: unique([
+        ...CI_CONTROL_SCRIPT_TESTS,
+        'scripts/lib/__tests__/merge-queue-backend.test.mjs',
+        'scripts/lib/__tests__/product-lane-classifier.test.mjs',
+      ]),
+      nodeTests: ['scripts/typecheck-scripts.mjs'],
+    };
   }
   const isExactSymphonyThroughputControl =
     files.length === SYMPHONY_THROUGHPUT_CONTROL_MANIFEST.size &&
@@ -1508,7 +1547,7 @@ export async function runCommandStatus(
   const child = spawn(command, args, {
     cwd: REPO_ROOT,
     stdio: 'inherit',
-    env: process.env,
+    env: buildVerificationEnv(),
     detached: process.platform !== 'win32',
   });
   const startedAt = Date.now();
@@ -1564,6 +1603,30 @@ export async function runCommandStatus(
     `[affected-tests] complete ${label} status=${status} elapsedMs=${Date.now() - startedAt} pid=${child.pid ?? 'unknown'} command=${commandText}`
   );
   return status;
+}
+
+export function buildVerificationEnv(source = process.env) {
+  const env = { ...source };
+  // Git exports repository-local variables to hooks. Verification tests create
+  // their own fixture repositories, so inheriting the caller's GIT_DIR (or a
+  // linked-worktree equivalent) redirects those fixtures back into this repo.
+  for (const name of [
+    'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+    'GIT_COMMON_DIR',
+    'GIT_CONFIG',
+    'GIT_CONFIG_COUNT',
+    'GIT_CONFIG_PARAMETERS',
+    'GIT_DIR',
+    'GIT_IMPLICIT_WORK_TREE',
+    'GIT_INDEX_FILE',
+    'GIT_OBJECT_DIRECTORY',
+    'GIT_PREFIX',
+    'GIT_SHALLOW_FILE',
+    'GIT_WORK_TREE',
+  ]) {
+    delete env[name];
+  }
+  return env;
 }
 
 export async function runCommand(command, args) {

@@ -7,6 +7,7 @@ import {
   buildAffectedTestPlan,
   buildFullSuiteCommands,
   buildSelectedTestCommands,
+  buildVerificationEnv,
   runCommandStatus,
 } from '../../run-affected-tests.mjs';
 
@@ -19,6 +20,19 @@ const script = readFileSync(
   resolve(import.meta.dirname, '../../automation-verify.sh'),
   'utf8'
 );
+
+describe('verification child environment', () => {
+  it('removes hook-local Git routing while preserving unrelated variables', () => {
+    expect(
+      buildVerificationEnv({
+        GIT_DIR: '.',
+        GIT_WORK_TREE: '/wrong/worktree',
+        GIT_INDEX_FILE: '/wrong/index',
+        PATH: '/repo/bin',
+      })
+    ).toEqual({ PATH: '/repo/bin' });
+  });
+});
 
 const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = [
   '.husky/pre-push',
@@ -398,6 +412,45 @@ const NEON_ATTEMPT_ARTIFACT_MANIFEST = [
 ];
 
 describe('automation-verify affected scope', () => {
+  it('keeps the product-lane foundation out of unrelated Web ratchets', () => {
+    const plan = buildAffectedTestPlan([
+      '.claude/rules/release.md',
+      '.github/workflows/README.md',
+      'docs/PR_FLOW.md',
+      'docs/TESTING_STRATEGY.md',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+      'scripts/lib/__tests__/merge-queue-backend.test.mjs',
+      'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+      'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
+      'scripts/lib/__tests__/product-lane-classifier.test.mjs',
+      'scripts/lib/ci-harness.mjs',
+      'scripts/lib/merge-queue-guard.mjs',
+      'scripts/lib/product-lane-classifier.mjs',
+      'scripts/lib/product-lane-finalize.mjs',
+      'scripts/lib/resolve-merge-group-path-diff.mjs',
+      'scripts/run-affected-tests.mjs',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([]);
+    expect(plan.scriptVitestTests).toContain(
+      'scripts/lib/__tests__/product-lane-classifier.test.mjs'
+    );
+    expect(plan.scriptVitestTests).toContain(
+      'scripts/lib/__tests__/merge-queue-backend.test.mjs'
+    );
+    expect(plan.nodeTests).toEqual(['scripts/typecheck-scripts.mjs']);
+  });
+
+  it('fails back to the full Web suite when the foundation adds a Web path', () => {
+    expect(
+      buildAffectedTestPlan([
+        'scripts/lib/product-lane-classifier.mjs',
+        'apps/web/lib/unknown.ts',
+      ]).mode
+    ).toBe('full');
+  });
+
   it('does not require retired Graphite source authorization artifacts', () => {
     for (const retiredPath of [
       '.github/workflows/gtmq-source-authorization.yml',

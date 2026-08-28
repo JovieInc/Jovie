@@ -131,13 +131,17 @@ It fails closed if an open PR is missing from that authoritative snapshot.
   named Actions outcome (`launched` / `repaired` / `skipped_stale` /
   `writer_missing` / `no_key` / `needs_human`) even when an implementer lease
   is live or `LIVE_AUTHOR` is blank (JOV-5335).
-- CHANGELOG ALLGREEN collision (JOV-5291 / JOV-5378): GitHub's server merge ignores local
-  union drivers. Two Unreleased `CHANGELOG.md` edits in one group park the
-  later entry. Implementation PRs that add or edit `CHANGELOG.md` are rejected
-  at admission (`scripts/lib/pre-land-changelog.mjs`) and dequeued from a live
-  group without bypassing CI. Stamp/release heads still serialize against a
-  queued CHANGELOG member. This is a classified skip, not an `enroll` product
-  failure (it must not mark the PR UNSTABLE).
+- Pre-land CHANGELOG prohibition (JOV-5291 / JOV-5378): GitHub's server merge
+  ignores local union drivers, so two Unreleased `CHANGELOG.md` edits in one
+  group park the later entry. Implementation PRs never edit `CHANGELOG.md`.
+  Source CI rejects the diff (`scripts/lib/pre-land-changelog.mjs` +
+  `scripts/version-fanout-guard.mjs`), native admission independently skips any
+  legacy candidate that still touches the file, and queued members are drained
+  without bypassing CI. Stamp/release heads still serialize against a queued
+  CHANGELOG member. User-visible changes earn exactly one What's New bullet
+  only after land/runtime proof through the release/UI path. This is a
+  classified skip, not an `enroll` product failure (it must not mark the PR
+  UNSTABLE).
 - Enroll live policy (JOV-5291): preflight reads GraphQL
   `mergeQueue.configuration.maximumEntriesToBuild` as live truth. Stale REST
   `max_entries_to_build` drift cannot fail `enroll` after the lock already

@@ -971,7 +971,7 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     collision_decision="$(changelog_collision_decision_for_pr "$n")"
     collision_action="$(jq -r '.action // empty' <<<"$collision_decision")"
     if [[ "$collision_action" == "skip" ]]; then
-      echo "    ⏸ CHANGELOG.md blocked ($(jq -r '.reason' <<<"$collision_decision")) for #$n; refusing enrollment without bypassing CI"
+      echo "    ⏸ pre-land CHANGELOG.md edit is prohibited ($(jq -r '.reason' <<<"$collision_decision")) for #$n; refusing native queue admission without bypassing CI"
       LAST_ENROLL_SKIP_REASON="$(jq -r '.reason // "pre-land-changelog"' <<<"$collision_decision")"
       return 2
     fi
@@ -1923,6 +1923,8 @@ if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 ]]; then
       echo "  #$DRAIN_ADMISSION_PR  ⏸ $LAST_ENROLL_SKIP_REASON (durable exact-head product failure; source repair required)"
     elif [[ "$LAST_ENROLL_SKIP_REASON" == "changelog-collision" \
       || "$LAST_ENROLL_SKIP_REASON" == "pre-land-changelog" \
+      || "$LAST_ENROLL_SKIP_REASON" == "preland-changelog" \
+      || "$LAST_ENROLL_SKIP_REASON" == "preland-changelog-prohibited" \
       || "$LAST_ENROLL_SKIP_REASON" == "unmergeable-tombstone" ]]; then
       echo "  #$DRAIN_ADMISSION_PR  ⏸ $LAST_ENROLL_SKIP_REASON (classified skip; enroll is not a product-quality failure)"
     elif [[ "$ADMISSION_ELIGIBLE" == "true" ]]; then

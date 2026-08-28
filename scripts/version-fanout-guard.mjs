@@ -9,14 +9,13 @@
  *   - VERSION
  *   - version.json
  *   - the `version` field of the root + workspace package.json files
- *   - dated release headings in CHANGELOG.md (e.g. `## [26.6.61] - 2026-06-28`)
+ *   - any feature-branch CHANGELOG.md edit
  *
  * Implementation PRs must not add or edit CHANGELOG.md at all (JOV-5378).
- * A user-visible change earns exactly one What's New bullet after land/runtime
- * proof through the existing release/UI receipt path. Linear remains SoR.
- *
  * Feature branches MAY edit package.json for dependency/script changes — only
- * the `version` field is protected.
+ * the `version` field is protected. They MUST NOT edit CHANGELOG.md. Jovie
+ * publishes exactly one user-visible What's New bullet, when warranted, only
+ * after land/runtime proof through the release path. Linear remains SoR.
  *
  * The actual version stamp happens on the main/release path via
  * `scripts/version-stamp.mjs` after merge. See `.claude/rules/release.md`.
@@ -128,7 +127,7 @@ export function evaluateVersionFanoutGuard({
     if (SCALAR_VERSION_FILES.has(file)) {
       violations.push(
         file === 'CHANGELOG.md'
-          ? `${file} (implementation PRs must not add or edit CHANGELOG.md — What's New is written after land/runtime proof)`
+          ? `${file} (implementation PRs must not add or edit CHANGELOG.md — pre-land changelog artifacts are prohibited; the post-land release path owns the single user-visible What's New bullet)`
           : `${file} (version file edited on a feature branch)`
       );
       continue;
@@ -298,7 +297,7 @@ function main() {
     'Version stamping is main-only. Revert these changes; the release path stamps them after merge.'
   );
   console.error(
-    "Do not add or edit CHANGELOG.md on implementation PRs. What's New is written after land/runtime proof."
+    "Do not add or edit CHANGELOG.md on implementation PRs. The post-land release path owns the single user-visible What's New bullet."
   );
   console.error(
     'See .claude/rules/release.md → "Version Stamping (main-only)".'
