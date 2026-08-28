@@ -6,6 +6,6 @@ describe('TableBadge', () => {
   it('defaults to small size for table density consistency', () => {
     render(<TableBadge variant='secondary'>Active</TableBadge>);
 
-    expect(screen.getByText('Active').className).toContain('text-[10px]');
+    expect(screen.getByText('Active')).toHaveClass('text-3xs');
   });
 });

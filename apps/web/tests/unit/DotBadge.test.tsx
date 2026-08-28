@@ -4,8 +4,8 @@ import { DotBadge } from '@/components/atoms/DotBadge';
 
 describe('DotBadge', () => {
   const defaultVariant = {
-    className: 'border-blue-500 bg-blue-100 text-blue-700',
-    dotClassName: 'bg-blue-500',
+    className: 'border-info bg-info-subtle text-info',
+    dotClassName: 'bg-info',
   };
 
   describe('rendering', () => {
@@ -87,22 +87,22 @@ describe('DotBadge', () => {
   describe('variants', () => {
     it('applies variant className to badge', () => {
       const successVariant = {
-        className: 'border-green-500 bg-green-100 text-green-700',
-        dotClassName: 'bg-green-500',
+        className: 'border-success bg-success-subtle text-success',
+        dotClassName: 'bg-success',
       };
 
       render(<DotBadge label='Success' variant={successVariant} />);
       const badge = screen.getByText('Success').closest('span');
 
-      expect(badge).toHaveClass('border-green-500');
-      expect(badge).toHaveClass('bg-green-100');
-      expect(badge).toHaveClass('text-green-700');
+      expect(badge).toHaveClass('border-success');
+      expect(badge).toHaveClass('bg-success-subtle');
+      expect(badge).toHaveClass('text-success');
     });
 
     it('applies variant dotClassName to dot', () => {
       const warningVariant = {
-        className: 'border-yellow-500 bg-yellow-100 text-yellow-700',
-        dotClassName: 'bg-yellow-500',
+        className: 'border-warning bg-warning-subtle text-warning',
+        dotClassName: 'bg-warning',
       };
 
       const { container } = render(
@@ -110,13 +110,13 @@ describe('DotBadge', () => {
       );
       const dot = container.querySelector('[aria-hidden]');
 
-      expect(dot).toHaveClass('bg-yellow-500');
+      expect(dot).toHaveClass('bg-warning');
     });
 
     it('supports multiple variant styles', () => {
       const customVariant = {
-        className: 'border-purple-500 bg-purple-100 text-purple-700 font-bold',
-        dotClassName: 'bg-purple-500 shadow-lg',
+        className: 'border-accent bg-accent-subtle text-accent font-bold',
+        dotClassName: 'bg-accent shadow-lg',
       };
 
       const { container } = render(
@@ -168,7 +168,7 @@ describe('DotBadge', () => {
 
       expect(badge).toHaveClass('inline-flex');
       expect(badge).toHaveClass('items-center');
-      expect(badge).toHaveClass('rounded-full');
+      expect(badge?.className).toContain('rounded-(--system-b-radius-pill)');
       expect(badge).toHaveClass('border');
       expect(badge).toHaveClass('font-[510]');
       expect(badge).toHaveClass('tracking-tight');
