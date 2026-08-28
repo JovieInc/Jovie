@@ -83,6 +83,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- [internal] **CI repair cannot trigger itself:** Rolling CI repair observes only authoritative CI completions. Malformed main receipts fail closed instead of crashing queue admission.
 - **Jovie Local no longer says you’re offline while the local server is compiling (JOV-5339):** first compile can take ~15 seconds with no bytes yet. Local waits, talks to localhost:3100, and reloads on its own when the host is warm — no Retry click. It only says “check your connection” when the machine is actually offline.
 - **Jovie Local keeps the app shell during hot reload (JOV-5339):** packaged 14s/18s boot and load timers no longer replace a compiling local window with “couldn’t load”. Chromium maps `localhost` to `127.0.0.1` without changing the origin, so sign-in cookies stay, and transient loopback misses retry until Next is up.
 - **iPhone and Mac sign-in return to the app instead of the website:** after browser login, iOS and macOS bounce through an allowlisted return page and reopen Jovie. Signed-in native sessions no longer dump into the web dashboard.
