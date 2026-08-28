@@ -1,23 +1,17 @@
 #!/usr/bin/env node
 
 /**
- * Prevent desktop code from landing without release handling.
+ * Prevent feature branches from creating competing desktop release state.
  *
- * Desktop changes need an explicit release handoff. Feature branches record
- * that handoff in Linear and the PR body; they must not edit CHANGELOG.md.
- * The main/release path stamps VERSION and publishes the next DMG.
+ * Desktop changes land with implementation and verification evidence only.
+ * The post-land release path owns VERSION, What's New, and the next DMG.
+ * Explicit desktop-release workflow maintenance remains admissible.
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
 
 const DESKTOP_PATH_PREFIX = 'apps/desktop/';
-const RELEASE_HANDLING_PATHS = new Set([
-  'VERSION',
-  '.github/workflows/desktop-release.yml',
-]);
-const LINEAR_ISSUE_MARKER = /<!--\s*linear-issue-id:\s*JOV-\d+\s*-->/;
-const DESKTOP_HANDOFF_MARKER = /<!--\s*desktop-release-handoff\s*-->/;
+const PRELAND_RELEASE_STATE_PATHS = new Set(['CHANGELOG.md', 'VERSION']);
 
 function isDesktopReleaseImpactingFile(file) {
   if (!file.startsWith(DESKTOP_PATH_PREFIX)) {
@@ -29,46 +23,22 @@ function isDesktopReleaseImpactingFile(file) {
   );
 }
 
-function isMergeQueueHead(branch) {
-  return String(branch || '')
-    .replace(/^origin\//, '')
-    .trim()
-    .startsWith('gh-readonly-queue/');
-}
-
-export function hasRecordedDesktopReleaseEvidence(text) {
-  if (typeof text !== 'string' || !text.trim()) {
-    return false;
-  }
-  return LINEAR_ISSUE_MARKER.test(text) && DESKTOP_HANDOFF_MARKER.test(text);
-}
-
-export function evaluateDesktopReleaseGuard(changedFiles, options = {}) {
+export function evaluateDesktopReleaseGuard(changedFiles) {
   const normalizedFiles = changedFiles
     .map(file => file.trim())
     .filter(Boolean)
     .map(file => file.replace(/\\/g, '/'));
 
   const desktopFiles = normalizedFiles.filter(isDesktopReleaseImpactingFile);
-  const releaseHandlingFiles = normalizedFiles.filter(file =>
-    RELEASE_HANDLING_PATHS.has(file)
+  const prelandReleaseStateFiles = normalizedFiles.filter(file =>
+    PRELAND_RELEASE_STATE_PATHS.has(file)
   );
-  const recordedEvidence = hasRecordedDesktopReleaseEvidence(
-    options.releaseEvidenceText
-  );
-  const queueHead = isMergeQueueHead(options.branch);
 
   return {
     changedFiles: normalizedFiles,
     desktopFiles,
-    releaseHandlingFiles,
-    recordedEvidence,
-    queueHead,
-    passed:
-      desktopFiles.length === 0 ||
-      releaseHandlingFiles.length > 0 ||
-      recordedEvidence ||
-      queueHead,
+    prelandReleaseStateFiles,
+    passed: desktopFiles.length === 0 || prelandReleaseStateFiles.length === 0,
   };
 }
 
@@ -97,57 +67,6 @@ function getChangedFiles(baseRef) {
   ].filter(Boolean);
 }
 
-function readGithubEvent() {
-  const eventPath = process.env.GITHUB_EVENT_PATH;
-  if (!eventPath || !existsSync(eventPath)) {
-    return null;
-  }
-  try {
-    return JSON.parse(readFileSync(eventPath, 'utf8'));
-  } catch {
-    return null;
-  }
-}
-
-function getReleaseEvidenceText() {
-  const evidenceFile = getArgValue('--evidence-file');
-  if (evidenceFile) {
-    return readFileSync(evidenceFile, 'utf8');
-  }
-  const eventBody = readGithubEvent()?.pull_request?.body;
-  if (typeof eventBody === 'string' && eventBody.trim()) {
-    return eventBody;
-  }
-  try {
-    return execFileSync(
-      'gh',
-      ['pr', 'view', '--json', 'body', '--jq', '.body // ""'],
-      {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-      }
-    );
-  } catch {
-    return '';
-  }
-}
-
-function getBranch() {
-  const fromArg = getArgValue('--branch');
-  if (fromArg) {
-    return fromArg;
-  }
-  const envBranch = process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME;
-  if (envBranch) {
-    return envBranch;
-  }
-  try {
-    return git(['branch', '--show-current']);
-  } catch {
-    return '';
-  }
-}
-
 function main() {
   const baseRef =
     getArgValue('--base') ||
@@ -168,38 +87,27 @@ function main() {
     process.exit(1);
   }
 
-  const result = evaluateDesktopReleaseGuard(changedFiles, {
-    releaseEvidenceText: getReleaseEvidenceText(),
-    branch: getBranch(),
-  });
+  const result = evaluateDesktopReleaseGuard(changedFiles);
 
   if (result.passed) {
     if (result.desktopFiles.length === 0) {
       console.log('[desktop-release-guard] No apps/desktop changes detected.');
-    } else if (result.releaseHandlingFiles.length > 0) {
-      console.log(
-        `[desktop-release-guard] Desktop release handled by ${result.releaseHandlingFiles.join(', ')}.`
-      );
-    } else if (result.recordedEvidence) {
-      console.log(
-        '[desktop-release-guard] Desktop release handled by Linear/PR handoff evidence.'
-      );
     } else {
       console.log(
-        '[desktop-release-guard] Desktop release handoff already enforced on the source PR.'
+        '[desktop-release-guard] Desktop change defers release state to the post-land publisher.'
       );
     }
     return;
   }
 
   console.error(
-    '[desktop-release-guard] apps/desktop changed without a DMG release trigger.'
+    '[desktop-release-guard] apps/desktop changed with pre-land release state.'
   );
   console.error(
-    "Record release evidence in Linear/the PR with <!-- desktop-release-handoff --> plus <!-- linear-issue-id:JOV-XXXX -->; the post-land release path owns What's New and VERSION. Or update .github/workflows/desktop-release.yml with explicit release workflow handling."
+    "Remove CHANGELOG/VERSION artifacts. Record implementation evidence in Linear/the PR; the post-land release path owns What's New, VERSION, and DMG publication."
   );
-  console.error('Desktop files:');
-  for (const file of result.desktopFiles) {
+  console.error('Pre-land release state:');
+  for (const file of result.prelandReleaseStateFiles) {
     console.error(`- ${file}`);
   }
   process.exit(1);
