@@ -166,7 +166,7 @@ describe('JOV-INV-012 optimization contract', () => {
     );
   });
 
-  it('resolves an explicit product contract or exception from issue text', () => {
+  it('resolves an explicit product contract or exception and rejects omission', () => {
     const productIssue = issue({
       description: `## Optimization contract
 \`\`\`json
@@ -195,13 +195,16 @@ ${JSON.stringify(completeProductOptimizationContract())}
     assert.equal(resolved.class, 'non-optimizable');
     assert.equal(validateOptimizationContract(resolved), null);
 
-    const inferred = resolveOptimizationContract(
+    const missing = resolveOptimizationContract(
       issue({
         identifier: 'JOV-1',
         description: '## Proposed fix\nTouch plan-gate.',
       })
     );
-    assert.equal(inferred.kind, 'exception');
-    assert.equal(validateOptimizationContract(inferred), null);
+    assert.equal(missing, null);
+    assert.equal(
+      validateOptimizationContract(missing),
+      'optimization-contract-missing'
+    );
   });
 });

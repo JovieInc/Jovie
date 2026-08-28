@@ -294,10 +294,5 @@ export function resolveOptimizationContract(issue) {
   const contractText = markdownSection(description, ['Optimization contract']);
   if (contractText) return parseProductContract(contractText);
 
-  const identifier = issue?.identifier || 'unknown';
-  return {
-    kind: 'exception',
-    class: 'non-product',
-    justification: `Issue ${identifier} does not declare a user-facing page, link, asset, campaign, recommendation, or content variant, so this is a justified non-product exception.`,
-  };
+  return null;
 }
