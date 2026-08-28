@@ -23,7 +23,7 @@ AUTHORITY = "Summer"
 CONTROLLER_RED_AFTER = timedelta(minutes=10)
 EMPTY_QUEUE_RED_AFTER = timedelta(minutes=15)
 UNCLASSIFIED_RED_AFTER = timedelta(minutes=15)
-NO_MERGE_PROGRESS_AFTER = timedelta(hours=24)
+NO_MERGE_PROGRESS_AFTER = timedelta(hours=1)
 HOLD_EXPIRY = timedelta(days=7)
 UTC = timezone.utc
 ISSUE_REFERENCE = re.compile(r"\b(?:JOV|LYB)-\d+\b", re.IGNORECASE)
@@ -109,8 +109,24 @@ def classify_open_prs(prs: list[dict[str, Any]], now: datetime) -> dict[str, Any
             "number": number,
             "issue": refs_by_number[number][0] if refs_by_number[number] else None,
         }
-        if pr.get("mergeQueueEntry"):
-            dispositions.append({**base, "state": "queued", "reason": "native-queue-entry"})
+        queue_entry = pr.get("mergeQueueEntry")
+        if isinstance(queue_entry, dict):
+            queue_state = queue_entry.get("state")
+            enqueued_at = parse_time(queue_entry.get("enqueuedAt"))
+            if not isinstance(queue_state, str) or not queue_state or enqueued_at is None:
+                unclassified.append(
+                    {"number": number, "reason": "malformed-native-queue-entry"}
+                )
+                continue
+            dispositions.append(
+                {
+                    **base,
+                    "state": "queued",
+                    "reason": "native-queue-entry",
+                    "queueState": queue_state,
+                    "enqueuedAt": isoformat(enqueued_at),
+                }
+            )
             continue
         close_reasons = sorted(labels.intersection(CLOSE_LABELS))
         if close_reasons:
@@ -206,12 +222,15 @@ def evaluate_closure_health(
         "recovering",
         "unknown",
     }
+    dispositions = classifications.get("dispositions")
     unclassified = classifications.get("unclassified")
     duplicates = classifications.get("duplicateIssueLanes")
     expired_holds = classifications.get("expiredHolds")
     observer_unknown = observer_unknown or not all(
-        isinstance(value, list) for value in (unclassified, duplicates, expired_holds)
+        isinstance(value, list)
+        for value in (dispositions, unclassified, duplicates, expired_holds)
     )
+    dispositions = dispositions if isinstance(dispositions, list) else []
     unclassified = unclassified if isinstance(unclassified, list) else []
     duplicates = duplicates if isinstance(duplicates, list) else []
     expired_holds = expired_holds if isinstance(expired_holds, list) else []
@@ -238,6 +257,16 @@ def evaluate_closure_health(
         reasons.append("duplicate-issue-lanes-unresolved")
     if expired_holds:
         reasons.append("expired-held-prs")
+    unmergeable_queue_prs = sorted(
+        item.get("number")
+        for item in dispositions
+        if isinstance(item, dict)
+        and item.get("state") == "queued"
+        and item.get("queueState") == "UNMERGEABLE"
+        and isinstance(item.get("number"), int)
+    )
+    if unmergeable_queue_prs:
+        reasons.append("native-queue-unmergeable")
     if active["controller"] and durations["controller"] >= CONTROLLER_RED_AFTER:
         reasons.append("queue-controller-red-over-10m")
     if (
@@ -256,7 +285,7 @@ def evaluate_closure_health(
         and open_prs > 0
         and (progress_anchor is None or now - progress_anchor >= NO_MERGE_PROGRESS_AFTER)
     ):
-        reasons.append("no-merge-progress-over-24h")
+        reasons.append("no-merge-progress-over-1h")
 
     grace_active = any(active.values())
     status = "red" if reasons else "grace" if grace_active else "healthy"
@@ -280,6 +309,7 @@ def evaluate_closure_health(
         "eligiblePrs": eligible_prs if shape_valid else None,
         "greenReadyPrs": green_ready_prs if shape_valid else None,
         "nativeQueueCount": native_queue_count if shape_valid else None,
+        "unmergeableNativeQueuePrs": unmergeable_queue_prs,
         "latestMergeAt": snapshot.get("latestMergeAt"),
         "classifications": classifications,
     }
@@ -304,7 +334,7 @@ query($owner:String!,$name:String!,$endCursor:String){
         number title headRefName isDraft mergeStateStatus createdAt updatedAt
         author{login}
         labels(first:50){nodes{name}}
-        mergeQueueEntry{position enqueuedAt}
+        mergeQueueEntry{position enqueuedAt state}
       }
     }
     merged:pullRequests(first:100,states:MERGED,orderBy:{field:UPDATED_AT,direction:DESC}){

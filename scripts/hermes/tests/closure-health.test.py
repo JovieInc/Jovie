@@ -28,6 +28,7 @@ def pr(
     merge_state: str = "CLEAN",
     draft: bool = False,
     queued: bool = False,
+    queue_state: str = "AWAITING_CHECKS",
     labels: tuple[str, ...] = (),
     updated_at: datetime = NOW,
     author: str = "summer-test",
@@ -43,7 +44,11 @@ def pr(
         "author": {"login": author},
         "labels": {"nodes": [{"name": label} for label in labels]},
         "mergeQueueEntry": (
-            {"position": 1, "enqueuedAt": updated_at.isoformat()}
+            {
+                "position": 1,
+                "enqueuedAt": updated_at.isoformat(),
+                "state": queue_state,
+            }
             if queued
             else None
         ),
@@ -61,10 +66,14 @@ def snapshot(**overrides: object) -> dict[str, object]:
         "eligiblePrs": 2,
         "greenReadyPrs": 2,
         "nativeQueueCount": 1,
-        "latestMergeAt": (NOW - timedelta(hours=1)).isoformat(),
+        "latestMergeAt": (NOW - timedelta(minutes=30)).isoformat(),
         "classifications": {
             "dispositions": [
-                {"number": 1, "state": "queued"},
+                {
+                    "number": 1,
+                    "state": "queued",
+                    "queueState": "AWAITING_CHECKS",
+                },
                 {"number": 2, "state": "promote"},
             ],
             "unclassified": [],
@@ -110,6 +119,7 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(result["duplicateIssueLanes"], [{"issue": "JOV-777", "prs": [8, 9]}])
         dispositions = {item["number"]: item for item in result["dispositions"]}
         self.assertEqual(dispositions[9]["state"], "queued")
+        self.assertEqual(dispositions[9]["queueState"], "AWAITING_CHECKS")
         self.assertEqual(dispositions[8]["state"], "repair")
 
     def test_close_requires_an_explicit_lifecycle_label(self):
@@ -143,9 +153,18 @@ class ClosureClassificationTests(unittest.TestCase):
         no_owner = pr(4, title="feat: held JOV-904", draft=True, author="")
         missing_updated = pr(5, title="feat: stale JOV-905")
         missing_updated["updatedAt"] = "not-a-date"
+        malformed_queue = pr(6, title="feat: queued JOV-906", queued=True)
+        malformed_queue["mergeQueueEntry"] = {"position": 1}
 
         result = MODULE.classify_open_prs(
-            [missing_number, multiple_lanes, expired, no_owner, missing_updated],
+            [
+                missing_number,
+                multiple_lanes,
+                expired,
+                no_owner,
+                missing_updated,
+                malformed_queue,
+            ],
             NOW,
         )
 
@@ -154,6 +173,7 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(reasons[2], "multiple-issue-lane-identities")
         self.assertEqual(reasons[4], "missing-hold-owner")
         self.assertEqual(reasons[5], "missing-updated-at")
+        self.assertEqual(reasons[6], "malformed-native-queue-entry")
         self.assertEqual(result["expiredHolds"], [3])
 
 
@@ -194,7 +214,7 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
 
     def test_duplicate_lanes_and_stale_merge_progress_are_immediate_red(self):
         duplicate = snapshot(
-            latestMergeAt=(NOW - timedelta(hours=25)).isoformat(),
+            latestMergeAt=(NOW - timedelta(hours=2)).isoformat(),
             classifications={
                 "dispositions": [{"number": 1, "state": "promote"}],
                 "unclassified": [],
@@ -207,7 +227,36 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "red")
         self.assertIn("duplicate-issue-lanes-unresolved", result["reasons"])
-        self.assertIn("no-merge-progress-over-24h", result["reasons"])
+        self.assertIn("no-merge-progress-over-1h", result["reasons"])
+        self.assertFalse(result["newIssueIntakeAllowed"])
+
+    def test_unmergeable_native_queue_entry_is_immediate_red(self):
+        classifications = MODULE.classify_open_prs(
+            [
+                pr(
+                    7,
+                    title="fix: repair JOV-707",
+                    queued=True,
+                    queue_state="UNMERGEABLE",
+                )
+            ],
+            NOW,
+        )
+
+        result = MODULE.evaluate_closure_health(
+            snapshot(
+                openPrs=1,
+                eligiblePrs=1,
+                greenReadyPrs=1,
+                classifications=classifications,
+            ),
+            previous=None,
+            now=NOW,
+        )
+
+        self.assertEqual(result["status"], "red")
+        self.assertIn("native-queue-unmergeable", result["reasons"])
+        self.assertEqual(result["unmergeableNativeQueuePrs"], [7])
         self.assertFalse(result["newIssueIntakeAllowed"])
 
     def test_unclassified_pr_crosses_fifteen_minute_deliberate_red(self):
@@ -347,7 +396,7 @@ class ClosureObservationTests(unittest.TestCase):
             "_run_graphql_snapshot",
             return_value={
                 "prs": prs,
-                "latestMergeAt": (NOW - timedelta(hours=1)).isoformat(),
+                "latestMergeAt": (NOW - timedelta(minutes=30)).isoformat(),
             },
         ), mock.patch.object(
             MODULE,
