@@ -78,4 +78,40 @@ describe('executePresenceBuildStep', () => {
     expect(artifact.empty).toBe(true);
     expect(artifact.facts).toEqual([]);
   });
+
+  it('surfaces the truthful Library onboarding object without sending', async () => {
+    mockSelect
+      .mockReturnValueOnce(
+        chainSelect([
+          { kind: 'repair', status: 'open' },
+          { kind: 'collision', status: 'open' },
+          { kind: 'placement_opportunity', status: 'drafted' },
+        ])
+      )
+      .mockReturnValueOnce(
+        chainSelect([
+          { evidenceClass: 'observed' },
+          { evidenceClass: 'claimed' },
+        ])
+      )
+      .mockReturnValueOnce(chainSelect([]));
+
+    const artifact = await executePresenceBuildStep(
+      'surface_library_opportunities',
+      'p1'
+    );
+
+    expect(artifact.summary).toContain('nothing was sent');
+    expect(artifact.facts).toEqual(
+      expect.arrayContaining([
+        { label: 'Repair queue', value: '1 open' },
+        { label: 'Collisions', value: '1 to review' },
+        { label: 'Placement opportunities', value: '1 found' },
+        { label: 'Rightsholders', value: '1 observed' },
+        { label: 'Downloads', value: 'No attested files live' },
+        { label: 'Stats', value: 'Not connected' },
+      ])
+    );
+    expect(JSON.stringify(artifact)).not.toMatch(/streams|revenue|license/i);
+  });
 });
