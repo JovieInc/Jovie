@@ -38,6 +38,11 @@ export function formatLibraryItemType(asset: LibraryReleaseAsset): string {
   if (asset.itemKind === 'merch') {
     return asset.productType?.trim() || 'Merch';
   }
+  if (asset.itemKind === 'document') {
+    return asset.itemStatusLabel ?? 'Document';
+  }
+  if (asset.catalogType === 'social') return 'Social';
+  if (asset.itemKind === 'video') return 'Video';
   return formatReleaseType(asset.releaseType);
 }
 
