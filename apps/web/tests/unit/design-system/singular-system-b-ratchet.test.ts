@@ -71,6 +71,10 @@ describe('singular System B — design-system unification ratchet', () => {
       resolve(WEB_ROOT, 'styles/linear-tokens.css'),
       'utf8'
     );
+    const marketingThemeBridge = readFileSync(
+      resolve(WEB_ROOT, 'components/marketing/MarketingSnapRail.css'),
+      'utf8'
+    );
     const marketingStyles = [
       'styles/design-system.css',
       'components/marketing/MarketingSnapRail.css',
@@ -93,6 +97,8 @@ describe('singular System B — design-system unification ratchet', () => {
     expect(linearTokens).toContain('.system-b-marketing.dark');
     expect(marketingStyles).toContain('.system-b-marketing {');
     expect(marketingStyles).toContain('.system-b-marketing.dark');
+    expect(marketingThemeBridge).not.toMatch(/--linear-[a-z0-9-]+\s*:/);
+    expect(marketingThemeBridge).not.toContain('var(--linear-');
     expect(marketingStyles).toContain('.system-b-marketing h1');
     expect(marketingStyles).toMatch(
       /\.system-b-marketing button,[\s\S]*?\.system-b-marketing a\[class\*="btn"\]\s*\{[^}]*font-family:\s*var\(--marketing-font-body\)/
