@@ -1,3 +1,5 @@
+import { evaluatePreLandChangelogAdmission } from './pre-land-changelog.mjs';
+
 export const MERGE_QUEUE_LABEL = 'merge-queue';
 export const FAST_TRACK_LABEL = 'fast';
 export const FAST_TRACK_UI_LABEL = 'fast-track-ui';
@@ -346,30 +348,43 @@ export function unmergeableReenqueueDecision({
  * rejects every candidate that still touches it. Queued members are retained
  * only as diagnostic evidence while the legacy backlog drains.
  *
- * Unknown evidence never skips (same fail-open as front-item churn).
+ * Implementation PRs that touch CHANGELOG.md are skipped at admission
+ * (JOV-5378). Stamp/release heads still serialize against a queued
+ * CHANGELOG member. Unknown evidence never skips.
  *
  * @param {{
  *   candidateFiles?: unknown,
  *   queuedMemberFiles?: unknown,
+ *   branch?: unknown,
  * }} [input]
  */
 export function changelogGroupCollisionDecision({
   candidateFiles,
   queuedMemberFiles,
+  branch,
 } = {}) {
-  if (!Array.isArray(candidateFiles) || !Array.isArray(queuedMemberFiles)) {
+  const admission = evaluatePreLandChangelogAdmission({
+    changedFiles: candidateFiles,
+    branch,
+  });
+  if (admission.action === 'unknown') {
     return { action: 'unknown', reason: 'changelog-evidence-unavailable' };
   }
-  const touchesChangelog = files =>
-    Array.isArray(files) && files.includes(CHANGELOG_COLLISION_PATH);
-  if (!touchesChangelog(candidateFiles)) {
+  if (admission.action === 'reject') {
+    return { action: 'skip', reason: 'pre-land-changelog' };
+  }
+  if (admission.reason === 'omits-changelog') {
     return { action: 'allow', reason: 'candidate-omits-changelog' };
+  }
+  if (!Array.isArray(queuedMemberFiles)) {
+    return { action: 'unknown', reason: 'changelog-evidence-unavailable' };
   }
   const colliding = queuedMemberFiles.filter(
     member =>
       Number.isInteger(member?.prNumber) &&
       member.prNumber > 0 &&
-      touchesChangelog(member.files)
+      Array.isArray(member.files) &&
+      member.files.includes(CHANGELOG_COLLISION_PATH)
   );
   return {
     action: 'skip',

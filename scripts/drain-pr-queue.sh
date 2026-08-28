@@ -720,8 +720,9 @@ pr_changed_paths_json() {  # <num> → JSON string array or null
 }
 
 changelog_collision_decision_for_pr() {  # <num>
-  local n="$1" candidate queued members='[]' files
+  local n="$1" candidate queued members='[]' files branch
   candidate="$(pr_changed_paths_json "$n")"
+  branch="$(echo "$SNAP" | jq -r --argjson n "$n" '.[] | select(.n == $n) | .head // empty')"
   while read -r queued; do
     [[ -n "$queued" ]] || continue
     files="$(pr_changed_paths_json "$queued")"
@@ -729,8 +730,8 @@ changelog_collision_decision_for_pr() {  # <num>
       '. + [{prNumber:$pr, files:$files}]' <<<"$members")"
   done < <(echo "$SNAP" | jq -r --argjson self "$n" \
     '.[] | select(.q == true) | select(.n != $self) | .n')
-  CHANGELOG_COLLISION_JSON="$(jq -nc --argjson candidateFiles "$candidate" --argjson queuedMemberFiles "$members" \
-    '{candidateFiles:$candidateFiles, queuedMemberFiles:$queuedMemberFiles}')" \
+  CHANGELOG_COLLISION_JSON="$(jq -nc --argjson candidateFiles "$candidate" --argjson queuedMemberFiles "$members" --arg branch "$branch" \
+    '{candidateFiles:$candidateFiles, queuedMemberFiles:$queuedMemberFiles, branch:$branch}')" \
     node scripts/ci-merge-queue-check.mjs changelog-collision
 }
 
@@ -970,8 +971,8 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     collision_decision="$(changelog_collision_decision_for_pr "$n")"
     collision_action="$(jq -r '.action // empty' <<<"$collision_decision")"
     if [[ "$collision_action" == "skip" ]]; then
-      echo "    ⏸ pre-land CHANGELOG.md edit is prohibited; refusing native queue admission for #$n"
-      LAST_ENROLL_SKIP_REASON="preland-changelog"
+      echo "    ⏸ pre-land CHANGELOG.md edit is prohibited ($(jq -r '.reason' <<<"$collision_decision")) for #$n; refusing native queue admission without bypassing CI"
+      LAST_ENROLL_SKIP_REASON="$(jq -r '.reason // "pre-land-changelog"' <<<"$collision_decision")"
       return 2
     fi
   fi
@@ -1618,9 +1619,44 @@ if waiting_lane_allows_clean_enroll \
     fi
   done < <(echo "$SNAP" | jq -c '.[]
     | select(.q == true)
-    | select(.qs == "UNMERGEABLE")
+    | select(([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)')
+fi
+
+# --- INVENTORY + DEQUEUE: pre-land CHANGELOG.md (JOV-5378) ---
+# Implementation PRs must not edit CHANGELOG.md. Queued members that still
+# carry the file are dequeued with reenqueue=false. Enrollment skip is a
+# classified skip, not a CI bypass.
+echo "=== INVENTORY (pre-land CHANGELOG.md) ==="
+echo "=== DEQUEUE (pre-land CHANGELOG.md → drain without CI bypass) ==="
+if waiting_lane_allows_clean_enroll \
+  || [[ "$DRAIN_PROMOTION_MODE" == "blocked" && "$DRAIN_FREEZE_EXISTING_QUEUE" == "0" ]]; then
+  changelog_open='[]'
+  while read -r pr; do
+    n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
+    head_ref="$(jq -r '.head // empty' <<<"$pr")"
+    files="$(pr_changed_paths_json "$n")"
+    changelog_open="$(jq -c --argjson n "$n" --argjson files "$files" --arg head "$head_ref" \
+      '. + [{number:$n, files:$files, headRefName:$head, queued:true}]' <<<"$changelog_open")"
+    drain_decision="$(CHANGELOG_COLLISION_JSON="$(jq -nc --argjson files "$files" --argjson queued true --arg branch "$head_ref" \
+      '{files:$files, queued:$queued, branch:$branch}')" \
+      node scripts/ci-merge-queue-check.mjs changelog-drain)"
+    drain_action="$(jq -r '.action // empty' <<<"$drain_decision")"
+    if [[ "$drain_action" != "dequeue" ]]; then
+      continue
+    fi
+    echo "  #$n  $t  ✗ pre-land-changelog"
+    if ! dequeue_strict "$n"; then
+      echo "::error::Failed to prove CHANGELOG PR #$n is outside native merge queue" >&2
+      exit 1
+    fi
+  done < <(echo "$SNAP" | jq -c '.[]
+    | select(.q == true)
     | select(.draft | not)
     | select(([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)')
+  inventory="$(CHANGELOG_COLLISION_JSON="$(jq -nc --argjson openPrs "$changelog_open" '{openPrs:$openPrs}')" \
+    node scripts/ci-merge-queue-check.mjs changelog-inventory)"
+  echo "  inventory count=$(jq -r '.count' <<<"$inventory") reason=$(jq -r '.reason' <<<"$inventory")"
+  echo "$inventory" | jq -r '.prs[]? | "  #\(.number)  \(.headRefName // "unknown")  queued=\(.queued)"'
 fi
 
 # --- DEQUEUE: only GENUINELY un-mergeable PRs (conflict or real failing checks) ---
@@ -1886,6 +1922,9 @@ if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 ]]; then
     if [[ "$LAST_ENROLL_SKIP_REASON" == "product-failure-tombstone" ]]; then
       echo "  #$DRAIN_ADMISSION_PR  ⏸ $LAST_ENROLL_SKIP_REASON (durable exact-head product failure; source repair required)"
     elif [[ "$LAST_ENROLL_SKIP_REASON" == "changelog-collision" \
+      || "$LAST_ENROLL_SKIP_REASON" == "pre-land-changelog" \
+      || "$LAST_ENROLL_SKIP_REASON" == "preland-changelog" \
+      || "$LAST_ENROLL_SKIP_REASON" == "preland-changelog-prohibited" \
       || "$LAST_ENROLL_SKIP_REASON" == "unmergeable-tombstone" ]]; then
       echo "  #$DRAIN_ADMISSION_PR  ⏸ $LAST_ENROLL_SKIP_REASON (classified skip; enroll is not a product-quality failure)"
     elif [[ "$ADMISSION_ELIGIBLE" == "true" ]]; then

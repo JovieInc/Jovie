@@ -498,4 +498,4 @@ Jovie uses Calendar Versioning (`YY.M.PATCH`) tracked in `version.json` and mirr
 pnpm version:check
 ```
 
-Version bumps and changelog entries are handled automatically by the `/ship` workflow. `CHANGELOG.md` uses `merge=union` in `.gitattributes` to auto-resolve merge conflicts between concurrent PRs.
+Version bumps are stamped on the main/release path (`pnpm version:stamp`). Implementation PRs must not add or edit `CHANGELOG.md`; a user-visible change earns exactly one What's New bullet after land/runtime proof. Linear remains the source of record.

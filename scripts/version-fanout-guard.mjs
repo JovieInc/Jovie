@@ -11,10 +11,11 @@
  *   - the `version` field of the root + workspace package.json files
  *   - any feature-branch CHANGELOG.md edit
  *
+ * Implementation PRs must not add or edit CHANGELOG.md at all (JOV-5378).
  * Feature branches MAY edit package.json for dependency/script changes — only
  * the `version` field is protected. They MUST NOT edit CHANGELOG.md. Jovie
  * publishes exactly one user-visible What's New bullet, when warranted, only
- * after land/runtime proof through the release path.
+ * after land/runtime proof through the release path. Linear remains SoR.
  *
  * The actual version stamp happens on the main/release path via
  * `scripts/version-stamp.mjs` after merge. See `.claude/rules/release.md`.
@@ -35,7 +36,7 @@ const ROOT = join(__dirname, '..');
 const STAMP_ALLOWED_BRANCHES = new Set(['main', 'master', 'production']);
 
 /** Files whose any change is a fan-out write on a feature branch. */
-const SCALAR_VERSION_FILES = new Set(['VERSION']);
+const SCALAR_VERSION_FILES = new Set(['VERSION', 'CHANGELOG.md']);
 
 /**
  * Branches that should be exempt from the guard entirely (they legitimately
@@ -124,7 +125,11 @@ export function evaluateVersionFanoutGuard({
   for (const file of normalizedFiles) {
     // 1. Scalar version files: any change is a fan-out write.
     if (SCALAR_VERSION_FILES.has(file)) {
-      violations.push(`${file} (version file edited on a feature branch)`);
+      violations.push(
+        file === 'CHANGELOG.md'
+          ? `${file} (implementation PRs must not add or edit CHANGELOG.md — pre-land changelog artifacts are prohibited; the post-land release path owns the single user-visible What's New bullet)`
+          : `${file} (version file edited on a feature branch)`
+      );
       continue;
     }
 
@@ -149,14 +154,6 @@ export function evaluateVersionFanoutGuard({
           `${file} (version ${before ?? '∅'} → ${after ?? '∅'} on a feature branch)`
         );
       }
-      continue;
-    }
-
-    // 4. CHANGELOG.md: all feature-branch edits are pre-land release artifacts.
-    if (file === 'CHANGELOG.md') {
-      violations.push(
-        "CHANGELOG.md (pre-land changelog artifacts are prohibited; the post-land release path owns the single user-visible What's New bullet)"
-      );
       continue;
     }
   }
@@ -300,7 +297,7 @@ function main() {
     'Version stamping is main-only. Revert these changes; the release path stamps them after merge.'
   );
   console.error(
-    "Do not edit CHANGELOG.md in a PR. The post-land release path owns the single user-visible What's New bullet."
+    "Do not add or edit CHANGELOG.md on implementation PRs. The post-land release path owns the single user-visible What's New bullet."
   );
   console.error(
     'See .claude/rules/release.md → "Version Stamping (main-only)".'

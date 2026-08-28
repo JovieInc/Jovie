@@ -109,6 +109,8 @@ def _write_native_receipt_fakes(
               unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
               unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
               changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+              changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+              changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
               --classify-queue) echo '[]' ;;
               *) echo "unexpected node args: $*" >&2; exit 2 ;;
             esac
@@ -172,6 +174,8 @@ class TestExactHeadQueueReceipt:
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
                   unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
                   changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 93 ;;
                 esac
@@ -252,6 +256,8 @@ class TestExactHeadQueueReceipt:
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
                   unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
                   changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 93 ;;
                 esac
@@ -337,6 +343,8 @@ class TestExactHeadQueueReceipt:
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
                   unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
                   changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 93 ;;
                 esac
@@ -429,6 +437,9 @@ class TestExactHeadQueueReceipt:
                   max-queue-depth) echo 16 ;;
                   front-churn) echo '{{"action":"block","reason":"unchanged head failed product checks","evidence":{{"failureClass":"deterministic-product-check"}}}}' ;;
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-unmergeable"}}' ;;
+                  changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 93 ;;
                 esac
@@ -852,6 +863,8 @@ class TestDrainPrQueueWiring:
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
                   unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
                   changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 2 ;;
                 esac
@@ -949,6 +962,8 @@ class TestDrainPrQueueWiring:
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
                   unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
                   changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 2 ;;
                 esac
@@ -1048,6 +1063,8 @@ JSON
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
                   unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
                   changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 2 ;;
                 esac
@@ -1143,6 +1160,8 @@ JSON
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
                   unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
                   changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 2 ;;
                 esac

@@ -558,6 +558,13 @@ describe('queue workflow mutation safety', () => {
     );
     expect(drain).toContain('unmergeable-eject');
     expect(drain).toContain('changelog-collision');
+    expect(drain).toContain('changelog-inventory');
+    expect(drain).toContain('changelog-drain');
+    expect(drain).toContain('pre-land-changelog');
+    expect(drain).toContain('INVENTORY (pre-land CHANGELOG.md)');
+    expect(drain).toContain(
+      'DEQUEUE (pre-land CHANGELOG.md → drain without CI bypass)'
+    );
     expect(drain).toContain(
       'classified skip; enroll is not a product-quality failure'
     );
