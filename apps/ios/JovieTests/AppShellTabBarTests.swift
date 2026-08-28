@@ -187,6 +187,13 @@ struct LibraryFeedTests {
     #expect(LibraryHome.ideas.accessibilityIdentifier == "library-home-ideas")
   }
 
+  @Test func controlHitFramesStayCanonicalWithoutEnlargingSearchVisual() {
+    #expect(LibraryControlMetrics.minimumTouchTarget == JovieIconButtonStyle.targetSize)
+    #expect(LibraryControlMetrics.minimumTouchTarget == 44)
+    #expect(LibraryControlMetrics.searchVisualHeight == 36)
+    #expect(LibraryControlMetrics.searchVisualHeight < LibraryControlMetrics.minimumTouchTarget)
+  }
+
   @Test func searchMatchesCatalogNameAndIgnoresTakes() {
     let hits = LibraryFeed.matching(LibraryFeed.previewAssets, query: "midnight")
     #expect(hits.map(\.id) == ["lib-release-midnight"])
