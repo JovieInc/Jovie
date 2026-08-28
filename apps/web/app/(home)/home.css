@@ -152,13 +152,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   color: var(--color-text-primary-token);
 }
 
-.homepage-header-auth a:last-child {
-  padding-inline: 24px;
-  border-color: rgba(255, 255, 255, 0.9);
-  background: #f4f6ff;
-  color: #050506;
-}
-
 .homepage-hero-stage {
   background: #000;
 }
@@ -840,7 +833,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
     font-size: 14px;
   }
 
-  .homepage-header-auth a:last-child {
+  .homepage-header-auth > div > a:last-child {
     display: none;
   }
 
@@ -1606,11 +1599,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-size: var(--text-app);
 }
 
-.home-viewport .homepage-header-auth a:last-child {
-  width: auto;
-  padding-inline: var(--space-4);
-}
-
 .home-viewport[data-scrolled="true"]
   [data-presentation="homepage-embedded"]
   nav
@@ -1849,6 +1837,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   letter-spacing: var(--ds-marketing-display-tracking);
   line-height: var(--ds-marketing-display-leading);
   text-wrap: balance;
+  white-space: pre-line;
 }
 
 .homepage-poster-hero__subtitle {
@@ -1867,6 +1856,14 @@ body:has(.home-viewport)::-webkit-scrollbar {
   justify-content: center;
   gap: var(--space-3);
   margin-top: var(--space-6);
+}
+
+.homepage-poster-hero__action-button {
+  border-radius: var(--radius-pill);
+  font-family:
+    var(--font-satoshi), "Satoshi", -apple-system, "system-ui", sans-serif;
+  font-size: 14px;
+  font-weight: 510;
 }
 
 .homepage-poster-hero__seam {
@@ -4219,116 +4216,44 @@ body:has(.home-viewport)::-webkit-scrollbar {
   }
 
   .homepage-artist-profiles__card {
-    flex-basis: 100%;
+    flex-basis: min(72vw, 18rem);
   }
 }
 /* HOMEPAGE ARTIST PROFILES SYSTEM B END */
 
 /* HOMEPAGE ARTIST OUTCOMES SYSTEM B START */
-.homepage-artist-outcome {
-  --homepage-artist-outcome-copy-track: 1fr;
-  --homepage-artist-outcome-media-track: 2fr;
-
-  position: relative;
-  display: grid;
+.homepage-artist-profile-preview {
   min-width: 0;
-  aspect-ratio: 9 / 16;
-  overflow: hidden;
-  border-radius: var(--radius-2xl);
-  background: var(--system-b-primary-bg);
-  color: var(--system-b-primary-fg);
-  grid-template-rows:
-    var(--homepage-artist-outcome-copy-track)
-    var(--homepage-artist-outcome-media-track);
 }
 
-.homepage-artist-outcome__copy {
-  position: relative;
-  z-index: 2;
+.homepage-artist-profile-preview__figure {
   display: grid;
-  min-height: 0;
-  align-content: start;
-  padding: clamp(var(--space-6), 2.8vw, var(--space-10));
-}
-
-.homepage-artist-outcome h3 {
+  gap: var(--space-4);
   margin: 0;
-  color: var(--system-b-primary-fg);
-  font-size: var(--text-2xl);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--leading-tight);
-  letter-spacing: var(--ds-marketing-lede-tracking);
-  text-wrap: balance;
 }
 
-.homepage-artist-outcome__copy p {
-  max-width: 31ch;
-  margin: var(--space-3) 0 0;
-  color: color-mix(in oklab, var(--system-b-primary-fg) 62%, transparent);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-normal);
-  line-height: var(--leading-relaxed);
-  text-wrap: pretty;
-}
-
-.homepage-artist-outcome__media {
-  position: relative;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  overflow: hidden;
-  margin: 0;
-  pointer-events: none;
-}
-
-.homepage-artist-outcome__device {
-  width: auto;
-  max-width: 74%;
-  height: calc(100% - var(--space-4));
-  aspect-ratio: 9 / 19.5;
-  padding: var(--space-2);
-}
-
-/* The product proof is deliberately larger than its outcome card. The media
-   frame owns the crop so the phone feels like a real continuation below it,
-   rather than a thumbnail floating inside a card. */
-.homepage-artist-profiles__card .homepage-artist-outcome__device {
-  width: min(22rem, 118%);
-  max-width: none;
-  height: auto;
-  margin: var(--space-4) 0 calc(var(--space-24) * -1);
+.homepage-artist-profile-preview__device {
+  width: 100%;
+  max-width: 15rem;
   padding: var(--space-1);
 }
 
-@media (max-width: 900px) {
-  .homepage-artist-profiles__card .homepage-artist-outcome__device {
-    width: min(24rem, 96%);
-    margin-bottom: calc(var(--space-32) * -1);
-  }
-}
-
-/* The shared Artist Profiles frame includes an editorial surface treatment.
-   Homepage outcome cards are product proof, so keep this instance neutral. */
-.homepage-artist-outcome .homepage-artist-outcome__device.ap-phone-frame {
+.homepage-artist-profile-preview .ap-phone-frame {
   border-color: var(--system-b-app-frame-seam);
   background: var(--system-b-bg-surface-0);
   box-shadow: none;
 }
 
-.homepage-artist-outcome
-  .homepage-artist-outcome__device
-  .ap-phone-frame__overlay {
+.homepage-artist-profile-preview .ap-phone-frame__overlay {
   background: none;
 }
 
-.homepage-artist-outcome
-  .homepage-artist-outcome__device
-  .ap-phone-frame__notch {
+.homepage-artist-profile-preview .ap-phone-frame__notch {
   background: var(--system-b-cinematic-black);
   box-shadow: none;
 }
 
-.homepage-artist-outcome__screen {
+.homepage-artist-profile-preview__screen {
   display: block;
   width: 100%;
   max-width: none;
@@ -4338,10 +4263,13 @@ body:has(.home-viewport)::-webkit-scrollbar {
   object-position: center top;
 }
 
-.homepage-artist-outcome__media .homepage-artist-outcome__screen {
-  width: 100%;
-  max-width: none;
-  height: 100%;
+.homepage-artist-profile-preview__label {
+  color: var(--color-text-tertiary-token);
+  font-family:
+    var(--font-satoshi), "Satoshi", -apple-system, "system-ui", sans-serif;
+  font-size: var(--text-sm);
+  font-weight: 510;
+  text-align: center;
 }
 
 .homepage-outcome-section {
@@ -4674,10 +4602,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 @media (max-width: 767px) {
-  .homepage-artist-outcome__caption {
-    padding: var(--space-5);
-  }
-
   .homepage-outcome-heading {
     max-width: 12ch;
     font-size: clamp(var(--text-3xl), 10vw, var(--text-4xl));

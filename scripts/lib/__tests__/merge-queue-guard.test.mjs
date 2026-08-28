@@ -2339,7 +2339,7 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     ).toBe('allow');
   });
 
-  it('skips ALLGREEN enrollment when CHANGELOG.md already sits in the queued group', () => {
+  it('skips every pre-land CHANGELOG.md candidate', () => {
     expect(CHANGELOG_COLLISION_PATH).toBe('CHANGELOG.md');
     expect(
       changelogGroupCollisionDecision({
@@ -2347,11 +2347,31 @@ describe('native merge-queue cohort (JOV-5047)', () => {
         queuedMemberFiles: [
           { prNumber: 16352, files: ['CHANGELOG.md', 'docs/x.md'] },
         ],
+        branch: 'fallback/JOV-5378-fix',
       })
     ).toMatchObject({
       action: 'skip',
-      reason: 'changelog-collision',
+      reason: 'pre-land-changelog',
+    });
+    expect(
+      changelogGroupCollisionDecision({
+        candidateFiles: ['CHANGELOG.md'],
+        queuedMemberFiles: [{ prNumber: 16352, files: ['CHANGELOG.md'] }],
+        branch: 'cursor/stamp-26-8-0-version-stamp-ab12',
+      })
+    ).toMatchObject({
+      action: 'skip',
+      reason: 'preland-changelog-prohibited',
       collidingPrs: [16352],
+    });
+    expect(
+      changelogGroupCollisionDecision({
+        candidateFiles: ['CHANGELOG.md'],
+        queuedMemberFiles: [],
+      })
+    ).toMatchObject({
+      action: 'skip',
+      reason: 'pre-land-changelog',
     });
     expect(
       changelogGroupCollisionDecision({
@@ -2362,8 +2382,8 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     expect(
       changelogGroupCollisionDecision({
         candidateFiles: ['CHANGELOG.md'],
-      }).action
-    ).toBe('unknown');
+      })
+    ).toMatchObject({ action: 'skip', reason: 'pre-land-changelog' });
   });
 
   it('skips a superseded Production Controller generation and promotes only exact main', () => {

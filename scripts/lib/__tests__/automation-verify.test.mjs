@@ -7,6 +7,7 @@ import {
   buildAffectedTestPlan,
   buildFullSuiteCommands,
   buildSelectedTestCommands,
+  buildVerificationEnv,
   runCommandStatus,
 } from '../../run-affected-tests.mjs';
 
@@ -19,6 +20,19 @@ const script = readFileSync(
   resolve(import.meta.dirname, '../../automation-verify.sh'),
   'utf8'
 );
+
+describe('verification child environment', () => {
+  it('removes hook-local Git routing while preserving unrelated variables', () => {
+    expect(
+      buildVerificationEnv({
+        GIT_DIR: '.',
+        GIT_WORK_TREE: '/wrong/worktree',
+        GIT_INDEX_FILE: '/wrong/index',
+        PATH: '/repo/bin',
+      })
+    ).toEqual({ PATH: '/repo/bin' });
+  });
+});
 
 const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = [
   '.husky/pre-push',
@@ -93,11 +107,13 @@ const MERGE_QUEUE_CONTROLLER_INPUTS = [
   'scripts/ci-merge-queue-check.mjs',
   'scripts/drain-pr-queue.sh',
   'scripts/lib/merge-queue-guard.mjs',
+  'scripts/lib/pre-land-changelog.mjs',
   'scripts/lib/resolve-merge-group-path-diff.mjs',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
   'scripts/merge-queue-backend.mjs',
   'scripts/tests/test_gh_retry.py',
@@ -108,6 +124,7 @@ const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
 ];
 
@@ -172,6 +189,15 @@ const VERCEL_CONGESTION_CONTROL_MANIFEST = [
 const AFFECTED_TEST_SELECTOR_MANIFEST = [
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
+];
+const SENTRY_AUTOFIX_RECURRENCE_LANE = [
+  '.github/workflows/sentry-autofix-recurrence.yml',
+  '.github/workflows/sentry-autofix.yml',
+  'scripts/sentry-autofix-recurrence.mjs',
+  'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
+  'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
+  'scripts/tests/test_agent_workflow_hygiene.py',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ];
 const SAFE_PR_REMEDIATION_LANE = [
   '.github/workflows/safe-pr-remediation.yml',
@@ -395,6 +421,45 @@ const NEON_ATTEMPT_ARTIFACT_MANIFEST = [
 ];
 
 describe('automation-verify affected scope', () => {
+  it('keeps the product-lane foundation out of unrelated Web ratchets', () => {
+    const plan = buildAffectedTestPlan([
+      '.claude/rules/release.md',
+      '.github/workflows/README.md',
+      'docs/PR_FLOW.md',
+      'docs/TESTING_STRATEGY.md',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+      'scripts/lib/__tests__/merge-queue-backend.test.mjs',
+      'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+      'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
+      'scripts/lib/__tests__/product-lane-classifier.test.mjs',
+      'scripts/lib/ci-harness.mjs',
+      'scripts/lib/merge-queue-guard.mjs',
+      'scripts/lib/product-lane-classifier.mjs',
+      'scripts/lib/product-lane-finalize.mjs',
+      'scripts/lib/resolve-merge-group-path-diff.mjs',
+      'scripts/run-affected-tests.mjs',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([]);
+    expect(plan.scriptVitestTests).toContain(
+      'scripts/lib/__tests__/product-lane-classifier.test.mjs'
+    );
+    expect(plan.scriptVitestTests).toContain(
+      'scripts/lib/__tests__/merge-queue-backend.test.mjs'
+    );
+    expect(plan.nodeTests).toEqual(['scripts/typecheck-scripts.mjs']);
+  });
+
+  it('fails back to the full Web suite when the foundation adds a Web path', () => {
+    expect(
+      buildAffectedTestPlan([
+        'scripts/lib/product-lane-classifier.mjs',
+        'apps/web/lib/unknown.ts',
+      ]).mode
+    ).toBe('full');
+  });
+
   it('does not require retired Graphite source authorization artifacts', () => {
     for (const retiredPath of [
       '.github/workflows/gtmq-source-authorization.yml',
@@ -512,6 +577,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
         'scripts/lib/__tests__/ci-branching-guard.test.mjs',
         'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+        'scripts/lib/__tests__/pre-land-changelog.test.mjs',
         'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
         'scripts/lib/__tests__/auto-ready-agent-drafts.test.mjs',
         'scripts/lib/__tests__/eval-main-health-action.test.mjs',
@@ -522,6 +588,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
         'scripts/lib/__tests__/lockfile-specifier-preflight.test.mjs',
         'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
+        'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
         'scripts/lib/__tests__/golden-path-lock.test.mjs',
         'scripts/lib/__tests__/golden-path-prod-autofix-workflow-contract.test.mjs',
         'scripts/lib/__tests__/queue-deferral-receipt.test.mjs',
@@ -709,6 +776,28 @@ describe('automation-verify affected scope', () => {
       buildAffectedTestPlan([
         ...ROLLING_CI_FX_CACHE_GC_LANE,
         'apps/web/lib/unknown-fx-cache-peer.ts',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('selects the bounded sentry autofix recurrence contract and fails closed on unrelated files', () => {
+    expect(buildAffectedTestPlan(SENTRY_AUTOFIX_RECURRENCE_LANE)).toMatchObject(
+      {
+        mode: 'selected',
+        selectedTests: [],
+        pythonUnittestTests: ['scripts/tests/test_agent_workflow_hygiene.py'],
+        scriptVitestTests: [
+          'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
+          'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
+          'scripts/lib/__tests__/automation-verify.test.mjs',
+        ],
+        nodeTests: ['scripts/typecheck-scripts.mjs'],
+      }
+    );
+    expect(
+      buildAffectedTestPlan([
+        ...SENTRY_AUTOFIX_RECURRENCE_LANE,
+        'apps/web/lib/unknown-sentry-recurrence-peer.ts',
       ]).mode
     ).toBe('full');
   });

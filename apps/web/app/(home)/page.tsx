@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import {
-  type HomepageArtistProfileCards,
+  type HomepageArtistProfilePreviews,
   HomepageArtistProfiles,
 } from '@/components/homepage/HomepageArtistProfiles';
 import { HomepageClosedLoop } from '@/components/homepage/HomepageClosedLoop';
@@ -13,9 +13,7 @@ import { HERO_COPY } from '@/components/homepage/intent';
 import {
   FaqSection,
   MarketingElectricSeam,
-  MarketingPlatformSpecBento,
   MarketingPosterHero,
-  MarketingShippedSitesShowcase,
 } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
@@ -51,32 +49,28 @@ const HERO_PRODUCT_IMAGES = {
   // demo canvas.
   product: getMarketingExportImage('dashboard-releases-sidebar-desktop'),
 };
-const ARTIST_OUTCOME_CARDS = [
+const ARTIST_PROFILE_PREVIEWS = [
   {
-    id: 'sell-out',
-    title: 'Sell Out',
-    body: 'Put your next show or tour date where fans can get tickets.',
+    id: 'tour',
+    label: 'Tour',
     image: getMarketingExportImage('tim-white-profile-tour-mobile'),
   },
   {
-    id: 'capture-fans',
-    title: 'Capture Fans',
-    body: 'Fan capture builds a list you can use again.',
+    id: 'subscribe',
+    label: 'Subscribe',
     image: getMarketingExportImage('tim-white-profile-subscribe-mobile'),
   },
   {
-    id: 'get-paid',
-    title: 'Get Paid',
-    body: 'Make direct support feel native to the artist profile.',
+    id: 'pay',
+    label: 'Pay',
     image: getMarketingExportImage('tim-white-profile-pay-mobile'),
   },
   {
-    id: 'drop-music',
-    title: 'Drop Music',
-    body: 'Give fans one link for the release before it lands.',
+    id: 'presave',
+    label: 'Presave',
     image: getMarketingExportImage('tim-white-profile-presave-mobile'),
   },
-] as const satisfies HomepageArtistProfileCards;
+] as const satisfies HomepageArtistProfilePreviews;
 
 export const revalidate = false;
 
@@ -263,9 +257,7 @@ function HomepageUnlockedSections() {
   return (
     <>
       <HomepageMeetJovie />
-      <HomepageArtistProfiles cards={ARTIST_OUTCOME_CARDS} />
-      <MarketingShippedSitesShowcase testId='homepage-shipped-sites-showcase' />
-      <MarketingPlatformSpecBento testId='homepage-platform-spec-bento' />
+      <HomepageArtistProfiles previews={ARTIST_PROFILE_PREVIEWS} />
       <HomepageClosedLoop />
       <HomepageFaq />
     </>

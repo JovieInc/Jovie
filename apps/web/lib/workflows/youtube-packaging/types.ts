@@ -62,6 +62,7 @@ export type DecisionOutcome =
   | 'control_wins'
   | 'inconclusive'
   | 'guardrail_blocked'
+  | 'native_experiment_required'
   | 'swap_executed'
   | 'rollback_executed'
   | 'waiting_for_approval';

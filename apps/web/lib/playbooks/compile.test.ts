@@ -133,6 +133,10 @@ describe('compilePlaybookToSkill', () => {
   it('registry tool set includes fan_email_send', () => {
     expect(getRegistryToolIds().has('fan_email_send')).toBe(true);
   });
+
+  it('registry tool set includes smart_link_switch_live', () => {
+    expect(getRegistryToolIds().has('smart_link_switch_live')).toBe(true);
+  });
 });
 
 describe('compiled dogfood playbooks', () => {

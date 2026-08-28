@@ -3,8 +3,8 @@ name: ship
 preamble-tier: 4
 version: 1.0.0
 description: |
-  Ship workflow: detect + merge base branch, run tests, review diff, bump VERSION,
-  update CHANGELOG, commit, push, create PR. Use when asked to "ship", "deploy",
+  Ship workflow: detect + merge base branch, run tests, review diff, commit,
+  push, create or update a PR. Never edit CHANGELOG before land. Use when asked to "ship", "deploy",
   "push to main", "create a PR", "merge and push", or "get it deployed".
   Proactively invoke this skill (do NOT push/PR directly) when the user says code
   is ready, asks about deploying, wants to push code up, or asks to create a PR. (gstack)
@@ -395,7 +395,8 @@ You are running the `/ship` workflow. This is a **non-interactive, fully automat
 **Never stop for:**
 - Uncommitted changes (always include them)
 - Version bump choice (auto-pick MICRO or PATCH — see Step 4)
-- CHANGELOG content (auto-generate from diff)
+- CHANGELOG content (do not edit CHANGELOG.md on implementation PRs)
+- Post-land What's New copy (owned by the release/UI path after runtime proof)
 - Commit message approval (auto-commit)
 - Multi-file changesets (auto-split into bisectable commits)
 - Legacy TODO cross-reference that does not create new follow-up work
@@ -1720,14 +1721,18 @@ already knows. A good test: would this insight save time in a future session? If
 
 ## Step 4: Version bump (auto-decide)
 
-> **JOVIE OVERRIDE — version stamping is MAIN-ONLY.** This repo bumps the version
+> **JOVIE OVERRIDE — version stamping is MAIN-ONLY, and CHANGELOG.md is post-land.** This repo bumps the version
 > fan-out (`VERSION`, `version.json`, root + workspace `package.json` versions, dated
 > `CHANGELOG.md` headings) only on the main/release path via `pnpm version:stamp`, never
 > on feature branches. `/ship` runs from a feature branch (Step 1), so **SKIP this entire
 > Step 4** — do not edit `VERSION`, `version.json`, or any `package.json` version field.
-> CI (`scripts/version-fanout-guard.mjs`) will fail the PR if you do. Put release notes
-> under the `## [Unreleased]` CHANGELOG section instead (see the CHANGELOG step below).
-> See `.claude/rules/release.md` → "Version Stamping (main-only)".
+> **SKIP the CHANGELOG step below.** Do not add or edit `CHANGELOG.md`.
+> Implementation PRs that touch it fail admission (JOV-5378). CI
+> (`scripts/version-fanout-guard.mjs` + `scripts/lib/pre-land-changelog.mjs`)
+> will fail the PR if you edit CHANGELOG.md. The post-land release/UI path owns
+> the single user-visible What's New bullet when runtime proof says one is
+> warranted. Linear remains SoR.
+> See `.claude/rules/release.md` → "Version Stamping (main-only)" and "Changelog".
 
 **Idempotency check:** Before bumping, compare VERSION against the base branch.
 
@@ -1758,47 +1763,16 @@ If output shows `ALREADY_BUMPED`, VERSION was already bumped on this branch (pri
 
 ---
 
-## CHANGELOG (auto-generate)
+## POST-LAND WHAT'S NEW BOUNDARY
 
-**Jovie override:** Feature branches edit only `## [Unreleased]`; main runs
-`pnpm version:stamp`. Never bump version fan-out or add a dated heading here.
+**Jovie override:** Do not edit `CHANGELOG.md`, add a changelog fragment, or
+create a VERSION/CHANGELOG metadata commit. Linear is the source of record and
+the PR carries implementation plus verification evidence.
 
-1. Read `CHANGELOG.md`, `git log <base>..HEAD --oneline`, and
-   `git diff <base>...HEAD`.
-2. Build a private source map first. For every commit or issue record a canonical
-   outcome key, audience, availability, action, outcome, and public/internal
-   disposition. Keep issue IDs and SHAs private.
-3. **Group by customer outcome.** Squash only when audience, availability,
-   action, and outcome match; otherwise split. Prioritize revenue/activation,
-   reliability, discovery, then polish.
-4. Write one unified `[Unreleased]` entry using `### Featured`, `### Added`,
-   `### Changed`, `### Fixed`, and `### Removed` as needed.
-   - Public bullets use `**Headline:** summary`.
-   - Headlines are 8 words or fewer.
-   - Summaries are 2 sentences and 22 words or fewer.
-   - Lead with what the user can now **do**, using concrete product nouns.
-   - Never mention ticket IDs, vendors, TODOS.md, or implementation jargon.
-   - Never claim availability without exact release evidence.
-5. Save the complete source map, ordered stories, and structured availability
-   evidence in the project-local gstack directory; never commit it. Released
-   stories require `git_tag` evidence formatted `v<release>@<40-char SHA>`;
-   Unreleased stories require `publication` evidence formatted
-   `CHANGELOG.md#Unreleased`.
-6. Run the **independent per-changelog eval**:
-   `bun run <gstack-root>/scripts/changelog-eval.ts <input.json> --changelog CHANGELOG.md --receipt <result.json>`.
-   It verifies reciprocal mapping, exclusions, squash/split grouping, priority,
-   evidence, copy limits, leaks, hashes the exact changelog, and matches the
-   published bullets.
-7. Fix only failed dimensions and retry for at most 3 total iterations. Still
-   failing means stop; never publish without a passing receipt.
-8. **Cross-check:** Every commit must map to exactly one public story or one
-   documented internal exclusion.
-
-The evaluator itself has a separate golden-fixture regression suite at
-`test/changelog-eval.test.ts`. Changes to this workflow or evaluator must pass
-that skill eval; a passing real release cannot substitute for it.
-
-**Do NOT ask the user to describe changes.** Infer from the diff and commit history.
+After the PR lands and the exact runtime is proven, Jovie's existing release/UI
+path decides whether the change is user-visible. If it is, that path locks
+exactly one plain-language What's New bullet. Internal-only work emits no vanity
+note. `/ship` does not draft, publish, or store that bullet before land.
 
 ---
 
@@ -1854,7 +1828,7 @@ Completion Status Protocol.
    - **Infrastructure:** migrations, config changes, route additions
    - **Models & services:** new models, services, concerns (with their tests)
    - **Controllers & views:** controllers, views, JS/React components (with their tests)
-   - **VERSION + CHANGELOG + follow-up issue references:** always in the final commit
+   - **Follow-up issue references:** include them with the coherent change they constrain
 
 3. **Rules for splitting:**
    - A model and its test file go in the same commit
@@ -1869,11 +1843,11 @@ Completion Status Protocol.
 5. Compose each commit message:
    - First line: `<type>: <summary>` (type = feat/fix/chore/refactor/docs)
    - Body: brief description of what this commit contains
-   - Only the **final commit** (VERSION + CHANGELOG) gets the version tag and co-author trailer:
+   - The final coherent commit may carry the co-author trailer; do not create a VERSION/CHANGELOG metadata commit:
 
 ```bash
 git commit -m "$(cat <<'EOF'
-chore: bump version and changelog (vX.Y.Z.W)
+chore: finalize Linear-linked shipping evidence
 
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 EOF
@@ -1888,7 +1862,7 @@ EOF
 
 Before pushing, re-verify if code changed during Steps 4-6:
 
-1. **Test verification:** If ANY code changed after Step 3's test run (fixes from review findings, CHANGELOG edits don't count), re-run the test suite. Paste fresh output. Stale output from Step 3 is NOT acceptable.
+1. **Test verification:** If ANY code changed after Step 3's test run, re-run the test suite. Paste fresh output. Stale output from Step 3 is NOT acceptable.
 
 2. **Build verification:** If the project has a build step, run it. Paste output.
 
@@ -1947,8 +1921,7 @@ The PR/MR body should contain these sections:
 ```
 ## Summary
 <Summarize ALL changes being shipped. Run `git log <base>..HEAD --oneline` to enumerate
-every commit. Exclude the VERSION/CHANGELOG metadata commit (that's this PR's bookkeeping,
-not a substantive change). Group the remaining commits into logical sections (e.g.,
+every commit. Group the commits into logical sections (e.g.,
 "**Performance**", "**Dead Code Removal**", "**Infrastructure**"). Every substantive commit
 must appear in at least one section. If a commit's work isn't reflected in the summary,
 you missed it.>
@@ -2081,7 +2054,7 @@ This step is automatic — never skip it, never ask for confirmation.
 - **Never force push.** Use regular `git push` only.
 - **Never ask for trivial confirmations** (e.g., "ready to push?", "create PR?"). DO stop for: version bumps (MINOR/MAJOR), pre-landing review findings (ASK items), and Codex structured review [P1] findings (large diffs only).
 - **Always use the 4-digit version format** from the VERSION file.
-- **Date format in CHANGELOG:** `YYYY-MM-DD`
+- **Never edit `CHANGELOG.md` before land.** Exactly one user-visible What's New bullet, when warranted, belongs to the post-land release/UI path.
 - **Split commits for bisectability** — each commit = one logical change.
 - **TODOS.md is legacy context only.** Never add new TODO items; create Linear issues for actionable follow-ups.
 - **Use Greptile reply templates from greptile-triage.md.** Every reply includes evidence (inline diff, code references, re-rank suggestion). Never post vague replies.

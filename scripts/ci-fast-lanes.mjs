@@ -30,6 +30,12 @@ import { fileURLToPath } from 'node:url';
 import { classifyCiRepoLanes } from './lib/ci-repo-lanes.mjs';
 
 const REPO_ROOT = process.cwd();
+const selectedProductLanes = () =>
+  new Set(
+    (process.env.CI_PRODUCT_LANES || 'ios,mac,web,operations,cross-product')
+      .split(',')
+      .filter(Boolean)
+  );
 
 /** @typedef {{ id: string, name: string, nextLocalCommand: string, status: 'success'|'failure'|'skipped', logExcerpt: string }} LaneResult */
 
@@ -269,7 +275,7 @@ function excerpt(text, max = 1200) {
 
 function runBiome() {
   const event = process.env.GITHUB_EVENT_NAME || '';
-  if (event === 'pull_request') {
+  if (event !== 'workflow_dispatch') {
     const files = changedFiles([
       '*.ts',
       '*.tsx',
@@ -297,7 +303,7 @@ function runBiome() {
 
 function runEslintServerBoundaries() {
   const event = process.env.GITHUB_EVENT_NAME || '';
-  if (event === 'pull_request') {
+  if (event !== 'workflow_dispatch') {
     const files = changedFiles([
       'apps/web/*.ts',
       'apps/web/*.tsx',
@@ -365,29 +371,56 @@ function runScriptsTypecheck() {
       skipped: true,
     };
   }
+  const files = changedFiles([
+    'scripts/**/*.ts',
+    'scripts/**/*.mts',
+    'scripts/**/*.mjs',
+    'scripts/**/*.cts',
+    'scripts/tsconfig*.json',
+  ]);
+  if (files && files.length === 0) {
+    return {
+      code: 0,
+      output: 'No scripts typecheck paths changed\n',
+      skipped: true,
+    };
+  }
   return shell('pnpm run typecheck:scripts');
 }
 
 function runGuardrails() {
-  const event = process.env.GITHUB_EVENT_NAME || '';
-  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
-    return {
-      code: 0,
-      output: 'Guardrails skipped (no Jovie product files changed)\n',
-      skipped: true,
-    };
-  }
   const base = process.env.GITHUB_BASE_REF || 'main';
   const originBase = `origin/${base}`;
+  const selected = selectedProductLanes();
   const parts = [
-    `node scripts/desktop-release-guard.mjs --base ${JSON.stringify(originBase)}`,
-    `node scripts/version-fanout-guard.mjs --base ${JSON.stringify(originBase)}`,
-    'node scripts/design-authority-guard.mjs',
-    'pnpm design:logo-assets:check',
-    'node --test scripts/cleanup-stale-dev.test.mjs scripts/desktop-release-guard.test.mjs scripts/desktop-installed-apps-audit.test.mjs scripts/dev-web-fast.test.mjs scripts/ios-guardrail-rollout-audit.test.mjs scripts/version-fanout-guard.test.mjs scripts/version-stamp.test.mjs scripts/agent/preflight.test.mjs scripts/agent/pen-save-receipt.test.mjs scripts/agent/pen-live-canvas-persist.test.mjs scripts/agent/pen-cold-readback.test.mjs scripts/skill-governance-guard.test.mjs scripts/skill-catalog.test.mjs scripts/agent-web-contract.test.mjs',
-    'node scripts/version-check.mjs',
-    'node apps/web/scripts/next-proxy-guard.mjs',
+    ...(selected.has('mac')
+      ? [
+          `node scripts/desktop-release-guard.mjs --base ${JSON.stringify(originBase)}`,
+        ]
+      : []),
+    ...(selected.has('cross-product')
+      ? [
+          `node scripts/version-fanout-guard.mjs --base ${JSON.stringify(originBase)}`,
+          'node scripts/version-check.mjs',
+        ]
+      : []),
+    ...(selected.has('operations')
+      ? [
+          'node scripts/design-authority-guard.mjs',
+          'pnpm design:logo-assets:check',
+          'node --test scripts/cleanup-stale-dev.test.mjs scripts/desktop-release-guard.test.mjs scripts/desktop-installed-apps-audit.test.mjs scripts/dev-web-fast.test.mjs scripts/ios-guardrail-rollout-audit.test.mjs scripts/version-fanout-guard.test.mjs scripts/version-stamp.test.mjs scripts/agent/preflight.test.mjs scripts/agent/pen-save-receipt.test.mjs scripts/agent/pen-live-canvas-persist.test.mjs scripts/agent/pen-cold-readback.test.mjs scripts/skill-governance-guard.test.mjs scripts/skill-catalog.test.mjs scripts/agent-web-contract.test.mjs',
+        ]
+      : []),
+    ...(selected.has('web')
+      ? ['node apps/web/scripts/next-proxy-guard.mjs']
+      : []),
   ];
+  if (parts.length === 0)
+    return {
+      code: 0,
+      output: 'No guardrail product lane selected\n',
+      skipped: true,
+    };
   let combined = '';
   for (const cmd of parts) {
     const result = shell(cmd);
@@ -400,6 +433,14 @@ function runGuardrails() {
 }
 
 function runDesignConformance() {
+  const selected = selectedProductLanes();
+  if (!selected.has('operations') && !selected.has('web')) {
+    return {
+      code: 0,
+      output: 'No design product lane selected\n',
+      skipped: true,
+    };
+  }
   // Always validate the normalized manifest. The selector inside the command
   // reports affected design domains but never invokes Gem/Symphony/Ubuntu ops.
   return shell(LANE_COMMANDS['design-conformance']);
@@ -464,7 +505,8 @@ function runStructural() {
     };
   }
 
-  const parts = [
+  const selected = selectedProductLanes();
+  const operationsParts = [
     'pnpm invariants:check',
     'pnpm ci:harness:check',
     'pnpm ci:incident-contract:validate',
@@ -473,7 +515,18 @@ function runStructural() {
     'pnpm ci:branching-guard:validate',
     'pnpm ci:merge-queue:check',
     'pnpm ci:typecheck-gate-guard',
+    'pnpm doc:freshness:check',
+    'node .github/scripts/quarantine-ledger.mjs validate',
+    'python3 .github/scripts/test-security-suppression-audit.py',
+    // The Gem contract is embedded in the broader Symphony controller suite.
+    "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs",
+    'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs',
+    'node --test scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
+    'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs',
+    'if python3 -c "import coverage, pytest" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage run --branch scripts/hermes/tests/gem-rehabilitation-policy.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage report --include="*/scripts/hermes/gem_rehabilitation_policy.py" --fail-under=90 && python3 -m pytest scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py scripts/tests/test_brand_scrub.py scripts/tests/test_agent_workflow_hygiene.py scripts/tests/test_runner_routing.py scripts/tests/test_symphony_ui_pilot_runtime.py scripts/tests/test_symphony_reconciler_runtime.py -v; else echo "pytest/coverage not installed — skip structural regressions"; fi',
     // actionlint runs as a dedicated workflow step before this script (rhysd/actionlint).
+  ];
+  const webParts = [
     'pnpm next:proxy-guard',
     'pnpm tailwind:check',
     'pnpm --filter=@jovie/web run lint:no-native-dialogs',
@@ -481,30 +534,24 @@ function runStructural() {
     'pnpm --filter=@jovie/web run lint:contrast-ratchet',
     // JOV-4421: hard ship gate — tests + matching stories for shippable UI.
     'pnpm component-ship-gate',
-    'pnpm doc:freshness:check',
-    'node .github/scripts/quarantine-ledger.mjs validate',
-    'python3 .github/scripts/test-security-suppression-audit.py',
     // CI workflow changes live at the repo root, so Turbo --affected can select
     // only the root package and return success after running zero web tests.
     // Target Vitest directly so the deploy contract always executes and fails
     // closed when the file cannot be resolved or contains no tests.
     'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts',
     'pnpm --filter @jovie/web run test:reliability-detectors',
-    // The Gem contract is embedded in the broader Symphony controller suite.
-    // Select the exact subtest so typed remediation admission, leases, and
-    // expected-head mutation remain executable CI behavior without adding the
-    // full backlog suite to every structural lane.
-    "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs",
-    // Pre-lease context is a fail-closed admission boundary. Keep its exact
-    // adapter, deadline, ledger, and receipt regressions executable in CI.
-    'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs',
-    'node --test scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
-    'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs',
-    // CI installs the hash-pinned pytest + coverage toolchain. The pure policy
-    // is the safety boundary for holds, retry budgets, exact-head leases, and
-    // bounded fanout, so branch-aware coverage is a hard structural gate.
-    'if python3 -c "import coverage, pytest" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage run --branch scripts/hermes/tests/gem-rehabilitation-policy.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage report --include="*/scripts/hermes/gem_rehabilitation_policy.py" --fail-under=90 && python3 -m pytest scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py scripts/tests/test_brand_scrub.py scripts/tests/test_agent_workflow_hygiene.py scripts/tests/test_runner_routing.py scripts/tests/test_symphony_ui_pilot_runtime.py scripts/tests/test_symphony_reconciler_runtime.py -v; else echo "pytest/coverage not installed — skip structural regressions"; fi',
   ];
+  const parts = [
+    ...(selected.has('operations') ? operationsParts : []),
+    ...(selected.has('web') ? webParts : []),
+  ];
+  if (parts.length === 0) {
+    return {
+      code: 0,
+      output: 'No structural product lane selected\n',
+      skipped: true,
+    };
+  }
 
   let combined = '';
   for (const cmd of parts) {

@@ -2169,7 +2169,7 @@ class FallbackTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         log = (self.root / "logs/JOV-7.log").read_text()
-        self.assertIn("remount_changelog_autoresolved", log)
+        self.assertIn("remount_changelog_stripped", log)
         self.assertIn("remount_changelog_push_failed", log)
         self.assertIn("START JOV-7", log)
         events = self.events.read_text()
@@ -2290,8 +2290,8 @@ class FallbackTests(unittest.TestCase):
         self.assertNotIn("checkout -B fallback/JOV-7-fix origin/main", events)
         self.assertIn("failing CI", events)
 
-    def test_grok_ship_one_remount_autoresolves_changelog_only_conflict(self):
-        """Live #16229: DIRTY vs main was CHANGELOG-only; grok sat for an hour."""
+    def test_grok_ship_one_remount_strips_changelog_only_conflict(self):
+        """CHANGELOG is post-land state; a branch-only artifact is discarded."""
         created = self.root / "pr-created"
         self.command(
             "gh",
@@ -2343,7 +2343,7 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         log = (self.root / "logs/JOV-7.log").read_text()
         self.assertIn("remount_merge_conflicts", log)
-        self.assertIn("remount_changelog_autoresolved", log)
+        self.assertIn("remount_changelog_stripped", log)
         self.assertIn("remount_changelog_pushed", log)
         events = self.events.read_text()
         self.assertIn("merge --no-edit origin/main", events)
@@ -2352,6 +2352,61 @@ class FallbackTests(unittest.TestCase):
         self.assertIn("push origin", events)
         self.assertNotIn("grok -", events)
         self.assertFalse(created.exists(), "changelog-only DIRTY remount must not wait on grok")
+
+    def test_grok_ship_one_remount_strips_clean_branch_changelog_diff(self):
+        """A conflict-free remount also removes a legacy branch changelog."""
+        created = self.root / "pr-created"
+        self.command(
+            "gh",
+            'case "$*" in\n'
+            '  *headRefName*) echo \'[{"number":16229,"headRefName":"fallback/JOV-7-fix","mergeStateStatus":"DIRTY"}]\';;\n'
+            '  *statusCheckRollup*) echo \'{"statusCheckRollup":[{"conclusion":"SUCCESS"}]}\';;\n'
+            '  *isDraft*) echo false;;\n'
+            '  *) echo 1;;\n'
+            'esac\n',
+        )
+        self.command(
+            "git",
+            'printf "git %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            '[ "$1" != clone ] || mkdir -p "$5/.git"\n'
+            'case "$*" in\n'
+            '  *"rev-parse HEAD") printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";;\n'
+            '  *"rev-parse --is-shallow-repository") printf "false\\n";;\n'
+            '  *"merge-base HEAD origin/main") exit 0;;\n'
+            '  *"diff --quiet origin/main...HEAD -- CHANGELOG.md") exit 1;;\n'
+            '  *"push origin"*) printf "pushed\\n" >> "$GEM_EVENTS";;\n'
+            'esac\n',
+        )
+        self.command(
+            "grok",
+            'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            'touch "$GROK_CREATED"\n',
+        )
+        result = subprocess.run(
+            [self.install_runtime() / GROK_SHIP.name, "JOV-7"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_EVENTS=self.events,
+                GROK_CREATED=created,
+                GROK_SHIP_WS_ROOT=self.root / "workspaces",
+                GROK_SHIP_LOG_DIR=self.root / "logs",
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.grok_linear_url(),
+                SYMPHONY_OPEN_PR_INDEX="live",
+            ),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        log = (self.root / "logs/JOV-7.log").read_text()
+        self.assertIn("remount_changelog_stripped", log)
+        self.assertIn("remount_changelog_pushed", log)
+        events = self.events.read_text()
+        self.assertIn("restore --source=origin/main -- CHANGELOG.md", events)
+        self.assertIn("commit -m chore: remove pre-land changelog artifact", events)
+        self.assertIn("push origin", events)
+        self.assertNotIn("grok -", events)
+        self.assertFalse(created.exists())
 
     def test_grok_ship_one_remount_still_invokes_grok_for_product_conflicts(self):
         created = self.root / "pr-created"
@@ -2401,7 +2456,7 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         log = (self.root / "logs/JOV-7.log").read_text()
         self.assertIn("remount_merge_conflicts", log)
-        self.assertNotIn("remount_changelog_autoresolved", log)
+        self.assertNotIn("remount_changelog_stripped", log)
         events = self.events.read_text()
         self.assertIn("grok -", events)
         self.assertNotIn("push origin", events)
@@ -2562,8 +2617,8 @@ class FallbackTests(unittest.TestCase):
         self.assertIn("--model cursor-grok-4.6-high-fast", events)
         self.assertTrue(created.exists())
 
-    def test_grok_ship_one_changelog_union_failure_still_invokes_grok(self):
-        """Live JOV-5238: changelog union crashed and remount exited before START."""
+    def test_grok_ship_one_changelog_strip_failure_still_invokes_grok(self):
+        """A missing main-stage CHANGELOG degrades to bounded Grok remediation."""
         created = self.root / "pr-created"
         self.command(
             "gh",
@@ -2583,7 +2638,7 @@ class FallbackTests(unittest.TestCase):
             '  *"merge-base HEAD origin/main") exit 0;;\n'
             '  *"merge --no-edit origin/main") echo "CONFLICT (content): Merge conflict in CHANGELOG.md" >&2; exit 1;;\n'
             '  *"diff --name-only --diff-filter=U") printf "CHANGELOG.md\\n";;\n'
-            '  *"show :2:CHANGELOG.md") echo "missing stage" >&2; exit 128;;\n'
+            '  *"show :3:CHANGELOG.md") echo "missing stage" >&2; exit 128;;\n'
             '  *"ls-files -u") printf "100644 abc CHANGELOG.md\\n";;\n'
             'esac\n',
         )
@@ -2610,8 +2665,8 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         log = (self.root / "logs/JOV-7.log").read_text()
         self.assertIn("remount_merge_conflicts", log)
-        self.assertIn("remount_changelog_union_failed", log)
-        self.assertNotIn("remount_changelog_autoresolved", log)
+        self.assertIn("remount_changelog_strip_failed", log)
+        self.assertNotIn("remount_changelog_stripped", log)
         self.assertIn("START JOV-7", log)
         events = self.events.read_text()
         self.assertIn("grok -", events)

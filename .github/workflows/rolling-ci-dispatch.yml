@@ -154,7 +154,7 @@ jobs:
             --arg producerEvent "$PRODUCER_EVENT" \
             --arg trustedPolicyRef "$TRUSTED_REF" \
             --arg cursorApiKey "${CURSOR_API_KEY:-}" \
-            '{repository,prNumber,headSha,liveHead,sourceHead,headRef,workflowRunId,workflowRunAttempt,failedJobs,writer,priorCommentBody,handoffCommentBody,conclusion,checkSuiteId,checks,cursorApiKey,source:{eventName:$eventName,workflow:$workflow,workflowPath:$workflowPath,producerEvent:$producerEvent,trustedPolicyRef:$trustedPolicyRef}}' \
+            '{repository:$repository,prNumber:$prNumber,headSha:$headSha,liveHead:$liveHead,sourceHead:$sourceHead,headRef:$headRef,workflowRunId:$workflowRunId,workflowRunAttempt:$workflowRunAttempt,failedJobs:$failedJobs,writer:$writer,priorCommentBody:$priorCommentBody,handoffCommentBody:$handoffCommentBody,conclusion:$conclusion,checkSuiteId:$checkSuiteId,checks:$checks,cursorApiKey:$cursorApiKey,source:{eventName:$eventName,workflow:$workflow,workflowPath:$workflowPath,producerEvent:$producerEvent,trustedPolicyRef:$trustedPolicyRef}}' \
             | node scripts/lib/rolling-ci-fx.mjs > "$RUNNER_TEMP/rolling-ci-plan.json"
 
           cat "$RUNNER_TEMP/rolling-ci-plan.json"

@@ -1,21 +1,17 @@
 #!/usr/bin/env node
 
 /**
- * Prevent desktop code from landing without release handling.
+ * Prevent feature branches from creating competing desktop release state.
  *
- * Desktop changes need an explicit release handoff. Feature branches should
- * add an Unreleased changelog note; the main/release path stamps VERSION and
- * publishes the next DMG.
+ * Desktop changes land with implementation and verification evidence only.
+ * The post-land release path owns VERSION, What's New, and the next DMG.
+ * Explicit desktop-release workflow maintenance remains admissible.
  */
 
 import { execFileSync } from 'node:child_process';
 
 const DESKTOP_PATH_PREFIX = 'apps/desktop/';
-const RELEASE_HANDLING_PATHS = new Set([
-  'CHANGELOG.md',
-  'VERSION',
-  '.github/workflows/desktop-release.yml',
-]);
+const PRELAND_RELEASE_STATE_PATHS = new Set(['CHANGELOG.md', 'VERSION']);
 
 function isDesktopReleaseImpactingFile(file) {
   if (!file.startsWith(DESKTOP_PATH_PREFIX)) {
@@ -34,15 +30,15 @@ export function evaluateDesktopReleaseGuard(changedFiles) {
     .map(file => file.replace(/\\/g, '/'));
 
   const desktopFiles = normalizedFiles.filter(isDesktopReleaseImpactingFile);
-  const releaseHandlingFiles = normalizedFiles.filter(file =>
-    RELEASE_HANDLING_PATHS.has(file)
+  const prelandReleaseStateFiles = normalizedFiles.filter(file =>
+    PRELAND_RELEASE_STATE_PATHS.has(file)
   );
 
   return {
     changedFiles: normalizedFiles,
     desktopFiles,
-    releaseHandlingFiles,
-    passed: desktopFiles.length === 0 || releaseHandlingFiles.length > 0,
+    prelandReleaseStateFiles,
+    passed: desktopFiles.length === 0 || prelandReleaseStateFiles.length === 0,
   };
 }
 
@@ -98,20 +94,20 @@ function main() {
       console.log('[desktop-release-guard] No apps/desktop changes detected.');
     } else {
       console.log(
-        `[desktop-release-guard] Desktop release handled by ${result.releaseHandlingFiles.join(', ')}.`
+        '[desktop-release-guard] Desktop change defers release state to the post-land publisher.'
       );
     }
     return;
   }
 
   console.error(
-    '[desktop-release-guard] apps/desktop changed without a DMG release trigger.'
+    '[desktop-release-guard] apps/desktop changed with pre-land release state.'
   );
   console.error(
-    'Add CHANGELOG.md notes under [Unreleased], change VERSION on the main release path, or update .github/workflows/desktop-release.yml with explicit release workflow handling.'
+    "Remove CHANGELOG/VERSION artifacts. Record implementation evidence in Linear/the PR; the post-land release path owns What's New, VERSION, and DMG publication."
   );
-  console.error('Desktop files:');
-  for (const file of result.desktopFiles) {
+  console.error('Pre-land release state:');
+  for (const file of result.prelandReleaseStateFiles) {
     console.error(`- ${file}`);
   }
   process.exit(1);

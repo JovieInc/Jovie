@@ -6,11 +6,14 @@ import {
   LibrarySurface,
 } from '@/app/app/(shell)/library/LibrarySurface';
 import {
+  buildLibraryDocumentAssets,
   buildLibraryMerchAssets,
   buildLibraryReleaseAssets,
+  buildLibraryYouTubeAssets,
 } from '@/app/app/(shell)/library/library-data';
 import { ShellReleasesView } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
+import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import {
   isLibraryApprovalStatus,
@@ -23,6 +26,7 @@ import {
 } from '@/lib/library/profile-visibility';
 import type { LibraryMerchCard } from '@/lib/merch/types';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
+import type { PublicVideoListItem } from '@/lib/youtube-library/queries';
 import { primaryProviderKeys, providerConfig } from './config';
 import { ReleaseTableSkeleton } from './loading';
 
@@ -38,6 +42,8 @@ interface ReleaseCatalogPageClientProps {
   readonly assetShareByAssetId?: Readonly<
     Record<string, LibraryAssetShareViewModel>
   >;
+  readonly creatorDocuments?: readonly CreatorDocumentListItem[];
+  readonly youtubeVideos?: readonly PublicVideoListItem[];
 }
 
 function toApprovalStatusMap(
@@ -70,6 +76,8 @@ export function ReleaseCatalogPageClient({
   approvalStatusByAssetId = {},
   profileVisibilityByAssetId = {},
   assetShareByAssetId = {},
+  creatorDocuments = [],
+  youtubeVideos = [],
 }: ReleaseCatalogPageClientProps) {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
@@ -153,6 +161,18 @@ export function ReleaseCatalogPageClient({
           ).map(withShare),
           ...buildLibraryMerchAssets(
             [...merchCards, ...archivedMerchCards],
+            artistName,
+            approvalStatusMap,
+            profileVisibilityMap
+          ).map(withShare),
+          ...buildLibraryYouTubeAssets(
+            youtubeVideos,
+            artistName,
+            approvalStatusMap,
+            profileVisibilityMap
+          ).map(withShare),
+          ...buildLibraryDocumentAssets(
+            creatorDocuments,
             artistName,
             approvalStatusMap,
             profileVisibilityMap

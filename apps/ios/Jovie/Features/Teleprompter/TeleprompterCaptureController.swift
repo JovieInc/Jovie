@@ -65,9 +65,24 @@ enum TeleprompterSpeechMode: Equatable, Sendable {
 /// recognizer comes from an `AVCaptureAudioDataOutput` tap on the same mic the
 /// movie file records, so the camera and Speech never fight over the audio
 /// session (AVAudioEngine's `.record` category would conflict with capture).
+/// Injectable capture boundary so tests can freeze Start/Cancel interleavings.
+@MainActor
+protocol TeleprompterCaptureControlling: AnyObject {
+  var captureSession: AVCaptureSession { get }
+  var isUsingOnDeviceRecognition: Bool { get }
+  var isSpeechRecognitionActive: Bool { get }
+  var onPartialTranscript: ((String) -> Void)? { get set }
+
+  func startPreview() async throws
+  func start(videoURL: URL) async throws
+  func stop() async throws -> TeleprompterCaptureResult
+  func cancel() async
+  func applyDeviceOrientation(_ orientation: UIDeviceOrientation)
+}
+
 @MainActor
 @Observable
-final class TeleprompterCaptureController {
+final class TeleprompterCaptureController: TeleprompterCaptureControlling {
   private static let finalRecognitionDrainDelay: Duration = .milliseconds(180)
   private static let recordingStartPollInterval: Duration = .milliseconds(50)
   private static let recordingStartPollLimit = 20

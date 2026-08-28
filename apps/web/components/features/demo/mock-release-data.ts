@@ -53,6 +53,11 @@ function makeReleaseViewModels(
   persona: DemoPersona,
   profileId: string
 ): ReleaseViewModel[] {
+  const publicHandle =
+    persona.id === INTERNAL_DJ_DEMO_PERSONA.id
+      ? 'calvinharris'
+      : persona.profile.handle;
+
   return persona.releases.map(release => ({
     profileId,
     id: release.id,
@@ -62,7 +67,7 @@ function makeReleaseViewModels(
     status: 'released' as const,
     artworkUrl: release.artworkUrl,
     slug: release.slug,
-    smartLinkPath: `/${persona.profile.handle}/${release.slug}`,
+    smartLinkPath: `/${publicHandle}/${release.slug}`,
     spotifyPopularity: release.spotifyPopularity,
     releaseType: release.releaseType,
     isExplicit: Boolean(release.tracks?.some(track => track.isExplicit)),

@@ -35,6 +35,7 @@ export interface HeaderNavProps {
   readonly authMode?: 'client' | 'public-static';
   readonly minimalAuth?: boolean;
   readonly minimalAuthVariant?: 'link' | 'pill';
+  readonly minimalAuthLabel?: 'Sign in' | 'Log in';
   readonly includePublicLoginInMobileNav?: boolean;
   readonly publicCta?: HeaderNavCta;
   readonly presentation?: 'default' | 'homepage-embedded' | 'marketing-glass';
@@ -68,12 +69,14 @@ export interface HeaderFlyoutMenu {
 type PublicAuthActionsProps = Readonly<{
   readonly minimal?: boolean;
   readonly minimalVariant?: 'link' | 'pill';
+  readonly minimalLabel?: 'Sign in' | 'Log in';
   readonly publicCta?: HeaderNavCta;
 }>;
 
 function PublicAuthActions({
   minimal = false,
   minimalVariant = 'link',
+  minimalLabel = 'Sign in',
   publicCta = {
     href: APP_ROUTES.SIGNUP,
     label: 'Request Access',
@@ -93,7 +96,7 @@ function PublicAuthActions({
       );
     }
 
-    return <MarketingSignInLink variant='ghost' />;
+    return <MarketingSignInLink variant='ghost' label={minimalLabel} />;
   }
   return (
     <div className='flex items-center gap-2'>
@@ -307,6 +310,7 @@ export function HeaderNav({
   authMode = 'client',
   minimalAuth = false,
   minimalAuthVariant = 'link',
+  minimalAuthLabel = 'Sign in',
   includePublicLoginInMobileNav = true,
   publicCta,
   presentation = 'default',
@@ -619,6 +623,7 @@ export function HeaderNav({
               <PublicAuthActions
                 minimal={minimalAuth}
                 minimalVariant={minimalAuthVariant}
+                minimalLabel={minimalAuthLabel}
                 publicCta={publicCta}
               />
             ) : (
