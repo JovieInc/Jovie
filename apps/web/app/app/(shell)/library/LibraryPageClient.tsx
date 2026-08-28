@@ -2,19 +2,24 @@
 
 import { Button, ConfirmDialog } from '@jovie/ui';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { type KeyboardEvent, useRef, useState } from 'react';
+import { type KeyboardEvent, useRef, useState, useTransition } from 'react';
+import { toast } from '@/components/feedback';
+import type { ArtistRuleView } from '@/lib/artist-rules/types';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
+import type { LibraryRelationshipView } from '@/lib/library/graph-types';
 import {
   LIBRARY_LIFECYCLE_STAGES,
   LIBRARY_STAGE_LABELS,
   parseLibraryStageParam,
 } from '@/lib/library/lifecycle-stage';
+import type { LibraryPostReleaseBundle } from '@/lib/library/post-release-types';
 import type { LibraryProfileVisibility } from '@/lib/library/profile-visibility';
 import type { LibraryMerchCard } from '@/lib/merch/types';
 import type { PublicVideoListItem } from '@/lib/youtube-library/queries';
 import { ReleaseCatalogPageClient } from '../dashboard/releases/ReleaseCatalogPageClient';
+import { ArtistRulesSheet } from './ArtistRulesSheet';
 import { CreatorDocumentsWorkspace } from './CreatorDocumentsWorkspace';
 
 const STAGE_TABS = ['all', ...LIBRARY_LIFECYCLE_STAGES] as const;
@@ -31,6 +36,10 @@ export function LibraryPageClient({
   creatorDocumentsNextCursor = null,
   creatorDocumentsLoadFailed = false,
   youtubeVideos = [],
+  youtubeConnected = false,
+  artistRules = [],
+  libraryRelationships = [],
+  postReleaseBundle = { downloads: [], findings: [], rightsholders: [] },
 }: {
   readonly creatorProfileId: string;
   readonly merchCards: readonly LibraryMerchCard[];
@@ -47,6 +56,10 @@ export function LibraryPageClient({
   readonly creatorDocumentsNextCursor?: string | null;
   readonly creatorDocumentsLoadFailed?: boolean;
   readonly youtubeVideos?: readonly PublicVideoListItem[];
+  readonly youtubeConnected?: boolean;
+  readonly artistRules?: readonly ArtistRuleView[];
+  readonly libraryRelationships?: readonly LibraryRelationshipView[];
+  readonly postReleaseBundle?: LibraryPostReleaseBundle;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -55,6 +68,7 @@ export function LibraryPageClient({
   const [pendingMode, setPendingMode] = useState<
     (typeof STAGE_TABS)[number] | null
   >(null);
+  const [isImportingYouTube, startYouTubeImport] = useTransition();
   const discardDocumentDraftsRef = useRef<(() => void) | null>(null);
   const stage = parseLibraryStageParam(
     searchParams.get('stage') ?? searchParams.get('section')
@@ -104,6 +118,39 @@ export function LibraryPageClient({
     nextTab.focus();
     nextTab.click();
   };
+
+  const handleYouTubeImport = () => {
+    if (!youtubeConnected) {
+      const returnTo =
+        stage === 'all' ? pathname : `${pathname}?stage=${stage}`;
+      router.push(
+        `/api/connectors/youtube/authorize?creatorProfileId=${encodeURIComponent(creatorProfileId)}&returnTo=${encodeURIComponent(returnTo)}`
+      );
+      return;
+    }
+
+    startYouTubeImport(async () => {
+      try {
+        const response = await fetch('/api/youtube-library/sync', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ creatorProfileId }),
+        });
+        const result = (await response.json()) as {
+          total?: number;
+          error?: string;
+        };
+        if (!response.ok) throw new Error(result.error ?? 'Sync failed');
+        toast.success(`Synced ${result.total ?? 0} YouTube videos`);
+        router.refresh();
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : 'YouTube sync failed'
+        );
+      }
+    });
+  };
+
   return (
     <div className='flex min-h-0 flex-1 flex-col'>
       <div
@@ -130,6 +177,26 @@ export function LibraryPageClient({
             {LIBRARY_STAGE_LABELS[tab]}
           </Button>
         ))}
+        <div className='ml-auto flex items-center gap-2'>
+          <ArtistRulesSheet
+            creatorProfileId={creatorProfileId}
+            initialRules={artistRules}
+          />
+          <Button
+            type='button'
+            size='sm'
+            variant='secondary'
+            disabled={isImportingYouTube || creatorProfileId === 'unavailable'}
+            onClick={handleYouTubeImport}
+            className='shrink-0'
+          >
+            {isImportingYouTube
+              ? 'Syncing…'
+              : youtubeConnected
+                ? 'Sync YouTube'
+                : 'Import YouTube'}
+          </Button>
+        </div>
       </div>
       {documentId ? (
         <div
@@ -167,6 +234,8 @@ export function LibraryPageClient({
             assetShareByAssetId={assetShareByAssetId}
             creatorDocuments={creatorDocuments}
             youtubeVideos={youtubeVideos}
+            libraryRelationships={libraryRelationships}
+            postReleaseBundle={postReleaseBundle}
           />
         </div>
       )}
