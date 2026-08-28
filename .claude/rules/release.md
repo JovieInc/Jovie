@@ -304,6 +304,9 @@ BOT REVIEWS
 - Edit `package.json` for dependency/script changes — only the `version` field is protected.
 - Record factual release evidence in the Linear issue and PR body. They may not
   create a branch-local changelog or release-note fragment.
+- Desktop PRs add `<!-- desktop-release-handoff -->` next to the Linear issue
+  marker. `scripts/desktop-release-guard.mjs` accepts that handoff; `CHANGELOG.md`
+  is not a valid trigger.
 
 **Enforcement:** `scripts/version-fanout-guard.mjs` runs in CI (`ci-deterministic` job) and fails normal feature branches that write the fan-out, including any `CHANGELOG.md` edit. Native queue admission independently rejects every PR that touches `CHANGELOG.md`, including legacy/release-prefixed branches. Run locally with `pnpm version:fanout-guard`.
 
