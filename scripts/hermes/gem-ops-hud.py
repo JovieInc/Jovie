@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Low-overhead, read-only operations HUD for Gem's Linux console."""
+"""Low-overhead, read-only operations HUD for Gem's Linux console.
+
+JOV-INV-017: the HUD is display-only. Summer's red-loop queue is rendered from
+the same canonical persisted file the controller writes; this process never
+invents stall items or issues control-plane writes.
+"""
 
 from __future__ import annotations
 
@@ -41,6 +46,13 @@ FLEET_GATE_RECEIPT = Path(
     )
 ).expanduser()
 FLEET_GATE_SCHEMA = "jovie-fleet-gate/v1"
+SUMMER_QUEUE_SCHEMA = "jovie-summer-red-queue/v1"
+SUMMER_QUEUE_PATH = Path(
+    os.environ.get(
+        "HUD_SUMMER_QUEUE",
+        "/home/timwhite/gem-workspace/state/jovie-delivery-controller/summer-queue.json",
+    )
+).expanduser()
 WORKFLOWS = {
     "CI",
     "Production Controller",
@@ -131,6 +143,26 @@ def fetch_fleet_gate(path: Path | None = None) -> dict[str, Any]:
 
     result = dict(receipt)
     result["updated"] = observed_at
+    result["error"] = None
+    return result
+
+
+def load_summer_queue(path: Path | None = None) -> dict[str, Any]:
+    """Read Summer's persisted red-loop queue. Display-only; never invent items."""
+    source = path or SUMMER_QUEUE_PATH
+    empty = {"schema": SUMMER_QUEUE_SCHEMA, "authority": "Summer", "items": [], "updated": None}
+    try:
+        payload = json.loads(source.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        return {**empty, "error": f"summer-queue-unavailable:{type(error).__name__}"}
+    if (
+        not isinstance(payload, dict)
+        or payload.get("schema") != SUMMER_QUEUE_SCHEMA
+        or not isinstance(payload.get("items"), list)
+    ):
+        return {**empty, "error": "summer-queue-malformed"}
+    result = dict(payload)
+    result["items"] = [dict(item) for item in payload["items"] if isinstance(item, dict)]
     result["error"] = None
     return result
 
@@ -792,6 +824,7 @@ def fetch_delivery() -> dict[str, Any]:
     deploy = http_json("https://jov.ie/api/health/deploy")
     main_sha = repo["defaultBranchRef"]["target"]["oid"]
     prod_sha = build.get("commitSha") or build.get("gitSha") or build.get("sha")
+    summer_queue = load_summer_queue()
     return {
         "updated": iso(),
         "error": None,
@@ -806,6 +839,7 @@ def fetch_delivery() -> dict[str, Any]:
             "queued": len(queue),
         },
         "queue": queue[:8],
+        "summer_queue": summer_queue,
         "runs": runs,
         "success_window_hours": 24,
         "merged_recent": len(merged_recent),
@@ -881,6 +915,8 @@ def render(state: dict[str, Any]) -> str:
     jobs = local.get("jobs") or []
     blockers = local.get("blockers") or []
     queue = delivery.get("queue") or []
+    summer_queue = delivery.get("summer_queue") or {}
+    summer_items = summer_queue.get("items") or []
     main = compact(delivery.get("main_sha"), 8) or "????????"
     prod = compact(delivery.get("prod_sha"), 8) or "????????"
     exact = "EXACT" if delivery.get("exact") else "NOT PROVEN"
@@ -996,6 +1032,23 @@ def render(state: dict[str, Any]) -> str:
         rows.append(grid_row(f"MQ #{item.get('number','?')}", item.get("position", "?"), "WAITING", item.get("title", "")))
     if not queue:
         rows.append(grid_row("Merge queue", 0, "EMPTY", "or delivery state unavailable"))
+
+    summer_status = (
+        "ERROR" if summer_queue.get("error")
+        else "ESCALATED" if any(item.get("outcome") == "escalated" for item in summer_items)
+        else "OPEN" if summer_items else "CLEAR"
+    )
+    rows.append(grid_row(
+        "Summer red queue", len(summer_items), summer_status,
+        summer_queue.get("error") or "canonical persisted stall state; HUD display-only",
+    ))
+    for item in summer_items[:4]:
+        rows.append(grid_row(
+            item.get("issue") or f"PR #{item.get('pr', '?')}",
+            item.get("stallClass", "?"),
+            str(item.get("outcome") or "open").upper(),
+            item.get("reason") or item.get("action") or "",
+        ))
 
     for run in (delivery.get("runs") or [])[:5]:
         state_text = run.get("status", "") if run.get("status") != "completed" else run.get("conclusion", "-")

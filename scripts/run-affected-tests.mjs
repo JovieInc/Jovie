@@ -435,6 +435,35 @@ const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
 ]);
+const NO_UNATTENDED_RED_PRIMARY_INPUTS = new Set([
+  'scripts/backlog-orchestrator/no-unattended-red.mjs',
+  'scripts/backlog-orchestrator/delivery-state-machine.mjs',
+  'scripts/backlog-orchestrator/__tests__/no-unattended-red.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs',
+]);
+const NO_UNATTENDED_RED_LANE = new Set([
+  ...NO_UNATTENDED_RED_PRIMARY_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  '.github/workflows/delivery-control-receipts.yml',
+  'canon/invariants.jsonl',
+  'scripts/hermes/gem-ops-hud.py',
+  'scripts/hermes/tests/gem-ops-hud.test.py',
+  'scripts/lib/ownerless-recovery-policy.mjs',
+  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
+  'scripts/invariants/registry.test.mjs',
+]);
+const NO_UNATTENDED_RED_NODE_TESTS = [
+  'scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/no-unattended-red.test.mjs',
+  'scripts/invariants/registry.test.mjs',
+];
+const NO_UNATTENDED_RED_PYTHON_TESTS = [
+  'scripts/hermes/tests/gem-ops-hud.test.py',
+];
+const NO_UNATTENDED_RED_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
+];
 const AUTHENTICATED_A11Y_REPAIR_CORE = new Set([
   'apps/web/app/exp/shell-v1/page.tsx',
   'apps/web/components/jovie/components/ChatInput.tsx',
@@ -806,6 +835,22 @@ export function buildAffectedTestPlan(
         'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
       ],
       nodeTests: [],
+    };
+  }
+  const isBoundedNoUnattendedRedChange =
+    files.some(file => NO_UNATTENDED_RED_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => NO_UNATTENDED_RED_LANE.has(file));
+  if (isBoundedNoUnattendedRedChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: NO_UNATTENDED_RED_PYTHON_TESTS,
+      scriptVitestTests: NO_UNATTENDED_RED_SCRIPT_TESTS,
+      nodeTests: NO_UNATTENDED_RED_NODE_TESTS,
     };
   }
   const ciUiDriftGuardrailInputCount = files.filter(file =>
