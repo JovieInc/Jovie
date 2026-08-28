@@ -227,6 +227,7 @@ class FleetControllerInstallerContractTests(unittest.TestCase):
             "gem": gem,
             "policy": gem / "scripts/gem_rehabilitation_policy.py",
             "gate": gem / "scripts/gem-priority-gate.py",
+            "closure": gem / "scripts/closure_health.py",
             "consumer": gem / "scripts/gem-pr-drain.py",
             "registry_module": gem / "scripts/gem_repo_registry.py",
             "registry_config": gem / "config/gem-repo-registry.json",
@@ -239,6 +240,7 @@ class FleetControllerInstallerContractTests(unittest.TestCase):
         (home / ".config/systemd/user").mkdir(parents=True)
         fake_bin.mkdir()
         paths["gate"].write_text("old gate\n", encoding="utf-8")
+        paths["closure"].write_text("old closure\n", encoding="utf-8")
         paths["consumer"].write_text("old consumer\n", encoding="utf-8")
         # Stale installed module looks beside itself (scripts/config/...),
         # which is the FileNotFoundError that rolled back activation.
@@ -328,6 +330,7 @@ exit 0
 
         self.assertEqual(process.returncode, 0, process.stderr)
         self.assertIn("fleet controller install sources verified", process.stdout)
+        self.assertIn("scripts/hermes/closure_health.py", process.stdout)
         self.assertIn("scripts/hermes/gem_rehabilitation_policy.py", process.stdout)
         self.assertIn("scripts/hermes/gem_repo_registry.py", process.stdout)
         self.assertIn("scripts/hermes/config/gem-repo-registry.json", process.stdout)
@@ -348,6 +351,7 @@ exit 0
             paths, env = self._runtime(directory)
             process = self._install(fixture, env)
             installed_policy = paths["policy"].read_bytes()
+            installed_closure = paths["closure"].read_bytes()
             installed_registry = paths["registry_module"].read_bytes()
             installed_registry_config = paths["registry_config"].read_bytes()
             attestation = json.loads(paths["attestation"].read_text(encoding="utf-8"))
@@ -356,6 +360,10 @@ exit 0
         self.assertEqual(
             installed_policy,
             (HERMES / "gem_rehabilitation_policy.py").read_bytes(),
+        )
+        self.assertEqual(
+            installed_closure,
+            (HERMES / "closure_health.py").read_bytes(),
         )
         self.assertEqual(
             installed_registry,
@@ -367,6 +375,8 @@ exit 0
         )
         self.assertIn(b"def resolve_registry_path", installed_registry)
         self.assertTrue(attestation["policy"]["matches"])
+        self.assertTrue(attestation["gate"]["matches"])
+        self.assertTrue(attestation["closureHealth"]["matches"])
         self.assertEqual(
             attestation["policy"]["sourceSha256"],
             attestation["policy"]["installedSha256"],
@@ -379,12 +389,13 @@ exit 0
             process = self._install(fixture, env, fail_restart=True)
             restored = {
                 name: paths[name].read_text(encoding="utf-8")
-                for name in ("gate", "consumer", "workflow", "registry_module", "registry_config")
+                for name in ("gate", "closure", "consumer", "workflow", "registry_module", "registry_config")
             }
             policy_exists = paths["policy"].exists()
 
         self.assertNotEqual(process.returncode, 0)
         self.assertEqual(restored["gate"], "old gate\n")
+        self.assertEqual(restored["closure"], "old closure\n")
         self.assertEqual(restored["consumer"], "old consumer\n")
         self.assertEqual(restored["workflow"], "old workflow\n")
         self.assertIn("FileNotFoundError", restored["registry_module"])

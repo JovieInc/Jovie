@@ -100,7 +100,9 @@ class ExitClassificationTests(unittest.TestCase):
         gate.write_text(json.dumps({
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
-            "workAdmission": {"allowed": True},
+            "closureAdmission": {"newIssueIntakeAllowed": True},
+            "workAdmission": {"allowed": True, "newIssueLeaseAllowed": True},
+            "remediationAdmission": {"allowed": True, "pushAllowed": True},
         }), encoding="utf-8")
         environment = mock.patch.dict(os.environ, {
             "GEM_FLEET_GATE_RECEIPT": str(gate),

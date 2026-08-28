@@ -63,6 +63,21 @@ def _drain_command(
     return f'{env_prefix}bash "{_DRAIN_SCRIPT}"'
 
 
+def _summer_closure_admission(
+    *, intake_allowed: bool = True
+) -> dict[str, object]:
+    return {
+        "allowed": intake_allowed,
+        "authority": "Summer",
+        "status": "green" if intake_allowed else "red",
+        "newIssueIntakeAllowed": intake_allowed,
+        "newImplementationAllowed": intake_allowed,
+        "fallbackPrGenerationAllowed": intake_allowed,
+        "promotionContinues": True,
+        "remediationContinues": True,
+    }
+
+
 def _write_native_receipt_fakes(
     tmp_path: Path,
     *,
@@ -973,6 +988,7 @@ JSON
             "state": "AMBER",
             "promotionMode": "hold-intake",
             "observedAt": datetime.now(timezone.utc).isoformat(),
+            "closureAdmission": _summer_closure_admission(),
             "signals": {
                 "main": {"status": "green", "sha": "a" * 40},
                 "production": {"status": "green", "deployedSha": "b" * 40},
@@ -1099,6 +1115,7 @@ JSON
             "state": "AMBER",
             "promotionMode": "hold-intake",
             "observedAt": datetime.now(timezone.utc).isoformat(),
+            "closureAdmission": _summer_closure_admission(),
             "signals": {
                 "main": {"status": "green", "sha": "a" * 40},
                 "production": {"status": "green", "deployedSha": "b" * 40},
@@ -1187,6 +1204,7 @@ JSON
             "state": "AMBER",
             "promotionMode": "hold-intake",
             "observedAt": datetime.now(timezone.utc).isoformat(),
+            "closureAdmission": _summer_closure_admission(),
             "signals": {
                 "main": {"status": "green", "sha": "a" * 40},
                 "production": {"status": "green", "deployedSha": "b" * 40},
@@ -1275,6 +1293,7 @@ JSON
             "state": "AMBER",
             "promotionMode": "hold-intake",
             "observedAt": datetime.now(timezone.utc).isoformat(),
+            "closureAdmission": _summer_closure_admission(),
             "signals": {
                 "main": {"status": "green", "sha": "a" * 40},
                 "production": {"status": "green", "deployedSha": "b" * 40},
@@ -1365,6 +1384,7 @@ JSON
             "state": "AMBER",
             "promotionMode": "hold-intake",
             "observedAt": datetime.now(timezone.utc).isoformat(),
+            "closureAdmission": _summer_closure_admission(),
             "signals": {
                 "main": {"status": "green", "sha": "a" * 40},
                 "production": {"status": "green", "deployedSha": "b" * 40},
@@ -1823,6 +1843,7 @@ JSON
             "state": "AMBER",
             "promotionMode": "hold-intake",
             "observedAt": datetime.now(timezone.utc).isoformat(),
+            "closureAdmission": _summer_closure_admission(),
             "signals": {
                 "main": {"status": "green", "sha": "a" * 40},
                 "production": {"status": "green", "deployedSha": "b" * 40},
@@ -1916,6 +1937,7 @@ JSON
             "state": "AMBER",
             "promotionMode": "hold-intake",
             "observedAt": datetime.now(timezone.utc).isoformat(),
+            "closureAdmission": _summer_closure_admission(),
             "signals": {
                 "main": {"status": "green", "sha": "a" * 40},
                 "production": {"status": "green", "deployedSha": "b" * 40},
@@ -2064,6 +2086,7 @@ JSON
             "state": "AMBER",
             "promotionMode": "hold-intake",
             "observedAt": datetime.now(timezone.utc).isoformat(),
+            "closureAdmission": _summer_closure_admission(),
             "signals": {
                 "main": {"status": "green", "sha": "a" * 40},
                 "production": {"status": "green", "deployedSha": "b" * 40},

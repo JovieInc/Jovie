@@ -1,6 +1,6 @@
 /**
  * Deterministic admission boundary for Symphony.
- * Invariant consumers: JOV-INV-007 and JOV-INV-008.
+ * Invariant consumers: JOV-INV-007, JOV-INV-008, and JOV-INV-011.
  *
  * Workstream bundles are useful reports, but only a bounded number of concrete
  * issues per routed product team may cross this boundary. Admission is
@@ -25,6 +25,8 @@ export const INDEPENDENT_REVIEW_RECEIPT_SCHEMA = 'jovie-independent-review/v1';
 export const INDEPENDENT_REVIEW_AUTHORITY = 'Gem';
 export const INDEPENDENT_REVIEWER = 'Gem';
 export const INDEPENDENT_REVIEW_SCOPE = 'exact-main-head';
+export const CLOSURE_HEALTH_SCHEMA = 'jovie-closure-health/v1';
+export const CLOSURE_HEALTH_AUTHORITY = 'Summer';
 export const FLEET_GATE_STATE = Object.freeze({
   GREEN: 'GREEN',
   AMBER: 'AMBER',
@@ -114,6 +116,36 @@ function alreadyAdmittedCohortSemantics(promotionMode) {
 
 function typedReason(code, layer, severity, detail) {
   return { code, layer, severity, detail };
+}
+
+function evaluateClosureAdmission(candidate) {
+  const valid =
+    candidate &&
+    typeof candidate === 'object' &&
+    !Array.isArray(candidate) &&
+    candidate.schema === CLOSURE_HEALTH_SCHEMA &&
+    candidate.authority === CLOSURE_HEALTH_AUTHORITY &&
+    ['healthy', 'grace', 'red'].includes(candidate.status) &&
+    typeof candidate.newIssueIntakeAllowed === 'boolean' &&
+    candidate.newIssueIntakeAllowed === (candidate.status === 'healthy') &&
+    candidate.promotionContinues === true &&
+    candidate.remediationContinues === true &&
+    Array.isArray(candidate.reasons) &&
+    candidate.reasons.every(reason => typeof reason === 'string');
+  const allowed = Boolean(valid && candidate.newIssueIntakeAllowed === true);
+  return {
+    allowed,
+    newIssueIntakeAllowed: allowed,
+    newImplementationAllowed: allowed,
+    fallbackPrGenerationAllowed: allowed,
+    authority: CLOSURE_HEALTH_AUTHORITY,
+    status: valid ? candidate.status : 'red',
+    reasons: valid
+      ? [...candidate.reasons]
+      : ['closure-health-receipt-missing-or-malformed'],
+    promotionContinues: true,
+    remediationContinues: true,
+  };
 }
 
 function isFreshTimestamp(value, nowMs, maxAgeMs) {
@@ -369,6 +401,7 @@ export function evaluateFleetGate(
       now,
     }
   );
+  const closureAdmission = evaluateClosureAdmission(evidence?.closureHealth);
 
   if (
     integrityStatus === 'active' &&
@@ -542,13 +575,15 @@ export function evaluateFleetGate(
   const workActivities =
     state === FLEET_GATE_STATE.RED
       ? [...FLEET_AUTHORITY.RED]
-      : [
-          ...(concurrency.newMutationAllowed &&
-          (!queueShapeValid || queueBelowBackpressure)
-            ? ['approved-issue-lease']
-            : []),
-          ...FLEET_AUTHORITY.AMBER,
-        ];
+      : !closureAdmission.newIssueIntakeAllowed
+        ? ['tests', 'review']
+        : [
+            ...(concurrency.newMutationAllowed &&
+            (!queueShapeValid || queueBelowBackpressure)
+              ? ['approved-issue-lease']
+              : []),
+            ...FLEET_AUTHORITY.AMBER,
+          ];
   const holdIntakeAllowed =
     state === FLEET_GATE_STATE.AMBER &&
     controllerFresh &&
@@ -570,19 +605,29 @@ export function evaluateFleetGate(
         : holdIntakeAllowed
           ? FLEET_PROMOTION_MODE.HOLD_INTAKE
           : FLEET_PROMOTION_MODE.BLOCKED;
+  const cohort = alreadyAdmittedCohortSemantics(promotionMode);
+  const closureAwareCohort = closureAdmission.newIssueIntakeAllowed
+    ? cohort
+    : {
+        ...cohort,
+        newIntakeAllowed: false,
+        semantics: 'preserve-cohort-and-stop-new-implementation-intake',
+      };
   return {
     schema: FLEET_GATE_SCHEMA,
     observedAt: evidence.observedAt || null,
     evaluatedAt: now,
     state,
     promotionMode,
-    alreadyAdmittedCohort: alreadyAdmittedCohortSemantics(promotionMode),
+    alreadyAdmittedCohort: closureAwareCohort,
     reasons,
     reviewAdmission,
+    closureAdmission,
     workAdmission: {
       allowed: state !== FLEET_GATE_STATE.RED,
       activities: workActivities,
       newIssueLeaseAllowed: workActivities.includes('approved-issue-lease'),
+      newImplementationAllowed: workActivities.includes('approved-issue-lease'),
     },
     promotionAdmission: {
       allowed: state === FLEET_GATE_STATE.GREEN && reviewAdmission.allowed,

@@ -6,12 +6,7 @@ export const ROLLING_CI_STATE_MARKER = 'jovie-rolling-ci-state';
 export const MAX_REPAIR_DELIVERIES = 3;
 export const TRUSTED_CI_WORKFLOW = 'CI';
 export const TRUSTED_CI_WORKFLOW_PATH = '.github/workflows/ci.yml';
-export const GITHUB_ACTIONS_APP_SLUG = 'github-actions';
-export const TRUSTED_FAILURE_EVENTS = Object.freeze([
-  'workflow_run',
-  'check_suite',
-  'check_run',
-]);
+export const TRUSTED_FAILURE_EVENTS = Object.freeze(['workflow_run']);
 export const TRUSTED_PRODUCER_EVENTS = Object.freeze([
   'pull_request',
   'merge_group',
@@ -20,13 +15,6 @@ export const TRUSTED_PRODUCER_EVENTS = Object.freeze([
 const SHA_RE = /^[0-9a-f]{40}$/i;
 const QUEUE_FRONT_RE =
   /^(?:refs\/heads\/)?gh-readonly-queue\/main\/pr-([1-9][0-9]*)-([0-9a-f]{40})$/;
-const CI_FAMILY_CHECK_NAME =
-  /^(?:CI\b|Test\b|Typecheck\b|Lint\b|E2E\b|e2e\b|ci-fast\b)/i;
-
-export function isCiFamilyCheckName(name) {
-  return CI_FAMILY_CHECK_NAME.test(String(name ?? '').trim());
-}
-
 /**
  * Native merge-group builds publish on
  * `gh-readonly-queue/main/pr-<front>-<exactBaseSha>`. workflow_run payloads
@@ -88,31 +76,12 @@ function isTrustedProducerEvent(event) {
 function isAuthenticatedWorkflowRun(source) {
   const workflowPath = source?.workflowPath;
   return (
-    source?.eventName === 'workflow_run' &&
+    TRUSTED_FAILURE_EVENTS.includes(source?.eventName) &&
     source?.workflow === TRUSTED_CI_WORKFLOW &&
     isTrustedProducerEvent(source?.producerEvent) &&
     isTrustedPolicyRef(source) &&
-    (workflowPath == null || workflowPath === TRUSTED_CI_WORKFLOW_PATH)
+    workflowPath === TRUSTED_CI_WORKFLOW_PATH
   );
-}
-
-function isAuthenticatedCheckEvent(source) {
-  if (!TRUSTED_FAILURE_EVENTS.includes(source?.eventName)) return false;
-  if (source.eventName === 'workflow_run') return false;
-  if (!isTrustedPolicyRef(source)) return false;
-  if (source?.producerEvent && !isTrustedProducerEvent(source.producerEvent)) {
-    return false;
-  }
-  const slug = source?.checkSuiteAppSlug;
-  if (slug && slug !== GITHUB_ACTIONS_APP_SLUG) return false;
-  if (
-    source.eventName === 'check_run' &&
-    source?.checkRunName &&
-    !isCiFamilyCheckName(source.checkRunName)
-  ) {
-    return false;
-  }
-  return true;
 }
 
 /** @param {Record<string, any>} [input] */
@@ -166,10 +135,7 @@ function stableFailureSignal(check, failedSteps) {
 }
 
 export function validateFailureSource(source) {
-  if (
-    !isAuthenticatedWorkflowRun(source) &&
-    !isAuthenticatedCheckEvent(source)
-  ) {
+  if (!isAuthenticatedWorkflowRun(source)) {
     throw new Error('failure source is not an authenticated CI workflow_run');
   }
   const workflowPath = source?.workflowPath;
@@ -179,10 +145,6 @@ export function validateFailureSource(source) {
     producerEvent: source.producerEvent ?? 'pull_request',
     trustedPolicyRef: source.trustedPolicyRef,
     ...(workflowPath ? { workflowPath } : {}),
-    ...(source?.checkSuiteAppSlug
-      ? { checkSuiteAppSlug: source.checkSuiteAppSlug }
-      : {}),
-    ...(source?.checkRunName ? { checkRunName: source.checkRunName } : {}),
   };
 }
 

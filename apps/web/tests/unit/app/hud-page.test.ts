@@ -9,6 +9,7 @@ const {
   getCurrentAdminPageAccessMock,
   getHudMetricsMock,
   getFounderFunnelDataMock,
+  getOvieMacHudSnapshotMock,
 } = vi.hoisted(() => ({
   redirectMock: vi.fn((url: string) => {
     throw new Error(`NEXT_REDIRECT:${url}`);
@@ -28,6 +29,7 @@ const {
   getCurrentAdminPageAccessMock: vi.fn(),
   getHudMetricsMock: vi.fn(),
   getFounderFunnelDataMock: vi.fn(),
+  getOvieMacHudSnapshotMock: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -50,6 +52,10 @@ vi.mock('@/lib/hud/metrics', () => ({
 
 vi.mock('@/lib/admin/founder-funnel', () => ({
   getFounderFunnelData: getFounderFunnelDataMock,
+}));
+
+vi.mock('@/lib/hud/ovie-mac-hud.server', () => ({
+  getOvieMacHudSnapshot: getOvieMacHudSnapshotMock,
 }));
 
 vi.mock('@/lib/hud/source-trust', () => ({
@@ -222,5 +228,23 @@ describe('/hud page auth', () => {
     expect(dashboardElement?.props?.density).toBe('kiosk');
     expect(dashboardElement?.props?.presentationMode).toBe('shell');
     expect(dashboardElement?.props?.initialMetrics).toEqual(metrics);
+  });
+
+  it('renders the three-metric Mac HUD instead of the seven-band dashboard', async () => {
+    getCurrentAdminPageAccessMock.mockResolvedValue({
+      isAuthenticated: true,
+      hasAdminRole: true,
+      userId: 'admin_1',
+    });
+    const macSnapshot = { alive: { status: 'dead' } };
+    getOvieMacHudSnapshotMock.mockResolvedValue(macSnapshot);
+    const result = await HudPage({
+      searchParams: Promise.resolve({ ovie: 'mac' }),
+    });
+    expect(getHudMetricsMock).not.toHaveBeenCalled();
+    expect(findElementByName(result, 'HudDashboardClient')).toBeNull();
+    expect(findElementByName(result, 'OvieMacHud')?.props?.snapshot).toEqual(
+      macSnapshot
+    );
   });
 });
