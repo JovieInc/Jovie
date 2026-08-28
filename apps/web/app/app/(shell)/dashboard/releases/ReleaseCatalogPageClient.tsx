@@ -20,6 +20,8 @@ import {
   type LibraryApprovalStatus,
 } from '@/lib/library/approval-status';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
+import type { LibraryRelationshipView } from '@/lib/library/graph-types';
+import type { LibraryPostReleaseBundle } from '@/lib/library/post-release-types';
 import {
   isLibraryProfileVisibility,
   type LibraryProfileVisibility,
@@ -44,6 +46,8 @@ interface ReleaseCatalogPageClientProps {
   >;
   readonly creatorDocuments?: readonly CreatorDocumentListItem[];
   readonly youtubeVideos?: readonly PublicVideoListItem[];
+  readonly libraryRelationships?: readonly LibraryRelationshipView[];
+  readonly postReleaseBundle?: LibraryPostReleaseBundle;
 }
 
 function toApprovalStatusMap(
@@ -78,6 +82,8 @@ export function ReleaseCatalogPageClient({
   assetShareByAssetId = {},
   creatorDocuments = [],
   youtubeVideos = [],
+  libraryRelationships = [],
+  postReleaseBundle = { downloads: [], findings: [], rightsholders: [] },
 }: ReleaseCatalogPageClientProps) {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
@@ -153,6 +159,12 @@ export function ReleaseCatalogPageClient({
       <LibrarySurface
         profileId={profileId}
         artistHandle={artistHandle}
+        merchProducts={merchCards.map(card => ({
+          id: card.id,
+          title: card.title,
+        }))}
+        relationships={libraryRelationships}
+        postReleaseBundle={postReleaseBundle}
         assets={[
           ...buildLibraryReleaseAssets(
             [...releases, ...archivedReleases],

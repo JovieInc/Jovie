@@ -1,13 +1,23 @@
+import { and, eq } from 'drizzle-orm';
 import { APP_ROUTES } from '@/constants/routes';
+import { listArtistRulesForProfile } from '@/lib/artist-rules/store';
+import type { ArtistRuleView } from '@/lib/artist-rules/types';
+import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
 import { requireCreatorDocumentAccess } from '@/lib/creator-documents/access';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
+import { db } from '@/lib/db';
 import { listCreatorDocuments } from '@/lib/db/creator-documents/store';
+import { connectorAccounts } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
 import {
   getLibraryAssetShareMapForProfile,
   loadArtistHandleForProfile,
 } from '@/lib/library/asset-share.server';
+import { listLibraryRelationshipsForProfile } from '@/lib/library/graph-store';
+import type { LibraryRelationshipView } from '@/lib/library/graph-types';
+import { listLibraryPostReleaseBundle } from '@/lib/library/post-release-store';
+import type { LibraryPostReleaseBundle } from '@/lib/library/post-release-types';
 import type { LibraryProfileVisibility } from '@/lib/library/profile-visibility';
 import { getLibraryProfileStateMapForProfile } from '@/lib/library/profile-visibility.server';
 import { getLibraryMerchCardsForProfile } from '@/lib/merch/service';
@@ -19,22 +29,21 @@ import {
   loadReleaseMatrixForProfile,
 } from '@/lib/releases/release-matrix-loader';
 import {
-  listVideosForProfile,
+  listLibraryVideosForProfile,
   type PublicVideoListItem,
-} from '@/lib/youtube-library';
+} from '@/lib/youtube-library/queries';
 import { loadAppShellRouteContext } from '../app-shell-route-context';
 import { LibraryPageClient } from './LibraryPageClient';
 
 export const runtime = 'nodejs';
 
 export default async function LibraryPage({
-  searchParams,
+  searchParams: _searchParams,
 }: {
   readonly searchParams: Promise<{
     readonly section?: string | string[] | undefined;
   }>;
 }) {
-  await searchParams;
   const routeContext = await loadAppShellRouteContext({
     route: APP_ROUTES.LIBRARY,
     authFailure: 'notFound',
@@ -63,8 +72,16 @@ export default async function LibraryPage({
   let creatorDocumentsNextCursor: string | null = null;
   let creatorDocumentsLoadFailed = false;
   let youtubeVideos: PublicVideoListItem[] = [];
+  let youtubeConnected = false;
+  let artistRules: ArtistRuleView[] = [];
+  let libraryRelationships: LibraryRelationshipView[] = [];
+  let postReleaseBundle: LibraryPostReleaseBundle = {
+    downloads: [],
+    findings: [],
+    rightsholders: [],
+  };
   if (profileId && selectedProfile) {
-    {
+    const loadDocuments = async () => {
       try {
         await requireCreatorDocumentAccess({
           userId: routeContext.userId,
@@ -81,8 +98,9 @@ export default async function LibraryPage({
         );
         creatorDocumentsLoadFailed = true;
       }
-    }
-    {
+    };
+
+    const loadAssets = async () => {
       const queryClient = getQueryClient();
       try {
         const assetSharesPromise = loadArtistHandleForProfile(profileId).then(
@@ -107,7 +125,6 @@ export default async function LibraryPage({
           archivedMerch,
           profileStates,
           assetShares,
-          videos,
         ] = await Promise.all([
           queryClient.fetchQuery({
             queryKey: queryKeys.releases.matrix(profileId),
@@ -118,7 +135,6 @@ export default async function LibraryPage({
           getLibraryMerchCardsForProfile(profileId, { lifecycle: 'archived' }),
           getLibraryProfileStateMapForProfile(profileId),
           assetSharesPromise,
-          listVideosForProfile({ creatorProfileId: profileId }),
         ]);
         merchCards = merch;
         archivedMerchCards = archivedMerch;
@@ -136,7 +152,6 @@ export default async function LibraryPage({
           ])
         );
         assetShareByAssetId = Object.fromEntries(assetShares);
-        youtubeVideos = videos;
       } catch (error) {
         void captureError(
           'Release matrix prefetch failed on library page',
@@ -146,7 +161,56 @@ export default async function LibraryPage({
           }
         );
       }
-    }
+    };
+
+    const loadYouTube = async () => {
+      try {
+        const [account, videos] = await Promise.all([
+          db
+            .select({ id: connectorAccounts.id })
+            .from(connectorAccounts)
+            .where(
+              and(
+                eq(connectorAccounts.userId, routeContext.userId),
+                eq(connectorAccounts.creatorProfileId, profileId),
+                eq(connectorAccounts.provider, CONNECTOR_PROVIDERS.youtube),
+                eq(connectorAccounts.status, 'connected')
+              )
+            )
+            .limit(1)
+            .then(rows => rows[0] ?? null),
+          listLibraryVideosForProfile({ creatorProfileId: profileId }),
+        ]);
+        youtubeConnected = Boolean(account);
+        youtubeVideos = videos;
+      } catch (error) {
+        void captureError('YouTube Library projection failed', error, {
+          route: APP_ROUTES.LIBRARY,
+        });
+      }
+    };
+
+    const loadControls = async () => {
+      try {
+        [artistRules, libraryRelationships, postReleaseBundle] =
+          await Promise.all([
+            listArtistRulesForProfile(profileId),
+            listLibraryRelationshipsForProfile(profileId),
+            listLibraryPostReleaseBundle(profileId),
+          ]);
+      } catch (error) {
+        void captureError('Library controls projection failed', error, {
+          route: APP_ROUTES.LIBRARY,
+        });
+      }
+    };
+
+    await Promise.all([
+      loadDocuments(),
+      loadAssets(),
+      loadYouTube(),
+      loadControls(),
+    ]);
   }
 
   return (
@@ -163,6 +227,10 @@ export default async function LibraryPage({
         creatorDocumentsNextCursor={creatorDocumentsNextCursor}
         creatorDocumentsLoadFailed={creatorDocumentsLoadFailed}
         youtubeVideos={youtubeVideos}
+        youtubeConnected={youtubeConnected}
+        artistRules={artistRules}
+        libraryRelationships={libraryRelationships}
+        postReleaseBundle={postReleaseBundle}
       />
     </HydrateClient>
   );
