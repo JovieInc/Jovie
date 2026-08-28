@@ -27,6 +27,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   mockRequireAuth,
   mockDbUpdate,
+  mockDbSelect,
+  mockDbSelectLimit,
   mockDbUpdateSet,
   mockDbUpdateWhere,
   mockDbUpdateReturning,
@@ -41,10 +43,16 @@ const {
   const mockDbUpdateWhere = vi.fn(() => ({ returning: mockDbUpdateReturning }));
   const mockDbUpdateSet = vi.fn(() => ({ where: mockDbUpdateWhere }));
   const mockDbUpdate = vi.fn(() => ({ set: mockDbUpdateSet }));
+  const mockDbSelectLimit = vi.fn();
+  const mockDbSelectWhere = vi.fn(() => ({ limit: mockDbSelectLimit }));
+  const mockDbSelectFrom = vi.fn(() => ({ where: mockDbSelectWhere }));
+  const mockDbSelect = vi.fn(() => ({ from: mockDbSelectFrom }));
 
   return {
     mockRequireAuth: vi.fn(),
     mockDbUpdate,
+    mockDbSelect,
+    mockDbSelectLimit,
     mockDbUpdateSet,
     mockDbUpdateWhere,
     mockDbUpdateReturning,
@@ -66,7 +74,7 @@ vi.mock('@/lib/auth/require-auth', () => ({
 }));
 
 vi.mock('@/lib/db', () => ({
-  db: { update: mockDbUpdate },
+  db: { select: mockDbSelect, update: mockDbUpdate },
 }));
 
 // Stub column tokens are opaque values — the route only ever forwards them
@@ -192,6 +200,13 @@ const ROUTE_PATH = '/api/connectors/suggested-actions/[id]/approve';
 describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDbSelectLimit.mockResolvedValue([
+      {
+        kind: 'calendar.create_event',
+        payload: BOOKING_PAYLOAD,
+        signalType: null,
+      },
+    ]);
   });
 
   it('returns 401 and performs no db/workflow work when unauthenticated', async () => {
@@ -216,7 +231,11 @@ describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', (
   it('approves via CAS with the exact update/where/returning shape and enqueues the workflow', async () => {
     mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
     mockDbUpdateReturning.mockResolvedValueOnce([
-      { id: ACTION_ID, payload: BOOKING_PAYLOAD, kind: 'calendar_booking' },
+      {
+        id: ACTION_ID,
+        payload: BOOKING_PAYLOAD,
+        kind: 'calendar.create_event',
+      },
     ]);
     mockEnqueueApprovedActionWorkflow.mockResolvedValueOnce('enqueued');
     mockRecordInboxDecision.mockResolvedValueOnce({ id: 'feedback-1' });
@@ -260,7 +279,7 @@ describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', (
       suggestedActionId: ACTION_ID,
       userId: USER_ID,
       verdict: 'approved',
-      cardKind: 'calendar_booking',
+      cardKind: 'calendar.create_event',
       surface: 'opportunity-inbox',
     });
 
@@ -268,27 +287,29 @@ describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', (
     expect(mockRecoverOrphanedApprovedAction).not.toHaveBeenCalled();
   });
 
-  it('falls back to null cardKind when the CAS row has no kind', async () => {
+  it('leaves an unregistered action unchanged', async () => {
     mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
-    mockDbUpdateReturning.mockResolvedValueOnce([
-      { id: ACTION_ID, payload: null, kind: null },
+    mockDbSelectLimit.mockResolvedValueOnce([
+      { kind: 'calendar_booking', payload: BOOKING_PAYLOAD, signalType: null },
     ]);
-    mockEnqueueApprovedActionWorkflow.mockResolvedValueOnce('enqueued');
 
-    await POST(makeRequest(), makeParams(ACTION_ID));
+    const response = await POST(makeRequest(), makeParams(ACTION_ID));
 
-    expect(mockEnqueueApprovedActionWorkflow).toHaveBeenCalledWith({
-      userId: USER_ID,
-      approvalId: ACTION_ID,
-      eventPayload: null,
-    });
-    expect(mockRecordInboxDecision).toHaveBeenCalledWith(
-      expect.objectContaining({ cardKind: null })
-    );
+    expect(response.status).toBe(422);
+    expect(await response.json()).toEqual({ error: 'unsupported-action-kind' });
+    expect(mockDbUpdate).not.toHaveBeenCalled();
+    expect(mockEnqueueApprovedActionWorkflow).not.toHaveBeenCalled();
   });
 
   it('approves a brand-deal buyer for preparation without entering the calendar executor', async () => {
     mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
+    mockDbSelectLimit.mockResolvedValueOnce([
+      {
+        payload: VERIFIED_BRAND_DEAL_PAYLOAD,
+        kind: 'brand_deal.opportunity',
+        signalType: 'brand_deal',
+      },
+    ]);
     mockDbUpdateReturning.mockResolvedValueOnce([
       {
         id: ACTION_ID,
@@ -319,7 +340,7 @@ describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', (
 
   it('fails an unverified brand-deal row closed without entering the calendar executor', async () => {
     mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
-    mockDbUpdateReturning.mockResolvedValueOnce([
+    mockDbSelectLimit.mockResolvedValueOnce([
       {
         id: ACTION_ID,
         payload: {
@@ -338,12 +359,12 @@ describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', (
     expect(body).toEqual({ error: 'brand-deal-evidence-unverified' });
     expect(mockEnqueueApprovedActionWorkflow).not.toHaveBeenCalled();
     expect(mockRecordInboxDecision).not.toHaveBeenCalled();
-    expect(mockDbUpdateSet).toHaveBeenLastCalledWith({ status: 'failed' });
+    expect(mockDbUpdate).not.toHaveBeenCalled();
   });
 
   it('fails a persisted noncanonical brand-deal alias closed', async () => {
     mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
-    mockDbUpdateReturning.mockResolvedValueOnce([
+    mockDbSelectLimit.mockResolvedValueOnce([
       {
         id: ACTION_ID,
         payload: VERIFIED_BRAND_DEAL_PAYLOAD,
@@ -359,7 +380,7 @@ describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', (
     expect(body).toEqual({ error: 'brand-deal-evidence-unverified' });
     expect(mockEnqueueApprovedActionWorkflow).not.toHaveBeenCalled();
     expect(mockRecordInboxDecision).not.toHaveBeenCalled();
-    expect(mockDbUpdateSet).toHaveBeenLastCalledWith({ status: 'failed' });
+    expect(mockDbUpdate).not.toHaveBeenCalled();
   });
 
   it('CAS miss + recovery "enqueued" -> 200 approved-recovered, no direct enqueue call', async () => {
@@ -388,6 +409,13 @@ describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', (
 
   it('CAS miss + decision-only recovery stays approved for preparation', async () => {
     mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
+    mockDbSelectLimit.mockResolvedValueOnce([
+      {
+        payload: VERIFIED_BRAND_DEAL_PAYLOAD,
+        kind: 'brand_deal.opportunity',
+        signalType: 'brand_deal',
+      },
+    ]);
     mockDbUpdateReturning.mockResolvedValueOnce([]);
     mockRecoverOrphanedApprovedAction.mockResolvedValueOnce('decision-only');
 
@@ -399,6 +427,29 @@ describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', (
       ok: true,
       approvalId: ACTION_ID,
       status: 'approved-for-preparation',
+    });
+    expect(mockEnqueueApprovedActionWorkflow).not.toHaveBeenCalled();
+  });
+
+  it('CAS miss + thumbnail decision recovery stays approved for generation', async () => {
+    mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
+    mockDbSelectLimit.mockResolvedValueOnce([
+      {
+        payload: { title: 'Candidate' },
+        kind: 'youtube.thumbnail_candidate',
+        signalType: null,
+      },
+    ]);
+    mockDbUpdateReturning.mockResolvedValueOnce([]);
+    mockRecoverOrphanedApprovedAction.mockResolvedValueOnce('decision-only');
+
+    const response = await POST(makeRequest(), makeParams(ACTION_ID));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      ok: true,
+      approvalId: ACTION_ID,
+      status: 'approved-for-generation',
     });
     expect(mockEnqueueApprovedActionWorkflow).not.toHaveBeenCalled();
   });
@@ -466,7 +517,11 @@ describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', (
   it('fails closed with 500 when the workflow enqueue throws after CAS already committed', async () => {
     mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
     mockDbUpdateReturning.mockResolvedValueOnce([
-      { id: ACTION_ID, payload: BOOKING_PAYLOAD, kind: 'calendar_booking' },
+      {
+        id: ACTION_ID,
+        payload: BOOKING_PAYLOAD,
+        kind: 'calendar.create_event',
+      },
     ]);
     const enqueueError = new Error('workflow_runs insert failed');
     mockEnqueueApprovedActionWorkflow.mockRejectedValueOnce(enqueueError);

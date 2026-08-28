@@ -12,15 +12,11 @@
  *   running → completed / waiting_for_approval / failed
  *
  * Invariants:
- * - Auto-swap ONLY when stepOutputs.autoPublishEnabled = true
+ * - Direct thumbnail mutation is disabled even for stale auto-publish records
  * - Decision log is append-only (immutable provenance)
  * - Bayesian winner requires checkGuardrails() + selectWinner() both passing
  * - Rollback: if control wins, treatment thumbnail is swapped back
- * - v1: thumbnail swap/rollback is stubbed (YouTube Data API connector TBD)
- *
- * BlockedBy: YouTube OAuth connector (#10919 note), thumbnail generator, policy gate.
- * The stub preserves the full decision flow and audit trail so the live connector
- * can be wired in by updating stubExecuteThumbnailSwap().
+ * - Live variants must be started through YouTube Studio's native experiment UI
  */
 
 import { and, eq } from 'drizzle-orm';
@@ -30,6 +26,7 @@ import { workflowRuns } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { checkGuardrails, selectWinner } from './bayesian';
+import { evaluateDirectThumbnailMutation } from './thumbnail-mutation-policy';
 import type {
   DecisionLogEntry,
   DecisionOutcome,
@@ -37,38 +34,6 @@ import type {
   VariantMetrics,
 } from './types';
 import { PACKAGING_SWAP_EXPERIMENT_WORKFLOW_KIND } from './types';
-
-// ---------------------------------------------------------------------------
-// Thumbnail swap stub (v1 — real YouTube Data API connector TBD)
-// ---------------------------------------------------------------------------
-
-/**
- * Executes a thumbnail swap on YouTube (stub implementation).
- *
- * In production this will call the YouTube Data API thumbnails.set endpoint
- * via the channel's OAuth connector. Until the connector is built, this
- * function logs the intent and succeeds so the rest of the decision flow
- * (audit log, outcome attribution, learning layer) runs end-to-end.
- *
- * ponytail: stub logs action, real connector replaces this function body.
- */
-async function stubExecuteThumbnailSwap(opts: {
-  readonly videoId: string;
-  readonly channelId: string;
-  readonly thumbnailUrl: string;
-  readonly action: 'apply_treatment' | 'rollback_to_control';
-}): Promise<void> {
-  logger.info(
-    '[packaging-swap-experiment] STUB thumbnail swap (connector not yet wired)',
-    {
-      videoId: opts.videoId,
-      channelId: opts.channelId,
-      action: opts.action,
-      thumbnailUrl: opts.thumbnailUrl,
-    }
-  );
-  // Real implementation: await youtubeConnector.setThumbnail(opts)
-}
 
 // ---------------------------------------------------------------------------
 // Decision log helpers
@@ -319,76 +284,34 @@ export async function executePackagingSwapExperiment(
       return;
     }
 
-    // 7. Execute swap or rollback
-    const now = new Date().toISOString();
-    let swapEntry: DecisionLogEntry;
-
-    if (decision.winner === 'treatment' && stepOutputs.treatmentThumbnailUrl) {
-      await stubExecuteThumbnailSwap({
-        videoId: stepOutputs.videoId,
-        channelId: stepOutputs.channelId,
-        thumbnailUrl: stepOutputs.treatmentThumbnailUrl,
-        action: 'apply_treatment',
-      });
-      swapEntry = buildDecisionEntry(
-        'swap_executed',
-        'Treatment thumbnail applied (auto-publish)',
-        {
-          confidence: decision.confidence,
-          controlRate: decision.controlRate,
-          treatmentRate: decision.treatmentRate,
-        }
-      );
-    } else {
-      // Control wins or inconclusive — rollback to control thumbnail
-      await stubExecuteThumbnailSwap({
-        videoId: stepOutputs.videoId,
-        channelId: stepOutputs.channelId,
-        thumbnailUrl: stepOutputs.treatmentThumbnailUrl ?? '',
-        action: 'rollback_to_control',
-      });
-      swapEntry = buildDecisionEntry(
-        'rollback_executed',
-        'Control retained / treatment rolled back',
-        {
-          confidence: decision.confidence,
-          controlRate: decision.controlRate,
-          treatmentRate: decision.treatmentRate,
-        }
-      );
-    }
-
-    const finalLog = [...stepOutputs.decisionLog, logEntry, swapEntry];
-
-    // 8. CAS: running → completed
-    await db
-      .update(workflowRuns)
-      .set({
-        status: 'completed',
-        shippedAt: new Date(),
-        updatedAt: new Date(),
-        stepOutputs: {
-          ...stepOutputs,
-          phase: 'decided',
-          control,
-          treatment,
-          winner: decision.winner,
-          lastSwappedAt: now,
-          decisionLog: finalLog,
-        } as Record<string, unknown>,
-      })
-      .where(
-        and(
-          eq(workflowRuns.id, workflowRunId),
-          eq(workflowRuns.status, 'running')
-        )
-      );
-
-    logger.info('[packaging-swap-experiment] experiment complete', {
+    // 7. Fail closed. Historical runs may still carry autoPublishEnabled=true,
+    // but native YouTube experiments are the only authorized live mutation path.
+    const mutationPolicy = evaluateDirectThumbnailMutation();
+    logger.warn('[packaging-swap-experiment] direct mutation blocked', {
       workflowRunId,
       winner: decision.winner,
-      confidence: decision.confidence,
+      reason: mutationPolicy.reason,
     });
+    const blockedEntry = buildDecisionEntry(
+      'native_experiment_required',
+      mutationPolicy.reason,
+      {
+        confidence: decision.confidence,
+        controlRate: decision.controlRate,
+        treatmentRate: decision.treatmentRate,
+      }
+    );
+    await markWorkflowFailed(workflowRunId, mutationPolicy.reason, {
+      stepOutputs: {
+        ...stepOutputs,
+        phase: 'failed',
+        control,
+        treatment,
+        winner: decision.winner,
+        decisionLog: [...stepOutputs.decisionLog, logEntry, blockedEntry],
+      },
+    });
+    return;
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     logger.error('[packaging-swap-experiment] executor threw unexpectedly', {

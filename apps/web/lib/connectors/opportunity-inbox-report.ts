@@ -10,7 +10,7 @@ import type { OpportunityInboxReportData } from './opportunity-inbox-types';
  */
 
 /** Kind emitted by measurement jobs for experiment result reports. */
-export const EXPERIMENT_REPORT_KIND = 'experiment.report';
+export { EXPERIMENT_REPORT_KIND } from './suggested-action-kinds';
 
 /** Kinds that classify as report cards. Prefix match on `experiment.` keeps
  *  future report-family kinds (e.g. `experiment.summary`) in the family. */
