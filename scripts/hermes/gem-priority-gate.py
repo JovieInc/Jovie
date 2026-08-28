@@ -151,6 +151,7 @@ def select_main_release_ready(attempts: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def observe_main(repo: str) -> dict[str, Any]:
+    sha: object = UNKNOWN_MAIN_SHA
     try:
         branch = gh_json(repo, "branches/main")
         sha = branch.get("commit", {}).get("sha")
@@ -185,7 +186,12 @@ def observe_main(repo: str) -> dict[str, Any]:
             },
         }
     except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError) as error:
-        return {"status": "unknown", "error": f"github-observation-failed: {error}"}
+        observed_sha = sha if valid_commit_sha(sha, exact=True) else UNKNOWN_MAIN_SHA
+        return {
+            "status": "unknown",
+            "sha": observed_sha,
+            "error": f"github-observation-failed: {error}",
+        }
 
 
 def observe_controller(
