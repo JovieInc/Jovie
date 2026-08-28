@@ -7,8 +7,6 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
-- [internal] **Packaged Mac Summer failures stay fenced (JOV-5374):** timeout and oversize Hermes output still kill the child and post fail, and a refused or thrown fail receipt is reported as an HTTP error instead of a persisted runtime failure.
-
 - [internal] **Ovie Mac HUD is one screen with three YC metrics (JOV-5298):** Packaged Jovie.app opens `/hud?ovie=mac` so the operator sees default alive/dead, week-over-week growth, and dogfood-receipted shipping only. Eve stays the talk door. Customer chat stays `/app/chat`.
 
 - **Empty iPhone chat home is a centered greeting with the composer docked at the bottom:** signed-in empty chat shows Let's get it / Ready to start? / Ready when you are, with no mark, no placeholder, and no extra tab bar.
