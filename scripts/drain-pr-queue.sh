@@ -627,7 +627,7 @@ record_unmergeable_eject_receipt() {  # <pr> <expected-head> <reason>
   echo "    +$UNMERGEABLE_EJECT_CONTEXT $description on #$n at $live_head"
 }
 
-# A product-failure tombstone is a success status so the source PR remains
+# JOV-INV-011: a product-failure tombstone is a success status so the source PR remains
 # CLEAN while Gem and Summer retain exact-head failure memory after bounded
 # Actions history rolls over. A new source commit is the only automatic reset.
 product_failure_receipt_head() {  # <head>
