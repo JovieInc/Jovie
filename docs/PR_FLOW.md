@@ -143,6 +143,28 @@ integrity evidence and severe integrity incidents admit nothing. The exception
 never permits business logic, auth, data, API, runtime, dependency, config, or
 control-plane changes, and a path-only classification is insufficient.
 
+### Summer closure-health stop-line
+
+Summer owns closure health; Gem remains the only native-queue and promotion
+writer. The closure observer classifies every open PR as `close`, `repair`,
+`promote`, `queued`, or `held` with an owner, reason, and seven-day expiry.
+`close` requires the repository's explicit `duplicate` lifecycle label;
+matching titles or Linear issue IDs never prove semantic redundancy.
+Summer grants no new issue lease, new implementation, or fallback PR generation
+unless the typed closure receipt is healthy. Missing or malformed closure
+evidence fails new intake closed.
+
+Closure health is red when the sole queue controller stays non-green for more
+than 10 minutes, the native queue stays empty with eligible clean PRs for more
+than 15 minutes, an open PR stays unclassified for more than 15 minutes,
+duplicate Linear issue lanes remain unresolved, an explicit hold expires, or no
+PR merges for one hour while open PRs remain. A native queue entry becoming
+`UNMERGEABLE` is red immediately: a nonempty queue is not progress. A grace
+episode also pauses new intake until the writer and queue prove progress. This
+stop-line never disables native promotion, exact-head PR remediation, tests, or
+review; those are the mechanisms that recover closure health. The executable
+authority is `JOV-INV-011` in `canon/invariants.jsonl`.
+
 ### Update Branch control-plane safety
 
 GitHub Update Branch is asynchronous: the branch Git ref can advance before the
@@ -236,9 +258,12 @@ existed. Contract:
    stale or duplicate deliveries are rejected.
 4. One remediation writer holds the PR lease. Implementer first.
    FX is the recovery tier after handoff or abandonment.
-   `Rolling CI Dispatch` subscribes to `check_suite`, `workflow_run`, and
-   `check_run` failures and launches Cursor-direct exact-head repair when
-   the implementer lease is not live. It does not check out PR code.
+   `Rolling CI Dispatch` subscribes only to completed `CI` `workflow_run`
+   events for `pull_request` and `merge_group`, then launches Cursor-direct
+   exact-head repair when the implementer lease is not live. It must not
+   subscribe to generic `check_suite` or `check_run` events because its own
+   completed checks can recursively re-enter the dispatcher. It does not
+   check out PR code.
    `Actions Cache GC` evicts stale or duplicate turbo caches without
    deleting live pnpm, node-cache, or playwright caches.
 5. A new commit or green rerun supersedes obsolete repairs.
