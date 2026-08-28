@@ -65,6 +65,7 @@ export async function POST(
         title: promoDownloads.title,
         artworkUrl: promoDownloads.artworkUrl,
         isActive: promoDownloads.isActive,
+        rightsControlAttested: promoDownloads.rightsControlAttested,
         artistName: creatorProfiles.displayName,
         isPro: users.isPro,
       })
@@ -77,7 +78,11 @@ export async function POST(
       .where(eq(promoDownloads.id, id))
       .limit(1);
 
-    if (!download?.isActive || !download?.isPro) {
+    if (
+      !download?.isActive ||
+      !download.rightsControlAttested ||
+      !download.isPro
+    ) {
       return NextResponse.json(
         { error: 'Not found' },
         { status: 404, headers: NO_STORE_HEADERS }

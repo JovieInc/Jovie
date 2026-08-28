@@ -88,7 +88,8 @@ export default async function PromoDownloadPage({ params }: PageProps) {
     .where(
       and(
         eq(promoDownloads.releaseId, content.id),
-        eq(promoDownloads.isActive, true)
+        eq(promoDownloads.isActive, true),
+        eq(promoDownloads.rightsControlAttested, true)
       )
     )
     .orderBy(promoDownloads.position)
