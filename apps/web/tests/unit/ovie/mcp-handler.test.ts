@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
+const workflowCaptureMocks = vi.hoisted(() => ({
+  create: vi.fn(),
+  get: vi.fn(),
+}));
+
 vi.mock('@/lib/wiki/gbrain-client', () => ({
   searchPages: vi.fn(async (query: string) => [
     { slug: 'ovie-mcp', title: `hit:${query}`, score: 0.9 },
@@ -9,6 +14,11 @@ vi.mock('@/lib/wiki/gbrain-client', () => ({
       ? { slug, title: 'Ovie MCP', compiled_truth: 'read-only' }
       : null
   ),
+}));
+
+vi.mock('@/lib/workflow-capture/server', () => ({
+  createWorkflowCaptureRequest: workflowCaptureMocks.create,
+  getWorkflowCaptureReceipt: workflowCaptureMocks.get,
 }));
 
 import {
@@ -327,6 +337,92 @@ describe('Ovie MCP handler', () => {
       ).body
     );
     expect(initiative.decisionId).toBe(decision.id);
+  });
+
+  it('puts a recording request in the founder Inbox and returns it to the requesting task', async () => {
+    const principal = {
+      ...founder,
+      subject: 'c67f31fc-4b61-43de-b690-b9d8045de8e0',
+    };
+    workflowCaptureMocks.create.mockResolvedValue({
+      schemaVersion: 1,
+      captureId: 'capture-123',
+      requestingTaskId: 'task-youtube-playback',
+      state: 'pending',
+      expiresAt: '2026-09-04T18:00:00.000Z',
+      sha256: null,
+      byteSize: null,
+      durationMs: null,
+      uploadedAt: null,
+      readyAt: null,
+      revokedAt: null,
+    });
+
+    const created = await handleOvieMcpRequest({
+      principal,
+      body: rpc('tools/call', {
+        name: 'request_workflow_capture',
+        arguments: {
+          requesting_task_id: 'task-youtube-playback',
+          request_key: 'studio-native-experiment-v1',
+          title: 'Record a YouTube Studio thumbnail experiment',
+          instructions: 'Open one eligible video and start the native test.',
+          start_url: 'https://studio.youtube.com/',
+        },
+      }),
+    });
+
+    expect(created.status).toBe(200);
+    expect(workflowCaptureMocks.create).toHaveBeenCalledWith({
+      userId: principal.subject,
+      request: expect.objectContaining({
+        requestingTaskId: 'task-youtube-playback',
+        requestedBy: 'jovie_agent',
+      }),
+    });
+    expect(
+      toolResult<{
+        requestingTaskId: string;
+        delivery: string;
+        recordButton: boolean;
+        pollWith: string;
+      }>(created.body)
+    ).toMatchObject({
+      requestingTaskId: 'task-youtube-playback',
+      delivery: 'ovie_inbox',
+      recordButton: true,
+      pollWith: 'get_workflow_capture',
+    });
+
+    workflowCaptureMocks.get.mockResolvedValue({
+      schemaVersion: 1,
+      captureId: 'capture-123',
+      requestingTaskId: 'task-youtube-playback',
+      state: 'ready',
+      expiresAt: '2026-09-04T18:00:00.000Z',
+      sha256: 'a'.repeat(64),
+      byteSize: 1200,
+      durationMs: 6000,
+      uploadedAt: '2026-08-28T18:00:00.000Z',
+      readyAt: '2026-08-28T18:01:00.000Z',
+      revokedAt: null,
+    });
+    const fetched = await handleOvieMcpRequest({
+      principal,
+      body: rpc('tools/call', {
+        name: 'get_workflow_capture',
+        arguments: { capture_id: 'capture-123' },
+      }),
+    });
+    expect(
+      toolResult<{ state: string; mediaPath: string; recordButton: boolean }>(
+        fetched.body
+      )
+    ).toMatchObject({
+      state: 'ready',
+      mediaPath: '/api/workflow-captures/capture-123/media',
+      recordButton: false,
+    });
   });
 
   it('lets authenticated non-founders read org state', async () => {
