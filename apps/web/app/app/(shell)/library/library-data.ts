@@ -1,3 +1,4 @@
+import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
 import type {
   PreviewVerification,
   ReleaseViewModel,
@@ -7,12 +8,21 @@ import {
   type LibraryApprovalStatus,
 } from '@/lib/library/approval-status';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
+import type {
+  LibraryCatalogType,
+  LibraryLifecycleStage,
+} from '@/lib/library/lifecycle-stage';
+import {
+  resolveLibraryCatalogType,
+  resolveLibraryLifecycleStage,
+} from '@/lib/library/lifecycle-stage';
 import {
   DEFAULT_LIBRARY_PROFILE_VISIBILITY,
   type LibraryProfileItemKind,
   type LibraryProfileVisibility,
 } from '@/lib/library/profile-visibility';
 import type { LibraryMerchCard } from '@/lib/merch/types';
+import type { PublicVideoListItem } from '@/lib/youtube-library/queries';
 import { hashLibraryWaveformSeed } from './library-waveform-peaks';
 
 export interface LibraryProviderLink {
@@ -37,6 +47,9 @@ export type LibraryView =
   | 'images'
   | 'videos'
   | 'audio'
+  | 'media'
+  | 'social'
+  | 'documents'
   | 'archived';
 
 export type LibraryAspectRatio = '1:1' | '16:9' | '9:16';
@@ -97,6 +110,11 @@ export interface LibraryReleaseAsset {
   readonly aspectRatio?: LibraryAspectRatio;
   readonly mediaOrientation?: LibraryMediaOrientation;
   readonly share?: LibraryAssetShareViewModel | null;
+  readonly catalogType?: LibraryCatalogType;
+  readonly linkedReleaseId?: string | null;
+  readonly documentStage?: CreatorDocumentListItem['stage'];
+  readonly privacyStatus?: string | null;
+  readonly lifecycleStage?: LibraryLifecycleStage;
 }
 
 export const LIBRARY_GRID_DENSITY_LAYOUT: Record<LibraryGridDensity, string> = {
@@ -337,6 +355,153 @@ export function buildLibraryMerchAssets(
   });
 }
 
+function youtubeCatalogType(
+  contentType: PublicVideoListItem['contentType']
+): LibraryCatalogType {
+  if (
+    contentType === 'music_video' ||
+    contentType === 'lyric_video' ||
+    contentType === 'live_performance'
+  ) {
+    return 'media';
+  }
+  return 'social';
+}
+
+export function buildLibraryDocumentAssets(
+  documents: readonly CreatorDocumentListItem[],
+  artistName: string,
+  approvalStatusByAssetId?: ReadonlyMap<string, LibraryApprovalStatus>,
+  profileVisibilityByAssetId?: ReadonlyMap<string, LibraryProfileVisibility>
+): LibraryReleaseAsset[] {
+  return documents.map(document => {
+    const assetId = `document-${document.id}`;
+    const asset: LibraryReleaseAsset = {
+      itemKind: 'document',
+      catalogType: 'document',
+      id: assetId,
+      title: document.title,
+      artist: artistName,
+      artworkUrl: null,
+      previewUrl: null,
+      videoUrl: null,
+      waveformSeed: hashLibraryWaveformSeed(assetId),
+      smartLinkPath: `/app/library?document=${encodeURIComponent(document.id)}`,
+      releaseDate: document.updatedAt,
+      releaseType: 'single',
+      status:
+        document.stage === 'capture_ready'
+          ? 'released'
+          : document.stage === 'private_draft'
+            ? 'draft'
+            : 'scheduled',
+      approvalStatus: resolveLibraryApprovalStatus(
+        assetId,
+        approvalStatusByAssetId
+      ),
+      profileVisibility: resolveLibraryProfileVisibility(
+        assetId,
+        profileVisibilityByAssetId
+      ),
+      lifecycleStatus: 'active',
+      trackCount: 0,
+      providerCount: 0,
+      providers: [],
+      hasLyrics: false,
+      hasArtwork: false,
+      hasVideoLinks: false,
+      assetKinds: [],
+      genres: [],
+      spotifyPopularity: null,
+      targetPlaylistCount: 0,
+      isExplicit: false,
+      label: null,
+      upc: null,
+      primaryIsrc: null,
+      distributor: null,
+      totalDurationMs: null,
+      itemStatusLabel: document.kind === 'idea' ? 'Idea' : 'Document',
+      primaryActionLabel: 'Open Document',
+      primaryActionHref: `/app/library?document=${encodeURIComponent(document.id)}`,
+      description: document.plainText,
+      updatedAt: document.updatedAt,
+      documentStage: document.stage,
+    };
+    return {
+      ...asset,
+      lifecycleStage: resolveLibraryLifecycleStage(asset),
+    };
+  });
+}
+
+export function buildLibraryYouTubeAssets(
+  videos: readonly PublicVideoListItem[],
+  artistName: string,
+  approvalStatusByAssetId?: ReadonlyMap<string, LibraryApprovalStatus>,
+  profileVisibilityByAssetId?: ReadonlyMap<string, LibraryProfileVisibility>
+): LibraryReleaseAsset[] {
+  return videos.map(video => {
+    const assetId = `youtube-${video.id}`;
+    const catalogType = youtubeCatalogType(video.contentType);
+    const thumbnail = normalizeHttpUrl(video.thumbnailUrl);
+    const asset: LibraryReleaseAsset = {
+      itemKind: 'video',
+      catalogType,
+      linkedReleaseId: video.releaseLink?.releaseId ?? null,
+      id: assetId,
+      title: video.title,
+      artist: artistName,
+      artworkUrl: thumbnail,
+      previewUrl: null,
+      videoUrl: video.url,
+      waveformSeed: hashLibraryWaveformSeed(assetId),
+      smartLinkPath: video.url,
+      releaseDate: video.publishedAt,
+      releaseType: 'single',
+      status:
+        video.privacyStatus === 'public'
+          ? 'released'
+          : video.privacyStatus === 'unlisted'
+            ? 'scheduled'
+            : 'draft',
+      approvalStatus: resolveLibraryApprovalStatus(
+        assetId,
+        approvalStatusByAssetId
+      ),
+      profileVisibility: resolveLibraryProfileVisibility(
+        assetId,
+        profileVisibilityByAssetId
+      ),
+      lifecycleStatus: 'active',
+      trackCount: 0,
+      providerCount: 1,
+      providers: [{ key: 'youtube', label: 'YouTube', url: video.url }],
+      hasLyrics: false,
+      hasArtwork: Boolean(thumbnail),
+      hasVideoLinks: true,
+      assetKinds: thumbnail ? ['artwork', 'video'] : ['video'],
+      genres: [],
+      spotifyPopularity: null,
+      targetPlaylistCount: 0,
+      isExplicit: false,
+      label: null,
+      upc: null,
+      primaryIsrc: video.releaseLink?.isrc ?? null,
+      distributor: null,
+      totalDurationMs:
+        video.durationSeconds === null ? null : video.durationSeconds * 1000,
+      itemStatusLabel: 'YouTube',
+      primaryActionLabel: 'Open Video',
+      primaryActionHref: video.url,
+      privacyStatus: video.privacyStatus ?? null,
+    };
+    return {
+      ...asset,
+      lifecycleStage: resolveLibraryLifecycleStage(asset),
+    };
+  });
+}
+
 export function getLibraryItemKind(
   asset: LibraryReleaseAsset
 ): LibraryItemKind {
@@ -363,9 +528,13 @@ export function libraryAssetMatchesView(
   if (isArchived) return false;
 
   const itemKind = getLibraryItemKind(asset);
+  const catalogType = resolveLibraryCatalogType(asset);
   if (view === 'all') return true;
   if (view === 'releases') return itemKind === 'release';
   if (view === 'merch') return itemKind === 'merch';
+  if (view === 'documents') return itemKind === 'document';
+  if (view === 'social') return catalogType === 'social';
+  if (view === 'media') return catalogType === 'media';
   if (view === 'images') return asset.assetKinds.includes('artwork');
   if (view === 'videos') return asset.assetKinds.includes('video');
   return hasVerifiedLibraryAudioPreview(asset);
