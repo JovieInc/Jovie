@@ -23,6 +23,7 @@ import {
 const head = 'a'.repeat(40);
 const nextHead = 'b'.repeat(40);
 const CLI = resolve(import.meta.dirname, '..', '..', 'rolling-ci-dispatch.mjs');
+const FX_CLI = resolve(import.meta.dirname, '..', 'rolling-ci-fx.mjs');
 const WORKFLOW = readFileSync(
   resolve(
     import.meta.dirname,
@@ -33,6 +34,88 @@ const WORKFLOW = readFileSync(
   ),
   'utf8'
 );
+const WORKFLOW_JQ_BLOCK_RE =
+  /jq -n \\\n((?:[ \t]+--arg(?:json)? \S+ "[^"]*" \\\n)+)\s+'(\{[^']+\})'\s*\\\n\s*\| node scripts\/lib\/rolling-ci-fx\.mjs/;
+
+function extractWorkflowPayloadExpression(source) {
+  const match = source.match(WORKFLOW_JQ_BLOCK_RE);
+  if (!match) {
+    throw new Error('Rolling CI Dispatch payload expression is missing');
+  }
+  return match[2];
+}
+
+function extractWorkflowPayloadArgs(source) {
+  const match = source.match(WORKFLOW_JQ_BLOCK_RE);
+  if (!match) {
+    throw new Error('Rolling CI Dispatch payload args are missing');
+  }
+  return [...match[1].matchAll(/--(arg(?:json)?) (\S+)/g)].map(
+    ([, kind, name]) => ({ json: kind === 'argjson', name })
+  );
+}
+
+function executeWorkflowPayload(overrides = {}) {
+  const expression = extractWorkflowPayloadExpression(WORKFLOW);
+  const declared = extractWorkflowPayloadArgs(WORKFLOW);
+  const fixtures = {
+    repository: 'JovieInc/Jovie',
+    prNumber: 17,
+    headSha: head,
+    liveHead: head,
+    sourceHead: head,
+    headRef: 'fallback/JOV-5377-fix',
+    workflowRunId: '9001',
+    workflowRunAttempt: 1,
+    failedJobs: [
+      { name: 'ci-fast', conclusion: 'failure', steps: ['Typecheck'] },
+    ],
+    writer: 'tim',
+    priorCommentBody: '',
+    handoffCommentBody: '',
+    conclusion: 'failure',
+    checkSuiteId: 44,
+    checks: [
+      {
+        name: 'ci-fast',
+        conclusion: 'failure',
+        headSha: head,
+        checkSuiteId: 44,
+      },
+    ],
+    eventName: 'workflow_run',
+    workflow: 'CI',
+    workflowPath: TRUSTED_CI_WORKFLOW_PATH,
+    producerEvent: 'pull_request',
+    trustedPolicyRef: 'main',
+    cursorApiKey: '',
+    ...overrides,
+  };
+  const jqArgs = ['-n'];
+  for (const { json, name } of declared) {
+    if (!Object.hasOwn(fixtures, name)) {
+      throw new Error(`missing fixture for jq ${name}`);
+    }
+    jqArgs.push(
+      json ? '--argjson' : '--arg',
+      name,
+      json ? JSON.stringify(fixtures[name]) : String(fixtures[name])
+    );
+  }
+  jqArgs.push(expression);
+  const payload = spawnSync('jq', jqArgs, { encoding: 'utf8' });
+  if (payload.status !== 0) {
+    throw new Error(payload.stderr || 'jq payload failed');
+  }
+  const parsed = JSON.parse(payload.stdout);
+  const planned = spawnSync(process.execPath, [FX_CLI], {
+    input: payload.stdout,
+    encoding: 'utf8',
+    env: { ...process.env, CURSOR_API_KEY: '' },
+  });
+  return { expression, parsed, planned };
+}
+
 const trustedSource = {
   eventName: 'workflow_run',
   workflow: 'CI',
@@ -475,6 +558,7 @@ describe('rolling CI dispatch CLI and workflow', () => {
       'WORKFLOW_PATH: ${{ github.event.workflow_run.path',
       'CHECK_SUITE_ID: ${{ github.event.workflow_run.check_suite_id',
       'EXPECTED_HEAD: ${{ github.event.workflow_run.head_sha',
+      'headSha:$headSha',
       'ref: ${{ github.sha }}',
       'persist-credentials: false',
       'actions: read',
@@ -504,6 +588,107 @@ describe('rolling CI dispatch CLI and workflow', () => {
     );
     expect(WORKFLOW).not.toMatch(
       /github\.event\.workflow_run\.event == 'pull_request' &&\s*\n\s*github\.event\.workflow_run\.path == '\.github\/workflows\/ci\.yml'/
+    );
+  });
+
+  it('deliberate red: jq shorthand on -n nulls exact-head fields', () => {
+    const result = spawnSync(
+      'jq',
+      ['-n', '--arg', 'headSha', head, '{headSha}'],
+      { encoding: 'utf8' }
+    );
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout).headSha).toBeNull();
+  });
+
+  it('executes the workflow payload expression so the exact head reaches the Node planner', () => {
+    const failedJobs = [
+      { name: 'ci-fast', conclusion: 'failure', steps: ['Typecheck'] },
+    ];
+    const checks = [
+      {
+        name: 'ci-fast',
+        conclusion: 'failure',
+        headSha: head,
+        checkSuiteId: 44,
+      },
+    ];
+    const { expression, parsed, planned } = executeWorkflowPayload({
+      failedJobs,
+      checks,
+    });
+    for (const { name } of extractWorkflowPayloadArgs(WORKFLOW)) {
+      expect(expression).toMatch(new RegExp(`${name}:\\$${name}\\b`));
+    }
+    expect(parsed).toEqual({
+      repository: 'JovieInc/Jovie',
+      prNumber: 17,
+      headSha: head,
+      liveHead: head,
+      sourceHead: head,
+      headRef: 'fallback/JOV-5377-fix',
+      workflowRunId: '9001',
+      workflowRunAttempt: 1,
+      failedJobs,
+      writer: 'tim',
+      priorCommentBody: '',
+      handoffCommentBody: '',
+      conclusion: 'failure',
+      checkSuiteId: 44,
+      checks,
+      cursorApiKey: '',
+      source: {
+        eventName: 'workflow_run',
+        workflow: 'CI',
+        workflowPath: TRUSTED_CI_WORKFLOW_PATH,
+        producerEvent: 'pull_request',
+        trustedPolicyRef: 'main',
+      },
+    });
+    expect(parsed.headSha).toHaveLength(40);
+    expect(planned.status, planned.stderr).toBe(0);
+    const result = JSON.parse(planned.stdout);
+    expect(result.dispatch.action).toBe('dispatch_implementer');
+    expect(result.dispatch.events[0].head).toBe(head);
+    expect(result.dispatch.state.head).toBe(head);
+  });
+
+  it('carries a 40-character exact head through green recovery and merge_group failure', () => {
+    const green = executeWorkflowPayload({
+      conclusion: 'success',
+      failedJobs: [],
+      checks: [{ ...matchingChecks[0], conclusion: 'success' }],
+    });
+    expect(green.parsed.headSha).toBe(head);
+    expect(green.parsed.headSha).toHaveLength(40);
+    expect(green.planned.status).toBe(0);
+    expect(JSON.parse(green.planned.stdout).dispatch.action).toBe(
+      'no_active_repairs'
+    );
+
+    const queueSha = 'c'.repeat(40);
+    const mergeGroup = executeWorkflowPayload({
+      producerEvent: 'merge_group',
+      headSha: queueSha,
+      liveHead: queueSha,
+      sourceHead: nextHead,
+      checks: [
+        {
+          name: 'ci-fast',
+          conclusion: 'failure',
+          headSha: queueSha,
+          checkSuiteId: 44,
+        },
+      ],
+    });
+    expect(mergeGroup.parsed.headSha).toBe(queueSha);
+    expect(mergeGroup.parsed.headSha).toHaveLength(40);
+    expect(mergeGroup.planned.status).toBe(0);
+    const mergeResult = JSON.parse(mergeGroup.planned.stdout);
+    expect(mergeResult.dispatch.action).toBe('dispatch_implementer');
+    expect(mergeResult.dispatch.events[0].head).toBe(queueSha);
+    expect(mergeResult.dispatch.events[0].source.producerEvent).toBe(
+      'merge_group'
     );
   });
 });
