@@ -1920,6 +1920,12 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
     expect(drain).not.toContain(
       'sort_by(.createdAt) | reverse | .[0].id // empty'
     );
+    expect(drain).toContain('runs?event=merge_group&per_page=100');
+    expect(drain).toContain(
+      'PRODUCT_FAILURE_CONTEXT="jovie-queue-product-failure/v1"'
+    );
+    expect(drain).toContain('block-product');
+    expect(drain).toContain('block-transient');
   });
 
   it('clears an earlier failure when the latest unchanged-head attempt succeeds', () => {
