@@ -11,7 +11,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { YOUTUBE_THUMBNAILS_COPY as copy } from '@/data/youtubeThumbnailsCopy';
 
 export const FREE_THUMBNAIL_SIGNUP_HREF = `${APP_ROUTES.SIGNUP}?plan=free&source=youtube-thumbnails`;
-export const FOUNDER_THUMBNAIL_SIGNUP_HREF = `${APP_ROUTES.SIGNUP}?source=youtube-thumbnails&offer=founder`;
+export const FOUNDER_THUMBNAIL_SIGNUP_HREF = `${APP_ROUTES.SIGNUP}?plan=pro&source=youtube-thumbnails&offer=founder&redirect_url=${encodeURIComponent('/billing/youtube-thumbnails')}`;
 
 function ThumbnailApprovalPreview() {
   return (
