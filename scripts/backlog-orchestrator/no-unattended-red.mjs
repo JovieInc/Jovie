@@ -212,7 +212,7 @@ function createApi() {
     return (observedSignals || []).map(signal => classifyStall(signal, { now })).filter(classified => !persisted.has(classified.issueKey)).map(classified => openLoopRecord(classified, { now }));
   }
   function projectSummerQueue(records, { now = new Date().toISOString() } = {}) {
-    const items = [...(records || [])].sort((left, right) => `${left.issueKey}:${left.observedAt}`.localeCompare(`${right.issueKey}:${right.observedAt}`)).map(record => ({ ...Object.fromEntries(QUEUE_KEYS.map(key => [key, record[key]])), escalation: record.escalation || null }));
+    const items = [...(records || [])].sort((left, right) => `${left.issueKey}:${left.observedAt}`.localeCompare(`${right.issueKey}:${right.observedAt}`)).map(record => ({ ...Object.fromEntries(QUEUE_KEYS.map(key => [key, record[key]])), issue: record.issue, stallClass: record.stallClass, outcome: record.outcome, escalation: record.escalation || null }));
     return { schema: SUMMER_QUEUE_SCHEMA, authority: 'Summer', observedAt: iso(now), items, counts: { open: items.filter(item => item.outcome === 'open').length, healthy: items.filter(item => item.outcome === 'healthy').length, escalated: items.filter(item => item.outcome === 'escalated').length } };
   }
   function evidenceTaskForRecord(record) {
@@ -237,7 +237,7 @@ function createApi() {
       return records;
     } catch (error) { if (error?.code === 'ENOENT') return []; throw error; }
   }
-  async function persistLoopOutcome(record, { stateDir, dryRun = false } = {}) {
+  async function persistLoopOutcome(record, { stateDir = '', dryRun = false } = {}) {
     assertNoUnattendedRed([record]);
     const destination = join(stateDir, 'red-loop', `${record.loopKey}.json`);
     const evidence = evidenceTaskForRecord(record);
