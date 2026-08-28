@@ -8,7 +8,10 @@ import {
   expectedDesktopAssetNames,
   validateReleaseAssets,
 } from './desktop-release-assets.mjs';
-import { evaluateDesktopReleaseGuard } from './desktop-release-guard.mjs';
+import {
+  evaluateDesktopReleaseGuard,
+  hasRecordedDesktopReleaseEvidence,
+} from './desktop-release-guard.mjs';
 
 const desktopRequire = createRequire(
   new URL('../apps/desktop/package.json', import.meta.url)
@@ -171,14 +174,62 @@ test('still fails when a desktop test changes with release-impacting desktop cod
   assert.deepEqual(result.desktopFiles, ['apps/desktop/src/main.ts']);
 });
 
-test('passes when desktop changes include unreleased changelog notes', () => {
+test('changelog notes are not a feature-branch desktop release trigger', () => {
   const result = evaluateDesktopReleaseGuard([
     'apps/desktop/src/main.ts',
     'CHANGELOG.md',
   ]);
 
+  assert.equal(result.passed, false);
+  assert.deepEqual(result.releaseHandlingFiles, []);
+  assert.equal(result.recordedEvidence, false);
+});
+
+test('recorded Linear/PR handoff evidence is machine-checkable', () => {
+  assert.equal(
+    hasRecordedDesktopReleaseEvidence(
+      '<!-- linear-issue-id:JOV-5374 -->\n<!-- desktop-release-handoff -->'
+    ),
+    true
+  );
+  assert.equal(
+    hasRecordedDesktopReleaseEvidence('<!-- linear-issue-id:JOV-5374 -->'),
+    false
+  );
+  assert.equal(
+    hasRecordedDesktopReleaseEvidence('<!-- desktop-release-handoff -->'),
+    false
+  );
+});
+
+test('passes when Linear/PR desktop release evidence is recorded', () => {
+  const result = evaluateDesktopReleaseGuard(['apps/desktop/src/main.ts'], {
+    releaseEvidenceText:
+      '<!-- linear-issue-id:JOV-5374 -->\n<!-- desktop-release-handoff -->',
+  });
+
   assert.equal(result.passed, true);
-  assert.deepEqual(result.releaseHandlingFiles, ['CHANGELOG.md']);
+  assert.equal(result.recordedEvidence, true);
+  assert.deepEqual(result.releaseHandlingFiles, []);
+});
+
+test('queue heads reuse source-PR desktop release evidence', () => {
+  const result = evaluateDesktopReleaseGuard(['apps/desktop/src/main.ts'], {
+    branch: 'gh-readonly-queue/main/pr-16486-abc',
+  });
+
+  assert.equal(result.passed, true);
+  assert.equal(result.queueHead, true);
+});
+
+test('passes when desktop changes include VERSION on the release path', () => {
+  const result = evaluateDesktopReleaseGuard([
+    'apps/desktop/src/main.ts',
+    'VERSION',
+  ]);
+
+  assert.equal(result.passed, true);
+  assert.deepEqual(result.releaseHandlingFiles, ['VERSION']);
 });
 
 test('passes when desktop changes include explicit release workflow handling', () => {
