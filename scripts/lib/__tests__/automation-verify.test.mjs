@@ -744,6 +744,7 @@ describe('automation-verify affected scope', () => {
         'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
         'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
         'scripts/hermes/tests/test-model-router.py',
+        'scripts/hermes/tests/symphony-reconciler.test.py',
       ],
       scriptVitestTests: [
         'scripts/lib/__tests__/automation-verify.test.mjs',

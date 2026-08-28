@@ -397,6 +397,7 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   'scripts/hermes/install-gem-fleet-controller.sh',
   'scripts/hermes/install-gem-pr-rehabilitation.sh',
   'scripts/hermes/model-router.py',
+  'scripts/hermes/symphony-reconciler.py',
   'scripts/hermes/systemd/gem-pr-drain.service',
   'scripts/hermes/systemd/gem-pr-drain.timer',
   'scripts/hermes/tests/gem-pr-drain.test.py',
@@ -404,6 +405,7 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
+  'scripts/hermes/tests/symphony-reconciler.test.py',
   'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
   'scripts/hermes/tests/test-model-router.py',
   'scripts/ci-fast-lanes.mjs',
@@ -418,6 +420,7 @@ const GEM_PR_REHABILITATION_PYTHON_TESTS = [
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
   'scripts/hermes/tests/test-model-router.py',
+  'scripts/hermes/tests/symphony-reconciler.test.py',
 ];
 const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/hermes/config/gem-repo-registry.json',
