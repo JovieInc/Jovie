@@ -14,6 +14,7 @@ export const CAPTURE_PURPOSES = [
   'thank_you',
   'bts',
   'screen',
+  'workflow_capture',
 ] as const;
 export type CapturePurpose = (typeof CAPTURE_PURPOSES)[number];
 

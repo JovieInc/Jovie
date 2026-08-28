@@ -7,6 +7,7 @@ import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity
 import { cn } from '@/lib/utils';
 import { OpportunityCardStack } from './OpportunityCardStack';
 import { OpportunityInboxReportCard } from './OpportunityInboxReportCard';
+import { WorkflowCaptureInboxCard } from './WorkflowCaptureInboxCard';
 
 export interface OpportunityInboxFeedProps {
   readonly cards: readonly OpportunityInboxCardViewModel[];
@@ -30,6 +31,7 @@ export interface OpportunityInboxFeedProps {
   readonly onStackActionInitiated?: (id: string) => void;
   /** Queues a report next step and restores focus only after it succeeds. */
   readonly onStackNextStep?: (id: string) => void;
+  readonly onCaptureCompleted?: (id: string) => void;
   readonly className?: string;
 }
 
@@ -57,27 +59,43 @@ export function OpportunityInboxFeed({
   stackKeyboardControlRef,
   onStackActionInitiated,
   onStackNextStep,
+  onCaptureCompleted,
   className,
 }: OpportunityInboxFeedProps) {
   if (enableStackInteractions) {
+    const workflowCaptureCards = cards.filter(
+      card => card.category === 'workflow_capture'
+    );
+    const stackCards = cards.filter(
+      card => card.category !== 'workflow_capture'
+    );
     return (
-      <OpportunityCardStack
-        cards={cards}
-        onAccept={id => {
-          onStackActionInitiated?.(id);
-          onApprove(id);
-        }}
-        onReject={id => {
-          onStackActionInitiated?.(id);
-          onDismiss(id);
-        }}
-        onOpen={onOpen ?? onApprove}
-        onNextStep={onStackNextStep ?? onNextStep ?? onApprove}
-        pendingActionId={pendingActionId}
-        pendingNextStepId={pendingNextStepId}
-        keyboardControlRef={stackKeyboardControlRef}
-        className={className}
-      />
+      <div className={className}>
+        {workflowCaptureCards.map(card => (
+          <WorkflowCaptureInboxCard
+            key={card.id}
+            card={card}
+            onDismiss={onDismiss}
+            onComplete={onCaptureCompleted ?? onDismiss}
+          />
+        ))}
+        <OpportunityCardStack
+          cards={stackCards}
+          onAccept={id => {
+            onStackActionInitiated?.(id);
+            onApprove(id);
+          }}
+          onReject={id => {
+            onStackActionInitiated?.(id);
+            onDismiss(id);
+          }}
+          onOpen={onOpen ?? onApprove}
+          onNextStep={onStackNextStep ?? onNextStep ?? onApprove}
+          pendingActionId={pendingActionId}
+          pendingNextStepId={pendingNextStepId}
+          keyboardControlRef={stackKeyboardControlRef}
+        />
+      </div>
     );
   }
 
@@ -90,7 +108,14 @@ export function OpportunityInboxFeed({
       <div className='system-b-opportunity-inbox-section-label'>Today</div>
       <div className='system-b-opportunity-inbox-feed-list'>
         {cards.map(card =>
-          card.category === 'report' && card.report ? (
+          card.category === 'workflow_capture' && card.workflowCapture ? (
+            <WorkflowCaptureInboxCard
+              key={card.id}
+              card={card}
+              onDismiss={onDismiss}
+              onComplete={onCaptureCompleted ?? onDismiss}
+            />
+          ) : card.category === 'report' && card.report ? (
             <OpportunityInboxReportCard
               key={card.id}
               card={card}
