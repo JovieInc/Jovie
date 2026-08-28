@@ -1,4 +1,5 @@
 export type {
+  DesignSystemCompatibilityConsumer,
   DesignSystemComponentId,
   DesignSystemComponentRegistryEntry,
   DesignSystemLayer,
@@ -11,6 +12,7 @@ export {
   designSystemCanonicalPenRoot,
   designSystemVariantKey,
   getDesignSystemComponent,
+  validateDesignSystemCompatibilityConsumerSource,
   validateDesignSystemComponentRegistry,
 } from './componentRegistry';
 export type {
