@@ -9,6 +9,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - [internal] **Mac Swift-control invariants are named, not a rewrite (JOV-5359):** Packaged Mac stays Electron `/hud?ovie=mac`; MenuMonitor stays the only Swift accessory; four proposed slugs (`JOV-INV-013`..`016`) stop a Swift HUD, remocked atoms, and full-suite UI gates. No Swift rewrite.
 
+- **Library is one catalog with Ideas, In Progress, and Out:** documents, YouTube videos, releases, and merch share stage, type, and release filters. Ideas is a stage, not a separate destination.
+
+- [internal] **YouTube channel import and artist rules land on the existing content graph (JOV-5362):** channel videos, thumbnails, metrics, and ISRC/collaborator claims write the youtube_* tables; unmatched credits fail closed; thumbnail winners need locked metrics and explicit promotion; memory can only propose artist rules until they are confirmed and typed.
+
 - [internal] **Ovie Mac HUD is one screen with three YC metrics (JOV-5298):** Packaged Jovie.app opens `/hud?ovie=mac` so the operator sees default alive/dead, week-over-week growth, and dogfood-receipted shipping only. Eve stays the talk door. Customer chat stays `/app/chat`.
 
 - **Empty iPhone chat home is a centered greeting with the composer docked at the bottom:** signed-in empty chat shows Let's get it / Ready to start? / Ready when you are, with no mark, no placeholder, and no extra tab bar.

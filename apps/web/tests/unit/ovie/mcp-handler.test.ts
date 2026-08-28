@@ -217,6 +217,12 @@ describe('Ovie MCP handler', () => {
       set: async () => {
         throw quota;
       },
+      setIfAbsent: async () => {
+        throw quota;
+      },
+      compareAndSet: async () => {
+        throw quota;
+      },
       lpush: async () => {
         throw quota;
       },

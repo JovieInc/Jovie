@@ -1928,6 +1928,19 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
     expect(drain).toContain('block-transient');
   });
 
+  it('normalizes GitHub REST run fields before matching failed fronts', () => {
+    const drain = readFileSync(
+      resolve(REPO_ROOT, 'scripts/drain-pr-queue.sh'),
+      'utf8'
+    );
+    expect(drain).toContain(
+      '{id, headBranch: .head_branch, status, conclusion, headSha: .head_sha, createdAt: .created_at, updatedAt: .updated_at}'
+    );
+    expect(drain).not.toContain(
+      '{id, headBranch, status, conclusion, headSha, createdAt, updatedAt}'
+    );
+  });
+
   it('clears an earlier failure when the latest unchanged-head attempt succeeds', () => {
     const decision = frontItemChurnDecision({
       prNumber: 15849,
@@ -2326,7 +2339,7 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     ).toBe('allow');
   });
 
-  it('skips ALLGREEN enrollment when CHANGELOG.md already sits in the queued group', () => {
+  it('skips every pre-land CHANGELOG.md candidate', () => {
     expect(CHANGELOG_COLLISION_PATH).toBe('CHANGELOG.md');
     expect(
       changelogGroupCollisionDecision({
@@ -2337,8 +2350,18 @@ describe('native merge-queue cohort (JOV-5047)', () => {
       })
     ).toMatchObject({
       action: 'skip',
-      reason: 'changelog-collision',
+      reason: 'preland-changelog-prohibited',
       collidingPrs: [16352],
+    });
+    expect(
+      changelogGroupCollisionDecision({
+        candidateFiles: ['CHANGELOG.md'],
+        queuedMemberFiles: [],
+      })
+    ).toMatchObject({
+      action: 'skip',
+      reason: 'preland-changelog-prohibited',
+      collidingPrs: [],
     });
     expect(
       changelogGroupCollisionDecision({

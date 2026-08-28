@@ -970,8 +970,8 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     collision_decision="$(changelog_collision_decision_for_pr "$n")"
     collision_action="$(jq -r '.action // empty' <<<"$collision_decision")"
     if [[ "$collision_action" == "skip" ]]; then
-      echo "    ⏸ CHANGELOG.md already queued with $(jq -r '.collidingPrs | join(",")' <<<"$collision_decision"); refusing ALLGREEN group collision for #$n"
-      LAST_ENROLL_SKIP_REASON="changelog-collision"
+      echo "    ⏸ pre-land CHANGELOG.md edit is prohibited; refusing native queue admission for #$n"
+      LAST_ENROLL_SKIP_REASON="preland-changelog"
       return 2
     fi
   fi
@@ -1330,7 +1330,7 @@ if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
   MAIN_HEAD_SHA="$(gh_retry api "repos/${REPO}/git/ref/heads/main" --jq '.object.sha // empty' 2>/dev/null || true)"
   MAIN_HEAD_SHA="$(printf '%s' "$MAIN_HEAD_SHA" | tr '[:upper:]' '[:lower:]')"
   MERGE_GROUP_RUNS_JSON="$(gh_retry api "repos/${REPO}/actions/workflows/ci.yml/runs?event=merge_group&per_page=100" \
-    --jq '[.workflow_runs[]? | {id, headBranch, status, conclusion, headSha, createdAt, updatedAt}]' 2>/dev/null || echo '[]')"
+    --jq '[.workflow_runs[]? | {id, headBranch: .head_branch, status, conclusion, headSha: .head_sha, createdAt: .created_at, updatedAt: .updated_at}]' 2>/dev/null || echo '[]')"
   export MERGE_GROUP_RUNS_JSON
 fi
 

@@ -1233,18 +1233,15 @@ describe('INVOKE_SKILL resolver', () => {
 describe('CHANGELOG_WORKFLOW resolver', () => {
   const shipContent = fs.readFileSync(path.join(ROOT, 'ship', 'SKILL.md'), 'utf-8');
 
-  test('ship SKILL.md contains changelog workflow', () => {
-    expect(shipContent).toContain('CHANGELOG (auto-generate)');
-    expect(shipContent).toContain('git log <base>..HEAD --oneline');
+  test('ship SKILL.md forbids pre-land changelog artifacts', () => {
+    expect(shipContent).toContain("POST-LAND WHAT'S NEW BOUNDARY");
+    expect(shipContent).toContain('Do not edit `CHANGELOG.md`');
   });
 
-  test('changelog workflow includes cross-check step', () => {
-    expect(shipContent).toContain('Cross-check');
-    expect(shipContent).toContain('Every commit must map to exactly one public story');
-  });
-
-  test('changelog workflow includes voice guidance', () => {
-    expect(shipContent).toContain('Lead with what the user can now **do**');
+  test('ship SKILL.md assigns one bullet only after runtime proof', () => {
+    expect(shipContent).toContain('After the PR lands and the exact runtime is proven');
+    expect(shipContent).toContain("exactly one plain-language What's New bullet");
+    expect(shipContent).toContain('Internal-only work emits no vanity note');
   });
 
   test('template uses {{CHANGELOG_WORKFLOW}} placeholder', () => {
@@ -1254,28 +1251,10 @@ describe('CHANGELOG_WORKFLOW resolver', () => {
     expect(tmpl).not.toContain('Group commits by theme');
   });
 
-  test('changelog workflow includes keep-changelog format', () => {
-    expect(shipContent).toContain('### Featured');
-    expect(shipContent).toContain('### Added');
-    expect(shipContent).toContain('### Fixed');
-  });
-
-  test('changelog workflow requires outcome grouping and both eval layers', () => {
-    expect(shipContent).toContain('Group by customer outcome');
-    expect(shipContent).toContain('audience, availability');
-    expect(shipContent).toContain('at most 3 total iterations');
-    expect(shipContent).toContain('independent per-changelog eval');
-    expect(shipContent).toContain('--changelog CHANGELOG.md');
-    expect(shipContent).toContain('hashes the exact changelog');
-    expect(shipContent).toContain('golden-fixture regression suite');
-    expect(shipContent).toContain('a passing real release cannot substitute');
-  });
-
-  test('changelog workflow enforces strict public language rules', () => {
-    expect(shipContent).toContain('Headlines are 8 words or fewer');
-    expect(shipContent).toContain('2 sentences and 22 words or fewer');
-    expect(shipContent).toContain('Never mention ticket IDs, vendors');
-    expect(shipContent).toContain('Never claim availability without exact release evidence');
+  test('ship SKILL.md keeps Linear and the landed PR as evidence', () => {
+    expect(shipContent).toContain('Linear is the source of record');
+    expect(shipContent).toContain('the PR carries implementation plus verification evidence');
+    expect(shipContent).not.toContain('CHANGELOG (auto-generate)');
   });
 });
 

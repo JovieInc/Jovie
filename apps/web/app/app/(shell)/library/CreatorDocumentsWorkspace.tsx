@@ -871,9 +871,6 @@ export function CreatorDocumentsWorkspace({
         ) : null}
         <div className='flex items-center justify-between gap-3'>
           <div>
-            <h1 className='text-lg font-semibold text-primary-token'>
-              Ideas And Scripts
-            </h1>
             <p className='text-sm text-secondary-token'>
               Private until you approve one exact script revision.
             </p>
