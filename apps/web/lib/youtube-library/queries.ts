@@ -49,6 +49,7 @@ export interface PublicVideoListItem {
   readonly contentType: YoutubeVideo['contentType'];
   readonly classificationConfidence: number | null;
   readonly thumbnailUrl: string | null;
+  readonly privacyStatus?: string | null;
   /** Present only when a link is approved. */
   readonly releaseLink: {
     isrc: string | null;
@@ -150,6 +151,7 @@ function toPublicItem(
     contentType: video.contentType,
     classificationConfidence: toNumber(video.classificationConfidence),
     thumbnailUrl,
+    privacyStatus: video.privacyStatus,
     releaseLink:
       link && link.status === 'approved'
         ? { isrc: link.isrc, releaseId: link.releaseId }

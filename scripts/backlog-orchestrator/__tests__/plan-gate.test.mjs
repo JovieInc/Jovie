@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-
+import { CONTROL_PLANE_OPTIMIZATION_EXCEPTION } from '../../invariants/optimization-contract.mjs';
 import { withPreLeaseReceipts } from './pre-lease.mjs';
 
 const planGate = await import('../plan-gate.mjs');
@@ -33,6 +33,7 @@ function evidence(overrides = {}) {
       'node --test scripts/backlog-orchestrator/__tests__/plan-gate.test.mjs',
     ],
     rollback: 'Revert the plan-gate commit and remove the receipt comment',
+    optimization: CONTROL_PLANE_OPTIMIZATION_EXCEPTION,
     ...overrides,
   };
 }
@@ -150,6 +151,18 @@ describe('plan-gate/v1', () => {
     });
     assert.equal(result.status, 'rejected');
     assert.match(result.reason, /rollback/);
+    assert.equal(fake.calls.addComment.length, 0);
+  });
+
+  it('rejects a missing optimization contract without mutating Linear', async () => {
+    const fake = client();
+    const result = await planGate.approvePlan({
+      issue: withPreLeaseReceipts(issue()),
+      evidence: evidence({ optimization: undefined }),
+      client: fake,
+    });
+    assert.equal(result.status, 'rejected');
+    assert.equal(result.reason, 'optimization-contract-missing');
     assert.equal(fake.calls.addComment.length, 0);
   });
 

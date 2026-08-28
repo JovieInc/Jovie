@@ -362,6 +362,9 @@ describe('codex issue shipper prompt', () => {
     expect(prompt).toContain('existing work/ownership');
     expect(prompt).toContain('delegate via the coordination inbox');
     expect(prompt).toContain('system-blocker');
+    expect(prompt).toContain(
+      'explicitly declare a justified exception instead of omitting the contract'
+    );
     expect(prompt).toContain('Use subagents');
     expect(prompt).toContain('Keep progress file-backed');
     expect(prompt).toContain('agent-run-artifact');

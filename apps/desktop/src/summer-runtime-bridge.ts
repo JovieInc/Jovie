@@ -265,6 +265,7 @@ export function createSummerRuntimeBridge(input: {
   readonly workerId: string;
   readonly spawnProcess?: SpawnSummer;
   readonly pollIntervalMs?: number;
+  readonly timeoutMs?: number;
   readonly onReceipt?: (receipt: SummerBridgeReceipt) => void;
 }): SummerRuntimeBridge {
   let timer: NodeJS.Timeout | undefined;
@@ -337,23 +338,39 @@ export function createSummerRuntimeBridge(input: {
           homeDirectory: input.homeDirectory,
           turn: claimed,
           spawnProcess: input.spawnProcess,
+          timeoutMs: input.timeoutMs,
           signal: activeRuntime.signal,
         });
       } catch (error) {
         const errorCode =
           error instanceof Error ? error.message : 'runtime-error';
-        await post({
-          action: 'fail',
-          id: claimed.id,
-          claim_token: claimed.claim_token,
-          failure_code: errorCode,
-        }).catch(() => undefined);
-        receipt = {
-          cycle,
-          state: 'runtime-error',
-          turnId: claimed.id,
-          errorCode,
-        };
+        let persisted = false;
+        let persistStatus: number | 'persist' = 'persist';
+        try {
+          const failed = await post({
+            action: 'fail',
+            id: claimed.id,
+            claim_token: claimed.claim_token,
+            failure_code: errorCode,
+          });
+          persisted = failed.ok;
+          persistStatus = failed.status;
+        } catch {
+          persisted = false;
+        }
+        receipt = persisted
+          ? {
+              cycle,
+              state: 'runtime-error',
+              turnId: claimed.id,
+              errorCode,
+            }
+          : {
+              cycle,
+              state: 'http-error',
+              turnId: claimed.id,
+              errorCode: `fail-${persistStatus}`,
+            };
         return receipt;
       } finally {
         activeRuntime = undefined;

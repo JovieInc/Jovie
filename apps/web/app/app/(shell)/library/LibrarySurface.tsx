@@ -123,6 +123,10 @@ import {
   libraryApprovalStatusDotClasses,
 } from '@/lib/library/approval-status';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
+import {
+  libraryAssetMatchesStage,
+  parseLibraryStageParam,
+} from '@/lib/library/lifecycle-stage';
 import { updateLibraryProfileVisibility } from '@/lib/library/profile-visibility/client-mutations';
 import {
   releaseStatusClasses,
@@ -294,6 +298,12 @@ const PRESETS: readonly {
     label: 'Audio',
     description: 'Playable previews',
     predicate: asset => libraryAssetMatchesView(asset, 'audio'),
+  },
+  {
+    id: 'documents',
+    label: 'Documents',
+    description: 'Creator documents and scripts',
+    predicate: asset => libraryAssetMatchesView(asset, 'documents'),
   },
   {
     id: 'archived',
@@ -2350,6 +2360,11 @@ export function LibrarySurface({
   const [preset, setPreset] = useState<LibraryPresetId>(() =>
     parseLibraryViewParam(searchParams.get('view'))
   );
+  const [stage, setStage] = useState(() =>
+    parseLibraryStageParam(
+      searchParams.get('stage') ?? searchParams.get('section')
+    )
+  );
   // Keep the server render and the browser's first hydration render identical.
   // A persisted view belongs to the post-hydration enhancement path; reading it
   // here would make a returning user's first client render differ from SSR.
@@ -2366,12 +2381,18 @@ export function LibrarySurface({
   const isDesktopLayout = useBreakpoint('lg');
   const deferredFilters = useDeferredValue(filters);
   const deferredPreset = useDeferredValue(preset);
+  const deferredStage = useDeferredValue(stage);
   const deferredSavedView = useDeferredValue(savedView);
   const deferredPills = useDeferredValue(pills);
   const deferredSort = useDeferredValue(sort);
 
   useEffect(() => {
     setPreset(parseLibraryViewParam(searchParams.get('view')));
+    setStage(
+      parseLibraryStageParam(
+        searchParams.get('stage') ?? searchParams.get('section')
+      )
+    );
   }, [searchParams]);
 
   // Deep-link view-mode override (e.g. the /app/tracks redirect lands on
@@ -2450,6 +2471,7 @@ export function LibrarySurface({
     return effectiveAssets
       .filter(presetPredicate)
       .filter(savedViewPredicate)
+      .filter(asset => libraryAssetMatchesStage(asset, deferredStage))
       .filter(asset => assetMatchesFilters(asset, deferredFilters))
       .filter(asset => assetMatchesPills(asset, deferredPills))
       .toSorted(compareAssets(deferredSort));
@@ -2459,6 +2481,7 @@ export function LibrarySurface({
     deferredPreset,
     deferredSavedView,
     deferredSort,
+    deferredStage,
     effectiveAssets,
   ]);
 
@@ -2565,6 +2588,18 @@ export function LibrarySurface({
   }
 
   function openAsset(id: string) {
+    const asset = effectiveAssets.find(item => item.id === id);
+    if (asset && getLibraryItemKind(asset) === 'document') {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('section');
+      params.set('document', id.replace(/^document-/, ''));
+      const query = params.toString();
+      router.replace(
+        query ? `${APP_ROUTES.LIBRARY}?${query}` : APP_ROUTES.LIBRARY,
+        { scroll: false }
+      );
+      return;
+    }
     setSelectedId(id);
     setDrawerOpen(true);
   }

@@ -28,6 +28,8 @@ export interface YouTubeChannelVideo {
   readonly url: string;
   readonly privacyStatus: string | null;
   readonly thumbnails: YouTubeThumbnailSet;
+  /** Provider-supplied credit names when the Data API exposes them. */
+  readonly creditedNames?: readonly string[];
 }
 
 /** Analytics payload for one video over one window. */

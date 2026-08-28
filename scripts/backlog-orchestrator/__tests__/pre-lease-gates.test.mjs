@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-
+import { CONTROL_PLANE_OPTIMIZATION_EXCEPTION } from '../../invariants/optimization-contract.mjs';
 import * as admissionGate from '../admission-gate.mjs';
 import * as admitter from '../admitter.mjs';
 import * as contextGate from '../context-gate.mjs';
@@ -55,6 +55,7 @@ function planEvidence() {
       'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs',
     ],
     rollback: 'Revert the gate commit and remove the receipt comments',
+    optimization: CONTROL_PLANE_OPTIMIZATION_EXCEPTION,
   };
 }
 

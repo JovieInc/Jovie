@@ -19,6 +19,10 @@
  * Display labels/tooltips for the dashboard read from
  * `lib/analytics/metric-definitions.ts`, which is itself derived from this
  * module.
+ *
+ * Product optimization contracts (JOV-INV-012) must use this layer plus
+ * model-experiments, audience events, YouTube packaging experiments, and
+ * release-to-revenue attribution. Do not add a parallel analytics stack.
  */
 
 /** How a metric's value is produced. */
