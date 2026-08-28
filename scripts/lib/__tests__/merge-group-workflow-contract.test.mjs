@@ -665,6 +665,59 @@ ${selectedGateScript}`,
     }
   });
 
+  it('builds the exact product-lane receipt with a valid immutable run URL', () => {
+    const receipt = getJobBlock(CI_WORKFLOW, 'ci-product-lane-receipt');
+    expect(receipt).toContain(
+      '--arg run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"'
+    );
+    const queryLine = receipt
+      .split('\n')
+      .find(line => line.includes("'{lanes:"));
+    expect(queryLine).toBeDefined();
+    const query = queryLine.trim().replace(/^'/, '').replace(/' \\$/, '');
+    const runUrl = 'https://github.com/JovieInc/Jovie/actions/runs/33198607319';
+    const result = spawnSync(
+      'jq',
+      [
+        '-n',
+        '--argjson',
+        'ios',
+        '["skipped","skipped"]',
+        '--argjson',
+        'mac',
+        '["skipped","skipped"]',
+        '--argjson',
+        'web',
+        '["success","success","success"]',
+        '--argjson',
+        'operations',
+        '["skipped"]',
+        '--argjson',
+        'cross',
+        '["skipped"]',
+        '--arg',
+        'receipt',
+        'product-lane-final-exact-head-1',
+        '--arg',
+        'run',
+        runUrl,
+        query,
+      ],
+      { encoding: 'utf8' }
+    );
+    expect(
+      result.status,
+      `stdout: ${result.stdout}\nstderr: ${result.stderr}`
+    ).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      receiptArtifact: 'product-lane-final-exact-head-1',
+      run: runUrl,
+      lanes: {
+        web: ['success', 'success', 'success'],
+      },
+    });
+  });
+
   it('starts Build+Layout combined-head server with pinned loopback HOSTNAME (JOV-4446)', () => {
     const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
     expect(buildLayout).toContain("github.event_name == 'merge_group'");

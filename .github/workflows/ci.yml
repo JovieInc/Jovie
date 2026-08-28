@@ -2048,7 +2048,8 @@ jobs:
             --argjson operations "[\"$(lane_result "$RUN_OPERATIONS" "$FAST")\"]" \
             --argjson cross "[\"$(lane_result "$RUN_CROSS" "$CROSS")\"]" \
             --arg receipt "product-lane-final-${GITHUB_SHA}-${GITHUB_RUN_ATTEMPT}" \
-            '{lanes: {ios: $ios, mac: $mac, web: $web, operations: $operations, "cross-product": $cross}, receiptArtifact: $receipt, run: env.GITHUB_SERVER_URL + "/" + env.GITHUB_REPOSITORY + "/actions/runs/" + env.GITHUB_RUN_ID}' \
+            --arg run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{lanes: {ios: $ios, mac: $mac, web: $web, operations: $operations, "cross-product": $cross}, receiptArtifact: $receipt, run: $run}' \
             > "$root/results.json"
           node scripts/lib/product-lane-finalize.mjs \
             "$root/receipt.json" "$root/results.json" \
