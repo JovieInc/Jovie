@@ -121,7 +121,7 @@ test('allows feature branch package.json dependency/script edits when version fi
   assert.deepEqual(result.violations, []);
 });
 
-test('allows feature branch CHANGELOG notes under Unreleased', () => {
+test('rejects every feature branch CHANGELOG edit', () => {
   const result = evaluate({
     changedFiles: ['CHANGELOG.md'],
     base: {
@@ -134,7 +134,8 @@ test('allows feature branch CHANGELOG notes under Unreleased', () => {
     },
   });
 
-  assert.equal(result.passed, true);
+  assert.equal(result.passed, false);
+  assert.match(result.violations[0], /pre-land changelog artifacts/);
 });
 
 test('fails when a feature branch adds a dated CHANGELOG release heading', () => {
@@ -152,7 +153,7 @@ test('fails when a feature branch adds a dated CHANGELOG release heading', () =>
 
   assert.equal(result.passed, false);
   assert.match(result.violations[0], /CHANGELOG\.md/);
-  assert.match(result.violations[0], /26\.6\.62/);
+  assert.match(result.violations[0], /post-land release path/);
 });
 
 test('does not enforce on main release path', () => {

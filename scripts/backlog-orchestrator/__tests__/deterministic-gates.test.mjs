@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-
+import { validateOptimizationContract } from '../../invariants/optimization-contract.mjs';
 import * as admissionGate from '../admission-gate.mjs';
 import * as admitter from '../admitter.mjs';
 import * as deterministicGates from '../deterministic-gates.mjs';
@@ -17,6 +17,10 @@ One deterministic alert fingerprint fans out.
 
 ## Proposed fix
 Normalize the unstable token before sending the event.
+
+## Optimization exception
+- Class: non-product
+- Justification: This control-plane alert normalization ships no user-facing page, link, asset, campaign, recommendation, or content variant.
 
 ## Acceptance criteria
 * Repeated events group into one issue.
@@ -68,6 +72,11 @@ describe('deterministic no-model gates', () => {
     assert.equal(result.evidence.repo, 'JovieInc/Jovie');
     assert.equal(result.evidence.target.target_repo, 'JovieInc/Jovie');
     assert.equal(result.evidence.project, 'Infra & CI/CD');
+    assert.equal(result.evidence.optimization.kind, 'exception');
+    assert.equal(
+      validateOptimizationContract(result.evidence.optimization),
+      null
+    );
     assert.deepEqual(result.evidence.acceptance, [
       'Repeated events group into one issue.',
       'Focused normalizer tests pass.',
@@ -76,6 +85,23 @@ describe('deterministic no-model gates', () => {
       planGate.validatePlanCandidate(issue(), result.evidence),
       null
     );
+  });
+
+  it('rejects an issue that omits both an optimization contract and an explicit exception', () => {
+    const result = deterministicGates.buildDeterministicPlanEvidence(
+      issue({
+        description: `## Problem
+A user-facing variant needs implementation.
+
+## Proposed fix
+Change the public page CTA.
+
+## Acceptance criteria
+* The CTA renders.`,
+      })
+    );
+    assert.equal(result.evidence, null);
+    assert.equal(result.reason, 'optimization-contract-missing');
   });
 
   it('accepts agent-ready as durable evidence without requiring more labels', () => {
@@ -130,6 +156,21 @@ describe('deterministic no-model gates', () => {
       description: `**Problem** — The gesture uses the wrong denominator.
 
 **Proposed fix** — Divide by the rendered track width and clamp the result.
+
+**Optimization contract**
+- Stable variant identity: body-measurement-slider:gesture:v2
+- Exposure: analytics exposure when the editable measurement slider renders
+- Outcome: analytics measurement edit completed without correction
+- Attribution: analytics session plus stable variant identity
+- Eligible context dimensions: platform; content-variant
+- Hypothesis: Linear gesture mapping increases successful measurement edits without harming accuracy.
+- Primary metric: durable-user-value: completed measurement edits per eligible exposure
+- Guardrails: accuracy; trust; correction rate
+- Privacy and consent: first-party consented interaction data only
+- Optimizer owner: Symphony
+- Cadence: weekly decision with writeback
+- Decision writeback: model-experiment promotion receipt
+- Rollback or control: restore the control gesture mapping
 
 **Acceptance** — Drag positions map linearly from zero to one.`,
     });

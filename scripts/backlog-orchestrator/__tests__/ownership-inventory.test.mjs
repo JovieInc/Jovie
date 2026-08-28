@@ -23,6 +23,10 @@ function issue(overrides = {}) {
     description: `## Proposed fix
 Keep repository-aware admission in scripts/backlog-orchestrator/admission-gate.mjs.
 
+## Optimization exception
+- Class: non-product
+- Justification: This control-plane ownership adapter ships no user-facing page, link, asset, campaign, recommendation, or content variant.
+
 ## Acceptance criteria
 * New packets name target fields.`,
     createdAt: '2026-08-01T00:00:00.000Z',
