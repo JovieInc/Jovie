@@ -144,6 +144,13 @@ import {
 import { resolvePitchDestination } from '@/lib/services/pitch/targets';
 import { type PitchInput, PLATFORM_LIMITS } from '@/lib/services/pitch/types';
 import { buildRetouchPrompt } from '@/lib/services/retouching/style';
+import {
+  evaluateAllSmartLinkSwitchRuleCases,
+  evaluateSmartLinkSwitchRuleCase,
+  SMART_LINK_SWITCH_LIVE_RULES,
+  SMART_LINK_SWITCH_RULE_CASE_IDS,
+  type SmartLinkSwitchRuleCaseId,
+} from '@/lib/services/smart-link-switch/switch-rules';
 import { RECORDABLE_VIDEO_KINDS } from '@/lib/teleprompter/types';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
@@ -5935,8 +5942,22 @@ function evaluateSkillPromptContract(vars: EvalVars) {
   const requestedFanEmailRule = requestedFanEmailRuleCase
     ? evaluateFanEmailRuleCase(requestedFanEmailRuleCase)
     : null;
+  const smartLinkSwitchRuleCases = evaluateAllSmartLinkSwitchRuleCases();
+  const requestedSmartLinkSwitchRuleCase =
+    typeof vars.smartLinkSwitchRuleCase === 'string' &&
+    (SMART_LINK_SWITCH_RULE_CASE_IDS as readonly string[]).includes(
+      vars.smartLinkSwitchRuleCase
+    )
+      ? (vars.smartLinkSwitchRuleCase as SmartLinkSwitchRuleCaseId)
+      : null;
+  const requestedSmartLinkSwitchRule = requestedSmartLinkSwitchRuleCase
+    ? evaluateSmartLinkSwitchRuleCase(requestedSmartLinkSwitchRuleCase)
+    : null;
   const fanEmailPlaybook = registryPathContent(
     'docs/playbooks/release-day-announcement.playbook.md'
+  );
+  const releasePlannerPlaybook = registryPathContent(
+    'docs/playbooks/jovie-release-planner.playbook.md'
   );
   const packagingPromptFacts = {
     evidenceNotVibes: textIncludesAll(PACKAGING_AUDIT_SYSTEM_PROMPT, [
@@ -6065,6 +6086,57 @@ function evaluateSkillPromptContract(vars: EvalVars) {
     oneCta:
       fanEmailRuleCases.find(item => item.id === 'one-cta')?.passed === true,
   };
+  const smartLinkSwitchPromptFacts = {
+    noPlaceholderUrl: textIncludesAll(SMART_LINK_SWITCH_LIVE_RULES, [
+      'Never invent a jov.ie URL',
+      'placeholder',
+      'STOP',
+    ]),
+    onlySwitchExisting: textIncludesAll(SMART_LINK_SWITCH_LIVE_RULES, [
+      'already exists',
+      'Do not mint a new live link',
+    ]),
+    alreadyLiveNoop: textIncludesAll(SMART_LINK_SWITCH_LIVE_RULES, [
+      'Already-live is a no-op keep',
+      'Do not mint a second live link',
+    ]),
+    resolvedDspsOnly: textIncludesAll(SMART_LINK_SWITCH_LIVE_RULES, [
+      'Cite only DSPs actually resolved',
+      'never invent DSP coverage',
+    ]),
+    missingLinkSkips: textIncludesAll(SMART_LINK_SWITCH_LIVE_RULES, [
+      'skip switch',
+      'Run still succeeds',
+    ]),
+    playbookEncodesGate: textIncludesAll(fanEmailPlaybook, [
+      'Never invent a jov.ie URL',
+      'already-live',
+      'skip switch',
+      'Cite only DSPs',
+    ]),
+    plannerEncodesGate: textIncludesAll(releasePlannerPlaybook, [
+      'Never invent a jov.ie URL',
+      'no-op keep',
+      'Do not mint',
+    ]),
+    placeholderRefused:
+      smartLinkSwitchRuleCases.find(item => item.id === 'placeholder-refused')
+        ?.passed === true,
+    missingLinkSkipsNoMint:
+      smartLinkSwitchRuleCases.find(
+        item => item.id === 'missing-link-skips-no-mint'
+      )?.passed === true,
+    alreadyLiveIsNoop:
+      smartLinkSwitchRuleCases.find(item => item.id === 'already-live-is-noop')
+        ?.passed === true,
+    failedLookupStops:
+      smartLinkSwitchRuleCases.find(item => item.id === 'failed-lookup-stops')
+        ?.passed === true,
+    onlyResolvedDspsCited:
+      smartLinkSwitchRuleCases.find(
+        item => item.id === 'only-resolved-dsps-cited'
+      )?.passed === true,
+  };
   const retouchGuardrails = [
     "Preserve the person's identity",
     'Do not change protected or sensitive attributes',
@@ -6091,6 +6163,11 @@ function evaluateSkillPromptContract(vars: EvalVars) {
     .filter(([, passed]) => !passed)
     .map(([name]) => name);
   const missingFanEmailPromptFacts = Object.entries(fanEmailPromptFacts)
+    .filter(([, passed]) => !passed)
+    .map(([name]) => name);
+  const missingSmartLinkSwitchPromptFacts = Object.entries(
+    smartLinkSwitchPromptFacts
+  )
     .filter(([, passed]) => !passed)
     .map(([name]) => name);
   const missingRetouchGenerationFacts = [
@@ -6181,6 +6258,17 @@ function evaluateSkillPromptContract(vars: EvalVars) {
         ? requestedFanEmailRule.passed
         : fanEmailRuleCases.every(item => item.passed),
       ruleCaseReason: requestedFanEmailRule?.reason ?? null,
+    },
+    smartLinkSwitch: {
+      skillId: 'smart_link_switch_live',
+      facts: smartLinkSwitchPromptFacts,
+      missingFacts: missingSmartLinkSwitchPromptFacts,
+      ruleCases: smartLinkSwitchRuleCases,
+      ruleCase: requestedSmartLinkSwitchRule?.id ?? null,
+      ruleCasePassed: requestedSmartLinkSwitchRule
+        ? requestedSmartLinkSwitchRule.passed
+        : smartLinkSwitchRuleCases.every(item => item.passed),
+      ruleCaseReason: requestedSmartLinkSwitchRule?.reason ?? null,
     },
     retouch: {
       skillId: 'retouch',
