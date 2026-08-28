@@ -44,8 +44,11 @@ set -e
 jq -e '
   .schema == "jovie-fleet-gate/v1" and
   (.observedAt | type == "string") and
-  (.signals.main.sha | test("^[0-9a-f]{40}$")) and
+  (try (.signals.main.sha | test("^[0-9a-f]{40}$")) catch false) and
   (.signals.integrity.status | IN("clear", "resolved", "active", "invalid")) and
+  (.signals.closureHealth.schema == "jovie-closure-health/v1") and
+  (.signals.closureHealth.newIssueIntakeAllowed | type == "boolean") and
+  (.closureAdmission.newIssueIntakeAllowed | type == "boolean") and
   (.promotionAdmission.allowed | type == "boolean") and
   (.isolatedPromotionAdmission.allowed | type == "boolean") and
   (.promotionMode | IN("normal", "isolated-only", "draft-only", "hold-intake", "blocked")) and
@@ -77,9 +80,11 @@ if [[ "$gate_rc" -ne 0 && "$gate_rc" -ne 2 ]]; then
 fi
 
 work_allowed=false
+new_issue_intake_allowed=false
 promotion_allowed=false
 deployment_allowed=false
 [[ "$(jq -r '.workAdmission.allowed' "$receipt")" == "true" ]] && work_allowed=true
+[[ "$(jq -r '.workAdmission.newIssueLeaseAllowed' "$receipt")" == "true" ]] && new_issue_intake_allowed=true
 [[ "$(jq -r '.promotionAdmission.allowed' "$receipt")" == "true" ]] && promotion_allowed=true
 [[ "$(jq -r '.deploymentAdmission.allowed // false' "$receipt")" == "true" ]] && deployment_allowed=true
 promotion_mode="$(jq -r '.promotionMode // "blocked"' "$receipt")"
@@ -115,6 +120,7 @@ if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
   {
     echo "gate_rc=$gate_rc"
     echo "work_allowed=$work_out"
+    echo "new_issue_intake_allowed=$new_issue_intake_allowed"
     echo "promotion_allowed=$promotion_allowed"
     echo "deployment_allowed=$deployment_allowed"
     echo "promotion_mode=$promotion_mode"
@@ -125,5 +131,5 @@ if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
   } >>"$GITHUB_OUTPUT"
 fi
 
-echo "Fleet gate evaluated (state=$state consumer=$consumer consumer_rc=$gate_rc work_allowed=$work_out deployment_allowed=$deployment_allowed mode=$mode)."
+echo "Fleet gate evaluated (state=$state consumer=$consumer consumer_rc=$gate_rc work_allowed=$work_out new_issue_intake_allowed=$new_issue_intake_allowed deployment_allowed=$deployment_allowed mode=$mode)."
 exit 0

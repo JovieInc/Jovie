@@ -9,6 +9,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - [internal] **Gem Fleet and Intake admission now share one host lock (JOV-5257):** mutating `reconcile -> gate-next` and issue-scoped `gate-next` take the same Gem `flock`. A contested lock fails closed with no Linear writes. Child timeout after possible effect requires receipt/lease reconciliation, never an automatic replay.
 
+- [internal] **Ovie Mac HUD is one screen with three YC metrics (JOV-5298):** Packaged Jovie.app opens `/hud?ovie=mac` so the operator sees default alive/dead, week-over-week growth, and dogfood-receipted shipping only. Eve stays the talk door. Customer chat stays `/app/chat`.
+
 - **Empty iPhone chat home is a centered greeting with the composer docked at the bottom:** signed-in empty chat shows Let's get it / Ready to start? / Ready when you are, with no mark, no placeholder, and no extra tab bar.
 
 - **Primary buttons use a lighter label:** CTA text is medium (510) instead of semibold, with the same size, fill, and 32px chrome.
@@ -85,6 +87,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- [internal] **CI repair cannot trigger itself:** Rolling CI repair observes only authoritative CI completions. Malformed main receipts fail closed instead of crashing queue admission.
 - **Jovie Local no longer says you’re offline while the local server is compiling (JOV-5339):** first compile can take ~15 seconds with no bytes yet. Local waits, talks to localhost:3100, and reloads on its own when the host is warm — no Retry click. It only says “check your connection” when the machine is actually offline.
 - **Jovie Local keeps the app shell during hot reload (JOV-5339):** packaged 14s/18s boot and load timers no longer replace a compiling local window with “couldn’t load”. Chromium maps `localhost` to `127.0.0.1` without changing the origin, so sign-in cookies stay, and transient loopback misses retry until Next is up.
 - **iPhone and Mac sign-in return to the app instead of the website:** after browser login, iOS and macOS bounce through an allowlisted return page and reopen Jovie. Signed-in native sessions no longer dump into the web dashboard.
