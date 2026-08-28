@@ -7,8 +7,6 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
-- **YouTube thumbnails can run as one approval loop:** creators can start with 10 candidates a month or choose $29/month founder access, approve styles in one Inbox, keep real people unchanged, and use native YouTube experiments before any fully automatic mode. When an agent needs a browser workflow, Ovie now asks for a private recording and returns the reviewed receipt to the originating task.
-
 - **Library is one catalog with Ideas, In Progress, and Out:** documents, YouTube videos, releases, and merch share stage, type, and release filters. Ideas is a stage, not a separate destination.
 
 - [internal] **YouTube channel import and artist rules land on the existing content graph (JOV-5362):** channel videos, thumbnails, metrics, and ISRC/collaborator claims write the youtube_* tables; unmatched credits fail closed; thumbnail winners need locked metrics and explicit promotion; memory can only propose artist rules until they are confirmed and typed.
