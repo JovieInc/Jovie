@@ -1941,6 +1941,7 @@ export const DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS = new Set([
 export const RETRYABLE_PRODUCT_FAILURE_STEPS = new Set([
   'Run unit tests',
   'Run packages/ui unit tests',
+  'Build and test',
 ]);
 export const MERGE_GROUP_CHURN_FAILURE_THRESHOLD = 2;
 export const MERGE_GROUP_CHURN_COOLDOWN_MS = 5 * 60 * 1000;
