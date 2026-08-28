@@ -98,9 +98,11 @@ final class TeleprompterViewModel {
   private(set) var elapsedSeconds: TimeInterval = 0
   private(set) var errorMessage: String?
 
-  let captureController: TeleprompterCaptureController
+  let captureController: any TeleprompterCaptureControlling
   private let store: VlogSessionStore
   private var activeRecord: VlogSessionRecord?
+  /// Bumped on start and cancel so a late Start cannot resurrect a dismissed take.
+  private var recordingOperationID: UInt64 = 0
   private var autoScroller = TeleprompterAutoScroller()
   private var autoStartIndex = 0
   private var autoStartElapsed: TimeInterval = 0
@@ -124,7 +126,7 @@ final class TeleprompterViewModel {
     // Default-argument expressions are evaluated outside the enclosing
     // @MainActor context. Keep the default inert and construct the actor-
     // isolated controller inside this initializer instead.
-    captureController: TeleprompterCaptureController? = nil
+    captureController: (any TeleprompterCaptureControlling)? = nil
   ) {
     self.proposal = proposal
     scriptTitle = proposal.title
@@ -244,6 +246,8 @@ final class TeleprompterViewModel {
 
   func startRecording() async {
     guard !isRecording, !isStarting, !isFinishing else { return }
+    recordingOperationID &+= 1
+    let operationID = recordingOperationID
     errorMessage = nil
     isEditingScript = false
     isStarting = true
@@ -271,9 +275,17 @@ final class TeleprompterViewModel {
       }
 
       try await captureController.start(videoURL: videoURL)
+      guard recordingOperationID == operationID else {
+        await captureController.cancel()
+        return
+      }
       isRecording = true
       startTicker()
     } catch {
+      guard recordingOperationID == operationID else {
+        await captureController.cancel()
+        return
+      }
       errorMessage = (error as? LocalizedError)?.errorDescription
         ?? "Couldn't start the recording."
       markActiveRecordFailed()
@@ -312,17 +324,24 @@ final class TeleprompterViewModel {
   /// A failed deletion keeps the overlay visible so the creator is never left
   /// with hidden, unreviewable media.
   func cancelRecording() async -> Bool {
+    guard !isFinishing else { return false }
+    isFinishing = true
+    defer { isFinishing = false }
+    recordingOperationID &+= 1
+
     overlayAutoResumeTask?.cancel()
     overlayAutoResumeTask = nil
     stopTicker()
+    let cancelledRecord = activeRecord
     isRecording = false
-    isStarting = false
     await captureController.cancel()
 
-    guard let record = activeRecord else { return true }
+    guard let record = cancelledRecord else { return true }
     do {
       try store.delete(record)
-      activeRecord = nil
+      if activeRecord?.id == record.id {
+        activeRecord = nil
+      }
       return true
     } catch {
       errorMessage = "Couldn't discard this private take. Try again before closing."

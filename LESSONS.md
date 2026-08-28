@@ -187,6 +187,11 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 ## CI / Build
 
+### Desktop release handoff is Linear/PR evidence, not CHANGELOG.md
+**Mistake:** After #16490 banned pre-land `CHANGELOG.md` edits, `desktop-release-guard` still treated a changelog note as the DMG trigger. Feature desktop PRs then failed `ci-fast` unless they broke the version-fanout guard.
+
+**Rule:** Desktop source changes pass without `CHANGELOG.md` or `VERSION`. Those files are pre-land release artifacts and fail closed. Explicit `desktop-release.yml` maintenance remains admissible. The post-land publisher owns What's New, VERSION, and the next DMG.
+
 ### Local Doppler commands must pin `jovie-web/dev`
 **Mistake:** Local commands were run as bare `doppler run -- ...`, which depends on ambient Doppler scope. In fresh worktrees that can fail with "You must specify a config" even though the repo always expects the `jovie-web/dev` local setup.
 

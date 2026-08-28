@@ -99,6 +99,7 @@ HOSTED_BACKGROUND_CONTROLLER_JOBS = (
     ("github-ai-orchestrator.yml", "finalize_claim"),
     ("neon-scheduled-cleanup.yml", "scheduled-cleanup"),
     ("observability-issue.yml", "sync-issue"),
+    ("sentry-autofix-recurrence.yml", "recurrence"),
     ("reusable-ci-lint.yml", "lint"),
     ("reusable-ci-lint.yml", "typecheck"),
     ("reusable-ci-lint.yml", "knip"),

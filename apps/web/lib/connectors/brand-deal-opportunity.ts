@@ -1,4 +1,6 @@
-export const BRAND_DEAL_OPPORTUNITY_KIND = 'brand_deal.opportunity';
+export { BRAND_DEAL_OPPORTUNITY_KIND } from './suggested-action-kinds';
+
+import { BRAND_DEAL_OPPORTUNITY_KIND } from './suggested-action-kinds';
 export const TIM_BRAND_DEAL_SOURCE_ACCOUNT = 't@timwhite.co';
 
 export interface BrandDealOpportunityData {

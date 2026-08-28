@@ -487,7 +487,7 @@ This repo includes [gstack](https://github.com/garrytan/gstack) as a git submodu
 
 | Skill | Purpose |
 |-------|---------|
-| `/ship` | Automated release: merge main, run tests, review diff, bump VERSION, update CHANGELOG, commit, push, create PR |
+| `/ship` | Automated PR preparation: merge main, run tests, review diff, commit, push, create/update PR; no pre-land CHANGELOG |
 | `/review` | Pre-landing PR review for SQL safety, trust boundary violations, side effects |
 | `/plan-ceo-review` | Founder mode: rethink problems, find the 10-star product |
 | `/plan-eng-review` | Eng manager mode: lock in execution plans with architecture and edge cases |

@@ -131,14 +131,14 @@ test('passes when no desktop files changed', () => {
   assert.deepEqual(result.desktopFiles, []);
 });
 
-test('fails when desktop files changed without a release trigger', () => {
+test('passes when desktop files defer release state to the post-land publisher', () => {
   const result = evaluateDesktopReleaseGuard([
     'apps/desktop/src/main.ts',
     'apps/desktop/electron-builder.yml',
   ]);
 
-  assert.equal(result.passed, false);
-  assert.deepEqual(result.releaseHandlingFiles, []);
+  assert.equal(result.passed, true);
+  assert.deepEqual(result.prelandReleaseStateFiles, []);
 });
 
 test('passes when only desktop contract tests changed', () => {
@@ -161,24 +161,24 @@ test('passes when only desktop smoke harnesses changed', () => {
   assert.deepEqual(result.desktopFiles, []);
 });
 
-test('still fails when a desktop test changes with release-impacting desktop code', () => {
+test('still passes when a desktop test changes with release-impacting desktop code', () => {
   const result = evaluateDesktopReleaseGuard([
     'apps/desktop/scripts/desktop-icon-contract.test.mjs',
     'apps/desktop/src/main.ts',
   ]);
 
-  assert.equal(result.passed, false);
+  assert.equal(result.passed, true);
   assert.deepEqual(result.desktopFiles, ['apps/desktop/src/main.ts']);
 });
 
-test('passes when desktop changes include unreleased changelog notes', () => {
+test('fails when desktop changes include a pre-land changelog artifact', () => {
   const result = evaluateDesktopReleaseGuard([
     'apps/desktop/src/main.ts',
     'CHANGELOG.md',
   ]);
 
-  assert.equal(result.passed, true);
-  assert.deepEqual(result.releaseHandlingFiles, ['CHANGELOG.md']);
+  assert.equal(result.passed, false);
+  assert.deepEqual(result.prelandReleaseStateFiles, ['CHANGELOG.md']);
 });
 
 test('passes when desktop changes include explicit release workflow handling', () => {
@@ -188,9 +188,17 @@ test('passes when desktop changes include explicit release workflow handling', (
   ]);
 
   assert.equal(result.passed, true);
-  assert.deepEqual(result.releaseHandlingFiles, [
-    '.github/workflows/desktop-release.yml',
+  assert.deepEqual(result.prelandReleaseStateFiles, []);
+});
+
+test('fails when desktop changes include a pre-land version artifact', () => {
+  const result = evaluateDesktopReleaseGuard([
+    'apps/desktop/src/main.ts',
+    'VERSION',
   ]);
+
+  assert.equal(result.passed, false);
+  assert.deepEqual(result.prelandReleaseStateFiles, ['VERSION']);
 });
 
 test('desktop publishing follows verified production instead of raw main pushes', () => {

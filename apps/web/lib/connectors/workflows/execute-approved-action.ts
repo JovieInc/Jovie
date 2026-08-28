@@ -73,12 +73,18 @@ export async function markWorkflowCompleted(
 
 export async function markWorkflowFailed(
   workflowRunId: string,
-  errorMessage: string
+  errorMessage: string,
+  options?: { readonly stepOutputs?: Record<string, unknown> }
 ): Promise<void> {
   try {
     await db
       .update(workflowRuns)
-      .set({ status: 'failed', error: errorMessage, updatedAt: new Date() })
+      .set({
+        status: 'failed',
+        error: errorMessage,
+        updatedAt: new Date(),
+        ...(options?.stepOutputs ? { stepOutputs: options.stepOutputs } : {}),
+      })
       .where(
         and(
           eq(workflowRuns.id, workflowRunId),

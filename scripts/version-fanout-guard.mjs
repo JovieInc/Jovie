@@ -9,11 +9,12 @@
  *   - VERSION
  *   - version.json
  *   - the `version` field of the root + workspace package.json files
- *   - dated release headings in CHANGELOG.md (e.g. `## [26.6.61] - 2026-06-28`)
+ *   - any feature-branch CHANGELOG.md edit
  *
- * Feature branches MAY still append release notes under the `## [Unreleased]`
- * CHANGELOG section and MAY edit package.json for dependency/script changes — only
- * the `version` field is protected.
+ * Feature branches MAY edit package.json for dependency/script changes — only
+ * the `version` field is protected. They MUST NOT edit CHANGELOG.md. Jovie
+ * publishes exactly one user-visible What's New bullet, when warranted, only
+ * after land/runtime proof through the release path.
  *
  * The actual version stamp happens on the main/release path via
  * `scripts/version-stamp.mjs` after merge. See `.claude/rules/release.md`.
@@ -35,10 +36,6 @@ const STAMP_ALLOWED_BRANCHES = new Set(['main', 'master', 'production']);
 
 /** Files whose any change is a fan-out write on a feature branch. */
 const SCALAR_VERSION_FILES = new Set(['VERSION']);
-
-/** Dated CHANGELOG release heading, e.g. `## [26.6.61] - 2026-06-28`. */
-const DATED_RELEASE_HEADING =
-  /^##\s*\[\d+\.\d+\.\d+(?:\.\d+)?\]\s*-\s*\d{4}-\d{2}-\d{2}\s*$/gm;
 
 /**
  * Branches that should be exempt from the guard entirely (they legitimately
@@ -84,13 +81,6 @@ function parseJsonVersion(raw) {
   } catch {
     return undefined;
   }
-}
-
-function datedHeadings(changelog) {
-  if (!changelog) {
-    return new Set();
-  }
-  return new Set(changelog.match(DATED_RELEASE_HEADING) ?? []);
 }
 
 /**
@@ -162,16 +152,11 @@ export function evaluateVersionFanoutGuard({
       continue;
     }
 
-    // 4. CHANGELOG.md: dated release headings are stamping; [Unreleased] is fine.
+    // 4. CHANGELOG.md: all feature-branch edits are pre-land release artifacts.
     if (file === 'CHANGELOG.md') {
-      const before = datedHeadings(getBaseContent(file));
-      const after = datedHeadings(getHeadContent(file));
-      const added = [...after].filter(heading => !before.has(heading));
-      if (added.length > 0) {
-        violations.push(
-          `CHANGELOG.md (new dated release heading(s) ${added.join(', ')} — add notes under "## [Unreleased]" instead)`
-        );
-      }
+      violations.push(
+        "CHANGELOG.md (pre-land changelog artifacts are prohibited; the post-land release path owns the single user-visible What's New bullet)"
+      );
       continue;
     }
   }
@@ -315,7 +300,7 @@ function main() {
     'Version stamping is main-only. Revert these changes; the release path stamps them after merge.'
   );
   console.error(
-    'Add release notes under "## [Unreleased]" in CHANGELOG.md instead.'
+    "Do not edit CHANGELOG.md in a PR. The post-land release path owns the single user-visible What's New bullet."
   );
   console.error(
     'See .claude/rules/release.md → "Version Stamping (main-only)".'

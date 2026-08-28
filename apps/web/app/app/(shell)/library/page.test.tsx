@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   loadAppShellRouteContext: vi.fn(),
   loadArchivedReleaseMatrixForProfile: vi.fn(),
   loadArtistHandleForProfile: vi.fn(),
+  listVideosForProfile: vi.fn(),
   requireCreatorDocumentAccess: vi.fn(),
 }));
 
@@ -37,6 +38,9 @@ vi.mock('@/lib/merch/service', () => ({
 vi.mock('@/lib/queries/server', () => ({
   getDehydratedState: vi.fn(() => ({})),
   getQueryClient: vi.fn(() => ({ fetchQuery: mocks.fetchQuery })),
+}));
+vi.mock('@/lib/youtube-library', () => ({
+  listVideosForProfile: mocks.listVideosForProfile,
 }));
 vi.mock('@/lib/releases/release-matrix-loader', () => ({
   loadArchivedReleaseMatrixForProfile:
@@ -103,10 +107,11 @@ describe('LibraryPage private document boundary', () => {
     mocks.getLibraryProfileStateMapForProfile.mockResolvedValue(new Map());
     mocks.loadArtistHandleForProfile.mockResolvedValue(null);
     mocks.getLibraryAssetShareMapForProfile.mockResolvedValue(new Map());
+    mocks.listVideosForProfile.mockResolvedValue([]);
   });
 
   it('authorizes the selected profile before listing private documents', async () => {
-    await renderLibraryPage('documents');
+    await renderLibraryPage();
 
     expect(mocks.requireCreatorDocumentAccess).toHaveBeenCalledWith({
       userId: 'user_1',
@@ -117,8 +122,8 @@ describe('LibraryPage private document boundary', () => {
     ).toBeLessThan(mocks.listCreatorDocuments.mock.invocationCallOrder[0] ?? 0);
   });
 
-  it('loads private documents independently from asset data', async () => {
-    const result = await renderLibraryPage('documents');
+  it('loads private documents into the unified library catalog', async () => {
+    const result = await renderLibraryPage();
 
     expect(getClientProps(result)).toMatchObject({
       creatorDocuments: [privateDocument],
@@ -132,7 +137,7 @@ describe('LibraryPage private document boundary', () => {
       new Error('Unauthorized')
     );
 
-    const result = await renderLibraryPage('documents');
+    const result = await renderLibraryPage();
 
     expect(mocks.listCreatorDocuments).not.toHaveBeenCalled();
     expect(getClientProps(result)).toMatchObject({
@@ -142,22 +147,13 @@ describe('LibraryPage private document boundary', () => {
     });
   });
 
-  it('does not load or serialize documents for the default Assets tab', async () => {
-    const result = await renderLibraryPage();
+  it('loads catalog assets and YouTube videos alongside documents', async () => {
+    await renderLibraryPage();
 
-    expect(mocks.requireCreatorDocumentAccess).not.toHaveBeenCalled();
-    expect(mocks.listCreatorDocuments).not.toHaveBeenCalled();
-    expect(getClientProps(result)).toMatchObject({
-      creatorDocuments: [],
-      creatorDocumentsNextCursor: null,
-      creatorDocumentsLoadFailed: false,
+    expect(mocks.fetchQuery).toHaveBeenCalled();
+    expect(mocks.getLibraryMerchCardsForProfile).toHaveBeenCalled();
+    expect(mocks.listVideosForProfile).toHaveBeenCalledWith({
+      creatorProfileId: profileId,
     });
-  });
-
-  it('does not load asset payloads for the Documents tab', async () => {
-    await renderLibraryPage('documents');
-
-    expect(mocks.fetchQuery).not.toHaveBeenCalled();
-    expect(mocks.getLibraryMerchCardsForProfile).not.toHaveBeenCalled();
   });
 });
