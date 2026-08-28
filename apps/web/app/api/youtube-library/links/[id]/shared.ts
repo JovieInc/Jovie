@@ -20,6 +20,7 @@ import {
 export interface ValidatedLink {
   readonly id: string;
   readonly status: string;
+  readonly creatorProfileId: string;
 }
 
 export async function validateLinkOwnership(
@@ -81,5 +82,12 @@ export async function validateLinkOwnership(
     };
   }
 
-  return { userId, link: { id: link.id, status: link.status } };
+  return {
+    userId,
+    link: {
+      id: link.id,
+      status: link.status,
+      creatorProfileId: link.creatorProfileId,
+    },
+  };
 }
