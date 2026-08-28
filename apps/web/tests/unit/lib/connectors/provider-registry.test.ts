@@ -76,6 +76,9 @@ describe('connector provider registry', () => {
       ])
     );
     expect(calendar.syncRunner).toBe(CONNECTOR_PROVIDERS.google_calendar);
+
+    const youtube = getConnectorDefinition(CONNECTOR_PROVIDERS.youtube);
+    expect(youtube.syncRunner).toBe(CONNECTOR_PROVIDERS.youtube);
   });
 
   it('unions Google OAuth scopes for the combined authorize flow', () => {

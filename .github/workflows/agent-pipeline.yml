@@ -234,8 +234,10 @@ jobs:
             .github/ci-harness/manifest.json
             .github/rulesets/branch-protection.yml
             scripts/lib/merge-queue-guard.mjs
+            scripts/lib/pre-land-changelog.mjs
             scripts/lib/pr-check-failures.mjs
             scripts/lib/detect-systemic-failures.mjs
+            scripts/version-fanout-guard.mjs
           sparse-checkout-cone-mode: false
 
       - name: Setup Node

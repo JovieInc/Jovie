@@ -2347,6 +2347,17 @@ describe('native merge-queue cohort (JOV-5047)', () => {
         queuedMemberFiles: [
           { prNumber: 16352, files: ['CHANGELOG.md', 'docs/x.md'] },
         ],
+        branch: 'fallback/JOV-5378-fix',
+      })
+    ).toMatchObject({
+      action: 'skip',
+      reason: 'pre-land-changelog',
+    });
+    expect(
+      changelogGroupCollisionDecision({
+        candidateFiles: ['CHANGELOG.md'],
+        queuedMemberFiles: [{ prNumber: 16352, files: ['CHANGELOG.md'] }],
+        branch: 'cursor/stamp-26-8-0-version-stamp-ab12',
       })
     ).toMatchObject({
       action: 'skip',
@@ -2360,8 +2371,7 @@ describe('native merge-queue cohort (JOV-5047)', () => {
       })
     ).toMatchObject({
       action: 'skip',
-      reason: 'preland-changelog-prohibited',
-      collidingPrs: [],
+      reason: 'pre-land-changelog',
     });
     expect(
       changelogGroupCollisionDecision({
@@ -2372,8 +2382,8 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     expect(
       changelogGroupCollisionDecision({
         candidateFiles: ['CHANGELOG.md'],
-      }).action
-    ).toBe('unknown');
+      })
+    ).toMatchObject({ action: 'skip', reason: 'pre-land-changelog' });
   });
 
   it('skips a superseded Production Controller generation and promotes only exact main', () => {

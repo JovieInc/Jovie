@@ -87,8 +87,9 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain(
       'Scripts typecheck skipped (no Symphony/control-plane files changed)'
     );
+    expect(CI_FAST_SOURCE).toContain('No guardrail product lane selected');
     expect(CI_FAST_SOURCE).toContain(
-      'Guardrails skipped (no Jovie product files changed)'
+      "process.env.CI_PRODUCT_LANES || 'ios,mac,web,operations,cross-product'"
     );
     expect(CI_FAST_SOURCE).toContain('files === null || files.length === 0');
   });

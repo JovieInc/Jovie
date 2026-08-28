@@ -3672,6 +3672,26 @@ function assertSkillPromptContractCovered(output) {
     );
   }
 
+  const smartLinkSwitch = payload.smartLinkSwitch ?? {};
+  if (!smartLinkSwitch || typeof smartLinkSwitch !== 'object') {
+    return fail('skill prompt contract missing smartLinkSwitch payload');
+  }
+  if (smartLinkSwitch.skillId !== 'smart_link_switch_live') {
+    return fail(
+      'smartLinkSwitch payload is not tied to smart_link_switch_live'
+    );
+  }
+  const missingSmartLinkSwitchFacts = Array.isArray(
+    smartLinkSwitch.missingFacts
+  )
+    ? smartLinkSwitch.missingFacts
+    : [];
+  if (missingSmartLinkSwitchFacts.length > 0) {
+    return fail(
+      `smart link switch evidence floor missing facts: ${missingSmartLinkSwitchFacts.join(', ')}`
+    );
+  }
+
   return pass();
 }
 
@@ -3714,6 +3734,22 @@ function assertFanEmailRuleCase(output) {
   if (fanEmail.ruleCasePassed !== true) {
     return fail(
       `fan email rule case failed: ${String(fanEmail.ruleCase)} ${String(fanEmail.ruleCaseReason)}`
+    );
+  }
+  return pass();
+}
+
+function assertSmartLinkSwitchRuleCase(output) {
+  const payload = parseOutput(output);
+  const smartLinkSwitch = payload.smartLinkSwitch ?? {};
+  if (smartLinkSwitch.skillId !== 'smart_link_switch_live') {
+    return fail(
+      'smart link switch rule case is not tied to smart_link_switch_live'
+    );
+  }
+  if (smartLinkSwitch.ruleCasePassed !== true) {
+    return fail(
+      `smart link switch rule case failed: ${String(smartLinkSwitch.ruleCase)} ${String(smartLinkSwitch.ruleCaseReason)}`
     );
   }
   return pass();
@@ -5211,6 +5247,7 @@ module.exports = {
   assertPackagingFormatSplitCase,
   assertChannelPlaylistRuleCase,
   assertFanEmailRuleCase,
+  assertSmartLinkSwitchRuleCase,
   assertAlbumArtProviderContractCovered,
   assertAiToolPromptContractCovered,
   assertChatTitleContractCovered,

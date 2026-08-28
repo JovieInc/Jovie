@@ -30,7 +30,7 @@
     {
       "kind": "prompt",
       "description": "Load catalog, llms.txt, and public profile. Choose upcoming-drop or catalog-reactivation. Never invent a next single.",
-      "prompt": "Today is the run date. Artist @{{artistUsername}}. Optional nextTitle={{nextTitle}} targetDate={{targetDate}}. Load jovie profile, releases, events, merch, https://jov.ie/{{artistUsername}}/llms.txt, and the public profile page. If nextTitle and targetDate are both non-empty, mode=upcoming-drop. Otherwise mode=catalog-reactivation using the latest live smart link. Do not invent a title. Write a 60-second diagnosis plus a week-by-week plan. Keep a live smart link. Skip fan email if list size is unknown or zero — run still succeeds, no queue. Never write open rate, click rate, list size, scarcity, or deadline numbers that were not retrieved this run; missing ESP metrics are unverifiable, omit them. Fan email is draft or queue-for-approval only; never auto-send or schedule without explicit human sign-off. One CTA. Live smart link only if it exists. No borrowed testimonials. Do not editorial-pitch a release older than 8 weeks as new. Do not auto-fill bio. Asset specs: 3000x3000 cover RGB no URLs, 1280x720 thumb, 1080x1920 stories, 1500x500 X header with focal content in the upper-right two-thirds."
+      "prompt": "Today is the run date. Artist @{{artistUsername}}. Optional nextTitle={{nextTitle}} targetDate={{targetDate}}. Load jovie profile, releases, events, merch, https://jov.ie/{{artistUsername}}/llms.txt, and the public profile page. If nextTitle and targetDate are both non-empty, mode=upcoming-drop. Otherwise mode=catalog-reactivation using the latest live smart link. Do not invent a title. Write a 60-second diagnosis plus a week-by-week plan. SMART-LINK-SWITCH — Aria link + operator Rule 6 + Recoup release-track-drop RULES only. Keep a live smart link. Never invent a jov.ie URL or placeholder. Only switch if a smart link already exists — do not mint. Already-live is a no-op keep, not a rebuild. Failed lookup/switch STOPs. Cite only DSPs actually resolved. No smart link → skip switch; run still succeeds. Skip fan email if list size is unknown or zero — run still succeeds, no queue. Never write open rate, click rate, list size, scarcity, or deadline numbers that were not retrieved this run; missing ESP metrics are unverifiable, omit them. Fan email is draft or queue-for-approval only; never auto-send or schedule without explicit human sign-off. One CTA. Live smart link only if it exists. No borrowed testimonials. Do not editorial-pitch a release older than 8 weeks as new. Do not auto-fill bio. Asset specs: 3000x3000 cover RGB no URLs, 1280x720 thumb, 1080x1920 stories, 1500x500 X header with focal content in the upper-right two-thirds."
     },
     {
       "kind": "prompt",
@@ -111,6 +111,8 @@ Caveats:
 - This playbook sequences. Pitch, retouch, merch, smart-link switch, and fan email execute elsewhere.
 - `generate_merch` is draft-only. Publish is out of scope.
 - Fan email is draft or queue-for-approval only. Unknown or 0 list skips send. Never invent ESP metrics.
-- A live DSP smart link is a no-op keep, not a rebuild.
+- A live DSP smart link is a no-op keep, not a rebuild. Never invent a
+  jov.ie URL. Only switch an existing smart link — do not mint. Failed
+  lookup/switch STOPs. Cite only resolved DSPs. Missing link skips switch.
 - Bio is taste. Do not auto-fill.
 - Featured empty-state rail is out of scope (JOV-4790).

@@ -105,13 +105,15 @@ export const PUBLIC_SKILL_REGISTRY = {
     id: 'smart_link_switch_live',
     name: 'Switch smart link live',
     description:
-      'Flip a release smart link from pre-save/countdown mode to live DSP links.',
+      'Flip an existing release smart link from pre-save/countdown to live DSP links. Never invent a jov.ie URL. Only switch if a smart link already exists — do not mint. Already-live is a no-op keep. Failed lookup/switch STOPs. Cite only resolved DSPs. Missing link skips; run still succeeds.',
     kind: 'tool',
     version: '1.0.0',
     lifecycle: 'ga',
     activeVersion: '1.0.0',
     entitlement: 'canEditSmartLinks',
     model: 'anthropic/claude-haiku-4-5-20251001',
+    inputSchemaZodPath: 'apps/web/lib/services/smart-link-switch/types.ts',
+    outputSchemaZodPath: 'apps/web/lib/services/smart-link-switch/types.ts',
     metadata: {
       surface: 'smart_link',
       action: 'switch_live',
