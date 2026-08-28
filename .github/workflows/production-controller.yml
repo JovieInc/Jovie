@@ -129,6 +129,9 @@ jobs:
       expected_sha: ${{ steps.authorize.outputs.expected_sha }}
       already_verified: ${{ steps.authorize.outputs.already_verified }}
       marker_recovery: ${{ steps.authorize.outputs.marker_recovery }}
+      run_web: ${{ steps.authorize.outputs.run_web }}
+      selected_lanes: ${{ steps.authorize.outputs.selected_lanes }}
+      lane_receipt_artifact_id: ${{ steps.authorize.outputs.lane_receipt_artifact_id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -157,6 +160,8 @@ jobs:
             echo "is_current=false"
             echo "already_verified=false"
             echo "marker_recovery=false"
+            echo "run_web=false"
+            echo "selected_lanes=none"
           } >> "$GITHUB_OUTPUT"
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Controller expected SHA must be a full commit."
@@ -339,6 +344,32 @@ jobs:
               exit 1
             fi
 
+            receipt_name="product-lane-release-${EXPECTED_SHA}-${source_run_attempt}"
+            artifacts_json="$(gh api "repos/$REPOSITORY/actions/runs/$source_run_id/artifacts?per_page=100")"
+            receipt_artifact_id="$(jq -r --arg name "$receipt_name" '
+              [.artifacts[] | select(.expired == false and .name == $name)]
+              | if length == 1 then .[0].id else empty end
+            ' <<<"$artifacts_json")"
+            [[ "$receipt_artifact_id" =~ ^[1-9][0-9]*$ ]] || {
+              echo "::error::Exact CI attempt lacks one sealed product-lane release receipt."
+              exit 1
+            }
+            receipt_dir="$RUNNER_TEMP/product-lane-release"
+            mkdir -p "$receipt_dir"
+            gh api "repos/$REPOSITORY/actions/artifacts/$receipt_artifact_id/zip" > "$receipt_dir/receipt.zip"
+            unzip -q "$receipt_dir/receipt.zip" -d "$receipt_dir"
+            jq -e --arg sha "$EXPECTED_SHA" --arg run "$source_run_id" '
+              .provenance.sha == $sha and
+              .releaseRouting.sourceMainRunId == $run and
+              .aggregatePassed == true and
+              (.selectedLanes | type == "array")
+            ' "$receipt_dir/release.json" >/dev/null || {
+              echo "::error::Product-lane release receipt failed exact-run validation."
+              exit 1
+            }
+            selected_lanes="$(jq -r '.selectedLanes | join(",")' "$receipt_dir/release.json")"
+            run_web="$(jq -r '.selectedLanes | index("web") != null' "$receipt_dir/release.json")"
+
             final_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
             [[ "$final_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
               echo "::error::Could not resolve exact main at the production authorization boundary."
@@ -353,6 +384,9 @@ jobs:
             {
               echo "source_ci_run_id=$source_run_id"
               echo "source_ci_run_attempt=$source_run_attempt"
+              echo "selected_lanes=$selected_lanes"
+              echo "run_web=$run_web"
+              echo "lane_receipt_artifact_id=$receipt_artifact_id"
               echo "authorized=true"
             } >> "$GITHUB_OUTPUT"
             echo "Authorized production from exact CI run $source_run_id attempt $source_run_attempt."
@@ -382,7 +416,7 @@ jobs:
   production-release:
     name: Production Release
     needs: [authorize-production]
-    if: ${{ always() && needs.authorize-production.result == 'success' && needs.authorize-production.outputs.authorized == 'true' }}
+    if: ${{ always() && needs.authorize-production.result == 'success' && needs.authorize-production.outputs.authorized == 'true' && needs.authorize-production.outputs.run_web == 'true' }}
     uses: ./.github/workflows/production-release.yml
     permissions:
       contents: read
@@ -690,18 +724,18 @@ jobs:
           fi
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: steps.current.outputs.is_current == 'true'
+        if: steps.current.outputs.is_current == 'true' && needs.authorize-production.outputs.run_web == 'true'
         with:
           ref: ${{ needs.authorize-production.outputs.expected_sha }}
           fetch-depth: 1
           persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
-        if: steps.current.outputs.is_current == 'true'
+        if: steps.current.outputs.is_current == 'true' && needs.authorize-production.outputs.run_web == 'true'
 
       - name: Require exact deployment and every post-deploy probe
         id: verify
-        if: steps.current.outputs.is_current == 'true'
+        if: steps.current.outputs.is_current == 'true' && needs.authorize-production.outputs.run_web == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -792,6 +826,8 @@ jobs:
           EXPECTED_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
           DEPLOYMENT_ID: ${{ needs.production-release.outputs.production_deployment_id }}
           AUTH_SMOKE_STATUS: ${{ needs.ci-post-deploy-auth-smoke.outputs.auth_smoke_status }}
+          RUN_WEB: ${{ needs.authorize-production.outputs.run_web }}
+          SELECTED_LANES: ${{ needs.authorize-production.outputs.selected_lanes }}
         shell: bash
         run: |
           set -euo pipefail
@@ -808,6 +844,26 @@ jobs:
           fi
           if [ "$boundary_sha" != "$EXPECTED_SHA" ]; then
             echo "Main advanced to $boundary_sha before finalization; neutral."
+            exit 0
+          fi
+
+          if [ "$RUN_WEB" != true ]; then
+            for result in \
+              "${{ needs.production-release.result }}" \
+              "${{ needs.ci-public-profile-smoke.result }}" \
+              "${{ needs.ci-post-deploy-auth-smoke.result }}" \
+              "${{ needs.lighthouse-ci.result }}"; do
+              [ "$result" = skipped ] || { echo "::error::Unselected Web release lane ran ($result)."; exit 1; }
+            done
+            jq -n \
+              --arg sha "$EXPECTED_SHA" \
+              --arg lanes "$SELECTED_LANES" \
+              --arg controller_run "${{ github.run_id }}" \
+              --arg controller_attempt "${{ github.run_attempt }}" \
+              '{sha: $sha, deploymentId: "not-applicable", selectedLanes: ($lanes | split(",")), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: "not-applicable"}' \
+              > "$RUNNER_TEMP/production-generation-verified.json"
+            echo "verified=true" >> "$GITHUB_OUTPUT"
+            echo "Web release skipped by the sealed product-lane receipt."
             exit 0
           fi
 
@@ -851,7 +907,7 @@ jobs:
           retention-days: 30
 
       - name: Notify exact verified production generation
-        if: ${{ steps.finalize.outputs.verified == 'true' }}
+        if: ${{ steps.finalize.outputs.verified == 'true' && needs.authorize-production.outputs.run_web == 'true' }}
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         shell: bash
