@@ -118,6 +118,30 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         )
         self.assertEqual(latest["started_at"], "2026-08-17T19:41:00Z")
 
+    def test_observe_main_preserves_exact_sha_when_release_gate_is_missing(self):
+        def github_response(_repo: str, endpoint: str):
+            if endpoint == "branches/main":
+                return {"commit": {"sha": MAIN_SHA}}
+            if endpoint == f"commits/{MAIN_SHA}/status":
+                return {"state": "success"}
+            if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
+                return {"check_runs": []}
+            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+        with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "unknown")
+        self.assertEqual(observed["sha"], MAIN_SHA)
+        self.assertIn("Main Release Ready check is missing", observed["error"])
+
+    def test_observe_main_uses_sentinel_when_branch_lookup_fails(self):
+        with mock.patch.object(MODULE, "gh_json", side_effect=OSError("offline")):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "unknown")
+        self.assertEqual(observed["sha"], MODULE.UNKNOWN_MAIN_SHA)
+
 
 class ProductionHealthTests(unittest.TestCase):
     def test_default_uses_the_dedicated_deploy_health_contract(self):
@@ -223,6 +247,15 @@ GREEN_SIGNALS: dict[str, object] = {
         "greenReadyPrs": 0,
         "target": 15,
     },
+    "closureHealth": {
+        "schema": "jovie-closure-health/v1",
+        "status": "healthy",
+        "authority": "Summer",
+        "newIssueIntakeAllowed": True,
+        "promotionContinues": True,
+        "remediationContinues": True,
+        "reasons": [],
+    },
     "independentReview": {
         "schema": "jovie-independent-review/v1",
         "status": "passed",
@@ -267,8 +300,11 @@ def run_main(
 AUTOENROLL_RECEIPT_JQ = """
 .schema == "jovie-fleet-gate/v1" and
 (.observedAt | type == "string") and
-(.signals.main.sha | test("^[0-9a-f]{40}$")) and
+(try (.signals.main.sha | test("^[0-9a-f]{40}$")) catch false) and
 (.signals.integrity.status | IN("clear", "resolved", "active", "invalid")) and
+(.signals.closureHealth.schema == "jovie-closure-health/v1") and
+(.signals.closureHealth.newIssueIntakeAllowed | type == "boolean") and
+(.closureAdmission.newIssueIntakeAllowed | type == "boolean") and
 (.promotionAdmission.allowed | type == "boolean") and
 (.isolatedPromotionAdmission.allowed | type == "boolean") and
 (.promotionMode | IN("normal", "isolated-only", "draft-only", "hold-intake", "blocked"))
@@ -298,12 +334,23 @@ def receipt_satisfies_autoenroll(receipt: dict[str, object]) -> bool:
     )
     promotion = receipt.get("promotionAdmission")
     isolated = receipt.get("isolatedPromotionAdmission")
+    closure_signal = (
+        receipt.get("signals", {}).get("closureHealth")
+        if isinstance(receipt.get("signals"), dict)
+        else None
+    )
+    closure_admission = receipt.get("closureAdmission")
     return (
         receipt.get("schema") == "jovie-fleet-gate/v1"
         and isinstance(receipt.get("observedAt"), str)
         and isinstance(sha, str)
         and bool(re.fullmatch(r"[0-9a-f]{40}", sha))
         and integrity in {"clear", "resolved", "active", "invalid"}
+        and isinstance(closure_signal, dict)
+        and closure_signal.get("schema") == "jovie-closure-health/v1"
+        and isinstance(closure_signal.get("newIssueIntakeAllowed"), bool)
+        and isinstance(closure_admission, dict)
+        and isinstance(closure_admission.get("newIssueIntakeAllowed"), bool)
         and isinstance(promotion, dict)
         and isinstance(promotion.get("allowed"), bool)
         and isinstance(isolated, dict)
@@ -505,6 +552,48 @@ class DeploymentBindingTests(unittest.TestCase):
         )
         self.assertIn(
             "expected-head-pr-update", receipt["remediationAdmission"]["activities"]
+        )
+
+    def test_closure_health_red_blocks_new_issue_lease_without_blocking_queue_or_remediation(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["closureHealth"] = {
+            "schema": "jovie-closure-health/v1",
+            "status": "red",
+            "authority": "Summer",
+            "newIssueIntakeAllowed": False,
+            "promotionContinues": True,
+            "remediationContinues": True,
+            "reasons": ["duplicate-issue-lanes-unresolved"],
+        }
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertFalse(receipt["closureAdmission"]["newIssueIntakeAllowed"])
+        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertNotIn("approved-issue-lease", receipt["workAdmission"]["activities"])
+        self.assertNotIn("isolated-implementation", receipt["workAdmission"]["activities"])
+        self.assertTrue(receipt["promotionAdmission"]["allowed"])
+        self.assertTrue(receipt["remediationAdmission"]["allowed"])
+        self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
+
+    def test_missing_closure_health_fails_new_intake_closed_without_stopping_promotion(self):
+        signals = dict(GREEN_SIGNALS)
+        signals.pop("closureHealth")
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertFalse(receipt["closureAdmission"]["newIssueIntakeAllowed"])
+        self.assertEqual(
+            receipt["closureAdmission"]["reasons"],
+            ["closure-health-receipt-missing-or-malformed"],
+        )
+        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(receipt["promotionAdmission"]["allowed"])
+        self.assertEqual(
+            receipt["signals"]["closureHealth"]["schema"],
+            "jovie-closure-health/v1",
         )
 
     def test_severe_gate_failure_keeps_diagnosis_live_but_blocks_remote_push(self):
@@ -1364,6 +1453,27 @@ class AutoEnrollStubReceiptTests(unittest.TestCase):
         self.assertTrue(jq_accepts_autoenroll_receipt(receipt))
         self.assertEqual(receipt["signals"]["main"]["sha"], MODULE.UNKNOWN_MAIN_SHA)
         self.assertEqual(receipt["signals"]["integrity"]["status"], "invalid")
+
+    def test_malformed_main_sha_is_rejected_without_a_jq_runtime_error(self):
+        jq = shutil.which("jq")
+        self.assertIsNotNone(jq)
+
+        for malformed_sha in (None, 17, {"value": MAIN_SHA}):
+            with self.subTest(malformed_sha=malformed_sha):
+                receipt = MODULE.failed_evaluation_receipt(
+                    OSError("Permission denied")
+                )
+                receipt["signals"]["main"]["sha"] = malformed_sha
+                result = subprocess.run(
+                    [jq, "-e", autoenroll_receipt_query()],
+                    input=json.dumps(receipt),
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+
+                self.assertEqual(result.returncode, 1)
+                self.assertEqual(result.stderr, "")
 
 
 class LeaseSignalTests(unittest.TestCase):
