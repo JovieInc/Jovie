@@ -19,7 +19,7 @@ import { MarketingFooterCta } from './MarketingFooterCta';
  * Marketing footer — frame.io-inspired premium density.
  *
  * Visual contract:
- * - #06070a base, hairline rgba(255,255,255,0.07) top border, subtle 220px
+ * - --system-b-cinematic-black base, hairline rgba(255,255,255,0.07) top border, subtle 220px
  *   ambient edge-glow at the seam.
  * - 4-column nav with caps eyebrow headers (11px / 0.2em tracking / muted),
  *   14px caption-weight links.

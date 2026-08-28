@@ -1,17 +1,17 @@
 /* TODO(DS_FOUNDATION_V1 Wave 4): consume --ds-public-content-max instead of hardcoded 1298px */
 /**
- * Linear Design Tokens
+ * Linear compatibility + marketing editorial tokens.
  *
- * Extracted from Linear.app marketing pages.
- * Colors primarily use OKLCH; exact Linear parity values may use LCH or hex where needed.
- * Light + dark mode support via :root / :root.dark.
+ * Color / status / named-accent / duration tokens alias canonical System B
+ * (`--color-*`, `--duration-*`) so marketing cannot introduce a second live
+ * color registry. Layout, type scale, and marketing-only effects remain here
+ * as editorial language (DESIGN.md 2026-06-18; JOV-5302).
  *
- * Usage:
- * - Import this file in design-system.css
- * - Use var(--linear-*) in marketing components
- * - Run `pnpm linear:extract` to regenerate from Linear.app
+ * Do not add new color literals for concepts that already exist on
+ * `--color-*` / `--ds-*` / `--noir-ion-*`. JOV-3573 owns the compiled
+ * one-namespace pipeline.
  *
- * @see https://linear.app
+ * @see apps/web/styles/design-system.css
  */
 
 :root {
@@ -83,30 +83,38 @@
   --linear-btn-secondary-bg: oklch(94% 0.005 282);
   --linear-btn-secondary-fg: oklch(20% 0.005 282);
   --linear-btn-secondary-hover: oklch(90% 0.005 282);
-  /* Accent button — palette purple */
-  --linear-btn-accent-bg: #8b1eff;
+  /* Accent button — named purple, not the interactive accent */
+  --linear-btn-accent-bg: var(--color-accent-purple);
   --linear-btn-accent-fg: oklch(100% 0 0);
-  --linear-btn-accent-hover: #9a46ff;
+  --linear-btn-accent-hover: color-mix(
+    in oklab,
+    var(--color-accent-purple) 82%,
+    white
+  );
   /* ============================================
-     ACCENT COLORS (mode-independent)
+     ACCENT / STATUS — aliases onto System B
+     Named hues follow --color-accent-* (light Linear parity, dark Noir Ion).
+     --linear-accent stays the named-purple alias, not --color-accent
+     (interactive #7170ff / Ion). --linear-info stays the blue/Ion family
+     so dashboard consumers are not remapped onto Aqua.
      ============================================ */
-  --linear-accent-gray: #7f7f85;
-  --linear-accent-blue: #2563ff;
-  --linear-accent-purple: #8b1eff;
-  --linear-accent-pink: #d61a7f;
-  --linear-accent-red: #f3122d;
-  --linear-accent-orange: #ff9800;
-  --linear-accent-green: #2f9e44;
-  --linear-accent-teal: #0f9b8e;
-  --linear-success: var(--linear-accent-green);
-  --linear-success-subtle: rgb(47 158 68 / 0.14);
-  --linear-warning: var(--linear-accent-orange);
-  --linear-warning-subtle: rgb(255 152 0 / 0.15);
-  --linear-error: var(--linear-accent-red);
-  --linear-error-subtle: rgb(243 18 45 / 0.14);
-  --linear-info: var(--linear-accent-blue);
-  --linear-info-subtle: rgb(37 99 255 / 0.14);
-  --linear-accent: var(--linear-accent-purple);
+  --linear-accent-gray: var(--color-accent-gray);
+  --linear-accent-blue: var(--color-accent-blue);
+  --linear-accent-purple: var(--color-accent-purple);
+  --linear-accent-pink: var(--color-accent-pink);
+  --linear-accent-red: var(--color-accent-red);
+  --linear-accent-orange: var(--color-accent-orange);
+  --linear-accent-green: var(--color-accent-green);
+  --linear-accent-teal: var(--color-accent-teal);
+  --linear-success: var(--color-success);
+  --linear-success-subtle: var(--color-success-subtle);
+  --linear-warning: var(--color-warning);
+  --linear-warning-subtle: var(--color-warning-subtle);
+  --linear-error: var(--color-error);
+  --linear-error-subtle: var(--color-error-subtle);
+  --linear-info: var(--color-accent-blue);
+  --linear-info-subtle: var(--color-accent-blue-subtle);
+  --linear-accent: var(--color-accent-purple);
   /* ============================================
      HERO-SPECIFIC TOKENS
      Used by RedesignedHero for theme-aware gradients
@@ -357,9 +365,9 @@
      ============================================ */
   --linear-blur-header: 20px;
   --linear-ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  --linear-duration-fast: 100ms;
-  --linear-duration-normal: 160ms;
-  --linear-duration-slow: 300ms;
+  --linear-duration-fast: var(--duration-fast);
+  --linear-duration-normal: var(--duration-normal);
+  --linear-duration-slow: var(--duration-slow);
   /* ============================================
      RESPONSIVE TYPOGRAPHY — mode-independent
      ============================================ */

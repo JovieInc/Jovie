@@ -11,7 +11,9 @@ Jovie uses one token system across three surface families:
 - Dashboard / app
 
 The tokens are shared. The component families differ in layout and chrome, not
-in separate design-token files.
+in separate design-token files. `apps/web/styles/linear-tokens.css` is a
+compatibility + editorial layer: named-accent / status / duration tokens
+alias `--color-*` and `--duration-*`. Do not add a second color registry there.
 
 The current canonical surface contract lives in
 [`apps/web/lib/canonical-surfaces.ts`](../apps/web/lib/canonical-surfaces.ts).

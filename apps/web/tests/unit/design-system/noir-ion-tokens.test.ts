@@ -78,6 +78,18 @@ describe('Noir Ion — approved dark anchors', () => {
     );
   });
 
+  it('aliases named Linear accents onto System B so dark Ion cannot drift (JOV-5302)', () => {
+    expect(linearTokens).toContain(
+      '--linear-accent-blue: var(--color-accent-blue);'
+    );
+    expect(linearTokens).toContain(
+      '--linear-accent-purple: var(--color-accent-purple);'
+    );
+    expect(linearTokens).not.toMatch(
+      /--linear-accent-blue:\s*#(?:2563ff|4d7dff)/i
+    );
+  });
+
   it('keeps accent semantics for Ultra, Pulse, Aqua, Mint, Gold, Flare', () => {
     expect(dsDark).toContain('--color-accent-purple: #a982ff;');
     expect(dsDark).toContain('--color-accent-pink: #ff48d2;');

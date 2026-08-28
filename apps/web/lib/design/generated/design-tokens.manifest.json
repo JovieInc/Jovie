@@ -2,12 +2,7 @@
   "$generated": "GENERATED FILE — do not edit. Source: apps/web/design/tokens.json. Rebuild: pnpm --filter @jovie/web run tokens:build",
   "source": "apps/web/design/tokens.json",
   "divergences": {
-    "$description": "Known same-concept/different-value pairs across legacy namespaces, tracked for the namespace-collapse wave. Do NOT silently unify these — each is a visual change requiring its own migration slice.",
-    "accent-blue": {
-      "canonical-dark": "#11afff",
-      "linear-marketing": "#2563ff",
-      "note": "--color-accent-blue dark is Noir Ion electric blue (JOV-4635). --linear-accent-blue remains marketing System A until namespace-collapse."
-    }
+    "$description": "Known same-concept/different-value pairs across legacy namespaces, tracked for the namespace-collapse wave. Do NOT silently unify these — each is a visual change requiring its own migration slice. JOV-5302 resolved accent-blue by aliasing --linear-accent-* onto --color-accent-*."
   },
   "tokens": [
     {
@@ -400,7 +395,7 @@
     },
     {
       "cssVar": "--linear-duration-slow",
-      "value": "300ms",
+      "value": "250ms",
       "status": "deprecated-alias",
       "emittedBy": "styles/linear-tokens.css",
       "note": "--linear-* namespace is shrink-only ratcheted (linear-namespace-ratchet.test.ts)"

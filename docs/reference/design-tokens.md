@@ -6,7 +6,7 @@ Jovie uses CSS custom properties for theming and design tokens. This is a refere
 
 ## Architecture
 
-**Single source of truth:** `apps/web/styles/design-system.css` (~11.8k lines). It `@import`s `apps/web/styles/linear-tokens.css` and is itself imported by `apps/web/app/globals.css` in a locked order (`tailwindcss` → `design-system.css` → `theme.css`).
+**Single source of truth:** `apps/web/styles/design-system.css` (~11.8k lines). It `@import`s `apps/web/styles/linear-tokens.css` (compatibility aliases + marketing editorial layout/type; not a second color registry) and is itself imported by `apps/web/app/globals.css` in a locked order (`tailwindcss` → `design-system.css` → `theme.css`).
 
 Key architectural properties:
 
@@ -21,7 +21,7 @@ Key architectural properties:
 | File | Role |
 |---|---|
 | `apps/web/styles/design-system.css` | Canonical token registry: theme inputs, semantic colors, surfaces, typography, spacing, radius, motion, shells, System B primitives |
-| `apps/web/styles/linear-tokens.css` | `--linear-*` tokens extracted from Linear.app marketing pages (regenerate via `pnpm linear:extract`); light + dark |
+| `apps/web/styles/linear-tokens.css` | Compatibility aliases onto System B (`--color-*` / `--duration-*`) plus marketing editorial layout/type. Not a second color registry |
 | `apps/web/app/globals.css` | Imports token layers; hosts the Tailwind v4 `@theme` bridges; must not become a second token registry |
 | `apps/web/styles/theme.css` | Feature accents, animation keyframes, scoped effects only |
 | `packages/ui/theme/tokens.ts` | TypeScript constants (`surfaces`, `text`, `borders`, …) that reference the CSS custom properties for use in JS/TS |
@@ -39,13 +39,13 @@ The generation seeds: base hue/chroma, accent hue/chroma, contrast (0–100 cont
 - **Status:** `--color-error` (and foreground), warning/success/info equivalents.
 - **Platform brands:** `--color-brand-spotify|apple|youtube` with `-hover` and `-subtle` variants.
 
-### Linear marketing tokens (`--linear-*`, ~284 in linear-tokens.css + aliases)
-Extracted from Linear.app for marketing surfaces:
+### Linear compatibility + editorial tokens (`--linear-*`)
+Compatibility layer for remaining `--linear-*` consumers. Named accents, status, and duration alias System B (`--linear-accent-blue: var(--color-accent-blue)`, `--linear-duration-*: var(--duration-*)`). Layout/type remain editorial:
 - OKLCH lightness ramp primitives (`--linear-l-0..7`), neutral chroma/hue.
 - Text (`--linear-text-primary..quaternary`), backgrounds (`--linear-bg-page`, `--linear-bg-surface-0..2`), borders (`--linear-border-subtle|default|strong|focus`).
-- Buttons (`--linear-btn-primary|secondary|accent-*`), accents (`--linear-accent-blue: #2563ff`, `-purple: #8b1eff`, etc.), status (`--linear-success|warning|error|info` + `-subtle`).
+- Buttons (`--linear-btn-primary|secondary|accent-*`), named-accent aliases (`--linear-accent-*: var(--color-accent-*)`), status (`--linear-success|warning|error` + `-subtle`).
 - Typography: font weights on Linear's optical scale (`normal 400`, `medium 510`, `semibold 590`, `bold 680`), `--linear-font-features`, optical sizing.
-- Spacing scale `--linear-space-1..40` (4px base), radius (`--linear-radius-sm|md|lg|full`), motion (`--linear-ease`, `--linear-duration-fast|normal|slow`).
+- Spacing scale `--linear-space-1..40` (4px base), radius (`--linear-radius-sm|md|lg|full`), motion (`--linear-ease`; `--linear-duration-*` aliases `--duration-*`).
 - Responsive section rhythm: `--linear-section-pt/pb-sm|md|lg`, `--linear-content-gap-*`, `--linear-intro-gap-*`.
 - App chrome geometry: `--linear-app-sidebar-width`, `--linear-app-header-height(-compact)`, `--linear-app-shell-gap|radius|border`, audio bar heights.
 
@@ -102,4 +102,4 @@ Three consumption patterns:
 
 - Never hardcode theme colors, focus rings, or motion values — ESLint rules (`no-hardcoded-theme-colors`, `no-raw-focus-ring`, `no-raw-motion-values`) guard this.
 - Add new core tokens to `design-system.css`, not `globals.css` or `theme.css`.
-- Prefer the semantic alias for the surface you're on (`--system-b-*` for public app pages, `--app-shell-*` for app chrome) over reaching into primitives. Marketing surfaces use System B tokens too — System A is retired (founder-directed 2026-06-18); the remaining `--linear-*` / `.linear-marketing` appliers are a shrink-only ratchet list (`apps/web/tests/unit/design-system/singular-system-b-ratchet.test.ts`), so never add new ones.
+- Prefer the semantic alias for the surface you're on (`--system-b-*` for public app pages, `--app-shell-*` for app chrome) over reaching into primitives. Marketing surfaces use System B tokens too — System A is retired (founder-directed 2026-06-18); remaining `--linear-*` consumers are a shrink-only ratchet (`apps/web/tests/unit/design-system/linear-namespace-ratchet.test.ts` + `singular-system-b-ratchet.test.ts`), so never add new ones.

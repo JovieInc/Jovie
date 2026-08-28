@@ -103,9 +103,9 @@ export function ThemeToggle({
 
   const iconButtonStyle = isLinear
     ? {
-        backgroundColor: 'var(--linear-bg-button)',
-        border: '1px solid var(--linear-border-subtle)',
-        color: 'var(--linear-text-tertiary)',
+        backgroundColor: 'var(--color-bg-button)',
+        border: '1px solid var(--color-border-subtle)',
+        color: 'var(--color-text-tertiary-token)',
       }
     : undefined;
 

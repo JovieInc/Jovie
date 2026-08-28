@@ -25,11 +25,7 @@ export function MarketingContentShell({
     >
       <MarketingContainer width='prose'>
         <div
-          className={cn(
-            'marketing-body',
-            'text-(--linear-text-secondary)',
-            className
-          )}
+          className={cn('marketing-body', 'text-secondary-token', className)}
         >
           {children}
         </div>

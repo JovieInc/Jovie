@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Marketing color tokens now follow System B (JOV-5302):** named `--linear-accent-*` aliases `--color-accent-*` (dark Ion, not a second `#2563ff` registry), and marketing wrappers no longer remap page colors onto a cinematic Linear palette.
+
 - **Empty iPhone chat home is a centered greeting with the composer docked at the bottom:** signed-in empty chat shows Let's get it / Ready to start? / Ready when you are, with no mark, no placeholder, and no extra tab bar.
 
 - **Primary buttons use a lighter label:** CTA text is medium (510) instead of semibold, with the same size, fill, and 32px chrome.

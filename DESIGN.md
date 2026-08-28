@@ -1068,7 +1068,7 @@ mark intentional marketing sentence-case headlines with
 | File | Responsibility |
 |------|----------------|
 | `apps/web/styles/design-system.css` | **Canonical token source** — all width, surface, and color values in this doc mirror CSS here |
-| `apps/web/styles/linear-tokens.css` | Marketing-specific Linear-extracted tokens |
+| `apps/web/styles/linear-tokens.css` | Compatibility aliases onto System B (`--color-*` / `--duration-*`) plus marketing editorial layout/type. Not a second color registry (JOV-5302) |
 | `apps/web/styles/theme.css` | Feature accents & animations only |
 | `apps/web/app/globals.css` | Tailwind registration + shared utilities |
 | `apps/web/tailwind.config.js` | Tailwind v4 token mapping |
@@ -1110,5 +1110,6 @@ mark intentional marketing sentence-case headlines with
 | 2026-07-28 | Icon/text alignment policy (JOV-4511) | Geometric centering is the web default; baseline alignment requires compatible baseline-bearing assets. Optical correction is component-scoped, measured, static, and geometry-preserving. |
 | 2026-04-11 | Ban emoji-on-colored-square icons | Replaced with accent color on card title text. Icon-on-square reads as AI slop and cheapens the brand. |
 | 2026-04-11 | Ban gold colors | Gold signals prestige-seeking. Not appropriate for Jovie's DJ audience. |
+| 2026-08-28 | Marketing `--linear-*` color/duration tokens alias System B (JOV-5302) | First UI-CANON slice. Named accents follow `--color-accent-*` (dark Ion, not mode-independent `#2563ff`). Marketing wrappers no longer remap `--color-*` onto a second Linear/cinematic palette. Layout/type stay editorial. Full one-namespace compile remains JOV-3573. |
 | 2026-06-18 | **Unify on one design system, two languages.** Retire System A; conform whole app to System B tokens. | Founder-directed (supersedes the 2026-04-22 "defer 3 months" note). Target = one token foundation, one palette, one core typeface (Inter), expressed as a compact product language + an editorial marketing language. Aligns with gbrain "design system review" canon ("not two design systems — one system, two languages"). Editorial layouts are preserved; surfaces are reskinned onto System B tokens, each with a `*-system-b-style-guard` test + a global shrink-only ratchet. |
 | 2026-06-18 | Retire DM Sans; Inter is the sole body/UI face; Satoshi kept for display only | One core typeface for the unified system. Satoshi remains the single approved display exception (hero / large editorial headings), generalizing the 2026-04-28 homepage-hero exception. DM Sans `next/font` load removed from `app/layout.tsx`; `--font-body` and `--marketing-font-body` repoint to Inter. |

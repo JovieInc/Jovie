@@ -93,6 +93,15 @@ describe('singular System B — design-system unification ratchet', () => {
     expect(linearTokens).toContain('.system-b-marketing.dark');
     expect(marketingStyles).toContain('.system-b-marketing {');
     expect(marketingStyles).toContain('.system-b-marketing.dark');
+
+    const snapRail = readFileSync(
+      resolve(WEB_ROOT, 'components/marketing/MarketingSnapRail.css'),
+      'utf8'
+    );
+    expect(snapRail).not.toMatch(
+      /--color-text-primary-token:\s*var\(--linear-text-primary\)/
+    );
+    expect(snapRail).not.toMatch(/--linear-text-primary:\s*#/);
     expect(marketingStyles).toContain('.system-b-marketing h1');
     expect(marketingStyles).toMatch(
       /\.system-b-marketing button,[\s\S]*?\.system-b-marketing a\[class\*="btn"\]\s*\{[^}]*font-family:\s*var\(--marketing-font-body\)/

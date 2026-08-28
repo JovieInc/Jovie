@@ -35,15 +35,15 @@ function getButtonClass(isActive: boolean, isLinear: boolean): string {
 // Linear-specific styles
 const LINEAR_STYLES = {
   container: {
-    backgroundColor: 'var(--linear-bg-button)',
-    border: '1px solid var(--linear-border-subtle)',
+    backgroundColor: 'var(--color-bg-button)',
+    border: '1px solid var(--color-border-subtle)',
   },
   indicator: {
-    backgroundColor: 'var(--linear-bg-surface-1)',
-    boxShadow: 'inset 0 0 0 1px var(--linear-border-subtle)',
+    backgroundColor: 'var(--color-bg-surface-1)',
+    boxShadow: 'inset 0 0 0 1px var(--color-border-subtle)',
   },
-  buttonActive: { color: 'var(--linear-text-primary)' },
-  buttonInactive: { color: 'var(--linear-text-tertiary)' },
+  buttonActive: { color: 'var(--color-text-primary-token)' },
+  buttonInactive: { color: 'var(--color-text-tertiary-token)' },
 } as const;
 
 function getLinearButtonStyle(isActive: boolean): CSSProperties {
