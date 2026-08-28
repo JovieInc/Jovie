@@ -1330,7 +1330,7 @@ if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
   MAIN_HEAD_SHA="$(gh_retry api "repos/${REPO}/git/ref/heads/main" --jq '.object.sha // empty' 2>/dev/null || true)"
   MAIN_HEAD_SHA="$(printf '%s' "$MAIN_HEAD_SHA" | tr '[:upper:]' '[:lower:]')"
   MERGE_GROUP_RUNS_JSON="$(gh_retry api "repos/${REPO}/actions/workflows/ci.yml/runs?event=merge_group&per_page=100" \
-    --jq '[.workflow_runs[]? | {id, headBranch, status, conclusion, headSha, createdAt, updatedAt}]' 2>/dev/null || echo '[]')"
+    --jq '[.workflow_runs[]? | {id, headBranch: .head_branch, status, conclusion, headSha: .head_sha, createdAt: .created_at, updatedAt: .updated_at}]' 2>/dev/null || echo '[]')"
   export MERGE_GROUP_RUNS_JSON
 fi
 
