@@ -141,6 +141,18 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertEqual(outputs["promotion_allowed"], "false")
 
+    def test_unknown_main_with_exact_sha_is_schema_valid_and_blocks_promotion(self):
+        code, outputs, receipt = run_wrapper(
+            signals(main={"status": "unknown", "sha": SHA})
+        )
+
+        self.assertEqual(code, 0)
+        self.assertEqual(receipt["signals"]["main"]["sha"], SHA)
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertFalse(receipt["promotionAdmission"]["allowed"])
+        self.assertEqual(outputs["promotion_allowed"], "false")
+        self.assertEqual(outputs["gate_rc"], "0")
+
     def test_deployment_consumer_uses_deployment_admission_not_promotion(self):
         action = (ROOT / ".github/actions/evaluate-fleet-gate/action.yml").read_text()
         self.assertIn("FLEET_GATE_CONSUMER", action)

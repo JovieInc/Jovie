@@ -44,7 +44,7 @@ set -e
 jq -e '
   .schema == "jovie-fleet-gate/v1" and
   (.observedAt | type == "string") and
-  (.signals.main.sha | test("^[0-9a-f]{40}$")) and
+  (try (.signals.main.sha | test("^[0-9a-f]{40}$")) catch false) and
   (.signals.integrity.status | IN("clear", "resolved", "active", "invalid")) and
   (.promotionAdmission.allowed | type == "boolean") and
   (.isolatedPromotionAdmission.allowed | type == "boolean") and

@@ -236,9 +236,12 @@ existed. Contract:
    stale or duplicate deliveries are rejected.
 4. One remediation writer holds the PR lease. Implementer first.
    FX is the recovery tier after handoff or abandonment.
-   `Rolling CI Dispatch` subscribes to `check_suite`, `workflow_run`, and
-   `check_run` failures and launches Cursor-direct exact-head repair when
-   the implementer lease is not live. It does not check out PR code.
+   `Rolling CI Dispatch` subscribes only to completed `CI` `workflow_run`
+   events for `pull_request` and `merge_group`, then launches Cursor-direct
+   exact-head repair when the implementer lease is not live. It must not
+   subscribe to generic `check_suite` or `check_run` events because its own
+   completed checks can recursively re-enter the dispatcher. It does not
+   check out PR code.
    `Actions Cache GC` evicts stale or duplicate turbo caches without
    deleting live pnpm, node-cache, or playwright caches.
 5. A new commit or green rerun supersedes obsolete repairs.
