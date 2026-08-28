@@ -245,6 +245,13 @@ def ready_autonomous_draft(pr):
         return {**result, "result": "skipped", "reason": "too_large_for_queue"}
     if pr.get("mergeable_state") == "dirty":
         return {**result, "result": "skipped", "reason": "conflicting"}
+    blocker = work_mutation_blocker(max_age=0)
+    if blocker:
+        return {
+            **result,
+            "result": "skipped",
+            "reason": blocker,
+        }
     try:
         run("gh", "pr", "ready", str(pr["number"]), "--repo", REPO, timeout=60)
     except Exception as error:
@@ -544,11 +551,13 @@ def main():
                 for pr in selected
             ]
         else:
-            ready_results = [
-                ready_autonomous_draft(pr)
-                for pr in all_open
-                if pr.get("draft") and autonomous_head(pr)
-            ]
+            ready_results = []
+            if gate["remediationAdmission"]["pushAllowed"]:
+                ready_results = [
+                    ready_autonomous_draft(pr)
+                    for pr in all_open
+                    if pr.get("draft") and autonomous_head(pr)
+                ]
             with concurrent.futures.ThreadPoolExecutor(
                 max_workers=max(1, len(selected))
             ) as executor:

@@ -62,6 +62,7 @@ SEVERE_REASONS = {
     "severe-integrity-incident",
 }
 DEFAULT_GEM_CONCURRENCY = 4
+LOCAL_REMEDIATION_CONCURRENCY_FLOOR = 1
 UTC = timezone.utc
 
 
@@ -997,6 +998,11 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and 1 <= measured_target <= 8
         else 0
     )
+    remediation_concurrency = (
+        gem_concurrency
+        if gem_concurrency > 0
+        else LOCAL_REMEDIATION_CONCURRENCY_FLOOR
+    )
     green_ready_prs = queue.get("greenReadyPrs", queue.get("eligiblePrs"))
     queue_target = queue.get("target")
     queue_shape_valid = (
@@ -1056,12 +1062,17 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         # implementation or fallback PR may begin while Summer holds intake.
         work_activities = ["tests", "review"]
     else:
-        work_activities = (
-            ["approved-issue-lease"]
-            if capacity_fresh
-            and (not queue_shape_valid or queue_below_backpressure)
-            else []
-        ) + ["isolated-implementation", "tests", "review", "draft-pr"]
+        new_implementation_allowed = capacity_fresh and (
+            not queue_shape_valid or queue_below_backpressure
+        )
+        work_activities = ["tests", "review"]
+        if new_implementation_allowed:
+            work_activities = [
+                "approved-issue-lease",
+                "isolated-implementation",
+                *work_activities,
+                "draft-pr",
+            ]
     # Remediation is a liveness capability, not issue intake or promotion.
     # A fleet hold must never hide the evidence or disable the bounded local
     # work needed to diagnose and repair the hold.  Only a non-RED receipt may
@@ -1074,7 +1085,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         "focused-tests",
         "review",
     ]
-    remediation_push_allowed = state != "RED"
+    remediation_push_allowed = state != "RED" and capacity_fresh
     cohort = already_admitted_cohort_semantics(promotion_mode)
     if not closure_intake_allowed:
         cohort = {
@@ -1130,7 +1141,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             "pushAllowed": remediation_push_allowed,
             "activities": remediation_local_activities
             + (["expected-head-pr-update"] if remediation_push_allowed else []),
-            "maxConcurrent": gem_concurrency,
+            "maxConcurrent": remediation_concurrency,
             "authority": "single-pr-writer-exact-head",
         },
         "deploymentAdmission": {
@@ -1174,7 +1185,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         "concurrency": {
             "gem": {
                 "maxConcurrent": gem_concurrency,
-                "runtimeFloor": 1,
+                "runtimeFloor": LOCAL_REMEDIATION_CONCURRENCY_FLOOR,
                 "baseline": DEFAULT_GEM_CONCURRENCY,
                 "evidenceAccepted": capacity_fresh,
                 "newMutationAllowed": capacity_fresh,
@@ -1330,6 +1341,11 @@ def failed_evaluation_receipt(
                 "accepted": False,
                 "reason": "independent-review-receipt-malformed",
             },
+            "concurrencyEvidence": {
+                "schema": CONCURRENCY_SCHEMA,
+                "accepted": False,
+                "reason": "capacity-evidence-missing-malformed-or-stale",
+            },
         },
         "reasons": [
             typed_reason(
@@ -1379,7 +1395,7 @@ def failed_evaluation_receipt(
                 "focused-tests",
                 "review",
             ],
-            "maxConcurrent": DEFAULT_GEM_CONCURRENCY,
+            "maxConcurrent": LOCAL_REMEDIATION_CONCURRENCY_FLOOR,
             "authority": "single-pr-writer-exact-head",
         },
         "deploymentAdmission": {
@@ -1404,8 +1420,12 @@ def failed_evaluation_receipt(
         },
         "concurrency": {
             "gem": {
-                "maxConcurrent": DEFAULT_GEM_CONCURRENCY,
+                "maxConcurrent": 0,
+                "runtimeFloor": LOCAL_REMEDIATION_CONCURRENCY_FLOOR,
                 "evidenceAccepted": False,
+                "newMutationAllowed": False,
+                "preserveQueuedWork": True,
+                "reason": "capacity-evidence-missing-malformed-or-stale",
             },
             "symphonyImplementation": "event-driven-backpressure",
         },

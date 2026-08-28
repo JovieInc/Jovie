@@ -554,6 +554,34 @@ class DeploymentBindingTests(unittest.TestCase):
             "expected-head-pr-update", receipt["remediationAdmission"]["activities"]
         )
 
+    def test_stale_capacity_preserves_one_local_repair_but_blocks_new_and_remote_mutation(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["concurrencyEvidence"] = {
+            **GREEN_SIGNALS["concurrencyEvidence"],
+            "accepted": False,
+            "error": "capacity-evidence-stale",
+        }
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertFalse(receipt["workAdmission"]["newImplementationAllowed"])
+        self.assertTrue(receipt["remediationAdmission"]["allowed"])
+        self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
+        self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
+        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
+        self.assertNotIn(
+            "expected-head-pr-update", receipt["remediationAdmission"]["activities"]
+        )
+        self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 0)
+        self.assertEqual(receipt["concurrency"]["gem"]["runtimeFloor"], 1)
+        self.assertFalse(receipt["concurrency"]["gem"]["newMutationAllowed"])
+        self.assertNotIn(
+            "isolated-implementation", receipt["workAdmission"]["activities"]
+        )
+        self.assertNotIn("draft-pr", receipt["workAdmission"]["activities"])
+
     def test_closure_health_red_blocks_new_issue_lease_without_blocking_queue_or_remediation(self):
         signals = dict(GREEN_SIGNALS)
         signals["closureHealth"] = {

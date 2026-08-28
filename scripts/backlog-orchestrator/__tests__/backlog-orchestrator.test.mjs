@@ -1664,19 +1664,21 @@ from gem_gate_contract import GateContractError, drain_state_dir, gate_state_dir
 receipt = {
     "schema": "jovie-fleet-gate/v1",
     "state": "AMBER",
-    "signals": {"main": {"status": "red", "sha": "a" * 40}, "closureHealth": {"schema": "jovie-closure-health/v1", "status": "healthy", "authority": "Summer", "newIssueIntakeAllowed": True, "promotionContinues": True, "remediationContinues": True, "reasons": []}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-missing"}},
+    "signals": {"main": {"status": "red", "sha": "a" * 40}, "closureHealth": {"schema": "jovie-closure-health/v1", "status": "healthy", "authority": "Summer", "newIssueIntakeAllowed": True, "promotionContinues": True, "remediationContinues": True, "reasons": []}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-missing"}, "concurrencyEvidence": {"accepted": True}},
     "reasons": [{"code": "main-not-green", "layer": "promotion", "severity": "warning", "detail": "main red"}],
     "reviewAdmission": {"allowed": False, "required": True, "authority": "Gem", "scope": "exact-main-head", "headSha": None, "observedAt": None, "reviewId": None, "reviewer": None, "reason": "independent-review-receipt-missing"},
     "closureAdmission": {"allowed": True, "newIssueIntakeAllowed": True, "newImplementationAllowed": True, "fallbackPrGenerationAllowed": True, "authority": "Summer", "promotionContinues": True, "remediationContinues": True},
-    "workAdmission": {"allowed": True, "newIssueLeaseAllowed": True},
+    "workAdmission": {"allowed": True, "activities": ["approved-issue-lease"], "newIssueLeaseAllowed": True, "newImplementationAllowed": True},
     "promotionAdmission": {"allowed": False},
     "remediationAdmission": {
         "allowed": True,
         "localAllowed": True,
         "pushAllowed": True,
+        "activities": ["expected-head-pr-update"],
         "maxConcurrent": 1,
         "authority": "single-pr-writer-exact-head",
     },
+    "concurrency": {"gem": {"maxConcurrent": 1, "evidenceAccepted": True, "newMutationAllowed": True}},
     "ownership": {"review": "Gem", "directGemPickup": False},
 }
 validate_gate_result(0, json.dumps(receipt), "fleet")
@@ -1816,19 +1818,21 @@ print(json.dumps(result))
 receipt = {
     "schema": "jovie-fleet-gate/v1",
     "state": "AMBER",
-    "signals": {"main": {"status": "red", "sha": "a" * 40}, "closureHealth": {"schema": "jovie-closure-health/v1", "status": "healthy", "authority": "Summer", "newIssueIntakeAllowed": True, "promotionContinues": True, "remediationContinues": True, "reasons": []}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-missing"}},
+    "signals": {"main": {"status": "red", "sha": "a" * 40}, "closureHealth": {"schema": "jovie-closure-health/v1", "status": "healthy", "authority": "Summer", "newIssueIntakeAllowed": True, "promotionContinues": True, "remediationContinues": True, "reasons": []}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-missing"}, "concurrencyEvidence": {"accepted": True}},
     "reasons": [{"code": "main-not-green", "layer": "promotion", "severity": "warning", "detail": "test"}],
     "reviewAdmission": {"allowed": False, "required": True, "authority": "Gem", "scope": "exact-main-head", "headSha": None, "observedAt": None, "reviewId": None, "reviewer": None, "reason": "independent-review-receipt-missing"},
     "closureAdmission": {"allowed": True, "newIssueIntakeAllowed": True, "newImplementationAllowed": True, "fallbackPrGenerationAllowed": True, "authority": "Summer", "promotionContinues": True, "remediationContinues": True},
-    "workAdmission": {"allowed": True, "newIssueLeaseAllowed": True},
+    "workAdmission": {"allowed": True, "activities": ["approved-issue-lease"], "newIssueLeaseAllowed": True, "newImplementationAllowed": True},
     "promotionAdmission": {"allowed": False},
     "remediationAdmission": {
         "allowed": True,
         "localAllowed": True,
         "pushAllowed": True,
+        "activities": ["expected-head-pr-update"],
         "maxConcurrent": 1,
         "authority": "single-pr-writer-exact-head",
     },
+    "concurrency": {"gem": {"maxConcurrent": 1, "evidenceAccepted": True, "newMutationAllowed": True}},
     "ownership": {"review": "Gem", "directGemPickup": False},
 }
 print(json.dumps(receipt))
