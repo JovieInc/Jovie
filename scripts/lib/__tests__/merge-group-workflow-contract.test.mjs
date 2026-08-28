@@ -168,7 +168,7 @@ describe('merge_group workflow contract', () => {
     expect(CI_WORKFLOW).toContain('--base "$MERGE_GROUP_BASE_SHA"');
     expect(CI_WORKFLOW).toContain('--head "$MERGE_GROUP_HEAD_SHA"');
     expect(PATH_DIFF_HELPER).toContain(
-      "['diff', '--name-only', `${baseSha}...${headSha}`]"
+      "['diff', '--no-renames', '--name-only', `${baseSha}...${headSha}`]"
     );
     expect(CI_WORKFLOW).not.toContain('withgraphite/graphite-ci-action');
     expect(CI_WORKFLOW).not.toContain('steps.graphite');
@@ -463,7 +463,7 @@ describe('merge_group workflow contract', () => {
     expect(pathChanges).toContain('--base "$MERGE_GROUP_BASE_SHA"');
     expect(pathChanges).toContain('--head "$MERGE_GROUP_HEAD_SHA"');
     expect(PATH_DIFF_HELPER).toContain(
-      "['diff', '--name-only', `${baseSha}...${headSha}`]"
+      "['diff', '--no-renames', '--name-only', `${baseSha}...${headSha}`]"
     );
     expect(PATH_DIFF_HELPER).toContain(LIVE_MAIN_FETCH_REF);
     expect(PATH_DIFF_HELPER).not.toContain('github.event.before');

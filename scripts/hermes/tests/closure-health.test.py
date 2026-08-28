@@ -25,6 +25,7 @@ def pr(
     number: int,
     *,
     title: str,
+    body: str = "",
     merge_state: str = "CLEAN",
     draft: bool = False,
     queued: bool = False,
@@ -36,6 +37,7 @@ def pr(
     return {
         "number": number,
         "title": title,
+        "body": body,
         "headRefName": f"symphony/test-pr-{number}",
         "isDraft": draft,
         "mergeStateStatus": merge_state,
@@ -121,6 +123,61 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(dispositions[9]["state"], "queued")
         self.assertEqual(dispositions[9]["queueState"], "AWAITING_CHECKS")
         self.assertEqual(dispositions[8]["state"], "repair")
+
+    def test_explicit_linear_marker_overrides_legacy_branch_and_title_identity(self):
+        child = pr(
+            10,
+            title="feat: durable Summer substrate JOV-5212",
+            body="<!-- linear-issue-id:JOV-5369 -->",
+        )
+        child["headRefName"] = "codex/jov-5212-durable-summer-turns"
+
+        result = MODULE.classify_open_prs(
+            [child, pr(11, title="fix: complete JOV-5212")],
+            NOW,
+        )
+
+        self.assertEqual(result["duplicateIssueLanes"], [])
+        dispositions = {item["number"]: item for item in result["dispositions"]}
+        self.assertEqual(dispositions[10]["issue"], "JOV-5369")
+        self.assertEqual(dispositions[11]["issue"], "JOV-5212")
+
+    def test_explicit_marker_aliases_must_agree_and_body_prose_is_not_identity(self):
+        matching = pr(
+            12,
+            title="feat: legacy JOV-5212",
+            body=(
+                "<!-- linear-issue-id:JOV-5369 -->\n"
+                "<!-- linear-issue-identifier:jov-5369 -->\n"
+                "Depends on JOV-9999."
+            ),
+        )
+        conflicting = pr(
+            13,
+            title="feat: legacy JOV-5212",
+            body=(
+                "<!-- linear-issue-id:JOV-5369 -->\n"
+                "<!-- linear-issue-identifier:JOV-5370 -->"
+            ),
+        )
+        prose_only = pr(
+            14,
+            title="feat: ship JOV-888",
+            body="Depends on JOV-999 and relates to JOV-1000.",
+        )
+
+        result = MODULE.classify_open_prs(
+            [matching, conflicting, prose_only],
+            NOW,
+        )
+
+        dispositions = {item["number"]: item for item in result["dispositions"]}
+        self.assertEqual(dispositions[12]["issue"], "JOV-5369")
+        self.assertEqual(dispositions[14]["issue"], "JOV-888")
+        reasons = {
+            item["number"]: item["reason"] for item in result["unclassified"]
+        }
+        self.assertEqual(reasons[13], "multiple-issue-lane-identities")
 
     def test_close_requires_an_explicit_lifecycle_label(self):
         result = MODULE.classify_open_prs(
@@ -345,6 +402,12 @@ class ClosureObservationTests(unittest.TestCase):
         self.assertEqual(result["latestMergeAt"], MODULE.isoformat(NOW))
         self.assertIn("owner=JovieInc", run.call_args.args[0])
         self.assertIn("name=Jovie", run.call_args.args[0])
+        query_arg = next(
+            argument
+            for argument in run.call_args.args[0]
+            if argument.startswith("query=")
+        )
+        self.assertIn("number title body headRefName", query_arg)
 
         pages[0]["data"]["repository"]["pullRequests"]["totalCount"] = 3
         completed.stdout = MODULE.json.dumps(pages)
