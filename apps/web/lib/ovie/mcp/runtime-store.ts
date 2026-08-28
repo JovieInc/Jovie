@@ -12,6 +12,13 @@ import { classifyRedisFailure } from '@/lib/redis-operability';
 
 const REDIS_QUOTA_SKIP_MS = 15 * 60_000;
 const REDIS_UNAVAILABLE_SKIP_MS = 30_000;
+const COMPARE_AND_SET_SCRIPT = `
+if redis.call('GET', KEYS[1]) ~= ARGV[1] then
+  return 0
+end
+redis.call('SET', KEYS[1], ARGV[2], 'EX', ARGV[3])
+return 1
+`;
 let skipRedisUntil = 0;
 
 function redisRecordBackend(
@@ -21,6 +28,19 @@ function redisRecordBackend(
     get: async key => redis.get(key),
     set: async (key, value) => {
       await redis.set(key, value, { ex: OVIE_MCP_RECORD_TTL_SECONDS });
+    },
+    setIfAbsent: async (key, value, ttlSeconds) => {
+      const result = await redis.set(key, value, {
+        ex: ttlSeconds,
+        nx: true,
+      });
+      return result === 'OK';
+    },
+    compareAndSet: async (key, expectedValue, nextValue, ttlSeconds) => {
+      const result = await redis
+        .createScript<number>(COMPARE_AND_SET_SCRIPT)
+        .eval([key], [expectedValue, nextValue, String(ttlSeconds)]);
+      return result === 1;
     },
     lpush: async (key, value) => {
       await redis.lpush(key, value);
