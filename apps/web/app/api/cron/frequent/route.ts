@@ -20,6 +20,7 @@
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { reconcileOrphanedAcceptedActions } from '@/lib/connectors/workflows/reconcile-orphaned-approved-actions';
+import { runConnectedYouTubeRefreshes } from '@/lib/connectors/youtube/refresh';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import {
@@ -49,7 +50,6 @@ import {
 import { warmAlphabetCache } from '@/lib/spotify/alphabet-cache';
 import { processPendingEvents } from '@/lib/tracking/forwarding';
 import { logger } from '@/lib/utils/logger';
-import { runScheduledRefreshes } from '@/lib/youtube-library';
 import { scheduleReleaseNotifications } from '../schedule-release-notifications/route';
 import { sendPendingNotifications } from '../send-release-notifications/route';
 
@@ -293,13 +293,12 @@ export async function GET(request: Request) {
     async () => reconcileOrphanedAcceptedActions(20)
   );
 
-  // 8.5 YouTube library refresh — JOV-5136. Real provider wiring lands with
-  //     JOV-3189 (YouTube OAuth connector); with provider: null this is a
-  //     no-op until channels exist.
+  // 8.5 YouTube library refresh — one stale connected channel per run keeps
+  //     provider calls bounded inside the frequent cron budget.
   results.youtubeLibraryRefresh = await runSubJob(
     'youtubeLibraryRefresh',
     async () => {
-      const refreshResult = await runScheduledRefreshes({ provider: null });
+      const refreshResult = await runConnectedYouTubeRefreshes();
       return refreshResult as unknown as Record<string, unknown>;
     }
   );
