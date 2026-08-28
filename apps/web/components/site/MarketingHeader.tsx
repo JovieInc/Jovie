@@ -10,7 +10,6 @@ import {
 } from '@/components/organisms/HeaderNav';
 import { APP_ROUTES } from '@/constants/routes';
 import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
-import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { MARKETING_CTA_INTENTS } from '@/data/marketingCtaIntents';
 import { MARKETING_NAV_LINKS } from '@/data/marketingNavigation';
@@ -122,7 +121,6 @@ const MARKETING_HEADER_CTA_BY_PATH: Readonly<
 > = {
   [APP_ROUTES.ARTIST_PROFILES]: MARKETING_CTA_INTENTS.claimProfile,
   [APP_ROUTES.ARTIST_PROFILE_LEGACY]: MARKETING_CTA_INTENTS.claimProfile,
-  [APP_ROUTES.LANDING_NEW]: HOMEPAGE_LAUNCH_COPY.hero.primaryCta,
 };
 
 export interface MarketingHeaderProps
@@ -219,8 +217,9 @@ export function MarketingHeader({
       authMode='public-static'
       hideNav={isMinimal}
       hideDesktopNav={hideCenterNav}
-      minimalAuth={isMinimal}
+      minimalAuth={isMinimal || isHomepage}
       minimalAuthVariant='link'
+      minimalAuthLabel={isHomepage ? 'Log in' : 'Sign in'}
       includePublicLoginInMobileNav
       containerSize='homepage'
       presentation={presentation}

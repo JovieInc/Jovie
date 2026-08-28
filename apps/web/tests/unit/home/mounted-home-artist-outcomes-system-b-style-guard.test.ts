@@ -69,13 +69,17 @@ describe('mounted homepage Meet Jovie System B source contract', () => {
       'homepage-artist-profiles__row',
       'homepage-artist-profiles__track',
       'homepage-artist-profiles__card',
-      'homepage-artist-outcome',
-      'homepage-artist-outcome__copy',
-      'homepage-artist-outcome__media',
-      'homepage-artist-outcome__device',
+      'homepage-artist-profile-preview',
+      'homepage-artist-profile-preview__figure',
+      'homepage-artist-profile-preview__device',
+      'homepage-artist-profile-preview__screen',
+      'homepage-artist-profile-preview__label',
     ]) {
       expect(source).toContain(className);
     }
+
+    expect(source).not.toContain('homepage-artist-outcome__copy');
+    expect(source).not.toContain('homepage-artist-outcome__media');
   });
 
   it('keeps outcome cards markup on named System B primitives', () => {
@@ -202,7 +206,7 @@ describe('mounted homepage Meet Jovie System B source contract', () => {
     }
   });
 
-  it('keeps outcome card CSS tokenized', () => {
+  it('keeps the mounted registry-phone rail direct and tokenized', () => {
     const css = extractCssBlock(
       readFileSync(path.join(webRoot, cssPath), 'utf8'),
       'HOMEPAGE ARTIST OUTCOMES SYSTEM B'
@@ -215,20 +219,14 @@ describe('mounted homepage Meet Jovie System B source contract', () => {
       ).not.toMatch(pattern);
     }
 
+    expect(css).toContain('homepage-artist-profile-preview__figure');
+    expect(css).toContain('homepage-artist-profile-preview__device');
+    expect(css).toContain('homepage-artist-profile-preview__screen');
+    expect(css).toContain('homepage-artist-profile-preview__label');
     expect(css).toContain('var(--system-b-app-frame-seam)');
-    expect(css).toContain('var(--color-text-primary-token)');
-    expect(css).toContain('var(--system-b-primary-bg)');
+    expect(css).toContain('var(--color-text-tertiary-token)');
     expect(css).toContain('var(--space-');
-    expect(css).toContain('var(--radius-2xl)');
-    expect(css).toContain('aspect-ratio: 9 / 16');
-    expect(css).toContain('--homepage-artist-outcome-copy-track: 1fr');
-    expect(css).toContain('--homepage-artist-outcome-media-track: 2fr');
-    expect(css).toContain('height: calc(100% - var(--space-4))');
-    expect(css).toContain('width: min(22rem, 118%)');
-    expect(css).toContain(
-      'margin: var(--space-4) 0 calc(var(--space-24) * -1)'
-    );
-    expect(css).not.toContain('transform: translateY(33%)');
+    expect(css).toContain('max-width: 15rem');
     expect(css).toContain('object-fit: contain');
     expect(css).toContain('background: var(--system-b-bg-surface-0)');
     expect(css).toContain('box-shadow: none');
@@ -236,5 +234,9 @@ describe('mounted homepage Meet Jovie System B source contract', () => {
     expect(css).toContain('ap-phone-frame__overlay');
     expect(css).toContain('ap-phone-frame__notch');
     expect(css).toContain('@media (max-width: 767px)');
+    expect(css).not.toContain('.homepage-artist-outcome {');
+    expect(css).not.toContain('--homepage-artist-outcome-copy-track');
+    expect(css).not.toContain('--homepage-artist-outcome-media-track');
+    expect(css).not.toContain('aspect-ratio: 9 / 16');
   });
 });

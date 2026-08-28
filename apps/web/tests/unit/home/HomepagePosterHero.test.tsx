@@ -54,13 +54,17 @@ describe('MarketingPosterHero', () => {
     expect(screen.getAllByTestId('homepage-primary-cta')).toHaveLength(1);
     const primaryLink = screen.getByRole('link', { name: 'Enter Jovie' });
     expect(primaryLink).toHaveAttribute('href', '/signup');
-    expect(primaryLink).toHaveAttribute('data-size', 'md');
+    expect(primaryLink).toHaveAttribute('data-size', 'marketing');
     expect(primaryLink).toHaveAttribute('data-variant', 'primary');
+    expect(primaryLink).toHaveClass('h-8', 'text-sm', 'rounded-full');
+    expect(primaryLink).toHaveClass('homepage-poster-hero__action-button');
     expect(primaryLink).not.toHaveClass('active:scale-[0.98]');
 
     const secondaryLink = screen.getByRole('link', { name: 'See proof' });
     expect(secondaryLink).toHaveAttribute('href', '/artist-profiles');
+    expect(secondaryLink).toHaveAttribute('data-size', 'marketing');
     expect(secondaryLink).toHaveAttribute('data-variant', 'ghost');
+    expect(secondaryLink).toHaveClass('homepage-poster-hero__action-button');
     expect(secondaryLink).not.toHaveClass('active:scale-[0.98]');
     // Secondary must stay quieter than the primary conversion control.
     expect(secondaryLink.getAttribute('data-variant')).not.toBe('primary');
