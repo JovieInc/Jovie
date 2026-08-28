@@ -157,6 +157,13 @@ export const ServerEnvSchema = z.object({
   STRIPE_PRICE_PRO_ANNUAL: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_PRO_YEARLY: z.string().startsWith('price_').optional(),
 
+  // Product-specific founder offer. Maps to Pro base entitlements while the
+  // exact price ID remains the YouTube thumbnail entitlement source of truth.
+  STRIPE_PRICE_YOUTUBE_THUMBNAILS_FOUNDER_MONTHLY: z
+    .string()
+    .startsWith('price_')
+    .optional(),
+
   // Stripe price IDs for Growth tier (legacy, kept for backward compat)
   STRIPE_PRICE_GROWTH_MONTHLY: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_GROWTH_YEARLY: z.string().startsWith('price_').optional(),
@@ -485,6 +492,7 @@ export const ENV_KEYS = [
   'STRIPE_PRICE_PRO_MONTHLY',
   'STRIPE_PRICE_PRO_ANNUAL',
   'STRIPE_PRICE_PRO_YEARLY',
+  'STRIPE_PRICE_YOUTUBE_THUMBNAILS_FOUNDER_MONTHLY',
   'STRIPE_PRICE_GROWTH_MONTHLY',
   'STRIPE_PRICE_GROWTH_YEARLY',
   'STRIPE_PRICE_MAX_MONTHLY',
