@@ -90,7 +90,7 @@ jobs:
 
       - name: Admit one issue from the fresh event
         id: admit
-        if: steps.refresh.outputs.work_allowed == 'true'
+        if: steps.refresh.outputs.new_issue_intake_allowed == 'true'
         env:
           JOVIE_AGENT_PROFILE: no_agent
           JOVIE_GBRAIN_BIN: /home/timwhite/.local/bin/gbrain

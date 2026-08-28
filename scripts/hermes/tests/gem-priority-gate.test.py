@@ -247,6 +247,15 @@ GREEN_SIGNALS: dict[str, object] = {
         "greenReadyPrs": 0,
         "target": 15,
     },
+    "closureHealth": {
+        "schema": "jovie-closure-health/v1",
+        "status": "healthy",
+        "authority": "Summer",
+        "newIssueIntakeAllowed": True,
+        "promotionContinues": True,
+        "remediationContinues": True,
+        "reasons": [],
+    },
     "independentReview": {
         "schema": "jovie-independent-review/v1",
         "status": "passed",
@@ -293,6 +302,9 @@ AUTOENROLL_RECEIPT_JQ = """
 (.observedAt | type == "string") and
 (try (.signals.main.sha | test("^[0-9a-f]{40}$")) catch false) and
 (.signals.integrity.status | IN("clear", "resolved", "active", "invalid")) and
+(.signals.closureHealth.schema == "jovie-closure-health/v1") and
+(.signals.closureHealth.newIssueIntakeAllowed | type == "boolean") and
+(.closureAdmission.newIssueIntakeAllowed | type == "boolean") and
 (.promotionAdmission.allowed | type == "boolean") and
 (.isolatedPromotionAdmission.allowed | type == "boolean") and
 (.promotionMode | IN("normal", "isolated-only", "draft-only", "hold-intake", "blocked"))
@@ -322,12 +334,23 @@ def receipt_satisfies_autoenroll(receipt: dict[str, object]) -> bool:
     )
     promotion = receipt.get("promotionAdmission")
     isolated = receipt.get("isolatedPromotionAdmission")
+    closure_signal = (
+        receipt.get("signals", {}).get("closureHealth")
+        if isinstance(receipt.get("signals"), dict)
+        else None
+    )
+    closure_admission = receipt.get("closureAdmission")
     return (
         receipt.get("schema") == "jovie-fleet-gate/v1"
         and isinstance(receipt.get("observedAt"), str)
         and isinstance(sha, str)
         and bool(re.fullmatch(r"[0-9a-f]{40}", sha))
         and integrity in {"clear", "resolved", "active", "invalid"}
+        and isinstance(closure_signal, dict)
+        and closure_signal.get("schema") == "jovie-closure-health/v1"
+        and isinstance(closure_signal.get("newIssueIntakeAllowed"), bool)
+        and isinstance(closure_admission, dict)
+        and isinstance(closure_admission.get("newIssueIntakeAllowed"), bool)
         and isinstance(promotion, dict)
         and isinstance(promotion.get("allowed"), bool)
         and isinstance(isolated, dict)
@@ -529,6 +552,48 @@ class DeploymentBindingTests(unittest.TestCase):
         )
         self.assertIn(
             "expected-head-pr-update", receipt["remediationAdmission"]["activities"]
+        )
+
+    def test_closure_health_red_blocks_new_issue_lease_without_blocking_queue_or_remediation(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["closureHealth"] = {
+            "schema": "jovie-closure-health/v1",
+            "status": "red",
+            "authority": "Summer",
+            "newIssueIntakeAllowed": False,
+            "promotionContinues": True,
+            "remediationContinues": True,
+            "reasons": ["duplicate-issue-lanes-unresolved"],
+        }
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertFalse(receipt["closureAdmission"]["newIssueIntakeAllowed"])
+        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertNotIn("approved-issue-lease", receipt["workAdmission"]["activities"])
+        self.assertNotIn("isolated-implementation", receipt["workAdmission"]["activities"])
+        self.assertTrue(receipt["promotionAdmission"]["allowed"])
+        self.assertTrue(receipt["remediationAdmission"]["allowed"])
+        self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
+
+    def test_missing_closure_health_fails_new_intake_closed_without_stopping_promotion(self):
+        signals = dict(GREEN_SIGNALS)
+        signals.pop("closureHealth")
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertFalse(receipt["closureAdmission"]["newIssueIntakeAllowed"])
+        self.assertEqual(
+            receipt["closureAdmission"]["reasons"],
+            ["closure-health-receipt-missing-or-malformed"],
+        )
+        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(receipt["promotionAdmission"]["allowed"])
+        self.assertEqual(
+            receipt["signals"]["closureHealth"]["schema"],
+            "jovie-closure-health/v1",
         )
 
     def test_severe_gate_failure_keeps_diagnosis_live_but_blocks_remote_push(self):
