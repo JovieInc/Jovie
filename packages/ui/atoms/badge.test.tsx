@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { Badge } from './badge';
+import { Badge, badgeVariants } from './badge';
 
 describe('Badge', () => {
   describe('Basic Rendering', () => {
@@ -112,7 +112,8 @@ describe('Badge', () => {
     it('applies md size by default', () => {
       render(<Badge data-testid='badge'>New</Badge>);
       const badge = screen.getByTestId('badge');
-      expect(badge.className).toContain('text-[12px]');
+      expect(badge.className).toContain('text-xs');
+      expect(badge.className).toContain('leading-5');
       expect(badge.className).toContain('px-2');
     });
 
@@ -123,7 +124,8 @@ describe('Badge', () => {
         </Badge>
       );
       const badge = screen.getByTestId('badge');
-      expect(badge.className).toContain('text-[10px]');
+      expect(badge.className).toContain('text-3xs');
+      expect(badge.className).toContain('leading-[18px]');
       expect(badge.className).toContain('px-1.5');
     });
 
@@ -135,6 +137,7 @@ describe('Badge', () => {
       );
       const badge = screen.getByTestId('badge');
       expect(badge.className).toContain('text-xs');
+      expect(badge.className).toContain('leading-5');
       expect(badge.className).toContain('px-2.5');
     });
   });
@@ -145,10 +148,51 @@ describe('Badge', () => {
       const badge = screen.getByTestId('badge');
       expect(badge.className).toContain('inline-flex');
       expect(badge.className).toContain('items-center');
+      expect(badge.className).toContain('justify-center');
       expect(badge.className).toContain('gap-1');
-      expect(badge.className).toContain('rounded-full');
-      expect(badge.className).toContain('whitespace-nowrap');
+      expect(badge.className).toContain('rounded-(--system-b-radius-pill)');
+      expect(badge.className).toContain('whitespace-normal');
+      expect(badge.className).toContain('break-words');
+      expect(badge.className).toContain('text-center');
       expect(badge.className).toContain('font-[510]');
+    });
+
+    it('wraps long destructive labels instead of overlapping adjacent content', () => {
+      render(
+        <div className='w-24' data-testid='constraint'>
+          <Badge variant='destructive' data-testid='badge'>
+            Destructive action unavailable
+          </Badge>
+        </div>
+      );
+
+      const badge = screen.getByTestId('badge');
+      expect(badge).toHaveClass(
+        'max-w-full',
+        'min-w-0',
+        'whitespace-normal',
+        'break-words',
+        'rounded-(--system-b-radius-pill)'
+      );
+      expect(badge).not.toHaveClass('whitespace-nowrap', 'overflow-hidden');
+      expect(badge.className).toContain('bg-(--color-error-subtle)');
+      expect(badge.className).toContain('text-error');
+    });
+
+    it('keeps hover color neutral unless a semantic variant explicitly owns it', () => {
+      const blueHoverPattern =
+        /hover:(?:bg|text|border)-(?:blue|cyan|sky|indigo)(?:-|\/|\b)/;
+
+      for (const variant of [
+        'default',
+        'secondary',
+        'destructive',
+        'outline',
+        'success',
+        'warning',
+      ] as const) {
+        expect(badgeVariants({ variant })).not.toMatch(blueHoverPattern);
+      }
     });
 
     it('applies focus-visible ring for accessibility', () => {
@@ -166,7 +210,7 @@ describe('Badge', () => {
       );
       const badge = screen.getByTestId('badge');
       expect(badge.className).toContain('custom-class');
-      expect(badge.className).toContain('rounded-full');
+      expect(badge.className).toContain('rounded-(--system-b-radius-pill)');
     });
   });
 

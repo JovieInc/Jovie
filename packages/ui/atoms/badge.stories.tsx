@@ -81,3 +81,19 @@ export const Tones: Story = {
     </div>
   ),
 };
+
+export const ConstrainedDestructiveLabel: Story = {
+  render: () => (
+    <div className='w-28'>
+      <Badge variant='destructive'>Account deletion requires approval</Badge>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Long destructive labels wrap inside the available width without clipping or overlapping adjacent content.',
+      },
+    },
+  },
+};
