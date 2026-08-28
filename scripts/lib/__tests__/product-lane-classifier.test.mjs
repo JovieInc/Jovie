@@ -160,6 +160,7 @@ describe('product lane classifier', () => {
       );
       expect(readFileSync(summary, 'utf8')).toBe(formatGitHubSummary(receipt));
       expect(readFileSync(outputs, 'utf8')).toContain('run_web=true');
+      expect(readFileSync(outputs, 'utf8')).toContain('run_macos=true');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
