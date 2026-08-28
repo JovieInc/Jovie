@@ -687,6 +687,13 @@
       "when": 1787928766493,
       "tag": "0097_regular_mister_sinister",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1787944286764,
+      "tag": "0098_regular_puff_adder",
+      "breakpoints": true
     }
   ]
 }
