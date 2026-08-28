@@ -82,12 +82,13 @@ export const CONNECTOR_REGISTRY = {
   [CONNECTOR_PROVIDERS.youtube]: {
     id: CONNECTOR_PROVIDERS.youtube,
     label: 'YouTube',
-    description: 'Verify a channel before approved thumbnail changes.',
+    description:
+      'Import channel videos into Library and verify approved thumbnail changes.',
     iconKey: 'youtube',
     oauthBundle: 'youtube',
     oauthScopes: YOUTUBE_OAUTH_SCOPES,
     tokenHandler: 'shared_token_vault',
-    syncRunner: null,
+    syncRunner: CONNECTOR_PROVIDERS.youtube,
     webhookHandler: null,
     displayOrder: 3,
   },

@@ -50,7 +50,11 @@ function hangingChild() {
   });
 }
 
-function queueFetch(turn: Record<string, unknown>, claimStatus = 200) {
+function queueFetch(
+  turn: Record<string, unknown>,
+  claimStatus = 200,
+  failStatus = 200
+) {
   const posted: Array<Record<string, unknown>> = [];
   const fetch = vi.fn(
     async (_url: string | URL | Request, init?: RequestInit) => {
@@ -68,6 +72,9 @@ function queueFetch(turn: Record<string, unknown>, claimStatus = 200) {
           },
           claimStatus
         );
+      }
+      if (body.action === 'fail') {
+        return response({ ok: failStatus === 200 }, failStatus);
       }
       return response({ ok: true });
     }
@@ -326,6 +333,168 @@ describe('packaged Summer runtime bridge', () => {
     expect(posted[1]).toMatchObject({
       action: 'complete',
       response_text: 'Recovered answer',
+    });
+  });
+
+  it('kills Hermes and rejects when runtime exceeds the bound', async () => {
+    const child = hangingChild();
+    const result = invokeSummerRuntime({
+      homeDirectory: '/Users/founder',
+      turn: {
+        id: 'turn_timeout',
+        conversation_id: 'conversation_1',
+        user_text: 'Bound the runtime',
+        claim_token: 'claim_timeout',
+      },
+      spawnProcess: () => child,
+      timeoutMs: 20,
+    });
+    await expect(result).rejects.toThrow('summer-runtime-timeout');
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM');
+  });
+
+  it('posts a fenced failure when Hermes exceeds the runtime bound', async () => {
+    const { fetch, posted } = queueFetch({
+      id: 'turn_timeout',
+      conversation_id: 'conversation_1',
+      user_text: 'Bound the runtime',
+    });
+    const child = hangingChild();
+    const bridge = createSummerRuntimeBridge({
+      platform: 'darwin',
+      appOrigin: 'https://jov.ie',
+      homeDirectory: '/Users/founder',
+      workerId: 'jovie-mac',
+      fetch,
+      timeoutMs: 20,
+      spawnProcess: () => child,
+    });
+    await expect(bridge.runCycle()).resolves.toMatchObject({
+      state: 'runtime-error',
+      errorCode: 'summer-runtime-timeout',
+    });
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM');
+    expect(posted.at(-1)).toMatchObject({
+      action: 'fail',
+      id: 'turn_timeout',
+      claim_token: 'claim_1',
+      failure_code: 'summer-runtime-timeout',
+    });
+  });
+
+  it('posts a fenced failure when Hermes exceeds the output bound', async () => {
+    const { fetch, posted } = queueFetch({
+      id: 'turn_output',
+      conversation_id: 'conversation_1',
+      user_text: 'Bound the output',
+    });
+    const spawnProcess = () => {
+      const child = hangingChild();
+      queueMicrotask(() => {
+        child.stdout.write('x'.repeat(128 * 1024 + 1));
+      });
+      return child;
+    };
+    const bridge = createSummerRuntimeBridge({
+      platform: 'darwin',
+      appOrigin: 'https://jov.ie',
+      homeDirectory: '/Users/founder',
+      workerId: 'jovie-mac',
+      fetch,
+      spawnProcess,
+    });
+    await expect(bridge.runCycle()).resolves.toMatchObject({
+      state: 'runtime-error',
+      errorCode: 'summer-runtime-output-limit',
+    });
+    expect(posted.at(-1)).toMatchObject({
+      action: 'fail',
+      id: 'turn_output',
+      claim_token: 'claim_1',
+      failure_code: 'summer-runtime-output-limit',
+    });
+  });
+
+  it('does not report a persisted runtime failure when the fail receipt is refused', async () => {
+    const { fetch, posted } = queueFetch(
+      {
+        id: 'turn_fail_http',
+        conversation_id: 'conversation_1',
+        user_text: 'Persist the fence',
+      },
+      200,
+      500
+    );
+    const bridge = createSummerRuntimeBridge({
+      platform: 'darwin',
+      appOrigin: 'https://jov.ie',
+      homeDirectory: '/Users/founder',
+      workerId: 'jovie-mac',
+      fetch,
+      spawnProcess: () => fakeChild({ exitCode: 1 }),
+    });
+    await expect(bridge.runCycle()).resolves.toMatchObject({
+      state: 'http-error',
+      turnId: 'turn_fail_http',
+      errorCode: 'fail-500',
+    });
+    expect(posted.at(-1)).toMatchObject({
+      action: 'fail',
+      failure_code: 'summer-runtime-exit-1',
+    });
+  });
+
+  it('does not report a persisted runtime failure when the fail receipt throws', async () => {
+    const posted: Array<Record<string, unknown>> = [];
+    const fetch = vi.fn(
+      async (_url: string | URL | Request, init?: RequestInit) => {
+        if (!init?.method) {
+          return response({
+            ok: true,
+            turns: [
+              {
+                id: 'turn_fail_throw',
+                conversation_id: 'conversation_1',
+                user_text: 'Persist the fence',
+              },
+            ],
+          });
+        }
+        const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+        posted.push(body);
+        if (body.action === 'claim') {
+          return response({
+            ok: true,
+            turn: {
+              id: 'turn_fail_throw',
+              conversation_id: 'conversation_1',
+              user_text: 'Persist the fence',
+              claim_token: 'claim_1',
+            },
+          });
+        }
+        if (body.action === 'fail') {
+          throw new Error('network down');
+        }
+        return response({ ok: true });
+      }
+    );
+    const bridge = createSummerRuntimeBridge({
+      platform: 'darwin',
+      appOrigin: 'https://jov.ie',
+      homeDirectory: '/Users/founder',
+      workerId: 'jovie-mac',
+      fetch,
+      spawnProcess: () => fakeChild({ exitCode: 1 }),
+    });
+    await expect(bridge.runCycle()).resolves.toMatchObject({
+      state: 'http-error',
+      turnId: 'turn_fail_throw',
+      errorCode: 'fail-persist',
+    });
+    expect(posted.at(-1)).toMatchObject({
+      action: 'fail',
+      failure_code: 'summer-runtime-exit-1',
     });
   });
 

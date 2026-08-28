@@ -1,0 +1,59 @@
+name: Sentry Autofix Recurrence
+
+# Closes the sentry-autofix loop after a fix has landed on current main.
+# Scheduled / manual only — never a source-PR or merge-queue gate, and never
+# a member of the production-mutation FIFO. Resolves quiet production
+# incidents and reopens ones that are still firing after the post-deploy soak.
+# Missing lastSeen, environment, or current-main ancestry is skip/fail-closed,
+# not a green resolve.
+
+on:
+  schedule:
+    - cron: '41 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: sentry-autofix-recurrence
+  cancel-in-progress: false
+
+jobs:
+  recurrence:
+    name: Resolve or reopen from post-deploy evidence
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: Production – jovie
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Generate read/comment Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: read
+          permission-pull-requests: write
+          permission-issues: write
+
+      - name: Check recurrence and resolve or reopen
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/sentry-autofix-recurrence.mjs

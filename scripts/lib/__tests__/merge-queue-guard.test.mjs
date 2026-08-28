@@ -1842,6 +1842,40 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
     expect(decision.action).toBe('allow');
   });
 
+  it('suppresses an unchanged iOS source head after repeated build failures', () => {
+    // Live #16441 failed the iOS `Build and test` step four times without a
+    // source commit. Each queue rebuild changed the synthetic group base, so
+    // treating the step as unclassified admitted the same broken head again.
+    const decision = frontItemChurnDecision({
+      prNumber: 16441,
+      currentBaseSha: BASE,
+      headCommittedAt: '2026-08-23T00:00:00.000Z',
+      observedAt: '2026-08-28T13:21:30.000Z',
+      mergeGroupRuns: [
+        groupRun(
+          16441,
+          NEW_BASE,
+          'failure',
+          '2026-08-28T13:01:50.000Z',
+          'completed',
+          ['Build and test']
+        ),
+        groupRun(
+          16441,
+          BASE,
+          'failure',
+          '2026-08-28T13:10:32.000Z',
+          'completed',
+          ['Build and test']
+        ),
+      ],
+    });
+    expect(decision.action).toBe('block');
+    expect(decision.reason).toContain('unchanged head');
+    expect(decision.evidence.failureClass).toBe('repeated-product-check');
+    expect(decision.evidence.failedAttempts).toBe(2);
+  });
+
   it('blocks repeated aggregate failures after one run proves the unchanged head fails unit tests', () => {
     // Reproduced by live #16441 on 2026-08-27: one merge_group run exposed the
     // unit-test failure while sibling attempts exposed only aggregate failures.
@@ -1885,6 +1919,25 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
     expect(drain).toContain('sort_by(.createdAt) | reverse | .[0:8][]? | .id');
     expect(drain).not.toContain(
       'sort_by(.createdAt) | reverse | .[0].id // empty'
+    );
+    expect(drain).toContain('runs?event=merge_group&per_page=100');
+    expect(drain).toContain(
+      'PRODUCT_FAILURE_CONTEXT="jovie-queue-product-failure/v1"'
+    );
+    expect(drain).toContain('block-product');
+    expect(drain).toContain('block-transient');
+  });
+
+  it('normalizes GitHub REST run fields before matching failed fronts', () => {
+    const drain = readFileSync(
+      resolve(REPO_ROOT, 'scripts/drain-pr-queue.sh'),
+      'utf8'
+    );
+    expect(drain).toContain(
+      '{id, headBranch: .head_branch, status, conclusion, headSha: .head_sha, createdAt: .created_at, updatedAt: .updated_at}'
+    );
+    expect(drain).not.toContain(
+      '{id, headBranch, status, conclusion, headSha, createdAt, updatedAt}'
     );
   });
 
@@ -2286,7 +2339,7 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     ).toBe('allow');
   });
 
-  it('skips ALLGREEN enrollment when CHANGELOG.md already sits in the queued group', () => {
+  it('skips every pre-land CHANGELOG.md candidate', () => {
     expect(CHANGELOG_COLLISION_PATH).toBe('CHANGELOG.md');
     expect(
       changelogGroupCollisionDecision({
@@ -2297,8 +2350,18 @@ describe('native merge-queue cohort (JOV-5047)', () => {
       })
     ).toMatchObject({
       action: 'skip',
-      reason: 'changelog-collision',
+      reason: 'preland-changelog-prohibited',
       collidingPrs: [16352],
+    });
+    expect(
+      changelogGroupCollisionDecision({
+        candidateFiles: ['CHANGELOG.md'],
+        queuedMemberFiles: [],
+      })
+    ).toMatchObject({
+      action: 'skip',
+      reason: 'preland-changelog-prohibited',
+      collidingPrs: [],
     });
     expect(
       changelogGroupCollisionDecision({
