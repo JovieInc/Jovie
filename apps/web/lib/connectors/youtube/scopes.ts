@@ -1,7 +1,7 @@
-/** Least-privilege Google scopes for channel readback and thumbnail upload. */
+/** Least-privilege scopes for channel import and non-monetary analytics. */
 export const YOUTUBE_OAUTH_SCOPES = [
   'https://www.googleapis.com/auth/youtube.readonly',
-  'https://www.googleapis.com/auth/youtube.upload',
+  'https://www.googleapis.com/auth/yt-analytics.readonly',
 ] as const;
 
 export const YOUTUBE_OAUTH_SCOPE_STRING = YOUTUBE_OAUTH_SCOPES.join(' ');
