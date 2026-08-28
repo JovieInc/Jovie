@@ -127,6 +127,11 @@ queued after mutation. Hard-gated, conflicting, or terminal-red entries are
 dequeued through the native API and then have their audit label removed.
 Pending, queued, and cancelled check runs are not terminal failures, preventing
 dequeue/re-enroll loops during ordinary CI cancellation or main movement.
+When a merge-group run proves a classified product failure, Gem writes the
+bot-authored `jovie-queue-product-failure/v1` status before dequeue or admission
+refusal. That success status preserves source-head cleanliness while acting as
+an exact-head tombstone after bounded Actions history rolls over; only a new
+source commit resets the product-failure memory.
 
 ### Fleet degradation policy
 
