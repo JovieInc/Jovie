@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
 /**
- * Prevent desktop code from landing without release handling.
+ * Prevent desktop code from landing with a pre-land CHANGELOG.md edit.
  *
- * Desktop changes need an explicit release handoff. Feature branches should
- * add an Unreleased changelog note; the main/release path stamps VERSION and
- * publishes the next DMG.
+ * Desktop release handling is post-land: Production Verified then
+ * `.github/workflows/desktop-release.yml`. Implementation PRs must not edit
+ * CHANGELOG.md or VERSION (JOV-5378). Linear remains SoR.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -38,11 +38,13 @@ export function evaluateDesktopReleaseGuard(changedFiles) {
     RELEASE_HANDLING_PATHS.has(file)
   );
 
+  const changelogTouched = normalizedFiles.includes('CHANGELOG.md');
+
   return {
     changedFiles: normalizedFiles,
     desktopFiles,
     releaseHandlingFiles,
-    passed: desktopFiles.length === 0 || releaseHandlingFiles.length > 0,
+    passed: desktopFiles.length === 0 || !changelogTouched,
   };
 }
 
@@ -105,10 +107,10 @@ function main() {
   }
 
   console.error(
-    '[desktop-release-guard] apps/desktop changed without a DMG release trigger.'
+    '[desktop-release-guard] apps/desktop changed with a pre-land CHANGELOG.md edit.'
   );
   console.error(
-    'Add CHANGELOG.md notes under [Unreleased], change VERSION on the main release path, or update .github/workflows/desktop-release.yml with explicit release workflow handling.'
+    'Do not add or edit CHANGELOG.md on implementation PRs. Desktop release handling is post-land after Production Verified.'
   );
   console.error('Desktop files:');
   for (const file of result.desktopFiles) {

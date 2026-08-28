@@ -131,13 +131,13 @@ test('passes when no desktop files changed', () => {
   assert.deepEqual(result.desktopFiles, []);
 });
 
-test('fails when desktop files changed without a release trigger', () => {
+test('passes desktop implementation diffs without a pre-land CHANGELOG.md edit', () => {
   const result = evaluateDesktopReleaseGuard([
     'apps/desktop/src/main.ts',
     'apps/desktop/electron-builder.yml',
   ]);
 
-  assert.equal(result.passed, false);
+  assert.equal(result.passed, true);
   assert.deepEqual(result.releaseHandlingFiles, []);
 });
 
@@ -161,23 +161,23 @@ test('passes when only desktop smoke harnesses changed', () => {
   assert.deepEqual(result.desktopFiles, []);
 });
 
-test('still fails when a desktop test changes with release-impacting desktop code', () => {
+test('still passes when a desktop test changes with release-impacting desktop code', () => {
   const result = evaluateDesktopReleaseGuard([
     'apps/desktop/scripts/desktop-icon-contract.test.mjs',
     'apps/desktop/src/main.ts',
   ]);
 
-  assert.equal(result.passed, false);
+  assert.equal(result.passed, true);
   assert.deepEqual(result.desktopFiles, ['apps/desktop/src/main.ts']);
 });
 
-test('passes when desktop changes include unreleased changelog notes', () => {
+test('fails when desktop changes include a pre-land CHANGELOG.md edit', () => {
   const result = evaluateDesktopReleaseGuard([
     'apps/desktop/src/main.ts',
     'CHANGELOG.md',
   ]);
 
-  assert.equal(result.passed, true);
+  assert.equal(result.passed, false);
   assert.deepEqual(result.releaseHandlingFiles, ['CHANGELOG.md']);
 });
 

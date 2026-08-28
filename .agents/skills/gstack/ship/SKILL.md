@@ -395,7 +395,7 @@ You are running the `/ship` workflow. This is a **non-interactive, fully automat
 **Never stop for:**
 - Uncommitted changes (always include them)
 - Version bump choice (auto-pick MICRO or PATCH — see Step 4)
-- CHANGELOG content (auto-generate from diff)
+- CHANGELOG content (do not edit CHANGELOG.md on implementation PRs)
 - Commit message approval (auto-commit)
 - Multi-file changesets (auto-split into bisectable commits)
 - Legacy TODO cross-reference that does not create new follow-up work
@@ -1720,14 +1720,16 @@ already knows. A good test: would this insight save time in a future session? If
 
 ## Step 4: Version bump (auto-decide)
 
-> **JOVIE OVERRIDE — version stamping is MAIN-ONLY.** This repo bumps the version
+> **JOVIE OVERRIDE — version stamping is MAIN-ONLY, and CHANGELOG.md is post-land.** This repo bumps the version
 > fan-out (`VERSION`, `version.json`, root + workspace `package.json` versions, dated
 > `CHANGELOG.md` headings) only on the main/release path via `pnpm version:stamp`, never
 > on feature branches. `/ship` runs from a feature branch (Step 1), so **SKIP this entire
 > Step 4** — do not edit `VERSION`, `version.json`, or any `package.json` version field.
-> CI (`scripts/version-fanout-guard.mjs`) will fail the PR if you do. Put release notes
-> under the `## [Unreleased]` CHANGELOG section instead (see the CHANGELOG step below).
-> See `.claude/rules/release.md` → "Version Stamping (main-only)".
+> **SKIP the CHANGELOG step below.** Do not add or edit `CHANGELOG.md`. Implementation PRs
+> that touch it fail admission (JOV-5378). A user-visible change earns exactly one What's New
+> bullet after land/runtime proof through the existing release/UI receipt path. Linear remains SoR.
+> CI (`scripts/version-fanout-guard.mjs` + `scripts/lib/pre-land-changelog.mjs`) will fail the PR if you edit CHANGELOG.md.
+> See `.claude/rules/release.md` → "Version Stamping (main-only)" and "Changelog".
 
 **Idempotency check:** Before bumping, compare VERSION against the base branch.
 

@@ -295,7 +295,9 @@ Before you open a PR:
 4. **Publish the draft first** (`JOVIE_PUSH_PHASE=publication`), consume rolling
    CI, then qualify the final exact, current head before ready. Don't hand-merge;
    the queue does it.
-5. If a PR's base branch was deleted, **retarget to `main`** before debugging a
+5. **Do not add or edit `CHANGELOG.md`.** Implementation PRs that touch it fail
+   admission. What's New is written after land/runtime proof. Linear is SoR.
+6. If a PR's base branch was deleted, **retarget to `main`** before debugging a
    "conflict."
 
 Related: [`pr-stacking.md`](../.claude/rules/pr-stacking.md),

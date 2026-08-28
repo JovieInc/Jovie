@@ -168,7 +168,7 @@ When in doubt, skip auto-merge and request review.
 1. **Open a draft PR early** — push your first meaningful commit and create a draft PR immediately.
 2. **Iterate** — push frequently, let CI catch issues, fix and push again.
 3. **When ready to ship:** run `/qa` → `/review` → `/ship` (skip `/qa` or `/review` if already run manually).
-4. `/ship` handles: tests, review, CHANGELOG `[Unreleased]` notes, commit, push, PR creation/update. It must **not** bump the version fan-out (`VERSION`, `version.json`, `package.json` versions, dated CHANGELOG headings) — see "Version Stamping (main-only)" below.
+4. `/ship` handles: tests, review, commit, push, PR creation/update. It must **not** bump the version fan-out (`VERSION`, `version.json`, `package.json` versions, dated CHANGELOG headings) and must **not** add or edit `CHANGELOG.md` — see "Version Stamping (main-only)" and "Changelog" below.
 5. `/land-and-deploy` handles: merge, CI wait, deploy verification.
 6. Apply `merge-queue` after the PR is ready. The live
    `MERGE_QUEUE_BACKEND=native` controller treats the label as intent/audit
@@ -297,14 +297,13 @@ BOT REVIEWS
 - `VERSION`
 - `version.json`
 - the `version` field of root + workspace `package.json` files (`apps/*`, `packages/*`)
-- dated release headings in `CHANGELOG.md` (e.g. `## [26.6.61] - 2026-06-28`)
+- `CHANGELOG.md` (any add or edit — dated headings and `[Unreleased]` notes alike)
 
 **What feature branches MAY do:**
 
-- Add release notes under the `## [Unreleased]` section of `CHANGELOG.md`.
 - Edit `package.json` for dependency/script changes — only the `version` field is protected.
 
-**Enforcement:** `scripts/version-fanout-guard.mjs` runs in CI (`ci-deterministic` job) and fails any non-`main` branch that writes the fan-out. It auto-skips on `main`, `master`, `production`, and `release/*`, `hotfix/*`, `train/*`, `integration/*` branches (the release/integration path). Run locally with `pnpm version:fanout-guard`.
+**Enforcement:** `scripts/version-fanout-guard.mjs` runs in CI (`ci-deterministic` job) and fails any non-`main` branch that writes the fan-out. Pre-land CHANGELOG diffs also fail merge-queue admission (`scripts/lib/pre-land-changelog.mjs`). The guard auto-skips on `main`, `master`, `production`, and `release/*`, `hotfix/*`, `train/*`, `integration/*` branches (the release/integration path). Run locally with `pnpm version:fanout-guard`.
 
 **Stamping on main:** After merge to `main` (or from the release workflow), run:
 
@@ -317,11 +316,11 @@ pnpm version:check        # validate consistency
 
 ## Changelog
 
-**During development, only add notes under the `## [Unreleased]` section of `CHANGELOG.md`.** The `/ship` workflow appends `[Unreleased]` entries automatically from the diff and commit history. The dated release heading is stamped on the main/release path by `pnpm version:stamp` — never add a dated `## [X.Y.Z] - DATE` heading on a feature branch.
+**Implementation PRs must not add or edit `CHANGELOG.md`.** Branch-local Unreleased notes collide in native ALLGREEN merge groups (GitHub's server merge ignores local `merge=union`). A user-visible change earns exactly one What's New bullet only after land/runtime proof, written through the existing release/UI receipt path (`apps/web/components/jovie/feature-intro-catalog.ts` plus the post-land `pnpm version:stamp` path). Linear remains the source of record.
 
-`CHANGELOG.md` uses `merge=union` in `.gitattributes` to auto-resolve merge conflicts between concurrent PRs.
+The dated release heading is stamped on the main/release path by `pnpm version:stamp` — never add a dated `## [X.Y.Z] - DATE` heading on a feature branch.
 
-**Customer-friendly format:** The changelog is rendered on the public `/changelog` page, RSS feed, and subscriber emails. Follow these conventions:
+**Customer-friendly format:** The changelog is rendered on the public `/changelog` page, RSS feed, and subscriber emails. Follow these conventions on the stamp/release path:
 
 - **Summary blockquote:** Add `> plain-language summary` (max 3 sentences) right after the version heading. Written for non-technical users (artists, fans, investors).
 - **`[internal]` prefix:** Tag developer-facing entries with `- [internal] ...`. These are hidden from the public page, RSS feed, and emails but preserved for developer reference.

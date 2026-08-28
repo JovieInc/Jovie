@@ -11,8 +11,11 @@
  *   - the `version` field of the root + workspace package.json files
  *   - dated release headings in CHANGELOG.md (e.g. `## [26.6.61] - 2026-06-28`)
  *
- * Feature branches MAY still append release notes under the `## [Unreleased]`
- * CHANGELOG section and MAY edit package.json for dependency/script changes — only
+ * Implementation PRs must not add or edit CHANGELOG.md at all (JOV-5378).
+ * A user-visible change earns exactly one What's New bullet after land/runtime
+ * proof through the existing release/UI receipt path. Linear remains SoR.
+ *
+ * Feature branches MAY edit package.json for dependency/script changes — only
  * the `version` field is protected.
  *
  * The actual version stamp happens on the main/release path via
@@ -34,11 +37,7 @@ const ROOT = join(__dirname, '..');
 const STAMP_ALLOWED_BRANCHES = new Set(['main', 'master', 'production']);
 
 /** Files whose any change is a fan-out write on a feature branch. */
-const SCALAR_VERSION_FILES = new Set(['VERSION']);
-
-/** Dated CHANGELOG release heading, e.g. `## [26.6.61] - 2026-06-28`. */
-const DATED_RELEASE_HEADING =
-  /^##\s*\[\d+\.\d+\.\d+(?:\.\d+)?\]\s*-\s*\d{4}-\d{2}-\d{2}\s*$/gm;
+const SCALAR_VERSION_FILES = new Set(['VERSION', 'CHANGELOG.md']);
 
 /**
  * Branches that should be exempt from the guard entirely (they legitimately
@@ -86,13 +85,6 @@ function parseJsonVersion(raw) {
   }
 }
 
-function datedHeadings(changelog) {
-  if (!changelog) {
-    return new Set();
-  }
-  return new Set(changelog.match(DATED_RELEASE_HEADING) ?? []);
-}
-
 /**
  * Evaluate whether a changeset writes the version fan-out on a non-release branch.
  *
@@ -134,7 +126,11 @@ export function evaluateVersionFanoutGuard({
   for (const file of normalizedFiles) {
     // 1. Scalar version files: any change is a fan-out write.
     if (SCALAR_VERSION_FILES.has(file)) {
-      violations.push(`${file} (version file edited on a feature branch)`);
+      violations.push(
+        file === 'CHANGELOG.md'
+          ? `${file} (implementation PRs must not add or edit CHANGELOG.md — What's New is written after land/runtime proof)`
+          : `${file} (version file edited on a feature branch)`
+      );
       continue;
     }
 
@@ -157,19 +153,6 @@ export function evaluateVersionFanoutGuard({
       if (before !== after) {
         violations.push(
           `${file} (version ${before ?? '∅'} → ${after ?? '∅'} on a feature branch)`
-        );
-      }
-      continue;
-    }
-
-    // 4. CHANGELOG.md: dated release headings are stamping; [Unreleased] is fine.
-    if (file === 'CHANGELOG.md') {
-      const before = datedHeadings(getBaseContent(file));
-      const after = datedHeadings(getHeadContent(file));
-      const added = [...after].filter(heading => !before.has(heading));
-      if (added.length > 0) {
-        violations.push(
-          `CHANGELOG.md (new dated release heading(s) ${added.join(', ')} — add notes under "## [Unreleased]" instead)`
         );
       }
       continue;
@@ -315,7 +298,7 @@ function main() {
     'Version stamping is main-only. Revert these changes; the release path stamps them after merge.'
   );
   console.error(
-    'Add release notes under "## [Unreleased]" in CHANGELOG.md instead.'
+    "Do not add or edit CHANGELOG.md on implementation PRs. What's New is written after land/runtime proof."
   );
   console.error(
     'See .claude/rules/release.md → "Version Stamping (main-only)".'

@@ -187,6 +187,11 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 ## CI / Build
 
+### Implementation PRs must not edit CHANGELOG.md (JOV-5378)
+**Mistake:** 26 open PRs edited `CHANGELOG.md`; Unreleased notes collided in native ALLGREEN merge groups; fallback PR #16485 recreated the artifact after #16484 already queued the fix.
+
+**Rule:** Do not add or edit `CHANGELOG.md` on implementation PRs. Admission (`scripts/lib/pre-land-changelog.mjs` + `scripts/version-fanout-guard.mjs`) rejects the diff. A user-visible change earns exactly one What's New bullet after land/runtime proof. Linear is SoR.
+
 ### Local Doppler commands must pin `jovie-web/dev`
 **Mistake:** Local commands were run as bare `doppler run -- ...`, which depends on ambient Doppler scope. In fresh worktrees that can fail with "You must specify a config" even though the repo always expects the `jovie-web/dev` local setup.
 

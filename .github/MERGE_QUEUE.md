@@ -131,10 +131,12 @@ It fails closed if an open PR is missing from that authoritative snapshot.
   named Actions outcome (`launched` / `repaired` / `skipped_stale` /
   `writer_missing` / `no_key` / `needs_human`) even when an implementer lease
   is live or `LIVE_AUTHOR` is blank (JOV-5335).
-- CHANGELOG ALLGREEN collision (JOV-5291): GitHub's server merge ignores local
+- CHANGELOG ALLGREEN collision (JOV-5291 / JOV-5378): GitHub's server merge ignores local
   union drivers. Two Unreleased `CHANGELOG.md` edits in one group park the
-  later entry. Admission skips a CHANGELOG-touching PR while another CHANGELOG
-  member is already queued. This is a classified skip, not an `enroll` product
+  later entry. Implementation PRs that add or edit `CHANGELOG.md` are rejected
+  at admission (`scripts/lib/pre-land-changelog.mjs`) and dequeued from a live
+  group without bypassing CI. Stamp/release heads still serialize against a
+  queued CHANGELOG member. This is a classified skip, not an `enroll` product
   failure (it must not mark the PR UNSTABLE).
 - Enroll live policy (JOV-5291): preflight reads GraphQL
   `mergeQueue.configuration.maximumEntriesToBuild` as live truth. Stale REST
