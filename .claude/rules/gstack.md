@@ -12,7 +12,7 @@ This repo vendors a Jovie-customized fork of [gstack](https://github.com/garryta
 
 | Skill | Invocation | Purpose |
 |-------|------------|---------|
-| Ship | `/ship` | Automated release: merge main, run tests, review diff, bump VERSION, update CHANGELOG, commit, push, create PR |
+| Ship | `/ship` | Automated PR preparation: merge main, run tests, review diff, commit, push, create/update PR; no pre-land CHANGELOG |
 | Review | `/review` | Pre-landing PR review for SQL safety, trust boundary violations, side effects |
 | Plan (CEO) | `/plan-ceo-review` | Founder mode: rethink problems from first principles, find the 10-star product |
 | Plan (Eng) | `/plan-eng-review` | Eng manager mode: lock in execution plans with architecture and edge cases |
