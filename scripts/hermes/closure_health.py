@@ -27,6 +27,10 @@ NO_MERGE_PROGRESS_AFTER = timedelta(hours=1)
 HOLD_EXPIRY = timedelta(days=7)
 UTC = timezone.utc
 ISSUE_REFERENCE = re.compile(r"\b(?:JOV|LYB)-\d+\b", re.IGNORECASE)
+EXPLICIT_ISSUE_MARKER = re.compile(
+    r"<!--\s*linear-issue-(?:id|identifier)\s*:\s*((?:JOV|LYB)-\d+)\s*-->",
+    re.IGNORECASE,
+)
 HOLD_LABELS = {"hold", "gated", "queue-deferred", "needs-human"}
 CLOSE_LABELS = {"duplicate"}
 
@@ -61,8 +65,19 @@ def _author(pr: dict[str, Any]) -> str | None:
 
 
 def _issue_references(pr: dict[str, Any]) -> list[str]:
-    # Body text commonly names dependencies and is not lane identity. Branch
-    # plus title are the deterministic ownership surfaces.
+    # Linear is the source of record. One explicit canonical marker in the PR
+    # body wins over a stale parent identifier in the branch or title.
+    # Conflicting explicit identities fail closed. Body prose and dependency
+    # references never become lane identity; legacy PRs without a marker keep
+    # the branch-plus-title fallback.
+    body = pr.get("body")
+    explicit = (
+        sorted({match.upper() for match in EXPLICIT_ISSUE_MARKER.findall(body)})
+        if isinstance(body, str)
+        else []
+    )
+    if explicit:
+        return explicit
     text = f"{pr.get('headRefName') or ''} {pr.get('title') or ''}"
     return sorted({match.upper() for match in ISSUE_REFERENCE.findall(text)})
 
@@ -331,7 +346,7 @@ query($owner:String!,$name:String!,$endCursor:String){
       totalCount
       pageInfo{hasNextPage endCursor}
       nodes{
-        number title headRefName isDraft mergeStateStatus createdAt updatedAt
+        number title body headRefName isDraft mergeStateStatus createdAt updatedAt
         author{login}
         labels(first:50){nodes{name}}
         mergeQueueEntry{position enqueuedAt state}

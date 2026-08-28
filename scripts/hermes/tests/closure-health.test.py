@@ -25,6 +25,7 @@ def pr(
     number: int,
     *,
     title: str,
+    body: str = "",
     merge_state: str = "CLEAN",
     draft: bool = False,
     queued: bool = False,
@@ -36,6 +37,7 @@ def pr(
     return {
         "number": number,
         "title": title,
+        "body": body,
         "headRefName": f"symphony/test-pr-{number}",
         "isDraft": draft,
         "mergeStateStatus": merge_state,
@@ -121,6 +123,113 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(dispositions[9]["state"], "queued")
         self.assertEqual(dispositions[9]["queueState"], "AWAITING_CHECKS")
         self.assertEqual(dispositions[8]["state"], "repair")
+
+    def test_explicit_linear_marker_overrides_stale_parent_branch_and_title(self):
+        child = pr(
+            10,
+            title="feat: complete JOV-5202 family slice",
+            body="<!-- linear-issue-identifier:JOV-5212 -->",
+        )
+        child["headRefName"] = "codex/jov-5202-durable-summer-turns"
+
+        result = MODULE.classify_open_prs(
+            [child, pr(11, title="fix: complete JOV-5202")],
+            NOW,
+        )
+
+        self.assertEqual(result["duplicateIssueLanes"], [])
+        dispositions = {item["number"]: item for item in result["dispositions"]}
+        self.assertEqual(dispositions[10]["issue"], "JOV-5212")
+        self.assertEqual(dispositions[11]["issue"], "JOV-5202")
+
+    def test_explicit_marker_aliases_must_agree_and_body_prose_is_not_identity(self):
+        matching = pr(
+            12,
+            title="feat: legacy JOV-5202",
+            body=(
+                "<!-- linear-issue-id:JOV-5212 -->\n"
+                "<!-- linear-issue-identifier:jov-5212 -->\n"
+                "Depends on JOV-5288."
+            ),
+        )
+        uuid_and_identifier = pr(
+            13,
+            title="feat: legacy JOV-5202",
+            body=(
+                "<!-- linear-issue-id:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee -->\n"
+                "<!-- linear-issue-identifier:JOV-5212 -->"
+            ),
+        )
+        prose_only = pr(
+            14,
+            title="feat: ship JOV-888",
+            body="Depends on JOV-999 and relates to JOV-1000.",
+        )
+
+        result = MODULE.classify_open_prs(
+            [matching, uuid_and_identifier, prose_only],
+            NOW,
+        )
+
+        dispositions = {item["number"]: item for item in result["dispositions"]}
+        self.assertEqual(dispositions[12]["issue"], "JOV-5212")
+        self.assertEqual(dispositions[13]["issue"], "JOV-5212")
+        self.assertEqual(dispositions[14]["issue"], "JOV-888")
+        self.assertEqual(result["unclassified"], [])
+
+    def test_missing_explicit_marker_preserves_branch_title_fallback(self):
+        result = MODULE.classify_open_prs(
+            [pr(15, title="feat: ship JOV-101", body="Depends on JOV-999.")],
+            NOW,
+        )
+
+        self.assertEqual(result["dispositions"][0]["issue"], "JOV-101")
+        self.assertEqual(result["unclassified"], [])
+
+    def test_conflicting_explicit_linear_markers_fail_closed(self):
+        conflicting = pr(
+            16,
+            title="feat: legacy JOV-5202",
+            body=(
+                "<!-- linear-issue-id:JOV-5212 -->\n"
+                "<!-- linear-issue-identifier:JOV-5288 -->"
+            ),
+        )
+
+        classifications = MODULE.classify_open_prs([conflicting], NOW)
+        reasons = {
+            item["number"]: item["reason"] for item in classifications["unclassified"]
+        }
+        self.assertEqual(reasons[16], "multiple-issue-lane-identities")
+        self.assertEqual(classifications["dispositions"], [])
+
+        first = MODULE.evaluate_closure_health(
+            snapshot(
+                openPrs=1,
+                eligiblePrs=1,
+                greenReadyPrs=1,
+                classifications=classifications,
+            ),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(first["status"], "grace")
+
+        result = MODULE.evaluate_closure_health(
+            snapshot(
+                openPrs=1,
+                eligiblePrs=1,
+                greenReadyPrs=1,
+                classifications=classifications,
+            ),
+            previous=first,
+            now=NOW + timedelta(minutes=16),
+        )
+        self.assertEqual(result["status"], "red")
+        self.assertIn("unclassified-open-pr-over-15m", result["reasons"])
+        self.assertFalse(result["newIssueIntakeAllowed"])
+        self.assertTrue(result["promotionContinues"])
+        self.assertTrue(result["remediationContinues"])
 
     def test_close_requires_an_explicit_lifecycle_label(self):
         result = MODULE.classify_open_prs(
@@ -345,6 +454,12 @@ class ClosureObservationTests(unittest.TestCase):
         self.assertEqual(result["latestMergeAt"], MODULE.isoformat(NOW))
         self.assertIn("owner=JovieInc", run.call_args.args[0])
         self.assertIn("name=Jovie", run.call_args.args[0])
+        query_arg = next(
+            argument
+            for argument in run.call_args.args[0]
+            if argument.startswith("query=")
+        )
+        self.assertIn("number title body headRefName", query_arg)
 
         pages[0]["data"]["repository"]["pullRequests"]["totalCount"] = 3
         completed.stdout = MODULE.json.dumps(pages)
