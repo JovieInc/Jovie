@@ -98,7 +98,7 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertIsInstance(held["expiresAt"], str)
         self.assertEqual(result["unclassified"], [])
 
-    def test_duplicate_issue_lanes_choose_one_canonical_pr_and_stop_the_line(self):
+    def test_duplicate_issue_lanes_stop_the_line_without_guessing_a_loser(self):
         result = MODULE.classify_open_prs(
             [
                 pr(8, title="feat: ship JOV-777", merge_state="DIRTY"),
@@ -110,8 +110,25 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(result["duplicateIssueLanes"], [{"issue": "JOV-777", "prs": [8, 9]}])
         dispositions = {item["number"]: item for item in result["dispositions"]}
         self.assertEqual(dispositions[9]["state"], "queued")
-        self.assertEqual(dispositions[8]["state"], "close")
-        self.assertEqual(dispositions[8]["reason"], "duplicate-of-pr-9")
+        self.assertEqual(dispositions[8]["state"], "repair")
+
+    def test_close_requires_an_explicit_lifecycle_label(self):
+        result = MODULE.classify_open_prs(
+            [pr(10, title="feat: superseded JOV-778", labels=("superseded",))],
+            NOW,
+        )
+
+        self.assertEqual(
+            result["dispositions"],
+            [
+                {
+                    "number": 10,
+                    "issue": "JOV-778",
+                    "state": "close",
+                    "reason": "superseded",
+                }
+            ],
+        )
 
     def test_malformed_identity_and_expired_hold_are_explicit(self):
         missing_number = pr(1, title="feat: invalid JOV-900")

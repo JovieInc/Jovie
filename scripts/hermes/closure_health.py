@@ -28,6 +28,7 @@ HOLD_EXPIRY = timedelta(days=7)
 UTC = timezone.utc
 ISSUE_REFERENCE = re.compile(r"\b(?:JOV|LYB)-\d+\b", re.IGNORECASE)
 HOLD_LABELS = {"hold", "gated", "queue-deferred", "needs-human"}
+CLOSE_LABELS = {"close", "duplicate", "superseded"}
 
 
 def isoformat(value: datetime) -> str:
@@ -66,22 +67,6 @@ def _issue_references(pr: dict[str, Any]) -> list[str]:
     return sorted({match.upper() for match in ISSUE_REFERENCE.findall(text)})
 
 
-def _canonical_duplicate(prs: list[dict[str, Any]]) -> dict[str, Any]:
-    def score(pr: dict[str, Any]) -> tuple[int, int, int, float, int]:
-        updated = parse_time(pr.get("updatedAt"))
-        return (
-            1 if pr.get("mergeQueueEntry") else 0,
-            1
-            if not pr.get("isDraft") and pr.get("mergeStateStatus") == "CLEAN"
-            else 0,
-            1 if not pr.get("isDraft") else 0,
-            updated.timestamp() if updated else 0.0,
-            int(pr.get("number") or 0),
-        )
-
-    return max(prs, key=score)
-
-
 def classify_open_prs(prs: list[dict[str, Any]], now: datetime) -> dict[str, Any]:
     """Map every usable open PR to close/repair/promote/queued/held."""
     issue_lanes: dict[str, list[dict[str, Any]]] = {}
@@ -109,26 +94,6 @@ def classify_open_prs(prs: list[dict[str, Any]], now: datetime) -> dict[str, Any
         for issue, lane in sorted(issue_lanes.items())
         if len(lane) > 1
     ]
-    duplicate_losers: dict[int, int] = {}
-    for duplicate in duplicates:
-        lane = issue_lanes[duplicate["issue"]]
-        # Sharing a Linear issue is closure debt, but not proof that distinct
-        # PR slices are semantically redundant. Only exact-title attempts get
-        # an automatic close disposition; heterogeneous lanes stay classified
-        # by their own queue/draft/merge state until Summer consolidates or
-        # gives them distinct issue ownership.
-        title_groups: dict[str, list[dict[str, Any]]] = {}
-        for candidate in lane:
-            normalized_title = " ".join(str(candidate.get("title") or "").lower().split())
-            title_groups.setdefault(normalized_title, []).append(candidate)
-        for group in title_groups.values():
-            if len(group) < 2:
-                continue
-            canonical = _canonical_duplicate(group)
-            for candidate in group:
-                if candidate["number"] != canonical["number"]:
-                    duplicate_losers[int(candidate["number"])] = int(canonical["number"])
-
     dispositions: list[dict[str, Any]] = []
     expired_holds: list[int] = []
     for pr in sorted(usable, key=lambda item: int(item["number"])):
@@ -147,10 +112,10 @@ def classify_open_prs(prs: list[dict[str, Any]], now: datetime) -> dict[str, Any
         if pr.get("mergeQueueEntry"):
             dispositions.append({**base, "state": "queued", "reason": "native-queue-entry"})
             continue
-        if number in duplicate_losers:
-            winner = duplicate_losers[number]
+        close_reasons = sorted(labels.intersection(CLOSE_LABELS))
+        if close_reasons:
             dispositions.append(
-                {**base, "state": "close", "reason": f"duplicate-of-pr-{winner}"}
+                {**base, "state": "close", "reason": "+".join(close_reasons)}
             )
             continue
         hold_reasons = sorted(labels.intersection(HOLD_LABELS))
