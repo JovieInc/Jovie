@@ -319,6 +319,61 @@ function executeAdmissionScope({
   }
 }
 
+function executeHoldIntakePreflight({
+  closureIntakeAllowed,
+  cohortIntakeAllowed,
+}) {
+  const receipt = {
+    schema: 'jovie-fleet-gate/v1',
+    observedAt: new Date().toISOString(),
+    state: 'AMBER',
+    promotionMode: 'hold-intake',
+    signals: {
+      main: { status: 'green' },
+      production: { status: 'green' },
+    },
+    promotionAdmission: { allowed: false },
+    isolatedPromotionAdmission: { allowed: false },
+    productionUnboundRepairAdmission: {
+      allowed: true,
+      condition: 'production-deployment-unbound',
+      mainSha: HEAD,
+      deployedSha: OTHER_HEAD,
+      maxConcurrent: 1,
+      deploymentsAllowed: false,
+    },
+    closureAdmission: {
+      allowed: closureIntakeAllowed,
+      authority: 'Summer',
+      status: closureIntakeAllowed ? 'green' : 'red',
+      newIssueIntakeAllowed: closureIntakeAllowed,
+      newImplementationAllowed: closureIntakeAllowed,
+      fallbackPrGenerationAllowed: closureIntakeAllowed,
+      promotionContinues: true,
+      remediationContinues: true,
+    },
+    alreadyAdmittedCohort: {
+      preserve: true,
+      newIntakeAllowed: cohortIntakeAllowed,
+    },
+  };
+  return spawnSync('bash', ['scripts/drain-pr-queue.sh'], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      DRY_RUN: '1',
+      DRAIN_PROMOTION_MODE: 'hold-intake',
+      DRAIN_FLEET_GATE_B64: Buffer.from(JSON.stringify(receipt)).toString(
+        'base64'
+      ),
+      DRAIN_MAX_SECONDS: '10',
+      DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS: '1',
+      FLEET_HOLD_TTL_SECONDS: '0',
+    },
+  });
+}
+
 describe('merge queue backend resolution', () => {
   it('defaults bare callers to the live native backend', () => {
     expect(DEFAULT_MERGE_QUEUE_BACKEND).toBe('native');
@@ -351,6 +406,33 @@ describe('merge queue backend resolution', () => {
 });
 
 describe('queue workflow mutation safety', () => {
+  it('accepts Summer stop-line hold-intake while keeping promotion and remediation live', () => {
+    const result = executeHoldIntakePreflight({
+      closureIntakeAllowed: false,
+      cohortIntakeAllowed: false,
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain(
+      'FLEET_HOLD_TTL_SECONDS must be an integer from 1 through 3600'
+    );
+    expect(result.stderr).not.toContain(
+      'Fleet receipt does not authorize promotion mode hold-intake'
+    );
+  });
+
+  it('rejects a hold-intake receipt whose cohort contradicts Summer intake authority', () => {
+    const result = executeHoldIntakePreflight({
+      closureIntakeAllowed: false,
+      cohortIntakeAllowed: true,
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain(
+      'Fleet receipt does not authorize promotion mode hold-intake'
+    );
+  });
+
   it.each([
     ['success', '.github/workflows/production-controller.yml', true, '1'],
     [

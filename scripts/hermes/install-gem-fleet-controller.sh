@@ -14,6 +14,7 @@ readonly STAMP
 readonly BACKUP_DIR="${GEM_ROOT}/state/backups/fleet-controller-${STAMP}"
 
 readonly GATE_SOURCE="${SOURCE_ROOT}/scripts/hermes/gem-priority-gate.py"
+readonly CLOSURE_SOURCE="${SOURCE_ROOT}/scripts/hermes/closure_health.py"
 readonly CONTRACT_SOURCE="${SOURCE_ROOT}/scripts/hermes/gem_gate_contract.py"
 readonly CONSUMER_SOURCE="${SOURCE_ROOT}/scripts/hermes/gem-pr-drain.py"
 readonly REGISTRY_MODULE_SOURCE="${SOURCE_ROOT}/scripts/hermes/gem_repo_registry.py"
@@ -22,6 +23,7 @@ readonly POLICY_SOURCE="${SOURCE_ROOT}/scripts/hermes/gem_rehabilitation_policy.
 readonly WORKFLOW_SOURCE="${SOURCE_ROOT}/scripts/hermes/WORKFLOW.jovie-ui-pilot.md"
 readonly SERVICE_UNIT_SOURCE="${SOURCE_ROOT}/scripts/hermes/systemd/symphony-ui-pilot.service"
 readonly GATE_TARGET="${GEM_ROOT}/scripts/gem-priority-gate.py"
+readonly CLOSURE_TARGET="${GEM_ROOT}/scripts/closure_health.py"
 readonly CONTRACT_TARGET="${GEM_ROOT}/scripts/gem_gate_contract.py"
 readonly CONSUMER_TARGET="${GEM_ROOT}/scripts/gem-pr-drain.py"
 readonly REGISTRY_MODULE_TARGET="${GEM_ROOT}/scripts/gem_repo_registry.py"
@@ -61,6 +63,7 @@ fi
 
 for source in \
   "${GATE_SOURCE}" \
+  "${CLOSURE_SOURCE}" \
   "${CONTRACT_SOURCE}" \
   "${CONSUMER_SOURCE}" \
   "${REGISTRY_MODULE_SOURCE}" \
@@ -74,6 +77,7 @@ done
 
 git -C "${SOURCE_ROOT}" diff --quiet -- \
   scripts/hermes/gem-priority-gate.py \
+  scripts/hermes/closure_health.py \
   scripts/hermes/gem_gate_contract.py \
   scripts/hermes/gem-pr-drain.py \
   scripts/hermes/gem_repo_registry.py \
@@ -84,6 +88,7 @@ git -C "${SOURCE_ROOT}" diff --quiet -- \
   scripts/hermes/lib/user-systemd-context.sh
 git -C "${SOURCE_ROOT}" diff --cached --quiet -- \
   scripts/hermes/gem-priority-gate.py \
+  scripts/hermes/closure_health.py \
   scripts/hermes/gem_gate_contract.py \
   scripts/hermes/gem-pr-drain.py \
   scripts/hermes/gem_repo_registry.py \
@@ -107,6 +112,7 @@ fi
 
 python3 -m py_compile \
   "${GATE_SOURCE}" \
+  "${CLOSURE_SOURCE}" \
   "${CONTRACT_SOURCE}" \
   "${CONSUMER_SOURCE}" \
   "${REGISTRY_MODULE_SOURCE}" \
@@ -117,6 +123,7 @@ if [[ "${VERIFY_ONLY}" == true ]]; then
   printf 'fleet controller install sources verified\n'
   sha256sum \
     "${GATE_SOURCE}" \
+    "${CLOSURE_SOURCE}" \
     "${CONTRACT_SOURCE}" \
     "${CONSUMER_SOURCE}" \
     "${REGISTRY_MODULE_SOURCE}" \
@@ -129,6 +136,7 @@ fi
 prepare_user_systemd_context
 mkdir -p "${BACKUP_DIR}" "${GEM_ROOT}/scripts" "${GEM_ROOT}/config"
 cp -p "${GATE_TARGET}" "${BACKUP_DIR}/gem-priority-gate.py"
+[[ ! -e "${CLOSURE_TARGET}" ]] || cp -p "${CLOSURE_TARGET}" "${BACKUP_DIR}/closure_health.py"
 cp -p "${CONSUMER_TARGET}" "${BACKUP_DIR}/gem-pr-drain.py"
 [[ ! -e "${CONTRACT_TARGET}" ]] || cp -p "${CONTRACT_TARGET}" "${BACKUP_DIR}/gem_gate_contract.py"
 [[ ! -e "${REGISTRY_MODULE_TARGET}" ]] || \
@@ -141,6 +149,7 @@ cp -p "${WORKFLOW_TARGET}" "${BACKUP_DIR}/WORKFLOW.jovie-ui-pilot.md"
 [[ ! -e "${SERVICE_UNIT_TARGET}" ]] || cp -p "${SERVICE_UNIT_TARGET}" "${BACKUP_DIR}/symphony-ui-pilot.service"
 
 timer_was_active=false
+closure_existed=false
 contract_existed=false
 registry_module_existed=false
 registry_config_existed=false
@@ -149,6 +158,7 @@ service_unit_existed=false
 install_started=false
 install_complete=false
 [[ ! -e "${CONTRACT_TARGET}" ]] || contract_existed=true
+[[ ! -e "${CLOSURE_TARGET}" ]] || closure_existed=true
 [[ ! -e "${REGISTRY_MODULE_TARGET}" ]] || registry_module_existed=true
 [[ ! -e "${REGISTRY_CONFIG_TARGET}" ]] || registry_config_existed=true
 [[ ! -e "${POLICY_TARGET}" ]] || policy_existed=true
@@ -169,6 +179,11 @@ finish_or_rollback() {
       restore_atomic "${BACKUP_DIR}/gem-priority-gate.py" "${GATE_TARGET}"
       restore_atomic "${BACKUP_DIR}/gem-pr-drain.py" "${CONSUMER_TARGET}"
       restore_atomic "${BACKUP_DIR}/WORKFLOW.jovie-ui-pilot.md" "${WORKFLOW_TARGET}"
+      if [[ "${closure_existed}" == true ]]; then
+        restore_atomic "${BACKUP_DIR}/closure_health.py" "${CLOSURE_TARGET}"
+      else
+        rm -f "${CLOSURE_TARGET}"
+      fi
       if [[ "${contract_existed}" == true ]]; then
         restore_atomic "${BACKUP_DIR}/gem_gate_contract.py" "${CONTRACT_TARGET}"
       else
@@ -228,6 +243,7 @@ install_atomic() {
 
 install_started=true
 install_atomic "${GATE_SOURCE}" "${GATE_TARGET}" 0755
+install_atomic "${CLOSURE_SOURCE}" "${CLOSURE_TARGET}" 0755
 install_atomic "${CONTRACT_SOURCE}" "${CONTRACT_TARGET}" 0644
 install_atomic "${CONSUMER_SOURCE}" "${CONSUMER_TARGET}" 0755
 install_atomic "${REGISTRY_MODULE_SOURCE}" "${REGISTRY_MODULE_TARGET}" 0755
@@ -238,6 +254,7 @@ mkdir -p "$(dirname "${SERVICE_UNIT_TARGET}")"
 install_atomic "${SERVICE_UNIT_SOURCE}" "${SERVICE_UNIT_TARGET}" 0644
 python3 -m py_compile \
   "${GATE_TARGET}" \
+  "${CLOSURE_TARGET}" \
   "${CONTRACT_TARGET}" \
   "${CONSUMER_TARGET}" \
   "${REGISTRY_MODULE_TARGET}" \
@@ -267,6 +284,10 @@ UNIT_SOURCE_SHA="$(sha256sum "${SERVICE_UNIT_SOURCE}" | awk '{print $1}')"
 UNIT_TARGET_SHA="$(sha256sum "${SERVICE_UNIT_TARGET}" | awk '{print $1}')"
 POLICY_SOURCE_SHA="$(sha256sum "${POLICY_SOURCE}" | awk '{print $1}')"
 POLICY_TARGET_SHA="$(sha256sum "${POLICY_TARGET}" | awk '{print $1}')"
+GATE_SOURCE_SHA="$(sha256sum "${GATE_SOURCE}" | awk '{print $1}')"
+GATE_TARGET_SHA="$(sha256sum "${GATE_TARGET}" | awk '{print $1}')"
+CLOSURE_SOURCE_SHA="$(sha256sum "${CLOSURE_SOURCE}" | awk '{print $1}')"
+CLOSURE_TARGET_SHA="$(sha256sum "${CLOSURE_TARGET}" | awk '{print $1}')"
 export \
   SOURCE_REVISION \
   WORKFLOW_SOURCE_SHA \
@@ -275,6 +296,10 @@ export \
   UNIT_TARGET_SHA \
   POLICY_SOURCE_SHA \
   POLICY_TARGET_SHA \
+  GATE_SOURCE_SHA \
+  GATE_TARGET_SHA \
+  CLOSURE_SOURCE_SHA \
+  CLOSURE_TARGET_SHA \
   GEM_ROOT
 python3 - <<'PY'
 import json
@@ -309,8 +334,21 @@ receipt = {
         "installedSha256": os.environ["POLICY_TARGET_SHA"],
         "matches": os.environ["POLICY_SOURCE_SHA"] == os.environ["POLICY_TARGET_SHA"],
     },
+    "gate": {
+        "sourceSha256": os.environ["GATE_SOURCE_SHA"],
+        "installedSha256": os.environ["GATE_TARGET_SHA"],
+        "matches": os.environ["GATE_SOURCE_SHA"] == os.environ["GATE_TARGET_SHA"],
+    },
+    "closureHealth": {
+        "sourceSha256": os.environ["CLOSURE_SOURCE_SHA"],
+        "installedSha256": os.environ["CLOSURE_TARGET_SHA"],
+        "matches": os.environ["CLOSURE_SOURCE_SHA"] == os.environ["CLOSURE_TARGET_SHA"],
+    },
 }
-if not all(receipt[artifact]["matches"] for artifact in ("workflow", "unit", "policy")):
+if not all(
+    receipt[artifact]["matches"]
+    for artifact in ("workflow", "unit", "policy", "gate", "closureHealth")
+):
     raise SystemExit("refusing stale Gem service attestation")
 temporary.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
 temporary.replace(destination)
@@ -325,6 +363,7 @@ trap - EXIT
 printf 'installed fleet controller backup=%s\n' "${BACKUP_DIR}"
 sha256sum \
   "${GATE_TARGET}" \
+  "${CLOSURE_TARGET}" \
   "${CONTRACT_TARGET}" \
   "${CONSUMER_TARGET}" \
   "${REGISTRY_MODULE_TARGET}" \
