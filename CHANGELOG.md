@@ -7,8 +7,6 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
-- [internal] **Summer now stops new implementation when PR closure health is not healthy:** every open PR receives a deterministic close/repair/promote/queued/held disposition, duplicate issue lanes and expired holds fail visible, and bounded controller/empty-queue/unclassified/no-merge episodes pause ordinary and Grok fallback intake. Gem's sole native-queue writer, promotion, tests, review, and exact-head remediation continue so the stop-line can recover itself.
-
 - **Empty iPhone chat home is a centered greeting with the composer docked at the bottom:** signed-in empty chat shows Let's get it / Ready to start? / Ready when you are, with no mark, no placeholder, and no extra tab bar.
 
 - **Primary buttons use a lighter label:** CTA text is medium (510) instead of semibold, with the same size, fill, and 32px chrome.
