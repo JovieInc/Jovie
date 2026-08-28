@@ -56,6 +56,30 @@ export async function PATCH(
       );
     }
 
+    if (parsed.data.isActive === true) {
+      const [download] = await db
+        .select({
+          rightsControlAttested: promoDownloads.rightsControlAttested,
+        })
+        .from(promoDownloads)
+        .where(
+          and(
+            eq(promoDownloads.id, id),
+            eq(promoDownloads.creatorProfileId, profile.id)
+          )
+        )
+        .limit(1);
+      if (!download?.rightsControlAttested) {
+        return NextResponse.json(
+          {
+            error:
+              'Confirm full recording control before making this download active.',
+          },
+          { status: 409, headers: NO_STORE_HEADERS }
+        );
+      }
+    }
+
     const [updated] = await db
       .update(promoDownloads)
       .set({ ...parsed.data, updatedAt: new Date() })

@@ -41,6 +41,7 @@ export default function PromoDownloadsPage() {
   const [listError, setListError] = useState<string | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [rightsControlAttested, setRightsControlAttested] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load existing files on mount
@@ -75,6 +76,12 @@ export default function PromoDownloadsPage() {
 
   const uploadFile = useCallback(
     async (file: File) => {
+      if (!rightsControlAttested) {
+        setUploadError(
+          'Confirm that you control the recording and may give this file away.'
+        );
+        return;
+      }
       const uploadMime = resolveAudioUploadMime({
         name: file.name,
         type: file.type,
@@ -120,6 +127,7 @@ export default function PromoDownloadsPage() {
             fileName: file.name,
             fileMimeType: uploadMime,
             fileSizeBytes: file.size,
+            rightsControlAttested,
           }),
         });
 
@@ -143,7 +151,7 @@ export default function PromoDownloadsPage() {
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
     },
-    [releaseId, userId]
+    [releaseId, rightsControlAttested, userId]
   );
 
   const handleFileSelect = useCallback(
@@ -223,10 +231,10 @@ export default function PromoDownloadsPage() {
           <div className='p-3 sm:p-4'>
             <button
               type='button'
-              aria-disabled={uploading || undefined}
+              aria-disabled={uploading || !rightsControlAttested || undefined}
               aria-label='Drop Or Choose A Promo Download Audio File'
               onClick={() => {
-                if (!uploading) {
+                if (!uploading && rightsControlAttested) {
                   fileInputRef.current?.click();
                 }
               }}
@@ -280,6 +288,18 @@ export default function PromoDownloadsPage() {
             className='sr-only'
             aria-label='Upload Promo Download Audio File'
           />
+          <label className='mx-3 mb-3 flex items-start gap-2 rounded-md border border-subtle bg-surface-0 p-3 text-xs text-secondary-token sm:mx-4'>
+            <input
+              type='checkbox'
+              checked={rightsControlAttested}
+              onChange={event => setRightsControlAttested(event.target.checked)}
+              className='mt-0.5 h-4 w-4 rounded border-subtle'
+            />
+            <span>
+              I attest that I control 100% of this recording and have the right
+              to give this file away. An email address is not a rights grant.
+            </span>
+          </label>
           <output
             className='block min-h-9 border-t border-transparent px-3 py-2.5 text-xs sm:px-4'
             aria-live='polite'
