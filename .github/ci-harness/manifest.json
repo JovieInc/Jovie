@@ -140,12 +140,21 @@
     },
     {
       "id": "ci-macos",
-      "name": "macOS MenuMonitor Build + Test (combined)",
+      "name": "Mac Build + Test (combined)",
       "tier": "combined-integration",
       "mergeGate": true,
       "gateStage": "merge-group",
-      "nextLocalCommand": "swift test --package-path apps/macos/MenuMonitor --enable-code-coverage && swift build --package-path apps/macos/MenuMonitor -c release",
-      "remediation": "Repair the path-selected MenuMonitor Swift test, coverage, or release-build regression on the exact combined head; source PRs keep the hosted native build off their fast gate."
+      "nextLocalCommand": "pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test && pnpm --filter @jovie/desktop run package:staging",
+      "remediation": "Repair the path-selected Electron or MenuMonitor test/package regression on the exact combined head; unrelated Web and iOS lanes remain skipped."
+    },
+    {
+      "id": "ci-cross-product-integration",
+      "name": "Cross-Product Integration (combined)",
+      "tier": "combined-integration",
+      "mergeGate": true,
+      "gateStage": "merge-group",
+      "nextLocalCommand": "pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test",
+      "remediation": "A shared contract must name affected products, pass each selected product lane, and pass the model-free shared-contract suites."
     },
     {
       "id": "ci-promptfoo-evals",

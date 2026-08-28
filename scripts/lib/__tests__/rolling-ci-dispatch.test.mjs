@@ -506,4 +506,119 @@ describe('rolling CI dispatch CLI and workflow', () => {
       /github\.event\.workflow_run\.event == 'pull_request' &&\s*\n\s*github\.event\.workflow_run\.path == '\.github\/workflows\/ci\.yml'/
     );
   });
+
+  it('binds every jq payload value into the exact planner input', () => {
+    const payloadFilter = WORKFLOW.match(
+      /^\s+'(\{repository:[^']+\})' \\$/m
+    )?.[1];
+    expect(payloadFilter).toBeDefined();
+
+    const failedJobs = [
+      { name: 'ci-fast', conclusion: 'failure', steps: ['Typecheck'] },
+    ];
+    const checks = [
+      {
+        name: 'ci-fast',
+        conclusion: 'failure',
+        headSha: head,
+        checkSuiteId: 44,
+      },
+    ];
+    const values = {
+      repository: 'JovieInc/Jovie',
+      prNumber: 17,
+      headSha: head,
+      liveHead: head,
+      sourceHead: head,
+      headRef: 'codex/jov-5377-rolling-ci-payload',
+      workflowRunId: '9001',
+      workflowRunAttempt: 1,
+      failedJobs,
+      writer: 'tim',
+      priorCommentBody: '',
+      handoffCommentBody: '',
+      conclusion: 'failure',
+      checkSuiteId: 44,
+      checks,
+      cursorApiKey: '',
+      source: {
+        eventName: 'workflow_run',
+        workflow: 'CI',
+        workflowPath: TRUSTED_CI_WORKFLOW_PATH,
+        producerEvent: 'pull_request',
+        trustedPolicyRef: 'main',
+      },
+    };
+    const jqArgs = [
+      '-n',
+      '--arg',
+      'repository',
+      values.repository,
+      '--argjson',
+      'prNumber',
+      String(values.prNumber),
+      '--arg',
+      'headSha',
+      values.headSha,
+      '--arg',
+      'liveHead',
+      values.liveHead,
+      '--arg',
+      'sourceHead',
+      values.sourceHead,
+      '--arg',
+      'headRef',
+      values.headRef,
+      '--arg',
+      'workflowRunId',
+      values.workflowRunId,
+      '--argjson',
+      'workflowRunAttempt',
+      String(values.workflowRunAttempt),
+      '--argjson',
+      'failedJobs',
+      JSON.stringify(values.failedJobs),
+      '--arg',
+      'writer',
+      values.writer,
+      '--arg',
+      'priorCommentBody',
+      values.priorCommentBody,
+      '--arg',
+      'handoffCommentBody',
+      values.handoffCommentBody,
+      '--arg',
+      'conclusion',
+      values.conclusion,
+      '--argjson',
+      'checkSuiteId',
+      String(values.checkSuiteId),
+      '--argjson',
+      'checks',
+      JSON.stringify(values.checks),
+      '--arg',
+      'eventName',
+      values.source.eventName,
+      '--arg',
+      'workflow',
+      values.source.workflow,
+      '--arg',
+      'workflowPath',
+      values.source.workflowPath,
+      '--arg',
+      'producerEvent',
+      values.source.producerEvent,
+      '--arg',
+      'trustedPolicyRef',
+      values.source.trustedPolicyRef,
+      '--arg',
+      'cursorApiKey',
+      values.cursorApiKey,
+      payloadFilter,
+    ];
+    const result = spawnSync('jq', jqArgs, { encoding: 'utf8' });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual(values);
+  });
 });

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
 import {
+  buildLibraryDocumentAssets,
   buildLibraryMerchAssets,
   buildLibraryReleaseAssets,
+  buildLibraryYouTubeAssets,
   formatLibraryDuration,
   formatLibraryReleaseDate,
   formatLibraryReleaseDateTitle,
@@ -16,6 +18,7 @@ import {
   stackLibraryReleaseVersions,
 } from '@/app/app/(shell)/library/library-data';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import { resolveLibraryLifecycleStage } from '@/lib/library/lifecycle-stage';
 import type { LibraryMerchCard } from '@/lib/merch/types';
 
 function buildRelease(
@@ -422,5 +425,57 @@ describe('library version stacking (JOV-3089)', () => {
     ]);
 
     expect(stackLibraryReleaseVersions(assets)).toHaveLength(2);
+  });
+
+  it('projects creator documents and YouTube videos as library items without duplicating media', () => {
+    const [document] = buildLibraryDocumentAssets(
+      [
+        {
+          id: 'doc-1',
+          title: 'Chorus hook',
+          kind: 'idea',
+          stage: 'private_draft',
+          currentRevision: 1,
+          content: { type: 'doc', content: [] },
+          plainText: 'hook',
+          updatedAt: '2026-08-28T00:00:00.000Z',
+        },
+      ],
+      'Tim White'
+    );
+    const [video] = buildLibraryYouTubeAssets(
+      [
+        {
+          id: 'yt-pk',
+          videoId: 'yt-1',
+          title: 'Neon Skyline',
+          url: 'https://youtube.com/watch?v=yt-1',
+          publishedAt: '2026-01-01T00:00:00.000Z',
+          durationSeconds: 200,
+          contentType: 'music_video',
+          classificationConfidence: 0.9,
+          thumbnailUrl: 'https://i.ytimg.com/vi/yt-1/hq.jpg',
+          privacyStatus: 'public',
+          releaseLink: { isrc: 'USABC2600001', releaseId: 'rel-1' },
+        },
+      ],
+      'Tim White'
+    );
+
+    expect(document?.itemKind).toBe('document');
+    expect(document?.catalogType).toBe('document');
+    expect(libraryAssetMatchesView(document!, 'documents')).toBe(true);
+    expect(libraryAssetMatchesView(document!, 'releases')).toBe(false);
+    expect(video?.itemKind).toBe('video');
+    expect(video?.catalogType).toBe('media');
+    expect(video?.linkedReleaseId).toBe('rel-1');
+    expect(libraryAssetMatchesView(video!, 'media')).toBe(true);
+    expect(libraryAssetMatchesView(video!, 'videos')).toBe(true);
+    expect(resolveLibraryLifecycleStage(document!)).toBe('idea');
+    expect(resolveLibraryLifecycleStage(video!)).toBe('out');
+    expect(resolveLibraryLifecycleStage({ status: 'draft' })).toBe('idea');
+    expect(
+      resolveLibraryLifecycleStage({ approvalStatus: 'needs_review' })
+    ).toBe('in_progress');
   });
 });

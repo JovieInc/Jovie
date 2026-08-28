@@ -7,7 +7,6 @@ import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 export const HOMEPAGE_FRONT_DOOR_CTA = getHomepageFrontDoorCtaContract(
   FEATURE_FLAGS.WAITLIST_ENABLED
 );
-export const HOMEPAGE_WAITLIST_URL = 'https://jov.ie/waitlist';
 export const FRONT_DOOR_CTA_LABEL = HOMEPAGE_FRONT_DOOR_CTA.primary.label;
 const FALLBACK_CTA_SUPPORT = HOMEPAGE_FRONT_DOOR_CTA.fallbackSupport;
 
@@ -28,11 +27,12 @@ export const HOMEPAGE_LAUNCH_COPY = {
       'Jovie is the AI artist workspace that surfaces opportunities in your catalog — presaves, captures, pitches — and helps you ship the next one.',
   },
   hero: {
-    headline: 'Drop more music.\nCrush every release.',
-    subhead: 'One system to make every release count, every time.',
+    headline: 'Jovie helps you move your music forward.',
+    subhead:
+      'It uses your catalog, audience, and artist presence to surface the one action most likely to pay off.',
     primaryCta: {
+      ...HOMEPAGE_FRONT_DOOR_CTA.primary,
       label: 'Get started',
-      href: HOMEPAGE_WAITLIST_URL,
     },
     secondaryCta: {
       // Quiet proof path — not a peer conversion objective to Get started.

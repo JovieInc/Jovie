@@ -6,36 +6,24 @@
  * run until recovered here or via the approve retry path.
  */
 
-import {
-  and,
-  sql as drizzleSql,
-  eq,
-  isNull,
-  ne,
-  notExists,
-  or,
-} from 'drizzle-orm';
-import {
-  BRAND_DEAL_OPPORTUNITY_KIND,
-  parseBrandDealOpportunity,
-} from '@/lib/connectors/brand-deal-opportunity';
+import { and, sql as drizzleSql, eq, notExists } from 'drizzle-orm';
 import { isMissingConnectorWorkflowTablesError } from '@/lib/connectors/schema-errors';
+import {
+  type ApprovedCalendarPayload,
+  resolveSuggestedActionDispatch,
+} from '@/lib/connectors/suggested-action-dispatch';
+import { CALENDAR_CREATE_EVENT_KIND } from '@/lib/connectors/suggested-action-kinds';
 import { db } from '@/lib/db';
 import { suggestedActions, workflowRuns } from '@/lib/db/schema/connectors';
 import { logger } from '@/lib/utils/logger';
-
-type BookingPayload = {
-  title?: string;
-  startsAt?: string;
-  endsAt?: string;
-  timeZone?: string;
-};
 
 export type OrphanedApprovalRecoveryResult =
   | 'enqueued'
   | 'already-queued'
   | 'decision-only'
   | 'invalid-decision-only'
+  | 'invalid-action'
+  | 'non-executable'
   | 'not-accepted'
   | 'not-found';
 
@@ -58,7 +46,7 @@ function workflowRunMissingForSuggestedAction() {
 export async function enqueueApprovedActionWorkflow(input: {
   userId: string;
   approvalId: string;
-  eventPayload: BookingPayload | null;
+  eventPayload: ApprovedCalendarPayload;
 }): Promise<'enqueued' | 'already-queued'> {
   const inserted = await db
     .insert(workflowRuns)
@@ -105,13 +93,20 @@ export async function recoverOrphanedApprovedAction(input: {
       return 'not-accepted';
     }
 
+    const dispatch = resolveSuggestedActionDispatch(action);
+    if (dispatch.mode === 'invalid') {
+      return dispatch.error === 'brand-deal-evidence-unverified'
+        ? 'invalid-decision-only'
+        : 'invalid-action';
+    }
+    if (dispatch.mode === 'decision-only') {
+      return 'decision-only';
+    }
     if (
-      action.kind === BRAND_DEAL_OPPORTUNITY_KIND ||
-      action.signalType === 'brand_deal'
+      dispatch.mode === 'workflow-capture' ||
+      dispatch.mode === 'next-step-only'
     ) {
-      return parseBrandDealOpportunity(action.kind, action.payload)
-        ? 'decision-only'
-        : 'invalid-decision-only';
+      return 'non-executable';
     }
 
     const [existingRun] = await db
@@ -132,7 +127,7 @@ export async function recoverOrphanedApprovedAction(input: {
     const enqueueResult = await enqueueApprovedActionWorkflow({
       userId: action.userId,
       approvalId: action.id,
-      eventPayload: action.payload as BookingPayload | null,
+      eventPayload: dispatch.eventPayload,
     });
 
     if (enqueueResult === 'already-queued') {
@@ -173,11 +168,7 @@ export async function reconcileOrphanedAcceptedActions(
       .where(
         and(
           eq(suggestedActions.status, 'approved'),
-          ne(suggestedActions.kind, BRAND_DEAL_OPPORTUNITY_KIND),
-          or(
-            isNull(suggestedActions.signalType),
-            ne(suggestedActions.signalType, 'brand_deal')
-          ),
+          eq(suggestedActions.kind, CALENDAR_CREATE_EVENT_KIND),
           workflowRunMissingForSuggestedAction()
         )
       )
@@ -185,17 +176,15 @@ export async function reconcileOrphanedAcceptedActions(
 
     let enqueued = 0;
     for (const action of orphaned) {
+      const dispatch = resolveSuggestedActionDispatch(action);
       // Defense in depth if a caller or mock bypasses the SQL predicate.
-      if (
-        action.kind === BRAND_DEAL_OPPORTUNITY_KIND ||
-        action.signalType === 'brand_deal'
-      ) {
+      if (dispatch.mode !== 'calendar-workflow') {
         continue;
       }
       const enqueueResult = await enqueueApprovedActionWorkflow({
         userId: action.userId,
         approvalId: action.id,
-        eventPayload: action.payload as BookingPayload | null,
+        eventPayload: dispatch.eventPayload,
       });
       if (enqueueResult === 'enqueued') {
         enqueued++;

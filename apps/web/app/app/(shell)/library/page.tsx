@@ -18,6 +18,10 @@ import {
   loadArchivedReleaseMatrixForProfile,
   loadReleaseMatrixForProfile,
 } from '@/lib/releases/release-matrix-loader';
+import {
+  listVideosForProfile,
+  type PublicVideoListItem,
+} from '@/lib/youtube-library';
 import { loadAppShellRouteContext } from '../app-shell-route-context';
 import { LibraryPageClient } from './LibraryPageClient';
 
@@ -30,8 +34,7 @@ export default async function LibraryPage({
     readonly section?: string | string[] | undefined;
   }>;
 }) {
-  const section = (await searchParams).section;
-  const showCreatorDocuments = section === 'documents';
+  await searchParams;
   const routeContext = await loadAppShellRouteContext({
     route: APP_ROUTES.LIBRARY,
     authFailure: 'notFound',
@@ -59,8 +62,9 @@ export default async function LibraryPage({
   let creatorDocuments: CreatorDocumentListItem[] = [];
   let creatorDocumentsNextCursor: string | null = null;
   let creatorDocumentsLoadFailed = false;
+  let youtubeVideos: PublicVideoListItem[] = [];
   if (profileId && selectedProfile) {
-    if (showCreatorDocuments) {
+    {
       try {
         await requireCreatorDocumentAccess({
           userId: routeContext.userId,
@@ -77,7 +81,8 @@ export default async function LibraryPage({
         );
         creatorDocumentsLoadFailed = true;
       }
-    } else {
+    }
+    {
       const queryClient = getQueryClient();
       try {
         const assetSharesPromise = loadArtistHandleForProfile(profileId).then(
@@ -102,6 +107,7 @@ export default async function LibraryPage({
           archivedMerch,
           profileStates,
           assetShares,
+          videos,
         ] = await Promise.all([
           queryClient.fetchQuery({
             queryKey: queryKeys.releases.matrix(profileId),
@@ -112,6 +118,7 @@ export default async function LibraryPage({
           getLibraryMerchCardsForProfile(profileId, { lifecycle: 'archived' }),
           getLibraryProfileStateMapForProfile(profileId),
           assetSharesPromise,
+          listVideosForProfile({ creatorProfileId: profileId }),
         ]);
         merchCards = merch;
         archivedMerchCards = archivedMerch;
@@ -129,6 +136,7 @@ export default async function LibraryPage({
           ])
         );
         assetShareByAssetId = Object.fromEntries(assetShares);
+        youtubeVideos = videos;
       } catch (error) {
         void captureError(
           'Release matrix prefetch failed on library page',
@@ -154,6 +162,7 @@ export default async function LibraryPage({
         creatorDocuments={creatorDocuments}
         creatorDocumentsNextCursor={creatorDocumentsNextCursor}
         creatorDocumentsLoadFailed={creatorDocumentsLoadFailed}
+        youtubeVideos={youtubeVideos}
       />
     </HydrateClient>
   );

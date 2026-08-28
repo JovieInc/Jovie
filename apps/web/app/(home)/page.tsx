@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import dynamic from 'next/dynamic';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import {
   type HomepageArtistProfilePreviews,
@@ -12,9 +13,7 @@ import { HERO_COPY } from '@/components/homepage/intent';
 import {
   FaqSection,
   MarketingElectricSeam,
-  MarketingPlatformSpecBento,
   MarketingPosterHero,
-  MarketingShippedSitesShowcase,
 } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
@@ -28,6 +27,22 @@ import { publicEnv } from '@/lib/env-public';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 
+// Below-the-fold sections are dynamic-loaded so their `motion/react`
+// hydration cost doesn't compete with above-the-fold work.
+//
+// JOV-1835: cuts homepage TBT from ~1365ms toward the 300ms budget.
+//
+// Sections that are not motion-heavy keep `ssr: true` so their HTML stays in
+// the initial document for SEO. The motion-driven workspace lives behind a
+// client `*Lazy.tsx` shim with reserved placeholder geometry, so its chunk and
+// scroll subscriptions do not compete with hero hydration or shift the page.
+const HomepageV2FinalCta = dynamic(
+  () =>
+    import('@/components/marketing/homepage-v2/HomepageV2Ctas').then(m => ({
+      default: m.HomepageV2FinalCta,
+    })),
+  { ssr: true }
+);
 const HERO_PRODUCT_IMAGES = {
   // Use the canonical populated workspace state so the first product proof
   // shows a real decision surface (including the detail rail), not an empty
@@ -243,8 +258,6 @@ function HomepageUnlockedSections() {
     <>
       <HomepageMeetJovie />
       <HomepageArtistProfiles previews={ARTIST_PROFILE_PREVIEWS} />
-      <MarketingShippedSitesShowcase testId='homepage-shipped-sites-showcase' />
-      <MarketingPlatformSpecBento testId='homepage-platform-spec-bento' />
       <HomepageClosedLoop />
       <HomepageFaq />
     </>
@@ -259,6 +272,7 @@ function HomepageStoryStack() {
       data-testid='homepage-story-stack'
     >
       <HomepageUnlockedSections />
+      <HomepageV2FinalCta />
     </div>
   );
 }

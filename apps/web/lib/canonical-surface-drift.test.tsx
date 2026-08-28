@@ -71,7 +71,7 @@ describe('canonical web surface drift guard', () => {
     );
 
     expect(homepage).toContain('MarketingPosterHero');
-    expect(homepage).not.toContain('HomepageV2FinalCta');
+    expect(homepage).toContain('HomepageV2FinalCta');
     expect(homepage).not.toContain('HomePageNarrative');
     expect(releases).toContain('LibraryLoadingState');
     expect(releases).toContain('PageErrorState');

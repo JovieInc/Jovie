@@ -8,18 +8,15 @@ const webRoot = path.resolve(__dirname, '../../..');
 describe('homepage hero next-move contract (JOV-4475)', () => {
   it('uses the exact approved headline and supporting line', () => {
     expect(HOMEPAGE_LAUNCH_COPY.hero.headline).toBe(
-      'Drop more music.\nCrush every release.'
+      'Jovie helps you move your music forward.'
     );
     expect(HOMEPAGE_LAUNCH_COPY.hero.subhead).toBe(
-      'One system to make every release count, every time.'
+      'It uses your catalog, audience, and artist presence to surface the one action most likely to pay off.'
     );
   });
 
   it('keeps Get started as the sole primary conversion path', () => {
     expect(HOMEPAGE_LAUNCH_COPY.hero.primaryCta.label).toBe('Get started');
-    expect(HOMEPAGE_LAUNCH_COPY.hero.primaryCta.href).toBe(
-      'https://jov.ie/waitlist'
-    );
     expect(HOMEPAGE_LAUNCH_COPY.hero.secondaryCta.label).toBe(
       'See a live profile'
     );
@@ -105,17 +102,12 @@ describe('homepage hero next-move contract (JOV-4475)', () => {
     expect(profilesSource).not.toContain('homepage-artist-outcome__copy');
   });
 
-  it('keeps one Get started on the root homepage and removes the footer duplicate', () => {
-    const pageSource = readFileSync(
-      path.join(webRoot, 'app/(home)/page.tsx'),
-      'utf8'
-    );
+  it('keeps homepage nav as Log in text only, with no second Get started', () => {
     const headerSource = readFileSync(
       path.join(webRoot, 'components/site/MarketingHeader.tsx'),
       'utf8'
     );
 
-    expect(pageSource).not.toContain('HomepageV2FinalCta');
     expect(headerSource).toContain('minimalAuth={isMinimal || isHomepage}');
     expect(headerSource).toContain("isHomepage ? 'Log in' : 'Sign in'");
 

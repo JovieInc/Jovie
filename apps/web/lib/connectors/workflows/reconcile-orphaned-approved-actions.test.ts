@@ -26,6 +26,10 @@ import {
 
 const USER_ID = 'user-uuid-0000-0000-0000-000000000001';
 const ACTION_ID = 'action-uuid-0000-0000-0000-000000000001';
+const CALENDAR_PAYLOAD = {
+  title: 'Show',
+  startsAt: '2026-08-28T18:00:00.000Z',
+};
 const VERIFIED_BRAND_DEAL_PAYLOAD = {
   title: 'Example Brand creator-performance pilot',
   buyerName: 'Alex Buyer',
@@ -130,7 +134,8 @@ describe('recoverOrphanedApprovedAction', () => {
                 id: ACTION_ID,
                 status: 'approved',
                 userId: USER_ID,
-                payload: { title: 'Show' },
+                payload: CALENDAR_PAYLOAD,
+                kind: 'calendar.create_event',
               },
             ]
           : [{ id: 'existing-run' }];
@@ -208,7 +213,8 @@ describe('recoverOrphanedApprovedAction', () => {
                 id: ACTION_ID,
                 status: 'approved',
                 userId: USER_ID,
-                payload: { title: 'Show' },
+                payload: CALENDAR_PAYLOAD,
+                kind: 'calendar.create_event',
               },
             ]
           : [];
@@ -233,7 +239,10 @@ describe('recoverOrphanedApprovedAction', () => {
         userId: USER_ID,
         stepOutputs: {
           approvalId: ACTION_ID,
-          eventPayload: { title: 'Show' },
+          eventPayload: {
+            ...CALENDAR_PAYLOAD,
+            timeZone: 'UTC',
+          },
         },
       })
     );
@@ -251,7 +260,8 @@ describe('recoverOrphanedApprovedAction', () => {
                 id: ACTION_ID,
                 status: 'approved',
                 userId: USER_ID,
-                payload: { title: 'Show' },
+                payload: CALENDAR_PAYLOAD,
+                kind: 'calendar.create_event',
               },
             ]
           : [];
@@ -316,7 +326,7 @@ describe('reconcileOrphanedAcceptedActions', () => {
       {
         id: ACTION_ID,
         userId: USER_ID,
-        payload: { title: 'Show' },
+        payload: CALENDAR_PAYLOAD,
         kind: 'calendar.create_event',
       },
     ]);
