@@ -49,6 +49,7 @@ describe('route-policy (proxy-routing)', () => {
       expect(getPublicProfileCandidate('/_next/static')).toBeNull(); // multi but first seg
       expect(getPublicProfileCandidate('/__clerk')).toBeNull();
       expect(getPublicProfileCandidate('/api/foo')).toBeNull();
+      expect(getPublicProfileCandidate('/openapi.json')).toBeNull();
     });
 
     it('reserves every single-segment APP_ROUTES value from public-profile lookup', () => {

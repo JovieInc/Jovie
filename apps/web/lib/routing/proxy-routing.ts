@@ -59,6 +59,7 @@ const SYSTEM_RESERVED_SEGMENTS = new Set([
   '_next',
   'favicon.ico',
   'og',
+  'openapi.json',
   'go',
   'out',
   '__clerk',
