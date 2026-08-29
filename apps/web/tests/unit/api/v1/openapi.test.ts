@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GET as getCanonical } from '@/app/api/v1/openapi.json/route';
 import { GET as getDiscovery } from '@/app/openapi.json/route';
+import { PUBLIC_ARTIST_API_POLICY_LINK } from '@/lib/api/v1/contract';
 import {
   ARTIST_OPENAPI_CACHE_CONTROL,
   ARTIST_OPENAPI_DOCUMENT,
@@ -13,6 +14,7 @@ async function readOpenApiResponse(response: Response) {
     contentType: response.headers.get('content-type') ?? '',
     cacheControl: response.headers.get('Cache-Control'),
     corsOrigin: response.headers.get('Access-Control-Allow-Origin'),
+    link: response.headers.get('Link'),
     status: response.status,
   };
 }
@@ -56,6 +58,9 @@ describe('public artist OpenAPI contract', () => {
     expect(ARTIST_OPENAPI_DOCUMENT.externalDocs.url).toBe(
       'https://docs.jov.ie/docs/api-reference'
     );
+    expect(ARTIST_OPENAPI_DOCUMENT.externalDocs.description).toContain(
+      'lifecycle policy'
+    );
     expect(ARTIST_OPENAPI_DOCUMENT.paths).toHaveProperty('/api/v1');
     expect(ARTIST_OPENAPI_DOCUMENT.paths).toHaveProperty('/api/v1/{username}');
     expect(ARTIST_OPENAPI_DOCUMENT.paths).not.toHaveProperty('/{username}');
@@ -78,12 +83,39 @@ describe('public artist OpenAPI contract', () => {
       ARTIST_OPENAPI_DOCUMENT.components.schemas.ArtistApiIndex.properties
         ?.endpoints?.properties?.artistTemplate?.format
     ).toBe('uri-template');
+    expect(
+      ARTIST_OPENAPI_DOCUMENT.components.schemas.ArtistApiIndex.properties
+        ?.rateLimit?.properties?.appliesTo
+    ).toEqual({ type: 'string', enum: ['artist-profile'] });
+    expect(
+      ARTIST_OPENAPI_DOCUMENT.components.schemas.ArtistApiIndex.properties
+        ?._links?.properties?.policy?.format
+    ).toBe('uri');
     expect(profileOperation.description).not.toContain('timwhite');
-    expect(Object.keys(profileOperation.responses)).toEqual(['200', '404']);
+    expect(Object.keys(profileOperation.responses)).toEqual([
+      '200',
+      '404',
+      '429',
+      '503',
+    ]);
+    expect(profileOperation.responses['200'].headers).toEqual(
+      expect.objectContaining({
+        Link: expect.any(Object),
+        'RateLimit-Policy': expect.any(Object),
+        RateLimit: expect.any(Object),
+        'X-RateLimit-Remaining': expect.any(Object),
+      })
+    );
+    expect(profileOperation.responses['429'].headers).toEqual(
+      expect.objectContaining({ 'Retry-After': expect.any(Object) })
+    );
+    expect(profileOperation.responses['503'].headers).toEqual(
+      expect.objectContaining({ 'Retry-After': expect.any(Object) })
+    );
 
     const indexSchema =
       ARTIST_OPENAPI_DOCUMENT.components.schemas.ArtistApiIndex;
-    expect(indexSchema.properties).not.toHaveProperty('rateLimit');
+    expect(indexSchema.properties).toHaveProperty('rateLimit');
   });
 });
 
@@ -92,12 +124,13 @@ describe('OpenAPI discovery routes', () => {
     ['/api/v1/openapi.json', getCanonical],
     ['/openapi.json', getDiscovery],
   ] as const)('%s returns 200 JSON with CORS and cache headers', async (_path, handler) => {
-    const { body, cacheControl, contentType, corsOrigin, status } =
+    const { body, cacheControl, contentType, corsOrigin, link, status } =
       await readOpenApiResponse(handler());
 
     expect(status).toBe(200);
     expect(contentType).toContain('application/json');
     expect(corsOrigin).toBe('*');
+    expect(link).toBe(PUBLIC_ARTIST_API_POLICY_LINK);
     expect(cacheControl).toBe(ARTIST_OPENAPI_CACHE_CONTROL);
     expect(body).toEqual(ARTIST_OPENAPI_DOCUMENT);
   });
@@ -113,5 +146,6 @@ describe('OpenAPI discovery routes', () => {
     expect(discovery.contentType).toBe(canonical.contentType);
     expect(discovery.cacheControl).toBe(canonical.cacheControl);
     expect(discovery.corsOrigin).toBe(canonical.corsOrigin);
+    expect(discovery.link).toBe(canonical.link);
   });
 });

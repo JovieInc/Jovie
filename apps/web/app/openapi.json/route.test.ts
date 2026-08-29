@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { PUBLIC_ARTIST_API_POLICY_LINK } from '@/lib/api/v1/contract';
 
 vi.mock('@/constants/app', () => ({ BASE_URL: 'https://jov.ie' }));
 
@@ -15,6 +16,8 @@ describe('GET /openapi.json', () => {
     expect(canonical.status).toBe(200);
     expect(versioned.status).toBe(200);
     expect(canonical.headers.get('Content-Type')).toContain('application/json');
+    expect(canonical.headers.get('Link')).toBe(PUBLIC_ARTIST_API_POLICY_LINK);
+    expect(versioned.headers.get('Link')).toBe(PUBLIC_ARTIST_API_POLICY_LINK);
 
     const canonicalSpec = await canonical.json();
     const versionedSpec = await versioned.json();

@@ -96,8 +96,8 @@
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
 | `/api/artist/theme` | GET, PUT | `auth` | Get/update artist theme |
-| `/api/v1` | GET | `public` | Stable, non-enumerating capability index for the anonymous read-only artist API |
-| `/api/v1/[username]` | GET | `public` | Public read-only artist profile with releases, events, and merch |
+| `/api/v1` | GET | `public` | Stable, non-enumerating capability index for the anonymous read-only artist API; lifecycle Link only |
+| `/api/v1/[username]` | GET | `public` | Public read-only artist profile with releases, events, merch, durable 100/min/IP artist-profile limit, RateLimit headers, and typed 429/503 paths |
 | `/api/v1/openapi.json` | GET | `public` | Canonical OpenAPI 3.1 contract for the public artist API |
 | `/openapi.json` | GET | `public` | Conventional discovery surface; identical contract to `/api/v1/openapi.json` |
 
