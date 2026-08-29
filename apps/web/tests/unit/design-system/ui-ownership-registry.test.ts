@@ -157,11 +157,11 @@ describe('cross-surface UI ownership registry', () => {
     const contentRecipes = APP_SCREEN_RECIPE_REGISTRY.filter(recipe =>
       recipe.componentIds.includes('component.app-shell-content-panel')
     );
-    expect(contentRecipes.map(recipe => recipe.id)).toEqual([
-      'recipe.app-standard',
-      'recipe.app-settings',
-      'recipe.app-operator',
-    ]);
+    expect(contentRecipes.map(recipe => recipe.id)).toEqual(
+      APP_SCREEN_RECIPE_REGISTRY.filter(
+        recipe => recipe.id !== 'recipe.app-compatibility'
+      ).map(recipe => recipe.id)
+    );
     expect(
       APP_SCREEN_COMPONENT_REGISTRY.some(component =>
         component.source.endsWith('/PageShell.tsx')

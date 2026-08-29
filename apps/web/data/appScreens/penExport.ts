@@ -11,6 +11,13 @@
  */
 
 import {
+  APP_SCREEN_ARCHETYPE_REGISTRY,
+  type AppScreenArchetypeId,
+  type AppScreenArchetypeRegistryEntry,
+  type AppScreenArchetypeSlotId,
+  type AppScreenArchetypeStateId,
+} from './archetypes';
+import {
   APP_SCREEN_COMPONENT_REGISTRY,
   APP_SCREEN_RECIPE_REGISTRY,
   APP_SCREEN_REGISTRY,
@@ -22,11 +29,7 @@ import {
 } from './registry';
 import { validateAppScreenSystem } from './validation';
 
-/**
- * v2 adds per-component native Pen-root resolution. Consumers must treat an
- * unresolved component as non-referenceable rather than guessing an ID.
- */
-export const APP_SCREEN_PEN_EXPORT_SCHEMA = 'app-screen-pen-export/v2';
+export const APP_SCREEN_PEN_EXPORT_SCHEMA = 'app-screen-pen-export/v3';
 
 export interface AppScreenPenExportScreen {
   readonly id: string;
@@ -34,8 +37,11 @@ export interface AppScreenPenExportScreen {
   readonly source: string;
   readonly kind: AppScreenKind;
   readonly conceptId: string;
+  readonly archetypeId: AppScreenArchetypeId | null;
   readonly recipeId: AppScreenRecipeId;
   readonly componentIds: readonly AppScreenComponentId[];
+  readonly slotIds: readonly AppScreenArchetypeSlotId[];
+  readonly stateIds: readonly AppScreenArchetypeStateId[];
   readonly storyId: string | null;
   readonly sourceSha: string | null;
   readonly designReference: boolean;
@@ -49,7 +55,9 @@ export interface AppScreenPenExport {
     readonly designReferences: number;
     readonly components: number;
     readonly recipes: number;
+    readonly archetypes: number;
   };
+  readonly archetypes: readonly AppScreenArchetypeRegistryEntry[];
   readonly components: readonly AppScreenComponentRegistryEntry[];
   readonly recipes: readonly AppScreenRecipeRegistryEntry[];
   readonly screens: readonly AppScreenPenExportScreen[];
@@ -89,8 +97,11 @@ export function buildAppScreenPenExport(
       source: screen.source,
       kind: screen.kind,
       conceptId: screen.conceptId,
+      archetypeId: screen.archetypeId,
       recipeId: screen.recipeId,
       componentIds: recipeComponents.get(screen.recipeId) ?? [],
+      slotIds: screen.story?.slotIds ?? [],
+      stateIds: screen.story?.stateIds ?? [],
       storyId: screen.story?.id ?? null,
       sourceSha: input.hashSource?.(screen.source) ?? null,
       designReference: screen.designReference,
@@ -104,7 +115,9 @@ export function buildAppScreenPenExport(
       designReferences: screens.filter(screen => screen.designReference).length,
       components: APP_SCREEN_COMPONENT_REGISTRY.length,
       recipes: APP_SCREEN_RECIPE_REGISTRY.length,
+      archetypes: APP_SCREEN_ARCHETYPE_REGISTRY.length,
     },
+    archetypes: APP_SCREEN_ARCHETYPE_REGISTRY,
     components: APP_SCREEN_COMPONENT_REGISTRY,
     recipes: APP_SCREEN_RECIPE_REGISTRY,
     screens,

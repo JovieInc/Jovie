@@ -2,11 +2,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  APP_SCREEN_ARCHETYPE_ASSIGNMENTS,
+  APP_SCREEN_ARCHETYPE_IDS,
+  APP_SCREEN_ARCHETYPE_REGISTRY,
   APP_SCREEN_COMPONENT_REGISTRY,
   APP_SCREEN_PEN_EXPORT_SCHEMA,
   APP_SCREEN_RECIPE_REGISTRY,
   APP_SCREEN_REGISTRY,
+  type AppScreenArchetypeAssemblyInput,
   type AppScreenRegistryEntry,
+  buildAppScreenArchetypeAssembly,
   buildAppScreenPenExport,
   validateAppScreenSystem,
 } from '@/data/appScreens';
@@ -27,6 +32,97 @@ function listPageSources(directory: string): string[] {
 }
 
 describe('authenticated app screen registry', () => {
+  it('defines exactly eight selectable product archetypes with canonical recipes and evidence', () => {
+    expect(APP_SCREEN_ARCHETYPE_IDS.join(',')).toBe(
+      'dashboard,detail,editor,settings,feed-list,onboarding,profile,opportunity-decision'
+    );
+    expect(APP_SCREEN_ARCHETYPE_REGISTRY).toHaveLength(8);
+
+    for (const archetype of APP_SCREEN_ARCHETYPE_REGISTRY) {
+      const recipe = APP_SCREEN_RECIPE_REGISTRY.find(
+        entry => entry.id === archetype.recipeId
+      );
+      expect(archetype.componentIds, archetype.id).toEqual(
+        recipe?.componentIds
+      );
+      expect(archetype.requiredStateIds, archetype.id).toEqual(
+        expect.arrayContaining(['loading', 'populated', 'error'])
+      );
+
+      if (archetype.reference.kind === 'app-screen') {
+        const screen = APP_SCREEN_REGISTRY.find(
+          entry =>
+            entry.designReference &&
+            entry.conceptId === archetype.reference.conceptId
+        );
+        expect(screen?.archetypeId, archetype.id).toBe(archetype.id);
+      } else {
+        const storySource = path.join(
+          repoRoot,
+          archetype.reference.storySource
+        );
+        expect(fs.existsSync(storySource), archetype.id).toBe(true);
+        expect(fs.readFileSync(storySource, 'utf8'), archetype.id).toContain(
+          `title: '${archetype.reference.storybookTitle}'`
+        );
+      }
+    }
+  });
+
+  it('maps every design reference to exactly one explicit product archetype', () => {
+    const references = APP_SCREEN_REGISTRY.filter(
+      entry => entry.designReference
+    );
+    expect(APP_SCREEN_ARCHETYPE_ASSIGNMENTS).toHaveLength(references.length);
+    for (const screen of references) {
+      expect(screen.archetypeId, screen.route).not.toBeNull();
+      expect(
+        APP_SCREEN_ARCHETYPE_ASSIGNMENTS.find(
+          entry => entry.conceptId === screen.conceptId
+        )?.archetypeId,
+        screen.route
+      ).toBe(screen.archetypeId);
+    }
+  });
+
+  it('builds only exact archetype assemblies and rejects one-off drift', () => {
+    const archetype = APP_SCREEN_ARCHETYPE_REGISTRY.find(
+      entry => entry.id === 'feed-list'
+    )!;
+
+    const exact: AppScreenArchetypeAssemblyInput = {
+      archetypeId: archetype.id,
+      recipeId: archetype.recipeId,
+      componentIds: archetype.componentIds,
+      slotIds: archetype.requiredSlotIds,
+      stateIds: archetype.requiredStateIds,
+    };
+    expect(buildAppScreenArchetypeAssembly(exact)).toEqual(exact);
+
+    const invalid: readonly [AppScreenArchetypeAssemblyInput, RegExp][] = [
+      [{ ...exact, archetypeId: 'missing-archetype' }, /missing-archetype/],
+      [
+        { ...exact, recipeId: 'recipe.product.dashboard' },
+        /archetype-recipe-mismatch/,
+      ],
+      [
+        { ...exact, componentIds: exact.componentIds.slice(1) },
+        /archetype-component-mismatch/,
+      ],
+      [{ ...exact, slotIds: exact.slotIds.slice(1) }, /missing-archetype-slot/],
+      [
+        {
+          ...exact,
+          stateIds: exact.stateIds.filter(state => state !== 'error'),
+        },
+        /missing-archetype-state/,
+      ],
+    ];
+    for (const [input, message] of invalid) {
+      expect(() => buildAppScreenArchetypeAssembly(input)).toThrow(message);
+    }
+  });
+
   it('registers every authenticated shell page exactly once', () => {
     expect(APP_SCREEN_REGISTRY.map(entry => entry.source).sort()).toEqual(
       listPageSources(shellRoot)
@@ -163,6 +259,7 @@ describe('authenticated app screen registry', () => {
       designReferences: 45,
       components: APP_SCREEN_COMPONENT_REGISTRY.length,
       recipes: APP_SCREEN_RECIPE_REGISTRY.length,
+      archetypes: APP_SCREEN_ARCHETYPE_REGISTRY.length,
     });
     expect(receipt.screens).toHaveLength(APP_SCREEN_REGISTRY.length);
     expect(receipt.components).toEqual(
@@ -236,6 +333,13 @@ describe('authenticated app screen registry', () => {
         ],
       }).map(x => x.code)
     ).toContain('missing-recipe');
+    expect(
+      validateAppScreenSystem({
+        screens: APP_SCREEN_REGISTRY.map(entry =>
+          entry.id === canonical.id ? { ...entry, archetypeId: null } : entry
+        ),
+      }).map(x => x.code)
+    ).toContain('missing-archetype');
   });
 
   it('fails closed on unproven or duplicate authenticated component Pen roots', () => {
@@ -342,6 +446,51 @@ describe('authenticated app screen registry', () => {
         ),
       }).map(x => x.code)
     ).toContain('story-component-mismatch');
+
+    const otherArchetype = APP_SCREEN_ARCHETYPE_REGISTRY.find(
+      entry => entry.id !== story.archetypeId
+    );
+    expect(otherArchetype).toBeDefined();
+    if (!otherArchetype) return;
+    expect(
+      validateAppScreenSystem({
+        screens: APP_SCREEN_REGISTRY.map(entry =>
+          entry.id === canonical.id
+            ? {
+                ...entry,
+                story: {
+                  ...story,
+                  archetypeId: otherArchetype.id,
+                },
+              }
+            : entry
+        ),
+      }).map(x => x.code)
+    ).toContain('story-archetype-mismatch');
+    expect(
+      validateAppScreenSystem({
+        screens: APP_SCREEN_REGISTRY.map(entry =>
+          entry.id === canonical.id
+            ? {
+                ...entry,
+                story: { ...story, slotIds: story.slotIds.slice(1) },
+              }
+            : entry
+        ),
+      }).map(x => x.code)
+    ).toContain('story-slot-mismatch');
+    expect(
+      validateAppScreenSystem({
+        screens: APP_SCREEN_REGISTRY.map(entry =>
+          entry.id === canonical.id
+            ? {
+                ...entry,
+                story: { ...story, stateIds: story.stateIds.slice(1) },
+              }
+            : entry
+        ),
+      }).map(x => x.code)
+    ).toContain('story-state-mismatch');
 
     // Story contract on a non-reference screen.
     const alias = APP_SCREEN_REGISTRY.find(

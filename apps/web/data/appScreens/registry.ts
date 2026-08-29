@@ -6,6 +6,16 @@
  * recipes before they become new design references.
  */
 
+import {
+  APP_SCREEN_ARCHETYPE_ASSIGNMENTS,
+  APP_SCREEN_ARCHETYPE_REGISTRY,
+  type AppScreenArchetypeId,
+  type AppScreenArchetypeSlotId,
+  type AppScreenArchetypeStateId,
+  buildAppScreenArchetypeAssembly,
+  getAppScreenArchetype,
+} from './archetypes';
+
 export type AppScreenKind = 'canonical' | 'alias' | 'legacy' | 'operator';
 
 export type AppScreenComponentId =
@@ -21,7 +31,15 @@ export type AppScreenRecipeId =
   | 'recipe.app-standard'
   | 'recipe.app-settings'
   | 'recipe.app-operator'
-  | 'recipe.app-compatibility';
+  | 'recipe.app-compatibility'
+  | 'recipe.product.dashboard'
+  | 'recipe.product.detail'
+  | 'recipe.product.editor'
+  | 'recipe.product.settings'
+  | 'recipe.product.feed-list'
+  | 'recipe.product.onboarding'
+  | 'recipe.product.profile'
+  | 'recipe.product.opportunity-decision';
 
 export interface AppScreenComponentRegistryEntry {
   readonly id: AppScreenComponentId;
@@ -54,8 +72,11 @@ export interface AppScreenRecipeRegistryEntry {
  */
 export interface AppScreenStoryContract {
   readonly id: string;
+  readonly archetypeId: AppScreenArchetypeId;
   readonly recipeId: AppScreenRecipeId;
   readonly componentIds: readonly AppScreenComponentId[];
+  readonly slotIds: readonly AppScreenArchetypeSlotId[];
+  readonly stateIds: readonly AppScreenArchetypeStateId[];
 }
 
 export interface AppScreenRegistryEntry {
@@ -69,6 +90,8 @@ export interface AppScreenRegistryEntry {
    * canonical concept route instead of becoming a duplicate design body.
    */
   readonly conceptId: string;
+  /** Exact product assembly contract, present only for design references. */
+  readonly archetypeId: AppScreenArchetypeId | null;
   readonly recipeId: AppScreenRecipeId;
   readonly designReference: boolean;
   /** Redirect receipt: literal destination for redirect-only sources. */
@@ -199,6 +222,12 @@ export const APP_SCREEN_RECIPE_REGISTRY = [
     errorBoundarySource: ROOT_ERROR_BOUNDARY,
     allowedKinds: ['alias', 'legacy'],
   },
+  ...APP_SCREEN_ARCHETYPE_REGISTRY.map(archetype => ({
+    id: archetype.recipeId,
+    componentIds: archetype.componentIds,
+    errorBoundarySource: ROOT_ERROR_BOUNDARY,
+    allowedKinds: archetype.allowedKinds,
+  })),
 ] as const satisfies readonly AppScreenRecipeRegistryEntry[];
 
 /** Explicit closed-world inventory. The coverage test fails when this drifts. */
@@ -584,17 +613,18 @@ export function appScreenConceptToStoryId(conceptId: string): string {
   return `app-screens-${slug}--reference`;
 }
 
-const RECIPE_BY_ID: Readonly<
-  Record<AppScreenRecipeId, AppScreenRecipeRegistryEntry>
-> = Object.fromEntries(
-  APP_SCREEN_RECIPE_REGISTRY.map(recipe => [recipe.id, recipe])
-);
+const ARCHETYPE_BY_CONCEPT: Readonly<Record<string, AppScreenArchetypeId>> =
+  Object.fromEntries(
+    APP_SCREEN_ARCHETYPE_ASSIGNMENTS.map(assignment => [
+      assignment.conceptId,
+      assignment.archetypeId,
+    ])
+  );
 
 export const APP_SCREEN_REGISTRY: readonly AppScreenRegistryEntry[] =
   APP_SCREEN_SOURCES.map(source => {
     const route = appScreenSourceToRoute(source);
     const kind = classifyScreen(source);
-    const recipeId = recipeFor(source, kind);
     const designReference =
       kind !== 'alias' &&
       kind !== 'legacy' &&
@@ -603,23 +633,38 @@ export const APP_SCREEN_REGISTRY: readonly AppScreenRegistryEntry[] =
       kind === 'alias' || kind === 'legacy'
         ? ALIAS_LEGACY_CONCEPT_MAP[source]
         : undefined;
-    const recipe = RECIPE_BY_ID[recipeId];
+    const conceptId = mapping?.conceptId ?? route;
+    const archetypeId = designReference
+      ? (ARCHETYPE_BY_CONCEPT[conceptId] ?? null)
+      : null;
+    const archetype = archetypeId ? getAppScreenArchetype(archetypeId) : null;
+    const recipeId = archetype?.recipeId ?? recipeFor(source, kind);
+    const assembly = archetype
+      ? buildAppScreenArchetypeAssembly({
+          archetypeId: archetype.id,
+          recipeId: archetype.recipeId,
+          componentIds: archetype.componentIds,
+          slotIds: archetype.requiredSlotIds,
+          stateIds: archetype.requiredStateIds,
+        })
+      : null;
     return {
       id: routeToId(route),
       route,
       source,
       kind,
-      conceptId: mapping?.conceptId ?? route,
+      conceptId,
+      archetypeId,
       recipeId,
       designReference,
       redirectTo: mapping?.redirectTo ?? null,
-      story: designReference
-        ? {
-            id: appScreenConceptToStoryId(mapping?.conceptId ?? route),
-            recipeId,
-            componentIds: recipe.componentIds,
-          }
-        : null,
+      story:
+        designReference && assembly
+          ? {
+              id: appScreenConceptToStoryId(conceptId),
+              ...assembly,
+            }
+          : null,
     };
   });
 

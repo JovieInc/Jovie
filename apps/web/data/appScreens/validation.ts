@@ -1,4 +1,10 @@
 import {
+  APP_SCREEN_ARCHETYPE_ASSIGNMENTS,
+  APP_SCREEN_ARCHETYPE_REGISTRY,
+  type AppScreenArchetypeAssignment,
+  type AppScreenArchetypeRegistryEntry,
+} from './archetypes';
+import {
   APP_SCREEN_COMPONENT_REGISTRY,
   APP_SCREEN_LEGACY_BODY_SOURCES,
   APP_SCREEN_RECIPE_REGISTRY,
@@ -10,6 +16,8 @@ import {
 } from './registry';
 
 export type AppScreenValidationCode =
+  | 'duplicate-archetype'
+  | 'duplicate-archetype-assignment'
   | 'duplicate-component'
   | 'duplicate-component-pen-root'
   | 'duplicate-recipe'
@@ -18,6 +26,15 @@ export type AppScreenValidationCode =
   | 'duplicate-route'
   | 'duplicate-reference-concept'
   | 'missing-component'
+  | 'missing-archetype'
+  | 'missing-archetype-assignment'
+  | 'missing-archetype-recipe'
+  | 'stale-archetype-assignment'
+  | 'invalid-archetype-reference'
+  | 'unexpected-screen-archetype'
+  | 'screen-archetype-mismatch'
+  | 'archetype-recipe-mismatch'
+  | 'archetype-component-mismatch'
   | 'reference-component-without-pen-root'
   | 'unresolved-component-pen-identity-without-reason'
   | 'duplicate-recipe-component'
@@ -32,6 +49,9 @@ export type AppScreenValidationCode =
   | 'unsafe-story'
   | 'story-recipe-mismatch'
   | 'story-component-mismatch'
+  | 'story-archetype-mismatch'
+  | 'story-slot-mismatch'
+  | 'story-state-mismatch'
   | 'unresolved-concept'
   | 'unexpected-redirect-receipt';
 
@@ -41,6 +61,8 @@ export interface AppScreenValidationIssue {
 }
 
 export interface AppScreenValidationInput {
+  readonly archetypes?: readonly AppScreenArchetypeRegistryEntry[];
+  readonly archetypeAssignments?: readonly AppScreenArchetypeAssignment[];
   readonly components?: readonly AppScreenComponentRegistryEntry[];
   readonly recipes?: readonly AppScreenRecipeRegistryEntry[];
   readonly screens?: readonly AppScreenRegistryEntry[];
@@ -64,14 +86,13 @@ const LEGACY_BODY_SOURCE_SET: ReadonlySet<string> = new Set(
   APP_SCREEN_LEGACY_BODY_SOURCES
 );
 
-const sameComponentIds = (
-  left: readonly string[],
-  right: readonly string[]
-): boolean =>
+const sameIds = (left: readonly string[], right: readonly string[]): boolean =>
   left.length === right.length &&
   left.every((value, index) => value === right[index]);
 
 export function validateAppScreenSystem({
+  archetypes = APP_SCREEN_ARCHETYPE_REGISTRY,
+  archetypeAssignments = APP_SCREEN_ARCHETYPE_ASSIGNMENTS,
   components = APP_SCREEN_COMPONENT_REGISTRY,
   recipes = APP_SCREEN_RECIPE_REGISTRY,
   screens = APP_SCREEN_REGISTRY,
@@ -80,6 +101,17 @@ export function validateAppScreenSystem({
   const add = (code: AppScreenValidationCode, message: string) =>
     issues.push({ code, message });
 
+  for (const id of duplicates(archetypes.map(entry => entry.id))) {
+    add('duplicate-archetype', `archetype ${id} is registered more than once`);
+  }
+  for (const conceptId of duplicates(
+    archetypeAssignments.map(entry => entry.conceptId)
+  )) {
+    add(
+      'duplicate-archetype-assignment',
+      `concept ${conceptId} has more than one archetype assignment`
+    );
+  }
   for (const id of duplicates(components.map(entry => entry.id))) {
     add('duplicate-component', `component ${id} is registered more than once`);
   }
@@ -100,6 +132,30 @@ export function validateAppScreenSystem({
     components.map(component => [component.id, component])
   );
   const recipesById = new Map(recipes.map(recipe => [recipe.id, recipe]));
+  const archetypesById = new Map(
+    archetypes.map(archetype => [archetype.id, archetype])
+  );
+  const assignmentsByConcept = new Map(
+    archetypeAssignments.map(assignment => [
+      assignment.conceptId,
+      assignment.archetypeId,
+    ])
+  );
+
+  for (const archetype of archetypes) {
+    const recipe = recipesById.get(archetype.recipeId);
+    if (!recipe) {
+      add(
+        'missing-archetype-recipe',
+        `archetype ${archetype.id} uses unregistered ${archetype.recipeId}`
+      );
+    } else if (!sameIds(archetype.componentIds, recipe.componentIds)) {
+      add(
+        'archetype-component-mismatch',
+        `archetype ${archetype.id} does not match ${recipe.id}`
+      );
+    }
+  }
 
   const componentPenRoots = new Set<string>();
   for (const component of components) {
@@ -155,6 +211,36 @@ export function validateAppScreenSystem({
     if (screen.designReference) referenceConcepts.add(screen.conceptId);
   }
 
+  for (const assignment of archetypeAssignments) {
+    if (!archetypesById.has(assignment.archetypeId)) {
+      add(
+        'missing-archetype',
+        `concept ${assignment.conceptId} uses unregistered ${assignment.archetypeId}`
+      );
+    }
+    if (!referenceConcepts.has(assignment.conceptId)) {
+      add(
+        'stale-archetype-assignment',
+        `concept ${assignment.conceptId} is not a design reference`
+      );
+    }
+  }
+
+  for (const archetype of archetypes) {
+    if (archetype.reference.kind !== 'app-screen') continue;
+    const reference = screens.find(
+      screen =>
+        screen.designReference &&
+        screen.conceptId === archetype.reference.conceptId
+    );
+    if (!reference || reference.archetypeId !== archetype.id) {
+      add(
+        'invalid-archetype-reference',
+        `archetype ${archetype.id} has no matching design-reference screen`
+      );
+    }
+  }
+
   for (const screen of screens) {
     const recipe = recipesById.get(screen.recipeId);
     if (!recipe) {
@@ -185,6 +271,38 @@ export function validateAppScreenSystem({
     }
 
     if (screen.designReference) {
+      const assignedArchetypeId = assignmentsByConcept.get(screen.conceptId);
+      if (!assignedArchetypeId) {
+        add(
+          'missing-archetype-assignment',
+          `design reference ${screen.id} has no explicit archetype assignment`
+        );
+      }
+      if (!screen.archetypeId) {
+        add(
+          'missing-archetype',
+          `design reference ${screen.id} has no product archetype`
+        );
+      } else {
+        if (assignedArchetypeId !== screen.archetypeId) {
+          add(
+            'screen-archetype-mismatch',
+            `${screen.id} declares ${screen.archetypeId} but its assignment declares ${assignedArchetypeId ?? 'none'}`
+          );
+        }
+        const archetype = archetypesById.get(screen.archetypeId);
+        if (!archetype) {
+          add(
+            'missing-archetype',
+            `screen ${screen.id} uses unregistered ${screen.archetypeId}`
+          );
+        } else if (screen.recipeId !== archetype.recipeId) {
+          add(
+            'archetype-recipe-mismatch',
+            `screen ${screen.id} uses ${screen.recipeId} but ${archetype.id} requires ${archetype.recipeId}`
+          );
+        }
+      }
       referenceConceptCounts.set(
         screen.conceptId,
         (referenceConceptCounts.get(screen.conceptId) ?? 0) + 1
@@ -195,11 +313,19 @@ export function validateAppScreenSystem({
           `design reference ${screen.id} has no Storybook story contract`
         );
       }
-    } else if (screen.story) {
-      add(
-        'unexpected-story',
-        `non-reference screen ${screen.id} must not carry a story contract`
-      );
+    } else {
+      if (screen.archetypeId) {
+        add(
+          'unexpected-screen-archetype',
+          `non-reference screen ${screen.id} must not select an archetype`
+        );
+      }
+      if (screen.story) {
+        add(
+          'unexpected-story',
+          `non-reference screen ${screen.id} must not carry a story contract`
+        );
+      }
     }
 
     if (screen.story) {
@@ -215,10 +341,32 @@ export function validateAppScreenSystem({
           `story ${screen.story.id} uses ${screen.story.recipeId} but ${screen.id} declares ${screen.recipeId}`
         );
       }
+      if (screen.story.archetypeId !== screen.archetypeId) {
+        add(
+          'story-archetype-mismatch',
+          `story ${screen.story.id} does not match ${screen.id}'s archetype`
+        );
+      }
+      const archetype = archetypesById.get(screen.story.archetypeId);
       if (
-        recipe &&
-        !sameComponentIds(screen.story.componentIds, recipe.componentIds)
+        archetype &&
+        !sameIds(screen.story.slotIds, archetype.requiredSlotIds)
       ) {
+        add(
+          'story-slot-mismatch',
+          `story ${screen.story.id} slot IDs do not exactly match ${archetype.id}`
+        );
+      }
+      if (
+        archetype &&
+        !sameIds(screen.story.stateIds, archetype.requiredStateIds)
+      ) {
+        add(
+          'story-state-mismatch',
+          `story ${screen.story.id} state IDs do not exactly match ${archetype.id}`
+        );
+      }
+      if (recipe && !sameIds(screen.story.componentIds, recipe.componentIds)) {
         add(
           'story-component-mismatch',
           `story ${screen.story.id} does not use the declared components of ${screen.recipeId}`
