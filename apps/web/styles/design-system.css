@@ -122,10 +122,10 @@
   --system-b-entity-chip-artist-accent: var(--color-accent-purple);
   --system-b-entity-chip-track-accent: var(--color-accent-blue);
   --system-b-entity-chip-event-accent: var(--color-accent-orange);
-  --system-b-entity-chip-on-light-text: var(--color-text-primary-token);
+  --system-b-entity-chip-on-light-text: var(--system-b-chat-user-bubble-text);
   --system-b-chat-message-max-width: 78%;
   --system-b-chat-user-bubble-bg: var(--color-text-primary-token);
-  --system-b-chat-user-bubble-text: var(--system-b-cinematic-black);
+  --system-b-chat-user-bubble-text: var(--color-bg-base);
   --system-b-chat-user-bubble-border: color-mix(
     in oklab,
     var(--color-text-primary-token) 80%,
