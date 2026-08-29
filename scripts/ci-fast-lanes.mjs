@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Production consumer binding: JOV-INV-018.
 /**
  * Run the cheap CI cluster as labeled lanes with continue-on-failure semantics.
  *
@@ -67,7 +68,8 @@ const LANES = [
   {
     id: 'guardrails',
     name: 'Guardrails (proxy)',
-    nextLocalCommand: 'pnpm next:proxy-guard',
+    nextLocalCommand:
+      'node --test scripts/invariants/app-user-identity.test.mjs && node scripts/invariants/app-user-identity.mjs --changed && pnpm next:proxy-guard',
     run: runGuardrails,
   },
   {
@@ -412,7 +414,11 @@ function runGuardrails() {
         ]
       : []),
     ...(selected.has('web')
-      ? ['node apps/web/scripts/next-proxy-guard.mjs']
+      ? [
+          'node --test scripts/invariants/app-user-identity.test.mjs',
+          'node scripts/invariants/app-user-identity.mjs --changed',
+          'node apps/web/scripts/next-proxy-guard.mjs',
+        ]
       : []),
   ];
   if (parts.length === 0)

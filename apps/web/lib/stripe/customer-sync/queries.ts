@@ -72,7 +72,18 @@ function mergeWithDefaults<T extends readonly UserBillingFieldKey[]>(
 }
 
 function isNonRetryableBillingError(error?: string): boolean {
-  return error === 'User not found' || error === 'User not authenticated';
+  return (
+    error === 'User not found' ||
+    error === 'User not authenticated' ||
+    error === 'Canonical app user ID cannot be used as a legacy Clerk ID'
+  );
+}
+
+const CANONICAL_APP_USER_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isCanonicalAppUserId(value: string): boolean {
+  return CANONICAL_APP_USER_ID.test(value);
 }
 
 /**
@@ -217,6 +228,15 @@ export async function fetchUserBillingData<
 ): Promise<FetchUserBillingDataResult<T>> {
   const { clerkUserId, fields = BILLING_FIELDS_FULL as unknown as T } = options;
 
+  // Fail closed before the database boundary if an authenticated Better Auth
+  // app UUID is accidentally routed into the legacy Clerk-ID adapter.
+  if (isCanonicalAppUserId(clerkUserId)) {
+    return {
+      success: false,
+      error: 'Canonical app user ID cannot be used as a legacy Clerk ID',
+    };
+  }
+
   try {
     const selectObj = buildSelectObject(fields);
     const userData = await fetchUserDataWithFallback(
@@ -259,6 +279,13 @@ export async function fetchUserBillingDataByIdentity<
 }): Promise<FetchUserBillingDataResult<T>> {
   const { userIdentity, fields = BILLING_FIELDS_FULL as unknown as T } =
     options;
+
+  if (isCanonicalAppUserId(userIdentity)) {
+    return fetchUserBillingDataByAppId({
+      appUserId: userIdentity,
+      fields,
+    });
+  }
 
   const legacyResult = await fetchUserBillingData({
     clerkUserId: userIdentity,

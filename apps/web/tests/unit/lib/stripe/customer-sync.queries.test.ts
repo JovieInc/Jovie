@@ -63,24 +63,21 @@ describe('fetchUserBillingData - Queries', () => {
   });
 
   describe('successful queries', () => {
-    it('falls back from legacy Clerk id to app user id for Better Auth Stripe metadata', async () => {
-      const where = vi
-        .fn()
-        .mockReturnValueOnce({ limit: vi.fn().mockResolvedValue([]) })
-        .mockReturnValueOnce({
-          limit: vi.fn().mockResolvedValue([
-            {
-              id: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
-              isPro: false,
-              plan: 'free',
-              stripeCustomerId: 'cus_better_auth',
-              stripeSubscriptionId: null,
-              stripePriceId: null,
-              billingVersion: 1,
-              lastBillingEventAt: null,
-            },
-          ]),
-        });
+    it('routes an app UUID directly to app-user lookup for Better Auth Stripe metadata', async () => {
+      const where = vi.fn().mockReturnValue({
+        limit: vi.fn().mockResolvedValue([
+          {
+            id: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
+            isPro: false,
+            plan: 'free',
+            stripeCustomerId: 'cus_better_auth',
+            stripeSubscriptionId: null,
+            stripePriceId: null,
+            billingVersion: 1,
+            lastBillingEventAt: null,
+          },
+        ]),
+      });
       mockDbSelect.mockReturnValue({
         from: vi.fn().mockReturnValue({ where }),
       });
@@ -92,14 +89,22 @@ describe('fetchUserBillingData - Queries', () => {
 
       expect(result.success).toBe(true);
       expect(result.data?.id).toBe('6ba7b810-9dad-11d1-80b4-00c04fd430c8');
-      expect(where).toHaveBeenNthCalledWith(
-        1,
-        expect.objectContaining({ left: mockUsersTable.clerkId })
-      );
-      expect(where).toHaveBeenNthCalledWith(
-        2,
+      expect(where).toHaveBeenCalledTimes(1);
+      expect(where).toHaveBeenCalledWith(
         expect.objectContaining({ left: mockUsersTable.id })
       );
+    });
+
+    it('fails closed before querying when the legacy helper receives an app UUID', async () => {
+      const result = await fetchUserBillingData({
+        clerkUserId: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
+      });
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Canonical app user ID cannot be used as a legacy Clerk ID',
+      });
+      expect(mockDbSelect).not.toHaveBeenCalled();
     });
 
     it('keeps legacy Clerk metadata on the single-query path', async () => {

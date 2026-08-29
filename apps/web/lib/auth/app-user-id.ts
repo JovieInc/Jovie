@@ -3,6 +3,8 @@ import 'server-only';
 import { eq } from 'drizzle-orm';
 import { users } from '@/lib/db/schema/auth';
 
+// Production consumer binding: JOV-INV-018.
+
 /**
  * Builds the canonical predicate for an authenticated app user.
  *
