@@ -22,6 +22,8 @@ export default defineConfig({
     include: [
       'tests/unit/lib/sentry/**/*.test.ts',
       'tests/unit/design-system/ui-ownership-registry.test.ts',
+      'tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+      'tests/unit/design-system/linear-namespace-ratchet.test.ts',
     ],
     pool: 'forks',
     testTimeout: 10000,

@@ -154,6 +154,40 @@ test('ordinary iOS UI changes select the design gate without Ubuntu operations',
   );
 });
 
+test('source design conformance runs the merge-queue poisoning ratchets in one Vitest process', () => {
+  const designConformanceTest =
+    readJson('package.json').scripts['design:conformance:test'];
+  const minimalVitestConfig = readFileSync(
+    resolve(REPO_ROOT, 'apps/web/vitest.config.minimal.mts'),
+    'utf8'
+  );
+
+  assert.equal(
+    designConformanceTest.match(/pnpm --filter web exec vitest run/g)?.length,
+    1
+  );
+  assert.match(
+    designConformanceTest,
+    /tests\/unit\/design-system\/arbitrary-values-ratchet\.test\.ts/
+  );
+  assert.match(
+    minimalVitestConfig,
+    /tests\/unit\/design-system\/arbitrary-values-ratchet\.test\.ts/
+  );
+  assert.match(
+    designConformanceTest,
+    /tests\/unit\/design-system\/linear-namespace-ratchet\.test\.ts/
+  );
+  assert.match(
+    minimalVitestConfig,
+    /tests\/unit\/design-system\/linear-namespace-ratchet\.test\.ts/
+  );
+  assert.equal(
+    LANE_COMMANDS['design-conformance'],
+    'pnpm design:conformance:gate'
+  );
+});
+
 test('Ubuntu operation paths remain disjoint from design selection', () => {
   const selected = selectDesignConformanceChecks([
     'scripts/backlog-orchestrator/admitter.mjs',
