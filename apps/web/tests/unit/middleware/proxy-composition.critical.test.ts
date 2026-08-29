@@ -120,6 +120,7 @@ vi.mock('@/constants/app', () => ({
 }));
 vi.mock('@/constants/domains', () => ({
   BASE_URL: 'https://jov.ie',
+  DOCS_URL: 'https://docs.jov.ie',
   HOSTNAME: 'jov.ie',
   STAGING_HOSTNAMES: new Set(['staging.jov.ie', 'main.jov.ie']),
 }));
@@ -178,6 +179,56 @@ describe('proxy composition (critical)', () => {
 
       // Marketing paths don't need CSP nonce — only app/protected routes do
       expect(mocks.buildContentSecurityPolicy).not.toHaveBeenCalled();
+    });
+
+    it('returns homepage markdown when Accept prefers text/markdown', async () => {
+      const req = createTestRequest({
+        pathname: '/',
+        headers: { accept: 'text/markdown' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toBe(
+        'text/markdown; charset=utf-8'
+      );
+      expect(res.headers.get('vary')).toBe('Accept');
+      await expect(res.text()).resolves.toContain('# ');
+      expect(mocks.buildContentSecurityPolicy).not.toHaveBeenCalled();
+    });
+
+    it('returns a markdown 404 recovery body for a missing path', async () => {
+      const req = createTestRequest({
+        pathname: '/some-path-that-does-not-exist',
+        headers: { accept: 'text/markdown' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(404);
+      expect(res.headers.get('content-type')).toBe(
+        'text/markdown; charset=utf-8'
+      );
+      expect(res.headers.get('vary')).toContain('Accept');
+      const body = await res.text();
+      expect(body).toContain('/llms.txt');
+      expect(body).toContain('/openapi.json');
+      expect(body).toContain('/sitemap.xml');
+    });
+
+    it('keeps the HTML homepage path for browser Accept and still varies on Accept', async () => {
+      const req = createTestRequest({
+        pathname: '/',
+        headers: {
+          accept:
+            'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+      });
+      const res = await callMiddleware(req);
+      expect(res.status).toBeLessThan(400);
+      expect(res.headers.get('content-type')).not.toBe(
+        'text/markdown; charset=utf-8'
+      );
+      expect(res.headers.get('vary')).toMatch(/Accept/i);
     });
 
     it('generates nonce for app paths', async () => {
@@ -340,54 +391,6 @@ describe('proxy composition (critical)', () => {
         ? config.matcher[0]
         : config.matcher;
       expect(matcherPattern).toContain('_next');
-    });
-  });
-
-  describe('Markdown Accept negotiation (JOV-5412)', () => {
-    it('serves homepage Markdown for Accept: text/markdown', async () => {
-      const req = createTestRequest({
-        pathname: '/',
-        headers: { accept: 'text/markdown' },
-      });
-      const res = await callMiddleware(req);
-      expect(res.status).toBe(200);
-      expect(res.headers.get('content-type')).toBe(
-        'text/markdown; charset=utf-8'
-      );
-      expect(res.headers.get('vary')).toBe('Accept');
-      expect(await res.text()).toContain('Jovie');
-    });
-
-    it('keeps the HTML homepage path for browser Accept', async () => {
-      const req = createTestRequest({
-        pathname: '/',
-        headers: {
-          accept:
-            'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        },
-      });
-      const res = await callMiddleware(req);
-      expect(res.status).toBeLessThan(400);
-      expect(res.headers.get('content-type')).not.toBe(
-        'text/markdown; charset=utf-8'
-      );
-      expect(res.headers.get('vary')).toMatch(/Accept/i);
-    });
-
-    it('returns a real Markdown 404 for an unknown route', async () => {
-      const req = createTestRequest({
-        pathname: '/this-page-does-not-exist',
-        headers: { accept: 'text/markdown' },
-      });
-      const res = await callMiddleware(req);
-      expect(res.status).toBe(404);
-      expect(res.headers.get('content-type')).toBe(
-        'text/markdown; charset=utf-8'
-      );
-      const body = await res.text();
-      expect(body).toContain('/llms.txt');
-      expect(body).toContain('/openapi.json');
-      expect(body).toContain('/sitemap.xml');
     });
   });
 });

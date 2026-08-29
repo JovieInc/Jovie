@@ -16,7 +16,7 @@ import {
   hasAnalyticsConsent,
 } from '@/lib/cookies/consent-state';
 import { NONESSENTIAL_PROXY_COOKIE_NAMES } from '@/lib/cookies/registry';
-import { ensureVaryAccept } from '@/lib/http/accept-markdown';
+import { ensureVaryAccept } from '@/lib/http/accept-header';
 import type { PathCategory } from '@/lib/routing/proxy-routing';
 import {
   buildContentSecurityPolicy,

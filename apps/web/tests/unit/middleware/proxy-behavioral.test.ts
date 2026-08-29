@@ -138,6 +138,7 @@ vi.mock('@/constants/app', () => ({
 }));
 vi.mock('@/constants/domains', () => ({
   BASE_URL: 'https://jov.ie',
+  DOCS_URL: 'https://docs.jov.ie',
   HOSTNAME: 'jov.ie',
   STAGING_HOSTNAMES: new Set(['staging.jov.ie', 'main.jov.ie']),
 }));
