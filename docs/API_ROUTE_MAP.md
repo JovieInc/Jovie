@@ -32,6 +32,13 @@
 |-------|---------|------|-------------|
 | `/api/v1/actions` | GET | `auth` | Read-only canonical Actions discovery. Resolves advisory capabilities for the four stable action IDs against an owned profile. No writes. |
 
+### API Schema
+
+| Route | Methods | Auth | Description |
+|-------|---------|------|-------------|
+| `/openapi.json` | GET | `public` | Conventional compatibility path for the canonical OpenAPI schema |
+| `/api/v1/openapi.json` | GET | `public` | Canonical OpenAPI schema for the public read-only API |
+
 ### Admin
 
 | Route | Methods | Auth | Description |
