@@ -296,6 +296,36 @@ describe('component comparative quality bar', () => {
     );
   });
 
+  it('qualifies batch-2 form controls and blocks one exact regression per owner', () => {
+    const batchIds = [
+      'atom.input',
+      'atom.textarea',
+      'atom.checkbox',
+      'atom.radio-group',
+      'atom.native-select',
+    ];
+    expect(
+      COMPARATIVE_QUALITY_BAR.filter(
+        item => item.enrollmentBatch === 'batch-2'
+      ).map(item => item.id)
+    ).toEqual(batchIds);
+    for (const baselineId of batchIds) {
+      expect(evaluateComparativeSample(controlFor(baselineId))).toMatchObject({
+        ok: true,
+        findings: [],
+      });
+      const fixture = redFor(baselineId);
+      const evaluation = evaluateComparativeSample(fixture);
+      const contract = DELIBERATE_RED_CONTRACTS.find(
+        item => item.baselineId === baselineId
+      );
+      expect(evaluation.ok).toBe(false);
+      expect(
+        evaluation.findings.map(({ dimension, code }) => ({ dimension, code }))
+      ).toEqual(contract.fingerprints);
+    }
+  });
+
   it('emits an inventory, benchmark, deliberate-red, and qualification receipt', () => {
     const result = runComparativeQualityBar();
     expect(result.ok).toBe(true);
@@ -317,6 +347,10 @@ describe('component comparative quality bar', () => {
     expect(result.receipt).toMatchObject({
       claimBoundary: 'rubric-and-evaluator-qualification-only',
       liveVisualCertification: { status: 'not-started', certified: 0 },
+      trustedBaseEnrollment: {
+        ref: expect.stringMatching(/^[0-9a-f]{40}$/),
+        requiredIds: expect.arrayContaining(['atom.select', 'atom.field']),
+      },
     });
     expect(result.receipt.qualificationControls).toHaveLength(
       COMPARATIVE_QUALITY_BAR.length
@@ -342,6 +376,55 @@ describe('component comparative quality bar', () => {
     expect(result.receipt.issues.join('\n')).toMatch(
       /deliberate-red fixture must block/
     );
+  });
+
+  it('allows enrollment growth but blocks shrinkage against the trusted base', () => {
+    const removedId = 'atom.previously-enrolled';
+    const result = runComparativeQualityBar({
+      trustedBaseEnrollment: {
+        ok: true,
+        ref: 'a'.repeat(40),
+        baselines: [{ id: removedId }],
+      },
+    });
+    expect(result.ok).toBe(false);
+    expect(result.receipt.issues.join('\n')).toContain(
+      `comparative enrollment may grow but not shrink against trusted base ${'a'.repeat(40)}: removed ${removedId}`
+    );
+
+    const input = clone(
+      COMPARATIVE_QUALITY_BAR.find(item => item.id === 'atom.input')
+    );
+    input.enrollmentBatch = 'batch-0';
+    input.requiredDimensions.push('append-stability');
+    input.requirements.minHitTargetPx = 48;
+    const weakened = runComparativeQualityBar({
+      trustedBaseEnrollment: {
+        ok: true,
+        ref: 'b'.repeat(40),
+        baselines: [input],
+      },
+    });
+    expect(weakened.ok).toBe(false);
+    expect(weakened.receipt.issues.join('\n')).toMatch(
+      new RegExp(
+        `atom\\.input: trusted baseline identity is immutable against ${'b'.repeat(40)}[\\s\\S]*atom\\.input: trusted baseline contract was weakened`
+      )
+    );
+
+    const trustedInput = clone(input);
+    delete trustedInput.enrollmentBatch;
+    trustedInput.requiredDimensions.pop();
+    trustedInput.requirements.minHitTargetPx = 40;
+    expect(
+      runComparativeQualityBar({
+        trustedBaseEnrollment: {
+          ok: true,
+          ref: 'c'.repeat(40),
+          baselines: [trustedInput],
+        },
+      }).ok
+    ).toBe(true);
   });
 
   it('requires exactly one qualification control for every enrolled baseline', () => {
@@ -551,6 +634,14 @@ describe('component comparative quality bar', () => {
     );
     expect(result.receipt.fixtures).toEqual([]);
     expect(result.receipt.qualificationControls).toEqual([]);
+
+    for (const malformedOptions of [true, [], null]) {
+      const malformed = runComparativeQualityBar(malformedOptions);
+      expect(malformed.ok).toBe(false);
+      expect(malformed.receipt.issues.join('\n')).toContain(
+        'comparative quality bar options must be an object; fail closed'
+      );
+    }
   });
 
   it('validates the requirement fields for each enrolled dimension', () => {
