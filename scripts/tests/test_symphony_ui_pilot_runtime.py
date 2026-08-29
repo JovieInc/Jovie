@@ -757,7 +757,7 @@ def test_installer_accepts_only_the_bounded_runtime_concurrency_overlay(tmp_path
         assert accepted.returncode == 0, accepted.stdout
         assert f"runtime max_concurrent_agents={target}" in accepted.stdout
 
-    for invalid in ("0", "9", "not-a-number"):
+    for invalid in ("0", "9", "01", "08", "0001", "0008", "not-a-number"):
         workflow.write_text(
             source.replace("  max_concurrent_agents: 4", f"  max_concurrent_agents: {invalid}", 1)
         )

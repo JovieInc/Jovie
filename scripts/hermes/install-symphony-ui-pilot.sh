@@ -13,7 +13,8 @@
 # Modes:
 #   (default)          install workflow + unit + lease guard + reconciler,
 #                      daemon-reload, then enable --now symphony-reconciler.timer
-#   --check            verify installed files match the repo sources; no writes
+#   --check            verify installed files match the repo sources, allowing
+#                      only the controller-owned 1..8 concurrency overlay; no writes
 #   --no-daemon-reload install files but skip systemctl --user daemon-reload
 #                      and skip timer activation
 #   --lease-guard-only restore only the executable lease guard atomically;
@@ -110,7 +111,7 @@ import sys
 source_path = pathlib.Path(sys.argv[1])
 installed_path = pathlib.Path(sys.argv[2])
 pattern = re.compile(
-    r"^(\s*max_concurrent_agents:\s*)([0-9]+)(\s*)$",
+    r"^(\s*max_concurrent_agents:\s*)([1-8])(\s*)$",
     re.MULTILINE,
 )
 source = source_path.read_text(encoding="utf-8")
