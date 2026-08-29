@@ -139,10 +139,19 @@ class WorkflowOverlayIdentityTests(unittest.TestCase):
     def test_accepts_each_bounded_runtime_value(self):
         for value in range(MODULE.MIN_CONCURRENCY, MODULE.MAX_CONCURRENCY + 1):
             with self.subTest(value=value):
-                MODULE.verify_concurrency_overlay(self.SOURCE, self.overlay(str(value)))
+                self.assertEqual(
+                    MODULE.verify_concurrency_overlay(self.SOURCE, self.overlay(str(value))),
+                    value,
+                )
 
     def test_identical_source_is_accepted(self):
-        MODULE.verify_concurrency_overlay(self.SOURCE, self.SOURCE)
+        self.assertEqual(MODULE.verify_concurrency_overlay(self.SOURCE, self.SOURCE), 4)
+
+    def test_padded_runtime_concurrency_fails_closed(self):
+        for value in ("01", "08", "0001", "0008"):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValueError, "outside the bounded policy"):
+                    MODULE.verify_concurrency_overlay(self.SOURCE, self.overlay(value))
 
     def test_missing_runtime_concurrency_fails_closed(self):
         with self.assertRaisesRegex(ValueError, "exactly one max_concurrent_agents"):

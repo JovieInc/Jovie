@@ -47,6 +47,9 @@ LOW_IO_FULL_AVG10 = 2.0
 HIGH_IO_FULL_AVG10 = 10.0
 SEVERE_IO_FULL_AVG10 = 20.0
 CONCURRENCY_LINE = re.compile(r"^(\s*max_concurrent_agents:\s*)([0-9]+)(\s*)$", re.MULTILINE)
+CANONICAL_CONCURRENCY = frozenset(
+    str(value) for value in range(MIN_CONCURRENCY, MAX_CONCURRENCY + 1)
+)
 
 
 def utc_now() -> str:
@@ -179,12 +182,12 @@ def render_target(text: str, target: int) -> str:
     return CONCURRENCY_LINE.sub(lambda match: f"{match.group(1)}{target}{match.group(3)}", text, count=1)
 
 
-def verify_concurrency_overlay(source_text: str, installed_text: str) -> None:
+def verify_concurrency_overlay(source_text: str, installed_text: str) -> int:
     """Require byte identity except a single bounded max_concurrent_agents overlay.
 
     The pressure controller rewrites only that scalar on the installed workflow.
-    Any other difference, a missing or duplicated line, a non-numeric value, or a
-    runtime value outside 1..8 fails closed.
+    Any other difference, a missing or duplicated line, a non-numeric value, a
+    zero-padded numeral, or a runtime value outside 1..8 fails closed.
     """
     source_matches = list(CONCURRENCY_LINE.finditer(source_text))
     installed_matches = list(CONCURRENCY_LINE.finditer(installed_text))
@@ -192,12 +195,13 @@ def verify_concurrency_overlay(source_text: str, installed_text: str) -> None:
         raise ValueError("source workflow must contain exactly one max_concurrent_agents scalar")
     if len(installed_matches) != 1:
         raise ValueError("installed workflow must contain exactly one max_concurrent_agents scalar")
-    value = int(installed_matches[0].group(2))
-    if not MIN_CONCURRENCY <= value <= MAX_CONCURRENCY:
+    source_raw = source_matches[0].group(2)
+    installed_raw = installed_matches[0].group(2)
+    if source_raw not in CANONICAL_CONCURRENCY or installed_raw not in CANONICAL_CONCURRENCY:
         raise ValueError("installed concurrency is outside the bounded policy")
-    source_value = int(source_matches[0].group(2))
-    if render_target(installed_text, source_value) != source_text:
+    if render_target(installed_text, int(source_raw)) != source_text:
         raise ValueError("workflow drift beyond concurrency overlay")
+    return int(installed_raw)
 
 
 def write_workflow_atomic(path: pathlib.Path, text: str) -> None:
@@ -407,10 +411,15 @@ def main() -> int:
         args = parse_args()
         if args.verify_workflow_overlay is not None:
             source_path, installed_path = args.verify_workflow_overlay
-            verify_concurrency_overlay(
-                source_path.read_text(encoding="utf-8"),
-                installed_path.read_text(encoding="utf-8"),
-            )
+            try:
+                target = verify_concurrency_overlay(
+                    source_path.read_text(encoding="utf-8"),
+                    installed_path.read_text(encoding="utf-8"),
+                )
+            except (OSError, ValueError):
+                print(f"DRIFT {installed_path}")
+                return 1
+            print(f"OK {installed_path} (runtime max_concurrent_agents={target})")
             return 0
         receipt = run(args)
         print(json.dumps(receipt, indent=2, sort_keys=True))

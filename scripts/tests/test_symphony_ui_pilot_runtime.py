@@ -759,42 +759,45 @@ def test_installer_backs_up_and_detects_drift(tmp_path: Path) -> None:
     assert _run_installer(tmp_path, "--check").returncode == 0
 
 
-def test_installer_check_accepts_bounded_concurrency_overlay(tmp_path: Path) -> None:
+def test_installer_accepts_only_the_bounded_runtime_concurrency_overlay(tmp_path: Path) -> None:
     assert _run_installer(tmp_path, "--no-daemon-reload").returncode == 0
     workflow = tmp_path / "symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md"
-    for value in range(1, 9):
-        _rewrite_installed_concurrency(workflow, str(value))
-        check = _run_installer(tmp_path, "--check")
-        assert check.returncode == 0, (value, check.stdout, check.stderr)
-        assert f"OK {workflow}" in check.stdout
+    source = WORKFLOW.read_text()
 
+    for target in range(1, 9):
+        _rewrite_installed_concurrency(workflow, str(target))
+        accepted = _run_installer(tmp_path, "--check")
+        assert accepted.returncode == 0, accepted.stdout
+        assert f"OK {workflow}" in accepted.stdout
+        assert f"runtime max_concurrent_agents={target}" in accepted.stdout
 
-def test_installer_check_fails_closed_for_invalid_concurrency_overlay(
-    tmp_path: Path,
-) -> None:
-    assert _run_installer(tmp_path, "--no-daemon-reload").returncode == 0
-    workflow = tmp_path / "symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md"
-    original = workflow.read_text()
-    cases = {
-        "missing": original.replace("  max_concurrent_agents: 4\n", ""),
-        "duplicated": original.replace(
-            "  max_concurrent_agents: 4\n",
-            "  max_concurrent_agents: 1\n  max_concurrent_agents: 2\n",
+    for invalid in ("0", "9", "01", "08", "0001", "0008", "not-a-number"):
+        workflow.write_text(
+            source.replace("  max_concurrent_agents: 4", f"  max_concurrent_agents: {invalid}", 1)
+        )
+        rejected = _run_installer(tmp_path, "--check")
+        assert rejected.returncode == 1, invalid
+        assert f"DRIFT {workflow}" in rejected.stdout
+
+    for malformed in (
+        source.replace("  max_concurrent_agents: 4\n", ""),
+        source.replace("  max_concurrent_agents: 4", "  max_concurrent_workers: 4", 1),
+        source.replace(
+            "  max_concurrent_agents: 4",
+            "  max_concurrent_agents: 4\n  max_concurrent_agents: 4",
+            1,
         ),
-        "non-numeric": original.replace("  max_concurrent_agents: 4\n", "  max_concurrent_agents: n\n"),
-        "zero": original.replace("  max_concurrent_agents: 4\n", "  max_concurrent_agents: 0\n"),
-        "above-policy": original.replace("  max_concurrent_agents: 4\n", "  max_concurrent_agents: 9\n"),
-        "other-drift": original.replace("  max_concurrent_agents: 4\n", "  max_concurrent_agents: 1\n").replace(
-            "max_turns: 24", "max_turns: 99"
-        ),
-    }
-    for name, text in cases.items():
-        workflow.write_text(text)
-        check = _run_installer(tmp_path, "--check")
-        assert check.returncode == 1, name
-        assert "DRIFT" in check.stdout, name
-        workflow.write_text(original)
-        assert _run_installer(tmp_path, "--check").returncode == 0, name
+    ):
+        workflow.write_text(malformed)
+        rejected = _run_installer(tmp_path, "--check")
+        assert rejected.returncode == 1
+        assert f"DRIFT {workflow}" in rejected.stdout
+
+    runtime = source.replace("  max_concurrent_agents: 4", "  max_concurrent_agents: 1", 1)
+    workflow.write_text(runtime.replace("  max_turns: 24", "  max_turns: 25", 1))
+    other_drift = _run_installer(tmp_path, "--check")
+    assert other_drift.returncode == 1
+    assert f"DRIFT {workflow}" in other_drift.stdout
 
 
 def test_installer_restores_only_lease_guard_atomically(tmp_path: Path) -> None:
