@@ -19,7 +19,7 @@ const meta = {
       route: '/waitlist',
       source: 'apps/web/components/features/waitlist/WaitlistSuccessView.tsx',
       sourceExport: 'WaitlistSuccessView',
-      sourceSha: '61690d2a4af920183f4a85366799ff0bafe4540b',
+      sourceSha: '8b0353fcbeb0cffef614fa47afbbbd8eeae48997',
       storyExport: 'Web214AuthenticatedPending',
       fixture: 'authenticated WAITLIST_PENDING',
     },

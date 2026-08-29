@@ -117,7 +117,7 @@ describe('PricingRecipeBody', () => {
     const match = storySource.match(/sourceSha: '([0-9a-f]{40})'/);
     expect(match).not.toBeNull();
     const sourceSha = match?.[1] as string;
-    expect(sourceSha).toBe('791efba42391c23dde72f4a2fc1dc7cfedb0eabc');
+    expect(sourceSha).toBe('8b0353fcbeb0cffef614fa47afbbbd8eeae48997');
     expect(storySource).toContain(
       "source: 'apps/web/components/organisms/PricingRecipeBody.tsx'"
     );
