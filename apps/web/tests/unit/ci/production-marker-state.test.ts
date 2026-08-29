@@ -72,6 +72,7 @@ function primaryMarker(
       deploymentId: 'dpl_primary123',
       controllerRun: String(controllerRun),
       controllerAttempt: '1',
+      authSmoke: 'passed',
     },
     attemptRun: run(1, status, conclusion),
     attemptJobs: [
@@ -99,6 +100,7 @@ function recoveryMarker(status: string, conclusion: string | null) {
       deploymentId: 'dpl_recovery123',
       controllerRun: String(controllerRun),
       controllerAttempt: '2',
+      authSmoke: 'passed',
     },
     attemptRun: run(2, status, conclusion),
     attemptJobs: [job('Production Verified', 2, status, conclusion)],
@@ -161,6 +163,7 @@ describe('production marker attempt state', () => {
             deploymentId: 'dpl_recorded123',
             controllerRun: String(liveRun.id),
             controllerAttempt: String(liveRun.run_attempt),
+            authSmoke: 'passed',
           },
           attemptRun: liveRun,
           attemptJobs: allJobs,
@@ -208,6 +211,113 @@ describe('production marker attempt state', () => {
     expect(result).toMatchObject({
       state: 'verified',
       controllerAttempt: 1,
+      releaseKind: 'web',
+      authSmoke: 'passed',
+    });
+  });
+
+  it('verifies an exact successful non-Web generation without claiming a Web deployment', () => {
+    const marker = primaryMarker('completed', 'success');
+    marker.payload = {
+      ...marker.payload,
+      deploymentId: 'not-applicable',
+      authSmoke: 'not-applicable',
+      selectedLanes: ['operations'],
+    };
+
+    expect(
+      classifyProductionMarkerEvidence(evidence({ markers: [marker] }))
+    ).toMatchObject({
+      state: 'verified',
+      sha,
+      releaseKind: 'non-web',
+      selectedLanes: ['operations'],
+      deploymentId: 'not-applicable',
+      authSmoke: 'not-applicable',
+      controllerRun,
+      controllerAttempt: 1,
+    });
+  });
+
+  it.each([
+    ['empty', []],
+    ['unknown', ['unknown-lane']],
+    ['duplicate', ['operations', 'operations']],
+    ['Web-only with not-applicable receipts', ['web']],
+    ['Web mixed into non-Web', ['operations', 'web']],
+  ])('fails closed for %s selected lanes on a non-Web marker', (_name, lanes) => {
+    const marker = primaryMarker('completed', 'success');
+    marker.payload = {
+      ...marker.payload,
+      deploymentId: 'not-applicable',
+      authSmoke: 'not-applicable',
+      selectedLanes: lanes,
+    };
+
+    expect(
+      classifyProductionMarkerEvidence(evidence({ markers: [marker] }))
+    ).toMatchObject({
+      state: 'manual',
+      reason: 'malformed_or_contradictory_marker',
+    });
+  });
+
+  it('requires exact runtime-probe evidence for a Web marker', () => {
+    for (const authSmoke of [undefined, 'not-applicable', 'failed']) {
+      const marker = primaryMarker('completed', 'success');
+      if (authSmoke === undefined) {
+        delete (marker.payload as Record<string, unknown>).authSmoke;
+      } else {
+        marker.payload.authSmoke = authSmoke;
+      }
+      expect(
+        classifyProductionMarkerEvidence(evidence({ markers: [marker] }))
+      ).toMatchObject({
+        state: 'manual',
+        reason: 'malformed_or_contradictory_marker',
+      });
+    }
+  });
+
+  it('distinguishes missing, expired, and duplicate marker evidence', () => {
+    expect(
+      classifyProductionMarkerEvidence(evidence({ markers: [] }))
+    ).toMatchObject({ state: 'none', reason: 'no_marker' });
+
+    const expired = primaryMarker('completed', 'success');
+    expired.artifact.expired = true;
+    expect(
+      classifyProductionMarkerEvidence(evidence({ markers: [expired] }))
+    ).toMatchObject({
+      state: 'manual',
+      reason: 'malformed_or_contradictory_marker',
+    });
+
+    expect(
+      classifyProductionMarkerEvidence(
+        evidence({
+          markers: [
+            primaryMarker('completed', 'success'),
+            primaryMarker('completed', 'success'),
+          ],
+        })
+      )
+    ).toMatchObject({ state: 'manual', reason: 'duplicate_marker_attempt' });
+  });
+
+  it.each([
+    ['run', { run_id: controllerRun + 1 }],
+    ['attempt', { run_attempt: 2 }],
+    ['SHA', { head_sha: 'b'.repeat(40) }],
+  ])('rejects a Production Verified job with a mismatched %s', (_name, mismatch) => {
+    const marker = primaryMarker('completed', 'success');
+    marker.attemptJobs[0] = { ...marker.attemptJobs[0], ...mismatch };
+
+    expect(
+      classifyProductionMarkerEvidence(evidence({ markers: [marker] }))
+    ).toMatchObject({
+      state: 'manual',
+      reason: 'contradictory_verified_job',
     });
   });
 
@@ -460,6 +570,7 @@ describe('recovered production marker state', () => {
         deploymentId: 'dpl_recovered123',
         controllerRun: String(recoveryRunId),
         controllerAttempt: '1',
+        authSmoke: 'oauth-reprobed',
         recoveredFromControllerRun: String(controllerRun),
         recoveredFromControllerAttempt: '1',
       },

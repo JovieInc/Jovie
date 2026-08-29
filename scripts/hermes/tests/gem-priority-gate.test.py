@@ -234,6 +234,62 @@ class ProductionHealthTests(unittest.TestCase):
         self.assertEqual(observed["reportedStatus"], {"unexpected": True})
 
 
+class ProductionGenerationObservationTests(unittest.TestCase):
+    def test_uses_exact_controller_identity_and_actions_token(self):
+        marker = {
+            "state": "verified",
+            "reason": "exact_attempt_verified",
+            "sha": MAIN_SHA,
+            "releaseKind": "non-web",
+            "selectedLanes": ["operations"],
+            "deploymentId": "not-applicable",
+            "authSmoke": "not-applicable",
+            "controllerRun": 456,
+            "controllerAttempt": 1,
+            "verificationJobId": 1019,
+        }
+        completed = subprocess.CompletedProcess(
+            args=["node"], returncode=0, stdout=json.dumps(marker), stderr=""
+        )
+        workflow = {
+            "id": 123,
+            "name": "Production Controller",
+            "path": ".github/workflows/production-controller.yml",
+            "state": "active",
+        }
+
+        with (
+            mock.patch.dict(
+                os.environ,
+                {"GH_TOKEN": "app-token", "FLEET_PRODUCTION_MARKER_TOKEN": "actions-token"},
+            ),
+            mock.patch.object(MODULE, "gh_json", return_value=workflow) as gh_json,
+            mock.patch.object(MODULE.subprocess, "run", return_value=completed) as run,
+        ):
+            observed = MODULE.observe_production_generation("JovieInc/Jovie", MAIN_SHA)
+
+        self.assertEqual(observed["schema"], "jovie-production-generation/v1")
+        self.assertEqual(observed["sha"], MAIN_SHA)
+        self.assertEqual(observed["selectedLanes"], ["operations"])
+        self.assertEqual(
+            gh_json.call_args.kwargs["environment"]["GH_TOKEN"], "actions-token"
+        )
+        self.assertEqual(run.call_args.kwargs["env"]["GH_TOKEN"], "actions-token")
+        self.assertIn("--controller-workflow-id", run.call_args.args[0])
+        self.assertIn("123", run.call_args.args[0])
+
+    def test_malformed_controller_identity_fails_closed_before_marker_read(self):
+        with (
+            mock.patch.object(MODULE, "gh_json", return_value={"id": 123}),
+            mock.patch.object(MODULE.subprocess, "run") as run,
+        ):
+            observed = MODULE.observe_production_generation("JovieInc/Jovie", MAIN_SHA)
+
+        self.assertEqual(observed["state"], "unknown")
+        self.assertEqual(observed["reason"], "production-generation-observation-failed")
+        run.assert_not_called()
+
+
 MAIN_SHA = "a3eeefdd4dc681d1c9b5b4385720d661f5129137"
 
 GREEN_SIGNALS: dict[str, object] = {
@@ -525,6 +581,23 @@ class DeploymentBindingTests(unittest.TestCase):
     def evaluate(self, signals: dict[str, object]) -> dict[str, object]:
         return MODULE.evaluate(dict(signals), MODULE.isoformat(MODULE.utc_now()))
 
+    def non_web_generation(self, **overrides: object) -> dict[str, object]:
+        return {
+            "schema": "jovie-production-generation/v1",
+            "source": "immutable-controller-marker",
+            "state": "verified",
+            "reason": "exact_attempt_verified",
+            "sha": MAIN_SHA,
+            "releaseKind": "non-web",
+            "selectedLanes": ["operations"],
+            "deploymentId": "not-applicable",
+            "authSmoke": "not-applicable",
+            "controllerRun": 456,
+            "controllerAttempt": 1,
+            "verificationJobId": 1019,
+            **overrides,
+        }
+
     def test_bound_production_is_green(self):
         receipt = self.evaluate(GREEN_SIGNALS)
         self.assertEqual(receipt["state"], "GREEN")
@@ -533,6 +606,94 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
         self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
+
+    def test_verified_non_web_generation_covers_main_without_rewriting_public_web_sha(self):
+        signals = dict(GREEN_SIGNALS)
+        prior_web_sha = "b" * 40
+        signals["production"] = {"status": "green", "deployedSha": prior_web_sha}
+        signals["productionGeneration"] = self.non_web_generation()
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertTrue(receipt["promotionAdmission"]["allowed"])
+        self.assertEqual(
+            receipt["signals"]["production"],
+            {"status": "green", "deployedSha": prior_web_sha},
+        )
+        self.assertEqual(
+            receipt["signals"]["releaseCoverage"],
+            {
+                "status": "bound",
+                "kind": "non-web-generation",
+                "sha": MAIN_SHA,
+                "selectedLanes": ["operations"],
+                "controllerRun": 456,
+                "controllerAttempt": 1,
+            },
+        )
+
+    def test_non_web_generation_must_be_exact_and_strictly_typed(self):
+        invalid_generations = [
+            self.non_web_generation(sha="b" * 40),
+            self.non_web_generation(selectedLanes=[]),
+            self.non_web_generation(selectedLanes=["unknown-lane"]),
+            self.non_web_generation(selectedLanes=["operations", "operations"]),
+            self.non_web_generation(selectedLanes=["operations", "web"]),
+            self.non_web_generation(verificationJobId=None),
+            self.non_web_generation(authSmoke="passed"),
+            self.non_web_generation(deploymentId="dpl_web123"),
+            self.non_web_generation(releaseKind="web"),
+            self.non_web_generation(source=None),
+        ]
+
+        for generation in invalid_generations:
+            with self.subTest(generation=generation):
+                signals = dict(GREEN_SIGNALS)
+                signals["production"] = {
+                    "status": "green",
+                    "deployedSha": "b" * 40,
+                }
+                signals["productionGeneration"] = generation
+
+                receipt = self.evaluate(signals)
+
+                self.assertEqual(receipt["state"], "AMBER")
+                self.assertFalse(receipt["promotionAdmission"]["allowed"])
+                self.assertEqual(
+                    receipt["signals"]["production"]["deployedSha"], "b" * 40
+                )
+                self.assertEqual(
+                    receipt["signals"]["releaseCoverage"]["status"], "unbound"
+                )
+
+    def test_non_web_generation_cannot_hide_missing_public_web_identity(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green"}
+        signals["productionGeneration"] = self.non_web_generation()
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertFalse(receipt["promotionAdmission"]["allowed"])
+        self.assertEqual(receipt["signals"]["releaseCoverage"]["status"], "unbound")
+
+    def test_forged_typed_generation_without_observer_authority_stays_unbound(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green", "deployedSha": "b" * 40}
+        generation = self.non_web_generation()
+        generation.pop("source")
+        signals["productionGeneration"] = generation
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertFalse(receipt["promotionAdmission"]["allowed"])
+        self.assertEqual(
+            receipt["signals"]["production"],
+            {"status": "green", "deployedSha": "b" * 40},
+        )
+        self.assertEqual(receipt["signals"]["releaseCoverage"]["status"], "unbound")
 
     def test_fleet_hold_does_not_pause_pr_remediation(self):
         signals = dict(GREEN_SIGNALS)
@@ -1340,6 +1501,8 @@ class WorkflowContractTests(unittest.TestCase):
         wrapper = (ROOT / "scripts/hermes/evaluate-fleet-gate.sh").read_text(encoding="utf-8")
         self.assertIn('--consumer "$consumer"', wrapper)
         self.assertIn("fleet | deployment", wrapper)
+        self.assertIn(".signals.releaseCoverage", wrapper)
+        self.assertIn('IN("web-runtime", "non-web-generation")', wrapper)
         self.assertIn(AUTOENROLL_RECEIPT_JQ.split(" and\n")[0], wrapper)
 
     def test_production_controller_uses_exact_subject_deployment_admission(self):
@@ -1366,7 +1529,6 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("push:", content)
         self.assertIn("branches: [main]", content)
         self.assertIn("ref: main", content)
-        self.assertIn("node-version: '22'", content)
         self.assertIn("./.github/actions/evaluate-fleet-gate", content)
         self.assertIn("dry-run: 'false'", content)
         self.assertIn("jovie-fixed", content)
@@ -1381,6 +1543,24 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("timeout 180s scripts/backlog-orchestrator/run-backlog.sh reconcile", content)
         self.assertIn("timeout 60s scripts/backlog-orchestrator/run-backlog.sh gate-next", content)
         self.assertIn("symphony-event-admission-heartbeat/v1", content)
+
+    def test_every_fleet_evaluator_can_read_actions_with_the_pinned_node_runtime(self):
+        action = (ROOT / ".github/actions/evaluate-fleet-gate/action.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("actions/setup-node@820762786026740c76f36085b0efc47a31fe5020", action)
+        self.assertIn("node-version: '22'", action)
+        self.assertIn("FLEET_PRODUCTION_MARKER_TOKEN: ${{ github.token }}", action)
+        for workflow_name in (
+            "fleet-gate-refresh.yml",
+            "merge-queue-autoenroll.yml",
+            "queue-deferred-release.yml",
+            "production-controller.yml",
+        ):
+            with self.subTest(workflow=workflow_name):
+                content = (self.WORKFLOWS / workflow_name).read_text(encoding="utf-8")
+                permissions = content.split("jobs:", 1)[0]
+                self.assertIn("actions: read", permissions)
 
     def test_stale_window_matches_the_consumer_fail_closed_window(self):
         gate_source = GATE.read_text(encoding="utf-8")

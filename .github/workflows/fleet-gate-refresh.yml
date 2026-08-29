@@ -24,6 +24,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -71,10 +72,6 @@ jobs:
         with:
           ref: main
           persist-credentials: false
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '22'
       - name: Refresh canonical receipt
         id: refresh
         uses: ./.github/actions/evaluate-fleet-gate

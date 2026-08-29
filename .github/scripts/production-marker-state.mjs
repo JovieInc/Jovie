@@ -5,6 +5,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { PRODUCT_RELEASE_LANES } from '../../scripts/lib/product-lane-classifier.mjs';
 
 const MARKER_FILE = 'production-generation-verified.json';
 const RECOVERY_FILE = 'production-generation-recovery.json';
@@ -23,6 +24,8 @@ const ACTIVE_STATUSES = new Set([
   'requested',
   'waiting',
 ]);
+const KNOWN_RELEASE_LANES = new Set(PRODUCT_RELEASE_LANES);
+const WEB_RUNTIME_PROBE_RECEIPTS = new Set(['passed', 'oauth-reprobed']);
 
 function manual(reason, detail = reason) {
   return { state: 'manual', reason, detail };
@@ -84,16 +87,66 @@ function validateArtifact(artifact, expectedName) {
   );
 }
 
-function validateMarkerPayload(payload, context, artifact) {
-  return (
-    payload &&
-    typeof payload === 'object' &&
-    payload.sha === context.sha &&
-    typeof payload.deploymentId === 'string' &&
-    /^dpl_[A-Za-z0-9]+$/.test(payload.deploymentId) &&
-    sameInteger(payload.controllerRun, artifact.workflowRunId) &&
-    positiveInteger(payload.controllerAttempt) !== null
-  );
+function normalizeSelectedLanes(value) {
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    !value.every(
+      lane => typeof lane === 'string' && KNOWN_RELEASE_LANES.has(lane)
+    ) ||
+    new Set(value).size !== value.length
+  ) {
+    return null;
+  }
+  return [...value];
+}
+
+function classifyMarkerPayload(payload, context, artifact) {
+  if (
+    !payload ||
+    typeof payload !== 'object' ||
+    payload.sha !== context.sha ||
+    !sameInteger(payload.controllerRun, artifact?.workflowRunId) ||
+    positiveInteger(payload.controllerAttempt) === null
+  ) {
+    return null;
+  }
+
+  if (payload.deploymentId === 'not-applicable') {
+    const selectedLanes = normalizeSelectedLanes(payload.selectedLanes);
+    if (
+      payload.authSmoke !== 'not-applicable' ||
+      !selectedLanes ||
+      selectedLanes.includes('web')
+    ) {
+      return null;
+    }
+    return {
+      releaseKind: 'non-web',
+      deploymentId: payload.deploymentId,
+      authSmoke: payload.authSmoke,
+      selectedLanes,
+    };
+  }
+
+  if (
+    typeof payload.deploymentId !== 'string' ||
+    !/^dpl_[A-Za-z0-9]+$/.test(payload.deploymentId) ||
+    !WEB_RUNTIME_PROBE_RECEIPTS.has(payload.authSmoke)
+  ) {
+    return null;
+  }
+  let selectedLanes = null;
+  if (payload.selectedLanes !== undefined) {
+    selectedLanes = normalizeSelectedLanes(payload.selectedLanes);
+    if (!selectedLanes?.includes('web')) return null;
+  }
+  return {
+    releaseKind: 'web',
+    deploymentId: payload.deploymentId,
+    authSmoke: payload.authSmoke,
+    selectedLanes,
+  };
 }
 
 function validateRecoveryPayload(payload, context, artifact) {
@@ -138,10 +191,12 @@ function classifyRecoveredMarkerEntry(entry, context) {
   const artifact = entry.artifact;
   const payload = entry.payload;
   const expectedName = `production-generation-verified-${context.sha}`;
+  const markerPayload = classifyMarkerPayload(payload, context, artifact);
   if (
     !validateArtifact(artifact, expectedName) ||
     artifact.expired ||
-    !validateMarkerPayload(payload, context, artifact)
+    !markerPayload ||
+    markerPayload.releaseKind !== 'web'
   ) {
     return { error: 'malformed_or_contradictory_marker' };
   }
@@ -185,7 +240,7 @@ function classifyRecoveredMarkerEntry(entry, context) {
     kind: 'verified',
     attempt,
     controllerRun,
-    deploymentId: payload.deploymentId,
+    ...markerPayload,
     markerContext,
     recovered: true,
   };
@@ -204,11 +259,12 @@ function classifyMarkerEntry(entry, context) {
   const artifact = entry.artifact;
   const attempt = positiveInteger(entry.payload?.controllerAttempt);
   const expectedName = markerNameForAttempt(context.sha, attempt);
+  const markerPayload = classifyMarkerPayload(entry.payload, context, artifact);
   if (
     !expectedName ||
     !validateArtifact(artifact, expectedName) ||
     artifact.expired ||
-    !validateMarkerPayload(entry.payload, context, artifact)
+    !markerPayload
   ) {
     return { error: 'malformed_or_contradictory_marker' };
   }
@@ -242,7 +298,8 @@ function classifyMarkerEntry(entry, context) {
       kind: 'verified',
       attempt,
       controllerRun,
-      deploymentId: entry.payload.deploymentId,
+      ...markerPayload,
+      verificationJobId: verifiedJobs[0].id,
       markerContext,
     };
   }
@@ -339,7 +396,14 @@ export function classifyProductionMarkerEvidence(evidence) {
           : 'exact_attempt_verified',
         controllerRun: primary.controllerRun,
         controllerAttempt: primary.attempt,
+        sha,
+        releaseKind: primary.releaseKind,
         deploymentId: primary.deploymentId,
+        authSmoke: primary.authSmoke,
+        selectedLanes: primary.selectedLanes,
+        ...(primary.verificationJobId
+          ? { verificationJobId: primary.verificationJobId }
+          : {}),
       };
     }
     if (primary.kind === 'active') {
@@ -406,7 +470,14 @@ export function classifyProductionMarkerEvidence(evidence) {
           reason: 'exact_recovery_attempt_verified',
           controllerRun: recovery.controllerRun,
           controllerAttempt: 2,
+          sha,
+          releaseKind: recovery.releaseKind,
           deploymentId: recovery.deploymentId,
+          authSmoke: recovery.authSmoke,
+          selectedLanes: recovery.selectedLanes,
+          ...(recovery.verificationJobId
+            ? { verificationJobId: recovery.verificationJobId }
+            : {}),
         };
       }
       if (recovery?.kind === 'active') {

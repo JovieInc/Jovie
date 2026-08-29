@@ -12,6 +12,7 @@ on:
     branches: [main]
 
 permissions:
+  actions: read
   contents: read
 
 # Every initial run and rerun joins one repo-wide FIFO. This lease spans exact
@@ -882,10 +883,11 @@ jobs:
             jq -n \
               --arg sha "$EXPECTED_SHA" \
               --arg deployment_id "$DEPLOYMENT_ID" \
+              --arg lanes "$SELECTED_LANES" \
               --arg controller_run "${{ github.run_id }}" \
               --arg controller_attempt "${{ github.run_attempt }}" \
               --arg auth_smoke "$AUTH_SMOKE_STATUS" \
-              '{sha: $sha, deploymentId: $deployment_id, controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: $auth_smoke}' \
+              '{sha: $sha, deploymentId: $deployment_id, selectedLanes: ($lanes | split(",")), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: $auth_smoke}' \
               > "$RUNNER_TEMP/production-generation-verified.json"
             test -s "$RUNNER_TEMP/production-generation-verified.json" || {
               echo "::error::Verified marker write-through produced an empty file."

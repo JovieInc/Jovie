@@ -1963,6 +1963,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(verified).not.toContain('ci-homepage-smoke');
     expect(verified).toContain('lighthouse-ci');
     expect(verified).toContain('authSmoke: $auth_smoke');
+    expect(verified).toContain('selectedLanes: ($lanes | split(","))');
     expect(verified).toContain('did not complete successfully');
     expect(verified).not.toContain('concurrency:');
     expect(verified).toContain('repos/${{ github.repository }}/commits/main');

@@ -63,6 +63,10 @@ SEVERE_REASONS = {
 }
 DEFAULT_GEM_CONCURRENCY = 4
 UTC = timezone.utc
+ROOT_DIR = Path(__file__).resolve().parents[2]
+PRODUCTION_MARKER_SCRIPT = ROOT_DIR / ".github/scripts/production-marker-state.mjs"
+PRODUCTION_GENERATION_SCHEMA = "jovie-production-generation/v1"
+KNOWN_RELEASE_LANES = {"ios", "mac", "web", "operations", "cross-product"}
 
 
 def utc_now() -> datetime:
@@ -172,13 +176,16 @@ def validate_closure_health(candidate: object) -> dict[str, Any]:
     }
 
 
-def gh_json(repo: str, endpoint: str) -> dict[str, Any]:
+def gh_json(
+    repo: str, endpoint: str, *, environment: dict[str, str] | None = None
+) -> dict[str, Any]:
     result = subprocess.run(
         ["gh", "api", f"repos/{repo}/{endpoint}"],
         check=True,
         capture_output=True,
         text=True,
         timeout=20,
+        env=environment,
     )
     value = json.loads(result.stdout)
     if not isinstance(value, dict):
@@ -431,6 +438,83 @@ def observe_production(url: str) -> dict[str, Any]:
     return observed
 
 
+def observe_production_generation(repo: str, sha: object) -> dict[str, Any]:
+    """Classify the immutable exact-main controller marker with Actions evidence."""
+    if not valid_commit_sha(sha, exact=True):
+        return {
+            "schema": PRODUCTION_GENERATION_SCHEMA,
+            "state": "unknown",
+            "sha": sha,
+            "reason": "invalid-main-sha",
+        }
+    try:
+        environment = os.environ.copy()
+        marker_token = environment.get("FLEET_PRODUCTION_MARKER_TOKEN")
+        if marker_token:
+            environment["GH_TOKEN"] = marker_token
+        workflow = gh_json(
+            repo,
+            "actions/workflows/production-controller.yml",
+            environment=environment,
+        )
+        workflow_id = workflow.get("id")
+        if (
+            not isinstance(workflow_id, int)
+            or isinstance(workflow_id, bool)
+            or workflow_id <= 0
+            or workflow.get("name") != "Production Controller"
+            or workflow.get("path") != ".github/workflows/production-controller.yml"
+            or workflow.get("state") != "active"
+        ):
+            raise ValueError("authoritative Production Controller identity is malformed")
+        result = subprocess.run(
+            [
+                "node",
+                str(PRODUCTION_MARKER_SCRIPT),
+                "--sha",
+                sha,
+                "--repo",
+                repo,
+                "--controller-workflow-id",
+                str(workflow_id),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=environment,
+        )
+        marker = json.loads(result.stdout)
+        if (
+            not isinstance(marker, dict)
+            or marker.get("state")
+            not in {"none", "pending", "recovery_available", "verified", "manual"}
+            or not isinstance(marker.get("reason"), str)
+            or not marker.get("reason")
+            or (marker.get("state") == "verified" and marker.get("sha") != sha)
+        ):
+            raise ValueError("production marker classifier returned malformed evidence")
+        return {
+            **marker,
+            "schema": PRODUCTION_GENERATION_SCHEMA,
+            "sha": sha,
+            "source": "immutable-controller-marker",
+        }
+    except (
+        OSError,
+        subprocess.SubprocessError,
+        ValueError,
+        json.JSONDecodeError,
+    ) as error:
+        return {
+            "schema": PRODUCTION_GENERATION_SCHEMA,
+            "state": "unknown",
+            "sha": sha,
+            "reason": "production-generation-observation-failed",
+            "error": str(error),
+        }
+
+
 def deployment_bound(main_sha: object, deployed_sha: object) -> bool:
     """True only when production is provably running the exact main SHA."""
     return (
@@ -438,6 +522,55 @@ def deployment_bound(main_sha: object, deployed_sha: object) -> bool:
         and valid_commit_sha(deployed_sha, exact=True)
         and main_sha == deployed_sha
     )
+
+
+def positive_integer(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def valid_non_web_generation(main_sha: object, generation: object) -> bool:
+    if not isinstance(generation, dict):
+        return False
+    selected_lanes = generation.get("selectedLanes")
+    return (
+        valid_commit_sha(main_sha, exact=True)
+        and generation.get("schema") == PRODUCTION_GENERATION_SCHEMA
+        and generation.get("source") == "immutable-controller-marker"
+        and generation.get("state") == "verified"
+        and generation.get("reason") == "exact_attempt_verified"
+        and generation.get("sha") == main_sha
+        and generation.get("releaseKind") == "non-web"
+        and generation.get("deploymentId") == "not-applicable"
+        and generation.get("authSmoke") == "not-applicable"
+        and isinstance(selected_lanes, list)
+        and len(selected_lanes) > 0
+        and all(isinstance(lane, str) and lane in KNOWN_RELEASE_LANES for lane in selected_lanes)
+        and len(set(selected_lanes)) == len(selected_lanes)
+        and "web" not in selected_lanes
+        and positive_integer(generation.get("controllerRun"))
+        and positive_integer(generation.get("controllerAttempt"))
+        and positive_integer(generation.get("verificationJobId"))
+    )
+
+
+def classify_release_coverage(
+    main_sha: object, deployed_sha: object, generation: object
+) -> dict[str, Any]:
+    if deployment_bound(main_sha, deployed_sha):
+        return {"status": "bound", "kind": "web-runtime", "sha": main_sha}
+    if valid_commit_sha(deployed_sha, exact=True) and valid_non_web_generation(
+        main_sha, generation
+    ):
+        assert isinstance(generation, dict)
+        return {
+            "status": "bound",
+            "kind": "non-web-generation",
+            "sha": main_sha,
+            "selectedLanes": list(generation["selectedLanes"]),
+            "controllerRun": generation["controllerRun"],
+            "controllerAttempt": generation["controllerAttempt"],
+        }
+    return {"status": "unbound", "kind": "none", "sha": None}
 
 
 def valid_commit_sha(value: object, *, exact: bool = False) -> bool:
@@ -847,6 +980,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         if isinstance(production_value, dict)
         else {"status": "unknown"}
     )
+    production_generation = signals.get("productionGeneration")
     controller_value = signals.get("controller")
     controller = (
         controller_value
@@ -857,7 +991,14 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     queue = queue_value if isinstance(queue_value, dict) else {"status": "unknown"}
     closure_health = validate_closure_health(signals.get("closureHealth"))
     closure_intake_allowed = closure_health["newIssueIntakeAllowed"] is True
-    normalized_signals = {**signals, "closureHealth": closure_health}
+    release_coverage = classify_release_coverage(
+        main.get("sha"), production.get("deployedSha"), production_generation
+    )
+    normalized_signals = {
+        **signals,
+        "closureHealth": closure_health,
+        "releaseCoverage": release_coverage,
+    }
     review = validate_independent_review(
         signals.get("independentReview"),
         main.get("sha"),
@@ -884,13 +1025,14 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             )
         )
 
-    # Cross-field invariant: green health is only deployment authority when
-    # production is bound to the exact deployed main SHA. A healthy but
-    # stale (or unverifiable) deployment freezes promotion and new leases.
+    # Cross-field invariant: green health is promotion authority only when
+    # current main is covered by the exact public Web SHA or by a strictly
+    # verified non-Web controller generation. Public deployedSha remains the
+    # literal Web identity in both cases.
     production_unbound = (
         main.get("status") == "green"
         and production.get("status") == "green"
-        and not deployment_bound(main.get("sha"), production.get("deployedSha"))
+        and release_coverage["status"] != "bound"
     )
 
     if not any(reason["severity"] == "critical" for reason in reasons):
@@ -929,7 +1071,8 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
                     "production-deployment-unbound",
                     "promotion",
                     "warning",
-                    "Production health is not bound to the exact deployed main SHA; "
+                    "Production health lacks exact current-main release coverage from "
+                    "either public Web identity or a verified non-Web generation; "
                     "promotion is frozen while isolated implementation continues.",
                 )
             )
@@ -1312,6 +1455,11 @@ def failed_evaluation_receipt(
         "signals": {
             "main": {"status": "unknown", "sha": UNKNOWN_MAIN_SHA},
             "production": {"status": "unknown"},
+            "releaseCoverage": {
+                "status": "unbound",
+                "kind": "none",
+                "sha": None,
+            },
             "controller": {"status": "unknown"},
             "integrity": {"status": "invalid", "detail": str(error)},
             "queue": {"status": "unknown", "eligiblePrs": None, "target": 0},
@@ -1513,6 +1661,7 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
     integrity_path = args.integrity_receipt or args.state_dir.parent / "integrity.json"
     concurrency_path = args.concurrency_evidence or args.state_dir.parent / "concurrency.json"
     main = observe_main(args.repo)
+    production_generation = observe_production_generation(args.repo, main.get("sha"))
     review_path = (
         args.independent_review_receipt
         or args.state_dir.parent / "independent-review.json"
@@ -1520,6 +1669,7 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
     return {
         "main": main,
         "production": observe_production(args.production_url),
+        "productionGeneration": production_generation,
         "controller": observe_controller(
             args.symphony_url,
             snapshot_path=args.state_dir.parent / "controller-snapshot.json",

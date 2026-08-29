@@ -97,7 +97,11 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
   ],
 ]);
 
-const ALL_LANES = [...PRODUCT_LANES, 'operations', 'cross-product'];
+export const PRODUCT_RELEASE_LANES = Object.freeze([
+  ...PRODUCT_LANES,
+  'operations',
+  'cross-product',
+]);
 
 const normalizePath = path =>
   String(path ?? '')
@@ -159,7 +163,7 @@ export function classifyProductLanes(paths) {
     ...(operationsSelected ? ['operations'] : []),
     ...(crossProductSelected ? ['cross-product'] : []),
   ];
-  const skippedLanes = ALL_LANES.filter(
+  const skippedLanes = PRODUCT_RELEASE_LANES.filter(
     lane => !selectedLanes.includes(lane)
   ).map(lane => ({
     lane,
@@ -186,7 +190,7 @@ export function classifyProductLanes(paths) {
 export function evaluateProductLaneResults(receipt, results) {
   const selected = new Set(receipt.selectedLanes);
   const admissions = Object.fromEntries(
-    ALL_LANES.map(lane => {
+    PRODUCT_RELEASE_LANES.map(lane => {
       const laneResults = results[lane] ?? [];
       if (!selected.has(lane)) {
         if (laneResults.some(result => result !== 'skipped')) {

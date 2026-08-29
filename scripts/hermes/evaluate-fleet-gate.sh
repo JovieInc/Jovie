@@ -45,6 +45,15 @@ jq -e '
   .schema == "jovie-fleet-gate/v1" and
   (.observedAt | type == "string") and
   (try (.signals.main.sha | test("^[0-9a-f]{40}$")) catch false) and
+  (.signals.releaseCoverage |
+    type == "object" and
+    if .status == "bound" then
+      (.kind | IN("web-runtime", "non-web-generation")) and
+      (.sha | test("^[0-9a-f]{40}$"))
+    else
+      .status == "unbound" and .kind == "none" and .sha == null
+    end
+  ) and
   (.signals.integrity.status | IN("clear", "resolved", "active", "invalid")) and
   (.signals.closureHealth.schema == "jovie-closure-health/v1") and
   (.signals.closureHealth.newIssueIntakeAllowed | type == "boolean") and

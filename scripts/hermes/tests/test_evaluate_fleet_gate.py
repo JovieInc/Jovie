@@ -99,6 +99,23 @@ def run_wrapper(payload, *, consumer="fleet", expected_sha=None):
 
 
 class EvaluateFleetGateWrapperTests(unittest.TestCase):
+    def non_web_generation(self, **overrides):
+        return {
+            "schema": "jovie-production-generation/v1",
+            "source": "immutable-controller-marker",
+            "state": "verified",
+            "reason": "exact_attempt_verified",
+            "sha": SHA,
+            "releaseKind": "non-web",
+            "selectedLanes": ["operations"],
+            "deploymentId": "not-applicable",
+            "authSmoke": "not-applicable",
+            "controllerRun": 456,
+            "controllerAttempt": 1,
+            "verificationJobId": 1019,
+            **overrides,
+        }
+
     def test_script_and_action_are_the_single_evaluate_path(self):
         self.assertTrue(SCRIPT.is_file())
         self.assertTrue(os.access(SCRIPT, os.X_OK) or SCRIPT.exists())
@@ -138,6 +155,42 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertEqual(outputs["work_allowed"], "false")
         self.assertEqual(outputs["new_issue_intake_allowed"], "false")
         self.assertEqual(outputs["gate_rc"], "2")
+
+    def test_wrapper_accepts_exact_non_web_coverage_without_rewriting_deployed_sha(self):
+        prior_web_sha = "b" * 40
+        code, outputs, receipt = run_wrapper(
+            signals(
+                production={"status": "green", "deployedSha": prior_web_sha},
+                productionGeneration=self.non_web_generation(),
+            )
+        )
+
+        self.assertEqual(code, 0)
+        self.assertEqual(outputs["promotion_allowed"], "true")
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertEqual(
+            receipt["signals"]["production"],
+            {"status": "green", "deployedSha": prior_web_sha},
+        )
+        self.assertEqual(
+            receipt["signals"]["releaseCoverage"]["kind"],
+            "non-web-generation",
+        )
+
+    def test_wrapper_rejects_forged_non_web_coverage_without_observer_source(self):
+        generation = self.non_web_generation()
+        generation.pop("source")
+        code, outputs, receipt = run_wrapper(
+            signals(
+                production={"status": "green", "deployedSha": "b" * 40},
+                productionGeneration=generation,
+            )
+        )
+
+        self.assertEqual(code, 0)
+        self.assertEqual(outputs["promotion_allowed"], "false")
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertEqual(receipt["signals"]["releaseCoverage"]["status"], "unbound")
 
     def test_missing_review_still_allows_isolated_lease(self):
         code, outputs, receipt = run_wrapper(
