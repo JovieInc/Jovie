@@ -810,9 +810,19 @@ async function persistAnonymousAssistantRecord({
       scriptLineKey,
       createdAt: now,
     })
-    .onConflictDoNothing({
+    .onConflictDoUpdate({
       target: [chatMessages.conversationId, chatMessages.clientMessageId],
-      where: drizzleSql`${chatMessages.clientMessageId} IS NOT NULL`,
+      targetWhere: drizzleSql`${chatMessages.clientMessageId} IS NOT NULL`,
+      set: {
+        content:
+          content ||
+          (toolCalls && toolCalls.length > 0
+            ? ''
+            : 'Done. What would you like to do next?'),
+        toolCalls,
+        assistantSource,
+        scriptLineKey,
+      },
     });
 
   await db
