@@ -474,6 +474,74 @@ describe('public profile audience block helper', () => {
     ).resolves.toBe(true);
   });
 
+  it('preserves the Upstash client request receiver for pipeline reads', async () => {
+    (process.env as { NODE_ENV: string }).NODE_ENV = 'production';
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mocks.createFingerprintEdge.mockResolvedValue('fingerprint-1');
+    mockAudienceBlockRows([]);
+
+    class ReceiverBoundUpstashClient {
+      headers = { authorization: 'Bearer test' };
+
+      async request(opts: {
+        readonly path: readonly string[];
+        readonly body: readonly unknown[];
+      }) {
+        // Production HttpClient reads `this.headers`. An unbound extract of
+        // `client.request` throws TypeError and fail-opens with a warning.
+        const authorization = this.headers.authorization;
+        if (!authorization) {
+          throw new TypeError(
+            "Cannot read properties of undefined (reading 'headers')"
+          );
+        }
+        const command = Array.isArray(opts.body[0]) ? opts.body[0] : [];
+        const key = String(command[1] ?? '');
+        if (key.includes(':has:')) {
+          return [{ result: true }];
+        }
+        return [{ result: null }];
+      }
+    }
+
+    const redis = {
+      pipeline() {
+        const commands: Array<{ command: unknown[] }> = [];
+        const pipeline = {
+          commands,
+          get(key: string) {
+            commands.push({ command: ['GET', key] });
+            return pipeline;
+          },
+          set(key: string, value: unknown) {
+            commands.push({ command: ['SET', key, value] });
+            return pipeline;
+          },
+          del(key: string) {
+            commands.push({ command: ['DEL', key] });
+            return pipeline;
+          },
+          client: new ReceiverBoundUpstashClient(),
+        };
+        return pipeline;
+      },
+    };
+    mocks.getRedis.mockReturnValue(redis);
+
+    try {
+      await expect(
+        checkProfileVisitorBlocked('tim', '1.2.3.4', 'Mozilla')
+      ).resolves.toBe(false);
+
+      expect(warning).not.toHaveBeenCalled();
+      // Pipeline GET for :has: returned true, so the existence probe is
+      // skipped and only the fingerprint JOIN runs.
+      expect(mocks.select).toHaveBeenCalledTimes(1);
+    } finally {
+      warning.mockRestore();
+    }
+  });
+
   it('fail-opens when the Redis pipeline payload is not an array', async () => {
     process.env.NODE_ENV = 'production';
     expect(() =>
