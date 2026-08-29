@@ -251,6 +251,11 @@ async function createFreshUserOnce(page: import('@playwright/test').Page) {
     const claimPayload = (await claimResponse.json()) as {
       claimed?: number;
       conversationId?: string;
+      profile?: {
+        profileId?: string;
+        handle?: string;
+        status?: string;
+      };
     };
 
     if (!betterAuthUserId) {
@@ -484,6 +489,11 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
     expect(claimPayload).toMatchObject({
       claimed: 1,
       conversationId,
+      profile: {
+        profileId: expect.any(String),
+        handle: uniqueHandle,
+        status: 'created',
+      },
     });
 
     const readClaimedProfileProof = async () => {
