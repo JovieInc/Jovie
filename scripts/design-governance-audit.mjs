@@ -11,6 +11,9 @@
  *      ci-fast-lanes.mjs is WARN-only (weekly + local; not a merge gate).
  *   6. code-style.md custom-rule count matches eslint.config.js.
  *   7. DESIGN_COMPLETE.md carries a superseded banner.
+ *   8. Design-agent invariants project from canon/invariants.jsonl only.
+ *
+ * Invariant consumer: JOV-INV-019.
  *
  * Exit 0 when nothing FAILs (WARN is allowed); exit 1 on any FAIL.
  *
@@ -29,6 +32,13 @@ import {
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { findDesignManifestProjectionViolations } from './design-authority-guard.mjs';
+import { buildLlmsDesignManifest } from './generate-llms-design-manifest.mjs';
+import {
+  findDesignInvariantProjectionViolations,
+  readDesignAgentContract,
+} from './invariants/design-agent-contract.mjs';
+
 const THIS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REPO_ROOT = path.join(THIS_DIR, '..');
 
@@ -46,6 +56,11 @@ const WEB_PACKAGE_PATH = 'apps/web/package.json';
 const ESLINT_CONFIG_PATH = 'apps/web/eslint.config.js';
 const CODE_STYLE_RULES_PATH = '.claude/rules/code-style.md';
 const DESIGN_COMPLETE_PATH = 'DESIGN_COMPLETE.md';
+const LLM_DESIGN_MANIFEST_PATH = 'docs/llms-design-manifest.txt';
+const DESIGN_PROJECTION_PROBE = {
+  id: 'design-projection-binding-probe',
+  statement: 'Executable projection binding probe.',
+};
 
 const ROOT_REQUIRED_SCRIPTS = [
   'design:authority:check',
@@ -409,6 +424,58 @@ export function runDesignGovernanceAudit(repoRoot = DEFAULT_REPO_ROOT) {
       'design-complete-banner',
       'FAIL',
       `${DESIGN_COMPLETE_PATH} unreadable: ${error instanceof Error ? error.message : error}`
+    );
+  }
+
+  try {
+    const contract = readDesignAgentContract(repoRoot);
+    const manifestViolations = findDesignInvariantProjectionViolations(
+      readRepoFile(LLM_DESIGN_MANIFEST_PATH),
+      contract
+    );
+    const probeContract = {
+      ...contract,
+      invariants: [...contract.invariants, DESIGN_PROJECTION_PROBE],
+    };
+    const generatedProbe = buildLlmsDesignManifest({
+      repoRoot,
+      designAgentContract: probeContract,
+    });
+    const generatorBindingViolations = findDesignInvariantProjectionViolations(
+      generatedProbe,
+      probeContract
+    );
+    const guardDetectsProbe = findDesignManifestProjectionViolations(
+      repoRoot,
+      probeContract
+    ).some(detail => detail.includes('projection differs from JOV-INV-019'));
+    const bindingViolations = [
+      ...generatorBindingViolations.map(
+        detail => `generator ignored contract probe: ${detail}`
+      ),
+      ...(guardDetectsProbe
+        ? []
+        : ['authority guard did not reject a changed contract projection']),
+    ];
+    const violations = [...manifestViolations, ...bindingViolations];
+    if (violations.length > 0) {
+      report(
+        'design-invariant-projection',
+        'FAIL',
+        `design invariants must project only from canon/invariants.jsonl: ${violations.join('; ')}`
+      );
+    } else {
+      report(
+        'design-invariant-projection',
+        'PASS',
+        `${contract.invariants.length} design invariants project from JOV-INV-019 through executable generator and guard bindings`
+      );
+    }
+  } catch (error) {
+    report(
+      'design-invariant-projection',
+      'FAIL',
+      `canonical projection unreadable: ${error instanceof Error ? error.message : error}`
     );
   }
 
