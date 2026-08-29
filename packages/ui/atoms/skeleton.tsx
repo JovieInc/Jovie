@@ -27,8 +27,7 @@ const roundedClasses: Record<RoundedVariant, string> = {
   full: 'rounded-full',
 };
 
-const RESERVED_GEOMETRY_UTILITY_PATTERN =
-  /^(?:min-|max-)?(?:h|w)-.+$|^size-.+$/;
+const RESERVED_GEOMETRY_UTILITY_PATTERN = /^(?:min-|max-)?[hw]-.+$|^size-.+$/;
 
 function withoutReservedGeometry(className: string | undefined): string {
   if (!className) return '';

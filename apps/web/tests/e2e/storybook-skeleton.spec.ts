@@ -6,7 +6,7 @@ const BUTTON_GEOMETRY_STORY_ID =
 
 async function openStory(page: Page, storyId: string) {
   await page.goto(`/iframe.html?id=${storyId}&viewMode=story`, {
-    waitUntil: 'networkidle',
+    waitUntil: 'domcontentloaded',
   });
 }
 
