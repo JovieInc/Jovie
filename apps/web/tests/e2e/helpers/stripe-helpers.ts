@@ -320,7 +320,7 @@ export async function completeCardPayment(page: Page, card: CardDetails) {
 
   if (!(await cardPaymentMethod.isChecked())) {
     const cardPaymentButton = page
-      .getByRole('button', { name: /pay with card/i })
+      .locator('[data-testid="card-accordion-item-button"]')
       .filter({ visible: true })
       .first();
     await expect(cardPaymentButton).toBeVisible({ timeout: 15_000 });
