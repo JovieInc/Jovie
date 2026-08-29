@@ -395,6 +395,7 @@ describe('component comparative quality bar', () => {
     const input = clone(
       COMPARATIVE_QUALITY_BAR.find(item => item.id === 'atom.input')
     );
+    input.trustedReference = clone(QUALITY_BAR_REFERENCES[input.referenceId]);
     input.enrollmentBatch = 'batch-0';
     input.requiredDimensions.push('append-stability');
     input.requirements.minHitTargetPx = 48;
@@ -411,6 +412,37 @@ describe('component comparative quality bar', () => {
         `atom\\.input: trusted baseline identity is immutable against ${'b'.repeat(40)}[\\s\\S]*atom\\.input: trusted baseline contract was weakened`
       )
     );
+
+    const forgedReference = clone(QUALITY_BAR_REFERENCES['shadcn-components']);
+    forgedReference.url = 'https://evil.example/components';
+    forgedReference.license.url = 'https://evil.example/license';
+    for (const { key, value } of [
+      { key: 'disposition', value: 'improve' },
+      {
+        key: 'referenceUrl',
+        value: 'https://ui.shadcn.com/docs/components/base/textarea',
+      },
+      { key: 'nearestPattern', value: 'Textarea' },
+      { key: 'trustedReference', value: forgedReference },
+    ]) {
+      const retagged = clone(
+        COMPARATIVE_QUALITY_BAR.find(item => item.id === 'atom.input')
+      );
+      retagged.trustedReference = clone(
+        QUALITY_BAR_REFERENCES[retagged.referenceId]
+      );
+      retagged[key] = value;
+      const blocked = runComparativeQualityBar({
+        trustedBaseEnrollment: {
+          ok: true,
+          ref: 'd'.repeat(40),
+          baselines: [retagged],
+        },
+      });
+      expect(blocked.receipt.issues).toContain(
+        `atom.input: trusted baseline identity is immutable against ${'d'.repeat(40)}`
+      );
+    }
 
     const trustedInput = clone(input);
     delete trustedInput.enrollmentBatch;

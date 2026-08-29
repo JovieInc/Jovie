@@ -79,7 +79,8 @@ process.stdin.setEncoding('utf8');
 for await (const chunk of process.stdin) source += chunk;
 const url = 'data:text/javascript;base64,' + Buffer.from(source).toString('base64');
 const registry = await import(url);
-process.stdout.write(JSON.stringify(registry.COMPARATIVE_QUALITY_BAR));
+// biome-ignore format: keep the trusted provenance snapshot adjacent to its baseline.
+process.stdout.write(JSON.stringify(registry.COMPARATIVE_QUALITY_BAR.map(item => ({ ...item, trustedReference: registry.QUALITY_BAR_REFERENCES[item.referenceId] }))));
 `;
 
 const unique = values => [...new Set(values)];
@@ -132,7 +133,8 @@ export function resolveTrustedBaseEnrollment(repoRoot = REPO_ROOT) {
   return result;
 }
 
-function trustedBaselineIdentity(baseline, includeEnrollmentBatch = true) {
+// biome-ignore format: keep the trust direction explicit at the comparison boundary.
+function trustedBaselineIdentity(baseline, includeEnrollmentBatch = true, fromTrusted = false) {
   if (!isComparativeObject(baseline) || typeof baseline.id !== 'string') {
     return null;
   }
@@ -141,6 +143,12 @@ function trustedBaselineIdentity(baseline, includeEnrollmentBatch = true) {
     layer: baseline.layer,
     owner: baseline.owner,
     referenceId: baseline.referenceId,
+    referenceUrl: baseline.referenceUrl,
+    nearestPattern: baseline.nearestPattern,
+    disposition: baseline.disposition,
+    reference: fromTrusted
+      ? baseline.trustedReference
+      : QUALITY_BAR_REFERENCES[baseline.referenceId],
   };
   if (includeEnrollmentBatch) {
     identity.enrollmentBatch = baseline.enrollmentBatch;
@@ -171,7 +179,8 @@ function trustedBaselineIssues(trustedBaselines, ref) {
     const locksEnrollmentBatch = typeof trusted?.enrollmentBatch === 'string';
     const trustedIdentity = trustedBaselineIdentity(
       trusted,
-      locksEnrollmentBatch
+      locksEnrollmentBatch,
+      true
     );
     if (!trustedIdentity) {
       issues.push(
