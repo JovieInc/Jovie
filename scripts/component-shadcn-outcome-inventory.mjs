@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Shadcn/Typeset outcome inventory (JOV-5438). Public references only. */
+/** Shadcn/Typeset outcome inventory (JOV-5438 / JOV-5448). Public references only. */
 
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
@@ -40,6 +40,11 @@ export const APPROVED_ENROLLMENT_BATCH_IDS = Object.freeze([
   'molecule.sidebar-nav-item',
   'atom.card',
   'atom.field',
+  'atom.input',
+  'atom.textarea',
+  'atom.checkbox',
+  'atom.radio-group',
+  'atom.native-select',
   'typography.system-b',
 ]);
 export const CATALOG_ROOTS = Object.freeze([
@@ -207,7 +212,12 @@ atom.button|atom|packages/ui/atoms/button.tsx|Button|button|diverge|button-affor
 atom.switch|atom|packages/ui/atoms/switch.tsx|Switch|switch|keep|toggle-state||packages/ui/atoms/switch.stories.tsx|packages/ui/atoms/switch.test.tsx|Named switch state changes without shifting surrounding geometry.
 molecule.sidebar-nav-item|molecule|apps/web/components/shell/SidebarNavItem.tsx|SidebarNavItem|sidebar|diverge|compact-navigation|atom.segment-control|apps/web/components/shell/SidebarNavItem.stories.tsx|apps/web/components/shell/SidebarNavItem.test.tsx|Compact shell rows keep an accessible name when collapsed.;;No decorative hover translation.
 atom.card|atom|packages/ui/atoms/card.tsx|Card|card|keep|card-bento||packages/ui/atoms/Card.stories.tsx|packages/ui/atoms/card.test.tsx|Single card surface; nested card-in-card compositions are blocked.
-atom.field|atom|packages/ui/atoms/field.tsx|Field|field|keep|form-control|atom.input,atom.textarea,atom.checkbox,atom.label|packages/ui/atoms/field.stories.tsx|packages/ui/atoms/field.test.tsx|Labeled control; error/description reserve geometry and stay described.
+atom.field|atom|packages/ui/atoms/field.tsx|Field|field|keep|form-control|atom.input,atom.textarea,atom.checkbox,atom.radio-group,atom.native-select,atom.label|packages/ui/atoms/field.stories.tsx|packages/ui/atoms/field.test.tsx|Labeled control; error/description reserve geometry and stay described.
+atom.input|atom|packages/ui/atoms/input.tsx|Input|input|keep|form-control|atom.field,atom.textarea|packages/ui/atoms/input.stories.tsx|packages/ui/atoms/input.test.tsx|Labeled textbox; invalid/pending reserve geometry and stay described.
+atom.textarea|atom|packages/ui/atoms/textarea.tsx|Textarea|textarea|keep|form-control|atom.field,atom.input|packages/ui/atoms/textarea.stories.tsx|packages/ui/atoms/textarea.test.tsx|Labeled multiline textbox; long copy wraps and invalid/pending reserve geometry.
+atom.checkbox|atom|packages/ui/atoms/checkbox.tsx|Checkbox|checkbox|keep|form-control|atom.field,atom.label|packages/ui/atoms/checkbox.stories.tsx|packages/ui/atoms/checkbox.test.tsx|Named checkbox exposes checked/unchecked/indeterminate without shifting layout.
+atom.radio-group|atom|packages/ui/atoms/radio-group.tsx|RadioGroup|radio-group|keep|form-control|atom.field,atom.label|packages/ui/atoms/radio-group.stories.tsx|packages/ui/atoms/radio-group.test.tsx|Radio group keeps one accessible name per option and arrow-key movement.
+atom.native-select|atom|packages/ui/atoms/native-select.tsx|NativeSelect|native-select|improve|form-control|atom.select,atom.field|packages/ui/atoms/native-select.stories.tsx|packages/ui/atoms/native-select.test.tsx|Native select stays form-associated; invalid/disabled do not shift siblings.
 typography.system-b|system|DESIGN.md|Typography|typography|diverge|typography-rhythm,typography-overflow||DESIGN.md|apps/web/styles/design-system.css|Heading leading stays near 1.3; body leading stays near 1.5.;;Long copy wraps; clip/visible overflow fails closed.
 `.trim()
     )
@@ -331,7 +341,7 @@ export function evaluateOutcomeInventory(options = {}) {
     if (!Array.isArray(item.outcomeInvariants) || item.outcomeInvariants.length === 0) issues.push(`${item.id}: outcome invariants are required`);
     if (item.enrolled === true) {
       enrolledIds.push(item.id);
-      if (!APPROVED_SET.has(item.id)) issues.push(`${item.id}: unapproved enrollment; batch-1 is closed`);
+      if (!APPROVED_SET.has(item.id)) issues.push(`${item.id}: unapproved enrollment; approved set is closed`);
       collectNamedDimensions(item, issues, item.id);
       for (const relativePath of [item.source, ...evidencePaths(item.evidence)].filter(Boolean)) {
         if (!existsSync(resolve(repoRoot, relativePath))) issues.push(`${item.id}: missing evidence path ${relativePath}`);
@@ -518,6 +528,21 @@ export const OUTCOME_BATCH_SAMPLES = Object.freeze([
   ]),
   outcomeSample('outcome-batch.atom.field.labeled', 'outcome-batch', 'atom.field', ['form-control'], [
     { copy: 'Display name', accessibleName: 'Display name', description: 'Shown on your public profile', describedBy: 'field-name-description', error: 'Enter a display name', layoutContract: 'reserved-geometry' },
+  ]),
+  outcomeSample('outcome-batch.atom.input.labeled', 'outcome-batch', 'atom.input', ['form-control'], [
+    { copy: 'Artist name', accessibleName: 'Artist name', description: 'Shown on your public profile', describedBy: 'input-name-description', error: 'Enter an artist name', pending: true, layoutContract: 'reserved-geometry' },
+  ]),
+  outcomeSample('outcome-batch.atom.textarea.labeled', 'outcome-batch', 'atom.textarea', ['form-control'], [
+    { copy: 'Bio', accessibleName: 'Bio', description: 'Shown on your public profile', describedBy: 'textarea-bio-description', error: 'Enter a bio', layoutContract: 'reserved-geometry' },
+  ]),
+  outcomeSample('outcome-batch.atom.checkbox.labeled', 'outcome-batch', 'atom.checkbox', ['form-control'], [
+    { copy: 'Public profile', accessibleName: 'Public profile', role: 'checkbox', layoutContract: 'static' },
+  ]),
+  outcomeSample('outcome-batch.atom.radio-group.labeled', 'outcome-batch', 'atom.radio-group', ['form-control'], [
+    { copy: 'Visibility', accessibleName: 'Visibility', role: 'radiogroup', layoutContract: 'static' },
+  ]),
+  outcomeSample('outcome-batch.atom.native-select.labeled', 'outcome-batch', 'atom.native-select', ['form-control'], [
+    { copy: 'Release type', accessibleName: 'Release type', description: 'Shown on the smart link', describedBy: 'native-select-type-description', error: 'Choose a release type', layoutContract: 'reserved-geometry' },
   ]),
   outcomeSample('outcome-batch.typography.system-b.rhythm', 'outcome-batch', 'typography.system-b', ['typography-rhythm', 'typography-overflow'], [
     { copy: 'Never Say A Word', accessibleName: 'Track title', typography: { role: 'heading', fontSizePx: 18, lineHeightPx: 23.4, measureCh: 40, overflow: 'wrap' } },

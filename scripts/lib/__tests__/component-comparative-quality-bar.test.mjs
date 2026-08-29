@@ -130,6 +130,45 @@ describe('component comparative quality bar', () => {
     );
   });
 
+  it('enrolls the canonical form-control family in the closed-world inventory', () => {
+    const inventory = discoverAtomMoleculeInventory();
+    for (const [sourcePath, baselineId] of [
+      ['packages/ui/atoms/input.tsx', 'atom.input'],
+      ['packages/ui/atoms/textarea.tsx', 'atom.textarea'],
+      ['packages/ui/atoms/checkbox.tsx', 'atom.checkbox'],
+      ['packages/ui/atoms/radio-group.tsx', 'atom.radio-group'],
+      ['packages/ui/atoms/native-select.tsx', 'atom.native-select'],
+    ]) {
+      expect(
+        inventory.find(item => item.sourcePath === sourcePath)
+      ).toMatchObject({
+        layer: 'atom',
+        comparisonStatus: 'rubric-enrolled',
+        baselineId,
+      });
+    }
+    const result = runComparativeQualityBar();
+    expect(result.ok).toBe(true);
+    expect(
+      COMPARATIVE_QUALITY_BAR.filter(item =>
+        [
+          'atom.input',
+          'atom.textarea',
+          'atom.checkbox',
+          'atom.radio-group',
+          'atom.native-select',
+        ].includes(item.id)
+      ).every(
+        item =>
+          item.enrolled === true &&
+          item.referenceUrl.startsWith(
+            'https://ui.shadcn.com/docs/components/base/'
+          ) &&
+          QUALITY_BAR_REFERENCES[item.referenceId].sourceImported === false
+      )
+    ).toBe(true);
+  });
+
   it('fails when any nested atom/molecule source silently leaves the inventory', () => {
     const inventory = discoverAtomMoleculeInventory();
     const withoutNestedFeatureAtom = inventory.filter(
@@ -265,7 +304,7 @@ describe('component comparative quality bar', () => {
       ok: true,
       inventory: {
         total: expect.any(Number),
-        rubricEnrolled: 7,
+        rubricEnrolled: 12,
         pendingComparison: expect.any(Number),
       },
     });
