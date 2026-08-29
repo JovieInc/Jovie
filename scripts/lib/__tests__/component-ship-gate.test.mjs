@@ -48,7 +48,7 @@ const LEGACY_COMPONENT_SOURCE =
   'export interface LegacyPanelProps { readonly title: string }\n' +
   'export function LegacyPanel({ title }: LegacyPanelProps) { return <h2>{title}</h2> }';
 const LEGACY_TEST_SOURCE =
-  "import { LegacyPanel } from '@/components/marketing/legacy/LegacyPanel';\nvoid LegacyPanel;";
+  "import { LegacyPanel } from '@/components/marketing/legacy/LegacyPanel';\nexport const node = <LegacyPanel title='Legacy' />;";
 const LEGACY_STORY_SOURCE =
   "import { LegacyPanel } from '@/components/marketing/legacy/LegacyPanel';\n" +
   "export const Legacy = { render: () => <LegacyPanel title='Legacy' /> };";
@@ -503,11 +503,75 @@ describe('coverage-via executable evidence', () => {
     ).toBe(true);
   });
 
-  it('accepts an exact module import plus runtime use', () => {
+  it('accepts an exact module import used as a JSX tag', () => {
     const result = coverageViaResult({
       testSource: [
         "import { ViaPanel } from '@/components/atoms/ViaPanel';",
-        'void ViaPanel;',
+        'export const node = <ViaPanel />;',
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts a direct call of the imported binding', () => {
+    const result = coverageViaResult({
+      testSource: [
+        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
+        'ViaPanel();',
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts a direct construct of the imported binding', () => {
+    const result = coverageViaResult({
+      testSource: [
+        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
+        'new ViaPanel();',
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts argument zero of an imported React renderer', () => {
+    const result = coverageViaResult({
+      testSource: [
+        "import { createElement } from 'react';",
+        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
+        'createElement(ViaPanel);',
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts argument zero of a namespaced React renderer', () => {
+    const result = coverageViaResult({
+      testSource: [
+        "import * as React from 'react';",
+        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
+        'React.createElement(ViaPanel);',
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts argument zero of an imported test renderer', () => {
+    const result = coverageViaResult({
+      testSource: [
+        "import { render } from '@testing-library/react';",
+        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
+        'render(ViaPanel);',
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts argument zero of createRoot().render', () => {
+    const result = coverageViaResult({
+      testSource: [
+        "import { createRoot } from 'react-dom/client';",
+        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
+        'createRoot(globalThis.document.createElement("div")).render(ViaPanel);',
       ].join('\n'),
     });
     expect(result.ok).toBe(true);
@@ -525,11 +589,11 @@ describe('coverage-via executable evidence', () => {
     expect(result.ok).toBe(true);
   });
 
-  it('accepts a dynamic exact-module import plus runtime use', () => {
+  it('accepts a dynamic exact-module import used as a JSX tag', () => {
     const result = coverageViaResult({
       testSource: [
         "const { ViaPanel } = await import('@/components/atoms/ViaPanel');",
-        'void ViaPanel;',
+        'export const node = <ViaPanel />;',
       ].join('\n'),
     });
     expect(result.ok).toBe(true);
@@ -563,6 +627,57 @@ describe('coverage-via executable evidence', () => {
   });
 
   it.each([
+    [
+      'import-only evidence',
+      "import { ViaPanel } from '@/components/atoms/ViaPanel';\n",
+    ],
+    [
+      'void evidence',
+      [
+        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
+        'void ViaPanel;',
+      ].join('\n'),
+    ],
+    [
+      'assignment evidence',
+      [
+        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
+        'const Comp = ViaPanel;',
+        'expect(Comp).toBeTruthy();',
+      ].join('\n'),
+    ],
+    [
+      'metadata evidence',
+      [
+        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
+        'expect(ViaPanel).toBeDefined();',
+        "expect(ViaPanel.name).toBe('ViaPanel');",
+      ].join('\n'),
+    ],
+    [
+      'fake-renderer evidence',
+      [
+        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
+        'function render(Component) { return Component; }',
+        'render(ViaPanel);',
+      ].join('\n'),
+    ],
+    [
+      'wrong-argument source evidence',
+      [
+        "import { readFileSync } from 'node:fs';",
+        "import { resolve } from 'node:path';",
+        "const source = readFileSync('utf8', resolve(process.cwd(), 'components/atoms/ViaPanel.tsx'));",
+        "expect(source).toContain('ViaPanel');",
+      ].join('\n'),
+    ],
+    [
+      'unlinked-source evidence',
+      [
+        "const source = 'apps/web/components/atoms/ViaPanel.tsx';",
+        "expect(source).toContain('ViaPanel');",
+      ].join('\n'),
+    ],
     [
       'a mock without a real import',
       [
