@@ -151,7 +151,7 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         source, projection = self.project_mode()
         self.assertGreater(
             len(base64.b64encode(json.dumps(source).encode())),
-            100_000,
+            131_072,
         )
         self.assertEqual(projection["schema"], "jovie-fleet-gate/v1")
         self.assertEqual(projection["promotionMode"], source["promotionMode"])
