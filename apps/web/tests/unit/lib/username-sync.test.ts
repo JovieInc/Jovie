@@ -19,7 +19,6 @@ describe('syncCanonicalUsernameFromApp', () => {
 
   it('invalidates both old and new usernames after a rename', async () => {
     const selectCalls: unknown[] = [
-      [{ id: 'user-1', activeProfileId: 'profile-1' }],
       [{ id: 'profile-1', usernameNormalized: 'oldname' }],
       [],
     ];
@@ -27,8 +26,16 @@ describe('syncCanonicalUsernameFromApp', () => {
     const fakeTx = {
       select: vi.fn().mockImplementation(() => ({
         from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue(selectCalls.shift() ?? []),
+          where: vi.fn().mockImplementation(() => {
+            const chain: {
+              orderBy: ReturnType<typeof vi.fn>;
+              limit: ReturnType<typeof vi.fn>;
+            } = {
+              orderBy: vi.fn(),
+              limit: vi.fn().mockResolvedValue(selectCalls.shift() ?? []),
+            };
+            chain.orderBy.mockReturnValue(chain);
+            return chain;
           }),
         }),
       })),
