@@ -156,6 +156,7 @@ def load_summer_queue(path: Path | None = None) -> dict[str, Any]:
         "authority": "Summer",
         "observedAt": None,
         "items": [],
+        "terminalTombstones": [],
         "updated": None,
     }
     try:
@@ -167,6 +168,7 @@ def load_summer_queue(path: Path | None = None) -> dict[str, Any]:
         or payload.get("schema") != SUMMER_QUEUE_SCHEMA
         or payload.get("authority") != "Summer"
         or not isinstance(payload.get("items"), list)
+        or not isinstance(payload.get("terminalTombstones"), list)
     ):
         return {**empty, "error": "summer-queue-malformed"}
     observed_at = payload.get("observedAt")
@@ -193,6 +195,27 @@ def load_summer_queue(path: Path | None = None) -> dict[str, Any]:
             "error": "summer-queue-stale",
         }
 
+    terminal_tombstones: list[dict[str, Any]] = []
+    for raw_tombstone in payload["terminalTombstones"]:
+        if not isinstance(raw_tombstone, dict):
+            return {**empty, "error": "summer-queue-malformed-tombstone"}
+        tombstone = dict(raw_tombstone)
+        tombstone_stamp = parse_time(tombstone.get("observedAt"))
+        has_identity = (
+            isinstance(tombstone.get("issue"), str)
+            and bool(tombstone["issue"].strip())
+        ) or (isinstance(tombstone.get("pr"), int) and tombstone["pr"] > 0)
+        if (
+            tombstone.get("outcome") != "healthy"
+            or tombstone.get("terminal") is not True
+            or tombstone_stamp is None
+            or tombstone_stamp.tzinfo is None
+            or tombstone_stamp.utcoffset() is None
+            or not has_identity
+        ):
+            return {**empty, "error": "summer-queue-malformed-tombstone"}
+        terminal_tombstones.append(tombstone)
+
     items: list[dict[str, Any]] = []
     stale_items = 0
     malformed_items = 0
@@ -213,6 +236,7 @@ def load_summer_queue(path: Path | None = None) -> dict[str, Any]:
             if terminal is not True:
                 malformed_items += 1
                 continue
+            terminal_tombstones.append(item)
             terminal_items += 1
             continue
         if outcome == "escalated":
@@ -244,6 +268,7 @@ def load_summer_queue(path: Path | None = None) -> dict[str, Any]:
 
     result = dict(payload)
     result["items"] = items
+    result["terminalTombstones"] = terminal_tombstones
     result["updated"] = observed_at
     result["suppressed"] = {
         "stale": stale_items,

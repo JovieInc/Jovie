@@ -383,6 +383,7 @@ class VersionedHudContractTests(unittest.TestCase):
             "schema": "jovie-summer-red-queue/v2",
             "authority": "Summer",
             "observedAt": HUD.iso(),
+            "terminalTombstones": [],
             "items": [{
                 "issue": "JOV-5390", "stallClass": "size-guard", "outcome": "escalated",
                 "terminal": True,
@@ -404,6 +405,7 @@ class VersionedHudContractTests(unittest.TestCase):
                 "schema": "jovie-summer-red-queue/v2",
                 "authority": "Summer",
                 "observedAt": HUD.iso(),
+                "terminalTombstones": [],
                 "items": [{
                     "issue": "JOV-12",
                     "stallClass": "queue-eviction",
@@ -428,6 +430,7 @@ class VersionedHudContractTests(unittest.TestCase):
                 "schema": "jovie-summer-red-queue/v2",
                 "authority": "Summer",
                 "observedAt": HUD.iso(moment),
+                "terminalTombstones": [],
                 "items": [{
                     "issue": "JOV-5335",
                     "pr": 16423,
@@ -487,6 +490,7 @@ class VersionedHudContractTests(unittest.TestCase):
                 path.write_text(json.dumps({
                     "schema": "jovie-summer-red-queue/v2",
                     "items": [],
+                    "terminalTombstones": [],
                     **override,
                 }), encoding="utf-8")
                 with mock.patch.object(HUD, "now", return_value=moment):
@@ -514,6 +518,7 @@ class VersionedHudContractTests(unittest.TestCase):
                 "schema": "jovie-summer-red-queue/v2",
                 "authority": "Summer",
                 "observedAt": observed_at,
+                "terminalTombstones": [],
                 "items": [
                     *malformed,
                     {
@@ -540,14 +545,15 @@ class VersionedHudContractTests(unittest.TestCase):
                 "schema": "jovie-summer-red-queue/v2",
                 "authority": "Summer",
                 "observedAt": observed_at,
+                "terminalTombstones": [{
+                    "issue": "JOV-5335",
+                    "pr": 16423,
+                    "outcome": "healthy",
+                    "terminal": True,
+                    "observedAt": observed_at,
+                    "reason": "linked-pr-merged-and-linear-done",
+                }],
                 "items": [
-                    {
-                        "issue": "JOV-5335",
-                        "pr": 16423,
-                        "outcome": "healthy",
-                        "terminal": True,
-                        "observedAt": observed_at,
-                    },
                     {
                         "issue": "JOV-5390",
                         "outcome": "escalated",
@@ -561,7 +567,9 @@ class VersionedHudContractTests(unittest.TestCase):
                 loaded = HUD.load_summer_queue(path)
 
         self.assertEqual([item["issue"] for item in loaded["items"]], ["JOV-5390"])
-        self.assertEqual(loaded["suppressed"]["terminal"], 1)
+        self.assertEqual(loaded["terminalTombstones"][0]["issue"], "JOV-5335")
+        self.assertEqual(loaded["terminalTombstones"][0]["pr"], 16423)
+        self.assertEqual(loaded["terminalTombstones"][0]["observedAt"], observed_at)
         self.assertIsNone(loaded["error"])
 
     def test_fresh_active_summer_item_is_preserved_with_source_timestamp(self):
@@ -573,6 +581,7 @@ class VersionedHudContractTests(unittest.TestCase):
                 "schema": "jovie-summer-red-queue/v2",
                 "authority": "Summer",
                 "observedAt": observed_at,
+                "terminalTombstones": [],
                 "items": [{
                     "issue": "JOV-5400",
                     "pr": 16599,
