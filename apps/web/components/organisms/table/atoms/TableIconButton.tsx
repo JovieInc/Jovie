@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, SimpleTooltip } from '@jovie/ui';
+import { IconButton, SimpleTooltip } from '@jovie/ui';
 import { cn } from '@/lib/utils';
 
 export interface TableIconButtonProps {
@@ -21,15 +21,20 @@ export function TableIconButton({
   className,
 }: TableIconButtonProps) {
   const button = (
-    <Button
-      variant={variant === 'danger' ? 'destructive' : 'ghost'}
-      size='icon'
+    <IconButton
+      variant='secondary'
+      size='lg'
+      destructive={variant === 'danger'}
       onClick={onClick}
-      aria-label={ariaLabel}
-      className={cn('h-10 w-10', className)}
+      ariaLabel={ariaLabel}
+      className={cn(
+        variant === 'danger' &&
+          'text-error hover:bg-error-subtle hover:text-error focus-visible:bg-error-subtle focus-visible:text-error active:bg-error-subtle active:text-error',
+        className
+      )}
     >
       {icon}
-    </Button>
+    </IconButton>
   );
 
   if (tooltip) {

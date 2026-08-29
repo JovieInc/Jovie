@@ -6,6 +6,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  IconButton,
 } from '@jovie/ui';
 import { X } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -91,15 +92,14 @@ export function HeaderBulkActions({
         </DropdownMenu>
       )}
       {onClearSelection && (
-        <Button
-          variant='ghost'
+        <IconButton
+          variant='secondary'
           size='sm'
           onClick={onClearSelection}
-          className='h-7 w-7 rounded-full border border-transparent p-0 text-tertiary-token transition-[background-color,border-color,color] duration-subtle hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
-          aria-label='Clear Selection'
+          ariaLabel='Clear Selection'
         >
-          <X className='h-3.5 w-3.5' />
-        </Button>
+          <X aria-hidden='true' />
+        </IconButton>
       )}
     </div>
   );
