@@ -261,11 +261,47 @@ class JovieOwnershipTests(unittest.TestCase):
         pr = self._open_pr(16211, mergeable_state="unstable", created_at="2026-08-19T18:59:08Z")
         pr["draft"] = True
         pr["head"]["ref"] = "grok/JOV-4894-fix"
-        with mock.patch.object(MODULE, "run", return_value="") as run:
-            result = MODULE.ready_autonomous_draft(pr)
+        with (
+            mock.patch.object(MODULE, "work_mutation_blocker", return_value=None),
+            mock.patch.object(MODULE, "run", side_effect=[pr["head"]["sha"], ""]) as run,
+        ):
+            with tempfile.TemporaryDirectory() as tmp, mock.patch.object(
+                MODULE, "STATE", pathlib.Path(tmp)
+            ):
+                result = MODULE.ready_autonomous_draft(pr)
         self.assertEqual(result["result"], "ok")
-        self.assertEqual(run.call_args.args[:3], ("gh", "pr", "ready"))
-        self.assertEqual(run.call_args.args[3], "16211")
+        self.assertEqual(run.call_args_list[0].args[:3], ("gh", "api", "repos/JovieInc/Jovie/pulls/16211"))
+        self.assertEqual(run.call_args_list[1].args[:3], ("gh", "pr", "ready"))
+        self.assertEqual(run.call_args_list[1].args[3], "16211")
+
+    def test_ready_autonomous_draft_rechecks_gate_and_exact_head_before_mutation(self):
+        pr = self._open_pr(16211, mergeable_state="unstable", created_at="2026-08-19T18:59:08Z")
+        pr["draft"] = True
+        pr["head"]["ref"] = "grok/JOV-4894-fix"
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(
+            MODULE, "STATE", pathlib.Path(tmp)
+        ):
+            with (
+                mock.patch.object(
+                    MODULE,
+                    "work_mutation_blocker",
+                    return_value="remediation_push_gate_amber",
+                ) as gate,
+                mock.patch.object(MODULE, "run") as run,
+            ):
+                blocked = MODULE.ready_autonomous_draft(pr)
+            self.assertEqual(blocked["reason"], "remediation_push_gate_amber")
+            gate.assert_called_once_with(max_age=0)
+            run.assert_not_called()
+
+            with (
+                mock.patch.object(MODULE, "work_mutation_blocker", return_value=None),
+                mock.patch.object(MODULE, "run", return_value="b" * 40) as run,
+            ):
+                changed = MODULE.ready_autonomous_draft(pr)
+            self.assertEqual(changed["reason"], "expected_head_changed_fail_closed")
+            self.assertEqual(run.call_count, 1)
+            self.assertEqual(run.call_args.args[:3], ("gh", "api", "repos/JovieInc/Jovie/pulls/16211"))
 
     def test_ready_autonomous_draft_ignores_unrelated_drafts(self):
         pr = self._open_pr(1, mergeable_state="clean", created_at="2026-08-19T18:00:00Z")

@@ -245,10 +245,39 @@ def ready_autonomous_draft(pr):
         return {**result, "result": "skipped", "reason": "too_large_for_queue"}
     if pr.get("mergeable_state") == "dirty":
         return {**result, "result": "skipped", "reason": "conflicting"}
+    head_sha = pr.get("head", {}).get("sha")
+    if not isinstance(head_sha, str) or not re.fullmatch(r"[0-9a-f]{40}", head_sha):
+        return {
+            **result,
+            "result": "skipped",
+            "reason": "expected_head_sha_invalid_fail_closed",
+        }
+    lease = acquire_pr_lease(pr)
+    if lease is None:
+        return {**result, "result": "skipped", "reason": "single_writer_active"}
     try:
+        blocker = work_mutation_blocker(max_age=0)
+        if blocker:
+            return {**result, "result": "skipped", "reason": blocker}
+        observed_head = run(
+            "gh",
+            "api",
+            f"repos/{REPO}/pulls/{pr['number']}",
+            "--jq",
+            ".head.sha",
+            timeout=60,
+        ).strip()
+        if observed_head != head_sha:
+            return {
+                **result,
+                "result": "skipped",
+                "reason": "expected_head_changed_fail_closed",
+            }
         run("gh", "pr", "ready", str(pr["number"]), "--repo", REPO, timeout=60)
     except Exception as error:
         return {**result, "result": "error", "error": type(error).__name__}
+    finally:
+        release_pr_lease(lease)
     return {**result, "result": "ok"}
 
 
