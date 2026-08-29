@@ -2010,33 +2010,6 @@ html[data-profile-initial-mode]
 }
 
 /* ============================================
-   RADIUS SYSTEM
-   ============================================ */
-:root {
-  --radius-none: 0;
-  --radius-xs: 2px;
-  /* Tags/badges — extracted: 2px on issue labels */
-  --radius-sm: 8px;
-  /* Badges, issue rows, small cards */
-  --radius-md: 10px;
-  /* Inner cards, drawer cards, properties panels */
-  --radius-default: 4px;
-  /* Marketing buttons */
-  --radius-lg: 12px;
-  /* App shell frame, content surface cards */
-  --radius-xl: 16px;
-  /* Large decorative elements */
-  --radius-2xl: 20px;
-  /* Modals, sheets, large nested surfaces */
-  --radius-3xl: 24px;
-  /* Large modals and phone shells */
-  --radius-pill: 9999px;
-  /* All app buttons / inputs / tabs — canonical Jovie DS true pill */
-  --radius-full: 9999px;
-  /* Circles, tags */
-}
-
-/* ============================================
    ANIMATION SYSTEM
    ============================================ */
 :root {

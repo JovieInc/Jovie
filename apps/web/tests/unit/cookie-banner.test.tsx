@@ -85,6 +85,7 @@ describe('CookieActions', () => {
       'backgroundColor',
       'color',
       'border',
+      'borderRadius',
       'fontSize',
       'fontWeight',
       'height',
@@ -92,6 +93,8 @@ describe('CookieActions', () => {
     ] as const) {
       expect(acceptAll).toHaveStyle({ [property]: rejectAll.style[property] });
     }
+    expect(rejectAll).toHaveStyle({ borderRadius: 'var(--radius-sm)' });
+    expect(customize).toHaveStyle({ borderRadius: 'var(--radius-sm)' });
   });
 });
 

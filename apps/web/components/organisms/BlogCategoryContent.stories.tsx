@@ -46,7 +46,7 @@ export const BLOG_CATEGORY_STORY_RECEIPT = {
   source: 'apps/web/components/organisms/BlogCategoryContent.tsx',
   sourceExport: 'BlogCategoryContent',
   storyExport: 'Web024ArtistManagement',
-  sourceSha: '916d0bddd91c065aa01b387adc2acd189391b040',
+  sourceSha: '8b0353fcbeb0cffef614fa47afbbbd8eeae48997',
   fixture: 'content/blog/the-contact-problem.md',
 } as const;
 

@@ -92,10 +92,6 @@ module.exports = {
         dialog: 'var(--app-dialog-radius)',
         'sidebar-floating': 'var(--app-shell-sidebar-floating-radius)',
         pill: 'var(--radius-pill)', // 48px — pill buttons
-        // Legacy linear-prefixed aliases
-        'linear-sm': 'var(--linear-radius-sm)',
-        'linear-md': 'var(--linear-radius-md)',
-        'linear-lg': 'var(--linear-radius-lg)',
       },
 
       // Linear max-width for containers
