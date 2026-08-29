@@ -114,8 +114,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-28T22:36:53.839Z",
-    "gitSha": "44a0329aa174a7a4f01381fb50e1e1da3e386273",
+    "capturedAt": "2026-08-29T22:14:53.116Z",
+    "gitSha": "e34be867ddbdeeb12ac4f8973bbc03947fe96a4a",
     "imagePath": "artist-profile-hero-section-desktop.png"
   },
   {
@@ -166,8 +166,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-29T20:56:38.680Z",
-    "gitSha": "601d6f1a04e36c6ce307b9a0eb01cb620c6762e2",
+    "capturedAt": "2026-08-29T22:16:42.142Z",
+    "gitSha": "e34be867ddbdeeb12ac4f8973bbc03947fe96a4a",
     "imagePath": "artist-profile-opinionated-section-desktop.png"
   },
   {
@@ -179,8 +179,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-29T06:14:20.648Z",
-    "gitSha": "180310200386f24df61ecc9d9afc00720845534c",
+    "capturedAt": "2026-08-29T22:17:10.797Z",
+    "gitSha": "e34be867ddbdeeb12ac4f8973bbc03947fe96a4a",
     "imagePath": "artist-profile-spec-wall-section-desktop.png"
   },
   {
@@ -192,8 +192,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-29T18:52:27.529Z",
-    "gitSha": "de24cb441227b8cf1153305f242876de918af362",
+    "capturedAt": "2026-08-29T22:17:38.358Z",
+    "gitSha": "e34be867ddbdeeb12ac4f8973bbc03947fe96a4a",
     "imagePath": "artist-profile-how-it-works-section-desktop.png"
   },
   {
@@ -218,8 +218,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-29T20:58:25.459Z",
-    "gitSha": "601d6f1a04e36c6ce307b9a0eb01cb620c6762e2",
+    "capturedAt": "2026-08-29T22:18:29.639Z",
+    "gitSha": "e34be867ddbdeeb12ac4f8973bbc03947fe96a4a",
     "imagePath": "artist-profile-final-cta-section-desktop.png"
   },
   {
@@ -609,8 +609,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-29T21:07:43.071Z",
-    "gitSha": "601d6f1a04e36c6ce307b9a0eb01cb620c6762e2",
+    "capturedAt": "2026-08-29T22:27:46.385Z",
+    "gitSha": "e34be867ddbdeeb12ac4f8973bbc03947fe96a4a",
     "imagePath": "dashboard-releases-desktop.png",
     "publicExportPath": "releases-dashboard-full.png"
   },
@@ -677,8 +677,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-29T21:09:30.775Z",
-    "gitSha": "601d6f1a04e36c6ce307b9a0eb01cb620c6762e2",
+    "capturedAt": "2026-08-29T22:29:33.547Z",
+    "gitSha": "e34be867ddbdeeb12ac4f8973bbc03947fe96a4a",
     "imagePath": "dashboard-audience-desktop.png",
     "publicExportPath": "audience-crm.png"
   },
@@ -694,8 +694,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-29T21:09:54.894Z",
-    "gitSha": "601d6f1a04e36c6ce307b9a0eb01cb620c6762e2",
+    "capturedAt": "2026-08-29T22:29:57.589Z",
+    "gitSha": "e34be867ddbdeeb12ac4f8973bbc03947fe96a4a",
     "imagePath": "dashboard-analytics-desktop.png"
   },
   {
@@ -710,8 +710,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-29T19:04:50.346Z",
-    "gitSha": "de24cb441227b8cf1153305f242876de918af362",
+    "capturedAt": "2026-08-29T22:30:02.188Z",
+    "gitSha": "e34be867ddbdeeb12ac4f8973bbc03947fe96a4a",
     "imagePath": "dashboard-earnings-desktop.png"
   },
   {
@@ -742,8 +742,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-29T21:10:48.284Z",
-    "gitSha": "601d6f1a04e36c6ce307b9a0eb01cb620c6762e2",
+    "capturedAt": "2026-08-29T22:30:50.869Z",
+    "gitSha": "e34be867ddbdeeb12ac4f8973bbc03947fe96a4a",
     "imagePath": "settings-links-desktop.png"
   },
   {
