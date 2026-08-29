@@ -7,8 +7,8 @@ import {
 } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ProfileInlineNotificationsCTA } from '@/components/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA';
 import type { ProfileNotificationsContextValue } from '@/components/organisms/profile-shell/types';
-import { ProfileInlineNotificationsCTA } from '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA';
 import type { Artist } from '@/types/db';
 
 const mockUseProfileNotifications = vi.fn();

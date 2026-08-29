@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   TourDrawerContent,
   TourModePanel,
-} from '@/features/profile/TourModePanel';
+} from '@/components/features/profile/TourModePanel';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist } from '@/types/db';
 

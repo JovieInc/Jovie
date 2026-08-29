@@ -1,8 +1,8 @@
 import { screen } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ProfilePrimaryCTA } from '@/components/features/profile/ProfilePrimaryCTA';
 import { ProfileShell } from '@/components/organisms/profile-shell';
-import { ProfilePrimaryCTA } from '@/features/profile/ProfilePrimaryCTA';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import { renderWithQueryClient } from '../../utils/test-utils';

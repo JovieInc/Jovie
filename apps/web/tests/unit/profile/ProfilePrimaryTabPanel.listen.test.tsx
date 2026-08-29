@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { ProfilePrimaryTabPanel } from '@/features/profile/ProfilePrimaryTabPanel';
+import { ProfilePrimaryTabPanel } from '@/components/features/profile/ProfilePrimaryTabPanel';
 import type { AvailableDSP } from '@/lib/dsp';
 import type { Artist } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
