@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "sources": {
+    "releaseSchedule": "https://raw.githubusercontent.com/nodejs/Release/main/schedule.json",
+    "releaseIndex": "https://nodejs.org/dist/index.json"
+  },
+  "production": {
+    "versionFile": ".nvmrc",
+    "mirrorVersionFile": ".node-version",
+    "allowedStatuses": ["active_lts", "maintenance_lts"],
+    "regularPatchSlaDays": 7,
+    "securityPatchSlaHours": 24
+  },
+  "packageEngineContracts": {
+    "majorPinned": [
+      "package.json",
+      "apps/console/package.json",
+      "apps/web/package.json"
+    ],
+    "minimumOnly": [
+      "apps/docs/package.json",
+      "apps/should-i-make/package.json",
+      "packages/ui/package.json"
+    ]
+  },
+  "compatibility": {
+    "candidates": [
+      {
+        "major": 24,
+        "ring": "candidate",
+        "blocking": true,
+        "minimumPromotionStatus": "active_lts"
+      },
+      {
+        "major": 26,
+        "ring": "shadow",
+        "blocking": false,
+        "minimumPromotionStatus": "active_lts"
+      }
+    ],
+    "declaredEngineProbes": [
+      {
+        "workspace": "apps/web",
+        "package": "@parse/node-apn"
+      }
+    ],
+    "nativeProbes": [
+      {
+        "workspace": "apps/web",
+        "package": "sharp"
+      }
+    ]
+  },
+  "promotion": {
+    "minimumConsecutiveGreenRuns": 3,
+    "minimumSoakDays": 14
+  },
+  "rollback": {
+    "maximumMinutes": 30,
+    "owner": "production-controller",
+    "action": "promote the last verified deployment and restore the prior Node pin"
+  }
+}
