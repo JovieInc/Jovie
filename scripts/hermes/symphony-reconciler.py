@@ -4,9 +4,10 @@
 The sidecar observes Symphony's local state API, records an exact workspace
 head/base receipt for every stopped attempt, and escalates repeated failures to
 the canonical remediation route only when that route selects a local model.
-The alternate model may repair the isolated workspace, but may not commit,
-push, merge, or change tracker state. Symphony remains the owner of the normal
-update/test/ready/native-merge lifecycle on its next bounded retry.
+The alternate model may repair the isolated workspace once per generation, but
+may not commit, push, merge, or change tracker state. A successful repair
+returns to Symphony's normal update/test/ready/native-merge lifecycle; a failed
+repair emits a terminal receipt naming the external GitHub-runner handoff.
 """
 
 from __future__ import annotations
@@ -40,6 +41,17 @@ DEFAULT_FLEET_GATE_RECEIPT = "/home/timwhite/gem-workspace/state/gem-priority-ga
 MODEL_ID = "qwen-coder-local"
 MODEL_TIMEOUT_SECONDS = 12 * 60
 RETRY_MINUTES = 15
+LOCAL_REPAIR_MAX_ATTEMPTS = 1
+CONSUMED_LOCAL_REPAIR_STATUSES = frozenset(
+    {
+        "repair_started",
+        "repair_interrupted",
+        "repair_handoff_ready",
+        "repair_failed",
+        "repair_timed_out",
+        "repair_not_started",
+    }
+)
 FLEET_GATE_RECEIPT_MAX_AGE = dt.timedelta(minutes=10)
 SYMPHONY_SERVICE = "symphony-ui-pilot.service"
 REQUIRED_RUNTIME_CAPABILITIES = frozenset(
@@ -1074,6 +1086,27 @@ def _generation(
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
+def _local_repair_generation(
+    identifier: str,
+    error: str,
+    state: dict[str, object],
+    runtime: dict[str, object] | None = None,
+) -> str:
+    """Stable identity for one local attempt, excluding repair-mutated status."""
+    raw = json.dumps(
+        {
+            "issue": identifier,
+            "error": error,
+            "head": state.get("head"),
+            "base": state.get("base"),
+            "runtimeRevision": runtime.get("runtimeRevision") if runtime else None,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
 def _is_repeated_or_conflict(item: dict[str, object], source: str, state: dict[str, object]) -> bool:
     try:
         attempt = int(item.get("attempt") or 0)
@@ -1292,7 +1325,67 @@ def _reconcile_item(
     state_before = _workspace_state(item.get("workspace_path"), identifier)
     runtime = runtime or runtime_preflight()
     generation = _generation(identifier, error, state_before, runtime)
+    local_repair_generation = _local_repair_generation(
+        identifier,
+        error,
+        state_before,
+        runtime,
+    )
     previous = _read_receipt(identifier)
+    previous_alternate = previous.get("alternateModel") if previous else None
+    previous_scope = previous.get("resourceScope") if previous else None
+    same_local_repair_generation = bool(
+        previous
+        and (
+            previous.get("localRepairGeneration") == local_repair_generation
+            or (
+                previous.get("localRepairGeneration") is None
+                and previous.get("reason") == error
+                and isinstance(previous_scope, dict)
+                and previous_scope.get("head") == state_before.get("head")
+                and previous_scope.get("base") == state_before.get("base")
+            )
+        )
+    )
+    if (
+        previous
+        and same_local_repair_generation
+        and isinstance(previous_alternate, dict)
+        and previous_alternate.get("status") in CONSUMED_LOCAL_REPAIR_STATUSES
+    ):
+        previous_status = previous_alternate.get("status")
+        if previous_status == "repair_started":
+            previous = {
+                **previous,
+                "updatedAt": _iso(_now()),
+                "authoritativeOwner": "symphony-reconciler",
+                "controllerState": "blocked",
+                "transition": "github_runner_handoff_required",
+                "nextAutomatedAction": "escalate_ci_platform_dependency",
+                "nextRetryAt": None,
+                "alternateModel": {
+                    **previous_alternate,
+                    "status": "repair_interrupted",
+                },
+                "terminalEscalation": {
+                    "owner": "symphony-reconciler",
+                    "requestedOwner": "CI Platform",
+                    "route": "rolling-ci-fx",
+                    "state": "handoff_unaccepted",
+                    "reason": "repair_interrupted",
+                    "trigger": "authenticated_ci_workflow_run",
+                },
+            }
+            _write_receipt(identifier, previous)
+        _event(
+            identifier,
+            "completed_local_repair_held",
+            reason=error,
+            alternate=previous_status,
+            next=previous.get("nextAutomatedAction"),
+            retry_at=previous.get("nextRetryAt"),
+        )
+        return False
     launcher_failure = classify_launcher_failure(error, item)
     routing_receipt = None
     workspace_value = state_before.get("workspace")
@@ -1394,12 +1487,15 @@ def _reconcile_item(
     )
     state_after = state_before
     local_repair_attempted = False
+    terminal_escalation: dict[str, object] | None = None
+    receipt_controller_state = decision_state
+    authoritative_owner = (
+        "symphony-reconciler" if alternate_permitted else "symphony-ui-pilot"
+    )
     if deterministic_terminal:
         alternate["status"] = "not_permitted"
 
-    already_attempted = bool(previous and previous.get("generation") == generation and previous.get("alternateModel", {}).get("status") in {"repair_handoff_ready", "repair_failed", "repair_timed_out", "repair_not_started"})
     previous_retry = _parse_time(previous.get("nextRetryAt")) if previous else None
-    escalation_due = not already_attempted or (previous_retry is not None and previous_retry <= _now())
     if repeated:
         attempted.append(
             {
@@ -1408,9 +1504,55 @@ def _reconcile_item(
                 "result": "acquired" if alternate_permitted else "not_acquired",
             }
         )
-        if escalation_due and state_before.get("valid") and alternate_permitted:
+        if state_before.get("valid") and alternate_permitted:
             local_repair_attempted = True
             transition = "alternate_local_repair_started"
+            _write_receipt(
+                identifier,
+                {
+                    "schema": SCHEMA,
+                    "updatedAt": _iso(_now()),
+                    "generation": generation,
+                    "localRepairGeneration": local_repair_generation,
+                    "issue": {
+                        "identifier": identifier,
+                        "id": item.get("issue_id"),
+                        "url": item.get("issue_url"),
+                    },
+                    "reason": error,
+                    "launcherFailure": launcher_failure,
+                    "retryPolicy": {
+                        "retryable": False,
+                        "maxAttempts": decision["maxAttempts"],
+                        "localRepairAttempts": 1,
+                        "localRepairMaxAttempts": LOCAL_REPAIR_MAX_ATTEMPTS,
+                    },
+                    "entryCriteria": "runtime retry/blocked after bounded normal-model attempt",
+                    "authoritativeOwner": "symphony-reconciler",
+                    "resourceScope": {
+                        "issue": identifier,
+                        "workspace": state_before.get("workspace"),
+                        "head": state_before.get("head"),
+                        "base": state_before.get("base"),
+                        "workspaceRevision": state_before.get("workspaceRevision"),
+                        "runtimeRevision": runtime.get("runtimeRevision"),
+                        "capabilities": runtime.get("capabilities", []),
+                    },
+                    "deadline": _iso(
+                        _now() + dt.timedelta(seconds=_model_timeout_seconds())
+                    ),
+                    "runtimeState": source,
+                    "controllerState": "blocked",
+                    "attempt": decision["attempt"],
+                    "transition": transition,
+                    "nextAutomatedAction": "await_local_repair_result",
+                    "nextRetryAt": None,
+                    "alternateModel": {
+                        **alternate,
+                        "status": "repair_started",
+                    },
+                },
+            )
             _event(
                 identifier,
                 transition,
@@ -1432,10 +1574,22 @@ def _reconcile_item(
                 transition = "returned_to_normal_loop"
                 next_action = "normal_model_update_test_ready_native_merge"
                 next_retry = _now() + dt.timedelta(minutes=RETRY_MINUTES)
+                authoritative_owner = "symphony-ui-pilot"
             else:
-                transition = "alternate_local_repair_deferred"
-                next_action = "retry_alternate_local_model"
-                next_retry = _now() + dt.timedelta(minutes=RETRY_MINUTES)
+                transition = "github_runner_handoff_required"
+                next_action = "escalate_ci_platform_dependency"
+                next_retry = None
+                policy_retryable = False
+                receipt_controller_state = "blocked"
+                authoritative_owner = "symphony-reconciler"
+                terminal_escalation = {
+                    "owner": "symphony-reconciler",
+                    "requestedOwner": "CI Platform",
+                    "route": "rolling-ci-fx",
+                    "state": "handoff_unaccepted",
+                    "reason": str(repair.get("result") or "local_repair_failed"),
+                    "trigger": "authenticated_ci_workflow_run",
+                }
         elif not state_before.get("valid"):
             transition = "durable_escalation_blocked"
             next_action = "retry_exact_workspace_observation"
@@ -1453,10 +1607,22 @@ def _reconcile_item(
             transition = "alternate_local_repair_waiting"
             next_action = "retry_alternate_local_model"
 
+    retry_policy: dict[str, object] = {
+        "retryable": policy_retryable,
+        "maxAttempts": decision["maxAttempts"],
+    }
+    if local_repair_attempted:
+        retry_policy.update(
+            {
+                "localRepairAttempts": 1,
+                "localRepairMaxAttempts": LOCAL_REPAIR_MAX_ATTEMPTS,
+            }
+        )
     receipt: dict[str, object] = {
         "schema": SCHEMA,
         "updatedAt": _iso(_now()),
         "generation": generation,
+        "localRepairGeneration": local_repair_generation,
         "issue": {
             "identifier": identifier,
             "id": item.get("issue_id"),
@@ -1464,12 +1630,9 @@ def _reconcile_item(
         },
         "reason": error,
         "launcherFailure": launcher_failure,
-        "retryPolicy": {
-            "retryable": policy_retryable,
-            "maxAttempts": decision["maxAttempts"],
-        },
+        "retryPolicy": retry_policy,
         "entryCriteria": "runtime retry/blocked after bounded normal-model attempt",
-        "authoritativeOwner": "symphony-reconciler" if alternate_permitted else "symphony-ui-pilot",
+        "authoritativeOwner": authoritative_owner,
         "resourceScope": {
             "issue": identifier,
             "workspace": state_after.get("workspace"),
@@ -1481,7 +1644,11 @@ def _reconcile_item(
         },
         "deadline": (
             None
-            if deterministic_terminal or decision_state == "ready"
+            if (
+                deterministic_terminal
+                or decision_state == "ready"
+                or terminal_escalation
+            )
             else _iso(_now() + dt.timedelta(seconds=_model_timeout_seconds()))
             if alternate_permitted
             else _iso(next_retry)
@@ -1489,7 +1656,7 @@ def _reconcile_item(
             else None
         ),
         "runtimeState": source,
-        "controllerState": decision_state,
+        "controllerState": receipt_controller_state,
         "attempt": decision["attempt"],
         "headBaseBefore": state_before,
         "headBaseCurrent": state_after,
@@ -1502,6 +1669,8 @@ def _reconcile_item(
         "nextRetryAt": _iso(next_retry) if next_retry else None,
         "alternateModel": alternate,
     }
+    if terminal_escalation:
+        receipt["terminalEscalation"] = terminal_escalation
     _write_receipt(identifier, receipt)
     _event(
         identifier,
@@ -1549,8 +1718,17 @@ def main() -> int:
         _event("control-plane", "healthy_or_idle", reason="no_stopped_work")
         return 0
     local_limit, local_reason = _stale_capacity_local_remediation_limit()
-    local_lease = _acquire_local_remediation_lease() if local_limit else None
-    local_slot_available = local_lease is not None
+    local_lease = _acquire_local_remediation_lease()
+    if local_lease is None:
+        _event(
+            "control-plane",
+            "reconciliation_writer_busy",
+            reason=local_reason,
+            capacity=local_limit,
+            observed=len(items),
+        )
+        return 0
+    local_slot_available = bool(local_limit)
     try:
         for source, item in items:
             try:
@@ -1558,15 +1736,13 @@ def main() -> int:
                 # can delegate one existing stopped workspace to the structurally
                 # local alternate repair path; no new issue lease or remote
                 # mutation is admitted by that receipt.
-                attempted = _reconcile_item(
-                    item,
-                    source,
-                    local_slot_available,
-                    runtime,
-                )
+                permitted = local_slot_available
+                attempted = _reconcile_item(item, source, permitted, runtime)
                 if attempted:
                     local_slot_available = False
             except (OSError, TypeError, ValueError, subprocess.SubprocessError) as exc:
+                if permitted:
+                    local_slot_available = False
                 _event(
                     str(item.get("issue_identifier") or "unknown"),
                     "item_reconciliation_failed",
@@ -1584,8 +1760,7 @@ def main() -> int:
                 observed=len(items),
             )
     finally:
-        if local_lease is not None:
-            _release_local_remediation_lease(local_lease)
+        _release_local_remediation_lease(local_lease)
     return 0
 
 
