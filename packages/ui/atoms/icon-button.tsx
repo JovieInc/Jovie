@@ -51,6 +51,11 @@ const ICON_BUTTON_VARIANT_TO_BUTTON_VARIANT: Record<
 const CIRCLE_CHROME_CLASSNAME =
   'relative isolate cursor-pointer overflow-hidden transition-colors duration-subtle ease-subtle';
 
+// Applied after variant chrome so quiet/ghost token colors cannot override
+// the shared Button destructive state.
+const ICON_BUTTON_DESTRUCTIVE_CLASSNAME =
+  'text-error hover:bg-error-subtle hover:text-error focus-visible:bg-error-subtle focus-visible:text-error active:bg-error-subtle';
+
 const iconButtonVariants = cva(
   // Shared base: uniform reduced-motion + touch behavior. Focus ring and
   // hit target come from the base Button so they cannot drift.
@@ -157,6 +162,7 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
       variant = 'ghost',
       size = 'lg',
       className,
+      destructive = false,
       ...props
     },
     ref
@@ -168,7 +174,12 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
         ref={ref}
         variant={ICON_BUTTON_VARIANT_TO_BUTTON_VARIANT[variant]}
         size={ICON_BUTTON_SIZE_TO_BUTTON_SIZE[size]}
-        className={cn(iconButtonVariants({ variant, size }), className)}
+        destructive={destructive}
+        className={cn(
+          iconButtonVariants({ variant, size }),
+          destructive && ICON_BUTTON_DESTRUCTIVE_CLASSNAME,
+          className
+        )}
         aria-label={resolvedAriaLabel}
         {...props}
       >
