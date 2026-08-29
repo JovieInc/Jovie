@@ -28,8 +28,8 @@ vi.mock('@/features/release/AlbumArtworkContextMenu', () => ({
 }));
 
 vi.mock('@/components/organisms/AvatarUploadable', () => ({
-  AvatarUploadable: ({ rounded }: { rounded?: string }) => (
-    <div data-testid='avatar-uploadable' data-rounded={rounded ?? 'default'} />
+  AvatarUploadable: ({ shape }: { shape?: string }) => (
+    <div data-testid='avatar-uploadable' data-shape={shape ?? 'person'} />
   ),
 }));
 
@@ -45,8 +45,8 @@ describe('ReleaseArtwork', () => {
     );
 
     expect(screen.getByTestId('avatar-uploadable')).toHaveAttribute(
-      'data-rounded',
-      'md'
+      'data-shape',
+      'artwork'
     );
   });
 

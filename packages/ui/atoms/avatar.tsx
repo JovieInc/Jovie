@@ -1,92 +1,29 @@
 import { cn } from '@jovie/ui/lib/utils';
 import * as React from 'react';
 
-// ---------------------------------------------------------------------------
-// Size map
-// ---------------------------------------------------------------------------
+import {
+  AVATAR_OUTLINE_CLASSNAME,
+  AVATAR_RING_CLASSNAME,
+  AVATAR_SIZE_MAP,
+  type AvatarShape,
+  type AvatarSize,
+  getAvatarShapeClassName,
+  getAvatarSizePx,
+} from './avatar-contract';
 
-const SIZE_MAP = {
-  xs: {
-    px: 16,
-    text: 'text-3xs',
-    dot: 'h-2 w-2',
-    dotOffset: '-bottom-px -right-px',
-  },
-  sm: {
-    px: 20,
-    text: 'text-3xs',
-    dot: 'h-2.5 w-2.5',
-    dotOffset: '-bottom-px -right-px',
-  },
-  md: {
-    px: 24,
-    text: 'text-2xs',
-    dot: 'h-3 w-3',
-    dotOffset: '-bottom-0.5 -right-0.5',
-  },
-  lg: {
-    px: 32,
-    text: 'text-app',
-    dot: 'h-3.5 w-3.5',
-    dotOffset: '-bottom-0.5 -right-0.5',
-  },
-  xl: {
-    px: 40,
-    text: 'text-mid',
-    dot: 'h-4 w-4',
-    dotOffset: '-bottom-0.5 -right-0.5',
-  },
-  '2xl': {
-    px: 96,
-    text: 'text-2xl',
-    dot: 'h-5 w-5',
-    dotOffset: '-bottom-1 -right-1',
-  },
-  'display-sm': {
-    px: 112,
-    text: 'text-xl',
-    dot: 'h-5 w-5',
-    dotOffset: '-bottom-1 -right-1',
-  },
-  'display-md': {
-    px: 128,
-    text: 'text-2xl',
-    dot: 'h-6 w-6',
-    dotOffset: '-bottom-1 -right-1',
-  },
-  'display-lg': {
-    px: 160,
-    text: 'text-3xl',
-    dot: 'h-6 w-6',
-    dotOffset: '-bottom-1.5 -right-1.5',
-  },
-  'display-xl': {
-    px: 192,
-    text: 'text-3xl',
-    dot: 'h-7 w-7',
-    dotOffset: '-bottom-1.5 -right-1.5',
-  },
-  'display-2xl': {
-    px: 224,
-    text: 'text-4xl',
-    dot: 'h-7 w-7',
-    dotOffset: '-bottom-2 -right-2',
-  },
-  'display-3xl': {
-    px: 256,
-    text: 'text-4xl',
-    dot: 'h-8 w-8',
-    dotOffset: '-bottom-2 -right-2',
-  },
-  'display-4xl': {
-    px: 384,
-    text: 'text-5xl',
-    dot: 'h-8 w-8',
-    dotOffset: '-bottom-2 -right-2',
-  },
-} as const;
+export type { AvatarShape, AvatarSize } from './avatar-contract';
+export {
+  AVATAR_OUTLINE_CLASSNAME,
+  AVATAR_PERSON_RADIUS_CLASSNAME,
+  AVATAR_RING_CLASSNAME,
+  AVATAR_SHAPE_NAMES,
+  AVATAR_SIZE_MAP,
+  AVATAR_SIZE_NAMES,
+  getAvatarArtworkRadiusClassName,
+  getAvatarShapeClassName,
+  getAvatarSizePx,
+} from './avatar-contract';
 
-export type AvatarSize = keyof typeof SIZE_MAP;
 export type AvatarStatus = 'online' | 'away' | 'offline';
 
 // ---------------------------------------------------------------------------
@@ -96,23 +33,31 @@ export type AvatarStatus = 'online' | 'away' | 'offline';
 export interface AvatarProps extends React.HTMLAttributes<HTMLSpanElement> {
   readonly size?: AvatarSize;
   readonly ring?: boolean;
+  /** Person/user avatars are circular; release artwork is rounded-square. */
+  readonly shape?: AvatarShape;
 }
 
-/**
- * `Avatar` — root container. Always a circle.
- */
+/** Root container. Shape class is last so local className cannot change crop. */
 const Avatar = React.forwardRef<HTMLSpanElement, AvatarProps>(
-  ({ size = 'md', ring = false, className, style, ...props }, ref) => {
-    const { px } = SIZE_MAP[size];
+  (
+    { size = 'md', ring = false, shape = 'person', className, style, ...props },
+    ref
+  ) => {
+    const px = getAvatarSizePx(size);
+    const isPerson = shape === 'person';
     return (
       <span
         ref={ref}
         data-ring={ring ? 'true' : 'false'}
         data-size={size}
+        data-shape={shape}
         className={cn(
-          'relative isolate inline-flex shrink-0 items-center justify-center overflow-visible rounded-full outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10',
-          ring && 'ring-2 ring-surface-page',
-          className
+          'relative isolate inline-flex shrink-0 items-center justify-center',
+          isPerson ? 'overflow-visible' : 'overflow-hidden',
+          AVATAR_OUTLINE_CLASSNAME,
+          ring && AVATAR_RING_CLASSNAME,
+          className,
+          getAvatarShapeClassName(shape, px)
         )}
         style={{ width: px, height: px, ...style }}
         {...props}
@@ -125,18 +70,25 @@ Avatar.displayName = 'Avatar';
 // ---------------------------------------------------------------------------
 
 export interface AvatarImageProps
-  extends React.ImgHTMLAttributes<HTMLImageElement> {}
+  extends React.ImgHTMLAttributes<HTMLImageElement> {
+  readonly size?: AvatarSize;
+  readonly shape?: AvatarShape;
+}
 
 /**
  * `AvatarImage` — rendered inside `Avatar`.
  * Hides itself via CSS if the image fails to load (browser default for broken imgs).
  */
 const AvatarImage = React.forwardRef<HTMLImageElement, AvatarImageProps>(
-  ({ className, alt = '', ...props }, ref) => (
+  ({ className, alt = '', size = 'md', shape = 'person', ...props }, ref) => (
     <img
       ref={ref}
       alt={alt}
-      className={cn('h-full w-full rounded-full object-cover', className)}
+      className={cn(
+        'h-full w-full object-cover',
+        className,
+        getAvatarShapeClassName(shape, getAvatarSizePx(size))
+      )}
       {...props}
     />
   )
@@ -148,20 +100,22 @@ AvatarImage.displayName = 'AvatarImage';
 export interface AvatarFallbackProps
   extends React.HTMLAttributes<HTMLSpanElement> {
   readonly size?: AvatarSize;
+  readonly shape?: AvatarShape;
 }
 
 /**
  * `AvatarFallback` — shown when no image is provided. Styled as initials.
  */
 const AvatarFallback = React.forwardRef<HTMLSpanElement, AvatarFallbackProps>(
-  ({ size = 'md', className, ...props }, ref) => (
+  ({ size = 'md', shape = 'person', className, ...props }, ref) => (
     <span
       ref={ref}
       className={cn(
-        'flex h-full w-full items-center justify-center rounded-full font-medium select-none',
+        'flex h-full w-full items-center justify-center font-medium select-none',
         'overflow-hidden bg-surface-2 text-secondary-token',
-        SIZE_MAP[size].text,
-        className
+        AVATAR_SIZE_MAP[size].text,
+        className,
+        getAvatarShapeClassName(shape, getAvatarSizePx(size))
       )}
       {...props}
     />
@@ -190,7 +144,7 @@ function AvatarStatusDot({
   size = 'md',
   className,
 }: AvatarStatusDotProps) {
-  const { dot, dotOffset } = SIZE_MAP[size];
+  const { dot, dotOffset } = AVATAR_SIZE_MAP[size];
   return (
     <span
       role='img'
@@ -198,7 +152,8 @@ function AvatarStatusDot({
       data-size={size}
       data-status={status}
       className={cn(
-        'absolute rounded-full ring-2 ring-surface-page',
+        'absolute rounded-full',
+        AVATAR_RING_CLASSNAME,
         dot,
         dotOffset,
         STATUS_COLOR[status],
@@ -246,11 +201,13 @@ function UserAvatar({
   const altText = name || 'Avatar';
 
   return (
-    <Avatar size={size} ring={ring} className={className}>
+    <Avatar size={size} ring={ring} shape='person' className={className}>
       {src ? (
-        <AvatarImage src={src} alt={altText} />
+        <AvatarImage src={src} alt={altText} size={size} shape='person' />
       ) : (
-        <AvatarFallback size={size}>{initials}</AvatarFallback>
+        <AvatarFallback size={size} shape='person'>
+          {initials}
+        </AvatarFallback>
       )}
       {status && <AvatarStatusDot status={status} size={size} />}
     </Avatar>

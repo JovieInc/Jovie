@@ -1,5 +1,6 @@
 'use client';
 
+import { getAvatarShapeClassName, getAvatarSizePx } from '@jovie/ui';
 import React, {
   forwardRef,
   useCallback,
@@ -42,22 +43,6 @@ export interface AvatarUploadableProps extends Omit<AvatarProps, 'src'> {
   /** Whether to show hover overlay when uploadable */
   readonly showHoverOverlay?: boolean;
 }
-
-const SIZE_MAP = {
-  xs: 24,
-  sm: 32,
-  md: 48,
-  lg: 64,
-  xl: 80,
-  '2xl': 96,
-  'display-sm': 112,
-  'display-md': 128,
-  'display-lg': 160,
-  'display-xl': 192,
-  'display-2xl': 224,
-  'display-3xl': 256,
-  'display-4xl': 384,
-};
 
 function mergeRefs<T>(...refs: Array<React.Ref<T>>) {
   return (node: T) => {
@@ -133,8 +118,12 @@ export const AvatarUploadable = React.memo(
       );
 
       const avatarSize = avatarProps.size || 'md';
-      const avatarRounded = avatarProps.rounded || 'full';
-      const numericSize = SIZE_MAP[avatarSize];
+      const avatarShape = avatarProps.shape || 'person';
+      const numericSize = getAvatarSizePx(avatarSize);
+      const overlayShapeClassName = getAvatarShapeClassName(
+        avatarShape,
+        numericSize
+      );
       const acceptedTypeList = useMemo(
         () => acceptedTypes.join(','),
         [acceptedTypes]
@@ -216,7 +205,7 @@ export const AvatarUploadable = React.memo(
             {isInteractive && showHoverOverlay && !isDragOver && (
               <AvatarUploadOverlay
                 iconSize={numericSize * 0.3}
-                rounded={avatarRounded}
+                shapeClassName={overlayShapeClassName}
               />
             )}
 
@@ -224,7 +213,7 @@ export const AvatarUploadable = React.memo(
               <AvatarUploadOverlay
                 iconSize={numericSize * 0.3}
                 isDragOver
-                rounded={avatarRounded}
+                shapeClassName={overlayShapeClassName}
               />
             )}
 

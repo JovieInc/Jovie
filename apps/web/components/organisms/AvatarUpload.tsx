@@ -71,7 +71,7 @@ export function AvatarUpload({
         src={currentAvatarUrl}
         alt={artistName}
         name={artistName}
-        size='xl'
+        size='2xl'
         uploadable
         onUpload={handleUpload}
         onSuccess={handleSuccess}

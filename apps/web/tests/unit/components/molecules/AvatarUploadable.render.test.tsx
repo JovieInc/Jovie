@@ -56,18 +56,20 @@ describe('AvatarUploadable - Display Mode (Non-uploadable)', () => {
     expect(container.querySelector('.rounded-full')).toBeInTheDocument();
   });
 
-  it('supports non-circular shape overrides when provided', () => {
+  it('uses rounded-square geometry for release artwork', () => {
     const { container } = render(
       <AvatarUploadable
         src='https://example.com/avatar.jpg'
         alt='Release artwork'
         name='Midnight Echo'
-        rounded='md'
+        size='2xl'
+        shape='artwork'
         uploadable={false}
       />
     );
 
-    expect(container.querySelector('.rounded-md')).toBeInTheDocument();
+    expect(container.querySelector('.rounded-lg')).toBeInTheDocument();
+    expect(container.querySelector('.rounded-full')).not.toBeInTheDocument();
   });
   it('does not show hover overlay when not uploadable', () => {
     render(

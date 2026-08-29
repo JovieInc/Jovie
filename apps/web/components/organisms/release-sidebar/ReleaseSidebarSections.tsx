@@ -263,8 +263,8 @@ export function ReleaseEntityHeader({
                   src={release.artworkUrl}
                   alt={artworkAlt}
                   name={release.title}
-                  size='md'
-                  rounded='md'
+                  size='xl'
+                  shape='artwork'
                   uploadable={canUploadArtwork}
                   onUpload={onArtworkUpload}
                   showHoverOverlay
@@ -273,9 +273,9 @@ export function ReleaseEntityHeader({
                 <DrawerMediaThumb
                   src={release.artworkUrl}
                   alt={artworkAlt}
-                  dimension={48}
-                  sizeClassName='h-12 w-12 rounded-lg'
-                  sizes='48px'
+                  dimension={40}
+                  sizeClassName='h-10 w-10 rounded-lg'
+                  sizes='40px'
                   fallback={
                     <Icon
                       name='Disc3'

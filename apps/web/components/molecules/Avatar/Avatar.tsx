@@ -2,8 +2,12 @@
 
 // @coverage-via apps/web/tests/unit/components/atoms/Avatar/Avatar.test.tsx
 import {
+  type AvatarShape,
+  type AvatarSize,
   Avatar as BaseAvatar,
   AvatarFallback as BaseAvatarFallback,
+  getAvatarShapeClassName,
+  getAvatarSizePx,
   getInitials,
 } from '@jovie/ui';
 import Image from 'next/image';
@@ -19,23 +23,10 @@ export interface AvatarProps {
   readonly alt: string;
   /** Display name for fallback initials */
   readonly name?: string;
-  /** Avatar size */
-  readonly size?:
-    | 'xs'
-    | 'sm'
-    | 'md'
-    | 'lg'
-    | 'xl'
-    | '2xl'
-    | 'display-sm'
-    | 'display-md'
-    | 'display-lg'
-    | 'display-xl'
-    | 'display-2xl'
-    | 'display-3xl'
-    | 'display-4xl';
-  /** Border radius style */
-  readonly rounded?: 'none' | 'sm' | 'md' | 'lg' | 'full';
+  /** Avatar size — pixels come from the canonical @jovie/ui contract. */
+  readonly size?: AvatarSize;
+  /** Person/user avatars are circular; release artwork is rounded-square. */
+  readonly shape?: AvatarShape;
   /** Whether this avatar represents a verified profile */
   readonly verified?: boolean;
   /** Loading priority for Next.js Image */
@@ -50,67 +41,6 @@ export interface AvatarProps {
   readonly style?: React.ComponentPropsWithoutRef<'div'>['style'];
 }
 
-// Size mappings with consistent design system values
-const SIZE_MAP = {
-  xs: { width: 24, height: 24, className: 'size-6', textSize: 'text-xs' },
-  sm: { width: 32, height: 32, className: 'size-8', textSize: 'text-sm' },
-  md: { width: 48, height: 48, className: 'size-12', textSize: 'text-base' },
-  lg: { width: 64, height: 64, className: 'size-16', textSize: 'text-lg' },
-  xl: { width: 80, height: 80, className: 'size-20', textSize: 'text-xl' },
-  '2xl': { width: 96, height: 96, className: 'size-24', textSize: 'text-2xl' },
-  'display-sm': {
-    width: 112,
-    height: 112,
-    className: 'size-28',
-    textSize: 'text-xl',
-  },
-  'display-md': {
-    width: 128,
-    height: 128,
-    className: 'size-32',
-    textSize: 'text-2xl',
-  },
-  'display-lg': {
-    width: 160,
-    height: 160,
-    className: 'size-40',
-    textSize: 'text-3xl',
-  },
-  'display-xl': {
-    width: 192,
-    height: 192,
-    className: 'size-48',
-    textSize: 'text-3xl',
-  },
-  'display-2xl': {
-    width: 224,
-    height: 224,
-    className: 'size-56',
-    textSize: 'text-4xl',
-  },
-  'display-3xl': {
-    width: 256,
-    height: 256,
-    className: 'size-64',
-    textSize: 'text-4xl',
-  },
-  'display-4xl': {
-    width: 384,
-    height: 384,
-    className: 'size-96',
-    textSize: 'text-5xl',
-  },
-} as const;
-
-// Rounded corner mappings
-const ROUNDED_MAP = {
-  none: 'rounded-none',
-  sm: 'rounded-sm',
-  md: 'rounded-md',
-  lg: 'rounded-lg',
-  full: 'rounded-full',
-} as const;
-
 // Blur data URLs for different sizes for optimized loading
 const BLUR_DATA_URLS = {
   24: 'data:image/webp;base64,UklGRoQCAABXRUJQVlA4WAoAAAAgAAAAPwAAPwAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZWUDhUAAAALwAAAP8QEI0AAAAgHyAQg4CARGQ=',
@@ -121,29 +51,17 @@ const BLUR_DATA_URLS = {
   96: 'data:image/webp;base64,UklGRoQCAABXRUJQVlA4WAoAAAAgAAAAPwAAPwAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAaSQBuAGMALgAgADIAMAAxADZWUDhUAAAALwAAAP8QEI0AAAAgHyAQg4CARGQ=',
 } as const;
 
-/** Generate initials — delegates to @jovie/ui's shared getInitials. */
 function generateInitials(name?: string): string {
   if (!name) return '?';
   return getInitials(name);
 }
 
-/**
- * Unified Avatar component for display-only usage
- *
- * This component handles:
- * - Multiple sizes with consistent design system values
- * - Fallback initials when image fails to load
- * - Optimized loading with blur placeholders
- * - Accessibility support with proper ARIA attributes
- * - Dark mode support
- */
 const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
   {
     src,
-    alt,
     name,
     size = 'md',
-    rounded = 'full',
+    shape = 'person',
     verified = false,
     priority = false,
     quality = 85,
@@ -156,8 +74,8 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
   const [hasError, setHasError] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  const { width, height, className: sizeClass, textSize } = SIZE_MAP[size];
-  const roundedClass = ROUNDED_MAP[rounded];
+  const width = getAvatarSizePx(size);
+  const shapeClassName = getAvatarShapeClassName(shape, width);
   const shouldUseBlurPlaceholder = width >= 40;
   const blurDataURL = useMemo(() => {
     if (BLUR_DATA_URLS[width as keyof typeof BLUR_DATA_URLS]) {
@@ -189,23 +107,15 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
       <div ref={ref} className={cn('relative', className)} style={style}>
         <BaseAvatar
           size={size}
+          shape={shape}
           data-slot='app-avatar'
-          style={{ width, height }}
-          className={cn(
-            sizeClass,
-            roundedClass,
-            'overflow-hidden text-primary-token',
-            'shadow-sm transition-colors duration-subtle'
-          )}
+          className='text-primary-token shadow-sm transition-colors duration-subtle'
           aria-hidden='true'
         >
           <BaseAvatarFallback
             size={size}
-            className={cn(
-              'font-medium leading-none select-none text-primary-token',
-              roundedClass,
-              textSize
-            )}
+            shape={shape}
+            className='font-medium leading-none select-none text-primary-token'
           >
             {initials}
           </BaseAvatarFallback>
@@ -223,14 +133,11 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
     <div ref={ref} className={cn('relative', className)} style={style}>
       <BaseAvatar
         size={size}
+        shape={shape}
         data-slot='app-avatar'
-        style={{ width, height }}
         className={cn(
-          sizeClass,
-          roundedClass,
-          'overflow-hidden text-primary-token',
-          isLoaded && 'bg-surface-1',
-          'shadow-sm transition-colors duration-subtle'
+          'text-primary-token shadow-sm transition-colors duration-subtle',
+          isLoaded && 'bg-surface-1'
         )}
         aria-hidden='true'
       >
@@ -239,15 +146,16 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
           alt=''
           aria-hidden='true'
           width={width}
-          height={height}
+          height={width}
           priority={priority}
           quality={quality}
           sizes={sizes ?? `${width}px`}
           unoptimized={unoptimized}
           {...placeholderProps}
           className={cn(
-            'object-cover object-center transition-opacity duration-subtle ease-out',
-            isLoaded ? 'opacity-100' : 'opacity-0'
+            'h-full w-full object-cover object-center transition-opacity duration-subtle ease-out',
+            isLoaded ? 'opacity-100' : 'opacity-0',
+            shapeClassName
           )}
           onLoad={() => setIsLoaded(true)}
           onError={() => setHasError(true)}
@@ -259,7 +167,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
         {/* Loading shimmer effect */}
         {!isLoaded && !hasError && (
           <div
-            className={cn('absolute inset-0 skeleton', roundedClass)}
+            className={cn('absolute inset-0 skeleton', shapeClassName)}
             aria-hidden='true'
           />
         )}

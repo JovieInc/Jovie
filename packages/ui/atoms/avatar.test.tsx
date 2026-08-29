@@ -1,13 +1,21 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import {
+  AVATAR_PERSON_RADIUS_CLASSNAME,
   Avatar,
   AvatarFallback,
   AvatarStatusDot,
+  getAvatarSizePx,
   getInitials,
   UserAvatar,
 } from './avatar';
+import {
+  NON_CIRCULAR_IDENTITY_AVATAR_FIXTURE_TEST_ID,
+  NonCircularIdentityAvatarFixture,
+} from './fixtures/non-circular-identity-avatar';
 
 describe('Avatar', () => {
   it('uses System B ring tokens for stacked avatars', () => {
@@ -81,5 +89,56 @@ describe('Avatar', () => {
     const image = screen.getByRole('img', { name: 'Tim White' });
     expect(image).toHaveAttribute('src', '/tim-white.png');
     expect(image).toHaveClass('rounded-full', 'object-cover');
+  });
+
+  it('keeps person geometry circular even when a square class is passed', () => {
+    render(
+      <Avatar data-testid='avatar' className='rounded-md'>
+        <AvatarFallback>TW</AvatarFallback>
+      </Avatar>
+    );
+
+    const avatar = screen.getByTestId('avatar');
+    expect(avatar).toHaveAttribute('data-shape', 'person');
+    expect(avatar).toHaveClass(AVATAR_PERSON_RADIUS_CLASSNAME);
+    expect(avatar).toHaveStyle({
+      width: `${getAvatarSizePx('md')}px`,
+      height: `${getAvatarSizePx('md')}px`,
+    });
+  });
+
+  it('uses rounded-square geometry for release artwork', () => {
+    render(
+      <Avatar data-testid='artwork' size='2xl' shape='artwork'>
+        <AvatarFallback size='2xl' shape='artwork'>
+          ME
+        </AvatarFallback>
+      </Avatar>
+    );
+
+    const artwork = screen.getByTestId('artwork');
+    expect(artwork).toHaveAttribute('data-shape', 'artwork');
+    expect(artwork).toHaveClass('rounded-lg');
+    expect(artwork).not.toHaveClass('rounded-full');
+    expect(artwork).toHaveClass('overflow-hidden');
+  });
+
+  it('rejects the deliberate-red non-circular identity crop', () => {
+    render(<NonCircularIdentityAvatarFixture />);
+    render(<UserAvatar name='Tim White' />);
+
+    const fixture = screen.getByTestId(
+      NON_CIRCULAR_IDENTITY_AVATAR_FIXTURE_TEST_ID
+    );
+    expect(fixture).toHaveAttribute('data-deliberate-red', '');
+    expect(fixture).toHaveClass('rounded-md');
+    expect(fixture).not.toHaveClass('rounded-full');
+
+    const identity = screen.getByText('TW');
+    expect(identity).toHaveClass('rounded-full');
+    expect(identity).not.toHaveClass('rounded-md');
+
+    const atomSource = readFileSync(path.join(__dirname, 'avatar.tsx'), 'utf8');
+    expect(atomSource).not.toContain('non-circular-identity-avatar');
   });
 });

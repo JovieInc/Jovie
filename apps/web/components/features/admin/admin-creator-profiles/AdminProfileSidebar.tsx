@@ -115,7 +115,6 @@ export function AdminProfileSidebar({
                 alt={`${profile.displayName ?? profile.username} avatar`}
                 name={profile.displayName ?? profile.username}
                 size='2xl'
-                rounded='md'
               />
             }
             meta={profile.location ? <span>{profile.location}</span> : null}
