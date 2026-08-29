@@ -2,7 +2,8 @@ name: Activate Gem Delivery Controller
 
 # A production receipt is the only authority to replace Gem's local controller
 # configuration. The installer refuses a dirty or mismatched source revision,
-# keeps a timestamped rollback copy, reloads systemd, and writes the attestation.
+# keeps a timestamped rollback copy, reloads systemd, enables and starts the
+# recurring drain timer, and attests both its enabled and active states.
 on:
   workflow_run:
     workflows: ["Production Controller"]
@@ -89,10 +90,13 @@ jobs:
           jq -e --arg sha "$PRODUCTION_SHA" '
             .schema == "gem-pr-rehabilitation-attestation/v1" and
             .sourceRevision == $sha and
+            .timerEnabled == true and
             .timerActive == true and
             .lastCycleResult == "success" and
             ([.artifacts[].matches] | all)
           ' "$GEM_WORKSPACE/state/gem-pr-rehabilitation-attestation.json" >/dev/null
+          systemctl --user is-enabled --quiet gem-pr-drain.timer
+          systemctl --user is-active --quiet gem-pr-drain.timer
           bash scripts/hermes/install-symphony-ui-pilot.sh --check
           SYMPHONY_RUNTIME_SOURCE_ROOT="$PWD/scripts/hermes" \
             SYMPHONY_MODEL_ROUTER="$HOME/.local/lib/symphony-reconciler/model-router.py" \
