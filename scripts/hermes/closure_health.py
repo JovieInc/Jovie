@@ -44,7 +44,7 @@ def parse_time(value: object) -> datetime | None:
         return None
     try:
         return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC)
-    except ValueError:
+    except (ValueError, OverflowError):
         return None
 
 
@@ -193,7 +193,13 @@ def classify_open_prs(prs: list[dict[str, Any]], now: datetime) -> dict[str, Any
 def _episode_since(
     previous: dict[str, Any] | None, key: str, now: datetime
 ) -> datetime:
-    candidate = (previous or {}).get("episodes", {}).get(key, {}).get("since")
+    episodes = (previous or {}).get("episodes")
+    if not isinstance(episodes, dict):
+        return now
+    episode = episodes.get(key)
+    if not isinstance(episode, dict):
+        return now
+    candidate = episode.get("since")
     parsed = parse_time(candidate)
     return parsed if parsed is not None and parsed <= now else now
 
