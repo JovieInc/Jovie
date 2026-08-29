@@ -16,6 +16,7 @@ import {
   hasAnalyticsConsent,
 } from '@/lib/cookies/consent-state';
 import { NONESSENTIAL_PROXY_COOKIE_NAMES } from '@/lib/cookies/registry';
+import { ensureVaryAccept } from '@/lib/http/accept-markdown';
 import type { PathCategory } from '@/lib/routing/proxy-routing';
 import {
   buildContentSecurityPolicy,
@@ -202,6 +203,10 @@ export function buildFinalResponse(
         path: '/',
       });
     }
+  }
+
+  if (pathname === '/') {
+    ensureVaryAccept(res.headers);
   }
 
   // Performance monitoring

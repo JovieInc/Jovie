@@ -93,6 +93,8 @@ vi.mock('@clerk/nextjs/server', () => ({
   clerkMiddleware: mocks.clerkMiddleware,
 }));
 vi.mock('@/constants/app', () => ({
+  APP_NAME: 'Jovie',
+  BASE_URL: 'https://jov.ie',
   AUDIENCE_ANON_COOKIE: 'audience_anon',
   AUDIENCE_IDENTIFIED_COOKIE: 'audience_identified',
   AUDIENCE_SPOTIFY_PREFERRED_COOKIE: 'audience_spotify_preferred',

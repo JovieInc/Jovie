@@ -215,7 +215,11 @@ const nextConfig = {
       // Marketing pages (pre-rendered at build) - long-lived cache
       {
         source: '/',
-        headers: [...securityHeaders, cacheHeaders.immutable],
+        headers: [
+          ...securityHeaders,
+          cacheHeaders.immutable,
+          { key: 'Vary', value: 'Accept' },
+        ],
       },
       {
         source: '/(pricing|support|investors|engagement-engine|blog|changelog)',

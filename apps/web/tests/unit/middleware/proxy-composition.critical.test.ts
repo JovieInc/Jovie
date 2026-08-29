@@ -108,6 +108,8 @@ vi.mock('@clerk/nextjs/server', () => ({
   clerkMiddleware: mocks.clerkMiddleware,
 }));
 vi.mock('@/constants/app', () => ({
+  APP_NAME: 'Jovie',
+  BASE_URL: 'https://jov.ie',
   AUDIENCE_ANON_COOKIE: 'audience_anon',
   AUDIENCE_IDENTIFIED_COOKIE: 'audience_identified',
   AUDIENCE_SPOTIFY_PREFERRED_COOKIE: 'audience_spotify_preferred',
@@ -338,6 +340,54 @@ describe('proxy composition (critical)', () => {
         ? config.matcher[0]
         : config.matcher;
       expect(matcherPattern).toContain('_next');
+    });
+  });
+
+  describe('Markdown Accept negotiation (JOV-5412)', () => {
+    it('serves homepage Markdown for Accept: text/markdown', async () => {
+      const req = createTestRequest({
+        pathname: '/',
+        headers: { accept: 'text/markdown' },
+      });
+      const res = await callMiddleware(req);
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toBe(
+        'text/markdown; charset=utf-8'
+      );
+      expect(res.headers.get('vary')).toBe('Accept');
+      expect(await res.text()).toContain('Jovie');
+    });
+
+    it('keeps the HTML homepage path for browser Accept', async () => {
+      const req = createTestRequest({
+        pathname: '/',
+        headers: {
+          accept:
+            'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+      });
+      const res = await callMiddleware(req);
+      expect(res.status).toBeLessThan(400);
+      expect(res.headers.get('content-type')).not.toBe(
+        'text/markdown; charset=utf-8'
+      );
+      expect(res.headers.get('vary')).toMatch(/Accept/i);
+    });
+
+    it('returns a real Markdown 404 for an unknown route', async () => {
+      const req = createTestRequest({
+        pathname: '/this-page-does-not-exist',
+        headers: { accept: 'text/markdown' },
+      });
+      const res = await callMiddleware(req);
+      expect(res.status).toBe(404);
+      expect(res.headers.get('content-type')).toBe(
+        'text/markdown; charset=utf-8'
+      );
+      const body = await res.text();
+      expect(body).toContain('/llms.txt');
+      expect(body).toContain('/openapi.json');
+      expect(body).toContain('/sitemap.xml');
     });
   });
 });

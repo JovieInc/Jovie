@@ -13,6 +13,7 @@ import {
   isTestAuthBypassEnabled,
   resolveTestBypassUserId,
 } from '@/lib/auth/test-mode';
+import { maybePublicMarkdownResponse } from '@/lib/http/markdown-documents';
 import { analyzeHost } from '@/lib/routing/proxy-routing';
 import {
   createFastNotFoundResponse,
@@ -171,6 +172,9 @@ export default async function middleware(
   if (isReservedProfileAliasMarkerPath(req.nextUrl.pathname)) {
     return createFastNotFoundResponse();
   }
+
+  const markdownResponse = maybePublicMarkdownResponse(req);
+  if (markdownResponse) return markdownResponse;
 
   const duplicateAliasSourceRedirect = getDuplicateAliasSourceRedirect(req);
   if (duplicateAliasSourceRedirect) return duplicateAliasSourceRedirect;
