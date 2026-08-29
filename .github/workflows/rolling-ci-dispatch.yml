@@ -122,7 +122,7 @@ jobs:
             exit 0
           fi
           echo "pr_number=$RESOLVED_PR" >> "$GITHUB_OUTPUT"
-          FAILED_JOBS=$(gh api "repos/$REPOSITORY/actions/runs/$WORKFLOW_RUN_ID/jobs" \
+          FAILED_JOBS=$(gh api "repos/$REPOSITORY/actions/runs/$WORKFLOW_RUN_ID/attempts/$WORKFLOW_RUN_ATTEMPT/jobs?per_page=100" \
             --jq '[.jobs[] | select(.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "startup_failure") | {name: .name, conclusion: .conclusion, steps: [.steps[]? | select(.conclusion == "failure" or .conclusion == "timed_out") | .name]}]')
           CHECKS=$(gh api --paginate "repos/$REPOSITORY/commits/$EXPECTED_HEAD/check-runs" \
             --jq '.check_runs[] | {name: .name, conclusion: .conclusion, headSha: .head_sha, checkSuiteId: .check_suite.id}' \
