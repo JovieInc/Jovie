@@ -93,7 +93,7 @@ const LANES = [
     id: 'structural',
     name: 'Structural Contract',
     nextLocalCommand:
-      'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm component-ship-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
+      'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm component-ship-gate && pnpm screen-certification-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
     run: runStructural,
   },
 ];
@@ -575,6 +575,7 @@ function runStructural() {
     'pnpm --filter=@jovie/web run lint:contrast-ratchet',
     // JOV-4421: hard ship gate — tests + matching stories for shippable UI.
     'pnpm component-ship-gate',
+    'pnpm screen-certification-gate',
     // CI workflow changes live at the repo root, so Turbo --affected can select
     // only the root package and return success after running zero web tests.
     // Target Vitest directly so the deploy contract always executes and fails
