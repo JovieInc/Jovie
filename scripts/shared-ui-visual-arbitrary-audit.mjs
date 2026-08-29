@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Shared-UI visual arbitrary-value audit (JOV-5434): shrink-only
- * file/value/count for packages/ui/{atoms,lib}. Exclusions: state/aria,
+ * file/value/count across production packages/ui. Exclusions: state/aria,
  * CSS vars, transition lists, empty content-[], CSS-property syntax.
  * pnpm design:shared-ui-visual-arbitrary:{check,update}
  */
@@ -13,15 +13,13 @@ const THIS_DIR = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = join(THIS_DIR, '..');
 export const SCHEMA = 'jovie.shared-ui-visual-arbitrary/v1';
 export const BASELINE_PATH = 'scripts/shared-ui-visual-arbitrary.baseline.json';
-export const SCAN_ROOTS = Object.freeze([
-  'packages/ui/atoms',
-  'packages/ui/lib',
-]);
+export const SCAN_ROOTS = Object.freeze(['packages/ui']);
 export const CHECK_COMMAND = 'pnpm design:shared-ui-visual-arbitrary:check';
 export const UPDATE_COMMAND = 'pnpm design:shared-ui-visual-arbitrary:update';
 
 const SOURCE_EXT = /\.(tsx|ts)$/;
-const SKIP_PRODUCTION = /\.(?:test|spec|stories)\.[cm]?[jt]sx?$|\/fixtures\//;
+const SKIP_PRODUCTION =
+  /(?:^|\/)(?:coverage|dist|build|docs|generated|fixtures?|__tests__)(?:\/|$)|(?:^|\/)vitest\.setup\.ts$|\.(?:test|spec|stories)\.[cm]?[jt]sx?$/;
 const ARBITRARY_TOKEN =
   /(?:^|[\s"'`])((?:[!a-z][\w-]*:)*!?[a-z][\w-]*-\[[^\]]+\]|\[[a-z-]+:[^\]]+\])/g;
 const STATE_UTILITY = /^(?:group-|peer-)?(?:data|aria)-\[/;

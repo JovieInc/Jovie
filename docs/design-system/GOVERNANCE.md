@@ -62,7 +62,7 @@ permanent check:
    invariants. The generated LLM manifest, design authority guard, and this
    audit consume that record. The audit injects a contract-change probe and
    fails unless both generator output and authority-guard rejection change.
-9. **Shared-UI visual arbitrary values** — `packages/ui/{atoms,lib}` production
+9. **Shared-UI visual arbitrary values** — `packages/ui` production
    files cannot grow one-off visual Tailwind values. Exact file/value/count
    debt may only shrink (`pnpm design:shared-ui-visual-arbitrary:check`).
 

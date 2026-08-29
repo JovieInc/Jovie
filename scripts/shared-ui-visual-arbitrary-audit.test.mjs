@@ -37,7 +37,7 @@ const CI_FAST_SOURCE = readFileSync(
   'utf8'
 );
 const GATE_SOURCE = readFileSync(resolve(REPO_ROOT, 'package.json'), 'utf8');
-const SCOPE = ['packages/ui/atoms', 'packages/ui/lib'];
+const SCOPE = ['packages/ui'];
 const ATOM = 'packages/ui/atoms/button.tsx';
 
 const DELIBERATE_RED = `
@@ -63,7 +63,7 @@ test('repo shared-UI visual arbitrary findings match the shrink-only baseline', 
   assert.equal(result.ok, true, result.issues.join('\n'));
   assert.equal(result.status, 'pass');
   assert.equal(result.totalFindings, 52);
-  assert.equal(result.scannedFiles.length, 50);
+  assert.equal(result.scannedFiles.length, 57);
 });
 
 test('baseline schema is exact file/value/count and sorted', () => {
@@ -232,11 +232,15 @@ test('unbaselined shrink fails locally and is sibling-safe on merge_group', () =
   assert.equal(mergeGroup.status, 'sibling_shrink');
 });
 
-test('scanner skips tests, stories, and fixtures', () => {
+test('scanner covers every production package root and skips non-production files', () => {
   const root = mkdtempSync(join(tmpdir(), 'shared-ui-visual-arbitrary-'));
   try {
     mkdirSync(join(root, 'packages/ui/atoms/fixtures'), { recursive: true });
     mkdirSync(join(root, 'packages/ui/lib'), { recursive: true });
+    mkdirSync(join(root, 'packages/ui/hooks'), { recursive: true });
+    mkdirSync(join(root, 'packages/ui/media'), { recursive: true });
+    mkdirSync(join(root, 'packages/ui/theme'), { recursive: true });
+    mkdirSync(join(root, 'packages/ui/__tests__'), { recursive: true });
     const files = {
       'packages/ui/atoms/live.tsx': 'export const x = "w-[327px]";\n',
       'packages/ui/atoms/live.test.tsx': 'export const x = "text-[#ff00aa]";\n',
@@ -244,6 +248,12 @@ test('scanner skips tests, stories, and fixtures', () => {
       'packages/ui/atoms/fixtures/red.tsx':
         'export const x = "rounded-[12px]";\n',
       'packages/ui/lib/overlay-styles.ts': 'export const x = "z-[65]";\n',
+      'packages/ui/hooks/live.ts': 'export const x = "h-[42px]";\n',
+      'packages/ui/media/live.ts': 'export const x = "text-[#ff00aa]";\n',
+      'packages/ui/theme/live.ts': 'export const x = "font-[550]";\n',
+      'packages/ui/root-live.tsx': 'export const x = "text-[15px]";\n',
+      'packages/ui/__tests__/ignored.tsx': 'export const x = "w-[999px]";\n',
+      'packages/ui/vitest.setup.ts': 'export const x = "h-[999px]";\n',
     };
     for (const [relativePath, source] of Object.entries(files)) {
       writeFileSync(join(root, relativePath), source);
@@ -251,9 +261,13 @@ test('scanner skips tests, stories, and fixtures', () => {
     const measured = scanSharedUiVisualArbitrary(root);
     assert.deepEqual(measured.scannedFiles, [
       'packages/ui/atoms/live.tsx',
+      'packages/ui/hooks/live.ts',
       'packages/ui/lib/overlay-styles.ts',
+      'packages/ui/media/live.ts',
+      'packages/ui/root-live.tsx',
+      'packages/ui/theme/live.ts',
     ]);
-    assert.equal(measured.totalFindings, 2);
+    assert.equal(measured.totalFindings, 6);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
