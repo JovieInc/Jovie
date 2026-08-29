@@ -8,7 +8,7 @@ vi.mock('next/image', () => ({
     alt = '',
     priority: _priority,
     ...props
-  }: ComponentProps<'img'>) => {
+  }: ComponentProps<'img'> & { readonly priority?: boolean }) => {
     void _priority;
     return <img alt={alt} {...props} />;
   },
