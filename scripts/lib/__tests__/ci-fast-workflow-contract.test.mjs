@@ -220,11 +220,14 @@ describe('ci-fast bounded parallel workflow', () => {
       'apps/web/components/',
       'apps/web/styles/',
       'apps/web/tests/',
+      'apps/web/\\.storybook/',
       'packages/ui/',
       'DESIGN\\.md$',
       'design\\.tokens\\.json$',
+      'chromatic\\.config\\.json$',
       'scripts/(component-',
       'screen-certification',
+      'shared-ui-visual-arbitrary',
       'story-coverage',
       'ui-story-coverage',
       'scripts/lib/__tests__/(component-',
@@ -493,6 +496,67 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     expect(selectsStructural.test('.claude/skills/qa/SKILL.md')).toBe(false);
     expect(selectsStructural.test('.claude/rules/auth.md')).toBe(false);
+  });
+
+  it('runs hosted structural CI for Storybook, Chromatic, and token-guard inputs', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const structuralDecision = remaining.slice(
+      remaining.indexOf('- name: Decide structural lane'),
+      remaining.indexOf('- name: Install actionlint')
+    );
+    const uiPattern = remaining.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
+    expect(uiPattern).toBeDefined();
+    const uiRe = new RegExp(uiPattern);
+
+    // Source PRs path-gate the remaining structural lane; merge groups never skip.
+    expect(structuralDecision).toContain(
+      'github.event_name }}" != "pull_request"'
+    );
+    expect(structuralDecision).toContain('echo "skip=false"');
+    expect(remaining).toMatch(/github\.event_name != 'merge_group'/);
+    expect(remaining).toMatch(
+      /needs\.ci-merge-group-admission\.result == 'success'/
+    );
+
+    // Direct rendered-harness and token-guard inputs must select structural.
+    expect(uiRe.test('apps/web/.storybook/main.ts')).toBe(true);
+    expect(uiRe.test('apps/web/.storybook/preview.tsx')).toBe(true);
+    expect(
+      uiRe.test('apps/web/.storybook/stories/elevation-matrix.stories.tsx')
+    ).toBe(true);
+    expect(uiRe.test('chromatic.config.json')).toBe(true);
+    expect(uiRe.test('scripts/shared-ui-visual-arbitrary-audit.mjs')).toBe(
+      true
+    );
+    expect(uiRe.test('scripts/shared-ui-visual-arbitrary-audit.test.mjs')).toBe(
+      true
+    );
+    expect(uiRe.test('scripts/shared-ui-visual-arbitrary.baseline.json')).toBe(
+      true
+    );
+
+    // JOV-5435 centralized web-test boundary stays selected.
+    expect(uiRe.test('apps/web/tests/unit/atoms/ViaPanel.test.tsx')).toBe(true);
+    expect(uiRe.test('apps/web/tests/e2e/smoke-public.spec.ts')).toBe(true);
+
+    // Similar-looking non-inputs must remain excluded.
+    expect(uiRe.test('apps/web/storybook/main.ts')).toBe(false);
+    expect(uiRe.test('.storybook/main.ts')).toBe(false);
+    expect(uiRe.test('apps/desktop/.storybook/preview.tsx')).toBe(false);
+    expect(uiRe.test('apps/web/chromatic.config.json')).toBe(false);
+    expect(uiRe.test('chromatic.config.js')).toBe(false);
+    expect(uiRe.test('docs/chromatic.config.json')).toBe(false);
+    expect(uiRe.test('scripts/shared-ui-visual.mjs')).toBe(false);
+    expect(uiRe.test('scripts/lib/shared-ui-visual-arbitrary-audit.mjs')).toBe(
+      false
+    );
+    expect(
+      uiRe.test('apps/web/scripts/shared-ui-visual-arbitrary-audit.mjs')
+    ).toBe(false);
+    expect(uiRe.test('apps/web/lib/env.ts')).toBe(false);
   });
 
   it('skips the aggregate when the original ci-fast eligibility is skipped', () => {

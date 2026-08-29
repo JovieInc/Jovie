@@ -246,6 +246,17 @@ describe('merge_group workflow contract', () => {
       );
     }
 
+    const remaining = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining');
+    expect(remaining).toContain(
+      'CI_FAST_SKIP_STRUCTURAL: ${{ steps.structural.outputs.skip }}'
+    );
+    expect(remaining).toContain('github.event_name }}" != "pull_request"');
+    expect(remaining).toContain('echo "skip=false"');
+    expect(remaining).toContain('apps/web/\\.storybook/');
+    expect(remaining).toContain('chromatic\\.config\\.json$');
+    expect(remaining).toContain('shared-ui-visual-arbitrary');
+    expect(remaining).toContain('apps/web/tests/');
+
     for (const jobId of [
       'ci-unit-tests',
       'ci-build-layout',
