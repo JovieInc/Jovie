@@ -12,6 +12,9 @@ const DESIGN_GOVERNANCE_PATHS = new Set([
   'scripts/oklch-palette-guard.mjs',
   'scripts/oklch-palette-guard.test.mjs',
   'apps/web/design/oklch-palette.json',
+  'scripts/shared-ui-visual-arbitrary-audit.mjs',
+  'scripts/shared-ui-visual-arbitrary-audit.test.mjs',
+  'scripts/shared-ui-visual-arbitrary.baseline.json',
   'package.json',
 ]);
 

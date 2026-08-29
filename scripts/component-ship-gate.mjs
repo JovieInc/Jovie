@@ -25,9 +25,11 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { runRenderedCertification } from './component-rendered-certification.mjs';
 import {
+  COVERAGE_ROOTS,
   checkStoryMatchesComponent,
   extractExportedComponentNames,
   isUnderShipScope,
+  listComponentsInRoot,
   normalizeRepoPath,
   parseCoverageVia,
   REPO_ROOT,
@@ -57,6 +59,7 @@ function parseArgs(argv) {
     skipRatchet: false,
     skipRenderedCert: false,
     json: false,
+    auditCoverageVia: false,
   };
   for (const arg of argv) {
     if (arg.startsWith('--diff-base='))
@@ -64,6 +67,7 @@ function parseArgs(argv) {
     else if (arg === '--skip-quality') flags.skipQuality = true;
     else if (arg === '--skip-ratchet') flags.skipRatchet = true;
     else if (arg === '--skip-rendered-cert') flags.skipRenderedCert = true;
+    else if (arg === '--audit-coverage-via') flags.auditCoverageVia = true;
     else if (arg === '--json') flags.json = true;
     else if (arg === '--help' || arg === '-h') flags.help = true;
   }
@@ -689,6 +693,61 @@ export function hasRealLegacyTestEvidence({
   return usesImportedComponent || hasExplicitSourceRead(sourceFile, sourceRel);
 }
 
+export function inspectCoverageViaReceipt({
+  viaRel,
+  sourceRel,
+  componentBase,
+  componentSource,
+  repoRoot = REPO_ROOT,
+}) {
+  return verifyCoverageVia({
+    viaRel,
+    componentRel: sourceRel,
+    componentBase,
+    repoRoot,
+    componentSource,
+    hasExecutableEvidence: hasRealLegacyTestEvidence,
+  });
+}
+
+export function auditCoverageViaReceipts({ repoRoot = REPO_ROOT } = {}) {
+  const seen = new Set();
+  const receipts = [];
+  const invalid = [];
+
+  for (const root of COVERAGE_ROOTS) {
+    for (const component of listComponentsInRoot(root, repoRoot)) {
+      if (seen.has(component.sourceRel)) continue;
+      seen.add(component.sourceRel);
+      const componentSource = readText(component.sourceRel, repoRoot);
+      const via = parseCoverageVia(componentSource);
+      if (!via) continue;
+      const viaRel = resolveCoverageViaPath(via, component.sourceRel, repoRoot);
+      const inspected = inspectCoverageViaReceipt({
+        viaRel,
+        sourceRel: component.sourceRel,
+        componentBase: component.component,
+        componentSource,
+        repoRoot,
+      });
+      const receipt = {
+        path: component.sourceRel,
+        viaRel,
+        ok: inspected.ok,
+        detail: inspected.detail,
+      };
+      receipts.push(receipt);
+      if (!inspected.ok) invalid.push(receipt);
+    }
+  }
+
+  return {
+    ok: invalid.length === 0,
+    receipts,
+    invalid,
+  };
+}
+
 function findChangedLegacyTest({
   changed,
   sourceRel,
@@ -871,22 +930,21 @@ export function checkChangedComponents(
 
     if (!testOk && via) {
       const viaRel = resolveCoverageViaPath(via, sourceRel, repoRoot);
-      const verified = verifyCoverageVia({
+      const coverageVia = inspectCoverageViaReceipt({
         viaRel,
-        componentRel: sourceRel,
+        sourceRel,
         componentBase: base,
-        repoRoot,
         componentSource,
-        hasExecutableEvidence: hasRealLegacyTestEvidence,
+        repoRoot,
       });
-      if (verified.ok) {
+      if (coverageVia.ok) {
         testOk = true;
         resolvedTest = viaRel;
       } else {
         issues.push({
           path: sourceRel,
           rule: 'coverage-via-invalid',
-          detail: verified.detail,
+          detail: coverageVia.detail,
         });
       }
     }
@@ -1181,8 +1239,29 @@ function main(argv = process.argv.slice(2)) {
   --skip-quality         Skip storybook quality guard
   --skip-ratchet         Skip multi-root story coverage ratchet
   --skip-rendered-cert   Skip source-blind rendered certification
+  --audit-coverage-via   Whole-tree executable @coverage-via receipt audit
   --json                 Print machine-readable report`);
     return 0;
+  }
+
+  if (flags.auditCoverageVia) {
+    const audit = auditCoverageViaReceipts();
+    if (flags.json) {
+      console.log(JSON.stringify(audit, null, 2));
+    } else {
+      console.log(
+        `[component-ship-gate] coverage-via audit: ${audit.receipts.length} receipts, ${audit.invalid.length} invalid`
+      );
+      for (const issue of audit.invalid) {
+        console.error(`- ${issue.path}: ${issue.detail}`);
+      }
+      if (audit.ok) {
+        console.log('[component-ship-gate] coverage-via audit: PASS');
+      } else {
+        console.error('[component-ship-gate] coverage-via audit: FAIL');
+      }
+    }
+    return audit.ok ? 0 : 1;
   }
 
   const report = runComponentShipGate({

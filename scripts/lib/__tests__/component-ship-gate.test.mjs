@@ -2,7 +2,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { checkChangedComponents } from '../../component-ship-gate.mjs';
+import {
+  auditCoverageViaReceipts,
+  checkChangedComponents,
+} from '../../component-ship-gate.mjs';
 import {
   checkStoryMatchesComponent,
   extractRequiredPropNames,
@@ -587,6 +590,12 @@ describe('coverage-via executable evidence', () => {
     expect(
       result.issues.some(issue => issue.rule === 'coverage-via-invalid')
     ).toBe(true);
+  });
+
+  it('has zero invalid existing coverage-via receipts', () => {
+    const audit = auditCoverageViaReceipts();
+    expect(audit.invalid).toEqual([]);
+    expect(audit.ok).toBe(true);
   });
 });
 

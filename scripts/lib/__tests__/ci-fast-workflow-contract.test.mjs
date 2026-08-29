@@ -166,8 +166,11 @@ describe('ci-fast bounded parallel workflow', () => {
       'profile-admission':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts',
       structural:
-        'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm component-ship-gate && pnpm screen-certification-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
+        'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-certification-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
     });
+    expect(CI_FAST_SOURCE).toContain(
+      "'pnpm design:shared-ui-visual-arbitrary:check'"
+    );
   });
 
   it('keeps the iOS design gate independent from Ubuntu operations', () => {
@@ -216,6 +219,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'apps/web/app/.*\\.(tsx|css)$',
       'apps/web/components/',
       'apps/web/styles/',
+      'apps/web/tests/',
       'packages/ui/',
       'DESIGN\\.md$',
       'design\\.tokens\\.json$',
@@ -473,6 +477,18 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(selectsStructural.test('apps/web/app/(home)/page.tsx')).toBe(true);
     expect(selectsStructural.test('packages/ui/atoms/badge.tsx')).toBe(true);
     expect(selectsStructural.test('scripts/component-ship-gate.mjs')).toBe(
+      true
+    );
+    expect(
+      selectsStructural.test('apps/web/tests/unit/atoms/ViaPanel.test.tsx')
+    ).toBe(true);
+    expect(
+      new RegExp(uiPattern).test('apps/web/tests/unit/atoms/ViaPanel.test.tsx')
+    ).toBe(true);
+    expect(
+      new RegExp(uiPattern).test('apps/web/components/atoms/Button.test.tsx')
+    ).toBe(true);
+    expect(new RegExp(uiPattern).test('packages/ui/atoms/badge.test.tsx')).toBe(
       true
     );
     expect(selectsStructural.test('.claude/skills/qa/SKILL.md')).toBe(false);
