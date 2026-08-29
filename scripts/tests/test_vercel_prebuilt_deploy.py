@@ -17,6 +17,7 @@ CI_WORKFLOW = REPO_ROOT / ".github/workflows/ci.yml"
 PRODUCTION_RELEASE_WORKFLOW = REPO_ROOT / ".github/workflows/production-release.yml"
 CANARY_WORKFLOW = REPO_ROOT / ".github/workflows/canary-health-gate.yml"
 EXPECTED_COMMIT_SHA = "a" * 40
+ACTION_CACHE_RESTORE_V6_1_0_SHA = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
 ACTION_CACHE_V4_2_3_SHA = "5a3ec84eff668545956fd18022155c47e93e2684"
 
 
@@ -39,7 +40,7 @@ def test_production_next_cache_experiment_is_bounded_and_restore_only_by_default
     assert restore_match, "production release must restore only the Next cache"
     restore = restore_match.group("body")
     assert "actions/cache/restore@" in restore
-    assert f"actions/cache/restore@{ACTION_CACHE_V4_2_3_SHA}" in restore
+    assert f"actions/cache/restore@{ACTION_CACHE_RESTORE_V6_1_0_SHA}" in restore
     assert "path: apps/web/.next/cache" in restore
     assert "jovie-production-next-cache-v1-" in restore
 
