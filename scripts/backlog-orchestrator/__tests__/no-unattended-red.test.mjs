@@ -207,6 +207,7 @@ describe('no unattended red loop', () => {
       NOW
     );
 
+    /** @type {any} The runtime queue schema is validated by the assertions below. */
     const queue = projectSummerQueue([merged, active, escalated], { now: NOW });
 
     assert.deepEqual(queue.items.map(item => item.issue), ['JOV-5400', 'JOV-5401']);
