@@ -23,7 +23,7 @@ export interface MarketingTerminalCtaProps {
   readonly penContractId: MarketingPenContractId;
 }
 
-interface MarketingTerminalCtaActionProps {
+interface MarketingTerminalCtaActionConfig {
   readonly href: string;
   readonly label: string;
   readonly variant: 'primary' | 'tertiary';
@@ -50,7 +50,7 @@ function MarketingTerminalCtaAction({
   analyticsEvent,
   analyticsSource,
   trailing,
-}: Readonly<MarketingTerminalCtaActionProps>) {
+}: Readonly<MarketingTerminalCtaActionConfig>) {
   return (
     <Button variant={variant} size={size} asChild className={className}>
       <Link
