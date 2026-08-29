@@ -317,7 +317,16 @@ export async function completeCardPayment(page: Page, card: CardDetails) {
     .filter({ visible: true })
     .first();
   await expect(cardPaymentMethod).toBeVisible({ timeout: 15_000 });
-  await cardPaymentMethod.check();
+
+  if (!(await cardPaymentMethod.isChecked())) {
+    const cardPaymentButton = page
+      .getByRole('button', { name: /pay with card/i })
+      .filter({ visible: true })
+      .first();
+    await expect(cardPaymentButton).toBeVisible({ timeout: 15_000 });
+    await cardPaymentButton.click();
+    await expect(cardPaymentMethod).toBeChecked();
+  }
 
   const phoneInput = page
     .locator('input[name="phoneNumber"]')
