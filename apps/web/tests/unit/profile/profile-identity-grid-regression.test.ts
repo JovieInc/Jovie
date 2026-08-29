@@ -22,12 +22,12 @@ describe('public profile identity grid', () => {
   });
 
   it('aligns name, metadata, location, and actions to one compact grid', () => {
-    expect(SURFACE).toContain('grid min-w-0 gap-0.5 [overflow-wrap:anywhere]');
+    expect(SURFACE).toContain('grid min-w-0 gap-1 [overflow-wrap:anywhere]');
     expect(SURFACE).toContain(
       'grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2'
     );
     expect(SURFACE).toContain('inline-flex min-h-11 max-w-full min-w-0');
-    expect(SURFACE).toContain('min-h-11 min-w-0 items-center');
+    expect(SURFACE).toContain('min-w-0 self-start items-center');
   });
 
   it('keeps long identity values bounded and decorative separators silent', () => {

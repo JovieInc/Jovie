@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  buttonVariants,
   Skeleton,
   Tooltip,
   TooltipContent,
@@ -39,15 +40,19 @@ export const subscriptionHeadingClassName =
 export const subscriptionDisclaimerClassName =
   'text-center text-xs leading-5 font-normal tracking-tight text-muted-foreground/80';
 
-export const profilePrimaryPillClassName =
-  'inline-flex h-12 items-center justify-center rounded-full border border-transparent bg-(--profile-pearl-primary-bg) px-5 text-mid font-semibold tracking-[-0.018em] text-(--profile-pearl-primary-fg) shadow-[0_10px_24px_rgba(0,0,0,0.16)] transition-[background-color,color,opacity,box-shadow,border-color] duration-subtle ease-out hover:opacity-96 hover:shadow-[0_12px_28px_rgba(0,0,0,0.18)] active:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed';
+export const profilePrimaryPillClassName = buttonVariants({
+  variant: 'primary',
+  size: 'marketing',
+});
 
 /** Pearl-Notify hero morph-bar CTA pill — glassy dark, sits over the hero image. */
 export const profileHeroMorphPillClassName =
   'inline-flex h-11 items-center justify-center rounded-full border border-white/14 bg-white/10 px-5 text-app font-semibold tracking-tight text-white dark:text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14),0_6px_16px_rgba(0,0,0,0.22)] backdrop-blur-xl transition-[background-color,color,opacity,box-shadow] duration-subtle ease-out hover:bg-white/14 active:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed';
 
-export const profileSecondaryPillClassName =
-  'inline-flex h-12 items-center justify-center rounded-full border border-(--profile-pearl-border) bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_92%,transparent)] px-5 text-mid font-semibold tracking-[-0.018em] text-primary-token shadow-[0_10px_24px_rgba(10,12,18,0.08)] backdrop-blur-xl transition-[background-color,border-color,color,box-shadow,opacity] duration-subtle ease-out hover:bg-(--profile-pearl-bg-hover) hover:border-(--profile-pearl-border) hover:shadow-[0_14px_28px_rgba(10,12,18,0.1)] active:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed';
+export const profileSecondaryPillClassName = buttonVariants({
+  variant: 'secondary',
+  size: 'marketing',
+});
 
 export const profileQuietIconButtonClassName =
   'border-transparent bg-transparent text-white/72 shadow-none hover:border-(--profile-pearl-border) hover:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_86%,transparent)] hover:text-white focus-visible:border-(--profile-pearl-border) focus-visible:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_90%,transparent)] focus-visible:text-white active:bg-(--profile-pearl-bg-active) active:text-white';
@@ -79,11 +84,11 @@ export const subscriptionHeroSubmitClassName =
 
 export const subscriptionPrimaryActionClassName = `${profilePrimaryPillClassName} shrink-0`;
 
-export const subscriptionMutedActionClassName = `${profileSecondaryPillClassName} h-10 shrink-0 px-4`;
+export const subscriptionMutedActionClassName = `${profileSecondaryPillClassName} shrink-0 px-4`;
 
 export const subscriptionPrimaryLinkClassName = cn(
   subscriptionPrimaryActionClassName,
-  'h-12 w-full justify-center px-6'
+  'w-full justify-center px-6'
 );
 
 export const subscriptionFeedbackRailClassName =
