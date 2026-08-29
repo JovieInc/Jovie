@@ -54,17 +54,26 @@ describe('LoadingSkeleton', () => {
     ).toBeInTheDocument();
   });
 
-  it('accepts valid fractional Tailwind size utilities', () => {
+  it('accepts valid decimal and fractional Tailwind size utilities', () => {
     const { container } = render(
-      <LoadingSkeleton height='h-3.5' width='w-3.5' rounded='full' />
+      <LoadingSkeleton height='h-3.5' width='w-1/2' rounded='full' />
     );
 
     const skeleton = container.querySelector('[aria-hidden="true"]');
 
     expect(skeleton).not.toBeNull();
     expect(skeleton?.className).toContain('h-3.5');
-    expect(skeleton?.className).toContain('w-3.5');
+    expect(skeleton?.className).toContain('w-1/2');
     expect(loggerWarn).not.toHaveBeenCalled();
+  });
+
+  it('rejects empty size tokens', () => {
+    const { container } = render(<LoadingSkeleton height='h-' width='w-' />);
+
+    const skeleton = container.querySelector('[data-slot="skeleton"]');
+    expect(skeleton).toHaveClass('h-4', 'w-full');
+    expect(skeleton).not.toHaveClass('h-', 'w-');
+    expect(loggerWarn).toHaveBeenCalledTimes(2);
   });
 
   it('passes the canonical loading label through the compatibility facade', () => {
