@@ -286,6 +286,9 @@ describe('decideFallbackTurn', () => {
     // Metadata event satisfies the handle guard; next step opens social.
     expect(turn.guardedStep).toBe('social');
     expect(turn.toolEvents.map(e => e.output.action)).toContain(
+      'handle_confirmed'
+    );
+    expect(turn.toolEvents.map(e => e.output.action)).toContain(
       'propose_social_link'
     );
   });
@@ -310,6 +313,9 @@ describe('decideFallbackTurn', () => {
     // Low signal + attach → contact (audience) rather than forced waitlist.
     expect(turn.guardedStep).toBe('contact');
     expect(turn.line.stepId).toBe('ask_audience');
+    expect(turn.toolEvents.map(e => e.output.action)).toContain(
+      'social_attached'
+    );
   });
 
   it('does not waitlist on incomplete k after handle+social', async () => {

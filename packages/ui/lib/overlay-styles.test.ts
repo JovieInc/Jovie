@@ -118,14 +118,14 @@ describe('overlay-styles', () => {
 
   describe('titleStyles', () => {
     it('base includes font sizing', () => {
-      expect(titleStyles.base).toContain('text-[16px]');
-      expect(titleStyles.base).toContain('font-[510]');
+      expect(titleStyles.base).toContain('text-base');
+      expect(titleStyles.base).toContain('font-medium');
     });
   });
 
   describe('descriptionStyles', () => {
     it('base includes muted text color', () => {
-      expect(descriptionStyles.base).toContain('text-[13px]');
+      expect(descriptionStyles.base).toContain('text-app');
       expect(descriptionStyles.base).toContain('text-secondary-token');
       expect(descriptionStyles.base).toContain('leading-relaxed');
     });

@@ -11,18 +11,20 @@ import {
   Workflow,
 } from 'lucide-react';
 import Link from 'next/link';
-import { memo } from 'react';
+import { memo, type ReactNode } from 'react';
 import { ActivityFeedSkeleton } from '@/components/molecules/ActivityFeed';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import type {
   JovieWorkIcon,
   JovieWorkItem,
+  JovieWorkOutcome,
   JovieWorkPhase,
 } from '@/lib/activity/jovie-work-feed';
 import { useJovieWorkFeedQuery } from '@/lib/queries/useJovieWorkFeedQuery';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
+import { formatAmount } from '@/lib/utils/format-number';
 import type { JovieWorkFeedProps } from './types';
 
 const JOVIE_WORK_ICONS: Record<JovieWorkIcon, typeof Sparkles> = {
@@ -41,6 +43,10 @@ const PHASE_STYLES: Record<JovieWorkPhase, string> = {
   completed: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
   failed: 'bg-red-500/10 text-red-700 dark:text-red-300',
 };
+
+const OUTCOME_SLOT_CLASS_NAME =
+  'mt-1 grid min-h-10 grid-cols-2 content-start gap-x-3 text-2xs leading-5 text-tertiary-token sm:grid-cols-4';
+const countFormatter = new Intl.NumberFormat('en-US');
 
 function JovieWorkGlyph({ icon }: { readonly icon: JovieWorkIcon }) {
   const Icon = JOVIE_WORK_ICONS[icon] ?? Sparkles;
@@ -61,6 +67,86 @@ function JovieWorkEmptyState({
         className='min-h-45 py-8'
         testId='jovie-work-empty-state'
       />
+    </div>
+  );
+}
+
+function JovieWorkOutcomeSlot({
+  outcome,
+}: {
+  readonly outcome?: JovieWorkOutcome;
+}) {
+  let content: ReactNode;
+  let displayState: JovieWorkOutcome['state'] | 'reserved' = 'reserved';
+
+  if (!outcome) {
+    content = null;
+  } else if (outcome.state === 'measuring') {
+    displayState = outcome.state;
+    content = (
+      <span className='col-span-full'>
+        Measuring attributed results for 30 days.
+      </span>
+    );
+  } else if (outcome.state === 'measured_zero') {
+    displayState = outcome.state;
+    content = (
+      <span className='col-span-full'>
+        No attributed results in the 30-day window.
+      </span>
+    );
+  } else if (outcome.state === 'unavailable' || !outcome.metrics) {
+    displayState = 'unavailable';
+    content = (
+      <span className='col-span-full'>Attributed results are unavailable.</span>
+    );
+  } else {
+    displayState = outcome.state;
+    const metrics = [
+      {
+        key: 'gmv',
+        value: outcome.metrics.gmvDeltaCents,
+        valueLabel: formatAmount(outcome.metrics.gmvDeltaCents),
+        label: 'GMV',
+      },
+      {
+        key: 'clicks',
+        value: outcome.metrics.clickDelta,
+        valueLabel: countFormatter.format(outcome.metrics.clickDelta),
+        label: 'Clicks',
+      },
+      {
+        key: 'dsp-clicks',
+        value: outcome.metrics.dspClickDelta,
+        valueLabel: countFormatter.format(outcome.metrics.dspClickDelta),
+        label: 'DSP Clicks',
+      },
+      {
+        key: 'new-fans',
+        value: outcome.metrics.newFansDelta,
+        valueLabel: countFormatter.format(outcome.metrics.newFansDelta),
+        label: 'New Fans',
+      },
+    ].filter(metric => metric.value > 0);
+
+    content = metrics.map(metric => (
+      <span key={metric.key} className='inline-flex min-w-0 gap-1'>
+        <span className='tabular-nums text-primary-token'>
+          {metric.valueLabel}
+        </span>
+        <span>{metric.label}</span>
+      </span>
+    ));
+  }
+
+  return (
+    <div
+      aria-hidden={outcome ? undefined : true}
+      className={OUTCOME_SLOT_CLASS_NAME}
+      data-testid='jovie-work-outcome-slot'
+      data-outcome-state={displayState}
+    >
+      {content}
     </div>
   );
 }
@@ -99,6 +185,9 @@ const JovieWorkItemRow = memo(function JovieWorkItemRow({
           <span className='text-tertiary-token'> - </span>
           <span>{item.description}</span>
         </p>
+        {item.outcomeSlot ? (
+          <JovieWorkOutcomeSlot outcome={item.outcome} />
+        ) : null}
       </div>
     </>
   );

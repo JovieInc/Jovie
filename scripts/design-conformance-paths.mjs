@@ -8,6 +8,13 @@ const DESIGN_GOVERNANCE_PATHS = new Set([
   'scripts/design-conformance-paths.mjs',
   'scripts/ci-fast-lanes.mjs',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/lib/oklch.mjs',
+  'scripts/oklch-palette-guard.mjs',
+  'scripts/oklch-palette-guard.test.mjs',
+  'apps/web/design/oklch-palette.json',
+  'scripts/shared-ui-visual-arbitrary-audit.mjs',
+  'scripts/shared-ui-visual-arbitrary-audit.test.mjs',
+  'scripts/shared-ui-visual-arbitrary.baseline.json',
   'package.json',
 ]);
 

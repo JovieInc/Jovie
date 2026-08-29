@@ -10,6 +10,10 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { CmdKPalette } from '@/components/organisms/CmdKPalette';
+import {
+  fuzzyMatch,
+  PaletteList,
+} from '@/components/organisms/SharedCommandPalette';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   commandsForSurface,
@@ -123,6 +127,11 @@ vi.mock('@/lib/queries/useChatCapabilitiesQuery', () => ({
 }));
 
 describe('SharedCommandPalette (cmd+k surface)', () => {
+  it('matches palette queries against the shared source', () => {
+    void PaletteList;
+    expect(fuzzyMatch('SharedCommandPalette', 'palette')).toBe(true);
+    expect(fuzzyMatch('SharedCommandPalette', 'missing')).toBe(false);
+  });
   it('exposes both skills and navs from the registry on the cmdk surface', () => {
     const cmds = commandsForSurface('cmdk');
     const skills = cmds.filter(c => c.kind === 'skill');

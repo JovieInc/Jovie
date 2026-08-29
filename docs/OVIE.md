@@ -65,7 +65,9 @@ If you are already signed in as admin, Fullscreen fetches `/api/hud/kiosk-sessio
 The original Ovie plan was a standalone Swift menu-bar app at
 [`JovieInc/ovie`](https://github.com/JovieInc/ovie). After founder direction
 (2026-07), that plan was deprecated: the Swift codebase is a **launcher
-only**, and the repo is **archived (read-only)** on GitHub.
+only**, and the repo is **archived (read-only)** on GitHub. There is no Swift
+Mac product transition in this checkout. Current stack and proposed
+Swift-control slugs: [`docs/macos/swift-control-invariants.md`](macos/swift-control-invariants.md).
 
 - Deprecation issue: [#12894](https://github.com/JovieInc/Jovie/issues/12894)
 - HUD surface: `apps/web/app/hud/page.tsx`

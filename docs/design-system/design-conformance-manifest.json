@@ -40,12 +40,13 @@
       "storySources": ["packages/ui/atoms/button.stories.tsx"],
       "testSources": ["packages/ui/atoms/button.test.tsx"],
       "penRootId": "g3IC1",
-      "sourceDigest": "96e8c15b3f83196ad10271dbca3ab21e9e0cfab35b6d427048604239c2d83826"
+      "sourceDigest": "51728c5a9021042635093adf8c7a27315b583f8f58feb9efdc18927db951ec88"
     }
   ],
   "legacy": {
     "unboundComponentIds": [
       "atom.brand-logo",
+      "atom.icon-button",
       "atom.link",
       "atom.logo",
       "atom.logo-link"

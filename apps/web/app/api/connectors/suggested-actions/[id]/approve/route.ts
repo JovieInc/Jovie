@@ -20,11 +20,8 @@ import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { CACHE_TAGS } from '@/lib/cache/tags';
-import {
-  BRAND_DEAL_OPPORTUNITY_KIND,
-  parseBrandDealOpportunity,
-} from '@/lib/connectors/brand-deal-opportunity';
 import { recordInboxDecision } from '@/lib/connectors/inbox-decision';
+import { resolveSuggestedActionDispatch } from '@/lib/connectors/suggested-action-dispatch';
 import {
   enqueueApprovedActionWorkflow,
   recoverOrphanedApprovedAction,
@@ -33,14 +30,6 @@ import { db } from '@/lib/db';
 import { suggestedActions } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
-
-// payload shape stored in suggestedActions for calendar booking actions
-type BookingPayload = {
-  title?: string;
-  startsAt?: string;
-  endsAt?: string;
-  timeZone?: string;
-};
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -54,11 +43,66 @@ export async function POST(_request: Request, { params }: RouteParams) {
   if (error) return error;
 
   try {
+    const [candidate] = await db
+      .select({
+        kind: suggestedActions.kind,
+        payload: suggestedActions.payload,
+        signalType: suggestedActions.signalType,
+      })
+      .from(suggestedActions)
+      .where(
+        and(eq(suggestedActions.id, id), eq(suggestedActions.userId, userId))
+      )
+      .limit(1);
+
+    if (!candidate) {
+      return NextResponse.json(
+        { error: 'not-found' },
+        { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const dispatch = resolveSuggestedActionDispatch(candidate);
+    if (dispatch.mode === 'invalid') {
+      return NextResponse.json(
+        { error: dispatch.error },
+        { status: 422, headers: NO_STORE_HEADERS }
+      );
+    }
+    if (dispatch.mode === 'workflow-capture') {
+      return NextResponse.json(
+        { error: 'workflow-capture-use-record' },
+        { status: 422, headers: NO_STORE_HEADERS }
+      );
+    }
+    if (dispatch.mode === 'next-step-only') {
+      return NextResponse.json(
+        { error: 'report-use-next-step' },
+        { status: 422, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const approvedAt = new Date();
     // CAS transition: pending → approved (WHERE status='pending' AND userId=:userId)
     // Also return payload so we can include eventPayload in the workflow_runs row.
     const updated = await db
       .update(suggestedActions)
-      .set({ status: 'approved', approvedAt: new Date() })
+      .set({
+        status: 'approved',
+        approvedAt,
+        ...(dispatch.mode === 'decision-only' &&
+        dispatch.family === 'youtube-thumbnail'
+          ? {
+              executionResult: {
+                schemaVersion: 1,
+                state: 'approved',
+                actionKind: candidate.kind,
+                approvedAt: approvedAt.toISOString(),
+                youtubeMutationPerformed: false,
+              },
+            }
+          : {}),
+      })
       .where(
         and(
           eq(suggestedActions.id, id),
@@ -85,7 +129,11 @@ export async function POST(_request: Request, { params }: RouteParams) {
           {
             ok: true,
             approvalId: id,
-            status: 'approved-for-preparation',
+            status:
+              dispatch.mode === 'decision-only' &&
+              dispatch.family === 'youtube-thumbnail'
+                ? 'approved-for-generation'
+                : 'approved-for-preparation',
           },
           { status: 200, headers: NO_STORE_HEADERS }
         );
@@ -105,6 +153,20 @@ export async function POST(_request: Request, { params }: RouteParams) {
         revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
         return NextResponse.json(
           { error: 'brand-deal-evidence-unverified' },
+          { status: 422, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      if (recovery === 'invalid-action') {
+        return NextResponse.json(
+          { error: 'unsupported-or-invalid-action' },
+          { status: 422, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      if (recovery === 'non-executable') {
+        return NextResponse.json(
+          { error: 'action-requires-dedicated-handler' },
           { status: 422, headers: NO_STORE_HEADERS }
         );
       }
@@ -138,44 +200,14 @@ export async function POST(_request: Request, { params }: RouteParams) {
       );
     }
 
-    // Include event payload so the cron executor can call Google Calendar
-    // without a second DB round-trip to reload the suggested_action row.
-    const eventPayload = updated[0].payload as BookingPayload | null;
     const approvedKind = updated[0].kind;
-    const isBrandDealDecision =
-      approvedKind === BRAND_DEAL_OPPORTUNITY_KIND ||
-      updated[0].signalType === 'brand_deal';
 
-    if (isBrandDealDecision) {
-      if (!parseBrandDealOpportunity(approvedKind, updated[0].payload)) {
-        await db
-          .update(suggestedActions)
-          .set({ status: 'failed' })
-          .where(
-            and(
-              eq(suggestedActions.id, id),
-              eq(suggestedActions.userId, userId),
-              eq(suggestedActions.status, 'approved')
-            )
-          );
-        logger.warn('[approve] invalid brand-deal provenance failed closed', {
-          approvalId: id,
-          userId,
-        });
-        revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
-        return NextResponse.json(
-          { error: 'brand-deal-evidence-unverified' },
-          { status: 422, headers: NO_STORE_HEADERS }
-        );
-      }
-
-      logger.info(
-        '[approve] brand-deal buyer approved for internal preparation',
-        {
-          approvalId: id,
-          userId,
-        }
-      );
+    if (dispatch.mode === 'decision-only') {
+      logger.info('[approve] decision-only suggested_action approved', {
+        approvalId: id,
+        userId,
+        family: dispatch.family,
+      });
       void recordInboxDecision({
         suggestedActionId: id,
         userId,
@@ -189,7 +221,10 @@ export async function POST(_request: Request, { params }: RouteParams) {
         {
           ok: true,
           approvalId: id,
-          status: 'approved-for-preparation',
+          status:
+            dispatch.family === 'brand-deal'
+              ? 'approved-for-preparation'
+              : 'approved-for-generation',
         },
         { status: 200, headers: NO_STORE_HEADERS }
       );
@@ -198,7 +233,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
     const enqueueResult = await enqueueApprovedActionWorkflow({
       userId,
       approvalId: id,
-      eventPayload,
+      eventPayload: dispatch.eventPayload,
     });
 
     logger.info('[approve] suggested_action approved, workflow_run queued', {

@@ -16,6 +16,10 @@ import {
   hasAnalyticsConsent,
 } from '@/lib/cookies/consent-state';
 import { NONESSENTIAL_PROXY_COOKIE_NAMES } from '@/lib/cookies/registry';
+import {
+  ensureVaryAccept,
+  HOMEPAGE_ACCEPT_VARY,
+} from '@/lib/http/accept-header';
 import type { PathCategory } from '@/lib/routing/proxy-routing';
 import {
   buildContentSecurityPolicy,
@@ -201,6 +205,14 @@ export function buildFinalResponse(
         maxAge: 60 * 60 * 24 * 365,
         path: '/',
       });
+    }
+  }
+
+  if (pathname === '/') {
+    if (!res.headers.get('Vary')) {
+      res.headers.set('Vary', HOMEPAGE_ACCEPT_VARY);
+    } else {
+      ensureVaryAccept(res.headers);
     }
   }
 

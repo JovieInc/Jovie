@@ -44,6 +44,13 @@ def signals(**overrides):
             "eligiblePrs": 0,
             "greenReadyPrs": 0,
             "target": 15,
+            "laneCapacity": {
+                "schema": "jovie-lane-capacity/v1",
+                "observedAt": now_iso(),
+                "global": {"ready": 0, "budget": 15},
+                "defaultLaneBudget": 4,
+                "lanes": {},
+            },
         },
         "closureHealth": {
             "schema": "jovie-closure-health/v1",

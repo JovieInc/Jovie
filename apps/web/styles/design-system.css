@@ -122,10 +122,10 @@
   --system-b-entity-chip-artist-accent: var(--color-accent-purple);
   --system-b-entity-chip-track-accent: var(--color-accent-blue);
   --system-b-entity-chip-event-accent: var(--color-accent-orange);
-  --system-b-entity-chip-on-light-text: var(--color-text-primary-token);
+  --system-b-entity-chip-on-light-text: var(--system-b-chat-user-bubble-text);
   --system-b-chat-message-max-width: 78%;
   --system-b-chat-user-bubble-bg: var(--color-text-primary-token);
-  --system-b-chat-user-bubble-text: var(--system-b-cinematic-black);
+  --system-b-chat-user-bubble-text: var(--color-bg-base);
   --system-b-chat-user-bubble-border: color-mix(
     in oklab,
     var(--color-text-primary-token) 80%,
@@ -1169,8 +1169,8 @@ html[data-profile-initial-mode]
 
   /* Accent palette rotation — Noir Ion semantics
      blue/Ion: primary action · purple/Ultra: agent · pink/Pulse: creative
-     teal/Aqua: system · green/Mint: success · orange/Gold: warning
-     red/Flare: danger */
+     teal/Aqua: system · green/Mint: success · orange: warning
+     red: danger */
   --color-accent-gray: #8d8d93;
   --color-accent-gray-subtle: rgb(127 127 133 / 0.18);
   --color-accent-blue: #11afff;
@@ -1839,6 +1839,8 @@ html[data-profile-initial-mode]
   --color-error: var(--color-accent-red);
   --color-error-subtle: var(--color-accent-red-subtle);
   --color-error-foreground: oklch(100% 0 0);
+  --color-danger: var(--color-error);
+  --color-danger-subtle: var(--color-error-subtle);
 
   /* Info */
   --color-info: var(--color-accent-blue);
@@ -1851,13 +1853,15 @@ html[data-profile-initial-mode]
   --color-success: var(--color-accent-green);
   --color-success-subtle: var(--color-accent-green-subtle);
 
-  /* Warning — Gold */
+  /* Warning — Orange */
   --color-warning: var(--color-accent-orange);
   --color-warning-subtle: var(--color-accent-orange-subtle);
 
-  /* Error — Flare */
+  /* Error — Red (danger) */
   --color-error: var(--color-accent-red);
   --color-error-subtle: var(--color-accent-red-subtle);
+  --color-danger: var(--color-error);
+  --color-danger-subtle: var(--color-error-subtle);
 
   /* Info — Aqua/system signal (not Ion blue; Ion is action/focus) */
   --color-info: var(--color-accent-teal);
@@ -1868,8 +1872,8 @@ html[data-profile-initial-mode]
    FEATURE ACCENT COLORS (OKLCH)
    ============================================
 
-   Perceptually uniform feature colors
-   All have ~same perceived brightness
+   Perceptually uniform named endpoints. Dark accents use hue-specific
+   energy bands (not a shared lightness target, not a pastel chroma cap).
 */
 :root {
   --accent-conv: var(--color-accent-purple);
@@ -2003,33 +2007,6 @@ html[data-profile-initial-mode]
   /* 80px */
   --space-24: 6rem;
   /* 96px */
-}
-
-/* ============================================
-   RADIUS SYSTEM
-   ============================================ */
-:root {
-  --radius-none: 0;
-  --radius-xs: 2px;
-  /* Tags/badges — extracted: 2px on issue labels */
-  --radius-sm: 8px;
-  /* Badges, issue rows, small cards */
-  --radius-md: 10px;
-  /* Inner cards, drawer cards, properties panels */
-  --radius-default: 4px;
-  /* Marketing buttons */
-  --radius-lg: 12px;
-  /* App shell frame, content surface cards */
-  --radius-xl: 16px;
-  /* Large decorative elements */
-  --radius-2xl: 20px;
-  /* Modals, sheets, large nested surfaces */
-  --radius-3xl: 24px;
-  /* Large modals and phone shells */
-  --radius-pill: 9999px;
-  /* All app buttons / inputs / tabs — canonical Jovie DS true pill */
-  --radius-full: 9999px;
-  /* Circles, tags */
 }
 
 /* ============================================

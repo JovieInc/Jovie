@@ -41,7 +41,7 @@ describe('web-195 pitch source contract', () => {
     expect(story).toContain("sourceExport: 'InvestorBrief'");
     expect(story).toContain("storyExport: 'Web195Pitch'");
     expect(story).toContain(
-      "sourceSha: '61690d2a4af920183f4a85366799ff0bafe4540b'"
+      "sourceSha: '8b0353fcbeb0cffef614fa47afbbbd8eeae48997'"
     );
     expect(story).not.toContain('fundraisingRegistry:');
   });

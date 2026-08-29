@@ -177,6 +177,7 @@ const PUBLIC_PROFILE_RESERVED_ROOT_SEGMENTS = new Set([
   'mobile-auth-return',
   'og',
   'onboarding',
+  'openapi.json',
   'out',
   'r',
   's',

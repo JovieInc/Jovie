@@ -157,9 +157,11 @@ Profile is historical ledger drift, not a reason to change the current code.
 
 ## macOS screen and state registry
 
-The checkout contains one macOS product target: `MenuMonitor`, a menu-bar-only
-operator tool. It is not a public artist profile, a creator app shell, or a
-macOS rendering of the iOS product surface.
+The checkout contains one macOS **Swift** target: `MenuMonitor`, a
+menu-bar-only operator tool. The Mac product / Ovie shell is Electron in
+`apps/desktop`, not this Swift package. MenuMonitor is not a public artist
+profile, a creator app shell, or a macOS rendering of the iOS product surface.
+See [`docs/macos/swift-control-invariants.md`](../macos/swift-control-invariants.md).
 
 | ID | Surface and owner | Source evidence | States verified in source | Adaptive behavior | Parity/proof |
 | --- | --- | --- | --- | --- | --- |

@@ -215,7 +215,15 @@ const nextConfig = {
       // Marketing pages (pre-rendered at build) - long-lived cache
       {
         source: '/',
-        headers: [...securityHeaders, cacheHeaders.immutable],
+        headers: [
+          ...securityHeaders,
+          cacheHeaders.immutable,
+          {
+            key: 'Vary',
+            value:
+              'Accept, rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch',
+          },
+        ],
       },
       {
         source: '/(pricing|support|investors|engagement-engine|blog|changelog)',
@@ -244,6 +252,19 @@ const nextConfig = {
       {
         source: '/(.*)',
         headers: [...securityHeaders, cacheHeaders.revalidate],
+      },
+      // Homepage content-negotiation: later rules win. Keep Accept on Vary
+      // together with Next's RSC tokens so a prerendered HTML object cannot
+      // be reused for Accept: text/markdown at the CDN.
+      {
+        source: '/',
+        headers: [
+          {
+            key: 'Vary',
+            value:
+              'Accept, rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch',
+          },
+        ],
       },
       // Canonical pitch-deck static HTML (apps/web/public/pitch/**) is
       // embedded as a same-origin iframe from the /pitch wrapper page.
@@ -540,7 +561,9 @@ const nextConfig = {
   // See JOV-2322.
   serverExternalPackages: ['@statsig/statsig-node-core'],
   experimental: {
-    cpus: process.env.GITHUB_ACTIONS === 'true' ? 2 : undefined,
+    // GitHub-hosted ubuntu-latest/24.04 runners are 4 vCPU / 16 GB RAM — cap
+    // at 4 (was 2, which halved build parallelism; revert to 2 if OOM recurs).
+    cpus: process.env.GITHUB_ACTIONS === 'true' ? 4 : undefined,
     // Note: PPR (ppr: 'incremental') was deprecated in Next.js 15.3
     // cacheComponents: true requires additional configuration, disabled for now
     // Turbopack filesystem cache for faster dev server startup

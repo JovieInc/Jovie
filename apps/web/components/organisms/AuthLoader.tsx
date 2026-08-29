@@ -24,14 +24,20 @@ export function AuthLoader() {
   }, []);
 
   return (
-    <div className='flex h-full w-full items-center justify-center'>
-      <div className='flex flex-col items-center gap-3'>
+    <div
+      className='flex h-full w-full items-center justify-center'
+      role='status'
+      aria-busy='true'
+      aria-live='polite'
+      aria-label='Loading'
+      data-testid='auth-loader'
+    >
+      <div className='flex flex-col items-center gap-3' aria-hidden='true'>
         <JovieMarkElectric size={32} />
         <p
           className={`text-xs text-tertiary-token transition-opacity duration-subtle ${
             showMessage ? 'opacity-100' : 'opacity-0'
           }`}
-          aria-hidden={!showMessage}
         >
           Loading...
         </p>

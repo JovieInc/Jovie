@@ -62,7 +62,7 @@ const meta = {
       registryId: 'web-010-playlists--[slug]',
       route: '/playlists/[slug]',
       source: 'apps/web/components/organisms/PlaylistDetailContent.tsx',
-      sourceSha: 'e21d2e01bc80d7e0146a071207c406e1cd762bd3',
+      sourceSha: '8b0353fcbeb0cffef614fa47afbbbd8eeae48997',
       fixture:
         'apps/web/components/features/home/homepage-profile-preview-fixture.ts',
     },

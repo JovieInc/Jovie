@@ -369,9 +369,11 @@ To fix a violation:
 
 ## Color System
 
-> **Canonical source:** Token values in the tables below are mirrored from
-> `apps/web/styles/design-system.css` (the single source of truth). When tokens
-> change in CSS, update these tables in the same PR — do not invent values here.
+> **Canonical source:** Authored OKLCH values live in
+> `apps/web/design/oklch-palette.json` (JOV-5388). Hex in CSS is the sRGB
+> projection of those tokens. `apps/web/styles/design-system.css` remains the
+> live emitter. When a locked color changes, update the registry, CSS
+> projection, and these tables in the same PR — do not invent values here.
 
 ### Theme Generation
 
@@ -440,8 +442,8 @@ remap product tokens to prior anchors without a second theme provider).
 | Pulse (pink) | `#FF48D2` | `rgba(255,72,210,.12)` | Launch or creative-status state only |
 | Aqua (cyan) | `#24F6D2` | `rgba(36,246,210,.10)` | System signal, sync, API/tool state (`--color-info`) |
 | Mint (green) | `#39E58C` | `rgba(57,229,140,.12)` | Success |
-| Gold | `#FFC857` | `rgba(255,200,87,.12)` | Warning |
-| Flare (coral) | `#FF677D` | `rgba(255,103,125,.12)` | Danger / error |
+| Orange | `#FFC857` | `rgba(255,200,87,.12)` | Warning |
+| Red | `#FF677D` | `rgba(255,103,125,.12)` | Danger / error |
 
 CTAs remain high-contrast light pills (not saturated Ion fills) per the
 neutral-CTA rule. Ion carries focus, links, selection, and active navigation.
@@ -483,7 +485,7 @@ Ion (JOV-4635).
 | `--accent-beauty` | `#d61a7f` | `#FF48D2` (Pulse) | Beauty/Design |
 | `--accent-links` | `#0f9b8e` | `#24F6D2` (Aqua) | Smart Links / system |
 | `--accent-speed` | `#2f9e44` | `#39E58C` (Mint) | Speed / success |
-| `--accent-pro` | `#ff9800` | `#FFC857` (Gold) | Pro Tools / warning |
+| `--accent-pro` | `#ff9800` | `#FFC857` (Orange) | Pro Tools / warning |
 
 **Usage rules:**
 - Assign an accent only to a named semantic state or data category
@@ -511,11 +513,18 @@ Pure neutral HSL — no hue tint. Used across both systems.
 
 ### Semantic Status Colors
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| Success | `oklch(72% 0.2 145)` | Green — confirmations |
-| Warning | `oklch(82% 0.17 85)` | Amber — cautions |
-| Error | `oklch(65% 0.2 25)` | Red — errors, destructive |
+Mint = success, Orange = warning, Red = danger. Authored OKLCH lives in
+`apps/web/design/oklch-palette.json`; hex is the sRGB lock. Dark accents use
+hue-specific energy bands (no equal-lightness target, no pastel chroma cap).
+Derived colors are equal-step interpolation or symmetric focals only; gradients
+must declare those endpoints. Elevation is `surface-0`…`surface-3` (dark
+recessed→raised; light peaks at surface-1). Guard: `pnpm design:oklch-palette:check`.
+
+| Token | Light OKLCH | Dark OKLCH | Usage |
+|-------|-------------|------------|-------|
+| Success (Mint) | `oklch(61.72% 0.1624 146.43)` | `oklch(81.65% 0.1857 155.04)` | Confirmations |
+| Warning (Orange) | `oklch(77.03% 0.1741 64.05)` | `oklch(86.15% 0.1423 82.66)` | Cautions |
+| Danger (Red) | `oklch(61.14% 0.2422 24.90)` | `oklch(71.03% 0.1852 14.41)` | Errors, destructive |
 
 ---
 
@@ -1067,7 +1076,10 @@ mark intentional marketing sentence-case headlines with
 
 | File | Responsibility |
 |------|----------------|
-| `apps/web/styles/design-system.css` | **Canonical token source** — all width, surface, and color values in this doc mirror CSS here |
+| `apps/web/design/oklch-palette.json` | **Authored OKLCH palette** — locked light/dark semantics, elevation, and hex projections (JOV-5388) |
+| `apps/web/design/tokens.json` | **Machine-readable base-token source** — compiler-owned brand, gray, and radius values plus explicit migration divergences |
+| `apps/web/styles/generated/design-tokens.css` | **Generated base-token emitter** — CSS projection of `design/tokens.json`; never hand-edit |
+| `apps/web/styles/design-system.css` | **Live semantic emitter** — imports generated base tokens and projects unmigrated semantic/color properties; color hex must match the OKLCH registry |
 | `apps/web/styles/linear-tokens.css` | Marketing-specific Linear-extracted tokens |
 | `apps/web/styles/theme.css` | Feature accents & animations only |
 | `apps/web/app/globals.css` | Tailwind registration + shared utilities |

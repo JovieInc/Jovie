@@ -64,17 +64,61 @@ def _drain_command(
 
 
 def _summer_closure_admission(
-    *, intake_allowed: bool = True
+    *, intake_allowed: bool = True, status: str | None = None
 ) -> dict[str, object]:
     return {
         "allowed": intake_allowed,
         "authority": "Summer",
-        "status": "green" if intake_allowed else "red",
+        "status": status or ("healthy" if intake_allowed else "red"),
         "newIssueIntakeAllowed": intake_allowed,
         "newImplementationAllowed": intake_allowed,
         "fallbackPrGenerationAllowed": intake_allowed,
         "promotionContinues": True,
         "remediationContinues": True,
+    }
+
+
+def _production_unbound_hold_receipt(
+    *, closure_status: str = "healthy", intake_allowed: bool = True
+) -> dict[str, object]:
+    return {
+        "schema": "jovie-fleet-gate/v1",
+        "state": "AMBER",
+        "promotionMode": "hold-intake",
+        "observedAt": datetime.now(timezone.utc).isoformat(),
+        "closureAdmission": _summer_closure_admission(
+            intake_allowed=intake_allowed, status=closure_status
+        ),
+        "signals": {
+            "main": {"status": "green", "sha": "a" * 40},
+            "production": {"status": "green", "deployedSha": "b" * 40},
+            "controller": {"status": "green"},
+            "queue": {
+                "status": "known",
+                "eligiblePrs": 1,
+                "greenReadyPrs": 1,
+                "target": 15,
+            },
+            "integrity": {"status": "clear"},
+        },
+        "promotionAdmission": {"allowed": False},
+        "isolatedPromotionAdmission": {
+            "allowed": False,
+            "deploymentsAllowed": False,
+        },
+        "productionUnboundRepairAdmission": {
+            "allowed": True,
+            "condition": "production-deployment-unbound",
+            "mainSha": "a" * 40,
+            "deployedSha": "b" * 40,
+            "maxConcurrent": 1,
+            "deploymentsAllowed": False,
+        },
+        "alreadyAdmittedCohort": {
+            "preserve": True,
+            "newIntakeAllowed": intake_allowed,
+            "semantics": "preserve-cohort-and-continue-isolated-implementation",
+        },
     }
 
 
@@ -109,6 +153,8 @@ def _write_native_receipt_fakes(
               unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
               unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
               changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+              changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+              changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
               --classify-queue) echo '[]' ;;
               *) echo "unexpected node args: $*" >&2; exit 2 ;;
             esac
@@ -172,6 +218,8 @@ class TestExactHeadQueueReceipt:
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
                   unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
                   changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 93 ;;
                 esac
@@ -252,6 +300,8 @@ class TestExactHeadQueueReceipt:
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
                   unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
                   changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 93 ;;
                 esac
@@ -337,6 +387,8 @@ class TestExactHeadQueueReceipt:
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
                   unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
                   changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 93 ;;
                 esac
@@ -429,6 +481,9 @@ class TestExactHeadQueueReceipt:
                   max-queue-depth) echo 16 ;;
                   front-churn) echo '{{"action":"block","reason":"unchanged head failed product checks","evidence":{{"failureClass":"deterministic-product-check"}}}}' ;;
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-unmergeable"}}' ;;
+                  changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 93 ;;
                 esac
@@ -852,6 +907,8 @@ class TestDrainPrQueueWiring:
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
                   unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
                   changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 2 ;;
                 esac
@@ -949,6 +1006,8 @@ class TestDrainPrQueueWiring:
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
                   unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
                   changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 2 ;;
                 esac
@@ -1048,6 +1107,8 @@ JSON
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
                   unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
                   changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 2 ;;
                 esac
@@ -1143,6 +1204,8 @@ JSON
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
                   unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
                   changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 2 ;;
                 esac
@@ -1316,47 +1379,16 @@ JSON
         assert "(0 slots)" in result.stdout
         assert "would +merge-queue" not in result.stdout
 
-    def test_hold_intake_preserves_queued_ordinary_pr_and_allows_implementation_intake(
-        self, tmp_path: Path
+    @pytest.mark.parametrize("closure_status", ["healthy", "grace"])
+    def test_hold_intake_accepts_canonical_closure_statuses(
+        self, tmp_path: Path, closure_status: str
     ) -> None:
         queued_head = "8" * 40
-        receipt = {
-            "schema": "jovie-fleet-gate/v1",
-            "state": "AMBER",
-            "promotionMode": "hold-intake",
-            "observedAt": datetime.now(timezone.utc).isoformat(),
-            "closureAdmission": _summer_closure_admission(),
-            "signals": {
-                "main": {"status": "green", "sha": "a" * 40},
-                "production": {"status": "green", "deployedSha": "b" * 40},
-                "controller": {"status": "green"},
-                "queue": {
-                    "status": "known",
-                    "eligiblePrs": 1,
-                    "greenReadyPrs": 1,
-                    "target": 15,
-                },
-                "integrity": {"status": "clear"},
-            },
-            "promotionAdmission": {"allowed": False},
-            "isolatedPromotionAdmission": {
-                "allowed": False,
-                "deploymentsAllowed": False,
-            },
-            "productionUnboundRepairAdmission": {
-                "allowed": True,
-                "condition": "production-deployment-unbound",
-                "mainSha": "a" * 40,
-                "deployedSha": "b" * 40,
-                "maxConcurrent": 1,
-                "deploymentsAllowed": False,
-            },
-            "alreadyAdmittedCohort": {
-                "preserve": True,
-                "newIntakeAllowed": True,
-                "semantics": "preserve-cohort-and-continue-isolated-implementation",
-            },
-        }
+        intake_allowed = closure_status == "healthy"
+        receipt = _production_unbound_hold_receipt(
+            closure_status=closure_status,
+            intake_allowed=intake_allowed,
+        )
         encoded = base64.b64encode(json.dumps(receipt).encode()).decode()
         fake_gh = tmp_path / "gh"
         fake_gh.write_text(
@@ -1398,7 +1430,53 @@ JSON
         assert "would dequeue #901" not in result.stdout
         assert "would +merge-queue" not in result.stdout
         assert "queue depth: 1/" in result.stdout
-        assert "(15 slots)" in result.stdout
+        if intake_allowed:
+            assert "(15 slots)" in result.stdout
+
+    @pytest.mark.parametrize(
+        ("closure_status", "intake_allowed"),
+        [
+            ("green", True),
+            ("healthy", False),
+            ("grace", True),
+            ("red", True),
+        ],
+    )
+    def test_hold_intake_rejects_retired_or_contradictory_closure_receipts(
+        self,
+        tmp_path: Path,
+        closure_status: str,
+        intake_allowed: bool,
+    ) -> None:
+        called = tmp_path / "called"
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            f"#!/usr/bin/env bash\ntouch '{called}'\nexit 99\n",
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+        receipt = _production_unbound_hold_receipt(
+            closure_status=closure_status,
+            intake_allowed=intake_allowed,
+        )
+        encoded = base64.b64encode(json.dumps(receipt).encode()).decode()
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRY_RUN=1 DRAIN_PROMOTION_MODE=hold-intake "
+                    f"DRAIN_FLEET_GATE_B64={encoded}"
+                ),
+            )
+        )
+
+        assert result.returncode == 2
+        assert (
+            "Fleet receipt does not authorize promotion mode hold-intake"
+            in result.stderr
+        )
+        assert not called.exists(), "drain invoked gh before receipt preflight"
 
     @pytest.mark.parametrize(
         "body",

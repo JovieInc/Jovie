@@ -394,6 +394,10 @@ describe('@critical releases/actions.ts — create/sync operations', () => {
 
       expect(result.success).toBe(true);
       expect(result.imported).toBe(5);
+      expect(mockSyncReleasesFromSpotify).toHaveBeenCalledWith(
+        MOCK_PROFILE.id,
+        {}
+      );
       expect(mockRevalidateTag).toHaveBeenCalled();
       expect(mockEnqueueDspArtistDiscoveryJob).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -401,6 +405,40 @@ describe('@critical releases/actions.ts — create/sync operations', () => {
           targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
         })
       );
+    });
+
+    it('bounds the real importer in the existing hosted E2E mode', async () => {
+      const previousFastOnboarding = process.env.E2E_FAST_ONBOARDING;
+      process.env.E2E_FAST_ONBOARDING = '1';
+      mockSyncReleasesFromSpotify.mockResolvedValue({
+        success: true,
+        imported: 1,
+        releases: [],
+        errors: [],
+      });
+      mockEnqueueDspArtistDiscoveryJob.mockResolvedValue(undefined);
+      mockEnqueueMusicFetchEnrichmentJob.mockResolvedValue(undefined);
+
+      try {
+        const { syncFromSpotify } = await import(
+          '@/app/app/(shell)/dashboard/releases/actions'
+        );
+        await syncFromSpotify();
+
+        expect(mockSyncReleasesFromSpotify).toHaveBeenCalledWith(
+          MOCK_PROFILE.id,
+          {
+            maxReleases: 1,
+            maxTracksPerRelease: 6,
+          }
+        );
+      } finally {
+        if (previousFastOnboarding === undefined) {
+          delete process.env.E2E_FAST_ONBOARDING;
+        } else {
+          process.env.E2E_FAST_ONBOARDING = previousFastOnboarding;
+        }
+      }
     });
 
     it('returns error when no Spotify ID on profile', async () => {

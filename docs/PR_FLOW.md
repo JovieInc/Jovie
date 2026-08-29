@@ -164,8 +164,16 @@ evidence fails new intake closed.
 Closure health is red when the sole queue controller stays non-green for more
 than 10 minutes, the native queue stays empty with eligible clean PRs for more
 than 15 minutes, an open PR stays unclassified for more than 15 minutes,
-duplicate Linear issue lanes remain unresolved, an explicit hold expires, or no
-PR merges for one hour while open PRs remain. A native queue entry becoming
+overlapping active artifacts for one Linear issue remain unresolved, an
+explicit hold expires, or no PR merges for one hour while open PRs remain.
+Held or draft PRs are not duplicate active writers; hold expiry governs them
+separately. Multiple active PRs for one issue are allowed only when
+changed-file sets are disjoint, and a duplicate receipt names only PRs that
+participate in an overlap. Only same-repository PRs may assert a Linear lane
+identity; cross-repository markers are ignored, while missing repository
+provenance fails closed. Missing, malformed, truncated, or rename-ambiguous
+changed-file evidence makes the complete multi-active lane unclassified. A
+native queue entry becoming
 `UNMERGEABLE` is red immediately: a nonempty queue is not progress. A grace
 episode also pauses new intake until the writer and queue prove progress. This
 stop-line never disables native promotion, exact-head PR remediation, tests, or
@@ -297,7 +305,9 @@ Before you open a PR:
 4. **Publish the draft first** (`JOVIE_PUSH_PHASE=publication`), consume rolling
    CI, then qualify the final exact, current head before ready. Don't hand-merge;
    the queue does it.
-5. If a PR's base branch was deleted, **retarget to `main`** before debugging a
+5. **Do not add or edit `CHANGELOG.md`.** Implementation PRs that touch it fail
+   admission. What's New is written after land/runtime proof. Linear is SoR.
+6. If a PR's base branch was deleted, **retarget to `main`** before debugging a
    "conflict."
 
 Related: [`pr-stacking.md`](../.claude/rules/pr-stacking.md),

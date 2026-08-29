@@ -81,5 +81,14 @@
   ],
   "lib/stripe/webhooks/handlers/payment-handler.ts": [
     "tests/unit/lib/stripe/webhooks/handlers/payment-handler.critical.test.ts"
+  ],
+  "components/features/profile/ProfileDrawerShell.tsx": [
+    "tests/components/profile/ProfileDrawerShell.interaction.test.tsx"
+  ],
+  "components/features/profile/ProfileUnifiedDrawer.tsx": [
+    "tests/components/profile/ProfileDrawerShell.interaction.test.tsx"
+  ],
+  "lib/a11y/modal-focus-boundary.ts": [
+    "tests/components/profile/ProfileDrawerShell.interaction.test.tsx"
   ]
 }

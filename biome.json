@@ -22,6 +22,9 @@
       "!apps/web/public/pitch/**",
       "!apps/web/styles/generated/**",
       "!apps/web/lib/design/generated/**",
+      "!apps/web/design/oklch-palette.json",
+      "!apps/web/typecheck-tests-baseline.json",
+      "!scripts/shared-ui-visual-arbitrary.baseline.json",
       "!packages/action-contracts/generated/**"
     ]
   },

@@ -49,17 +49,19 @@ export function loadSource() {
 
 /** @returns {{ css: string, ts: string, manifest: string }} */
 export function generate(tokens = loadSource()) {
-  // --- CSS: only tokens that are NET-NEW resolutions (gray scale). The
-  // accent/radius/duration values stay emitted by design-system.css until the
-  // namespace-collapse wave moves those definitions here; emitting them twice
-  // would create cascade-order ambiguity.
+  // --- CSS: machine-readable values that this compiler owns. Accent and
+  // duration values stay in their current emitters until their migration wave;
+  // emitting them twice would create cascade-order ambiguity.
   const brandVars = entries(tokens.brand)
     .map(([name, value]) => `  --brand-${name}: ${value};`)
     .join('\n');
   const grayVars = entries(tokens.gray)
     .map(([step, value]) => `  --gray${step}: ${value};`)
     .join('\n');
-  const css = `/* ${HEADER} */\n:root {\n${brandVars}\n${grayVars}\n}\n`;
+  const radiusVars = entries(tokens.radius)
+    .map(([name, value]) => `  --radius-${name}: ${value};`)
+    .join('\n');
+  const css = `/* ${HEADER} */\n:root {\n${brandVars}\n${grayVars}\n${radiusVars}\n}\n`;
 
   // --- TS: full typed export of the source for programmatic consumers.
   const data = Object.fromEntries(
@@ -105,7 +107,7 @@ export function generate(tokens = loadSource()) {
       cssVar: `--radius-${name}`,
       value,
       status: 'canonical',
-      emittedBy: 'styles/design-system.css',
+      emittedBy: 'styles/generated/design-tokens.css',
     });
   }
   for (const [name, value] of entries(tokens.duration)) {

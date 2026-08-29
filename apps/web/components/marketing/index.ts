@@ -17,6 +17,13 @@ export { FaqSection } from './FaqSection';
 export { FeatureAccordion } from './FeatureAccordion';
 export type { FigCardProps } from './FigCard';
 export { FigCard } from './FigCard';
+export type {
+  MarketingBentoCard,
+  MarketingBentoCardAction,
+  MarketingBentoPreviewAspect,
+  MarketingBentoSectionProps,
+} from './MarketingBentoSection';
+export { MarketingBentoSection } from './MarketingBentoSection';
 export type { MarketingContainerProps } from './MarketingContainer';
 export { MarketingContainer } from './MarketingContainer';
 export type { MarketingContentShellProps } from './MarketingContentShell';

@@ -53,7 +53,7 @@ vi.mock('@/lib/analytics', () => ({
 
 import { usePathname, useRouter } from 'next/navigation';
 import { toast } from '@/components/feedback';
-import { UserButton } from '@/components/organisms/user-button';
+import { UserButton } from '@/components/organisms/user-button/UserButton';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe, useUserSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';

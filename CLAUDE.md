@@ -89,7 +89,7 @@ Skip issues labeled `human-review-required` or containing "This issue requires h
 
 ## Scoped Rules
 
-Read the relevant `.claude/rules/*` file before touching that area: environment, auth, db, ui, security, release, ci-branching, testing, infra, ios, code-style, linear, gstack, swarm, hermes-air, pen.
+Read the relevant `.claude/rules/*` file before touching that area: environment, auth, db, ui, security, release, ci-branching, testing, infra, ios, macos, code-style, linear, gstack, swarm, hermes-air, pen.
 
 ## Skill Routing
 
@@ -103,6 +103,7 @@ Match a skill → invoke it first. Full routing table: [`.claude/rules/gstack.md
 | `DESIGN.md` | Operational design-system execution |
 | `docs/design-system/GOVERNANCE.md` | Design drift audit, standing initiative |
 | `docs/PR_FLOW.md` | Shipping, CI tiers, taste gate |
+| `docs/macos/swift-control-invariants.md` | Mac Electron vs Swift stack; proposed Swift-control slugs |
 | `docs/marketing/AGENT_GUIDE.md` | Generating or editing any marketing/landing page |
 | `docs/AI_AGENT_GUIDE.md` | API routes, cron, webhooks inventory |
 | `docs/company/operating-principles.md` | Product prioritization canon |
@@ -112,4 +113,4 @@ Match a skill → invoke it first. Full routing table: [`.claude/rules/gstack.md
 | `CODEX.md` | Codex bootstrap wrapper |
 
 Indexes (`docs/API_ROUTE_MAP.md`, `docs/CRON_REGISTRY.md`, `docs/WEBHOOK_MAP.md`, …) are system-of-record — navigate via this map.
-<!-- doc-freshness:scoped-rules-count:18 -->
+<!-- doc-freshness:scoped-rules-count:19 -->

@@ -155,6 +155,7 @@ export const APP_ROUTES = {
   COMPARE: '/compare',
   DEMO: '/demo',
   DEMO_VIDEO: '/demovideo',
+  DEVELOPERS: '/developers',
   ENGAGEMENT_ENGINE: '/engagement-engine',
   INVESTORS: '/investors',
   PITCH: '/pitch',
@@ -169,6 +170,7 @@ export const APP_ROUTES = {
   SUPPORT: '/support',
   PAY: '/pay',
   INSTANT_MERCH: '/instant-merch',
+  YOUTUBE_THUMBNAILS: '/youtube-thumbnails',
 
   // Legal
   LEGAL_PRIVACY: '/legal/privacy',
