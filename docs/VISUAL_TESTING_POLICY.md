@@ -25,11 +25,15 @@ source lacks:
 
 1. **Test** — colocated `*.test.ts(x)` / `*.spec.ts(x)`, **touched in the same
    diff**, or a verified `// @coverage-via <path>` whose target imports the
-   exact component module and uses the imported binding, or asserts an exact
-   `node:fs` read of that source. Comments, mocks without a real import,
-   same-name text, and unasserted reads do not count. Existing components may
-   also use a changed central test with the same executable evidence. Newly
-   added components may not use the central-test exception.
+   exact component module and uses that binding as a JSX tag, calls or
+   constructs it directly, or passes it as argument zero to an explicitly
+   imported React/test renderer; or asserts an exact `node:fs` read of that
+   source from `readFileSync` argument zero. Comments, mocks without a real
+   import, same-name text, `void`/assignment/metadata mentions, local fake
+   renderers, wrong-argument paths, and unasserted reads do not count.
+   Existing components may also use a changed central test with the same
+   executable evidence. Newly added components may not use the central-test
+   exception.
 2. **Story** — colocated `*.stories.ts(x)`. Existing marketing/site components
    may use a verified real-component story in the canonical
    `MarketingRecipes`, `MarketingSections`, or `MarketingShells` catalog;

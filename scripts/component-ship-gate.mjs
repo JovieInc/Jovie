@@ -3,7 +3,8 @@
  * Hard component ship gate (JOV-4421).
  *
  * Fail closed when a shippable UI component is added/changed without:
- *   1. Matching unit/interaction test (colocated or verified @coverage-via)
+ *   1. Matching unit/interaction test (colocated or verified @coverage-via;
+ *      JOV-5451 rejects inert executable receipts)
  *   2. Matching Storybook story that imports the real component
  *   3. Static match checks (required props / state matrix hints)
  *   4. Story quality hygiene (no pure-black voids / fake CTAs)
@@ -435,15 +436,148 @@ function isExactModuleMocked({ sourceFile, importerRel, sourceRel }) {
   return mocked;
 }
 
-function isTypeOrImportUse(node) {
-  for (let current = node.parent; current; current = current.parent) {
-    if (ts.isImportDeclaration(current) || ts.isTypeNode(current)) return true;
-    if (ts.isBindingElement(current) && isDynamicImportBinding(current)) {
-      return true;
+const RENDERER_MODULES = new Set([
+  'react',
+  'react/jsx-runtime',
+  'react/jsx-dev-runtime',
+  'react-dom',
+  'react-dom/client',
+  'react-dom/server',
+  'react-test-renderer',
+  '@testing-library/react',
+  '@testing-library/react/pure',
+]);
+
+const RENDERER_NAMED_EXPORTS = new Set([
+  'createElement',
+  'createFactory',
+  'jsx',
+  'jsxs',
+  'jsxDEV',
+  'render',
+  'hydrate',
+  'createRoot',
+  'hydrateRoot',
+  'renderToString',
+  'renderToStaticMarkup',
+  'renderToPipeableStream',
+  'renderToReadableStream',
+  'create',
+]);
+
+function unwrapExpression(node) {
+  let current = node;
+  while (
+    current &&
+    (ts.isParenthesizedExpression(current) ||
+      ts.isAsExpression(current) ||
+      ts.isSatisfiesExpression(current) ||
+      ts.isTypeAssertionExpression(current))
+  ) {
+    current = current.expression;
+  }
+  return current;
+}
+
+function importedRendererBindings(sourceFile) {
+  const named = new Set();
+  const namespaces = new Set();
+  for (const statement of sourceFile.statements) {
+    if (
+      !ts.isImportDeclaration(statement) ||
+      !statement.importClause ||
+      statement.importClause.isTypeOnly ||
+      !ts.isStringLiteral(statement.moduleSpecifier) ||
+      !RENDERER_MODULES.has(statement.moduleSpecifier.text)
+    ) {
+      continue;
     }
-    if (ts.isStatement(current)) return false;
+    if (statement.importClause.name) {
+      namespaces.add(statement.importClause.name.text);
+    }
+    const bindings = statement.importClause.namedBindings;
+    if (bindings && ts.isNamespaceImport(bindings)) {
+      namespaces.add(bindings.name.text);
+    } else if (bindings && ts.isNamedImports(bindings)) {
+      for (const element of bindings.elements) {
+        if (element.isTypeOnly) continue;
+        const importedName = (element.propertyName ?? element.name).text;
+        if (RENDERER_NAMED_EXPORTS.has(importedName)) {
+          named.add(element.name.text);
+        }
+      }
+    }
+  }
+  const shadowed = shadowedBindingNames(sourceFile, [...named, ...namespaces]);
+  return {
+    named: new Set([...named].filter(name => !shadowed.has(name))),
+    namespaces: new Set([...namespaces].filter(name => !shadowed.has(name))),
+  };
+}
+
+function isImportedRendererCallee(expression, rendererBindings) {
+  const expr = unwrapExpression(expression);
+  if (ts.isIdentifier(expr) && rendererBindings.named.has(expr.text)) {
+    return true;
+  }
+  if (
+    ts.isPropertyAccessExpression(expr) &&
+    ts.isIdentifier(expr.expression) &&
+    rendererBindings.namespaces.has(expr.expression.text) &&
+    RENDERER_NAMED_EXPORTS.has(expr.name.text)
+  ) {
+    return true;
+  }
+  if (
+    ts.isPropertyAccessExpression(expr) &&
+    expr.name.text === 'render' &&
+    ts.isCallExpression(unwrapExpression(expr.expression))
+  ) {
+    return isImportedRendererCallee(
+      unwrapExpression(expr.expression).expression,
+      rendererBindings
+    );
   }
   return false;
+}
+
+function isJsxTagUse(node) {
+  const parent = node.parent;
+  return Boolean(
+    parent &&
+      (ts.isJsxOpeningElement(parent) || ts.isJsxSelfClosingElement(parent)) &&
+      parent.tagName === node
+  );
+}
+
+function isDirectExecuteUse(node) {
+  const parent = node.parent;
+  return Boolean(
+    parent &&
+      ((ts.isCallExpression(parent) && parent.expression === node) ||
+        (ts.isNewExpression(parent) && parent.expression === node))
+  );
+}
+
+function isRendererArgumentZeroUse(node, rendererBindings) {
+  let current = node;
+  let parent = node.parent;
+  while (
+    parent &&
+    (ts.isParenthesizedExpression(parent) ||
+      ts.isAsExpression(parent) ||
+      ts.isSatisfiesExpression(parent) ||
+      ts.isTypeAssertionExpression(parent))
+  ) {
+    current = parent;
+    parent = parent.parent;
+  }
+  return Boolean(
+    parent &&
+      ts.isCallExpression(parent) &&
+      parent.arguments[0] === current &&
+      isImportedRendererCallee(parent.expression, rendererBindings)
+  );
 }
 
 function hasRuntimeImportedUse(sourceFile, importedNames) {
@@ -451,15 +585,14 @@ function hasRuntimeImportedUse(sourceFile, importedNames) {
   const shadowedNames = shadowedBindingNames(sourceFile, allNames);
   const names = new Set(allNames.filter(name => !shadowedNames.has(name)));
   if (names.size === 0) return false;
+  const rendererBindings = importedRendererBindings(sourceFile);
   let used = false;
   walkAst(sourceFile, node => {
-    if (
-      !used &&
-      ts.isIdentifier(node) &&
-      names.has(node.text) &&
-      !isTypeOrImportUse(node)
-    ) {
-      used = true;
+    if (!used && ts.isIdentifier(node) && names.has(node.text)) {
+      used =
+        isJsxTagUse(node) ||
+        isDirectExecuteUse(node) ||
+        isRendererArgumentZeroUse(node, rendererBindings);
     }
   });
   return used;
@@ -596,31 +729,53 @@ function hasExplicitSourceRead(sourceFile, sourceRel) {
     sourceRel.replace(/^apps\/web\//, ''),
   ]);
   const wrappers = localReadWrappers(sourceFile, readBindings);
-  const pathBindings = new Set();
+  const identifierInits = new Map();
   walkAst(sourceFile, node => {
-    if (!ts.isVariableDeclaration(node) || !ts.isIdentifier(node.name)) return;
-    const value = unwrapStringLiteral(node.initializer);
-    if (value && exactPaths.has(value)) pathBindings.add(node.name.text);
+    if (
+      !ts.isVariableDeclaration(node) ||
+      !ts.isIdentifier(node.name) ||
+      !node.initializer
+    ) {
+      return;
+    }
+    identifierInits.set(node.name.text, node.initializer);
   });
 
-  const nodeReadsExactPath = node => {
-    const literal = unwrapStringLiteral(node);
-    if (literal && exactPaths.has(literal)) return true;
+  const isJoinOrResolveCall = node => {
+    if (!ts.isCallExpression(node)) return false;
+    const callee = node.expression;
+    const name = ts.isIdentifier(callee)
+      ? callee.text
+      : ts.isPropertyAccessExpression(callee)
+        ? callee.name.text
+        : null;
+    return name === 'join' || name === 'resolve';
+  };
+
+  const nodeReadsExactPath = (node, seen = new Set()) => {
+    if (!node) return false;
+    const resolved = staticStringValue(node, identifierInits);
+    if (resolved && exactPaths.has(resolved)) return true;
     const joined = joinedLiteralPath(node);
     if (joined && exactPaths.has(joined)) return true;
-    return ts.isIdentifier(node) && pathBindings.has(node.text);
+    if (isJoinOrResolveCall(node)) {
+      return node.arguments.some(argument =>
+        nodeReadsExactPath(argument, seen)
+      );
+    }
+    if (ts.isIdentifier(node) && identifierInits.has(node.text)) {
+      if (seen.has(node.text)) return false;
+      return nodeReadsExactPath(
+        identifierInits.get(node.text),
+        new Set([...seen, node.text])
+      );
+    }
+    return false;
   };
 
   const callReadsExactPath = call => {
-    if (nodeReadsExactPath(call)) return true;
-    let matches = false;
-    for (const argument of call.arguments) {
-      walkAst(argument, node => {
-        if (matches) return;
-        if (nodeReadsExactPath(node)) matches = true;
-      });
-    }
-    return matches;
+    const pathArg = call.arguments[0];
+    return Boolean(pathArg) && nodeReadsExactPath(pathArg);
   };
 
   const assertedNames = new Set();
