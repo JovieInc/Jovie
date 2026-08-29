@@ -65,6 +65,11 @@ permanent check:
 9. **Shared-UI visual arbitrary values** — `packages/ui/{atoms,lib}` production
    files cannot grow one-off visual Tailwind values. Exact file/value/count
    debt may only shrink (`pnpm design:shared-ui-visual-arbitrary:check`).
+10. **Shadcn / Typeset outcome inventory** — enrolled primitives keep a
+    machine-readable comparison rubric against public Shadcn docs and Typeset
+    typography concepts (`pnpm component-ship-gate` + this audit). Missing or
+    unknown benchmark dimensions fail closed. No Shadcn/Typeset implementation
+    is imported.
 
 Exit code is non-zero on any FAIL; WARN never blocks. Failures print the
 exact offending values so remediation is mechanical.
