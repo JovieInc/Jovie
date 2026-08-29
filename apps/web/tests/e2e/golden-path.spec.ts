@@ -350,6 +350,19 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
     timeout: 60_000,
   });
 
+  const confirmedRequestBody = confirmedHandleResponse
+    .request()
+    .postDataJSON() as {
+    messages?: Array<{ id?: string; role?: string }>;
+  };
+  const confirmedClientMessageId = confirmedRequestBody.messages
+    ?.toReversed()
+    .find(message => message.role === 'user')?.id;
+  expect(
+    confirmedClientMessageId,
+    'Handle confirmation request did not include a user message id'
+  ).toBeTruthy();
+
   const requestBody = artistResponse.request().postDataJSON() as {
     messages?: Array<{ id?: string; role?: string }>;
   };
@@ -380,6 +393,28 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
     'Anonymous chat did not reserve a conversation'
   ).toBeTruthy();
 
+  const readConfirmedTurnConversation = async () => {
+    const [proof] = await sql`
+      SELECT conversation_id
+      FROM chat_messages
+      WHERE client_message_id = ${confirmedClientMessageId}
+        AND role = 'user'
+      ORDER BY created_at DESC
+      LIMIT 2
+    `;
+    return proof?.conversation_id ?? null;
+  };
+
+  await expect
+    .poll(readConfirmedTurnConversation, {
+      message:
+        'Handle confirmation forked away from the original anonymous conversation',
+      timeout: 30_000,
+    })
+    .toBe(conversationId);
+
+  const confirmedAssistantMessageId = `assistant:${confirmedClientMessageId}`;
+
   const readPersistedConfirmedHandle = async () => {
     const [proof] = await sql`
       SELECT event.value -> 'output' ->> 'handle' AS handle
@@ -388,6 +423,7 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
         COALESCE(message.tool_calls, '[]'::jsonb)
       ) AS event(value)
       WHERE message.conversation_id = ${conversationId}
+        AND message.client_message_id = ${confirmedAssistantMessageId}
         AND event.value -> 'output' ->> 'action' = 'handle_confirmed'
       ORDER BY message.created_at DESC
       LIMIT 1
