@@ -71,8 +71,17 @@ describe('social shortcut alias rewrite (JOV-5072)', () => {
     const rewrites = await nextConfig.rewrites();
 
     expect(Array.isArray(rewrites)).toBe(false);
-    expect(
-      (rewrites as { beforeFiles?: readonly RewriteRule[] }).beforeFiles ?? []
-    ).toHaveLength(0);
+    const beforeFiles =
+      (rewrites as { beforeFiles?: readonly RewriteRule[] }).beforeFiles ?? [];
+    const afterFiles = getAfterFilesRewrites(rewrites);
+
+    expect(beforeFiles).not.toContainEqual({
+      source: '/:username/:platform(ig|tt|x|yt|sp|web)',
+      destination: '/:username/s/:platform',
+    });
+    expect(afterFiles).toContainEqual({
+      source: '/:username/:platform(ig|tt|x|yt|sp|web)',
+      destination: '/:username/s/:platform',
+    });
   });
 });

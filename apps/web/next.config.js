@@ -7,6 +7,7 @@ const { withWorkflow } = require('workflow/next');
 // Read version from canonical source (version.json at monorepo root)
 const { version: APP_VERSION } = require('../../version.json');
 const isVercelPreview = process.env.VERCEL_ENV === 'preview';
+const AGENTIC_HTML_MARKER_QUERY = '__jovie_agentic_html';
 
 const nextConfig = {
   // Local and CI E2E runs use loopback hosts (`localhost` and `127.0.0.1`).
@@ -215,7 +216,11 @@ const nextConfig = {
       // Marketing pages (pre-rendered at build) - long-lived cache
       {
         source: '/',
-        headers: [...securityHeaders, cacheHeaders.immutable],
+        headers: [
+          ...securityHeaders,
+          cacheHeaders.immutable,
+          { key: 'Vary', value: 'Accept' },
+        ],
       },
       {
         source: '/(pricing|support|investors|engagement-engine|blog|changelog)',
@@ -486,7 +491,32 @@ const nextConfig = {
     ];
 
     return {
-      beforeFiles: [],
+      // Keep the visual homepage static while allowing explicit Markdown
+      // clients to negotiate the compact machine-readable representation.
+      // The internal route rewrites HTML requests back to / with a marker;
+      // the missing query guard prevents a rewrite loop.
+      beforeFiles: [
+        {
+          source: '/',
+          has: [
+            {
+              type: 'header',
+              key: 'accept',
+              // Match a text/markdown media range (case-insensitive) while
+              // leaving q-value and wildcard precedence to the route handler.
+              value:
+                '(?:[^,]+,\\s*)*[Tt][Ee][Xx][Tt]/[Mm][Aa][Rr][Kk][Dd][Oo][Ww][Nn](?:\\s*;[^,]*)?(?:\\s*,.*)?',
+            },
+          ],
+          missing: [
+            {
+              type: 'query',
+              key: AGENTIC_HTML_MARKER_QUERY,
+            },
+          ],
+          destination: `/jovie-agentic/home?${AGENTIC_HTML_MARKER_QUERY}=1`,
+        },
+      ],
       // Run after concrete filesystem routes but before /[username]/[slug].
       // The catch-all resolver checks published, renamed, and unpublished
       // content before falling back to the legacy profile-mode redirect.
