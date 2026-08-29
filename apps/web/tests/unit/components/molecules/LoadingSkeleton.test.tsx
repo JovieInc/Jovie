@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { loggerWarn } = vi.hoisted(() => ({
@@ -13,7 +13,19 @@ vi.mock('@/lib/utils/logger', () => ({
   },
 }));
 
-import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import {
+  AuthFormSkeleton,
+  ButtonSkeleton,
+  CardSkeleton,
+  LoadingSkeleton,
+  ProfileSkeleton,
+  SocialBarSkeleton,
+  TableSkeleton,
+} from '@/components/molecules/LoadingSkeleton';
+import {
+  inspectLoadingOwners,
+  loadingOwnerIssueCodes,
+} from '@/tests/utils/loading-owner';
 
 describe('LoadingSkeleton', () => {
   beforeEach(() => {
@@ -31,6 +43,40 @@ describe('LoadingSkeleton', () => {
     expect(skeleton?.className).toContain('h-3.5');
     expect(skeleton?.className).toContain('w-3.5');
     expect(loggerWarn).not.toHaveBeenCalled();
+  });
+
+  it('passes the canonical loading label through the compatibility facade', () => {
+    render(
+      <LoadingSkeleton
+        label='Loading audience'
+        lines={2}
+        height='h-6'
+        width='w-48'
+        rounded='lg'
+      />
+    );
+
+    const status = screen.getByRole('status', { name: 'Loading audience' });
+    expect(status).toHaveAttribute('aria-live', 'polite');
+    expect(status).toHaveAttribute('aria-atomic', 'true');
+    expect(status).toHaveAttribute('data-lines', '2');
+    expect(status).toHaveAttribute('data-height', 'h-6');
+    expect(status).toHaveAttribute('data-width', 'w-48');
+    expect(status).toHaveAttribute('data-rounded', 'lg');
+    expect(status.querySelectorAll('[role="status"]')).toHaveLength(0);
+  });
+
+  it.each([
+    ['profile', <ProfileSkeleton />],
+    ['button', <ButtonSkeleton />],
+    ['social bar', <SocialBarSkeleton />],
+    ['auth form', <AuthFormSkeleton />],
+    ['card', <CardSkeleton />],
+    ['table', <TableSkeleton rows={2} columns={2} />],
+  ])('keeps the %s composite on one named loading owner', (_name, node) => {
+    const { container } = render(node);
+
+    expect(loadingOwnerIssueCodes(inspectLoadingOwners(container))).toEqual([]);
   });
 
   it('warns and falls back for invalid size utilities', () => {
@@ -58,5 +104,16 @@ describe('LoadingSkeleton', () => {
       undefined,
       'LoadingSkeleton'
     );
+  });
+
+  it('rejects arbitrary size values so reserved geometry stays tokenized', () => {
+    const { container } = render(
+      <LoadingSkeleton height='h-[13px]' width='w-[29px]' />
+    );
+
+    const skeleton = container.querySelector('[data-slot="skeleton"]');
+    expect(skeleton).toHaveClass('h-4', 'w-full');
+    expect(skeleton).not.toHaveClass('h-[13px]', 'w-[29px]');
+    expect(loggerWarn).toHaveBeenCalledTimes(2);
   });
 });

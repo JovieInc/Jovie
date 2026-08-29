@@ -52,15 +52,16 @@ export function Skeleton({
 }: SkeletonProps) {
   return (
     <div
+      {...props}
       className={cn(
-        shimmer && 'skeleton motion-reduce:animate-none',
+        shimmer && 'skeleton motion-reduce:animate-none motion-reduce:bg-none',
         !shimmer && 'bg-surface-1 motion-reduce:animate-none',
         roundedClasses[rounded],
         className
       )}
       data-state={shimmer ? 'shimmer' : 'static'}
+      data-slot='skeleton'
       aria-hidden='true'
-      {...props}
     />
   );
 }
@@ -118,6 +119,7 @@ export function LoadingSkeleton({
   const normalizedLines = Number.isFinite(lines)
     ? Math.max(1, Math.floor(lines))
     : 1;
+  const accessibleLabel = label.trim() || 'Loading content';
 
   // Generate stable keys for multi-line skeletons.
   const lineKeys = React.useMemo(
@@ -133,9 +135,13 @@ export function LoadingSkeleton({
       aria-busy='true'
       aria-live='polite'
       aria-atomic='true'
+      aria-label={accessibleLabel}
       data-lines={normalizedLines}
+      data-height={height}
+      data-width={width}
+      data-rounded={rounded}
+      data-slot='loading-skeleton'
     >
-      <span className='sr-only'>{label}</span>
       {lineKeys.map((key, index) => (
         <Skeleton
           key={key}

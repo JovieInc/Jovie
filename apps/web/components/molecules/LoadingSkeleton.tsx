@@ -1,6 +1,10 @@
 'use client';
 
-import { Skeleton, LoadingSkeleton as UILoadingSkeleton } from '@jovie/ui';
+import {
+  Skeleton,
+  LoadingSkeleton as UILoadingSkeleton,
+  type LoadingSkeletonProps as UILoadingSkeletonProps,
+} from '@jovie/ui';
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { logger } from '@/lib/utils/logger';
@@ -10,17 +14,13 @@ function generateSkeletonKeys(prefix: string, count: number): string[] {
   return Array.from({ length: count }, (_, i) => `${prefix}-${i}`);
 }
 
-interface LoadingSkeletonProps {
-  readonly className?: string;
-  readonly lines?: number;
-  readonly height?: string;
-  readonly width?: string;
-  readonly rounded?: 'sm' | 'md' | 'lg' | 'full';
-}
+export type LoadingSkeletonProps = Pick<
+  UILoadingSkeletonProps,
+  'className' | 'lines' | 'height' | 'width' | 'rounded' | 'label'
+>;
 
 const SIZE_TOKEN_PATTERN = /^\d+(?:\.\d+)?$/;
 const FRACTION_TOKEN_PATTERN = /^\d+\/\d+$/;
-const ARBITRARY_TOKEN_PATTERN = /^\[[^\]]+\]$/;
 
 const VALID_HEIGHT_KEYWORDS = new Set([
   'auto',
@@ -63,7 +63,7 @@ function isValidSizeClass(
     return false;
   }
 
-  if (SIZE_TOKEN_PATTERN.test(token) || ARBITRARY_TOKEN_PATTERN.test(token)) {
+  if (SIZE_TOKEN_PATTERN.test(token)) {
     return true;
   }
 
@@ -96,6 +96,7 @@ export function LoadingSkeleton({
   height = 'h-4',
   width = 'w-full',
   rounded = 'sm',
+  label,
 }: Readonly<LoadingSkeletonProps>) {
   // Validate height and width classes
   const validatedHeight = validateSizeClass(height, 'height');
@@ -108,6 +109,7 @@ export function LoadingSkeleton({
       height={validatedHeight}
       width={validatedWidth}
       rounded={rounded}
+      label={label}
     />
   );
 }
@@ -115,9 +117,12 @@ export function LoadingSkeleton({
 // Specific skeleton components for common use cases
 export function ProfileSkeleton() {
   return (
-    <output
+    <div
       className='flex flex-col items-center space-y-4 text-center'
+      role='status'
       aria-busy='true'
+      aria-live='polite'
+      aria-atomic='true'
       aria-label='Loading Artist Profile'
     >
       <Skeleton className='h-32 w-32' rounded='full' />
@@ -125,15 +130,21 @@ export function ProfileSkeleton() {
         <Skeleton className='h-8 w-48' aria-label='Loading Artist Name' />
         <Skeleton className='h-6 w-64' aria-label='Loading Artist Tagline' />
       </div>
-    </output>
+    </div>
   );
 }
 
 export function ButtonSkeleton() {
   return (
-    <output aria-label='Loading Action Button' aria-busy='true'>
+    <div
+      role='status'
+      aria-label='Loading Action Button'
+      aria-busy='true'
+      aria-live='polite'
+      aria-atomic='true'
+    >
       <Skeleton className='block h-12 w-full max-w-sm' rounded='lg' />
-    </output>
+    </div>
   );
 }
 
@@ -143,8 +154,11 @@ export function SocialBarSkeleton() {
   return (
     <nav
       className='flex flex-wrap justify-center gap-4'
+      role='status'
       aria-label='Loading Social Media Links'
       aria-busy='true'
+      aria-live='polite'
+      aria-atomic='true'
     >
       {SOCIAL_BAR_SKELETON_KEYS.map(key => (
         <Skeleton key={key} className='h-12 w-12' rounded='full' />
@@ -155,10 +169,13 @@ export function SocialBarSkeleton() {
 
 export function AuthFormSkeleton() {
   return (
-    <output
+    <div
       className='block space-y-5'
+      role='status'
       aria-label='Loading Authentication Form'
       aria-busy='true'
+      aria-live='polite'
+      aria-atomic='true'
     >
       <Skeleton className='block h-4 w-24' rounded='full' />
       <Skeleton
@@ -169,19 +186,26 @@ export function AuthFormSkeleton() {
       <Skeleton className='block h-[3.9rem] w-full' rounded='full' />
       <Skeleton className='block h-[3.9rem] w-full' rounded='full' />
       <div className='flex items-center gap-4 py-1' aria-hidden='true'>
-        <span className='h-px flex-1 bg-white/8' />
+        <span className='h-px flex-1 border-t border-subtle' />
         <Skeleton className='block h-3 w-6' rounded='full' />
-        <span className='h-px flex-1 bg-white/8' />
+        <span className='h-px flex-1 border-t border-subtle' />
       </div>
       <Skeleton className='block h-[3.75rem] w-full' rounded='full' />
       <Skeleton className='block h-[3.9rem] w-full' rounded='full' />
-    </output>
+    </div>
   );
 }
 
 export function CardSkeleton() {
   return (
-    <div className='w-full p-4 border border-subtle rounded-lg'>
+    <div
+      className='w-full rounded-lg border border-subtle p-4'
+      role='status'
+      aria-busy='true'
+      aria-live='polite'
+      aria-atomic='true'
+      aria-label='Loading Card'
+    >
       <div className='space-y-3'>
         <div className='flex items-center space-x-3'>
           <Skeleton className='h-10 w-10' rounded='full' />
@@ -227,7 +251,14 @@ export function TableSkeleton({
   );
 
   return (
-    <div className='w-full overflow-hidden border border-subtle rounded-lg'>
+    <div
+      className='w-full overflow-hidden rounded-lg border border-subtle'
+      role='status'
+      aria-busy='true'
+      aria-live='polite'
+      aria-atomic='true'
+      aria-label='Loading Table'
+    >
       {/* Header */}
       <div className='flex border-b border-subtle bg-surface-1'>
         {headerKeys.map(key => (
