@@ -389,6 +389,17 @@ function runScriptsTypecheck() {
 }
 
 function runGuardrails() {
+  // Exclusive Symphony/Summer diffs must not wait on Jovie product guardrails
+  // (JOV-5288). Product-lane selection still slices remaining work when the
+  // product lane is on.
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+    return {
+      code: 0,
+      output: 'Guardrails skipped (no Jovie product files changed)\n',
+      skipped: true,
+    };
+  }
   const base = process.env.GITHUB_BASE_REF || 'main';
   const originBase = `origin/${base}`;
   const selected = selectedProductLanes();
@@ -433,6 +444,14 @@ function runGuardrails() {
 }
 
 function runDesignConformance() {
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+    return {
+      code: 0,
+      output: 'Design conformance skipped (no Jovie product files changed)\n',
+      skipped: true,
+    };
+  }
   const selected = selectedProductLanes();
   if (!selected.has('operations') && !selected.has('web')) {
     return {
@@ -467,6 +486,15 @@ function runIosFast() {
 }
 
 function runProfileAdmission() {
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+    return {
+      code: 0,
+      output:
+        'Public-profile admission skipped (no Jovie product files changed)\n',
+      skipped: true,
+    };
+  }
   const files = changedFiles([
     ':(glob)apps/web/app/\\[username\\]/**',
     'apps/web/app/(marketing)/renders/profile-admission/**',
@@ -503,6 +531,19 @@ function runStructural() {
       output: 'Structural Contract skipped (path-gated)\n',
       skipped: true,
     };
+  }
+
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (event !== 'workflow_dispatch') {
+    const lanes = repoLanes();
+    if (!lanes.runJovieProduct && !lanes.runSymphonyControl) {
+      return {
+        code: 0,
+        output:
+          'Structural skipped (Summer/ops only; no Jovie or Symphony suites)\n',
+        skipped: true,
+      };
+    }
   }
 
   const selected = selectedProductLanes();
