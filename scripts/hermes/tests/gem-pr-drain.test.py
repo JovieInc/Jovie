@@ -37,22 +37,42 @@ def stale_capacity_receipt():
             "production": {"status": "green", "deployedSha": main_sha},
             "controller": {"status": "green"},
             "integrity": {"status": "clear"},
-            "queue": {"status": "known", "eligiblePrs": 2, "greenReadyPrs": 2, "target": 15},
+            "queue": {
+                "status": "known",
+                "eligiblePrs": 2,
+                "greenReadyPrs": 2,
+                "target": 15,
+            },
             "closureHealth": {
-                "schema": "jovie-closure-health/v1", "status": "healthy",
-                "authority": "Summer", "newIssueIntakeAllowed": True,
-                "promotionContinues": True, "remediationContinues": True, "reasons": [],
+                "schema": "jovie-closure-health/v1",
+                "status": "healthy",
+                "authority": "Summer",
+                "newIssueIntakeAllowed": True,
+                "promotionContinues": True,
+                "remediationContinues": True,
+                "reasons": [],
             },
             "independentReview": {
-                "schema": "jovie-independent-review/v1", "status": "passed",
-                "authority": "Gem", "reviewer": "Gem", "reviewId": "stale-capacity",
-                "headSha": main_sha, "scope": "exact-main-head", "observedAt": observed_at,
-                "accepted": True, "reason": "fresh-exact-head-independent-review",
+                "schema": "jovie-independent-review/v1",
+                "status": "passed",
+                "authority": "Gem",
+                "reviewer": "Gem",
+                "reviewId": "review-stale-capacity",
+                "headSha": main_sha,
+                "scope": "exact-main-head",
+                "observedAt": observed_at,
+                "accepted": True,
+                "reason": "fresh-exact-head-independent-review",
             },
             "concurrencyEvidence": {
-                "schema": "gem-concurrency-evidence/v1", "target": 4, "approved": True,
-                "cleanRuns": 1, "severeIncidents": 0, "observedAt": observed_at,
-                "accepted": False, "error": "capacity-evidence-stale",
+                "schema": "gem-concurrency-evidence/v1",
+                "target": 4,
+                "approved": True,
+                "cleanRuns": 1,
+                "severeIncidents": 0,
+                "observedAt": observed_at,
+                "accepted": False,
+                "error": "capacity-evidence-stale",
             },
         },
         observed_at,
@@ -103,7 +123,7 @@ class JovieOwnershipTests(unittest.TestCase):
         self.assertEqual(validated["concurrency"]["gem"]["runtimeFloor"], 1)
         for field, value, expected in (
             ("pushAllowed", True, "remote remediation must require"),
-            ("maxConcurrent", 2, "stale capacity must block remote remediation"),
+            ("maxConcurrent", 2, "stale capacity must keep remediation maxConcurrent at zero"),
         ):
             with self.subTest(field=field):
                 broken = json.loads(json.dumps(receipt))
@@ -134,6 +154,104 @@ class JovieOwnershipTests(unittest.TestCase):
                 MODULE.effective_capacity(
                     4, {"remediationAdmission": {"maxConcurrent": maximum}}
                 )
+
+    def test_zero_remote_capacity_is_clean_idle_without_github_mutation(self):
+        receipt = stale_capacity_receipt()
+        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
+        self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 0)
+        self.assertEqual(receipt["concurrency"]["gem"]["runtimeFloor"], 1)
+        self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            state = pathlib.Path(tmp)
+            stdout = io.StringIO()
+            with (
+                mock.patch.object(MODULE, "STATE", state),
+                mock.patch.object(MODULE, "ARTIFACT", state / "latest.json"),
+                mock.patch.object(MODULE, "POLICY_ENABLED", True),
+                mock.patch.object(
+                    MODULE,
+                    "run_process",
+                    return_value=MODULE.subprocess.CompletedProcess(
+                        ["python3", str(GATE_SOURCE)],
+                        0,
+                        stdout=json.dumps(receipt),
+                        stderr="",
+                    ),
+                ),
+                mock.patch.object(MODULE, "auth_status") as auth_status,
+                mock.patch.object(MODULE, "inventory") as inventory,
+                mock.patch.object(MODULE, "update_one") as update_one,
+                mock.patch.object(MODULE, "run") as remote_run,
+                mock.patch.object(MODULE.sys, "argv", [str(SOURCE)]),
+                redirect_stdout(stdout),
+            ):
+                exit_code = MODULE.main()
+
+        document = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 0, document)
+        self.assertEqual(document["status"], "ok")
+        self.assertEqual(document["capacity"], 0)
+        self.assertEqual(document["selected"], [])
+        self.assertEqual(document["processed"], [])
+        self.assertEqual(document["intake"], "blocked_missing_capacity_evidence")
+        self.assertEqual(document["remediation_admission"], "local_only")
+        auth_status.assert_not_called()
+        inventory.assert_not_called()
+        update_one.assert_not_called()
+        remote_run.assert_not_called()
+
+    def test_stale_capacity_receipt_rejects_remote_mutation(self):
+        receipt = stale_capacity_receipt()
+        receipt["remediationAdmission"]["pushAllowed"] = True
+        receipt["remediationAdmission"]["activities"].append("expected-head-pr-update")
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "remote remediation must require non-RED state and accepted capacity",
+        ):
+            MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
+
+    def test_stale_capacity_rejects_contradictory_remote_floor(self):
+        receipt = stale_capacity_receipt()
+        receipt["remediationAdmission"]["maxConcurrent"] = 1
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "stale capacity must keep remediation maxConcurrent at zero",
+        ):
+            MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
+
+    def test_null_capacity_evidence_fails_closed_with_typed_contract_error(self):
+        receipt = stale_capacity_receipt()
+        receipt["signals"]["concurrencyEvidence"] = None
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "capacity evidence signal acceptance is not boolean",
+        ):
+            MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
+
+    def test_stale_capacity_blocks_autonomous_draft_remote_mutation(self):
+        draft = self._open_pr(
+            3, mergeable_state="clean", created_at="2026-08-28T20:02:00Z"
+        )
+        draft["draft"] = True
+        draft["head"]["ref"] = "symphony/JOV-9999-stale-capacity"
+
+        with (
+            mock.patch.object(
+                MODULE,
+                "work_mutation_blocker",
+                return_value="remediation_push_gate_green",
+            ),
+            mock.patch.object(MODULE, "run") as run,
+        ):
+            result = MODULE.ready_autonomous_draft(draft)
+
+        self.assertEqual(result["result"], "skipped")
+        self.assertEqual(result["reason"], "remediation_push_gate_green")
+        run.assert_not_called()
 
     def test_exact_head_lease_allows_only_one_cross_process_writer(self):
         pr = {
