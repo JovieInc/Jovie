@@ -143,8 +143,6 @@ function validateMoleculeOwnershipReceipt({
  */
 const CENTRAL_MARKETING_CONTRACT_COVERAGE = [
   'FaqSection',
-  'MarketingContainer',
-  'MarketingContentShell',
   'ArtistNotificationsLanding',
   'ArtistProfileCaptureSection',
   'ArtistProfileHowItWorks',
@@ -562,24 +560,6 @@ describe('canonical marketing component registry', () => {
         'utf8'
       )
     ).toContain('export function HomepageV2Route');
-    expect(
-      fs.readFileSync(
-        path.join(
-          repoRoot,
-          'apps/web/components/marketing/MarketingContainer.tsx'
-        ),
-        'utf8'
-      )
-    ).toContain('export function MarketingContainer');
-    expect(
-      fs.readFileSync(
-        path.join(
-          repoRoot,
-          'apps/web/components/marketing/MarketingContentShell.tsx'
-        ),
-        'utf8'
-      )
-    ).toContain('export function MarketingContentShell');
     expect(
       fs.readFileSync(
         path.join(repoRoot, 'apps/web/components/site/MarketingFinalCTA.tsx'),

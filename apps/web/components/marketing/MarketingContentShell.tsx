@@ -1,4 +1,3 @@
-// @coverage-via apps/web/tests/unit/marketing/component-registry.test.ts
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 import { MarketingContainer } from './MarketingContainer';
