@@ -3086,6 +3086,17 @@ describe('CI E2E smoke workflow', () => {
       resolve(repoRoot, 'apps/web/tests/e2e/golden-path.spec.ts'),
       'utf8'
     );
+    const moneyPathSpec = readFileSync(
+      resolve(repoRoot, 'apps/web/tests/e2e/money-path-persistence.spec.ts'),
+      'utf8'
+    );
+    const authHelper = readFileSync(
+      resolve(repoRoot, 'apps/web/tests/helpers/auth.ts'),
+      'utf8'
+    );
+    const packageJson = JSON.parse(
+      readFileSync(resolve(repoRoot, 'apps/web/package.json'), 'utf8')
+    ) as { scripts: Record<string, string> };
     const smokeManifest = readFileSync(
       resolve(repoRoot, 'apps/web/tests/e2e/smoke-manifest.ts'),
       'utf8'
@@ -3099,22 +3110,39 @@ describe('CI E2E smoke workflow', () => {
     expect(goldenPathStep).toContain('export CHAT_LLM_FAILURE_INJECTION=1');
     expect(goldenPathStep).toContain('export PUBLIC_NOAUTH_SMOKE=1');
     expect(goldenPathStep).not.toContain('E2E_USE_TEST_AUTH_BYPASS');
+    expect(goldenPathStep).toContain(
+      'STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}'
+    );
+    expect(goldenPathStep).toContain(
+      'STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}'
+    );
+    expect(goldenPathStep).toContain(
+      'STRIPE_PRICE_PRO_MONTHLY: ${{ secrets.STRIPE_PRICE_PRO_MONTHLY }}'
+    );
+    expect(packageJson.scripts['test:e2e:golden-path:ci']).toContain(
+      'tests/e2e/golden-path.spec.ts'
+    );
+    expect(packageJson.scripts['test:e2e:golden-path:ci']).toContain(
+      'tests/e2e/money-path-persistence.spec.ts'
+    );
     expect(goldenPathSpec).toContain(
       "process.env.E2E_USE_TEST_AUTH_BYPASS === '1'"
     );
     expect(goldenPathSpec).toContain(
       'Golden path requires the dedicated real-auth lane'
     );
-    expect(goldenPathSpec).toContain(
+    expect(goldenPathSpec).toContain('prepareBetterAuthEmailOtp(page, {');
+    expect(goldenPathSpec).toContain('beforeResponseFulfill: ensureDbUser,');
+    expect(authHelper).toContain(
       "const signInRoute = '**/api/auth/sign-in/email-otp'"
     );
-    const routeFetchIndex = goldenPathSpec.indexOf(
+    const routeFetchIndex = authHelper.indexOf(
       'response = await route.fetch()'
     );
-    const approveAppUserIndex = goldenPathSpec.indexOf(
-      'await ensureDbUser(betterAuthUserId)'
+    const prepareAppUserIndex = authHelper.indexOf(
+      'await options.beforeResponseFulfill?.(betterAuthUserId)'
     );
-    const signInFulfillIndex = goldenPathSpec.indexOf(
+    const signInFulfillIndex = authHelper.indexOf(
       'await route.fulfill({ response, body })'
     );
     const navigationArmIndex = goldenPathSpec.indexOf(
@@ -3124,28 +3152,21 @@ describe('CI E2E smoke workflow', () => {
       'const claimResponsePromise = page.waitForResponse('
     );
     const otpSubmitIndex = goldenPathSpec.indexOf(
-      "pressSequentially('424242')"
+      'await preparedAuth.submit()'
     );
-    const authPreparationIndex = goldenPathSpec.indexOf(
-      'const authPreparationError = await Promise.race(['
-    );
-    const unrouteIndex = goldenPathSpec.indexOf(
-      'await page.unroute(signInRoute)'
-    );
+    const disposeIndex = goldenPathSpec.indexOf('await preparedAuth.dispose()');
     expect(routeFetchIndex).toBeGreaterThan(-1);
-    expect(approveAppUserIndex).toBeGreaterThan(routeFetchIndex);
-    expect(signInFulfillIndex).toBeGreaterThan(approveAppUserIndex);
+    expect(prepareAppUserIndex).toBeGreaterThan(routeFetchIndex);
+    expect(signInFulfillIndex).toBeGreaterThan(prepareAppUserIndex);
     expect(navigationArmIndex).toBeGreaterThan(-1);
     expect(navigationArmIndex).toBeLessThan(otpSubmitIndex);
     expect(claimArmIndex).toBeGreaterThan(navigationArmIndex);
     expect(claimArmIndex).toBeLessThan(otpSubmitIndex);
-    expect(authPreparationIndex).toBeGreaterThan(otpSubmitIndex);
-    expect(unrouteIndex).toBeGreaterThan(authPreparationIndex);
-    expect(goldenPathSpec).toContain('authPreparationResult,');
+    expect(disposeIndex).toBeGreaterThan(otpSubmitIndex);
     expect(goldenPathSpec).toContain(
       'without racing the start-route auth gate'
     );
-    expect(goldenPathSpec).toContain(
+    expect(authHelper).toContain(
       'Better Auth email-OTP request did not reach the preparation barrier'
     );
     expect(goldenPathSpec).not.toContain('heldClaimResponsePromise');
@@ -3162,6 +3183,11 @@ describe('CI E2E smoke workflow', () => {
     expect(goldenPathSpec).toContain(
       'resetAuthStatePreservingOnboardingSession(page.context())'
     );
+    expect(moneyPathSpec).toContain('getRequiredStripeTestContext()');
+    expect(moneyPathSpec).toContain("'checkout.session.completed'");
+    expect(moneyPathSpec).toContain('invalidResponse.status()).toBe(400)');
+    expect(moneyPathSpec).toContain('deleteRunOwnedStripeCustomer(');
+    expect(moneyPathSpec).not.toContain('ensureUserIsFree');
   });
 
   it('seeds public QA fixtures on ephemeral Neon before PR smoke runs', () => {

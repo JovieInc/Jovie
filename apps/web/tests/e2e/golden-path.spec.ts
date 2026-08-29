@@ -3,9 +3,9 @@ import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   ensureSignedInUser,
-  fillControlledInputUntilEnabled,
   getAdminCredentials,
   hasAdminCredentials,
+  prepareBetterAuthEmailOtp,
 } from '../helpers/clerk-auth';
 import {
   installRuntimeAutomationBypass,
@@ -27,7 +27,7 @@ import {
  * (see docs/PRICING-PHILOSOPHY.md), so the golden path's "first value" moment
  * is the artist's public profile going live with imported music — not a
  * paywall. Checkout is a post-activation upgrade path, not part of this
- * journey; it is covered separately by billing-checkout.spec.ts (JOV-3757).
+ * journey; persistence is covered by money-path-persistence.spec.ts.
  *
  * Test artist: "Tim White" (~50 releases, deterministic)
  */
@@ -261,20 +261,10 @@ async function interceptTrackingCalls(page: Page) {
  */
 async function createFreshUserOnce(page: import('@playwright/test').Page) {
   const email = `gp-${Date.now().toString(36)}+e2e@test.jovie.com`;
-  await page.goto('/signup', {
-    waitUntil: 'domcontentloaded',
-    timeout: 60_000,
-  });
-  const emailInput = page.getByLabel('Email Address');
-  const continueButton = page.getByRole('button', {
-    name: 'Continue with Email',
-  });
-  // Hydration can reset the server-rendered controlled input after the first
-  // fill. Refill until React retains the value and enables submission.
-  await fillControlledInputUntilEnabled(emailInput, continueButton, email);
-  await continueButton.click();
-  await expect(page.locator('[data-auth-email-code-step="code"]')).toBeVisible({
-    timeout: 30_000,
+  const preparedAuth = await prepareBetterAuthEmailOtp(page, {
+    email,
+    entryPath: '/signup',
+    beforeResponseFulfill: ensureDbUser,
   });
 
   // OTP verification hard-navigates to /start as soon as Better Auth returns.
@@ -282,51 +272,6 @@ async function createFreshUserOnce(page: import('@playwright/test').Page) {
   // app row while the sign-in response is withheld from the browser. This
   // preserves the real session cookie and lets the first /start mount perform
   // the one authoritative claim without racing the start-route auth gate.
-  const signInRoute = '**/api/auth/sign-in/email-otp';
-  let betterAuthUserId: string | null = null;
-  let settleAuthPreparation: (error: Error | null) => void = () => undefined;
-  const authPreparationResult = new Promise<Error | null>(resolve => {
-    settleAuthPreparation = resolve;
-  });
-  await page.route(signInRoute, async route => {
-    let response: Awaited<ReturnType<typeof route.fetch>> | null = null;
-    let body: string | null = null;
-    let preparationError: Error | null = null;
-
-    try {
-      response = await route.fetch();
-      body = await response.text();
-      if (response.status() !== 200) {
-        throw new Error(
-          `Better Auth email-OTP sign-in returned ${response.status()}`
-        );
-      }
-
-      const payload = JSON.parse(body) as { user?: { id?: string } };
-      betterAuthUserId = payload.user?.id ?? null;
-      if (!betterAuthUserId) {
-        throw new Error('Better Auth email-OTP response omitted the user id');
-      }
-
-      await ensureDbUser(betterAuthUserId);
-    } catch (error) {
-      preparationError =
-        error instanceof Error ? error : new Error(String(error));
-    }
-
-    try {
-      if (response && body !== null) {
-        await route.fulfill({ response, body });
-      } else {
-        await route.abort();
-      }
-    } catch (error) {
-      preparationError ??=
-        error instanceof Error ? error : new Error(String(error));
-    }
-
-    settleAuthPreparation(preparationError);
-  });
   try {
     const automaticStartNavigationPromise = page.waitForURL(
       url => url.pathname === '/start',
@@ -340,24 +285,7 @@ async function createFreshUserOnce(page: import('@playwright/test').Page) {
       { timeout: 30_000 }
     );
     void claimResponsePromise.catch(() => undefined);
-    await page.getByLabel('Digit 1 of 6').pressSequentially('424242');
-    let authPreparationTimeout: ReturnType<typeof setTimeout> | undefined;
-    const authPreparationError = await Promise.race([
-      authPreparationResult,
-      new Promise<Error>(resolve => {
-        authPreparationTimeout = setTimeout(
-          () =>
-            resolve(
-              new Error(
-                'Better Auth email-OTP request did not reach the preparation barrier'
-              )
-            ),
-          30_000
-        );
-      }),
-    ]);
-    if (authPreparationTimeout) clearTimeout(authPreparationTimeout);
-    if (authPreparationError) throw authPreparationError;
+    const { betterAuthUserId } = await preparedAuth.submit();
     await automaticStartNavigationPromise;
     const claimResponse = await claimResponsePromise;
     expect(claimResponse.status()).toBe(200);
@@ -366,13 +294,9 @@ async function createFreshUserOnce(page: import('@playwright/test').Page) {
       conversationId?: string;
     };
 
-    if (!betterAuthUserId) {
-      throw new Error('Better Auth sign-in did not expose a user id');
-    }
-
     return { email, betterAuthUserId, claimPayload };
   } finally {
-    await page.unroute(signInRoute);
+    await preparedAuth.dispose();
   }
 }
 
