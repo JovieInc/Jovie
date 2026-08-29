@@ -96,10 +96,52 @@ check_one() {
   return "$rc"
 }
 
+check_workflow() {
+  local src="$1" dst="$2"
+  if [ ! -f "$dst" ]; then
+    echo "MISSING $dst"
+    return 1
+  fi
+  python3 - "$src" "$dst" <<'PY'
+import pathlib
+import re
+import sys
+
+source_path = pathlib.Path(sys.argv[1])
+installed_path = pathlib.Path(sys.argv[2])
+pattern = re.compile(
+    r"^(\s*max_concurrent_agents:\s*)([0-9]+)(\s*)$",
+    re.MULTILINE,
+)
+source = source_path.read_text(encoding="utf-8")
+installed = installed_path.read_text(encoding="utf-8")
+source_matches = list(pattern.finditer(source))
+installed_matches = list(pattern.finditer(installed))
+if len(source_matches) != 1 or len(installed_matches) != 1:
+    print(f"DRIFT {installed_path}")
+    raise SystemExit(1)
+source_target = int(source_matches[0].group(2))
+runtime_target = int(installed_matches[0].group(2))
+if source_target not in range(1, 9) or runtime_target not in range(1, 9):
+    print(f"DRIFT {installed_path}")
+    raise SystemExit(1)
+
+def normalized(text: str) -> str:
+    return pattern.sub(lambda match: f"{match.group(1)}<runtime>{match.group(3)}", text)
+
+if normalized(source) != normalized(installed):
+    print(f"DRIFT {installed_path}")
+    raise SystemExit(1)
+print(f"OK {installed_path} (runtime max_concurrent_agents={runtime_target})")
+PY
+}
+
 if [ "$CHECK_ONLY" -eq 1 ]; then
   rc=0
   if [ "$LEASE_GUARD_ONLY" -eq 0 ]; then
-    check_one "$WORKFLOW_SRC" "$WORKFLOW_DST" || rc=1
+    # The pressure controller owns this one bounded runtime overlay. Everything
+    # else in the installed workflow must remain byte-for-byte source-identical.
+    check_workflow "$WORKFLOW_SRC" "$WORKFLOW_DST" || rc=1
     check_one "$UNIT_SRC" "$UNIT_DST" || rc=1
     check_one "$RECONCILER_SRC" "$RECONCILER_DST" || rc=1
     check_one "$MODEL_ROUTER_SRC" "$MODEL_ROUTER_DST" || rc=1
