@@ -106,4 +106,123 @@ CREATE INDEX IF NOT EXISTS "investor_update_candidates_source_idx" ON "investor_
 CREATE INDEX IF NOT EXISTS "investor_update_delivery_events_approval_idx" ON "investor_update_delivery_events" USING btree ("approval_id","occurred_at");--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "investor_update_delivery_events_external_unique" ON "investor_update_delivery_events" USING btree ("approval_id","event_type","external_reference");--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "investor_update_drafts_period_unique" ON "investor_update_drafts" USING btree ("period_start");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "investor_update_final_approvals_draft_time_idx" ON "investor_update_final_approvals" USING btree ("draft_id","approved_at","id");
+CREATE INDEX IF NOT EXISTS "investor_update_final_approvals_draft_time_idx" ON "investor_update_final_approvals" USING btree ("draft_id","approved_at","id");--> statement-breakpoint
+ALTER TABLE "investor_update_drafts" ADD COLUMN "revision" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "investor_update_final_approvals" ADD COLUMN "draft_revision" integer NOT NULL;--> statement-breakpoint
+CREATE OR REPLACE FUNCTION "investor_update_advance_draft_revision"() RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+	target_draft_id uuid;
+BEGIN
+	IF TG_TABLE_NAME = 'investor_update_candidates' THEN
+		target_draft_id := NEW.draft_id;
+	ELSE
+		SELECT draft_id INTO target_draft_id
+		FROM investor_update_candidates
+		WHERE id = NEW.candidate_id;
+	END IF;
+
+	UPDATE investor_update_drafts
+	SET revision = revision + 1, updated_at = now()
+	WHERE id = target_draft_id;
+	RETURN NEW;
+END;
+$$;--> statement-breakpoint
+CREATE OR REPLACE FUNCTION "investor_update_version_subject_change"() RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+	IF NEW.subject IS DISTINCT FROM OLD.subject AND NEW.revision = OLD.revision THEN
+		NEW.revision := OLD.revision + 1;
+	END IF;
+	NEW.updated_at := now();
+	RETURN NEW;
+END;
+$$;--> statement-breakpoint
+CREATE OR REPLACE FUNCTION "investor_update_prevent_ledger_mutation"() RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+	RAISE EXCEPTION 'investor_update_append_only_violation' USING ERRCODE = '55000';
+END;
+$$;--> statement-breakpoint
+CREATE OR REPLACE FUNCTION "investor_update_validate_approval_snapshot"() RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+	current_revision integer;
+	provided_count integer;
+	provided_distinct_count integer;
+	latest_count integer;
+	candidate_count integer;
+BEGIN
+	SELECT revision INTO current_revision
+	FROM investor_update_drafts
+	WHERE id = NEW.draft_id
+	FOR SHARE;
+
+	IF current_revision IS NULL OR current_revision <> NEW.draft_revision THEN
+		RAISE EXCEPTION 'investor_update_revision_conflict' USING ERRCODE = '40001';
+	END IF;
+
+	IF jsonb_typeof(NEW.decision_record_ids) <> 'array' THEN
+		RAISE EXCEPTION 'investor_update_decision_snapshot_invalid' USING ERRCODE = '23514';
+	END IF;
+
+	SELECT count(*), count(DISTINCT decision_id)
+	INTO provided_count, provided_distinct_count
+	FROM jsonb_array_elements_text(NEW.decision_record_ids) AS ids(decision_id);
+
+	IF provided_count <> provided_distinct_count OR EXISTS (
+		SELECT 1
+		FROM jsonb_array_elements_text(NEW.decision_record_ids) AS ids(decision_id)
+		LEFT JOIN investor_update_candidate_decisions decision
+			ON decision.id::text = ids.decision_id
+		LEFT JOIN investor_update_candidates candidate
+			ON candidate.id = decision.candidate_id
+		WHERE decision.id IS NULL OR candidate.draft_id <> NEW.draft_id
+	) THEN
+		RAISE EXCEPTION 'investor_update_decision_snapshot_invalid' USING ERRCODE = '23514';
+	END IF;
+
+	WITH latest_decisions AS (
+		SELECT DISTINCT ON (decision.candidate_id) decision.id
+		FROM investor_update_candidate_decisions decision
+		JOIN investor_update_candidates candidate
+			ON candidate.id = decision.candidate_id
+		WHERE candidate.draft_id = NEW.draft_id
+		ORDER BY decision.candidate_id, decision.decided_at DESC, decision.id DESC
+	)
+	SELECT count(*) INTO latest_count FROM latest_decisions;
+	SELECT count(*) INTO candidate_count
+	FROM investor_update_candidates
+	WHERE draft_id = NEW.draft_id;
+
+	IF candidate_count <> latest_count OR latest_count <> provided_count OR EXISTS (
+		WITH latest_decisions AS (
+			SELECT DISTINCT ON (decision.candidate_id) decision.id
+			FROM investor_update_candidate_decisions decision
+			JOIN investor_update_candidates candidate
+				ON candidate.id = decision.candidate_id
+			WHERE candidate.draft_id = NEW.draft_id
+			ORDER BY decision.candidate_id, decision.decided_at DESC, decision.id DESC
+		)
+		SELECT 1
+		FROM latest_decisions latest
+		WHERE NOT (NEW.decision_record_ids ? latest.id::text)
+	) THEN
+		RAISE EXCEPTION 'investor_update_decision_snapshot_stale' USING ERRCODE = '23514';
+	END IF;
+
+	RETURN NEW;
+END;
+$$;--> statement-breakpoint
+CREATE TRIGGER "investor_update_draft_subject_revision" BEFORE UPDATE ON "investor_update_drafts" FOR EACH ROW EXECUTE FUNCTION "investor_update_version_subject_change"();--> statement-breakpoint
+CREATE TRIGGER "investor_update_candidate_revision" AFTER INSERT ON "investor_update_candidates" FOR EACH ROW EXECUTE FUNCTION "investor_update_advance_draft_revision"();--> statement-breakpoint
+CREATE TRIGGER "investor_update_decision_revision" AFTER INSERT ON "investor_update_candidate_decisions" FOR EACH ROW EXECUTE FUNCTION "investor_update_advance_draft_revision"();--> statement-breakpoint
+CREATE TRIGGER "investor_update_candidates_immutable" BEFORE UPDATE OR DELETE ON "investor_update_candidates" FOR EACH ROW EXECUTE FUNCTION "investor_update_prevent_ledger_mutation"();--> statement-breakpoint
+CREATE TRIGGER "investor_update_decisions_immutable" BEFORE UPDATE OR DELETE ON "investor_update_candidate_decisions" FOR EACH ROW EXECUTE FUNCTION "investor_update_prevent_ledger_mutation"();--> statement-breakpoint
+CREATE TRIGGER "investor_update_approval_snapshot_guard" BEFORE INSERT ON "investor_update_final_approvals" FOR EACH ROW EXECUTE FUNCTION "investor_update_validate_approval_snapshot"();--> statement-breakpoint
+CREATE TRIGGER "investor_update_approvals_immutable" BEFORE UPDATE OR DELETE ON "investor_update_final_approvals" FOR EACH ROW EXECUTE FUNCTION "investor_update_prevent_ledger_mutation"();--> statement-breakpoint
+CREATE TRIGGER "investor_update_delivery_events_immutable" BEFORE UPDATE OR DELETE ON "investor_update_delivery_events" FOR EACH ROW EXECUTE FUNCTION "investor_update_prevent_ledger_mutation"();

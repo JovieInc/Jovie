@@ -156,6 +156,8 @@ export const investorUpdateDrafts = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     periodStart: date('period_start', { mode: 'string' }).notNull(),
     subject: text('subject').notNull(),
+    /** Monotonic snapshot version. DB triggers advance it with every draft input mutation. */
+    revision: integer('revision').notNull().default(0),
     createdByUserId: text('created_by_user_id').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
@@ -278,6 +280,8 @@ export const investorUpdateFinalApprovals = pgTable(
     renderedCopy: text('rendered_copy').notNull(),
     copyHash: text('copy_hash').notNull(),
     snapshotFingerprint: text('snapshot_fingerprint').notNull(),
+    /** Draft revision held and verified by the approval insert trigger. */
+    draftRevision: integer('draft_revision').notNull(),
     decisionRecordIds: jsonb('decision_record_ids').$type<string[]>().notNull(),
     recipientSegments: jsonb('recipient_segments')
       .$type<InvestorUpdateRecipientSegment[]>()

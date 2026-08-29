@@ -776,7 +776,7 @@ jobs:
           fi
 
           # Drizzle paths
-          DRIZZLE_PATTERN='^(apps/web/drizzle/|apps/web/lib/db/|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts))'
+          DRIZZLE_PATTERN='^(apps/web/drizzle/|apps/web/lib/db/|apps/web/scripts/test-investor-update-ledger\.sh|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts))'
           if echo "$CHANGED_FILES" | grep -q -E "$DRIZZLE_PATTERN"; then
             echo "run_drizzle=true" >> "$GITHUB_OUTPUT"
           else
@@ -3398,6 +3398,45 @@ jobs:
           GIT_BRANCH: manual-${{ github.run_id }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
+  ci-investor-update-ledger:
+    name: Investor Update Ledger
+    needs: [ci-path-changes]
+    if: >-
+      always() &&
+      needs.ci-path-changes.result == 'success' &&
+      needs.ci-path-changes.outputs.run_drizzle == 'true' &&
+      (github.event_name == 'pull_request' || github.event_name == 'merge_group')
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_PASSWORD: jovie
+          POSTGRES_USER: jovie
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U jovie -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+
+      - name: Verify approval ledger invariants in PostgreSQL
+        env:
+          PGDATABASE: postgres
+          PGHOST: 127.0.0.1
+          PGPASSWORD: jovie
+          PGPORT: 5432
+          PGUSER: jovie
+          RUN_INVESTOR_UPDATE_DB_INTEGRATION: '1'
+        run: bash apps/web/scripts/test-investor-update-ledger.sh
+
   # Post-deploy smoke test -- deterministic curl checks against production.
   # Replaces the previous Playwright-based test that was flaky due to
   # dynamic content assertions, hydration timing, and excessive retries.
@@ -4919,6 +4958,7 @@ jobs:
         ci-secret-scan,
         ci-golden-path-lock,
         drizzle-migration-guard,
+        ci-investor-update-ledger,
       ]
     if: ${{ always() && github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
@@ -4943,6 +4983,7 @@ jobs:
           SECRET_RESULT="${{ needs.ci-secret-scan.result }}"
           GOLDEN_PATH_LOCK_RESULT="${{ needs.ci-golden-path-lock.result }}"
           MIGRATION_RESULT="${{ needs.drizzle-migration-guard.result }}"
+          INVESTOR_LEDGER_RESULT="${{ needs.ci-investor-update-ledger.result }}"
           NOOP_GROUP="${{ needs.ci-path-changes.outputs.is_noop_merge_group }}"
           RUN_JOVIE_PRODUCT="${{ needs.ci-path-changes.outputs.run_jovie_product }}"
           RUN_WEB="${{ needs.ci-path-changes.outputs.run_web }}"
@@ -4953,6 +4994,7 @@ jobs:
           SHARED_IMPACT="${{ needs.ci-path-changes.outputs.shared_contract_impact }}"
           RUN_PROMPTFOO="${{ needs.ci-path-changes.outputs.run_promptfoo_evals }}"
           RUN_GOLDEN_EVAL="${{ needs.ci-path-changes.outputs.run_golden_eval_set }}"
+          RUN_DRIZZLE="${{ needs.ci-path-changes.outputs.run_drizzle }}"
           {
             echo "### Merge group ready"
             echo
@@ -4980,6 +5022,7 @@ jobs:
             echo "| Secret Scan | $SECRET_RESULT |"
             echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT |"
             echo "| Migration Guard | $MIGRATION_RESULT |"
+            echo "| Investor Update Ledger | $INVESTOR_LEDGER_RESULT |"
             echo
             echo "Preview/A11y evidence is explicit opt-in or post-merge; merge groups do not provision Neon."
           } >> "$GITHUB_STEP_SUMMARY"
@@ -4999,6 +5042,15 @@ jobs:
               exit 1
             fi
           done
+
+          if [[ "$RUN_DRIZZLE" == "true" && "$INVESTOR_LEDGER_RESULT" != "success" ]]; then
+            echo "::error::Investor Update Ledger did not pass for a DB-changing combined head (result: $INVESTOR_LEDGER_RESULT)"
+            exit 1
+          fi
+          if [[ "$RUN_DRIZZLE" != "true" && "$INVESTOR_LEDGER_RESULT" != "skipped" ]]; then
+            echo "::error::Investor Update Ledger ran without DB path selection (result: $INVESTOR_LEDGER_RESULT)"
+            exit 1
+          fi
 
           if [[ "$NOOP_GROUP" == "true" ]]; then
             [ "$LANE_RECEIPT_RESULT" = skipped ] || { echo "::error::No-op receipt must skip."; exit 1; }
@@ -5054,7 +5106,7 @@ jobs:
     # GitHub's merge_group producer reuses the same required context name for
     # combined-head unit/build/layout evidence. Migration Guard, Fork PR Gate,
     # and PR Size Guard remain separately required ruleset contexts.
-    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-secret-scan, ci-golden-path-lock]
+    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-secret-scan, ci-golden-path-lock, ci-investor-update-ledger]
     if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -5070,6 +5122,8 @@ jobs:
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
           RISK_LEVEL="${{ needs.ci-risk-classifier.outputs.risk_level }}"
           RISK_RULES="${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}"
+          INVESTOR_LEDGER_RESULT="${{ needs.ci-investor-update-ledger.result }}"
+          RUN_DRIZZLE="${{ needs.ci-path-changes.outputs.run_drizzle }}"
 
           {
             echo "### PR Ready"
@@ -5083,6 +5137,7 @@ jobs:
             echo "| Secret Scan | $SECRET_SCAN_RESULT | \`./scripts/security/scan-secrets.sh ci-pr origin/main\` |"
             echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT | \`node scripts/golden-path-lock.mjs merge-gate\` |"
             echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
+            echo "| Investor Update Ledger | $INVESTOR_LEDGER_RESULT | isolated PostgreSQL ledger proof |"
             echo
             echo "Risk level: ${RISK_LEVEL:-low}; matched rules: ${RISK_RULES:-none}"
             echo "Heavy evidence is manual, scheduled, or event-driven and never starts from this source-PR gate."
@@ -5107,6 +5162,15 @@ jobs:
 
           if [[ "$FAST_RESULT" != "success" ]]; then
             echo "❌ ci-fast did not pass (result: $FAST_RESULT)"
+            exit 1
+          fi
+
+          if [[ "$RUN_DRIZZLE" == "true" && "$INVESTOR_LEDGER_RESULT" != "success" ]]; then
+            echo "❌ Investor Update Ledger did not pass for a DB-changing PR (result: $INVESTOR_LEDGER_RESULT)"
+            exit 1
+          fi
+          if [[ "$RUN_DRIZZLE" != "true" && "$INVESTOR_LEDGER_RESULT" != "skipped" ]]; then
+            echo "❌ Investor Update Ledger ran without DB path selection (result: $INVESTOR_LEDGER_RESULT)"
             exit 1
           fi
 

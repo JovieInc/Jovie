@@ -1,5 +1,5 @@
 {
-  "id": "241423e7-499d-4e26-9269-e0aec6308982",
+  "id": "1d2ac9b6-0577-43eb-af7f-5b9a1b98a316",
   "prevId": "55c99076-7cbc-41cd-985a-17109ac5c16c",
   "version": "7",
   "dialect": "postgresql",
@@ -14882,6 +14882,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
         "created_by_user_id": {
           "name": "created_by_user_id",
           "type": "text",
@@ -14964,6 +14971,12 @@
         "snapshot_fingerprint": {
           "name": "snapshot_fingerprint",
           "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "draft_revision": {
+          "name": "draft_revision",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },

@@ -80,6 +80,8 @@ trigger sending.
    - requires all candidates and all recipient roles to be decided;
    - fingerprints all candidates, latest decision records, exact rendered copy,
      ordered segments/count, and tracking settings;
+   - binds approval to a monotonic draft revision held under a database share
+     lock, so a concurrent candidate/decision mutation fails approval closed;
    - rejects tracking flags and exposes no send transition;
    - keeps receipt writes server-only until a trusted provider adapter can attest
      an opaque event reference and server-observed time.
@@ -101,6 +103,10 @@ trigger sending.
   remain null. There are no ownership, dilution, cap-table, or legal fields.
 - Candidate and ask records require a durable source record. A URL or prose note
   alone is not sufficient provenance.
+- Candidate facts, founder decisions, final approvals, and delivery observations
+  are append-only at the database boundary. Approval inserts also verify that the
+  supplied decision IDs are the current decision for every candidate in the
+  locked draft revision.
 - Tracking flags default to false and are rejected while the compliant-substrate
   capability constant is false.
 - Delivery events are server-only observations with opaque references. They do not
@@ -134,6 +140,8 @@ Meaningful tests must cover:
 - explicit inclusion/exclusion of every recipient role and exact count agreement;
 - tracking-off enforcement and absence of a send action;
 - exact-copy/hash mismatch and approval expiry;
+- concurrent draft mutation, final revision readback, and immutable approval-ledger
+  behavior;
 - provider acceptance timing, future-event rejection, and downstream receipt chain;
 - known/estimated/unknown contribution validation;
 - API admin gating and mutation input validation;

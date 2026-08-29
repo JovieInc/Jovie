@@ -3,6 +3,7 @@ import 'server-only';
 import { createHash, randomUUID } from 'node:crypto';
 import { and, desc, eq, inArray, lte } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { getDeepErrorMessage } from '@/lib/db/errors';
 import { users } from '@/lib/db/schema/auth';
 import {
   investorUpdateCandidateDecisions,
@@ -161,6 +162,13 @@ export async function loadInvestorUpdateReviewState(): Promise<InvestorUpdateRev
         .where(eq(investorUpdateDeliveryEvents.approvalId, approval.id))
         .orderBy(desc(investorUpdateDeliveryEvents.occurredAt))
     : [];
+  const [latestDraftVersion] = await db
+    .select({ revision: investorUpdateDrafts.revision })
+    .from(investorUpdateDrafts)
+    .where(eq(investorUpdateDrafts.id, current.draft.id))
+    .limit(1);
+  const draftVersionUnchanged =
+    latestDraftVersion?.revision === current.draft.revision;
 
   return {
     draft: {
@@ -184,6 +192,8 @@ export async function loadInvestorUpdateReviewState(): Promise<InvestorUpdateRev
           approvedAt: toIso(approval.approvedAt),
           expiresAt: toIso(approval.expiresAt),
           matchesCurrentDraft:
+            draftVersionUnchanged &&
+            approval.draftRevision === current.draft.revision &&
             composition.pendingCandidateIds.length === 0 &&
             approval.snapshotFingerprint ===
               approvalFingerprint({
@@ -387,22 +397,38 @@ export async function approveInvestorUpdateSnapshot(input: {
     recipientCount: snapshot.recipientCount,
     trackingSettings: snapshot.trackingSettings,
   });
-  const [approval] = await db
-    .insert(investorUpdateFinalApprovals)
-    .values({
-      draftId: current.draft.id,
-      renderedCopy: snapshot.renderedCopy,
-      copyHash: hashCopy(snapshot.renderedCopy),
-      snapshotFingerprint: fingerprint,
-      decisionRecordIds,
-      recipientSegments: [...snapshot.segments],
-      recipientCount: snapshot.recipientCount,
-      trackingSettings: snapshot.trackingSettings,
-      approvedByUserId: input.userId,
-      approvedAt: now,
-      expiresAt: new Date(now.getTime() + INVESTOR_UPDATE_APPROVAL_TTL_MS),
-    })
-    .returning({ id: investorUpdateFinalApprovals.id });
+  let approval: { id: string } | undefined;
+  try {
+    [approval] = await db
+      .insert(investorUpdateFinalApprovals)
+      .values({
+        draftId: current.draft.id,
+        renderedCopy: snapshot.renderedCopy,
+        copyHash: hashCopy(snapshot.renderedCopy),
+        snapshotFingerprint: fingerprint,
+        draftRevision: current.draft.revision,
+        decisionRecordIds,
+        recipientSegments: [...snapshot.segments],
+        recipientCount: snapshot.recipientCount,
+        trackingSettings: snapshot.trackingSettings,
+        approvedByUserId: input.userId,
+        approvedAt: now,
+        expiresAt: new Date(now.getTime() + INVESTOR_UPDATE_APPROVAL_TTL_MS),
+      })
+      .returning({ id: investorUpdateFinalApprovals.id });
+  } catch (error) {
+    const message = getDeepErrorMessage(error);
+    if (
+      message.includes('investor_update_revision_conflict') ||
+      message.includes('investor_update_decision_snapshot_stale')
+    ) {
+      throw new InvestorUpdateWorkflowError(
+        'approval_invalid',
+        'The draft changed during approval. Review the latest copy and approve again.'
+      );
+    }
+    throw error;
+  }
   if (!approval) {
     throw new InvestorUpdateWorkflowError(
       'approval_invalid',
