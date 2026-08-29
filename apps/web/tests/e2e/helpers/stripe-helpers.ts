@@ -312,6 +312,21 @@ export async function fillStripeInput(
 
 /** Complete card payment in the Stripe checkout page. */
 export async function completeCardPayment(page: Page, card: CardDetails) {
+  const cardPaymentMethod = page
+    .getByRole('radio', { name: /card/i })
+    .filter({ visible: true })
+    .first();
+  await expect(cardPaymentMethod).toBeVisible({ timeout: 15_000 });
+  await cardPaymentMethod.check();
+
+  const phoneInput = page
+    .locator('input[name="phoneNumber"]')
+    .filter({ visible: true })
+    .first();
+  if (await phoneInput.isVisible()) {
+    await phoneInput.fill('+14155550123');
+  }
+
   await fillStripeInput(page, 'input[name="cardnumber"]', card.number);
   await fillStripeInput(page, 'input[name="exp-date"]', card.exp);
   await fillStripeInput(page, 'input[name="cvc"]', card.cvc);
