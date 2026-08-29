@@ -89,10 +89,24 @@ describe('cross-surface UI ownership registry', () => {
     expect(item('molecule.profile-primary-cta').visibleControlGeometry).toEqual(
       { visiblePx: 32, hitTargetPx: 44, appliesTo: 'marketing-control' }
     );
+    const iconButton = item('atom.icon-button');
+    expect(iconButton.sourceAuthority).toEqual({
+      registry: 'design-system',
+      id: 'atom.icon-button',
+    });
+    expect(iconButton.canonicalOwner).toEqual({
+      sourcePath: 'packages/ui/atoms/icon-button.tsx',
+      exportName: 'IconButton',
+      registryId: 'atom.icon-button',
+    });
+    expect(iconButton.duplicateAliases).toEqual(
+      expect.arrayContaining(['OverflowMenuTrigger', 'RailToggleButton'])
+    );
+    expect(iconButton.requiredStates).toContain('pressed');
     const nativeButtonBindings = item('atom.button').platformAdapters.find(
       adapter => adapter.platform === 'ios'
     )?.nativeBindings;
-    const nativeIconBindings = item('atom.icon-button').platformAdapters.find(
+    const nativeIconBindings = iconButton.platformAdapters.find(
       adapter => adapter.platform === 'ios'
     )?.nativeBindings;
     expect(nativeButtonBindings).toMatchObject([
