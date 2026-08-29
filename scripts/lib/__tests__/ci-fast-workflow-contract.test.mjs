@@ -202,6 +202,36 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
+  it('fails closed onto structural UI gates for every web UI source and guard', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const structuralDecision = remaining.slice(
+      remaining.indexOf('- name: Decide structural lane'),
+      remaining.indexOf('- name: Install actionlint')
+    );
+
+    for (const requiredPath of [
+      'apps/web/app/.*\\.(tsx|css)$',
+      'apps/web/components/',
+      'apps/web/styles/',
+      'packages/ui/',
+      'DESIGN\\.md$',
+      'design\\.tokens\\.json$',
+      'scripts/(component-',
+      'screen-certification',
+      'story-coverage',
+      'ui-story-coverage',
+      'scripts/lib/__tests__/(component-',
+    ]) {
+      expect(structuralDecision).toContain(requiredPath);
+    }
+    expect(structuralDecision).toContain(
+      'grep -qE "$STRUCTURAL_CONTROL_PATTERN|$STRUCTURAL_UI_PATTERN"'
+    );
+  });
+
   it('runs the lockfile specifier preflight before expensive fast lanes', () => {
     const preflight = jobBlock('ci-lockfile-preflight', 'ci-path-changes');
     expect(preflight).toContain('name: Lockfile Specifier Preflight');
@@ -414,12 +444,14 @@ describe('ci-fast bounded parallel workflow', () => {
       'ci-fast-remaining',
       'ci-profile-admission-browser'
     );
-    const selectorPattern = remaining.match(
-      /git diff --name-only[^\n]*\|\s*grep -qE '([^']+)'/
+    const controlPattern = remaining.match(
+      /STRUCTURAL_CONTROL_PATTERN='([^']+)'/
     )?.[1];
-    expect(selectorPattern).toBeDefined();
+    const uiPattern = remaining.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
+    expect(controlPattern).toBeDefined();
+    expect(uiPattern).toBeDefined();
 
-    const selectsStructural = new RegExp(selectorPattern);
+    const selectsStructural = new RegExp(`${controlPattern}|${uiPattern}`);
     expect(
       selectsStructural.test(
         'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs'
@@ -435,6 +467,14 @@ describe('ci-fast bounded parallel workflow', () => {
     ).toBe(false);
     expect(selectsStructural.test('.github/workflows/ci.yml')).toBe(true);
     expect(selectsStructural.test('.claude/rules/ci-branching.md')).toBe(true);
+    expect(selectsStructural.test('apps/web/components/atoms/Button.tsx')).toBe(
+      true
+    );
+    expect(selectsStructural.test('apps/web/app/(home)/page.tsx')).toBe(true);
+    expect(selectsStructural.test('packages/ui/atoms/badge.tsx')).toBe(true);
+    expect(selectsStructural.test('scripts/component-ship-gate.mjs')).toBe(
+      true
+    );
     expect(selectsStructural.test('.claude/skills/qa/SKILL.md')).toBe(false);
     expect(selectsStructural.test('.claude/rules/auth.md')).toBe(false);
   });

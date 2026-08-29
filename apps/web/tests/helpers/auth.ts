@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page, type Route } from '@playwright/test';
+import { expect, type Page, type Route } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { getDeterministicDevTestAuthPersonaUserId } from '@/lib/auth/dev-test-auth-identity';
 import type { DevTestAuthPersona } from '@/lib/auth/dev-test-auth-types';
