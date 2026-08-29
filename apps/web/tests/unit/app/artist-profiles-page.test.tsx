@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -244,6 +246,17 @@ async function renderArtistProfileLandingPage(
 }
 
 describe('ArtistProfilesPage', () => {
+  it('asserts the exact ArtistProfileLandingPage source', () => {
+    expect(
+      readFileSync(
+        resolve(
+          process.cwd(),
+          'components/marketing/artist-profile/ArtistProfileLandingPage.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileLandingPage');
+  });
   it('exports the static artist-profiles SEO contract and renders through the marketing shell', async () => {
     const {
       default: ArtistProfilesPage,

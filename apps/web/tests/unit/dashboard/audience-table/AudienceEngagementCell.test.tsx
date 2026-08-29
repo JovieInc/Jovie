@@ -1,7 +1,7 @@
 import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { AudienceEngagementCell } from '@/components/organisms/table';
+import { AudienceEngagementCell } from '@/components/organisms/table/atoms/AudienceEngagementCell';
 
 function renderWithTooltip(ui: React.ReactElement) {
   return render(<TooltipProvider>{ui}</TooltipProvider>);

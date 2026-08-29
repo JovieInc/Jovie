@@ -2,7 +2,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { checkChangedComponents } from '../../component-ship-gate.mjs';
+import {
+  auditCoverageViaReceipts,
+  checkChangedComponents,
+} from '../../component-ship-gate.mjs';
 import {
   checkStoryMatchesComponent,
   extractRequiredPropNames,
@@ -455,6 +458,82 @@ describe('diff gate', () => {
     expect(result.issues.some(issue => issue.rule === 'missing-story')).toBe(
       true
     );
+  });
+});
+
+describe('coverage-via executable evidence', () => {
+  const viaSourceRel = 'apps/web/components/marketing/via/ViaPanel.tsx';
+  const viaTestRel = 'apps/web/tests/unit/marketing/ViaPanel.test.tsx';
+  const viaStoryRel = 'apps/web/components/marketing/via/ViaPanel.stories.tsx';
+  const viaComponentSource = [
+    `// @coverage-via ${viaTestRel}`,
+    'export function ViaPanel() { return <div /> }',
+  ].join('\n');
+  const viaStorySource = [
+    "import { ViaPanel } from './ViaPanel';",
+    'export default { component: ViaPanel };',
+    'export const Default = {};',
+  ].join('\n');
+
+  function coverageViaResult(testSource) {
+    const root = fixtureRepo({
+      [viaSourceRel]: viaComponentSource,
+      [viaTestRel]: testSource,
+      [viaStoryRel]: viaStorySource,
+    });
+    return checkChangedComponents([viaSourceRel, viaTestRel, viaStoryRel], {
+      repoRoot: root,
+    });
+  }
+
+  it.each([
+    [
+      'a commented import',
+      [
+        "// import { ViaPanel } from '@/components/marketing/via/ViaPanel';",
+        'void ViaPanel;',
+      ].join('\n'),
+    ],
+    [
+      'a name mention without an exact import',
+      [
+        "const note = 'ViaPanel lives in marketing/via/ViaPanel';",
+        'expect(note).toContain("ViaPanel");',
+      ].join('\n'),
+    ],
+  ])('rejects %s as @coverage-via evidence', (_case, testSource) => {
+    const result = coverageViaResult(testSource);
+    expect(result.ok).toBe(false);
+    expect(
+      result.issues.some(issue => issue.rule === 'coverage-via-invalid')
+    ).toBe(true);
+  });
+
+  it('accepts an exact import that exercises the component', () => {
+    const result = coverageViaResult(
+      [
+        "import { ViaPanel } from '@/components/marketing/via/ViaPanel';",
+        'void ViaPanel;',
+      ].join('\n')
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts an asserted exact node:fs source read', () => {
+    const result = coverageViaResult(
+      [
+        "import { readFileSync } from 'node:fs';",
+        "const source = readFileSync('apps/web/components/marketing/via/ViaPanel.tsx', 'utf8');",
+        "expect(source).toContain('ViaPanel');",
+      ].join('\n')
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it('has zero invalid existing coverage-via receipts', () => {
+    const audit = auditCoverageViaReceipts();
+    expect(audit.invalid).toEqual([]);
+    expect(audit.ok).toBe(true);
   });
 });
 
