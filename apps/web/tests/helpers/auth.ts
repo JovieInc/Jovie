@@ -1,4 +1,4 @@
-import { expect, type Page, type Route } from '@playwright/test';
+import { expect, type Locator, type Page, type Route } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { getDeterministicDevTestAuthPersonaUserId } from '@/lib/auth/dev-test-auth-identity';
 import type { DevTestAuthPersona } from '@/lib/auth/dev-test-auth-types';
@@ -283,16 +283,19 @@ export async function prepareBetterAuthEmailOtp(
   });
 
   const emailInput = page.getByLabel('Email Address');
-  const continueButton = page.getByRole('button', {
-    name: 'Continue with Email',
+  const emailSubmitButton = page.getByRole('button', {
+    name:
+      options.entryPath === '/signup'
+        ? 'Continue with Email'
+        : 'Email me a Code',
   });
   await fillControlledInputUntilEnabled(
     emailInput,
-    continueButton,
+    emailSubmitButton,
     options.email,
     timeout
   );
-  await continueButton.click();
+  await emailSubmitButton.click();
   await expect(page.locator('[data-auth-email-code-step="code"]')).toBeVisible({
     timeout,
   });

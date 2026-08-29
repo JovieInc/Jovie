@@ -218,13 +218,19 @@ describe('ci-fast bounded parallel workflow', () => {
     for (const requiredPath of [
       'apps/web/app/.*\\.(tsx|css)$',
       'apps/web/components/',
-      'apps/web/styles/',
+      'apps/web/\\.storybook/',
+      'apps/web/package\\.json$',
+      'apps/web/scripts/',
       'apps/web/tests/',
+      'apps/web/styles/',
       'packages/ui/',
+      'chromatic\\.config\\.json$',
+      'package\\.json$',
       'DESIGN\\.md$',
       'design\\.tokens\\.json$',
       'scripts/(component-',
       'screen-certification',
+      'shared-ui-visual-arbitrary',
       'story-coverage',
       'ui-story-coverage',
       'scripts/lib/__tests__/(component-',
@@ -491,6 +497,57 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(new RegExp(uiPattern).test('packages/ui/atoms/badge.test.tsx')).toBe(
       true
     );
+    for (const receiptRepairPath of [
+      'apps/web/tests/components/organisms/RightDrawer.interaction.test.tsx',
+      'apps/web/tests/unit/marketing/component-registry.test.ts',
+      'apps/web/tests/unit/marketing/support-route-header-contract.test.ts',
+      'apps/web/tests/e2e/utils/public-surface-manifest.ts',
+    ]) {
+      expect(selectsStructural.test(receiptRepairPath)).toBe(true);
+    }
+    // These paths feed the live rendered component harness, not just the
+    // shadow UI-story audit; a harness change must not skip runStructural.
+    for (const storybookHarnessPath of [
+      'apps/web/.storybook/main.ts',
+      'apps/web/.storybook/preview.tsx',
+      'apps/web/.storybook/stories/elevation-matrix.stories.tsx',
+      'chromatic.config.json',
+    ]) {
+      expect(selectsStructural.test(storybookHarnessPath)).toBe(true);
+    }
+    for (const tokenAuditPath of [
+      'scripts/shared-ui-visual-arbitrary-audit.mjs',
+      'scripts/shared-ui-visual-arbitrary-audit.test.mjs',
+      'scripts/shared-ui-visual-arbitrary.baseline.json',
+    ]) {
+      expect(selectsStructural.test(tokenAuditPath)).toBe(true);
+    }
+    for (const directStructuralInput of [
+      'package.json',
+      'apps/web/package.json',
+      'apps/web/scripts/check-reliability-detectors.ts',
+      'apps/web/scripts/lint-contrast-ratchet.mjs',
+      'apps/web/scripts/lint-no-native-dialogs.mjs',
+      'apps/web/scripts/next-proxy-guard.mjs',
+      'apps/web/scripts/seo-ratchet-guard.mjs',
+      'apps/web/scripts/tailwind-guard.mjs',
+      'scripts/doc-freshness-lint.mjs',
+    ]) {
+      expect(selectsStructural.test(directStructuralInput)).toBe(true);
+    }
+    for (const nonUiPath of [
+      'apps/web/app/api/health/deploy/route.ts',
+      'apps/web/data/designSystem/componentRegistry.ts',
+      'apps/web/lib/queries/useDashboardProfileQuery.ts',
+      'apps/web/scripts/test-performance-guard.ts',
+      'docs/design-system/design-conformance-manifest.json',
+      'docs/product/README.md',
+      'apps/web/storybook/main.ts',
+      'chromatic.config.json.bak',
+      'apps/web/tests-not-centralized/unit/foo.test.ts',
+    ]) {
+      expect(selectsStructural.test(nonUiPath)).toBe(false);
+    }
     expect(selectsStructural.test('.claude/skills/qa/SKILL.md')).toBe(false);
     expect(selectsStructural.test('.claude/rules/auth.md')).toBe(false);
   });

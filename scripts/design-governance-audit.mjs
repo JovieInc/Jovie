@@ -12,7 +12,7 @@
  *   6. code-style.md custom-rule count matches eslint.config.js.
  *   7. DESIGN_COMPLETE.md carries a superseded banner.
  *   8. Design-agent invariants project from canon/invariants.jsonl only.
- *   9. Shared-UI visual arbitrary values are shrink-only (JOV-5434).
+ *   9. Shared-UI visual arbitrary values are shrink-only (JOV-5437).
  *  10. Shadcn/Typeset outcome inventory is fail-closed (JOV-5438).
  *
  * Invariant consumer: JOV-INV-019.

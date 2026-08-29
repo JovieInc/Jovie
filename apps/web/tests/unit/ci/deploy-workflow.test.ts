@@ -3086,10 +3086,17 @@ describe('CI E2E smoke workflow', () => {
       resolve(repoRoot, 'apps/web/tests/e2e/golden-path.spec.ts'),
       'utf8'
     );
+    const moneyPathSpec = readFileSync(
+      resolve(repoRoot, 'apps/web/tests/e2e/money-path-persistence.spec.ts'),
+      'utf8'
+    );
     const authHelper = readFileSync(
       resolve(repoRoot, 'apps/web/tests/helpers/auth.ts'),
       'utf8'
     );
+    const packageJson = JSON.parse(
+      readFileSync(resolve(repoRoot, 'apps/web/package.json'), 'utf8')
+    ) as { scripts: Record<string, string> };
     const releasesActions = readFileSync(
       resolve(
         repoRoot,
@@ -3112,6 +3119,21 @@ describe('CI E2E smoke workflow', () => {
     expect(goldenPathStep).toContain('export CHAT_LLM_FAILURE_INJECTION=1');
     expect(goldenPathStep).toContain('export PUBLIC_NOAUTH_SMOKE=1');
     expect(goldenPathStep).not.toContain('E2E_USE_TEST_AUTH_BYPASS');
+    expect(goldenPathStep).toContain(
+      'STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}'
+    );
+    expect(goldenPathStep).toContain(
+      'STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}'
+    );
+    expect(goldenPathStep).toContain(
+      'STRIPE_PRICE_PRO_MONTHLY: ${{ secrets.STRIPE_PRICE_PRO_MONTHLY }}'
+    );
+    expect(packageJson.scripts['test:e2e:golden-path:ci']).toContain(
+      'tests/e2e/golden-path.spec.ts'
+    );
+    expect(packageJson.scripts['test:e2e:golden-path:ci']).toContain(
+      'tests/e2e/money-path-persistence.spec.ts'
+    );
     expect(goldenPathSpec).toContain(
       "process.env.E2E_USE_TEST_AUTH_BYPASS === '1'"
     );
@@ -3123,6 +3145,9 @@ describe('CI E2E smoke workflow', () => {
     expect(authHelper).toContain(
       "const signInRoute = '**/api/auth/sign-in/email-otp'"
     );
+    expect(authHelper).toContain("options.entryPath === '/signup'");
+    expect(authHelper).toContain("'Continue with Email'");
+    expect(authHelper).toContain("'Email me a Code'");
     const routeFetchIndex = authHelper.indexOf(
       'response = await route.fetch()'
     );
@@ -3170,6 +3195,13 @@ describe('CI E2E smoke workflow', () => {
     expect(goldenPathSpec).toContain(
       'resetAuthStatePreservingOnboardingSession(page.context())'
     );
+    expect(moneyPathSpec).toContain('getRequiredStripeTestContext()');
+    expect(moneyPathSpec).toContain('materializeTestCheckoutCompletion(');
+    expect(moneyPathSpec).toContain("'checkout.session.completed'");
+    expect(moneyPathSpec).toContain('invalidResponse.status()).toBe(400)');
+    expect(moneyPathSpec).toContain('deleteRunOwnedStripeCustomer(');
+    expect(moneyPathSpec).not.toContain('completeCardPayment(');
+    expect(moneyPathSpec).not.toContain('ensureUserIsFree');
     expect(goldenPathSpec).not.toContain('ensureSpotifyUrlOnProfile');
     expect(goldenPathSpec).not.toContain(
       'SET spotify_id = NULL, spotify_url = NULL'

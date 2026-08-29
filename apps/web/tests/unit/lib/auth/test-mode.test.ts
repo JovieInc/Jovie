@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getDeterministicDevTestAuthPersonaUserId } from '@/lib/auth/dev-test-auth-identity';
+import {
+  getDeterministicDevTestAuthPersonaUserId,
+  getDeterministicTestBetterAuthUserId,
+} from '@/lib/auth/dev-test-auth-identity';
 import {
   DEFAULT_TEST_CREATOR_USER_ID,
   isTestAuthBypassEnabled,
@@ -142,6 +145,14 @@ describe('test-mode auth bypass', () => {
     ).toBe(DEFAULT_TEST_CREATOR_USER_ID);
     expect(DEFAULT_TEST_CREATOR_USER_ID).toBe(
       getDeterministicDevTestAuthPersonaUserId('creator')
+    );
+  });
+
+  it('derives the admin UUID from the configured admin email', () => {
+    const adminEmail = 'configured-admin@example.test';
+
+    expect(getDeterministicDevTestAuthPersonaUserId('admin', adminEmail)).toBe(
+      getDeterministicTestBetterAuthUserId(adminEmail)
     );
   });
 
