@@ -15,6 +15,8 @@ export {
   validateDesignSystemCompatibilityConsumerSource,
   validateDesignSystemComponentRegistry,
 } from './componentRegistry';
+export * from './interactionRegistry';
+export * from './interactionRegistryValidation';
 export type {
   ButtonPenPropagationFixture,
   ButtonPenRefInput,
