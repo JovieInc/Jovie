@@ -155,6 +155,7 @@ describe('Badge', () => {
       expect(badge.className).toContain('text-xs');
       expect(badge.className).toContain('leading-5');
       expect(badge.className).toContain('px-2');
+      expect(badge.className).toContain('leading-5');
     });
 
     it('applies sm size', () => {

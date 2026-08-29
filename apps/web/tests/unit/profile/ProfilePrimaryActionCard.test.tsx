@@ -4,7 +4,7 @@ import {
   ProfilePrimaryActionCard,
   type ProfilePrimaryActionCardRelease,
   resolveProfilePrimaryActionCardState,
-} from '@/features/profile/ProfilePrimaryActionCard';
+} from '@/components/features/profile/ProfilePrimaryActionCard';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist } from '@/types/db';
 

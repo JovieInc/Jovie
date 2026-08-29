@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { type ReactNode, useMemo } from 'react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { ReleaseCountdown } from '@/components/features/release/ReleaseCountdown';
-import { profileSecondaryPillClassName } from '@/features/profile/artist-notifications-cta/shared';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
 import {
   startOfProfileSurfaceLocalDay as startOfLocalDay,
@@ -439,8 +438,8 @@ function ListenCard({
 }
 
 const CTA_PILL_CLASS_NAME = cn(
-  profileSecondaryPillClassName,
-  'h-7 rounded-full border-white/14 bg-white dark:bg-surface-1 text-2xs font-semibold text-black dark:text-white shadow-[0_10px_24px_rgba(255,255,255,0.16)] hover:bg-white dark:bg-surface-1 hover:text-black dark:text-white'
+  'inline-flex h-7 items-center justify-center rounded-full border border-white/14 bg-white dark:bg-surface-1 px-5 text-2xs font-semibold text-black dark:text-white shadow-[0_10px_24px_rgba(255,255,255,0.16)]',
+  'group-hover:bg-white dark:group-hover:bg-surface-1 group-hover:text-black dark:group-hover:text-white'
 );
 
 function getReleaseArtistNames(

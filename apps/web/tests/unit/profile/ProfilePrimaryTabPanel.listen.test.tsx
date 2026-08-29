@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { ProfilePrimaryTabPanel } from '@/features/profile/ProfilePrimaryTabPanel';
+import { ProfilePrimaryTabPanel } from '@/components/features/profile/ProfilePrimaryTabPanel';
 import type { AvailableDSP } from '@/lib/dsp';
 import type { Artist } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
@@ -150,5 +150,29 @@ describe('ProfilePrimaryTabPanel listen mode', () => {
     expect(screen.queryByText('Latest release')).not.toBeInTheDocument();
     expect(screen.queryByText('Releases')).not.toBeInTheDocument();
     expect(screen.queryByTestId('mock-releases-view')).not.toBeInTheDocument();
+  });
+
+  it('keeps the preview music CTA at 32px inside a 44px target', () => {
+    render(
+      <ProfilePrimaryTabPanel
+        mode='listen'
+        artist={artist}
+        dsps={dsps}
+        isSubscribed={false}
+        contentPrefs={contentPrefs}
+        onTogglePref={vi.fn()}
+        onUnsubscribe={vi.fn()}
+        isUnsubscribing={false}
+        releases={[]}
+        renderMode='preview'
+      />
+    );
+
+    const alertsCta = screen.getByRole('button', {
+      name: 'Turn On Music Alerts',
+    });
+    expect(alertsCta).toHaveClass('h-8');
+    expect(alertsCta.className).toContain('before:h-11');
+    expect(alertsCta.className).toContain('before:min-w-11');
   });
 });
