@@ -77,8 +77,8 @@ describe('Kbd', () => {
       expect(kbd.className).toContain('py-px');
       expect(kbd.className).toContain('leading-none');
       expect(kbd.className).toContain('font-mono');
-      expect(kbd.className).toContain('text-[11px]');
-      expect(kbd.className).toContain('font-[510]');
+      expect(kbd.className).toContain('text-2xs');
+      expect(kbd.className).toContain('font-medium');
       expect(kbd.className).toContain('shadow-sm');
     });
 

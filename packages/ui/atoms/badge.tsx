@@ -3,7 +3,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 
 const badgeVariants = cva(
-  'inline-flex max-w-full items-center gap-1 rounded-full border border-transparent align-middle whitespace-nowrap px-2 py-0.5 text-[12px] font-[510] tracking-[-0.006em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)/30 focus-visible:ring-offset-1',
+  'inline-flex max-w-full items-center gap-1 rounded-full border border-transparent align-middle whitespace-nowrap px-2 py-0.5 text-xs font-medium tracking-[-0.006em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)/30 focus-visible:ring-offset-1',
   {
     variants: {
       variant: {
@@ -24,8 +24,8 @@ const badgeVariants = cva(
         error: 'border-error/20 bg-(--color-error-subtle) text-error',
       },
       size: {
-        sm: 'px-1.5 py-0 text-[10px] leading-[18px]',
-        md: 'px-2 py-0.5 text-[12px] leading-[20px]',
+        sm: 'px-1.5 py-0 text-3xs leading-[18px]',
+        md: 'px-2 py-0.5 text-xs leading-[20px]',
         lg: 'px-2.5 py-0.5 text-xs',
         xl: 'px-3 py-1 text-xs',
       },

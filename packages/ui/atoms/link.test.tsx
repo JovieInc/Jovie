@@ -16,6 +16,8 @@ describe('Link', () => {
     expect(link).toHaveAttribute('data-variant', 'link');
     expect(link).toHaveAttribute('data-appearance', 'default');
     expect(link).toHaveAttribute('data-state', 'idle');
+    expect(link.className).toContain('text-app');
+    expect(link.className).toContain('font-medium');
     expect(link.className).toContain('text-(--color-link-default)');
     expect(link.className).toContain('visited:text-(--color-link-visited)');
   });
@@ -141,7 +143,7 @@ describe('Link', () => {
 
     const link = screen.getByTestId('override-link');
     expect(link.className).toContain('text-sm');
-    expect(link.className).not.toContain('text-[13px]');
+    expect(link.className).not.toContain('text-app');
   });
 
   it('omits variant classes when variant is null (composition escape hatch)', () => {
