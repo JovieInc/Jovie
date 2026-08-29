@@ -138,6 +138,8 @@ jobs:
           recover_holds=0
           deferred_release=0
           reconcile_queue_reentry=0
+          admission_disposition='neutral'
+          admission_reason='event-maintenance'
 
           case "$EVENT_NAME" in
             pull_request)
@@ -145,6 +147,8 @@ jobs:
               if [[ "$base_ref" == "main" ]]; then
                 pr_number="$(jq -er '.pull_request.number | tostring' "$GITHUB_EVENT_PATH")"
                 head_sha="$(jq -er '.pull_request.head.sha | ascii_downcase | select(test("^[0-9a-f]{40}$"))' "$GITHUB_EVENT_PATH")"
+                admission_disposition='candidate'
+                admission_reason='pull-request-exact-head'
                 # A `queue-deferred` unlabeled event is special only when the
                 # canonical Jovie App actor emitted it. The drain still reads
                 # a fresh exact-head controller release receipt before native
@@ -159,6 +163,7 @@ jobs:
                 fi
               else
                 echo "PR targets $base_ref, not main; maintenance-only"
+                admission_reason='non-main-base'
               fi
               ;;
             workflow_run)
@@ -169,9 +174,11 @@ jobs:
               if [[ "$workflow_path" == ".github/workflows/production-controller.yml" ]]; then
                 echo "Production Controller completed; maintenance-only exact fleet-hold recovery signal"
                 [[ "$workflow_conclusion" == "success" ]] && recover_holds=1
+                admission_reason='production-controller-reconcile'
                 head_sha=''
               elif [[ "$workflow_path" != ".github/workflows/ci.yml" || "$workflow_conclusion" != "success" ]]; then
                 echo "CI workflow_run is not a terminal success; maintenance-only"
+                admission_reason='ci-not-successful'
                 head_sha=''
               else
                 prs_json="$(gh pr list -R "$REPO" --state open --limit 200 --json number,headRefOid,baseRefName,isDraft)"
@@ -188,8 +195,11 @@ jobs:
                   live_pr="$(jq -c --argjson number "${matching_prs[0]}" '.[] | select(.number == $number)' <<<"$prs_json")"
                   if [[ "$(jq -r '.isDraft' <<<"$live_pr")" == "false" ]]; then
                     pr_number="${matching_prs[0]}"
+                    admission_disposition='candidate'
+                    admission_reason='ci-success-exact-head'
                   else
                     echo "PR #${matching_prs[0]} is draft; maintenance-only"
+                    admission_reason='draft-ineligible'
                     head_sha=''
                   fi
                 else
@@ -203,7 +213,12 @@ jobs:
                     && "$(jq -r '.workflow_run.event // empty' "$GITHUB_EVENT_PATH")" == "merge_group" \
                     && "$workflow_conclusion" == "success" ]]; then
                     reconcile_queue_reentry=1
+                    admission_reason='composite-merge-group'
                     echo 'Composite merge-group CI completed; bounded exact-head re-entry recovery enabled'
+                  elif [[ "${#matching_prs[@]}" -eq 0 ]]; then
+                    admission_reason='superseded-ref'
+                  else
+                    admission_reason='ambiguous-ref'
                   fi
                   head_sha=''
                 fi
@@ -212,9 +227,12 @@ jobs:
             workflow_dispatch)
               if [[ -z "$MANUAL_PR" && -z "$MANUAL_HEAD" ]]; then
                 echo 'Untargeted manual dispatch; no primary target (bounded reconciliation remains enabled)'
+                admission_reason='manual-maintenance'
               elif [[ "$MANUAL_PR" =~ ^[1-9][0-9]*$ && "${MANUAL_HEAD,,}" =~ ^[0-9a-f]{40}$ ]]; then
                 pr_number="$MANUAL_PR"
                 head_sha="${MANUAL_HEAD,,}"
+                admission_disposition='candidate'
+                admission_reason='manual-exact-head'
               else
                 echo '::error::Targeted manual admission requires pr_number and an exact 40-character head_sha' >&2
                 exit 2
@@ -222,6 +240,7 @@ jobs:
               ;;
             push)
               echo 'Main push; no primary target (bounded reconciliation remains enabled)'
+              admission_reason='main-push-reconcile'
               ;;
             *)
               echo "::error::Unsupported admission event: $EVENT_NAME" >&2
@@ -229,7 +248,19 @@ jobs:
               ;;
           esac
 
+          if [[ "$admission_disposition" == 'neutral' ]]; then
+            # Typed-neutral events can run bounded maintenance, but can never
+            # carry an admission target into the mutating drain.
+            pr_number=''
+            head_sha=''
+          elif [[ "$admission_disposition" != 'candidate' || -z "$pr_number" || -z "$head_sha" ]]; then
+            echo "::error::Invalid admission scope: disposition=$admission_disposition reason=$admission_reason" >&2
+            exit 2
+          fi
+
           {
+            echo "disposition=$admission_disposition"
+            echo "reason=$admission_reason"
             echo "pr_number=$pr_number"
             echo "head_sha=$head_sha"
             echo "recover_holds=$recover_holds"
@@ -249,8 +280,8 @@ jobs:
           # published head. A surviving mutex owner may additionally recover a
           # tiny exact-green cohort when GitHub replaced an older pending event;
           # this is never an unbounded clean-backlog sweep.
-          DRAIN_ADMISSION_PR: ${{ steps.admission.outputs.pr_number }}
-          DRAIN_ADMISSION_HEAD: ${{ steps.admission.outputs.head_sha }}
+          DRAIN_ADMISSION_PR: ${{ steps.admission.outputs.disposition == 'candidate' && steps.admission.outputs.pr_number || '' }}
+          DRAIN_ADMISSION_HEAD: ${{ steps.admission.outputs.disposition == 'candidate' && steps.admission.outputs.head_sha || '' }}
           # A Jovie Bot queue-deferred release can proceed through the narrow
           # exact-head fallback while Gem's *observation endpoint* is down.
           # The shared Bash pre-enqueue guard requires the bot-authored typed

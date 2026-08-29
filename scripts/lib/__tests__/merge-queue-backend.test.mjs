@@ -542,10 +542,10 @@ describe('queue workflow mutation safety', () => {
       'Main push; no primary target (bounded reconciliation remains enabled)'
     );
     expect(enroll).toContain(
-      'DRAIN_ADMISSION_PR: ${{ steps.admission.outputs.pr_number }}'
+      "DRAIN_ADMISSION_PR: ${{ steps.admission.outputs.disposition == 'candidate' && steps.admission.outputs.pr_number || '' }}"
     );
     expect(enroll).toContain(
-      'DRAIN_ADMISSION_HEAD: ${{ steps.admission.outputs.head_sha }}'
+      "DRAIN_ADMISSION_HEAD: ${{ steps.admission.outputs.disposition == 'candidate' && steps.admission.outputs.head_sha || '' }}"
     );
     expect(enroll).toContain("DRAIN_RECONCILE_QUEUE_DEFERRED: '0'");
     expect(enroll).not.toContain("github.event_name == 'push' && '1' || '0'");
@@ -616,11 +616,11 @@ describe('queue workflow mutation safety', () => {
   });
 
   it.each([
-    ['draft', 'success', true],
-    ['failed', 'failure', false],
-    ['pending', 'pending', false],
-    ['incomplete', null, false],
-  ])('treats a %s CI completion as maintenance-only', (_kind, conclusion, isDraft) => {
+    ['draft', 'success', true, 'draft-ineligible'],
+    ['failed', 'failure', false, 'ci-not-successful'],
+    ['pending', 'pending', false, 'ci-not-successful'],
+    ['incomplete', null, false, 'ci-not-successful'],
+  ])('treats a %s CI completion as typed neutral', (_kind, conclusion, isDraft, reason) => {
     const outputs = executeAdmissionScope({
       path: '.github/workflows/ci.yml',
       conclusion,
@@ -637,6 +637,34 @@ describe('queue workflow mutation safety', () => {
 
     expect(outputs).toEqual(
       expect.objectContaining({
+        disposition: 'neutral',
+        reason,
+        pr_number: '',
+        head_sha: '',
+        reconcile_queue_reentry: '0',
+      })
+    );
+  });
+
+  it('treats successful CI for a superseded source ref as typed neutral', () => {
+    const outputs = executeAdmissionScope({
+      path: '.github/workflows/ci.yml',
+      conclusion: 'success',
+      name: 'CI',
+      pullRequests: [
+        {
+          number: 16546,
+          headRefOid: OTHER_HEAD,
+          baseRefName: 'main',
+          isDraft: false,
+        },
+      ],
+    });
+
+    expect(outputs).toEqual(
+      expect.objectContaining({
+        disposition: 'neutral',
+        reason: 'superseded-ref',
         pr_number: '',
         head_sha: '',
         reconcile_queue_reentry: '0',
@@ -661,6 +689,8 @@ describe('queue workflow mutation safety', () => {
 
     expect(outputs).toEqual(
       expect.objectContaining({
+        disposition: 'candidate',
+        reason: 'ci-success-exact-head',
         pr_number: '16546',
         head_sha: HEAD,
         reconcile_queue_reentry: '0',
@@ -684,6 +714,8 @@ describe('queue workflow mutation safety', () => {
 
     expect(outputs).toEqual(
       expect.objectContaining({
+        disposition: 'neutral',
+        reason: 'composite-merge-group',
         pr_number: '',
         head_sha: '',
         reconcile_queue_reentry: '1',
