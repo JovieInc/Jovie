@@ -156,8 +156,10 @@ def capacity():
 
 def effective_capacity(host_capacity, gate):
     maximum = gate.get("remediationAdmission", {}).get("maxConcurrent")
-    if isinstance(maximum, bool) or not isinstance(maximum, int) or maximum < 1:
+    if isinstance(maximum, bool) or not isinstance(maximum, int) or maximum < 0:
         raise ValueError("typed remediation maxConcurrent is missing or invalid")
+    if maximum == 0:
+        return 0
     return min(host_capacity, maximum)
 
 
@@ -245,6 +247,13 @@ def ready_autonomous_draft(pr):
         return {**result, "result": "skipped", "reason": "too_large_for_queue"}
     if pr.get("mergeable_state") == "dirty":
         return {**result, "result": "skipped", "reason": "conflicting"}
+    blocker = work_mutation_blocker(max_age=0)
+    if blocker:
+        return {
+            **result,
+            "result": "skipped",
+            "reason": blocker,
+        }
     try:
         run("gh", "pr", "ready", str(pr["number"]), "--repo", REPO, timeout=60)
     except Exception as error:
@@ -484,12 +493,26 @@ def main():
             print(json.dumps(document, indent=2))
             return 0
 
+        remote_capacity = effective_capacity(capacity(), gate)
+        if remote_capacity == 0:
+            document.update(
+                status="ok",
+                remediation_admission="idle_zero_remote_capacity",
+                capacity=0,
+                intake="paused_zero_remote_capacity",
+                selected=[],
+                processed=[],
+            )
+            write_artifact(document)
+            print(json.dumps(document, indent=2))
+            return 0
+
         authenticated, reason = auth_status()
         document["auth"] = {"github": reason}
         if not authenticated:
             raise RuntimeError(reason)
         all_open, eligible = inventory()
-        worker_capacity = effective_capacity(capacity(), gate)
+        worker_capacity = remote_capacity
         document.update(
             open_count=len(all_open),
             eligible_count=len(eligible),
@@ -544,11 +567,13 @@ def main():
                 for pr in selected
             ]
         else:
-            ready_results = [
-                ready_autonomous_draft(pr)
-                for pr in all_open
-                if pr.get("draft") and autonomous_head(pr)
-            ]
+            ready_results = []
+            if gate["remediationAdmission"]["pushAllowed"]:
+                ready_results = [
+                    ready_autonomous_draft(pr)
+                    for pr in all_open
+                    if pr.get("draft") and autonomous_head(pr)
+                ]
             with concurrent.futures.ThreadPoolExecutor(
                 max_workers=max(1, len(selected))
             ) as executor:

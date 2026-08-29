@@ -750,6 +750,50 @@ class DeploymentBindingTests(unittest.TestCase):
             "expected-head-pr-update", receipt["remediationAdmission"]["activities"]
         )
 
+    def test_stale_capacity_preserves_runtime_floor_but_blocks_new_and_remote_mutation(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["concurrencyEvidence"] = {
+            **GREEN_SIGNALS["concurrencyEvidence"],
+            "accepted": False,
+            "error": "capacity-evidence-stale",
+        }
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertFalse(receipt["workAdmission"]["newImplementationAllowed"])
+        self.assertTrue(receipt["remediationAdmission"]["allowed"])
+        self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
+        self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
+        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
+        self.assertNotIn(
+            "expected-head-pr-update", receipt["remediationAdmission"]["activities"]
+        )
+        self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 0)
+        self.assertEqual(receipt["concurrency"]["gem"]["runtimeFloor"], 1)
+        self.assertFalse(receipt["concurrency"]["gem"]["newMutationAllowed"])
+        self.assertNotIn(
+            "isolated-implementation", receipt["workAdmission"]["activities"]
+        )
+        self.assertNotIn("draft-pr", receipt["workAdmission"]["activities"])
+
+    def test_missing_or_malformed_capacity_normalizes_to_zero_remote_capacity(self):
+        for evidence in (None, {"schema": "malformed"}):
+            with self.subTest(evidence=evidence):
+                signals = dict(GREEN_SIGNALS)
+                signals["concurrencyEvidence"] = evidence
+
+                receipt = self.evaluate(signals)
+
+                self.assertFalse(receipt["signals"]["concurrencyEvidence"]["accepted"])
+                self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+                self.assertFalse(receipt["workAdmission"]["newImplementationAllowed"])
+                self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
+                self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
+                self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 0)
+                self.assertEqual(receipt["concurrency"]["gem"]["runtimeFloor"], 1)
+
     def test_closure_health_red_blocks_new_issue_lease_without_blocking_queue_or_remediation(self):
         signals = dict(GREEN_SIGNALS)
         signals["closureHealth"] = {
@@ -801,7 +845,18 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertTrue(receipt["remediationAdmission"]["allowed"])
         self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
         self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
+        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
+        self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 0)
+        self.assertEqual(receipt["concurrency"]["gem"]["runtimeFloor"], 1)
+        self.assertFalse(receipt["concurrency"]["gem"]["evidenceAccepted"])
         self.assertIn("diagnose-pr", receipt["remediationAdmission"]["activities"])
+        sys.path.insert(0, str(GATE.parent))
+        from gem_gate_contract import validate_gate_result
+
+        self.assertEqual(
+            validate_gate_result(0, json.dumps(receipt), "remediation")["state"],
+            "RED",
+        )
 
     def test_queue_observation_uses_compact_merge_state_without_nested_rollups(self):
         prs = [

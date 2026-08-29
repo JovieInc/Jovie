@@ -20,6 +20,65 @@ if SPEC is None or SPEC.loader is None:
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
+GATE_SOURCE = ROOT / "scripts/hermes/gem-priority-gate.py"
+GATE_SPEC = importlib.util.spec_from_file_location("gem_priority_gate_for_drain", GATE_SOURCE)
+if GATE_SPEC is None or GATE_SPEC.loader is None:
+    raise RuntimeError(f"could not load {GATE_SOURCE}")
+GATE_MODULE = importlib.util.module_from_spec(GATE_SPEC)
+GATE_SPEC.loader.exec_module(GATE_MODULE)
+
+
+def stale_capacity_receipt():
+    now = GATE_MODULE.utc_now()
+    observed_at = GATE_MODULE.isoformat(now)
+    main_sha = "a" * 40
+    return GATE_MODULE.evaluate(
+        {
+            "main": {"status": "green", "sha": main_sha},
+            "production": {"status": "green", "deployedSha": main_sha},
+            "controller": {"status": "green"},
+            "integrity": {"status": "clear"},
+            "queue": {
+                "status": "known",
+                "eligiblePrs": 2,
+                "greenReadyPrs": 2,
+                "target": 15,
+            },
+            "closureHealth": {
+                "schema": "jovie-closure-health/v1",
+                "status": "healthy",
+                "authority": "Summer",
+                "newIssueIntakeAllowed": True,
+                "promotionContinues": True,
+                "remediationContinues": True,
+                "reasons": [],
+            },
+            "independentReview": {
+                "schema": "jovie-independent-review/v1",
+                "status": "passed",
+                "authority": "Gem",
+                "reviewer": "Gem",
+                "reviewId": "review-stale-capacity",
+                "headSha": main_sha,
+                "scope": "exact-main-head",
+                "observedAt": observed_at,
+                "accepted": True,
+                "reason": "fresh-exact-head-independent-review",
+            },
+            "concurrencyEvidence": {
+                "schema": "gem-concurrency-evidence/v1",
+                "target": 4,
+                "approved": True,
+                "cleanRuns": 1,
+                "severeIncidents": 0,
+                "observedAt": observed_at,
+                "accepted": False,
+                "error": "capacity-evidence-stale",
+            },
+        },
+        observed_at,
+    )
+
 
 class JovieOwnershipTests(unittest.TestCase):
     def test_jovie_and_legacy_alias_can_be_stabilized_when_allowlisted(self):
@@ -35,11 +94,112 @@ class JovieOwnershipTests(unittest.TestCase):
         gate = {"remediationAdmission": {"maxConcurrent": 1}}
         self.assertEqual(MODULE.effective_capacity(4, gate), 1)
         self.assertEqual(MODULE.effective_capacity(1, gate), 1)
-        for maximum in (None, 0, -1, True, 1.5):
+        self.assertEqual(
+            MODULE.effective_capacity(4, {"remediationAdmission": {"maxConcurrent": 0}}),
+            0,
+        )
+        for maximum in (None, -1, True, 1.5):
             with self.subTest(maximum=maximum), self.assertRaises(ValueError):
                 MODULE.effective_capacity(
                     4, {"remediationAdmission": {"maxConcurrent": maximum}}
                 )
+
+    def test_zero_remote_capacity_is_clean_idle_without_github_mutation(self):
+        receipt = stale_capacity_receipt()
+        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
+        self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 0)
+        self.assertEqual(receipt["concurrency"]["gem"]["runtimeFloor"], 1)
+        self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            state = pathlib.Path(tmp)
+            stdout = io.StringIO()
+            with (
+                mock.patch.object(MODULE, "STATE", state),
+                mock.patch.object(MODULE, "ARTIFACT", state / "latest.json"),
+                mock.patch.object(MODULE, "POLICY_ENABLED", True),
+                mock.patch.object(
+                    MODULE,
+                    "run_process",
+                    return_value=MODULE.subprocess.CompletedProcess(
+                        ["python3", str(GATE_SOURCE)],
+                        0,
+                        stdout=json.dumps(receipt),
+                        stderr="",
+                    ),
+                ),
+                mock.patch.object(MODULE, "auth_status") as auth_status,
+                mock.patch.object(MODULE, "inventory") as inventory,
+                mock.patch.object(MODULE, "update_one") as update_one,
+                mock.patch.object(MODULE, "run") as remote_run,
+                mock.patch.object(MODULE.sys, "argv", [str(SOURCE)]),
+                redirect_stdout(stdout),
+            ):
+                exit_code = MODULE.main()
+
+        document = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 0, document)
+        self.assertEqual(document["status"], "ok")
+        self.assertEqual(document["capacity"], 0)
+        self.assertEqual(document["selected"], [])
+        self.assertEqual(document["processed"], [])
+        self.assertEqual(document["intake"], "paused_zero_remote_capacity")
+        auth_status.assert_not_called()
+        inventory.assert_not_called()
+        update_one.assert_not_called()
+        remote_run.assert_not_called()
+
+    def test_stale_capacity_receipt_rejects_remote_mutation(self):
+        receipt = stale_capacity_receipt()
+        receipt["remediationAdmission"]["pushAllowed"] = True
+        receipt["remediationAdmission"]["activities"].append("expected-head-pr-update")
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "remote remediation must require non-RED state and accepted capacity",
+        ):
+            MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
+
+    def test_stale_capacity_rejects_contradictory_remote_floor(self):
+        receipt = stale_capacity_receipt()
+        receipt["remediationAdmission"]["maxConcurrent"] = 1
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "stale capacity must keep remediation maxConcurrent at zero",
+        ):
+            MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
+
+    def test_null_capacity_evidence_fails_closed_with_typed_contract_error(self):
+        receipt = stale_capacity_receipt()
+        receipt["signals"]["concurrencyEvidence"] = None
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "capacity evidence signal acceptance is not boolean",
+        ):
+            MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
+
+    def test_stale_capacity_blocks_autonomous_draft_remote_mutation(self):
+        draft = self._open_pr(
+            3, mergeable_state="clean", created_at="2026-08-28T20:02:00Z"
+        )
+        draft["draft"] = True
+        draft["head"]["ref"] = "symphony/JOV-9999-stale-capacity"
+
+        with (
+            mock.patch.object(
+                MODULE,
+                "work_mutation_blocker",
+                return_value="remediation_push_gate_green",
+            ),
+            mock.patch.object(MODULE, "run") as run,
+        ):
+            result = MODULE.ready_autonomous_draft(draft)
+
+        self.assertEqual(result["result"], "skipped")
+        self.assertEqual(result["reason"], "remediation_push_gate_green")
+        run.assert_not_called()
 
     def test_exact_head_lease_allows_only_one_cross_process_writer(self):
         pr = {
@@ -167,7 +327,10 @@ class JovieOwnershipTests(unittest.TestCase):
         pr = self._open_pr(16211, mergeable_state="unstable", created_at="2026-08-19T18:59:08Z")
         pr["draft"] = True
         pr["head"]["ref"] = "grok/JOV-4894-fix"
-        with mock.patch.object(MODULE, "run", return_value="") as run:
+        with (
+            mock.patch.object(MODULE, "work_mutation_blocker", return_value=None),
+            mock.patch.object(MODULE, "run", return_value="") as run,
+        ):
             result = MODULE.ready_autonomous_draft(pr)
         self.assertEqual(result["result"], "ok")
         self.assertEqual(run.call_args.args[:3], ("gh", "pr", "ready"))
