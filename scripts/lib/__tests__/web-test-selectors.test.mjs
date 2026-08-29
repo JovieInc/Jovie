@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { BASELINE_SCHEMA_VERSION } from '../../typecheck-scripts.mjs';
+import {
+  BASELINE_SCHEMA_VERSION,
+  isSupportedTypecheckNode,
+} from '../../typecheck-scripts.mjs';
 import {
   buildReceipt,
   collectChangedFiles,
@@ -48,6 +51,7 @@ describe('authoritative web unit selector', () => {
     );
     expect(tsconfig.compilerOptions.skipLibCheck).toBe(true);
     const baseline = json('apps/web/typecheck-tests-baseline.json');
+    expect(isSupportedTypecheckNode(process.version)).toBe(true);
     expect(baseline.schemaVersion).toBe(BASELINE_SCHEMA_VERSION);
     expect(baseline.tool).toBe('scripts/typecheck-web-tests.mjs');
     expect(baseline.selector).toBe(AUTHORITATIVE_WEB_UNIT_COMMAND);
