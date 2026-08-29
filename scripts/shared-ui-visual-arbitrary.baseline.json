@@ -1,6 +1,6 @@
 {
   "schema": "jovie.shared-ui-visual-arbitrary/v1",
-  "scope": ["packages/ui/atoms","packages/ui/lib"],
+  "scope": ["packages/ui"],
   "totalFindings": 52,
   "findings": [
     {"file":"packages/ui/atoms/badge.tsx","value":"font-[510]","count":1},
