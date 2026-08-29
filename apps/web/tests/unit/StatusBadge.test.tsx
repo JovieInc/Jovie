@@ -183,7 +183,7 @@ describe('StatusBadge', () => {
       expect(badge).toHaveClass('inline-flex');
       expect(badge).toHaveClass('items-center');
       expect(badge).toHaveClass('gap-2');
-      expect(badge).toHaveClass('rounded-full');
+      expect(badge).toHaveClass('rounded-(--system-b-radius-pill)');
       expect(badge).toHaveClass('border');
       expect(badge).toHaveClass('font-medium');
     });

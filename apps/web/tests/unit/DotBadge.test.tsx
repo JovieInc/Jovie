@@ -168,7 +168,7 @@ describe('DotBadge', () => {
 
       expect(badge).toHaveClass('inline-flex');
       expect(badge).toHaveClass('items-center');
-      expect(badge).toHaveClass('rounded-full');
+      expect(badge).toHaveClass('rounded-(--system-b-radius-pill)');
       expect(badge).toHaveClass('border');
       expect(badge).toHaveClass('font-medium');
       expect(badge).not.toHaveClass('font-[510]');
