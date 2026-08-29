@@ -1,4 +1,5 @@
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
+import { buildSiteLlmsGuidance } from '@/lib/agent/site-llms-guidance';
 
 /**
  * llms.txt — AI-readable site identity file (llmstxt.org standard).
@@ -75,6 +76,7 @@ ${APP_NAME} is a conversion-first release platform built specifically for indepe
 - **Blog**: ${BASE_URL}/blog — Music marketing insights and product updates
 - **Support**: ${BASE_URL}/support — Help and contact
 
+${buildSiteLlmsGuidance()}
 ## Contact
 
 - Website: ${BASE_URL}

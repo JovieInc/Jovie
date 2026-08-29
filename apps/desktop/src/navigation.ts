@@ -110,6 +110,7 @@ const PUBLIC_PROFILE_RESERVED_ROOT_SEGMENTS = new Set([
   'investor-portal',
   'llms-full.txt',
   'llms.txt',
+  'openapi.json',
   'og',
   'onboarding',
   'out',
