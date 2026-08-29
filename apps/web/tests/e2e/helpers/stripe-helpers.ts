@@ -42,38 +42,8 @@ export interface CardDetails {
   postal: string;
 }
 
-const STRIPE_FIELD_SELECTOR_ALIASES: Readonly<Record<string, string>> = {
-  'input[name="cardnumber"]': [
-    'input[name="cardnumber"]',
-    'input[name="number"]',
-    'input[autocomplete="cc-number"]',
-    'input[aria-label*="card number" i]',
-    'input[placeholder*="1234"]',
-  ].join(', '),
-  'input[name="exp-date"]': [
-    'input[name="exp-date"]',
-    'input[name="expiry"]',
-    'input[autocomplete="cc-exp"]',
-    'input[aria-label*="expiration" i]',
-    'input[aria-label*="expiry" i]',
-    'input[placeholder*="MM"]',
-  ].join(', '),
-  'input[name="cvc"]': [
-    'input[name="cvc"]',
-    'input[name="securityCode"]',
-    'input[autocomplete="cc-csc"]',
-    'input[aria-label*="security code" i]',
-    'input[aria-label*="CVC" i]',
-    'input[aria-label*="CVV" i]',
-  ].join(', '),
-  'input[name="postal"]': [
-    'input[name="postal"]',
-    'input[name="postalCode"]',
-    'input[autocomplete="postal-code"]',
-    'input[aria-label*="postal" i]',
-    'input[aria-label*="ZIP" i]',
-  ].join(', '),
-};
+/** Stripe's documented PaymentMethod fixture for deterministic test code. */
+export const TEST_PAYMENT_METHOD_SUCCESS = 'pm_card_visa';
 
 export const TEST_CARD_SUCCESS: CardDetails = {
   number: '4242424242424242',
@@ -258,86 +228,22 @@ export async function createCheckoutSession(
 export async function fillStripeInput(
   page: Page,
   selector: string,
-  value: string,
-  timeout = 15_000
+  value: string
 ) {
-  const resolvedSelector = STRIPE_FIELD_SELECTOR_ALIASES[selector] ?? selector;
-  const deadline = Date.now() + timeout;
-
-  while (Date.now() < deadline) {
-    for (const frame of page.frames()) {
-      const inputs = frame.locator(resolvedSelector);
-      const count = await inputs.count();
-
-      for (let index = 0; index < count; index += 1) {
-        const input = inputs.nth(index);
-        if (await input.isVisible()) {
-          await input.fill(value);
-          return;
-        }
-      }
+  for (const frame of page.frames()) {
+    const input = frame.locator(selector);
+    if ((await input.count()) > 0) {
+      await input.first().fill(value);
+      return;
     }
-
-    await page.waitForTimeout(250);
   }
 
-  const diagnostics = await Promise.all(
-    page.frames().map(async frame => {
-      let frameLocation = frame.url();
-      try {
-        const url = new URL(frameLocation);
-        frameLocation = `${url.hostname}${url.pathname}`;
-      } catch {
-        // Preserve non-URL frame labels such as about:blank.
-      }
-
-      const inputs = await frame.locator('input').evaluateAll(elements =>
-        elements.slice(0, 20).map(element => ({
-          type: element.getAttribute('type'),
-          name: element.getAttribute('name'),
-          autocomplete: element.getAttribute('autocomplete'),
-          ariaLabel: element.getAttribute('aria-label'),
-          placeholder: element.getAttribute('placeholder'),
-        }))
-      );
-
-      return { frame: frameLocation, inputs };
-    })
-  );
-
-  throw new Error(
-    `Visible Stripe input not found within ${timeout}ms for selector: ${selector}; fields=${JSON.stringify(diagnostics)}`
-  );
-}
-
-/**
- * Select Stripe's semantic card control.
- *
- * Hosted Checkout mounts an accordion button after its visible "Card" radio.
- * Stripe controls the radio from that button, so wait for and drive the actual
- * state owner instead of mutating presentation state directly.
- */
-export async function selectCardPaymentMethod(page: Page) {
-  const cardPaymentMethod = page
-    .getByRole('radio', { name: /card/i })
-    .filter({ visible: true })
-    .first();
-  await expect(cardPaymentMethod).toBeVisible({ timeout: 15_000 });
-
-  if (!(await cardPaymentMethod.isChecked())) {
-    const cardAccordion = page
-      .getByTestId('card-accordion-item-button')
-      .filter({ visible: true })
-      .first();
-    await expect(cardAccordion).toBeVisible({ timeout: 15_000 });
-    await cardAccordion.click();
-    await expect(cardPaymentMethod).toBeChecked();
-  }
+  throw new Error(`Stripe input not found for selector: ${selector}`);
 }
 
 /** Complete card payment in the Stripe checkout page. */
 export async function completeCardPayment(page: Page, card: CardDetails) {
-  await selectCardPaymentMethod(page);
+  await page.waitForSelector('iframe', { timeout: 15_000 });
 
   const phoneInput = page
     .locator('input[name="phoneNumber"]')
@@ -384,36 +290,137 @@ export async function fetchSubscriptionBySession(
   return stripeClient.subscriptions.retrieve(subscriptionId);
 }
 
-/** Retrieve and validate a completed test-mode subscription Checkout session. */
-export async function fetchCompletedTestCheckoutSession(
+/**
+ * Materialize Stripe's documented server-side test output for hosted Checkout.
+ *
+ * Stripe explicitly prevents automated control of Checkout's front-end. This
+ * keeps the Jovie-owned boundary real: the app creates the exact test-mode
+ * Checkout Session and customer, Stripe creates and pays a real test
+ * subscription with its documented PaymentMethod fixture, and the returned
+ * session-shaped object is signed before it enters Jovie's webhook route.
+ */
+export async function materializeTestCheckoutCompletion(
   stripeClient: Stripe,
-  sessionId: string
+  options: {
+    readonly sessionId: string;
+    readonly priceId: string;
+    readonly appUserId: string;
+    readonly email: string;
+  }
 ): Promise<{
   session: Stripe.Checkout.Session;
   customerId: string;
   subscriptionId: string;
 }> {
-  const session = await stripeClient.checkout.sessions.retrieve(sessionId);
-  if (session.livemode !== false) {
-    throw new Error('Checkout session must have livemode=false');
+  const session = await stripeClient.checkout.sessions.retrieve(
+    options.sessionId
+  );
+  if (session.livemode !== false || session.mode !== 'subscription') {
+    throw new Error('Checkout Session must be a test-mode subscription');
   }
-  if (session.status !== 'complete' || session.payment_status !== 'paid') {
-    throw new Error(
-      `Checkout session is not paid and complete (${session.status}/${session.payment_status})`
-    );
+  if (session.metadata?.clerk_user_id !== options.appUserId) {
+    throw new Error('Checkout Session has mismatched ownership metadata');
   }
   const customerId =
     typeof session.customer === 'string'
       ? session.customer
       : session.customer?.id;
-  const subscriptionId =
-    typeof session.subscription === 'string'
-      ? session.subscription
-      : session.subscription?.id;
-  if (!customerId || !subscriptionId) {
-    throw new Error('Checkout session omitted customer or subscription');
+  if (!customerId) {
+    throw new Error('Checkout Session omitted its customer');
   }
-  return { session, customerId, subscriptionId };
+
+  const customer = await stripeClient.customers.retrieve(customerId);
+  if (
+    customer.deleted ||
+    customer.livemode !== false ||
+    customer.email !== options.email ||
+    customer.metadata.clerk_user_id !== options.appUserId
+  ) {
+    throw new Error('Checkout customer is not owned by this test run');
+  }
+
+  const paymentMethod = await stripeClient.paymentMethods.attach(
+    TEST_PAYMENT_METHOD_SUCCESS,
+    { customer: customerId }
+  );
+  if (
+    paymentMethod.livemode !== false ||
+    paymentMethod.customer !== customerId
+  ) {
+    throw new Error('Stripe test PaymentMethod did not attach to the customer');
+  }
+
+  const subscription = await stripeClient.subscriptions.create(
+    {
+      customer: customerId,
+      items: [{ price: options.priceId }],
+      default_payment_method: paymentMethod.id,
+      payment_behavior: 'error_if_incomplete',
+      metadata: {
+        clerk_user_id: options.appUserId,
+        checkout_session_id: session.id,
+      },
+    },
+    { idempotencyKey: `jovie-money-path:${session.id}` }
+  );
+  const subscriptionCustomerId =
+    typeof subscription.customer === 'string'
+      ? subscription.customer
+      : subscription.customer.id;
+  if (
+    subscription.livemode !== false ||
+    subscription.status !== 'active' ||
+    subscriptionCustomerId !== customerId ||
+    subscription.items.data[0]?.price.id !== options.priceId
+  ) {
+    throw new Error('Stripe test subscription did not become active');
+  }
+
+  const invoiceId =
+    typeof subscription.latest_invoice === 'string'
+      ? subscription.latest_invoice
+      : subscription.latest_invoice?.id;
+  if (!invoiceId) {
+    throw new Error('Stripe test subscription omitted its initial invoice');
+  }
+  const invoice = await stripeClient.invoices.retrieve(invoiceId);
+  if (
+    invoice.livemode !== false ||
+    invoice.status !== 'paid' ||
+    invoice.amount_paid <= 0
+  ) {
+    throw new Error('Stripe test subscription invoice was not paid');
+  }
+
+  return {
+    session: {
+      ...session,
+      customer: customerId,
+      subscription: subscription.id,
+      status: 'complete',
+      payment_status: 'paid',
+    },
+    customerId,
+    subscriptionId: subscription.id,
+  };
+}
+
+/** Expire only the still-open test Checkout Session owned by this run. */
+export async function expireRunOwnedTestCheckoutSession(
+  stripeClient: Stripe,
+  sessionId: string,
+  appUserId: string
+): Promise<void> {
+  const session = await stripeClient.checkout.sessions.retrieve(sessionId);
+  if (
+    session.livemode !== false ||
+    session.metadata?.clerk_user_id !== appUserId
+  ) {
+    throw new Error('Refusing to expire a Checkout Session owned elsewhere');
+  }
+  if (session.status === 'open') {
+    await stripeClient.checkout.sessions.expire(sessionId);
+  }
 }
 
 /**

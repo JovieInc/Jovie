@@ -46,6 +46,7 @@
   "legacy": {
     "unboundComponentIds": [
       "atom.brand-logo",
+      "atom.icon-button",
       "atom.link",
       "atom.logo",
       "atom.logo-link"

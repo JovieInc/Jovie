@@ -61,6 +61,8 @@ const SYSTEM_RESERVED_SEGMENTS = new Set([
   'og',
   'go',
   'out',
+  'robots.txt',
+  'sitemap.xml',
   '__clerk',
   'clerk',
   'phpmyadmin',

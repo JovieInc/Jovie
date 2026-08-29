@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, gte, inArray, lte } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { workflowRuns } from '@/lib/db/schema/connectors';
 import { type MerchOrder, merchOrders } from '@/lib/db/schema/merch';
@@ -61,12 +61,26 @@ export function computeStoreGmvCents(
  */
 export async function getPaidOrdersForMerchCards(
   merchCardIds: readonly string[],
-  creatorProfileId: string
+  creatorProfileId: string,
+  workflowRunId: string,
+  window?: { readonly start: Date; readonly end: Date }
 ): Promise<
   Pick<MerchOrder, 'id' | 'merchCardId' | 'subtotalCents' | 'status'>[]
 > {
-  if (merchCardIds.length === 0 || !creatorProfileId) {
+  if (merchCardIds.length === 0 || !creatorProfileId || !workflowRunId) {
     return [];
+  }
+
+  const conditions = [
+    eq(merchOrders.creatorProfileId, creatorProfileId),
+    inArray(merchOrders.merchCardId, [...merchCardIds]),
+    drizzleSql`${merchOrders.metadata} ->> 'releaseWorkflowRunId' = ${workflowRunId}`,
+  ];
+  if (window) {
+    conditions.push(
+      gte(merchOrders.createdAt, window.start),
+      lte(merchOrders.createdAt, window.end)
+    );
   }
 
   return db
@@ -77,24 +91,22 @@ export async function getPaidOrdersForMerchCards(
       status: merchOrders.status,
     })
     .from(merchOrders)
-    .where(
-      and(
-        eq(merchOrders.creatorProfileId, creatorProfileId),
-        inArray(merchOrders.merchCardId, [...merchCardIds])
-      )
-    );
+    .where(and(...conditions));
 }
 
 export async function buildReleaseGmvRowForRun(input: {
   readonly workflowRunId: string;
   readonly stepOutputs: ReleaseToRevenueRunStepOutputs;
+  readonly window?: { readonly start: Date; readonly end: Date };
 }): Promise<ReleaseGmvPerRunRow> {
   const creatorProfileId =
     input.stepOutputs.designPartner?.creatorProfileId ?? '';
   const merchCardIds = await resolveMerchCardIdsForRun(input.stepOutputs);
   const orders = await getPaidOrdersForMerchCards(
     merchCardIds,
-    creatorProfileId
+    creatorProfileId,
+    input.workflowRunId,
+    input.window
   );
   const { gmvCents, orderCount } = computeStoreGmvCents(orders);
 

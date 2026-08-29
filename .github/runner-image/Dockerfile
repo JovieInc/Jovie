@@ -5,8 +5,8 @@ ARG RUNNER_AMD64_DIGEST=sha256:f546db5932b903c81cf269a712dad679fdf139dc08b7676c0
 ARG RUNNER_PLATFORM=linux/amd64
 FROM --platform=${RUNNER_PLATFORM} myoung34/github-runner:${RUNNER_VERSION}@${RUNNER_AMD64_DIGEST} AS runner-base
 
-ARG NODE_VERSION=22.23.1
-ARG NODE_LINUX_X64_SHA256=9749e988f437343b7fa832c69ded82a312e41a03116d766797ac14f6f9eee578
+ARG NODE_VERSION=22.23.2
+ARG NODE_LINUX_X64_SHA256=d60acfe00a2932254bb0ad20e01b0d74397a0875595de719654b214f4b03f307
 ARG PNPM_VERSION=9.15.4
 
 USER root
@@ -86,7 +86,7 @@ RUN mkdir -p "${COREPACK_HOME}" \
     && corepack install --global "pnpm@${PNPM_VERSION}" \
     && test "$(su -s /bin/bash runner -c \
       'cd / && COREPACK_ENABLE_NETWORK=0 \
-      /opt/hostedtoolcache/node/22.23.1/x64/bin/pnpm --version')" = "${PNPM_VERSION}"
+      /opt/hostedtoolcache/node/22.23.2/x64/bin/pnpm --version')" = "${PNPM_VERSION}"
 
 COPY --from=prerequisites --chown=runner:runner \
   /opt/jovie-installed-tree /opt/jovie-installed-tree

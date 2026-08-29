@@ -72,6 +72,12 @@
       "fg": "--color-accent",
       "bg": "--color-bg-surface-1",
       "minRatio": 3.0
+    },
+    {
+      "name": "entity chip text on user message",
+      "fg": "--system-b-entity-chip-on-light-text",
+      "bg": "--system-b-chat-user-bubble-bg",
+      "minRatio": 4.5
     }
   ]
 }

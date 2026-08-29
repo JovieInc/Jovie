@@ -12,7 +12,7 @@ export const ABOUT_STORY_RECEIPT = {
   sourceExport: 'AboutPageContent',
   storyExport: 'Web016About',
   sourceAuditBaseSha: 'c767a55d279c69fbddb32324f78faced8938884c',
-  containingMergeSha: '841866b0a7891bb064958af2cbbdf09b3cd3b1b3',
+  containingMergeSha: '8b0353fcbeb0cffef614fa47afbbbd8eeae48997',
   proofScope: 'system-b-body-only',
   implementation: 'exact-production-body',
 } as const;

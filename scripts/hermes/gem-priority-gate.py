@@ -63,6 +63,7 @@ SEVERE_REASONS = {
     "severe-integrity-incident",
 }
 DEFAULT_GEM_CONCURRENCY = 4
+LOCAL_REMEDIATION_CONCURRENCY_FLOOR = 1
 CONTROL_PLANE_PREFIXES = (
     ".github/workflows/",
     "canon/",
@@ -957,7 +958,22 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     queue = queue_value if isinstance(queue_value, dict) else {"status": "unknown"}
     closure_health = validate_closure_health(signals.get("closureHealth"))
     closure_intake_allowed = closure_health["newIssueIntakeAllowed"] is True
-    normalized_signals = {**signals, "closureHealth": closure_health}
+    concurrency_evidence_value = signals.get("concurrencyEvidence")
+    concurrency_evidence = (
+        concurrency_evidence_value
+        if isinstance(concurrency_evidence_value, dict)
+        and isinstance(concurrency_evidence_value.get("accepted"), bool)
+        else {
+            "schema": CONCURRENCY_SCHEMA,
+            "accepted": False,
+            "reason": "capacity-evidence-missing-malformed-or-stale",
+        }
+    )
+    normalized_signals = {
+        **signals,
+        "closureHealth": closure_health,
+        "concurrencyEvidence": concurrency_evidence,
+    }
     review = validate_independent_review(
         signals.get("independentReview"),
         main.get("sha"),
@@ -1086,7 +1102,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and production.get("status") == "green"
         and valid_commit_sha(production.get("deployedSha"))
     )
-    evidence = signals.get("concurrencyEvidence") or {}
+    evidence = concurrency_evidence
     capacity_fresh = evidence.get("accepted") is True
     measured_target = evidence.get("target")
     gem_concurrency = (
@@ -1165,23 +1181,30 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         promotion_mode = "blocked"
     if state == "RED":
         work_activities: list[str] = []
-    elif not closure_intake_allowed:
+    elif not closure_intake_allowed or not capacity_fresh:
         # Existing validation/review work remains useful, but no new
-        # implementation or fallback PR may begin while Summer holds intake.
+        # implementation or fallback PR may begin while Summer holds intake
+        # or capacity evidence is missing/stale.
         work_activities = ["tests", "review"]
     else:
-        work_activities = (
-            ["approved-issue-lease"]
-            if capacity_fresh
+        new_implementation_allowed = (
+            capacity_fresh
             and queue_shape_valid
             and lane_global_available
-            else []
-        ) + ["isolated-implementation", "tests", "review", "draft-pr"]
+        )
+        work_activities = ["tests", "review"]
+        if new_implementation_allowed:
+            work_activities = [
+                "approved-issue-lease",
+                "isolated-implementation",
+                *work_activities,
+                "draft-pr",
+            ]
     # Remediation is a liveness capability, not issue intake or promotion.
     # A fleet hold must never hide the evidence or disable the bounded local
-    # work needed to diagnose and repair the hold.  Only a non-RED receipt may
-    # authorize updating the remote PR head; merge/deploy remain separately
-    # governed by their own typed admissions.
+    # work needed to diagnose and repair the hold. Remote PR mutation requires
+    # both a non-RED receipt and accepted capacity; merge/deploy remain
+    # separately governed by their own typed admissions.
     remediation_local_activities = [
         "observe-pr",
         "diagnose-pr",
@@ -1189,7 +1212,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         "focused-tests",
         "review",
     ]
-    remediation_push_allowed = state != "RED"
+    remediation_push_allowed = state != "RED" and capacity_fresh
     cohort = already_admitted_cohort_semantics(promotion_mode)
     if not closure_intake_allowed:
         cohort = {
@@ -1289,7 +1312,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         "concurrency": {
             "gem": {
                 "maxConcurrent": gem_concurrency,
-                "runtimeFloor": 1,
+                "runtimeFloor": LOCAL_REMEDIATION_CONCURRENCY_FLOOR,
                 "baseline": DEFAULT_GEM_CONCURRENCY,
                 "evidenceAccepted": capacity_fresh,
                 "newMutationAllowed": capacity_fresh,
@@ -1445,6 +1468,11 @@ def failed_evaluation_receipt(
                 "accepted": False,
                 "reason": "independent-review-receipt-malformed",
             },
+            "concurrencyEvidence": {
+                "schema": CONCURRENCY_SCHEMA,
+                "accepted": False,
+                "reason": "capacity-evidence-missing-malformed-or-stale",
+            },
         },
         "reasons": [
             typed_reason(
@@ -1494,7 +1522,7 @@ def failed_evaluation_receipt(
                 "focused-tests",
                 "review",
             ],
-            "maxConcurrent": DEFAULT_GEM_CONCURRENCY,
+            "maxConcurrent": 0,
             "authority": "single-pr-writer-exact-head",
         },
         "deploymentAdmission": {
@@ -1519,8 +1547,12 @@ def failed_evaluation_receipt(
         },
         "concurrency": {
             "gem": {
-                "maxConcurrent": DEFAULT_GEM_CONCURRENCY,
+                "maxConcurrent": 0,
+                "runtimeFloor": LOCAL_REMEDIATION_CONCURRENCY_FLOOR,
                 "evidenceAccepted": False,
+                "newMutationAllowed": False,
+                "preserveQueuedWork": True,
+                "reason": "capacity-evidence-missing-malformed-or-stale",
             },
             "symphonyImplementation": "event-driven-backpressure",
         },

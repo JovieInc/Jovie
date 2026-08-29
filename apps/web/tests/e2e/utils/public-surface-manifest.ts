@@ -213,6 +213,18 @@ const MARKETING_SURFACES = [
     interactions: GLOBAL_INTERACTIONS,
   },
   {
+    id: 'marketing-developers',
+    family: 'marketing',
+    expectedState: 'ok',
+    path: APP_ROUTES.DEVELOPERS,
+    readySelectors: ['h1', 'main'],
+    mainSelector: 'main',
+    minMainTextLength: 120,
+    lighthouse: false,
+    perfGroups: ['marketing-public'],
+    interactions: GLOBAL_INTERACTIONS,
+  },
+  {
     id: 'marketing-ai',
     family: 'marketing',
     expectedState: 'ok',

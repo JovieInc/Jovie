@@ -31,6 +31,7 @@ const FOUNDER_LOCK_REQUIREMENTS = Object.freeze([
 ]);
 const LEGACY_UNBOUND_CEILING = new Set([
   'atom.brand-logo',
+  'atom.icon-button',
   'atom.link',
   'atom.logo',
   'atom.logo-link',

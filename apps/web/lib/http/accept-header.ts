@@ -104,3 +104,38 @@ export function isNextRscRequest(headers: Headers): boolean {
     headers.has('next-router-segment-prefetch')
   );
 }
+
+/**
+ * App Router RSC Vary tokens. Next overwrites a bare `Vary: Accept` on the
+ * prerendered homepage with these; keep them when we add Accept so Flight
+ * navigations and Markdown cannot share one CDN object.
+ */
+export const NEXT_RSC_VARY =
+  'rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch';
+
+/** Homepage / CDN Vary: Accept plus the RSC tokens Next already emits. */
+export const HOMEPAGE_ACCEPT_VARY = `Accept, ${NEXT_RSC_VARY}`;
+
+function varyTokens(header: string | null): string[] {
+  if (!header) return [];
+  const tokens: string[] = [];
+  const seen = new Set<string>();
+  for (const part of header.split(',')) {
+    const token = part.trim();
+    if (!token) continue;
+    const key = token.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    tokens.push(token);
+  }
+  return tokens;
+}
+
+/** Ensure Accept is present on Vary so HTML and Markdown cannot share a cache key. */
+export function ensureVaryAccept(headers: Headers): void {
+  const tokens = varyTokens(headers.get('Vary'));
+  if (!tokens.some(token => token.toLowerCase() === 'accept')) {
+    tokens.push('Accept');
+  }
+  headers.set('Vary', tokens.join(', '));
+}

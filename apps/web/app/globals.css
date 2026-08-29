@@ -1346,7 +1346,7 @@ body {
     color: var(--linear-text-secondary);
     background: transparent;
     border: 1px solid var(--linear-border-subtle);
-    border-radius: var(--linear-radius-sm, 8px);
+    border-radius: var(--radius-sm, 8px);
     cursor: pointer;
     transition:
       background-color var(--linear-duration-fast) var(--linear-ease),
@@ -2339,7 +2339,7 @@ body {
 }
 
 [data-sonner-toast] {
-  --border-radius: var(--linear-radius-lg);
+  --border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   font-family: var(--font-sans), system-ui, sans-serif;
   font-feature-settings: var(--linear-font-features);
@@ -2369,7 +2369,7 @@ body {
   background: var(--color-bg-surface-1);
   border-color: var(--color-border-subtle);
   color: var(--color-text-tertiary-token);
-  border-radius: var(--linear-radius-sm);
+  border-radius: var(--radius-sm);
   transition:
     background 150ms ease,
     color 150ms ease;

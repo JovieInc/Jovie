@@ -4,7 +4,10 @@ import {
   buildNotFoundMarkdown,
 } from '@/lib/agent/homepage-markdown';
 import { isNextRscRequest, negotiateAccept } from '@/lib/http/accept-header';
-import { isDedicatedRootSegment } from '@/lib/routing/proxy-routing';
+import {
+  getPublicProfileCandidate,
+  isDedicatedRootSegment,
+} from '@/lib/routing/proxy-routing';
 
 const MARKDOWN_CONTENT_TYPE = 'text/markdown; charset=utf-8';
 const FILE_EXTENSION_PATTERN = /\.[a-z0-9]{1,8}$/i;
@@ -50,6 +53,9 @@ export function shouldPassThroughMarkdownNegotiation(
   const root = segments[0];
   if (!root) return false;
   if (isDedicatedRootSegment(root)) return true;
+  // Artist profiles and smart links are a known HTML surface, not unknown
+  // routes. Do not intercept them as Markdown 404s.
+  if (getPublicProfileCandidate(`/${root}`)) return true;
   return segments.some(hasFileExtension);
 }
 

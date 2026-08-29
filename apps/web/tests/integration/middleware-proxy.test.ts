@@ -90,6 +90,7 @@ describe('middleware matcher — dot escape correctness (JOV-2236)', () => {
       '/icon.svg',
       '/font.woff2',
       '/data.json',
+      '/openapi.json',
       '/favicon.ico',
       '/manifest.webmanifest',
       '/.well-known/apple-app-site-association',

@@ -2,16 +2,15 @@ import { neon } from '@neondatabase/serverless';
 import { expect, test } from '@playwright/test';
 import { prepareBetterAuthEmailOtp } from '../helpers/clerk-auth';
 import {
-  completeCardPayment,
   createCheckoutSession,
   createSignedStripeWebhook,
   deleteRunOwnedStripeCustomer,
-  fetchCompletedTestCheckoutSession,
+  expireRunOwnedTestCheckoutSession,
   findRunOwnedStripeCustomerIds,
   getBillingStatus,
   getRequiredStripeTestContext,
+  materializeTestCheckoutCompletion,
   postStripeWebhook,
-  TEST_CARD_SUCCESS,
 } from './helpers/stripe-helpers';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -123,6 +122,9 @@ test('persists verified checkout entitlement for a fresh and returning session',
     const freshUser = await readMoneyUser();
     expect(freshUser).not.toBeNull();
     appUserId = freshUser?.id ?? null;
+    if (!appUserId) {
+      throw new Error('Money-path user did not expose its application ID');
+    }
     expect(freshUser).toMatchObject({
       betterAuthUserId,
       email,
@@ -142,24 +144,28 @@ test('persists verified checkout entitlement for a fresh and returning session',
     if (createdSession.livemode !== false) {
       throw new Error('Created Checkout session must have livemode=false');
     }
+    expect(createdSession.mode).toBe('subscription');
     expect(createdSession.metadata?.clerk_user_id).toBe(appUserId);
+    const checkoutUrl = new URL(checkout.url);
+    expect(checkoutUrl.protocol).toBe('https:');
+    expect(checkoutUrl.hostname).toBe('checkout.stripe.com');
     customerId =
       typeof createdSession.customer === 'string'
         ? createdSession.customer
         : (createdSession.customer?.id ?? null);
     expect(customerId).toBeTruthy();
 
-    await page.goto(checkout.url, { waitUntil: 'domcontentloaded' });
-    await completeCardPayment(page, TEST_CARD_SUCCESS);
-
-    const completed = await fetchCompletedTestCheckoutSession(
-      stripeClient,
-      checkoutSessionId
-    );
+    const completed = await materializeTestCheckoutCompletion(stripeClient, {
+      sessionId: checkoutSessionId,
+      priceId,
+      appUserId,
+      email,
+    });
     customerId = completed.customerId;
     expect(completed.session.metadata?.clerk_user_id).toBe(appUserId);
 
-    // A browser redirect is not authority: only the verified webhook may grant.
+    // A Stripe-side test payment is not authority: only Jovie's verified
+    // webhook may persist access.
     const redirectOnlyUser = await readMoneyUser();
     expect(redirectOnlyUser).toMatchObject({
       isPro: false,
@@ -273,6 +279,13 @@ test('persists verified checkout entitlement for a fresh and returning session',
     await returningContext?.close();
 
     if (appUserId) {
+      if (checkoutSessionId) {
+        await expireRunOwnedTestCheckoutSession(
+          stripeClient,
+          checkoutSessionId,
+          appUserId
+        );
+      }
       const databaseCustomerId = (await readMoneyUser())?.stripeCustomerId;
       const cleanupCustomerIds = new Set(
         [customerId, databaseCustomerId].filter(

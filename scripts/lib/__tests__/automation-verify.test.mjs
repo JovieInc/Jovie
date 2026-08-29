@@ -75,8 +75,10 @@ const GEM_PR_REHABILITATION_LANE = [
   '.github/requirements/pytest.txt',
   '.github/workflows/gem-delivery-controller-activation.yml',
   '.github/workflows/ci.yml',
+  'docs/PR_FLOW.md',
   'scripts/hermes/config/gem-repo-registry.json',
   'scripts/hermes/config/model-registry.json',
+  'scripts/hermes/closure_health.py',
   'scripts/hermes/gem-pr-drain.py',
   'scripts/hermes/gem-ops-hud.py',
   'scripts/hermes/gem-priority-gate.py',
@@ -87,6 +89,7 @@ const GEM_PR_REHABILITATION_LANE = [
   'scripts/hermes/install-gem-fleet-controller.sh',
   'scripts/hermes/install-gem-pr-rehabilitation.sh',
   'scripts/hermes/model-router.py',
+  'scripts/hermes/symphony-reconciler.py',
   'scripts/hermes/systemd/gem-pr-drain.service',
   'scripts/hermes/systemd/gem-pr-drain.timer',
   'scripts/hermes/tests/gem-pr-drain.test.py',
@@ -94,6 +97,8 @@ const GEM_PR_REHABILITATION_LANE = [
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
+  'scripts/hermes/tests/closure-health.test.py',
+  'scripts/hermes/tests/symphony-reconciler.test.py',
   'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
   'scripts/hermes/tests/test-model-router.py',
   'scripts/ci-fast-lanes.mjs',
@@ -602,6 +607,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/linear-issue-intake.test.mjs',
         'scripts/lib/__tests__/agent-qc-wires.test.mjs',
         'scripts/lib/__tests__/needs-human-autoclose.test.mjs',
+        'scripts/lib/__tests__/production-lane-range.test.mjs',
         'scripts/lib/__tests__/hermes-launchd.test.mjs',
       ],
     });
@@ -738,11 +744,13 @@ describe('automation-verify affected scope', () => {
       mode: 'selected',
       selectedTests: [],
       pythonUnittestTests: [
+        'scripts/hermes/tests/closure-health.test.py',
         'scripts/hermes/tests/gem-priority-gate.test.py',
         'scripts/hermes/tests/gem-pr-drain.test.py',
         'scripts/hermes/tests/gem-ops-hud.test.py',
         'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
         'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
+        'scripts/hermes/tests/symphony-reconciler.test.py',
         'scripts/hermes/tests/test-model-router.py',
       ],
       scriptVitestTests: [
@@ -756,6 +764,21 @@ describe('automation-verify affected scope', () => {
         'apps/ios/Jovie/RootView.swift',
       ]).mode
     ).toBe('full');
+  });
+
+  it('routes a closure-health source-only repair to its Python regression suite', () => {
+    expect(
+      buildAffectedTestPlan(['scripts/hermes/closure_health.py'])
+    ).toMatchObject({
+      mode: 'selected',
+      pythonUnittestTests: expect.arrayContaining([
+        'scripts/hermes/tests/closure-health.test.py',
+      ]),
+      scriptVitestTests: expect.arrayContaining([
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+      ]),
+    });
   });
 
   it('selects the No Unattended Red contracts without unrelated product tests', () => {
@@ -856,6 +879,19 @@ describe('automation-verify affected scope', () => {
         'apps/web/lib/unknown-safe-remediation-peer.ts',
       ]).mode
     ).toBe('full');
+  });
+
+  it('keeps reconciler-only changes inside the bounded rehabilitation lane', () => {
+    for (const changedPath of [
+      'scripts/hermes/symphony-reconciler.py',
+      'scripts/hermes/tests/symphony-reconciler.test.py',
+    ]) {
+      const plan = buildAffectedTestPlan([changedPath]);
+      expect(plan.mode).toBe('selected');
+      expect(plan.pythonUnittestTests).toContain(
+        'scripts/hermes/tests/symphony-reconciler.test.py'
+      );
+    }
   });
 
   it('routes fleet controller installer repairs to the Gem rehabilitation lane', () => {

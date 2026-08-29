@@ -21,9 +21,6 @@ import {
   MENU_ITEM_COMPACT_DESTRUCTIVE,
   MENU_ITEM_DESTRUCTIVE,
   MENU_LABEL_BASE,
-  MENU_OVERFLOW_TRIGGER_BASE,
-  MENU_OVERFLOW_TRIGGER_DRAWER,
-  MENU_OVERFLOW_TRIGGER_SEGMENT,
   MENU_SEARCH_CLEAR_BUTTON_BASE,
   MENU_SEARCH_ICON_BASE,
   MENU_SEARCH_INPUT_BASE,
@@ -240,13 +237,6 @@ describe('dropdown-styles', () => {
       expect(MENU_ICON_TRIGGER_BASE).toContain('hover:bg-surface-1');
       expect(MENU_ICON_TRIGGER_BASE).toContain('focus-visible:ring-focus');
     });
-
-    it('overflow trigger variants use tokenized focus and density classes', () => {
-      expect(MENU_OVERFLOW_TRIGGER_BASE).toContain('focus-visible:ring-focus');
-      expect(MENU_OVERFLOW_TRIGGER_BASE).toContain('ring-offset-surface-page');
-      expect(MENU_OVERFLOW_TRIGGER_DRAWER).toContain('min-h-7');
-      expect(MENU_OVERFLOW_TRIGGER_SEGMENT).toContain('h-7');
-    });
   });
 
   describe('search styles', () => {
@@ -293,9 +283,6 @@ describe('dropdown-styles', () => {
       MENU_SEARCH_INPUT_BASE,
       MENU_SEARCH_CLEAR_BUTTON_BASE,
       MENU_ICON_TRIGGER_BASE,
-      MENU_OVERFLOW_TRIGGER_BASE,
-      MENU_OVERFLOW_TRIGGER_DRAWER,
-      MENU_OVERFLOW_TRIGGER_SEGMENT,
       MENU_LABEL_BASE,
       MENU_SEPARATOR_BASE,
       MENU_SHORTCUT_BASE,

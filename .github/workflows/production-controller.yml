@@ -131,11 +131,14 @@ jobs:
       marker_recovery: ${{ steps.authorize.outputs.marker_recovery }}
       run_web: ${{ steps.authorize.outputs.run_web }}
       selected_lanes: ${{ steps.authorize.outputs.selected_lanes }}
+      deployed_sha: ${{ steps.authorize.outputs.deployed_sha }}
+      web_evidence_sha: ${{ steps.authorize.outputs.web_evidence_sha }}
       lane_receipt_artifact_id: ${{ steps.authorize.outputs.lane_receipt_artifact_id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
           persist-credentials: false
       - name: Cross-prove exact successful push CI
         id: authorize
@@ -152,6 +155,7 @@ jobs:
           TRIGGER_RUN_STATUS: ${{ github.event.workflow_run.status }}
           TRIGGER_RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
           TRIGGER_HEAD_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name }}
+          PRODUCTION_BUILD_INFO_URL: https://jov.ie/api/health/build-info
         shell: bash
         run: |
           set -euo pipefail
@@ -162,7 +166,10 @@ jobs:
             echo "marker_recovery=false"
             echo "run_web=false"
             echo "selected_lanes=none"
+            echo "deployed_sha="
+            echo "web_evidence_sha=none"
           } >> "$GITHUB_OUTPUT"
+          marker_recovery=false
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Controller expected SHA must be a full commit."
             exit 1
@@ -255,6 +262,7 @@ jobs:
                 echo "::error::Only the exact full controller attempt 2 may consume an interrupted-marker recovery."
                 exit 1
               fi
+              marker_recovery=true
               echo "marker_recovery=true" >> "$GITHUB_OUTPUT"
               ;;
             none)
@@ -367,8 +375,54 @@ jobs:
               echo "::error::Product-lane release receipt failed exact-run validation."
               exit 1
             }
-            selected_lanes="$(jq -r '.selectedLanes | join(",")' "$receipt_dir/release.json")"
-            run_web="$(jq -r '.selectedLanes | index("web") != null' "$receipt_dir/release.json")"
+
+            # A release wave can collapse several rapid main pushes. Anchor to
+            # the exact deployment currently serving the canonical alias, prove
+            # that checkpoint with its durable controller marker, then route
+            # from the complete still-unreleased first-parent range.
+            build_info_json="$(curl --fail --silent --show-error \
+              --connect-timeout 5 --max-time 15 --retry 2 --retry-all-errors \
+              "$PRODUCTION_BUILD_INFO_URL")"
+            deployed_sha="$(jq -er '
+              .commitSha
+              | select(type == "string" and test("^[0-9a-f]{40}$"))
+            ' <<<"$build_info_json")" || {
+              echo "::error::Canonical production build info omitted an exact deployed SHA."
+              exit 1
+            }
+            lane_range_mode=range
+            if [ "$marker_recovery" = true ] && [ "$deployed_sha" = "$EXPECTED_SHA" ]; then
+              # Attempt 1 can promote the exact build before its durable marker is
+              # uploaded. The actor-bound recovery proof above authorizes attempt
+              # 2 to reuse the exact current receipt without asking that missing
+              # marker to prove itself.
+              lane_range_mode=marker-recovery
+              echo "::notice::Recovering the exact current production receipt after alias promotion."
+            else
+              deployed_marker_json="$(node .github/scripts/production-marker-state.mjs \
+                --sha "$deployed_sha" \
+                --repo "$REPOSITORY" \
+                --controller-workflow-id "$controller_workflow_id")"
+              jq -e '
+                .state == "verified" and
+                (.deploymentId | type == "string" and test("^dpl_[A-Za-z0-9]+$"))
+              ' >/dev/null <<<"$deployed_marker_json" || {
+                echo "::error::Canonical production SHA lacks one exact verified deployment marker."
+                exit 1
+              }
+            fi
+
+            lane_range_json="$RUNNER_TEMP/production-lane-range.json"
+            node scripts/lib/production-lane-range.mjs \
+              --repo "$REPOSITORY" \
+              --deployed-sha "$deployed_sha" \
+              --current-sha "$EXPECTED_SHA" \
+              --current-receipt "$receipt_dir/release.json" \
+              --mode "$lane_range_mode" \
+              --json-out "$lane_range_json"
+            selected_lanes="$(jq -r 'if (.selectedLanes | length) == 0 then "none" else (.selectedLanes | join(",")) end' "$lane_range_json")"
+            run_web="$(jq -r '.runWeb' "$lane_range_json")"
+            web_evidence_sha="$(jq -r '.webEvidenceSha // "none"' "$lane_range_json")"
 
             final_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
             [[ "$final_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
@@ -386,11 +440,22 @@ jobs:
               echo "source_ci_run_attempt=$source_run_attempt"
               echo "selected_lanes=$selected_lanes"
               echo "run_web=$run_web"
+              echo "deployed_sha=$deployed_sha"
+              echo "web_evidence_sha=$web_evidence_sha"
               echo "lane_receipt_artifact_id=$receipt_artifact_id"
               echo "authorized=true"
             } >> "$GITHUB_OUTPUT"
-            echo "Authorized production from exact CI run $source_run_id attempt $source_run_attempt."
+            echo "Authorized production from exact CI run $source_run_id attempt $source_run_attempt over deployed range $deployed_sha..$EXPECTED_SHA."
             exit 0
+
+      - name: Preserve cumulative production lane evidence
+        if: ${{ steps.authorize.outputs.authorized == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: production-lane-range-${{ steps.authorize.outputs.expected_sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/production-lane-range.json
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Write one-shot production marker recovery lease
         if: ${{ steps.authorize.outputs.marker_recovery == 'true' && steps.authorize.outputs.authorized == 'true' }}
@@ -828,6 +893,8 @@ jobs:
           AUTH_SMOKE_STATUS: ${{ needs.ci-post-deploy-auth-smoke.outputs.auth_smoke_status }}
           RUN_WEB: ${{ needs.authorize-production.outputs.run_web }}
           SELECTED_LANES: ${{ needs.authorize-production.outputs.selected_lanes }}
+          DEPLOYED_SHA: ${{ needs.authorize-production.outputs.deployed_sha }}
+          WEB_EVIDENCE_SHA: ${{ needs.authorize-production.outputs.web_evidence_sha }}
         shell: bash
         run: |
           set -euo pipefail
@@ -858,9 +925,11 @@ jobs:
             jq -n \
               --arg sha "$EXPECTED_SHA" \
               --arg lanes "$SELECTED_LANES" \
+              --arg deployed_sha "$DEPLOYED_SHA" \
+              --arg web_evidence_sha "$WEB_EVIDENCE_SHA" \
               --arg controller_run "${{ github.run_id }}" \
               --arg controller_attempt "${{ github.run_attempt }}" \
-              '{sha: $sha, deploymentId: "not-applicable", selectedLanes: ($lanes | split(",")), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: "not-applicable"}' \
+              '{sha: $sha, deploymentId: "not-applicable", deploymentBaseSha: $deployed_sha, webEvidenceSha: $web_evidence_sha, selectedLanes: (if $lanes == "none" then [] else ($lanes | split(",")) end), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: "not-applicable"}' \
               > "$RUNNER_TEMP/production-generation-verified.json"
             echo "verified=true" >> "$GITHUB_OUTPUT"
             echo "Web release skipped by the sealed product-lane receipt."
@@ -885,7 +954,10 @@ jobs:
               --arg controller_run "${{ github.run_id }}" \
               --arg controller_attempt "${{ github.run_attempt }}" \
               --arg auth_smoke "$AUTH_SMOKE_STATUS" \
-              '{sha: $sha, deploymentId: $deployment_id, controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: $auth_smoke}' \
+              --arg deployed_sha "$DEPLOYED_SHA" \
+              --arg web_evidence_sha "$WEB_EVIDENCE_SHA" \
+              --arg lanes "$SELECTED_LANES" \
+              '{sha: $sha, deploymentId: $deployment_id, deploymentBaseSha: $deployed_sha, webEvidenceSha: $web_evidence_sha, selectedLanes: (if $lanes == "none" then [] else ($lanes | split(",")) end), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: $auth_smoke}' \
               > "$RUNNER_TEMP/production-generation-verified.json"
             test -s "$RUNNER_TEMP/production-generation-verified.json" || {
               echo "::error::Verified marker write-through produced an empty file."

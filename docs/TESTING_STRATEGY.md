@@ -231,7 +231,8 @@ pnpm test
 # Run fast tests (optimized config)
 pnpm test:fast
 
-# Run with coverage
+# CI-matching web unit selector (Turbo task test:fast; pnpm test:ci is the alias)
+pnpm test:fast
 pnpm test:ci
 
 # Run E2E tests
