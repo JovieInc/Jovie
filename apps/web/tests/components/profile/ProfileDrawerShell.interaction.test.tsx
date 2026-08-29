@@ -2,45 +2,31 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ReactNode, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ProfileDrawerShell } from '@/components/features/profile/ProfileDrawerShell';
 import type { ProfileSurfacePresentation } from '@/features/profile/contracts';
-import { ProfileDrawerShell } from '@/features/profile/ProfileDrawerShell';
 import { ProfileUnifiedDrawer } from '@/features/profile/ProfileUnifiedDrawer';
 import { MenuView } from '@/features/profile/views/MenuView';
 import type { ShareContext } from '@/lib/share/types';
 import { mockArtist } from '@/lib/test-utils/mock-data';
 
-vi.mock('vaul', () => ({
-  Drawer: {
-    Root: ({
-      children,
-      open = true,
-    }: {
-      readonly children: ReactNode;
-      readonly open?: boolean;
-    }) => (open ? children : null),
-    Portal: ({ children }: { readonly children: ReactNode }) => children,
-    Overlay: (props: Record<string, unknown>) => <div {...props} />,
-    Content: ({
-      children,
-      ref,
-      ...props
-    }: {
-      readonly children: ReactNode;
-      readonly ref?: React.Ref<HTMLDivElement>;
-      [key: string]: unknown;
-    }) => (
-      <div role='dialog' aria-modal='true' tabIndex={-1} ref={ref} {...props}>
-        {children}
-      </div>
-    ),
-    Title: ({ children }: { readonly children: ReactNode }) => (
-      <h2>{children}</h2>
-    ),
-    Description: ({ children }: { readonly children: ReactNode }) => (
-      <p>{children}</p>
-    ),
-  },
-}));
+vi.mock('vaul', () => {
+  const Pass = ({ children }: { readonly children: ReactNode }) => children;
+  return {
+    Drawer: {
+      Root: (props: {
+        readonly children: ReactNode;
+        readonly open?: boolean;
+      }) => (props.open === false ? null : props.children),
+      Portal: Pass,
+      Overlay: (props: Record<string, unknown>) => <div {...props} />,
+      Content: (props: Record<string, unknown>) => (
+        <div role='dialog' aria-modal='true' tabIndex={-1} {...props} />
+      ),
+      Title: Pass,
+      Description: Pass,
+    },
+  };
+});
 
 vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
 vi.mock('@/features/share/PublicShareMenu', () => ({
@@ -109,6 +95,30 @@ const drawerProps = {
   shareContext: {} as ShareContext,
 };
 
+function MenuShell({
+  open = true,
+  presentation,
+  onOpenChange = vi.fn(),
+  children = <button type='button'>Share Profile</button>,
+}: {
+  readonly open?: boolean;
+  readonly presentation: ProfileSurfacePresentation;
+  readonly onOpenChange?: (open: boolean) => void;
+  readonly children?: ReactNode;
+}) {
+  return (
+    <ProfileDrawerShell
+      open={open}
+      onOpenChange={onOpenChange}
+      title='Menu'
+      presentation={presentation}
+      dataTestId='profile-menu-drawer'
+    >
+      {children}
+    </ProfileDrawerShell>
+  );
+}
+
 function OpenShell({
   presentation,
   onOpenChange,
@@ -122,19 +132,17 @@ function OpenShell({
       <button type='button' onClick={() => setOpen(true)}>
         Open menu
       </button>
-      <ProfileDrawerShell
+      <MenuShell
         open={open}
+        presentation={presentation}
         onOpenChange={next => {
           onOpenChange?.(next);
           setOpen(next);
         }}
-        title='Menu'
-        presentation={presentation}
-        dataTestId='profile-menu-drawer'
       >
         <button type='button'>Share Profile</button>
         <button type='button'>Pay</button>
-      </ProfileDrawerShell>
+      </MenuShell>
     </div>
   );
 }
@@ -144,15 +152,7 @@ function renderOpenShell(
   onOpenChange = vi.fn()
 ) {
   return render(
-    <ProfileDrawerShell
-      open
-      onOpenChange={onOpenChange}
-      title='Menu'
-      presentation={presentation}
-      dataTestId='profile-menu-drawer'
-    >
-      <button type='button'>Share Profile</button>
-    </ProfileDrawerShell>
+    <MenuShell presentation={presentation} onOpenChange={onOpenChange} />
   );
 }
 
@@ -219,17 +219,7 @@ describe('ProfileDrawerShell keyboard modal contract', () => {
     const { unmount, rerender } = renderOpenShell('modal');
     expect(document.body.style.overflow).toBe('hidden');
     expect(document.documentElement.style.overflow).toBe('hidden');
-    rerender(
-      <ProfileDrawerShell
-        open
-        onOpenChange={vi.fn()}
-        title='Menu'
-        presentation='embedded'
-        dataTestId='profile-menu-drawer'
-      >
-        <button type='button'>Share Profile</button>
-      </ProfileDrawerShell>
-    );
+    rerender(<MenuShell presentation='embedded' />);
     expect(document.body.style.overflow).toBe('hidden');
     unmount();
     expect(document.body.style.overflow).toBe('');
@@ -241,15 +231,7 @@ describe('ProfileDrawerShell keyboard modal contract', () => {
     const { rerender } = renderOpenShell('standalone', onOpenChange);
     for (const presentation of ['embedded', 'modal'] as const) {
       rerender(
-        <ProfileDrawerShell
-          open
-          onOpenChange={onOpenChange}
-          title='Menu'
-          presentation={presentation}
-          dataTestId='profile-menu-drawer'
-        >
-          <button type='button'>Share Profile</button>
-        </ProfileDrawerShell>
+        <MenuShell presentation={presentation} onOpenChange={onOpenChange} />
       );
     }
     expect(screen.getByTestId('profile-menu-drawer')).toHaveAttribute(
@@ -271,13 +253,7 @@ describe('ProfileDrawerShell keyboard modal contract', () => {
   it('dismisses only the nested topmost dialog on Escape', () => {
     const onOpenChange = vi.fn();
     render(
-      <ProfileDrawerShell
-        open
-        onOpenChange={onOpenChange}
-        title='Menu'
-        presentation='modal'
-        dataTestId='profile-menu-drawer'
-      >
+      <MenuShell presentation='modal' onOpenChange={onOpenChange}>
         <button type='button'>Share Profile</button>
         <div
           role='dialog'
@@ -287,7 +263,7 @@ describe('ProfileDrawerShell keyboard modal contract', () => {
         >
           <button type='button'>Confirm</button>
         </div>
-      </ProfileDrawerShell>
+      </MenuShell>
     );
     screen.getByRole('button', { name: 'Confirm' }).focus();
     fireEvent.keyDown(screen.getByRole('button', { name: 'Confirm' }), {
@@ -319,17 +295,11 @@ describe('ProfileDrawerShell keyboard modal contract', () => {
       return (
         <div>
           <button type='button'>Open menu</button>
-          <ProfileDrawerShell
-            open
-            onOpenChange={() => undefined}
-            title='Menu'
-            presentation='modal'
-            dataTestId='profile-menu-drawer'
-          >
+          <MenuShell presentation='modal' onOpenChange={() => undefined}>
             <button type='button' onClick={() => setLeft(true)}>
               Leave
             </button>
-          </ProfileDrawerShell>
+          </MenuShell>
         </div>
       );
     }

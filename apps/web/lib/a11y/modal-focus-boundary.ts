@@ -141,12 +141,6 @@ function acquireScrollLock(): () => void {
   };
 }
 
-/**
- * Applies the shared modal boundary used by drawer and menu surfaces:
- * sibling content is inert, keyboard focus cannot leave the active topmost
- * dialog, Escape dismisses that dialog when requested, and a live opener is
- * restored after non-navigation close.
- */
 export function useModalFocusBoundary(
   modalRef: RefObject<HTMLElement | null>,
   isOpen: boolean,

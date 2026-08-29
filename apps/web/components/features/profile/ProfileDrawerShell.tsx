@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/profile/ProfileDrawerShell.interaction.test.tsx
+
 import { ChevronLeft, X } from 'lucide-react';
 import { useCallback, useId, useRef } from 'react';
 import { Drawer } from 'vaul';
