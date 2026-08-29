@@ -1,5 +1,5 @@
-import { BADGE_SHARED_GEOMETRY_CLASS } from './badge-geometry-contract';
-import { cn } from './utils';
+import { BADGE_SHARED_GEOMETRY_CLASS } from '../../lib/badge-geometry-contract';
+import { cn } from '../../lib/utils';
 
 export const BADGE_DRIFT_FIXTURE_RED_STYLE = {
   outline: '2px solid #ff0000',

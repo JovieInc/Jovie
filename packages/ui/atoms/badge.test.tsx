@@ -13,6 +13,7 @@ import {
   BADGE_SHARED_GEOMETRY_CLASS,
   BADGE_SIZE_GEOMETRY,
 } from '../lib/badge-geometry-contract';
+import { Badge, badgeVariants } from './badge';
 import {
   BADGE_BLUE_HOVER_FIXTURE_SOURCE,
   BADGE_BLUE_HOVER_FIXTURE_TEST_ID,
@@ -23,8 +24,7 @@ import {
   BadgeBlueHoverDriftFixture,
   BadgeGeometryShiftDriftFixture,
   BadgeOverflowDriftFixture,
-} from '../lib/badge-geometry-drift-fixtures';
-import { Badge, badgeVariants } from './badge';
+} from './fixtures/badge-geometry-drift-fixtures';
 
 const packageRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -37,7 +37,7 @@ const contractSourcePath = path.join(
 );
 const fixtureSourcePath = path.join(
   packageRoot,
-  'lib/badge-geometry-drift-fixtures.tsx'
+  'atoms/fixtures/badge-geometry-drift-fixtures.tsx'
 );
 
 function readSource(filePath: string): string {
@@ -165,6 +165,7 @@ describe('Badge', () => {
       );
       const badge = screen.getByTestId('badge');
       expect(badge.className).toContain('text-3xs');
+      expect(badge.className).toContain('leading-5');
       expect(badge.className).toContain('px-1.5');
     });
 
@@ -345,7 +346,9 @@ describe('Badge canonical geometry ownership', () => {
     expect(BADGE_SHARED_GEOMETRY_CLASS).toContain(
       'rounded-(--system-b-radius-pill)'
     );
+    expect(BADGE_SIZE_GEOMETRY.sm).toContain('leading-5');
     expect(BADGE_SIZE_GEOMETRY.md).toContain('text-xs');
+    expect(BADGE_SIZE_GEOMETRY.md).toContain('leading-5');
   });
 });
 
