@@ -119,7 +119,7 @@ export const DESIGN_REFERENCE_ARCHETYPE_BY_ROUTE = Object.fromEntries([
   ...routes('profile', '/app/profiles'),
   ...routes(
     'feed-list',
-    '/app/calendar,/app/chats,/app/contacts,/app/library,/app/tasks,/app/tour-dates,/app/admin/activity,/app/admin/features,/app/admin/investors,/app/admin/investors/links,/app/admin/people,/app/admin/platform-connections,/app/admin/playlists,/app/admin/screenshots'
+    '/app/calendar,/app/chats,/app/contacts,/app/library,/app/tasks,/app/tour-dates,/app/admin/activity,/app/admin/features,/app/admin/investors,/app/admin/investors/links,/app/admin/investors/updates,/app/admin/people,/app/admin/platform-connections,/app/admin/playlists,/app/admin/screenshots'
   ),
 ]) as Readonly<Record<string, AppScreenArchetypeId>>;
 

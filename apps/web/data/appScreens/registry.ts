@@ -222,6 +222,7 @@ export const APP_SCREEN_SOURCES = [
   'apps/web/app/app/(shell)/admin/investors/links/page.tsx',
   'apps/web/app/app/(shell)/admin/investors/page.tsx',
   'apps/web/app/app/(shell)/admin/investors/settings/page.tsx',
+  'apps/web/app/app/(shell)/admin/investors/updates/page.tsx',
   'apps/web/app/app/(shell)/admin/leads/page.tsx',
   'apps/web/app/app/(shell)/admin/ops/page.tsx',
   'apps/web/app/app/(shell)/admin/outreach/dm/page.tsx',
