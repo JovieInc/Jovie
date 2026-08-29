@@ -124,6 +124,46 @@ export function planProductionLaneRange({
   };
 }
 
+export function planProductionMarkerRecovery({
+  deployedSha,
+  currentSha,
+  currentReceipt,
+}) {
+  exactSha(deployedSha, 'deployedSha');
+  exactSha(currentSha, 'currentSha');
+  if (deployedSha !== currentSha) {
+    throw new Error(
+      'marker recovery requires production to serve current main'
+    );
+  }
+  if (
+    !currentReceipt ||
+    typeof currentReceipt !== 'object' ||
+    currentReceipt.provenance?.sha !== currentSha ||
+    currentReceipt.aggregatePassed !== true
+  ) {
+    throw new Error(
+      'marker recovery receipt is not exact passing current main'
+    );
+  }
+  const selectedLanes = uniqueStrings(
+    currentReceipt.selectedLanes,
+    'currentReceipt.selectedLanes'
+  );
+  const runWeb = selectedLanes.includes('web');
+  return {
+    schemaVersion: 1,
+    basis: 'current-marker-recovery',
+    deployedSha,
+    currentSha,
+    commitCount: 0,
+    cumulativeChangedPaths: [],
+    selectedLanes,
+    runWeb,
+    webEvidenceSha: runWeb ? currentSha : null,
+  };
+}
+
 export function validateLaneEvidenceReceipt({
   receipt,
   expectedSha,
@@ -434,20 +474,36 @@ export function runProductionLaneRange(argv = process.argv.slice(2)) {
   ]) {
     if (!args[name]) throw new Error(`--${name} is required`);
   }
-  const gitRange = collectProductionGitRange(
-    args['deployed-sha'],
-    args['current-sha']
-  );
-  const plan = planProductionLaneRange({
-    deployedSha: args['deployed-sha'],
-    currentSha: args['current-sha'],
-    ...gitRange,
-  });
+  const mode = args.mode ?? 'range';
+  if (!['range', 'marker-recovery'].includes(mode)) {
+    throw new Error('--mode must be range or marker-recovery');
+  }
+  let currentReceipt;
+  let plan;
+  if (mode === 'marker-recovery') {
+    collectProductionGitRange(args['deployed-sha'], args['current-sha']);
+    currentReceipt = JSON.parse(readFileSync(args['current-receipt'], 'utf8'));
+    plan = planProductionMarkerRecovery({
+      deployedSha: args['deployed-sha'],
+      currentSha: args['current-sha'],
+      currentReceipt,
+    });
+  } else {
+    const gitRange = collectProductionGitRange(
+      args['deployed-sha'],
+      args['current-sha']
+    );
+    plan = planProductionLaneRange({
+      deployedSha: args['deployed-sha'],
+      currentSha: args['current-sha'],
+      ...gitRange,
+    });
+  }
 
   let webEvidence = null;
   if (plan.runWeb) {
     if (plan.webEvidenceSha === plan.currentSha) {
-      const currentReceipt = JSON.parse(
+      currentReceipt ??= JSON.parse(
         readFileSync(args['current-receipt'], 'utf8')
       );
       const validated = validateLaneEvidenceReceipt({
@@ -457,7 +513,13 @@ export function runProductionLaneRange(argv = process.argv.slice(2)) {
         expectedRunAttempt: currentReceipt.provenance?.runAttempt,
         lane: 'web',
       });
-      webEvidence = { ...validated, source: 'current-main-release-receipt' };
+      webEvidence = {
+        ...validated,
+        source:
+          mode === 'marker-recovery'
+            ? 'current-marker-recovery-receipt'
+            : 'current-main-release-receipt',
+      };
     } else {
       webEvidence = {
         ...resolveHistoricalLaneEvidence({

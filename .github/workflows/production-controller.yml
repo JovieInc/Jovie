@@ -169,6 +169,7 @@ jobs:
             echo "deployed_sha="
             echo "web_evidence_sha=none"
           } >> "$GITHUB_OUTPUT"
+          marker_recovery=false
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Controller expected SHA must be a full commit."
             exit 1
@@ -261,6 +262,7 @@ jobs:
                 echo "::error::Only the exact full controller attempt 2 may consume an interrupted-marker recovery."
                 exit 1
               fi
+              marker_recovery=true
               echo "marker_recovery=true" >> "$GITHUB_OUTPUT"
               ;;
             none)
@@ -388,17 +390,27 @@ jobs:
               echo "::error::Canonical production build info omitted an exact deployed SHA."
               exit 1
             }
-            deployed_marker_json="$(node .github/scripts/production-marker-state.mjs \
-              --sha "$deployed_sha" \
-              --repo "$REPOSITORY" \
-              --controller-workflow-id "$controller_workflow_id")"
-            jq -e '
-              .state == "verified" and
-              (.deploymentId | type == "string" and test("^dpl_[A-Za-z0-9]+$"))
-            ' >/dev/null <<<"$deployed_marker_json" || {
-              echo "::error::Canonical production SHA lacks one exact verified deployment marker."
-              exit 1
-            }
+            lane_range_mode=range
+            if [ "$marker_recovery" = true ] && [ "$deployed_sha" = "$EXPECTED_SHA" ]; then
+              # Attempt 1 can promote the exact build before its durable marker is
+              # uploaded. The actor-bound recovery proof above authorizes attempt
+              # 2 to reuse the exact current receipt without asking that missing
+              # marker to prove itself.
+              lane_range_mode=marker-recovery
+              echo "::notice::Recovering the exact current production receipt after alias promotion."
+            else
+              deployed_marker_json="$(node .github/scripts/production-marker-state.mjs \
+                --sha "$deployed_sha" \
+                --repo "$REPOSITORY" \
+                --controller-workflow-id "$controller_workflow_id")"
+              jq -e '
+                .state == "verified" and
+                (.deploymentId | type == "string" and test("^dpl_[A-Za-z0-9]+$"))
+              ' >/dev/null <<<"$deployed_marker_json" || {
+                echo "::error::Canonical production SHA lacks one exact verified deployment marker."
+                exit 1
+              }
+            fi
 
             lane_range_json="$RUNNER_TEMP/production-lane-range.json"
             node scripts/lib/production-lane-range.mjs \
@@ -406,8 +418,9 @@ jobs:
               --deployed-sha "$deployed_sha" \
               --current-sha "$EXPECTED_SHA" \
               --current-receipt "$receipt_dir/release.json" \
+              --mode "$lane_range_mode" \
               --json-out "$lane_range_json"
-            selected_lanes="$(jq -r '.selectedLanes | join(",") // "none"' "$lane_range_json")"
+            selected_lanes="$(jq -r 'if (.selectedLanes | length) == 0 then "none" else (.selectedLanes | join(",")) end' "$lane_range_json")"
             run_web="$(jq -r '.runWeb' "$lane_range_json")"
             web_evidence_sha="$(jq -r '.webEvidenceSha // "none"' "$lane_range_json")"
 
@@ -916,7 +929,7 @@ jobs:
               --arg web_evidence_sha "$WEB_EVIDENCE_SHA" \
               --arg controller_run "${{ github.run_id }}" \
               --arg controller_attempt "${{ github.run_attempt }}" \
-              '{sha: $sha, deploymentId: "not-applicable", deploymentBaseSha: $deployed_sha, webEvidenceSha: $web_evidence_sha, selectedLanes: ($lanes | split(",")), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: "not-applicable"}' \
+              '{sha: $sha, deploymentId: "not-applicable", deploymentBaseSha: $deployed_sha, webEvidenceSha: $web_evidence_sha, selectedLanes: (if $lanes == "none" then [] else ($lanes | split(",")) end), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: "not-applicable"}' \
               > "$RUNNER_TEMP/production-generation-verified.json"
             echo "verified=true" >> "$GITHUB_OUTPUT"
             echo "Web release skipped by the sealed product-lane receipt."
@@ -944,7 +957,7 @@ jobs:
               --arg deployed_sha "$DEPLOYED_SHA" \
               --arg web_evidence_sha "$WEB_EVIDENCE_SHA" \
               --arg lanes "$SELECTED_LANES" \
-              '{sha: $sha, deploymentId: $deployment_id, deploymentBaseSha: $deployed_sha, webEvidenceSha: $web_evidence_sha, selectedLanes: ($lanes | split(",")), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: $auth_smoke}' \
+              '{sha: $sha, deploymentId: $deployment_id, deploymentBaseSha: $deployed_sha, webEvidenceSha: $web_evidence_sha, selectedLanes: (if $lanes == "none" then [] else ($lanes | split(",")) end), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: $auth_smoke}' \
               > "$RUNNER_TEMP/production-generation-verified.json"
             test -s "$RUNNER_TEMP/production-generation-verified.json" || {
               echo "::error::Verified marker write-through produced an empty file."

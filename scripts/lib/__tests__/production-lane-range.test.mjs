@@ -8,6 +8,7 @@ import { classifyProductionMarkerEvidence } from '../../../.github/scripts/produ
 import {
   collectProductionGitRange,
   planProductionLaneRange,
+  planProductionMarkerRecovery,
   resolveHistoricalLaneEvidence,
   runProductionLaneRange,
   validateLaneEvidenceReceipt,
@@ -121,6 +122,33 @@ describe('production lane range', () => {
     expect(plan.selectedLanes).toEqual(['operations']);
     expect(plan.runWeb).toBe(false);
     expect(plan.webEvidenceSha).toBeNull();
+  });
+
+  it('retains the exact current Web receipt during marker recovery', () => {
+    const currentSha = sha('c');
+    const currentReceipt = receipt({ headSha: currentSha });
+    const plan = planProductionMarkerRecovery({
+      deployedSha: currentSha,
+      currentSha,
+      currentReceipt,
+    });
+
+    expect(plan).toMatchObject({
+      basis: 'current-marker-recovery',
+      deployedSha: currentSha,
+      currentSha,
+      selectedLanes: ['web'],
+      runWeb: true,
+      webEvidenceSha: currentSha,
+    });
+
+    expect(() =>
+      planProductionMarkerRecovery({
+        deployedSha: sha('b'),
+        currentSha,
+        currentReceipt,
+      })
+    ).toThrow('marker recovery requires production to serve current main');
   });
 
   it('fails closed when the supplied first-parent range is discontinuous', () => {
@@ -301,6 +329,10 @@ describe('production lane range', () => {
     expect(productionController).toContain('--sha "$deployed_sha"');
     expect(productionController).toContain(
       'node scripts/lib/production-lane-range.mjs'
+    );
+    expect(productionController).toContain('--mode "$lane_range_mode"');
+    expect(productionController).toContain(
+      'if $lanes == "none" then [] else ($lanes | split(",")) end'
     );
     expect(productionController).toContain(
       'production-lane-range-${{ steps.authorize.outputs.expected_sha }}'
