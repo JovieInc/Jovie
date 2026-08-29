@@ -266,6 +266,9 @@ describe('auth routing boundary', () => {
       'external'
     );
     expect(
+      classifyNavigation('ios', 'https://jov.ie/openapi.json', options)
+    ).toBe('blocked');
+    expect(
       classifyNavigation('electron', 'https://jov.ie/auth/start', options)
     ).toBe('auth');
     expect(
