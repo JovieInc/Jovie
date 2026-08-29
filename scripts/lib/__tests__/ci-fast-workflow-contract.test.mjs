@@ -216,6 +216,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'apps/web/app/.*\\.(tsx|css)$',
       'apps/web/components/',
       'apps/web/styles/',
+      'apps/web/tests/',
       'packages/ui/',
       'DESIGN\\.md$',
       'design\\.tokens\\.json$',
@@ -473,6 +474,18 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(selectsStructural.test('apps/web/app/(home)/page.tsx')).toBe(true);
     expect(selectsStructural.test('packages/ui/atoms/badge.tsx')).toBe(true);
     expect(selectsStructural.test('scripts/component-ship-gate.mjs')).toBe(
+      true
+    );
+    expect(
+      selectsStructural.test('apps/web/tests/unit/atoms/ViaPanel.test.tsx')
+    ).toBe(true);
+    expect(
+      new RegExp(uiPattern).test('apps/web/tests/unit/atoms/ViaPanel.test.tsx')
+    ).toBe(true);
+    expect(
+      new RegExp(uiPattern).test('apps/web/components/atoms/Button.test.tsx')
+    ).toBe(true);
+    expect(new RegExp(uiPattern).test('packages/ui/atoms/badge.test.tsx')).toBe(
       true
     );
     expect(selectsStructural.test('.claude/skills/qa/SKILL.md')).toBe(false);
