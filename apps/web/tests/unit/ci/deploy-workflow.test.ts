@@ -4761,6 +4761,25 @@ describe('production promotion exact-artifact contract', () => {
 });
 
 describe('production marker recovery workflow (JOV-4965)', () => {
+  it('authorizes event-driven fleet refresh at the dispatching job boundary', () => {
+    const workflow = readFileSync(productionMarkerRecoveryWorkflowPath, 'utf8');
+    const job = getJobBlock(workflow, 'recover-marker');
+    const jobHeader = job.slice(0, job.indexOf('    env:'));
+    const dispatch = getStepBlock(job, 'Dispatch fresh fleet reconciliation');
+
+    expect(jobHeader).toContain(
+      'permissions:\n      contents: read\n      actions: write'
+    );
+    expect(workflow).toContain(
+      "if: steps.admission.outputs.fleet_refresh_required == 'true'"
+    );
+    expect(dispatch).toContain('GH_TOKEN: ${{ github.token }}');
+    expect(dispatch).toContain('set -euo pipefail');
+    expect(dispatch).toContain(
+      'gh workflow run fleet-gate-refresh.yml --ref main'
+    );
+  });
+
   it('is event-driven with a bounded manual fallback and never mutates release state', () => {
     const workflow = readFileSync(productionMarkerRecoveryWorkflowPath, 'utf8');
 
