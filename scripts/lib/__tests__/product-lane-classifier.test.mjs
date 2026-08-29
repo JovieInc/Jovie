@@ -54,7 +54,9 @@ describe('product lane classifier', () => {
       '.github/ci-harness/manifest.json',
       'scripts/ci-fast-lanes.mjs',
       'scripts/lib/product-lane-classifier.mjs',
+      'scripts/lib/production-lane-range.mjs',
       'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
+      'scripts/lib/__tests__/production-lane-range.test.mjs',
       'apps/web/tests/unit/ci/deploy-workflow.test.ts',
     ]);
 
