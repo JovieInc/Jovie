@@ -805,7 +805,7 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
         await expect(
           h1,
           'Artist name does not match imported artist'
-        ).toHaveText(/tim white/i, { timeout: 10_000 });
+        ).toHaveText(TEST_SPOTIFY_ARTIST.name, { timeout: 10_000 });
 
         await expect(
           fanPage

@@ -3180,6 +3180,10 @@ describe('CI E2E smoke workflow', () => {
       'sendChatMessage(TEST_SPOTIFY_ARTIST.url)'
     );
     expect(goldenPathSpec).toContain(
+      '.toHaveText(TEST_SPOTIFY_ARTIST.name, { timeout: 10_000 })'
+    );
+    expect(goldenPathSpec).not.toContain('/tim white/i');
+    expect(goldenPathSpec).toContain(
       'fillControlledInputUntilEnabled(input, sendButton, text)'
     );
     expect(goldenPathSpec).toContain('.filter({ visible: true })');
