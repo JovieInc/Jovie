@@ -179,6 +179,7 @@ describe('sitemap', () => {
       expect.arrayContaining([
         'https://jov.ie',
         'https://jov.ie/blog',
+        'https://jov.ie/developers',
         'https://jov.ie/blog/hello-world',
         'https://jov.ie/changelog/26.8.0',
         'https://jov.ie/legal/privacy',

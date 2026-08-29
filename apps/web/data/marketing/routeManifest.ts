@@ -448,6 +448,30 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     url: '/support',
   },
   {
+    glob: '(marketing)/developers/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'JOV-5412 public developer guide',
+      notes:
+        'Public API documentation page uses the marketing shell but is prose-led rather than recipe-composable.',
+    },
+    exempt: {
+      reason:
+        'public developer documentation page — prose API reference; not recipe-composable',
+      linearId: 'JOV-5412',
+      approvedBy: 'tw',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/16619',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/developers',
+    healthCheck: {
+      path: '/developers',
+      expected: 'page',
+    },
+  },
+  {
     glob: '(marketing)/compare/[slug]/page.tsx',
     recipeId: 'comparison',
     renderedSections: approvedBindings(
