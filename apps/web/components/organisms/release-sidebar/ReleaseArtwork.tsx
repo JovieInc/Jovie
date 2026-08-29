@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/components/organisms/release-sidebar/ReleaseArtwork.test.tsx
 'use client';
 
 /**
@@ -63,7 +64,10 @@ export function ReleaseArtwork({
     <DrawerMediaThumb
       src={imgError ? null : artworkUrl}
       alt={altText}
-      sizeClassName='h-16 w-16'
+      dimension={96}
+      sizeClassName='h-24 w-24'
+      imageClassName='object-contain'
+      sizes='96px'
       fallback={
         <Icon
           name='Disc3'
@@ -80,8 +84,8 @@ export function ReleaseArtwork({
         src={artworkUrl}
         alt={altText}
         name={title}
-        size='lg'
-        rounded='md'
+        size='2xl'
+        shape='artwork'
         uploadable={canUploadArtwork}
         onUpload={onArtworkUpload}
         showHoverOverlay

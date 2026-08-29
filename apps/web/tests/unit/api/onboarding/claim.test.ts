@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   mockGetCachedAuth,
   mockGetCachedCurrentUser,
+  mockGetDbUser,
   mockGetCurrentOnboardingSessionId,
   mockClearOnboardingSessionCookie,
   mockDbSelect,
@@ -20,6 +21,7 @@ const {
 } = vi.hoisted(() => ({
   mockGetCachedAuth: vi.fn(),
   mockGetCachedCurrentUser: vi.fn(),
+  mockGetDbUser: vi.fn(),
   mockGetCurrentOnboardingSessionId: vi.fn(),
   mockClearOnboardingSessionCookie: vi.fn().mockResolvedValue(undefined),
   mockDbSelect: vi.fn(),
@@ -37,6 +39,10 @@ const {
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
   getCachedCurrentUser: mockGetCachedCurrentUser,
+}));
+
+vi.mock('@/lib/auth/session', () => ({
+  getDbUser: mockGetDbUser,
 }));
 
 vi.mock('@/lib/waitlist/access-request', () => ({
@@ -309,6 +315,10 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
       sessionId: 'ba_session_123',
       orgId: null,
     });
+    mockGetDbUser.mockResolvedValue({
+      id: '3a53ba3e-150c-4ab5-8e73-2d2499764e2c',
+      userStatus: 'waitlist_pending',
+    });
     mockGetCurrentOnboardingSessionId.mockResolvedValue('sess_abc123');
     mockExtractClientIP.mockReturnValue('10.0.0.1');
     mockMaterializeClaimedOnboardingProfile.mockResolvedValue({
@@ -560,6 +570,28 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     expect(body).not.toHaveProperty('waitlist');
     expect(mockMaterializeClaimedOnboardingProfile).toHaveBeenCalledWith(
       expect.objectContaining({ conversationId: 'conv_approved' })
+    );
+  });
+
+  it('continues profile onboarding when the user already passed the waitlist gate', async () => {
+    mockGetDbUser.mockResolvedValue({
+      id: '3a53ba3e-150c-4ab5-8e73-2d2499764e2c',
+      userStatus: 'waitlist_approved',
+    });
+    mockIsWaitlistGateEnabled.mockResolvedValue(true);
+    setupDbSelectForCandidates(
+      [{ id: 'conv_preapproved', createdAt: new Date('2026-05-01') }],
+      waitlistDecisionMessageRows()
+    );
+    setupUpdateForPrimary(1);
+    setupInsertAudit(true);
+
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(200);
+    expect(mockSubmitWaitlistAccessRequest).not.toHaveBeenCalled();
+    expect(mockMaterializeClaimedOnboardingProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ conversationId: 'conv_preapproved' })
     );
   });
 

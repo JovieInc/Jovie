@@ -10,11 +10,18 @@
  *
  * Usage:
  *   node scripts/generate-llms-design-manifest.mjs [--check] [--out <path>]
+ *
+ * Invariant consumer: JOV-INV-019.
  */
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import {
+  formatDesignInvariantLines,
+  readDesignAgentContract,
+} from './invariants/design-agent-contract.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = path.resolve(SCRIPT_DIR, '..');
@@ -97,49 +104,6 @@ const CONTRACT_TOKEN_PREFIXES = [
 ];
 
 const CONTRACT_TOKEN_BLOCKLIST_PREFIXES = ['color-brand-', 'color-accent-'];
-
-export const CANONICAL_DESIGN_INVARIANTS = [
-  [
-    'no-serif-product-source',
-    'Product source uses Inter and Satoshi only; serif media requires an exact approved exception.',
-  ],
-  [
-    'marketing-pill-32-visible-44-target',
-    'Marketing pills are 32px visible inside a 44px minimum hit target.',
-  ],
-  [
-    'marketing-o-mark-32',
-    'The marketing O-mark is visibly 32px and control-aligned.',
-  ],
-  [
-    'semantic-accent-only',
-    'Accent color communicates semantic state or a named data category, never decoration.',
-  ],
-  [
-    'decorative-icons-unboxed',
-    'Decorative icons and emoji have no border, ring, circle, or badge plate.',
-  ],
-  [
-    'single-component-family',
-    'One canonical component family owns a concept; supported states are variants consumed as instances.',
-  ],
-  [
-    'founder-review-canonical-only',
-    'Founder review contains canonical masters and intentional variants, without receipts, duplicates, or filler.',
-  ],
-  [
-    'pen-source-identity-boundary',
-    'Pen is proposal/review evidence until source identity and required persistence receipts pass.',
-  ],
-  [
-    'logo-visible-bounds-normalization',
-    'Logos normalize visible non-transparent ink through the shared asset registry, never route-local crop or scale CSS.',
-  ],
-  [
-    'do-not-fuck-with-art',
-    'Never crop album art. Use object-fit: contain, not cover. No gradient, overlay, play button, or chrome on album art, merch, or a face except optional mostly-transparent glass play/pause.',
-  ],
-];
 
 export function isContractToken(name) {
   const bare = name.startsWith('--') ? name.slice(2) : name;
@@ -478,6 +442,7 @@ export function buildLlmsDesignManifest({
   eslintConfig = readText(ESLINT_CONFIG),
   canonicalSurfacesSource = readText(CANONICAL_SURFACES),
   uiComponents = listUiAtomComponents(path.join(repoRoot, 'packages/ui/atoms')),
+  designAgentContract = readDesignAgentContract(repoRoot),
 } = {}) {
   const allTokens = parseCssCustomProperties(designSystemCss);
   const tokens = filterContractTokens(allTokens);
@@ -489,6 +454,7 @@ export function buildLlmsDesignManifest({
   );
   const restrictedImports = parseRestrictedUiImports(eslintConfig);
   const surfaces = parseCanonicalSurfaces(canonicalSurfacesSource);
+  const designInvariantLines = formatDesignInvariantLines(designAgentContract);
 
   const lines = [
     '# Jovie Design System — AI Agent Contract',
@@ -517,9 +483,7 @@ export function buildLlmsDesignManifest({
     '',
     '## Canonical Invariants',
     '',
-    ...CANONICAL_DESIGN_INVARIANTS.flatMap(([id, rule]) => [
-      `- \`${id}\` — ${rule}`,
-    ]),
+    ...designInvariantLines,
     '',
     '## Canonical Tailwind Utilities',
     '',

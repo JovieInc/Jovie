@@ -152,6 +152,7 @@ describe('@critical SubscriptionHandler - Deleted', () => {
       success: true,
       skipped: true,
       reason: 'stale_event',
+      appUserId: 'app_user_deleted_skipped',
     });
 
     const context: WebhookContext = {

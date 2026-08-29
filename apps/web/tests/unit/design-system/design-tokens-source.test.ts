@@ -51,6 +51,45 @@ describe('design tokens — single machine-readable source', () => {
     }
   });
 
+  it('owns radius CSS and leaves Tailwind no legacy linear radius namespace', () => {
+    const tokens = loadSource() as {
+      radius: Record<string, string>;
+    };
+    const generated = readFileSync(
+      join(WEB_ROOT, 'styles', 'generated', 'design-tokens.css'),
+      'utf8'
+    );
+    const designSystem = readFileSync(
+      join(WEB_ROOT, 'styles', 'design-system.css'),
+      'utf8'
+    );
+    const linearTokens = readFileSync(
+      join(WEB_ROOT, 'styles', 'linear-tokens.css'),
+      'utf8'
+    );
+    const tailwindConfig = readFileSync(
+      join(WEB_ROOT, 'tailwind.config.js'),
+      'utf8'
+    );
+
+    for (const [name, value] of Object.entries(tokens.radius)) {
+      if (name.startsWith('$')) continue;
+      expect(generated).toContain(`--radius-${name}: ${value};`);
+    }
+
+    expect(designSystem).not.toMatch(/^\s*--radius-[a-z0-9-]+:/m);
+    expect(linearTokens).not.toMatch(/--linear-radius-[a-z0-9-]+/);
+    expect(tailwindConfig).not.toMatch(/'linear-(?:sm|md|lg)'/);
+
+    const tailwindRadiusTokens = [
+      ...tailwindConfig.matchAll(/var\(--radius-([a-z0-9-]+)\)/g),
+    ].map(match => match[1]);
+    expect(tailwindRadiusTokens.length).toBeGreaterThan(0);
+    for (const name of tailwindRadiusTokens) {
+      expect(tokens.radius).toHaveProperty(name);
+    }
+  });
+
   it('accent values in tokens.json match the live design-system.css emitter', () => {
     const tokens = loadSource() as {
       accent: Record<'light' | 'dark', Record<string, string>>;

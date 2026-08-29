@@ -87,7 +87,7 @@ describe('VoicePageContent source contract', () => {
     expect(voiceMeta.parameters.pen).toEqual({
       registryId: 'web-041-voice',
       route: '/voice',
-      sourceSha: 'e21d2e01bc80d7e0146a071207c406e1cd762bd3',
+      sourceSha: '8b0353fcbeb0cffef614fa47afbbbd8eeae48997',
       proofScope: 'exact-production-body',
     });
     expect(Web041Voice).toEqual({});

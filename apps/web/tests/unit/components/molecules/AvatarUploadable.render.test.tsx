@@ -56,18 +56,20 @@ describe('AvatarUploadable - Display Mode (Non-uploadable)', () => {
     expect(container.querySelector('.rounded-full')).toBeInTheDocument();
   });
 
-  it('supports non-circular shape overrides when provided', () => {
+  it('uses rounded-square geometry for release artwork', () => {
     const { container } = render(
       <AvatarUploadable
         src='https://example.com/avatar.jpg'
         alt='Release artwork'
         name='Midnight Echo'
-        rounded='md'
+        size='2xl'
+        shape='artwork'
         uploadable={false}
       />
     );
 
-    expect(container.querySelector('.rounded-md')).toBeInTheDocument();
+    expect(container.querySelector('.rounded-lg')).toBeInTheDocument();
+    expect(container.querySelector('.rounded-full')).not.toBeInTheDocument();
   });
   it('does not show hover overlay when not uploadable', () => {
     render(
@@ -130,6 +132,27 @@ describe('AvatarUploadable - Upload Mode', () => {
     expect(fileInput).toBeInTheDocument();
     expect(fileInput).toHaveAttribute('type', 'file');
     expect(fileInput).toHaveClass('sr-only');
+  });
+
+  it('announces artwork uploads with release semantics', () => {
+    render(
+      <AvatarUploadable
+        src='https://example.com/release.jpg'
+        alt='Release artwork'
+        name='Midnight Echo'
+        size='2xl'
+        shape='artwork'
+        uploadable={true}
+        onUpload={mockOnUpload}
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Upload release artwork' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Choose Release Artwork File')
+    ).toHaveAttribute('type', 'file');
   });
 });
 

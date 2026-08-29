@@ -41,6 +41,21 @@ describe('authenticated app screen registry', () => {
     );
   });
 
+  it('maps every design-reference screen to one product archetype and keeps projections null', () => {
+    const references = APP_SCREEN_REGISTRY.filter(
+      entry => entry.designReference
+    );
+    expect(references).toHaveLength(45);
+    for (const screen of references) {
+      expect(screen.archetypeId, screen.route).not.toBeNull();
+    }
+    for (const screen of APP_SCREEN_REGISTRY.filter(
+      entry => !entry.designReference
+    )) {
+      expect(screen.archetypeId, screen.route).toBeNull();
+    }
+  });
+
   it('backs every registered component with its real Storybook title', () => {
     for (const component of APP_SCREEN_COMPONENT_REGISTRY) {
       expect(fs.existsSync(path.join(repoRoot, component.source))).toBe(true);
@@ -163,6 +178,7 @@ describe('authenticated app screen registry', () => {
       designReferences: 45,
       components: APP_SCREEN_COMPONENT_REGISTRY.length,
       recipes: APP_SCREEN_RECIPE_REGISTRY.length,
+      archetypes: 8,
     });
     expect(receipt.screens).toHaveLength(APP_SCREEN_REGISTRY.length);
     expect(receipt.components).toEqual(

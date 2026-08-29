@@ -108,6 +108,8 @@ vi.mock('@clerk/nextjs/server', () => ({
   clerkMiddleware: mocks.clerkMiddleware,
 }));
 vi.mock('@/constants/app', () => ({
+  APP_NAME: 'Jovie',
+  BASE_URL: 'https://jov.ie',
   AUDIENCE_ANON_COOKIE: 'audience_anon',
   AUDIENCE_IDENTIFIED_COOKIE: 'audience_identified',
   AUDIENCE_SPOTIFY_PREFERRED_COOKIE: 'audience_spotify_preferred',
@@ -118,6 +120,7 @@ vi.mock('@/constants/app', () => ({
 }));
 vi.mock('@/constants/domains', () => ({
   BASE_URL: 'https://jov.ie',
+  DOCS_URL: 'https://docs.jov.ie',
   HOSTNAME: 'jov.ie',
   STAGING_HOSTNAMES: new Set(['staging.jov.ie', 'main.jov.ie']),
 }));
@@ -176,6 +179,56 @@ describe('proxy composition (critical)', () => {
 
       // Marketing paths don't need CSP nonce — only app/protected routes do
       expect(mocks.buildContentSecurityPolicy).not.toHaveBeenCalled();
+    });
+
+    it('returns homepage markdown when Accept prefers text/markdown', async () => {
+      const req = createTestRequest({
+        pathname: '/',
+        headers: { accept: 'text/markdown' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toBe(
+        'text/markdown; charset=utf-8'
+      );
+      expect(res.headers.get('vary')).toBe('Accept');
+      await expect(res.text()).resolves.toContain('# ');
+      expect(mocks.buildContentSecurityPolicy).not.toHaveBeenCalled();
+    });
+
+    it('returns a markdown 404 recovery body for a missing path', async () => {
+      const req = createTestRequest({
+        pathname: '/some-path-that-does-not-exist',
+        headers: { accept: 'text/markdown' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(404);
+      expect(res.headers.get('content-type')).toBe(
+        'text/markdown; charset=utf-8'
+      );
+      expect(res.headers.get('vary')).toContain('Accept');
+      const body = await res.text();
+      expect(body).toContain('/llms.txt');
+      expect(body).toContain('/openapi.json');
+      expect(body).toContain('/sitemap.xml');
+    });
+
+    it('keeps the HTML homepage path for browser Accept and still varies on Accept', async () => {
+      const req = createTestRequest({
+        pathname: '/',
+        headers: {
+          accept:
+            'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+      });
+      const res = await callMiddleware(req);
+      expect(res.status).toBeLessThan(400);
+      expect(res.headers.get('content-type')).not.toBe(
+        'text/markdown; charset=utf-8'
+      );
+      expect(res.headers.get('vary')).toMatch(/Accept/i);
     });
 
     it('generates nonce for app paths', async () => {

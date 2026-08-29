@@ -1,5 +1,12 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -267,12 +274,21 @@ function executeAdmissionScope({
   conclusion,
   name,
   workflowEvent = 'pull_request',
+  pullRequests = [],
 }) {
   const workflow = readRepoFile('.github/workflows/merge-queue-autoenroll.yml');
   const script = workflowRunScript(workflow, 'Resolve exact admission scope');
   const directory = mkdtempSync(join(tmpdir(), 'merge-queue-admission-'));
   const eventPath = join(directory, 'event.json');
   const outputPath = join(directory, 'output.txt');
+  const binPath = join(directory, 'bin');
+  const ghPath = join(binPath, 'gh');
+  mkdirSync(binPath);
+  writeFileSync(
+    ghPath,
+    '#!/usr/bin/env bash\nprintf \'%s\\n\' "$MOCK_PULL_REQUESTS"\n'
+  );
+  chmodSync(ghPath, 0o755);
   writeFileSync(
     eventPath,
     JSON.stringify({
@@ -299,6 +315,8 @@ function executeAdmissionScope({
           GITHUB_OUTPUT: outputPath,
           MANUAL_PR: '',
           MANUAL_HEAD: '',
+          MOCK_PULL_REQUESTS: JSON.stringify(pullRequests),
+          PATH: `${binPath}:${process.env.PATH}`,
           REPO: REPOSITORY,
         },
       }
@@ -514,7 +532,7 @@ describe('queue workflow mutation safety', () => {
     expect(scope).toContain('.pull_request.head.sha');
     expect(scope).toContain('.pull_request.base.ref');
     expect(scope).toContain('.workflow_run.head_sha');
-    expect(scope).toContain('--json number,headRefOid,baseRefName');
+    expect(scope).toContain('--json number,headRefOid,baseRefName,isDraft');
     expect(scope).toContain('select(.baseRefName == "main")');
     expect(scope).toContain('No unique open main PR owns workflow_run head');
     expect(scope).toContain(
@@ -524,10 +542,10 @@ describe('queue workflow mutation safety', () => {
       'Main push; no primary target (bounded reconciliation remains enabled)'
     );
     expect(enroll).toContain(
-      'DRAIN_ADMISSION_PR: ${{ steps.admission.outputs.pr_number }}'
+      "DRAIN_ADMISSION_PR: ${{ steps.admission.outputs.disposition == 'candidate' && steps.admission.outputs.pr_number || '' }}"
     );
     expect(enroll).toContain(
-      'DRAIN_ADMISSION_HEAD: ${{ steps.admission.outputs.head_sha }}'
+      "DRAIN_ADMISSION_HEAD: ${{ steps.admission.outputs.disposition == 'candidate' && steps.admission.outputs.head_sha || '' }}"
     );
     expect(enroll).toContain("DRAIN_RECONCILE_QUEUE_DEFERRED: '0'");
     expect(enroll).not.toContain("github.event_name == 'push' && '1' || '0'");
@@ -597,6 +615,89 @@ describe('queue workflow mutation safety', () => {
     expect(drain).toContain('exit 3');
   });
 
+  it.each([
+    ['draft', 'success', true, 'draft-ineligible'],
+    ['failed', 'failure', false, 'ci-not-successful'],
+    ['pending', 'pending', false, 'ci-not-successful'],
+    ['incomplete', null, false, 'ci-not-successful'],
+  ])('treats a %s CI completion as typed neutral', (_kind, conclusion, isDraft, reason) => {
+    const outputs = executeAdmissionScope({
+      path: '.github/workflows/ci.yml',
+      conclusion,
+      name: 'CI',
+      pullRequests: [
+        {
+          number: 16510,
+          headRefOid: HEAD,
+          baseRefName: 'main',
+          isDraft,
+        },
+      ],
+    });
+
+    expect(outputs).toEqual(
+      expect.objectContaining({
+        disposition: 'neutral',
+        reason,
+        pr_number: '',
+        head_sha: '',
+        reconcile_queue_reentry: '0',
+      })
+    );
+  });
+
+  it('treats successful CI for a superseded source ref as typed neutral', () => {
+    const outputs = executeAdmissionScope({
+      path: '.github/workflows/ci.yml',
+      conclusion: 'success',
+      name: 'CI',
+      pullRequests: [
+        {
+          number: 16546,
+          headRefOid: OTHER_HEAD,
+          baseRefName: 'main',
+          isDraft: false,
+        },
+      ],
+    });
+
+    expect(outputs).toEqual(
+      expect.objectContaining({
+        disposition: 'neutral',
+        reason: 'superseded-ref',
+        pr_number: '',
+        head_sha: '',
+        reconcile_queue_reentry: '0',
+      })
+    );
+  });
+
+  it('selects a unique live non-draft main PR after successful CI', () => {
+    const outputs = executeAdmissionScope({
+      path: '.github/workflows/ci.yml',
+      conclusion: 'success',
+      name: 'CI',
+      pullRequests: [
+        {
+          number: 16546,
+          headRefOid: HEAD,
+          baseRefName: 'main',
+          isDraft: false,
+        },
+      ],
+    });
+
+    expect(outputs).toEqual(
+      expect.objectContaining({
+        disposition: 'candidate',
+        reason: 'ci-success-exact-head',
+        pr_number: '16546',
+        head_sha: HEAD,
+        reconcile_queue_reentry: '0',
+      })
+    );
+  });
+
   it('reconciles only native exact-head receipts after an unattributable successful composite CI run', () => {
     const workflow = readRepoFile(
       '.github/workflows/merge-queue-autoenroll.yml'
@@ -613,6 +714,8 @@ describe('queue workflow mutation safety', () => {
 
     expect(outputs).toEqual(
       expect.objectContaining({
+        disposition: 'neutral',
+        reason: 'composite-merge-group',
         pr_number: '',
         head_sha: '',
         reconcile_queue_reentry: '1',

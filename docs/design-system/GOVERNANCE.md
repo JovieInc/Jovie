@@ -57,6 +57,11 @@ permanent check:
    configured in `apps/web/eslint.config.js`.
 7. **Stale completion docs** — `DESIGN_COMPLETE.md` must carry a superseded
    banner rather than contradict live tests.
+8. **Design-invariant projection** — `JOV-INV-019` in
+   `canon/invariants.jsonl` is the only executable list of design-agent
+   invariants. The generated LLM manifest, design authority guard, and this
+   audit consume that record. The audit injects a contract-change probe and
+   fails unless both generator output and authority-guard rejection change.
 
 Exit code is non-zero on any FAIL; WARN never blocks. Failures print the
 exact offending values so remediation is mechanical.

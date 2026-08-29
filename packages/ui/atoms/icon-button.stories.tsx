@@ -25,6 +25,7 @@ const SECONDARY_STATE_EXAMPLES = [
   { label: 'Rest', props: {} },
   { label: 'Disabled', props: { disabled: true } },
   { label: 'Loading', props: { loading: true } },
+  { label: 'Destructive', props: { destructive: true } },
 ] as const;
 
 type ProofTheme = 'light' | 'dark';

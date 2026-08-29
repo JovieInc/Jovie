@@ -34,6 +34,15 @@ describe('JOV-5288 CI repo lanes', () => {
     expect(plan.lanes).toEqual([CI_LANES.SYMPHONY_CONTROL]);
   });
 
+  it('classifies ci-fast lane wiring as Symphony control-plane, not Jovie product', () => {
+    expect(classifyChangedFile('scripts/ci-fast-lanes.mjs')).toEqual([
+      CI_LANES.SYMPHONY_CONTROL,
+    ]);
+    expect(classifyChangedFile('scripts/lib/ci-repo-lanes.mjs')).toEqual([
+      CI_LANES.SYMPHONY_CONTROL,
+    ]);
+  });
+
   it('keeps Jovie product files off Symphony and Summer/ops suites', () => {
     const plan = classifyCiRepoLanes([
       'apps/web/components/features/profile/ProfileHeader.tsx',
