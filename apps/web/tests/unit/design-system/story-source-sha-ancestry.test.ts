@@ -5,7 +5,8 @@ import { describe, expect, it } from 'vitest';
 
 const repoRoot = resolve(process.cwd(), '../..');
 const componentsRoot = resolve(process.cwd(), 'components');
-const directSourceShaPattern = /sourceSha:\s*'([0-9a-f]{40})'/g;
+const directReceiptShaPattern =
+  /(?:sourceSha|containingMergeSha):\s*'([0-9a-f]{40})'/g;
 const constantSourceShaPattern =
   /const\s+[A-Z0-9_]*SOURCE_SHA[A-Z0-9_]*\s*=\s*'([0-9a-f]{40})'/g;
 
@@ -20,12 +21,12 @@ function listStoryFiles(directory: string): string[] {
 }
 
 function sourceShas(source: string): string[] {
-  return [directSourceShaPattern, constantSourceShaPattern].flatMap(pattern =>
+  return [directReceiptShaPattern, constantSourceShaPattern].flatMap(pattern =>
     Array.from(source.matchAll(pattern), match => match[1])
   );
 }
 
-describe('story sourceSha ancestry', () => {
+describe('story receipt SHA ancestry', () => {
   it('keeps every literal receipt ancestral and able to replay its story path', () => {
     const issues: string[] = [];
     const shallow =
