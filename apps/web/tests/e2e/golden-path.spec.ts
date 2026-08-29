@@ -379,6 +379,30 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
     conversationId,
     'Anonymous chat did not reserve a conversation'
   ).toBeTruthy();
+
+  const readPersistedConfirmedHandle = async () => {
+    const [proof] = await sql`
+      SELECT event.value -> 'output' ->> 'handle' AS handle
+      FROM chat_messages message
+      CROSS JOIN LATERAL jsonb_array_elements(
+        COALESCE(message.tool_calls, '[]'::jsonb)
+      ) AS event(value)
+      WHERE message.conversation_id = ${conversationId}
+        AND event.value -> 'output' ->> 'action' = 'handle_confirmed'
+      ORDER BY message.created_at DESC
+      LIMIT 1
+    `;
+    return proof?.handle ?? null;
+  };
+
+  await expect
+    .poll(readPersistedConfirmedHandle, {
+      message:
+        'Confirmed handle was visible but not durable in the claim transcript',
+      timeout: 30_000,
+    })
+    .toBe(handle);
+
   return conversationId;
 }
 
