@@ -1,6 +1,6 @@
 'use client';
 
-import { Switch } from '@jovie/ui';
+import { Button, Switch } from '@jovie/ui';
 import {
   BadgeCheck,
   Bell,
@@ -342,8 +342,6 @@ export function ProfileDesktopSurface({
   // otherwise the toggle is meaningless and confuses unsubscribed visitors.
   const artistEmailReady = readArtistEmailReadyFromSettings(artist.settings);
   const showArtistEmailRow = isSubscribed && artistEmailReady;
-  const primaryActionControlClassName =
-    'inline-flex h-11 items-center gap-2 rounded-full bg-white dark:bg-surface-1 px-4 text-app font-semibold tracking-tight text-black dark:text-white transition-colors duration-subtle hover:bg-white dark:bg-surface-1/88';
   const PrimaryActionIcon = primaryAction.kind === 'tour' ? CalendarDays : Play;
   let primaryActionElement: React.ReactNode;
   if (primaryAction.kind === 'subscribe') {
@@ -359,17 +357,21 @@ export function ProfileDesktopSurface({
     );
   } else if (primaryAction.href) {
     primaryActionElement = (
-      <a href={primaryAction.href} className={primaryActionControlClassName}>
-        <PrimaryActionIcon className='h-4 w-4' />
-        {primaryAction.label}
-      </a>
+      <Button asChild variant='primary' size='marketing' className='gap-2 px-4'>
+        <a href={primaryAction.href}>
+          <PrimaryActionIcon className='h-4 w-4' />
+          {primaryAction.label}
+        </a>
+      </Button>
     );
   } else {
     primaryActionElement = (
-      <button
+      <Button
         type='button'
+        variant='primary'
+        size='marketing'
         onClick={() => onModeSelect(primaryAction.mode)}
-        className={primaryActionControlClassName}
+        className='gap-2 px-4'
       >
         <PrimaryActionIcon
           className={cn(
@@ -378,7 +380,7 @@ export function ProfileDesktopSurface({
           )}
         />
         {primaryAction.label}
-      </button>
+      </Button>
     );
   }
 
