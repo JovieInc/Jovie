@@ -209,7 +209,26 @@ describe('proxy composition (critical)', () => {
         'text/markdown; charset=utf-8'
       );
       expect(res.headers.get('vary')).toContain('Accept');
-      await expect(res.text()).resolves.toContain('/llms.txt');
+      const body = await res.text();
+      expect(body).toContain('/llms.txt');
+      expect(body).toContain('/openapi.json');
+      expect(body).toContain('/sitemap.xml');
+    });
+
+    it('keeps the HTML homepage path for browser Accept and still varies on Accept', async () => {
+      const req = createTestRequest({
+        pathname: '/',
+        headers: {
+          accept:
+            'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+      });
+      const res = await callMiddleware(req);
+      expect(res.status).toBeLessThan(400);
+      expect(res.headers.get('content-type')).not.toBe(
+        'text/markdown; charset=utf-8'
+      );
+      expect(res.headers.get('vary')).toMatch(/Accept/i);
     });
 
     it('generates nonce for app paths', async () => {

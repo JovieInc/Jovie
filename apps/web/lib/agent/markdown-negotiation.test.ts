@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { NextRequest } from 'next/server';
 import { describe, expect, it } from 'vitest';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
@@ -33,6 +35,7 @@ describe('shouldPassThroughMarkdownNegotiation', () => {
     expect(shouldPassThroughMarkdownNegotiation('/api/v1/timwhite')).toBe(true);
     expect(shouldPassThroughMarkdownNegotiation('/llms.txt')).toBe(true);
     expect(shouldPassThroughMarkdownNegotiation('/openapi.json')).toBe(true);
+    expect(shouldPassThroughMarkdownNegotiation('/sitemap.xml')).toBe(true);
     expect(shouldPassThroughMarkdownNegotiation('/app/dashboard')).toBe(true);
   });
 });
@@ -77,10 +80,27 @@ describe('negotiateAgentMarkdown', () => {
     expect(body).toContain('/sitemap.xml');
   });
 
+  it('omits the body on HEAD while keeping Markdown headers', async () => {
+    const res = negotiateAgentMarkdown(
+      request('/', { accept: 'text/markdown', method: 'HEAD' })
+    );
+    expect(res?.status).toBe(200);
+    expect(res?.headers.get('content-type')).toBe(
+      'text/markdown; charset=utf-8'
+    );
+    expect(res?.headers.get('vary')).toBe('Accept');
+    expect(await res?.text()).toBe('');
+  });
+
   it('does not intercept HTML or RSC homepage requests', () => {
     expect(negotiateAgentMarkdown(request('/'))).toBeNull();
     expect(
       negotiateAgentMarkdown(request('/', { accept: 'text/html' }))
+    ).toBeNull();
+    expect(
+      negotiateAgentMarkdown(
+        request('/', { accept: 'text/html, text/markdown;q=0.9' })
+      )
     ).toBeNull();
     expect(
       negotiateAgentMarkdown(
@@ -101,5 +121,23 @@ describe('negotiateAgentMarkdown', () => {
     expect(
       negotiateAgentMarkdown(request('/pricing', { accept: 'text/markdown' }))
     ).toBeNull();
+  });
+});
+
+describe('homepage CDN Vary contract', () => {
+  it('includes Accept on the `/` header rule so HTML and Markdown cannot mix', () => {
+    const candidates = [
+      resolve(process.cwd(), 'next.config.js'),
+      resolve(process.cwd(), 'apps/web/next.config.js'),
+    ];
+    const source = readFileSync(
+      candidates.find(path => existsSync(path)) ?? candidates[0],
+      'utf8'
+    );
+    const homepageIndex = source.indexOf("source: '/',");
+    const nextSourceIndex = source.indexOf('source:', homepageIndex + 1);
+    const homepageBlock = source.slice(homepageIndex, nextSourceIndex);
+    expect(homepageBlock).toContain("key: 'Vary'");
+    expect(homepageBlock).toContain("value: 'Accept'");
   });
 });

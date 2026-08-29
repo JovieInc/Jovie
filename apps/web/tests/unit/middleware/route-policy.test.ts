@@ -52,6 +52,7 @@ describe('route-policy (proxy-routing)', () => {
       expect(getPublicProfileCandidate('/openapi.json')).toBeNull();
       expect(getPublicProfileCandidate('/llms.txt')).toBeNull();
       expect(getPublicProfileCandidate('/llms-full.txt')).toBeNull();
+      expect(getPublicProfileCandidate('/sitemap.xml')).toBeNull();
     });
 
     it('reserves every single-segment APP_ROUTES value from public-profile lookup', () => {

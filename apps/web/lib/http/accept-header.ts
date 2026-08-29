@@ -104,3 +104,19 @@ export function isNextRscRequest(headers: Headers): boolean {
     headers.has('next-router-segment-prefetch')
   );
 }
+
+/** Ensure Accept is present on Vary so HTML and Markdown cannot share a cache key. */
+export function ensureVaryAccept(headers: Headers): void {
+  const existing = headers.get('Vary');
+  if (!existing) {
+    headers.set('Vary', 'Accept');
+    return;
+  }
+
+  const hasAccept = existing
+    .split(',')
+    .some(part => part.trim().toLowerCase() === 'accept');
+  if (!hasAccept) {
+    headers.set('Vary', `${existing}, Accept`);
+  }
+}
