@@ -406,6 +406,30 @@ export async function deleteRunOwnedStripeCustomer(
   await stripeClient.customers.del(customerId);
 }
 
+/**
+ * Find every customer created for this exact test identity. This closes the
+ * cleanup gap where Checkout created a customer but failed before returning
+ * the customer or session ID to the test.
+ */
+export async function findRunOwnedStripeCustomerIds(
+  stripeClient: Stripe,
+  appUserId: string,
+  email: string
+): Promise<string[]> {
+  const customers = await stripeClient.customers.list({ email, limit: 100 });
+  const mismatched = customers.data.find(
+    customer =>
+      customer.email !== email || customer.metadata.clerk_user_id !== appUserId
+  );
+  if (mismatched) {
+    throw new Error(
+      'Refusing Stripe cleanup because an email-matched customer has mismatched ownership'
+    );
+  }
+
+  return customers.data.map(customer => customer.id);
+}
+
 /** Intercept fire-and-forget tracking routes to prevent Turbopack cascade. */
 export async function interceptTrackingRoutes(page: Page) {
   await page.route('**/api/profile/view', route =>

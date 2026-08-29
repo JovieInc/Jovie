@@ -7,6 +7,7 @@ import {
   createSignedStripeWebhook,
   deleteRunOwnedStripeCustomer,
   fetchCompletedTestCheckoutSession,
+  findRunOwnedStripeCustomerIds,
   getBillingStatus,
   getRequiredStripeTestContext,
   postStripeWebhook,
@@ -271,16 +272,28 @@ test('persists verified checkout entitlement for a fresh and returning session',
   } finally {
     await returningContext?.close();
 
-    if (!customerId) {
-      customerId = (await readMoneyUser())?.stripeCustomerId ?? null;
-    }
-    if (customerId && appUserId) {
-      await deleteRunOwnedStripeCustomer(
+    if (appUserId) {
+      const databaseCustomerId = (await readMoneyUser())?.stripeCustomerId;
+      const cleanupCustomerIds = new Set(
+        [customerId, databaseCustomerId].filter(
+          (value): value is string => typeof value === 'string'
+        )
+      );
+      const discoveredCustomerIds = await findRunOwnedStripeCustomerIds(
         stripeClient,
-        customerId,
         appUserId,
         email
       );
+      discoveredCustomerIds.forEach(id => cleanupCustomerIds.add(id));
+
+      for (const cleanupCustomerId of cleanupCustomerIds) {
+        await deleteRunOwnedStripeCustomer(
+          stripeClient,
+          cleanupCustomerId,
+          appUserId,
+          email
+        );
+      }
     }
     if (stripeEventId) {
       await sql`
