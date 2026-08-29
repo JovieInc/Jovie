@@ -276,10 +276,11 @@ curl --fail --silent --show-error --max-time 5 http://127.0.0.1:4041/api/v1/stat
 
 # File writes are not runtime proof. Attest the exact source revision and both
 # deployed configuration surfaces only after daemon-reload, service activation,
-# and the local state endpoint have all succeeded. This receipt contains hashes
-# and state only; it never serializes credentials or configuration contents.
-WORKFLOW_SOURCE_SHA="$(sha256sum "${WORKFLOW_SOURCE}" | awk '{print $1}')"
-WORKFLOW_TARGET_SHA="$(sha256sum "${WORKFLOW_TARGET}" | awk '{print $1}')"
+# and the local state endpoint have all succeeded. The installed workflow may
+# differ from source only in the controller-owned max_concurrent_agents scalar
+# within 1..8; every other byte remains a hard failure. This receipt contains
+# hashes, match mode, and state only; it never serializes credentials or
+# configuration contents.
 UNIT_SOURCE_SHA="$(sha256sum "${SERVICE_UNIT_SOURCE}" | awk '{print $1}')"
 UNIT_TARGET_SHA="$(sha256sum "${SERVICE_UNIT_TARGET}" | awk '{print $1}')"
 POLICY_SOURCE_SHA="$(sha256sum "${POLICY_SOURCE}" | awk '{print $1}')"
@@ -289,9 +290,10 @@ GATE_TARGET_SHA="$(sha256sum "${GATE_TARGET}" | awk '{print $1}')"
 CLOSURE_SOURCE_SHA="$(sha256sum "${CLOSURE_SOURCE}" | awk '{print $1}')"
 CLOSURE_TARGET_SHA="$(sha256sum "${CLOSURE_TARGET}" | awk '{print $1}')"
 export \
+  SOURCE_ROOT \
   SOURCE_REVISION \
-  WORKFLOW_SOURCE_SHA \
-  WORKFLOW_TARGET_SHA \
+  WORKFLOW_SOURCE \
+  WORKFLOW_TARGET \
   UNIT_SOURCE_SHA \
   UNIT_TARGET_SHA \
   POLICY_SOURCE_SHA \
@@ -302,15 +304,48 @@ export \
   CLOSURE_TARGET_SHA \
   GEM_ROOT
 python3 - <<'PY'
+import hashlib
+import importlib.util
 import json
 import os
 import pathlib
+import sys
 from datetime import datetime, timezone
 
 root = pathlib.Path(os.environ["GEM_ROOT"])
 destination = root / "state" / "gem-service-attestation.json"
 destination.parent.mkdir(parents=True, exist_ok=True)
 temporary = destination.with_suffix(".json.tmp")
+controller_path = (
+    pathlib.Path(os.environ["SOURCE_ROOT"])
+    / "scripts/hermes/symphony-concurrency-controller.py"
+)
+spec = importlib.util.spec_from_file_location(
+    "symphony_concurrency_controller", controller_path
+)
+if spec is None or spec.loader is None:
+    raise SystemExit("refusing stale Gem service attestation")
+controller = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(controller)
+
+workflow_source = pathlib.Path(os.environ["WORKFLOW_SOURCE"])
+workflow_target = pathlib.Path(os.environ["WORKFLOW_TARGET"])
+source_bytes = workflow_source.read_bytes()
+installed_bytes = workflow_target.read_bytes()
+source_text = source_bytes.decode("utf-8")
+installed_text = installed_bytes.decode("utf-8")
+try:
+    installed_value = controller.verify_concurrency_overlay(
+        source_text, installed_text
+    )
+except ValueError as error:
+    print(error, file=sys.stderr)
+    raise SystemExit("refusing stale Gem service attestation") from error
+source_matches = list(controller.CONCURRENCY_LINE.finditer(source_text))
+source_value = int(source_matches[0].group(2))
+source_sha = hashlib.sha256(source_bytes).hexdigest()
+installed_sha = hashlib.sha256(installed_bytes).hexdigest()
+match_mode = "exact" if source_sha == installed_sha else "bounded-overlay"
 receipt = {
     "schema": "gem-service-attestation/v1",
     "observedAt": datetime.now(timezone.utc).isoformat(),
@@ -320,9 +355,12 @@ receipt = {
     "active": True,
     "healthy": True,
     "workflow": {
-        "sourceSha256": os.environ["WORKFLOW_SOURCE_SHA"],
-        "installedSha256": os.environ["WORKFLOW_TARGET_SHA"],
-        "matches": os.environ["WORKFLOW_SOURCE_SHA"] == os.environ["WORKFLOW_TARGET_SHA"],
+        "sourceSha256": source_sha,
+        "installedSha256": installed_sha,
+        "matches": True,
+        "matchMode": match_mode,
+        "sourceMaxConcurrentAgents": source_value,
+        "installedMaxConcurrentAgents": installed_value,
     },
     "unit": {
         "sourceSha256": os.environ["UNIT_SOURCE_SHA"],

@@ -222,6 +222,11 @@ def test_activation_requires_exact_production_revision_and_attestation() -> None
     assert "immutable successful" in activation
     assert "GEM_CONTROLLER_EXPECTED_REVISION" in activation
     assert 'gem-service-attestation/v1' in activation
+    assert '.workflow.matches == true' in activation
+    assert '.workflow.matchMode == "exact"' in activation
+    assert '.workflow.matchMode == "bounded-overlay"' in activation
+    assert "sourceMaxConcurrentAgents" in activation
+    assert "installedMaxConcurrentAgents" in activation
 
 
 def test_activation_uses_the_provisioned_gem_host_runner_contract() -> None:

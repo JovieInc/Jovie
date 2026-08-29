@@ -419,6 +419,34 @@ class FleetControllerInstallerContractTests(unittest.TestCase):
         symphony.mkdir(parents=True)
         (home / ".config/systemd/user").mkdir(parents=True)
         fake_bin.mkdir()
+        rewrite_helper = fake_bin / "rewrite-installed-workflow.py"
+        rewrite_helper.write_text(
+            "import os\n"
+            "import pathlib\n"
+            "import re\n"
+            "\n"
+            "path = pathlib.Path(os.environ['SYMPHONY_RUNTIME']) / "
+            "'WORKFLOW.jovie-ui-pilot.md'\n"
+            "mode = os.environ['FAKE_WORKFLOW_REWRITE']\n"
+            "text = path.read_text(encoding='utf-8')\n"
+            "if mode == 'unrelated-drift':\n"
+            "    updated = text.replace('max_turns: 24', 'max_turns: 99', 1)\n"
+            "    if updated == text:\n"
+            "        raise SystemExit('unrelated drift rewrite missed max_turns')\n"
+            "    path.write_text(updated, encoding='utf-8')\n"
+            "    raise SystemExit(0)\n"
+            "updated, count = re.subn(\n"
+            "    r'^(\\s*max_concurrent_agents:\\s*)([0-9]+)(\\s*)$',\n"
+            "    lambda match: f'{match.group(1)}{mode}{match.group(3)}',\n"
+            "    text,\n"
+            "    count=1,\n"
+            "    flags=re.MULTILINE,\n"
+            ")\n"
+            "if count != 1:\n"
+            "    raise SystemExit('concurrency rewrite missed max_concurrent_agents')\n"
+            "path.write_text(updated, encoding='utf-8')\n",
+            encoding="utf-8",
+        )
         paths["gate"].write_text("old gate\n", encoding="utf-8")
         paths["closure"].write_text("old closure\n", encoding="utf-8")
         paths["consumer"].write_text("old consumer\n", encoding="utf-8")
@@ -436,14 +464,17 @@ class FleetControllerInstallerContractTests(unittest.TestCase):
 
         systemctl = fake_bin / "systemctl"
         systemctl.write_text(
-            """#!/bin/sh
+            f"""#!/bin/sh
 case "$*" in
   *"show-environment"*) exit 0 ;;
   *"is-active --quiet gem-pr-drain.timer"*) exit 1 ;;
   *"is-active --quiet gem-pr-drain.service"*) exit 1 ;;
   *"restart symphony-ui-pilot.service"*)
-    [ "${FAKE_RESTART_FAILURE:-false}" != true ]
-    exit
+    [ "${{FAKE_RESTART_FAILURE:-false}}" != true ] || exit 1
+    if [ -n "${{FAKE_WORKFLOW_REWRITE:-}}" ]; then
+      python3 "{rewrite_helper}" || exit 1
+    fi
+    exit 0
     ;;
   *"is-active --quiet symphony-ui-pilot.service"*) exit 0 ;;
 esac
@@ -474,13 +505,17 @@ exit 0
         env: dict[str, str],
         *,
         fail_restart: bool = False,
+        workflow_rewrite: str | None = None,
     ) -> subprocess.CompletedProcess[str]:
+        install_env = {
+            **env,
+            "FAKE_RESTART_FAILURE": "true" if fail_restart else "false",
+        }
+        if workflow_rewrite is not None:
+            install_env["FAKE_WORKFLOW_REWRITE"] = workflow_rewrite
         return subprocess.run(
             ["bash", str(fixture / FLEET_INSTALLER.relative_to(ROOT)), str(fixture)],
-            env={
-                **env,
-                "FAKE_RESTART_FAILURE": "true" if fail_restart else "false",
-            },
+            env=install_env,
             text=True,
             capture_output=True,
             check=False,
@@ -557,10 +592,85 @@ exit 0
         self.assertTrue(attestation["policy"]["matches"])
         self.assertTrue(attestation["gate"]["matches"])
         self.assertTrue(attestation["closureHealth"]["matches"])
+        self.assertTrue(attestation["workflow"]["matches"])
+        self.assertEqual(attestation["workflow"]["matchMode"], "exact")
+        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 4)
+        self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 4)
+        self.assertEqual(
+            attestation["workflow"]["sourceSha256"],
+            attestation["workflow"]["installedSha256"],
+        )
         self.assertEqual(
             attestation["policy"]["sourceSha256"],
             attestation["policy"]["installedSha256"],
         )
+
+    def test_attestation_accepts_controller_rewrite_during_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            process = self._install(fixture, env, workflow_rewrite="6")
+            installed_workflow = paths["workflow"].read_text(encoding="utf-8")
+            source_workflow = (
+                fixture / "scripts/hermes/WORKFLOW.jovie-ui-pilot.md"
+            ).read_text(encoding="utf-8")
+            attestation = json.loads(paths["attestation"].read_text(encoding="utf-8"))
+
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertNotEqual(installed_workflow, source_workflow)
+        self.assertIn("max_concurrent_agents: 6", installed_workflow)
+        self.assertIn("max_concurrent_agents: 4", source_workflow)
+        self.assertTrue(attestation["workflow"]["matches"])
+        self.assertEqual(attestation["workflow"]["matchMode"], "bounded-overlay")
+        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 4)
+        self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 6)
+        self.assertNotEqual(
+            attestation["workflow"]["sourceSha256"],
+            attestation["workflow"]["installedSha256"],
+        )
+        self.assertTrue(attestation["unit"]["matches"])
+        self.assertTrue(attestation["policy"]["matches"])
+
+    def test_attestation_rejects_out_of_bounds_overlay_and_rolls_back(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            process = self._install(fixture, env, workflow_rewrite="9")
+            restored_workflow = paths["workflow"].read_text(encoding="utf-8")
+            attestation_exists = paths["attestation"].exists()
+
+        self.assertNotEqual(process.returncode, 0)
+        self.assertEqual(restored_workflow, "old workflow\n")
+        self.assertFalse(attestation_exists)
+        self.assertIn("refusing stale Gem service attestation", process.stderr)
+        self.assertIn("outside the bounded policy", process.stderr)
+        self.assertIn("fleet controller install rolled back", process.stderr)
+
+    def test_attestation_rejects_unrelated_drift_and_rolls_back(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            process = self._install(
+                fixture, env, workflow_rewrite="unrelated-drift"
+            )
+            restored_workflow = paths["workflow"].read_text(encoding="utf-8")
+            attestation_exists = paths["attestation"].exists()
+
+        self.assertNotEqual(process.returncode, 0)
+        self.assertEqual(restored_workflow, "old workflow\n")
+        self.assertFalse(attestation_exists)
+        self.assertIn("refusing stale Gem service attestation", process.stderr)
+        self.assertIn("beyond concurrency overlay", process.stderr)
+        self.assertIn("fleet controller install rolled back", process.stderr)
+
+    def test_activation_requires_bounded_overlay_attestation_fields(self):
+        workflow = ACTIVATION.read_text(encoding="utf-8")
+        self.assertIn("gem-service-attestation/v1", workflow)
+        self.assertIn(".workflow.matches == true", workflow)
+        self.assertIn('.workflow.matchMode == "exact"', workflow)
+        self.assertIn('.workflow.matchMode == "bounded-overlay"', workflow)
+        self.assertIn("sourceMaxConcurrentAgents", workflow)
+        self.assertIn("installedMaxConcurrentAgents", workflow)
 
     def test_failed_install_removes_a_new_policy_during_atomic_rollback(self):
         with tempfile.TemporaryDirectory() as directory:

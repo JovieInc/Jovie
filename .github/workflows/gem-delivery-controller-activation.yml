@@ -83,6 +83,18 @@ jobs:
             .active == true and
             .healthy == true and
             .workflow.matches == true and
+            (
+              (.workflow.matchMode == "exact" and
+                .workflow.sourceSha256 == .workflow.installedSha256) or
+              (.workflow.matchMode == "bounded-overlay" and
+                .workflow.sourceSha256 != .workflow.installedSha256)
+            ) and
+            (.workflow.sourceMaxConcurrentAgents | type == "number") and
+            (.workflow.installedMaxConcurrentAgents | type == "number") and
+            .workflow.sourceMaxConcurrentAgents >= 1 and
+            .workflow.sourceMaxConcurrentAgents <= 8 and
+            .workflow.installedMaxConcurrentAgents >= 1 and
+            .workflow.installedMaxConcurrentAgents <= 8 and
             .unit.matches == true
           ' "$GEM_WORKSPACE/state/gem-service-attestation.json" >/dev/null
           curl --fail --silent --show-error --max-time 5 http://127.0.0.1:4041/api/v1/state \
