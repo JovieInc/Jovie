@@ -13,6 +13,9 @@
     "url": "https://github.com/JovieInc/Jovie/issues"
   },
   "homepage": "https://jov.ie/developers",
+  "bin": {
+    "jovie": "./dist/cli.js"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -22,14 +25,17 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "engines": {
     "node": ">=22.23.2 <23"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx src/cli.ts",
     "lint": "biome check .",
+    "pack:dry": "tsx scripts/pack-dry.ts",
     "test": "vitest run",
     "test:ci": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage",
@@ -39,6 +45,7 @@
   "devDependencies": {
     "@types/node": "^26.1.2",
     "@vitest/coverage-v8": "4.1.10",
+    "tsx": "^4.23.1",
     "typescript": "^6.0.3",
     "vitest": "4.1.10"
   }
