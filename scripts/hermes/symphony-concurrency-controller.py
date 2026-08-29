@@ -179,6 +179,27 @@ def render_target(text: str, target: int) -> str:
     return CONCURRENCY_LINE.sub(lambda match: f"{match.group(1)}{target}{match.group(3)}", text, count=1)
 
 
+def verify_concurrency_overlay(source_text: str, installed_text: str) -> None:
+    """Require byte identity except a single bounded max_concurrent_agents overlay.
+
+    The pressure controller rewrites only that scalar on the installed workflow.
+    Any other difference, a missing or duplicated line, a non-numeric value, or a
+    runtime value outside 1..8 fails closed.
+    """
+    source_matches = list(CONCURRENCY_LINE.finditer(source_text))
+    installed_matches = list(CONCURRENCY_LINE.finditer(installed_text))
+    if len(source_matches) != 1:
+        raise ValueError("source workflow must contain exactly one max_concurrent_agents scalar")
+    if len(installed_matches) != 1:
+        raise ValueError("installed workflow must contain exactly one max_concurrent_agents scalar")
+    value = int(installed_matches[0].group(2))
+    if not MIN_CONCURRENCY <= value <= MAX_CONCURRENCY:
+        raise ValueError("installed concurrency is outside the bounded policy")
+    source_value = int(source_matches[0].group(2))
+    if render_target(installed_text, source_value) != source_text:
+        raise ValueError("workflow drift beyond concurrency overlay")
+
+
 def write_workflow_atomic(path: pathlib.Path, text: str) -> None:
     temporary = path.with_name(f".{path.name}.tmp")
     temporary.write_text(text, encoding="utf-8")
@@ -371,12 +392,27 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--proc-root", type=pathlib.Path, default=pathlib.Path("/proc"))
     parser.add_argument("--runtime-url", default="http://127.0.0.1:4041/api/v1/state")
+    parser.add_argument(
+        "--verify-workflow-overlay",
+        nargs=2,
+        metavar=("SOURCE", "INSTALLED"),
+        type=pathlib.Path,
+        help="exit 0 when INSTALLED matches SOURCE except a bounded concurrency overlay",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     try:
-        receipt = run(parse_args())
+        args = parse_args()
+        if args.verify_workflow_overlay is not None:
+            source_path, installed_path = args.verify_workflow_overlay
+            verify_concurrency_overlay(
+                source_path.read_text(encoding="utf-8"),
+                installed_path.read_text(encoding="utf-8"),
+            )
+            return 0
+        receipt = run(args)
         print(json.dumps(receipt, indent=2, sort_keys=True))
         return 0
     except (OSError, ValueError, json.JSONDecodeError) as error:

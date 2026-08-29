@@ -8,7 +8,8 @@ Guards the contract that the orphan beam.smp incident violated:
   policy, a clean stop (beam exits 1 on SIGTERM), and a single-listener guard
   for 127.0.0.1:4041;
 - the install script materializes both onto a target home idempotently, keeps
-  timestamped backups, and detects drift in --check mode.
+  timestamped backups, and detects drift in --check mode except the bounded
+  runtime overlay on agent.max_concurrent_agents (1..8).
 
 No network, no systemd, no host state: everything runs against the repo
 checkout and a tmp_path target home. CI's pytest lane has no PyYAML, so the
@@ -495,6 +496,21 @@ def _run_installer(target_home: Path, *args: str) -> subprocess.CompletedProcess
     )
 
 
+def _rewrite_installed_concurrency(workflow: Path, value: str) -> None:
+    def replace(match: re.Match[str]) -> str:
+        return f"{match.group(1)}{value}{match.group(3)}"
+
+    updated, count = re.subn(
+        r"^(\s*max_concurrent_agents:\s*)([0-9]+)(\s*)$",
+        replace,
+        workflow.read_text(),
+        count=1,
+        flags=re.MULTILINE,
+    )
+    assert count == 1, "installed workflow must contain one concurrency scalar"
+    workflow.write_text(updated)
+
+
 def test_installer_deploys_workflow_and_unit(tmp_path: Path) -> None:
     result = _run_installer(tmp_path, "--no-daemon-reload")
     assert result.returncode == 0, result.stderr
@@ -741,6 +757,44 @@ def test_installer_backs_up_and_detects_drift(tmp_path: Path) -> None:
     assert backups[0].read_text() == "drifted\n"
     assert workflow.read_text() == WORKFLOW.read_text()
     assert _run_installer(tmp_path, "--check").returncode == 0
+
+
+def test_installer_check_accepts_bounded_concurrency_overlay(tmp_path: Path) -> None:
+    assert _run_installer(tmp_path, "--no-daemon-reload").returncode == 0
+    workflow = tmp_path / "symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md"
+    for value in range(1, 9):
+        _rewrite_installed_concurrency(workflow, str(value))
+        check = _run_installer(tmp_path, "--check")
+        assert check.returncode == 0, (value, check.stdout, check.stderr)
+        assert f"OK {workflow}" in check.stdout
+
+
+def test_installer_check_fails_closed_for_invalid_concurrency_overlay(
+    tmp_path: Path,
+) -> None:
+    assert _run_installer(tmp_path, "--no-daemon-reload").returncode == 0
+    workflow = tmp_path / "symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md"
+    original = workflow.read_text()
+    cases = {
+        "missing": original.replace("  max_concurrent_agents: 4\n", ""),
+        "duplicated": original.replace(
+            "  max_concurrent_agents: 4\n",
+            "  max_concurrent_agents: 1\n  max_concurrent_agents: 2\n",
+        ),
+        "non-numeric": original.replace("  max_concurrent_agents: 4\n", "  max_concurrent_agents: n\n"),
+        "zero": original.replace("  max_concurrent_agents: 4\n", "  max_concurrent_agents: 0\n"),
+        "above-policy": original.replace("  max_concurrent_agents: 4\n", "  max_concurrent_agents: 9\n"),
+        "other-drift": original.replace("  max_concurrent_agents: 4\n", "  max_concurrent_agents: 1\n").replace(
+            "max_turns: 24", "max_turns: 99"
+        ),
+    }
+    for name, text in cases.items():
+        workflow.write_text(text)
+        check = _run_installer(tmp_path, "--check")
+        assert check.returncode == 1, name
+        assert "DRIFT" in check.stdout, name
+        workflow.write_text(original)
+        assert _run_installer(tmp_path, "--check").returncode == 0, name
 
 
 def test_installer_restores_only_lease_guard_atomically(tmp_path: Path) -> None:

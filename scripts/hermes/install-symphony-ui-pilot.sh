@@ -13,7 +13,9 @@
 # Modes:
 #   (default)          install workflow + unit + lease guard + reconciler,
 #                      daemon-reload, then enable --now symphony-reconciler.timer
-#   --check            verify installed files match the repo sources; no writes
+#   --check            verify installed files match the repo sources; the
+#                      installed workflow may overlay agent.max_concurrent_agents
+#                      with a bounded runtime value (1..8). No writes.
 #   --no-daemon-reload install files but skip systemctl --user daemon-reload
 #                      and skip timer activation
 #   --lease-guard-only restore only the executable lease guard atomically;
@@ -96,10 +98,31 @@ check_one() {
   return "$rc"
 }
 
+# The pressure controller may rewrite only agent.max_concurrent_agents on the
+# installed workflow. Accept 1..8 there; every other byte must match source.
+check_workflow() {
+  local src="$1" dst="$2"
+  if [ ! -f "$dst" ]; then
+    echo "MISSING $dst"
+    return 1
+  fi
+  if cmp -s "$src" "$dst"; then
+    echo "OK $dst"
+    return 0
+  fi
+  if python3 "$REPO_ROOT/scripts/hermes/symphony-concurrency-controller.py" \
+    --verify-workflow-overlay "$src" "$dst" >/dev/null 2>&1; then
+    echo "OK $dst"
+    return 0
+  fi
+  echo "DRIFT $dst"
+  return 1
+}
+
 if [ "$CHECK_ONLY" -eq 1 ]; then
   rc=0
   if [ "$LEASE_GUARD_ONLY" -eq 0 ]; then
-    check_one "$WORKFLOW_SRC" "$WORKFLOW_DST" || rc=1
+    check_workflow "$WORKFLOW_SRC" "$WORKFLOW_DST" || rc=1
     check_one "$UNIT_SRC" "$UNIT_DST" || rc=1
     check_one "$RECONCILER_SRC" "$RECONCILER_DST" || rc=1
     check_one "$MODEL_ROUTER_SRC" "$MODEL_ROUTER_DST" || rc=1
