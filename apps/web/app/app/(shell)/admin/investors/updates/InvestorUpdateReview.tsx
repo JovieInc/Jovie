@@ -28,6 +28,43 @@ function defaultSegments(): InvestorUpdateRecipientSegment[] {
   }));
 }
 
+function ApprovalStatus({
+  approvalIsCurrent,
+  error,
+  latestApproval,
+}: Readonly<{
+  approvalIsCurrent: boolean;
+  error: string | null;
+  latestApproval: InvestorUpdateReviewState['latestApproval'];
+}>) {
+  if (error) {
+    return <p className='text-sm text-destructive'>{error}</p>;
+  }
+  if (approvalIsCurrent && latestApproval) {
+    return (
+      <p className='flex items-start gap-2 text-sm text-success'>
+        <ShieldCheck className='mt-0.5 h-4 w-4 shrink-0' />
+        Exact copy and {latestApproval.recipientCount} recipients approved until{' '}
+        {new Date(latestApproval.expiresAt).toLocaleTimeString()}. This did not
+        send anything.
+      </p>
+    );
+  }
+  if (latestApproval) {
+    return (
+      <p className='text-sm text-warning'>
+        The latest approval is expired or no longer matches this draft.
+      </p>
+    );
+  }
+  return (
+    <p className='text-xs text-secondary-token'>
+      Open/click tracking is off. This action only records manual final
+      approval; it has no provider or send transition.
+    </p>
+  );
+}
+
 export function InvestorUpdateReview({
   initialState,
 }: Readonly<{ initialState: InvestorUpdateReviewState }>) {
@@ -367,28 +404,11 @@ export function InvestorUpdateReview({
           </fieldset>
 
           <div className='mt-4 min-h-12' aria-live='polite'>
-            {error ? (
-              <p className='text-sm text-destructive'>{error}</p>
-            ) : approvalIsCurrent ? (
-              <p className='flex items-start gap-2 text-sm text-success'>
-                <ShieldCheck className='mt-0.5 h-4 w-4 shrink-0' />
-                Exact copy and {state.latestApproval?.recipientCount} recipients
-                approved until{' '}
-                {new Date(
-                  state.latestApproval?.expiresAt ?? ''
-                ).toLocaleTimeString()}
-                . This did not send anything.
-              </p>
-            ) : state.latestApproval ? (
-              <p className='text-sm text-warning'>
-                The latest approval is expired or no longer matches this draft.
-              </p>
-            ) : (
-              <p className='text-xs text-secondary-token'>
-                Open/click tracking is off. This action only records manual
-                final approval; it has no provider or send transition.
-              </p>
-            )}
+            <ApprovalStatus
+              approvalIsCurrent={approvalIsCurrent}
+              error={error}
+              latestApproval={state.latestApproval}
+            />
           </div>
           <Button
             className='mt-2 w-full'

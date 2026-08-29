@@ -370,7 +370,7 @@ export async function approveInvestorUpdateSnapshot(input: {
   readonly now?: Date;
 }): Promise<string> {
   const current = await loadCurrentDraftRows();
-  if (!current || current.draft.id !== input.draftId) {
+  if (current?.draft.id !== input.draftId) {
     throw new InvestorUpdateWorkflowError(
       'approval_invalid',
       'Only the current living draft can receive final approval.'

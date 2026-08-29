@@ -448,8 +448,12 @@ export function serializeInvestorUpdateApprovalSnapshot(input: {
   readonly trackingSettings: InvestorUpdateTrackingSettings;
 }): string {
   return JSON.stringify({
-    candidateIds: [...input.candidateIds].sort(),
-    decisionRecordIds: [...input.decisionRecordIds].sort(),
+    candidateIds: [...input.candidateIds].sort((left, right) =>
+      left.localeCompare(right)
+    ),
+    decisionRecordIds: [...input.decisionRecordIds].sort((left, right) =>
+      left.localeCompare(right)
+    ),
     renderedCopy: input.renderedCopy,
     segments: INVESTOR_UPDATE_RECIPIENT_ROLES.map(role => {
       const segment = input.segments.find(candidate => candidate.role === role);
