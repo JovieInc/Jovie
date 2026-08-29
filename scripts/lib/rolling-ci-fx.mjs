@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 import { pathToFileURL } from 'node:url';
-import { parseRollingCiState, runDispatch } from './rolling-ci-dispatch.mjs';
+import {
+  parseRollingCiState,
+  rollingCiStateMarker,
+  runDispatch,
+} from './rolling-ci-dispatch.mjs';
 import {
   FX_ADAPTER_NAME,
   FX_HANDOFF_FAILURE,
@@ -10,13 +14,15 @@ import {
   resolveRemediationRoute,
 } from './rolling-ci-handoff.mjs';
 
-export const CURSOR_AGENTS_URL = 'https://api.cursor.com/v0/agents';
+export const CURSOR_AGENTS_URL = 'https://api.cursor.com/v1/agents';
+export const FX_EXECUTION_RECEIPT_SCHEMA = 'jovie-fx-execution-receipt/v1';
 export const FX_NAMED_OUTCOMES = Object.freeze([
   'launched',
   'repaired',
   'skipped_stale',
   'writer_missing',
   'no_key',
+  'blocked_executor',
   'needs_human',
 ]);
 export const RUNNER_FAILURE_CLASSES = Object.freeze([
@@ -49,6 +55,106 @@ export function findOwnedAgents(agents, fingerprint) {
     )
     .map(agent => agent?.id)
     .filter(id => typeof id === 'string' && id.length > 0);
+}
+
+const CURSOR_ERROR_BODY_LIMIT = 512;
+const SENSITIVE_KEY_RE =
+  /api[-_]?key|authorization|cookie|password|secret|token/i;
+
+function sanitizeCursorDiagnostic(value) {
+  const serialized =
+    typeof value === 'string'
+      ? value
+      : JSON.stringify(value, (key, nestedValue) =>
+          SENSITIVE_KEY_RE.test(key) ? '[REDACTED]' : nestedValue
+        );
+  return String(serialized ?? '')
+    .replace(/\b(Bearer|Basic)\s+[A-Za-z0-9+/=._-]+/gi, '$1 [REDACTED]')
+    .slice(0, CURSOR_ERROR_BODY_LIMIT);
+}
+
+async function readCursorResponse(response) {
+  if (typeof response.text === 'function') {
+    const raw = await response.text();
+    try {
+      return { body: JSON.parse(raw), raw };
+    } catch {
+      return { body: {}, raw };
+    }
+  }
+  const body = await response.json().catch(() => ({}));
+  return { body, raw: JSON.stringify(body) };
+}
+
+function cursorApiError(operation, response, body, raw) {
+  const details =
+    body?.error && typeof body.error === 'object' ? body.error : body;
+  const code = sanitizeCursorDiagnostic(details?.code ?? 'unknown');
+  const message = sanitizeCursorDiagnostic(details?.message ?? 'unknown');
+  const diagnosticBody = sanitizeCursorDiagnostic(
+    body && Object.keys(body).length > 0 ? body : raw
+  );
+  return new Error(
+    `cursor ${operation} failed: ${response.status}; code=${code}; message=${message}; body=${diagnosticBody}`
+  );
+}
+
+function blockedExecutorIncident() {
+  return {
+    type: 'fx_safe_executor_unavailable',
+    failure: 'fx-safe-executor-unavailable',
+    owner: 'CI Platform',
+    remedy:
+      'provide a GitHub-runner-local executor that returns an exact-head terminal result without pushing, opening a PR, or mutating the queue',
+  };
+}
+
+function blockedExecutorReceipt({
+  repository,
+  prNumber,
+  headSha,
+  fingerprint,
+}) {
+  return {
+    schema: FX_EXECUTION_RECEIPT_SCHEMA,
+    status: 'blocked',
+    terminal: true,
+    outcome: 'executor_unavailable',
+    executor: 'cursor-cloud',
+    repository,
+    prNumber,
+    headSha,
+    fingerprint,
+    agentId: null,
+    runId: null,
+    result: 'remote_mutation_not_authorized',
+    remoteMutationAllowed: false,
+  };
+}
+
+function terminalizeDispatch(dispatch, receipt) {
+  const next = structuredClone(dispatch);
+  const fingerprint = receipt.fingerprint;
+  const failure = next.state?.failures?.[fingerprint];
+  if (failure) {
+    failure.terminalReceipt = receipt;
+  }
+  if (next.state?.claim?.fingerprint === fingerprint) {
+    next.state.claim.status = 'terminal';
+    next.state.claim.reason = receipt.result;
+  }
+  next.action = 'terminal_configuration_incident';
+  const withoutMarker = String(next.body ?? '')
+    .replace(/<!-- jovie-rolling-ci-state:[A-Za-z0-9+/=_-]+ -->/g, '')
+    .replace(
+      /The one-writer lease is pinned to this exact head\.[\s\S]*?before changing code\./,
+      'The repair claim is terminal for this exact head and fingerprint. A new commit or green rerun supersedes it.'
+    )
+    .trim();
+  next.body = `${withoutMarker}\n\n## FX execution terminal\n\n- Status: blocked\n- Reason: \`${receipt.result}\`\n- Owner: CI Platform\n- Next action: install a GitHub-runner-local executor; Cursor Cloud cannot repair repository code without pushing a branch.\n\n<!-- jovie-fx-execution-receipt:${Buffer.from(
+    JSON.stringify(receipt)
+  ).toString('base64url')} -->\n${rollingCiStateMarker(next.state)}`;
+  return next;
 }
 
 /**
@@ -152,6 +258,7 @@ export function resolveFxNamedOutcome(input = {}) {
   const dispatchAction = String(input.dispatch?.action ?? '');
   if (action === 'launch' || action === 'dedup') return 'launched';
   if (action === 'configuration_incident' || reason === 'fx-auth-missing') {
+    if (reason === 'fx-safe-executor-unavailable') return 'blocked_executor';
     return 'no_key';
   }
   if (action === 'writer_missing') return 'writer_missing';
@@ -235,11 +342,11 @@ export function planFxLaunch(input = {}) {
     prNumber,
     headSha,
     sourceHead,
-    headRef,
     fingerprint,
     failedChecks = [],
     cursorAgents = [],
     cursorApiKey,
+    remoteMutationAllowed = false,
     producerEvent,
     runnerClass = null,
   } = input;
@@ -248,6 +355,20 @@ export function planFxLaunch(input = {}) {
       action: 'configuration_incident',
       reason: 'fx-auth-missing',
       incident: fxConfigurationIncident(),
+    };
+  }
+  if (remoteMutationAllowed !== true) {
+    const receipt = blockedExecutorReceipt({
+      repository,
+      prNumber,
+      headSha,
+      fingerprint,
+    });
+    return {
+      action: 'configuration_incident',
+      reason: 'fx-safe-executor-unavailable',
+      incident: blockedExecutorIncident(),
+      receipt,
     };
   }
   const owned = findOwnedAgents(cursorAgents, fingerprint);
@@ -274,15 +395,15 @@ export function planFxLaunch(input = {}) {
           runnerClass,
         }),
       },
-      source: {
-        repository: `https://github.com/${repository}`,
-        ref: headRef || `refs/pull/${prNumber}/head`,
-      },
-      target: {
-        autoCreatePr: false,
-        autoBranchOnConflict: false,
-        skipReviewerRequest: true,
-      },
+      name: `Jovie CI repair ${fingerprint}`.slice(0, 100),
+      repos: [
+        {
+          url: `https://github.com/${repository}`,
+          prUrl: `https://github.com/${repository}/pull/${prNumber}`,
+        },
+      ],
+      workOnCurrentBranch: true,
+      autoCreatePR: false,
     },
   };
 }
@@ -300,6 +421,7 @@ export function planFxWebhookRemediation(input = {}) {
     fxAdapter,
     cursorAgents = [],
     cursorApiKey = '',
+    remoteMutationAllowed = false,
     now,
     repository,
     prNumber,
@@ -331,14 +453,21 @@ export function planFxWebhookRemediation(input = {}) {
    * @param {Record<string, any>} result
    * @returns {Record<string, any>}
    */
-  const withOutcome = result => ({
-    ...result,
-    runnerClass,
-    outcome: resolveFxNamedOutcome({
-      launch: result.launch,
-      dispatch,
-    }),
-  });
+  const withOutcome = result => {
+    const terminalReceipt = result.launch?.receipt;
+    const finalizedDispatch = terminalReceipt
+      ? terminalizeDispatch(result.dispatch, terminalReceipt)
+      : result.dispatch;
+    return {
+      ...result,
+      dispatch: finalizedDispatch,
+      runnerClass,
+      outcome: resolveFxNamedOutcome({
+        launch: result.launch,
+        dispatch: finalizedDispatch,
+      }),
+    };
+  };
 
   if (route.route === 'implementer' && !allowRunnerClassFx) {
     return withOutcome({
@@ -383,6 +512,7 @@ export function planFxWebhookRemediation(input = {}) {
       failedChecks: (dispatch?.events ?? []).map(event => event.check),
       cursorAgents,
       cursorApiKey,
+      remoteMutationAllowed,
       runnerClass,
     }),
   });
@@ -397,13 +527,11 @@ export async function listCursorAgents(input = {}) {
       'Content-Type': 'application/json',
     },
   });
-  const body = /** @type {Record<string, any>} */ (
-    await response.json().catch(() => ({}))
-  );
+  const { body, raw } = await readCursorResponse(response);
   if (!response.ok) {
-    throw new Error(`cursor list failed: ${response.status}`);
+    throw cursorApiError('list', response, body, raw);
   }
-  return Array.isArray(body?.agents) ? body.agents : [];
+  return Array.isArray(body?.items) ? body.items : [];
 }
 
 /** @param {Record<string, any>} [input] */
@@ -417,9 +545,18 @@ export async function launchCursorAgent(input = {}) {
     },
     body: JSON.stringify(request),
   });
-  const body = await response.json().catch(() => ({}));
+  const { body, raw } = await readCursorResponse(response);
   if (!response.ok) {
-    throw new Error(`cursor launch failed: ${response.status}`);
+    throw cursorApiError('launch', response, body, raw);
+  }
+  if (
+    typeof body?.agent?.id !== 'string' ||
+    body.agent.id.length === 0 ||
+    typeof body?.run?.id !== 'string' ||
+    body.run.id.length === 0 ||
+    body.run.agentId !== body.agent.id
+  ) {
+    throw new Error('cursor launch returned no bound agent/run acceptance');
   }
   return body;
 }
@@ -441,6 +578,7 @@ async function main() {
     ? input.cursorAgents
     : [];
   if (
+    input.remoteMutationAllowed === true &&
     cursorApiKey &&
     cursorAgents.length === 0 &&
     input.listCursorAgents !== false
@@ -496,6 +634,7 @@ async function main() {
     fxAdapter: input.fxAdapter,
     cursorAgents,
     cursorApiKey,
+    remoteMutationAllowed: input.remoteMutationAllowed === true,
     now: input.now,
     repository: input.repository,
     prNumber: input.prNumber,
