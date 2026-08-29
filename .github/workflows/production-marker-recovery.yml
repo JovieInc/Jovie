@@ -1,12 +1,20 @@
 name: Production Marker Recovery
-run-name: Production Marker Recovery ${{ inputs.sha }} from controller run ${{ inputs.controller_run }}
+run-name: >-
+  Production Marker Recovery
+  ${{ inputs.sha || github.event.workflow_run.head_sha }}
+  from controller run
+  ${{ inputs.controller_run || github.event.workflow_run.id }}
 
 on:
-  # Manual, bounded recovery for one exact deployed generation whose original
-  # Production Controller run ended without preserving the verified-generation
-  # marker (JOV-4965). This workflow never redeploys, never mutates aliases,
-  # and never rolls back: it re-proves the already-deployed generation and
-  # preserves the marker only while canonical production still owns it.
+  # Controller completion is the primary recovery signal. The manual input is
+  # retained as a bounded break-glass path for historical generations. This
+  # workflow never redeploys, never mutates aliases, and never rolls back: it
+  # re-proves the already-deployed generation and preserves the marker only
+  # while canonical production still owns it.
+  workflow_run:
+    workflows: [Production Controller]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       sha:
@@ -27,12 +35,14 @@ on:
         type: string
 
 permissions:
+  actions: write
   contents: read
 
 # Share the repo-wide production FIFO so recovery can never race a live
 # release, promotion, or rollback for a newer generation.
 concurrency:
   group: production-mutation
+  queue: max
   cancel-in-progress: false
 
 jobs:
@@ -44,11 +54,12 @@ jobs:
       contents: read
       actions: read
     env:
-      EXPECTED_SHA: ${{ inputs.sha }}
+      EXPECTED_SHA: ${{ inputs.sha || github.event.workflow_run.head_sha }}
       EXPECTED_DEPLOYMENT_ID: ${{ inputs.deployment_id }}
-      SOURCE_CONTROLLER_RUN: ${{ inputs.controller_run }}
-      SOURCE_CONTROLLER_ATTEMPT: ${{ inputs.controller_attempt }}
+      SOURCE_CONTROLLER_RUN: ${{ inputs.controller_run || github.event.workflow_run.id }}
+      SOURCE_CONTROLLER_ATTEMPT: ${{ inputs.controller_attempt || github.event.workflow_run.run_attempt }}
       REPO: ${{ github.repository }}
+      REQUEST_MODE: ${{ github.event_name }}
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -57,19 +68,23 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Validate bounded recovery request
+        id: admission
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
+          echo "recovery_required=false" >> "$GITHUB_OUTPUT"
+          echo "fleet_refresh_required=false" >> "$GITHUB_OUTPUT"
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Recovery SHA must be a full 40-hex commit."
             exit 1
           }
-          [[ "$EXPECTED_DEPLOYMENT_ID" =~ ^dpl_[A-Za-z0-9]+$ ]] || {
+          if [ "$REQUEST_MODE" = "workflow_dispatch" ] &&
+            [[ ! "$EXPECTED_DEPLOYMENT_ID" =~ ^dpl_[A-Za-z0-9]+$ ]]; then
             echo "::error::Recovery deployment ID must be an exact dpl_ identifier."
             exit 1
-          }
+          fi
           [[ "$SOURCE_CONTROLLER_RUN" =~ ^[1-9][0-9]*$ ]] &&
             [[ "$SOURCE_CONTROLLER_ATTEMPT" =~ ^[1-9][0-9]*$ ]] || {
             echo "::error::Recovery source controller run and attempt must be exact positive integers."
@@ -104,7 +119,8 @@ jobs:
           # rollback must have been skipped — never executed.
           jobs_json="$(gh api \
             "repos/$REPO/actions/runs/$SOURCE_CONTROLLER_RUN/attempts/$SOURCE_CONTROLLER_ATTEMPT/jobs?per_page=100")"
-          jq -e --arg sha "$EXPECTED_SHA" '
+          recoverable_jobs=false
+          if jq -e --arg sha "$EXPECTED_SHA" '
             type == "object" and
             (.total_count | type == "number") and
             (.jobs | type == "array") and
@@ -114,10 +130,17 @@ jobs:
             ([.jobs[] | select(.name == "Production Release / Sentry Error Gate (production)" and .status == "completed" and .conclusion == "success")] | length) == 1 and
             ([.jobs[] | select(.name | endswith("Centralized production rollback"))] | length) == 1 and
             ([.jobs[] | select(.name | endswith("Centralized production rollback")) | select(.status == "completed" and .conclusion == "skipped")] | length) == 1
-          ' >/dev/null <<<"$jobs_json" || {
+          ' >/dev/null <<<"$jobs_json"; then
+            recoverable_jobs=true
+          fi
+          if [ "$recoverable_jobs" != true ]; then
+            if [ "$REQUEST_MODE" = "workflow_run" ]; then
+              echo "::notice::Controller attempt did not finish the exact promotion path; marker recovery is not applicable."
+              exit 0
+            fi
             echo "::error::Recovery source attempt lacks exact promotion, Sentry, and skipped-rollback evidence."
             exit 1
-          }
+          fi
 
           # Recovery never overwrites durable truth: no verified marker for
           # this exact generation may already exist.
@@ -127,19 +150,26 @@ jobs:
             existing="$(gh api \
               "repos/$REPO/actions/artifacts?name=$marker_name&per_page=100" \
               --jq '.total_count')"
-            [ "$existing" = "0" ] || {
+            if [ "$existing" != "0" ]; then
+              if [ "$REQUEST_MODE" = "workflow_run" ]; then
+                echo "fleet_refresh_required=true" >> "$GITHUB_OUTPUT"
+                echo "::notice::Verified marker already exists for $EXPECTED_SHA; event recovery is neutral."
+                exit 0
+              fi
               echo "::error::A verified marker already exists for $EXPECTED_SHA; recovery is not permitted."
               exit 1
-            }
+            fi
           done
+          echo "recovery_required=true" >> "$GITHUB_OUTPUT"
+          echo "fleet_refresh_required=true" >> "$GITHUB_OUTPUT"
 
       - name: Verify canonical ownership and exact runtime probes
+        if: steps.admission.outputs.recovery_required == 'true'
         timeout-minutes: 10
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          EXPECTED_COMMIT_SHA: ${{ inputs.sha }}
-          EXPECTED_PRODUCTION_DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+          EXPECTED_COMMIT_SHA: ${{ inputs.sha || github.event.workflow_run.head_sha }}
           PRODUCTION_ALIAS_MAX_ATTEMPTS: 8
           PRODUCTION_ALIAS_REQUIRED_ROUNDS: 2
           PRODUCTION_ALIAS_RETRY_SECONDS: 5
@@ -163,21 +193,29 @@ jobs:
           canonical_id="$(jq -r '.id' <<<"$canonical_json")"
           canonical_state="$(jq -r '.readyState | ascii_upcase' <<<"$canonical_json")"
           canonical_target="$(jq -r '.target | ascii_downcase' <<<"$canonical_json")"
+          if [ -z "$EXPECTED_DEPLOYMENT_ID" ]; then
+            EXPECTED_DEPLOYMENT_ID="$canonical_id"
+            echo "EXPECTED_DEPLOYMENT_ID=$EXPECTED_DEPLOYMENT_ID" >> "$GITHUB_ENV"
+          fi
           if [ "$canonical_id" != "$EXPECTED_DEPLOYMENT_ID" ] ||
             [ "$canonical_state" != "READY" ] ||
             [ "$canonical_target" != "production" ]; then
             echo "::error::Canonical production is $canonical_id, not $EXPECTED_DEPLOYMENT_ID; bounded marker recovery no longer applies to $EXPECTED_SHA."
             exit 1
           fi
+          export EXPECTED_PRODUCTION_DEPLOYMENT_ID="$EXPECTED_DEPLOYMENT_ID"
+          echo "EXPECTED_PRODUCTION_DEPLOYMENT_ID=$EXPECTED_DEPLOYMENT_ID" >> "$GITHUB_ENV"
 
           # Every logical route observation (plain, stable, canary) must reach
           # its exact-proof count; transport unknowns are non-contradictory but
           # never pass by themselves.
           bash .github/scripts/verify-production-alias.sh
 
-      - uses: ./.github/actions/setup-playwright
+      - if: steps.admission.outputs.recovery_required == 'true'
+        uses: ./.github/actions/setup-playwright
 
       - name: Re-probe production Better Auth OAuth runtime
+        if: steps.admission.outputs.recovery_required == 'true'
         env:
           BASE_URL: https://jov.ie
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
@@ -244,11 +282,28 @@ jobs:
           exit 1
 
       - name: Preserve recovered verified-generation marker
+        if: steps.admission.outputs.recovery_required == 'true'
+        id: preserve
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
+          echo "marker_upload_required=false" >> "$GITHUB_OUTPUT"
+          # Re-read durable truth at the write boundary. The original
+          # controller upload may become visible while the bounded probes run;
+          # never create a duplicate marker name in that race.
+          for marker_name in \
+            "production-generation-verified-$EXPECTED_SHA" \
+            "production-generation-verified-recovery-$EXPECTED_SHA"; do
+            existing="$(gh api \
+              "repos/$REPO/actions/artifacts?name=$marker_name&per_page=100" \
+              --jq '.total_count')"
+            if [ "$existing" != "0" ]; then
+              echo "::notice::Verified marker became durable during recovery; upload is neutral."
+              exit 0
+            fi
+          done
           # Write-through: the payload is produced and uploaded only after
           # every recovery gate above proved exact evidence, and the payload
           # binds this recovery run plus the exact source controller attempt.
@@ -272,16 +327,19 @@ jobs:
             echo "::error::Recovered marker write-through produced an empty file."
             exit 1
           }
+          echo "marker_upload_required=true" >> "$GITHUB_OUTPUT"
 
       - name: Upload recovered verified-generation marker
+        if: steps.preserve.outputs.marker_upload_required == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: production-generation-verified-${{ inputs.sha }}
+          name: production-generation-verified-${{ env.EXPECTED_SHA }}
           path: ${{ runner.temp }}/production-generation-verified.json
           if-no-files-found: error
           retention-days: 30
 
       - name: Confirm uploaded recovered marker bytes
+        if: steps.preserve.outputs.marker_upload_required == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -336,3 +394,15 @@ jobs:
           # The authoritative classifier requires this workflow run to finish
           # successfully, so it can only classify the marker after this job exits.
           echo "Uploaded exact recovered marker for $EXPECTED_SHA ($EXPECTED_DEPLOYMENT_ID); authoritative classification follows successful workflow completion."
+
+      - name: Dispatch fresh fleet reconciliation
+        if: steps.admission.outputs.fleet_refresh_required == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # workflow_dispatch starts a fresh event lineage. This avoids
+          # GitHub's three-level workflow_run chain ceiling while preserving
+          # Fleet Gate Refresh as the canonical receipt writer.
+          gh workflow run fleet-gate-refresh.yml --ref main

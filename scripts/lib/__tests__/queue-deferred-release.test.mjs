@@ -79,9 +79,9 @@ describe('queue-deferred release closed loop (JOV-5054)', () => {
   });
 
   it('keeps Fleet Gate Refresh as the one-way workflow_run bridge', () => {
-    // CI and Production Controller are upstream semantic inputs. Fleet Gate
-    // Refresh turns them into one canonical receipt; Queue-Deferred Release
-    // consumes only that receipt and must never wake the gate again.
+    // CI and Production Controller are direct upstream semantic inputs.
+    // Marker Recovery dispatches the gate as a fresh event after durable bytes
+    // so Queue-Deferred Release stays within GitHub's workflow_run chain cap.
     const upstream = fleetGateRefreshWorkflow.match(
       /workflow_run:\s*\n(?:\s*#[^\n]*\n)*\s*workflows:\s*\[([^\]]+)\]/
     )?.[1];
@@ -107,5 +107,12 @@ describe('queue-deferred release closed loop (JOV-5054)', () => {
     );
     expect(fleetGateRefreshWorkflow).not.toContain('schedule:');
     expect(workflow).toContain('workflow_dispatch:');
+    const markerRecovery = readFileSync(
+      resolve(repoRoot, '.github/workflows/production-marker-recovery.yml'),
+      'utf8'
+    );
+    expect(markerRecovery).toContain(
+      'gh workflow run fleet-gate-refresh.yml --ref main'
+    );
   });
 });
