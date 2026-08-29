@@ -151,6 +151,9 @@ describe('Avatar Component', () => {
       expect(innerDiv).toHaveAttribute('data-shape', 'artwork');
       expect(innerDiv).toHaveClass('rounded-lg');
       expect(innerDiv).not.toHaveClass('rounded-full');
+      const artworkImage = screen.getByTestId('avatar-image');
+      expect(artworkImage).toHaveClass('rounded-lg', 'object-contain');
+      expect(artworkImage).not.toHaveClass('rounded-full', 'object-cover');
     });
   });
 

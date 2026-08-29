@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/organisms/AvatarUpload.test.tsx
 'use client';
 
 import { useCallback, useRef, useState } from 'react';

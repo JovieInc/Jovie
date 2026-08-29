@@ -119,6 +119,14 @@ export const AvatarUploadable = React.memo(
 
       const avatarSize = avatarProps.size || 'md';
       const avatarShape = avatarProps.shape || 'person';
+      const uploadButtonLabel =
+        avatarShape === 'artwork'
+          ? 'Upload release artwork'
+          : 'Upload profile photo';
+      const fileInputLabel =
+        avatarShape === 'artwork'
+          ? 'Choose Release Artwork File'
+          : 'Choose Profile Photo File';
       const numericSize = getAvatarSizePx(avatarSize);
       const overlayShapeClassName = getAvatarShapeClassName(
         avatarShape,
@@ -186,7 +194,7 @@ export const AvatarUploadable = React.memo(
             onDragOver={canUpload ? handleDragOver : undefined}
             onDrop={canUpload ? handleDrop : undefined}
             onClick={handleClick}
-            aria-label={isInteractive ? 'Upload profile photo' : undefined}
+            aria-label={isInteractive ? uploadButtonLabel : undefined}
             aria-busy={isUploading || undefined}
             disabled={!isInteractive}
           >
@@ -236,7 +244,7 @@ export const AvatarUploadable = React.memo(
               accept={acceptedTypeList}
               onChange={handleFileSelect}
               className='sr-only'
-              aria-label='Choose Profile Photo File'
+              aria-label={fileInputLabel}
             />
           )}
         </>

@@ -26,6 +26,13 @@ export {
 
 export type AvatarStatus = 'online' | 'away' | 'offline';
 
+interface AvatarContextValue {
+  readonly size: AvatarSize;
+  readonly shape: AvatarShape;
+}
+
+const AvatarContext = React.createContext<AvatarContextValue | null>(null);
+
 // ---------------------------------------------------------------------------
 // Primitive building blocks — exported for composability
 // ---------------------------------------------------------------------------
@@ -40,11 +47,20 @@ export interface AvatarProps extends React.HTMLAttributes<HTMLSpanElement> {
 /** Root container. Shape class is last so local className cannot change crop. */
 const Avatar = React.forwardRef<HTMLSpanElement, AvatarProps>(
   (
-    { size = 'md', ring = false, shape = 'person', className, style, ...props },
+    {
+      size = 'md',
+      ring = false,
+      shape = 'person',
+      className,
+      style,
+      children,
+      ...props
+    },
     ref
   ) => {
     const px = getAvatarSizePx(size);
     const isPerson = shape === 'person';
+    const contextValue = React.useMemo(() => ({ size, shape }), [size, shape]);
     return (
       <span
         ref={ref}
@@ -61,7 +77,11 @@ const Avatar = React.forwardRef<HTMLSpanElement, AvatarProps>(
         )}
         style={{ width: px, height: px, ...style }}
         {...props}
-      />
+      >
+        <AvatarContext.Provider value={contextValue}>
+          {children}
+        </AvatarContext.Provider>
+      </span>
     );
   }
 );
@@ -80,18 +100,25 @@ export interface AvatarImageProps
  * Hides itself via CSS if the image fails to load (browser default for broken imgs).
  */
 const AvatarImage = React.forwardRef<HTMLImageElement, AvatarImageProps>(
-  ({ className, alt = '', size = 'md', shape = 'person', ...props }, ref) => (
-    <img
-      ref={ref}
-      alt={alt}
-      className={cn(
-        'h-full w-full object-cover',
-        className,
-        getAvatarShapeClassName(shape, getAvatarSizePx(size))
-      )}
-      {...props}
-    />
-  )
+  ({ className, alt = '', size, shape, ...props }, ref) => {
+    const context = React.useContext(AvatarContext);
+    const resolvedSize = context?.size ?? size ?? 'md';
+    const resolvedShape = context?.shape ?? shape ?? 'person';
+
+    return (
+      <img
+        ref={ref}
+        alt={alt}
+        className={cn(
+          'h-full w-full',
+          className,
+          resolvedShape === 'artwork' ? 'object-contain' : 'object-cover',
+          getAvatarShapeClassName(resolvedShape, getAvatarSizePx(resolvedSize))
+        )}
+        {...props}
+      />
+    );
+  }
 );
 AvatarImage.displayName = 'AvatarImage';
 
@@ -107,19 +134,25 @@ export interface AvatarFallbackProps
  * `AvatarFallback` — shown when no image is provided. Styled as initials.
  */
 const AvatarFallback = React.forwardRef<HTMLSpanElement, AvatarFallbackProps>(
-  ({ size = 'md', shape = 'person', className, ...props }, ref) => (
-    <span
-      ref={ref}
-      className={cn(
-        'flex h-full w-full items-center justify-center font-medium select-none',
-        'overflow-hidden bg-surface-2 text-secondary-token',
-        AVATAR_SIZE_MAP[size].text,
-        className,
-        getAvatarShapeClassName(shape, getAvatarSizePx(size))
-      )}
-      {...props}
-    />
-  )
+  ({ size, shape, className, ...props }, ref) => {
+    const context = React.useContext(AvatarContext);
+    const resolvedSize = context?.size ?? size ?? 'md';
+    const resolvedShape = context?.shape ?? shape ?? 'person';
+
+    return (
+      <span
+        ref={ref}
+        className={cn(
+          'flex h-full w-full items-center justify-center font-medium select-none',
+          'overflow-hidden bg-surface-2 text-secondary-token',
+          AVATAR_SIZE_MAP[resolvedSize].text,
+          className,
+          getAvatarShapeClassName(resolvedShape, getAvatarSizePx(resolvedSize))
+        )}
+        {...props}
+      />
+    );
+  }
 );
 AvatarFallback.displayName = 'AvatarFallback';
 
@@ -139,17 +172,15 @@ export interface AvatarStatusDotProps {
   readonly className?: string;
 }
 
-function AvatarStatusDot({
-  status,
-  size = 'md',
-  className,
-}: AvatarStatusDotProps) {
-  const { dot, dotOffset } = AVATAR_SIZE_MAP[size];
+function AvatarStatusDot({ status, size, className }: AvatarStatusDotProps) {
+  const context = React.useContext(AvatarContext);
+  const resolvedSize = context?.size ?? size ?? 'md';
+  const { dot, dotOffset } = AVATAR_SIZE_MAP[resolvedSize];
   return (
     <span
       role='img'
       aria-label={`${status} status`}
-      data-size={size}
+      data-size={resolvedSize}
       data-status={status}
       className={cn(
         'absolute rounded-full',
@@ -203,13 +234,11 @@ function UserAvatar({
   return (
     <Avatar size={size} ring={ring} shape='person' className={className}>
       {src ? (
-        <AvatarImage src={src} alt={altText} size={size} shape='person' />
+        <AvatarImage src={src} alt={altText} />
       ) : (
-        <AvatarFallback size={size} shape='person'>
-          {initials}
-        </AvatarFallback>
+        <AvatarFallback>{initials}</AvatarFallback>
       )}
-      {status && <AvatarStatusDot status={status} size={size} />}
+      {status && <AvatarStatusDot status={status} />}
     </Avatar>
   );
 }

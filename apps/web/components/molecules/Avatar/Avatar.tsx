@@ -153,8 +153,9 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
           unoptimized={unoptimized}
           {...placeholderProps}
           className={cn(
-            'h-full w-full object-cover object-center transition-opacity duration-subtle ease-out',
+            'h-full w-full object-center transition-opacity duration-subtle ease-out',
             isLoaded ? 'opacity-100' : 'opacity-0',
+            shape === 'artwork' ? 'object-contain' : 'object-cover',
             shapeClassName
           )}
           onLoad={() => setIsLoaded(true)}

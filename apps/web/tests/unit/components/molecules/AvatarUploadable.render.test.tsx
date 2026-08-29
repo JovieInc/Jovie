@@ -133,6 +133,27 @@ describe('AvatarUploadable - Upload Mode', () => {
     expect(fileInput).toHaveAttribute('type', 'file');
     expect(fileInput).toHaveClass('sr-only');
   });
+
+  it('announces artwork uploads with release semantics', () => {
+    render(
+      <AvatarUploadable
+        src='https://example.com/release.jpg'
+        alt='Release artwork'
+        name='Midnight Echo'
+        size='2xl'
+        shape='artwork'
+        uploadable={true}
+        onUpload={mockOnUpload}
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Upload release artwork' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Choose Release Artwork File')
+    ).toHaveAttribute('type', 'file');
+  });
 });
 
 describe('AvatarUploadable - File Upload Interactions', () => {

@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/components/organisms/release-sidebar/ReleaseArtwork.test.tsx
 'use client';
 
 /**
@@ -65,6 +66,7 @@ export function ReleaseArtwork({
       alt={altText}
       dimension={96}
       sizeClassName='h-24 w-24'
+      imageClassName='object-contain'
       sizes='96px'
       fallback={
         <Icon

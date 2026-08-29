@@ -7,11 +7,16 @@ import {
   AVATAR_PERSON_RADIUS_CLASSNAME,
   Avatar,
   AvatarFallback,
+  AvatarImage,
   AvatarStatusDot,
   getAvatarSizePx,
   getInitials,
   UserAvatar,
 } from './avatar';
+import {
+  CROPPED_ARTWORK_AVATAR_FIXTURE_TEST_ID,
+  CroppedArtworkAvatarFixture,
+} from './fixtures/cropped-artwork-avatar';
 import {
   NON_CIRCULAR_IDENTITY_AVATAR_FIXTURE_TEST_ID,
   NonCircularIdentityAvatarFixture,
@@ -110,9 +115,7 @@ describe('Avatar', () => {
   it('uses rounded-square geometry for release artwork', () => {
     render(
       <Avatar data-testid='artwork' size='2xl' shape='artwork'>
-        <AvatarFallback size='2xl' shape='artwork'>
-          ME
-        </AvatarFallback>
+        <AvatarFallback>ME</AvatarFallback>
       </Avatar>
     );
 
@@ -121,6 +124,78 @@ describe('Avatar', () => {
     expect(artwork).toHaveClass('rounded-lg');
     expect(artwork).not.toHaveClass('rounded-full');
     expect(artwork).toHaveClass('overflow-hidden');
+    expect(screen.getByText('ME')).toHaveClass('rounded-lg', 'text-2xl');
+  });
+
+  it('inherits artwork geometry and contain fit in the documented composition', () => {
+    render(
+      <Avatar size='2xl' shape='artwork'>
+        <AvatarImage data-testid='artwork-image' src='/release.png' />
+      </Avatar>
+    );
+
+    const image = screen.getByTestId('artwork-image');
+    expect(image).toHaveClass('rounded-lg', 'object-contain');
+    expect(image).not.toHaveClass('rounded-full', 'object-cover');
+  });
+
+  it('supports explicit artwork props without allowing a cover crop', () => {
+    render(
+      <Avatar size='2xl' shape='artwork'>
+        <AvatarImage
+          data-testid='explicit-artwork-image'
+          src='/release.png'
+          size='2xl'
+          shape='artwork'
+          className='rounded-full object-cover'
+        />
+      </Avatar>
+    );
+
+    const image = screen.getByTestId('explicit-artwork-image');
+    expect(image).toHaveClass('rounded-lg', 'object-contain');
+    expect(image).not.toHaveClass('rounded-full', 'object-cover');
+  });
+
+  it('keeps the parent artwork contract when child props conflict', () => {
+    render(
+      <Avatar size='2xl' shape='artwork'>
+        <AvatarImage
+          data-testid='conflicting-artwork-image'
+          src='/release.png'
+          size='md'
+          shape='person'
+        />
+      </Avatar>
+    );
+
+    const image = screen.getByTestId('conflicting-artwork-image');
+    expect(image).toHaveClass('rounded-lg', 'object-contain');
+    expect(image).not.toHaveClass('rounded-full', 'object-cover');
+  });
+
+  it('rejects the deliberate-red circular cover crop for artwork', () => {
+    render(<CroppedArtworkAvatarFixture />);
+    render(
+      <Avatar size='2xl' shape='artwork'>
+        <AvatarImage
+          data-testid='production-artwork-image'
+          src='/release.png'
+        />
+      </Avatar>
+    );
+
+    const fixture = screen.getByTestId(CROPPED_ARTWORK_AVATAR_FIXTURE_TEST_ID);
+    const fixtureImage = screen.getByTestId(
+      `${CROPPED_ARTWORK_AVATAR_FIXTURE_TEST_ID}-image`
+    );
+    expect(fixture).toHaveAttribute('data-deliberate-red', '');
+    expect(fixture).toHaveClass('rounded-full');
+    expect(fixtureImage).toHaveClass('rounded-full', 'object-cover');
+
+    const productionImage = screen.getByTestId('production-artwork-image');
+    expect(productionImage).toHaveClass('rounded-lg', 'object-contain');
+    expect(productionImage).not.toHaveClass('rounded-full', 'object-cover');
   });
 
   it('rejects the deliberate-red non-circular identity crop', () => {
