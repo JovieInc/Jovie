@@ -1,8 +1,20 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { authorizeSummerControl } from '@/lib/ovie/control';
+import {
+  OVIE_MCP_RESOURCE_PATH,
+  OVIE_OAUTH_ISSUER_PATH,
+  OVIE_OAUTH_SCOPES,
+} from './oauth-contract';
 
-export const OVIE_MCP_RESOURCE_PATH = '/api/ovie/mcp';
-export const OVIE_OAUTH_ISSUER_PATH = '/api/ovie/oauth';
+export {
+  OVIE_MCP_RESOURCE_PATH,
+  OVIE_OAUTH_AUTHORIZATION_SERVER_METADATA_PATH,
+  OVIE_OAUTH_DISCOVERY_HEADERS,
+  OVIE_OAUTH_ISSUER_PATH,
+  OVIE_OAUTH_PROTECTED_RESOURCE_METADATA_PATH,
+  OVIE_OAUTH_SCOPES,
+} from './oauth-contract';
+
 export const OVIE_FALLBACK_SECRET =
   'jovie-non-production-better-auth-fallback-secret';
 
@@ -57,7 +69,7 @@ export class OvieOAuthIssuer {
       grant_types_supported: ['authorization_code'],
       code_challenge_methods_supported: ['S256'],
       token_endpoint_auth_methods_supported: ['none'],
-      scopes_supported: ['ovie:read', 'ovie:write'],
+      scopes_supported: [...OVIE_OAUTH_SCOPES],
     };
   }
 
@@ -66,7 +78,7 @@ export class OvieOAuthIssuer {
       resource: `${origin}${OVIE_MCP_RESOURCE_PATH}`,
       authorization_servers: [`${origin}${OVIE_OAUTH_ISSUER_PATH}`],
       bearer_methods_supported: ['header'],
-      scopes_supported: ['ovie:read', 'ovie:write'],
+      scopes_supported: [...OVIE_OAUTH_SCOPES],
     };
   }
 
@@ -117,7 +129,7 @@ export class OvieOAuthIssuer {
       sub: input.subject,
       email: input.email,
       admin: input.isAdmin,
-      scopes: [...(input.scopes ?? ['ovie:read', 'ovie:write'])],
+      scopes: [...(input.scopes ?? OVIE_OAUTH_SCOPES)],
       exp: Date.now() + 5 * 60 * 1000,
     } satisfies CodeClaims);
   }
@@ -237,12 +249,12 @@ export function issueOvieLanderAccessToken(input?: {
     access_token: signPayload(input?.secret ?? ovieIssuerSecret(), {
       sub: input?.subject ?? 'ovie-lander',
       isAdmin: true,
-      scopes: ['ovie:read', 'ovie:write'],
+      scopes: [...OVIE_OAUTH_SCOPES],
       exp,
     } satisfies OvieAccessClaims),
     token_type: 'Bearer',
     expires_in: ttlSec,
-    scope: 'ovie:read ovie:write',
+    scope: OVIE_OAUTH_SCOPES.join(' '),
   };
 }
 
