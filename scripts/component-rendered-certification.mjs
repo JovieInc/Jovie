@@ -14,7 +14,6 @@
 import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
 import { runOutcomeCertification } from './component-shadcn-outcome-inventory.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -528,7 +527,7 @@ function receiptFor(sample, evaluation) {
 }
 
 /**
- * @param {{ headSha?: string, redFixtures?: any[], landingBatch?: any[], repoRoot?: string, inventory?: object, outcomeRedFixtures?: object[], outcomeBatch?: object[] }} [options]
+ * @param {{ headSha?: string, redFixtures?: any[], landingBatch?: any[], repoRoot?: string, inventory?: object, outcomeRedFixtures?: object[], outcomeBatch?: object[], comparativeInventory?: object[], comparativeRedFixtures?: any[], comparativeQualificationControls?: any[] }} [options]
  */
 export function runRenderedCertification(options = {}) {
   const headSha = resolveHeadSha(options.headSha);
@@ -569,6 +568,9 @@ export function runRenderedCertification(options = {}) {
     inventory: options.inventory,
     redFixtures: options.outcomeRedFixtures,
     enrolledBatch: options.outcomeBatch,
+    comparativeInventory: options.comparativeInventory,
+    comparativeRedFixtures: options.comparativeRedFixtures,
+    qualificationControls: options.comparativeQualificationControls,
   });
   if (!outcome.ok) {
     issues.push(...outcome.receipt.issues);

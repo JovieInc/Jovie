@@ -1060,6 +1060,7 @@ export function runComponentShipGate(options = {}) {
     skipRatchet: options.skipRatchet ?? false,
     skipRenderedCert: options.skipRenderedCert ?? false,
     headSha: options.headSha ?? null,
+    comparativeQualificationControls: options.comparativeQualificationControls,
   };
 
   const report = {
@@ -1133,6 +1134,8 @@ export function runComponentShipGate(options = {}) {
     try {
       const rendered = runRenderedCertification({
         headSha: flags.headSha ?? undefined,
+        comparativeQualificationControls:
+          flags.comparativeQualificationControls,
       });
       report.sections.renderedCertification = {
         ok: rendered.ok,
@@ -1225,6 +1228,20 @@ function printReport(report) {
       }
       for (const item of outcome.enrolledBatch ?? []) {
         console.log(`  outcome-batch ${item.id}: ${item.verdict}`);
+      }
+      const comparative = outcome.comparativeQualityBar;
+      if (comparative) {
+        console.log(
+          `  quality-bar inventory: ${comparative.inventory.rubricEnrolled}/${comparative.inventory.total} rubric-enrolled, ${comparative.inventory.pendingComparison} pending comparison`
+        );
+        for (const item of comparative.fixtures ?? []) {
+          console.log(`  quality-bar fixture ${item.id}: ${item.verdict}`);
+        }
+        for (const item of comparative.qualificationControls ?? []) {
+          console.log(
+            `  quality-bar qualification control ${item.baselineId}: ${item.verdict}`
+          );
+        }
       }
     }
   } else {
