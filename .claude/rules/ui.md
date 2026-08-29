@@ -115,7 +115,7 @@ that unautomatable behavior was manually verified.
 
 | Rule | Automated evidence when applicable | Manual/device or design-review evidence |
 |---|---|---|
-| Component ownership and changed interaction behavior | `pnpm component-ship-gate` requires a changed shared component's real test and story; focused Vitest asserts the user-visible transition for shared and feature components | Confirm the component belongs to the existing family, not a fork |
+| Component ownership and changed interaction behavior | `pnpm component-ship-gate` requires a changed shared component's real test and story plus fail-closed rendered certification receipts; focused Vitest asserts the user-visible transition for shared and feature components | Confirm the component belongs to the existing family, not a fork |
 | Semantic controls, names, and keyboard behavior | Focused Testing Library/Playwright behavior tests, `apps/web/tests/utils/a11y.ts`, and `pnpm --filter @jovie/web run a11y:ci` for affected routes | Screen-reader reading/order and hardware-keyboard pass |
 | Contrast and touch alternatives | `pnpm --filter @jovie/web run lint:contrast-ratchet` and `pnpm --filter @jovie/web run lint:touch-target` | Touch target usability at device scale and non-color cue review |
 | Focus, selection, layout, and state retention | Focus assertions plus the applicable Playwright bounding-box, visual, or layout-stability test | Real browser checks for scroll/caret/selection and unexpected movement |
