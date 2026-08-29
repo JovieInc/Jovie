@@ -5,10 +5,7 @@
  */
 
 import 'server-only';
-import { and, sql as drizzleSql, eq } from 'drizzle-orm';
-import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
-import { billingAuditLog } from '@/lib/db/schema/billing';
+import { applyBillingUpdateWithAudit } from '@/lib/db/billing-status';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
 import { fetchUserBillingDataByIdentity } from './queries';
 import {
@@ -43,46 +40,6 @@ function isEventStale(
 ): boolean {
   if (!eventTimestamp || !lastEventAt) return false;
   return eventTimestamp < lastEventAt;
-}
-
-/**
- * Prepare update data for billing status change
- */
-function prepareUpdateData(
-  options: UpdateBillingStatusOptions,
-  effectivePlan: string
-): Partial<typeof users.$inferInsert> {
-  const {
-    isPro,
-    stripeCustomerId,
-    stripeSubscriptionId,
-    stripePriceId,
-    stripeEventTimestamp,
-  } = options;
-
-  const updateData: Partial<typeof users.$inferInsert> = {
-    isPro,
-    plan: effectivePlan,
-    billingUpdatedAt: new Date(),
-  };
-
-  if (stripeCustomerId) {
-    updateData.stripeCustomerId = stripeCustomerId;
-  }
-
-  if (stripeSubscriptionId !== undefined) {
-    updateData.stripeSubscriptionId = stripeSubscriptionId;
-  }
-
-  if (stripePriceId !== undefined) {
-    updateData.stripePriceId = stripePriceId;
-  }
-
-  if (stripeEventTimestamp) {
-    updateData.lastBillingEventAt = stripeEventTimestamp;
-  }
-
-  return updateData;
 }
 
 /**
@@ -161,12 +118,11 @@ export async function updateUserBillingStatus(
     if (isEventStale(stripeEventTimestamp, currentUser.lastBillingEventAt)) {
       return {
         success: true,
+        appUserId: currentUser.id,
         skipped: true,
         reason: 'Event is older than last processed event',
       };
     }
-
-    const updateData = prepareUpdateData(options, effectivePlan);
 
     // Prepare previous state for audit log
     const previousState = {
@@ -190,49 +146,30 @@ export async function updateUserBillingStatus(
         stripePriceId === undefined ? currentUser.stripePriceId : stripePriceId,
     };
 
-    // Optimistic locking: Only update if billingVersion hasn't changed
-    const result = await db
-      .update(users)
-      .set({
-        ...updateData,
-        billingVersion: drizzleSql`${users.billingVersion} + 1`,
-      })
-      .where(
-        and(
-          eq(users.id, currentUser.id),
-          eq(users.billingVersion, currentUser.billingVersion)
-        )
-      )
-      .returning({ id: users.id, billingVersion: users.billingVersion });
+    const result = await applyBillingUpdateWithAudit({
+      userId: currentUser.id,
+      userIdentity: clerkUserId,
+      expectedBillingVersion: currentUser.billingVersion,
+      isPro,
+      plan: effectivePlan,
+      billingUpdatedAt: new Date(),
+      stripeCustomerId: stripeCustomerId || undefined,
+      stripeSubscriptionId,
+      stripePriceId,
+      lastBillingEventAt: stripeEventTimestamp,
+      eventType,
+      previousState,
+      newState,
+      stripeEventId,
+      source,
+      metadata,
+    });
 
-    if (result.length === 0) {
+    if (!result) {
       return await retryUpdateWithFreshData(options);
     }
 
-    // Log to audit table
-    try {
-      await db.insert(billingAuditLog).values({
-        userId: currentUser.id,
-        eventType,
-        previousState,
-        newState,
-        stripeEventId,
-        source,
-        metadata: {
-          ...metadata,
-          clerkUserId,
-          billingVersion: result[0].billingVersion,
-        },
-      });
-    } catch (auditError) {
-      await captureWarning('Failed to write billing audit log', auditError, {
-        userId: currentUser.id,
-        eventType,
-        stripeEventId,
-      });
-    }
-
-    return { success: true };
+    return { success: true, appUserId: currentUser.id };
   } catch (error) {
     await captureCriticalError('Error updating user billing status', error, {
       clerkUserId,
@@ -310,28 +247,52 @@ async function retryUpdateWithFreshData(
     if (isEventStale(stripeEventTimestamp, freshUser.lastBillingEventAt)) {
       return {
         success: true,
+        appUserId: freshUser.id,
         skipped: true,
         reason: 'Event is older than last processed event (on retry)',
       };
     }
 
-    const updateData = prepareUpdateData(options, effectivePlan);
+    const previousState = {
+      isPro: freshUser.isPro,
+      plan: freshUser.plan,
+      stripeCustomerId: freshUser.stripeCustomerId,
+      stripeSubscriptionId: freshUser.stripeSubscriptionId,
+      stripePriceId: freshUser.stripePriceId,
+    };
+    const newState = {
+      isPro,
+      plan: effectivePlan,
+      stripeCustomerId: stripeCustomerId ?? freshUser.stripeCustomerId,
+      stripeSubscriptionId:
+        stripeSubscriptionId === undefined
+          ? freshUser.stripeSubscriptionId
+          : stripeSubscriptionId,
+      stripePriceId:
+        stripePriceId === undefined ? freshUser.stripePriceId : stripePriceId,
+    };
+    const result = await applyBillingUpdateWithAudit({
+      userId: freshUser.id,
+      userIdentity: clerkUserId,
+      expectedBillingVersion: freshUser.billingVersion,
+      isPro,
+      plan: effectivePlan,
+      billingUpdatedAt: new Date(),
+      stripeCustomerId: stripeCustomerId || undefined,
+      stripeSubscriptionId,
+      stripePriceId,
+      lastBillingEventAt: stripeEventTimestamp,
+      eventType,
+      previousState,
+      newState,
+      stripeEventId,
+      source,
+      metadata,
+      retried: true,
+      retryCount: retryCount + 1,
+    });
 
-    const result = await db
-      .update(users)
-      .set({
-        ...updateData,
-        billingVersion: drizzleSql`${users.billingVersion} + 1`,
-      })
-      .where(
-        and(
-          eq(users.id, freshUser.id),
-          eq(users.billingVersion, freshUser.billingVersion)
-        )
-      )
-      .returning({ id: users.id, billingVersion: users.billingVersion });
-
-    if (result.length === 0) {
+    if (!result) {
       if (retryCount < MAX_RETRIES) {
         return retryUpdateWithFreshData(options, retryCount + 1);
       }
@@ -347,54 +308,7 @@ async function retryUpdateWithFreshData(
       };
     }
 
-    // Log to audit table
-    try {
-      await db.insert(billingAuditLog).values({
-        userId: freshUser.id,
-        eventType,
-        previousState: {
-          isPro: freshUser.isPro,
-          plan: freshUser.plan,
-          stripeCustomerId: freshUser.stripeCustomerId,
-          stripeSubscriptionId: freshUser.stripeSubscriptionId,
-          stripePriceId: freshUser.stripePriceId,
-        },
-        newState: {
-          isPro,
-          plan: effectivePlan,
-          stripeCustomerId: stripeCustomerId ?? freshUser.stripeCustomerId,
-          stripeSubscriptionId:
-            stripeSubscriptionId === undefined
-              ? freshUser.stripeSubscriptionId
-              : stripeSubscriptionId,
-          stripePriceId:
-            stripePriceId === undefined
-              ? freshUser.stripePriceId
-              : stripePriceId,
-        },
-        stripeEventId,
-        source,
-        metadata: {
-          ...metadata,
-          clerkUserId,
-          billingVersion: result[0].billingVersion,
-          retried: true,
-          retryCount: retryCount + 1,
-        },
-      });
-    } catch (auditError) {
-      await captureWarning(
-        'Failed to write billing audit log on retry',
-        auditError,
-        {
-          userId: freshUser.id,
-          eventType,
-          stripeEventId,
-        }
-      );
-    }
-
-    return { success: true };
+    return { success: true, appUserId: freshUser.id };
   } catch (error) {
     await captureCriticalError('Error retrying billing status update', error, {
       clerkUserId,

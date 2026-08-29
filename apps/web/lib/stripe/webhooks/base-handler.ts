@@ -31,6 +31,9 @@ import { getCustomerId, isActiveSubscription } from './utils';
  * Extends HandlerResult with additional subscription-specific context.
  */
 export interface ProcessSubscriptionResult extends HandlerResult {
+  /** Canonical app `users.id` resolved from legacy or Better Auth metadata. */
+  appUserId?: string;
+
   /** The plan that was assigned (if subscription is active) */
   plan?: string;
 
@@ -200,6 +203,7 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
 
     return {
       success: true,
+      appUserId: result.appUserId,
       isActive: false,
       skipped: result.skipped,
       reason: result.reason,
@@ -290,6 +294,7 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
 
     return {
       success: true,
+      appUserId: result.appUserId,
       isActive: true,
       plan,
       skipped: result.skipped,

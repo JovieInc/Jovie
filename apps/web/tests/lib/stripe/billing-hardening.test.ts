@@ -7,30 +7,34 @@
  * - Audit logging
  */
 
-import { PgDialect } from 'drizzle-orm/pg-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Hoisted mocks for database operations
-const { mockDbSelect, mockDbUpdate, mockDbInsert, mockSelectData } = vi.hoisted(
-  () => {
-    const selectData: Record<string, unknown>[] = [];
+const {
+  mockCaptureCriticalError,
+  mockDbSelect,
+  mockApplyBillingUpdateWithAudit,
+  mockSelectData,
+} = vi.hoisted(() => {
+  const selectData: Record<string, unknown>[] = [];
 
-    return {
-      mockDbSelect: vi.fn(),
-      mockDbUpdate: vi.fn(),
-      mockDbInsert: vi.fn(),
-      mockSelectData: selectData,
-    };
-  }
-);
+  return {
+    mockCaptureCriticalError: vi.fn(),
+    mockDbSelect: vi.fn(),
+    mockApplyBillingUpdateWithAudit: vi.fn(),
+    mockSelectData: selectData,
+  };
+});
 
 // Mock database
 vi.mock('@/lib/db', () => ({
   db: {
     select: mockDbSelect,
-    update: mockDbUpdate,
-    insert: mockDbInsert,
   },
+}));
+
+vi.mock('@/lib/db/billing-status', () => ({
+  applyBillingUpdateWithAudit: mockApplyBillingUpdateWithAudit,
 }));
 
 // Mock auth
@@ -54,7 +58,7 @@ vi.mock('@/lib/auth/session', () => ({
 
 // Mock error tracking
 vi.mock('@/lib/error-tracking', () => ({
-  captureCriticalError: vi.fn(),
+  captureCriticalError: mockCaptureCriticalError,
   captureWarning: vi.fn(),
   logFallback: vi.fn(),
 }));
@@ -74,6 +78,12 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSelectData.length = 0;
+    mockApplyBillingUpdateWithAudit.mockImplementation(
+      async (input: { userId: string; expectedBillingVersion: number }) => ({
+        appUserId: input.userId,
+        billingVersion: input.expectedBillingVersion + 1,
+      })
+    );
   });
 
   describe('Event Ordering', () => {
@@ -81,8 +91,6 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
       const { updateUserBillingStatus } = await import(
         '@/lib/stripe/customer-sync'
       );
-      let updatePredicate: unknown;
-
       mockDbSelect.mockReturnValue({
         from: () => ({
           where: () => ({
@@ -102,26 +110,6 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
           }),
         }),
       });
-      mockDbUpdate.mockReturnValue({
-        set: () => ({
-          where: (predicate: unknown) => {
-            updatePredicate = predicate;
-            return {
-              returning: () =>
-                Promise.resolve([
-                  {
-                    id: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
-                    billingVersion: 2,
-                  },
-                ]),
-            };
-          },
-        }),
-      });
-      mockDbInsert.mockReturnValue({
-        values: () => Promise.resolve([{ id: 'audit-ba' }]),
-      });
-
       const result = await updateUserBillingStatus({
         clerkUserId: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
         isPro: true,
@@ -130,11 +118,13 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
       });
 
       expect(result.success).toBe(true);
-      const predicateSql = new PgDialect().sqlToQuery(
-        updatePredicate as never
-      ).sql;
-      expect(predicateSql).toContain('"users"."id" =');
-      expect(predicateSql).not.toContain('"users"."clerk_id"');
+      expect(result.appUserId).toBe('6ba7b810-9dad-11d1-80b4-00c04fd430c8');
+      expect(mockApplyBillingUpdateWithAudit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
+          userIdentity: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
+        })
+      );
     });
 
     it('should skip events older than lastBillingEventAt', async () => {
@@ -177,7 +167,7 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
       expect(result.reason).toContain('older than last processed');
 
       // Should not have called update
-      expect(mockDbUpdate).not.toHaveBeenCalled();
+      expect(mockApplyBillingUpdateWithAudit).not.toHaveBeenCalled();
     });
 
     it('should process events newer than lastBillingEventAt', async () => {
@@ -207,21 +197,6 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
         }),
       });
 
-      // Mock successful update
-      mockDbUpdate.mockReturnValue({
-        set: () => ({
-          where: () => ({
-            returning: () =>
-              Promise.resolve([{ id: 'uuid-123', billingVersion: 2 }]),
-          }),
-        }),
-      });
-
-      // Mock audit log insert
-      mockDbInsert.mockReturnValue({
-        values: () => Promise.resolve([{ id: 'audit-123' }]),
-      });
-
       const result = await updateUserBillingStatus({
         clerkUserId: 'user_test123',
         isPro: false,
@@ -234,7 +209,7 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
       expect(result.skipped).toBeFalsy();
 
       // Should have called update
-      expect(mockDbUpdate).toHaveBeenCalled();
+      expect(mockApplyBillingUpdateWithAudit).toHaveBeenCalled();
     });
 
     it('should process events when no prior lastBillingEventAt exists', async () => {
@@ -261,21 +236,6 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
         }),
       });
 
-      // Mock successful update
-      mockDbUpdate.mockReturnValue({
-        set: () => ({
-          where: () => ({
-            returning: () =>
-              Promise.resolve([{ id: 'uuid-123', billingVersion: 2 }]),
-          }),
-        }),
-      });
-
-      // Mock audit log insert
-      mockDbInsert.mockReturnValue({
-        values: () => Promise.resolve([{ id: 'audit-123' }]),
-      });
-
       const result = await updateUserBillingStatus({
         clerkUserId: 'user_test123',
         isPro: true,
@@ -288,7 +248,7 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
 
       expect(result.success).toBe(true);
       expect(result.skipped).toBeFalsy();
-      expect(mockDbUpdate).toHaveBeenCalled();
+      expect(mockApplyBillingUpdateWithAudit).toHaveBeenCalled();
     });
   });
 
@@ -325,26 +285,15 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
           }),
         }));
 
-        // Mock update - first fails (empty return), second succeeds
-        mockDbUpdate.mockImplementation(() => ({
-          set: () => ({
-            where: () => ({
-              returning: () => {
-                updateCallCount++;
-                if (updateCallCount === 1) {
-                  // First attempt fails - optimistic lock
-                  return Promise.resolve([]);
-                }
-                // Second attempt succeeds
-                return Promise.resolve([{ id: 'uuid-123', billingVersion: 3 }]);
-              },
-            }),
-          }),
-        }));
-
-        // Mock audit log insert
-        mockDbInsert.mockReturnValue({
-          values: () => Promise.resolve([{ id: 'audit-123' }]),
+        // First atomic statement loses the optimistic lock; retry succeeds.
+        mockApplyBillingUpdateWithAudit.mockImplementation(async input => {
+          updateCallCount++;
+          return updateCallCount === 1
+            ? null
+            : {
+                appUserId: input.userId,
+                billingVersion: input.expectedBillingVersion + 1,
+              };
         });
 
         const resultPromise = updateUserBillingStatus({
@@ -394,14 +343,8 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
           }),
         });
 
-        // Mock update - always fails (simulating high contention)
-        mockDbUpdate.mockReturnValue({
-          set: () => ({
-            where: () => ({
-              returning: () => Promise.resolve([]), // Empty = lock failed
-            }),
-          }),
-        });
+        // No atomic statement wins the optimistic lock.
+        mockApplyBillingUpdateWithAudit.mockResolvedValue(null);
 
         const resultPromise = updateUserBillingStatus({
           clerkUserId: 'user_test123',
@@ -428,8 +371,6 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
         '@/lib/stripe/customer-sync'
       );
 
-      let auditLogValues: Record<string, unknown> | null = null;
-
       // Mock user
       mockDbSelect.mockReturnValue({
         from: () => ({
@@ -439,32 +380,16 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
                 {
                   id: 'uuid-123',
                   isPro: false,
+                  plan: 'free',
                   stripeCustomerId: null,
                   stripeSubscriptionId: null,
+                  stripePriceId: null,
                   billingVersion: 1,
                   lastBillingEventAt: null,
                 },
               ]),
           }),
         }),
-      });
-
-      // Mock successful update
-      mockDbUpdate.mockReturnValue({
-        set: () => ({
-          where: () => ({
-            returning: () =>
-              Promise.resolve([{ id: 'uuid-123', billingVersion: 2 }]),
-          }),
-        }),
-      });
-
-      // Mock audit log insert - capture the values
-      mockDbInsert.mockReturnValue({
-        values: (values: Record<string, unknown>) => {
-          auditLogValues = values;
-          return Promise.resolve([{ id: 'audit-123' }]);
-        },
       });
 
       await updateUserBillingStatus({
@@ -478,11 +403,8 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
         metadata: { plan: 'standard' },
       });
 
-      expect(mockDbInsert).toHaveBeenCalled();
-      expect(auditLogValues).toBeTruthy();
-
-      // Cast through unknown to the expected type for assertions
-      const values = auditLogValues as unknown as {
+      expect(mockApplyBillingUpdateWithAudit).toHaveBeenCalledOnce();
+      const values = mockApplyBillingUpdateWithAudit.mock.calls[0]?.[0] as {
         eventType?: string;
         stripeEventId?: string;
         source?: string;
@@ -495,23 +417,24 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
       expect(values.source).toBe('webhook');
       expect(values.previousState).toEqual({
         isPro: false,
+        plan: 'free',
         stripeCustomerId: null,
         stripeSubscriptionId: null,
+        stripePriceId: null,
       });
       expect(values.newState).toEqual({
         isPro: true,
         plan: 'pro',
         stripeCustomerId: 'cus_new',
         stripeSubscriptionId: 'sub_new',
+        stripePriceId: null,
       });
     });
 
-    it('should include clerkUserId and billingVersion in metadata', async () => {
+    it('delegates the identity and expected version to the atomic writer', async () => {
       const { updateUserBillingStatus } = await import(
         '@/lib/stripe/customer-sync'
       );
-
-      let auditLogValues: Record<string, unknown> | null = null;
 
       // Mock user
       mockDbSelect.mockReturnValue({
@@ -532,41 +455,70 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
         }),
       });
 
-      // Mock successful update
-      mockDbUpdate.mockReturnValue({
-        set: () => ({
-          where: () => ({
-            returning: () =>
-              Promise.resolve([{ id: 'uuid-123', billingVersion: 6 }]),
-          }),
-        }),
-      });
-
-      // Mock audit log insert
-      mockDbInsert.mockReturnValue({
-        values: (values: Record<string, unknown>) => {
-          auditLogValues = values;
-          return Promise.resolve([{ id: 'audit-123' }]);
-        },
-      });
-
       await updateUserBillingStatus({
         clerkUserId: 'user_test123',
         isPro: true,
         eventType: 'subscription_created',
       });
 
-      // Cast through unknown to access metadata
-      const values = auditLogValues as unknown as {
-        metadata?: Record<string, unknown>;
-      };
-      const metadata = values.metadata;
-      expect(metadata?.clerkUserId).toBe('user_test123');
-      expect(metadata?.billingVersion).toBe(6);
+      expect(mockApplyBillingUpdateWithAudit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'uuid-123',
+          userIdentity: 'user_test123',
+          expectedBillingVersion: 5,
+        })
+      );
     });
   });
 
   describe('Error Handling', () => {
+    it('returns failure when the atomic entitlement and audit statement fails', async () => {
+      const { updateUserBillingStatus } = await import(
+        '@/lib/stripe/customer-sync'
+      );
+
+      mockDbSelect.mockReturnValue({
+        from: () => ({
+          where: () => ({
+            limit: () =>
+              Promise.resolve([
+                {
+                  id: 'uuid-audit-failure',
+                  isPro: false,
+                  plan: 'free',
+                  stripeCustomerId: null,
+                  stripeSubscriptionId: null,
+                  stripePriceId: null,
+                  billingVersion: 1,
+                  lastBillingEventAt: null,
+                },
+              ]),
+          }),
+        }),
+      });
+      mockApplyBillingUpdateWithAudit.mockRejectedValue(
+        new Error('audit unavailable')
+      );
+
+      const result = await updateUserBillingStatus({
+        clerkUserId: 'uuid-audit-failure',
+        isPro: true,
+        stripeEventId: 'evt_audit_failure',
+        eventType: 'subscription_created',
+      });
+
+      expect(mockApplyBillingUpdateWithAudit).toHaveBeenCalledOnce();
+      expect(result).toEqual({
+        success: false,
+        error: 'Failed to update billing status',
+      });
+      expect(mockCaptureCriticalError).toHaveBeenCalledWith(
+        'Error updating user billing status',
+        expect.objectContaining({ message: 'audit unavailable' }),
+        expect.objectContaining({ stripeEventId: 'evt_audit_failure' })
+      );
+    });
+
     it('should return error when user not found', async () => {
       const { updateUserBillingStatus } = await import(
         '@/lib/stripe/customer-sync'
