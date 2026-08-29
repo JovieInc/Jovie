@@ -168,8 +168,12 @@ overlapping active artifacts for one Linear issue remain unresolved, an
 explicit hold expires, or no PR merges for one hour while open PRs remain.
 Held or draft PRs are not duplicate active writers; hold expiry governs them
 separately. Multiple active PRs for one issue are allowed only when
-changed-file sets are disjoint. Missing, malformed, or truncated changed-file
-evidence for a multi-active lane fails closed as unclassified. A native queue entry becoming
+changed-file sets are disjoint, and a duplicate receipt names only PRs that
+participate in an overlap. Only same-repository PRs may assert a Linear lane
+identity; cross-repository markers are ignored, while missing repository
+provenance fails closed. Missing, malformed, truncated, or rename-ambiguous
+changed-file evidence makes the complete multi-active lane unclassified. A
+native queue entry becoming
 `UNMERGEABLE` is red immediately: a nonempty queue is not progress. A grace
 episode also pauses new intake until the writer and queue prove progress. This
 stop-line never disables native promotion, exact-head PR remediation, tests, or

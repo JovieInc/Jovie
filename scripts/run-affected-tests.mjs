@@ -385,8 +385,10 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   '.github/requirements/pytest.txt',
   '.github/workflows/gem-delivery-controller-activation.yml',
   '.github/workflows/ci.yml',
+  'docs/PR_FLOW.md',
   'scripts/hermes/config/gem-repo-registry.json',
   'scripts/hermes/config/model-registry.json',
+  'scripts/hermes/closure_health.py',
   'scripts/hermes/gem-pr-drain.py',
   'scripts/hermes/gem-ops-hud.py',
   'scripts/hermes/gem-priority-gate.py',
@@ -405,6 +407,7 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
+  'scripts/hermes/tests/closure-health.test.py',
   'scripts/hermes/tests/symphony-reconciler.test.py',
   'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
   'scripts/hermes/tests/test-model-router.py',
@@ -414,6 +417,7 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   'scripts/run-affected-tests.mjs',
 ]);
 const GEM_PR_REHABILITATION_PYTHON_TESTS = [
+  'scripts/hermes/tests/closure-health.test.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
   'scripts/hermes/tests/gem-pr-drain.test.py',
   'scripts/hermes/tests/gem-ops-hud.test.py',
@@ -424,6 +428,7 @@ const GEM_PR_REHABILITATION_PYTHON_TESTS = [
 ];
 const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/hermes/config/gem-repo-registry.json',
+  'scripts/hermes/closure_health.py',
   'scripts/hermes/gem-pr-drain.py',
   'scripts/hermes/gem-ops-hud.py',
   'scripts/hermes/gem-repo-drain-cycle.py',
@@ -438,6 +443,7 @@ const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/hermes/tests/gem-ops-hud.test.py',
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
+  'scripts/hermes/tests/closure-health.test.py',
   'scripts/hermes/tests/symphony-reconciler.test.py',
 ]);
 const NO_UNATTENDED_RED_PRIMARY_INPUTS = new Set([

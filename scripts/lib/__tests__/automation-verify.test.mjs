@@ -75,8 +75,10 @@ const GEM_PR_REHABILITATION_LANE = [
   '.github/requirements/pytest.txt',
   '.github/workflows/gem-delivery-controller-activation.yml',
   '.github/workflows/ci.yml',
+  'docs/PR_FLOW.md',
   'scripts/hermes/config/gem-repo-registry.json',
   'scripts/hermes/config/model-registry.json',
+  'scripts/hermes/closure_health.py',
   'scripts/hermes/gem-pr-drain.py',
   'scripts/hermes/gem-ops-hud.py',
   'scripts/hermes/gem-priority-gate.py',
@@ -95,6 +97,7 @@ const GEM_PR_REHABILITATION_LANE = [
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
+  'scripts/hermes/tests/closure-health.test.py',
   'scripts/hermes/tests/symphony-reconciler.test.py',
   'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
   'scripts/hermes/tests/test-model-router.py',
@@ -740,6 +743,7 @@ describe('automation-verify affected scope', () => {
       mode: 'selected',
       selectedTests: [],
       pythonUnittestTests: [
+        'scripts/hermes/tests/closure-health.test.py',
         'scripts/hermes/tests/gem-priority-gate.test.py',
         'scripts/hermes/tests/gem-pr-drain.test.py',
         'scripts/hermes/tests/gem-ops-hud.test.py',
@@ -759,6 +763,21 @@ describe('automation-verify affected scope', () => {
         'apps/ios/Jovie/RootView.swift',
       ]).mode
     ).toBe('full');
+  });
+
+  it('routes a closure-health source-only repair to its Python regression suite', () => {
+    expect(
+      buildAffectedTestPlan(['scripts/hermes/closure_health.py'])
+    ).toMatchObject({
+      mode: 'selected',
+      pythonUnittestTests: expect.arrayContaining([
+        'scripts/hermes/tests/closure-health.test.py',
+      ]),
+      scriptVitestTests: expect.arrayContaining([
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+      ]),
+    });
   });
 
   it('selects the No Unattended Red contracts without unrelated product tests', () => {
