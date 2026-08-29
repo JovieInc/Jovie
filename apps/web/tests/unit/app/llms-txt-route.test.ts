@@ -17,7 +17,15 @@ describe('GET /llms.txt', () => {
     expect(body).toContain('/api/v1/openapi.json');
     expect(body).toContain('/api/mcp/{username}');
     expect(body).toContain('https://docs.jov.ie');
-    expect(body).toContain('public developer access is read-only');
+    expect(body).toContain(
+      'the public artist API and per-artist MCP are anonymous/read-only'
+    );
+    expect(body).toContain(
+      'https://jov.ie/.well-known/oauth-protected-resource/api/ovie/mcp'
+    );
+    expect(body).toContain(
+      'https://jov.ie/.well-known/oauth-authorization-server/api/ovie/oauth'
+    );
   });
 });
 
