@@ -454,6 +454,9 @@ class StaleAlarmTests(unittest.TestCase):
 
 
 class PreviousClosureHealthTests(unittest.TestCase):
+    def test_boundary_offset_timestamp_is_treated_as_missing_history(self):
+        self.assertIsNone(MODULE.parse_time("0001-01-01T00:00:00+14:00"))
+
     def test_null_signals_in_persisted_receipt_is_ignored(self):
         with tempfile.TemporaryDirectory() as tmp:
             state_dir = pathlib.Path(tmp)

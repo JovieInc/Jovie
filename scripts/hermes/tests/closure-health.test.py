@@ -235,6 +235,9 @@ class ClosureClassificationTests(unittest.TestCase):
 
 
 class ClosureHealthEvaluationTests(unittest.TestCase):
+    def test_boundary_offset_timestamp_is_treated_as_missing_history(self):
+        self.assertIsNone(MODULE.parse_time("0001-01-01T00:00:00+14:00"))
+
     def test_healthy_writer_and_progress_allow_new_intake(self):
         result = MODULE.evaluate_closure_health(snapshot(), previous=None, now=NOW)
 
