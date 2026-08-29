@@ -30,6 +30,11 @@ export const SYSTEMIC_HOLD_REASONS = Object.freeze([
   CONTEXT_BLOCKER.OWNERSHIP_CONFLICT,
 ]);
 
+export const TRANSIENT_CANDIDATE_DEFER_REASONS = Object.freeze([
+  'collision-domain-leased',
+  'lane-capacity-exhausted',
+]);
+
 function emptyStore() {
   return { schema: ISSUE_HOLD_SCHEMA, byIdentifier: {} };
 }
@@ -204,8 +209,22 @@ export async function admitNextFromPool({
     }
 
     const reason = result?.reason;
+    const reasonCode = result?.reasonCode || reason;
     const detail = result?.detail || null;
     const issueSpecific = isIssueSpecificHoldReason(reason, detail);
+    const transientDefer =
+      result?.disposition === 'defer' &&
+      TRANSIENT_CANDIDATE_DEFER_REASONS.includes(reasonCode);
+    if (transientDefer) {
+      skipped.push({
+        identifier: selected.identifier,
+        stage: result?.stage || null,
+        reason,
+        reasonCode,
+        detail,
+        issueHash: issueContentHash(selected),
+      });
+    }
     if (issueSpecific) {
       skipped.push({
         identifier: selected.identifier,
@@ -219,7 +238,10 @@ export async function admitNextFromPool({
         await persistHolds(store);
       }
     }
-    if (shouldFailClosedForEvent(reason, detail, { targeted })) {
+    if (
+      !transientDefer &&
+      shouldFailClosedForEvent(reason, detail, { targeted })
+    ) {
       return { ...result, skipped, decisions: selection.decisions };
     }
     excluded.push(selected.identifier);

@@ -971,6 +971,13 @@ describe('deterministic Symphony admission boundary', () => {
         eligiblePrs: 6,
         greenReadyPrs: 1,
         target: 15,
+        laneCapacity: {
+          schema: 'jovie-lane-capacity/v1',
+          observedAt: '2026-08-09T05:00:00.000Z',
+          global: { ready: 1, budget: 15 },
+          defaultLaneBudget: 4,
+          lanes: {},
+        },
       },
       closureHealth: {
         schema: 'jovie-closure-health/v1',
@@ -1011,7 +1018,7 @@ describe('deterministic Symphony admission boundary', () => {
     });
   }
 
-  it('backpressures only at fifteen green ready-to-merge PRs', () => {
+  it('leaves per-lane backpressure to the candidate preflight', () => {
     const fleetGate = admitter.evaluateFleetGate(
       fleetEvidence({
         queue: {
@@ -1026,7 +1033,7 @@ describe('deterministic Symphony admission boundary', () => {
 
     assert.equal(fleetGate.state, 'GREEN');
     assert.equal(fleetGate.promotionAdmission.allowed, true);
-    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
+    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, true);
     assert.equal(
       fleetGate.reasons.some(reason => reason.code === 'queue-above-target'),
       false
@@ -1043,6 +1050,29 @@ describe('deterministic Symphony admission boundary', () => {
       { now: '2026-08-09T05:01:00.000Z' }
     );
     assert.equal(oneLanded.workAdmission.newIssueLeaseAllowed, true);
+  });
+
+  it('fails lane admission closed when the nested global receipt disagrees with queue evidence', () => {
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({
+        queue: {
+          status: 'known',
+          eligiblePrs: 6,
+          greenReadyPrs: 1,
+          target: 15,
+          laneCapacity: {
+            schema: 'jovie-lane-capacity/v1',
+            observedAt: '2026-08-09T05:00:00.000Z',
+            global: { ready: 0, budget: 15 },
+            defaultLaneBudget: 4,
+            lanes: {},
+          },
+        },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+
+    assert.equal(fleetGate.laneCapacity, null);
   });
 
   it('blocks a new lease when Summer closure health is red while promotion stays live', () => {
@@ -1481,6 +1511,10 @@ describe('deterministic Symphony admission boundary', () => {
         ...controllerSignals.independentReview,
         observedAt: new Date().toISOString(),
       };
+      if (controllerSignals.queue?.laneCapacity) {
+        controllerSignals.queue.laneCapacity.observedAt =
+          new Date().toISOString();
+      }
       try {
         const { stdout } = await execFileAsync(
           'python3',

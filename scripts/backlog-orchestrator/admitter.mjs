@@ -578,10 +578,7 @@ export function evaluateFleetGate(
       : !closureAdmission.newIssueIntakeAllowed
         ? ['tests', 'review']
         : [
-            ...(concurrency.newMutationAllowed &&
-            (!queueShapeValid || queueBelowBackpressure)
-              ? ['approved-issue-lease']
-              : []),
+            ...(concurrency.newMutationAllowed ? ['approved-issue-lease'] : []),
             ...FLEET_AUTHORITY.AMBER,
           ];
   const holdIntakeAllowed =
@@ -654,6 +651,11 @@ export function evaluateFleetGate(
       gem: concurrency,
       symphonyImplementation: 'event-driven-backpressure',
     },
+    laneCapacity:
+      evidence?.queue?.laneCapacity?.global?.ready === greenReadyPrs &&
+      evidence?.queue?.laneCapacity?.global?.budget === queueTarget
+        ? evidence.queue.laneCapacity
+        : null,
   };
 }
 
