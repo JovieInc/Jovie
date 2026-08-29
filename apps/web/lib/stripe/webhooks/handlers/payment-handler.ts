@@ -23,7 +23,7 @@
 import type Stripe from 'stripe';
 
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
-import { getInternalUserId, recordCommission } from '@/lib/referrals/service';
+import { recordCommission } from '@/lib/referrals/service';
 import { stripe } from '@/lib/stripe/client';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import {
@@ -135,17 +135,14 @@ export class PaymentHandler extends BaseSubscriptionHandler {
    * @private
    */
   private async tryRecordReferralCommission(
-    userId: string,
+    appUserId: string,
     invoice: Stripe.Invoice
   ): Promise<void> {
     if (invoice.amount_paid <= 0) return;
 
     try {
-      const internalId = await getInternalUserId(userId);
-      if (!internalId) return;
-
       await recordCommission({
-        referredUserId: internalId,
+        referredUserId: appUserId,
         stripeInvoiceId: invoice.id,
         paymentAmountCents: invoice.amount_paid,
         currency: invoice.currency,
@@ -237,9 +234,12 @@ export class PaymentHandler extends BaseSubscriptionHandler {
         eventType: 'payment_succeeded',
       });
 
-      await invalidateBillingCache(userId);
-      await this.tryRecordReferralCommission(userId, invoice);
-      this.sendRecoveryEmailIfNeeded(invoice, subscription, userId);
+      if (!result.appUserId) {
+        throw new Error('Billing update omitted canonical app user ID');
+      }
+      await invalidateBillingCache(result.appUserId);
+      await this.tryRecordReferralCommission(result.appUserId, invoice);
+      this.sendRecoveryEmailIfNeeded(invoice, subscription, result.appUserId);
 
       return result;
     } catch (error) {
@@ -364,13 +364,16 @@ export class PaymentHandler extends BaseSubscriptionHandler {
       throw new Error(`Failed to downgrade user: ${result.error}`);
     }
 
-    await invalidateBillingCache(userId);
+    if (!result.appUserId) {
+      throw new Error('Billing update omitted canonical app user ID');
+    }
+    await invalidateBillingCache(result.appUserId);
 
     // Send dunning email (fire-and-forget, don't block webhook response)
     if (shouldSendDunningEmail(invoice.attempt_count ?? 1)) {
       const priceId = subscription.items.data[0]?.price?.id;
       sendPaymentFailedEmail({
-        userId,
+        userId: result.appUserId,
         amountDue: invoice.amount_due,
         currency: invoice.currency,
         attemptCount: invoice.attempt_count ?? 1,

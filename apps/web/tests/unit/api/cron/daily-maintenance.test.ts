@@ -10,6 +10,7 @@ const mockSweepUnderEnrichedProfilesForCron = vi.hoisted(() => vi.fn());
 const mockRunOnboardingScriptAggregation = vi.hoisted(() => vi.fn());
 const mockRunProfileSearchMonitoring = vi.hoisted(() => vi.fn());
 const mockSyncAiCrawlerAnalyticsCron = vi.hoisted(() => vi.fn());
+const mockReconcileReleaseWorkflowRunOutcomes = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/analytics/data-retention', () => ({
   runDataRetentionCleanup: mockRunDataRetentionCleanup,
@@ -60,6 +61,10 @@ vi.mock('@/lib/profile-search/runner', () => ({
 
 vi.mock('@/app/api/cron/sync-ai-crawler-analytics/route', () => ({
   syncAiCrawlerAnalyticsCron: mockSyncAiCrawlerAnalyticsCron,
+}));
+
+vi.mock('@/lib/release-to-revenue/outcome-reconciliation', () => ({
+  reconcileReleaseWorkflowRunOutcomes: mockReconcileReleaseWorkflowRunOutcomes,
 }));
 
 describe('GET /api/cron/daily-maintenance', () => {
@@ -118,6 +123,13 @@ describe('GET /api/cron/daily-maintenance', () => {
       success: true,
       zonesProcessed: 1,
       samplesInserted: 2,
+    });
+    mockReconcileReleaseWorkflowRunOutcomes.mockResolvedValue({
+      scanned: 2,
+      attempted: 2,
+      reconciled: 2,
+      unavailable: 0,
+      failed: 0,
     });
   });
 
@@ -181,6 +193,42 @@ describe('GET /api/cron/daily-maintenance', () => {
       samplesInserted: 2,
     });
     expect(mockSyncAiCrawlerAnalyticsCron).toHaveBeenCalledTimes(1);
+    expect(data.results.releaseOutcomeReconciliation).toEqual({
+      success: true,
+      data: {
+        scanned: 2,
+        attempted: 2,
+        reconciled: 2,
+        unavailable: 0,
+        failed: 0,
+      },
+    });
+    expect(mockReconcileReleaseWorkflowRunOutcomes).toHaveBeenCalledTimes(1);
     expect(data.results.dataRetention.success).toBe(true);
+  });
+
+  it('reports reconciliation failure without blocking later maintenance jobs', async () => {
+    mockReconcileReleaseWorkflowRunOutcomes.mockResolvedValue({
+      scanned: 2,
+      attempted: 2,
+      reconciled: 1,
+      unavailable: 0,
+      failed: 1,
+    });
+
+    const { GET } = await import('@/app/api/cron/daily-maintenance/route');
+    const response = await GET(
+      new Request('http://localhost/api/cron/daily-maintenance', {
+        headers: { Authorization: 'Bearer test-secret' },
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(207);
+    expect(data.results.releaseOutcomeReconciliation).toMatchObject({
+      success: false,
+      error: '1 release outcome reconciliation failed',
+    });
+    expect(data.results.dataRetention).toMatchObject({ success: true });
   });
 });

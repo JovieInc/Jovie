@@ -17,6 +17,7 @@ export let simulateRaceDisappear = false;
 export let simulateUnprocessedRetry = false;
 export let simulateActiveLease = false;
 export let simulateLeaseClaimFailure = false;
+export let simulateLeaseLossBeforeFinalize = false;
 
 export function setSimulateRaceDisappear(value: boolean) {
   simulateRaceDisappear = value;
@@ -32,6 +33,10 @@ export function setSimulateActiveLease(value: boolean) {
 
 export function setSimulateLeaseClaimFailure(value: boolean) {
   simulateLeaseClaimFailure = value;
+}
+
+export function setSimulateLeaseLossBeforeFinalize(value: boolean) {
+  simulateLeaseLossBeforeFinalize = value;
 }
 
 export async function getPost() {
@@ -80,24 +85,36 @@ const hoisted = vi.hoisted(() => {
     })),
   }));
 
-  // Mock db.update().set().where()
-  const dbUpdate = vi.fn(() => ({
-    set: vi.fn(() => ({
-      where: vi.fn(() => ({
+  const dbUpdateWhere = vi.fn();
+  const dbUpdateSet = vi.fn((values: Record<string, unknown>) => ({
+    where: vi.fn((condition: unknown) => {
+      dbUpdateWhere(condition);
+      return {
         returning: vi.fn(async () => {
           const {
             simulateActiveLease: activeLease,
             simulateLeaseClaimFailure: claimFailure,
+            simulateLeaseLossBeforeFinalize: leaseLoss,
           } = await import('./webhooks.test-utils');
           if (claimFailure && dbUpdate.mock.calls.length === 1) {
             throw new Error('lease claim failed');
           }
-          return activeLease && dbUpdate.mock.calls.length === 1
+          if (leaseLoss && values.processedAt instanceof Date) {
+            return [];
+          }
+          return activeLease &&
+            dbUpdate.mock.calls.length === 1 &&
+            values.processingStartedAt instanceof Date
             ? []
             : [{ id: 'webhook-1' }];
         }),
-      })),
-    })),
+      };
+    }),
+  }));
+
+  // Mock db.update().set().where()
+  const dbUpdate = vi.fn(() => ({
+    set: dbUpdateSet,
   }));
 
   // Mock handler handle method
@@ -111,6 +128,8 @@ const hoisted = vi.hoisted(() => {
     mockDbInsert: dbInsert,
     mockDbSelect: dbSelect,
     mockDbUpdate: dbUpdate,
+    mockDbUpdateSet: dbUpdateSet,
+    mockDbUpdateWhere: dbUpdateWhere,
     mockGetHandler: vi.fn(),
     mockGetStripeObjectId: vi.fn(() => 'obj_123'),
     mockStripeTimestampToDate: vi.fn(
@@ -128,6 +147,8 @@ export const mockGetPlanFromPriceId = hoisted.mockGetPlanFromPriceId;
 export const mockDbInsert = hoisted.mockDbInsert;
 export const mockDbSelect = hoisted.mockDbSelect;
 export const mockDbUpdate = hoisted.mockDbUpdate;
+export const mockDbUpdateSet = hoisted.mockDbUpdateSet;
+export const mockDbUpdateWhere = hoisted.mockDbUpdateWhere;
 export const mockGetHandler = hoisted.mockGetHandler;
 export const mockGetStripeObjectId = hoisted.mockGetStripeObjectId;
 export const mockStripeTimestampToDate = hoisted.mockStripeTimestampToDate;
