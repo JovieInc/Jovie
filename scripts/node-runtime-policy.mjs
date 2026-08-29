@@ -90,7 +90,7 @@ export function validateRepositoryPolicy(policy, repoRoot = defaultRepoRoot) {
   }
   for (const packagePath of policy.packageEngineContracts.majorPinned) {
     const packageJson = JSON.parse(
-      readFileSync(resolve(repoRoot, packagePath))
+      readFileSync(resolve(repoRoot, packagePath), 'utf8')
     );
     if (packageJson.engines?.node !== expectedPinnedEngine) {
       errors.push(
@@ -100,7 +100,7 @@ export function validateRepositoryPolicy(policy, repoRoot = defaultRepoRoot) {
   }
   for (const packagePath of policy.packageEngineContracts.minimumOnly) {
     const packageJson = JSON.parse(
-      readFileSync(resolve(repoRoot, packagePath))
+      readFileSync(resolve(repoRoot, packagePath), 'utf8')
     );
     if (packageJson.engines?.node !== expectedMinimumEngine) {
       errors.push(
