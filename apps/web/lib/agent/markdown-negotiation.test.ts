@@ -25,7 +25,9 @@ describe('shouldPassThroughMarkdownNegotiation', () => {
   it('negotiates the homepage and unknown paths', () => {
     expect(shouldPassThroughMarkdownNegotiation('/')).toBe(false);
     expect(
-      shouldPassThroughMarkdownNegotiation('/some-path-that-does-not-exist')
+      shouldPassThroughMarkdownNegotiation(
+        '/some-path-that-definitely-does-not-exist'
+      )
     ).toBe(false);
   });
 
@@ -37,6 +39,8 @@ describe('shouldPassThroughMarkdownNegotiation', () => {
     expect(shouldPassThroughMarkdownNegotiation('/openapi.json')).toBe(true);
     expect(shouldPassThroughMarkdownNegotiation('/sitemap.xml')).toBe(true);
     expect(shouldPassThroughMarkdownNegotiation('/app/dashboard')).toBe(true);
+    expect(shouldPassThroughMarkdownNegotiation('/tim')).toBe(true);
+    expect(shouldPassThroughMarkdownNegotiation('/tim/listen')).toBe(true);
   });
 });
 
@@ -61,7 +65,7 @@ describe('negotiateAgentMarkdown', () => {
 
   it('returns a markdown 404 recovery body for missing paths', async () => {
     const res = negotiateAgentMarkdown(
-      request('/some-path-that-does-not-exist', {
+      request('/some-path-that-definitely-does-not-exist', {
         accept: 'text/markdown',
       })
     );
@@ -78,6 +82,13 @@ describe('negotiateAgentMarkdown', () => {
     expect(body).toContain('/llms.txt');
     expect(body).toContain('/openapi.json');
     expect(body).toContain('/sitemap.xml');
+    expect(body).toContain('/llms-full.txt');
+  });
+
+  it('does not 404 a public profile path that still renders HTML', () => {
+    expect(
+      negotiateAgentMarkdown(request('/tim', { accept: 'text/markdown' }))
+    ).toBeNull();
   });
 
   it('omits the body on HEAD while keeping Markdown headers', async () => {
@@ -102,11 +113,22 @@ describe('negotiateAgentMarkdown', () => {
         request('/', { accept: 'text/html, text/markdown;q=0.9' })
       )
     ).toBeNull();
+    expect(negotiateAgentMarkdown(request('/', { accept: '*/*' }))).toBeNull();
     expect(
       negotiateAgentMarkdown(
         request('/', { accept: 'text/markdown', rsc: true })
       )
     ).toBeNull();
+  });
+
+  it('serves markdown when markdown outranks HTML by q-value', async () => {
+    const res = negotiateAgentMarkdown(
+      request('/', { accept: 'text/html;q=0.1, text/markdown;q=0.9' })
+    );
+    expect(res?.status).toBe(200);
+    expect(res?.headers.get('content-type')).toBe(
+      'text/markdown; charset=utf-8'
+    );
   });
 
   it('returns 406 when the client rejects HTML and markdown', () => {
@@ -134,10 +156,16 @@ describe('homepage CDN Vary contract', () => {
       candidates.find(path => existsSync(path)) ?? candidates[0],
       'utf8'
     );
-    const homepageIndex = source.indexOf("source: '/',");
-    const nextSourceIndex = source.indexOf('source:', homepageIndex + 1);
-    const homepageBlock = source.slice(homepageIndex, nextSourceIndex);
+    const lastHomepageIndex = source.lastIndexOf("source: '/',");
+    const catchAllIndex = source.indexOf("source: '/(.*)',");
+    expect(lastHomepageIndex).toBeGreaterThan(catchAllIndex);
+    const nextSourceIndex = source.indexOf('source:', lastHomepageIndex + 1);
+    const homepageBlock = source.slice(
+      lastHomepageIndex,
+      nextSourceIndex === -1 ? undefined : nextSourceIndex
+    );
     expect(homepageBlock).toContain("key: 'Vary'");
-    expect(homepageBlock).toContain("value: 'Accept'");
+    expect(homepageBlock).toContain('Accept');
+    expect(homepageBlock).toContain('rsc');
   });
 });

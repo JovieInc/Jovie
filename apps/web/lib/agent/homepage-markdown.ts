@@ -65,6 +65,7 @@ That path does not exist on ${APP_NAME}. Recover from one of these public surfac
 - Public artist API: ${BASE_URL}/api/v1/{username}
 - Docs: ${DOCS_URL}
 - Sitemap: ${BASE_URL}/sitemap.xml
+- Full site guide: ${BASE_URL}/llms-full.txt
 - About: ${BASE_URL}${APP_ROUTES.ABOUT}
 - Support: ${BASE_URL}${APP_ROUTES.SUPPORT}
 `;

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { ensureVaryAccept, negotiateAccept } from '@/lib/http/accept-header';
+import {
+  ensureVaryAccept,
+  HOMEPAGE_ACCEPT_VARY,
+  negotiateAccept,
+} from '@/lib/http/accept-header';
 
 describe('negotiateAccept', () => {
   it('prefers markdown when Accept names text/markdown with a higher q', () => {
@@ -9,6 +13,7 @@ describe('negotiateAccept', () => {
     expect(negotiateAccept('text/html;q=0.1, text/markdown;q=0.9')).toBe(
       'markdown'
     );
+    expect(negotiateAccept('text/html;q=0, text/markdown')).toBe('markdown');
   });
 
   it('keeps HTML for browsers and unspecified Accept', () => {
@@ -50,5 +55,20 @@ describe('ensureVaryAccept', () => {
     ensureVaryAccept(headers);
     ensureVaryAccept(headers);
     expect(headers.get('Vary')).toBe('Accept-Encoding, Accept');
+  });
+
+  it('keeps Next RSC Vary tokens when adding Accept', () => {
+    const headers = new Headers({
+      Vary: 'rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch',
+    });
+    ensureVaryAccept(headers);
+    expect(headers.get('Vary')).toBe(
+      'rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept'
+    );
+  });
+
+  it('exports a homepage Vary value that includes Accept and RSC tokens', () => {
+    expect(HOMEPAGE_ACCEPT_VARY.startsWith('Accept,')).toBe(true);
+    expect(HOMEPAGE_ACCEPT_VARY).toContain('rsc');
   });
 });

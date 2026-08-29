@@ -218,7 +218,11 @@ const nextConfig = {
         headers: [
           ...securityHeaders,
           cacheHeaders.immutable,
-          { key: 'Vary', value: 'Accept' },
+          {
+            key: 'Vary',
+            value:
+              'Accept, rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch',
+          },
         ],
       },
       {
@@ -248,6 +252,19 @@ const nextConfig = {
       {
         source: '/(.*)',
         headers: [...securityHeaders, cacheHeaders.revalidate],
+      },
+      // Homepage content-negotiation: later rules win. Keep Accept on Vary
+      // together with Next's RSC tokens so a prerendered HTML object cannot
+      // be reused for Accept: text/markdown at the CDN.
+      {
+        source: '/',
+        headers: [
+          {
+            key: 'Vary',
+            value:
+              'Accept, rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch',
+          },
+        ],
       },
       // Canonical pitch-deck static HTML (apps/web/public/pitch/**) is
       // embedded as a same-origin iframe from the /pitch wrapper page.
