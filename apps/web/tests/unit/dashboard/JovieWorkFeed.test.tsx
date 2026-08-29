@@ -110,4 +110,147 @@ describe('JovieWorkFeed', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retry load' }));
     expect(refetchMock).toHaveBeenCalledOnce();
   });
+
+  it('reserves one layout-stable result slot throughout a release run', () => {
+    const fixtures = [
+      {
+        phase: 'pending',
+        statusLabel: 'Needs approval',
+        outcome: undefined,
+        expected: null,
+      },
+      {
+        phase: 'in_progress',
+        statusLabel: 'In progress',
+        outcome: undefined,
+        expected: null,
+      },
+      {
+        phase: 'completed',
+        statusLabel: 'Done',
+        outcome: {
+          state: 'measuring',
+          metrics: {
+            gmvDeltaCents: 1800,
+            clickDelta: 12,
+            dspClickDelta: 7,
+            newFansDelta: 3,
+          },
+        },
+        expected: 'Measuring attributed results for 30 days.',
+      },
+      {
+        phase: 'completed',
+        statusLabel: 'Done',
+        outcome: {
+          state: 'measured_zero',
+          metrics: {
+            gmvDeltaCents: 0,
+            clickDelta: 0,
+            dspClickDelta: 0,
+            newFansDelta: 0,
+          },
+        },
+        expected: 'No attributed results in the 30-day window.',
+      },
+      {
+        phase: 'completed',
+        statusLabel: 'Done',
+        outcome: {
+          state: 'measured_positive',
+          metrics: {
+            gmvDeltaCents: 1800,
+            clickDelta: 12,
+            dspClickDelta: 0,
+            newFansDelta: 3,
+          },
+        },
+        expected: '$18.00',
+      },
+      {
+        phase: 'completed',
+        statusLabel: 'Done',
+        outcome: { state: 'unavailable', metrics: null },
+        expected: 'Attributed results are unavailable.',
+      },
+    ] as const;
+    const slotClasses = new Set<string>();
+
+    for (const fixture of fixtures) {
+      useJovieWorkFeedQueryMock.mockReturnValue({
+        data: [
+          {
+            id: `workflow:${fixture.outcome?.state ?? fixture.phase}`,
+            source: 'workflow_run',
+            phase: fixture.phase,
+            title: 'Release autopilot',
+            description: 'Jovie ran release-to-revenue for Midnight Drive.',
+            icon: 'workflow',
+            timestamp: '2026-06-23T00:00:00.000Z',
+            statusLabel: fixture.statusLabel,
+            outcomeSlot: 'release_outcome',
+            outcome: fixture.outcome,
+          },
+        ],
+        isLoading: false,
+        isFetching: false,
+        error: null,
+        refetch: refetchMock,
+      });
+
+      const view = render(<JovieWorkFeed profileId='profile-123' />);
+      const slot = screen.getByTestId('jovie-work-outcome-slot');
+      slotClasses.add(slot.className);
+      expect(slot).toHaveAttribute(
+        'data-outcome-state',
+        fixture.outcome?.state ?? 'reserved'
+      );
+
+      if (!fixture.outcome) {
+        expect(slot).toHaveAttribute('aria-hidden', 'true');
+        expect(slot).toBeEmptyDOMElement();
+      } else {
+        expect(screen.getByText(fixture.expected ?? '')).toBeVisible();
+      }
+
+      if (fixture.outcome?.state === 'measuring') {
+        expect(screen.queryByText('$18.00')).toBeNull();
+      }
+      if (fixture.outcome?.state === 'measured_positive') {
+        expect(screen.getByText('12')).toBeVisible();
+        expect(screen.getByText('3')).toBeVisible();
+        expect(screen.queryByText('DSP Clicks')).toBeNull();
+      }
+
+      view.unmount();
+    }
+
+    expect(slotClasses.size).toBe(1);
+    expect([...slotClasses][0]).toContain('min-h-10');
+  });
+
+  it('does not reserve result geometry for unrelated work rows', () => {
+    useJovieWorkFeedQueryMock.mockReturnValue({
+      data: [
+        {
+          id: 'agent:1',
+          source: 'agent_run',
+          phase: 'in_progress',
+          title: 'Metadata agent',
+          description: 'Jovie agent Metadata Agent ran.',
+          icon: 'agent',
+          timestamp: '2026-06-23T00:00:00.000Z',
+          statusLabel: 'In progress',
+        },
+      ],
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: refetchMock,
+    });
+
+    render(<JovieWorkFeed profileId='profile-123' />);
+
+    expect(screen.queryByTestId('jovie-work-outcome-slot')).toBeNull();
+  });
 });
