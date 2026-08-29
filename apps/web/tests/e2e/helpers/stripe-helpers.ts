@@ -310,8 +310,14 @@ export async function fillStripeInput(
   );
 }
 
-/** Complete card payment in the Stripe checkout page. */
-export async function completeCardPayment(page: Page, card: CardDetails) {
+/**
+ * Select Stripe's semantic card control.
+ *
+ * Hosted Checkout may mount an accordion button after its visible "Card"
+ * label, briefly covering that label. The radio remains the form-state owner,
+ * so drive it directly instead of racing Stripe's presentation layers.
+ */
+export async function selectCardPaymentMethod(page: Page) {
   const cardPaymentMethod = page
     .getByRole('radio', { name: /card/i })
     .filter({ visible: true })
@@ -319,34 +325,19 @@ export async function completeCardPayment(page: Page, card: CardDetails) {
   await expect(cardPaymentMethod).toBeVisible({ timeout: 15_000 });
 
   if (!(await cardPaymentMethod.isChecked())) {
-    const cardPaymentButton = page
-      .locator(
-        '[data-testid="card-accordion-item-button"], button[aria-label*="card" i]'
-      )
-      .filter({ visible: true })
-      .first();
-    const cardButtonVisible = await cardPaymentButton
-      .waitFor({ state: 'visible', timeout: 5_000 })
-      .then(() => true)
-      .catch(() => false);
-    if (cardButtonVisible) {
-      await cardPaymentButton.click();
-    } else {
-      const cardPaymentLabel = page
-        .locator('#payment-method-label-card')
-        .filter({ visible: true })
-        .first();
-      await expect(cardPaymentLabel).toBeVisible({ timeout: 15_000 });
-      await cardPaymentLabel.click({ timeout: 5_000 }).catch(async error => {
-        if (await cardPaymentButton.isVisible()) {
-          await cardPaymentButton.click();
-          return;
-        }
-        throw error;
-      });
-    }
+    await cardPaymentMethod.evaluate(element => {
+      if (!(element instanceof HTMLInputElement)) {
+        throw new Error('Stripe card payment method is not an input');
+      }
+      element.click();
+    });
     await expect(cardPaymentMethod).toBeChecked();
   }
+}
+
+/** Complete card payment in the Stripe checkout page. */
+export async function completeCardPayment(page: Page, card: CardDetails) {
+  await selectCardPaymentMethod(page);
 
   const phoneInput = page
     .locator('input[name="phoneNumber"]')
