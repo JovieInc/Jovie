@@ -8,10 +8,11 @@
  *   3. Static match checks (required props / state matrix hints)
  *   4. Story quality hygiene (no pure-black voids / fake CTAs)
  *   5. Multi-root story-coverage ratchet (lock_up + no uncovered growth)
+ *   6. Fail-closed source-blind rendered certification (JOV-5400)
  *
  * Usage:
  *   pnpm component-ship-gate
- *   node scripts/component-ship-gate.mjs [--diff-base=origin/main] [--skip-quality] [--skip-ratchet]
+ *   node scripts/component-ship-gate.mjs [--diff-base=origin/main] [--skip-quality] [--skip-ratchet] [--skip-rendered-cert]
  *
  * Env:
  *   COMPONENT_SHIP_DIFF_BASE / STORY_COVERAGE_DIFF_BASE / TURBO_SCM_BASE / GITHUB_BASE_REF
@@ -22,6 +23,7 @@ import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
+import { runRenderedCertification } from './component-rendered-certification.mjs';
 import {
   checkStoryMatchesComponent,
   extractExportedComponentNames,
@@ -53,6 +55,7 @@ function parseArgs(argv) {
     diffBase: null,
     skipQuality: false,
     skipRatchet: false,
+    skipRenderedCert: false,
     json: false,
   };
   for (const arg of argv) {
@@ -60,6 +63,7 @@ function parseArgs(argv) {
       flags.diffBase = arg.slice('--diff-base='.length);
     else if (arg === '--skip-quality') flags.skipQuality = true;
     else if (arg === '--skip-ratchet') flags.skipRatchet = true;
+    else if (arg === '--skip-rendered-cert') flags.skipRenderedCert = true;
     else if (arg === '--json') flags.json = true;
     else if (arg === '--help' || arg === '-h') flags.help = true;
   }
@@ -818,6 +822,8 @@ export function runComponentShipGate(options = {}) {
     diffBase: options.diffBase ?? resolveDiffBase(null),
     skipQuality: options.skipQuality ?? false,
     skipRatchet: options.skipRatchet ?? false,
+    skipRenderedCert: options.skipRenderedCert ?? false,
+    headSha: options.headSha ?? null,
   };
 
   const report = {
@@ -886,6 +892,29 @@ export function runComponentShipGate(options = {}) {
     report.sections.ratchet = { ok: true, skipped: true };
   }
 
+  // 4) Source-blind rendered certification (JOV-5400)
+  if (!flags.skipRenderedCert) {
+    try {
+      const rendered = runRenderedCertification({
+        headSha: flags.headSha ?? undefined,
+      });
+      report.sections.renderedCertification = {
+        ok: rendered.ok,
+        schema: rendered.schema,
+        receipt: rendered.receipt,
+      };
+      if (!rendered.ok) report.ok = false;
+    } catch (error) {
+      report.sections.renderedCertification = {
+        ok: false,
+        message: error instanceof Error ? error.message : String(error),
+      };
+      report.ok = false;
+    }
+  } else {
+    report.sections.renderedCertification = { ok: true, skipped: true };
+  }
+
   return report;
 }
 
@@ -938,11 +967,31 @@ function printReport(report) {
     }
   }
 
+  const rendered = report.sections.renderedCertification;
+  if (rendered?.skipped) {
+    console.log('[component-ship-gate] rendered-cert: skipped');
+  } else if (rendered?.ok) {
+    const head = rendered.receipt?.headSha ?? 'unknown';
+    console.log(`[component-ship-gate] rendered-cert: ok head=${head}`);
+    for (const item of rendered.receipt?.fixtures ?? []) {
+      console.log(`  fixture ${item.id}: ${item.verdict}`);
+    }
+    for (const item of rendered.receipt?.landingBatch ?? []) {
+      console.log(`  landing ${item.id}: ${item.verdict}`);
+    }
+  } else {
+    console.error('[component-ship-gate] rendered-cert: FAIL');
+    if (rendered?.message) console.error(rendered.message);
+    for (const issue of rendered?.receipt?.issues ?? []) {
+      console.error(`- ${issue}`);
+    }
+  }
+
   if (report.ok) {
     console.log('[component-ship-gate] PASS');
   } else {
     console.error(
-      '[component-ship-gate] FAIL — shippable UI components require matching tests + stories (JOV-4421)'
+      '[component-ship-gate] FAIL — shippable UI components require matching tests + stories + rendered certification (JOV-4421, JOV-5400)'
     );
   }
 }
@@ -952,9 +1001,10 @@ function main(argv = process.argv.slice(2)) {
   if (flags.help) {
     console.log(`Usage: node scripts/component-ship-gate.mjs [options]
   --diff-base=<ref>   Git base for changed-file detection (default: origin/main)
-  --skip-quality      Skip storybook quality guard
-  --skip-ratchet      Skip multi-root story coverage ratchet
-  --json              Print machine-readable report`);
+  --skip-quality         Skip storybook quality guard
+  --skip-ratchet         Skip multi-root story coverage ratchet
+  --skip-rendered-cert   Skip source-blind rendered certification
+  --json                 Print machine-readable report`);
     return 0;
   }
 
@@ -962,6 +1012,7 @@ function main(argv = process.argv.slice(2)) {
     diffBase: flags.diffBase ?? resolveDiffBase(null),
     skipQuality: flags.skipQuality,
     skipRatchet: flags.skipRatchet,
+    skipRenderedCert: flags.skipRenderedCert,
   });
 
   if (flags.json) {
