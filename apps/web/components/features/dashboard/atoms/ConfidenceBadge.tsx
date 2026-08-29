@@ -1,6 +1,11 @@
 'use client';
 
-import { DotBadge, type DotBadgeVariant } from '@/components/atoms/DotBadge';
+import { DotBadge } from '@/components/atoms/DotBadge';
+import {
+  CONFIDENCE_BADGE_LABEL_GAP_CLASS,
+  CONFIDENCE_BADGE_STYLES,
+  type ConfidenceLevel,
+} from './dashboard-status-badge-semantic-contract';
 
 export interface ConfidenceBadgeProps {
   readonly score: number; // 0-1 decimal
@@ -9,32 +14,9 @@ export interface ConfidenceBadgeProps {
   readonly className?: string;
 }
 
-type ConfidenceLevel = 'high' | 'medium' | 'low';
-
 const CONFIDENCE_THRESHOLDS = {
   high: 0.8,
   medium: 0.5,
-};
-
-const CONFIDENCE_STYLES: Record<
-  ConfidenceLevel,
-  { label: string } & DotBadgeVariant
-> = {
-  high: {
-    label: 'High',
-    className: 'border-success/20 bg-surface-1 text-success',
-    dotClassName: 'bg-success',
-  },
-  medium: {
-    label: 'Medium',
-    className: 'border-warning/20 bg-surface-1 text-warning',
-    dotClassName: 'bg-warning',
-  },
-  low: {
-    label: 'Low',
-    className: 'border-error/20 bg-surface-1 text-error',
-    dotClassName: 'bg-error',
-  },
 };
 
 function getConfidenceLevel(score: number): ConfidenceLevel {
@@ -51,6 +33,8 @@ function getConfidenceLevel(score: number): ConfidenceLevel {
  * - Medium (50-79%): Amber
  * - Low (<50%): Red
  *
+ * Semantic roles are source-backed. Pill geometry and nowrap live on DotBadge.
+ *
  * @example
  * <ConfidenceBadge score={0.85} />           // "85%"
  * <ConfidenceBadge score={0.85} showLabel /> // "85% High"
@@ -62,13 +46,15 @@ export function ConfidenceBadge({
   className,
 }: ConfidenceBadgeProps) {
   const level = getConfidenceLevel(score);
-  const style = CONFIDENCE_STYLES[level];
+  const style = CONFIDENCE_BADGE_STYLES[level];
   const percentage = Math.round(score * 100);
 
   const label = (
     <>
       <span>{percentage}%</span>
-      {showLabel && <span className='ml-1'>{style.label}</span>}
+      {showLabel && (
+        <span className={CONFIDENCE_BADGE_LABEL_GAP_CLASS}>{style.label}</span>
+      )}
     </>
   );
 

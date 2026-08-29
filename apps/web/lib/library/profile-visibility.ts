@@ -5,6 +5,7 @@ export const LIBRARY_PROFILE_ITEM_KINDS = [
   'image',
   'video',
   'audio',
+  'document',
 ] as const;
 
 export type LibraryProfileVisibility =

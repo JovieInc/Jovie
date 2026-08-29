@@ -1,30 +1,33 @@
 import SwiftUI
 import UIKit
 
+/// System B dark tokens. Hexes match the Noir Ion table in DESIGN.md and
+/// `--noir-ion-*` anchors in apps/web/styles/design-system.css. Do not invent
+/// a second palette.
 enum JovieColor {
-  static let backgroundBase = Color(hex: 0x06070A)
-  static let surface0 = Color(hex: 0x0A0B0E)
-  static let surface1 = Color(hex: 0x101216)
-  static let surface2 = Color(hex: 0x161A20)
-  static let surface3 = Color(hex: 0x2A2C32)
-  static let textPrimary = Color(hex: 0xFFFFFF)
-  static let textSecondary = Color(hex: 0xE3E4E6)
-  static let textTertiary = Color(hex: 0x969799)
-  static let borderSubtle = Color.white.opacity(0.05)
-  static let borderDefault = Color.white.opacity(0.08)
-  static let borderStrong = Color.white.opacity(0.10)
-  static let accentBlue = Color(hex: 0x4D7DFF)
-  static let accentPurple = Color(hex: 0x9B4DFF)
-  static let accentPink = Color(hex: 0xEA4A9C)
-  static let accentOrange = Color(hex: 0xFFAB2E)
-  /// System B focus/active accent (`--color-accent`), not a CTA color.
-  static let accent = Color(hex: 0x7170FF)
+  static let backgroundBase = Color(hex: 0x030407)
+  static let surface0 = Color(hex: 0x06080D)
+  static let surface1 = Color(hex: 0x0F1420)
+  static let surface2 = Color(hex: 0x151B2A)
+  static let surface3 = Color(hex: 0x1B2436)
+  static let textPrimary = Color(hex: 0xF5F7FB)
+  static let textSecondary = Color(hex: 0xD7DCE8)
+  static let textTertiary = Color(hex: 0xA8B0C3)
+  static let borderSubtle = Color(hex: 0xA8B0C3).opacity(0.10)
+  static let borderDefault = Color(hex: 0xA8B0C3).opacity(0.16)
+  static let borderStrong = Color(hex: 0xC7EDFF).opacity(0.26)
+  static let accentBlue = Color(hex: 0x11AFFF)
+  static let accentPurple = Color(hex: 0xA982FF)
+  static let accentPink = Color(hex: 0xFF48D2)
+  static let accentOrange = Color(hex: 0xFFC857)
+  /// System B focus/active accent (`--color-accent` / Ion), not a CTA color.
+  static let accent = Color(hex: 0x11AFFF)
   static let progressTrack = accentBlue.opacity(0.08)
-  static let errorText = Color(hex: 0xFF7A73)
+  static let errorText = Color(hex: 0xFF677D)
   static let qrSurface = Color.white
 
   /// Per-entity-kind accent colors for inline chat chips (JOV-3608). Ported
-  /// 1:1 from the dark-mode carbon-palette CSS vars in
+  /// 1:1 from the dark-mode Noir Ion CSS vars in
   /// apps/web/styles/design-system.css (`--color-accent`,
   /// `--color-accent-purple`, `--color-accent-blue`,
   /// `--color-accent-orange`), which is what `EntityChip`/`EntityMentionSpan`
@@ -34,13 +37,13 @@ enum JovieColor {
   /// here or web/iOS accent parity silently drifts on the next design pass.
   enum EntityAccent {
     /// release -> --color-accent
-    static let release = Color(hex: 0x7170FF)
+    static let release = Color(hex: 0x11AFFF)
     /// artist -> --color-accent-purple
-    static let artist = Color(hex: 0x9B4DFF)
+    static let artist = Color(hex: 0xA982FF)
     /// track -> --color-accent-blue
-    static let track = Color(hex: 0x4D7DFF)
+    static let track = Color(hex: 0x11AFFF)
     /// event -> --color-accent-orange
-    static let event = Color(hex: 0xFFAB2E)
+    static let event = Color(hex: 0xFFC857)
 
     static func color(for kind: MobileChatEntityKind) -> Color {
       switch kind {
@@ -54,12 +57,26 @@ enum JovieColor {
 }
 
 enum JovieFont {
+  /// Locked empty-chat greeting: 28 / 620.
+  static let emptyGreetingSize: CGFloat = 28
+  static let emptyGreetingWeight: CGFloat = 620
+  /// ActionButton label weight (medium).
+  static let actionLabelWeight: CGFloat = 510
+
   static func display(size: CGFloat, weight: Font.Weight = .semibold) -> Font {
     font(size: size, weight: weight)
   }
 
+  static func display(size: CGFloat, numericWeight: CGFloat) -> Font {
+    font(size: size, numericWeight: numericWeight)
+  }
+
   static func body(size: CGFloat, weight: Font.Weight = .regular) -> Font {
     font(size: size, weight: weight)
+  }
+
+  static func body(size: CGFloat, numericWeight: CGFloat) -> Font {
+    font(size: size, numericWeight: numericWeight)
   }
 
   private static func font(size: CGFloat, weight: Font.Weight) -> Font {
@@ -73,6 +90,50 @@ enum JovieFont {
 
     return .system(size: size, weight: weight)
   }
+
+  private static func font(size: CGFloat, numericWeight: CGFloat) -> Font {
+    let uiWeight = UIFont.Weight(rawValue: uiFontWeightRawValue(forCSSWeight: numericWeight))
+    let descriptorBase =
+      UIFont(name: "Inter Variable", size: size)
+      ?? UIFont(name: "Inter", size: size)
+      ?? UIFont.systemFont(ofSize: size)
+    let descriptor = descriptorBase.fontDescriptor.addingAttributes([
+      .traits: [UIFontDescriptor.TraitKey.weight: uiWeight.rawValue]
+    ])
+    return Font(UIFont(descriptor: descriptor, size: size))
+  }
+
+  /// Maps CSS/Satoshi weights onto UIFont.Weight raw values.
+  static func uiFontWeightRawValue(forCSSWeight cssWeight: CGFloat) -> CGFloat {
+    let anchors: [(css: CGFloat, ui: CGFloat)] = [
+      (100, -0.8),
+      (200, -0.6),
+      (300, -0.4),
+      (400, 0.0),
+      (500, 0.23),
+      (600, 0.3),
+      (700, 0.4),
+      (800, 0.56),
+      (900, 0.62),
+    ]
+    if cssWeight <= anchors[0].css { return anchors[0].ui }
+    if cssWeight >= anchors[anchors.count - 1].css { return anchors[anchors.count - 1].ui }
+    for index in 1..<anchors.count {
+      let upper = anchors[index]
+      let lower = anchors[index - 1]
+      if cssWeight <= upper.css {
+        let t = (cssWeight - lower.css) / (upper.css - lower.css)
+        return lower.ui + ((upper.ui - lower.ui) * t)
+      }
+    }
+    return 0
+  }
+}
+
+enum JovieActionButtonMetrics {
+  static let height: CGFloat = 32
+  static let labelWeight = JovieFont.actionLabelWeight
+  static let radius = JovieRadius.pill
 }
 
 enum JovieSpacing {
@@ -186,7 +247,7 @@ struct JoviePillButtonStyle: ButtonStyle {
 
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
-      .font(JovieFont.body(size: 14, weight: .semibold))
+      .font(JovieFont.body(size: 14, numericWeight: JovieActionButtonMetrics.labelWeight))
       .foregroundStyle(filled ? JovieColor.backgroundBase : JovieColor.textPrimary)
       .frame(maxWidth: .infinity)
       .padding(.vertical, 14)

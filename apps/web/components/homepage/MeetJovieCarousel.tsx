@@ -5,15 +5,15 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArtistProfilePhoneFrame } from '@/components/marketing/artist-profile/ArtistProfilePhoneFrame';
-import type { HomepageArtistProfileCards } from './HomepageArtistProfiles';
+import type { HomepageArtistProfilePreviews } from './HomepageArtistProfiles';
 
 export function ArtistProfileCardRow({
-  cards,
-}: Readonly<{ cards: HomepageArtistProfileCards }>) {
+  previews,
+}: Readonly<{ previews: HomepageArtistProfilePreviews }>) {
   const railRef = useRef<HTMLDivElement | null>(null);
   const [scrollState, setScrollState] = useState({
     canGoPrevious: false,
-    canGoNext: cards.length > 3,
+    canGoNext: previews.length > 3,
   });
 
   const updateScrollState = useCallback(() => {
@@ -90,31 +90,30 @@ export function ArtistProfileCardRow({
         ref={railRef}
       >
         <ul
-          aria-label='Jovie Artist Profile Outcomes'
+          aria-label='Jovie Artist Profile Previews'
           className='homepage-artist-profiles__track'
         >
-          {cards.map(card => (
+          {previews.map(preview => (
             <li
-              className='homepage-artist-outcome homepage-artist-profiles__card'
-              key={card.id}
+              className='homepage-artist-profile-preview homepage-artist-profiles__card'
+              key={preview.id}
             >
-              <div className='homepage-artist-outcome__copy'>
-                <h3>{card.title}</h3>
-                <p>{card.body}</p>
-              </div>
-              <figure className='homepage-artist-outcome__media'>
-                <ArtistProfilePhoneFrame className='homepage-artist-outcome__device'>
+              <figure className='homepage-artist-profile-preview__figure'>
+                <ArtistProfilePhoneFrame className='homepage-artist-profile-preview__device'>
                   <Image
-                    alt={card.image.alt}
-                    className='homepage-artist-outcome__screen'
-                    height={card.image.height}
+                    alt={preview.image.alt}
+                    className='homepage-artist-profile-preview__screen'
+                    height={preview.image.height}
                     loading='lazy'
                     quality={100}
-                    sizes='(min-width: 1280px) 13rem, (min-width: 768px) 16vw, 44vw'
-                    src={card.image.publicUrl}
-                    width={card.image.width}
+                    sizes='(min-width: 1280px) 15rem, (min-width: 768px) 21vw, 68vw'
+                    src={preview.image.publicUrl}
+                    width={preview.image.width}
                   />
                 </ArtistProfilePhoneFrame>
+                <figcaption className='homepage-artist-profile-preview__label'>
+                  {preview.label}
+                </figcaption>
               </figure>
             </li>
           ))}

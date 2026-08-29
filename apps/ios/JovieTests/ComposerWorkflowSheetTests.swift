@@ -174,6 +174,9 @@ struct ChatComposerAccessibilityGuardTests {
     #expect(source.contains("chat-composer-send"))
     #expect(source.contains("accessibilityIdentifier(\"chat-composer-plus\")"))
     #expect(source.contains("chat-composer-mic"))
+    #expect(source.contains("static let emptyPlaceholder = \"\""))
+    #expect(source.contains("chat-composer-input"))
+    #expect(source.contains("Ask Jovie") == false)
   }
 
   @Test func mobileChatContainerDoesNotSwallowChildIdentifiers() throws {
@@ -186,5 +189,28 @@ struct ChatComposerAccessibilityGuardTests {
     #expect(source.contains(".accessibilityElement(children: .contain)"))
     #expect(source.contains("accessibilityIdentifier(\"mobile-chat\")"))
     #expect(source.contains("accessibilityIdentifier(\"chat-scroll-to-latest\")"))
+    #expect(source.contains("accessibilityIdentifier(\"chat-empty-greeting\")"))
+    #expect(source.contains("enum MobileChatEmptyHomePolicy"))
+    #expect(source.contains("centeredAboveDockedComposer"))
+    #expect(source.contains("JovieLogoMark") == false)
+    #expect(source.contains("Ask Jovie") == false)
+    #expect(source.contains("FeatureIntroHost") == false)
+    #expect(source.contains("Spacer(minLength: 0)"))
+    #expect(source.contains(".safeAreaInset(edge: .bottom, spacing: 0)"))
+  }
+
+  @Test func placeholderEmptyHomeMatchesCenteredGreetingLock() throws {
+    let sourceURL = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("Jovie/Features/Chat/MobileChatPlaceholderView.swift")
+    let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+    #expect(source.contains("MobileChatEmptyGreetingView"))
+    #expect(source.contains("ChatEmptyGreeting.current()"))
+    #expect(source.contains("JovieLogoMark") == false)
+    #expect(source.contains("Ask Jovie") == false)
+    #expect(source.contains("Spacer(minLength: 0)"))
+    #expect(source.contains(".safeAreaInset(edge: .bottom, spacing: 0)"))
   }
 }

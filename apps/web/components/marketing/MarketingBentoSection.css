@@ -1,0 +1,7 @@
+.marketing-bento-section__secondary {
+  color: var(--color-text-secondary-token);
+}
+
+.marketing-bento-section__tertiary {
+  color: var(--color-text-tertiary-token);
+}

@@ -1,5 +1,66 @@
 import SwiftUI
 
+enum ChatEmptyGreeting: String, CaseIterable, Sendable {
+  case letsGetIt = "Let's get it"
+  case readyToStart = "Ready to start?"
+  case readyWhenYouAre = "Ready when you are"
+
+  static let lockedCopy = allCases.map(\.rawValue)
+
+  /// Day-stable rotate. Product shows one of the three; the still is Let's get it.
+  static func current(at date: Date = .now, calendar: Calendar = .current) -> String {
+    let day = calendar.ordinality(of: .day, in: .era, for: date) ?? 0
+    return lockedCopy[day % lockedCopy.count]
+  }
+
+  static func isLocked(_ copy: String) -> Bool {
+    lockedCopy.contains(copy)
+  }
+}
+
+enum MobileChatEmptyHomePolicy {
+  enum GreetingPlacement: Equatable {
+    /// Vertically centered in the remaining space above the docked composer.
+    case centeredAboveDockedComposer
+  }
+
+  static func greetingPlacement() -> GreetingPlacement {
+    .centeredAboveDockedComposer
+  }
+
+  static func composerIsDockedToBottom() -> Bool {
+    true
+  }
+
+  static func showsBrandMark() -> Bool {
+    false
+  }
+
+  static func showsFeatureIntroOnEmptyHome() -> Bool {
+    false
+  }
+}
+
+struct MobileChatEmptyGreetingView: View {
+  let greeting: String
+
+  var body: some View {
+    Text(greeting)
+      .font(
+        JovieFont.display(
+          size: JovieFont.emptyGreetingSize,
+          numericWeight: JovieFont.emptyGreetingWeight
+        )
+      )
+      .foregroundStyle(JovieColor.textPrimary)
+      .multilineTextAlignment(.center)
+      .frame(maxWidth: .infinity)
+      .frame(minHeight: 40)
+      .accessibilityAddTraits(.isHeader)
+      .accessibilityIdentifier("chat-empty-greeting")
+  }
+}
+
 enum MobileChatKeyboardPolicy {
   /// Dismiss when the assistant starts streaming only if the user has not typed since send.
   static func shouldDismissOnStreamingStart(userEditedSinceSend: Bool) -> Bool {
@@ -63,18 +124,7 @@ struct MobileChatView: View {
         }
       }
       .safeAreaInset(edge: .bottom, spacing: 0) {
-        VStack(spacing: JovieSpacing.medium) {
-          if repository.timeline.isEmpty {
-            FeatureIntroHost(
-              catalog: .current,
-              changelogURL: FeatureIntroCatalog.changelogURL(from: webBaseURL),
-              onHighlightCTA: { isComposerFocused = true }
-            )
-            .padding(.horizontal, JovieSpacing.large)
-          }
-
-          composerChrome
-        }
+        composerChrome
       }
     }
     .accessibilityElement(children: .contain)
@@ -205,6 +255,7 @@ struct MobileChatView: View {
         isComposerFocused: $isComposerFocused,
         isSending: repository.isSending,
         isOffline: repository.isOffline,
+        workspaceMode: repository.workspace,
         onSend: {
           let text = draft
           draft = ""
@@ -245,38 +296,26 @@ struct MobileChatView: View {
   }
 
   private var emptyState: some View {
-    ScrollView {
-      VStack(spacing: JovieSpacing.large) {
-        Spacer(minLength: 120)
-
-        VStack(spacing: JovieSpacing.large) {
-          JovieLogoMark(size: 34)
-
-          VStack(spacing: JovieSpacing.small) {
-            Text("Ask Jovie")
-              .font(JovieFont.display(size: 28))
-              .foregroundStyle(JovieColor.textPrimary)
-              .multilineTextAlignment(.center)
-
-            Text(
-              repository.isOffline
-                ? "Offline. Drafts stay on this device and cached history remains available."
-                : "Ask Jovie about your profile, releases, and next moves."
-            )
-            .font(JovieFont.body(size: 15))
-            .foregroundStyle(JovieColor.textTertiary)
-            .multilineTextAlignment(.center)
-            .fixedSize(horizontal: false, vertical: true)
-          }
+    VStack(spacing: 0) {
+      Spacer(minLength: 0)
+      VStack(spacing: JovieSpacing.small) {
+        MobileChatEmptyGreetingView(greeting: ChatEmptyGreeting.current())
+        if repository.workspace == .ovie {
+          Text(
+            repository.isOffline
+              ? "Offline. Drafts stay on this device and cached history remains available."
+              : repository.workspace.emptyChatSubtitle
+          )
+          .font(JovieFont.body(size: 15))
+          .foregroundStyle(JovieColor.textTertiary)
+          .multilineTextAlignment(.center)
+          .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: 330)
-        .padding(.horizontal, JovieSpacing.xLarge)
-
-        Spacer(minLength: 48)
       }
-      .frame(maxWidth: .infinity)
+      .padding(.horizontal, JovieSpacing.xLarge)
+      Spacer(minLength: 0)
     }
-    .scrollDismissesKeyboard(.interactively)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
     .contentShape(Rectangle())
     .onTapGesture {
       isComposerFocused = false

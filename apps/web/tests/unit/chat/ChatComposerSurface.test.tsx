@@ -166,12 +166,12 @@ afterEach(() => {
 });
 
 describe('ChatComposerSurface accessibility states', () => {
-  it('renders the product-voice empty placeholder', () => {
+  it('renders an empty composer with no placeholder', () => {
     renderComposer();
 
     expect(
       screen.getByRole('textbox', { name: 'Chat Message Input' })
-    ).toHaveAttribute('placeholder', 'Ask Jovie to plan your next release...');
+    ).not.toHaveAttribute('placeholder');
   });
 
   it('uses Ovie composer copy when the ov pack is selected', () => {

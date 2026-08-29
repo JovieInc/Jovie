@@ -401,7 +401,7 @@ describe('authenticated app screen registry', () => {
     ).toContain('unexpected-redirect-receipt');
   });
 
-  it('keeps success, warning, and error on Mint, Gold, and Flare aliases', () => {
+  it('keeps success, warning, and danger on Mint, Orange, and Red aliases', () => {
     const tokens = fs.readFileSync(
       path.join(repoRoot, 'apps/web/styles/design-system.css'),
       'utf8'
@@ -409,6 +409,7 @@ describe('authenticated app screen registry', () => {
     expect(tokens).toMatch(/--color-success:\s*var\(--color-accent-green\);/);
     expect(tokens).toMatch(/--color-warning:\s*var\(--color-accent-orange\);/);
     expect(tokens).toMatch(/--color-error:\s*var\(--color-accent-red\);/);
-    expect(tokens).not.toMatch(/--color-(?:success|warning|error):\s*#/);
+    expect(tokens).toMatch(/--color-danger:\s*var\(--color-error\);/);
+    expect(tokens).not.toMatch(/--color-(?:success|warning|error|danger):\s*#/);
   });
 });

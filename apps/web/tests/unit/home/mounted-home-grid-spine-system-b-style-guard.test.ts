@@ -86,6 +86,11 @@ describe('mounted homepage grid spine System B source contract', () => {
       countOccurrences(pageSource, "data-testid='homepage-story-stack'")
     ).toBe(1);
     expect(countOccurrences(pageSource, "data-testid='homepage-faq'")).toBe(1);
+
+    expect(pageSource).not.toContain('MarketingShippedSitesShowcase');
+    expect(pageSource).not.toContain('MarketingPlatformSpecBento');
+    expect(pageSource).not.toContain('homepage-shipped-sites-showcase');
+    expect(pageSource).not.toContain('homepage-platform-spec-bento');
   });
 
   it('locks the page-level CSS spine onto the shared content column', () => {

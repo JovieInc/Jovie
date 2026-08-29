@@ -1,3 +1,5 @@
+import { evaluatePreLandChangelogAdmission } from './pre-land-changelog.mjs';
+
 export const MERGE_QUEUE_LABEL = 'merge-queue';
 export const FAST_TRACK_LABEL = 'fast';
 export const FAST_TRACK_UI_LABEL = 'fast-track-ui';
@@ -341,41 +343,52 @@ export function unmergeableReenqueueDecision({
 }
 
 /**
- * ALLGREEN groups merge queued PRs together. GitHub's server merge ignores
- * local `merge=union`, so two Unreleased CHANGELOG edits park the later
- * entry UNMERGEABLE while the source PR stays MERGEABLE vs main.
+ * CHANGELOG.md is post-land release state, never a PR artifact. Historical
+ * PRs may predate the source-CI guard, so native admission independently
+ * rejects every candidate that still touches it. Queued members are retained
+ * only as diagnostic evidence while the legacy backlog drains.
  *
- * Unknown evidence never skips (same fail-open as front-item churn).
+ * Implementation PRs that touch CHANGELOG.md are skipped at admission
+ * (JOV-5378). Stamp/release heads still serialize against a queued
+ * CHANGELOG member. Unknown evidence never skips.
  *
  * @param {{
  *   candidateFiles?: unknown,
  *   queuedMemberFiles?: unknown,
+ *   branch?: unknown,
  * }} [input]
  */
 export function changelogGroupCollisionDecision({
   candidateFiles,
   queuedMemberFiles,
+  branch,
 } = {}) {
-  if (!Array.isArray(candidateFiles) || !Array.isArray(queuedMemberFiles)) {
+  const admission = evaluatePreLandChangelogAdmission({
+    changedFiles: candidateFiles,
+    branch,
+  });
+  if (admission.action === 'unknown') {
     return { action: 'unknown', reason: 'changelog-evidence-unavailable' };
   }
-  const touchesChangelog = files =>
-    Array.isArray(files) && files.includes(CHANGELOG_COLLISION_PATH);
-  if (!touchesChangelog(candidateFiles)) {
+  if (admission.action === 'reject') {
+    return { action: 'skip', reason: 'pre-land-changelog' };
+  }
+  if (admission.reason === 'omits-changelog') {
     return { action: 'allow', reason: 'candidate-omits-changelog' };
+  }
+  if (!Array.isArray(queuedMemberFiles)) {
+    return { action: 'unknown', reason: 'changelog-evidence-unavailable' };
   }
   const colliding = queuedMemberFiles.filter(
     member =>
       Number.isInteger(member?.prNumber) &&
       member.prNumber > 0 &&
-      touchesChangelog(member.files)
+      Array.isArray(member.files) &&
+      member.files.includes(CHANGELOG_COLLISION_PATH)
   );
-  if (colliding.length === 0) {
-    return { action: 'allow', reason: 'no-queued-changelog-member' };
-  }
   return {
     action: 'skip',
-    reason: 'changelog-collision',
+    reason: 'preland-changelog-prohibited',
     collidingPrs: colliding.map(member => member.prNumber),
   };
 }
@@ -496,6 +509,12 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Build + Layout (combined)',
   'CI / iOS Build + Test (combined)',
   'iOS Build + Test (combined)',
+  'CI / Mac Build + Test (combined)',
+  'Mac Build + Test (combined)',
+  'CI / Cross-Product Integration (combined)',
+  'Cross-Product Integration (combined)',
+  'CI / macOS MenuMonitor Build + Test (combined)',
+  'macOS MenuMonitor Build + Test (combined)',
   'CI / Promptfoo Evals (deterministic)',
   'Promptfoo Evals (deterministic)',
   'CI / Golden Eval Set (deterministic)',
@@ -1939,6 +1958,7 @@ export const DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS = new Set([
 export const RETRYABLE_PRODUCT_FAILURE_STEPS = new Set([
   'Run unit tests',
   'Run packages/ui unit tests',
+  'Build and test',
 ]);
 export const MERGE_GROUP_CHURN_FAILURE_THRESHOLD = 2;
 export const MERGE_GROUP_CHURN_COOLDOWN_MS = 5 * 60 * 1000;
@@ -2074,7 +2094,18 @@ export function frontItemChurnDecision({
       RETRYABLE_PRODUCT_FAILURE_STEPS.has(step)
     )
   );
-  if (retryableProductFailures.length >= MERGE_GROUP_CHURN_FAILURE_THRESHOLD) {
+  // Count sibling failed attempts once any run proves a retryable product
+  // failure. Some sibling runs expose only aggregate Build and test failures;
+  // a moving main SHA must not reset the one-retry allowance forever (#16238,
+  // reproduced by #16441 on 2026-08-27).
+  const retryableAttemptCount =
+    retryableProductFailures.length === 0
+      ? 0
+      : Math.max(
+          retryableProductFailures.length,
+          failuresForCurrentHead.length
+        );
+  if (retryableAttemptCount >= MERGE_GROUP_CHURN_FAILURE_THRESHOLD) {
     const lastFailed = retryableProductFailures[0];
     const front = parseMergeQueueFrontBranch(lastFailed.headBranch);
     return {
@@ -2083,7 +2114,7 @@ export function frontItemChurnDecision({
         'unchanged head has repeated product-validation failures; re-enrollment would duplicate the same merge-group work until the source head moves',
       evidence: {
         failureClass: 'repeated-product-check',
-        failedAttempts: retryableProductFailures.length,
+        failedAttempts: retryableAttemptCount,
         lastFailedRunId: lastFailed.id ?? null,
         lastFailedAt: lastFailed.createdAt ?? null,
         failedSteps: lastFailed.failedSteps,

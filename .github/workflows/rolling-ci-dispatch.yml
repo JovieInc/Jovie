@@ -4,45 +4,23 @@ on:
   workflow_run:
     workflows: ['CI']
     types: [completed]
-  check_suite:
-    types: [completed]
-  check_run:
-    types: [completed]
 
 permissions: {}
 
 concurrency:
-  group: rolling-ci-dispatch-${{ github.event.workflow_run.pull_requests[0].number || github.event.check_suite.pull_requests[0].number || github.event.check_run.pull_requests[0].number || github.event.workflow_run.head_sha || github.event.check_suite.head_sha || github.event.check_run.head_sha }}
+  group: rolling-ci-dispatch-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha }}
   cancel-in-progress: true
 
 jobs:
   dispatch:
     name: Dispatch exact-head CI failure
     if: >-
-      (
-        github.event_name == 'workflow_run' &&
-        (github.event.workflow_run.event == 'pull_request' ||
-        github.event.workflow_run.event == 'merge_group') &&
-        github.event.workflow_run.path == '.github/workflows/ci.yml' &&
-        github.event.workflow_run.conclusion != 'cancelled' &&
-        (github.event.workflow_run.conclusion == 'failure' ||
-        github.event.workflow_run.conclusion == 'success')
-      ) ||
-      (
-        github.event_name == 'check_suite' &&
-        github.event.check_suite.app.slug == 'github-actions' &&
-        github.event.check_suite.conclusion != 'cancelled' &&
-        (github.event.check_suite.conclusion == 'failure' ||
-        github.event.check_suite.conclusion == 'success') &&
-        github.event.check_suite.pull_requests[0] != null
-      ) ||
-      (
-        github.event_name == 'check_run' &&
-        (github.event.check_run.app.slug == 'github-actions' ||
-        github.event.check_run.check_suite.app.slug == 'github-actions') &&
-        github.event.check_run.conclusion == 'failure' &&
-        github.event.check_run.pull_requests[0] != null
-      )
+      (github.event.workflow_run.event == 'pull_request' ||
+      github.event.workflow_run.event == 'merge_group') &&
+      github.event.workflow_run.path == '.github/workflows/ci.yml' &&
+      github.event.workflow_run.conclusion != 'cancelled' &&
+      (github.event.workflow_run.conclusion == 'failure' ||
+      github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -75,23 +53,22 @@ jobs:
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
           REPOSITORY: ${{ github.repository }}
           EVENT_NAME: ${{ github.event_name }}
-          WORKFLOW_NAME: ${{ github.event.workflow_run.name || 'CI' }}
-          WORKFLOW_PATH: ${{ github.event.workflow_run.path || '.github/workflows/ci.yml' }}
-          PRODUCER_EVENT: ${{ github.event.workflow_run.event || 'pull_request' }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          WORKFLOW_PATH: ${{ github.event.workflow_run.path }}
+          PRODUCER_EVENT: ${{ github.event.workflow_run.event }}
           TRUSTED_REF: ${{ github.ref_name }}
-          CONCLUSION: ${{ github.event.workflow_run.conclusion || github.event.check_suite.conclusion || github.event.check_run.conclusion }}
-          EXPECTED_HEAD: ${{ github.event.workflow_run.head_sha || github.event.check_suite.head_sha || github.event.check_run.head_sha }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          EXPECTED_HEAD: ${{ github.event.workflow_run.head_sha }}
           WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
           WORKFLOW_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
-          CHECK_SUITE_ID: ${{ github.event.workflow_run.check_suite_id || github.event.check_suite.id || github.event.check_run.check_suite.id }}
-          PR_NUMBER_EVENT: ${{ github.event.workflow_run.pull_requests[0].number || github.event.check_suite.pull_requests[0].number || github.event.check_run.pull_requests[0].number }}
-          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch || github.event.check_suite.head_branch || github.event.check_run.check_suite.head_branch }}
-          CHECK_APP_SLUG: ${{ github.event.check_suite.app.slug || github.event.check_run.app.slug || github.event.check_run.check_suite.app.slug || 'github-actions' }}
-          CHECK_RUN_NAME: ${{ github.event.check_run.name }}
+          CHECK_SUITE_ID: ${{ github.event.workflow_run.check_suite_id }}
+          PR_NUMBER_EVENT: ${{ github.event.workflow_run.pull_requests[0].number }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
           set -euo pipefail
           echo "should_record=false" >> "$GITHUB_OUTPUT"
           echo "launch_action=skip" >> "$GITHUB_OUTPUT"
+          echo "fx_outcome=needs_human" >> "$GITHUB_OUTPUT"
           echo "pr_number=" >> "$GITHUB_OUTPUT"
           RESOLVED_PR=$(node --input-type=module <<'EOF'
           import { resolveDispatchPullRequest } from './scripts/lib/rolling-ci-dispatch.mjs';
@@ -105,20 +82,17 @@ jobs:
           EOF
           ) || {
             echo "No unique open pull request or authenticated check suite owns this failure head."
+            echo "fx_outcome=needs_human" >> "$GITHUB_OUTPUT"
             exit 0
           }
           if [[ ! "${CHECK_SUITE_ID:-}" =~ ^[0-9]+$ || -z "${EXPECTED_HEAD:-}" ]]; then
             echo "No unique open pull request or authenticated check suite owns this failure head."
+            echo "fx_outcome=needs_human" >> "$GITHUB_OUTPUT"
             exit 0
-          fi
-          if [[ -z "${WORKFLOW_RUN_ID:-}" ]]; then
-            RESOLVED=$(gh api "repos/$REPOSITORY/actions/runs?head_sha=$EXPECTED_HEAD&per_page=30" \
-              | jq --arg suite "$CHECK_SUITE_ID" '[.workflow_runs[] | select(.path == ".github/workflows/ci.yml" and .name == "CI" and (.event == "pull_request" or .event == "merge_group") and (.check_suite_id|tostring) == $suite)] | sort_by(.run_attempt) | last // empty')
-            WORKFLOW_RUN_ID=$(jq -r '.id // empty' <<<"$RESOLVED")
-            WORKFLOW_RUN_ATTEMPT=$(jq -r '.run_attempt // empty' <<<"$RESOLVED")
           fi
           if [[ -z "${WORKFLOW_RUN_ID:-}" || ! "${WORKFLOW_RUN_ATTEMPT:-}" =~ ^[0-9]+$ ]]; then
             echo "Failure event is not an authenticated CI workflow_run for this suite."
+            echo "fx_outcome=needs_human" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           LIVE_PR=$(gh api "repos/$REPOSITORY/pulls/$RESOLVED_PR" \
@@ -139,15 +113,17 @@ jobs:
           EOF
           ) || {
             echo "Failure event is stale, forked, or no longer open; refusing dispatch."
+            echo "fx_outcome=skipped_stale" >> "$GITHUB_OUTPUT"
             exit 0
           }
           if [[ "$(jq -r '.state' <<<"$LIVE_PR")" != "open" || "$(jq -r '.fork' <<<"$LIVE_PR")" == "true" || "$(jq -r '.same_repo' <<<"$LIVE_PR")" != "true" ]]; then
             echo "Failure event is stale, forked, or no longer open; refusing dispatch."
+            echo "fx_outcome=skipped_stale" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "pr_number=$RESOLVED_PR" >> "$GITHUB_OUTPUT"
-          FAILED_JOBS=$(gh api "repos/$REPOSITORY/actions/runs/$WORKFLOW_RUN_ID/jobs" \
-            --jq '[.jobs[] | select(.conclusion == "failure") | {name: .name, steps: [.steps[]? | select(.conclusion == "failure") | .name]}]')
+          FAILED_JOBS=$(gh api "repos/$REPOSITORY/actions/runs/$WORKFLOW_RUN_ID/attempts/$WORKFLOW_RUN_ATTEMPT/jobs?per_page=100" \
+            --jq '[.jobs[] | select(.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "startup_failure") | {name: .name, conclusion: .conclusion, steps: [.steps[]? | select(.conclusion == "failure" or .conclusion == "timed_out") | .name]}]')
           CHECKS=$(gh api --paginate "repos/$REPOSITORY/commits/$EXPECTED_HEAD/check-runs" \
             --jq '.check_runs[] | {name: .name, conclusion: .conclusion, headSha: .head_sha, checkSuiteId: .check_suite.id}' \
             | jq -s '.')
@@ -177,15 +153,14 @@ jobs:
             --arg workflowPath "$WORKFLOW_PATH" \
             --arg producerEvent "$PRODUCER_EVENT" \
             --arg trustedPolicyRef "$TRUSTED_REF" \
-            --arg checkSuiteAppSlug "$CHECK_APP_SLUG" \
-            --arg checkRunName "${CHECK_RUN_NAME:-}" \
             --arg cursorApiKey "${CURSOR_API_KEY:-}" \
-            '{repository,prNumber,headSha,liveHead,sourceHead,headRef,workflowRunId,workflowRunAttempt,failedJobs,writer,priorCommentBody,handoffCommentBody,conclusion,checkSuiteId,checks,cursorApiKey,source:{eventName:$eventName,workflow:$workflow,workflowPath:$workflowPath,producerEvent:$producerEvent,trustedPolicyRef:$trustedPolicyRef,checkSuiteAppSlug:$checkSuiteAppSlug,checkRunName:$checkRunName}}' \
+            '{repository:$repository,prNumber:$prNumber,headSha:$headSha,liveHead:$liveHead,sourceHead:$sourceHead,headRef:$headRef,workflowRunId:$workflowRunId,workflowRunAttempt:$workflowRunAttempt,failedJobs:$failedJobs,writer:$writer,priorCommentBody:$priorCommentBody,handoffCommentBody:$handoffCommentBody,conclusion:$conclusion,checkSuiteId:$checkSuiteId,checks:$checks,cursorApiKey:$cursorApiKey,remoteMutationAllowed:false,source:{eventName:$eventName,workflow:$workflow,workflowPath:$workflowPath,producerEvent:$producerEvent,trustedPolicyRef:$trustedPolicyRef}}' \
             | node scripts/lib/rolling-ci-fx.mjs > "$RUNNER_TEMP/rolling-ci-plan.json"
 
           cat "$RUNNER_TEMP/rolling-ci-plan.json"
           echo "should_record=$(jq -r '.dispatch.mutate' "$RUNNER_TEMP/rolling-ci-plan.json")" >> "$GITHUB_OUTPUT"
           echo "launch_action=$(jq -r '.launch.action' "$RUNNER_TEMP/rolling-ci-plan.json")" >> "$GITHUB_OUTPUT"
+          echo "fx_outcome=$(jq -r '.outcome // "needs_human"' "$RUNNER_TEMP/rolling-ci-plan.json")" >> "$GITHUB_OUTPUT"
           echo "launch_request=$(jq -c '.launch.request // {}' "$RUNNER_TEMP/rolling-ci-plan.json")" >> "$GITHUB_OUTPUT"
           {
             echo "comment_body<<ROLLING_CI_COMMENT"
@@ -205,6 +180,7 @@ jobs:
           bash scripts/lib/upsert-pr-comment.sh "$PR_NUMBER" "rolling-ci-dispatch" "$COMMENT_BODY"
 
       - name: Launch FX remediator
+        id: launch
         if: steps.plan.outputs.launch_action == 'launch'
         env:
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
@@ -227,5 +203,23 @@ jobs:
             request: planned.launch.request,
             cursorApiKey: process.env.CURSOR_API_KEY,
           });
-          console.log(JSON.stringify({ id: launched?.id ?? null, ok: true }));
+          console.log(
+            JSON.stringify({ id: launched?.agent?.id ?? null, ok: true })
+          );
           EOF
+
+      - name: Record FX outcome
+        if: always() && steps.plan.outcome != 'skipped'
+        env:
+          PLAN_OUTCOME: ${{ steps.plan.outputs.fx_outcome }}
+          LAUNCH_RESULT: ${{ steps.launch.outcome }}
+        run: |
+          set -euo pipefail
+          outcome="${PLAN_OUTCOME:-needs_human}"
+          if [[ "${LAUNCH_RESULT:-}" == 'success' ]]; then
+            outcome='launched'
+          elif [[ "${LAUNCH_RESULT:-}" == 'failure' && "$outcome" == 'launched' ]]; then
+            outcome='needs_human'
+          fi
+          echo "::notice::FX outcome=${outcome}"
+          echo "FX outcome: \`${outcome}\`" >> "$GITHUB_STEP_SUMMARY"

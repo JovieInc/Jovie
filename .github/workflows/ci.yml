@@ -466,8 +466,17 @@ jobs:
       run_drizzle: ${{ steps.detect.outputs.run_drizzle || 'false' }}
       run_neon: ${{ steps.detect.outputs.run_neon || 'false' }}
       run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}
+      run_macos: ${{ steps.detect.outputs.run_macos || 'false' }}
+      run_web: ${{ steps.detect.outputs.run_web || 'false' }}
+      run_operations: ${{ steps.detect.outputs.run_operations || 'false' }}
+      run_cross_product: ${{ steps.detect.outputs.run_cross_product || 'false' }}
+      selected_lanes: ${{ steps.detect.outputs.selected_lanes || 'none' }}
+      shared_contract_impact: ${{ steps.detect.outputs.shared_contract_impact || 'none' }}
       has_code_changes: ${{ steps.detect.outputs.has_code_changes || 'false' }}
       is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}
+      run_jovie_product: ${{ steps.detect.outputs.run_jovie_product || 'false' }}
+      run_symphony_control: ${{ steps.detect.outputs.run_symphony_control || 'false' }}
+      run_summer_ops: ${{ steps.detect.outputs.run_summer_ops || 'false' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -526,6 +535,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          emit_ci_lanes() {
+            local mode="${1:-}"
+            if [[ "$mode" == "all" ]]; then
+              node scripts/lib/ci-repo-lanes.mjs --emit-github-output --all
+            elif [[ "$mode" == "none" ]]; then
+              node scripts/lib/ci-repo-lanes.mjs --emit-github-output --none
+            else
+              printf '%s\n' "${CHANGED_FILES:-}" | node scripts/lib/ci-repo-lanes.mjs --emit-github-output
+            fi
+          }
           IS_FORK="${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}"
           # Determine changed files
           if [[ "${{ github.event_name }}" == "merge_group" ]]; then
@@ -562,9 +581,12 @@ jobs:
               # still validate the exact combined head. The typed no-op output
               # lets only unit and build/layout skip their expensive work.
               echo "is_noop_merge_group=true" >> "$GITHUB_OUTPUT"
-              for output in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios has_code_changes; do
+              for output in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios run_macos run_web run_operations run_cross_product has_code_changes; do
                 echo "$output=false" >> "$GITHUB_OUTPUT"
               done
+              echo "selected_lanes=none" >> "$GITHUB_OUTPUT"
+              echo "shared_contract_impact=none" >> "$GITHUB_OUTPUT"
+              emit_ci_lanes none
               exit 0
             fi
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
@@ -576,7 +598,7 @@ jobs:
               echo "::error::Could not resolve origin/${{ github.base_ref }} after fetch"
               exit 1
             fi
-            CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
+            CHANGED_FILES=$(git diff --no-renames --name-only "origin/${{ github.base_ref }}" HEAD)
             if [[ -z "${CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
               echo "::error::Empty changed-file list vs origin/${{ github.base_ref }}; refusing a false docs-only classification."
               exit 1
@@ -584,9 +606,12 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
-            for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios has_code_changes; do
+            for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios run_macos run_web run_operations run_cross_product has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
+            echo "selected_lanes=ios,mac,web,operations,cross-product" >> "$GITHUB_OUTPUT"
+            echo "shared_contract_impact=ios,mac,web" >> "$GITHUB_OUTPUT"
+            emit_ci_lanes all
             exit 0
           elif [[ "${{ github.event_name }}" == "push" ]]; then
             PUSH_BASE_SHA="${{ github.event.before }}"
@@ -596,18 +621,28 @@ jobs:
               exit 1
             fi
             git cat-file -e "${PUSH_BASE_SHA}^{commit}"
-            CHANGED_FILES=$(git diff --name-only "$PUSH_BASE_SHA" HEAD)
+            CHANGED_FILES=$(git diff --no-renames --name-only "$PUSH_BASE_SHA" HEAD)
           else
             echo "::error::Unsupported event for path change detection: ${{ github.event_name }}"
             exit 1
           fi
 
-          IOS_PATTERN='^(apps/ios/|fastlane/|Gemfile$|Gemfile\.lock$|scripts/ios-best-practices-lint\.sh$|\.github/workflows/ios-(ci|testflight)\.yml$)'
-          if echo "$CHANGED_FILES" | grep -q -E "$IOS_PATTERN"; then
-            echo "run_ios=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run_ios=false" >> "$GITHUB_OUTPUT"
-          fi
+          PRODUCT_LANE_DIR="$RUNNER_TEMP/product-lane-classification"
+          mkdir -p "$PRODUCT_LANE_DIR"
+          printf '%s\n' "$CHANGED_FILES" > "$PRODUCT_LANE_DIR/changed-paths.txt"
+          node scripts/lib/product-lane-classifier.mjs \
+            --files-from "$PRODUCT_LANE_DIR/changed-paths.txt" \
+            --json-out "$PRODUCT_LANE_DIR/receipt.json" \
+            --summary-out "$PRODUCT_LANE_DIR/summary.md" \
+            --github-output "$GITHUB_OUTPUT"
+          jq \
+            --arg sha "$GITHUB_SHA" \
+            --arg run_id "$GITHUB_RUN_ID" \
+            --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            '. + {provenance: {sha: $sha, runId: $run_id, runAttempt: $run_attempt}}' \
+            "$PRODUCT_LANE_DIR/receipt.json" > "$PRODUCT_LANE_DIR/sealed.json"
+          mv "$PRODUCT_LANE_DIR/sealed.json" "$PRODUCT_LANE_DIR/receipt.json"
+          cat "$PRODUCT_LANE_DIR/summary.md" >> "$GITHUB_STEP_SUMMARY"
 
           TEST_PERFORMANCE_PATTERN='^apps/web/scripts/test-performance-(guard\.ts|profiler(\.test)?\.ts)$'
           if echo "$CHANGED_FILES" | grep -q -E "$TEST_PERFORMANCE_PATTERN"; then
@@ -628,6 +663,7 @@ jobs:
             for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_golden_path run_drizzle run_neon; do
               echo "$t=false" >> "$GITHUB_OUTPUT"
             done
+            emit_ci_lanes
             exit 0
           fi
 
@@ -638,6 +674,7 @@ jobs:
             for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
               echo "$t=false" >> "$GITHUB_OUTPUT"
             done
+            emit_ci_lanes
             exit 0
           fi
 
@@ -771,6 +808,17 @@ jobs:
             echo "run_test=false" >> "$GITHUB_OUTPUT"
             echo "run_test_performance=false" >> "$GITHUB_OUTPUT"
           fi
+
+          emit_ci_lanes
+
+      - name: Preserve intake product-lane receipt
+        if: ${{ github.event_name != 'workflow_dispatch' && steps.detect.outputs.is_noop_merge_group != 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: product-lane-intake-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/product-lane-classification/receipt.json
+          if-no-files-found: error
+          retention-days: 30
 
   # Do not allocate unit/build/Xcode/eval capacity after a required external
   # queue gate has already failed or GitHub has deleted the synthetic ref.
@@ -1108,7 +1156,7 @@ jobs:
         id: lanes
         env:
           CI_FAST_LANE_GROUP: typecheck
-          TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || ((github.base_ref && format('origin/{0}', github.base_ref)) || '') }}
+          TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
           CI_FAST_LANES_OUT: ${{ runner.temp }}/ci-fast-lanes.json
         run: node scripts/ci-fast-lanes.mjs
       - name: Upload ci-fast lane results
@@ -1179,7 +1227,7 @@ jobs:
           # origin/<base>; a --depth=1 fetch leaves the base tip shallow and fails
           # desktop-release-guard / version-fanout-guard on PRs.
           git fetch origin "${{ github.base_ref }}" --no-tags
-          if git diff --name-only "origin/${{ github.base_ref }}" HEAD | grep -qE '^(\.github/|\.claude/rules/(ci-branching|release|testing|gstack)\.md|AGENTS\.md|CODEX\.md|canon/invariants\.jsonl|scripts/invariants/|scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|ownership-inventory)|scripts/backlog-orchestrator/__tests__/(pre-lease-gates|gate-next-hold|ownership-inventory)|scripts/lib/(ci-|merge-queue)|scripts/lib/__tests__/(ci-fast-workflow-contract|merge-group-workflow-contract)\.test\.mjs|scripts/ci-|scripts/hermes/(gem-|gem_|install-gem-pr-rehabilitation)|scripts/brand-scrub\.py|scripts/tests/test_(brand_scrub|agent_workflow_hygiene|vercel_prebuilt_deploy)\.py)'; then
+          if git diff --name-only "origin/${{ github.base_ref }}" HEAD | grep -qE '^(\.github/|\.claude/rules/(ci-branching|release|testing|gstack)\.md|AGENTS\.md|CODEX\.md|canon/invariants\.jsonl|scripts/invariants/|scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|ownership-inventory)|scripts/backlog-orchestrator/__tests__/(pre-lease-gates|gate-next-hold|ownership-inventory)|scripts/lib/(ci-|merge-queue|product-lane-(classifier|finalize))|scripts/lib/__tests__/(ci-fast-workflow-contract|merge-group-workflow-contract|product-lane-classifier)\.test\.mjs|scripts/ci-|scripts/hermes/(gem-|gem_|install-gem-pr-rehabilitation)|scripts/brand-scrub\.py|scripts/tests/test_(brand_scrub|agent_workflow_hygiene|vercel_prebuilt_deploy)\.py)'; then
             echo "skip=false" >> "$GITHUB_OUTPUT"
           else
             echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -1199,7 +1247,8 @@ jobs:
         id: lanes
         env:
           CI_FAST_LANE_GROUP: remaining
-          TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || ((github.base_ref && format('origin/{0}', github.base_ref)) || '') }}
+          CI_PRODUCT_LANES: ${{ needs.ci-path-changes.outputs.selected_lanes }}
+          TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
           CI_FAST_SKIP_STRUCTURAL: ${{ steps.structural.outputs.skip }}
           CI_FAST_LANES_OUT: ${{ runner.temp }}/ci-fast-lanes.json
         run: node scripts/ci-fast-lanes.mjs
@@ -1703,11 +1752,16 @@ jobs:
         needs.ci-merge-group-admission.result == 'success'
       ) &&
       (
+        github.event_name == 'workflow_dispatch' ||
         (
           github.event_name == 'merge_group' &&
-          needs.ci-path-changes.outputs.is_noop_merge_group != 'true'
+          needs.ci-path-changes.outputs.run_web == 'true'
         ) ||
-        (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        (
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          needs.ci-path-changes.outputs.run_web == 'true'
+        )
       )
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -1721,7 +1775,7 @@ jobs:
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
       - name: Build exact combined head
-        run: pnpm turbo build --filter=@jovie/web
+        run: pnpm turbo build --filter=@jovie/web && pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test && pnpm --filter @jovie/extension build && pnpm --filter @jovie/observability-ingest typecheck && pnpm --filter @jovie/observability-ingest test
         env:
           # Merge-group code is PR-controlled. This deterministic mock key is
           # intentionally public and keeps the combined lane secret-free.
@@ -1841,10 +1895,174 @@ jobs:
       ) &&
       needs.ci-path-changes.outputs.run_ios == 'true' &&
       (
+        github.event_name == 'workflow_dispatch' ||
         github.event_name == 'merge_group' ||
         (github.event_name == 'push' && github.ref == 'refs/heads/main')
       )
     uses: ./.github/workflows/ios-ci.yml
+
+  # Mac product evidence stays on the synthetic combined head or direct-main
+  # fallback. It covers both the MenuMonitor Swift package and the packaged
+  # Electron desktop application for the exact selected SHA.
+  ci-macos:
+    name: Mac Build + Test (combined)
+    needs: [ci-path-changes, ci-merge-group-admission]
+    if: >-
+      always() &&
+      needs.ci-path-changes.result == 'success' &&
+      (
+        github.event_name != 'merge_group' ||
+        needs.ci-merge-group-admission.result == 'success'
+      ) &&
+      needs.ci-path-changes.outputs.run_macos == 'true' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'merge_group' ||
+        (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      )
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Test and package exact Mac head
+        run: |
+          set -euo pipefail
+          swift test --package-path apps/macos/MenuMonitor --enable-code-coverage
+          swift build --package-path apps/macos/MenuMonitor -c release
+          pnpm --filter @jovie/desktop run typecheck
+          pnpm --filter @jovie/desktop run test
+          pnpm --filter @jovie/desktop run package:staging
+      - name: Verify exact Mac artifact set
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < VERSION)"
+          for artifact in \
+            "apps/desktop/dist/Jovie-Staging-${version}-universal.dmg" \
+            "apps/desktop/dist/Jovie-Staging-${version}-universal.dmg.blockmap" \
+            "apps/desktop/dist/Jovie-Staging-${version}-universal.zip" \
+            "apps/desktop/dist/Jovie-Staging-${version}-universal.zip.blockmap" \
+            "apps/macos/MenuMonitor/.build/release/MenuMonitor"; do
+            [ -f "$artifact" ] || { echo "::error::Missing Mac artifact: $artifact"; exit 1; }
+          done
+      - name: Upload exact Mac staging package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: desktop-staging-${{ github.sha }}
+          path: |
+            apps/desktop/dist/Jovie-Staging-*-universal.dmg
+            apps/desktop/dist/Jovie-Staging-*-universal.dmg.blockmap
+            apps/desktop/dist/Jovie-Staging-*-universal.zip
+            apps/desktop/dist/Jovie-Staging-*-universal.zip.blockmap
+            apps/macos/MenuMonitor/.build/release/MenuMonitor
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+  ci-cross-product-integration:
+    name: Cross-Product Integration (combined)
+    needs:
+      [ci-path-changes, ci-merge-group-admission, ci-unit-tests, ci-build-layout, ci-ios, ci-macos]
+    if: >-
+      always() &&
+      needs.ci-path-changes.result == 'success' &&
+      needs.ci-path-changes.outputs.run_cross_product == 'true' &&
+      (
+        github.event_name != 'merge_group' ||
+        needs.ci-merge-group-admission.result == 'success'
+      ) &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'merge_group' ||
+        (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Require every affected product lane
+        env:
+          RUN_WEB: ${{ needs.ci-path-changes.outputs.run_web }}
+          RUN_MAC: ${{ needs.ci-path-changes.outputs.run_macos }}
+          RUN_IOS: ${{ needs.ci-path-changes.outputs.run_ios }}
+          WEB_UNITS: ${{ needs.ci-unit-tests.result }}
+          WEB_BUILD: ${{ needs.ci-build-layout.result }}
+          MAC_RESULT: ${{ needs.ci-macos.result }}
+          IOS_RESULT: ${{ needs.ci-ios.result }}
+        run: |
+          set -euo pipefail
+          [ "$RUN_WEB" != 'true' ] || { [ "$WEB_UNITS" = 'success' ] && [ "$WEB_BUILD" = 'success' ]; }
+          [ "$RUN_MAC" != 'true' ] || [ "$MAC_RESULT" = 'success' ]
+          [ "$RUN_IOS" != 'true' ] || [ "$IOS_RESULT" = 'success' ]
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Run model-free shared contracts
+        run: |
+          pnpm --filter @jovie/auth-routing test
+          pnpm --filter @jovie/action-contracts test
+          pnpm --filter @jovie/audio-contracts test
+
+  ci-product-lane-receipt:
+    name: Product Lane Receipt
+    needs:
+      [ci-path-changes, ci-fast, ci-unit-tests, ci-build-layout, ci-ios, ci-macos, ci-cross-product-integration]
+    if: >-
+      always() &&
+      needs.ci-path-changes.result == 'success' &&
+      needs.ci-path-changes.outputs.is_noop_merge_group != 'true' &&
+      (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: product-lane-intake-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/product-lane-receipt
+      - name: Join exact lane results
+        env:
+          FAST: ${{ needs.ci-fast.result }}
+          WEB_UNIT: ${{ needs.ci-unit-tests.result }}
+          WEB_BUILD: ${{ needs.ci-build-layout.result }}
+          IOS: ${{ needs.ci-ios.result }}
+          MAC: ${{ needs.ci-macos.result }}
+          CROSS: ${{ needs.ci-cross-product-integration.result }}
+          RUN_WEB: ${{ needs.ci-path-changes.outputs.run_web }}
+          RUN_IOS: ${{ needs.ci-path-changes.outputs.run_ios }}
+          RUN_MAC: ${{ needs.ci-path-changes.outputs.run_macos }}
+          RUN_OPERATIONS: ${{ needs.ci-path-changes.outputs.run_operations }}
+          RUN_CROSS: ${{ needs.ci-path-changes.outputs.run_cross_product }}
+        run: |
+          set -euo pipefail
+          lane_result() { [ "$1" = true ] && printf '%s' "$2" || printf skipped; }
+          root="$RUNNER_TEMP/product-lane-receipt"
+          jq -n \
+            --argjson ios "[\"$(lane_result "$RUN_IOS" "$IOS")\",\"$(lane_result "$RUN_IOS" "$FAST")\"]" \
+            --argjson mac "[\"$(lane_result "$RUN_MAC" "$MAC")\",\"$(lane_result "$RUN_MAC" "$FAST")\"]" \
+            --argjson web "[\"$(lane_result "$RUN_WEB" "$WEB_UNIT")\",\"$(lane_result "$RUN_WEB" "$WEB_BUILD")\",\"$(lane_result "$RUN_WEB" "$FAST")\"]" \
+            --argjson operations "[\"$(lane_result "$RUN_OPERATIONS" "$FAST")\"]" \
+            --argjson cross "[\"$(lane_result "$RUN_CROSS" "$CROSS")\"]" \
+            --arg receipt "product-lane-final-${GITHUB_SHA}-${GITHUB_RUN_ATTEMPT}" \
+            --arg run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{lanes: {ios: $ios, mac: $mac, web: $web, operations: $operations, "cross-product": $cross}, receiptArtifact: $receipt, run: $run}' \
+            > "$root/results.json"
+          node scripts/lib/product-lane-finalize.mjs \
+            "$root/receipt.json" "$root/results.json" \
+            "$root/final.json" "$root/final.md"
+          cat "$root/final.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve final product-lane receipt
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: product-lane-final-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/product-lane-receipt/final.*
+          if-no-files-found: error
+          retention-days: 30
 
   ci-build-public:
     name: Build (public routes)
@@ -3182,9 +3400,6 @@ jobs:
   ci-unit-tests:
     name: Unit Tests (${{ matrix.shard }})
     needs: [ci-path-changes, ci-merge-group-admission]
-    # Runs ten shards on every non-empty merge-group combined head and the
-    # direct-main fallback. Only an exact typed empty-diff merge group skips the
-    # matrix; source PRs defer unit evidence to the combined queue head.
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
@@ -3195,9 +3410,13 @@ jobs:
       (
         (
           github.event_name == 'merge_group' &&
-          needs.ci-path-changes.outputs.is_noop_merge_group != 'true'
+          needs.ci-path-changes.outputs.run_web == 'true'
         ) ||
-        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        (
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          needs.ci-path-changes.outputs.run_web == 'true'
+        ) ||
         github.event_name == 'workflow_dispatch'
       )
     # Phase 0: quarantine generic fixed-runner routing until all five named
@@ -3290,7 +3509,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         env:
           TURBO_SCM_HEAD: ${{ github.sha }}
-          TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || ((github.base_ref && format('origin/{0}', github.base_ref)) || '') }}
+          TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
         run: |
           # Each ephemeral runner has 2 CPUs. Match Vitest forks to that quota so
           # two five-shard PR cohorts use 20 workers across 20 allocated CPUs
@@ -3325,7 +3544,7 @@ jobs:
         continue-on-error: true
         env:
           TURBO_SCM_HEAD: ${{ github.sha }}
-          TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || ((github.base_ref && format('origin/{0}', github.base_ref)) || '') }}
+          TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
         run: pnpm turbo test:fast --affected -- --pool=forks --maxWorkers=2 --retry=${{ steps.quarantine.outputs.quarantine_unit_retries }} ${{ steps.quarantine.outputs.unit_files }}
 
       - name: Run packages/ui unit tests
@@ -4670,9 +4889,6 @@ jobs:
 
   ci-merge-group-ready:
     name: ${{ github.event_name == 'merge_group' && 'PR Ready' || 'PR Ready (merge-group inactive)' }}
-    # Combined heads always require deterministic core gates and path-selected
-    # iOS evidence. Non-empty heads also require ten unit shards and one hosted
-    # build/layout workspace; only an exact typed no-op skips those heavy lanes.
     # Deep browser lanes never provision Neon from this event.
     needs:
       [
@@ -4683,6 +4899,9 @@ jobs:
         ci-unit-tests,
         ci-build-layout,
         ci-ios,
+        ci-macos,
+        ci-cross-product-integration,
+        ci-product-lane-receipt,
         ci-promptfoo-evals,
         ci-golden-eval-set,
         ci-secret-scan,
@@ -4704,13 +4923,22 @@ jobs:
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
           BUILD_LAYOUT_RESULT="${{ needs.ci-build-layout.result }}"
           IOS_RESULT="${{ needs.ci-ios.result }}"
+          MACOS_RESULT="${{ needs.ci-macos.result }}"
+          CROSS_PRODUCT_RESULT="${{ needs.ci-cross-product-integration.result }}"
+          LANE_RECEIPT_RESULT="${{ needs.ci-product-lane-receipt.result }}"
           PROMPTFOO_RESULT="${{ needs.ci-promptfoo-evals.result }}"
           GOLDEN_EVAL_RESULT="${{ needs.ci-golden-eval-set.result }}"
           SECRET_RESULT="${{ needs.ci-secret-scan.result }}"
           GOLDEN_PATH_LOCK_RESULT="${{ needs.ci-golden-path-lock.result }}"
           MIGRATION_RESULT="${{ needs.drizzle-migration-guard.result }}"
           NOOP_GROUP="${{ needs.ci-path-changes.outputs.is_noop_merge_group }}"
+          RUN_JOVIE_PRODUCT="${{ needs.ci-path-changes.outputs.run_jovie_product }}"
+          RUN_WEB="${{ needs.ci-path-changes.outputs.run_web }}"
           RUN_IOS="${{ needs.ci-path-changes.outputs.run_ios }}"
+          RUN_MACOS="${{ needs.ci-path-changes.outputs.run_macos }}"
+          RUN_CROSS_PRODUCT="${{ needs.ci-path-changes.outputs.run_cross_product }}"
+          SELECTED_LANES="${{ needs.ci-path-changes.outputs.selected_lanes }}"
+          SHARED_IMPACT="${{ needs.ci-path-changes.outputs.shared_contract_impact }}"
           RUN_PROMPTFOO="${{ needs.ci-path-changes.outputs.run_promptfoo_evals }}"
           RUN_GOLDEN_EVAL="${{ needs.ci-path-changes.outputs.run_golden_eval_set }}"
           {
@@ -4723,12 +4951,18 @@ jobs:
             echo "| --- | --- |"
             echo "| Path Changes | $PATH_RESULT |"
             echo "| Typed no-op merge group | $NOOP_GROUP |"
+            echo "| Jovie product suites | $RUN_JOVIE_PRODUCT |"
+            echo "| Selected product lanes | $SELECTED_LANES |"
+            echo "| Shared-contract impact | $SHARED_IMPACT |"
             echo "| Merge Group Admission | $ADMISSION_RESULT |"
             echo "| CI Risk Classifier | $RISK_RESULT |"
             echo "| ci-fast | $FAST_RESULT |"
             echo "| Unit Tests | $UNIT_RESULT |"
             echo "| Build + Layout (same hosted workspace) | $BUILD_LAYOUT_RESULT |"
             echo "| iOS Build + Test | $IOS_RESULT |"
+            echo "| Mac Build + Test | $MACOS_RESULT |"
+            echo "| Cross-Product Integration | $CROSS_PRODUCT_RESULT |"
+            echo "| Product Lane Receipt | $LANE_RECEIPT_RESULT |"
             echo "| Promptfoo Evals (path-selected) | $PROMPTFOO_RESULT |"
             echo "| Golden Eval Set (path-selected) | $GOLDEN_EVAL_RESULT |"
             echo "| Secret Scan | $SECRET_RESULT |"
@@ -4755,29 +4989,31 @@ jobs:
           done
 
           if [[ "$NOOP_GROUP" == "true" ]]; then
-            if [[ "$UNIT_RESULT" != "skipped" || "$BUILD_LAYOUT_RESULT" != "skipped" ]]; then
-              echo "::error::Typed no-op merge group must skip Unit Tests and Build + Layout (unit: $UNIT_RESULT, build: $BUILD_LAYOUT_RESULT)"
-              exit 1
-            fi
-          else
-            if [[ "$UNIT_RESULT" != "success" ]]; then
-              echo "::error::Unit Test shards did not pass on the non-empty merge-group combined head (result: $UNIT_RESULT)"
-              exit 1
-            fi
-            if [[ "$BUILD_LAYOUT_RESULT" != "success" ]]; then
-              echo "::error::Build + Layout did not pass on the non-empty merge-group combined head (result: $BUILD_LAYOUT_RESULT)"
-              exit 1
-            fi
+            [ "$LANE_RECEIPT_RESULT" = skipped ] || { echo "::error::No-op receipt must skip."; exit 1; }
+          elif [[ "$LANE_RECEIPT_RESULT" != success ]]; then
+            echo "::error::Final product-lane receipt did not pass ($LANE_RECEIPT_RESULT)."
+            exit 1
           fi
 
-          if [[ "$RUN_IOS" == "true" && "$IOS_RESULT" != "success" ]]; then
-            echo "::error::iOS Build + Test did not pass for an iOS-changing combined head (result: $IOS_RESULT)"
-            exit 1
-          fi
-          if [[ "$RUN_IOS" != "true" && "$IOS_RESULT" != "skipped" ]]; then
-            echo "::error::iOS Build + Test ran without an iOS path selection (result: $IOS_RESULT)"
-            exit 1
-          fi
+          for selected_gate in \
+            "Web Unit Tests:$RUN_WEB:$UNIT_RESULT" \
+            "Web Build + Layout:$RUN_WEB:$BUILD_LAYOUT_RESULT" \
+            "iOS Build + Test:$RUN_IOS:$IOS_RESULT" \
+            "Mac Build + Test:$RUN_MACOS:$MACOS_RESULT" \
+            "Cross-Product Integration:$RUN_CROSS_PRODUCT:$CROSS_PRODUCT_RESULT"; do
+            name="${selected_gate%%:*}"
+            selection_and_result="${selected_gate#*:}"
+            selected="${selection_and_result%%:*}"
+            result="${selection_and_result#*:}"
+            if [[ "$selected" == "true" && "$result" != "success" ]]; then
+              echo "::error::$name did not pass for its selected product lane (result: $result)"
+              exit 1
+            fi
+            if [[ "$selected" != "true" && "$result" != "skipped" ]]; then
+              echo "::error::$name ran without product path selection (result: $result)"
+              exit 1
+            fi
+          done
 
           for selected_gate in \
             "Promptfoo Evals:$RUN_PROMPTFOO:$PROMPTFOO_RESULT" \
@@ -5411,12 +5647,15 @@ jobs:
         ci-unit-tests,
         ci-build-layout,
         ci-ios,
+        ci-macos,
+        ci-cross-product-integration,
+        ci-product-lane-receipt,
         ci-promptfoo-evals,
         ci-golden-eval-set,
       ]
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     outputs:
       release_authorized: ${{ steps.ready.outputs.release_authorized }}
       evidence_mode: ${{ steps.ready.outputs.evidence_mode }}
@@ -5449,9 +5688,15 @@ jobs:
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
           BUILD_LAYOUT_RESULT="${{ needs.ci-build-layout.result }}"
           IOS_RESULT="${{ needs.ci-ios.result }}"
+          MACOS_RESULT="${{ needs.ci-macos.result }}"
+          CROSS_PRODUCT_RESULT="${{ needs.ci-cross-product-integration.result }}"
+          LANE_RECEIPT_RESULT="${{ needs.ci-product-lane-receipt.result }}"
           PROMPTFOO_RESULT="${{ needs.ci-promptfoo-evals.result }}"
           GOLDEN_EVAL_RESULT="${{ needs.ci-golden-eval-set.result }}"
+          RUN_WEB="${{ needs.ci-path-changes.outputs.run_web }}"
           RUN_IOS="${{ needs.ci-path-changes.outputs.run_ios }}"
+          RUN_MACOS="${{ needs.ci-path-changes.outputs.run_macos }}"
+          RUN_CROSS_PRODUCT="${{ needs.ci-path-changes.outputs.run_cross_product }}"
           RUN_PROMPTFOO="${{ needs.ci-path-changes.outputs.run_promptfoo_evals }}"
           RUN_GOLDEN_EVAL="${{ needs.ci-path-changes.outputs.run_golden_eval_set }}"
 
@@ -5466,6 +5711,9 @@ jobs:
               "Unit Tests:$UNIT_RESULT" \
               "Build + Layout:$BUILD_LAYOUT_RESULT" \
               "iOS Build + Test:$IOS_RESULT" \
+              "Mac Build + Test:$MACOS_RESULT" \
+              "Cross-Product Integration:$CROSS_PRODUCT_RESULT" \
+              "Product Lane Receipt:$LANE_RECEIPT_RESULT" \
               "Promptfoo Evals:$PROMPTFOO_RESULT" \
               "Golden Eval Set:$GOLDEN_EVAL_RESULT"; do
               name="${lane%%:*}"
@@ -5480,17 +5728,12 @@ jobs:
             exit 0
           fi
 
-          # Direct/admin main fallback is intentionally unconditional: ten unit
-          # shards and the combined hosted build+layout may never be represented
-          # by a skipped placeholder.
           for lane in \
             "Path Changes:$PATH_RESULT" \
             "CI Risk Classifier:$RISK_RESULT" \
             "ci-fast:$FAST_RESULT" \
             "Secret Scan:$SECRET_RESULT" \
-            "Migration Guard:$MIGRATION_RESULT" \
-            "Unit Tests (ten shards):$UNIT_RESULT" \
-            "Build + Layout:$BUILD_LAYOUT_RESULT"; do
+            "Migration Guard:$MIGRATION_RESULT"; do
             name="${lane%%:*}"
             result="${lane#*:}"
             if [ "$result" != "success" ]; then
@@ -5499,15 +5742,30 @@ jobs:
             fi
           done
 
-          if [ "$RUN_IOS" = "true" ]; then
-            if [ "$IOS_RESULT" != "success" ]; then
-              echo "::error::Main fallback iOS Build + Test did not pass (result $IOS_RESULT)."
-              exit 1
-            fi
-          elif [ "$IOS_RESULT" != "skipped" ]; then
-            echo "::error::Main fallback ran iOS Build + Test without an iOS path selection (result $IOS_RESULT)."
+          if [ "$LANE_RECEIPT_RESULT" != success ]; then
+            echo "::error::Main fallback Product Lane Receipt did not pass ($LANE_RECEIPT_RESULT)."
             exit 1
           fi
+
+          for selected_gate in \
+            "Web Unit Tests:$RUN_WEB:$UNIT_RESULT" \
+            "Web Build + Layout:$RUN_WEB:$BUILD_LAYOUT_RESULT" \
+            "iOS Build + Test:$RUN_IOS:$IOS_RESULT" \
+            "Mac Build + Test:$RUN_MACOS:$MACOS_RESULT" \
+            "Cross-Product Integration:$RUN_CROSS_PRODUCT:$CROSS_PRODUCT_RESULT"; do
+            name="${selected_gate%%:*}"
+            selection_and_result="${selected_gate#*:}"
+            selected="${selection_and_result%%:*}"
+            result="${selection_and_result#*:}"
+            if [ "$selected" = "true" ] && [ "$result" != "success" ]; then
+              echo "::error::Main fallback $name did not pass (result $result)."
+              exit 1
+            fi
+            if [ "$selected" != "true" ] && [ "$result" != "skipped" ]; then
+              echo "::error::Main fallback ran unselected $name (result $result)."
+              exit 1
+            fi
+          done
 
           for selected_gate in \
             "Promptfoo Evals:$RUN_PROMPTFOO:$PROMPTFOO_RESULT" \
@@ -5528,3 +5786,43 @@ jobs:
 
           echo "evidence_mode=fallback" >> "$GITHUB_OUTPUT"
           echo "release_authorized=true" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve sealed product-lane release routing
+        if: ${{ steps.ready.outputs.release_authorized == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVIDENCE_MODE: ${{ steps.ready.outputs.evidence_mode }}
+          PROOF_RUN_ID: ${{ needs.main-queue-provenance.outputs.proof_run_id }}
+        run: |
+          set -euo pipefail
+          source_run_id="$GITHUB_RUN_ID"
+          [ "$EVIDENCE_MODE" != merge_group ] || source_run_id="$PROOF_RUN_ID"
+          [[ "$source_run_id" =~ ^[1-9][0-9]*$ ]]
+          prefix="product-lane-final-${GITHUB_SHA}-"
+          artifacts="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$source_run_id/artifacts?per_page=100")"
+          artifact_id="$(jq -r --arg prefix "$prefix" '
+            [.artifacts[] | select(.expired == false and (.name | startswith($prefix)))]
+            | sort_by(.id) | last | .id // empty
+          ' <<<"$artifacts")"
+          [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]] || {
+            echo "::error::No sealed final product-lane receipt exists for $GITHUB_SHA."
+            exit 1
+          }
+          root="$RUNNER_TEMP/product-lane-release"
+          mkdir -p "$root"
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" > "$root/receipt.zip"
+          unzip -q "$root/receipt.zip" -d "$root/source"
+          jq -e --arg sha "$GITHUB_SHA" --arg run "$source_run_id" '
+            .provenance.sha == $sha and .provenance.runId == $run and .aggregatePassed == true
+          ' "$root/source/final.json" >/dev/null
+          jq --arg admission_run "$source_run_id" --arg main_run "$GITHUB_RUN_ID" --arg source_artifact "$artifact_id" \
+            '. + {releaseRouting: {admissionRunId: $admission_run, sourceMainRunId: $main_run, sourceArtifactId: $source_artifact}}' \
+            "$root/source/final.json" > "$root/release.json"
+      - name: Preserve sealed product-lane release routing
+        if: ${{ steps.ready.outputs.release_authorized == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: product-lane-release-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/product-lane-release/release.json
+          if-no-files-found: error
+          retention-days: 30

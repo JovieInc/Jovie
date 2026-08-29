@@ -14,6 +14,8 @@ INDEPENDENT_REVIEW_SCHEMA = "jovie-independent-review/v1"
 INDEPENDENT_REVIEW_AUTHORITY = "Gem"
 INDEPENDENT_REVIEWER = "Gem"
 INDEPENDENT_REVIEW_SCOPE = "exact-main-head"
+CLOSURE_HEALTH_SCHEMA = "jovie-closure-health/v1"
+CLOSURE_HEALTH_AUTHORITY = "Summer"
 JOVIE_REPO = "JovieInc/Jovie"
 
 
@@ -137,6 +139,53 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
     new_issue_lease = receipt.get("workAdmission", {}).get("newIssueLeaseAllowed")
     if not isinstance(new_issue_lease, bool):
         raise GateContractError("new issue lease admission is missing or is not boolean")
+    closure_signal = receipt.get("signals", {}).get("closureHealth")
+    closure_admission = receipt.get("closureAdmission")
+    if not isinstance(closure_signal, dict):
+        raise GateContractError("closure health signal is missing")
+    if closure_signal.get("schema") != CLOSURE_HEALTH_SCHEMA:
+        raise GateContractError("closure health signal schema is invalid")
+    if closure_signal.get("authority") != CLOSURE_HEALTH_AUTHORITY:
+        raise GateContractError("closure health authority is not Summer")
+    closure_status = closure_signal.get("status")
+    if closure_status not in {"healthy", "grace", "red"}:
+        raise GateContractError("closure health status is invalid")
+    closure_signal_allowed = closure_signal.get("newIssueIntakeAllowed")
+    if not isinstance(closure_signal_allowed, bool):
+        raise GateContractError("closure health intake signal must be boolean")
+    if closure_signal_allowed is not (closure_status == "healthy"):
+        raise GateContractError("closure health status contradicts intake signal")
+    if closure_signal.get("promotionContinues") is not True:
+        raise GateContractError("closure health signal must preserve promotion")
+    if closure_signal.get("remediationContinues") is not True:
+        raise GateContractError("closure health signal must preserve remediation")
+    closure_reasons = closure_signal.get("reasons")
+    if not isinstance(closure_reasons, list) or not all(
+        isinstance(reason, str) for reason in closure_reasons
+    ):
+        raise GateContractError("closure health reasons are malformed")
+    if not isinstance(closure_admission, dict):
+        raise GateContractError("closure admission is missing")
+    closure_allowed = closure_admission.get("newIssueIntakeAllowed")
+    if not isinstance(closure_allowed, bool):
+        raise GateContractError("closure intake admission must be boolean")
+    if closure_admission.get("authority") != CLOSURE_HEALTH_AUTHORITY:
+        raise GateContractError("closure admission authority is not Summer")
+    if closure_admission.get("promotionContinues") is not True:
+        raise GateContractError("closure stop-line must preserve promotion")
+    if closure_admission.get("remediationContinues") is not True:
+        raise GateContractError("closure stop-line must preserve remediation")
+    for field in (
+        "allowed",
+        "newImplementationAllowed",
+        "fallbackPrGenerationAllowed",
+    ):
+        if closure_admission.get(field) is not closure_allowed:
+            raise GateContractError(f"closure admission {field} contradicts intake")
+    if closure_allowed is not closure_signal_allowed:
+        raise GateContractError("closure signal and admission disagree")
+    if new_issue_lease and not closure_allowed:
+        raise GateContractError("new issue lease bypasses Summer closure admission")
     if promotion_allowed and not review_allowed:
         raise GateContractError("promotion admission bypasses independent review")
     if direct_gem_allowed:
@@ -149,11 +198,57 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
     push_allowed = remediation.get("pushAllowed")
     if not isinstance(push_allowed, bool):
         raise GateContractError("remediation push admission is missing or is not boolean")
-    if push_allowed != (state != "RED"):
-        raise GateContractError("remote remediation must fail closed only on RED")
+    concurrency = receipt.get("concurrency") or {}
+    if not isinstance(concurrency, dict):
+        raise GateContractError("concurrency admission is malformed")
+    gem_concurrency = concurrency.get("gem") or {}
+    if not isinstance(gem_concurrency, dict):
+        raise GateContractError("Gem concurrency admission is malformed")
+    capacity_accepted = gem_concurrency.get("evidenceAccepted")
+    new_mutation_allowed = gem_concurrency.get("newMutationAllowed")
+    if not isinstance(capacity_accepted, bool):
+        raise GateContractError("capacity evidence acceptance is missing or is not boolean")
+    if not isinstance(new_mutation_allowed, bool):
+        raise GateContractError("new mutation admission is missing or is not boolean")
+    if new_mutation_allowed is not capacity_accepted:
+        raise GateContractError("new mutation admission bypasses capacity evidence")
+    capacity_signal = receipt.get("signals", {}).get("concurrencyEvidence") or {}
+    signal_accepted = capacity_signal.get("accepted") if isinstance(capacity_signal, dict) else None
+    if not isinstance(signal_accepted, bool):
+        raise GateContractError("capacity evidence signal acceptance is not boolean")
+    if signal_accepted is not capacity_accepted:
+        raise GateContractError("capacity evidence signal and admission disagree")
+    if push_allowed != (state != "RED" and capacity_accepted):
+        raise GateContractError(
+            "remote remediation must require non-RED state and accepted capacity"
+        )
+    remote_update_listed = "expected-head-pr-update" in remediation.get("activities", [])
+    if remote_update_listed is not push_allowed:
+        raise GateContractError("remote remediation activity contradicts push admission")
     maximum = remediation.get("maxConcurrent")
-    if isinstance(maximum, bool) or not isinstance(maximum, int) or maximum < 1:
-        raise GateContractError("remediation concurrency must be a positive integer")
+    if isinstance(maximum, bool) or not isinstance(maximum, int) or maximum < 0:
+        raise GateContractError("remediation concurrency must be a non-negative integer")
+    if not capacity_accepted:
+        if maximum != 0:
+            raise GateContractError("stale capacity must block remote remediation concurrency")
+        if gem_concurrency.get("maxConcurrent") != 0:
+            raise GateContractError("stale capacity must block new mutation concurrency")
+        if gem_concurrency.get("runtimeFloor") != 1:
+            raise GateContractError("stale capacity must bound local runtime repair to one")
+        if new_issue_lease:
+            raise GateContractError("stale capacity must block new issue leases")
+        if receipt.get("workAdmission", {}).get("newImplementationAllowed") is not False:
+            raise GateContractError("stale capacity must block new implementation intake")
+        if "approved-issue-lease" in receipt.get("workAdmission", {}).get("activities", []):
+            raise GateContractError("stale capacity must not advertise new issue leases")
+    else:
+        if maximum < 1:
+            raise GateContractError("accepted capacity must provide remediation concurrency")
+        gem_maximum = gem_concurrency.get("maxConcurrent")
+        if isinstance(gem_maximum, bool) or not isinstance(gem_maximum, int) or gem_maximum < 1:
+            raise GateContractError("accepted capacity must provide positive concurrency")
+        if maximum > gem_maximum:
+            raise GateContractError("remediation concurrency exceeds accepted capacity")
     if remediation.get("authority") != "single-pr-writer-exact-head":
         raise GateContractError("remediation authority must require one exact-head writer")
     reasons = receipt.get("reasons")

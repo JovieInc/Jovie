@@ -168,7 +168,7 @@ describe('merge_group workflow contract', () => {
     expect(CI_WORKFLOW).toContain('--base "$MERGE_GROUP_BASE_SHA"');
     expect(CI_WORKFLOW).toContain('--head "$MERGE_GROUP_HEAD_SHA"');
     expect(PATH_DIFF_HELPER).toContain(
-      "['diff', '--name-only', `${baseSha}...${headSha}`]"
+      "['diff', '--no-renames', '--name-only', `${baseSha}...${headSha}`]"
     );
     expect(CI_WORKFLOW).not.toContain('withgraphite/graphite-ci-action');
     expect(CI_WORKFLOW).not.toContain('steps.graphite');
@@ -250,6 +250,8 @@ describe('merge_group workflow contract', () => {
       'ci-unit-tests',
       'ci-build-layout',
       'ci-ios',
+      'ci-macos',
+      'ci-cross-product-integration',
       'ci-promptfoo-evals',
       'ci-golden-eval-set',
     ]) {
@@ -278,12 +280,12 @@ describe('merge_group workflow contract', () => {
     expect(ciFast).toContain('exit 1');
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     expect(units).not.toContain('ci-unit-runner-route');
-    expect(units).toContain(
-      "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+    expect(units).toMatch(
+      /github\.event_name == 'push' &&\s+github\.ref == 'refs\/heads\/main'/
     );
     const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
-    expect(buildLayout).toContain(
-      "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+    expect(buildLayout).toMatch(
+      /github\.event_name == 'push' &&\s+github\.ref == 'refs\/heads\/main'/
     );
 
     for (const jobId of [
@@ -313,6 +315,9 @@ describe('merge_group workflow contract', () => {
     expect(aggregate).toContain('ci-unit-tests');
     expect(aggregate).toContain('ci-build-layout');
     expect(aggregate).toContain('ci-ios');
+    expect(aggregate).toContain('ci-macos');
+    expect(aggregate).toContain('ci-cross-product-integration');
+    expect(aggregate).toContain('ci-product-lane-receipt');
     expect(aggregate).toContain('ci-promptfoo-evals');
     expect(aggregate).toContain('ci-golden-eval-set');
     expect(aggregate).toContain('ci-golden-path-lock');
@@ -321,7 +326,7 @@ describe('merge_group workflow contract', () => {
     expect(aggregate).toContain('RUN_PROMPTFOO');
     expect(aggregate).toContain('RUN_GOLDEN_EVAL');
     expect(aggregate).toContain(
-      'Unit Test shards did not pass on the non-empty merge-group combined head'
+      '$name did not pass for its selected product lane'
     );
     expect(aggregate).not.toContain(
       'RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"'
@@ -336,10 +341,17 @@ describe('merge_group workflow contract', () => {
     expect(unitTests).not.toContain(
       "needs.ci-path-changes.outputs.run_test == 'true'"
     );
+    expect(unitTests).toContain(
+      "needs.ci-path-changes.outputs.run_web == 'true'"
+    );
+    // JOV-5288 repo lanes skip Jovie app suites in ci-fast; Web unit shards
+    // stay on the product-lane `run_web` gate so iOS/Mac-only diffs do not
+    // wait on Web units.
+    expect(unitTests).not.toContain('run_jovie_product');
     expect(unitTests).toContain('run: echo "run_full_ci=true"');
     expect(unitTests).toContain("github.event_name == 'merge_group'");
-    expect(unitTests).toContain(
-      "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+    expect(unitTests).toMatch(
+      /github\.event_name == 'push' &&\s+github\.ref == 'refs\/heads\/main'/
     );
     expect(unitTests).toContain("github.event_name == 'workflow_dispatch'");
     expect(unitTests).not.toContain("github.event_name == 'pull_request'");
@@ -357,6 +369,8 @@ describe('merge_group workflow contract', () => {
       'ci-unit-tests',
       'ci-build-layout',
       'ci-ios',
+      'ci-macos',
+      'ci-cross-product-integration',
       'ci-promptfoo-evals',
       'ci-golden-eval-set',
     ]) {
@@ -376,6 +390,22 @@ describe('merge_group workflow contract', () => {
     expect(unitTests).toContain(
       "shard: ['1/10', '2/10', '3/10', '4/10', '5/10', '6/10', '7/10', '8/10', '9/10', '10/10']"
     );
+
+    const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
+    expect(macos).toContain('runs-on: macos-26');
+    expect(CI_WORKFLOW).toContain(
+      'node scripts/lib/product-lane-classifier.mjs'
+    );
+    expect(CI_WORKFLOW).not.toContain('.github/workflows/macos-ci.yml');
+    expect(macos).toContain("github.event_name == 'merge_group'");
+    expect(macos).not.toContain("github.event_name == 'pull_request'");
+    expect(macos).toContain(
+      'swift test --package-path apps/macos/MenuMonitor --enable-code-coverage'
+    );
+    expect(macos).toContain(
+      'swift build --package-path apps/macos/MenuMonitor -c release'
+    );
+    expect(macos).toContain('pnpm --filter @jovie/desktop run package:staging');
     expect(unitTests).toContain(
       "github.event_name == 'merge_group' && matrix.shard == '4/10'"
     );
@@ -445,7 +475,7 @@ describe('merge_group workflow contract', () => {
     expect(pathChanges).toContain('--base "$MERGE_GROUP_BASE_SHA"');
     expect(pathChanges).toContain('--head "$MERGE_GROUP_HEAD_SHA"');
     expect(PATH_DIFF_HELPER).toContain(
-      "['diff', '--name-only', `${baseSha}...${headSha}`]"
+      "['diff', '--no-renames', '--name-only', `${baseSha}...${headSha}`]"
     );
     expect(PATH_DIFF_HELPER).toContain(LIVE_MAIN_FETCH_REF);
     expect(PATH_DIFF_HELPER).not.toContain('github.event.before');
@@ -453,6 +483,18 @@ describe('merge_group workflow contract', () => {
     expect(pathChanges).toContain('IS_NOOP');
     expect(pathChanges).toContain(
       "is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}"
+    );
+    expect(pathChanges).toContain(
+      "run_jovie_product: ${{ steps.detect.outputs.run_jovie_product || 'false' }}"
+    );
+    expect(pathChanges).toContain(
+      "run_symphony_control: ${{ steps.detect.outputs.run_symphony_control || 'false' }}"
+    );
+    expect(pathChanges).toContain(
+      "run_summer_ops: ${{ steps.detect.outputs.run_summer_ops || 'false' }}"
+    );
+    expect(pathChanges).toContain(
+      'node scripts/lib/ci-repo-lanes.mjs --emit-github-output'
     );
     expect(pathChanges).toContain(
       'echo "is_noop_merge_group=true" >> "$GITHUB_OUTPUT"'
@@ -527,33 +569,46 @@ describe('merge_group workflow contract', () => {
     );
   });
 
-  it('short-circuits only expensive lanes for a typed empty-diff merge group', () => {
+  it('selects product lanes independently and fails closed on selected lane results', () => {
     const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
+    const ios = getJobBlock(CI_WORKFLOW, 'ci-ios');
+    const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
+    const crossProduct = getJobBlock(
+      CI_WORKFLOW,
+      'ci-cross-product-integration'
+    );
     const aggregate = getJobBlock(CI_WORKFLOW, 'ci-merge-group-ready');
 
     expect(pathChanges).toContain(
       "is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}"
     );
-    for (const [name, job] of [
-      ['ci-unit-tests', units],
-      ['ci-build-layout', buildLayout],
-    ]) {
-      expect(job, name).toContain(
-        "needs.ci-path-changes.outputs.is_noop_merge_group != 'true'"
-      );
-      expect(job, name).toContain("github.event_name == 'merge_group'");
-    }
-
+    expect(pathChanges).toContain('product-lane-classifier.mjs');
+    expect(pathChanges).toContain(
+      "run_web: ${{ steps.detect.outputs.run_web || 'false' }}"
+    );
+    expect(pathChanges).toContain(
+      "run_macos: ${{ steps.detect.outputs.run_macos || 'false' }}"
+    );
+    expect(pathChanges).toContain(
+      "run_cross_product: ${{ steps.detect.outputs.run_cross_product || 'false' }}"
+    );
+    expect(units).toContain("outputs.run_web == 'true'");
+    expect(buildLayout).toContain("outputs.run_web == 'true'");
+    expect(ios).toContain("outputs.run_ios == 'true'");
+    expect(macos).toContain("outputs.run_macos == 'true'");
+    expect(crossProduct).toContain("outputs.run_cross_product == 'true'");
+    expect(getJobBlock(CI_WORKFLOW, 'ci-fast-remaining')).toContain(
+      'CI_PRODUCT_LANES: ${{ needs.ci-path-changes.outputs.selected_lanes }}'
+    );
     expect(aggregate).toContain(
       'NOOP_GROUP="${{ needs.ci-path-changes.outputs.is_noop_merge_group }}"'
     );
+    expect(aggregate).toContain('SELECTED_LANES=');
+    expect(aggregate).toContain('Shared-contract impact');
     expect(aggregate).toContain(
-      'Typed no-op merge group must skip Unit Tests and Build + Layout'
-    );
-    expect(aggregate).toContain(
-      'Build + Layout did not pass on the non-empty merge-group combined head'
+      'Cross-Product Integration:$RUN_CROSS_PRODUCT:$CROSS_PRODUCT_RESULT'
     );
 
     for (const jobId of [
@@ -565,89 +620,112 @@ describe('merge_group workflow contract', () => {
       'drizzle-migration-guard',
     ]) {
       expect(getJobBlock(CI_WORKFLOW, jobId), jobId).not.toContain(
-        "needs.ci-path-changes.outputs.is_noop_merge_group != 'true'"
+        "needs.ci-path-changes.outputs.run_web == 'true'"
       );
     }
 
-    const heavyGateStart = aggregate.indexOf(
-      '          if [[ "$NOOP_GROUP" == "true" ]]; then'
+    const loopStart = aggregate.indexOf(
+      '          for selected_gate in \\\n            "Web Unit Tests:'
     );
-    const heavyGateEnd = aggregate.indexOf(
-      '          if [[ "$RUN_IOS" == "true"',
-      heavyGateStart
-    );
-    expect(heavyGateStart).toBeGreaterThanOrEqual(0);
-    expect(heavyGateEnd).toBeGreaterThan(heavyGateStart);
-    const heavyGateScript = aggregate
-      .slice(heavyGateStart, heavyGateEnd)
+    const loopEnd = aggregate.indexOf('          done', loopStart);
+    expect(loopStart).toBeGreaterThanOrEqual(0);
+    expect(loopEnd).toBeGreaterThan(loopStart);
+    const selectedGateScript = aggregate
+      .slice(loopStart, loopEnd + '          done'.length)
       .replace(/^ {10}/gm, '');
 
-    for (const testCase of [
-      {
-        name: 'typed no-op accepts both heavy lanes skipped',
-        noop: 'true',
-        unit: 'skipped',
-        build: 'skipped',
-        status: 0,
-      },
-      {
-        name: 'typed no-op rejects a unit success placeholder',
-        noop: 'true',
-        unit: 'success',
-        build: 'skipped',
-        status: 1,
-      },
-      {
-        name: 'typed no-op rejects a build success placeholder',
-        noop: 'true',
-        unit: 'skipped',
-        build: 'success',
-        status: 1,
-      },
-      {
-        name: 'non-empty group accepts both heavy lanes green',
-        noop: 'false',
-        unit: 'success',
-        build: 'success',
-        status: 0,
-      },
-      {
-        name: 'unset output fails closed as a non-empty group',
-        noop: '',
-        unit: 'skipped',
-        build: 'skipped',
-        status: 1,
-      },
-      {
-        name: 'malformed output fails closed as a non-empty group',
-        noop: 'TRUE',
-        unit: 'skipped',
-        build: 'skipped',
-        status: 1,
-      },
-    ]) {
+    const cases = `unselected Web accepts skipped jobs|false|skipped|skipped|false|skipped|0
+unselected Web rejects unit execution|false|success|skipped|false|skipped|1
+unselected Web rejects build execution|false|skipped|success|false|skipped|1
+healthy Web passes with iOS skipped|true|success|success|false|skipped|0
+selected Web rejects skipped jobs|true|skipped|skipped|false|skipped|1
+deliberate-red iOS fails with Web skipped|false|skipped|skipped|true|failure|1`;
+    for (const testCase of cases.split('\n')) {
+      const [name, web, unit, build, runIos, iosResult, status] =
+        testCase.split('|');
       const result = spawnSync(
         'bash',
         [
           '-euo',
           'pipefail',
           '-c',
-          `NOOP_GROUP="$1"
+          `RUN_WEB="$1"
 UNIT_RESULT="$2"
 BUILD_LAYOUT_RESULT="$3"
-${heavyGateScript}`,
-          'merge-group-heavy-gate',
-          testCase.noop,
-          testCase.unit,
-          testCase.build,
+RUN_IOS="$4"
+IOS_RESULT="$5"
+RUN_MACOS=false
+MACOS_RESULT=skipped
+RUN_CROSS_PRODUCT=false
+CROSS_PRODUCT_RESULT=skipped
+${selectedGateScript}`,
+          'product-lane-gate',
+          web,
+          unit,
+          build,
+          runIos,
+          iosResult,
         ],
         { encoding: 'utf8' }
       );
       expect(
         result.status,
-        `${testCase.name}\nstdout: ${result.stdout}\nstderr: ${result.stderr}`
-      ).toBe(testCase.status);
+        `${name}\nstdout: ${result.stdout}\nstderr: ${result.stderr}`
+      ).toBe(Number(status));
     }
+  });
+
+  it('builds the exact product-lane receipt with a valid immutable run URL', () => {
+    const receipt = getJobBlock(CI_WORKFLOW, 'ci-product-lane-receipt');
+    expect(receipt).toContain(
+      '--arg run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"'
+    );
+    const queryLine = receipt
+      .split('\n')
+      .find(line => line.includes("'{lanes:"));
+    expect(queryLine).toBeDefined();
+    const query = queryLine.trim().replace(/^'/, '').replace(/' \\$/, '');
+    const runUrl = 'https://github.com/JovieInc/Jovie/actions/runs/33198607319';
+    const result = spawnSync(
+      'jq',
+      [
+        '-n',
+        '--argjson',
+        'ios',
+        '["skipped","skipped"]',
+        '--argjson',
+        'mac',
+        '["skipped","skipped"]',
+        '--argjson',
+        'web',
+        '["success","success","success"]',
+        '--argjson',
+        'operations',
+        '["skipped"]',
+        '--argjson',
+        'cross',
+        '["skipped"]',
+        '--arg',
+        'receipt',
+        'product-lane-final-exact-head-1',
+        '--arg',
+        'run',
+        runUrl,
+        query,
+      ],
+      { encoding: 'utf8' }
+    );
+    expect(
+      result.status,
+      `stdout: ${result.stdout}\nstderr: ${result.stderr}`
+    ).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      receiptArtifact: 'product-lane-final-exact-head-1',
+      run: runUrl,
+      lanes: {
+        web: ['success', 'success', 'success'],
+      },
+    });
   });
 
   it('starts Build+Layout combined-head server with pinned loopback HOSTNAME (JOV-4446)', () => {
@@ -1021,6 +1099,7 @@ ${heavyGateScript}`,
       'ci-fast',
       'ci-build-layout',
       'ci-ios',
+      'ci-macos',
       'ci-promptfoo-evals',
       'ci-golden-eval-set',
       'ci-secret-scan',

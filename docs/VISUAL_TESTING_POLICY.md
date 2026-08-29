@@ -42,11 +42,16 @@ source lacks:
 4. **Hygiene** — `pnpm storybook:quality` (no pure-black voids, no fake CTAs).
 5. **Ratchet** — multi-root floors in `scripts/story-coverage-baseline.json`
    may only improve; new uncovered components fail even if percent holds.
+6. **Rendered certification (JOV-5400)** — source-blind fail-closed evaluator
+   for applicable design, copy, accessibility, interaction, layout-stability,
+   theme, semantic-variant, tokenized-padding, and concentric-radius invariants.
+   Deliberate-red fixtures must block; the current design-system landing batch
+   emits exact-head pass/block receipts.
 
 ### Commands
 
 ```bash
-pnpm component-ship-gate          # diff + match + quality + ratchet
+pnpm component-ship-gate          # diff + match + quality + ratchet + rendered cert
 pnpm story-coverage:check         # multi-root ratchet only
 pnpm story-coverage:update        # explicit floor raise (never silent)
 pnpm storybook:quality            # story hygiene only

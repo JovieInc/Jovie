@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 import { pathToFileURL } from 'node:url';
-import { parseRollingCiState, runDispatch } from './rolling-ci-dispatch.mjs';
+import {
+  parseRollingCiState,
+  rollingCiStateMarker,
+  runDispatch,
+} from './rolling-ci-dispatch.mjs';
 import {
   FX_ADAPTER_NAME,
   FX_HANDOFF_FAILURE,
@@ -10,7 +14,31 @@ import {
   resolveRemediationRoute,
 } from './rolling-ci-handoff.mjs';
 
-export const CURSOR_AGENTS_URL = 'https://api.cursor.com/v0/agents';
+export const CURSOR_AGENTS_URL = 'https://api.cursor.com/v1/agents';
+export const FX_EXECUTION_RECEIPT_SCHEMA = 'jovie-fx-execution-receipt/v1';
+export const FX_NAMED_OUTCOMES = Object.freeze([
+  'launched',
+  'repaired',
+  'skipped_stale',
+  'writer_missing',
+  'no_key',
+  'blocked_executor',
+  'needs_human',
+]);
+export const RUNNER_FAILURE_CLASSES = Object.freeze([
+  'checkout',
+  'infra',
+  'flake',
+]);
+export const FX_RUNNER_IDEMPOTENCY_KEY = 'jov-fx-ci-runners-20260822';
+
+const CHECKOUT_FAILURE_RE = /checkout/i;
+const INFRA_FAILURE_RE =
+  /startup_failure|timed_out|heartbeat|hosted runner|lost communication|set up job|initialize containers|\brunner\b/i;
+const FLAKE_FAILURE_RE =
+  /flake|eagain|etimedout|rate.?limit|\b50[23]\b|spurious/i;
+const PRODUCT_FAILURE_RE =
+  /typecheck|unit tests|knip|eval|brand safety|overflow|layout|\blint\b|promptfoo/i;
 
 export function cursorAuthHeader(apiKey) {
   return `Basic ${Buffer.from(`${apiKey}:`, 'utf8').toString('base64')}`;
@@ -27,6 +55,106 @@ export function findOwnedAgents(agents, fingerprint) {
     )
     .map(agent => agent?.id)
     .filter(id => typeof id === 'string' && id.length > 0);
+}
+
+const CURSOR_ERROR_BODY_LIMIT = 512;
+const SENSITIVE_KEY_RE =
+  /api[-_]?key|authorization|cookie|password|secret|token/i;
+
+function sanitizeCursorDiagnostic(value) {
+  const serialized =
+    typeof value === 'string'
+      ? value
+      : JSON.stringify(value, (key, nestedValue) =>
+          SENSITIVE_KEY_RE.test(key) ? '[REDACTED]' : nestedValue
+        );
+  return String(serialized ?? '')
+    .replace(/\b(Bearer|Basic)\s+[A-Za-z0-9+/=._-]+/gi, '$1 [REDACTED]')
+    .slice(0, CURSOR_ERROR_BODY_LIMIT);
+}
+
+async function readCursorResponse(response) {
+  if (typeof response.text === 'function') {
+    const raw = await response.text();
+    try {
+      return { body: JSON.parse(raw), raw };
+    } catch {
+      return { body: {}, raw };
+    }
+  }
+  const body = await response.json().catch(() => ({}));
+  return { body, raw: JSON.stringify(body) };
+}
+
+function cursorApiError(operation, response, body, raw) {
+  const details =
+    body?.error && typeof body.error === 'object' ? body.error : body;
+  const code = sanitizeCursorDiagnostic(details?.code ?? 'unknown');
+  const message = sanitizeCursorDiagnostic(details?.message ?? 'unknown');
+  const diagnosticBody = sanitizeCursorDiagnostic(
+    body && Object.keys(body).length > 0 ? body : raw
+  );
+  return new Error(
+    `cursor ${operation} failed: ${response.status}; code=${code}; message=${message}; body=${diagnosticBody}`
+  );
+}
+
+function blockedExecutorIncident() {
+  return {
+    type: 'fx_safe_executor_unavailable',
+    failure: 'fx-safe-executor-unavailable',
+    owner: 'CI Platform',
+    remedy:
+      'provide a GitHub-runner-local executor that returns an exact-head terminal result without pushing, opening a PR, or mutating the queue',
+  };
+}
+
+function blockedExecutorReceipt({
+  repository,
+  prNumber,
+  headSha,
+  fingerprint,
+}) {
+  return {
+    schema: FX_EXECUTION_RECEIPT_SCHEMA,
+    status: 'blocked',
+    terminal: true,
+    outcome: 'executor_unavailable',
+    executor: 'cursor-cloud',
+    repository,
+    prNumber,
+    headSha,
+    fingerprint,
+    agentId: null,
+    runId: null,
+    result: 'remote_mutation_not_authorized',
+    remoteMutationAllowed: false,
+  };
+}
+
+function terminalizeDispatch(dispatch, receipt) {
+  const next = structuredClone(dispatch);
+  const fingerprint = receipt.fingerprint;
+  const failure = next.state?.failures?.[fingerprint];
+  if (failure) {
+    failure.terminalReceipt = receipt;
+  }
+  if (next.state?.claim?.fingerprint === fingerprint) {
+    next.state.claim.status = 'terminal';
+    next.state.claim.reason = receipt.result;
+  }
+  next.action = 'terminal_configuration_incident';
+  const withoutMarker = String(next.body ?? '')
+    .replace(/<!-- jovie-rolling-ci-state:[A-Za-z0-9+/=_-]+ -->/g, '')
+    .replace(
+      /The one-writer lease is pinned to this exact head\.[\s\S]*?before changing code\./,
+      'The repair claim is terminal for this exact head and fingerprint. A new commit or green rerun supersedes it.'
+    )
+    .trim();
+  next.body = `${withoutMarker}\n\n## FX execution terminal\n\n- Status: blocked\n- Reason: \`${receipt.result}\`\n- Owner: CI Platform\n- Next action: install a GitHub-runner-local executor; Cursor Cloud cannot repair repository code without pushing a branch.\n\n<!-- jovie-fx-execution-receipt:${Buffer.from(
+    JSON.stringify(receipt)
+  ).toString('base64url')} -->\n${rollingCiStateMarker(next.state)}`;
+  return next;
 }
 
 /**
@@ -76,10 +204,78 @@ function sourcePrWriter(value) {
   return String(value ?? '').trim();
 }
 
+function failureLabels(failedJobs = []) {
+  const labels = [];
+  for (const job of failedJobs) {
+    labels.push(String(job?.name ?? ''), String(job?.conclusion ?? ''));
+    for (const step of job?.steps ?? []) {
+      labels.push(String(step?.name ?? step));
+    }
+  }
+  return labels.filter(Boolean);
+}
+
+function failedJobsFrom(input = {}) {
+  if (Array.isArray(input.failedJobs) && input.failedJobs.length > 0) {
+    return input.failedJobs;
+  }
+  return (input.dispatch?.events ?? []).map(event => ({
+    name: event.check,
+    steps: event.failedSteps ?? [],
+    conclusion: event.conclusion,
+  }));
+}
+
+/**
+ * Runner-class CI failures are checkout, infra, or flake — not product
+ * assertions. Mixed product steps stay on the implementer path.
+ *
+ * @param {unknown} failedJobs
+ * @returns {'checkout' | 'infra' | 'flake' | null}
+ */
+export function classifyRunnerFailure(failedJobs = []) {
+  const jobs = Array.isArray(failedJobs) ? failedJobs : [];
+  const labels = failureLabels(jobs);
+  if (labels.some(label => PRODUCT_FAILURE_RE.test(label))) return null;
+  if (labels.some(label => CHECKOUT_FAILURE_RE.test(label))) return 'checkout';
+  if (labels.some(label => FLAKE_FAILURE_RE.test(label))) return 'flake';
+  if (labels.some(label => INFRA_FAILURE_RE.test(label))) return 'infra';
+  if (
+    jobs.some(
+      job =>
+        job?.conclusion === 'startup_failure' || job?.conclusion === 'timed_out'
+    )
+  ) {
+    return 'infra';
+  }
+  return null;
+}
+
+/** @param {Record<string, any>} [input] */
+export function resolveFxNamedOutcome(input = {}) {
+  const action = input.launch?.action;
+  const reason = String(input.launch?.reason ?? '');
+  const dispatchAction = String(input.dispatch?.action ?? '');
+  if (action === 'launch' || action === 'dedup') return 'launched';
+  if (action === 'configuration_incident' || reason === 'fx-auth-missing') {
+    if (reason === 'fx-safe-executor-unavailable') return 'blocked_executor';
+    return 'no_key';
+  }
+  if (action === 'writer_missing') return 'writer_missing';
+  if (
+    (action === 'skip' && /stale/.test(reason)) ||
+    /stale/.test(dispatchAction)
+  ) {
+    return 'skipped_stale';
+  }
+  if (dispatchAction === 'supersede_repairs_green') return 'repaired';
+  return 'needs_human';
+}
+
 /**
  * Webhook writer for `runDispatch`. merge_group LIVE_AUTHOR can be blank
  * (`gh api pulls/$PR .user.login`). Prefer the source PR author; if still
- * blank on an FX-owned route (`fx` or `configuration_incident`), use the
+ * blank, including a live implementer lease with an empty owner, use the
  * adapter name so planning reaches `launch_action` instead of throwing
  * `writer is required`.
  *
@@ -89,7 +285,7 @@ export function resolveDispatchWriter(input = {}) {
   const { route, priorClaimWriter, implementer } = input;
   const sourceWriter = sourcePrWriter(implementer);
   if (route?.route === 'implementer') {
-    return sourcePrWriter(route.writer) || sourceWriter;
+    return sourcePrWriter(route.writer) || sourceWriter || FX_ADAPTER_NAME;
   }
   if (route?.route === 'fx') {
     const prior = sourcePrWriter(priorClaimWriter);
@@ -111,12 +307,16 @@ export function buildFxPrompt(input = {}) {
     fingerprint,
     failedChecks = [],
     producerEvent,
+    runnerClass = null,
   } = input;
   const mergeGroup = producerEvent === 'merge_group';
   return [
     mergeGroup
       ? 'Repair the source pull request after a native merge_group CI failure. Do not open a sibling PR.'
       : 'Repair the current pull request at the exact failed head. Do not open a sibling PR.',
+    runnerClass
+      ? `Runner-class failure (${runnerClass}): checkout, infra, or flake. Remediate the runner/CI wiring at the exact head. Do not change product tests or weaken gates. Idempotency: ${FX_RUNNER_IDEMPOTENCY_KEY}.`
+      : '',
     `Repository: ${repository}`,
     `PR: #${prNumber}`,
     mergeGroup
@@ -142,18 +342,33 @@ export function planFxLaunch(input = {}) {
     prNumber,
     headSha,
     sourceHead,
-    headRef,
     fingerprint,
     failedChecks = [],
     cursorAgents = [],
     cursorApiKey,
+    remoteMutationAllowed = false,
     producerEvent,
+    runnerClass = null,
   } = input;
   if (typeof cursorApiKey !== 'string' || cursorApiKey.trim().length === 0) {
     return {
       action: 'configuration_incident',
       reason: 'fx-auth-missing',
       incident: fxConfigurationIncident(),
+    };
+  }
+  if (remoteMutationAllowed !== true) {
+    const receipt = blockedExecutorReceipt({
+      repository,
+      prNumber,
+      headSha,
+      fingerprint,
+    });
+    return {
+      action: 'configuration_incident',
+      reason: 'fx-safe-executor-unavailable',
+      incident: blockedExecutorIncident(),
+      receipt,
     };
   }
   const owned = findOwnedAgents(cursorAgents, fingerprint);
@@ -177,22 +392,26 @@ export function planFxLaunch(input = {}) {
           fingerprint,
           failedChecks,
           producerEvent,
+          runnerClass,
         }),
       },
-      source: {
-        repository: `https://github.com/${repository}`,
-        ref: headRef || `refs/pull/${prNumber}/head`,
-      },
-      target: {
-        autoCreatePr: false,
-        autoBranchOnConflict: false,
-        skipReviewerRequest: true,
-      },
+      name: `Jovie CI repair ${fingerprint}`.slice(0, 100),
+      repos: [
+        {
+          url: `https://github.com/${repository}`,
+          prUrl: `https://github.com/${repository}/pull/${prNumber}`,
+        },
+      ],
+      workOnCurrentBranch: true,
+      autoCreatePR: false,
     },
   };
 }
 
-/** @param {Record<string, any>} [input] */
+/**
+ * @param {Record<string, any>} [input]
+ * @returns {Record<string, any>}
+ */
 export function planFxWebhookRemediation(input = {}) {
   const {
     dispatch,
@@ -202,6 +421,7 @@ export function planFxWebhookRemediation(input = {}) {
     fxAdapter,
     cursorAgents = [],
     cursorApiKey = '',
+    remoteMutationAllowed = false,
     now,
     repository,
     prNumber,
@@ -209,6 +429,9 @@ export function planFxWebhookRemediation(input = {}) {
     sourceHead,
     headRef,
   } = input;
+  const runnerClass = classifyRunnerFailure(
+    failedJobsFrom({ ...input, dispatch })
+  );
   const route = resolveWebhookRemediationRoute({
     receipt,
     liveHead,
@@ -224,16 +447,37 @@ export function planFxWebhookRemediation(input = {}) {
     action === 'dispatch_implementer' ||
     action === 'dispatch_superseding_head' ||
     action === 'reject_competing_writer';
+  const allowRunnerClassFx = Boolean(runnerClass);
 
-  if (route.route === 'implementer') {
+  /**
+   * @param {Record<string, any>} result
+   * @returns {Record<string, any>}
+   */
+  const withOutcome = result => {
+    const terminalReceipt = result.launch?.receipt;
+    const finalizedDispatch = terminalReceipt
+      ? terminalizeDispatch(result.dispatch, terminalReceipt)
+      : result.dispatch;
     return {
+      ...result,
+      dispatch: finalizedDispatch,
+      runnerClass,
+      outcome: resolveFxNamedOutcome({
+        launch: result.launch,
+        dispatch: finalizedDispatch,
+      }),
+    };
+  };
+
+  if (route.route === 'implementer' && !allowRunnerClassFx) {
+    return withOutcome({
       dispatch,
       route,
       launch: { action: 'skip', reason: 'implementer_lease_live' },
-    };
+    });
   }
   if (route.route === 'configuration_incident') {
-    return {
+    return withOutcome({
       dispatch,
       route,
       launch: {
@@ -241,17 +485,17 @@ export function planFxWebhookRemediation(input = {}) {
         reason: 'fx-auth-missing',
         incident: route.incident,
       },
-    };
+    });
   }
-  if (route.route !== 'fx' || !isFailureDispatch) {
-    return {
+  if ((route.route !== 'fx' && !allowRunnerClassFx) || !isFailureDispatch) {
+    return withOutcome({
       dispatch,
       route,
       launch: { action: 'skip', reason: action || route.route },
-    };
+    });
   }
 
-  return {
+  return withOutcome({
     dispatch,
     route,
     launch: planFxLaunch({
@@ -268,8 +512,10 @@ export function planFxWebhookRemediation(input = {}) {
       failedChecks: (dispatch?.events ?? []).map(event => event.check),
       cursorAgents,
       cursorApiKey,
+      remoteMutationAllowed,
+      runnerClass,
     }),
-  };
+  });
 }
 
 /** @param {Record<string, any>} [input] */
@@ -281,13 +527,11 @@ export async function listCursorAgents(input = {}) {
       'Content-Type': 'application/json',
     },
   });
-  const body = /** @type {Record<string, any>} */ (
-    await response.json().catch(() => ({}))
-  );
+  const { body, raw } = await readCursorResponse(response);
   if (!response.ok) {
-    throw new Error(`cursor list failed: ${response.status}`);
+    throw cursorApiError('list', response, body, raw);
   }
-  return Array.isArray(body?.agents) ? body.agents : [];
+  return Array.isArray(body?.items) ? body.items : [];
 }
 
 /** @param {Record<string, any>} [input] */
@@ -301,9 +545,18 @@ export async function launchCursorAgent(input = {}) {
     },
     body: JSON.stringify(request),
   });
-  const body = await response.json().catch(() => ({}));
+  const { body, raw } = await readCursorResponse(response);
   if (!response.ok) {
-    throw new Error(`cursor launch failed: ${response.status}`);
+    throw cursorApiError('launch', response, body, raw);
+  }
+  if (
+    typeof body?.agent?.id !== 'string' ||
+    body.agent.id.length === 0 ||
+    typeof body?.run?.id !== 'string' ||
+    body.run.id.length === 0 ||
+    body.run.agentId !== body.agent.id
+  ) {
+    throw new Error('cursor launch returned no bound agent/run acceptance');
   }
   return body;
 }
@@ -325,6 +578,7 @@ async function main() {
     ? input.cursorAgents
     : [];
   if (
+    input.remoteMutationAllowed === true &&
     cursorApiKey &&
     cursorAgents.length === 0 &&
     input.listCursorAgents !== false
@@ -353,7 +607,25 @@ async function main() {
     priorClaimWriter,
     implementer: input.writer,
   });
-  const dispatch = runDispatch({ ...input, writer });
+  const runnerClass = classifyRunnerFailure(input.failedJobs);
+  let dispatch;
+  try {
+    dispatch = runDispatch({ ...input, writer });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message === 'writer is required') {
+      const result = {
+        route,
+        runnerClass,
+        dispatch: { action: 'writer_missing', mutate: false },
+        launch: { action: 'writer_missing', reason: 'writer is required' },
+        outcome: 'writer_missing',
+      };
+      process.stdout.write(`${JSON.stringify(result)}\n`);
+      return;
+    }
+    throw error;
+  }
   const result = planFxWebhookRemediation({
     dispatch,
     receipt,
@@ -362,12 +634,14 @@ async function main() {
     fxAdapter: input.fxAdapter,
     cursorAgents,
     cursorApiKey,
+    remoteMutationAllowed: input.remoteMutationAllowed === true,
     now: input.now,
     repository: input.repository,
     prNumber: input.prNumber,
     headSha: input.headSha,
     sourceHead: input.sourceHead,
     headRef: input.headRef,
+    failedJobs: input.failedJobs,
   });
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }

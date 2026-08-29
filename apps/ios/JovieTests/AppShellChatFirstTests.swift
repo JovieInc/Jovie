@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import Jovie
 
@@ -123,8 +124,19 @@ struct AppShellChatFirstTests {
 
   @Test func composerSendStaysDisabledForEmptyOrInFlightDrafts() {
     #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "", isSending: false) == false)
-    #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "Ask Jovie", isSending: true) == false)
-    #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "Ask Jovie", isSending: false))
+    #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "Let's get it", isSending: true) == false)
+    #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "Let's get it", isSending: false))
+  }
+
+  @Test func emptyChatHomeLocksGreetingAndDocksComposer() {
+    #expect(
+      MobileChatEmptyHomePolicy.greetingPlacement() == .centeredAboveDockedComposer
+    )
+    #expect(MobileChatEmptyHomePolicy.composerIsDockedToBottom())
+    #expect(MobileChatEmptyHomePolicy.showsBrandMark() == false)
+    #expect(MobileChatEmptyHomePolicy.showsFeatureIntroOnEmptyHome() == false)
+    #expect(ChatComposerCopy.emptyPlaceholder.isEmpty)
+    #expect(ChatComposerCopy.inputAccessibilityIdentifier == "chat-composer-input")
   }
 
   @Test func composerPlusDisablesWhileSending() {
@@ -134,9 +146,44 @@ struct AppShellChatFirstTests {
 
   @Test func composerGeometryReservesSendSlotWithoutGrowingTheBar() {
     #expect(ChatComposerMetrics.barHeight == 52)
-    #expect(ChatComposerMetrics.sendSlotSize == 36)
-    #expect(ChatComposerMetrics.plusButtonSize == 36)
+    #expect(ChatComposerMetrics.sendSlotSize == JovieActionButtonMetrics.height)
+    #expect(ChatComposerMetrics.plusButtonSize == JovieActionButtonMetrics.height)
+    #expect(JovieActionButtonMetrics.height == 32)
+    #expect(JovieActionButtonMetrics.radius == 999)
+    #expect(JovieActionButtonMetrics.labelWeight == 510)
+    #expect(JovieFont.actionLabelWeight == 510)
     #expect(ChatComposerMetrics.sendSlotSize <= ChatComposerMetrics.barHeight)
+  }
+
+  @Test func emptyChatGreetingRotatesLockedSetOnly() {
+    #expect(
+      ChatEmptyGreeting.lockedCopy == [
+        "Let's get it",
+        "Ready to start?",
+        "Ready when you are",
+      ]
+    )
+    #expect(ChatEmptyGreeting.lockedCopy.contains("What's next?") == false)
+    #expect(ChatEmptyGreeting.lockedCopy.contains("Ask Jovie") == false)
+    #expect(ChatComposerCopy.emptyPlaceholder.isEmpty)
+
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+    let dayZero = Date(timeIntervalSince1970: 0)
+    let greeting = ChatEmptyGreeting.current(at: dayZero, calendar: calendar)
+    #expect(ChatEmptyGreeting.isLocked(greeting))
+
+    let nextDay = Date(timeIntervalSince1970: 86_400)
+    let rotated = ChatEmptyGreeting.current(at: nextDay, calendar: calendar)
+    #expect(ChatEmptyGreeting.isLocked(rotated))
+    #expect(greeting != rotated)
+
+    #expect(JovieFont.emptyGreetingSize == 28)
+    #expect(JovieFont.emptyGreetingWeight == 620)
+    #expect(JovieFont.uiFontWeightRawValue(forCSSWeight: 510) > 0.23)
+    #expect(JovieFont.uiFontWeightRawValue(forCSSWeight: 510) < 0.3)
+    #expect(JovieFont.uiFontWeightRawValue(forCSSWeight: 620) > 0.3)
+    #expect(JovieFont.uiFontWeightRawValue(forCSSWeight: 620) < 0.4)
   }
 
   @Test func waitlistLaunchStaysOffTheAppShell() {

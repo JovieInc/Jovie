@@ -1,3 +1,4 @@
+import { CONTROL_PLANE_OPTIMIZATION_EXCEPTION } from '../../invariants/optimization-contract.mjs';
 import { buildAdmissionGateReceipt } from '../admission-gate.mjs';
 import {
   buildContextGateReceipt,
@@ -86,6 +87,7 @@ export function planEvidenceFor(overrides = {}) {
     acceptance: ['Receipts revalidate semantically before every lease'],
     test: ["node --test 'scripts/backlog-orchestrator/__tests__/*.test.mjs'"],
     rollback: 'Revert the gate commit and remove the receipt comments',
+    optimization: CONTROL_PLANE_OPTIMIZATION_EXCEPTION,
     ...overrides,
   };
 }

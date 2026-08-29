@@ -1,16 +1,15 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
-  type HomepageArtistProfileCards,
+  type HomepageArtistProfilePreviews,
   HomepageArtistProfiles,
 } from '@/components/homepage/HomepageArtistProfiles';
 import { HomepageMeetJovie } from '@/components/homepage/HomepageMeetJovie';
 
-const CARDS: HomepageArtistProfileCards = [
+const PREVIEWS: HomepageArtistProfilePreviews = [
   {
-    id: 'sell-out',
-    title: 'Sell Out',
-    body: 'Put your next show where fans can get tickets.',
+    id: 'tour',
+    label: 'Tour',
     image: {
       publicUrl: '/artist-streams.png',
       width: 660,
@@ -19,9 +18,8 @@ const CARDS: HomepageArtistProfileCards = [
     },
   },
   {
-    id: 'capture-fans',
-    title: 'Capture Fans',
-    body: 'Build a list you can use again.',
+    id: 'subscribe',
+    label: 'Subscribe',
     image: {
       publicUrl: '/artist-fans.png',
       width: 660,
@@ -30,9 +28,8 @@ const CARDS: HomepageArtistProfileCards = [
     },
   },
   {
-    id: 'get-paid',
-    title: 'Get Paid',
-    body: 'Make direct support feel native.',
+    id: 'pay',
+    label: 'Pay',
     image: {
       publicUrl: '/artist-pay.png',
       width: 660,
@@ -41,9 +38,8 @@ const CARDS: HomepageArtistProfileCards = [
     },
   },
   {
-    id: 'drop-music',
-    title: 'Drop Music',
-    body: 'Give fans one link for the release before it lands.',
+    id: 'presave',
+    label: 'Presave',
     image: {
       publicUrl: '/artist-presave.png',
       width: 660,
@@ -75,8 +71,8 @@ describe('HomepageMeetJovie', () => {
 });
 
 describe('HomepageArtistProfiles', () => {
-  it('moves all three profile outcomes into Artist Profiles', () => {
-    render(<HomepageArtistProfiles cards={CARDS} />);
+  it('renders the four registry product states without synthetic outcome copy', () => {
+    render(<HomepageArtistProfiles previews={PREVIEWS} />);
 
     expect(
       screen.getByRole('heading', { level: 2, name: 'Artist Profiles' })
@@ -85,28 +81,23 @@ describe('HomepageArtistProfiles', () => {
       'homepage-artist-profiles__intro'
     );
     expect(
-      screen.getByRole('list', { name: 'Jovie Artist Profile Outcomes' })
+      screen.getByRole('list', { name: 'Jovie Artist Profile Previews' })
     ).toBeInTheDocument();
     expect(screen.getAllByRole('listitem')).toHaveLength(4);
 
-    for (const title of [
-      'Sell Out',
-      'Capture Fans',
-      'Get Paid',
-      'Drop Music',
-    ]) {
-      expect(
-        screen.getByRole('heading', { level: 3, name: title })
-      ).toBeInTheDocument();
+    for (const label of ['Tour', 'Subscribe', 'Pay', 'Presave']) {
+      expect(screen.getByText(label)).toBeInTheDocument();
     }
 
-    for (const body of CARDS.map(card => card.body)) {
-      expect(screen.getByText(body)).toBeInTheDocument();
-    }
+    expect(screen.queryByRole('heading', { level: 3 })).toBeNull();
+    expect(screen.queryByText('Sell Out')).toBeNull();
+    expect(screen.queryByText('Capture Fans')).toBeNull();
+    expect(screen.queryByText('Get Paid')).toBeNull();
+    expect(screen.queryByText('Drop Music')).toBeNull();
   });
 
   it('preserves registry-backed image geometry with accessible carousel controls', () => {
-    render(<HomepageArtistProfiles cards={CARDS} />);
+    render(<HomepageArtistProfiles previews={PREVIEWS} />);
 
     expect(
       screen.getByRole('link', { name: 'Explore Artist Profiles' })
@@ -131,15 +122,18 @@ describe('HomepageArtistProfiles', () => {
     expect(next).toHaveAttribute('data-variant', 'ghost');
     expect(next).toHaveAttribute('data-size', 'icon');
 
-    for (const [index, card] of CARDS.entries()) {
+    for (const [index, preview] of PREVIEWS.entries()) {
       expect(images[index].getAttribute('src')).toContain(
-        encodeURIComponent(card.image.publicUrl)
+        encodeURIComponent(preview.image.publicUrl)
       );
-      expect(images[index]).toHaveAttribute('alt', card.image.alt);
-      expect(images[index]).toHaveAttribute('width', String(card.image.width));
+      expect(images[index]).toHaveAttribute('alt', preview.image.alt);
+      expect(images[index]).toHaveAttribute(
+        'width',
+        String(preview.image.width)
+      );
       expect(images[index]).toHaveAttribute(
         'height',
-        String(card.image.height)
+        String(preview.image.height)
       );
     }
   });

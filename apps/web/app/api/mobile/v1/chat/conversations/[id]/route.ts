@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { getMobileConversationDetail } from '@/lib/mobile/chat/conversations';
-import { requireMobileProfileSession } from '@/lib/mobile/session-auth';
+import {
+  isOvConversationTitle,
+  requireMobileWorkspaceSession,
+} from '@/lib/mobile/workspace';
 
 export const runtime = 'nodejs';
 
@@ -13,23 +16,19 @@ interface RouteParams {
 export async function GET(request: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
-    const auth = await requireMobileProfileSession(request);
-    if ('errorResponse' in auth) {
-      return auth.errorResponse;
+    const session = await requireMobileWorkspaceSession(request, 100);
+    if ('errorResponse' in session) {
+      return session.errorResponse;
     }
 
-    const url = new URL(request.url);
-    const limitParam = url.searchParams.get('limit');
-    const parsed = limitParam ? Number.parseInt(limitParam, 10) : 100;
-    const limit = Number.isFinite(parsed) ? parsed : 100;
-    const before = url.searchParams.get('before');
+    const before = session.url.searchParams.get('before');
 
     let detail;
     try {
       detail = await getMobileConversationDetail({
         conversationId: id,
-        creatorProfileId: auth.profile.id,
-        limit,
+        creatorProfileId: session.profile.id,
+        limit: session.limit,
         before,
       });
     } catch (error) {
@@ -46,6 +45,14 @@ export async function GET(request: Request, { params }: RouteParams) {
     }
 
     if (!detail) {
+      return NextResponse.json(
+        { error: 'Conversation not found' },
+        { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const isOv = isOvConversationTitle(detail.conversation.title);
+    if (session.workspace === 'ov' ? !isOv : isOv) {
       return NextResponse.json(
         { error: 'Conversation not found' },
         { status: 404, headers: NO_STORE_HEADERS }

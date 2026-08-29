@@ -191,6 +191,29 @@ describe('IconButton', () => {
     );
   });
 
+  it('keeps destructive color on top of quiet secondary chrome', () => {
+    render(
+      <IconButton
+        ariaLabel='Delete row'
+        destructive
+        size='lg'
+        variant='secondary'
+      >
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+
+    const button = screen.getByRole('button', { name: 'Delete row' });
+    expect(button).toHaveAttribute('data-destructive', 'true');
+    expect(button).toHaveAttribute('data-size', 'icon-lg');
+    expect(button.className).toContain('text-error');
+    expect(button.className).toContain('hover:bg-error-subtle');
+    expect(button.className).toContain('overflow-visible');
+    expect(button.className).toContain('before:h-11');
+    expect(button.className).toContain('rounded-full');
+    expect(button.className).not.toContain('text-secondary-token');
+  });
+
   it('uses the shared subtle motion contract for circular chrome', () => {
     render(
       <IconButton ariaLabel='Surface action' variant='surface'>

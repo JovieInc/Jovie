@@ -26,7 +26,8 @@ function resolveAppUrl(env) {
   }
 
   if (env === 'local') {
-    const localUrl = process.env.ELECTRON_APP_URL || 'http://localhost:3112';
+    // Match `dev:web:local` / apps/web/scripts/dev-fast.mjs (PORT || 3100).
+    const localUrl = process.env.ELECTRON_APP_URL || 'http://localhost:3100';
     let parsed;
     try {
       parsed = new URL(localUrl);

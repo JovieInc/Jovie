@@ -1,5 +1,12 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -267,12 +274,21 @@ function executeAdmissionScope({
   conclusion,
   name,
   workflowEvent = 'pull_request',
+  pullRequests = [],
 }) {
   const workflow = readRepoFile('.github/workflows/merge-queue-autoenroll.yml');
   const script = workflowRunScript(workflow, 'Resolve exact admission scope');
   const directory = mkdtempSync(join(tmpdir(), 'merge-queue-admission-'));
   const eventPath = join(directory, 'event.json');
   const outputPath = join(directory, 'output.txt');
+  const binPath = join(directory, 'bin');
+  const ghPath = join(binPath, 'gh');
+  mkdirSync(binPath);
+  writeFileSync(
+    ghPath,
+    '#!/usr/bin/env bash\nprintf \'%s\\n\' "$MOCK_PULL_REQUESTS"\n'
+  );
+  chmodSync(ghPath, 0o755);
   writeFileSync(
     eventPath,
     JSON.stringify({
@@ -299,6 +315,8 @@ function executeAdmissionScope({
           GITHUB_OUTPUT: outputPath,
           MANUAL_PR: '',
           MANUAL_HEAD: '',
+          MOCK_PULL_REQUESTS: JSON.stringify(pullRequests),
+          PATH: `${binPath}:${process.env.PATH}`,
           REPO: REPOSITORY,
         },
       }
@@ -317,6 +335,61 @@ function executeAdmissionScope({
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+}
+
+function executeHoldIntakePreflight({
+  closureIntakeAllowed,
+  cohortIntakeAllowed,
+}) {
+  const receipt = {
+    schema: 'jovie-fleet-gate/v1',
+    observedAt: new Date().toISOString(),
+    state: 'AMBER',
+    promotionMode: 'hold-intake',
+    signals: {
+      main: { status: 'green' },
+      production: { status: 'green' },
+    },
+    promotionAdmission: { allowed: false },
+    isolatedPromotionAdmission: { allowed: false },
+    productionUnboundRepairAdmission: {
+      allowed: true,
+      condition: 'production-deployment-unbound',
+      mainSha: HEAD,
+      deployedSha: OTHER_HEAD,
+      maxConcurrent: 1,
+      deploymentsAllowed: false,
+    },
+    closureAdmission: {
+      allowed: closureIntakeAllowed,
+      authority: 'Summer',
+      status: closureIntakeAllowed ? 'green' : 'red',
+      newIssueIntakeAllowed: closureIntakeAllowed,
+      newImplementationAllowed: closureIntakeAllowed,
+      fallbackPrGenerationAllowed: closureIntakeAllowed,
+      promotionContinues: true,
+      remediationContinues: true,
+    },
+    alreadyAdmittedCohort: {
+      preserve: true,
+      newIntakeAllowed: cohortIntakeAllowed,
+    },
+  };
+  return spawnSync('bash', ['scripts/drain-pr-queue.sh'], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      DRY_RUN: '1',
+      DRAIN_PROMOTION_MODE: 'hold-intake',
+      DRAIN_FLEET_GATE_B64: Buffer.from(JSON.stringify(receipt)).toString(
+        'base64'
+      ),
+      DRAIN_MAX_SECONDS: '10',
+      DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS: '1',
+      FLEET_HOLD_TTL_SECONDS: '0',
+    },
+  });
 }
 
 describe('merge queue backend resolution', () => {
@@ -351,6 +424,33 @@ describe('merge queue backend resolution', () => {
 });
 
 describe('queue workflow mutation safety', () => {
+  it('accepts Summer stop-line hold-intake while keeping promotion and remediation live', () => {
+    const result = executeHoldIntakePreflight({
+      closureIntakeAllowed: false,
+      cohortIntakeAllowed: false,
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain(
+      'FLEET_HOLD_TTL_SECONDS must be an integer from 1 through 3600'
+    );
+    expect(result.stderr).not.toContain(
+      'Fleet receipt does not authorize promotion mode hold-intake'
+    );
+  });
+
+  it('rejects a hold-intake receipt whose cohort contradicts Summer intake authority', () => {
+    const result = executeHoldIntakePreflight({
+      closureIntakeAllowed: false,
+      cohortIntakeAllowed: true,
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain(
+      'Fleet receipt does not authorize promotion mode hold-intake'
+    );
+  });
+
   it.each([
     ['success', '.github/workflows/production-controller.yml', true, '1'],
     [
@@ -432,7 +532,7 @@ describe('queue workflow mutation safety', () => {
     expect(scope).toContain('.pull_request.head.sha');
     expect(scope).toContain('.pull_request.base.ref');
     expect(scope).toContain('.workflow_run.head_sha');
-    expect(scope).toContain('--json number,headRefOid,baseRefName');
+    expect(scope).toContain('--json number,headRefOid,baseRefName,isDraft');
     expect(scope).toContain('select(.baseRefName == "main")');
     expect(scope).toContain('No unique open main PR owns workflow_run head');
     expect(scope).toContain(
@@ -442,10 +542,10 @@ describe('queue workflow mutation safety', () => {
       'Main push; no primary target (bounded reconciliation remains enabled)'
     );
     expect(enroll).toContain(
-      'DRAIN_ADMISSION_PR: ${{ steps.admission.outputs.pr_number }}'
+      "DRAIN_ADMISSION_PR: ${{ steps.admission.outputs.disposition == 'candidate' && steps.admission.outputs.pr_number || '' }}"
     );
     expect(enroll).toContain(
-      'DRAIN_ADMISSION_HEAD: ${{ steps.admission.outputs.head_sha }}'
+      "DRAIN_ADMISSION_HEAD: ${{ steps.admission.outputs.disposition == 'candidate' && steps.admission.outputs.head_sha || '' }}"
     );
     expect(enroll).toContain("DRAIN_RECONCILE_QUEUE_DEFERRED: '0'");
     expect(enroll).not.toContain("github.event_name == 'push' && '1' || '0'");
@@ -476,6 +576,13 @@ describe('queue workflow mutation safety', () => {
     );
     expect(drain).toContain('unmergeable-eject');
     expect(drain).toContain('changelog-collision');
+    expect(drain).toContain('changelog-inventory');
+    expect(drain).toContain('changelog-drain');
+    expect(drain).toContain('pre-land-changelog');
+    expect(drain).toContain('INVENTORY (pre-land CHANGELOG.md)');
+    expect(drain).toContain(
+      'DEQUEUE (pre-land CHANGELOG.md → drain without CI bypass)'
+    );
     expect(drain).toContain(
       'classified skip; enroll is not a product-quality failure'
     );
@@ -508,6 +615,89 @@ describe('queue workflow mutation safety', () => {
     expect(drain).toContain('exit 3');
   });
 
+  it.each([
+    ['draft', 'success', true, 'draft-ineligible'],
+    ['failed', 'failure', false, 'ci-not-successful'],
+    ['pending', 'pending', false, 'ci-not-successful'],
+    ['incomplete', null, false, 'ci-not-successful'],
+  ])('treats a %s CI completion as typed neutral', (_kind, conclusion, isDraft, reason) => {
+    const outputs = executeAdmissionScope({
+      path: '.github/workflows/ci.yml',
+      conclusion,
+      name: 'CI',
+      pullRequests: [
+        {
+          number: 16510,
+          headRefOid: HEAD,
+          baseRefName: 'main',
+          isDraft,
+        },
+      ],
+    });
+
+    expect(outputs).toEqual(
+      expect.objectContaining({
+        disposition: 'neutral',
+        reason,
+        pr_number: '',
+        head_sha: '',
+        reconcile_queue_reentry: '0',
+      })
+    );
+  });
+
+  it('treats successful CI for a superseded source ref as typed neutral', () => {
+    const outputs = executeAdmissionScope({
+      path: '.github/workflows/ci.yml',
+      conclusion: 'success',
+      name: 'CI',
+      pullRequests: [
+        {
+          number: 16546,
+          headRefOid: OTHER_HEAD,
+          baseRefName: 'main',
+          isDraft: false,
+        },
+      ],
+    });
+
+    expect(outputs).toEqual(
+      expect.objectContaining({
+        disposition: 'neutral',
+        reason: 'superseded-ref',
+        pr_number: '',
+        head_sha: '',
+        reconcile_queue_reentry: '0',
+      })
+    );
+  });
+
+  it('selects a unique live non-draft main PR after successful CI', () => {
+    const outputs = executeAdmissionScope({
+      path: '.github/workflows/ci.yml',
+      conclusion: 'success',
+      name: 'CI',
+      pullRequests: [
+        {
+          number: 16546,
+          headRefOid: HEAD,
+          baseRefName: 'main',
+          isDraft: false,
+        },
+      ],
+    });
+
+    expect(outputs).toEqual(
+      expect.objectContaining({
+        disposition: 'candidate',
+        reason: 'ci-success-exact-head',
+        pr_number: '16546',
+        head_sha: HEAD,
+        reconcile_queue_reentry: '0',
+      })
+    );
+  });
+
   it('reconciles only native exact-head receipts after an unattributable successful composite CI run', () => {
     const workflow = readRepoFile(
       '.github/workflows/merge-queue-autoenroll.yml'
@@ -524,6 +714,8 @@ describe('queue workflow mutation safety', () => {
 
     expect(outputs).toEqual(
       expect.objectContaining({
+        disposition: 'neutral',
+        reason: 'composite-merge-group',
         pr_number: '',
         head_sha: '',
         reconcile_queue_reentry: '1',

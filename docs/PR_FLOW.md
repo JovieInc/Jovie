@@ -49,7 +49,7 @@ in the merge queue, while network/deploy/exhaustive depth runs later.
 | Tier | Jobs | Trigger |
 |---|---|---|
 | **PR gate** (must stay fast) | typecheck, lint, portable iOS contract, structural contract, diff secret scan, Golden Path Lock, size/fork/migration policy | every PR — deterministic, path-aware |
-| **Merge queue** | combined-head `ci-fast`, five affected unit shards, one hosted build + layout workspace, path-selected hosted Xcode build/test, path-selected model-free Promptfoo/golden evals, diff secret scan, Golden Path Lock, migration policy | GitHub `merge_group` synthetic head |
+| **Merge queue** | combined-head `ci-fast`, path-selected Web unit/build, Mac test/package artifact, iOS Xcode build/test, shared-contract integration, path-selected model-free Promptfoo/golden evals, diff secret scan, Golden Path Lock, migration policy | GitHub `merge_group` synthetic head |
 | **Release (`main`)** | exact queue proof or fail-closed direct-main fallback, then successful exact CI-attempt authorization into one `production-mutation` FIFO spanning staging, promotion, one centralized rollback owner, and final verification | completed successful `CI` workflow run for `main`; one bounded controller retry |
 | **Post-deploy** | hosted public, homepage, and live Lighthouse probes against the immutable deployment URL while the controller retains its lease; authenticated smoke is explicit optional evidence until credentials exist; final current-main/canonical check; `Production Verified` marker; event-driven Golden Path Prod Autofix (Cursor-direct, fail-closed) | successful current production release |
 | **Deep / nightly** | CodeQL, Trivy, full-history secret scans, Scorecard, SonarCloud, full E2E matrix, exhaustive suites, weekly Slop Gate (advisory copy smell on main) | schedule, event, or explicit manual dispatch |
@@ -67,8 +67,10 @@ Rules:
   within seconds of hitting `main`, so it is EVENT-class and must be caught
   pre-merge. The full-history secret scan stays nightly.
 - **The source PR gate stays deterministic and cheap.** The merge queue is the
-  integration gate for the exact combined head. It owns affected unit shards,
-  build, and deterministic layout evidence. Preview, Neon, E2E, Lighthouse,
+  integration gate for the exact combined head. A fail-closed changed-path
+  receipt selects Web, Mac, iOS, operations/tooling, and shared-contract lanes;
+  it owns only the selected product evidence plus deterministic global checks.
+  Preview, Neon, E2E, Lighthouse,
   a11y, Storybook, golden-path, preview, and extended-smoke work never starts
   from a source-PR event or risk label. Run it through a hosted manual,
   scheduled, or repository event after the fast source gate. No PR label fans
@@ -127,6 +129,11 @@ queued after mutation. Hard-gated, conflicting, or terminal-red entries are
 dequeued through the native API and then have their audit label removed.
 Pending, queued, and cancelled check runs are not terminal failures, preventing
 dequeue/re-enroll loops during ordinary CI cancellation or main movement.
+When a merge-group run proves a classified product failure, Gem writes the
+bot-authored `jovie-queue-product-failure/v1` status before dequeue or admission
+refusal. That success status preserves source-head cleanliness while acting as
+an exact-head tombstone after bounded Actions history rolls over; only a new
+source commit resets the product-failure memory.
 
 ### Fleet degradation policy
 
@@ -142,6 +149,28 @@ work may exist only as a draft. Unknown or stale production/main/controller/
 integrity evidence and severe integrity incidents admit nothing. The exception
 never permits business logic, auth, data, API, runtime, dependency, config, or
 control-plane changes, and a path-only classification is insufficient.
+
+### Summer closure-health stop-line
+
+Summer owns closure health; Gem remains the only native-queue and promotion
+writer. The closure observer classifies every open PR as `close`, `repair`,
+`promote`, `queued`, or `held` with an owner, reason, and seven-day expiry.
+`close` requires the repository's explicit `duplicate` lifecycle label;
+matching titles or Linear issue IDs never prove semantic redundancy.
+Summer grants no new issue lease, new implementation, or fallback PR generation
+unless the typed closure receipt is healthy. Missing or malformed closure
+evidence fails new intake closed.
+
+Closure health is red when the sole queue controller stays non-green for more
+than 10 minutes, the native queue stays empty with eligible clean PRs for more
+than 15 minutes, an open PR stays unclassified for more than 15 minutes,
+duplicate Linear issue lanes remain unresolved, an explicit hold expires, or no
+PR merges for one hour while open PRs remain. A native queue entry becoming
+`UNMERGEABLE` is red immediately: a nonempty queue is not progress. A grace
+episode also pauses new intake until the writer and queue prove progress. This
+stop-line never disables native promotion, exact-head PR remediation, tests, or
+review; those are the mechanisms that recover closure health. The executable
+authority is `JOV-INV-011` in `canon/invariants.jsonl`.
 
 ### Update Branch control-plane safety
 
@@ -236,9 +265,12 @@ existed. Contract:
    stale or duplicate deliveries are rejected.
 4. One remediation writer holds the PR lease. Implementer first.
    FX is the recovery tier after handoff or abandonment.
-   `Rolling CI Dispatch` subscribes to `check_suite`, `workflow_run`, and
-   `check_run` failures and launches Cursor-direct exact-head repair when
-   the implementer lease is not live. It does not check out PR code.
+   `Rolling CI Dispatch` subscribes only to completed `CI` `workflow_run`
+   events for `pull_request` and `merge_group`, then launches Cursor-direct
+   exact-head repair when the implementer lease is not live. It must not
+   subscribe to generic `check_suite` or `check_run` events because its own
+   completed checks can recursively re-enter the dispatcher. It does not
+   check out PR code.
    `Actions Cache GC` evicts stale or duplicate turbo caches without
    deleting live pnpm, node-cache, or playwright caches.
 5. A new commit or green rerun supersedes obsolete repairs.
@@ -265,7 +297,9 @@ Before you open a PR:
 4. **Publish the draft first** (`JOVIE_PUSH_PHASE=publication`), consume rolling
    CI, then qualify the final exact, current head before ready. Don't hand-merge;
    the queue does it.
-5. If a PR's base branch was deleted, **retarget to `main`** before debugging a
+5. **Do not add or edit `CHANGELOG.md`.** Implementation PRs that touch it fail
+   admission. What's New is written after land/runtime proof. Linear is SoR.
+6. If a PR's base branch was deleted, **retarget to `main`** before debugging a
    "conflict."
 
 Related: [`pr-stacking.md`](../.claude/rules/pr-stacking.md),

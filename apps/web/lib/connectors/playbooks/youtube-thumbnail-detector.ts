@@ -10,9 +10,9 @@ import { db } from '@/lib/db';
 import { suggestedActions } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
+import { YOUTUBE_THUMBNAIL_PLAYBOOK_KIND } from '../suggested-action-kinds';
 
-export const YOUTUBE_THUMBNAIL_PLAYBOOK_KIND =
-  'youtube.thumbnail_experiment' as const;
+export { YOUTUBE_THUMBNAIL_PLAYBOOK_KIND } from '../suggested-action-kinds';
 
 /** Industry-sourced projected CTR lift range for packaging improvements. */
 export const PROJECTED_IMPACT_RANGE = {

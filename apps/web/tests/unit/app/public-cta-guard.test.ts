@@ -56,4 +56,19 @@ describe('public CTA guard', () => {
 
     expect(offenders).toEqual([]);
   });
+
+  it('keeps homepage public auth as a labeled text MarketingSignInLink', () => {
+    const headerNav = readFileSync(
+      join(ROOT, 'components', 'organisms', 'HeaderNav.tsx'),
+      'utf8'
+    );
+
+    expect(headerNav).toContain("minimalAuthLabel?: 'Sign in' | 'Log in'");
+    expect(headerNav).toContain(
+      "<MarketingSignInLink variant='ghost' label={minimalLabel} />"
+    );
+    expect(headerNav).not.toMatch(
+      /minimalAuth[\s\S]*?<Button[\s\S]*?>Get started<\/Button>/
+    );
+  });
 });

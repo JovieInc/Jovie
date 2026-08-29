@@ -79,6 +79,33 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain('**/tsconfig*.json');
   });
 
+  it('isolates Jovie product typecheck from Symphony/control-plane suites', () => {
+    expect(CI_FAST_SOURCE).toContain("from './lib/ci-repo-lanes.mjs'");
+    expect(CI_FAST_SOURCE).toContain(
+      'Jovie product typecheck skipped (no product files changed)'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'Scripts typecheck skipped (no Symphony/control-plane files changed)'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'Guardrails skipped (no Jovie product files changed)'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'Design conformance skipped (no Jovie product files changed)'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'Public-profile admission skipped (no Jovie product files changed)'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'Structural skipped (Summer/ops only; no Jovie or Symphony suites)'
+    );
+    expect(CI_FAST_SOURCE).toContain('No guardrail product lane selected');
+    expect(CI_FAST_SOURCE).toContain(
+      "process.env.CI_PRODUCT_LANES || 'ios,mac,web,operations,cross-product'"
+    );
+    expect(CI_FAST_SOURCE).toContain('files === null || files.length === 0');
+  });
+
   it('maps the exact hosted selector set to dedicated parallel jobs', () => {
     const hostedSelectors = HOSTED_GROUP_JOBS.map(({ jobId, nextJobId }) => {
       const block = jobBlock(jobId, nextJobId);
@@ -139,7 +166,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'profile-admission':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts',
       structural:
-        'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm component-ship-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
+        'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm component-ship-gate && pnpm screen-certification-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
     });
   });
 

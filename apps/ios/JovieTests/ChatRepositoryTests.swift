@@ -566,6 +566,23 @@ struct ChatRepositoryTests {
     #expect(repository.isOffline == false)
   }
 
+  @Test func workspaceSendIncludesChatModeOnlyForOvie() async {
+    func send(workspace: MobileWorkspaceMode, suite: String) async -> String? {
+      let client = RecordingTurnChatClient()
+      let repository = ChatRepository(
+        client: client,
+        cache: ChatCache(defaults: UserDefaults(suiteName: suite)!),
+        userID: "user_repo_ws",
+        webBaseURL: URL(string: "https://preview.example")!,
+        workspace: workspace
+      )
+      await repository.send(text: "Need a taste decision")
+      return client.lastRequest?.chatMode
+    }
+    #expect(await send(workspace: .ovie, suite: "ie.jov.Jovie.tests.chat-repo-ov-mode") == "ov")
+    #expect(await send(workspace: .jovie, suite: "ie.jov.Jovie.tests.chat-repo-jovie-mode") == nil)
+  }
+
   @Test func sendOnTransportFailureMarksOfflineAndDoesNotExpireSession() async {
     let client = ScriptedChatClient(
       sendTurnResult: .failure(MobileChatClientError.transportFailed(code: -1009)),
@@ -598,6 +615,26 @@ private final class RecordingConversationActivityDonator: ConversationActivityDo
 
   func donate(conversationID: String, title: String) {
     donations.append(Donation(conversationID: conversationID, title: title))
+  }
+}
+
+private final class RecordingTurnChatClient: MobileChatClientProtocol, @unchecked Sendable {
+  private(set) var lastRequest: MobileChatTurnRequest?
+
+  func listConversations(limit: Int) async throws -> [MobileConversationSummary] {
+    []
+  }
+
+  func fetchConversation(id: String, limit: Int) async throws -> MobileConversationDetailResponse {
+    throw MobileChatClientError.requestFailed(statusCode: 404)
+  }
+
+  func sendTurn(
+    _ request: MobileChatTurnRequest,
+    onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?
+  ) async throws -> [MobileChatStreamEvent] {
+    lastRequest = request
+    return []
   }
 }
 

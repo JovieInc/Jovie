@@ -63,6 +63,21 @@ def _drain_command(
     return f'{env_prefix}bash "{_DRAIN_SCRIPT}"'
 
 
+def _summer_closure_admission(
+    *, intake_allowed: bool = True
+) -> dict[str, object]:
+    return {
+        "allowed": intake_allowed,
+        "authority": "Summer",
+        "status": "green" if intake_allowed else "red",
+        "newIssueIntakeAllowed": intake_allowed,
+        "newImplementationAllowed": intake_allowed,
+        "fallbackPrGenerationAllowed": intake_allowed,
+        "promotionContinues": True,
+        "remediationContinues": True,
+    }
+
+
 def _write_native_receipt_fakes(
     tmp_path: Path,
     *,
@@ -94,6 +109,8 @@ def _write_native_receipt_fakes(
               unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
               unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
               changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+              changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+              changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
               --classify-queue) echo '[]' ;;
               *) echo "unexpected node args: $*" >&2; exit 2 ;;
             esac
@@ -134,6 +151,352 @@ def _write_native_receipt_fakes(
 
 
 class TestExactHeadQueueReceipt:
+    def test_durable_product_failure_receipt_blocks_when_actions_history_aged_out(
+        self, tmp_path: Path
+    ) -> None:
+        head = "8" * 40
+        main = "9" * 40
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                case "${{2:-}}" in
+                  preflight) exit 0 ;;
+                  list-state) echo '{{"16068":{{"headRefOid":"{head}","queued":false,"isInMergeQueue":false,"mergeQueueEntry":null}}}}' ;;
+                  explain-selector) cat >/dev/null; echo '{{"observed":true,"queued":false,"eligible":true,"reason":"eligible"}}' ;;
+                  prove-receipt) echo '{{"ok":false,"state":{{"queued":false}},"explanation":{{"reason":"not-queued"}}}}' ;;
+                  enroll) echo "durable product-failure receipt must block enroll" >&2; exit 91 ;;
+                  dequeue) echo '{{"state":{{"queued":false}}}}' ;;
+                  max-queue-depth) echo 16 ;;
+                  front-churn) echo "Actions history must not be required after a durable receipt" >&2; exit 92 ;;
+                  unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
+                  unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
+                  changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
+                  --classify-queue) echo '[]' ;;
+                  *) echo "unexpected node args: $*" >&2; exit 93 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":16068,"t":"Durable product failure","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/product-failure","headOid":"{head}","base":"main","body":"","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{head}","baseRefName":"main","body":""}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/git/ref/heads/main"* ]]; then
+                  echo '{main}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then
+                  echo '[]'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/commits/{head}/status"* ]]; then
+                  echo '{{"statuses":[{{"context":"jovie-queue-product-failure/v1","state":"success","description":"blocked:merge-group-product-failure","creator":{{"type":"Bot"}},"target_url":"https://github.com/JovieInc/Jovie/actions/runs/77","updated_at":"2026-08-28T14:20:00Z"}}]}}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 94
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=f"DRAIN_ADMISSION_PR=16068 DRAIN_ADMISSION_HEAD={head}",
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "product-failure-tombstone" in result.stdout
+        assert "durable product-failure receipt must block enroll" not in result.stderr
+        assert "Actions history must not be required" not in result.stderr
+
+    def test_new_source_head_does_not_inherit_old_product_failure_tombstone(
+        self, tmp_path: Path
+    ) -> None:
+        old_head = "7" * 40
+        new_head = "8" * 40
+        main = "9" * 40
+        api_calls = tmp_path / "api-calls"
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                case "${{2:-}}" in
+                  preflight) exit 0 ;;
+                  list-state) echo '{{"16070":{{"headRefOid":"{new_head}","queued":false,"isInMergeQueue":false,"mergeQueueEntry":null}}}}' ;;
+                  max-queue-depth) echo 16 ;;
+                  front-churn) echo '{{"action":"allow","reason":"new head has no failed attempt","evidence":null}}' ;;
+                  unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
+                  unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
+                  changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
+                  --classify-queue) echo '[]' ;;
+                  *) echo "unexpected node args: $*" >&2; exit 93 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":16070,"t":"Moved product-failure head","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/moved-product-failure","headOid":"{new_head}","base":"main","body":"","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{new_head}","baseRefName":"main","body":"","files":[]}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then
+                  printf '%s\n' "$2" >>'{api_calls}'
+                  if [[ "$2" == *"/git/ref/heads/main"* ]]; then echo '{main}'; exit 0; fi
+                  if [[ "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then echo '[]'; exit 0; fi
+                  if [[ "$2" == *"/commits/{new_head}/status"* ]]; then echo '{{"statuses":[]}}'; exit 0; fi
+                  if [[ "$2" == *"/commits/{old_head}/status"* ]]; then
+                    echo '{{"statuses":[{{"context":"jovie-queue-product-failure/v1","state":"success","description":"blocked:merge-group-product-failure","creator":{{"type":"Bot"}},"target_url":"https://github.com/JovieInc/Jovie/actions/runs/77"}}]}}'
+                    exit 0
+                  fi
+                  if [[ "$2" == *"/commits/{new_head}"* ]]; then echo '2026-08-28T14:30:00Z'; exit 0; fi
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 94
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    f"DRY_RUN=1 DRAIN_ADMISSION_PR=16070 DRAIN_ADMISSION_HEAD={new_head}"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "[dry-run] would enroll #16070 via native" in result.stdout
+        calls = api_calls.read_text(encoding="utf-8")
+        assert f"/commits/{new_head}/status" in calls
+        assert f"/commits/{old_head}/status" not in calls
+
+    def test_classified_product_failure_persists_exact_head_tombstone_before_return(
+        self, tmp_path: Path
+    ) -> None:
+        head = "a" * 40
+        main = "b" * 40
+        post_args = tmp_path / "product-failure-status-post"
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                case "${{2:-}}" in
+                  preflight) exit 0 ;;
+                  list-state) echo '{{"16069":{{"headRefOid":"{head}","queued":false,"isInMergeQueue":false,"mergeQueueEntry":null}}}}' ;;
+                  explain-selector) cat >/dev/null; echo '{{"observed":true,"queued":false,"eligible":true,"reason":"eligible"}}' ;;
+                  prove-receipt) echo '{{"ok":false,"state":{{"queued":false}},"explanation":{{"reason":"not-queued"}}}}' ;;
+                  enroll) echo "classified product failure must not enroll" >&2; exit 91 ;;
+                  dequeue) echo '{{"state":{{"queued":false}}}}' ;;
+                  max-queue-depth) echo 16 ;;
+                  front-churn) echo '{{"action":"block","reason":"unchanged head failed product checks","evidence":{{"failureClass":"repeated-product-check"}}}}' ;;
+                  unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
+                  unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
+                  changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
+                  --classify-queue) echo '[]' ;;
+                  *) echo "unexpected node args: $*" >&2; exit 93 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":16069,"t":"Fresh classified product failure","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/classified-product-failure","headOid":"{head}","base":"main","body":"","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{head}","baseRefName":"main","body":""}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/git/ref/heads/main"* ]]; then
+                  echo '{main}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then
+                  echo '[]'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/commits/{head}" && "$2" != *"/status"* ]]; then
+                  echo '2026-08-28T13:00:00Z'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/commits/{head}/status"* ]]; then
+                  echo '{{"statuses":[]}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && " $* " == *" -X POST "* && " $* " == *"/statuses/{head} "* ]]; then
+                  printf '%s\n' "$*" >'{post_args}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 94
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    f"DRAIN_ADMISSION_PR=16069 DRAIN_ADMISSION_HEAD={head} "
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "+jovie-queue-product-failure/v1" in result.stdout
+        posted = post_args.read_text(encoding="utf-8")
+        assert f"repos/JovieInc/Jovie/statuses/{head}" in posted
+        assert "context=jovie-queue-product-failure/v1" in posted
+        assert "description=blocked:merge-group-product-failure" in posted
+        assert "classified product failure must not enroll" not in result.stderr
+
+    def test_queued_product_failure_records_tombstone_before_dequeue(
+        self, tmp_path: Path
+    ) -> None:
+        head = "c" * 40
+        main = "d" * 40
+        mutation_order = tmp_path / "mutation-order"
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                case "${{2:-}}" in
+                  preflight) exit 0 ;;
+                  list-state) echo '{{"16071":{{"headRefOid":"{head}","queued":true,"isInMergeQueue":true,"mergeQueueEntry":{{"state":"AWAITING_CHECKS","position":1}}}}}}' ;;
+                  dequeue) printf 'dequeue\n' >>'{mutation_order}'; echo '{{"state":{{"queued":false}}}}' ;;
+                  max-queue-depth) echo 16 ;;
+                  front-churn) echo '{{"action":"block","reason":"unchanged head failed product checks","evidence":{{"failureClass":"deterministic-product-check"}}}}' ;;
+                  unmergeable-eject) echo '{{"action":"keep","reason":"not-unmergeable"}}' ;;
+                  changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
+                  --classify-queue) echo '[]' ;;
+                  *) echo "unexpected node args: $*" >&2; exit 93 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":16071,"t":"Queued product failure","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/queued-product-failure","headOid":"{head}","base":"main","body":"","L":["merge-queue"],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[{{"name":"merge-queue"}}],"headRefOid":"{head}","baseRefName":"main","body":""}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/git/ref/heads/main"* ]]; then echo '{main}'; exit 0; fi
+                if [[ "$1" == "api" && "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then echo '[]'; exit 0; fi
+                if [[ "$1" == "api" && "$2" == *"/commits/{head}/status"* ]]; then echo '{{"statuses":[]}}'; exit 0; fi
+                if [[ "$1" == "api" && "$2" == *"/commits/{head}" && "$2" != *"/status"* ]]; then echo '2026-08-28T13:00:00Z'; exit 0; fi
+                if [[ "$1" == "api" && " $* " == *" -X POST "* && " $* " == *"/statuses/{head} "* ]]; then
+                  printf 'status\n' >>'{mutation_order}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 94
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env="GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com",
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert mutation_order.read_text(encoding="utf-8").splitlines() == [
+            "status",
+            "dequeue",
+        ]
+        assert "+jovie-queue-product-failure/v1" in result.stdout
+
     def test_delayed_native_receipt_reconciles_without_enrolling(self, tmp_path: Path) -> None:
         head = "6" * 40
         _write_native_receipt_fakes(
@@ -500,6 +863,8 @@ class TestDrainPrQueueWiring:
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
                   unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
                   changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 2 ;;
                 esac
@@ -597,6 +962,8 @@ class TestDrainPrQueueWiring:
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
                   unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
                   changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 2 ;;
                 esac
@@ -696,6 +1063,8 @@ JSON
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
                   unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
                   changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 2 ;;
                 esac
@@ -791,6 +1160,8 @@ JSON
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
                   unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
                   changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 2 ;;
                 esac
@@ -973,6 +1344,7 @@ JSON
             "state": "AMBER",
             "promotionMode": "hold-intake",
             "observedAt": datetime.now(timezone.utc).isoformat(),
+            "closureAdmission": _summer_closure_admission(),
             "signals": {
                 "main": {"status": "green", "sha": "a" * 40},
                 "production": {"status": "green", "deployedSha": "b" * 40},
@@ -1099,6 +1471,7 @@ JSON
             "state": "AMBER",
             "promotionMode": "hold-intake",
             "observedAt": datetime.now(timezone.utc).isoformat(),
+            "closureAdmission": _summer_closure_admission(),
             "signals": {
                 "main": {"status": "green", "sha": "a" * 40},
                 "production": {"status": "green", "deployedSha": "b" * 40},
@@ -1187,6 +1560,7 @@ JSON
             "state": "AMBER",
             "promotionMode": "hold-intake",
             "observedAt": datetime.now(timezone.utc).isoformat(),
+            "closureAdmission": _summer_closure_admission(),
             "signals": {
                 "main": {"status": "green", "sha": "a" * 40},
                 "production": {"status": "green", "deployedSha": "b" * 40},
@@ -1275,6 +1649,7 @@ JSON
             "state": "AMBER",
             "promotionMode": "hold-intake",
             "observedAt": datetime.now(timezone.utc).isoformat(),
+            "closureAdmission": _summer_closure_admission(),
             "signals": {
                 "main": {"status": "green", "sha": "a" * 40},
                 "production": {"status": "green", "deployedSha": "b" * 40},
@@ -1365,6 +1740,7 @@ JSON
             "state": "AMBER",
             "promotionMode": "hold-intake",
             "observedAt": datetime.now(timezone.utc).isoformat(),
+            "closureAdmission": _summer_closure_admission(),
             "signals": {
                 "main": {"status": "green", "sha": "a" * 40},
                 "production": {"status": "green", "deployedSha": "b" * 40},
@@ -1823,6 +2199,7 @@ JSON
             "state": "AMBER",
             "promotionMode": "hold-intake",
             "observedAt": datetime.now(timezone.utc).isoformat(),
+            "closureAdmission": _summer_closure_admission(),
             "signals": {
                 "main": {"status": "green", "sha": "a" * 40},
                 "production": {"status": "green", "deployedSha": "b" * 40},
@@ -1916,6 +2293,7 @@ JSON
             "state": "AMBER",
             "promotionMode": "hold-intake",
             "observedAt": datetime.now(timezone.utc).isoformat(),
+            "closureAdmission": _summer_closure_admission(),
             "signals": {
                 "main": {"status": "green", "sha": "a" * 40},
                 "production": {"status": "green", "deployedSha": "b" * 40},
@@ -2064,6 +2442,7 @@ JSON
             "state": "AMBER",
             "promotionMode": "hold-intake",
             "observedAt": datetime.now(timezone.utc).isoformat(),
+            "closureAdmission": _summer_closure_admission(),
             "signals": {
                 "main": {"status": "green", "sha": "a" * 40},
                 "production": {"status": "green", "deployedSha": "b" * 40},

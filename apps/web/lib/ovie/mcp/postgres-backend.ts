@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { ovieOperatingKv } from '@/lib/db/schema/ovie';
 import { OVIE_MCP_INDEX_CAP, type RecordBackend } from './store';
@@ -22,6 +22,28 @@ export function postgresRecordBackend(): RecordBackend {
           target: ovieOperatingKv.key,
           set: { value, updatedAt: now },
         });
+    },
+    async setIfAbsent(key, value) {
+      const now = new Date();
+      const rows = await db
+        .insert(ovieOperatingKv)
+        .values({ key, value, updatedAt: now })
+        .onConflictDoNothing({ target: ovieOperatingKv.key })
+        .returning({ key: ovieOperatingKv.key });
+      return rows.length === 1;
+    },
+    async compareAndSet(key, expectedValue, nextValue) {
+      const rows = await db
+        .update(ovieOperatingKv)
+        .set({ value: nextValue, updatedAt: new Date() })
+        .where(
+          and(
+            eq(ovieOperatingKv.key, key),
+            eq(ovieOperatingKv.value, expectedValue)
+          )
+        )
+        .returning({ key: ovieOperatingKv.key });
+      return rows.length === 1;
     },
     async lpush(key, value) {
       const current = await backend.get(key);

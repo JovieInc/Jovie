@@ -20,4 +20,15 @@ describe('MarketingSignInLink', () => {
       APP_ROUTES.SIGNIN
     );
   });
+
+  it('renders homepage Log in as a text link, not a filled pill', () => {
+    const { container } = render(
+      <MarketingSignInLink variant='ghost' label='Log in' />
+    );
+
+    const link = screen.getByRole('link', { name: 'Log in' });
+    expect(link).toHaveAttribute('href', APP_ROUTES.SIGNIN);
+    expect(link.tagName).toBe('A');
+    expect(container.querySelector('button')).toBeNull();
+  });
 });

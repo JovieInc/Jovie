@@ -142,6 +142,9 @@ struct AppShellView<
   let onStartNewChat: () -> Void
   let onAutoSendMessage: (String) -> Void
   let onLogout: @MainActor () async -> Void
+  let showsWorkspaceSwitch: Bool
+  let workspaceMode: MobileWorkspaceMode
+  let onSelectWorkspace: (MobileWorkspaceMode) -> Void
   @ViewBuilder let profileContent: ProfileContent
   @ViewBuilder let audienceContent: (_ askJovie: @escaping (String) -> Void) -> AudienceContent
   @ViewBuilder let libraryContent: (
@@ -196,6 +199,9 @@ struct AppShellView<
     onStartNewChat: @escaping () -> Void = {},
     onAutoSendMessage: @escaping (String) -> Void = { _ in },
     onLogout: @escaping @MainActor () async -> Void,
+    showsWorkspaceSwitch: Bool = false,
+    workspaceMode: MobileWorkspaceMode = .jovie,
+    onSelectWorkspace: @escaping (MobileWorkspaceMode) -> Void = { _ in },
     @ViewBuilder profileContent: () -> ProfileContent,
     @ViewBuilder audienceContent: @escaping (_ askJovie: @escaping (String) -> Void) -> AudienceContent,
     @ViewBuilder libraryContent: @escaping (
@@ -233,6 +239,9 @@ struct AppShellView<
     self.onStartNewChat = onStartNewChat
     self.onAutoSendMessage = onAutoSendMessage
     self.onLogout = onLogout
+    self.showsWorkspaceSwitch = showsWorkspaceSwitch
+    self.workspaceMode = workspaceMode
+    self.onSelectWorkspace = onSelectWorkspace
     self.profileContent = profileContent()
     self.audienceContent = audienceContent
     self.libraryContent = libraryContent
@@ -480,7 +489,10 @@ struct AppShellView<
             accountURL: accountURL,
             billingURL: billingURL,
             onClose: { navigationPath.removeLast() },
-            onLogout: onLogout
+            onLogout: onLogout,
+            showsWorkspaceSwitch: showsWorkspaceSwitch,
+            workspaceMode: workspaceMode,
+            onSelectWorkspace: onSelectWorkspace
           )
           .navigationBarBackButtonHidden()
         }
@@ -548,6 +560,10 @@ struct AppShellView<
 
     if state.shouldStartVoiceCapture {
       voiceCaptureTrigger += 1
+    }
+
+    if state.shouldOpenSettings, navigationPath.last != .settings {
+      navigationPath.append(.settings)
     }
 
     if state.selectedTab != previousTab {

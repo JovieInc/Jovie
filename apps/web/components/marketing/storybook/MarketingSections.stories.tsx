@@ -29,6 +29,8 @@ import { ArtistProfileSpecWall } from '@/components/marketing/artist-profile/Art
 import { CaptureActionPill } from '@/components/marketing/artist-profile/captureShared';
 import { HomepageV2FinalCta } from '@/components/marketing/homepage-v2/HomepageV2Ctas';
 import { MarketingContentProse } from '@/components/marketing/MarketingContentProse';
+import { MarketingPlatformSpecBento } from '@/components/marketing/MarketingPlatformSpecBento';
+import { MarketingShippedSitesShowcase } from '@/components/marketing/MarketingShippedSitesShowcase';
 import { MarketingSnapRail } from '@/components/marketing/MarketingSnapRail';
 import { ArtistProfileCaptureVisual } from '@/components/marketing/MarketingStoryPrimitives';
 import { MarketingSurfaceCard } from '@/components/marketing/MarketingSurfaceCard';
@@ -229,6 +231,7 @@ export const socialProof: Story = {
       <ArtistProfileReleaseCycleGallery
         releaseCycle={ARTIST_PROFILE_COPY.releaseCycle}
       />
+      <MarketingShippedSitesShowcase />
     </SectionFrame>
   ),
 };
@@ -397,6 +400,7 @@ export const specWall: Story = {
         specWall={ARTIST_NOTIFICATIONS_COPY.specWall}
         tiles={ARTIST_NOTIFICATIONS_SPEC_TILES}
       />
+      <MarketingPlatformSpecBento />
     </SectionFrame>
   ),
 };

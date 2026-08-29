@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { Archive, Trash2 } from 'lucide-react';
 import { HeaderBulkActions } from './HeaderBulkActions';
 
 const meta: Meta<typeof HeaderBulkActions> = {
@@ -6,9 +7,6 @@ const meta: Meta<typeof HeaderBulkActions> = {
   component: HeaderBulkActions,
   parameters: {
     layout: 'centered',
-    jovie: {
-      uncoveredProps: ['disabled'],
-    },
   },
 };
 
@@ -19,10 +17,23 @@ export const Selected: Story = {
   args: {
     selectedCount: 3,
     bulkActions: [
-      { label: 'Archive', onClick: () => undefined },
+      { label: 'Archive', icon: <Archive />, onClick: () => undefined },
       { label: 'Export', onClick: () => undefined, disabled: true },
-      { label: 'Delete', onClick: () => undefined, variant: 'destructive' },
+      {
+        label: 'Delete',
+        icon: <Trash2 />,
+        onClick: () => undefined,
+        variant: 'destructive',
+      },
     ],
+    onClearSelection: () => undefined,
+  },
+};
+
+export const ClearOnly: Story = {
+  args: {
+    selectedCount: 2,
+    bulkActions: [],
     onClearSelection: () => undefined,
   },
 };

@@ -7,6 +7,28 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- **Library is one catalog with Ideas, In Progress, and Out:** documents, YouTube videos, releases, and merch share stage, type, and release filters. Ideas is a stage, not a separate destination.
+
+- [internal] **YouTube channel import and artist rules land on the existing content graph (JOV-5362):** channel videos, thumbnails, metrics, and ISRC/collaborator claims write the youtube_* tables; unmatched credits fail closed; thumbnail winners need locked metrics and explicit promotion; memory can only propose artist rules until they are confirmed and typed.
+
+- [internal] **Ovie Mac HUD is one screen with three YC metrics (JOV-5298):** Packaged Jovie.app opens `/hud?ovie=mac` so the operator sees default alive/dead, week-over-week growth, and dogfood-receipted shipping only. Eve stays the talk door. Customer chat stays `/app/chat`.
+
+- **Empty iPhone chat home is a centered greeting with the composer docked at the bottom:** signed-in empty chat shows Let's get it / Ready to start? / Ready when you are, with no mark, no placeholder, and no extra tab bar.
+
+- **Primary buttons use a lighter label:** CTA text is medium (510) instead of semibold, with the same size, fill, and 32px chrome.
+
+- **Empty chat greets you and waits:** new conversations show one of Let's get it, Ready to start?, or Ready when you are above a blank input. No placeholder, logo, or What's next? line.
+
+- [internal] **MenuMonitor reports freshness instead of fake zeros (JOV-5305):** Initial loading hides counts, stale values say Last known, and action/error state reaches the accessible status item.
+
+- [internal] **Jovie, Symphony, and Summer/ops CI lanes no longer block each other (JOV-5288):** this repo's required checks stay the Jovie aggregates. Exclusive Symphony/control-plane or Summer/ops diffs skip Jovie app unit/build/typecheck suites; exclusive product diffs skip Symphony scripts typecheck. Mixed and unknown non-doc files fail closed onto the product lane. Migration Guard and secret scanning stay on.
+
+- **Home and Artist Profiles now show live artist sites and the platform spec grid:** a dark shipped-sites gallery and a blue / pink / purple platform bento sit below the fold on jov.ie and /artist-profiles, using real Jovie profile and product shots.
+
+- [internal] **Summer invariant stewardship now has a weekly plus event-driven audit (JOV-5309):** Current-week candidates are normalized with source, date, and authority, semantic duplicates/conflicts/missing consumers fail visible, and Ovie projects only actionable exceptions. Cadence reuses the existing governance workflow. The executable registry remains `canon/invariants.jsonl` under JOV-5306.
+
+- [internal] **Canonical homepage and dashboard-releases owners stay attached to screenshot and visual-qa registries (JOV-5304):** live `/` is `MarketingPosterHero` + `PublicPageShell`, live releases is `ShellReleasesView` with demo `/demo` still `ReleasesExperience`, and a fail-closed drift guard rejects `/ai`/`/investors` promotion plus a deliberate-red fixture.
+
 - [internal] **Settings and section-header molecules have one owner (JOV-5308):** dashboard SettingsPanel/SectionHeader aliases are gone, remaining settings consumers import the canonical molecule, and a machine-readable ownership receipt fails closed on duplicate owners, detached consumers, and malformed typed atom dependencies.
 
 - [internal] **Pool `gate-next` continues past issue-specific context/research misses (JOV-5292):** a targeted `context-no-results` or `research-evidence-required` hold no longer starves the fleet-gate event. Admission still takes at most one later verified candidate. Targeted `--issue` reports that issue's hold. Systemic holds (`gbrain-unavailable`, org-chart missing, ownership conflict, fleet-gate closed) still fail closed. Hash-bound holds persist outside the git tree until content changes or 24h elapses. Hourly intake-readiness stays dry-run / receipt-only.
@@ -14,7 +36,6 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] **FX remediates failed native merge_group CI (JOV-5303):** Rolling CI Dispatch now accepts completed `CI` `workflow_run` events whose producer is `merge_group`, resolves the source PR from the queue front ref, and launches FX against that branch. The previous pull_request-only gate left merge-queue failures unrepaired after UNMERGEABLE eject.
 
 - [internal] **ALLGREEN merge groups no longer UNMERGEABLE siblings on shrink-only design-system ratchets (JOV-5300):** `--linear-*` usage may drop below the JSON floor on `merge_group` without failing required unit shards. Growth still fails. Local / pull_request authorship still fail-closes until the changing PR lowers the baseline. Source `PR Ready` stays cheap (no unit/e2e ruleset expansion).
-
 - [internal] **Native merge-queue UNMERGEABLE entries auto-eject and CHANGELOG collisions no longer poison CLEAN PRs (JOV-5291):** parked UNMERGEABLE group members dequeue with a typed exact-head receipt and are not re-enqueued; enroll trusts live GraphQL `maximumEntriesToBuild=3` instead of stale REST drift; two Unreleased CHANGELOG edits are serialized instead of failing the later PR's `enroll` check.
 
 - [internal] **Stale Symphony fallback locks can no longer permanently own pickup (JOV-5297):** the sidecar GCs leftover `JOV-*.lock` files when the Linear issue is In Review / Done / has an inflight open PR, or when an unlocked lock is older than the typed TTL, and writes a receipt. Pickup now emits lease start, a typed refuse reason, lock count, and the next eligible issue; an unknown refuse reason is red. Codex refuses a second writer on In Review / open PR.
@@ -68,6 +89,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- [internal] **CI repair cannot trigger itself:** Rolling CI repair observes only authoritative CI completions. Malformed main receipts fail closed instead of crashing queue admission.
+- **Jovie Local no longer says you’re offline while the local server is compiling (JOV-5339):** first compile can take ~15 seconds with no bytes yet. Local waits, talks to localhost:3100, and reloads on its own when the host is warm — no Retry click. It only says “check your connection” when the machine is actually offline.
+- **Jovie Local keeps the app shell during hot reload (JOV-5339):** packaged 14s/18s boot and load timers no longer replace a compiling local window with “couldn’t load”. Chromium maps `localhost` to `127.0.0.1` without changing the origin, so sign-in cookies stay, and transient loopback misses retry until Next is up.
 - **iPhone and Mac sign-in return to the app instead of the website:** after browser login, iOS and macOS bounce through an allowlisted return page and reopen Jovie. Signed-in native sessions no longer dump into the web dashboard.
 - **iPhone sign-in can open the browser when SwiftUI has no key window (JOV-5198):** Continue in Browser waits for a foreground-active window, presents from a visible or scene-backed window when needed, and a failed session start is no longer reported as `invalidAuthURL`.
 - [internal] **Ovie eval review persists a durable row and records `judge:absent` as a verdict:** enqueue reports success only after `ovie_operating_kv` write, missing rubric judges are not scored as pass, word count is a `word-count:N` signal unless a verbosity budget is set, and Slack feedback redacts emails in the message body.

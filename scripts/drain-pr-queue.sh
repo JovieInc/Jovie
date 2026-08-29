@@ -112,6 +112,8 @@ DRAIN_RECONCILE_MISSED_ADMISSION="${DRAIN_RECONCILE_MISSED_ADMISSION:-0}"
 DRAIN_QUEUE_REENTRY_MAX_PER_RUN="${DRAIN_QUEUE_REENTRY_MAX_PER_RUN:-2}"
 QUEUE_REENTRY_CONTEXT="jovie-queue-reentry/v1"
 UNMERGEABLE_EJECT_CONTEXT="jovie-native-unmergeable/v1"
+PRODUCT_FAILURE_CONTEXT="jovie-queue-product-failure/v1"
+PRODUCT_FAILURE_DESCRIPTION="blocked:merge-group-product-failure"
 LAST_ENROLL_SKIP_REASON=""
 # JOV-5276: no-auto* is a durable tombstone. Unlike queue-deferred, this
 # controller never strips these labels, including hold-intake missed-admission
@@ -182,7 +184,15 @@ case "$DRAIN_PROMOTION_MODE" in
         .productionUnboundRepairAdmission.maxConcurrent == 1 and
         .productionUnboundRepairAdmission.deploymentsAllowed == false and
         .alreadyAdmittedCohort.preserve == true and
-        .alreadyAdmittedCohort.newIntakeAllowed == true
+        .closureAdmission.authority == "Summer" and
+        (.closureAdmission.status | IN("green", "red")) and
+        (.closureAdmission.newIssueIntakeAllowed | type == "boolean") and
+        .closureAdmission.allowed == .closureAdmission.newIssueIntakeAllowed and
+        .closureAdmission.newImplementationAllowed == .closureAdmission.newIssueIntakeAllowed and
+        .closureAdmission.fallbackPrGenerationAllowed == .closureAdmission.newIssueIntakeAllowed and
+        .closureAdmission.promotionContinues == true and
+        .closureAdmission.remediationContinues == true and
+        .alreadyAdmittedCohort.newIntakeAllowed == .closureAdmission.newIssueIntakeAllowed
       else
         .promotionAdmission.allowed == false and
         .isolatedPromotionAdmission.allowed == false
@@ -617,6 +627,85 @@ record_unmergeable_eject_receipt() {  # <pr> <expected-head> <reason>
   echo "    +$UNMERGEABLE_EJECT_CONTEXT $description on #$n at $live_head"
 }
 
+# JOV-INV-011: a product-failure tombstone is a success status so the source PR remains
+# CLEAN while Gem and Summer retain exact-head failure memory after bounded
+# Actions history rolls over. A new source commit is the only automatic reset.
+product_failure_receipt_head() {  # <head>
+  local head="$1" statuses
+  [[ "$head" =~ ^[0-9a-f]{40}$ ]] || return 1
+  if ! statuses="$(gh_retry api "repos/$REPO/commits/$head/status" 2>/dev/null)"; then
+    return 2
+  fi
+  if ! jq -e '.statuses | type == "array"' <<<"$statuses" >/dev/null 2>&1; then
+    return 2
+  fi
+  jq -r \
+    --arg context "$PRODUCT_FAILURE_CONTEXT" \
+    --arg description "$PRODUCT_FAILURE_DESCRIPTION" \
+    --arg head "$head" \
+    --arg repo "$REPO" '
+      [ .statuses[]? | select(.context == $context) ]
+      | sort_by(.updated_at)
+      | last
+      | select(
+          . != null
+          and .state == "success"
+          and (.creator.type == "Bot")
+          and .description == $description
+          and (.target_url | test("^https://github\\.com/" + $repo + "/actions/runs/[1-9][0-9]*$"))
+        )
+      | $head
+    ' <<<"$statuses"
+}
+
+record_product_failure_receipt() {  # <pr> <expected-head>
+  local n="$1" expected_head="$2" current live_head target_url receipt_head receipt_rc
+  if [[ ! "$expected_head" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "    !! cannot record product-failure tombstone for #$n without an exact head" >&2
+    return 1
+  fi
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "    [dry-run] would record $PRODUCT_FAILURE_CONTEXT on #$n at $expected_head"
+    return 0
+  fi
+  set +e
+  receipt_head="$(product_failure_receipt_head "$expected_head")"
+  receipt_rc=$?
+  set -e
+  if [[ "$receipt_rc" -eq 0 && "$receipt_head" == "$expected_head" ]]; then
+    echo "    =$PRODUCT_FAILURE_CONTEXT on #$n at $expected_head (already recorded)"
+    return 0
+  fi
+  if [[ "$receipt_rc" -eq 2 ]]; then
+    echo "    !! could not read product-failure tombstone state for #$n" >&2
+    return 1
+  fi
+  if ! target_url="$(fleet_hold_target_url)"; then
+    echo "    !! canonical workflow run identity is missing for product-failure tombstone #$n" >&2
+    return 1
+  fi
+  if ! current="$(gh_retry pr view "$n" -R "$REPO" --json state,headRefOid 2>/dev/null)"; then
+    echo "    !! could not refresh #$n before recording product-failure tombstone" >&2
+    return 1
+  fi
+  live_head="$(jq -r '(.headRefOid // "") | ascii_downcase' <<<"$current")"
+  if ! jq -e --arg head "$expected_head" '
+    .state == "OPEN" and ((.headRefOid // "") | ascii_downcase) == $head
+  ' <<<"$current" >/dev/null; then
+    echo "    ⏸ #$n head changed before product-failure tombstone"
+    return 2
+  fi
+  if ! gh_retry api -X POST "repos/$REPO/statuses/$live_head" \
+    -f state=success \
+    -f context="$PRODUCT_FAILURE_CONTEXT" \
+    -f description="$PRODUCT_FAILURE_DESCRIPTION" \
+    -f target_url="$target_url" >/dev/null; then
+    echo "    !! failed to record exact-head product-failure tombstone for #$n" >&2
+    return 1
+  fi
+  echo "    +$PRODUCT_FAILURE_CONTEXT $PRODUCT_FAILURE_DESCRIPTION on #$n at $live_head"
+}
+
 pr_changed_paths_json() {  # <num> → JSON string array or null
   local n="$1" files
   if ! files="$(gh_retry pr view "$n" -R "$REPO" --json files --jq '[.files[].path]' 2>/dev/null)"; then
@@ -631,8 +720,9 @@ pr_changed_paths_json() {  # <num> → JSON string array or null
 }
 
 changelog_collision_decision_for_pr() {  # <num>
-  local n="$1" candidate queued members='[]' files
+  local n="$1" candidate queued members='[]' files branch
   candidate="$(pr_changed_paths_json "$n")"
+  branch="$(echo "$SNAP" | jq -r --argjson n "$n" '.[] | select(.n == $n) | .head // empty')"
   while read -r queued; do
     [[ -n "$queued" ]] || continue
     files="$(pr_changed_paths_json "$queued")"
@@ -640,8 +730,8 @@ changelog_collision_decision_for_pr() {  # <num>
       '. + [{prNumber:$pr, files:$files}]' <<<"$members")"
   done < <(echo "$SNAP" | jq -r --argjson self "$n" \
     '.[] | select(.q == true) | select(.n != $self) | .n')
-  CHANGELOG_COLLISION_JSON="$(jq -nc --argjson candidateFiles "$candidate" --argjson queuedMemberFiles "$members" \
-    '{candidateFiles:$candidateFiles, queuedMemberFiles:$queuedMemberFiles}')" \
+  CHANGELOG_COLLISION_JSON="$(jq -nc --argjson candidateFiles "$candidate" --argjson queuedMemberFiles "$members" --arg branch "$branch" \
+    '{candidateFiles:$candidateFiles, queuedMemberFiles:$queuedMemberFiles, branch:$branch}')" \
     node scripts/ci-merge-queue-check.mjs changelog-collision
 }
 
@@ -842,13 +932,28 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
   # suppresses the unchanged source head across base movement and elapsed
   # time. Unclassified infrastructure failures retain the bounded retry.
   # A new source commit is the recovery signal; unknown evidence never mutates.
-  local churn_action
-  churn_action="$(front_churn_action "$n" "$expected_head")"
-  if [[ "$churn_action" == "block" ]]; then
-    echo "    ⏸ unchanged head has a classified/repeated merge-group failure; refusing re-enrollment for #$n until recovery policy allows it"
-    LAST_ENROLL_SKIP_REASON="front-churn"
-    return 2
-  fi
+  local churn_disposition
+  churn_disposition="$(front_churn_disposition "$n" "$expected_head")"
+  case "$churn_disposition" in
+    block-product)
+      if ! record_product_failure_receipt "$n" "$expected_head"; then
+        echo "    !! refusing enrollment without durable product-failure memory for #$n" >&2
+        return 1
+      fi
+      echo "    ⏸ unchanged head has a durable classified/repeated merge-group failure; refusing re-enrollment for #$n until the source head moves"
+      LAST_ENROLL_SKIP_REASON="product-failure-tombstone"
+      return 2
+      ;;
+    block-transient)
+      echo "    ⏸ unchanged head is inside the bounded unclassified failure cooldown; refusing re-enrollment for #$n"
+      LAST_ENROLL_SKIP_REASON="front-churn"
+      return 2
+      ;;
+    receipt-unknown)
+      echo "    !! product-failure tombstone state is unavailable for #$n; refusing enrollment" >&2
+      return 1
+      ;;
+  esac
   if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
     local eject_head reenqueue_decision reenqueue_action collision_decision collision_action
     eject_head="$(unmergeable_eject_receipt_head "$expected_head")"
@@ -866,8 +971,8 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     collision_decision="$(changelog_collision_decision_for_pr "$n")"
     collision_action="$(jq -r '.action // empty' <<<"$collision_decision")"
     if [[ "$collision_action" == "skip" ]]; then
-      echo "    ⏸ CHANGELOG.md already queued with $(jq -r '.collidingPrs | join(",")' <<<"$collision_decision"); refusing ALLGREEN group collision for #$n"
-      LAST_ENROLL_SKIP_REASON="changelog-collision"
+      echo "    ⏸ pre-land CHANGELOG.md edit is prohibited ($(jq -r '.reason' <<<"$collision_decision")) for #$n; refusing native queue admission without bypassing CI"
+      LAST_ENROLL_SKIP_REASON="$(jq -r '.reason // "pre-land-changelog"' <<<"$collision_decision")"
       return 2
     fi
   fi
@@ -1225,30 +1330,49 @@ MERGE_GROUP_RUNS_JSON="[]"
 if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
   MAIN_HEAD_SHA="$(gh_retry api "repos/${REPO}/git/ref/heads/main" --jq '.object.sha // empty' 2>/dev/null || true)"
   MAIN_HEAD_SHA="$(printf '%s' "$MAIN_HEAD_SHA" | tr '[:upper:]' '[:lower:]')"
-  MERGE_GROUP_RUNS_JSON="$(gh_retry api "repos/${REPO}/actions/workflows/ci.yml/runs?event=merge_group&per_page=50" \
-    --jq '[.workflow_runs[]? | {id, headBranch, status, conclusion, headSha, createdAt, updatedAt}]' 2>/dev/null || echo '[]')"
+  MERGE_GROUP_RUNS_JSON="$(gh_retry api "repos/${REPO}/actions/workflows/ci.yml/runs?event=merge_group&per_page=100" \
+    --jq '[.workflow_runs[]? | {id, headBranch: .head_branch, status, conclusion, headSha: .head_sha, createdAt: .created_at, updatedAt: .updated_at}]' 2>/dev/null || echo '[]')"
   export MERGE_GROUP_RUNS_JSON
 fi
 
-# front_churn_action <num> <head_oid> → prints allow|block|unknown.
-front_churn_action() {
+# front_churn_disposition <num> <head_oid> → prints
+# allow|block-product|block-transient|unknown|receipt-unknown.
+# Annotate recent failed fronts, not only the latest run. A single-run
+# failedSteps payload never reaches MERGE_GROUP_CHURN_FAILURE_THRESHOLD=2, so
+# unit-test merge_group failures re-enrolled forever as main moved (#16238,
+# reproduced by #16441 on 2026-08-27).
+front_churn_disposition() {
   local n="$1" head_oid="$2" committed run_id jobs_json runs_json
-  if [[ "$MERGE_QUEUE_BACKEND" != "native" || ! "$MAIN_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+  local receipt_head receipt_rc decision action failure_class
+  if [[ "$MERGE_QUEUE_BACKEND" != "native" ]]; then
+    echo "unknown"
+    return 0
+  fi
+  set +e
+  receipt_head="$(product_failure_receipt_head "$head_oid")"
+  receipt_rc=$?
+  set -e
+  if [[ "$receipt_rc" -eq 2 ]]; then
+    echo "receipt-unknown"
+    return 0
+  fi
+  if [[ "$receipt_rc" -eq 0 && "$receipt_head" == "$head_oid" ]]; then
+    echo "block-product"
+    return 0
+  fi
+  if [[ ! "$MAIN_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
     echo "unknown"
     return 0
   fi
   committed="$(gh_retry api "repos/${REPO}/commits/${head_oid}" --jq '.commit.committer.date // empty' 2>/dev/null || true)"
   runs_json="$MERGE_GROUP_RUNS_JSON"
-  run_id="$(jq -r --arg prefix "gh-readonly-queue/main/pr-${n}-" '
-    [.[]
-      | select((.headBranch // "") | startswith($prefix))
-      | select(.status == "completed")
-      | select(.conclusion == "failure" or .conclusion == "timed_out"
-        or .conclusion == "action_required" or .conclusion == "startup_failure"
-        or .conclusion == "stale")]
-    | sort_by(.createdAt) | reverse | .[0].id // empty
-  ' <<<"$runs_json")"
-  if [[ "$run_id" =~ ^[1-9][0-9]*$ ]]; then
+  while IFS= read -r run_id; do
+    [[ "$run_id" =~ ^[1-9][0-9]*$ ]] || continue
+    if jq -e --argjson run_id "$run_id" '
+      any(.[]; .id == $run_id and (.failedSteps | type == "array"))
+    ' <<<"$runs_json" >/dev/null; then
+      continue
+    fi
     jobs_json="$(gh_retry api "repos/${REPO}/actions/runs/${run_id}/jobs?per_page=100" --paginate \
       --jq '[.jobs[]? | .steps[]? | select(.conclusion == "failure") | .name]' 2>/dev/null || echo '[]')"
     if jq -e 'type == "array" and all(.[]; type == "string")' <<<"$jobs_json" >/dev/null; then
@@ -1256,10 +1380,35 @@ front_churn_action() {
         map(if .id == $run_id then . + {failedSteps: $failed_steps} else . end)
       ' <<<"$runs_json")"
     fi
+  done < <(jq -r --arg prefix "gh-readonly-queue/main/pr-${n}-" '
+    [.[]
+      | select((.headBranch // "") | startswith($prefix))
+      | select(.status == "completed")
+      | select(.conclusion == "failure" or .conclusion == "timed_out"
+        or .conclusion == "action_required" or .conclusion == "startup_failure"
+        or .conclusion == "stale")]
+    | sort_by(.createdAt) | reverse | .[0:8][]? | .id
+  ' <<<"$runs_json")
+  MERGE_GROUP_RUNS_JSON="$runs_json"
+  if ! decision="$(MERGE_GROUP_RUNS_JSON="$runs_json" \
+    node scripts/ci-merge-queue-check.mjs front-churn \
+      --pr="$n" --base="$MAIN_HEAD_SHA" --head-committed-at="$committed" 2>/dev/null)"; then
+    echo "unknown"
+    return 0
   fi
-  MERGE_GROUP_RUNS_JSON="$runs_json" node scripts/ci-merge-queue-check.mjs front-churn \
-    --pr="$n" --base="$MAIN_HEAD_SHA" --head-committed-at="$committed" 2>/dev/null \
-    | jq -r '.action // "unknown"'
+  action="$(jq -r '.action // "unknown"' <<<"$decision" 2>/dev/null || echo unknown)"
+  failure_class="$(jq -r '.evidence.failureClass // empty' <<<"$decision" 2>/dev/null || true)"
+  if [[ "$action" == "block" \
+    && ( "$failure_class" == "deterministic-product-check" \
+      || "$failure_class" == "repeated-product-check" ) ]]; then
+    echo "block-product"
+  elif [[ "$action" == "block" ]]; then
+    echo "block-transient"
+  elif [[ "$action" == "allow" || "$action" == "unknown" ]]; then
+    echo "$action"
+  else
+    echo "unknown"
+  fi
 }
 
 # Production-red mode permits one exact-head exception. Evaluate only native
@@ -1470,9 +1619,44 @@ if waiting_lane_allows_clean_enroll \
     fi
   done < <(echo "$SNAP" | jq -c '.[]
     | select(.q == true)
-    | select(.qs == "UNMERGEABLE")
+    | select(([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)')
+fi
+
+# --- INVENTORY + DEQUEUE: pre-land CHANGELOG.md (JOV-5378) ---
+# Implementation PRs must not edit CHANGELOG.md. Queued members that still
+# carry the file are dequeued with reenqueue=false. Enrollment skip is a
+# classified skip, not a CI bypass.
+echo "=== INVENTORY (pre-land CHANGELOG.md) ==="
+echo "=== DEQUEUE (pre-land CHANGELOG.md → drain without CI bypass) ==="
+if waiting_lane_allows_clean_enroll \
+  || [[ "$DRAIN_PROMOTION_MODE" == "blocked" && "$DRAIN_FREEZE_EXISTING_QUEUE" == "0" ]]; then
+  changelog_open='[]'
+  while read -r pr; do
+    n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
+    head_ref="$(jq -r '.head // empty' <<<"$pr")"
+    files="$(pr_changed_paths_json "$n")"
+    changelog_open="$(jq -c --argjson n "$n" --argjson files "$files" --arg head "$head_ref" \
+      '. + [{number:$n, files:$files, headRefName:$head, queued:true}]' <<<"$changelog_open")"
+    drain_decision="$(CHANGELOG_COLLISION_JSON="$(jq -nc --argjson files "$files" --argjson queued true --arg branch "$head_ref" \
+      '{files:$files, queued:$queued, branch:$branch}')" \
+      node scripts/ci-merge-queue-check.mjs changelog-drain)"
+    drain_action="$(jq -r '.action // empty' <<<"$drain_decision")"
+    if [[ "$drain_action" != "dequeue" ]]; then
+      continue
+    fi
+    echo "  #$n  $t  ✗ pre-land-changelog"
+    if ! dequeue_strict "$n"; then
+      echo "::error::Failed to prove CHANGELOG PR #$n is outside native merge queue" >&2
+      exit 1
+    fi
+  done < <(echo "$SNAP" | jq -c '.[]
+    | select(.q == true)
     | select(.draft | not)
     | select(([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)')
+  inventory="$(CHANGELOG_COLLISION_JSON="$(jq -nc --argjson openPrs "$changelog_open" '{openPrs:$openPrs}')" \
+    node scripts/ci-merge-queue-check.mjs changelog-inventory)"
+  echo "  inventory count=$(jq -r '.count' <<<"$inventory") reason=$(jq -r '.reason' <<<"$inventory")"
+  echo "$inventory" | jq -r '.prs[]? | "  #\(.number)  \(.headRefName // "unknown")  queued=\(.queued)"'
 fi
 
 # --- DEQUEUE: only GENUINELY un-mergeable PRs (conflict or real failing checks) ---
@@ -1537,13 +1721,25 @@ if waiting_lane_allows_clean_enroll || [[ "$DRAIN_PROMOTION_MODE" == "blocked" &
     n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
     head_oid="$(jq -r '.headOid // ""' <<<"$pr")"
     [[ "$head_oid" =~ ^[0-9a-f]{40}$ ]] || continue
-    churn_action="$(front_churn_action "$n" "$head_oid")"
-    if [[ "$churn_action" == "block" ]]; then
-      echo "  #$n  $t  ✗ unchanged head has a classified/repeated merge-group failure"
+    churn_disposition="$(front_churn_disposition "$n" "$head_oid")"
+    if [[ "$churn_disposition" == "block-product" ]]; then
+      echo "  #$n  $t  ✗ unchanged head has a durable classified/repeated merge-group failure"
+      if ! record_product_failure_receipt "$n" "$head_oid"; then
+        echo "::error::Failed to record product-failure tombstone for #$n at $head_oid" >&2
+        exit 1
+      fi
       if ! dequeue_strict "$n"; then
         echo "::error::Failed to prove non-progressing front PR #$n is outside native merge queue" >&2
         exit 1
       fi
+    elif [[ "$churn_disposition" == "block-transient" ]]; then
+      echo "  #$n  $t  ✗ bounded unclassified merge-group failure cooldown"
+      if ! dequeue_strict "$n"; then
+        echo "::error::Failed to prove transiently non-progressing PR #$n is outside native merge queue" >&2
+        exit 1
+      fi
+    elif [[ "$churn_disposition" == "receipt-unknown" ]]; then
+      echo "  #$n  $t  ~ product-failure tombstone state unavailable; leaving queued"
     fi
   done < <(echo "$SNAP" | jq -c '.[]
     | select(.q == true)
@@ -1723,7 +1919,12 @@ if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 ]]; then
     fi
   fi
   if [[ "$DRY_RUN" != "1" && "$ADMISSION_TARGET_OBSERVED" == "true" && "$ADMISSION_ALREADY_QUEUED" != "true" ]]; then
-    if [[ "$LAST_ENROLL_SKIP_REASON" == "changelog-collision" \
+    if [[ "$LAST_ENROLL_SKIP_REASON" == "product-failure-tombstone" ]]; then
+      echo "  #$DRAIN_ADMISSION_PR  ⏸ $LAST_ENROLL_SKIP_REASON (durable exact-head product failure; source repair required)"
+    elif [[ "$LAST_ENROLL_SKIP_REASON" == "changelog-collision" \
+      || "$LAST_ENROLL_SKIP_REASON" == "pre-land-changelog" \
+      || "$LAST_ENROLL_SKIP_REASON" == "preland-changelog" \
+      || "$LAST_ENROLL_SKIP_REASON" == "preland-changelog-prohibited" \
       || "$LAST_ENROLL_SKIP_REASON" == "unmergeable-tombstone" ]]; then
       echo "  #$DRAIN_ADMISSION_PR  ⏸ $LAST_ENROLL_SKIP_REASON (classified skip; enroll is not a product-quality failure)"
     elif [[ "$ADMISSION_ELIGIBLE" == "true" ]]; then

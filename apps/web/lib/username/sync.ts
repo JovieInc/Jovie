@@ -1,9 +1,8 @@
 import 'server-only';
 
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateUsernameChange } from '@/lib/cache/profile';
-import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
@@ -45,27 +44,30 @@ async function updateCanonicalUsernameInternal(
         throw new Error('App user mismatch while syncing username');
       }
 
-      const [userRow] = await tx
-        .select({ id: users.id, activeProfileId: users.activeProfileId })
-        .from(users)
-        .where(eq(users.id, sessionAppUserId))
-        .limit(1);
-
-      if (!userRow?.activeProfileId) {
-        throw new Error('User not found');
-      }
-
+      // Own the profile via creator_profiles.user_id. Do not SELECT users
+      // inside withDbSessionTx: post-cutover sessions set app.clerk_user_id
+      // to users.id, while users RLS still matches clerk_id, so that lookup
+      // returned no row and threw Error: User not found (JOV-5396).
       const [profile] = await tx
         .select({
           id: creatorProfiles.id,
           usernameNormalized: creatorProfiles.usernameNormalized,
         })
         .from(creatorProfiles)
-        .where(eq(creatorProfiles.id, userRow.activeProfileId))
+        .where(eq(creatorProfiles.userId, sessionAppUserId))
+        .orderBy(
+          desc(creatorProfiles.isClaimed),
+          desc(creatorProfiles.onboardingCompletedAt)
+        )
         .limit(1);
 
       if (!profile) {
-        throw new Error('Creator profile not found');
+        return {
+          normalized,
+          changed: false,
+          conflict: false,
+          previousCanonicalUsername: null,
+        };
       }
 
       const previousCanonicalUsername = profile.usernameNormalized;

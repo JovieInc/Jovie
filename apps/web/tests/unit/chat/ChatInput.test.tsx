@@ -797,7 +797,7 @@ describe('ChatInput', () => {
 
     expect(
       screen.getByRole('textbox', { name: /chat message input/i })
-    ).toHaveAttribute('placeholder', 'Ask Jovie to plan your next release...');
+    ).not.toHaveAttribute('placeholder');
   });
 
   it('enables send when textarea DOM input is replayed into controlled state', async () => {

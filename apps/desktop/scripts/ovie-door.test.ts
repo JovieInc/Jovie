@@ -6,9 +6,11 @@ import {
   CUSTOMER_JOVIE_ENTRY_ROUTE,
   evaluateOviePackageProof,
   OVIE_OPERATOR_OPS_ROUTE,
+  OVIE_OPERATOR_OPS_SEARCH,
   OVIE_OPERATOR_TALK_ROUTE,
   OVIE_PACKAGE_PROOF_CHECKS,
   ovieOperatorDoorRoutes,
+  ovieOperatorOpsHref,
   PRODUCTION_DESKTOP_APP_ID,
   packagedDesktopAppId,
   packagedUsesCompetingStagingShell,
@@ -54,10 +56,12 @@ test('operator talk and ops stay distinct from customer Jovie chat', () => {
   expect(ovieOperatorDoorRoutes()).toEqual({
     talk: OVIE_OPERATOR_TALK_ROUTE,
     ops: OVIE_OPERATOR_OPS_ROUTE,
+    opsSearch: OVIE_OPERATOR_OPS_SEARCH,
     customerJovie: CUSTOMER_JOVIE_ENTRY_ROUTE,
   });
   expect(OVIE_OPERATOR_TALK_ROUTE).toBe('/app/ov/chat');
   expect(OVIE_OPERATOR_OPS_ROUTE).toBe('/hud');
+  expect(ovieOperatorOpsHref()).toBe('/hud?ovie=mac');
   expect(CUSTOMER_JOVIE_ENTRY_ROUTE).toBe('/app/chat');
 });
 
@@ -98,7 +102,11 @@ test('packaged main enters the Ovie talk door and starts the Summer bridge', asy
   expect(mainSource).toMatch(/from '\.\/summer-runtime-bridge'/);
   expect(mainSource).toMatch(/OVIE_OPERATOR_TALK_ROUTE/);
   expect(mainSource).toMatch(/packagedUsesCompetingStagingShell/);
+  expect(mainSource).toMatch(/ovieOperatorOpsHref/);
   expect(mainSource).toMatch(/openOvieOperatorTalkDoor/);
+  expect(mainSource).toMatch(/openOvieOperatorOpsDoor/);
+  expect(mainSource).toMatch(/click: openOvieOperatorOpsDoor/);
+  expect(mainSource).toMatch(/click: openOvieOperatorTalkDoor/);
   expect(mainSource).toMatch(/createSummerRuntimeBridge/);
   expect(mainSource).toMatch(/event\.sender\.session\.fetch/);
 });

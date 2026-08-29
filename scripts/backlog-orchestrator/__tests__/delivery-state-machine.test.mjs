@@ -26,6 +26,13 @@ describe('delivery state machine', () => {
       ['lease-ambiguous', 'reconcile-exact-head-lease'],
       ['stale-config', 'reload-and-attest-controller-service'],
       ['missing-trigger', 'restore-event-trigger-and-reconcile'],
+      ['size-guard', 'split-source-aligned-size-guard'],
+      ['missing-failing-checks', 'create-bounded-ci-repair-pr'],
+      ['stale-conflicted-head', 'exact-head-branch-update'],
+      ['queue-eviction', 'reconcile-exact-head-queue-admission'],
+      ['provider-unavailable', 'restore-provider-availability'],
+      ['missing-owner-lease', 'reconcile-exact-head-lease'],
+      ['dropped-controller-event', 'restore-event-trigger-and-reconcile'],
     ]) {
       const receipt = buildDeliveryReceipt({ delivery_key: failure, failure });
       assert.equal(receipt.schema, DELIVERY_RECEIPT_SCHEMA);
@@ -211,5 +218,48 @@ describe('delivery state machine', () => {
     assert.equal(receipt.event.failure, 'missing-trigger');
     assert.equal(receipt.next.action, 'restore-event-trigger-and-reconcile');
     assert.equal(receipt.externalMutations, 0);
+  });
+
+  it('keeps not-proven and unbound production as evidence, never a repair claim', () => {
+    const missing = buildDeliveryReceipt({
+      delivery_key: 'not-proven-1',
+      failure: 'not-proven',
+    });
+    assert.equal(missing.stage, 'evidence-pending');
+    assert.equal(missing.next.action, 'collect-missing-evidence');
+    const unbound = buildDeliveryReceipt({
+      delivery_key: 'prod-unbound-1',
+      failure: 'production-deployment-unbound',
+    });
+    assert.equal(unbound.stage, 'evidence-pending');
+    assert.equal(unbound.next.mode, 'evidence');
+  });
+
+  it('classifies CI and size-guard workflow failures without treating them as queue-noop', async () => {
+    const ci = buildDeliveryReceipt({
+      workflow_run: { id: 7, conclusion: 'failure', name: 'CI' },
+    });
+    assert.equal(ci.event.failure, 'missing-failing-checks');
+    const size = buildDeliveryReceipt({
+      workflow_run: { id: 8, conclusion: 'failure', name: 'PR Size Guard' },
+    });
+    assert.equal(size.next.action, 'split-source-aligned-size-guard');
+    const directory = await mkdtemp(join(tmpdir(), 'jovie-delivery-red-'));
+    try {
+      const result = await persistDeliveryOutcome(
+        buildDeliveryReceipt({
+          delivery_key: 'ci-failed-loop',
+          failure: 'ci-failed',
+          issue: 'JOV-5390',
+          pr_number: 16019,
+          head_sha: HEAD,
+        }),
+        { stateDir: directory }
+      );
+      assert.equal(result.loop.stallClass, 'missing-failing-checks');
+      assert.equal(result.queue.items[0].issue, 'JOV-5390');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });

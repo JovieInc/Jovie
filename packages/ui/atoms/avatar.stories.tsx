@@ -36,6 +36,41 @@ export const WithImage: Story = {
   ),
 };
 
+export const ArtworkComposition: Story = {
+  render: () => (
+    <div className='flex items-end gap-6'>
+      <div className='grid justify-items-center gap-2'>
+        <Avatar size='2xl' shape='artwork'>
+          <AvatarImage
+            src='https://placehold.co/400x600/111827/E5E7EB?text=Full+Artwork'
+            alt='Full release artwork using inherited props'
+          />
+        </Avatar>
+        <span className='text-xs text-tertiary-token'>Inherited</span>
+      </div>
+      <div className='grid justify-items-center gap-2'>
+        <Avatar size='2xl' shape='artwork'>
+          <AvatarImage
+            src='https://placehold.co/400x600/111827/E5E7EB?text=Full+Artwork'
+            alt='Full release artwork using explicit props'
+            size='2xl'
+            shape='artwork'
+          />
+        </Avatar>
+        <span className='text-xs text-tertiary-token'>Explicit</span>
+      </div>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Artwork children inherit the parent rounded-square geometry and preserve the full image with contain fit; explicit matching props remain supported.',
+      },
+    },
+  },
+};
+
 export const User: Story = {
   render: () => <UserAvatar name='Tim White' size='xl' status='away' />,
 };

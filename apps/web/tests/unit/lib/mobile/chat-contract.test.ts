@@ -21,7 +21,18 @@ describe('mobile chat contract', () => {
       clientMessageId: 'msg_1',
       text: 'Help me launch',
       source: 'typed',
+      chatMode: null,
     });
+    expect(
+      parseMobileChatTurnRequest({
+        conversationId: 'conv_1',
+        clientTurnId: 'turn_1',
+        clientMessageId: 'msg_1',
+        text: 'Summer, what is blocked?',
+        source: 'typed',
+        chatMode: 'ov',
+      })?.chatMode
+    ).toBeNull();
   });
 
   it('rejects invalid mobile turn requests', () => {

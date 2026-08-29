@@ -99,6 +99,7 @@ HOSTED_BACKGROUND_CONTROLLER_JOBS = (
     ("github-ai-orchestrator.yml", "finalize_claim"),
     ("neon-scheduled-cleanup.yml", "scheduled-cleanup"),
     ("observability-issue.yml", "sync-issue"),
+    ("sentry-autofix-recurrence.yml", "recurrence"),
     ("reusable-ci-lint.yml", "lint"),
     ("reusable-ci-lint.yml", "typecheck"),
     ("reusable-ci-lint.yml", "knip"),
@@ -1014,6 +1015,7 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     assert "github.event.label.name == 'gated'" in block
     assert "github.event.label.name == 'queue-deferred'" in block
     assert "github.event.label.name == 'needs-human'" in block
+    assert "github.event.label.name == 'duplicate'" in block
     assert "runs-on: [self-hosted, Linux, X64, jovie-fixed]" in block
 
 

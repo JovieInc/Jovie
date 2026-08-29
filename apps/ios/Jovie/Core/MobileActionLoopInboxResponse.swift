@@ -8,6 +8,45 @@ struct MobileActionLoopInboxItem: Codable, Equatable, Sendable, Identifiable {
   let why: String
   let primaryActionLabel: String
   let status: String
+  let imageURL: String?
+
+  enum CodingKeys: String, CodingKey {
+    case id
+    case typeLabel
+    case createdAt
+    case title
+    case why
+    case primaryActionLabel
+    case status
+    case imageURL = "imageUrl"
+  }
+
+  init(
+    id: String,
+    typeLabel: String,
+    createdAt: String,
+    title: String,
+    why: String,
+    primaryActionLabel: String,
+    status: String,
+    imageURL: String? = nil
+  ) {
+    self.id = id
+    self.typeLabel = typeLabel
+    self.createdAt = createdAt
+    self.title = title
+    self.why = why
+    self.primaryActionLabel = primaryActionLabel
+    self.status = status
+    self.imageURL = imageURL
+  }
+
+  var stillImageURL: URL? {
+    guard typeLabel == "Still", let imageURL, let url = URL(string: imageURL) else {
+      return nil
+    }
+    return url
+  }
 }
 
 struct MobileActionLoopInboxEmptyActionCard: Codable, Equatable, Sendable, Identifiable {

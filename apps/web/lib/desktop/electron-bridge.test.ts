@@ -77,13 +77,13 @@ describe('electron-bridge — defensive guards', () => {
     Reflect.deleteProperty(document.documentElement.dataset, 'desktopRuntime');
   });
 
-  it('notifyDesktopAppBooted sends once when bridge method exists', () => {
+  it('notifyDesktopAppBooted re-sends so HMR can re-arm the shell watchdog', () => {
     const notifyAppBooted = vi.fn();
     setElectronAPI({ notifyAppBooted });
     document.documentElement.dataset.desktopRuntime = 'electron';
     __testing.notifyDesktopAppBooted();
     __testing.notifyDesktopAppBooted();
-    expect(notifyAppBooted).toHaveBeenCalledTimes(1);
+    expect(notifyAppBooted).toHaveBeenCalledTimes(2);
     Reflect.deleteProperty(document.documentElement.dataset, 'desktopRuntime');
   });
 

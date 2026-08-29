@@ -37,6 +37,7 @@ import * as deterministicGates from './deterministic-gates.mjs';
 import * as gateNextHold from './gate-next-hold.mjs';
 import { cliGbrainClient } from './gbrain-client.mjs';
 import * as intakeReadiness from './intake-readiness.mjs';
+import * as laneCapacity from './lane-capacity.mjs';
 import * as linear from './linear-client.mjs';
 import * as ownershipInventory from './ownership-inventory.mjs';
 import * as planGate from './plan-gate.mjs';
@@ -424,6 +425,7 @@ async function fleetGateForTeam(team, now = new Date().toISOString()) {
       },
       integrity: receipt?.signals?.integrity || { status: 'clear' },
       queue: receipt?.signals?.queue,
+      closureHealth: receipt?.signals?.closureHealth,
       concurrencyEvidence: receipt?.signals?.concurrencyEvidence,
       independentReview: receipt?.signals?.independentReview,
       observedAt: receipt?.observedAt,
@@ -507,6 +509,34 @@ async function admissionPreflight(team, candidate = null) {
   if (candidate) {
     const candidateTarget =
       ownershipInventory.resolveAdmissionTarget(candidate);
+    if (candidateTarget.decision !== 'admit') {
+      return {
+        open: false,
+        disposition: 'defer',
+        reasonCode: candidateTarget.reason || 'collision-domain-missing',
+        reason:
+          candidateTarget.reason || 'candidate collision domain unavailable',
+        load,
+        fleetGate,
+      };
+    }
+    const laneDecision = laneCapacity.evaluateLaneCapacity(
+      fleetGate.laneCapacity,
+      candidateTarget.target.collision_domains
+    );
+    if (!laneDecision.allowed) {
+      return {
+        open: false,
+        disposition: laneDecision.disposition,
+        reasonCode: laneDecision.code,
+        reason:
+          laneDecision.domain && Number.isInteger(laneDecision.ready)
+            ? `${laneDecision.code}: ${laneDecision.domain} (${laneDecision.ready}/${laneDecision.budget})`
+            : laneDecision.code,
+        load,
+        fleetGate,
+      };
+    }
     const active = symphonyIssues.filter(issue =>
       load.identifiers.includes(issue.identifier)
     );
@@ -528,6 +558,8 @@ async function admissionPreflight(team, candidate = null) {
     if (collisions.length > 0) {
       return {
         open: false,
+        disposition: 'defer',
+        reasonCode: 'collision-domain-leased',
         reason: `collision domain already leased by ${collisions.join(', ')}`,
         load,
         fleetGate,
@@ -599,6 +631,8 @@ async function evaluateGateCandidate(
       stage: 'collision-preflight',
       issue: selected.identifier,
       reason: collisionPreflight.reason,
+      reasonCode: collisionPreflight.reasonCode,
+      disposition: collisionPreflight.disposition,
       active: collisionPreflight.load.identifiers,
       fleetGate: collisionPreflight.fleetGate,
       staleLeaseRecovery,

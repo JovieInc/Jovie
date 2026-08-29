@@ -6,27 +6,31 @@ This document and [apps/web/lib/canonical-surfaces.ts](../apps/web/lib/canonical
 
 | ID | Label | Live Route(s) | Review Route | Screenshot ID(s) | Current Owner | Component Family | Description |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `homepage` | Homepage | `/` | `/` | `marketing-home-desktop` | `app/(home)/page.tsx -> HomePageNarrative` | `features/home` | Primary marketing homepage and current live review surface. |
+| `homepage` | Homepage | `/` | `/` | `marketing-home-desktop` | `app/(home)/page.tsx -> MarketingPosterHero` (`app/(home)/layout.tsx -> PublicPageShell`) | `features/home` | Primary marketing homepage and current live review surface. |
 | `public-profile` | Public Profile | `/[username]` | `/demo/showcase/public-profile` | `public-profile-desktop`, `public-profile-mobile` | `app/[username]/page.tsx -> StaticArtistPage` | `features/profile` | Canonical public artist profile surface rendered from `StaticArtistPage` and `ProfileCompactTemplate`. |
 | `release-landing` | Release Landing | `/r/[slug]`, `/[username]/[slug]` | `/demo/showcase/release-landing` | `release-landing-desktop`, `release-landing-mobile` | `app/r/[slug]/ReleaseLandingPage.tsx -> ReleaseLandingPage` | `features/release` | Canonical smart-link release destination sharing the public shell direction. |
-| `dashboard-releases` | Dashboard Releases | `/app/dashboard/releases` | `/demo` | `dashboard-releases-desktop`, `dashboard-releases-sidebar-desktop`, `dashboard-release-sidebar-detail-desktop` | `app/app/(shell)/dashboard/releases/page.tsx -> ReleasesPageClient` | `features/dashboard/organisms/release-provider-matrix` | Canonical authenticated releases workspace and current dashboard review/capture surface. |
+| `dashboard-releases` | Dashboard Releases | `/app/releases`, `/app/dashboard/releases` | `/demo` | `dashboard-releases-desktop`, `dashboard-releases-sidebar-desktop`, `dashboard-release-sidebar-detail-desktop`, `dashboard-release-sidebar-platforms-desktop` | live `ShellReleasesView`; demo `/demo` still `ReleasesExperience` | `features/dashboard/organisms/release-provider-matrix` | Canonical authenticated releases workspace and current dashboard review/capture surface. |
+
+The TypeScript registry also tracks additional mirrored workspaces (`dashboard-audience`, `dashboard-insights`, `dashboard-earnings`, `settings-artist-profile`, `settings-links`). They are outside this rapid-audit set.
 
 ## What Is Not A Canonical Surface
 
-- `/ai` is a redirect, not a designed surface.
-- `/investors` is a redirect, not a designed surface.
+- `/ai` is a live marketing page excluded from the canonical review set.
+- `/investors` is a live marketing page excluded from the canonical review set.
 - Screenshot and admin review infrastructure already exists and is not redefined here.
 
 ## Current Source Files
 
 - [apps/web/lib/canonical-surfaces.ts](../apps/web/lib/canonical-surfaces.ts)
+- [apps/web/lib/canonical-surface-drift.ts](../apps/web/lib/canonical-surface-drift.ts)
 - [apps/web/lib/screenshots/registry.ts](../apps/web/lib/screenshots/registry.ts)
 - [apps/web/lib/screenshots/catalog.ts](../apps/web/lib/screenshots/catalog.ts)
+- [apps/web/lib/visual-qa/registry.ts](../apps/web/lib/visual-qa/registry.ts)
 - [apps/web/components/features/demo/showcase-surfaces.ts](../apps/web/components/features/demo/showcase-surfaces.ts)
 
-## Next Slice
+## Screenshot Alignment
 
-Slice 2 should align screenshot and admin metadata to these canonical surfaces rather than rebuilding the existing screenshot system.
+Screenshot and visual-qa metadata attach to these surfaces through `canonicalSurfaceId`. Do not rebuild the screenshot system. The fail-closed drift guard lives in [`apps/web/lib/canonical-surface-drift.ts`](../apps/web/lib/canonical-surface-drift.ts).
 
 ## How to add a marketing screenshot
 
