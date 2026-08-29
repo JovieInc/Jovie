@@ -1,8 +1,18 @@
 name: Production Controller Health
 
 on:
+  # Production Controller completion is the primary reconciliation signal.
+  # Marker Recovery completion retriggers this workflow only after recovered
+  # bytes are durable, so reconciliation resumes without founder input.
+  workflow_run:
+    workflows: [Production Controller, Production Marker Recovery]
+    types: [completed]
+    branches: [main]
+  # polling-exception: GitHub may drop a workflow_run delivery. This once-daily
+  # audit is a safety net only, owned by Gem/GitHub, with 24h maximum staleness.
+  # Revisit when GitHub exposes durable delivery receipts for workflow_run.
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '17 4 * * *'
   workflow_dispatch:
 
 permissions:
@@ -271,6 +281,34 @@ jobs:
           [[ "$source_ci_id" =~ ^[1-9][0-9]*$ ]] &&
             [[ "$source_ci_attempt" =~ ^[1-9][0-9]*$ ]] || incident malformed_source_ci
 
+          replay_source_ci_once() {
+            local recovery_reason="$1"
+            if [ "$source_ci_attempt" -ne 1 ]; then
+              incident ci_event_replay_exhausted
+            fi
+            local source_boundary
+            source_boundary="$(gh api \
+              "repos/$REPOSITORY/actions/runs/$source_ci_id/attempts/1")"
+            jq -e --argjson id "$source_ci_id" --arg sha "$current_sha" \
+              --arg repo "$REPOSITORY" --argjson workflow_id "$ci_workflow_id" '
+              .id == $id and .run_attempt == 1 and
+              .workflow_id == $workflow_id and .path == ".github/workflows/ci.yml" and
+              .head_sha == $sha and .head_branch == "main" and
+              .head_repository.full_name == $repo and .event == "push" and
+              .status == "completed" and .conclusion == "success"
+            ' >/dev/null <<<"$source_boundary" || incident changed_source_ci
+            local boundary_sha
+            boundary_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+            [[ "$boundary_sha" =~ ^[0-9a-f]{40}$ ]] || incident invalid_ci_replay_boundary
+            if [ "$boundary_sha" != "$current_sha" ]; then
+              echo "CI event replay was superseded by $boundary_sha; neutral."
+              exit 0
+            fi
+            gh run rerun "$source_ci_id"
+            echo "recovery_reason=$recovery_reason" >> "$GITHUB_OUTPUT"
+            echo "Replayed exact successful CI once ($recovery_reason)."
+          }
+
           expected_title="Production Controller $current_sha from CI $source_ci_id attempt $source_ci_attempt"
           controller_runs="$(gh api \
             "repos/$REPOSITORY/actions/workflows/production-controller.yml/runs?branch=main&event=workflow_run&head_sha=$current_sha&per_page=100")"
@@ -324,12 +362,14 @@ jobs:
               .head_sha == $sha and .head_branch == "main" and
               .head_repository.full_name == $repo and
               .event == "workflow_run" and
+              (.run_attempt | type == "number" and . > 0) and
               (.status | type == "string" and length > 0) and
               ((.conclusion | type) == "string" or .conclusion == null) and
               (.updated_at | type == "string" and length > 0)
             ' >/dev/null <<<"$live_controller" || incident changed_controller_run
             controller_status="$(jq -r '.status' <<<"$live_controller")"
             controller_conclusion="$(jq -r '.conclusion // empty' <<<"$live_controller")"
+            controller_attempt="$(jq -r '.run_attempt' <<<"$live_controller")"
             controller_updated="$(jq -r '.updated_at // empty' <<<"$live_controller")"
             echo "run_url=https://github.com/$REPOSITORY/actions/runs/$controller_id" \
               >> "$GITHUB_OUTPUT"
@@ -342,6 +382,35 @@ jobs:
             if [ "$controller_status" != "completed" ] || [ -z "$controller_conclusion" ]; then
               echo "Controller run $controller_id is not terminal yet ($controller_status/${controller_conclusion:-null})."
               exit 0
+            fi
+            if [ "$controller_conclusion" != "success" ] &&
+              [ "$controller_attempt" = "1" ] &&
+              [[ "$controller_conclusion" =~ ^(cancelled|failure|startup_failure|timed_out)$ ]]; then
+              # A failed attempt may be replayed only when its exact job list
+              # proves the reusable production workflow never started. This
+              # is the event-driven recovery for failures in coalescing, fleet
+              # admission, or exact CI authorization.
+              controller_jobs="$(gh api \
+                "repos/$REPOSITORY/actions/runs/$controller_id/attempts/1/jobs?per_page=100")"
+              if jq -e --argjson run_id "$controller_id" --arg sha "$current_sha" '
+                type == "object" and
+                (.total_count | type == "number") and
+                (.jobs | type == "array") and
+                .total_count == (.jobs | length) and
+                all(.jobs[];
+                  (.id | type == "number" and . > 0) and
+                  .run_id == $run_id and .run_attempt == 1 and
+                  .head_sha == $sha and .head_branch == "main" and
+                  (.name | type == "string" and length > 0) and
+                  (.status | type == "string" and length > 0) and
+                  ((.conclusion | type) == "string" or .conclusion == null)
+                ) and
+                ([.jobs[] | select(.name == "Production Release" and .status == "completed" and .conclusion == "skipped")] | length) == 1 and
+                ([.jobs[] | select(.name | startswith("Production Release /"))] | length) == 0
+              ' >/dev/null <<<"$controller_jobs"; then
+                replay_source_ci_once predeploy_controller_ci_replayed
+                exit 0
+              fi
             fi
             # Successful controllers should upload a marker. Re-classify once
             # before failing closed so artifact listing lag cannot open an
@@ -376,7 +445,8 @@ jobs:
               esac
 
               # Post-success grace: artifact listing / upload can lag job
-              # completion. Health is every 15m; wait up to 30m before paging.
+              # completion. Event recovery owns the immediate path; the daily
+              # safety audit waits up to 30m before paging.
               # (JOV-4442: false controller_completed_without_marker pages.)
               if [[ "$controller_updated" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T ]]; then
                 controller_epoch="$(date -u -d "$controller_updated" +%s)"
@@ -418,28 +488,7 @@ jobs:
             echo "Controller event remains inside the 15-minute delivery grace."
             exit 0
           fi
-          if [ "$source_ci_attempt" -ne 1 ]; then
-            incident ci_event_replay_exhausted
-          fi
-          source_boundary="$(gh api \
-            "repos/$REPOSITORY/actions/runs/$source_ci_id/attempts/1")"
-          jq -e --argjson id "$source_ci_id" --arg sha "$current_sha" \
-            --arg repo "$REPOSITORY" --argjson workflow_id "$ci_workflow_id" '
-            .id == $id and .run_attempt == 1 and
-            .workflow_id == $workflow_id and .path == ".github/workflows/ci.yml" and
-            .head_sha == $sha and .head_branch == "main" and
-            .head_repository.full_name == $repo and .event == "push" and
-            .status == "completed" and .conclusion == "success"
-          ' >/dev/null <<<"$source_boundary" || incident changed_source_ci
-          boundary_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
-          [[ "$boundary_sha" =~ ^[0-9a-f]{40}$ ]] || incident invalid_ci_replay_boundary
-          if [ "$boundary_sha" != "$current_sha" ]; then
-            echo "CI event replay was superseded by $boundary_sha; neutral."
-            exit 0
-          fi
-          gh run rerun "$source_ci_id"
-          echo "recovery_reason=ci_event_replayed" >> "$GITHUB_OUTPUT"
-          echo "Replayed exact successful CI once to redeliver the controller event."
+          replay_source_ci_once ci_event_replayed
 
       - name: Open one manual-recovery incident
         # Retired: fail closed in Actions; never create a GitHub backlog item.

@@ -16,8 +16,9 @@ on:
   workflow_run:
     # Queue-Deferred Release is downstream of this gate. Listening to it here
     # formed a reciprocal workflow_run loop that could retrigger both
-    # controllers without a new upstream capacity signal.
-    workflows: [CI, Production Controller]
+    # controllers without a new upstream capacity signal. Marker Recovery is
+    # upstream evidence: its completed run makes recovered bytes authoritative.
+    workflows: [CI, Production Controller, Production Marker Recovery]
     types: [completed]
   push:
     branches: [main]
