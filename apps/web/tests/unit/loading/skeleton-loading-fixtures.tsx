@@ -42,6 +42,36 @@ export function DuplicateLoadingOwnerFixture() {
   );
 }
 
+/** Deliberate-red: the loading owner has no accessible name. */
+export function MissingLoadingNameFixture() {
+  return (
+    <div
+      data-testid={SKELETON_LOADING_RED_FIXTURE_TEST_ID}
+      data-deliberate-red=''
+      data-red-kind='missing-name'
+      role='status'
+      aria-busy='true'
+      aria-live='polite'
+    >
+      <span aria-hidden='true'>Loading</span>
+    </div>
+  );
+}
+
+/** Deliberate-red: the loading owner does not announce politely. */
+export function MissingPoliteLiveFixture() {
+  return (
+    <div
+      data-testid={SKELETON_LOADING_RED_FIXTURE_TEST_ID}
+      data-deliberate-red=''
+      data-red-kind='missing-polite-live'
+      role='status'
+      aria-busy='true'
+      aria-label='Loading content'
+    />
+  );
+}
+
 /**
  * A small composition helper for testing that the canonical owner remains the
  * only status/busy node even when arbitrary decorative content is present.

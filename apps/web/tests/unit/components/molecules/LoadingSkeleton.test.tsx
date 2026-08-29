@@ -79,6 +79,19 @@ describe('LoadingSkeleton', () => {
     expect(loadingOwnerIssueCodes(inspectLoadingOwners(container))).toEqual([]);
   });
 
+  it('uses the semantic separator token in the auth composition', () => {
+    const { container } = render(<AuthFormSkeleton />);
+    const separators = container.querySelectorAll(
+      '[aria-hidden="true"] > .border-subtle'
+    );
+
+    expect(separators).toHaveLength(2);
+    separators.forEach(separator => {
+      expect(separator).toHaveClass('border-t', 'border-subtle');
+      expect(separator.className).not.toContain('bg-white/8');
+    });
+  });
+
   it('warns and falls back for invalid size utilities', () => {
     const { container } = render(
       <LoadingSkeleton height='rounded-md' width='grid-cols-2' />

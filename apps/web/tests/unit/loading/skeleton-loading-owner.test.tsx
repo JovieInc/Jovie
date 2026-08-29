@@ -8,6 +8,8 @@ import {
 import {
   CanonicalLoadingFixture,
   DuplicateLoadingOwnerFixture,
+  MissingLoadingNameFixture,
+  MissingPoliteLiveFixture,
   RawSkeletonLoadingFixture,
   SKELETON_LOADING_RED_FIXTURE_TEST_ID,
 } from './skeleton-loading-fixtures';
@@ -56,6 +58,26 @@ describe('canonical Skeleton loading owner contract', () => {
     expect(loadingOwnerIssueCodes(inspectLoadingOwners(container))).toEqual([
       'duplicate-owners',
       'competing-descendant',
+    ]);
+  });
+
+  it('rejects the missing-name deliberate-red fixture', () => {
+    const { container } = render(<MissingLoadingNameFixture />);
+    const fixture = screen.getByTestId(SKELETON_LOADING_RED_FIXTURE_TEST_ID);
+
+    expect(fixture).toHaveAttribute('data-red-kind', 'missing-name');
+    expect(loadingOwnerIssueCodes(inspectLoadingOwners(container))).toEqual([
+      'missing-accessible-name',
+    ]);
+  });
+
+  it('rejects the missing-live-region deliberate-red fixture', () => {
+    const { container } = render(<MissingPoliteLiveFixture />);
+    const fixture = screen.getByTestId(SKELETON_LOADING_RED_FIXTURE_TEST_ID);
+
+    expect(fixture).toHaveAttribute('data-red-kind', 'missing-polite-live');
+    expect(loadingOwnerIssueCodes(inspectLoadingOwners(container))).toEqual([
+      'missing-polite-live',
     ]);
   });
 });
