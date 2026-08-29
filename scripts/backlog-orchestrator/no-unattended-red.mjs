@@ -93,7 +93,10 @@ function createApi() {
   const sha = value => { const n = text(value)?.toLowerCase(); return n && /^[0-9a-f]{40}$/.test(n) ? n : null; };
   const prn = value => Number.isInteger(value) && value > 0 ? value : null;
   const iso = now => typeof now === 'string' ? now : new Date(now).toISOString();
-  const issueKey = signal => text(signal.issue) || (signal.pr ? `pr:${signal.pr}` : null) || text(signal.deliveryKey) || digest({ stallClass: signal.stallClass, pr: signal.pr || null, headSha: signal.headSha || null });
+  const workflowName = signal => text(signal.workflowName) || text(signal.workflow) || text(signal.workflow?.name);
+  const identifiedKey = signal => text(signal.issue) || (prn(signal.pr) ? `pr:${prn(signal.pr)}` : null);
+  const anonymousIdentity = signal => digest({ stallClass: text(signal.stallClass) || 'not-proven', workflow: workflowName(signal), issue: text(signal.issue), pr: prn(signal.pr), headSha: sha(signal.headSha) });
+  const issueKey = signal => identifiedKey(signal) || text(signal.deliveryKey) || anonymousIdentity(signal);
   const loopKeyFor = classified => digest({ issueKey: classified.issueKey });
   const leaseKeyFor = classified => digest({ issueKey: classified.issueKey, writer: classified.writer, headSha: classified.headSha });
   const backoffMs = attempt => Math.min(BACKOFF_MAX_MS, BACKOFF_BASE_MS * 2 ** (Math.max(1, Number.isInteger(attempt) ? attempt : 1) - 1));
@@ -111,7 +114,7 @@ function createApi() {
     if (explicit === 'not-proven') return 'not-proven';
     if (explicit && TYPED_ROUTES[explicit]) return explicit;
     if (explicit && FAILURE_STALLS[explicit]) return FAILURE_STALLS[explicit];
-    const workflow = text(signal.workflowName) || text(signal.workflow);
+    const workflow = workflowName(signal);
     if (workflow && WORKFLOW_STALLS[workflow]) {
       if (signal.conclusion === 'cancelled') return 'dropped-controller-event';
       if (signal.conclusion === 'failure' || signal.conclusion === 'timed_out') return WORKFLOW_STALLS[workflow];
@@ -139,8 +142,9 @@ function createApi() {
     const pr = prn(signal.pr_number ?? signal.pr);
     const headSha = sha(signal.head_sha ?? signal.headSha ?? signal.head);
     const issue = text(signal.issue_identifier) || text(signal.issue);
-    const deliveryKey = text(signal.delivery_key) || text(signal.deliveryKey) || text(signal.event_id) || digest({ stallClass, issue, pr, headSha, observedAt: iso(now) });
-    return { schema: NO_UNATTENDED_RED_SCHEMA, stallClass, mode, owner: typed.owner, writer: typed.writer, action, issue, pr, headSha, deliveryKey, issueKey: issueKey({ issue, pr, deliveryKey, stallClass, headSha }), proven, mechanical, observedAt: iso(now), mergeQueueIndependent: true, evidence: signal.evidence && typeof signal.evidence === 'object' ? signal.evidence : {} };
+    const workflow = workflowName(signal);
+    const deliveryKey = text(signal.delivery_key) || text(signal.deliveryKey) || text(signal.event_id) || anonymousIdentity({ stallClass, workflowName: workflow, issue, pr, headSha });
+    return { schema: NO_UNATTENDED_RED_SCHEMA, stallClass, mode, owner: typed.owner, writer: typed.writer, action, issue, pr, headSha, workflow, deliveryKey, issueKey: issueKey({ issue, pr, deliveryKey, stallClass, headSha, workflowName: workflow }), proven, mechanical, observedAt: iso(now), mergeQueueIndependent: true, evidence: signal.evidence && typeof signal.evidence === 'object' ? signal.evidence : {} };
   }
   function assertNoUnattendedRed(records) {
     const silent = (records || []).filter(record => {
@@ -157,7 +161,7 @@ function createApi() {
       return { ...existing, duplicate: true, observedAt: iso(now) };
     }
     const observedAt = iso(now);
-    const record = { schema: NO_UNATTENDED_RED_SCHEMA, loopKey: loopKeyFor(classified), leaseKey: leaseKeyFor(classified), stallClass: classified.stallClass, mode: classified.mode, owner: classified.owner, writer: classified.writer, action: classified.action, issue: classified.issue, issueKey: classified.issueKey, pr: classified.pr, headSha: classified.headSha, deliveryKey: classified.deliveryKey, proven: classified.proven === true, mechanical: classified.mechanical === true, attempt, attemptBudget: ATTEMPT_BUDGET, authorityBudget: AUTHORITY_BUDGET, backoffMs: backoffMs(Math.max(1, attempt)), nextProofAt: nextProofAt(observedAt, Math.max(1, attempt)), outcome: 'open', dispatchState: 'classified', terminal: false, externalMutations: 0, observedAt, reason: `${classified.stallClass}:${classified.action}`, evidence: classified.evidence };
+    const record = { schema: NO_UNATTENDED_RED_SCHEMA, loopKey: loopKeyFor(classified), leaseKey: leaseKeyFor(classified), stallClass: classified.stallClass, mode: classified.mode, owner: classified.owner, writer: classified.writer, action: classified.action, issue: classified.issue, issueKey: classified.issueKey, pr: classified.pr, headSha: classified.headSha, workflow: classified.workflow || null, deliveryKey: classified.deliveryKey, proven: classified.proven === true, mechanical: classified.mechanical === true, attempt, attemptBudget: ATTEMPT_BUDGET, authorityBudget: AUTHORITY_BUDGET, backoffMs: backoffMs(Math.max(1, attempt)), nextProofAt: nextProofAt(observedAt, Math.max(1, attempt)), outcome: 'open', dispatchState: 'classified', terminal: false, externalMutations: 0, observedAt, reason: `${classified.stallClass}:${classified.action}`, evidence: classified.evidence };
     assertNoUnattendedRed([record]);
     return record;
   }
@@ -211,11 +215,22 @@ function createApi() {
   }
   function reconcileMissedEvents(persistedRecords, observedSignals, { now = new Date().toISOString() } = {}) {
     const persisted = new Set((persistedRecords || []).map(record => record.issueKey || record.loopKey));
-    return (observedSignals || []).map(signal => classifyStall(signal, { now })).filter(classified => !persisted.has(classified.issueKey)).map(classified => openLoopRecord(classified, { now }));
+    const persistedAnonymous = new Set((persistedRecords || []).filter(record => !identifiedKey(record)).map(record => anonymousIdentity(record)));
+    return (observedSignals || []).map(signal => classifyStall(signal, { now })).filter(classified => !persisted.has(classified.issueKey) && (identifiedKey(classified) || !persistedAnonymous.has(anonymousIdentity(classified)))).map(classified => openLoopRecord(classified, { now }));
+  }
+  function preferQueueRecord(left, right) {
+    const rank = record => (record.outcome === 'escalated' ? 2 : record.outcome === 'open' ? 1 : 0);
+    if (rank(right) !== rank(left)) return rank(right) > rank(left) ? right : left;
+    return `${right.observedAt || ''}`.localeCompare(`${left.observedAt || ''}`) >= 0 ? right : left;
   }
   function projectSummerQueue(records, { now = new Date().toISOString() } = {}) {
     const source = [...(records || [])];
-    const items = source.filter(record => record.outcome !== 'healthy').sort((left, right) => `${left.issueKey}:${left.observedAt}`.localeCompare(`${right.issueKey}:${right.observedAt}`)).map(record => ({ ...Object.fromEntries(QUEUE_KEYS.map(key => [key, record[key]])), issue: record.issue, stallClass: record.stallClass, outcome: record.outcome, escalation: record.escalation || null }));
+    const collapsed = new Map();
+    for (const record of source.filter(record => record.outcome !== 'healthy')) {
+      const key = identifiedKey(record) || anonymousIdentity(record);
+      collapsed.set(key, collapsed.has(key) ? preferQueueRecord(collapsed.get(key), record) : record);
+    }
+    const items = [...collapsed.values()].sort((left, right) => `${left.issueKey}:${left.observedAt}`.localeCompare(`${right.issueKey}:${right.observedAt}`)).map(record => ({ ...Object.fromEntries(QUEUE_KEYS.map(key => [key, record[key]])), issue: record.issue, stallClass: record.stallClass, outcome: record.outcome, escalation: record.escalation || null }));
     const terminalTombstones = source.filter(record => record.outcome === 'healthy').map(record => ({ ...Object.fromEntries(QUEUE_KEYS.map(key => [key, record[key]])), issue: record.issue, pr: record.pr, outcome: record.outcome, terminal: record.terminal, observedAt: record.observedAt, reason: record.reason }));
     return { schema: SUMMER_QUEUE_SCHEMA, authority: 'Summer', observedAt: iso(now), items, terminalTombstones, counts: { open: items.filter(item => item.outcome === 'open').length, healthy: 0, escalated: items.filter(item => item.outcome === 'escalated').length, terminalHidden: terminalTombstones.length } };
   }
