@@ -313,9 +313,9 @@ export async function fillStripeInput(
 /**
  * Select Stripe's semantic card control.
  *
- * Hosted Checkout may mount an accordion button after its visible "Card"
- * label, briefly covering that label. The radio remains the form-state owner,
- * so drive it directly instead of racing Stripe's presentation layers.
+ * Hosted Checkout mounts an accordion button after its visible "Card" radio.
+ * Stripe controls the radio from that button, so wait for and drive the actual
+ * state owner instead of mutating presentation state directly.
  */
 export async function selectCardPaymentMethod(page: Page) {
   const cardPaymentMethod = page
@@ -325,12 +325,12 @@ export async function selectCardPaymentMethod(page: Page) {
   await expect(cardPaymentMethod).toBeVisible({ timeout: 15_000 });
 
   if (!(await cardPaymentMethod.isChecked())) {
-    await cardPaymentMethod.evaluate(element => {
-      if (!(element instanceof HTMLInputElement)) {
-        throw new Error('Stripe card payment method is not an input');
-      }
-      element.click();
-    });
+    const cardAccordion = page
+      .getByTestId('card-accordion-item-button')
+      .filter({ visible: true })
+      .first();
+    await expect(cardAccordion).toBeVisible({ timeout: 15_000 });
+    await cardAccordion.click();
     await expect(cardPaymentMethod).toBeChecked();
   }
 }

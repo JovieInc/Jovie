@@ -5,7 +5,7 @@ test.describe('Stripe card payment method selection', () => {
   test.describe.configure({ retries: 0 });
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test('checks the semantic radio when hosted presentation chrome covers it', async ({
+  test('waits for the hosted controller that owns the semantic radio state', async ({
     page,
   }) => {
     await page.setContent(`
@@ -18,15 +18,29 @@ test.describe('Stripe card payment method selection', () => {
           aria-label="Card"
           style="position: absolute; left: 16px; top: 42px"
         />
-        <button
-          type="button"
-          aria-label="Pay with card"
-          data-testid="card-accordion-item-button"
-          style="position: absolute; inset: 0; z-index: 2"
-        >
-          Card accordion
-        </button>
       </div>
+      <script>
+        const radio = document.querySelector('#card-method');
+        radio.addEventListener('click', event => {
+          event.preventDefault();
+          radio.checked = false;
+        });
+
+        setTimeout(() => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.setAttribute('aria-label', 'Pay with card');
+          button.setAttribute('data-testid', 'card-accordion-item-button');
+          button.style.cssText =
+            'position: absolute; inset: 0; z-index: 2; width: 240px; height: 80px';
+          button.textContent = 'Card accordion';
+          button.addEventListener('click', () => {
+            radio.checked = true;
+            radio.dispatchEvent(new Event('change', { bubbles: true }));
+          });
+          document.body.appendChild(button);
+        }, 100);
+      </script>
     `);
 
     const cardRadio = page.getByRole('radio', { name: 'Card' });
