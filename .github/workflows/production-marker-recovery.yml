@@ -281,26 +281,58 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Confirm recovered marker classifies as verified
+      - name: Confirm uploaded recovered marker bytes
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          controller_workflow_id="$(gh api \
-            "repos/$REPO/actions/workflows/production-controller.yml" --jq '.id')"
-          marker_state="$(node .github/scripts/production-marker-state.mjs \
-            --sha "$EXPECTED_SHA" \
-            --repo "$REPO" \
-            --controller-workflow-id "$controller_workflow_id")"
+          marker_name="production-generation-verified-$EXPECTED_SHA"
+          artifacts_json="$(gh api \
+            "repos/$REPO/actions/runs/${{ github.run_id }}/artifacts?name=$marker_name&per_page=100")"
           jq -e \
-            --arg deployment_id "$EXPECTED_DEPLOYMENT_ID" '
+            --arg marker_name "$marker_name" \
+            --argjson run_id "${{ github.run_id }}" '
               type == "object" and
-              .state == "verified" and
-              .reason == "exact_recovered_generation_verified" and
-              .deploymentId == $deployment_id
-            ' >/dev/null <<<"$marker_state" || {
-            echo "::error::Recovered marker did not classify as verified: $marker_state"
+              .total_count == 1 and
+              (.artifacts | type == "array" and length == 1) and
+              .artifacts[0].name == $marker_name and
+              .artifacts[0].expired == false and
+              .artifacts[0].workflow_run.id == $run_id and
+              .artifacts[0].workflow_run.head_branch == "main"
+            ' >/dev/null <<<"$artifacts_json" || {
+            echo "::error::Recovered marker upload is missing or foreign to this exact run."
             exit 1
           }
-          echo "Recovered exact verified-generation marker for $EXPECTED_SHA ($EXPECTED_DEPLOYMENT_ID)."
+          artifact_id="$(jq -r '.artifacts[0].id' <<<"$artifacts_json")"
+          archive="$RUNNER_TEMP/recovered-marker.zip"
+          extracted="$RUNNER_TEMP/recovered-marker-upload"
+          mkdir -p "$extracted"
+          gh api "repos/$REPO/actions/artifacts/$artifact_id/zip" > "$archive"
+          unzip -q "$archive" -d "$extracted"
+          cmp --silent \
+            "$RUNNER_TEMP/production-generation-verified.json" \
+            "$extracted/production-generation-verified.json" || {
+            echo "::error::Uploaded recovered marker bytes differ from the locally verified payload."
+            exit 1
+          }
+          jq -e \
+            --arg sha "$EXPECTED_SHA" \
+            --arg deployment_id "$EXPECTED_DEPLOYMENT_ID" \
+            --arg controller_run "${{ github.run_id }}" \
+            --arg controller_attempt "${{ github.run_attempt }}" \
+            --arg source_run "$SOURCE_CONTROLLER_RUN" \
+            --arg source_attempt "$SOURCE_CONTROLLER_ATTEMPT" '
+              .sha == $sha and
+              .deploymentId == $deployment_id and
+              .controllerRun == $controller_run and
+              .controllerAttempt == $controller_attempt and
+              .recoveredFromControllerRun == $source_run and
+              .recoveredFromControllerAttempt == $source_attempt
+            ' "$extracted/production-generation-verified.json" >/dev/null || {
+            echo "::error::Uploaded recovered marker payload lost its exact recovery binding."
+            exit 1
+          }
+          # The authoritative classifier requires this workflow run to finish
+          # successfully, so it can only classify the marker after this job exits.
+          echo "Uploaded exact recovered marker for $EXPECTED_SHA ($EXPECTED_DEPLOYMENT_ID); authoritative classification follows successful workflow completion."
