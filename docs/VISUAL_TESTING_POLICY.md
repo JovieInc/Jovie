@@ -43,11 +43,13 @@ source lacks:
 4. **Hygiene** — `pnpm storybook:quality` (no pure-black voids, no fake CTAs).
 5. **Ratchet** — multi-root floors in `scripts/story-coverage-baseline.json`
    may only improve; new uncovered components fail even if percent holds.
-6. **Rendered certification (JOV-5400)** — source-blind fail-closed evaluator
+6. **Rendered certification (JOV-5400 / JOV-5438)** — source-blind fail-closed evaluator
    for applicable design, copy, accessibility, interaction, layout-stability,
    theme, semantic-variant, tokenized-padding, and concentric-radius invariants.
    Deliberate-red fixtures must block; the current design-system landing batch
-   emits exact-head pass/block receipts.
+   emits exact-head pass/block receipts. The same receipt records the Shadcn /
+   Typeset outcome inventory for the enrolled primitive batch (MIT public
+   references only; missing/unknown benchmark dimensions fail closed).
 
 ### Commands
 

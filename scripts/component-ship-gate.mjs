@@ -9,6 +9,7 @@
  *   4. Story quality hygiene (no pure-black voids / fake CTAs)
  *   5. Multi-root story-coverage ratchet (lock_up + no uncovered growth)
  *   6. Fail-closed source-blind rendered certification (JOV-5400)
+ *      including the Shadcn/Typeset outcome inventory (JOV-5438)
  *
  * Usage:
  *   pnpm component-ship-gate
@@ -1214,6 +1215,18 @@ function printReport(report) {
     for (const item of rendered.receipt?.landingBatch ?? []) {
       console.log(`  landing ${item.id}: ${item.verdict}`);
     }
+    const outcome = rendered.receipt?.shadcnOutcome;
+    if (outcome) {
+      console.log(
+        `[component-ship-gate] shadcn-outcome: ${outcome.ok ? 'ok' : 'FAIL'} enrolled=${(outcome.enrolled ?? []).length}`
+      );
+      for (const item of outcome.fixtures ?? []) {
+        console.log(`  outcome-fixture ${item.id}: ${item.verdict}`);
+      }
+      for (const item of outcome.enrolledBatch ?? []) {
+        console.log(`  outcome-batch ${item.id}: ${item.verdict}`);
+      }
+    }
   } else {
     console.error('[component-ship-gate] rendered-cert: FAIL');
     if (rendered?.message) console.error(rendered.message);
@@ -1226,7 +1239,7 @@ function printReport(report) {
     console.log('[component-ship-gate] PASS');
   } else {
     console.error(
-      '[component-ship-gate] FAIL — shippable UI components require matching tests + stories + rendered certification (JOV-4421, JOV-5400)'
+      '[component-ship-gate] FAIL — shippable UI components require matching tests + stories + rendered certification (JOV-4421, JOV-5400, JOV-5438)'
     );
   }
 }

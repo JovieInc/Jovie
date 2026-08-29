@@ -107,6 +107,7 @@ describe('rendered component certification', () => {
     expect(report.sections.renderedCertification.receipt).toMatchObject({
       gate: 'component-ship-gate',
       headSha: HEAD,
+      shadcnOutcome: { ok: true, section: 'shadcnOutcome' },
     });
   });
 });
