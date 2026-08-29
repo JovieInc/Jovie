@@ -156,7 +156,7 @@ def capacity():
 
 def effective_capacity(host_capacity, gate):
     maximum = gate.get("remediationAdmission", {}).get("maxConcurrent")
-    if isinstance(maximum, bool) or not isinstance(maximum, int) or maximum < 1:
+    if isinstance(maximum, bool) or not isinstance(maximum, int) or maximum < 0:
         raise ValueError("typed remediation maxConcurrent is missing or invalid")
     return min(host_capacity, maximum)
 
@@ -484,12 +484,24 @@ def main():
             print(json.dumps(document, indent=2))
             return 0
 
+        worker_capacity = effective_capacity(capacity(), gate)
+        if worker_capacity == 0:
+            document.update(
+                status="ok",
+                remediation_admission="local_only",
+                capacity=0,
+                intake="blocked_missing_capacity_evidence",
+                selected=[],
+            )
+            write_artifact(document)
+            print(json.dumps(document, indent=2))
+            return 0
+
         authenticated, reason = auth_status()
         document["auth"] = {"github": reason}
         if not authenticated:
             raise RuntimeError(reason)
         all_open, eligible = inventory()
-        worker_capacity = effective_capacity(capacity(), gate)
         document.update(
             open_count=len(all_open),
             eligible_count=len(eligible),
