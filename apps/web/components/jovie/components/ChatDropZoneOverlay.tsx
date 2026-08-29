@@ -6,16 +6,6 @@ import { useMemo } from 'react';
 
 import type { PendingFile } from '../hooks/useChatFileAttachments';
 
-const ACCENT = '#7170ff';
-
-function tint(hex: string, alpha: number): string {
-  const h = hex.replace('#', '');
-  const r = Number.parseInt(h.slice(0, 2), 16);
-  const g = Number.parseInt(h.slice(2, 4), 16);
-  const b = Number.parseInt(h.slice(4, 6), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
-}
-
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
@@ -42,9 +32,6 @@ export function ChatDropZoneOverlay({
   isDragOver,
   pendingFiles,
 }: ChatDropZoneOverlayProps) {
-  const accent = ACCENT;
-  const tinted = useMemo(() => tint(accent, 0.16), [accent]);
-
   const kindCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const f of pendingFiles) {
@@ -67,18 +54,16 @@ export function ChatDropZoneOverlay({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
           className='system-b-chat-drop-zone-overlay'
-          aria-hidden='false'
-          role='presentation'
+          aria-label='Drop Files To Attach To This Thread'
+          aria-live='polite'
+          aria-atomic='true'
+          role='status'
+          data-transient-surface='file-drop'
         >
-          <div className='system-b-chat-drop-zone-border' />
           <div className='system-b-chat-drop-zone-content'>
-            <span
-              className='system-b-chat-drop-zone-icon'
-              style={{ background: tinted }}
-            >
+            <span className='system-b-chat-drop-zone-icon'>
               <Upload
-                className='h-7 w-7'
-                style={{ color: accent }}
+                className='system-b-chat-drop-zone-upload-icon'
                 strokeWidth={1.8}
               />
             </span>
