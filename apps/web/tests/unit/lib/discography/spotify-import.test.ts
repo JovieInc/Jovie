@@ -10,6 +10,10 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const mockDbUpdateWhere = vi.fn().mockResolvedValue([]);
+const mockDbUpdateSet = vi.fn().mockReturnValue({ where: mockDbUpdateWhere });
+const mockDbUpdate = vi.fn().mockReturnValue({ set: mockDbUpdateSet });
+
 // Mock external dependencies before imports
 vi.mock('@sentry/nextjs', async importOriginal => {
   const actual = await importOriginal<typeof import('@sentry/nextjs')>();
@@ -39,6 +43,7 @@ vi.mock('@/lib/db', () => ({
 
       return queryBuilder;
     }),
+    update: mockDbUpdate,
   },
 }));
 
@@ -67,6 +72,9 @@ const mockReconcileCreditedArtistProfiles = vi.fn().mockResolvedValue({
   reused: 0,
 });
 const mockCaptureWarning = vi.fn().mockResolvedValue(undefined);
+const mockEnsureImportedReleasePublishedByDefault = vi
+  .fn()
+  .mockResolvedValue(undefined);
 
 vi.mock('@/lib/spotify', () => ({
   getSpotifyArtistAlbums: mockGetSpotifyArtistAlbums,
@@ -130,6 +138,11 @@ vi.mock('@/lib/error-tracking', () => ({
   captureWarning: mockCaptureWarning,
 }));
 
+vi.mock('@/lib/library/approval-status.server', () => ({
+  ensureImportedReleasePublishedByDefault:
+    mockEnsureImportedReleasePublishedByDefault,
+}));
+
 describe('spotify-import', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -150,6 +163,10 @@ describe('spotify-import', () => {
       reused: 0,
     });
     mockCaptureWarning.mockResolvedValue(undefined);
+    mockEnsureImportedReleasePublishedByDefault.mockResolvedValue(undefined);
+    mockDbUpdate.mockReturnValue({ set: mockDbUpdateSet });
+    mockDbUpdateSet.mockReturnValue({ where: mockDbUpdateWhere });
+    mockDbUpdateWhere.mockResolvedValue([]);
     mockSafeParse.mockImplementation((id: unknown) => ({
       success: typeof id === 'string' && id.length > 0,
     }));
@@ -397,6 +414,86 @@ describe('spotify-import', () => {
   });
 
   describe('release metadata precedence', () => {
+    it('preserves imported metadata when marking an explicit release and publishes the first import', async () => {
+      const album = {
+        id: 'album-explicit',
+        name: 'Explicit Release',
+        album_type: 'single' as const,
+        total_tracks: 1,
+        release_date: '2024-01-01',
+        release_date_precision: 'day' as const,
+        artists: [{ id: 'artist-1', name: 'Artist Name' }],
+        images: [
+          {
+            url: 'https://example.com/explicit.jpg',
+            height: 640,
+            width: 640,
+          },
+        ],
+        uri: 'spotify:album:album-explicit',
+        external_urls: {
+          spotify: 'https://open.spotify.com/album/album-explicit',
+        },
+      };
+      const track = {
+        id: 'track-explicit',
+        name: 'Explicit Track',
+        track_number: 1,
+        disc_number: 1,
+        duration_ms: 180000,
+        explicit: true,
+        external_urls: {
+          spotify: 'https://open.spotify.com/track/track-explicit',
+        },
+        uri: 'spotify:track:track-explicit',
+        preview_url: null,
+        external_ids: { isrc: 'USABC2412345' },
+        artists: [{ id: 'artist-1', name: 'Artist Name' }],
+      };
+
+      mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
+        albums: [album],
+        total: 1,
+      });
+      mockGetSpotifyAlbums.mockResolvedValueOnce([
+        {
+          ...album,
+          tracks: { items: [track], total: 1, next: null },
+          label: 'Test Label',
+          popularity: 30,
+          copyrights: [],
+          external_ids: { upc: '123456789012' },
+        },
+      ]);
+      mockGetSpotifyTracks.mockResolvedValueOnce([track]);
+
+      const { importReleasesFromSpotify } = await import(
+        '@/lib/discography/spotify-import'
+      );
+
+      const result = await importReleasesFromSpotify(
+        'profile-123',
+        '6Ghvu1VvMGScGpOUJBAHNH'
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockUpsertRelease).toHaveBeenCalledTimes(1);
+      expect(mockUpsertRelease).toHaveBeenCalledWith(
+        expect.objectContaining({
+          artworkUrl: 'https://example.com/image.jpg',
+          releaseDate: new Date('2024-01-01'),
+          metadata: expect.objectContaining({ spotifyId: 'album-explicit' }),
+        })
+      );
+      expect(mockDbUpdateSet).toHaveBeenCalledWith(
+        expect.objectContaining({ isExplicit: true })
+      );
+      expect(mockEnsureImportedReleasePublishedByDefault).toHaveBeenCalledWith({
+        creatorProfileId: 'profile-123',
+        releaseId: 'release-1',
+      });
+    });
+
     it('fetches full track metadata and persists valid ISRC from track endpoint', async () => {
       mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
         albums: [
