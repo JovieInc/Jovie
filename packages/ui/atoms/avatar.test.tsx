@@ -216,4 +216,11 @@ describe('Avatar', () => {
     const atomSource = readFileSync(path.join(__dirname, 'avatar.tsx'), 'utf8');
     expect(atomSource).not.toContain('non-circular-identity-avatar');
   });
+
+  it('keeps the context-backed Avatar primitive behind a client boundary', () => {
+    const atomSource = readFileSync(path.join(__dirname, 'avatar.tsx'), 'utf8');
+
+    expect(atomSource.startsWith("'use client';")).toBe(true);
+    expect(atomSource).toContain('React.createContext');
+  });
 });

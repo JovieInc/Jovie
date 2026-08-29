@@ -1,3 +1,5 @@
+'use client';
+
 import { cn } from '@jovie/ui/lib/utils';
 import * as React from 'react';
 
