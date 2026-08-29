@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BASELINE_SCHEMA_VERSION,
   compareWithBaseline,
+  hasUnparseableTscFailure,
   parseTscOutput,
 } from '../../typecheck-scripts.mjs';
 
@@ -93,6 +94,35 @@ describe('scripts-typecheck: compareWithBaseline', () => {
     expect(result.staleEntries).toEqual([
       { file: 'scripts/fixed.mjs', code: 'TS2339', count: 0, baseline: 3 },
     ]);
+  });
+});
+
+describe('scripts-typecheck: compiler execution contract', () => {
+  it('rejects a nonzero compiler exit with no parseable diagnostics', () => {
+    expect(
+      hasUnparseableTscFailure({
+        status: 1,
+        counts: counts({}),
+        globalErrors: [],
+      })
+    ).toBe(true);
+  });
+
+  it('accepts a clean compiler exit and ordinary type-error diagnostics', () => {
+    expect(
+      hasUnparseableTscFailure({
+        status: 0,
+        counts: counts({}),
+        globalErrors: [],
+      })
+    ).toBe(false);
+    expect(
+      hasUnparseableTscFailure({
+        status: 2,
+        counts: counts({ 'scripts/a.mjs': { TS2305: 1 } }),
+        globalErrors: [],
+      })
+    ).toBe(false);
   });
 });
 

@@ -49,8 +49,6 @@ const artist = {
   name: 'Dua Lipa',
   handle: 'dualipa',
   spotify_id: 'artist-spotify-id',
-  image_url: null,
-  tagline: null,
   location: null,
   hometown: null,
   career_highlights: null,
@@ -60,7 +58,6 @@ const artist = {
   is_featured: false,
   marketing_opt_out: false,
   created_at: '2026-04-24T00:00:00.000Z',
-  settings: null,
 } satisfies Artist;
 
 const contentPrefs: Record<NotificationContentType, boolean> = {

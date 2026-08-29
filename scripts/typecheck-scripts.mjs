@@ -144,6 +144,10 @@ export function totalErrors(counts) {
   return total;
 }
 
+export function hasUnparseableTscFailure({ status, counts, globalErrors }) {
+  return status !== 0 && counts.size === 0 && globalErrors.length === 0;
+}
+
 /** @param {ErrorCounts} counts */
 export function toBaselineJson(counts, extra = {}) {
   /** @type {Record<string, Record<string, number>>} */
@@ -239,13 +243,21 @@ export function evaluateTypecheckBaseline({
   env = process.env,
   tool,
 }) {
-  const { output } = runTscProject({
+  const { status, output } = runTscProject({
     tsconfig,
     extraArgs,
     env,
     prefix,
   });
   const { counts, globalErrors, lines } = parseTscOutput(output);
+
+  if (hasUnparseableTscFailure({ status, counts, globalErrors })) {
+    console.error(
+      `[${prefix}] FAIL — tsc exited ${status} without parseable diagnostics; the check itself is broken.`
+    );
+    if (output.trim()) console.error(output.trim());
+    process.exit(1);
+  }
 
   if (globalErrors.length > 0) {
     console.error(
