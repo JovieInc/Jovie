@@ -759,6 +759,19 @@ describe('automation-verify affected scope', () => {
     ).toBe('full');
   });
 
+  it('keeps reconciler-only changes inside the bounded rehabilitation lane', () => {
+    for (const changedPath of [
+      'scripts/hermes/symphony-reconciler.py',
+      'scripts/hermes/tests/symphony-reconciler.test.py',
+    ]) {
+      const plan = buildAffectedTestPlan([changedPath]);
+      expect(plan.mode).toBe('selected');
+      expect(plan.pythonUnittestTests).toContain(
+        'scripts/hermes/tests/symphony-reconciler.test.py'
+      );
+    }
+  });
+
   it('selects the No Unattended Red contracts without unrelated product tests', () => {
     const lane = [
       'scripts/backlog-orchestrator/no-unattended-red.mjs',

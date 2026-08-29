@@ -858,7 +858,22 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     queue = queue_value if isinstance(queue_value, dict) else {"status": "unknown"}
     closure_health = validate_closure_health(signals.get("closureHealth"))
     closure_intake_allowed = closure_health["newIssueIntakeAllowed"] is True
-    normalized_signals = {**signals, "closureHealth": closure_health}
+    concurrency_evidence_value = signals.get("concurrencyEvidence")
+    concurrency_evidence = (
+        concurrency_evidence_value
+        if isinstance(concurrency_evidence_value, dict)
+        and isinstance(concurrency_evidence_value.get("accepted"), bool)
+        else {
+            "schema": CONCURRENCY_SCHEMA,
+            "accepted": False,
+            "reason": "capacity-evidence-missing-malformed-or-stale",
+        }
+    )
+    normalized_signals = {
+        **signals,
+        "closureHealth": closure_health,
+        "concurrencyEvidence": concurrency_evidence,
+    }
     review = validate_independent_review(
         signals.get("independentReview"),
         main.get("sha"),
@@ -987,7 +1002,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and production.get("status") == "green"
         and valid_commit_sha(production.get("deployedSha"))
     )
-    evidence = signals.get("concurrencyEvidence") or {}
+    evidence = concurrency_evidence
     capacity_fresh = evidence.get("accepted") is True
     measured_target = evidence.get("target")
     gem_concurrency = (

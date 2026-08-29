@@ -582,6 +582,21 @@ class DeploymentBindingTests(unittest.TestCase):
         )
         self.assertNotIn("draft-pr", receipt["workAdmission"]["activities"])
 
+    def test_missing_or_malformed_capacity_normalizes_to_local_only_receipt(self):
+        for evidence in (None, {"schema": "malformed"}):
+            with self.subTest(evidence=evidence):
+                signals = dict(GREEN_SIGNALS)
+                signals["concurrencyEvidence"] = evidence
+
+                receipt = self.evaluate(signals)
+
+                self.assertFalse(receipt["signals"]["concurrencyEvidence"]["accepted"])
+                self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+                self.assertFalse(receipt["workAdmission"]["newImplementationAllowed"])
+                self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
+                self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
+                self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 0)
+
     def test_closure_health_red_blocks_new_issue_lease_without_blocking_queue_or_remediation(self):
         signals = dict(GREEN_SIGNALS)
         signals["closureHealth"] = {

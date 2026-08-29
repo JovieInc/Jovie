@@ -429,6 +429,7 @@ const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/hermes/gem-repo-drain-cycle.py',
   'scripts/hermes/gem_repo_registry.py',
   'scripts/hermes/gem_rehabilitation_policy.py',
+  'scripts/hermes/symphony-reconciler.py',
   'scripts/hermes/install-gem-fleet-controller.sh',
   'scripts/hermes/install-gem-pr-rehabilitation.sh',
   'scripts/hermes/systemd/gem-pr-drain.service',
@@ -437,6 +438,7 @@ const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/hermes/tests/gem-ops-hud.test.py',
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
+  'scripts/hermes/tests/symphony-reconciler.test.py',
 ]);
 const NO_UNATTENDED_RED_PRIMARY_INPUTS = new Set([
   'scripts/backlog-orchestrator/no-unattended-red.mjs',
