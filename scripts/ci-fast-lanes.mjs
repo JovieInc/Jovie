@@ -71,6 +71,12 @@ const LANES = [
     run: runGuardrails,
   },
   {
+    id: 'design-system-source-ratchet',
+    name: 'Design-system source count ratchet',
+    nextLocalCommand: 'pnpm design:source-count-ratchet',
+    run: runDesignSystemSourceRatchet,
+  },
+  {
     id: 'design-conformance',
     name: 'Design Conformance',
     nextLocalCommand: 'pnpm design:conformance:gate',
@@ -112,6 +118,7 @@ export const LANE_GROUPS = Object.freeze({
     'eslint-server-boundaries',
     'scripts-typecheck',
     'guardrails',
+    'design-system-source-ratchet',
     'design-conformance',
     'ios-fast',
     'profile-admission',
@@ -441,6 +448,27 @@ function runGuardrails() {
     }
   }
   return { code: 0, output: combined };
+}
+
+function runDesignSystemSourceRatchet() {
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+    return {
+      code: 0,
+      output:
+        'Design-system source ratchet skipped (no Jovie product files changed)\n',
+      skipped: true,
+    };
+  }
+  const selected = selectedProductLanes();
+  if (!selected.has('web')) {
+    return {
+      code: 0,
+      output: 'No web product lane selected\n',
+      skipped: true,
+    };
+  }
+  return shell(LANE_COMMANDS['design-system-source-ratchet']);
 }
 
 function runDesignConformance() {
