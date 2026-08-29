@@ -3180,6 +3180,10 @@ describe('CI E2E smoke workflow', () => {
       'sendChatMessage(TEST_SPOTIFY_ARTIST.url)'
     );
     expect(goldenPathSpec).toContain(
+      'fillControlledInputUntilEnabled(input, sendButton, text)'
+    );
+    expect(goldenPathSpec).toContain('.filter({ visible: true })');
+    expect(goldenPathSpec).toContain(
       'Protected Golden Path fixture is already owned; refusing to detach'
     );
     expect(goldenPathSpec).toContain('user_profile_claims upc');
