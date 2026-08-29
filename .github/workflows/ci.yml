@@ -4273,6 +4273,9 @@ jobs:
           MUSICFETCH_API_TOKEN: ${{ secrets.MUSICFETCH_API_TOKEN }}
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          STRIPE_PRICE_PRO_MONTHLY: ${{ secrets.STRIPE_PRICE_PRO_MONTHLY }}
 
       - name: Upload Playwright Artifacts on Failure
         if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
