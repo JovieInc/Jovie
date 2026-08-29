@@ -432,16 +432,20 @@ describe('production marker attempt state', () => {
 describe('recovered production marker state', () => {
   const recoveryRunId = 789;
 
-  function recoveryDispatchRun(status: string, conclusion: string | null) {
+  function markerRecoveryRun(
+    status: string,
+    conclusion: string | null,
+    event = 'workflow_dispatch'
+  ) {
     return {
       id: recoveryRunId,
       run_attempt: 1,
       workflow_id: workflowId + 1,
       path: '.github/workflows/production-marker-recovery.yml',
-      head_sha: 'c'.repeat(40),
+      head_sha: event === 'workflow_run' ? sha : 'c'.repeat(40),
       head_branch: 'main',
       head_repository: { full_name: repo },
-      event: 'workflow_dispatch',
+      event,
       status,
       conclusion,
     };
@@ -463,7 +467,7 @@ describe('recovered production marker state', () => {
         recoveredFromControllerRun: String(controllerRun),
         recoveredFromControllerAttempt: '1',
       },
-      attemptRun: recoveryDispatchRun('completed', 'success'),
+      attemptRun: markerRecoveryRun('completed', 'success'),
       attemptJobs: [],
       originalRun: run(1, 'completed', 'failure'),
       originalJobs: [
@@ -491,6 +495,53 @@ describe('recovered production marker state', () => {
     });
   });
 
+  it('verifies an event-driven recovered marker bound to the exact generation', () => {
+    const marker = recoveredMarker();
+    marker.attemptRun = markerRecoveryRun(
+      'completed',
+      'success',
+      'workflow_run'
+    );
+
+    expect(
+      classifyProductionMarkerEvidence(
+        evidence({ markers: [marker], latestRun: undefined })
+      )
+    ).toMatchObject({
+      state: 'verified',
+      reason: 'exact_recovered_generation_verified',
+      controllerRun: recoveryRunId,
+      controllerAttempt: 1,
+    });
+  });
+
+  it('rejects event-driven recovery provenance for a different generation', () => {
+    const marker = recoveredMarker();
+    marker.attemptRun = {
+      ...markerRecoveryRun('completed', 'success', 'workflow_run'),
+      head_sha: 'd'.repeat(40),
+    };
+
+    expect(
+      classifyProductionMarkerEvidence(evidence({ markers: [marker] }))
+    ).toMatchObject({
+      state: 'manual',
+      reason: 'contradictory_marker_attempt',
+    });
+  });
+
+  it('rejects unsupported recovery events', () => {
+    const marker = recoveredMarker();
+    marker.attemptRun = markerRecoveryRun('completed', 'success', 'push');
+
+    expect(
+      classifyProductionMarkerEvidence(evidence({ markers: [marker] }))
+    ).toMatchObject({
+      state: 'manual',
+      reason: 'contradictory_marker_attempt',
+    });
+  });
+
   it('fails closed when the recovered source run was rolled back', () => {
     const marker = recoveredMarker();
     marker.originalJobs = [
@@ -511,7 +562,7 @@ describe('recovered production marker state', () => {
 
   it('fails closed when the recovery run did not complete successfully', () => {
     const marker = recoveredMarker();
-    marker.attemptRun = recoveryDispatchRun('completed', 'failure');
+    marker.attemptRun = markerRecoveryRun('completed', 'failure');
     expect(
       classifyProductionMarkerEvidence(evidence({ markers: [marker] }))
     ).toMatchObject({

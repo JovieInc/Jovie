@@ -123,21 +123,24 @@ function markerNameForAttempt(sha, attempt) {
 }
 
 /**
- * A recovered marker is written by the bounded workflow_dispatch recovery
- * path after it re-proves canonical ownership and every exact runtime probe
- * for a generation whose original controller run never preserved a marker.
- * The uploading recovery run replaces the controller-run binding; the payload
- * must name the exact original controller run attempt it recovers.
+ * A recovered marker is written by the bounded event-driven or manual recovery
+ * path after it re-proves canonical ownership and every exact runtime probe for
+ * a generation whose original controller run never preserved a marker. The
+ * uploading recovery run replaces the controller-run binding; the payload must
+ * name the exact original controller run attempt it recovers.
  */
 function validateMarkerRecoveryRun(run, context, attempt) {
   if (!run || typeof run !== 'object') return false;
+  const trustedRecoveryEvent =
+    run.event === 'workflow_dispatch' ||
+    (run.event === 'workflow_run' && run.head_sha === context.sha);
   return (
     sameInteger(run.id, context.controllerRun) &&
     sameInteger(run.run_attempt, attempt) &&
     run.path === MARKER_RECOVERY_PATH &&
     run.head_branch === 'main' &&
     run.head_repository?.full_name === context.repo &&
-    run.event === 'workflow_dispatch' &&
+    trustedRecoveryEvent &&
     run.status === 'completed' &&
     run.conclusion === 'success'
   );

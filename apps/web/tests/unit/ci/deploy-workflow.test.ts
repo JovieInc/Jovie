@@ -4867,6 +4867,8 @@ describe('production marker recovery workflow (JOV-4965)', () => {
     expect(markerState).toContain('recoveredFromControllerAttempt');
     expect(markerState).toContain("'exact_recovered_generation_verified'");
     expect(markerState).toContain("run.event === 'workflow_dispatch'");
+    expect(markerState).toContain("run.event === 'workflow_run'");
+    expect(markerState).toContain('run.head_sha === context.sha');
     expect(markerState).toContain('unsafe_or_contradictory_rollback');
   });
 });
