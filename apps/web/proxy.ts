@@ -6,7 +6,12 @@ import {
 } from 'next/server';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
-import { resolveAgenticHomepageProxyResponse } from '@/lib/agentic/homepage-proxy';
+import {
+  AGENTIC_HOMEPAGE_INTERNAL_MARKER,
+  AGENTIC_HOMEPAGE_INTERNAL_MARKER_VALUE,
+  AGENTIC_HOMEPAGE_INTERNAL_PATH,
+  resolveAgenticHomepageProxyResponse,
+} from '@/lib/agentic/homepage-proxy';
 import { buildProtectedAuthRedirectUrl } from '@/lib/auth/build-auth-route-url';
 import { handleInvestorRequest } from '@/lib/auth/investor-portal';
 import { handleProxyRequest } from '@/lib/auth/proxy-request-handler';
@@ -166,8 +171,13 @@ export default async function middleware(
     return createProbeDropResponse();
   }
 
-  const agenticHomepageResponse = resolveAgenticHomepageProxyResponse(req);
-  if (agenticHomepageResponse) return agenticHomepageResponse;
+  if (
+    req.nextUrl.pathname === AGENTIC_HOMEPAGE_INTERNAL_PATH &&
+    req.headers.get(AGENTIC_HOMEPAGE_INTERNAL_MARKER) !==
+      AGENTIC_HOMEPAGE_INTERNAL_MARKER_VALUE
+  ) {
+    return createFastNotFoundResponse();
+  }
 
   // The profile-mode marker is a private destination for afterFiles rewrites.
   // Proxy executes before those rewrites, so a marker present here can only be
@@ -206,6 +216,14 @@ export default async function middleware(
   // ========================================================================
   const investorResponse = await handleInvestorRequest(req, event);
   if (investorResponse) return investorResponse;
+
+  // Representation negotiation belongs only to the canonical Jovie host.
+  // Retired support, investor, and meetjovie hosts must preserve their
+  // established redirects even when an agent prefers Markdown.
+  if (hostInfo.isMainHost) {
+    const agenticHomepageResponse = resolveAgenticHomepageProxyResponse(req);
+    if (agenticHomepageResponse) return agenticHomepageResponse;
+  }
 
   if (isTestAuthBypassEnabled()) {
     const testBypassUserId = resolveTestBypassUserId(req.headers, req.cookies);

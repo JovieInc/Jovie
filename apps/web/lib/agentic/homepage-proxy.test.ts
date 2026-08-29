@@ -1,7 +1,10 @@
 import { NextRequest } from 'next/server';
 import { describe, expect, it } from 'vitest';
 import {
+  AGENTIC_HOMEPAGE_INTERNAL_MARKER,
+  AGENTIC_HOMEPAGE_INTERNAL_MARKER_VALUE,
   AGENTIC_HOMEPAGE_INTERNAL_PATH,
+  appendVaryToken,
   resolveAgenticHomepageProxyResponse,
 } from './homepage-proxy';
 
@@ -33,9 +36,15 @@ describe('agentic homepage proxy negotiation', () => {
       return;
     }
 
-    expect(response?.headers.get('x-middleware-rewrite')).toBe(
-      `https://jov.ie${AGENTIC_HOMEPAGE_INTERNAL_PATH}`
+    const rewrite = new URL(
+      response?.headers.get('x-middleware-rewrite') ?? 'https://invalid'
     );
+    expect(rewrite.pathname).toBe(AGENTIC_HOMEPAGE_INTERNAL_PATH);
+    expect(
+      response?.headers.get(
+        `x-middleware-request-${AGENTIC_HOMEPAGE_INTERNAL_MARKER}`
+      )
+    ).toBe(AGENTIC_HOMEPAGE_INTERNAL_MARKER_VALUE);
     expect(response?.headers.get('vary')).toBe('Accept');
   });
 
@@ -45,5 +54,13 @@ describe('agentic homepage proxy negotiation', () => {
     );
 
     expect(response).toBeNull();
+  });
+
+  it('preserves framework-owned Vary tokens and de-duplicates Accept', () => {
+    const headers = new Headers({ Vary: 'RSC, Accept-Encoding, accept' });
+
+    appendVaryToken(headers, 'Accept');
+
+    expect(headers.get('Vary')).toBe('RSC, Accept-Encoding, accept');
   });
 });

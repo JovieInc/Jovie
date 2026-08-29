@@ -1241,8 +1241,12 @@ describe('proxy.ts middleware', () => {
       });
       const res = await callMiddleware(req);
 
-      expect(res.headers.get('x-middleware-rewrite')).toBe(
-        'https://localhost/jovie-agentic/home'
+      const rewrite = new URL(
+        res.headers.get('x-middleware-rewrite') ?? 'https://invalid'
+      );
+      expect(rewrite.pathname).toBe('/jovie-agentic/home');
+      expect(res.headers.get('x-middleware-request-x-jovie-agentic-home')).toBe(
+        'root'
       );
       expect(res.headers.get('vary')).toContain('Accept');
       expect(mocks.getUserState).not.toHaveBeenCalled();
@@ -1261,10 +1265,25 @@ describe('proxy.ts middleware', () => {
       expect(res.headers.get('x-middleware-rewrite')).toBeNull();
     });
 
-    it('leaves the internal rewrite target to Next route handling', async () => {
+    it('blocks direct access to the internal representation route', async () => {
       const req = createUnauthenticatedRequest({
         pathname: '/jovie-agentic/home',
         headers: { Accept: 'text/markdown' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.headers.get('x-middleware-rewrite')).toBeNull();
+      expect(res.status).toBe(404);
+      expect(res.headers.get('x-robots-tag')).toBe('none');
+    });
+
+    it('allows the proxy-marked internal rewrite to reach route handling', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/jovie-agentic/home',
+        headers: {
+          Accept: 'text/markdown',
+          'x-jovie-agentic-home': 'root',
+        },
       });
       const res = await callMiddleware(req);
 
@@ -1797,6 +1816,19 @@ describe('proxy.ts middleware', () => {
       expect(location).toContain('jov.ie');
       expect(location).toContain('/some-page');
     });
+
+    it('preserves the redirect for a Markdown-preferred root request', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        hostname: 'meetjovie.com',
+        headers: { Accept: 'text/markdown' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(301);
+      expect(res.headers.get('location')).toContain('https://jov.ie/');
+      expect(res.headers.get('x-middleware-rewrite')).toBeNull();
+    });
   });
 
   describe('support.jov.ie redirect', () => {
@@ -1811,6 +1843,19 @@ describe('proxy.ts middleware', () => {
       expect(res.status).toBe(308);
       const location = res.headers.get('location');
       expect(location).toBe('https://jov.ie/support?ref=123');
+    });
+
+    it('preserves the redirect for a Markdown-preferred root request', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        hostname: 'support.jov.ie',
+        headers: { Accept: 'text/markdown' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(308);
+      expect(res.headers.get('location')).toBe('https://jov.ie/support');
+      expect(res.headers.get('x-middleware-rewrite')).toBeNull();
     });
 
     it('redirects support.jov.ie investor paths before investor handling runs', async () => {
@@ -1889,6 +1934,21 @@ describe('proxy.ts middleware', () => {
       expect(res.headers.get('location')).toContain(
         'https://jov.ie/investor-portal'
       );
+    });
+
+    it('preserves the redirect for a Markdown-preferred root request', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        hostname: 'investors.jov.ie',
+        headers: { Accept: 'text/markdown' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(301);
+      expect(res.headers.get('location')).toContain(
+        'https://jov.ie/investor-portal'
+      );
+      expect(res.headers.get('x-middleware-rewrite')).toBeNull();
     });
   });
 });
