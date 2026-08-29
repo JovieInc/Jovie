@@ -78,7 +78,7 @@ describe('Noir Ion — approved dark anchors', () => {
     );
   });
 
-  it('keeps accent semantics for Ultra, Pulse, Aqua, Mint, Gold, Flare', () => {
+  it('keeps accent semantics for Ultra, Pulse, Aqua, Mint, Orange, Red', () => {
     expect(dsDark).toContain('--color-accent-purple: #a982ff;');
     expect(dsDark).toContain('--color-accent-pink: #ff48d2;');
     expect(dsDark).toContain('--color-accent-teal: #24f6d2;');

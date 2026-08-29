@@ -365,6 +365,26 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     url: '/instant-merch',
   },
   {
+    glob: '(marketing)/youtube-thumbnails/page.tsx',
+    recipeId: 'feature',
+    renderedSections: approvedBindings(
+      'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx',
+      'hero',
+      'how-it-works',
+      'feature-grid',
+      'pricing'
+    ),
+    bindingEvidence: {
+      status: 'verified',
+      source: 'route implementation 2026-08-28',
+      notes:
+        'Uses canonical System B marketing primitives and a product-callout preview without identity imagery.',
+    },
+    status: 'active',
+    specVersion: '1.2.0',
+    url: '/youtube-thumbnails',
+  },
+  {
     glob: '(marketing)/launch/page.tsx',
     recipeId: 'launch',
     renderedSections: approvedBindings(

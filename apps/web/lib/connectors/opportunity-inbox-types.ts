@@ -6,7 +6,15 @@ export type OpportunityInboxCardCategory =
   | 'suggestion'
   | 'tour_date'
   | 'report'
-  | 'brand_deal';
+  | 'brand_deal'
+  | 'workflow_capture';
+
+export interface OpportunityInboxWorkflowCaptureData {
+  readonly instructions: string;
+  readonly startUrl: string | null;
+  readonly expiresAt: string;
+  readonly state: 'pending' | 'uploaded_needs_review';
+}
 
 export interface OpportunityInboxReportBreakdownItem {
   readonly label: string;
@@ -47,6 +55,8 @@ export interface OpportunityInboxCardViewModel {
   readonly brandDealRankingScore?: number;
   /** Present only when category === 'report'. */
   readonly report?: OpportunityInboxReportData;
+  /** Present only when category === 'workflow_capture'. */
+  readonly workflowCapture?: OpportunityInboxWorkflowCaptureData;
 }
 
 export interface OpportunityInboxTourDateItem {

@@ -781,6 +781,43 @@ describe('automation-verify affected scope', () => {
     ).toBe('full');
   });
 
+  it('selects the No Unattended Red contracts without unrelated product tests', () => {
+    const lane = [
+      'scripts/backlog-orchestrator/no-unattended-red.mjs',
+      'scripts/backlog-orchestrator/delivery-state-machine.mjs',
+      'scripts/backlog-orchestrator/__tests__/no-unattended-red.test.mjs',
+      'scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs',
+      '.github/workflows/delivery-control-receipts.yml',
+      'canon/invariants.jsonl',
+      'scripts/hermes/gem-ops-hud.py',
+      'scripts/hermes/tests/gem-ops-hud.test.py',
+      'scripts/lib/ownerless-recovery-policy.mjs',
+      'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
+      'scripts/invariants/registry.test.mjs',
+      ...AFFECTED_TEST_SELECTOR_MANIFEST,
+    ];
+    expect(buildAffectedTestPlan(lane)).toMatchObject({
+      mode: 'selected',
+      selectedTests: [],
+      pythonUnittestTests: ['scripts/hermes/tests/gem-ops-hud.test.py'],
+      scriptVitestTests: [
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
+      ],
+      nodeTests: [
+        'scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs',
+        'scripts/backlog-orchestrator/__tests__/no-unattended-red.test.mjs',
+        'scripts/invariants/registry.test.mjs',
+      ],
+    });
+    expect(
+      buildAffectedTestPlan([
+        ...lane,
+        'scripts/backlog-orchestrator/unknown-red-peer.mjs',
+      ]).mode
+    ).toBe('full');
+  });
+
   it('selects the bounded FX webhook + Actions cache GC contract and fails closed on unrelated files', () => {
     expect(buildAffectedTestPlan(ROLLING_CI_FX_CACHE_GC_LANE)).toMatchObject({
       mode: 'selected',

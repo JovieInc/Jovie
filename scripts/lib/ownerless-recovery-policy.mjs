@@ -30,7 +30,7 @@ const FOCUSED_PATHS = Object.freeze([
   {
     lane: 'delivery-control',
     pattern:
-      /^scripts\/backlog-orchestrator\/(?:delivery-state-machine|admission-disposition)\.mjs$/,
+      /^scripts\/backlog-orchestrator\/(?:delivery-state-machine|admission-disposition|no-unattended-red)\.mjs$/,
   },
   {
     lane: 'waitlist-canary',

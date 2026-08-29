@@ -1,0 +1,83 @@
+{
+  "schema": "jovie.oklch-palette/v1",
+  "issue": "JOV-5388",
+  "authority": "founder-locked",
+  "authoredSpace": "oklch",
+  "projection": "srgb-hex",
+  "semantics": { "success": "mint", "warning": "orange", "danger": "red" },
+  "elevation": {
+    "tokens": ["surface-0", "surface-1", "surface-2", "surface-3"],
+    "dark": { "order": "recessed-to-raised", "lightness": "monotonic-increasing" },
+    "light": { "peak": "surface-1", "recede": ["surface-1", "surface-2", "surface-3"] }
+  },
+  "swatches": {
+    "surface-0": { "light": { "oklch": "oklch(97.02% 0 0)", "hex": "#F5F5F5" }, "dark": { "oklch": "oklch(13.43% 0.0122 264.69)", "hex": "#06080D" } },
+    "surface-1": { "light": { "oklch": "oklch(100.00% 0 0)", "hex": "#FFFFFF" }, "dark": { "oklch": "oklch(19.24% 0.0257 266.62)", "hex": "#0F1420" } },
+    "surface-2": { "light": { "oklch": "oklch(96.40% 0.0029 264.54)", "hex": "#F2F3F5" }, "dark": { "oklch": "oklch(22.38% 0.0308 267.18)", "hex": "#151B2A" } },
+    "surface-3": { "light": { "oklch": "oklch(94.32% 0.0042 271.37)", "hex": "#EBECEF" }, "dark": { "oklch": "oklch(26.08% 0.0364 263.63)", "hex": "#1B2436" } },
+    "text-primary": { "light": { "oklch": "oklch(15.43% 0 0)", "hex": "#0C0C0C" }, "dark": { "oklch": "oklch(97.58% 0.0057 264.53)", "hex": "#F5F7FB" } },
+    "ion": { "light": { "oklch": "oklch(62.25% 0.2069 278.85)", "hex": "#7170FF" }, "dark": { "oklch": "oklch(71.95% 0.1626 240.25)", "hex": "#11AFFF" } },
+    "ultra": { "light": { "oklch": "oklch(55.23% 0.2847 296.78)", "hex": "#8B1EFF" }, "dark": { "oklch": "oklch(69.82% 0.1792 295.80)", "hex": "#A982FF" } },
+    "pulse": { "light": { "oklch": "oklch(57.91% 0.2257 355.70)", "hex": "#D61A7F" }, "dark": { "oklch": "oklch(70.73% 0.2552 339.69)", "hex": "#FF48D2" } },
+    "aqua": { "light": { "oklch": "oklch(62.08% 0.1074 184.32)", "hex": "#0F9B8E" }, "dark": { "oklch": "oklch(87.20% 0.1577 176.54)", "hex": "#24F6D2" } },
+    "mint": { "light": { "oklch": "oklch(61.72% 0.1624 146.43)", "hex": "#2F9E44" }, "dark": { "oklch": "oklch(81.65% 0.1857 155.04)", "hex": "#39E58C" } },
+    "orange": { "light": { "oklch": "oklch(77.03% 0.1741 64.05)", "hex": "#FF9800" }, "dark": { "oklch": "oklch(86.15% 0.1423 82.66)", "hex": "#FFC857" } },
+    "red": { "light": { "oklch": "oklch(61.14% 0.2422 24.90)", "hex": "#F3122D" }, "dark": { "oklch": "oklch(71.03% 0.1852 14.41)", "hex": "#FF677D" } }
+  },
+  "energyBands": {
+    "policy": { "equalLightnessTarget": false, "pastelChromaCap": false, "chromaFloor": 0.12, "minLightnessSpread": 0.08 },
+    "dark": {
+      "ion": { "hue": [230, 250], "l": [0.68, 0.76] },
+      "ultra": { "hue": [285, 310], "l": [0.66, 0.74] },
+      "pulse": { "hue": [325, 350], "l": [0.66, 0.76] },
+      "aqua": { "hue": [165, 190], "l": [0.82, 0.92] },
+      "mint": { "hue": [145, 165], "l": [0.76, 0.86] },
+      "orange": { "hue": [70, 95], "l": [0.82, 0.9] },
+      "red": { "hue": [5, 30], "l": [0.66, 0.76] }
+    }
+  },
+  "derived": [
+    { "id": "mint-soft", "kind": "symmetric-focal", "focal": "mint", "alpha": 0.12 },
+    { "id": "orange-soft", "kind": "symmetric-focal", "focal": "orange", "alpha": 0.12 },
+    { "id": "red-soft", "kind": "symmetric-focal", "focal": "red", "alpha": 0.12 },
+    { "id": "ion-soft", "kind": "symmetric-focal", "focal": "ion", "alpha": 0.12 },
+    { "id": "link-hover", "kind": "equal-step", "from": "ion", "to": "text-primary", "t": 0.22, "theme": "dark" }
+  ],
+  "gradients": [
+    { "id": "link-hover-mix", "kind": "equal-step", "endpoints": ["ion", "text-primary"], "focal": "ion", "stops": [{ "token": "ion", "at": 0 }, { "token": "text-primary", "at": 1 }] },
+    { "id": "status-soft-wash", "kind": "symmetric-focal", "endpoints": ["mint"], "focal": "mint", "stops": [{ "token": "mint", "at": 0 }, { "token": "mint", "at": 1 }] }
+  ],
+  "contrastPairs": [
+    { "name": "text-primary / surface-0", "fg": "text-primary", "bg": "surface-0", "minRatio": 4.5, "themes": ["light", "dark"] },
+    { "name": "text-primary / surface-1", "fg": "text-primary", "bg": "surface-1", "minRatio": 4.5, "themes": ["light", "dark"] },
+    { "name": "mint / surface-0 dark", "fg": "mint", "bg": "surface-0", "minRatio": 4.5, "themes": ["dark"] },
+    { "name": "orange / surface-0 dark", "fg": "orange", "bg": "surface-0", "minRatio": 4.5, "themes": ["dark"] },
+    { "name": "red / surface-0 dark", "fg": "red", "bg": "surface-0", "minRatio": 4.5, "themes": ["dark"] }
+  ],
+  "cssBindings": {
+    "darkHex": {
+      "--noir-ion-shell": "surface-0", "--noir-ion-card": "surface-1", "--noir-ion-elevated": "surface-2", "--noir-ion-floating": "surface-3",
+      "--noir-ion-text-primary": "text-primary", "--noir-ion-ion": "ion", "--noir-ion-ultra": "ultra", "--noir-ion-pulse": "pulse",
+      "--noir-ion-aqua": "aqua", "--noir-ion-mint": "mint", "--noir-ion-gold": "orange", "--noir-ion-flare": "red",
+      "--color-accent-blue": "ion", "--color-accent-purple": "ultra", "--color-accent-pink": "pulse", "--color-accent-teal": "aqua",
+      "--color-accent-green": "mint", "--color-accent-orange": "orange", "--color-accent-red": "red"
+    },
+    "lightHex": {
+      "--color-bg-surface-0": "surface-0", "--color-bg-surface-2": "surface-2", "--color-bg-surface-3": "surface-3",
+      "--color-accent": "ion", "--color-accent-purple": "ultra", "--color-accent-pink": "pulse", "--color-accent-teal": "aqua",
+      "--color-accent-green": "mint", "--color-accent-orange": "orange", "--color-accent-red": "red"
+    },
+    "aliases": {
+      "--color-success": "--color-accent-green", "--color-warning": "--color-accent-orange",
+      "--color-error": "--color-accent-red", "--color-danger": "--color-error"
+    }
+  },
+  "tokensJsonBindings": {
+    "accent.light.green": { "swatch": "mint", "theme": "light" },
+    "accent.light.orange": { "swatch": "orange", "theme": "light" },
+    "accent.light.red": { "swatch": "red", "theme": "light" },
+    "accent.dark.green": { "swatch": "mint", "theme": "dark" },
+    "accent.dark.orange": { "swatch": "orange", "theme": "dark" },
+    "accent.dark.red": { "swatch": "red", "theme": "dark" }
+  }
+}
