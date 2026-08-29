@@ -283,16 +283,19 @@ export async function prepareBetterAuthEmailOtp(
   });
 
   const emailInput = page.getByLabel('Email Address');
-  const continueButton = page.getByRole('button', {
-    name: 'Continue with Email',
+  const emailSubmitButton = page.getByRole('button', {
+    name:
+      options.entryPath === '/signup'
+        ? 'Continue with Email'
+        : 'Email me a Code',
   });
   await fillControlledInputUntilEnabled(
     emailInput,
-    continueButton,
+    emailSubmitButton,
     options.email,
     timeout
   );
-  await continueButton.click();
+  await emailSubmitButton.click();
   await expect(page.locator('[data-auth-email-code-step="code"]')).toBeVisible({
     timeout,
   });
