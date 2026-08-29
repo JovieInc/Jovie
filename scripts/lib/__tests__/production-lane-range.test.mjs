@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -281,7 +281,7 @@ describe('production lane range', () => {
     });
   });
 
-  it('executes the repository-backed operations-only CLI path without network evidence', () => {
+  it('executes the repository-backed CLI path with exact current lane evidence', () => {
     const currentSha = execFileSync('git', ['rev-parse', 'HEAD'], {
       encoding: 'utf8',
     }).trim();
@@ -293,10 +293,25 @@ describe('production lane range', () => {
       sha: currentSha,
       firstParent: deployedSha,
     });
+    const expectedPlan = planProductionLaneRange({
+      deployedSha,
+      currentSha,
+      ...gitRange,
+    });
 
     const root = mkdtempSync(join(tmpdir(), 'jovie-production-range-test-'));
     const jsonPath = join(root, 'range.json');
+    const receiptPath = join(root, 'current-receipt.json');
     try {
+      writeFileSync(
+        receiptPath,
+        `${JSON.stringify(
+          receipt({
+            headSha: currentSha,
+            selectedLanes: expectedPlan.selectedLanes,
+          })
+        )}\n`
+      );
       const result = runProductionLaneRange([
         '--repo',
         'JovieInc/Jovie',
@@ -305,16 +320,25 @@ describe('production lane range', () => {
         '--current-sha',
         currentSha,
         '--current-receipt',
-        join(root, 'not-needed.json'),
+        receiptPath,
         '--json-out',
         jsonPath,
       ]);
-      expect(result.runWeb).toBe(false);
-      expect(result.selectedLanes).toEqual(['operations']);
+      expect(result).toMatchObject({
+        ...expectedPlan,
+        webEvidence: expectedPlan.runWeb
+          ? {
+              sha: currentSha,
+              lane: 'web',
+              source: 'current-main-release-receipt',
+            }
+          : null,
+      });
       expect(JSON.parse(readFileSync(jsonPath, 'utf8'))).toMatchObject({
         deployedSha,
         currentSha,
-        runWeb: false,
+        selectedLanes: expectedPlan.selectedLanes,
+        runWeb: expectedPlan.runWeb,
       });
     } finally {
       rmSync(root, { recursive: true, force: true });
