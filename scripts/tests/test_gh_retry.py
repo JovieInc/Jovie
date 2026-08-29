@@ -855,6 +855,102 @@ class TestGhRetryHelper:
 
 
 class TestDrainPrQueueWiring:
+    def test_exact_admission_rereads_transient_unknown_mergeability(
+        self, tmp_path: Path
+    ) -> None:
+        head = "a" * 40
+        view_calls = tmp_path / "view-calls"
+        view_calls.write_text("0", encoding="utf-8")
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                case "${{2:-}}" in
+                  preflight) exit 0 ;;
+                  list-state) echo '{{"101":{{"headRefOid":"{head}","queued":false}}}}' ;;
+                  enroll) echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":{{"id":"MQE_1","state":"AWAITING_CHECKS","position":1}}}}}}' ;;
+                  dequeue) echo '{{"state":{{"queued":false}}}}' ;;
+                  max-queue-depth) echo 16 ;;
+                  unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
+                  unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
+                  changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
+                  --classify-queue) echo '[]' ;;
+                  *) echo "unexpected node args: $*" >&2; exit 2 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":101,"t":"Transient mergeability","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/transient","headOid":"{head}","base":"main","body":"","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  count=$(<"{view_calls}")
+                  count=$((count + 1))
+                  echo "$count" >"{view_calls}"
+                  mergeable=MERGEABLE
+                  [[ "$count" -eq 1 ]] && mergeable=UNKNOWN
+                  printf '%s\n' '{{"state":"OPEN","isDraft":false,"mergeable":"'"$mergeable"'","labels":[],"headRefOid":"{head}","baseRefName":"main","body":""}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && " $* " == *" -X POST "* && " $* " == *"/statuses/{head} "* ]]; then
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/commits/{head}/status"* ]]; then
+                  echo '{{"statuses":[]}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then
+                  echo '[]'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/commits/{head}"* ]]; then
+                  echo '2026-08-29T20:00:00Z'
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then exit 1; fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    f"DRAIN_ADMISSION_PR=101 DRAIN_ADMISSION_HEAD={head} "
+                    "DRAIN_MERGEABLE_RECHECK_ATTEMPTS=3 "
+                    "DRAIN_MERGEABLE_RECHECK_SECONDS=0 "
+                    "GITHUB_RUN_ID=42 GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "mergeable=UNKNOWN for #101" in result.stdout
+        assert "+native-queue on #101" in result.stdout
+        assert int(view_calls.read_text(encoding="utf-8")) >= 2
+
     @pytest.mark.parametrize(
         ("enroll_mode", "dequeue_mode", "expected_returncode", "expected_dequeues"),
         [

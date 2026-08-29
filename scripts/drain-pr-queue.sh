@@ -22,6 +22,9 @@
 #   DRAIN_MAX_SECONDS  hard wall-clock budget between GitHub calls (default 900)
 #   DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS  hard cap per exact-head isolation
 #     evaluator process (default 45)
+#   DRAIN_MERGEABLE_RECHECK_ATTEMPTS / DRAIN_MERGEABLE_RECHECK_SECONDS
+#     bounded live reread for GitHub's transient UNKNOWN mergeability window
+#     immediately before exact-head enrollment (defaults 6 / 2)
 #   DRAIN_ADMISSION_PR / DRAIN_ADMISSION_HEAD  optional exact new-admission
 #     scope; when both are empty this run is maintenance-only
 #   DRAIN_RECONCILE_MISSED_ADMISSION  permit one bounded exact-green recovery
@@ -72,9 +75,18 @@ case "$MERGE_QUEUE_BACKEND" in
 esac
 DRAIN_MAX_SECONDS="${DRAIN_MAX_SECONDS:-900}"
 DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS="${DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS:-45}"
+DRAIN_MERGEABLE_RECHECK_ATTEMPTS="${DRAIN_MERGEABLE_RECHECK_ATTEMPTS:-6}"
+DRAIN_MERGEABLE_RECHECK_SECONDS="${DRAIN_MERGEABLE_RECHECK_SECONDS:-2}"
 if [[ ! "$DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]] \
   || (( DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS > DRAIN_MAX_SECONDS )); then
   echo "::error::DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS must be positive and no larger than DRAIN_MAX_SECONDS" >&2
+  exit 2
+fi
+if [[ ! "$DRAIN_MERGEABLE_RECHECK_ATTEMPTS" =~ ^[1-9][0-9]*$ ]] \
+  || (( DRAIN_MERGEABLE_RECHECK_ATTEMPTS > 10 )) \
+  || [[ ! "$DRAIN_MERGEABLE_RECHECK_SECONDS" =~ ^[0-9]+$ ]] \
+  || (( DRAIN_MERGEABLE_RECHECK_SECONDS > 30 )); then
+  echo "::error::DRAIN_MERGEABLE_RECHECK_ATTEMPTS must be 1-10 and DRAIN_MERGEABLE_RECHECK_SECONDS must be 0-30" >&2
   exit 2
 fi
 DRAIN_STARTED_AT="$SECONDS"
@@ -877,14 +889,37 @@ reconcile_deferred_auto_merge_after_main_push() {
 # a queue-deferred hold cannot be overwritten by this controller.
 enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr authorized-head]
   local n="$1" authorized_pr="${2:-$DRAIN_ADMISSION_PR}" authorized_head="${3:-$DRAIN_ADMISSION_HEAD}"
-  local current enrollment_receipt head_oid expected_head json_fields queue_position queue_state
+  local current enrollment_receipt head_oid expected_head json_fields live_head mergeability_attempt mergeability_state queue_position queue_state
   LAST_ENROLL_SKIP_REASON=""
   json_fields="state,isDraft,mergeable,labels,headRefOid,baseRefName,body"
-  if ! current="$(gh_retry pr view "$n" -R "$REPO" \
-    --json "$json_fields" 2>/dev/null)"; then
-    echo "    !! could not refresh #$n eligibility; refusing enrollment" >&2
-    return 1
-  fi
+  for ((mergeability_attempt = 1; mergeability_attempt <= DRAIN_MERGEABLE_RECHECK_ATTEMPTS; mergeability_attempt++)); do
+    if ! current="$(gh_retry pr view "$n" -R "$REPO" \
+      --json "$json_fields" 2>/dev/null)"; then
+      echo "    !! could not refresh #$n eligibility; refusing enrollment" >&2
+      return 1
+    fi
+    mergeability_state="$(jq -r '.mergeable // "UNKNOWN"' <<<"$current")"
+    [[ "$mergeability_state" == "MERGEABLE" ]] && break
+    [[ "$mergeability_state" == "UNKNOWN" ]] || break
+    live_head="$(jq -r '.headRefOid // empty' <<<"$current" | tr '[:upper:]' '[:lower:]')"
+    if [[ "$n" != "$authorized_pr" || "$live_head" != "$authorized_head" ]] \
+      || ! jq -e '
+        .state == "OPEN"
+        and (.isDraft | not)
+        and .baseRefName == "main"
+        and ([.labels[].name] | any(
+          . == "needs-human" or . == "hold" or . == "gated"
+          or . == "needs-conflict-resolution" or . == "fast"
+          or '"$NO_AUTO_HOLD_JQ"'
+        ) | not)
+      ' <<<"$current" >/dev/null; then
+      break
+    fi
+    if (( mergeability_attempt < DRAIN_MERGEABLE_RECHECK_ATTEMPTS )); then
+      echo "    ~ mergeable=UNKNOWN for #$n at $live_head; bounded live reread $mergeability_attempt/$DRAIN_MERGEABLE_RECHECK_ATTEMPTS"
+      sleep "$DRAIN_MERGEABLE_RECHECK_SECONDS"
+    fi
+  done
   if ! jq -e --arg backend "$MERGE_QUEUE_BACKEND" '
     .state == "OPEN"
     and (.isDraft | not)
