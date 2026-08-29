@@ -91,6 +91,16 @@ export const InContext: Story = {
   ),
 };
 
+export const CanonicalTokens: Story = {
+  args: {
+    title: 'Something went wrong',
+    description: 'Please check your connection and try again.',
+    actions: [{ label: 'Try again', onClick: fn() }],
+    onDismiss: fn(),
+    className: 'w-96',
+  },
+};
+
 export const Dismissible: Story = {
   args: {
     title: 'Something went wrong',

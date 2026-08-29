@@ -6,6 +6,7 @@
 
 import 'server-only';
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
@@ -13,7 +14,7 @@ import { users } from '@/lib/db/schema/auth';
 import { billingAuditLog } from '@/lib/db/schema/billing';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
 import { getOrCreateCustomer, stripe } from '../client';
-import { fetchUserBillingData } from './queries';
+import { fetchUserBillingDataByAppId } from './queries';
 import { BILLING_FIELDS_CUSTOMER } from './types';
 
 function isCustomerWithMetadata(
@@ -34,67 +35,115 @@ function isCustomerWithMetadata(
   return typeof value.metadata === 'object';
 }
 
+function isStripeResourceMissingError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'resource_missing'
+  );
+}
+
+async function isMatchingLegacyClerkIdentity(
+  stripeIdentity: string,
+  appUserId: string
+): Promise<boolean> {
+  const [user] = await db
+    .select({ clerkId: users.clerkId })
+    .from(users)
+    .where(appUserIdFilter(appUserId))
+    .limit(1);
+
+  return user?.clerkId === stripeIdentity;
+}
+
 /**
  * Validate and return an existing Stripe customer ID, or null if invalid/missing.
  * Returns null on any validation failure so the caller can proceed to create a new customer.
  */
 async function validateExistingStripeCustomer(
   stripeCustomerId: string,
-  clerkUserId: string
+  appUserId: string
 ): Promise<string | null> {
+  let existing: Awaited<ReturnType<typeof stripe.customers.retrieve>>;
   try {
-    const existing = await stripe.customers.retrieve(stripeCustomerId);
-
-    if (
-      existing &&
-      typeof existing === 'object' &&
-      'deleted' in existing &&
-      existing.deleted
-    ) {
-      throw new Error('Stripe customer is deleted');
-    }
-
-    if (!isCustomerWithMetadata(existing)) {
-      throw new Error('Stripe customer payload is missing id');
-    }
-
-    const customer = existing;
-    const existingClerkUserId = customer.metadata?.clerk_user_id;
-
-    if (
-      typeof existingClerkUserId === 'string' &&
-      existingClerkUserId.length > 0 &&
-      existingClerkUserId !== clerkUserId
-    ) {
-      throw new Error('Stripe customer belongs to a different user');
-    }
-
-    if (existingClerkUserId !== clerkUserId) {
-      await stripe.customers.update(customer.id, {
-        metadata: {
-          ...customer.metadata,
-          clerk_user_id: clerkUserId,
-          created_via: 'jovie_app',
-        },
-      });
-    }
-
-    return stripeCustomerId;
+    existing = await stripe.customers.retrieve(stripeCustomerId);
   } catch (error) {
+    if (!isStripeResourceMissingError(error)) {
+      throw error;
+    }
+
     await captureWarning(
       'Stored Stripe customer ID is invalid; repairing',
       error,
-      { clerkUserId, function: 'ensureStripeCustomer' }
+      { appUserId, function: 'ensureStripeCustomer' }
     );
     return null;
   }
+
+  if (
+    existing &&
+    typeof existing === 'object' &&
+    'deleted' in existing &&
+    existing.deleted
+  ) {
+    await captureWarning(
+      'Stored Stripe customer ID is invalid; repairing',
+      new Error('Stripe customer is deleted'),
+      { appUserId, function: 'ensureStripeCustomer' }
+    );
+    return null;
+  }
+
+  if (!isCustomerWithMetadata(existing)) {
+    throw new Error('Stripe customer payload is missing id');
+  }
+
+  const customer = existing;
+  const existingClerkUserId = customer.metadata?.clerk_user_id;
+  const hasExistingIdentity =
+    typeof existingClerkUserId === 'string' && existingClerkUserId.length > 0;
+  const identityMatches =
+    existingClerkUserId === appUserId ||
+    (hasExistingIdentity &&
+      (await isMatchingLegacyClerkIdentity(existingClerkUserId, appUserId)));
+
+  if (hasExistingIdentity && !identityMatches) {
+    await captureWarning(
+      'Stored Stripe customer ID is invalid; repairing',
+      new Error('Stripe customer belongs to a different user'),
+      { appUserId, function: 'ensureStripeCustomer' }
+    );
+    return null;
+  }
+
+  if (existingClerkUserId !== appUserId) {
+    try {
+      await stripe.customers.update(customer.id, {
+        metadata: {
+          ...customer.metadata,
+          clerk_user_id: appUserId,
+          created_via: 'jovie_app',
+        },
+      });
+    } catch (error) {
+      await captureWarning(
+        'Failed to upgrade Stripe customer identity metadata',
+        error,
+        { appUserId, customerId: customer.id }
+      );
+    }
+  }
+
+  return stripeCustomerId;
 }
 
 /**
  * Ensure a Stripe customer exists for the current user.
  *
- * This function uses fetchUserBillingData internally with BILLING_FIELDS_CUSTOMER
- * to efficiently query only the fields needed for customer operations.
+ * This function uses the authenticated app user UUID with
+ * BILLING_FIELDS_CUSTOMER to query only the fields needed for customer
+ * operations.
  *
  * Features:
  * - Validates existing Stripe customer ID if present
@@ -125,10 +174,9 @@ export async function ensureStripeCustomer(): Promise<{
       return { success: false, error: 'User not authenticated' };
     }
 
-    return await withDbSession(async clerkUserId => {
-      // Get user details using consolidated query function
-      const userResult = await fetchUserBillingData({
-        clerkUserId,
+    return await withDbSession(async appUserId => {
+      const userResult = await fetchUserBillingDataByAppId({
+        appUserId,
         fields: BILLING_FIELDS_CUSTOMER,
       });
 
@@ -145,7 +193,7 @@ export async function ensureStripeCustomer(): Promise<{
       if (userData.stripeCustomerId) {
         const validCustomerId = await validateExistingStripeCustomer(
           userData.stripeCustomerId,
-          clerkUserId
+          appUserId
         );
         if (validCustomerId) {
           return { success: true, customerId: validCustomerId };
@@ -154,7 +202,7 @@ export async function ensureStripeCustomer(): Promise<{
 
       // Create a new Stripe customer
       const customer = await getOrCreateCustomer(
-        clerkUserId,
+        appUserId,
         userData.email || ''
       );
 
@@ -169,7 +217,7 @@ export async function ensureStripeCustomer(): Promise<{
           })
           .where(
             and(
-              eq(users.clerkId, clerkUserId),
+              appUserIdFilter(appUserId),
               eq(users.billingVersion, userData.billingVersion)
             )
           )
@@ -181,7 +229,7 @@ export async function ensureStripeCustomer(): Promise<{
           await captureWarning(
             'Concurrent update detected during customer creation',
             undefined,
-            { clerkUserId, customerId: customer.id }
+            { appUserId, customerId: customer.id }
           );
           return { success: true, customerId: customer.id };
         }
@@ -193,7 +241,7 @@ export async function ensureStripeCustomer(): Promise<{
           previousState: { stripeCustomerId: null },
           newState: { stripeCustomerId: customer.id },
           source: 'manual',
-          metadata: { clerkUserId },
+          metadata: { appUserId },
         });
       } catch (updateError) {
         // Customer was created in Stripe but we couldn't save the ID
@@ -201,7 +249,7 @@ export async function ensureStripeCustomer(): Promise<{
         await captureWarning(
           'Failed to update user with Stripe customer ID',
           updateError,
-          { clerkUserId, customerId: customer.id }
+          { appUserId, customerId: customer.id }
         );
         return { success: true, customerId: customer.id };
       }

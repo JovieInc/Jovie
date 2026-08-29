@@ -344,6 +344,10 @@ describe('merge_group workflow contract', () => {
     expect(unitTests).toContain(
       "needs.ci-path-changes.outputs.run_web == 'true'"
     );
+    // JOV-5288 repo lanes skip Jovie app suites in ci-fast; Web unit shards
+    // stay on the product-lane `run_web` gate so iOS/Mac-only diffs do not
+    // wait on Web units.
+    expect(unitTests).not.toContain('run_jovie_product');
     expect(unitTests).toContain('run: echo "run_full_ci=true"');
     expect(unitTests).toContain("github.event_name == 'merge_group'");
     expect(unitTests).toMatch(
@@ -482,6 +486,12 @@ describe('merge_group workflow contract', () => {
     );
     expect(pathChanges).toContain(
       "run_jovie_product: ${{ steps.detect.outputs.run_jovie_product || 'false' }}"
+    );
+    expect(pathChanges).toContain(
+      "run_symphony_control: ${{ steps.detect.outputs.run_symphony_control || 'false' }}"
+    );
+    expect(pathChanges).toContain(
+      "run_summer_ops: ${{ steps.detect.outputs.run_summer_ops || 'false' }}"
     );
     expect(pathChanges).toContain(
       'node scripts/lib/ci-repo-lanes.mjs --emit-github-output'

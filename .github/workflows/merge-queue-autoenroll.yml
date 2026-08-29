@@ -165,13 +165,16 @@ jobs:
               head_sha="$(jq -er '.workflow_run.head_sha | ascii_downcase | select(test("^[0-9a-f]{40}$"))' "$GITHUB_EVENT_PATH")"
               workflow_path="$(jq -er '.workflow_run.path | select(type == "string" and length > 0)' "$GITHUB_EVENT_PATH")"
               workflow_path="${workflow_path%%@*}"
-              workflow_conclusion="$(jq -er '.workflow_run.conclusion' "$GITHUB_EVENT_PATH")"
+              workflow_conclusion="$(jq -r '.workflow_run.conclusion // empty' "$GITHUB_EVENT_PATH")"
               if [[ "$workflow_path" == ".github/workflows/production-controller.yml" ]]; then
                 echo "Production Controller completed; maintenance-only exact fleet-hold recovery signal"
                 [[ "$workflow_conclusion" == "success" ]] && recover_holds=1
                 head_sha=''
+              elif [[ "$workflow_path" != ".github/workflows/ci.yml" || "$workflow_conclusion" != "success" ]]; then
+                echo "CI workflow_run is not a terminal success; maintenance-only"
+                head_sha=''
               else
-                prs_json="$(gh pr list -R "$REPO" --state open --limit 200 --json number,headRefOid,baseRefName)"
+                prs_json="$(gh pr list -R "$REPO" --state open --limit 200 --json number,headRefOid,baseRefName,isDraft)"
                 matching_prs=()
                 while IFS= read -r matching_pr; do
                   [[ -n "$matching_pr" ]] && matching_prs+=("$matching_pr")
@@ -182,7 +185,13 @@ jobs:
                   | .number
                 ' <<<"$prs_json")
                 if [[ "${#matching_prs[@]}" -eq 1 ]]; then
-                  pr_number="${matching_prs[0]}"
+                  live_pr="$(jq -c --argjson number "${matching_prs[0]}" '.[] | select(.number == $number)' <<<"$prs_json")"
+                  if [[ "$(jq -r '.isDraft' <<<"$live_pr")" == "false" ]]; then
+                    pr_number="${matching_prs[0]}"
+                  else
+                    echo "PR #${matching_prs[0]} is draft; maintenance-only"
+                    head_sha=''
+                  fi
                 else
                   echo "No unique open main PR owns workflow_run head $head_sha; maintenance-only"
                   # A merge-group CI run carries GitHub's synthetic composite

@@ -25,6 +25,10 @@ const APP_ID_SCOPED_SOURCES = [
     expectedPredicates: 1,
   },
   {
+    relativePath: 'lib/stripe/customer-sync/customer.ts',
+    expectedPredicates: 2,
+  },
+  {
     relativePath: 'app/api/dashboard/pixels/route.ts',
     expectedPredicates: 3,
   },
