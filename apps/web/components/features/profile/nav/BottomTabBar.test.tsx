@@ -9,7 +9,7 @@
  *  - Tab click handler calls onTabSelect with correct mode
  *  - Grid column count matches visible tab count
  *  - No horizontal overflow at narrow viewports (320px) — structural check
- *  - Compact 48px floating capsule with full-cell interaction geometry
+ *  - Compact 32px floating capsule with 44px interaction geometry
  *  - Labels remain screen-reader-only
  *  - Empty Events tabs remain reachable so the surface can show alert signup
  */
@@ -200,21 +200,27 @@ describe('BottomTabBar — grid layout', () => {
     expect(grid?.getAttribute('style')).toContain('repeat(4,');
   });
 
-  it('keeps visible chrome compact while each full grid cell remains interactive', () => {
+  it('keeps the dock icon-only while each named grid cell remains interactive', () => {
     const { container } = render(<BottomTabBar {...makeProps()} />);
     const nav = screen.getByTestId('profile-bottom-nav');
-    expect(nav.className).toContain('h-12');
+    expect(nav.className).toContain('h-8');
+    expect(nav.className).toContain('px-1');
+    expect(nav.className).not.toContain('p-1');
     expect(nav.className).toContain('rounded-full');
 
     const grid = container.querySelector('[style*="grid-template-columns"]');
     expect(grid?.className).toContain('h-11');
-    expect(grid?.className).toContain('-my-0.5');
+    expect(grid?.className).toContain('-my-1.5');
 
     const buttons = container.querySelectorAll('button');
     for (const btn of buttons) {
       expect(btn.className).toContain('h-full');
       expect(btn.className).not.toContain('min-h-13');
-      expect(btn.querySelector('span')?.className).toContain('sr-only');
+      const label = btn.querySelector('span');
+      const icon = btn.querySelector('svg');
+      expect(icon?.getAttribute('class')).toContain('h-4 w-4');
+      expect(label?.className).toContain('sr-only');
+      expect(btn).toHaveAttribute('aria-label', label?.textContent);
     }
   });
 
