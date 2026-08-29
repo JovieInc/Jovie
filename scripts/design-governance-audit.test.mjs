@@ -34,6 +34,9 @@ test('binds design projections to the canonical invariant registry', () => {
   const audit = results.find(item => item.id === 'shared-ui-visual-arbitrary');
   assert.equal(audit?.status, 'PASS');
   assert.match(audit.detail, /visual findings/);
+  const outcome = results.find(item => item.id === 'shadcn-outcome-inventory');
+  assert.equal(outcome?.status, 'PASS');
+  assert.match(outcome.detail, /MIT public-outcome boundary/);
   const wiring = results.find(
     item => item.id === 'shared-ui-visual-arbitrary-wiring'
   );

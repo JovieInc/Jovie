@@ -13,6 +13,7 @@
  *   7. DESIGN_COMPLETE.md carries a superseded banner.
  *   8. Design-agent invariants project from canon/invariants.jsonl only.
  *   9. Shared-UI visual arbitrary values are shrink-only (JOV-5437).
+ *  10. Shadcn/Typeset outcome inventory is fail-closed (JOV-5438).
  *
  * Invariant consumer: JOV-INV-019.
  *
@@ -32,7 +33,7 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-
+import { runOutcomeCertification } from './component-shadcn-outcome-inventory.mjs';
 import { findDesignManifestProjectionViolations } from './design-authority-guard.mjs';
 import { buildLlmsDesignManifest } from './generate-llms-design-manifest.mjs';
 import {
@@ -511,6 +512,23 @@ export function runDesignGovernanceAudit(repoRoot = DEFAULT_REPO_ROOT) {
       'shared-ui-visual-arbitrary',
       'FAIL',
       `shared-UI visual arbitrary audit unreadable: ${error instanceof Error ? error.message : error}`
+    );
+  }
+
+  try {
+    const outcome = runOutcomeCertification({ repoRoot });
+    report(
+      'shadcn-outcome-inventory',
+      outcome.ok ? 'PASS' : 'FAIL',
+      outcome.ok
+        ? `${(outcome.receipt.enrolled ?? []).length} enrolled primitives; MIT public-outcome boundary; catalog=${outcome.receipt.catalogCount}`
+        : outcome.receipt.issues.join('; ')
+    );
+  } catch (error) {
+    report(
+      'shadcn-outcome-inventory',
+      'FAIL',
+      `Shadcn outcome inventory unreadable: ${error instanceof Error ? error.message : error}`
     );
   }
 

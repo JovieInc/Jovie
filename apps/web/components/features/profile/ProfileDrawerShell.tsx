@@ -1,7 +1,9 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/profile/ProfileDrawerShell.interaction.test.tsx
+
 import { ChevronLeft, X } from 'lucide-react';
-import { useId, useRef } from 'react';
+import { useCallback, useId, useRef } from 'react';
 import { Drawer } from 'vaul';
 import type { ProfileSurfacePresentation } from '@/features/profile/contracts';
 import { useModalFocusBoundary } from '@/lib/a11y/modal-focus-boundary';
@@ -48,10 +50,16 @@ export function ProfileDrawerShell({
   const accessibleDescriptionId = useId();
   const accessibleDescription = subtitle ?? 'Profile menu and actions.';
   const isSecondaryHeader = navigationLevel === 'secondary' && Boolean(onBack);
-  useModalFocusBoundary(
-    modalRef,
-    open && (presentation === 'embedded' || presentation === 'modal')
-  );
+  const handleDismiss = useCallback(() => onOpenChange(false), [onOpenChange]);
+  const attachModalRef = useCallback((node: HTMLElement | null) => {
+    modalRef.current = node;
+  }, []);
+  useModalFocusBoundary(modalRef, open, {
+    restoreFocus: true,
+    onDismiss: handleDismiss,
+    lockScroll: presentation === 'embedded' || presentation === 'modal',
+    instanceKey: presentation,
+  });
   // The drawer uses one capped envelope across releases, pay, tour, and
   // subscribe so desktop preview shells never jump when swapping views.
   // `--profile-drawer-height-max` is intentionally shorter than the full phone
@@ -122,7 +130,7 @@ export function ProfileDrawerShell({
 
             <button
               type='button'
-              onClick={() => onOpenChange(false)}
+              onClick={handleDismiss}
               className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[color:var(--color-bg-hover)] text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-interactive-active hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
               aria-label='Close'
               data-testid='profile-drawer-close-button'
@@ -174,13 +182,12 @@ export function ProfileDrawerShell({
           type='button'
           aria-label='Close Drawer Overlay'
           data-modal-backdrop
+          tabIndex={-1}
           className={`fixed inset-0 ${PROFILE_Z.LOCAL_CONTENT} bg-black/24`}
-          onClick={() => onOpenChange(false)}
+          onClick={handleDismiss}
         />
         <dialog
-          ref={node => {
-            modalRef.current = node;
-          }}
+          ref={attachModalRef}
           className={`absolute inset-x-0 bottom-0 ${PROFILE_Z.STICKY_CHROME} m-0 max-w-none border-0 bg-transparent p-0`}
           data-testid={dataTestId}
           aria-modal='true'
@@ -217,13 +224,12 @@ export function ProfileDrawerShell({
           type='button'
           aria-label='Close Modal Overlay'
           data-modal-backdrop
+          tabIndex={-1}
           className='absolute inset-0'
-          onClick={() => onOpenChange(false)}
+          onClick={handleDismiss}
         />
         <div
-          ref={node => {
-            modalRef.current = node;
-          }}
+          ref={attachModalRef}
           className='relative z-10 flex max-h-[min(760px,calc(100%-24px))] w-full max-w-108 flex-col overflow-hidden rounded-(--profile-card-radius) border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_34px_96px_rgba(0,0,0,0.48)]'
           data-testid={dataTestId}
           role='dialog'
@@ -252,16 +258,20 @@ export function ProfileDrawerShell({
       <Drawer.Portal>
         <Drawer.Overlay
           className={`fixed inset-0 ${PROFILE_Z.DRAWER_BACKDROP} bg-black/60 backdrop-blur-sm`}
-          onClick={() => onOpenChange(false)}
+          onClick={handleDismiss}
+          data-modal-backdrop
+          tabIndex={-1}
           data-testid='profile-drawer-overlay'
         />
         <div
           className={`fixed inset-x-0 bottom-0 ${PROFILE_Z.DRAWER_CONTENT} flex justify-center`}
         >
           <Drawer.Content
+            ref={attachModalRef}
             className={contentClasses}
             style={drawerHeightStyle}
             data-testid={dataTestId}
+            aria-modal='true'
             aria-labelledby={titleId}
           >
             <Drawer.Title asChild>
