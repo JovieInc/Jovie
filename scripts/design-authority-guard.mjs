@@ -3,18 +3,12 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-export const REQUIRED_DESIGN_INVARIANT_IDS = [
-  'no-serif-product-source',
-  'marketing-pill-32-visible-44-target',
-  'marketing-o-mark-32',
-  'semantic-accent-only',
-  'decorative-icons-unboxed',
-  'single-component-family',
-  'founder-review-canonical-only',
-  'pen-source-identity-boundary',
-  'logo-visible-bounds-normalization',
-  'do-not-fuck-with-art',
-];
+import {
+  findDesignInvariantProjectionViolations,
+  readDesignAgentContract,
+} from './invariants/design-agent-contract.mjs';
+
+// Invariant consumer: JOV-INV-019.
 
 const ACTIVE_AUTHORITY_FILES = [
   'DESIGN.md',
@@ -102,6 +96,20 @@ function trackedFiles(repoRoot) {
     .filter(Boolean);
 }
 
+export function findDesignManifestProjectionViolations(
+  repoRoot,
+  designAgentContract = readDesignAgentContract(repoRoot)
+) {
+  const manifest = readFileSync(
+    path.join(repoRoot, 'docs/llms-design-manifest.txt'),
+    'utf8'
+  );
+  return findDesignInvariantProjectionViolations(
+    manifest,
+    designAgentContract
+  ).map(detail => `docs/llms-design-manifest.txt: ${detail}`);
+}
+
 export function findDesignAuthorityViolations(repoRoot = process.cwd()) {
   const violations = [];
   const serifExceptions = readSerifExceptions(repoRoot);
@@ -112,15 +120,7 @@ export function findDesignAuthorityViolations(repoRoot = process.cwd()) {
     }
   }
 
-  const manifest = readFileSync(
-    path.join(repoRoot, 'docs/llms-design-manifest.txt'),
-    'utf8'
-  );
-  for (const id of REQUIRED_DESIGN_INVARIANT_IDS) {
-    if (!manifest.includes(`\`${id}\``)) {
-      violations.push(`docs/llms-design-manifest.txt: missing invariant ${id}`);
-    }
-  }
+  violations.push(...findDesignManifestProjectionViolations(repoRoot));
 
   const productFiles = trackedFiles(repoRoot).filter(file => {
     if (!/^(apps|packages)\//.test(file)) return false;

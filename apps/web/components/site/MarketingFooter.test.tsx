@@ -74,6 +74,17 @@ describe('MarketingFooter', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('keeps developer resources discoverable in the minimal homepage footer', () => {
+    mockUsePathname.mockReturnValue('/');
+
+    render(<MarketingFooter variant='minimal' />);
+
+    expect(screen.getByRole('link', { name: 'Developers' })).toHaveAttribute(
+      'href',
+      '/developers'
+    );
+  });
+
   it.each([
     '/artist-profiles',
     '/artist-profile',

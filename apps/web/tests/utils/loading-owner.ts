@@ -61,7 +61,8 @@ function isCanonicalSkeleton(element: Element): boolean {
   return (
     classTokens(element).includes('skeleton') &&
     element.getAttribute('aria-hidden') === 'true' &&
-    element.hasAttribute('data-state')
+    element.hasAttribute('data-state') &&
+    element.getAttribute('data-slot') === 'skeleton'
   );
 }
 

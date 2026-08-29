@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { EntitySidebarShell } from '@/components/molecules/drawer';
+import { EntitySidebarShell } from '@/components/molecules/drawer/EntitySidebarShell';
 
 vi.mock('@/components/molecules/drawer/RightDrawer', () => ({
   RightDrawer: ({

@@ -541,6 +541,7 @@ describe('rolling CI dispatch CLI and workflow', () => {
       checkSuiteId: 44,
       checks,
       cursorApiKey: '',
+      remoteMutationAllowed: false,
       source: {
         eventName: 'workflow_run',
         workflow: 'CI',
@@ -620,5 +621,40 @@ describe('rolling CI dispatch CLI and workflow', () => {
 
     expect(result.status, result.stderr).toBe(0);
     expect(JSON.parse(result.stdout)).toEqual(values);
+  });
+
+  it('reads every job from the exact workflow run attempt', () => {
+    expect(WORKFLOW).toContain(
+      'actions/runs/$WORKFLOW_RUN_ID/attempts/$WORKFLOW_RUN_ATTEMPT/jobs?per_page=100'
+    );
+
+    const failedJobsFilter = WORKFLOW.match(
+      /FAILED_JOBS=\$\(gh api [\s\S]*?--jq '([^']+)'\)/
+    )?.[1];
+    expect(failedJobsFilter).toBeDefined();
+
+    const jobs = Array.from({ length: 60 }, (_, index) => ({
+      name: `job-${index + 1}`,
+      conclusion: index === 59 ? 'failure' : 'success',
+      steps: [
+        {
+          name: index === 59 ? 'Late failing step' : 'Passing step',
+          conclusion: index === 59 ? 'failure' : 'success',
+        },
+      ],
+    }));
+    const result = spawnSync('jq', [failedJobsFilter], {
+      input: JSON.stringify({ jobs }),
+      encoding: 'utf8',
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual([
+      {
+        name: 'job-60',
+        conclusion: 'failure',
+        steps: ['Late failing step'],
+      },
+    ]);
   });
 });

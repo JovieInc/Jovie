@@ -59,9 +59,14 @@ describe('public CTA guard', () => {
 
   it('keeps homepage public auth as a labeled text MarketingSignInLink', () => {
     const headerNav = readFileSync(
-      join(ROOT, 'components', 'organisms', 'HeaderNav.tsx'),
+      join(ROOT, 'components/organisms/HeaderNav.tsx'),
       'utf8'
     );
+    const authActions = readFileSync(
+      join(ROOT, 'components/molecules/AuthActions.tsx'),
+      'utf8'
+    );
+    expect(authActions).toContain('export function AuthActions');
 
     expect(headerNav).toContain("minimalAuthLabel?: 'Sign in' | 'Log in'");
     expect(headerNav).toContain(

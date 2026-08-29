@@ -1,11 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockDb, mockEq } = vi.hoisted(() => ({
+const { mockDb, mockEq, mockRecordWorkflowRunOutcome } = vi.hoisted(() => ({
   mockDb: {
     select: vi.fn(),
     update: vi.fn(),
   },
   mockEq: vi.fn((column: unknown, value: unknown) => ({ column, value })),
+  mockRecordWorkflowRunOutcome: vi.fn(),
+}));
+
+vi.mock('@/lib/connectors/workflows/outcome-attribution', () => ({
+  recordWorkflowRunOutcome: mockRecordWorkflowRunOutcome,
 }));
 
 vi.mock('drizzle-orm', () => ({
@@ -123,6 +128,7 @@ function mockPersistedRun(stepOutputs: ReleaseToRevenueRunStepOutputs) {
 describe('distribution draft decisions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRecordWorkflowRunOutcome.mockResolvedValue(null);
   });
 
   it('dispatches an approved draft without auto-sending pending siblings', async () => {
@@ -193,5 +199,66 @@ describe('distribution draft decisions', () => {
 
     expect(result.draft.status).toBe('rejected');
     expect(result.draft.dispatchedAt).toBeUndefined();
+  });
+
+  it('completes an all-rejected run without recording an activated outcome', async () => {
+    const drafts = buildDistributionDrafts({
+      releaseTitle: 'Neon Sky',
+      releaseLink: 'https://jov.ie/timwhite/neon-sky',
+      merchDropLink: null,
+      platform: 'instagram',
+    });
+    const lastDraft = drafts.items.at(-1);
+    const updateSet = mockPersistedRun({
+      ...baseStepOutputs,
+      distributionDrafts: {
+        ...drafts,
+        items: drafts.items.map(draft => ({
+          ...draft,
+          status: draft.id === lastDraft?.id ? 'pending' : 'rejected',
+        })),
+      },
+    });
+
+    const result = await rejectDistributionDraft({
+      runId: 'run-1',
+      draftId: lastDraft?.id ?? '',
+      userId: 'user-1',
+    });
+
+    expect(result).toMatchObject({ ok: true, runStatus: 'completed' });
+    expect(updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'completed', currentStep: 'completed' })
+    );
+    expect(mockRecordWorkflowRunOutcome).not.toHaveBeenCalled();
+  });
+
+  it('records an outcome when completion includes a dispatched draft', async () => {
+    const drafts = buildDistributionDrafts({
+      releaseTitle: 'Neon Sky',
+      releaseLink: 'https://jov.ie/timwhite/neon-sky',
+      merchDropLink: null,
+      platform: 'instagram',
+    });
+    const lastDraft = drafts.items.at(-1);
+    mockPersistedRun({
+      ...baseStepOutputs,
+      distributionDrafts: {
+        ...drafts,
+        items: drafts.items.map(draft => ({
+          ...draft,
+          status: draft.id === lastDraft?.id ? 'pending' : 'rejected',
+        })),
+      },
+    });
+
+    const result = await approveDistributionDraft({
+      runId: 'run-1',
+      draftId: lastDraft?.id ?? '',
+      userId: 'user-1',
+    });
+
+    expect(result).toMatchObject({ ok: true, runStatus: 'completed' });
+    expect(mockRecordWorkflowRunOutcome).toHaveBeenCalledWith('run-1');
   });
 });

@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url';
 
 const MARKER_FILE = 'production-generation-verified.json';
 const RECOVERY_FILE = 'production-generation-recovery.json';
+const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const CONTROLLER_PATH = '.github/workflows/production-controller.yml';
 const MARKER_RECOVERY_PATH = '.github/workflows/production-marker-recovery.yml';
 const INTERRUPTED_CONCLUSIONS = new Set([
@@ -85,14 +86,22 @@ function validateArtifact(artifact, expectedName) {
 }
 
 function validateMarkerPayload(payload, context, artifact) {
-  return (
+  const identityMatches =
     payload &&
     typeof payload === 'object' &&
     payload.sha === context.sha &&
     typeof payload.deploymentId === 'string' &&
-    /^dpl_[A-Za-z0-9]+$/.test(payload.deploymentId) &&
     sameInteger(payload.controllerRun, artifact.workflowRunId) &&
-    positiveInteger(payload.controllerAttempt) !== null
+    positiveInteger(payload.controllerAttempt) !== null;
+  if (!identityMatches) return false;
+  if (/^dpl_[A-Za-z0-9]+$/.test(payload.deploymentId)) return true;
+  return (
+    payload.deploymentId === 'not-applicable' &&
+    SHA_PATTERN.test(payload.deploymentBaseSha ?? '') &&
+    payload.webEvidenceSha === 'none' &&
+    Array.isArray(payload.selectedLanes) &&
+    !payload.selectedLanes.includes('web') &&
+    payload.authSmoke === 'not-applicable'
   );
 }
 

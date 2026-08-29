@@ -211,7 +211,7 @@ export function renderActionItem(
             {item.trailing}
             {renderBadge(item.badge)}
             {item.subText ? (
-              <span className='text-[11px] text-(--linear-text-tertiary)'>
+              <span className='text-2xs text-(--linear-text-tertiary)'>
                 {item.subText}
               </span>
             ) : null}

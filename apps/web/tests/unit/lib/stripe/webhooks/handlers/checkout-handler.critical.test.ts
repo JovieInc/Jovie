@@ -17,9 +17,8 @@ const {
   mockGetPlanFromPriceId,
   mockCaptureCriticalError,
   mockLogFallback,
-  mockAttributeLeadPaidConversionByClerkUserId,
+  mockAttributeLeadPaidConversionByAppUserId,
   mockActivateReferral,
-  mockGetInternalUserId,
   mockLoggerWarn,
 } = vi.hoisted(() => ({
   mockStripeSubscriptionsRetrieve: vi.fn(),
@@ -29,9 +28,8 @@ const {
   mockGetPlanFromPriceId: vi.fn(),
   mockCaptureCriticalError: vi.fn(),
   mockLogFallback: vi.fn(),
-  mockAttributeLeadPaidConversionByClerkUserId: vi.fn(),
+  mockAttributeLeadPaidConversionByAppUserId: vi.fn(),
   mockActivateReferral: vi.fn(),
-  mockGetInternalUserId: vi.fn(),
   mockLoggerWarn: vi.fn(),
 }));
 
@@ -69,13 +67,12 @@ vi.mock('@/lib/error-tracking', () => ({
 }));
 
 vi.mock('@/lib/leads/funnel-events', () => ({
-  attributeLeadPaidConversionByClerkUserId:
-    mockAttributeLeadPaidConversionByClerkUserId,
+  attributeLeadPaidConversionByAppUserId:
+    mockAttributeLeadPaidConversionByAppUserId,
 }));
 
 vi.mock('@/lib/referrals/service', () => ({
   activateReferral: mockActivateReferral,
-  getInternalUserId: mockGetInternalUserId,
 }));
 
 vi.mock('@/lib/utils/logger', () => ({
@@ -100,11 +97,13 @@ describe('@critical CheckoutSessionHandler', () => {
 
     // Default mock implementations
     mockGetPlanFromPriceId.mockReturnValue('standard');
-    mockUpdateUserBillingStatus.mockResolvedValue({ success: true });
+    mockUpdateUserBillingStatus.mockResolvedValue({
+      success: true,
+      appUserId: 'app_user_default',
+    });
     mockInvalidateBillingCache.mockResolvedValue(undefined);
-    mockAttributeLeadPaidConversionByClerkUserId.mockResolvedValue(undefined);
+    mockAttributeLeadPaidConversionByAppUserId.mockResolvedValue(undefined);
     mockActivateReferral.mockResolvedValue(undefined);
-    mockGetInternalUserId.mockResolvedValue(null);
   });
 
   describe('eventTypes', () => {
@@ -116,6 +115,10 @@ describe('@critical CheckoutSessionHandler', () => {
 
   describe('handle - successful checkout', () => {
     it('processes checkout session with user ID in metadata', async () => {
+      const betterAuthRow = {
+        id: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
+        clerkId: 'ba:better_auth_123',
+      };
       const mockSubscription = {
         id: 'sub_123',
         status: 'active',
@@ -124,6 +127,10 @@ describe('@critical CheckoutSessionHandler', () => {
       } as unknown as Stripe.Subscription;
 
       mockStripeSubscriptionsRetrieve.mockResolvedValue(mockSubscription);
+      mockUpdateUserBillingStatus.mockResolvedValue({
+        success: true,
+        appUserId: betterAuthRow.id,
+      });
 
       const context: WebhookContext = {
         event: {
@@ -135,7 +142,7 @@ describe('@critical CheckoutSessionHandler', () => {
               id: 'cs_test_123',
               customer: 'cus_123',
               subscription: 'sub_123',
-              metadata: { clerk_user_id: 'user_abc123' },
+              metadata: { clerk_user_id: betterAuthRow.id },
             } as unknown as Stripe.Checkout.Session,
           },
         } as Stripe.Event,
@@ -150,13 +157,21 @@ describe('@critical CheckoutSessionHandler', () => {
       expect(mockStripeSubscriptionsRetrieve).toHaveBeenCalledWith('sub_123');
       expect(mockUpdateUserBillingStatus).toHaveBeenCalledWith(
         expect.objectContaining({
-          clerkUserId: 'user_abc123',
+          clerkUserId: betterAuthRow.id,
           isPro: true,
           stripeSubscriptionId: 'sub_123',
           eventType: 'subscription_created',
         })
       );
       expect(mockInvalidateBillingCache).toHaveBeenCalled();
+      expect(mockActivateReferral).toHaveBeenCalledWith(betterAuthRow.id);
+      expect(mockActivateReferral).not.toHaveBeenCalledWith(
+        betterAuthRow.clerkId
+      );
+      expect(mockAttributeLeadPaidConversionByAppUserId).toHaveBeenCalledWith(
+        betterAuthRow.id,
+        'sub_123'
+      );
 
       // Should not use fallback when metadata is present
       expect(mockGetUserIdFromStripeCustomer).not.toHaveBeenCalled();

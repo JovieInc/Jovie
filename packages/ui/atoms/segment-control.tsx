@@ -66,8 +66,8 @@ const segmentTriggerVariants = cva(
 );
 
 const segmentTriggerSizeClassNames = {
-  sm: 'h-7 px-2.5 text-[12px]',
-  md: 'h-[28px] px-2.5 text-[13px]',
+  sm: 'h-7 px-2.5 text-xs',
+  md: 'h-[28px] px-2.5 text-app',
   lg: 'h-9 px-4 text-sm',
 } as const;
 

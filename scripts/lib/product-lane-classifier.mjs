@@ -57,7 +57,7 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     'shared-release-admission',
     'operations-tooling',
     [],
-    /^(\.github\/(workflows\/(ci|production-controller)\.yml|ci-harness\/)|scripts\/ci-fast-lanes\.mjs|scripts\/lib\/(ci-harness|merge-queue-guard|product-lane-(classifier|finalize))\.mjs|scripts\/lib\/__tests__\/(ci-harness|merge-group-workflow-contract|product-lane-classifier)\.test\.mjs)$/,
+    /^(config\/node-runtime-policy\.json|\.github\/(workflows\/(ci|production-controller)\.yml|ci-harness\/)|scripts\/ci-fast-lanes\.mjs|scripts\/lib\/(ci-harness|merge-queue-guard|product-lane-(classifier|finalize)|production-lane-range)\.mjs|scripts\/lib\/__tests__\/(ci-harness|merge-group-workflow-contract|product-lane-classifier|production-lane-range)\.test\.mjs)$/,
   ],
   [
     'operations-release-contract-test',

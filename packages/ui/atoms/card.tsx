@@ -151,7 +151,7 @@ const CardDescription = React.forwardRef<
   return (
     <Comp
       ref={ref}
-      className={cn('text-[13px] text-secondary-token', className)}
+      className={cn('text-app text-secondary-token', className)}
       {...props}
     />
   );

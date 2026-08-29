@@ -43,7 +43,8 @@ INDEPENDENT_REVIEW_SCHEMA = "jovie-independent-review/v1"
 INDEPENDENT_REVIEW_AUTHORITY = "Gem"
 INDEPENDENT_REVIEWER = "Gem"
 INDEPENDENT_REVIEW_SCOPE = "exact-main-head"
-QUEUE_SNAPSHOT_SCHEMA = "jovie-queue-snapshot/v1"
+QUEUE_SNAPSHOT_SCHEMA = "jovie-queue-snapshot/v2"
+LANE_CAPACITY_SCHEMA = "jovie-lane-capacity/v1"
 QUEUE_SNAPSHOT_TTL = timedelta(minutes=10)
 CONTROLLER_SNAPSHOT_SCHEMA = "jovie-controller-snapshot/v1"
 CONTROLLER_SNAPSHOT_TTL = timedelta(minutes=10)
@@ -62,6 +63,13 @@ SEVERE_REASONS = {
     "severe-integrity-incident",
 }
 DEFAULT_GEM_CONCURRENCY = 4
+LOCAL_REMEDIATION_CONCURRENCY_FLOOR = 1
+CONTROL_PLANE_PREFIXES = (
+    ".github/workflows/",
+    "canon/",
+    "scripts/backlog-orchestrator/",
+    "scripts/hermes/",
+)
 UTC = timezone.utc
 
 
@@ -78,7 +86,7 @@ def parse_time(value: object) -> datetime | None:
         return None
     try:
         return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC)
-    except ValueError:
+    except (ValueError, OverflowError):
         return None
 
 
@@ -131,7 +139,10 @@ def previous_closure_health(state_dir: Path) -> dict[str, Any] | None:
         receipt = read_json(state_dir / "latest.json")
     except (OSError, ValueError, json.JSONDecodeError):
         return None
-    candidate = receipt.get("signals", {}).get("closureHealth")
+    signals = receipt.get("signals")
+    if not isinstance(signals, dict):
+        return None
+    candidate = signals.get("closureHealth")
     if not isinstance(candidate, dict) or candidate.get("schema") != CLOSURE_HEALTH_SCHEMA:
         return None
     return candidate
@@ -489,13 +500,27 @@ def observe_integrity(path: Path) -> dict[str, Any]:
     }
 
 
-def observe_concurrency(path: Path, now: datetime) -> dict[str, Any] | None:
+def observe_concurrency(path: Path, now: datetime) -> dict[str, Any]:
     if not path.exists():
-        return None
+        return {
+            "schema": CONCURRENCY_SCHEMA,
+            "accepted": False,
+            "reason": "capacity-evidence-missing",
+        }
     try:
         receipt = read_json(path)
     except (OSError, ValueError, json.JSONDecodeError):
-        return None
+        return {
+            "schema": CONCURRENCY_SCHEMA,
+            "accepted": False,
+            "reason": "capacity-evidence-malformed",
+        }
+    if not isinstance(receipt, dict):
+        return {
+            "schema": CONCURRENCY_SCHEMA,
+            "accepted": False,
+            "reason": "capacity-evidence-malformed",
+        }
     observed_at = parse_time(receipt.get("observedAt"))
     target = receipt.get("target")
     required_clean_runs = 20 if isinstance(target, int) and target > 4 else 1
@@ -703,7 +728,7 @@ def run_gh_queue_snapshot(repo: str) -> subprocess.CompletedProcess[str]:
     """Fetch a compact queue snapshot with a short bounded retry budget."""
     command = [
         "gh", "pr", "list", "--repo", repo, "--state", "open", "--json",
-        "number,isDraft,labels,mergeStateStatus", "--limit", "100",
+        "number,isDraft,labels,mergeStateStatus,files", "--limit", "100",
     ]
     last_error: BaseException | None = None
     for attempt in range(3):
@@ -730,6 +755,69 @@ def write_queue_snapshot(path: Path, snapshot: dict[str, Any]) -> None:
     temporary.replace(path)
 
 
+def collision_domains_for_paths(repo: str, files: list[dict[str, Any]]) -> list[str]:
+    domains: set[str] = set()
+    for file in files:
+        path = str(file.get("path") or "").strip().rstrip("/")
+        if not path:
+            continue
+        segments = [segment for segment in path.split("/") if segment]
+        surface = "/".join(segments[:2]) if len(segments) > 1 else path
+        domains.add(f"artifact:{repo}:{surface}")
+        if any(path.startswith(prefix) for prefix in CONTROL_PLANE_PREFIXES):
+            domains.add(f"risk:{repo}:control-plane")
+        lowered = path.lower()
+        if "drizzle/migrations" in lowered or "migration" in lowered or "schema" in lowered:
+            domains.add(f"risk:{repo}:database-schema")
+    return sorted(domains)
+
+
+def build_lane_capacity_receipt(
+    repo: str,
+    green_ready: list[dict[str, Any]],
+    observed_at: datetime,
+    global_budget: int,
+    default_lane_budget: int,
+) -> dict[str, Any]:
+    lane_counts: dict[str, int] = {}
+    for pr in green_ready:
+        for domain in collision_domains_for_paths(repo, pr.get("files") or []):
+            lane_counts[domain] = lane_counts.get(domain, 0) + 1
+    return {
+        "schema": LANE_CAPACITY_SCHEMA,
+        "observedAt": isoformat(observed_at),
+        "global": {"ready": len(green_ready), "budget": global_budget},
+        "defaultLaneBudget": default_lane_budget,
+        "lanes": {
+            domain: {"ready": count, "budget": default_lane_budget}
+            for domain, count in sorted(lane_counts.items())
+        },
+    }
+
+
+def valid_lane_capacity_receipt(value: object, now: datetime) -> bool:
+    if not isinstance(value, dict) or value.get("schema") != LANE_CAPACITY_SCHEMA:
+        return False
+    observed_at = parse_time(value.get("observedAt"))
+    global_capacity = value.get("global")
+    return bool(
+        observed_at is not None
+        and observed_at <= now + timedelta(minutes=1)
+        and now - observed_at <= QUEUE_SNAPSHOT_TTL
+        and isinstance(global_capacity, dict)
+        and isinstance(global_capacity.get("ready"), int)
+        and not isinstance(global_capacity.get("ready"), bool)
+        and global_capacity.get("ready") >= 0
+        and isinstance(global_capacity.get("budget"), int)
+        and not isinstance(global_capacity.get("budget"), bool)
+        and global_capacity.get("budget") > 0
+        and isinstance(value.get("defaultLaneBudget"), int)
+        and not isinstance(value.get("defaultLaneBudget"), bool)
+        and value.get("defaultLaneBudget") > 0
+        and isinstance(value.get("lanes"), dict)
+    )
+
+
 def load_last_known_queue(
     path: Path, now: datetime, target: int
 ) -> dict[str, Any] | None:
@@ -747,6 +835,7 @@ def load_last_known_queue(
         return None
     eligible = data.get("eligiblePrs")
     green_ready = data.get("greenReadyPrs")
+    lane_capacity = data.get("laneCapacity")
     if (
         not isinstance(eligible, int)
         or isinstance(eligible, bool)
@@ -754,6 +843,9 @@ def load_last_known_queue(
         or not isinstance(green_ready, int)
         or isinstance(green_ready, bool)
         or green_ready < 0
+        or not valid_lane_capacity_receipt(lane_capacity, now)
+        or lane_capacity.get("global", {}).get("ready") != green_ready
+        or lane_capacity.get("global", {}).get("budget") != target
     ):
         return None
     return {
@@ -763,12 +855,14 @@ def load_last_known_queue(
         "target": target,
         "source": "last-known",
         "observedAt": data.get("observedAt"),
+        "laneCapacity": lane_capacity,
     }
 
 
 def observe_queue(
     repo: str,
     target: int,
+    default_lane_budget: int = DEFAULT_GEM_CONCURRENCY,
     snapshot_path: Path | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any]:
@@ -800,6 +894,13 @@ def observe_queue(
             "target": target,
             "source": "live",
             "observedAt": isoformat(observed_at),
+            "laneCapacity": build_lane_capacity_receipt(
+                repo,
+                green_ready,
+                observed_at,
+                target,
+                default_lane_budget,
+            ),
         }
         if snapshot_path is not None:
             write_queue_snapshot(
@@ -857,7 +958,22 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     queue = queue_value if isinstance(queue_value, dict) else {"status": "unknown"}
     closure_health = validate_closure_health(signals.get("closureHealth"))
     closure_intake_allowed = closure_health["newIssueIntakeAllowed"] is True
-    normalized_signals = {**signals, "closureHealth": closure_health}
+    concurrency_evidence_value = signals.get("concurrencyEvidence")
+    concurrency_evidence = (
+        concurrency_evidence_value
+        if isinstance(concurrency_evidence_value, dict)
+        and isinstance(concurrency_evidence_value.get("accepted"), bool)
+        else {
+            "schema": CONCURRENCY_SCHEMA,
+            "accepted": False,
+            "reason": "capacity-evidence-missing-malformed-or-stale",
+        }
+    )
+    normalized_signals = {
+        **signals,
+        "closureHealth": closure_health,
+        "concurrencyEvidence": concurrency_evidence,
+    }
     review = validate_independent_review(
         signals.get("independentReview"),
         main.get("sha"),
@@ -986,7 +1102,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and production.get("status") == "green"
         and valid_commit_sha(production.get("deployedSha"))
     )
-    evidence = signals.get("concurrencyEvidence") or {}
+    evidence = concurrency_evidence
     capacity_fresh = evidence.get("accepted") is True
     measured_target = evidence.get("target")
     gem_concurrency = (
@@ -1009,6 +1125,20 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and queue_target > 0
     )
     queue_below_backpressure = queue_shape_valid and green_ready_prs < queue_target
+    evaluated_now = parse_time(observed_at) or utc_now()
+    lane_capacity_valid = valid_lane_capacity_receipt(
+        queue.get("laneCapacity"), evaluated_now
+    )
+    lane_global = queue.get("laneCapacity", {}).get("global", {})
+    lane_capacity_consistent = bool(
+        lane_capacity_valid
+        and lane_global.get("ready") == green_ready_prs
+        and lane_global.get("budget") == queue_target
+    )
+    lane_global_available = bool(
+        lane_capacity_consistent
+        and lane_global.get("ready") < lane_global.get("budget")
+    )
     isolated_promotion_allowed = (
         state == "AMBER"
         and review_allowed
@@ -1051,22 +1181,30 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         promotion_mode = "blocked"
     if state == "RED":
         work_activities: list[str] = []
-    elif not closure_intake_allowed:
+    elif not closure_intake_allowed or not capacity_fresh:
         # Existing validation/review work remains useful, but no new
-        # implementation or fallback PR may begin while Summer holds intake.
+        # implementation or fallback PR may begin while Summer holds intake
+        # or capacity evidence is missing/stale.
         work_activities = ["tests", "review"]
     else:
-        work_activities = (
-            ["approved-issue-lease"]
-            if capacity_fresh
-            and (not queue_shape_valid or queue_below_backpressure)
-            else []
-        ) + ["isolated-implementation", "tests", "review", "draft-pr"]
+        new_implementation_allowed = (
+            capacity_fresh
+            and queue_shape_valid
+            and lane_global_available
+        )
+        work_activities = ["tests", "review"]
+        if new_implementation_allowed:
+            work_activities = [
+                "approved-issue-lease",
+                "isolated-implementation",
+                *work_activities,
+                "draft-pr",
+            ]
     # Remediation is a liveness capability, not issue intake or promotion.
     # A fleet hold must never hide the evidence or disable the bounded local
-    # work needed to diagnose and repair the hold.  Only a non-RED receipt may
-    # authorize updating the remote PR head; merge/deploy remain separately
-    # governed by their own typed admissions.
+    # work needed to diagnose and repair the hold. Remote PR mutation requires
+    # both a non-RED receipt and accepted capacity; merge/deploy remain
+    # separately governed by their own typed admissions.
     remediation_local_activities = [
         "observe-pr",
         "diagnose-pr",
@@ -1074,7 +1212,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         "focused-tests",
         "review",
     ]
-    remediation_push_allowed = state != "RED"
+    remediation_push_allowed = state != "RED" and capacity_fresh
     cohort = already_admitted_cohort_semantics(promotion_mode)
     if not closure_intake_allowed:
         cohort = {
@@ -1174,7 +1312,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         "concurrency": {
             "gem": {
                 "maxConcurrent": gem_concurrency,
-                "runtimeFloor": 1,
+                "runtimeFloor": LOCAL_REMEDIATION_CONCURRENCY_FLOOR,
                 "baseline": DEFAULT_GEM_CONCURRENCY,
                 "evidenceAccepted": capacity_fresh,
                 "newMutationAllowed": capacity_fresh,
@@ -1330,6 +1468,11 @@ def failed_evaluation_receipt(
                 "accepted": False,
                 "reason": "independent-review-receipt-malformed",
             },
+            "concurrencyEvidence": {
+                "schema": CONCURRENCY_SCHEMA,
+                "accepted": False,
+                "reason": "capacity-evidence-missing-malformed-or-stale",
+            },
         },
         "reasons": [
             typed_reason(
@@ -1379,7 +1522,7 @@ def failed_evaluation_receipt(
                 "focused-tests",
                 "review",
             ],
-            "maxConcurrent": DEFAULT_GEM_CONCURRENCY,
+            "maxConcurrent": 0,
             "authority": "single-pr-writer-exact-head",
         },
         "deploymentAdmission": {
@@ -1404,8 +1547,12 @@ def failed_evaluation_receipt(
         },
         "concurrency": {
             "gem": {
-                "maxConcurrent": DEFAULT_GEM_CONCURRENCY,
+                "maxConcurrent": 0,
+                "runtimeFloor": LOCAL_REMEDIATION_CONCURRENCY_FLOOR,
                 "evidenceAccepted": False,
+                "newMutationAllowed": False,
+                "preserveQueuedWork": True,
+                "reason": "capacity-evidence-missing-malformed-or-stale",
             },
             "symphonyImplementation": "event-driven-backpressure",
         },
@@ -1513,6 +1660,16 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
     integrity_path = args.integrity_receipt or args.state_dir.parent / "integrity.json"
     concurrency_path = args.concurrency_evidence or args.state_dir.parent / "concurrency.json"
     main = observe_main(args.repo)
+    concurrency = observe_concurrency(concurrency_path, now)
+    measured_target = concurrency.get("target")
+    default_lane_budget = (
+        measured_target
+        if concurrency.get("accepted") is True
+        and isinstance(measured_target, int)
+        and not isinstance(measured_target, bool)
+        and 1 <= measured_target <= 8
+        else 0
+    )
     review_path = (
         args.independent_review_receipt
         or args.state_dir.parent / "independent-review.json"
@@ -1529,6 +1686,7 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
         "queue": observe_queue(
             args.repo,
             args.queue_target,
+            default_lane_budget,
             snapshot_path=args.state_dir.parent / "queue-snapshot.json",
             now=now,
         ),
@@ -1537,7 +1695,7 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
             previous_closure_health(args.state_dir),
             now,
         ),
-        "concurrencyEvidence": observe_concurrency(concurrency_path, now),
+        "concurrencyEvidence": concurrency,
         "independentReview": refresh_independent_review_receipt(
             review_path, main, now
         ),

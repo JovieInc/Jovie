@@ -57,6 +57,21 @@ permanent check:
    configured in `apps/web/eslint.config.js`.
 7. **Stale completion docs** — `DESIGN_COMPLETE.md` must carry a superseded
    banner rather than contradict live tests.
+8. **Design-invariant projection** — `JOV-INV-019` in
+   `canon/invariants.jsonl` is the only executable list of design-agent
+   invariants. The generated LLM manifest, design authority guard, and this
+   audit consume that record. The audit injects a contract-change probe and
+   fails unless both generator output and authority-guard rejection change.
+9. **Shared-UI visual arbitrary values** — every production TypeScript source
+   under `packages/ui` cannot grow one-off visual Tailwind values. Tests,
+   stories, fixtures, generated output, and build/tooling artifacts stay
+   excluded. Exact file/value/count debt may only shrink
+   (`pnpm design:shared-ui-visual-arbitrary:check`).
+10. **Shadcn / Typeset outcome inventory** — enrolled primitives keep a
+    machine-readable comparison rubric against public Shadcn docs and Typeset
+    typography concepts (`pnpm component-ship-gate` + this audit). Missing or
+    unknown benchmark dimensions fail closed. No Shadcn/Typeset implementation
+    is imported.
 
 Exit code is non-zero on any FAIL; WARN never blocks. Failures print the
 exact offending values so remediation is mechanical.

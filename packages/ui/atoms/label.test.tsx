@@ -86,7 +86,7 @@ describe('Label', () => {
     it('applies base text styling', () => {
       render(<Label data-testid='label'>Email</Label>);
       const label = screen.getByTestId('label');
-      expect(label.className).toContain('text-[13px]');
+      expect(label.className).toContain('text-app');
       expect(label.className).toContain('inline-flex');
       expect(label.className).toContain('cursor-pointer');
       expect(label.className).toContain('font-medium');
@@ -125,7 +125,7 @@ describe('Label', () => {
       );
       const label = screen.getByTestId('label');
       expect(label.className).toContain('custom-class');
-      expect(label.className).toContain('text-[13px]');
+      expect(label.className).toContain('text-app');
     });
   });
 

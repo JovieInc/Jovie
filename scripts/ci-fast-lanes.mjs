@@ -93,7 +93,7 @@ const LANES = [
     id: 'structural',
     name: 'Structural Contract',
     nextLocalCommand:
-      'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm component-ship-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
+      'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-certification-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
     run: runStructural,
   },
 ];
@@ -389,6 +389,17 @@ function runScriptsTypecheck() {
 }
 
 function runGuardrails() {
+  // Exclusive Symphony/Summer diffs must not wait on Jovie product guardrails
+  // (JOV-5288). Product-lane selection still slices remaining work when the
+  // product lane is on.
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+    return {
+      code: 0,
+      output: 'Guardrails skipped (no Jovie product files changed)\n',
+      skipped: true,
+    };
+  }
   const base = process.env.GITHUB_BASE_REF || 'main';
   const originBase = `origin/${base}`;
   const selected = selectedProductLanes();
@@ -433,6 +444,14 @@ function runGuardrails() {
 }
 
 function runDesignConformance() {
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+    return {
+      code: 0,
+      output: 'Design conformance skipped (no Jovie product files changed)\n',
+      skipped: true,
+    };
+  }
   const selected = selectedProductLanes();
   if (!selected.has('operations') && !selected.has('web')) {
     return {
@@ -467,6 +486,15 @@ function runIosFast() {
 }
 
 function runProfileAdmission() {
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+    return {
+      code: 0,
+      output:
+        'Public-profile admission skipped (no Jovie product files changed)\n',
+      skipped: true,
+    };
+  }
   const files = changedFiles([
     ':(glob)apps/web/app/\\[username\\]/**',
     'apps/web/app/(marketing)/renders/profile-admission/**',
@@ -505,6 +533,19 @@ function runStructural() {
     };
   }
 
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (event !== 'workflow_dispatch') {
+    const lanes = repoLanes();
+    if (!lanes.runJovieProduct && !lanes.runSymphonyControl) {
+      return {
+        code: 0,
+        output:
+          'Structural skipped (Summer/ops only; no Jovie or Symphony suites)\n',
+        skipped: true,
+      };
+    }
+  }
+
   const selected = selectedProductLanes();
   const operationsParts = [
     'pnpm invariants:check',
@@ -532,8 +573,11 @@ function runStructural() {
     'pnpm --filter=@jovie/web run lint:no-native-dialogs',
     'pnpm --filter=@jovie/web run lint:seo',
     'pnpm --filter=@jovie/web run lint:contrast-ratchet',
+    'pnpm design:shared-ui-visual-arbitrary:check',
     // JOV-4421: hard ship gate — tests + matching stories for shippable UI.
+    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-ship-gate.test.mjs',
     'pnpm component-ship-gate',
+    'pnpm screen-certification-gate',
     // CI workflow changes live at the repo root, so Turbo --affected can select
     // only the root package and return success after running zero web tests.
     // Target Vitest directly so the deploy contract always executes and fails

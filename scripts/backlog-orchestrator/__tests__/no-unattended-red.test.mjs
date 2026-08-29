@@ -13,6 +13,8 @@ import {
   dispatchOpenRecords,
   escalate,
   inferStallClass,
+  loopKeyFor,
+  NO_UNATTENDED_RED_SCHEMA,
   openLoopRecord,
   persistLoopOutcome,
   projectSummerQueue,
@@ -192,6 +194,159 @@ describe('no unattended red loop', () => {
       await rm(directory, { recursive: true, force: true });
     }
     assert.equal(assertNoUnattendedRed([open('not-proven', { proven: false })]), true);
+  });
+
+  it('deliberate red: Summer queue tombstones healthy artifacts and timestamps active items', () => {
+    const active = open('queue-eviction', { issue: 'JOV-5400', pr: 16599 });
+    const merged = advanceAttempt(
+      open('missing-failing-checks', { issue: 'JOV-5335', pr: 16423 }),
+      { healthy: true, reason: 'linked-pr-merged-and-linear-done' },
+      { now: NOW }
+    );
+    const escalated = escalate(
+      open('provider-unavailable', { issue: 'JOV-5401' }),
+      'founder-action-required',
+      NOW
+    );
+
+    /** @type {any} The runtime queue schema is validated by the assertions below. */
+    const queue = projectSummerQueue([merged, active, escalated], { now: NOW });
+
+    assert.deepEqual(queue.items.map(item => item.issue), ['JOV-5400', 'JOV-5401']);
+    assert.equal(queue.items[0].observedAt, NOW);
+    assert.equal(queue.items[0].terminal, false);
+    assert.equal(queue.items[1].terminal, true);
+    assert.equal(queue.counts.terminalHidden, 1);
+    assert.equal(queue.counts.healthy, 0);
+    assert.equal(queue.terminalTombstones[0].issue, 'JOV-5335');
+    assert.equal(queue.terminalTombstones[0].pr, 16423);
+    assert.equal(queue.terminalTombstones[0].observedAt, NOW);
+    assert.equal(queue.terminalTombstones[0].reason, 'linked-pr-merged-and-linear-done');
+  });
+
+  it('deliberate red: anonymous stall identity ignores observation time', async () => {
+    const anonymous = (stallClass, extra = {}) => ({
+      stallClass,
+      workflowName: extra.workflowName ?? 'CI',
+      headSha: extra.headSha ?? HEAD,
+      proven: true,
+      ...extra,
+    });
+    const first = classifyStall(anonymous('missing-failing-checks'), { now: NOW });
+    const later = classifyStall(anonymous('missing-failing-checks'), {
+      now: '2026-08-29T01:00:00.000Z',
+    });
+    assert.equal(first.deliveryKey, later.deliveryKey);
+    assert.equal(first.issueKey, later.issueKey);
+    assert.equal(loopKeyFor(first), loopKeyFor(later));
+    assert.notEqual(first.observedAt, later.observedAt);
+    assert.equal(
+      classifyStall(anonymous('missing-failing-checks', { event_id: 'evt-1' }), { now: NOW })
+        .deliveryKey,
+      'evt-1'
+    );
+    assert.notEqual(
+      first.deliveryKey,
+      classifyStall(
+        anonymous('missing-failing-checks', { workflowName: 'Production Controller' }),
+        { now: NOW }
+      ).deliveryKey
+    );
+    assert.notEqual(
+      first.deliveryKey,
+      classifyStall(anonymous('missing-failing-checks', { headSha: 'b'.repeat(40) }), {
+        now: NOW,
+      }).deliveryKey
+    );
+    assert.notEqual(
+      first.deliveryKey,
+      classifyStall(anonymous('dropped-controller-event'), { now: NOW }).deliveryKey
+    );
+    assert.notEqual(first.issueKey, classifyStall(signal('missing-failing-checks'), { now: NOW }).issueKey);
+    assert.equal(
+      reconcileMissedEvents(
+        [openLoopRecord(first, { now: NOW })],
+        [anonymous('missing-failing-checks')],
+        { now: '2026-08-29T01:00:00.000Z' }
+      ).length,
+      0
+    );
+    const directory = await mkdtemp(join(tmpdir(), 'jovie-red-anonymous-'));
+    try {
+      const [created, duplicate] = await Promise.all([
+        persistLoopOutcome(openLoopRecord(first, { now: NOW }), { stateDir: directory }),
+        persistLoopOutcome(openLoopRecord(later, { now: later.observedAt }), {
+          stateDir: directory,
+        }),
+      ]);
+      assert.deepEqual(new Set([created.status, duplicate.status]), new Set(['created', 'duplicate']));
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('deliberate red: legacy anonymous duplicate projection emits one active queue item', () => {
+    const later = '2026-08-29T01:00:00.000Z';
+    const legacy = (observedAt, extra = {}) => ({
+      schema: NO_UNATTENDED_RED_SCHEMA,
+      outcome: extra.outcome ?? 'open',
+      stallClass: extra.stallClass ?? 'dropped-controller-event',
+      issue: extra.issue ?? null,
+      pr: extra.pr ?? null,
+      headSha: extra.headSha ?? HEAD,
+      workflow: extra.workflow ?? null,
+      issueKey: extra.issueKey ?? `legacy:${observedAt}`,
+      deliveryKey: extra.deliveryKey ?? `legacy:${observedAt}`,
+      owner: extra.owner ?? 'gem',
+      writer: extra.writer ?? 'gem',
+      action: extra.action ?? 'restore-event-trigger-and-reconcile',
+      leaseKey: extra.leaseKey ?? 'lease',
+      nextProofAt: observedAt,
+      dispatchState: extra.dispatchState ?? 'classified',
+      mode: extra.mode ?? 'typed-remediation',
+      observedAt,
+      terminal: extra.terminal ?? false,
+      reason: extra.reason ?? 'dropped-controller-event:restore-event-trigger-and-reconcile',
+      escalation: extra.escalation ?? null,
+    });
+    const identified = open('queue-eviction', { issue: 'JOV-5400', pr: 16599 });
+    const otherHead = legacy(NOW, {
+      stallClass: 'dropped-controller-event',
+      headSha: 'b'.repeat(40),
+      issueKey: 'legacy-other-head',
+    });
+    const otherClass = legacy(NOW, {
+      stallClass: 'missing-failing-checks',
+      workflow: 'CI',
+      issueKey: 'legacy-other-class',
+      action: 'create-bounded-ci-repair-pr',
+    });
+    /** @type {any} The runtime queue schema is validated by the assertions below. */
+    const queue = projectSummerQueue(
+      [
+        legacy('2026-08-28T21:00:00.000Z'),
+        legacy(later),
+        legacy(NOW, {
+          outcome: 'escalated',
+          terminal: true,
+          issueKey: 'legacy-escalated',
+          reason: 'retry-budget-exhausted:dropped-controller-event',
+          escalation: { reason: 'retry-budget-exhausted:dropped-controller-event' },
+        }),
+        otherHead,
+        otherClass,
+        identified,
+      ],
+      { now: NOW }
+    );
+    const dropped = queue.items.filter(item => item.stallClass === 'dropped-controller-event');
+    assert.equal(dropped.filter(item => item.headSha === HEAD && !item.issue).length, 1);
+    assert.equal(dropped.find(item => item.headSha === HEAD && !item.issue).outcome, 'escalated');
+    assert.equal(dropped.find(item => item.headSha === HEAD && !item.issue).observedAt, NOW);
+    assert.equal(dropped.filter(item => item.headSha === 'b'.repeat(40)).length, 1);
+    assert.equal(queue.items.filter(item => item.stallClass === 'missing-failing-checks').length, 1);
+    assert.equal(queue.items.filter(item => item.issue === 'JOV-5400').length, 1);
+    assert.equal(projectSummerQueue([], { now: NOW }).items.length, 0);
   });
 
   it('deliberate red: silent or unattended red is rejected', () => {

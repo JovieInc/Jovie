@@ -1,36 +1,18 @@
 'use client';
 
-import { DotBadge, type DotBadgeVariant } from '@/components/atoms/DotBadge';
+import { DotBadge } from '@/components/atoms/DotBadge';
 import type { AudienceIntentLevel } from '@/types';
+import { AUDIENCE_INTENT_BADGE_STYLES } from './dashboard-status-badge-semantic-contract';
 
 export interface AudienceIntentBadgeProps {
   readonly intentLevel: AudienceIntentLevel;
   readonly className?: string;
 }
 
-const INTENT_BADGES: Record<
-  AudienceIntentLevel,
-  { label: string } & DotBadgeVariant
-> = {
-  high: {
-    label: 'High',
-    className: 'border-default bg-surface-1 text-secondary-token',
-    dotClassName: 'bg-secondary-token',
-  },
-  medium: {
-    label: 'Medium',
-    className: 'border-subtle bg-surface-0 text-tertiary-token',
-    dotClassName: 'bg-tertiary-token',
-  },
-  low: {
-    label: 'Low',
-    className: 'border-subtle bg-transparent text-tertiary-token',
-    dotClassName: 'bg-tertiary-token/70',
-  },
-};
-
 /**
  * AudienceIntentBadge - Displays the intent level of an audience segment.
+ *
+ * Semantic roles are source-backed. Pill geometry and nowrap live on DotBadge.
  *
  * @example
  * <AudienceIntentBadge intentLevel="high" />
@@ -39,7 +21,7 @@ export function AudienceIntentBadge({
   intentLevel,
   className,
 }: AudienceIntentBadgeProps) {
-  const badge = INTENT_BADGES[intentLevel];
+  const badge = AUDIENCE_INTENT_BADGE_STYLES[intentLevel];
 
   return <DotBadge label={badge.label} variant={badge} className={className} />;
 }

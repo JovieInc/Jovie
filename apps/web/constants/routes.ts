@@ -155,6 +155,7 @@ export const APP_ROUTES = {
   COMPARE: '/compare',
   DEMO: '/demo',
   DEMO_VIDEO: '/demovideo',
+  DEVELOPERS: '/developers',
   ENGAGEMENT_ENGINE: '/engagement-engine',
   INVESTORS: '/investors',
   PITCH: '/pitch',

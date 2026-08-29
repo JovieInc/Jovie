@@ -3,10 +3,10 @@
 #
 # The gate must not inherit whatever Node happens to be on the shell's PATH.
 # On the orchestration host the default is pnpm's Node 22.22.1, which violates
-# engines (`>=22.23.1 <23`) and fails the runner-prerequisite contract tests:
+# engines (`>=22.23.2 <23`) and fails the runner-prerequisite contract tests:
 # verify-prerequisites.mjs --write-marker rejects any Node older than .nvmrc,
 # so shard 7/8 reported exactly 3 failures under 22.22.1 and passed under the
-# .nvmrc-pinned 22.23.1.
+# .nvmrc-pinned 22.23.2.
 #
 # Behavior:
 #   - ambient `node` already satisfies .nvmrc (same major, >= pinned): exit 0,

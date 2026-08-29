@@ -13,6 +13,7 @@ import {
   DESIGN_SYSTEM_COMPONENT_REGISTRY,
   designSystemVariantKey,
   normalizeButtonPenRef,
+  validateDesignSystemCompatibilityConsumerSource,
   validateDesignSystemComponentRegistry,
 } from '@/data/designSystem';
 import {
@@ -142,8 +143,6 @@ function validateMoleculeOwnershipReceipt({
  */
 const CENTRAL_MARKETING_CONTRACT_COVERAGE = [
   'FaqSection',
-  'MarketingContainer',
-  'MarketingContentShell',
   'ArtistNotificationsLanding',
   'ArtistProfileCaptureSection',
   'ArtistProfileHowItWorks',
@@ -462,6 +461,111 @@ describe('canonical marketing component registry', () => {
     expect(source.match(/asChild/g)).toHaveLength(2);
     expect(source).not.toContain('public-action-primary');
     expect(source).not.toContain('focus-visible:ring-white/40');
+  });
+
+  it('asserts exact source reads for shared marketing coverage-via receipts', () => {
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-notifications/ArtistNotificationsLanding.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistNotificationsLanding');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileAdaptiveSection.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileAdaptiveSection');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileCaptureSection.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileCaptureSection');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileHowItWorks.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileHowItWorks');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileLandingRoute.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileLandingRoute');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileOutcomesCarousel.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileOutcomesCarousel');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileSectionShell.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileSectionShell');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileSocialProof.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileSocialProof');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileSpecWall.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileSpecWall');
+    expect(
+      fs.readFileSync(
+        path.join(repoRoot, 'apps/web/components/marketing/FaqSection.tsx'),
+        'utf8'
+      )
+    ).toContain('export function FaqSection');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/homepage-v2/HomepageV2Route.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function HomepageV2Route');
+    expect(
+      fs.readFileSync(
+        path.join(repoRoot, 'apps/web/components/site/MarketingFinalCTA.tsx'),
+        'utf8'
+      )
+    ).toContain('export function MarketingFinalCTA');
   });
 
   it('keeps contract ids and Pen roots globally unique', () => {
@@ -799,6 +903,20 @@ describe('canonical shared source atom registry', () => {
           true
         );
       }
+      for (const consumer of entry.compatibilityConsumers) {
+        const consumerSource = fs.readFileSync(
+          path.join(repoRoot, consumer.source),
+          'utf8'
+        );
+        expect(
+          validateDesignSystemCompatibilityConsumerSource(
+            entry,
+            consumer,
+            consumerSource
+          ),
+          `${entry.id}:${consumer.exportName}`
+        ).toEqual([]);
+      }
     }
 
     expect(
@@ -817,6 +935,37 @@ describe('canonical shared source atom registry', () => {
       DESIGN_SYSTEM_COMPONENT_IDS
     );
     expect(validateDesignSystemComponentRegistry()).toEqual([]);
+  });
+
+  it('fails closed when an IconButton compatibility consumer detaches', () => {
+    const iconButton = DESIGN_SYSTEM_COMPONENT_REGISTRY.find(
+      entry => entry.id === 'atom.icon-button'
+    );
+    expect(iconButton).toBeDefined();
+    const overflow = iconButton?.compatibilityConsumers.find(
+      consumer => consumer.exportName === 'OverflowMenuTrigger'
+    );
+    expect(overflow).toBeDefined();
+    if (!iconButton || !overflow) return;
+
+    const detachedSource = `
+      import { Button } from './button';
+      export function OverflowMenuTrigger() {
+        return <Button aria-label='More tabs' />;
+      }
+    `;
+    expect(
+      validateDesignSystemCompatibilityConsumerSource(
+        iconButton,
+        overflow,
+        detachedSource
+      )
+    ).toEqual([
+      {
+        code: 'detached-canonical-consumer',
+        id: 'atom.icon-button:OverflowMenuTrigger',
+      },
+    ]);
   });
 
   it('keeps atom.logo raw until it has a source-mapped Pen origin', () => {

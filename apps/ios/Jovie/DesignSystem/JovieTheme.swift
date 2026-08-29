@@ -1,30 +1,33 @@
 import SwiftUI
 import UIKit
 
+/// System B dark tokens. Hexes match the Noir Ion table in DESIGN.md and
+/// `--noir-ion-*` anchors in apps/web/styles/design-system.css. Do not invent
+/// a second palette.
 enum JovieColor {
-  static let backgroundBase = Color(hex: 0x06070A)
-  static let surface0 = Color(hex: 0x0A0B0E)
-  static let surface1 = Color(hex: 0x101216)
-  static let surface2 = Color(hex: 0x161A20)
-  static let surface3 = Color(hex: 0x2A2C32)
-  static let textPrimary = Color(hex: 0xFFFFFF)
-  static let textSecondary = Color(hex: 0xE3E4E6)
-  static let textTertiary = Color(hex: 0x969799)
-  static let borderSubtle = Color.white.opacity(0.05)
-  static let borderDefault = Color.white.opacity(0.08)
-  static let borderStrong = Color.white.opacity(0.10)
-  static let accentBlue = Color(hex: 0x4D7DFF)
-  static let accentPurple = Color(hex: 0x9B4DFF)
-  static let accentPink = Color(hex: 0xEA4A9C)
-  static let accentOrange = Color(hex: 0xFFAB2E)
-  /// System B focus/active accent (`--color-accent`), not a CTA color.
-  static let accent = Color(hex: 0x7170FF)
+  static let backgroundBase = Color(hex: 0x030407)
+  static let surface0 = Color(hex: 0x06080D)
+  static let surface1 = Color(hex: 0x0F1420)
+  static let surface2 = Color(hex: 0x151B2A)
+  static let surface3 = Color(hex: 0x1B2436)
+  static let textPrimary = Color(hex: 0xF5F7FB)
+  static let textSecondary = Color(hex: 0xD7DCE8)
+  static let textTertiary = Color(hex: 0xA8B0C3)
+  static let borderSubtle = Color(hex: 0xA8B0C3).opacity(0.10)
+  static let borderDefault = Color(hex: 0xA8B0C3).opacity(0.16)
+  static let borderStrong = Color(hex: 0xC7EDFF).opacity(0.26)
+  static let accentBlue = Color(hex: 0x11AFFF)
+  static let accentPurple = Color(hex: 0xA982FF)
+  static let accentPink = Color(hex: 0xFF48D2)
+  static let accentOrange = Color(hex: 0xFFC857)
+  /// System B focus/active accent (`--color-accent` / Ion), not a CTA color.
+  static let accent = Color(hex: 0x11AFFF)
   static let progressTrack = accentBlue.opacity(0.08)
-  static let errorText = Color(hex: 0xFF7A73)
+  static let errorText = Color(hex: 0xFF677D)
   static let qrSurface = Color.white
 
   /// Per-entity-kind accent colors for inline chat chips (JOV-3608). Ported
-  /// 1:1 from the dark-mode carbon-palette CSS vars in
+  /// 1:1 from the dark-mode Noir Ion CSS vars in
   /// apps/web/styles/design-system.css (`--color-accent`,
   /// `--color-accent-purple`, `--color-accent-blue`,
   /// `--color-accent-orange`), which is what `EntityChip`/`EntityMentionSpan`
@@ -34,13 +37,13 @@ enum JovieColor {
   /// here or web/iOS accent parity silently drifts on the next design pass.
   enum EntityAccent {
     /// release -> --color-accent
-    static let release = Color(hex: 0x7170FF)
+    static let release = Color(hex: 0x11AFFF)
     /// artist -> --color-accent-purple
-    static let artist = Color(hex: 0x9B4DFF)
+    static let artist = Color(hex: 0xA982FF)
     /// track -> --color-accent-blue
-    static let track = Color(hex: 0x4D7DFF)
+    static let track = Color(hex: 0x11AFFF)
     /// event -> --color-accent-orange
-    static let event = Color(hex: 0xFFAB2E)
+    static let event = Color(hex: 0xFFC857)
 
     static func color(for kind: MobileChatEntityKind) -> Color {
       switch kind {

@@ -72,6 +72,43 @@ const LEDGER_MISS = {
 };
 
 describe('issue-specific gate-next holds', () => {
+  it('skips a saturated hot lane and admits an older independent lane without a durable hold', async () => {
+    const persisted = [];
+    const evaluated = [];
+    const hot = financeIssue();
+    const oldIndependent = ordinaryIssue();
+    const result = await gateNextHold.admitNextFromPool({
+      issues: [hot, oldIndependent],
+      now: NOW,
+      persistHolds: store => persisted.push(store),
+      evaluateCandidate: async selected => {
+        evaluated.push(selected.identifier);
+        if (selected.identifier === hot.identifier) {
+          return {
+            status: 'blocked',
+            stage: 'collision-preflight',
+            disposition: 'defer',
+            reasonCode: 'lane-capacity-exhausted',
+            reason:
+              'lane-capacity-exhausted: risk:JovieInc/Jovie:control-plane (2/2)',
+            mutations: 0,
+          };
+        }
+        return {
+          status: 'admitted',
+          issue: selected.identifier,
+          mutations: 'verified',
+        };
+      },
+    });
+
+    assert.equal(result.status, 'admitted');
+    assert.equal(result.issue, oldIndependent.identifier);
+    assert.deepEqual(evaluated, [hot.identifier, oldIndependent.identifier]);
+    assert.equal(result.skipped[0].reasonCode, 'lane-capacity-exhausted');
+    assert.equal(persisted.length, 0);
+  });
+
   it('continues past a targeted context miss and admits the next verified issue', async () => {
     const persisted = [];
     const evaluated = [];

@@ -30,6 +30,7 @@ import {
   getOvieOAuthIssuer,
   isAllowedRedirect,
   isOvieOAuthFounder,
+  OVIE_OAUTH_SCOPES,
   ovieFounderLoginLocation,
   pkceS256,
 } from '@/lib/ovie/mcp/oauth';
@@ -512,6 +513,8 @@ describe('Ovie MCP OAuth', () => {
     const claims = exchanger.verifyAccessToken(token.access_token);
     expect(claims?.isAdmin).toBe(true);
     expect(claims?.email).toBe('tim@meetjovie.com');
+    expect(claims?.scopes).toEqual([...OVIE_OAUTH_SCOPES]);
+    expect(token.scope).toBe(OVIE_OAUTH_SCOPES.join(' '));
     expect(isAllowedRedirect('https://evil.example/cb')).toBe(false);
   });
 

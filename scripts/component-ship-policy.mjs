@@ -22,17 +22,16 @@ export const COVERAGE_ROOTS = Object.freeze([
   'apps/web/components/organisms',
   'apps/web/components/marketing',
   'apps/web/components/site',
+  // Closed-world catch-all. The narrower roots above keep their stronger
+  // per-layer floors; this additional root prevents feature/shell/provider
+  // components from escaping the whole-tree uncovered-count ratchet.
+  'apps/web/components',
 ]);
 
 /** Path prefixes that trigger the diff ship gate when a component source changes. */
 export const SHIP_SCOPE_PREFIXES = Object.freeze([
-  'packages/ui/atoms/',
   'packages/ui/',
-  'apps/web/components/atoms/',
-  'apps/web/components/molecules/',
-  'apps/web/components/organisms/',
-  'apps/web/components/marketing/',
-  'apps/web/components/site/',
+  'apps/web/components/',
 ]);
 
 const STORY_RE = /\.stories\.(tsx|ts|jsx|js|mdx)$/i;
@@ -109,19 +108,9 @@ export function isUnderShipScope(relPath) {
   if (!p.endsWith('.tsx')) return false;
   if (isStoryFile(p) || isTestFile(p)) return false;
   if (p.split('/').some(seg => EXCLUDE_DIR_NAMES.has(seg))) return false;
-  // packages/ui non-atom: only top-level .tsx under packages/ui/
-  if (p.startsWith('packages/ui/atoms/')) return true;
-  if (p.startsWith('packages/ui/')) {
-    const rest = p.slice('packages/ui/'.length);
-    if (rest.includes('/')) return false; // nested non-atom dirs (hooks, lib, theme)
-    return true;
-  }
-  return SHIP_SCOPE_PREFIXES.some(
-    prefix =>
-      prefix !== 'packages/ui/' &&
-      prefix !== 'packages/ui/atoms/' &&
-      p.startsWith(prefix)
-  );
+  const base = basename(p).replace(/\.tsx$/i, '');
+  if (isExcludedBasename(base)) return false;
+  return SHIP_SCOPE_PREFIXES.some(prefix => p.startsWith(prefix));
 }
 
 export function coverageRootForPath(relPath) {
@@ -460,13 +449,18 @@ export function resolveCoverageViaPath(
 }
 
 /**
- * Verify a coverage-via target exists and imports the component.
+ * Verify a coverage-via target exists and contains executable evidence:
+ * an exact module import plus runtime use of the imported binding, or an
+ * asserted node:fs read of the exact component source. Comments, mocks
+ * without a real import, same-name text, and unasserted reads fail closed.
  */
 export function verifyCoverageVia({
   viaRel,
   componentRel,
   componentBase,
   repoRoot = REPO_ROOT,
+  componentSource,
+  hasExecutableEvidence,
 }) {
   const abs = join(repoRoot, viaRel);
   if (!existsSync(abs) || !statSync(abs).isFile()) {
@@ -476,13 +470,19 @@ export function verifyCoverageVia({
     };
   }
   const text = readFileSync(abs, 'utf8');
-  const importsComponent =
-    text.includes(componentBase) ||
-    text.includes(basename(componentRel).replace(/\.tsx$/i, ''));
-  if (!importsComponent) {
+  const executable =
+    typeof hasExecutableEvidence === 'function' &&
+    Boolean(componentSource) &&
+    hasExecutableEvidence({
+      testSource: text,
+      testRel: viaRel,
+      sourceRel: componentRel,
+      componentSource,
+    });
+  if (!executable) {
     return {
       ok: false,
-      detail: `@coverage-via ${viaRel} does not reference ${componentRel}`,
+      detail: `@coverage-via ${viaRel} must import ${componentRel} (${componentBase}) and use the imported binding, or assert an exact node:fs read of that source`,
     };
   }
   return { ok: true, detail: null };

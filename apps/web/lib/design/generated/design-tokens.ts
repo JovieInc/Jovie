@@ -69,7 +69,7 @@ export const DESIGN_TOKENS = {
     "accent-active-dark": "#0088ff"
   },
   "radius": {
-    "$description": "System B radius scale (styles/design-system.css).",
+    "$description": "System B radius scale emitted by styles/generated/design-tokens.css.",
     "none": "0",
     "xs": "2px",
     "default": "4px",

@@ -171,7 +171,10 @@ describe('CommonDropdown', () => {
         },
       ];
       render(<CommonDropdown items={items} open={true} />);
-      expect(screen.getByText('user@test.com')).toBeInTheDocument();
+      expect(screen.getByText('user@test.com')).toHaveClass(
+        'text-2xs',
+        'text-(--linear-text-tertiary)'
+      );
     });
 
     it('renders item with shortcut', () => {

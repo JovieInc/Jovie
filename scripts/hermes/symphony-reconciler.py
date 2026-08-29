@@ -4,14 +4,16 @@
 The sidecar observes Symphony's local state API, records an exact workspace
 head/base receipt for every stopped attempt, and escalates repeated failures to
 the canonical remediation route only when that route selects a local model.
-The alternate model may repair the isolated workspace, but may not commit,
-push, merge, or change tracker state. Symphony remains the owner of the normal
-update/test/ready/native-merge lifecycle on its next bounded retry.
+The alternate model may repair one isolated stopped workspace when the fleet
+gate runtimeFloor admits local-only stale-capacity recovery, but may not
+commit, push, merge, or change tracker state. Symphony remains the owner of
+the normal update/test/ready/native-merge lifecycle on its next bounded retry.
 """
 
 from __future__ import annotations
 
 import datetime as dt
+import fcntl
 import hashlib
 import json
 import os
@@ -35,6 +37,7 @@ DEFAULT_API = "http://127.0.0.1:4041/api/v1/state"
 DEFAULT_WORKSPACES = "~/symphony-workspaces"
 DEFAULT_STATE = "~/.local/state/symphony-reconciler"
 DEFAULT_CAPABILITY_MANIFEST = "config/symphony-reconciler-capabilities.json"
+DEFAULT_FLEET_GATE_RECEIPT = "/home/timwhite/gem-workspace/state/gem-priority-gate/latest.json"
 MODEL_ID = "qwen-coder-local"
 MODEL_TIMEOUT_SECONDS = 12 * 60
 RETRY_MINUTES = 15
@@ -48,6 +51,75 @@ REQUIRED_RUNTIME_CAPABILITIES = frozenset(
         "isolated-repair",
     }
 )
+FLEET_GATE_RECEIPT_MAX_AGE = dt.timedelta(minutes=10)
+
+
+def _stale_capacity_local_remediation_limit(
+    receipt_path: pathlib.Path | None = None,
+) -> tuple[int, str]:
+    """Admit only the fail-closed, local-only stale-capacity recovery lane."""
+    path = receipt_path or pathlib.Path(DEFAULT_FLEET_GATE_RECEIPT)
+    try:
+        receipt = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return 0, "fleet_gate_unavailable"
+    if not isinstance(receipt, dict):
+        return 0, "fleet_gate_local_remediation_not_admitted"
+    remediation = receipt.get("remediationAdmission") or {}
+    work = receipt.get("workAdmission") or {}
+    concurrency = receipt.get("concurrency") or {}
+    signals = receipt.get("signals") or {}
+    if not all(
+        isinstance(value, dict)
+        for value in (remediation, work, concurrency, signals)
+    ):
+        return 0, "fleet_gate_local_remediation_not_admitted"
+    gem = concurrency.get("gem") or {}
+    evidence = signals.get("concurrencyEvidence") or {}
+    if not isinstance(gem, dict) or not isinstance(evidence, dict):
+        return 0, "fleet_gate_local_remediation_not_admitted"
+    observed_at = _parse_time(receipt.get("observedAt"))
+    try:
+        age = _now() - observed_at if observed_at is not None else None
+    except TypeError:
+        age = None
+    safe_stale_lane = (
+        receipt.get("schema") == "jovie-fleet-gate/v1"
+        and receipt.get("state") in {"GREEN", "AMBER", "RED"}
+        and remediation.get("allowed") is True
+        and remediation.get("localAllowed") is True
+        and remediation.get("pushAllowed") is False
+        and remediation.get("maxConcurrent") == 0
+        and gem.get("runtimeFloor") == 1
+        and evidence.get("accepted") is False
+        and gem.get("evidenceAccepted") is False
+        and gem.get("newMutationAllowed") is False
+        and gem.get("maxConcurrent") == 0
+        and work.get("newIssueLeaseAllowed") is False
+        and work.get("newImplementationAllowed") is False
+        and age is not None
+        and dt.timedelta(0) <= age <= FLEET_GATE_RECEIPT_MAX_AGE
+    )
+    if not safe_stale_lane:
+        return 0, "fleet_gate_local_remediation_not_admitted"
+    return 1, "fleet_gate_stale_capacity_local_only"
+
+
+def _acquire_local_remediation_lease():
+    directory = _state_root() / "leases"
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    handle = (directory / "stale-capacity-local-remediation.lock").open("a+")
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        handle.close()
+        return None
+    return handle
+
+
+def _release_local_remediation_lease(handle) -> None:
+    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+    handle.close()
 
 
 def _sha256_bytes(value: bytes) -> str:
@@ -1209,11 +1281,11 @@ def _reconcile_item(
     source: str,
     alternate_permitted: bool,
     runtime: dict[str, object] | None = None,
-) -> None:
+) -> bool:
     identifier = str(item.get("issue_identifier", ""))
     if not identifier or not identifier.replace("-", "").isalnum():
         _event("unknown", "invalid_runtime_item", reason="invalid_identifier")
-        return
+        return False
     error = str(item.get("error") or f"runtime_{source}")
     try:
         attempt = int(item.get("attempt") or 0)
@@ -1271,7 +1343,7 @@ def _reconcile_item(
             next="manual_or_environment_repair",
             retry_at=None,
         )
-        return
+        return False
     next_retry = _parse_time(decision.get("due_at")) if retry_scheduled else None
     repeated = (
         alternate_permitted
@@ -1323,6 +1395,7 @@ def _reconcile_item(
         else "normal_model_retry"
     )
     state_after = state_before
+    local_repair_attempted = False
     if deterministic_terminal:
         alternate["status"] = "not_permitted"
 
@@ -1348,6 +1421,7 @@ def _reconcile_item(
                 attempt=attempt,
             )
             repair, state_after = _alternate_repair(identifier, error, state_before)
+            local_repair_attempted = True
             attempted.append(repair)
             alternate.update(
                 {
@@ -1441,6 +1515,7 @@ def _reconcile_item(
         retry_at=_iso(next_retry) if next_retry else None,
         alternate=alternate.get("status"),
     )
+    return local_repair_attempted
 
 
 def main() -> int:
@@ -1475,19 +1550,47 @@ def main() -> int:
     if not items:
         _event("control-plane", "healthy_or_idle", reason="no_stopped_work")
         return 0
-    for source, item in items:
-        try:
-            # The controller is the sole scheduler. Reconciliation observes and
-            # attests policy only; it never stops the healthy listener or takes
-            # alternate-provider ownership.
-            _reconcile_item(item, source, False, runtime)
-        except (OSError, TypeError, ValueError, subprocess.SubprocessError) as exc:
+    local_limit, local_reason = _stale_capacity_local_remediation_limit()
+    local_lease = _acquire_local_remediation_lease()
+    if local_lease is None:
+        _event(
+            "control-plane",
+            "reconciliation_writer_busy",
+            reason=local_reason,
+            capacity=local_limit,
+            observed=len(items),
+        )
+        return 0
+    local_slot_available = bool(local_limit)
+    try:
+        for source, item in items:
+            permitted = local_slot_available
+            try:
+                # A stale-capacity receipt can delegate one existing stopped
+                # workspace to the local alternate repair path. No new issue
+                # lease or remote mutation is admitted by that receipt.
+                attempted = _reconcile_item(item, source, permitted, runtime)
+                if attempted:
+                    local_slot_available = False
+            except (OSError, TypeError, ValueError, subprocess.SubprocessError) as exc:
+                if permitted:
+                    local_slot_available = False
+                _event(
+                    str(item.get("issue_identifier") or "unknown"),
+                    "item_reconciliation_failed",
+                    reason=type(exc).__name__,
+                    next="retry_timer",
+                )
+        if local_limit:
             _event(
-                str(item.get("issue_identifier") or "unknown"),
-                "item_reconciliation_failed",
-                reason=type(exc).__name__,
-                next="retry_timer",
+                "control-plane",
+                "bounded_local_remediation_admitted",
+                reason=local_reason,
+                capacity=local_limit,
+                observed=len(items),
             )
+    finally:
+        _release_local_remediation_lease(local_lease)
     return 0
 
 
