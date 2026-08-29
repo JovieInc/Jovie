@@ -579,6 +579,55 @@ describe('recovered production marker state', () => {
     });
   });
 
+  it('preserves exact runtime proof when only the post-write fleet dispatch failed', () => {
+    const marker = recoveredMarker();
+    marker.attemptRun = markerRecoveryRun('completed', 'failure');
+    const successfulSteps = [
+      'Validate bounded recovery request',
+      'Verify canonical ownership and exact runtime probes',
+      'Re-probe production Better Auth OAuth runtime',
+      'Preserve recovered verified-generation marker',
+      'Upload recovered verified-generation marker',
+      'Confirm uploaded recovered marker bytes',
+    ];
+    marker.attemptJobs = [
+      {
+        id: 71,
+        run_id: recoveryRunId,
+        run_attempt: 1,
+        name: 'Recover exact verified-generation marker',
+        head_sha: 'c'.repeat(40),
+        head_branch: 'main',
+        status: 'completed',
+        conclusion: 'failure',
+        steps: [
+          ...successfulSteps.map((name, index) => ({
+            number: index + 1,
+            name,
+            status: 'completed',
+            conclusion: 'success',
+          })),
+          {
+            number: successfulSteps.length + 1,
+            name: 'Dispatch fresh fleet reconciliation',
+            status: 'completed',
+            conclusion: 'failure',
+          },
+        ],
+      },
+    ];
+
+    expect(
+      classifyProductionMarkerEvidence(
+        evidence({ markers: [marker], latestRun: undefined })
+      )
+    ).toMatchObject({
+      state: 'verified',
+      reason: 'exact_recovered_generation_verified',
+      controllerRun: recoveryRunId,
+    });
+  });
+
   it('fails closed when the source run is not the exact controller attempt', () => {
     const marker = recoveredMarker();
     marker.originalRun = {

@@ -4774,7 +4774,12 @@ describe('production marker recovery workflow (JOV-4965)', () => {
     expect(workflow).toContain('group: production-mutation');
     expect(workflow).toContain('queue: max');
     expect(workflow).toContain('cancel-in-progress: false');
-    expect(workflow).toContain('actions: write');
+    expect(workflow).toContain(`jobs:
+  recover-marker:
+    name: Recover exact verified-generation marker`);
+    expect(workflow).toContain(`    permissions:
+      contents: read
+      actions: write`);
     expect(workflow).toContain('REQUEST_MODE: ${{ github.event_name }}');
     expect(workflow).toContain(
       "if: steps.admission.outputs.recovery_required == 'true'"
