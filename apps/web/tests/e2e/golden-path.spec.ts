@@ -713,7 +713,7 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
         wrongTrackCount: 0,
       });
     const [importedRelease] = await sql`
-      SELECT r.title, pl.url AS "spotifyUrl"
+      SELECT r.title, r.slug, pl.url AS "spotifyUrl"
       FROM discog_releases r
       INNER JOIN provider_links pl
         ON pl.release_id = r.id AND pl.provider_id = 'spotify'
@@ -816,11 +816,29 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
 
         // Match the exact release-provider URL persisted by the real import;
         // a generic artist-level Spotify button cannot satisfy this proof.
+        // The canonical profile composition keeps fans inside Jovie first:
+        // release rows open /{handle}/{releaseSlug}, and the exact provider
+        // destination lives on that release page with tracking parameters.
+        const releasePath = `/${uniqueHandle}/${String(importedRelease?.slug)}`;
+        const releaseLink = fanPage
+          .locator(`a[href="${releasePath}"]`)
+          .filter({ hasText: String(importedRelease?.title) })
+          .first();
+        await expect(
+          releaseLink,
+          'Imported release does not link to its canonical Jovie release page'
+        ).toBeVisible({ timeout: 10_000 });
+        await releaseLink.click();
+        await expect(fanPage).toHaveURL(
+          new RegExp(`${releasePath.replaceAll('/', '\\/')}(?:\\?.*)?$`),
+          { timeout: 30_000 }
+        );
+
         await expect(
           fanPage
-            .locator(`a[href="${String(importedRelease?.spotifyUrl)}"]`)
+            .locator(`a[href^="${String(importedRelease?.spotifyUrl)}"]`)
             .first(),
-          'Imported Spotify release link is not live on the public profile'
+          'Imported Spotify release link is not live on the release page'
         ).toBeVisible({ timeout: 10_000 });
       }).toPass({
         timeout: 180_000,
