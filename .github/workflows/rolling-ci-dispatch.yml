@@ -154,7 +154,7 @@ jobs:
             --arg producerEvent "$PRODUCER_EVENT" \
             --arg trustedPolicyRef "$TRUSTED_REF" \
             --arg cursorApiKey "${CURSOR_API_KEY:-}" \
-            '{repository:$repository,prNumber:$prNumber,headSha:$headSha,liveHead:$liveHead,sourceHead:$sourceHead,headRef:$headRef,workflowRunId:$workflowRunId,workflowRunAttempt:$workflowRunAttempt,failedJobs:$failedJobs,writer:$writer,priorCommentBody:$priorCommentBody,handoffCommentBody:$handoffCommentBody,conclusion:$conclusion,checkSuiteId:$checkSuiteId,checks:$checks,cursorApiKey:$cursorApiKey,source:{eventName:$eventName,workflow:$workflow,workflowPath:$workflowPath,producerEvent:$producerEvent,trustedPolicyRef:$trustedPolicyRef}}' \
+            '{repository:$repository,prNumber:$prNumber,headSha:$headSha,liveHead:$liveHead,sourceHead:$sourceHead,headRef:$headRef,workflowRunId:$workflowRunId,workflowRunAttempt:$workflowRunAttempt,failedJobs:$failedJobs,writer:$writer,priorCommentBody:$priorCommentBody,handoffCommentBody:$handoffCommentBody,conclusion:$conclusion,checkSuiteId:$checkSuiteId,checks:$checks,cursorApiKey:$cursorApiKey,remoteMutationAllowed:false,source:{eventName:$eventName,workflow:$workflow,workflowPath:$workflowPath,producerEvent:$producerEvent,trustedPolicyRef:$trustedPolicyRef}}' \
             | node scripts/lib/rolling-ci-fx.mjs > "$RUNNER_TEMP/rolling-ci-plan.json"
 
           cat "$RUNNER_TEMP/rolling-ci-plan.json"
@@ -203,7 +203,9 @@ jobs:
             request: planned.launch.request,
             cursorApiKey: process.env.CURSOR_API_KEY,
           });
-          console.log(JSON.stringify({ id: launched?.id ?? null, ok: true }));
+          console.log(
+            JSON.stringify({ id: launched?.agent?.id ?? null, ok: true })
+          );
           EOF
 
       - name: Record FX outcome

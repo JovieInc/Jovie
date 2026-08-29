@@ -31,16 +31,26 @@ export {
 export type {
   AvatarFallbackProps,
   AvatarProps,
+  AvatarShape,
   AvatarSize,
   AvatarStatus,
   AvatarStatusDotProps,
   UserAvatarProps,
 } from './atoms/avatar';
 export {
+  AVATAR_OUTLINE_CLASSNAME,
+  AVATAR_PERSON_RADIUS_CLASSNAME,
+  AVATAR_RING_CLASSNAME,
+  AVATAR_SHAPE_NAMES,
+  AVATAR_SIZE_MAP,
+  AVATAR_SIZE_NAMES,
   Avatar,
   AvatarFallback,
   AvatarImage,
   AvatarStatusDot,
+  getAvatarArtworkRadiusClassName,
+  getAvatarShapeClassName,
+  getAvatarSizePx,
   getInitials,
   UserAvatar,
 } from './atoms/avatar';

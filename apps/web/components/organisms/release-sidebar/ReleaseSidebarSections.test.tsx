@@ -21,7 +21,19 @@ vi.mock('@/components/molecules/drawer', () => ({
   }: {
     readonly children?: React.ReactNode;
   }) => <div>{children}</div>,
-  DrawerMediaThumb: () => null,
+  DrawerMediaThumb: ({
+    imageClassName,
+    sizeClassName,
+  }: {
+    readonly imageClassName?: string;
+    readonly sizeClassName?: string;
+  }) => (
+    <div
+      data-testid='release-artwork-thumb'
+      data-image-class={imageClassName}
+      className={sizeClassName}
+    />
+  ),
   DrawerSection: ({ children }: { readonly children?: React.ReactNode }) => (
     <section>{children}</section>
   ),
@@ -34,14 +46,17 @@ vi.mock('@/components/molecules/drawer', () => ({
   }) => <div data-testid={testId}>{children}</div>,
   EntityHeaderCard: ({
     children,
+    image,
     title,
     'data-testid': testId,
   }: {
     readonly children?: React.ReactNode;
+    readonly image?: React.ReactNode;
     readonly title?: React.ReactNode;
     readonly 'data-testid'?: string;
   }) => (
     <div data-testid={testId}>
+      {image}
       {title}
       {children}
     </div>
@@ -49,7 +64,19 @@ vi.mock('@/components/molecules/drawer', () => ({
 }));
 
 vi.mock('@/components/organisms/AvatarUploadable', () => ({
-  AvatarUploadable: () => null,
+  AvatarUploadable: ({
+    shape,
+    size,
+  }: {
+    readonly shape?: string;
+    readonly size?: string;
+  }) => (
+    <div
+      data-testid='release-artwork-uploadable'
+      data-shape={shape}
+      data-size={size}
+    />
+  ),
 }));
 
 vi.mock('@/components/shell/DrawerHero', () => ({
@@ -126,5 +153,58 @@ describe('ReleaseSidebarSections', () => {
 
     expect(screen.getByTestId('release-header-card')).toBeTruthy();
     expect(screen.getByText('Midnight Drive')).toBeTruthy();
+  });
+
+  it('uses one canonical artwork geometry and contain-fit contract', () => {
+    render(
+      <ReleaseEntityHeader
+        release={mockRelease}
+        artistName='Example Artist'
+        providerConfig={providerConfig}
+        canUploadArtwork={false}
+        canRevertArtwork={false}
+        onArtworkUpload={undefined}
+        onArtworkRevert={undefined}
+        allowDownloads={false}
+        previewUrl='https://example.com/preview.mp3'
+        isPlaying={false}
+        onTogglePreview={() => undefined}
+      />
+    );
+
+    const artwork = screen.getByTestId('release-artwork-thumb');
+    const preview = screen.getByRole('button', { name: 'Play preview' });
+
+    expect(artwork).toHaveClass('h-10', 'w-10', 'rounded-xs');
+    expect(artwork).toHaveAttribute('data-image-class', 'object-contain');
+    expect(preview).toHaveClass('rounded-xs');
+    expect(preview).not.toHaveClass('rounded-lg');
+  });
+
+  it('keeps editable release artwork on the same xl artwork contract', () => {
+    render(
+      <ReleaseEntityHeader
+        release={mockRelease}
+        artistName='Example Artist'
+        providerConfig={providerConfig}
+        canUploadArtwork
+        canRevertArtwork={false}
+        onArtworkUpload={async () => 'https://example.com/uploaded.jpg'}
+        onArtworkRevert={undefined}
+        allowDownloads={false}
+        previewUrl={null}
+        isPlaying={false}
+        onTogglePreview={() => undefined}
+      />
+    );
+
+    expect(screen.getByTestId('release-artwork-uploadable')).toHaveAttribute(
+      'data-shape',
+      'artwork'
+    );
+    expect(screen.getByTestId('release-artwork-uploadable')).toHaveAttribute(
+      'data-size',
+      'xl'
+    );
   });
 });

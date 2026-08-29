@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/organisms/AvatarUpload.test.tsx
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
@@ -71,7 +72,7 @@ export function AvatarUpload({
         src={currentAvatarUrl}
         alt={artistName}
         name={artistName}
-        size='xl'
+        size='2xl'
         uploadable
         onUpload={handleUpload}
         onSuccess={handleSuccess}

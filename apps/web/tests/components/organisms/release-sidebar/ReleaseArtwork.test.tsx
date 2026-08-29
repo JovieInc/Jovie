@@ -14,10 +14,19 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerMediaThumb: ({
     children,
     fallback,
+    imageClassName,
   }: {
     children?: ReactNode;
     fallback?: ReactNode;
-  }) => <div data-testid='drawer-media-thumb'>{children ?? fallback}</div>,
+    imageClassName?: string;
+  }) => (
+    <div
+      data-testid='drawer-media-thumb'
+      data-image-class-name={imageClassName}
+    >
+      {children ?? fallback}
+    </div>
+  ),
 }));
 
 vi.mock('@/features/release/AlbumArtworkContextMenu', () => ({
@@ -28,8 +37,8 @@ vi.mock('@/features/release/AlbumArtworkContextMenu', () => ({
 }));
 
 vi.mock('@/components/organisms/AvatarUploadable', () => ({
-  AvatarUploadable: ({ rounded }: { rounded?: string }) => (
-    <div data-testid='avatar-uploadable' data-rounded={rounded ?? 'default'} />
+  AvatarUploadable: ({ shape }: { shape?: string }) => (
+    <div data-testid='avatar-uploadable' data-shape={shape ?? 'person'} />
   ),
 }));
 
@@ -45,8 +54,8 @@ describe('ReleaseArtwork', () => {
     );
 
     expect(screen.getByTestId('avatar-uploadable')).toHaveAttribute(
-      'data-rounded',
-      'md'
+      'data-shape',
+      'artwork'
     );
   });
 
@@ -60,5 +69,20 @@ describe('ReleaseArtwork', () => {
     );
 
     expect(screen.getByTestId('drawer-media-thumb')).toBeInTheDocument();
+  });
+
+  it('preserves the full static release artwork without a cover crop', () => {
+    render(
+      <ReleaseArtwork
+        artworkUrl='https://example.com/release.jpg'
+        title='Midnight Echo'
+        canUploadArtwork={false}
+      />
+    );
+
+    expect(screen.getByTestId('drawer-media-thumb')).toHaveAttribute(
+      'data-image-class-name',
+      'object-contain'
+    );
   });
 });

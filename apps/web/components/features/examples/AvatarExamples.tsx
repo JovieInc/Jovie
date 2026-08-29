@@ -25,7 +25,6 @@ export function PublicProfileExample() {
         alt='User profile photo'
         name='John Doe'
         size='lg'
-        rounded='full'
       />
       <div>
         <h3 className='text-lg font-semibold'>John Doe</h3>

@@ -20,10 +20,11 @@ const meta: Meta<typeof Avatar> = {
       options: ['xs', 'sm', 'md', 'lg', 'xl', '2xl'],
       description: 'Avatar size',
     },
-    rounded: {
+    shape: {
       control: 'select',
-      options: ['none', 'sm', 'md', 'lg', 'full'],
-      description: 'Border radius style',
+      options: ['person', 'artwork'],
+      description:
+        'Person avatars are circular; release artwork is rounded-square',
     },
     src: {
       control: 'text',
@@ -50,7 +51,7 @@ export const Default: Story = {
     alt: 'John Doe',
     name: 'John Doe',
     size: 'md',
-    rounded: 'full',
+    shape: 'person',
   },
 };
 
@@ -61,7 +62,7 @@ export const Fallback: Story = {
     alt: 'Jane Smith',
     name: 'Jane Smith',
     size: 'md',
-    rounded: 'full',
+    shape: 'person',
   },
   parameters: {
     docs: {
@@ -118,52 +119,36 @@ export const Sizes: Story = {
     docs: {
       description: {
         story:
-          'Avatar component in different sizes: xs (24px), sm (32px), md (48px), lg (64px), xl (80px), 2xl (96px).',
+          'Avatar sizes from the canonical contract: xs (16px), sm (20px), md (24px), lg (32px), xl (40px), 2xl (96px).',
       },
     },
   },
 };
 
-// Different rounded styles
-export const RoundedVariants: Story = {
+export const PersonAndArtwork: Story = {
   render: () => (
     <div className='flex items-center space-x-4'>
       <Avatar
         src='https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face'
-        alt='Avatar'
+        alt='Artist'
         name='John'
-        rounded='none'
+        size='2xl'
+        shape='person'
       />
       <Avatar
         src='https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face'
-        alt='Avatar'
-        name='John'
-        rounded='sm'
-      />
-      <Avatar
-        src='https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face'
-        alt='Avatar'
-        name='John'
-        rounded='md'
-      />
-      <Avatar
-        src='https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face'
-        alt='Avatar'
-        name='John'
-        rounded='lg'
-      />
-      <Avatar
-        src='https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face'
-        alt='Avatar'
-        name='John'
-        rounded='full'
+        alt='Release artwork'
+        name='Midnight Echo'
+        size='2xl'
+        shape='artwork'
       />
     </div>
   ),
   parameters: {
     docs: {
       description: {
-        story: 'Avatar component with different rounded corner styles.',
+        story:
+          'Person avatars stay circular. Release artwork uses the rounded-square crop.',
       },
     },
   },

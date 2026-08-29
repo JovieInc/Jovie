@@ -281,7 +281,7 @@ export function AddReleaseSidebar({
                   alt={title ? `${title} artwork` : 'New release artwork'}
                   name={title || 'Untitled'}
                   size='2xl'
-                  rounded='md'
+                  shape='artwork'
                   uploadable
                   onUpload={handleArtworkStage}
                   showHoverOverlay

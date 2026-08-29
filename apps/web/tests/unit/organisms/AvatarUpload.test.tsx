@@ -201,13 +201,17 @@ describe('AvatarUpload - Error Handling', () => {
   });
 
   it('should display upload instructions', () => {
-    renderWithQueryClient(
+    const { container } = renderWithQueryClient(
       <AvatarUpload
         artistName='Test Artist'
         currentAvatarUrl='/test-avatar.jpg'
       />
     );
 
+    expect(container.querySelector('[data-slot="app-avatar"]')).toHaveAttribute(
+      'data-size',
+      '2xl'
+    );
     expect(
       screen.getByText(/Auto-optimized to AVIF\/WebP/i)
     ).toBeInTheDocument();

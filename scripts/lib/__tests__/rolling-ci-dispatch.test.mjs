@@ -541,6 +541,7 @@ describe('rolling CI dispatch CLI and workflow', () => {
       checkSuiteId: 44,
       checks,
       cursorApiKey: '',
+      remoteMutationAllowed: false,
       source: {
         eventName: 'workflow_run',
         workflow: 'CI',

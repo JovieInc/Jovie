@@ -46,7 +46,8 @@ FLEET_GATE_RECEIPT = Path(
     )
 ).expanduser()
 FLEET_GATE_SCHEMA = "jovie-fleet-gate/v1"
-SUMMER_QUEUE_SCHEMA = "jovie-summer-red-queue/v1"
+SUMMER_QUEUE_SCHEMA = "jovie-summer-red-queue/v2"
+SUMMER_QUEUE_STALE_SECONDS = 90 * 60
 SUMMER_QUEUE_PATH = Path(
     os.environ.get(
         "HUD_SUMMER_QUEUE",
@@ -150,7 +151,14 @@ def fetch_fleet_gate(path: Path | None = None) -> dict[str, Any]:
 def load_summer_queue(path: Path | None = None) -> dict[str, Any]:
     """Read Summer's persisted red-loop queue. Display-only; never invent items."""
     source = path or SUMMER_QUEUE_PATH
-    empty = {"schema": SUMMER_QUEUE_SCHEMA, "authority": "Summer", "items": [], "updated": None}
+    empty = {
+        "schema": SUMMER_QUEUE_SCHEMA,
+        "authority": "Summer",
+        "observedAt": None,
+        "items": [],
+        "terminalTombstones": [],
+        "updated": None,
+    }
     try:
         payload = json.loads(source.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
@@ -158,12 +166,133 @@ def load_summer_queue(path: Path | None = None) -> dict[str, Any]:
     if (
         not isinstance(payload, dict)
         or payload.get("schema") != SUMMER_QUEUE_SCHEMA
+        or payload.get("authority") != "Summer"
         or not isinstance(payload.get("items"), list)
+        or not isinstance(payload.get("terminalTombstones"), list)
     ):
         return {**empty, "error": "summer-queue-malformed"}
+    observed_at = payload.get("observedAt")
+    observed_stamp = parse_time(observed_at) if isinstance(observed_at, str) else None
+    if (
+        observed_stamp is None
+        or observed_stamp.tzinfo is None
+        or observed_stamp.utcoffset() is None
+    ):
+        return {**empty, "error": "summer-queue-invalid-observedAt"}
+    queue_age = (now() - observed_stamp).total_seconds()
+    if queue_age < -FLEET_RECEIPT_FUTURE_SKEW_SECONDS:
+        return {
+            **empty,
+            "observedAt": observed_at,
+            "updated": observed_at,
+            "error": "summer-queue-future-observedAt",
+        }
+    if queue_age > SUMMER_QUEUE_STALE_SECONDS:
+        return {
+            **empty,
+            "observedAt": observed_at,
+            "updated": observed_at,
+            "error": "summer-queue-stale",
+        }
+
+    terminal_tombstones: list[dict[str, Any]] = []
+    for raw_tombstone in payload["terminalTombstones"]:
+        if not isinstance(raw_tombstone, dict):
+            return {**empty, "error": "summer-queue-malformed-tombstone"}
+        tombstone = dict(raw_tombstone)
+        tombstone_observed_at = tombstone.get("observedAt")
+        tombstone_stamp = (
+            parse_time(tombstone_observed_at)
+            if isinstance(tombstone_observed_at, str)
+            else None
+        )
+        has_identity = (
+            isinstance(tombstone.get("issue"), str)
+            and bool(tombstone["issue"].strip())
+        ) or (
+            isinstance(tombstone.get("issueKey"), str)
+            and bool(tombstone["issueKey"].strip())
+        ) or (
+            isinstance(tombstone.get("pr"), int)
+            and not isinstance(tombstone.get("pr"), bool)
+            and tombstone["pr"] > 0
+        )
+        if (
+            tombstone.get("outcome") != "healthy"
+            or tombstone.get("terminal") is not True
+            or tombstone_stamp is None
+            or tombstone_stamp.tzinfo is None
+            or tombstone_stamp.utcoffset() is None
+            or not has_identity
+        ):
+            return {**empty, "error": "summer-queue-malformed-tombstone"}
+        terminal_tombstones.append(tombstone)
+
+    items: list[dict[str, Any]] = []
+    stale_items = 0
+    malformed_items = 0
+    terminal_items = 0
+    for raw_item in payload["items"]:
+        if not isinstance(raw_item, dict):
+            malformed_items += 1
+            continue
+        item = dict(raw_item)
+        outcome = item.get("outcome")
+        terminal = item.get("terminal")
+        if outcome not in {"open", "healthy", "escalated"} or not isinstance(
+            terminal, bool
+        ):
+            malformed_items += 1
+            continue
+        if outcome == "healthy":
+            if terminal is not True:
+                malformed_items += 1
+                continue
+            terminal_tombstones.append(item)
+            terminal_items += 1
+            continue
+        if outcome == "escalated":
+            if terminal is not True:
+                malformed_items += 1
+                continue
+            items.append(item)
+            continue
+        item_observed_at = item.get("observedAt")
+        item_stamp = (
+            parse_time(item_observed_at)
+            if isinstance(item_observed_at, str)
+            else None
+        )
+        if terminal is True or item_stamp is None or item_stamp.tzinfo is None:
+            malformed_items += 1
+            continue
+        item_age = (now() - item_stamp).total_seconds()
+        if (
+            item_stamp.utcoffset() is None
+            or item_age < -FLEET_RECEIPT_FUTURE_SKEW_SECONDS
+        ):
+            malformed_items += 1
+            continue
+        if item_age > SUMMER_QUEUE_STALE_SECONDS:
+            stale_items += 1
+            continue
+        items.append(item)
+
     result = dict(payload)
-    result["items"] = [dict(item) for item in payload["items"] if isinstance(item, dict)]
-    result["error"] = None
+    result["items"] = items
+    result["terminalTombstones"] = terminal_tombstones
+    result["updated"] = observed_at
+    result["suppressed"] = {
+        "stale": stale_items,
+        "terminal": terminal_items,
+        "malformed": malformed_items,
+    }
+    result["error"] = (
+        "summer-queue-items-rejected:"
+        f"stale={stale_items},malformed={malformed_items}"
+        if stale_items or malformed_items
+        else None
+    )
     return result
 
 

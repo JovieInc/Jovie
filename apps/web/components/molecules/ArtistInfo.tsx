@@ -1,3 +1,4 @@
+import { getAvatarSizePx } from '@jovie/ui';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { ArtistName } from '@/components/atoms/ArtistName';
@@ -55,15 +56,7 @@ export function ArtistInfo({
 
   const resolvedAvatarSize = avatarSizeMap[avatarSize][viewport];
 
-  const avatarResponsiveSizes = {
-    lg: '64px',
-    xl: '80px',
-    'display-sm': '112px',
-    'display-lg': '160px',
-    'display-xl': '192px',
-    'display-md': '128px',
-    'display-2xl': '224px',
-  }[resolvedAvatarSize];
+  const avatarResponsiveSizes = `${getAvatarSizePx(resolvedAvatarSize)}px`;
 
   const avatarContent = (
     <div className='rounded-full border border-(--profile-pearl-border) bg-(--profile-pearl-bg) p-1 shadow-(--profile-pearl-shadow) backdrop-blur-xl'>

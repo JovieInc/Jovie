@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-
+import {
+  AVATAR_SIZE_MAP as CanonicalAvatarSizeMap,
+  getAvatarSizePx as canonicalGetAvatarSizePx,
+} from './atoms/avatar-contract';
 import {
   CloseButtonIcon as CanonicalCloseButtonIcon,
   closeButtonClassName as canonicalCloseButtonClassName,
@@ -11,9 +14,11 @@ import {
   closeButtonStyles as atomIndexCloseButtonStyles,
 } from './atoms/index';
 import {
+  AVATAR_SIZE_MAP as RootAvatarSizeMap,
   CloseButtonIcon as RootCloseButtonIcon,
   closeButtonClassName as rootCloseButtonClassName,
   closeButtonStyles as rootCloseButtonStyles,
+  getAvatarSizePx as rootGetAvatarSizePx,
 } from './index';
 
 describe('@jovie/ui public exports', () => {
@@ -27,5 +32,7 @@ describe('@jovie/ui public exports', () => {
     expect(AtomIndexCloseButtonIcon).toBe(RootCloseButtonIcon);
     expect(atomIndexCloseButtonClassName).toBe(rootCloseButtonClassName);
     expect(atomIndexCloseButtonStyles).toBe(rootCloseButtonStyles);
+    expect(RootAvatarSizeMap).toBe(CanonicalAvatarSizeMap);
+    expect(rootGetAvatarSizePx).toBe(canonicalGetAvatarSizePx);
   });
 });

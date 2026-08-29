@@ -380,10 +380,14 @@ class VersionedHudContractTests(unittest.TestCase):
     def test_hud_renders_persisted_summer_queue_without_inventing_items(self):
         state = fixture_state()
         state["delivery"]["summer_queue"] = {
-            "schema": "jovie-summer-red-queue/v1",
+            "schema": "jovie-summer-red-queue/v2",
             "authority": "Summer",
+            "observedAt": HUD.iso(),
+            "terminalTombstones": [],
             "items": [{
                 "issue": "JOV-5390", "stallClass": "size-guard", "outcome": "escalated",
+                "terminal": True,
+                "observedAt": HUD.iso(),
                 "reason": "retry-budget-exhausted:size-guard",
             }],
             "error": None,
@@ -398,9 +402,17 @@ class VersionedHudContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = pathlib.Path(tmp) / "summer-queue.json"
             path.write_text(json.dumps({
-                "schema": "jovie-summer-red-queue/v1",
+                "schema": "jovie-summer-red-queue/v2",
                 "authority": "Summer",
-                "items": [{"issue": "JOV-12", "stallClass": "queue-eviction"}],
+                "observedAt": HUD.iso(),
+                "terminalTombstones": [],
+                "items": [{
+                    "issue": "JOV-12",
+                    "stallClass": "queue-eviction",
+                    "outcome": "open",
+                    "terminal": False,
+                    "observedAt": HUD.iso(),
+                }],
             }), encoding="utf-8")
             before = path.read_text(encoding="utf-8")
             loaded = HUD.load_summer_queue(path)
@@ -409,6 +421,205 @@ class VersionedHudContractTests(unittest.TestCase):
             missing = HUD.load_summer_queue(pathlib.Path(tmp) / "missing.json")
         self.assertEqual(missing["items"], [])
         self.assertIn("summer-queue-unavailable", missing["error"])
+
+    def test_fresh_queue_never_launders_stale_item_as_current_bottleneck(self):
+        moment = dt.datetime(2026, 8, 28, 22, 0, tzinfo=dt.timezone.utc)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "summer-queue.json"
+            path.write_text(json.dumps({
+                "schema": "jovie-summer-red-queue/v2",
+                "authority": "Summer",
+                "observedAt": HUD.iso(moment),
+                "terminalTombstones": [],
+                "items": [{
+                    "issue": "JOV-5335",
+                    "pr": 16423,
+                    "stallClass": "missing-failing-checks",
+                    "outcome": "open",
+                    "terminal": False,
+                    "observedAt": "2026-08-23T06:15:00Z",
+                    "reason": "land #16423",
+                }],
+            }), encoding="utf-8")
+            with mock.patch.object(HUD, "now", return_value=moment):
+                loaded = HUD.load_summer_queue(path)
+                state = fixture_state()
+                state["delivery"]["summer_queue"] = loaded
+                with mock.patch.dict(HUD.os.environ, {"HUD_COLOR": "never"}):
+                    output = HUD.render(state)
+
+        self.assertEqual(loaded["items"], [])
+        self.assertEqual(loaded["updated"], HUD.iso(moment))
+        self.assertEqual(loaded["suppressed"]["stale"], 1)
+        self.assertEqual(
+            loaded["error"],
+            "summer-queue-items-rejected:stale=1,malformed=0",
+        )
+        self.assertNotIn("JOV-5335", output)
+        self.assertNotIn("land #16423", output)
+
+    def test_summer_queue_receipt_fails_closed_on_invalid_or_stale_source_time(self):
+        moment = dt.datetime(2026, 8, 28, 22, 0, tzinfo=dt.timezone.utc)
+        cases = {
+            "legacy-schema": (
+                {
+                    "schema": "jovie-summer-red-queue/v1",
+                    "authority": "Summer",
+                    "observedAt": HUD.iso(moment),
+                },
+                "summer-queue-malformed",
+            ),
+            "missing-authority": ({"observedAt": HUD.iso(moment)}, "summer-queue-malformed"),
+            "missing-time": ({"authority": "Summer"}, "summer-queue-invalid-observedAt"),
+            "naive-time": (
+                {"authority": "Summer", "observedAt": "2026-08-28T22:00:00"},
+                "summer-queue-invalid-observedAt",
+            ),
+            "future-time": (
+                {"authority": "Summer", "observedAt": "2026-08-28T22:00:06Z"},
+                "summer-queue-future-observedAt",
+            ),
+            "stale-time": (
+                {"authority": "Summer", "observedAt": "2026-08-28T20:29:59Z"},
+                "summer-queue-stale",
+            ),
+        }
+        for name, (override, expected_error) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp:
+                path = pathlib.Path(tmp) / "summer-queue.json"
+                path.write_text(json.dumps({
+                    "schema": "jovie-summer-red-queue/v2",
+                    "items": [],
+                    "terminalTombstones": [],
+                    **override,
+                }), encoding="utf-8")
+                with mock.patch.object(HUD, "now", return_value=moment):
+                    loaded = HUD.load_summer_queue(path)
+
+            self.assertEqual(loaded["items"], [])
+            self.assertEqual(loaded["error"], expected_error)
+
+    def test_summer_queue_rejects_untyped_terminal_and_stale_items(self):
+        moment = dt.datetime(2026, 8, 28, 22, 0, tzinfo=dt.timezone.utc)
+        observed_at = HUD.iso(moment)
+        malformed = [
+            "not-an-object",
+            {"outcome": "unknown", "terminal": False, "observedAt": observed_at},
+            {"outcome": "open", "terminal": "false", "observedAt": observed_at},
+            {"outcome": "open", "terminal": True, "observedAt": observed_at},
+            {"outcome": "healthy", "terminal": False, "observedAt": observed_at},
+            {"outcome": "escalated", "terminal": False, "observedAt": observed_at},
+            {"outcome": "open", "terminal": False, "observedAt": "2026-08-28T22:00:06Z"},
+            {"outcome": "open", "terminal": False, "observedAt": None},
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "summer-queue.json"
+            path.write_text(json.dumps({
+                "schema": "jovie-summer-red-queue/v2",
+                "authority": "Summer",
+                "observedAt": observed_at,
+                "terminalTombstones": [],
+                "items": [
+                    *malformed,
+                    {
+                        "issue": "JOV-OLD",
+                        "outcome": "open",
+                        "terminal": False,
+                        "observedAt": "2026-08-28T20:29:59Z",
+                    },
+                ],
+            }), encoding="utf-8")
+            with mock.patch.object(HUD, "now", return_value=moment):
+                loaded = HUD.load_summer_queue(path)
+
+        self.assertEqual(loaded["items"], [])
+        self.assertEqual(loaded["suppressed"]["stale"], 1)
+        self.assertEqual(loaded["suppressed"]["malformed"], len(malformed))
+
+    def test_terminal_linked_pr_and_issue_are_tombstoned_but_escalation_remains(self):
+        moment = dt.datetime(2026, 8, 28, 22, 0, tzinfo=dt.timezone.utc)
+        observed_at = HUD.iso(moment)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "summer-queue.json"
+            path.write_text(json.dumps({
+                "schema": "jovie-summer-red-queue/v2",
+                "authority": "Summer",
+                "observedAt": observed_at,
+                "terminalTombstones": [{
+                    "issue": "JOV-5335",
+                    "pr": 16423,
+                    "outcome": "healthy",
+                    "terminal": True,
+                    "observedAt": observed_at,
+                    "reason": "linked-pr-merged-and-linear-done",
+                }],
+                "items": [
+                    {
+                        "issue": "JOV-5390",
+                        "outcome": "escalated",
+                        "terminal": True,
+                        "observedAt": observed_at,
+                        "reason": "founder-action-required",
+                    },
+                ],
+            }), encoding="utf-8")
+            with mock.patch.object(HUD, "now", return_value=moment):
+                loaded = HUD.load_summer_queue(path)
+
+        self.assertEqual([item["issue"] for item in loaded["items"]], ["JOV-5390"])
+        self.assertEqual(loaded["terminalTombstones"][0]["issue"], "JOV-5335")
+        self.assertEqual(loaded["terminalTombstones"][0]["pr"], 16423)
+        self.assertEqual(loaded["terminalTombstones"][0]["observedAt"], observed_at)
+        self.assertIsNone(loaded["error"])
+
+    def test_terminal_tombstone_requires_typed_identity_and_timestamp(self):
+        moment = dt.datetime(2026, 8, 28, 22, 0, tzinfo=dt.timezone.utc)
+        for tombstone in (
+            "not-an-object",
+            {"issue": "JOV-1", "outcome": "healthy", "terminal": True, "observedAt": 1},
+            {"pr": True, "outcome": "healthy", "terminal": True, "observedAt": HUD.iso(moment)},
+            {"issue": "JOV-1", "outcome": "open", "terminal": True, "observedAt": HUD.iso(moment)},
+        ):
+            with self.subTest(tombstone=tombstone), tempfile.TemporaryDirectory() as tmp:
+                path = pathlib.Path(tmp) / "summer-queue.json"
+                path.write_text(json.dumps({
+                    "schema": "jovie-summer-red-queue/v2",
+                    "authority": "Summer",
+                    "observedAt": HUD.iso(moment),
+                    "terminalTombstones": [tombstone],
+                    "items": [],
+                }), encoding="utf-8")
+                with mock.patch.object(HUD, "now", return_value=moment):
+                    loaded = HUD.load_summer_queue(path)
+
+            self.assertEqual(loaded["items"], [])
+            self.assertEqual(loaded["error"], "summer-queue-malformed-tombstone")
+
+    def test_fresh_active_summer_item_is_preserved_with_source_timestamp(self):
+        moment = dt.datetime(2026, 8, 28, 22, 0, tzinfo=dt.timezone.utc)
+        observed_at = HUD.iso(moment - dt.timedelta(minutes=5))
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "summer-queue.json"
+            path.write_text(json.dumps({
+                "schema": "jovie-summer-red-queue/v2",
+                "authority": "Summer",
+                "observedAt": observed_at,
+                "terminalTombstones": [],
+                "items": [{
+                    "issue": "JOV-5400",
+                    "pr": 16599,
+                    "outcome": "open",
+                    "terminal": False,
+                    "observedAt": observed_at,
+                    "reason": "ci-failed",
+                }],
+            }), encoding="utf-8")
+            with mock.patch.object(HUD, "now", return_value=moment):
+                loaded = HUD.load_summer_queue(path)
+
+        self.assertEqual(loaded["updated"], observed_at)
+        self.assertEqual([item["issue"] for item in loaded["items"]], ["JOV-5400"])
+        self.assertIsNone(loaded["error"])
 
 
 if __name__ == "__main__":

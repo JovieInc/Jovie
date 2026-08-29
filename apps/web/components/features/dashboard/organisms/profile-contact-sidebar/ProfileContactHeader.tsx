@@ -109,7 +109,6 @@ function ProfileAvatar({
         alt={avatarAlt}
         name={displayName}
         size='2xl'
-        rounded='md'
         uploadable
         onUpload={onAvatarUpload}
         onError={message => {
@@ -128,7 +127,6 @@ function ProfileAvatar({
       alt={avatarAlt}
       name={displayName}
       size='2xl'
-      rounded='md'
     />
   );
 }
