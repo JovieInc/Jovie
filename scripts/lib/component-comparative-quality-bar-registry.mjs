@@ -22,6 +22,8 @@ export const QUALITY_BAR_CONTEXTS = deepFreeze([
   'embedded-mobile',
 ]);
 
+export const QUALITY_BAR_BATCHES = deepFreeze(['batch-1', 'batch-2']);
+
 export const QUALITY_BAR_DIMENSIONS = deepFreeze([
   'semantic-anatomy',
   'state-completeness',
@@ -99,7 +101,13 @@ export const ATOM_MOLECULE_INVENTORY_RATCHET = deepFreeze([
 ]);
 
 const contexts = QUALITY_BAR_CONTEXTS;
-const entry = value => deepFreeze({ contexts, enrolled: true, ...value });
+const entry = value =>
+  deepFreeze({
+    contexts,
+    enrolled: true,
+    enrollmentBatch: 'batch-1',
+    ...value,
+  });
 
 export const COMPARATIVE_QUALITY_BAR = deepFreeze([
   entry({
@@ -312,6 +320,7 @@ export const COMPARATIVE_QUALITY_BAR = deepFreeze([
   }),
   entry({
     id: 'atom.input',
+    enrollmentBatch: 'batch-2',
     layer: 'atom',
     owner: {
       sourcePath: 'packages/ui/atoms/input.tsx',
@@ -348,6 +357,7 @@ export const COMPARATIVE_QUALITY_BAR = deepFreeze([
   }),
   entry({
     id: 'atom.textarea',
+    enrollmentBatch: 'batch-2',
     layer: 'atom',
     owner: {
       sourcePath: 'packages/ui/atoms/textarea.tsx',
@@ -377,6 +387,7 @@ export const COMPARATIVE_QUALITY_BAR = deepFreeze([
   }),
   entry({
     id: 'atom.checkbox',
+    enrollmentBatch: 'batch-2',
     layer: 'atom',
     owner: {
       sourcePath: 'packages/ui/atoms/checkbox.tsx',
@@ -412,6 +423,7 @@ export const COMPARATIVE_QUALITY_BAR = deepFreeze([
   }),
   entry({
     id: 'atom.radio-group',
+    enrollmentBatch: 'batch-2',
     layer: 'atom',
     owner: {
       sourcePath: 'packages/ui/atoms/radio-group.tsx',
@@ -442,6 +454,7 @@ export const COMPARATIVE_QUALITY_BAR = deepFreeze([
   }),
   entry({
     id: 'atom.native-select',
+    enrollmentBatch: 'batch-2',
     layer: 'atom',
     owner: {
       sourcePath: 'packages/ui/atoms/native-select.tsx',

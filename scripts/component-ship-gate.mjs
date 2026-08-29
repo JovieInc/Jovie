@@ -1221,7 +1221,7 @@ function printReport(report) {
     const outcome = rendered.receipt?.shadcnOutcome;
     if (outcome) {
       console.log(
-        `[component-ship-gate] shadcn-outcome: ${outcome.ok ? 'ok' : 'FAIL'} enrolled=${(outcome.enrolled ?? []).length}`
+        `[component-ship-gate] shadcn-outcome rubric: ${outcome.ok ? 'qualified' : 'FAIL'} enrolled=${(outcome.enrolled ?? []).length} live-visual=${outcome.liveVisualCertification?.status ?? 'unknown'}`
       );
       for (const item of outcome.fixtures ?? []) {
         console.log(`  outcome-fixture ${item.id}: ${item.verdict}`);
