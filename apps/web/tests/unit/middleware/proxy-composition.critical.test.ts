@@ -199,7 +199,7 @@ describe('proxy composition (critical)', () => {
 
     it('returns a markdown 404 recovery body for a missing path', async () => {
       const req = createTestRequest({
-        pathname: '/some-path-that-does-not-exist',
+        pathname: '/some-path-that-definitely-does-not-exist',
         headers: { accept: 'text/markdown' },
       });
       const res = await callMiddleware(req);
@@ -213,6 +213,7 @@ describe('proxy composition (critical)', () => {
       expect(body).toContain('/llms.txt');
       expect(body).toContain('/openapi.json');
       expect(body).toContain('/sitemap.xml');
+      expect(body).toContain('/llms-full.txt');
     });
 
     it('keeps the HTML homepage path for browser Accept and still varies on Accept', async () => {
@@ -229,6 +230,18 @@ describe('proxy composition (critical)', () => {
         'text/markdown; charset=utf-8'
       );
       expect(res.headers.get('vary')).toMatch(/Accept/i);
+    });
+
+    it('does not markdown-404 a public profile candidate', async () => {
+      const req = createTestRequest({
+        pathname: '/tim',
+        headers: { accept: 'text/markdown' },
+      });
+      const res = await callMiddleware(req);
+      expect(res.status).not.toBe(404);
+      expect(res.headers.get('content-type')).not.toBe(
+        'text/markdown; charset=utf-8'
+      );
     });
 
     it('generates nonce for app paths', async () => {

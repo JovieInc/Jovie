@@ -16,7 +16,10 @@ import {
   hasAnalyticsConsent,
 } from '@/lib/cookies/consent-state';
 import { NONESSENTIAL_PROXY_COOKIE_NAMES } from '@/lib/cookies/registry';
-import { ensureVaryAccept } from '@/lib/http/accept-header';
+import {
+  ensureVaryAccept,
+  HOMEPAGE_ACCEPT_VARY,
+} from '@/lib/http/accept-header';
 import type { PathCategory } from '@/lib/routing/proxy-routing';
 import {
   buildContentSecurityPolicy,
@@ -206,7 +209,11 @@ export function buildFinalResponse(
   }
 
   if (pathname === '/') {
-    ensureVaryAccept(res.headers);
+    if (!res.headers.get('Vary')) {
+      res.headers.set('Vary', HOMEPAGE_ACCEPT_VARY);
+    } else {
+      ensureVaryAccept(res.headers);
+    }
   }
 
   // Performance monitoring
