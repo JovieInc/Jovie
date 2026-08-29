@@ -76,6 +76,23 @@ describe('component-ship-policy scope', () => {
   it('includes shippable surfaces and excludes tests/stories/utils', () => {
     expect(isUnderShipScope('packages/ui/atoms/button.tsx')).toBe(true);
     expect(
+      isUnderShipScope(
+        'apps/web/components/features/profile/ProfileHeroCard.tsx'
+      )
+    ).toBe(true);
+    expect(
+      isUnderShipScope('apps/web/components/shell/AppShellRightRail.tsx')
+    ).toBe(true);
+    expect(isUnderShipScope('apps/web/components/jovie/JovieChat.tsx')).toBe(
+      true
+    );
+    expect(
+      isUnderShipScope('apps/web/components/providers/CoreProviders.tsx')
+    ).toBe(true);
+    expect(isUnderShipScope('apps/web/components/feedback/Banner.tsx')).toBe(
+      true
+    );
+    expect(
       isUnderShipScope('apps/web/components/molecules/ArtistCard.tsx')
     ).toBe(true);
     expect(
@@ -86,6 +103,9 @@ describe('component-ship-policy scope', () => {
     );
     expect(isUnderShipScope('packages/ui/atoms/button.test.tsx')).toBe(false);
     expect(isUnderShipScope('packages/ui/hooks/useX.tsx')).toBe(false);
+    expect(isUnderShipScope('packages/ui/lib/class-names.utils.tsx')).toBe(
+      false
+    );
     expect(isUnderShipScope('apps/web/app/(marketing)/page.tsx')).toBe(false);
     expect(
       isUnderShipScope(
@@ -110,6 +130,15 @@ describe('component-ship-policy scope', () => {
     expect(list.find(c => c.component === 'button')?.covered).toBe(true);
     expect(list.find(c => c.component === 'button')?.tested).toBe(true);
     expect(list.find(c => c.component === 'orphan')?.covered).toBe(false);
+  });
+
+  it('keeps the complete web component inventory inside the hard diff gate', () => {
+    const inventory = listComponentsInRoot('apps/web/components');
+
+    expect(inventory.length).toBeGreaterThan(1000);
+    expect(
+      inventory.filter(component => !isUnderShipScope(component.sourceRel))
+    ).toEqual([]);
   });
 });
 
@@ -201,6 +230,52 @@ describe('diff gate', () => {
     expect(m.total).toBe(1);
     expect(m.covered).toBe(0);
     expect(m.percent).toBe(0);
+  });
+
+  it('fails closed for a changed feature component outside the legacy layer roots', () => {
+    const sourceRel =
+      'apps/web/components/features/profile/UnownedProfileCard.tsx';
+    const root = fixtureRepo({
+      [sourceRel]: 'export function UnownedProfileCard() { return null }\n',
+    });
+
+    const result = checkChangedComponents([sourceRel], { repoRoot: root });
+
+    expect(result.applicable).toBe(true);
+    expect(result.ok).toBe(false);
+    expect(result.changedComponents).toEqual([sourceRel]);
+    expect(result.issues.map(issue => issue.rule)).toEqual(
+      expect.arrayContaining(['missing-test', 'missing-story'])
+    );
+  });
+
+  it('accepts a changed feature component only with touched real test and story evidence', () => {
+    const sourceRel = 'apps/web/components/features/profile/ProfileSignal.tsx';
+    const testRel =
+      'apps/web/components/features/profile/ProfileSignal.test.tsx';
+    const storyRel =
+      'apps/web/components/features/profile/ProfileSignal.stories.tsx';
+    const root = fixtureRepo({
+      [sourceRel]:
+        'export interface ProfileSignalProps { readonly label: string }\n' +
+        'export function ProfileSignal({ label }: ProfileSignalProps) { return <span>{label}</span> }\n',
+      [testRel]:
+        "import { ProfileSignal } from './ProfileSignal';\nvoid ProfileSignal;\n",
+      [storyRel]:
+        "import { ProfileSignal } from './ProfileSignal';\n" +
+        'export default { component: ProfileSignal };\n' +
+        "export const Default = { args: { label: 'Signal' } };\n",
+    });
+
+    const result = checkChangedComponents([sourceRel, testRel, storyRel], {
+      repoRoot: root,
+    });
+
+    expect(result).toMatchObject({
+      applicable: true,
+      ok: true,
+      changedComponents: [sourceRel],
+    });
   });
 
   it('reports missing test/story for changed components in a fixture root', () => {
@@ -488,6 +563,13 @@ describe('multi-root ratchet', () => {
           uncoveredComponents: [],
         },
         'apps/web/components/site': {
+          percent: 0,
+          covered: 0,
+          total: 0,
+          uncovered: 0,
+          uncoveredComponents: [],
+        },
+        'apps/web/components': {
           percent: 0,
           covered: 0,
           total: 0,

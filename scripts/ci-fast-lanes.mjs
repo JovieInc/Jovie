@@ -574,6 +574,7 @@ function runStructural() {
     'pnpm --filter=@jovie/web run lint:seo',
     'pnpm --filter=@jovie/web run lint:contrast-ratchet',
     // JOV-4421: hard ship gate — tests + matching stories for shippable UI.
+    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-ship-gate.test.mjs',
     'pnpm component-ship-gate',
     'pnpm screen-certification-gate',
     // CI workflow changes live at the repo root, so Turbo --affected can select
