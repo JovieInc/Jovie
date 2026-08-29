@@ -194,6 +194,29 @@ describe('no unattended red loop', () => {
     assert.equal(assertNoUnattendedRed([open('not-proven', { proven: false })]), true);
   });
 
+  it('deliberate red: Summer queue tombstones healthy artifacts and timestamps active items', () => {
+    const active = open('queue-eviction', { issue: 'JOV-5400', pr: 16599 });
+    const merged = advanceAttempt(
+      open('missing-failing-checks', { issue: 'JOV-5335', pr: 16423 }),
+      { healthy: true, reason: 'linked-pr-merged-and-linear-done' },
+      { now: NOW }
+    );
+    const escalated = escalate(
+      open('provider-unavailable', { issue: 'JOV-5401' }),
+      'founder-action-required',
+      NOW
+    );
+
+    const queue = projectSummerQueue([merged, active, escalated], { now: NOW });
+
+    assert.deepEqual(queue.items.map(item => item.issue), ['JOV-5400', 'JOV-5401']);
+    assert.equal(queue.items[0].observedAt, NOW);
+    assert.equal(queue.items[0].terminal, false);
+    assert.equal(queue.items[1].terminal, true);
+    assert.equal(queue.counts.terminalHidden, 1);
+    assert.equal(queue.counts.healthy, 0);
+  });
+
   it('deliberate red: silent or unattended red is rejected', () => {
     assert.throws(
       () =>
