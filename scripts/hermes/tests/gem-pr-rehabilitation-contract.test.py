@@ -442,6 +442,18 @@ case "$*" in
   *"is-active --quiet gem-pr-drain.timer"*) exit 1 ;;
   *"is-active --quiet gem-pr-drain.service"*) exit 1 ;;
   *"restart symphony-ui-pilot.service"*)
+    if { [ -n "${FAKE_WORKFLOW_OVERLAY_VALUE:-}" ] || [ "${FAKE_WORKFLOW_UNRELATED_DRIFT:-false}" = true ]; } &&
+       [ ! -e "$FAKE_WORKFLOW_MUTATION_MARKER" ]; then
+      if [ -n "${FAKE_WORKFLOW_OVERLAY_VALUE:-}" ]; then
+        sed "s/max_concurrent_agents: [1-8]$/max_concurrent_agents: ${FAKE_WORKFLOW_OVERLAY_VALUE}/" \
+          "$FAKE_WORKFLOW_OVERLAY_TARGET" > "$FAKE_WORKFLOW_OVERLAY_TARGET.fake"
+        mv "$FAKE_WORKFLOW_OVERLAY_TARGET.fake" "$FAKE_WORKFLOW_OVERLAY_TARGET"
+      fi
+      if [ "${FAKE_WORKFLOW_UNRELATED_DRIFT:-false}" = true ]; then
+        printf '\n# unrelated runtime drift\n' >> "$FAKE_WORKFLOW_OVERLAY_TARGET"
+      fi
+      : > "$FAKE_WORKFLOW_MUTATION_MARKER"
+    fi
     [ "${FAKE_RESTART_FAILURE:-false}" != true ]
     exit
     ;;
@@ -464,6 +476,8 @@ exit 0
             "HOME": str(home),
             "GEM_WORKSPACE": str(gem),
             "SYMPHONY_RUNTIME": str(symphony),
+            "FAKE_WORKFLOW_MUTATION_MARKER": str(root / "workflow-mutated"),
+            "FAKE_WORKFLOW_OVERLAY_TARGET": str(paths["workflow"]),
             "PATH": f"{fake_bin}:/usr/bin:/bin:/usr/sbin:/sbin",
         }
         return paths, env
@@ -474,12 +488,18 @@ exit 0
         env: dict[str, str],
         *,
         fail_restart: bool = False,
+        workflow_overlay: str = "",
+        unrelated_workflow_drift: bool = False,
     ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             ["bash", str(fixture / FLEET_INSTALLER.relative_to(ROOT)), str(fixture)],
             env={
                 **env,
                 "FAKE_RESTART_FAILURE": "true" if fail_restart else "false",
+                "FAKE_WORKFLOW_OVERLAY_VALUE": workflow_overlay,
+                "FAKE_WORKFLOW_UNRELATED_DRIFT": (
+                    "true" if unrelated_workflow_drift else "false"
+                ),
             },
             text=True,
             capture_output=True,
@@ -561,6 +581,56 @@ exit 0
             attestation["policy"]["sourceSha256"],
             attestation["policy"]["installedSha256"],
         )
+        self.assertEqual(attestation["workflow"]["matchMode"], "exact")
+        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 4)
+        self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 4)
+
+    def test_install_attests_controller_owned_bounded_concurrency_overlay(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            process = self._install(fixture, env, workflow_overlay="1")
+            installed_workflow = paths["workflow"].read_text(encoding="utf-8")
+            attestation = json.loads(paths["attestation"].read_text(encoding="utf-8"))
+
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertIn("max_concurrent_agents: 1", installed_workflow)
+        self.assertTrue(attestation["workflow"]["matches"])
+        self.assertEqual(
+            attestation["workflow"]["matchMode"], "bounded_concurrency_overlay"
+        )
+        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 4)
+        self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 1)
+        self.assertNotEqual(
+            attestation["workflow"]["sourceSha256"],
+            attestation["workflow"]["installedSha256"],
+        )
+
+    def test_install_rejects_out_of_bounds_concurrency_overlay(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            process = self._install(fixture, env, workflow_overlay="9")
+            restored_workflow = paths["workflow"].read_text(encoding="utf-8")
+            attestation_exists = paths["attestation"].exists()
+
+        self.assertNotEqual(process.returncode, 0)
+        self.assertEqual(restored_workflow, "old workflow\n")
+        self.assertFalse(attestation_exists)
+        self.assertIn("refusing stale Gem service attestation", process.stderr)
+
+    def test_install_rejects_unrelated_workflow_drift(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            process = self._install(fixture, env, unrelated_workflow_drift=True)
+            restored_workflow = paths["workflow"].read_text(encoding="utf-8")
+            attestation_exists = paths["attestation"].exists()
+
+        self.assertNotEqual(process.returncode, 0)
+        self.assertEqual(restored_workflow, "old workflow\n")
+        self.assertFalse(attestation_exists)
+        self.assertIn("refusing stale Gem service attestation", process.stderr)
 
     def test_failed_install_removes_a_new_policy_during_atomic_rollback(self):
         with tempfile.TemporaryDirectory() as directory:

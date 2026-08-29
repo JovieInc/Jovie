@@ -278,8 +278,6 @@ curl --fail --silent --show-error --max-time 5 http://127.0.0.1:4041/api/v1/stat
 # deployed configuration surfaces only after daemon-reload, service activation,
 # and the local state endpoint have all succeeded. This receipt contains hashes
 # and state only; it never serializes credentials or configuration contents.
-WORKFLOW_SOURCE_SHA="$(sha256sum "${WORKFLOW_SOURCE}" | awk '{print $1}')"
-WORKFLOW_TARGET_SHA="$(sha256sum "${WORKFLOW_TARGET}" | awk '{print $1}')"
 UNIT_SOURCE_SHA="$(sha256sum "${SERVICE_UNIT_SOURCE}" | awk '{print $1}')"
 UNIT_TARGET_SHA="$(sha256sum "${SERVICE_UNIT_TARGET}" | awk '{print $1}')"
 POLICY_SOURCE_SHA="$(sha256sum "${POLICY_SOURCE}" | awk '{print $1}')"
@@ -290,8 +288,8 @@ CLOSURE_SOURCE_SHA="$(sha256sum "${CLOSURE_SOURCE}" | awk '{print $1}')"
 CLOSURE_TARGET_SHA="$(sha256sum "${CLOSURE_TARGET}" | awk '{print $1}')"
 export \
   SOURCE_REVISION \
-  WORKFLOW_SOURCE_SHA \
-  WORKFLOW_TARGET_SHA \
+  WORKFLOW_SOURCE \
+  WORKFLOW_TARGET \
   UNIT_SOURCE_SHA \
   UNIT_TARGET_SHA \
   POLICY_SOURCE_SHA \
@@ -302,15 +300,53 @@ export \
   CLOSURE_TARGET_SHA \
   GEM_ROOT
 python3 - <<'PY'
+import hashlib
 import json
 import os
 import pathlib
+import re
 from datetime import datetime, timezone
 
 root = pathlib.Path(os.environ["GEM_ROOT"])
 destination = root / "state" / "gem-service-attestation.json"
 destination.parent.mkdir(parents=True, exist_ok=True)
 temporary = destination.with_suffix(".json.tmp")
+
+# The pressure controller owns exactly one bounded runtime overlay. It may
+# update this value while the service restart is becoming healthy, so attest
+# the same semantic contract as install-symphony-ui-pilot.sh --check instead
+# of racing it with a byte-exact workflow hash.
+concurrency_pattern = re.compile(
+    r"^(\s*max_concurrent_agents:\s*)([1-8])(\s*)$",
+    re.MULTILINE,
+)
+workflow_source_bytes = pathlib.Path(os.environ["WORKFLOW_SOURCE"]).read_bytes()
+workflow_installed_bytes = pathlib.Path(os.environ["WORKFLOW_TARGET"]).read_bytes()
+workflow_source = workflow_source_bytes.decode("utf-8")
+workflow_installed = workflow_installed_bytes.decode("utf-8")
+source_matches = list(concurrency_pattern.finditer(workflow_source))
+installed_matches = list(concurrency_pattern.finditer(workflow_installed))
+workflow_matches = False
+workflow_match_mode = "invalid"
+source_concurrency = None
+installed_concurrency = None
+if len(source_matches) == 1 and len(installed_matches) == 1:
+    source_concurrency = int(source_matches[0].group(2))
+    installed_concurrency = int(installed_matches[0].group(2))
+
+    def normalized(text: str) -> str:
+        return concurrency_pattern.sub(
+            lambda match: f"{match.group(1)}<runtime>{match.group(3)}", text
+        )
+
+    workflow_matches = normalized(workflow_source) == normalized(workflow_installed)
+    if workflow_matches:
+        workflow_match_mode = (
+            "exact"
+            if workflow_source == workflow_installed
+            else "bounded_concurrency_overlay"
+        )
+
 receipt = {
     "schema": "gem-service-attestation/v1",
     "observedAt": datetime.now(timezone.utc).isoformat(),
@@ -320,9 +356,12 @@ receipt = {
     "active": True,
     "healthy": True,
     "workflow": {
-        "sourceSha256": os.environ["WORKFLOW_SOURCE_SHA"],
-        "installedSha256": os.environ["WORKFLOW_TARGET_SHA"],
-        "matches": os.environ["WORKFLOW_SOURCE_SHA"] == os.environ["WORKFLOW_TARGET_SHA"],
+        "sourceSha256": hashlib.sha256(workflow_source_bytes).hexdigest(),
+        "installedSha256": hashlib.sha256(workflow_installed_bytes).hexdigest(),
+        "matches": workflow_matches,
+        "matchMode": workflow_match_mode,
+        "sourceMaxConcurrentAgents": source_concurrency,
+        "installedMaxConcurrentAgents": installed_concurrency,
     },
     "unit": {
         "sourceSha256": os.environ["UNIT_SOURCE_SHA"],
