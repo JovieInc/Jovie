@@ -674,9 +674,14 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
                      WHERE r.source_type <> 'ingested'
                        OR NOT (
                          r.metadata @> jsonb_build_object(
-                           'spotifyArtists',
-                           jsonb_build_array(jsonb_build_object('id', ${TEST_SPOTIFY_ARTIST.id}))
-                         )
+                         'spotifyArtists',
+                          jsonb_build_array(
+                            jsonb_build_object(
+                              'id',
+                              ${TEST_SPOTIFY_ARTIST.id}::text
+                            )
+                          )
+                        )
                        )
                    )::int AS "wrongReleaseCount",
                    COUNT(DISTINCT rt.id) FILTER (

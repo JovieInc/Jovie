@@ -3191,6 +3191,7 @@ describe('CI E2E smoke workflow', () => {
     expect(goldenPathSpec).toContain('FROM discog_releases r');
     expect(goldenPathSpec).toContain('LEFT JOIN discog_release_tracks rt');
     expect(goldenPathSpec).toContain('LEFT JOIN provider_links pl');
+    expect(goldenPathSpec).toContain('${TEST_SPOTIFY_ARTIST.id}::text');
     expect(releasesActions).toContain(
       'function getE2EFastSpotifyImportOptions()'
     );
