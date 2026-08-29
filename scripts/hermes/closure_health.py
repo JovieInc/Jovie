@@ -36,6 +36,9 @@ CLOSE_LABELS = {"duplicate"}
 ACTIVE_WRITER_STATES = frozenset({"repair", "promote", "queued"})
 CHANGED_FILES_PAGE = 100
 EVIDENCE_STATUSES = frozenset({"complete", "missing", "malformed", "truncated"})
+COMPLETE_CHANGED_FILE_TYPES = frozenset(
+    {"ADDED", "CHANGED", "COPIED", "DELETED", "MODIFIED"}
+)
 
 
 def isoformat(value: datetime) -> str:
@@ -106,7 +109,10 @@ def _changed_file_evidence(pr: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(node, dict):
             return {"status": "malformed"}
         path = node.get("path")
+        change_type = node.get("changeType")
         if not isinstance(path, str) or not path.strip():
+            return {"status": "malformed"}
+        if change_type not in COMPLETE_CHANGED_FILE_TYPES:
             return {"status": "malformed"}
         normalized = path.strip()
         if normalized in seen:
@@ -178,6 +184,7 @@ def _duplicate_active_lanes(
         if len(numbers) < 2:
             continue
         complete: dict[int, frozenset[str]] = {}
+        lane_incomplete = False
         for number in numbers:
             evidence = evidence_by_number.get(number) or {"status": "missing"}
             status = evidence.get("status")
@@ -199,18 +206,34 @@ def _duplicate_active_lanes(
                     }
                 )
                 seen_unclassified.add(number)
+            lane_incomplete = True
+        if lane_incomplete:
+            for number in numbers:
+                if number not in seen_unclassified:
+                    extra_unclassified.append(
+                        {
+                            "number": number,
+                            "reason": "changed-file-evidence-incomplete-peer",
+                        }
+                    )
+                    seen_unclassified.add(number)
+            continue
         classified_numbers = [number for number in numbers if number in complete]
         if len(classified_numbers) < 2:
             continue
         overlap: set[str] = set()
+        overlapping_numbers: set[int] = set()
         for index, left in enumerate(classified_numbers):
             for right in classified_numbers[index + 1 :]:
-                overlap |= complete[left] & complete[right]
+                pair_overlap = complete[left] & complete[right]
+                if pair_overlap:
+                    overlap |= pair_overlap
+                    overlapping_numbers.update((left, right))
         if overlap:
             duplicates.append(
                 {
                     "issue": issue,
-                    "prs": sorted(classified_numbers),
+                    "prs": sorted(overlapping_numbers),
                     "overlap": sorted(overlap),
                 }
             )
@@ -229,6 +252,16 @@ def classify_open_prs(prs: list[dict[str, Any]], now: datetime) -> dict[str, Any
             unclassified.append({"number": number, "reason": "missing-pr-number"})
             continue
         usable.append(pr)
+        cross_repository = pr.get("isCrossRepository")
+        if not isinstance(cross_repository, bool):
+            refs_by_number[number] = []
+            unclassified.append(
+                {"number": number, "reason": "missing-repository-provenance"}
+            )
+            continue
+        if cross_repository:
+            refs_by_number[number] = []
+            continue
         references = _issue_references(pr)
         refs_by_number[number] = references
         if len(references) > 1:
@@ -495,12 +528,12 @@ query($owner:String!,$name:String!,$endCursor:String){
       totalCount
       pageInfo{hasNextPage endCursor}
       nodes{
-        number title body headRefName isDraft mergeStateStatus createdAt updatedAt
+        number title body headRefName isDraft isCrossRepository mergeStateStatus createdAt updatedAt
         author{login}
         labels(first:50){nodes{name}}
         mergeQueueEntry{position enqueuedAt state}
         changedFiles
-        files(first:__FILES_PAGE__){totalCount nodes{path}}
+        files(first:__FILES_PAGE__){totalCount nodes{path changeType}}
       }
     }
     merged:pullRequests(first:100,states:MERGED,orderBy:{field:UPDATED_AT,direction:DESC}){
