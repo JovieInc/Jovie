@@ -15,6 +15,7 @@ import {
   type ScreenshotManifestEntry,
 } from '../../lib/screenshots/types';
 import { pruneFixedOwnedOutputFiles } from '../../scripts/owned-output-path';
+import { optimizePngLosslessly } from '../../scripts/png-optimization';
 import { replaceWithAtomicSibling } from './atomic-output';
 import {
   assertNoDevOverlays,
@@ -155,6 +156,8 @@ async function captureCatalogImage(
         fullPage: scenario.fullPage,
       });
     }
+
+    await optimizePngLosslessly(nextPath);
 
     const previousBuffer = await readOptionalFile(catalogPath);
     const nextBuffer = await readFile(nextPath);

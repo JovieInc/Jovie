@@ -139,6 +139,9 @@ class DeploymentContractTests(unittest.TestCase):
         self.assertIn("install-gem-pr-rehabilitation.sh", workflow)
         self.assertIn("gem-pr-rehabilitation-attestation/v1", workflow)
         self.assertIn(".sourceRevision == $sha", workflow)
+        self.assertIn(".timerEnabled == true", workflow)
+        self.assertIn("systemctl --user is-enabled --quiet gem-pr-drain.timer", workflow)
+        self.assertIn("systemctl --user is-active --quiet gem-pr-drain.timer", workflow)
         self.assertIn("([.artifacts[].matches] | all)", workflow)
 
     def test_verify_only_installer_is_source_clean_and_side_effect_free(self):
@@ -178,6 +181,183 @@ class DeploymentContractTests(unittest.TestCase):
             )
         self.assertEqual(process.returncode, 0, process.stderr)
         self.assertIn("install sources verified", process.stdout)
+
+    def _install_runtime(
+        self,
+        directory: str,
+        *,
+        fail_enable: bool = False,
+        stuck_service: bool = False,
+        prior_enabled: bool = False,
+        prior_active: bool = False,
+    ) -> tuple[subprocess.CompletedProcess[str], pathlib.Path, pathlib.Path, pathlib.Path]:
+        root = pathlib.Path(directory)
+        fixture = root / "repo"
+        home = root / "home"
+        gem = root / "gem"
+        fake_bin = root / "bin"
+        log = root / "systemctl.log"
+        enabled = root / "timer.enabled"
+        active = root / "timer.active"
+        shutil.copytree(HERMES, fixture / "scripts/hermes")
+        (home / ".local/bin").mkdir(parents=True)
+        unit_root = home / ".config/systemd/user"
+        unit_root.mkdir(parents=True)
+        (unit_root / "gem-pr-drain.timer").write_text(
+            "old timer\n", encoding="utf-8"
+        )
+        if prior_enabled:
+            enabled.touch()
+        if prior_active:
+            active.touch()
+        fake_bin.mkdir()
+        git_env = _git_env()
+        subprocess.run(["git", "init", "-q", str(fixture)], check=True, env=git_env)
+        subprocess.run(
+            ["git", "-C", str(fixture), "add", "scripts/hermes"],
+            check=True,
+            env=git_env,
+        )
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(fixture),
+                "-c",
+                "user.name=Gem Test",
+                "-c",
+                "user.email=gem-test@example.invalid",
+                "commit",
+                "-qm",
+                "fixture",
+            ],
+            check=True,
+            env=git_env,
+        )
+        systemctl = fake_bin / "systemctl"
+        systemctl.write_text(
+            """#!/bin/sh
+printf '%s\n' "$*" >> "$FAKE_SYSTEMCTL_LOG"
+case "$*" in
+  *"show-environment"*) exit 0 ;;
+  *"is-active --quiet gem-pr-drain.timer"*) test -f "$FAKE_TIMER_ACTIVE"; exit $? ;;
+  *"is-enabled --quiet gem-pr-drain.timer"*) test -f "$FAKE_TIMER_ENABLED"; exit $? ;;
+  *"is-active --quiet gem-pr-drain.service"*)
+    if [ "$FAKE_STUCK_SERVICE" = true ]; then exit 0; else exit 1; fi
+    ;;
+  *"enable --now gem-pr-drain.timer"*)
+    : > "$FAKE_TIMER_ENABLED"
+    : > "$FAKE_TIMER_ACTIVE"
+    if [ "$FAKE_ENABLE_FAILURE" = true ]; then
+      exit 9
+    fi
+    exit 0
+    ;;
+  *"enable gem-pr-drain.timer"*) : > "$FAKE_TIMER_ENABLED"; exit 0 ;;
+  *"disable gem-pr-drain.timer"*) rm -f "$FAKE_TIMER_ENABLED"; exit 0 ;;
+  *"stop gem-pr-drain.timer"*) rm -f "$FAKE_TIMER_ACTIVE"; exit 0 ;;
+  *"start gem-pr-drain.timer"*) : > "$FAKE_TIMER_ACTIVE"; exit 0 ;;
+  *"show gem-pr-drain.service --property=Result --value"*)
+    printf '%s\n' success
+    exit 0
+    ;;
+esac
+exit 0
+""",
+            encoding="utf-8",
+        )
+        systemctl.chmod(0o755)
+        sleep = fake_bin / "sleep"
+        sleep.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        sleep.chmod(0o755)
+        process = subprocess.run(
+            [
+                "bash",
+                str(fixture / "scripts/hermes/install-gem-pr-rehabilitation.sh"),
+                str(fixture),
+            ],
+            env={
+                "HOME": str(home),
+                "GEM_WORKSPACE": str(gem),
+                "PATH": f"{fake_bin}:/usr/bin:/bin:/usr/sbin:/sbin",
+                "FAKE_SYSTEMCTL_LOG": str(log),
+                "FAKE_TIMER_ENABLED": str(enabled),
+                "FAKE_TIMER_ACTIVE": str(active),
+                "FAKE_ENABLE_FAILURE": "true" if fail_enable else "false",
+                "FAKE_STUCK_SERVICE": "true" if stuck_service else "false",
+            },
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        return process, log, enabled, active
+
+    def test_installer_enables_and_attests_the_recurring_timer(self):
+        with tempfile.TemporaryDirectory() as directory:
+            process, log, enabled, active = self._install_runtime(directory)
+            self.assertEqual(process.returncode, 0, process.stderr)
+            receipt = json.loads(
+                (
+                    pathlib.Path(directory)
+                    / "gem/state/gem-pr-rehabilitation-attestation.json"
+                ).read_text(encoding="utf-8")
+            )
+            commands = log.read_text(encoding="utf-8").splitlines()
+            enabled_exists = enabled.exists()
+            active_exists = active.exists()
+
+        self.assertTrue(enabled_exists)
+        self.assertTrue(active_exists)
+        self.assertIn("--user enable --now gem-pr-drain.timer", commands)
+        self.assertIn("--user is-enabled --quiet gem-pr-drain.timer", commands)
+        self.assertTrue(receipt["timerEnabled"])
+        self.assertTrue(receipt["timerActive"])
+
+    def test_failed_install_restores_every_prior_timer_state(self):
+        for prior_enabled in (False, True):
+            for prior_active in (False, True):
+                with self.subTest(
+                    prior_enabled=prior_enabled, prior_active=prior_active
+                ), tempfile.TemporaryDirectory() as directory:
+                    process, log, enabled, active = self._install_runtime(
+                        directory,
+                        fail_enable=True,
+                        prior_enabled=prior_enabled,
+                        prior_active=prior_active,
+                    )
+                    commands = log.read_text(encoding="utf-8").splitlines()
+                    enabled_exists = enabled.exists()
+                    active_exists = active.exists()
+
+                self.assertNotEqual(
+                    process.returncode, 0, f"{process.stderr}\n{commands}"
+                )
+                self.assertEqual(enabled_exists, prior_enabled, commands)
+                self.assertEqual(active_exists, prior_active, commands)
+                expected_persistence_command = (
+                    "--user enable gem-pr-drain.timer"
+                    if prior_enabled
+                    else "--user disable gem-pr-drain.timer"
+                )
+                self.assertIn(expected_persistence_command, commands)
+
+    def test_early_stuck_service_failure_restores_prior_active_timer(self):
+        with tempfile.TemporaryDirectory() as directory:
+            process, log, enabled, active = self._install_runtime(
+                directory,
+                stuck_service=True,
+                prior_enabled=False,
+                prior_active=True,
+            )
+            commands = log.read_text(encoding="utf-8").splitlines()
+            enabled_exists = enabled.exists()
+            active_exists = active.exists()
+
+        self.assertEqual(process.returncode, 3, process.stderr)
+        self.assertFalse(enabled_exists, commands)
+        self.assertTrue(active_exists, commands)
+        self.assertIn("--user disable gem-pr-drain.timer", commands)
+        self.assertIn("--user start gem-pr-drain.timer", commands)
 
 
 class FleetControllerInstallerContractTests(unittest.TestCase):

@@ -35,6 +35,21 @@ describe('Skeleton', () => {
       render(<Skeleton data-testid='skeleton' />);
       const skeleton = screen.getByTestId('skeleton');
       expect(skeleton).toHaveAttribute('aria-hidden', 'true');
+      expect(skeleton).toHaveAttribute('data-slot', 'skeleton');
+    });
+
+    it('keeps decorative semantics canonical when callers pass conflicting attrs', () => {
+      render(
+        <Skeleton
+          data-testid='skeleton'
+          aria-hidden='false'
+          data-state='static'
+        />
+      );
+      const skeleton = screen.getByTestId('skeleton');
+
+      expect(skeleton).toHaveAttribute('aria-hidden', 'true');
+      expect(skeleton).toHaveAttribute('data-state', 'shimmer');
     });
   });
 
@@ -83,6 +98,7 @@ describe('Skeleton', () => {
       render(<Skeleton data-testid='skeleton' />);
       const skeleton = screen.getByTestId('skeleton');
       expect(skeleton.className).toContain('motion-reduce:animate-none');
+      expect(skeleton.className).toContain('motion-reduce:bg-none');
     });
   });
 
@@ -139,8 +155,38 @@ describe('LoadingSkeleton', () => {
     it('announces a useful loading label', () => {
       render(<LoadingSkeleton label='Loading audience' />);
 
-      expect(screen.getByRole('status')).toHaveTextContent('Loading audience');
-      expect(screen.getByRole('status')).toHaveAttribute('aria-atomic', 'true');
+      const status = screen.getByRole('status', { name: 'Loading audience' });
+      expect(status).toHaveAttribute('aria-label', 'Loading audience');
+      expect(status).toHaveAttribute('aria-atomic', 'true');
+      expect(status).toHaveAttribute('data-slot', 'loading-skeleton');
+    });
+
+    it('falls back to a named owner when the label is blank', () => {
+      render(<LoadingSkeleton label='   ' />);
+
+      expect(
+        screen.getByRole('status', { name: 'Loading content' })
+      ).toHaveAttribute('aria-label', 'Loading content');
+    });
+
+    it('guards the accessible label at runtime', () => {
+      render(<LoadingSkeleton label={null as unknown as string} />);
+
+      expect(
+        screen.getByRole('status', { name: 'Loading content' })
+      ).toHaveAttribute('aria-label', 'Loading content');
+    });
+
+    it('can render as a decorative placeholder under a shared owner', () => {
+      const { container } = render(<LoadingSkeleton announce={false} />);
+
+      expect(
+        container.querySelector('[data-slot="loading-skeleton"]')
+      ).not.toHaveAttribute('role');
+      expect(
+        container.querySelector('[data-slot="loading-skeleton"]')
+      ).not.toHaveAttribute('aria-busy');
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
   });
 
@@ -201,12 +247,59 @@ describe('LoadingSkeleton', () => {
       expect(skeleton?.className).toContain('custom-class');
     });
 
+    it('keeps reserved geometry authoritative over caller className', () => {
+      render(
+        <LoadingSkeleton
+          className='h-[13px] w-[29px]'
+          height='h-6'
+          width='w-48'
+        />
+      );
+
+      const skeleton = document.querySelector('[data-slot="skeleton"]');
+      expect(skeleton).toHaveClass('h-6', 'w-48');
+      expect(skeleton).not.toHaveClass('h-[13px]', 'w-[29px]');
+    });
+
+    it('removes important and responsive caller geometry overrides', () => {
+      render(
+        <LoadingSkeleton
+          className='!h-[13px] sm:!w-[29px] min-h-24 max-w-0 shrink-0'
+          height='h-6'
+          width='w-48'
+        />
+      );
+
+      const skeleton = document.querySelector('[data-slot="skeleton"]');
+      expect(skeleton).toHaveClass('h-6', 'w-48', 'shrink-0');
+      expect(skeleton).not.toHaveClass(
+        '!h-[13px]',
+        'sm:!w-[29px]',
+        'min-h-24',
+        'max-w-0'
+      );
+    });
+
     it('applies height to all lines', () => {
       render(<LoadingSkeleton lines={2} height='h-6' />);
       const skeletons = document.querySelectorAll('.skeleton');
       skeletons.forEach(skeleton => {
         expect(skeleton.className).toContain('h-6');
       });
+    });
+
+    it('declares the reserved geometry on the single loading owner', () => {
+      render(
+        <LoadingSkeleton lines={3} height='h-6' width='w-48' rounded='lg' />
+      );
+
+      const status = screen.getByRole('status');
+      expect(status).toHaveAttribute('data-lines', '3');
+      expect(status).toHaveAttribute('data-height', 'h-6');
+      expect(status).toHaveAttribute('data-width', 'w-48');
+      expect(status).toHaveAttribute('data-rounded', 'lg');
+      expect(status.querySelectorAll('[role="status"]')).toHaveLength(0);
+      expect(status.querySelectorAll('[aria-busy="true"]')).toHaveLength(0);
     });
   });
 });

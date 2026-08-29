@@ -1181,9 +1181,10 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         promotion_mode = "blocked"
     if state == "RED":
         work_activities: list[str] = []
-    elif not closure_intake_allowed:
+    elif not closure_intake_allowed or not capacity_fresh:
         # Existing validation/review work remains useful, but no new
-        # implementation or fallback PR may begin while Summer holds intake.
+        # implementation or fallback PR may begin while Summer holds intake
+        # or capacity evidence is missing/stale.
         work_activities = ["tests", "review"]
     else:
         new_implementation_allowed = (
@@ -1201,9 +1202,9 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             ]
     # Remediation is a liveness capability, not issue intake or promotion.
     # A fleet hold must never hide the evidence or disable the bounded local
-    # work needed to diagnose and repair the hold.  Only a non-RED receipt may
-    # authorize updating the remote PR head; merge/deploy remain separately
-    # governed by their own typed admissions.
+    # work needed to diagnose and repair the hold. Remote PR mutation requires
+    # both a non-RED receipt and accepted capacity; merge/deploy remain
+    # separately governed by their own typed admissions.
     remediation_local_activities = [
         "observe-pr",
         "diagnose-pr",

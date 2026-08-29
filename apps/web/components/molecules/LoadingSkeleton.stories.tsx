@@ -69,6 +69,23 @@ export const Button: Story = {
   render: () => <ButtonSkeleton />,
 };
 
+export const ButtonGeometryComparison: Story = {
+  render: () => (
+    <div className='w-100 space-y-4'>
+      <div data-testid='button-skeleton-geometry'>
+        <ButtonSkeleton />
+      </div>
+      <button
+        className='block h-12 w-full max-w-sm rounded-lg bg-surface-1'
+        data-testid='loaded-button-geometry'
+        type='button'
+      >
+        Loaded action
+      </button>
+    </div>
+  ),
+};
+
 export const SocialBar: Story = {
   render: () => <SocialBarSkeleton />,
 };
@@ -85,20 +102,28 @@ export const ReducedMotion: Story = {
   render: () => (
     <div className='space-y-6'>
       <div className='text-center'>
-        <LoadingSkeleton height='h-8' width='w-64' rounded='md' />
-        <p className='text-sm mt-2 text-gray-600 dark:text-gray-400'>
-          With prefers-reduced-motion: Static skeleton (no animation)
+        <LoadingSkeleton
+          height='h-8'
+          width='w-64'
+          rounded='md'
+          label='Loading reduced-motion preview'
+        />
+        <p className='mt-2 text-sm text-secondary-token'>
+          With prefers-reduced-motion, the canonical base fill remains visible
+          and shimmer animation is suppressed.
         </p>
       </div>
-      <div className='p-4 bg-gray-100 dark:bg-gray-800 rounded-lg'>
-        <p className='text-sm mb-2 font-medium'>How it works:</p>
-        <ul className='text-sm text-gray-600 dark:text-gray-400 list-disc pl-5 space-y-1'>
+      <div className='rounded-lg bg-surface-0 p-4'>
+        <p className='mb-2 text-sm font-medium text-primary-token'>
+          How it works:
+        </p>
+        <ul className='list-disc space-y-1 pl-5 text-sm text-secondary-token'>
           <li>Animated shimmer effect for most users</li>
           <li>
-            Static background when prefers-reduced-motion is enabled (no
+            Canonical base fill when prefers-reduced-motion is enabled (no
             animation)
           </li>
-          <li>Uses motion-reduce:animate-none utility class</li>
+          <li>Uses motion-reduce animation and background-image fallbacks</li>
           <li>
             Skeleton remains visible as a static placeholder while loading
           </li>

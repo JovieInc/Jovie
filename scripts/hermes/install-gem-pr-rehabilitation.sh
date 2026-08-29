@@ -96,10 +96,16 @@ fi
 prepare_user_systemd_context
 
 mkdir -p "${BACKUP_DIR}" "${GEM_ROOT}/scripts" "${GEM_ROOT}/config" "${UNIT_ROOT}"
+# Enablement survives host restarts; activity describes the current user-systemd
+# session. Preserve and restore the two timer states independently on rollback.
 timer_was_active=false
+timer_was_enabled=false
 install_started=false
 install_complete=false
-[[ ! -e "${UNIT_ROOT}/${TIMER}" ]] || systemctl --user is-active --quiet "${TIMER}" && timer_was_active=true
+if [[ -e "${UNIT_ROOT}/${TIMER}" ]]; then
+  systemctl --user is-active --quiet "${TIMER}" && timer_was_active=true
+  systemctl --user is-enabled --quiet "${TIMER}" && timer_was_enabled=true
+fi
 
 for index in "${!TARGETS[@]}"; do
   if [[ -e "${TARGETS[$index]}" ]]; then
@@ -127,6 +133,11 @@ finish_or_rollback() {
       fi
     done
     systemctl --user daemon-reload >/dev/null 2>&1 || true
+    if [[ "${timer_was_enabled}" == true ]]; then
+      systemctl --user enable "${TIMER}" >/dev/null 2>&1 || true
+    else
+      systemctl --user disable "${TIMER}" >/dev/null 2>&1 || true
+    fi
     if [[ "${timer_was_active}" == true ]]; then
       systemctl --user start "${TIMER}" >/dev/null 2>&1 || true
     fi
@@ -136,6 +147,7 @@ finish_or_rollback() {
 }
 trap finish_or_rollback EXIT
 
+install_started=true
 systemctl --user stop "${TIMER}"
 for _ in $(seq 1 20); do
   systemctl --user is-active --quiet "${SERVICE}" || break
@@ -153,7 +165,6 @@ install_atomic() {
   mv "${temporary}" "${target}"
 }
 
-install_started=true
 for index in "${!TARGETS[@]}"; do
   mode=0644
   case "${RELATIVE_SOURCES[$index]}" in
@@ -173,9 +184,10 @@ python3 -m py_compile \
   "${GEM_ROOT}/scripts/gem_rehabilitation_policy.py" \
   "${GEM_ROOT}/scripts/model-router.py"
 systemctl --user daemon-reload
-systemctl --user start "${TIMER}"
+systemctl --user enable --now "${TIMER}"
 systemctl --user start "${SERVICE}"
 [[ "$(systemctl --user show "${SERVICE}" --property=Result --value)" == success ]]
+systemctl --user is-enabled --quiet "${TIMER}"
 systemctl --user is-active --quiet "${TIMER}"
 
 RECEIPT="${GEM_ROOT}/state/gem-pr-rehabilitation-attestation.json"
@@ -223,6 +235,7 @@ receipt = {
     "schema": "gem-pr-rehabilitation-attestation/v1",
     "observedAt": datetime.now(timezone.utc).isoformat(),
     "sourceRevision": os.environ["SOURCE_REVISION"],
+    "timerEnabled": True,
     "timerActive": True,
     "lastCycleResult": "success",
     "artifacts": artifacts,

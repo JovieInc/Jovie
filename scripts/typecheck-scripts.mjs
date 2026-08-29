@@ -136,7 +136,7 @@ export function compareWithBaseline(current, baseline) {
 }
 
 /** @param {ErrorCounts} counts */
-function totalErrors(counts) {
+export function totalErrors(counts) {
   let total = 0;
   for (const byCode of counts.values()) {
     for (const count of byCode.values()) total += count;
@@ -145,7 +145,7 @@ function totalErrors(counts) {
 }
 
 /** @param {ErrorCounts} counts */
-function toBaselineJson(counts) {
+export function toBaselineJson(counts, extra = {}) {
   /** @type {Record<string, Record<string, number>>} */
   const files = {};
   for (const file of [...counts.keys()].sort()) {
@@ -157,10 +157,13 @@ function toBaselineJson(counts) {
   }
   return {
     schemaVersion: BASELINE_SCHEMA_VERSION,
-    tool: 'scripts/typecheck-scripts.mjs',
+    tool: extra.tool ?? 'scripts/typecheck-scripts.mjs',
     generatedAt: new Date().toISOString(),
     totalErrors: totalErrors(counts),
     files,
+    ...Object.fromEntries(
+      Object.entries(extra).filter(([key]) => key !== 'tool')
+    ),
   };
 }
 
@@ -176,26 +179,30 @@ function tsconfigPath() {
     : DEFAULT_TSCONFIG_PATH;
 }
 
-/**
- * Run tsc and return parsed output.
- * Invokes node_modules/typescript/bin/tsc via the current node binary so no
- * platform-specific .bin shim is needed; typescript is a pinned root devDep.
- * @returns {{ status: number, output: string }}
- */
-function runTsc() {
+export function runTscProject({
+  tsconfig,
+  extraArgs = [],
+  env = process.env,
+  prefix = 'scripts-typecheck',
+}) {
   const tscEntrypoint = resolve(REPO_ROOT, 'node_modules/typescript/bin/tsc');
   if (!existsSync(tscEntrypoint)) {
     return {
       status: 1,
       output:
-        `[scripts-typecheck] Cannot find ${tscEntrypoint}.\n` +
+        `[${prefix}] Cannot find ${tscEntrypoint}.\n` +
         'Remediation: run `pnpm install` at the repo root (typescript is a root devDependency).\n',
     };
   }
   const result = spawnSync(
     process.execPath,
-    [tscEntrypoint, '-p', tsconfigPath(), '--pretty', 'false'],
-    { cwd: REPO_ROOT, encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 }
+    [tscEntrypoint, '-p', tsconfig, '--pretty', 'false', ...extraArgs],
+    {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      env,
+      maxBuffer: 50 * 1024 * 1024,
+    }
   );
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
   if (result.error) {
@@ -204,54 +211,74 @@ function runTsc() {
   return { status: result.status ?? 1, output };
 }
 
-function loadBaseline() {
-  const path = baselinePath();
+function loadBaselineFile(path, prefix, updateCommand) {
   if (!existsSync(path)) {
-    console.error(`[scripts-typecheck] Baseline not found: ${path}`);
-    console.error(
-      'Remediation: generate it with `pnpm run typecheck:scripts:update`.'
-    );
+    console.error(`[${prefix}] Baseline not found: ${path}`);
+    console.error(`Remediation: generate it with \`${updateCommand}\`.`);
     process.exit(1);
   }
   const parsed = JSON.parse(readFileSync(path, 'utf8'));
   if (parsed?.schemaVersion !== BASELINE_SCHEMA_VERSION) {
     console.error(
-      `[scripts-typecheck] Baseline schemaVersion must be ${BASELINE_SCHEMA_VERSION}; got ${parsed?.schemaVersion}`
+      `[${prefix}] Baseline schemaVersion must be ${BASELINE_SCHEMA_VERSION}; got ${parsed?.schemaVersion}`
     );
     process.exit(1);
   }
   return parsed;
 }
 
-function main() {
-  const updateMode = process.argv.includes('--update-baseline');
-  const { output } = runTsc();
+export function evaluateTypecheckBaseline({
+  prefix,
+  baselineFile,
+  tsconfig,
+  extraArgs = [],
+  extraBaselineFields = {},
+  pretty = true,
+  updateCommand,
+  updateMode = process.argv.includes('--update-baseline'),
+  env = process.env,
+  tool,
+}) {
+  const { output } = runTscProject({
+    tsconfig,
+    extraArgs,
+    env,
+    prefix,
+  });
   const { counts, globalErrors, lines } = parseTscOutput(output);
 
   if (globalErrors.length > 0) {
     console.error(
-      '[scripts-typecheck] FAIL — tsc reported config-level errors; the check itself is broken.'
+      `[${prefix}] FAIL — tsc reported config-level errors; the check itself is broken.`
     );
     for (const line of globalErrors) console.error(`  ${line}`);
     process.exit(1);
   }
 
   if (updateMode) {
-    const baseline = toBaselineJson(counts);
-    writeFileSync(baselinePath(), `${JSON.stringify(baseline, null, 2)}\n`);
+    const baseline = toBaselineJson(counts, {
+      tool: tool ?? `scripts/${prefix}.mjs`,
+      ...extraBaselineFields,
+    });
+    writeFileSync(
+      baselineFile,
+      pretty
+        ? `${JSON.stringify(baseline, null, 2)}\n`
+        : `${JSON.stringify(baseline)}\n`
+    );
     console.log(
-      `[scripts-typecheck] baseline updated → ${baselinePath()} ` +
+      `[${prefix}] baseline updated → ${baselineFile} ` +
         `(${baseline.totalErrors} errors across ${Object.keys(baseline.files).length} files)`
     );
     process.exit(0);
   }
 
-  const baseline = loadBaseline();
+  const baseline = loadBaselineFile(baselineFile, prefix, updateCommand);
   const { ok, newErrors, staleEntries } = compareWithBaseline(counts, baseline);
 
   if (ok) {
     console.log(
-      `[scripts-typecheck] PASS — ${totalErrors(counts)} pre-existing errors match the baseline ` +
+      `[${prefix}] PASS — ${totalErrors(counts)} pre-existing errors match the baseline ` +
         `(${baseline.totalErrors} baselined); no new errors.`
     );
     process.exit(0);
@@ -259,7 +286,7 @@ function main() {
 
   if (newErrors.length > 0) {
     console.error(
-      `[scripts-typecheck] FAIL — ${newErrors.length} (file, error-code) group(s) exceed the baseline.`
+      `[${prefix}] FAIL — ${newErrors.length} (file, error-code) group(s) exceed the baseline.`
     );
     for (const { file, code, count, baseline: base } of newErrors) {
       console.error(`  ${file}: ${code} ×${count} (baseline ×${base})`);
@@ -269,22 +296,34 @@ function main() {
     }
     console.error(
       'Fix the new errors. If one is genuinely pre-existing, regenerate the ' +
-        'baseline with `pnpm run typecheck:scripts:update` (visible in PR diff).'
+        `baseline with \`${updateCommand}\` (visible in PR diff).`
     );
   }
   if (staleEntries.length > 0) {
     console.error(
-      `[scripts-typecheck] FAIL — baseline is stale: ${staleEntries.length} (file, error-code) group(s) no longer produce the baselined errors.`
+      `[${prefix}] FAIL — baseline is stale: ${staleEntries.length} (file, error-code) group(s) no longer produce the baselined errors.`
     );
     for (const { file, code, count, baseline: base } of staleEntries) {
       console.error(`  ${file}: ${code} ×${count} (baseline ×${base})`);
     }
     console.error(
-      'The baseline is shrink-only: regenerate it with `pnpm run typecheck:scripts:update` ' +
+      `The baseline is shrink-only: regenerate it with \`${updateCommand}\` ` +
         'in the same PR that removes the errors.'
     );
   }
   process.exit(1);
+}
+
+function main() {
+  evaluateTypecheckBaseline({
+    prefix: 'scripts-typecheck',
+    baselineFile: baselinePath(),
+    tsconfig: tsconfigPath(),
+    extraArgs: [],
+    pretty: true,
+    updateCommand: 'pnpm run typecheck:scripts:update',
+    tool: 'scripts/typecheck-scripts.mjs',
+  });
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

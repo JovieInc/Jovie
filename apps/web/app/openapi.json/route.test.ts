@@ -1,12 +1,31 @@
-import { describe, expect, it } from 'vitest';
-import { GET as canonicalGET } from '@/app/api/v1/openapi.json/route';
-import { GET as aliasGET } from '@/app/openapi.json/route';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@/constants/app', () => ({ BASE_URL: 'https://jov.ie' }));
+
+const [{ GET: getCanonical }, { GET: getVersioned }] = await Promise.all([
+  import('./route'),
+  import('@/app/api/v1/openapi.json/route'),
+]);
 
 describe('GET /openapi.json', () => {
-  it('re-exports the public Artist API spec', async () => {
-    const [alias, canonical] = await Promise.all([aliasGET(), canonicalGET()]);
-    expect(alias.status).toBe(200);
+  it('serves the same public Artist API spec as /api/v1/openapi.json', async () => {
+    const canonical = getCanonical();
+    const versioned = getVersioned();
+
     expect(canonical.status).toBe(200);
-    expect(await alias.json()).toEqual(await canonical.json());
+    expect(versioned.status).toBe(200);
+    expect(canonical.headers.get('Content-Type')).toContain('application/json');
+
+    const canonicalSpec = await canonical.json();
+    const versionedSpec = await versioned.json();
+
+    expect(canonicalSpec).toEqual(versionedSpec);
+    expect(canonicalSpec.openapi).toBe('3.1.0');
+    expect(canonicalSpec.info.title).toBe('Jovie Artist API');
+    expect(canonicalSpec.paths['/{username}'].get.operationId).toBe(
+      'getArtist'
+    );
+    expect(canonicalSpec.info.description).toMatch(/read-only/i);
+    expect(canonicalSpec.info.contact.url).toBe('https://jov.ie/llms.txt');
   });
 });

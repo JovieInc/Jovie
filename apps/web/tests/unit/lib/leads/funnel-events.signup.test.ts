@@ -325,3 +325,101 @@ describe('attributeLeadSignupFromClerkUserId', () => {
     expect(cookieStore.delete).toHaveBeenCalledWith('jovie_lead_attribution');
   });
 });
+
+describe('attributeLeadPaidConversionByAppUserId', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDbUpdate.mockImplementation(() => ({
+      set: vi.fn(() => ({
+        where: vi.fn().mockResolvedValue(undefined),
+      })),
+    }));
+  });
+
+  it('attributes a Better Auth purchase by app UUID, not its ba: legacy sentinel', async () => {
+    const betterAuthRow = {
+      id: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
+      clerkId: 'ba:better_auth_123',
+    };
+    mockDbSelect.mockImplementationOnce(() =>
+      createSelectChain([
+        {
+          id: 'lead_123',
+          paidAt: null,
+          paidSubscriptionId: null,
+        },
+      ])
+    );
+    const insertValues = vi.fn(() => ({
+      onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+    }));
+    mockDbInsert.mockImplementation(() => ({ values: insertValues }));
+
+    const { attributeLeadPaidConversionByAppUserId } = await import(
+      '@/lib/leads/funnel-events'
+    );
+    await attributeLeadPaidConversionByAppUserId(
+      betterAuthRow.id,
+      'sub_better_auth'
+    );
+
+    expect(mockDbSelect).toHaveBeenCalledOnce();
+    expect(mockDbUpdate).toHaveBeenCalledOnce();
+    expect(insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        leadId: 'lead_123',
+        eventType: 'paid_converted',
+        metadata: expect.objectContaining({
+          signupUserId: betterAuthRow.id,
+          stripeSubscriptionId: 'sub_better_auth',
+        }),
+      })
+    );
+    expect(insertValues).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          signupUserId: betterAuthRow.clerkId,
+        }),
+      })
+    );
+  });
+
+  it('preserves the legacy Clerk entry point while attributing by resolved app UUID', async () => {
+    mockDbSelect
+      .mockImplementationOnce(() =>
+        createSelectChain([{ id: 'legacy_app_user_123' }])
+      )
+      .mockImplementationOnce(() =>
+        createSelectChain([
+          {
+            id: 'lead_legacy',
+            paidAt: null,
+            paidSubscriptionId: null,
+          },
+        ])
+      );
+    const insertValues = vi.fn(() => ({
+      onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+    }));
+    mockDbInsert.mockImplementation(() => ({ values: insertValues }));
+
+    const { attributeLeadPaidConversionByClerkUserId } = await import(
+      '@/lib/leads/funnel-events'
+    );
+    await attributeLeadPaidConversionByClerkUserId(
+      'user_legacy_123',
+      'sub_legacy'
+    );
+
+    expect(mockDbSelect).toHaveBeenCalledTimes(2);
+    expect(insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        leadId: 'lead_legacy',
+        metadata: expect.objectContaining({
+          signupUserId: 'legacy_app_user_123',
+          stripeSubscriptionId: 'sub_legacy',
+        }),
+      })
+    );
+  });
+});

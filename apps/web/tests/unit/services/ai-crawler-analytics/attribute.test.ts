@@ -63,4 +63,23 @@ describe('attributeAiCrawlerRows', () => {
       ])
     );
   });
+
+  it('does not attribute conventional OpenAPI discovery traffic to a profile handle', () => {
+    const aggregates = attributeAiCrawlerRows(
+      profiles,
+      [
+        {
+          count: 7,
+          path: '/openapi.json',
+          userAgent: 'GPTBot/1.0',
+          hour: '2026-06-25T10:00:00.000Z',
+        },
+      ],
+      [],
+      periodStart,
+      weeklyCutoff
+    );
+
+    expect(aggregates).toEqual([]);
+  });
 });

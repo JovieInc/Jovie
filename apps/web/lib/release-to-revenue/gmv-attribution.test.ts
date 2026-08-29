@@ -31,6 +31,8 @@ interface OrderFixture {
   readonly id: string;
   readonly creatorProfileId: string;
   readonly merchCardId: string;
+  readonly workflowRunId?: string;
+  readonly createdAt?: Date;
   readonly subtotalCents: number;
   readonly status: string;
 }
@@ -71,10 +73,24 @@ function installFakeDb(opts: {
 
         if (table === 'merch_orders') {
           captured.orderQuery = { sql: q.sql, params };
+          const runScoped = q.sql.includes('releaseWorkflowRunId');
+          const dateBounds = params
+            .map(param => {
+              if (param instanceof Date) return param;
+              if (typeof param !== 'string') return null;
+              const parsed = new Date(param);
+              return Number.isNaN(parsed.getTime()) ? null : parsed;
+            })
+            .filter((param): param is Date => param !== null);
           const matched = (opts.orders ?? []).filter(
             order =>
               params.includes(order.creatorProfileId) &&
-              params.includes(order.merchCardId)
+              params.includes(order.merchCardId) &&
+              (!runScoped || params.includes(order.workflowRunId)) &&
+              (!order.createdAt ||
+                dateBounds.length !== 2 ||
+                (order.createdAt >= dateBounds[0] &&
+                  order.createdAt <= dateBounds[1]))
           );
           return Promise.resolve(
             matched.map(order => ({
@@ -181,6 +197,7 @@ describe('getPaidOrdersForMerchCards tenant isolation', () => {
           id: 'order-A',
           creatorProfileId: 'profile-A',
           merchCardId: 'card-A',
+          workflowRunId: 'run-A',
           subtotalCents: 2500,
           status: 'paid',
         },
@@ -188,6 +205,7 @@ describe('getPaidOrdersForMerchCards tenant isolation', () => {
           id: 'order-B',
           creatorProfileId: 'profile-B',
           merchCardId: 'card-B',
+          workflowRunId: 'run-A',
           subtotalCents: 9900,
           status: 'paid',
         },
@@ -196,7 +214,8 @@ describe('getPaidOrdersForMerchCards tenant isolation', () => {
 
     const orders = await getPaidOrdersForMerchCards(
       ['card-A', 'card-B'],
-      'profile-A'
+      'profile-A',
+      'run-A'
     );
 
     expect(orders.map(order => order.id)).toEqual(['order-A']);
@@ -211,10 +230,68 @@ describe('getPaidOrdersForMerchCards tenant isolation', () => {
   it('fails closed (no query) when the owner is missing', async () => {
     installFakeDb({ orders: [] });
 
-    const orders = await getPaidOrdersForMerchCards(['card-A'], '');
+    const orders = await getPaidOrdersForMerchCards(['card-A'], '', 'run-A');
 
     expect(orders).toEqual([]);
     expect(mockDbSelect).not.toHaveBeenCalled();
+  });
+
+  it('filters same-card orders to the exact workflow run and attribution window', async () => {
+    installFakeDb({
+      orders: [
+        {
+          id: 'order-run-A',
+          creatorProfileId: 'profile-A',
+          merchCardId: 'card-A',
+          workflowRunId: 'run-A',
+          createdAt: new Date('2026-06-21T00:00:00.000Z'),
+          subtotalCents: 2500,
+          status: 'paid',
+        },
+        {
+          id: 'order-run-B',
+          creatorProfileId: 'profile-A',
+          merchCardId: 'card-A',
+          workflowRunId: 'run-B',
+          createdAt: new Date('2026-06-21T00:00:00.000Z'),
+          subtotalCents: 9900,
+          status: 'paid',
+        },
+        {
+          id: 'order-run-A-after-window',
+          creatorProfileId: 'profile-A',
+          merchCardId: 'card-A',
+          workflowRunId: 'run-A',
+          createdAt: new Date('2026-07-21T00:00:00.000Z'),
+          subtotalCents: 7500,
+          status: 'paid',
+        },
+        {
+          id: 'order-missing-run-metadata',
+          creatorProfileId: 'profile-A',
+          merchCardId: 'card-A',
+          createdAt: new Date('2026-06-21T00:00:00.000Z'),
+          subtotalCents: 6100,
+          status: 'paid',
+        },
+      ],
+    });
+
+    const orders = await getPaidOrdersForMerchCards(
+      ['card-A'],
+      'profile-A',
+      'run-A',
+      {
+        start: new Date('2026-06-20T00:00:00.000Z'),
+        end: new Date('2026-07-20T00:00:00.000Z'),
+      }
+    );
+
+    expect(orders.map(order => order.id)).toEqual(['order-run-A']);
+    expect(captured.orderQuery?.sql).toContain('releaseWorkflowRunId');
+    expect(captured.orderQuery?.sql).toContain('"merch_orders"."created_at"');
+    expect(captured.orderQuery?.params).toContain('run-A');
+    expect(captured.orderQuery?.params).not.toContain('run-B');
   });
 });
 
@@ -279,6 +356,7 @@ describe('buildReleaseGmvRowForRun', () => {
           id: 'order-A',
           creatorProfileId: 'profile-A',
           merchCardId: 'card-A',
+          workflowRunId: 'run-A',
           subtotalCents: 2500,
           status: 'paid',
         },
@@ -286,6 +364,7 @@ describe('buildReleaseGmvRowForRun', () => {
           id: 'order-B',
           creatorProfileId: 'profile-B',
           merchCardId: 'card-B',
+          workflowRunId: 'run-A',
           subtotalCents: 9900,
           status: 'paid',
         },
@@ -347,6 +426,7 @@ describe('getReleaseGmvSnapshotForUser tenant isolation', () => {
           id: 'order-A',
           creatorProfileId: 'profile-A',
           merchCardId: 'card-A',
+          workflowRunId: 'run-A',
           subtotalCents: 2500,
           status: 'paid',
         },
@@ -355,6 +435,7 @@ describe('getReleaseGmvSnapshotForUser tenant isolation', () => {
           id: 'order-B',
           creatorProfileId: 'profile-B',
           merchCardId: 'card-B',
+          workflowRunId: 'run-A',
           subtotalCents: 9900,
           status: 'paid',
         },
@@ -395,6 +476,7 @@ describe('getReleaseGmvSnapshotForUser tenant isolation', () => {
           id: 'order-A',
           creatorProfileId: 'profile-A',
           merchCardId: 'card-A',
+          workflowRunId: 'run-A',
           subtotalCents: 2500,
           status: 'paid',
         },
