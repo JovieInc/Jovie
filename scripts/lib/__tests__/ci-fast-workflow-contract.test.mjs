@@ -94,8 +94,11 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain(
       'Design conformance skipped (no Jovie product files changed)'
     );
-    expect(CI_FAST_SOURCE).toContain(
+    expect(CI_FAST_SOURCE).not.toContain(
       'Design-system source ratchet skipped (no Jovie product files changed)'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'The check is cheap enough to run for every remaining-group job'
     );
     expect(CI_FAST_SOURCE).toContain(
       'Public-profile admission skipped (no Jovie product files changed)'

@@ -4,12 +4,32 @@
     {
       "id": "web-arbitrary-values",
       "path": "apps/web/tests/unit/design-system/arbitrary-values.baseline.json",
-      "projection": { "kind": "count", "pointer": ["count"] }
+      "projection": {
+        "kind": "count",
+        "pointer": ["count"]
+      },
+      "owner": "design-system-steward",
+      "linearIssue": "JOV-3570",
+      "reason": "Legacy arbitrary Tailwind values are migration debt.",
+      "removalCondition": "Retire only when apps/web production source has zero arbitrary values or an equivalent zero-tolerance rule owns the same scope.",
+      "evidence": [
+        "apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts"
+      ]
     },
     {
       "id": "web-linear-namespace",
       "path": "apps/web/tests/unit/design-system/linear-namespace.baseline.json",
-      "projection": { "kind": "count", "pointer": ["count"] }
+      "projection": {
+        "kind": "count",
+        "pointer": ["count"]
+      },
+      "owner": "design-system-steward",
+      "linearIssue": "JOV-3570",
+      "reason": "The legacy --linear-* token namespace is migration debt.",
+      "removalCondition": "Retire only when the legacy namespace reaches zero and canonical semantic tokens own every consumer.",
+      "evidence": [
+        "apps/web/tests/unit/design-system/linear-namespace-ratchet.test.ts"
+      ]
     },
     {
       "id": "component-family-counts",
@@ -18,7 +38,14 @@
         "kind": "number-map",
         "pointer": ["counts"],
         "keys": ["button", "palette", "emptyState", "shell"]
-      }
+      },
+      "owner": "design-system-steward",
+      "linearIssue": "JOV-3570",
+      "reason": "Duplicate drift-prone component families remain above canon.",
+      "removalCondition": "Retire only after each family is represented by its approved canonical component set and a zero-tolerance ownership rule replaces the ratchet.",
+      "evidence": [
+        "apps/web/tests/unit/design-system/component-family-ratchet.test.ts"
+      ]
     },
     {
       "id": "component-family-empty-state-paths",
@@ -26,32 +53,89 @@
       "projection": {
         "kind": "string-set",
         "pointer": ["allowedEmptyStatePaths"]
-      }
+      },
+      "owner": "design-system-steward",
+      "linearIssue": "JOV-3570",
+      "reason": "Bespoke EmptyState paths are explicit migration exceptions.",
+      "removalCondition": "Retire when every product empty state composes the canonical EmptyState primitive or has an approved permanent owner contract.",
+      "evidence": [
+        "apps/web/tests/unit/design-system/component-family-ratchet.test.ts"
+      ]
     },
     {
       "id": "button-surface-class-ceiling",
       "path": "apps/web/tests/unit/design-system/button-surface-classes-remaining.json",
-      "projection": { "kind": "count", "pointer": ["maxRemaining"] }
+      "projection": {
+        "kind": "count",
+        "pointer": ["maxRemaining"]
+      },
+      "owner": "design-system-steward",
+      "linearIssue": "JOV-3570",
+      "reason": "Legacy system-b button surface classes are retired migration debt.",
+      "removalCondition": "Retire when an equivalent zero-tolerance rule permanently prevents legacy button surface classes.",
+      "evidence": [
+        "apps/web/tests/unit/design-system/button-canon-ratchet.test.ts"
+      ]
     },
     {
       "id": "button-surface-class-paths",
       "path": "apps/web/tests/unit/design-system/button-surface-classes-remaining.json",
-      "projection": { "kind": "string-set", "pointer": ["remaining"] }
+      "projection": {
+        "kind": "string-set",
+        "pointer": ["remaining"]
+      },
+      "owner": "design-system-steward",
+      "linearIssue": "JOV-3570",
+      "reason": "Named legacy button surface exceptions are explicit migration debt.",
+      "removalCondition": "Retire when the exception set is empty and a zero-tolerance source rule owns the same surface.",
+      "evidence": [
+        "apps/web/tests/unit/design-system/button-canon-ratchet.test.ts"
+      ]
     },
     {
       "id": "web-raw-buttons",
       "path": "apps/web/tests/unit/design-system/raw-button.baseline.json",
-      "projection": { "kind": "count", "pointer": ["count"] }
+      "projection": {
+        "kind": "count",
+        "pointer": ["count"]
+      },
+      "owner": "design-system-steward",
+      "linearIssue": "JOV-3570",
+      "reason": "Raw button elements bypass canonical Button behavior and states.",
+      "removalCondition": "Retire when raw production buttons reach zero or an AST rule proves every remaining raw element has an explicit canonical exception.",
+      "evidence": [
+        "apps/web/tests/unit/design-system/raw-button-ratchet.test.ts"
+      ]
     },
     {
       "id": "shared-layer-server-imports",
       "path": "apps/web/tests/unit/design-system/server-imports.baseline.json",
-      "projection": { "kind": "count", "pointer": ["count"] }
+      "projection": {
+        "kind": "count",
+        "pointer": ["count"]
+      },
+      "owner": "design-system-steward",
+      "linearIssue": "JOV-3570",
+      "reason": "Shared presentation layers must remain portable and client-safe.",
+      "removalCondition": "Retire only when the zero baseline is replaced by an equivalent import-boundary rule over atoms, molecules, and organisms.",
+      "evidence": [
+        "apps/web/tests/unit/design-system/server-imports-ratchet.test.ts"
+      ]
     },
     {
       "id": "sidebar-nav-row",
       "path": "apps/web/tests/unit/design-system/sidebar-nav-row.baseline.json",
-      "projection": { "kind": "count", "pointer": ["count"] }
+      "projection": {
+        "kind": "count",
+        "pointer": ["count"]
+      },
+      "owner": "design-system-steward",
+      "linearIssue": "JOV-3570",
+      "reason": "Hand-rolled sidebar rows drift from compact-navigation canon.",
+      "removalCondition": "Retire only when the zero baseline is replaced by a structural rule that requires SidebarNavItem ownership.",
+      "evidence": [
+        "apps/web/tests/unit/design-system/sidebar-nav-row-ratchet.test.ts"
+      ]
     },
     {
       "id": "sidebar-nav-row-allowlist",
@@ -60,7 +144,17 @@
         "kind": "typescript-string-set",
         "binding": "ALLOWLIST"
       },
-      "projection": { "kind": "string-set", "pointer": ["values"] }
+      "projection": {
+        "kind": "string-set",
+        "pointer": ["values"]
+      },
+      "owner": "design-system-steward",
+      "linearIssue": "JOV-3570",
+      "reason": "Sidebar paths excluded from the compact-navigation detector are explicit exceptions.",
+      "removalCondition": "Retire when the allowlist is empty and every sidebar row is evaluated by the canonical detector.",
+      "evidence": [
+        "apps/web/tests/unit/design-system/sidebar-nav-row-ratchet.test.ts"
+      ]
     },
     {
       "id": "destructive-dialog-allowlist",
@@ -69,7 +163,17 @@
         "kind": "typescript-string-set",
         "binding": "DIRECT_DESTRUCTIVE_ALERT_DIALOG_ALLOWLIST"
       },
-      "projection": { "kind": "string-set", "pointer": ["values"] }
+      "projection": {
+        "kind": "string-set",
+        "pointer": ["values"]
+      },
+      "owner": "design-system-steward",
+      "linearIssue": "JOV-3570",
+      "reason": "Direct destructive dialog paths bypass the canonical confirmation molecule.",
+      "removalCondition": "Retire when every destructive flow uses the canonical confirmation molecule and the exception set is empty.",
+      "evidence": [
+        "apps/web/tests/unit/design-system/destructive-confirm-dialog-audit.test.ts"
+      ]
     },
     {
       "id": "contrast-raw-color-counts",
@@ -85,12 +189,27 @@
           "arbitraryHex"
         ],
         "ignoredKeys": ["_comment"]
-      }
+      },
+      "owner": "design-system-steward",
+      "linearIssue": "JOV-3570",
+      "reason": "Raw color classes can bypass semantic contrast ownership.",
+      "removalCondition": "Retire only when all tracked raw-color categories remain zero under an equivalent zero-tolerance source rule.",
+      "evidence": ["apps/web/scripts/lint-contrast-ratchet.mjs"]
     },
     {
       "id": "touch-target-count",
       "path": "apps/web/touch-target-ratchet.baseline.json",
-      "projection": { "kind": "count", "pointer": ["count"] }
+      "projection": {
+        "kind": "count",
+        "pointer": ["count"]
+      },
+      "owner": "design-system-steward",
+      "linearIssue": "JOV-3570",
+      "reason": "Sub-44px interactive hit targets are accessibility debt.",
+      "removalCondition": "Retire when the baseline reaches zero and the touch-target detector remains a zero-tolerance gate.",
+      "evidence": [
+        "apps/web/tests/unit/design-system/touch-target-ratchet.test.ts"
+      ]
     },
     {
       "id": "shared-ui-visual-arbitrary",
@@ -99,7 +218,12 @@
         "kind": "finding-count-set",
         "pointer": ["findings"],
         "totalPointer": ["totalFindings"]
-      }
+      },
+      "owner": "design-system-steward",
+      "linearIssue": "JOV-3570",
+      "reason": "Shared UI arbitrary visual values bypass canonical tokens.",
+      "removalCondition": "Retire when packages/ui contains zero tracked arbitrary visual values and the detector remains zero-tolerance.",
+      "evidence": ["scripts/shared-ui-visual-arbitrary-audit.test.mjs"]
     },
     {
       "id": "serif-authority-exceptions",
@@ -109,7 +233,12 @@
         "pointer": ["serif"],
         "keyFields": ["path", "match", "kind"],
         "validator": "serif-exception"
-      }
+      },
+      "owner": "design-system-steward",
+      "linearIssue": "JOV-3570",
+      "reason": "Serif usage is an explicit exception to Jovie type authority.",
+      "removalCondition": "Retire when design governance encodes the same zero-exception type-authority rule without an exception registry.",
+      "evidence": ["scripts/design-governance-audit.mjs"]
     },
     {
       "id": "story-coverage-floors",
@@ -127,7 +256,12 @@
           "apps/web/components/site",
           "apps/web/components"
         ]
-      }
+      },
+      "owner": "design-system-steward",
+      "linearIssue": "JOV-3570",
+      "reason": "Uncovered canonical component surfaces are certification debt.",
+      "removalCondition": "Retire only when full story coverage is enforced by an equivalent zero-tolerance certification rule.",
+      "evidence": ["scripts/story-coverage-ratchet.mjs"]
     },
     {
       "id": "design-conformance-unbound-components",
@@ -135,7 +269,12 @@
       "projection": {
         "kind": "string-set",
         "pointer": ["legacy", "unboundComponentIds"]
-      }
+      },
+      "owner": "design-system-steward",
+      "linearIssue": "JOV-3570",
+      "reason": "Legacy component IDs are not yet bound to canonical evidence.",
+      "removalCondition": "Retire when every catalog component is evidence-bound and the manifest schema no longer permits legacy unbound IDs.",
+      "evidence": ["scripts/design-conformance-check.test.mjs"]
     }
   ]
 }

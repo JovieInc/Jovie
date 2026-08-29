@@ -87,11 +87,19 @@ When you add a check, add it to `scripts/design-governance-audit.mjs`. Absence
 from `ci-fast-lanes.mjs` is WARN, not FAIL — the audit must not demand a
 merge halt.
 
-Exception (JOV-5301): the remaining-group `design-system-source-ratchet` lane
-is a ~100ms filesystem count of apps/web arbitrary Tailwind values and
-`--linear-*` usage. It fails only on growth so a source-green PR cannot enroll
-and UNMERGEABLE an ALLGREEN group. It does not expand `design-conformance:gate`,
-unit tests, or e2e.
+Exception (JOV-5301 / JOV-5447): the remaining-group
+`design-system-source-ratchet` lane is a sub-five-second filesystem and trusted
+Git-base check. It counts apps/web arbitrary Tailwind values and `--linear-*`
+usage, then compares the 17-projection design-debt registry inventory to the
+exact CI base. Count, keyed-count, explicit-path, object-exception,
+file/value, and story-coverage floors may only tighten; same-PR baseline raises
+cannot bless growth. The inventory identity lands before its enforcing change,
+so a candidate cannot remove or retarget its own denominator. Every projection
+carries an owner, reason, Linear issue, removal condition or expiry, and a
+repository evidence reference. Because enrolled controls live under apps/web,
+scripts, and docs, this cheap lane runs in every remaining-group job rather than
+trusting a product-path classifier. It does not expand
+`design-conformance:gate`, unit tests, e2e, or add a new workflow.
 
 Do not add a heavy new required workflow for design governance. The weekly
 workflow is the standing safety net for drift that no PR happened to touch.

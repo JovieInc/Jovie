@@ -450,25 +450,21 @@ function runGuardrails() {
   return { code: 0, output: combined };
 }
 
+export function executeDesignSystemSourceRatchetLane(
+  runCommand = shell,
+  command = LANE_COMMANDS['design-system-source-ratchet']
+) {
+  // Cross-product by design: enrolled controls live under apps/web, scripts,
+  // and docs. The check is cheap enough to run for every remaining-group job,
+  // so no candidate-controlled path classifier can skip a registry edit.
+  return runCommand(command);
+}
+
 function runDesignSystemSourceRatchet() {
-  const event = process.env.GITHUB_EVENT_NAME || '';
-  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
-    return {
-      code: 0,
-      output:
-        'Design-system source ratchet skipped (no Jovie product files changed)\n',
-      skipped: true,
-    };
-  }
-  const selected = selectedProductLanes();
-  if (!selected.has('web')) {
-    return {
-      code: 0,
-      output: 'No web product lane selected\n',
-      skipped: true,
-    };
-  }
-  return shell(LANE_COMMANDS['design-system-source-ratchet']);
+  return executeDesignSystemSourceRatchetLane(
+    shell,
+    LANE_COMMANDS['design-system-source-ratchet']
+  );
 }
 
 function runDesignConformance() {
