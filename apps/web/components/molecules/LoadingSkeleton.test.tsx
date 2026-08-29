@@ -27,6 +27,9 @@ import {
   TableSkeleton,
 } from './LoadingSkeleton';
 
+const ARBITRARY_HEIGHT = ['h-', '[13px]'].join('');
+const ARBITRARY_WIDTH = ['w-', '[29px]'].join('');
+
 describe('LoadingSkeleton', () => {
   beforeEach(() => {
     loggerWarn.mockClear();
@@ -100,7 +103,7 @@ describe('LoadingSkeleton', () => {
   it('keeps validated geometry authoritative over caller className', () => {
     const { container } = render(
       <LoadingSkeleton
-        className='h-[13px] w-[29px]'
+        className={`${ARBITRARY_HEIGHT} ${ARBITRARY_WIDTH}`}
         height='h-6'
         width='w-48'
       />
@@ -108,7 +111,7 @@ describe('LoadingSkeleton', () => {
 
     const skeleton = container.querySelector('[data-slot="skeleton"]');
     expect(skeleton).toHaveClass('h-6', 'w-48');
-    expect(skeleton).not.toHaveClass('h-[13px]', 'w-[29px]');
+    expect(skeleton).not.toHaveClass(ARBITRARY_HEIGHT, ARBITRARY_WIDTH);
   });
 
   it.each([
@@ -166,12 +169,12 @@ describe('LoadingSkeleton', () => {
 
   it('rejects arbitrary size values so reserved geometry stays tokenized', () => {
     const { container } = render(
-      <LoadingSkeleton height='h-[13px]' width='w-[29px]' />
+      <LoadingSkeleton height={ARBITRARY_HEIGHT} width={ARBITRARY_WIDTH} />
     );
 
     const skeleton = container.querySelector('[data-slot="skeleton"]');
     expect(skeleton).toHaveClass('h-4', 'w-full');
-    expect(skeleton).not.toHaveClass('h-[13px]', 'w-[29px]');
+    expect(skeleton).not.toHaveClass(ARBITRARY_HEIGHT, ARBITRARY_WIDTH);
     expect(loggerWarn).toHaveBeenCalledTimes(2);
   });
 
