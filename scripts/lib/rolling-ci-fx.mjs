@@ -10,7 +10,7 @@ import {
   resolveRemediationRoute,
 } from './rolling-ci-handoff.mjs';
 
-export const CURSOR_AGENTS_URL = 'https://api.cursor.com/v0/agents';
+export const CURSOR_AGENTS_URL = 'https://api.cursor.com/v1/agents';
 export const FX_NAMED_OUTCOMES = Object.freeze([
   'launched',
   'repaired',
@@ -49,6 +49,48 @@ export function findOwnedAgents(agents, fingerprint) {
     )
     .map(agent => agent?.id)
     .filter(id => typeof id === 'string' && id.length > 0);
+}
+
+const CURSOR_ERROR_BODY_LIMIT = 512;
+const SENSITIVE_KEY_RE =
+  /api[-_]?key|authorization|cookie|password|secret|token/i;
+
+function sanitizeCursorDiagnostic(value) {
+  const serialized =
+    typeof value === 'string'
+      ? value
+      : JSON.stringify(value, (key, nestedValue) =>
+          SENSITIVE_KEY_RE.test(key) ? '[REDACTED]' : nestedValue
+        );
+  return String(serialized ?? '')
+    .replace(/\b(Bearer|Basic)\s+[A-Za-z0-9+/=._-]+/gi, '$1 [REDACTED]')
+    .slice(0, CURSOR_ERROR_BODY_LIMIT);
+}
+
+async function readCursorResponse(response) {
+  if (typeof response.text === 'function') {
+    const raw = await response.text();
+    try {
+      return { body: JSON.parse(raw), raw };
+    } catch {
+      return { body: {}, raw };
+    }
+  }
+  const body = await response.json().catch(() => ({}));
+  return { body, raw: JSON.stringify(body) };
+}
+
+function cursorApiError(operation, response, body, raw) {
+  const details =
+    body?.error && typeof body.error === 'object' ? body.error : body;
+  const code = sanitizeCursorDiagnostic(details?.code ?? 'unknown');
+  const message = sanitizeCursorDiagnostic(details?.message ?? 'unknown');
+  const diagnosticBody = sanitizeCursorDiagnostic(
+    body && Object.keys(body).length > 0 ? body : raw
+  );
+  return new Error(
+    `cursor ${operation} failed: ${response.status}; code=${code}; message=${message}; body=${diagnosticBody}`
+  );
 }
 
 /**
@@ -235,7 +277,6 @@ export function planFxLaunch(input = {}) {
     prNumber,
     headSha,
     sourceHead,
-    headRef,
     fingerprint,
     failedChecks = [],
     cursorAgents = [],
@@ -274,15 +315,15 @@ export function planFxLaunch(input = {}) {
           runnerClass,
         }),
       },
-      source: {
-        repository: `https://github.com/${repository}`,
-        ref: headRef || `refs/pull/${prNumber}/head`,
-      },
-      target: {
-        autoCreatePr: false,
-        autoBranchOnConflict: false,
-        skipReviewerRequest: true,
-      },
+      name: `Jovie CI repair ${fingerprint}`.slice(0, 100),
+      repos: [
+        {
+          url: `https://github.com/${repository}`,
+          prUrl: `https://github.com/${repository}/pull/${prNumber}`,
+        },
+      ],
+      workOnCurrentBranch: true,
+      autoCreatePR: false,
     },
   };
 }
@@ -397,13 +438,11 @@ export async function listCursorAgents(input = {}) {
       'Content-Type': 'application/json',
     },
   });
-  const body = /** @type {Record<string, any>} */ (
-    await response.json().catch(() => ({}))
-  );
+  const { body, raw } = await readCursorResponse(response);
   if (!response.ok) {
-    throw new Error(`cursor list failed: ${response.status}`);
+    throw cursorApiError('list', response, body, raw);
   }
-  return Array.isArray(body?.agents) ? body.agents : [];
+  return Array.isArray(body?.items) ? body.items : [];
 }
 
 /** @param {Record<string, any>} [input] */
@@ -417,9 +456,9 @@ export async function launchCursorAgent(input = {}) {
     },
     body: JSON.stringify(request),
   });
-  const body = await response.json().catch(() => ({}));
+  const { body, raw } = await readCursorResponse(response);
   if (!response.ok) {
-    throw new Error(`cursor launch failed: ${response.status}`);
+    throw cursorApiError('launch', response, body, raw);
   }
   return body;
 }

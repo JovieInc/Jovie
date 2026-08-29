@@ -203,7 +203,9 @@ jobs:
             request: planned.launch.request,
             cursorApiKey: process.env.CURSOR_API_KEY,
           });
-          console.log(JSON.stringify({ id: launched?.id ?? null, ok: true }));
+          console.log(
+            JSON.stringify({ id: launched?.agent?.id ?? null, ok: true })
+          );
           EOF
 
       - name: Record FX outcome

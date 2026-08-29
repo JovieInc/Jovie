@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   normalizeFailureEvents,
   runDispatch,
@@ -10,6 +10,8 @@ import {
   classifyRunnerFailure,
   FX_RUNNER_IDEMPOTENCY_KEY,
   findOwnedAgents,
+  launchCursorAgent,
+  listCursorAgents,
   planFxLaunch,
   planFxWebhookRemediation,
   resolveDispatchWriter,
@@ -159,10 +161,18 @@ describe('rolling CI FX webhook remediation', () => {
       headRef: 'cursor/arbitrary-values-fix',
     });
     expect(planned.launch.action).toBe('launch');
-    expect(planned.launch.request.target.autoCreatePr).toBe(false);
-    expect(planned.launch.request.source.ref).toBe(
-      'cursor/arbitrary-values-fix'
-    );
+    expect(planned.launch.request).toMatchObject({
+      repos: [
+        {
+          url: 'https://github.com/JovieInc/Jovie',
+          prUrl: 'https://github.com/JovieInc/Jovie/pull/16180',
+        },
+      ],
+      workOnCurrentBranch: true,
+      autoCreatePR: false,
+    });
+    expect(planned.launch.request).not.toHaveProperty('source');
+    expect(planned.launch.request).not.toHaveProperty('target');
     expect(planned.launch.request.prompt.text).toContain(
       'native merge_group CI failure'
     );
@@ -202,10 +212,11 @@ describe('rolling CI FX webhook remediation', () => {
     });
     expect(planned.dispatch.action).toBe('dispatch_implementer');
     expect(planned.launch.action).toBe('launch');
-    expect(planned.launch.request.source.ref).toBe(
-      'cursor/fx-merge-group-remediator-7038'
+    expect(planned.launch.request.repos[0].prUrl).toBe(
+      'https://github.com/JovieInc/Jovie/pull/16180'
     );
-    expect(planned.launch.request.target.autoCreatePr).toBe(false);
+    expect(planned.launch.request.workOnCurrentBranch).toBe(true);
+    expect(planned.launch.request.autoCreatePR).toBe(false);
     expect(planned.launch.request.prompt.text).toContain(
       'native merge_group CI failure'
     );
@@ -225,9 +236,10 @@ describe('rolling CI FX webhook remediation', () => {
       headRef: 'cursor/fx-ci-cache-gc-aee1',
     });
     expect(planned.launch.action).toBe('launch');
-    expect(planned.launch.request.target.autoCreatePr).toBe(false);
-    expect(planned.launch.request.source.ref).toBe(
-      'cursor/fx-ci-cache-gc-aee1'
+    expect(planned.launch.request.autoCreatePR).toBe(false);
+    expect(planned.launch.request.workOnCurrentBranch).toBe(true);
+    expect(planned.launch.request.repos[0].prUrl).toBe(
+      'https://github.com/JovieInc/Jovie/pull/17'
     );
     expect(planned.launch.request.prompt.text).toContain(head);
   });
@@ -260,6 +272,96 @@ describe('rolling CI FX webhook remediation', () => {
     expect(
       findOwnedAgents([{ id: 'agent-1', prompt: 'nope' }], 'ci:abc')
     ).toEqual([]);
+  });
+
+  it('reads the Cursor v1 list envelope and preserves fingerprint dedupe', async () => {
+    const fingerprint = 'ci:exact-fingerprint';
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () =>
+        JSON.stringify({
+          items: [
+            {
+              id: 'bc-agent-1',
+              name: `Jovie CI repair ${fingerprint}`,
+              status: 'ACTIVE',
+            },
+          ],
+        }),
+    });
+    const agents = await listCursorAgents({
+      cursorApiKey: 'cursor-key',
+      fetchImpl,
+    });
+    expect(agents).toHaveLength(1);
+    expect(findOwnedAgents(agents, fingerprint)).toEqual(['bc-agent-1']);
+  });
+
+  it('posts the Cursor v1 request schema without creating a sibling PR', async () => {
+    const request = planFxLaunch({
+      repository: 'JovieInc/Jovie',
+      prNumber: 17,
+      headSha: head,
+      fingerprint: 'ci:request-schema',
+      cursorApiKey: 'cursor-key',
+    }).request;
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      text: async () =>
+        JSON.stringify({
+          agent: { id: 'bc-agent-1' },
+          run: { id: 'run-1', agentId: 'bc-agent-1' },
+        }),
+    });
+    await launchCursorAgent({ request, cursorApiKey: 'cursor-key', fetchImpl });
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'https://api.cursor.com/v1/agents',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify(request),
+      })
+    );
+    expect(request).toMatchObject({
+      repos: [
+        {
+          url: 'https://github.com/JovieInc/Jovie',
+          prUrl: 'https://github.com/JovieInc/Jovie/pull/17',
+        },
+      ],
+      workOnCurrentBranch: true,
+      autoCreatePR: false,
+    });
+  });
+
+  it('reports bounded sanitized Cursor 400 diagnostics', async () => {
+    const secret = 'cursor-secret-value';
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: async () =>
+        JSON.stringify({
+          error: {
+            code: 'invalid_request',
+            message: 'repos is required',
+            apiKey: secret,
+            detail: `Bearer ${secret}`,
+          },
+          padding: 'x'.repeat(1_000),
+        }),
+    });
+    const error = await launchCursorAgent({
+      request: {},
+      cursorApiKey: 'cursor-key',
+      fetchImpl,
+    }).catch(caught => caught);
+    expect(error).toBeInstanceOf(Error);
+    expect(error.message).toMatch(
+      /code=invalid_request; message=repos is required; body=/
+    );
+    expect(error.message).not.toContain(secret);
+    expect(error.message.length).toBeLessThan(700);
   });
 
   it('does not steal a live implementer comment claim when dispatching', () => {
