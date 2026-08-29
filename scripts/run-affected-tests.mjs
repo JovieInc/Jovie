@@ -292,10 +292,15 @@ const PRODUCT_LANE_FOUNDATION_LANE = new Set([
   'scripts/lib/resolve-merge-group-path-diff.mjs',
 ]);
 const MERGE_QUEUE_CONTROLLER_INPUTS = new Set([
+  '.github/actions/evaluate-fleet-gate/action.yml',
   '.github/workflows/merge-queue-autoenroll.yml',
   'docs/PR_FLOW.md',
   'scripts/ci-merge-queue-check.mjs',
   'scripts/drain-pr-queue.sh',
+  'scripts/hermes/evaluate-fleet-gate.sh',
+  'scripts/hermes/fleet_admission_receipt.py',
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+  'scripts/hermes/tests/test_fleet_admission_receipt.py',
   'scripts/lib/merge-queue-guard.mjs',
   'scripts/lib/pre-land-changelog.mjs',
   'scripts/lib/resolve-merge-group-path-diff.mjs',
@@ -317,7 +322,11 @@ const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
 ];
-const MERGE_QUEUE_CONTROLLER_PYTHON_TESTS = ['scripts/tests/test_gh_retry.py'];
+const MERGE_QUEUE_CONTROLLER_PYTHON_TESTS = [
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+  'scripts/hermes/tests/test_fleet_admission_receipt.py',
+  'scripts/tests/test_gh_retry.py',
+];
 const EVENT_DRIVEN_SHIPPER_SCRIPT_TESTS = [
   ...CI_CONTROL_SCRIPT_TESTS,
   'scripts/lib/__tests__/hermes-launchd.test.mjs',
@@ -376,7 +385,12 @@ const FLEET_PROMOTION_GATE_INPUTS = new Set([
 ]);
 const FLEET_PROMOTION_GATE_LANE = new Set([
   ...FLEET_PROMOTION_GATE_INPUTS,
+  '.github/actions/evaluate-fleet-gate/action.yml',
   'apps/web/tests/unit/api/health/deploy.critical.test.ts',
+  'scripts/hermes/evaluate-fleet-gate.sh',
+  'scripts/hermes/fleet_admission_receipt.py',
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+  'scripts/hermes/tests/test_fleet_admission_receipt.py',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/run-affected-tests.mjs',
 ]);

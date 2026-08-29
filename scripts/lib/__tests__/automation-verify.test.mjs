@@ -64,9 +64,14 @@ const CI_UI_DRIFT_GUARDRAIL_INPUTS = [
   'scripts/setup.sh',
 ];
 const FLEET_PROMOTION_GATE_LANE = [
+  '.github/actions/evaluate-fleet-gate/action.yml',
   'apps/web/tests/unit/api/health/deploy.critical.test.ts',
+  'scripts/hermes/evaluate-fleet-gate.sh',
+  'scripts/hermes/fleet_admission_receipt.py',
   'scripts/hermes/gem-priority-gate.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+  'scripts/hermes/tests/test_fleet_admission_receipt.py',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/run-affected-tests.mjs',
 ];
@@ -107,10 +112,15 @@ const GEM_PR_REHABILITATION_LANE = [
   'scripts/run-affected-tests.mjs',
 ];
 const MERGE_QUEUE_CONTROLLER_INPUTS = [
+  '.github/actions/evaluate-fleet-gate/action.yml',
   '.github/workflows/merge-queue-autoenroll.yml',
   'docs/PR_FLOW.md',
   'scripts/ci-merge-queue-check.mjs',
   'scripts/drain-pr-queue.sh',
+  'scripts/hermes/evaluate-fleet-gate.sh',
+  'scripts/hermes/fleet_admission_receipt.py',
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+  'scripts/hermes/tests/test_fleet_admission_receipt.py',
   'scripts/lib/merge-queue-guard.mjs',
   'scripts/lib/pre-land-changelog.mjs',
   'scripts/lib/resolve-merge-group-path-diff.mjs',
@@ -1114,7 +1124,11 @@ describe('automation-verify affected scope', () => {
 
     expect(plan.mode).toBe('selected');
     expect(plan.scriptVitestTests).toEqual(MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS);
-    expect(plan.pythonTests).toEqual(['scripts/tests/test_gh_retry.py']);
+    expect(plan.pythonTests).toEqual([
+      'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+      'scripts/hermes/tests/test_fleet_admission_receipt.py',
+      'scripts/tests/test_gh_retry.py',
+    ]);
     expect(plan.selectedTests).toEqual([]);
   });
 
@@ -1125,7 +1139,11 @@ describe('automation-verify affected scope', () => {
 
     expect(plan.mode).toBe('selected');
     expect(plan.scriptVitestTests).toEqual(MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS);
-    expect(plan.pythonTests).toEqual(['scripts/tests/test_gh_retry.py']);
+    expect(plan.pythonTests).toEqual([
+      'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+      'scripts/hermes/tests/test_fleet_admission_receipt.py',
+      'scripts/tests/test_gh_retry.py',
+    ]);
   });
 
   it('fails closed when merge-queue controller changes include unknown automation', () => {

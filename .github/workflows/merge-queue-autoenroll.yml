@@ -294,6 +294,7 @@ jobs:
           # exact-head mode; deferred-release-only is only for when the fleet
           # policy itself is that fallback.
           DRAIN_PROMOTION_MODE: ${{ steps.admission.outputs.deferred_release == '1' && needs.fleet-policy.outputs.mode != 'hold-intake' && 'deferred-release-only' || needs.fleet-policy.outputs.mode }}
+          # Bounded admission projection for isolated-only, hold-intake, draft-only, blocked.
           DRAIN_FLEET_GATE_B64: ${{ needs.fleet-policy.outputs.receipt_b64 }}
           DRAIN_RECOVER_FLEET_HOLDS: ${{ needs.fleet-policy.outputs.mode == 'normal' && steps.admission.outputs.recover_holds == '1' && '1' || '0' }}
           # Composite CI heads cannot map to source PRs. The drain consumes
