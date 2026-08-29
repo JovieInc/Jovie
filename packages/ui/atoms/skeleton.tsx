@@ -90,6 +90,8 @@ export interface LoadingSkeletonProps {
   readonly rounded?: RoundedVariant;
   /** Accessible text announced while the placeholder is busy. */
   readonly label?: string;
+  /** Whether this placeholder owns the loading announcement. */
+  readonly announce?: boolean;
 }
 
 /**
@@ -115,11 +117,15 @@ export function LoadingSkeleton({
   width = 'w-full',
   rounded = 'sm',
   label = 'Loading content',
+  announce = true,
 }: LoadingSkeletonProps) {
   const normalizedLines = Number.isFinite(lines)
     ? Math.max(1, Math.floor(lines))
     : 1;
-  const accessibleLabel = label.trim() || 'Loading content';
+  const accessibleLabel =
+    typeof label === 'string' && label.trim()
+      ? label.trim()
+      : 'Loading content';
 
   // Generate stable keys for multi-line skeletons.
   const lineKeys = React.useMemo(
@@ -127,15 +133,20 @@ export function LoadingSkeleton({
       Array.from({ length: normalizedLines }, (_, i) => `skeleton-line-${i}`),
     [normalizedLines]
   );
+  const ownerAttributes = announce
+    ? {
+        role: 'status' as const,
+        'aria-busy': 'true' as const,
+        'aria-live': 'polite' as const,
+        'aria-atomic': 'true' as const,
+        'aria-label': accessibleLabel,
+      }
+    : {};
 
   return (
     <div
+      {...ownerAttributes}
       className={normalizedLines === 1 ? 'w-full' : 'space-y-2'}
-      role='status'
-      aria-busy='true'
-      aria-live='polite'
-      aria-atomic='true'
-      aria-label={accessibleLabel}
       data-lines={normalizedLines}
       data-height={height}
       data-width={width}
@@ -146,11 +157,11 @@ export function LoadingSkeleton({
         <Skeleton
           key={key}
           className={cn(
+            className,
             height,
             normalizedLines > 1 && index === normalizedLines - 1
               ? 'w-3/4'
-              : width,
-            className
+              : width
           )}
           rounded={rounded}
         />

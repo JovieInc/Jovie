@@ -168,6 +168,26 @@ describe('LoadingSkeleton', () => {
         screen.getByRole('status', { name: 'Loading content' })
       ).toHaveAttribute('aria-label', 'Loading content');
     });
+
+    it('guards the accessible label at runtime', () => {
+      render(<LoadingSkeleton label={null as unknown as string} />);
+
+      expect(
+        screen.getByRole('status', { name: 'Loading content' })
+      ).toHaveAttribute('aria-label', 'Loading content');
+    });
+
+    it('can render as a decorative placeholder under a shared owner', () => {
+      const { container } = render(<LoadingSkeleton announce={false} />);
+
+      expect(
+        container.querySelector('[data-slot="loading-skeleton"]')
+      ).not.toHaveAttribute('role');
+      expect(
+        container.querySelector('[data-slot="loading-skeleton"]')
+      ).not.toHaveAttribute('aria-busy');
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
   });
 
   describe('Multiple Lines', () => {
@@ -225,6 +245,20 @@ describe('LoadingSkeleton', () => {
       render(<LoadingSkeleton className='custom-class' />);
       const skeleton = document.querySelector('.skeleton');
       expect(skeleton?.className).toContain('custom-class');
+    });
+
+    it('keeps reserved geometry authoritative over caller className', () => {
+      render(
+        <LoadingSkeleton
+          className='h-[13px] w-[29px]'
+          height='h-6'
+          width='w-48'
+        />
+      );
+
+      const skeleton = document.querySelector('[data-slot="skeleton"]');
+      expect(skeleton).toHaveClass('h-6', 'w-48');
+      expect(skeleton).not.toHaveClass('h-[13px]', 'w-[29px]');
     });
 
     it('applies height to all lines', () => {

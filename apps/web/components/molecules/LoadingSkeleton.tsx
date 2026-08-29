@@ -16,7 +16,7 @@ function generateSkeletonKeys(prefix: string, count: number): string[] {
 
 export type LoadingSkeletonProps = Pick<
   UILoadingSkeletonProps,
-  'className' | 'lines' | 'height' | 'width' | 'rounded' | 'label'
+  'className' | 'lines' | 'height' | 'width' | 'rounded' | 'label' | 'announce'
 >;
 
 const SIZE_TOKEN_PATTERN = /^\d+(?:\.\d+)?$/;
@@ -97,6 +97,7 @@ export function LoadingSkeleton({
   width = 'w-full',
   rounded = 'sm',
   label,
+  announce,
 }: Readonly<LoadingSkeletonProps>) {
   // Validate height and width classes
   const validatedHeight = validateSizeClass(height, 'height');
@@ -110,6 +111,7 @@ export function LoadingSkeleton({
       width={validatedWidth}
       rounded={rounded}
       label={label}
+      announce={announce}
     />
   );
 }

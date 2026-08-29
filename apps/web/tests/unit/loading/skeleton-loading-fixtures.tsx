@@ -22,6 +22,19 @@ export function RawSkeletonLoadingFixture() {
   );
 }
 
+/** Deliberate-red: raw markup spoofs the old canonical attribute subset. */
+export function SpoofedCanonicalLoadingFixture() {
+  return (
+    <div
+      data-testid={SKELETON_LOADING_RED_FIXTURE_TEST_ID}
+      data-deliberate-red=''
+      data-red-kind='spoofed-canonical-skeleton'
+    >
+      <div className='skeleton' aria-hidden='true' data-state='shimmer' />
+    </div>
+  );
+}
+
 /**
  * Deliberate-red: a complete owner wraps another complete owner.
  * Production loading surfaces must announce through one owner only.

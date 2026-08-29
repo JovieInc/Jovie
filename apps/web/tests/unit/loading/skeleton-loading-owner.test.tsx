@@ -12,6 +12,7 @@ import {
   MissingPoliteLiveFixture,
   RawSkeletonLoadingFixture,
   SKELETON_LOADING_RED_FIXTURE_TEST_ID,
+  SpoofedCanonicalLoadingFixture,
 } from './skeleton-loading-fixtures';
 
 describe('canonical Skeleton loading owner contract', () => {
@@ -43,6 +44,20 @@ describe('canonical Skeleton loading owner contract', () => {
 
     expect(fixture).toHaveAttribute('data-deliberate-red', '');
     expect(fixture).toHaveAttribute('data-red-kind', 'raw-skeleton');
+    expect(loadingOwnerIssueCodes(inspectLoadingOwners(container))).toEqual([
+      'missing-owner',
+      'raw-skeleton',
+    ]);
+  });
+
+  it('rejects raw markup that spoofs the old canonical attributes', () => {
+    const { container } = render(<SpoofedCanonicalLoadingFixture />);
+    const fixture = screen.getByTestId(SKELETON_LOADING_RED_FIXTURE_TEST_ID);
+
+    expect(fixture).toHaveAttribute(
+      'data-red-kind',
+      'spoofed-canonical-skeleton'
+    );
     expect(loadingOwnerIssueCodes(inspectLoadingOwners(container))).toEqual([
       'missing-owner',
       'raw-skeleton',

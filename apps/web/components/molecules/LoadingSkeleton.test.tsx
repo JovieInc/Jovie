@@ -97,13 +97,27 @@ describe('LoadingSkeleton', () => {
     expect(status.querySelectorAll('[role="status"]')).toHaveLength(0);
   });
 
+  it('keeps validated geometry authoritative over caller className', () => {
+    const { container } = render(
+      <LoadingSkeleton
+        className='h-[13px] w-[29px]'
+        height='h-6'
+        width='w-48'
+      />
+    );
+
+    const skeleton = container.querySelector('[data-slot="skeleton"]');
+    expect(skeleton).toHaveClass('h-6', 'w-48');
+    expect(skeleton).not.toHaveClass('h-[13px]', 'w-[29px]');
+  });
+
   it.each([
-    ['profile', <ProfileSkeleton />],
-    ['button', <ButtonSkeleton />],
-    ['social bar', <SocialBarSkeleton />],
-    ['auth form', <AuthFormSkeleton />],
-    ['card', <CardSkeleton />],
-    ['table', <TableSkeleton rows={2} columns={2} />],
+    ['profile', <ProfileSkeleton key='profile' />],
+    ['button', <ButtonSkeleton key='button' />],
+    ['social bar', <SocialBarSkeleton key='social-bar' />],
+    ['auth form', <AuthFormSkeleton key='auth-form' />],
+    ['card', <CardSkeleton key='card' />],
+    ['table', <TableSkeleton key='table' rows={2} columns={2} />],
   ])('keeps the %s composite on one named loading owner', (_name, node) => {
     const { container } = render(node);
 
