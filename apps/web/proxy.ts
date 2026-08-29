@@ -196,8 +196,10 @@ export default async function middleware(
     return NextResponse.next();
   }
 
-  const markdownResponse = negotiateAgentMarkdown(req);
-  if (markdownResponse) return markdownResponse;
+  if (hostInfo.isMainHost) {
+    const markdownResponse = negotiateAgentMarkdown(req);
+    if (markdownResponse) return markdownResponse;
+  }
 
   // ========================================================================
   // Investor portal: handle before auth (token-based access, not BA sessions)

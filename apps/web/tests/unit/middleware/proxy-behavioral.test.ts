@@ -1762,6 +1762,19 @@ describe('proxy.ts middleware', () => {
       expect(location).toContain('jov.ie');
       expect(location).toContain('/some-page');
     });
+
+    it('preserves the redirect when an agent prefers Markdown', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        hostname: 'meetjovie.com',
+        headers: { Accept: 'text/markdown' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(301);
+      expect(res.headers.get('location')).toContain('https://jov.ie/');
+      expect(res.headers.get('content-type')).toBeNull();
+    });
   });
 
   describe('support.jov.ie redirect', () => {
@@ -1854,6 +1867,21 @@ describe('proxy.ts middleware', () => {
       expect(res.headers.get('location')).toContain(
         'https://jov.ie/investor-portal'
       );
+    });
+
+    it('preserves the redirect when an agent prefers Markdown', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        hostname: 'investors.jov.ie',
+        headers: { Accept: 'text/markdown' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(301);
+      expect(res.headers.get('location')).toContain(
+        'https://jov.ie/investor-portal'
+      );
+      expect(res.headers.get('content-type')).toBeNull();
     });
   });
 });
