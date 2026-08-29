@@ -397,6 +397,10 @@ const FLEET_PROMOTION_GATE_LANE = new Set([
 const FLEET_PROMOTION_GATE_PYTHON_TESTS = [
   'scripts/hermes/tests/gem-priority-gate.test.py',
 ];
+const FLEET_PROMOTION_GATE_PYTEST_TESTS = [
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+  'scripts/hermes/tests/test_fleet_admission_receipt.py',
+];
 const GEM_PR_REHABILITATION_LANE = new Set([
   '.github/requirements/pytest.in',
   '.github/requirements/pytest.txt',
@@ -984,7 +988,7 @@ export function buildAffectedTestPlan(
       mandatoryTests: [],
       selectedTests: ['apps/web/tests/unit/api/health/deploy.critical.test.ts'],
       rootVitestTests: [],
-      pythonTests: [],
+      pythonTests: FLEET_PROMOTION_GATE_PYTEST_TESTS,
       pythonUnittestTests: FLEET_PROMOTION_GATE_PYTHON_TESTS,
       scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
       nodeTests: [],

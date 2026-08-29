@@ -270,12 +270,27 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertEqual(projection["promotionMode"], "normal")
         self.assertLess(len(outputs["receipt_b64"]), 32_768)
 
-    def test_autoenroll_passes_only_the_bounded_projection(self):
-        workflow = (ROOT / ".github/workflows/merge-queue-autoenroll.yml").read_text()
+    def test_queue_consumers_pass_only_the_bounded_projection(self):
+        action = (ROOT / ".github/actions/evaluate-fleet-gate/action.yml").read_text()
+        autoenroll = (
+            ROOT / ".github/workflows/merge-queue-autoenroll.yml"
+        ).read_text()
+        deferred_release = (
+            ROOT / ".github/workflows/queue-deferred-release.yml"
+        ).read_text()
         wrapper = SCRIPT.read_text()
         self.assertIn(
             "DRAIN_FLEET_GATE_B64: ${{ needs.fleet-policy.outputs.receipt_b64 }}",
-            workflow,
+            autoenroll,
+        )
+        for workflow in (autoenroll, deferred_release):
+            self.assertIn(
+                "receipt_b64: ${{ steps.policy.outputs.receipt_b64 }}", workflow
+            )
+        self.assertIn("Base64 bounded admission projection", action)
+        self.assertIn(
+            'needs.fleet-policy.outputs.receipt_b64 }}" | base64 -d',
+            deferred_release,
         )
         self.assertIn("fleet_admission_receipt.py", wrapper)
         self.assertIn("base64 -w0 <\"$admission\"", wrapper)

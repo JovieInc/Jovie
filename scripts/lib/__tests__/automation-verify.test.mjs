@@ -736,6 +736,10 @@ describe('automation-verify affected scope', () => {
         selectedTests: [
           'apps/web/tests/unit/api/health/deploy.critical.test.ts',
         ],
+        pythonTests: [
+          'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+          'scripts/hermes/tests/test_fleet_admission_receipt.py',
+        ],
         pythonUnittestTests: ['scripts/hermes/tests/gem-priority-gate.test.py'],
         scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
       });
