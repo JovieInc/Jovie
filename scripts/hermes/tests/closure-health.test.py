@@ -269,6 +269,30 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
         self.assertEqual(queue_red["status"], "red")
         self.assertIn("native-queue-empty-with-eligible-over-15m", queue_red["reasons"])
 
+    def test_malformed_previous_episode_containers_restart_bounded_grace(self):
+        stalled = snapshot(
+            controller={"status": "failed", "runId": 43, "observedAt": NOW.isoformat()},
+            nativeQueueCount=0,
+        )
+        malformed_history = (
+            {"episodes": None},
+            {"episodes": []},
+            {"episodes": {"controller": "invalid"}},
+        )
+
+        for previous in malformed_history:
+            with self.subTest(previous=previous):
+                result = MODULE.evaluate_closure_health(
+                    stalled,
+                    previous=previous,
+                    now=NOW,
+                )
+                self.assertEqual(result["status"], "grace")
+                self.assertEqual(
+                    result["episodes"]["controller"]["since"],
+                    MODULE.isoformat(NOW),
+                )
+
     def test_duplicate_lanes_and_stale_merge_progress_are_immediate_red(self):
         duplicate = snapshot(
             latestMergeAt=(NOW - timedelta(hours=2)).isoformat(),
