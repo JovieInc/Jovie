@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 
+const nextConfigModule = await import('../../../next.config.js');
+const nextConfig = nextConfigModule.default ?? nextConfigModule;
+
 interface RouteRule {
   readonly source: string;
   readonly destination: string;
@@ -46,8 +49,6 @@ describe('OV mode routing', () => {
   });
 
   it('redirects all legacy admin URLs to the matching OV URL', async () => {
-    const nextConfigModule = await import('../../../next.config.js');
-    const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const redirects = (await nextConfig.redirects()) as RouteRule[];
 
     expect(redirects).toContainEqual({
@@ -58,8 +59,6 @@ describe('OV mode routing', () => {
   });
 
   it('aliases every OV path to the existing admin implementation tree', async () => {
-    const nextConfigModule = await import('../../../next.config.js');
-    const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const rewrites = flattenRewrites(await nextConfig.rewrites());
 
     expect(rewrites).toContainEqual({
