@@ -11,12 +11,14 @@ import {
   evaluateChangedScreens,
   evaluateScreenProof,
   makeScreenProof,
+  PROTECTED_REVENUE_SCREEN_SOURCES,
   RETAINED_SWEEP_WORKFLOWS,
   runScreenCertification,
   SCREEN_CERT_INVARIANT_ID,
   SCREEN_CERT_SCHEMA,
   SCREEN_PLATFORMS,
   SCREEN_REGISTRY,
+  validateProtectedRevenueScreenRegistry,
   validateRetainedSweeps,
   validateScreenRegistry,
 } from './screen-certification.mjs';
@@ -25,6 +27,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const HEAD = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const gated = () => SCREEN_REGISTRY.filter(entry => !entry.excluded);
 const home = () => SCREEN_REGISTRY.find(e => e.id === 'web.homepage');
+const protectedSources = () => Object.keys(PROTECTED_REVENUE_SCREEN_SOURCES);
 const kindOf = path => classifyScreenPath(path).kind;
 function findings(patch, screen = gated()[0]) {
   const proof = { ...makeScreenProof(screen, HEAD), ...patch };
@@ -50,6 +53,49 @@ describe('JOV-INV-018 screen-certification/v1', () => {
       'excluded'
     );
     assert.equal(kindOf('apps/web/app/(home)/page.tsx'), 'registered');
+  });
+
+  it('registers every protected revenue screen source', () => {
+    assert.deepEqual(protectedSources(), [
+      'apps/web/app/(dynamic)/start/page.tsx',
+      'apps/web/app/app/(shell)/page.tsx',
+      'apps/web/app/app/(shell)/jovie-work/page.tsx',
+      'apps/web/app/app/(shell)/settings/billing/page.tsx',
+      'apps/web/app/onboarding/checkout/page.tsx',
+      'apps/web/app/billing/success/page.tsx',
+    ]);
+    for (const source of protectedSources()) {
+      assert.equal(kindOf(source), 'registered', source);
+    }
+    assert.deepEqual(validateProtectedRevenueScreenRegistry(), []);
+  });
+
+  it('rejects duplicate protected owners and missing mobile proof', () => {
+    const source = 'apps/web/app/app/(shell)/jovie-work/page.tsx';
+    const screen = SCREEN_REGISTRY.find(entry =>
+      entry.sources.includes(source)
+    );
+    const cases = [
+      {
+        registry: [
+          ...SCREEN_REGISTRY,
+          { ...screen, id: 'web.jovie-work-duplicate', owner: 'duplicate' },
+        ],
+        expected: /exactly one non-excluded registry owner; found 2/,
+      },
+      {
+        registry: SCREEN_REGISTRY.map(entry =>
+          entry.id === screen.id ? { ...entry, viewports: ['desktop'] } : entry
+        ),
+        expected: /must include mobile viewport proof/,
+      },
+    ];
+    for (const { registry, expected } of cases) {
+      assert.match(
+        validateProtectedRevenueScreenRegistry(registry).join('\n'),
+        expected
+      );
+    }
   });
 
   it('emits exact-head changed-surface receipts', () => {
@@ -110,6 +156,51 @@ describe('JOV-INV-018 screen-certification/v1', () => {
       proofs: [],
     });
     assert.match(result.issues.join('\n'), /missing registration/);
+  });
+
+  it('rejects a modified protected source when its registration is missing', () => {
+    const source = 'apps/web/app/app/(shell)/jovie-work/page.tsx';
+    const registry = SCREEN_REGISTRY.filter(
+      entry => !entry.sources.includes(source)
+    );
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      registry,
+      headSha: HEAD,
+      mintFromSamples: false,
+      proofs: [],
+    });
+    assert.match(result.issues.join('\n'), /missing registration/);
+  });
+
+  it('allows an unrelated modified unregistered screen', () => {
+    const result = evaluateChangedScreens({
+      changedFiles: [
+        {
+          path: 'apps/web/app/(home)/unregistered/page.tsx',
+          status: 'M',
+        },
+      ],
+      headSha: HEAD,
+      mintFromSamples: false,
+      proofs: [],
+    });
+    assert.deepEqual(result.issues, []);
+  });
+
+  it('requires exact-head proof for a registered protected source', () => {
+    const result = evaluateChangedScreens({
+      changedFiles: [
+        {
+          path: 'apps/web/app/app/(shell)/jovie-work/page.tsx',
+          status: 'M',
+        },
+      ],
+      headSha: HEAD,
+      mintFromSamples: false,
+      proofs: [],
+    });
+    assert.match(result.issues.join('\n'), /missing exact-head proof/);
   });
 
   it('rejects stale exact-head proof', () => {
