@@ -17,10 +17,10 @@
       "uncovered": 1
     },
     "apps/web/components/atoms": {
-      "percent": 4.11,
-      "covered": 3,
-      "total": 73,
-      "uncovered": 70
+      "percent": 35.29,
+      "covered": 24,
+      "total": 68,
+      "uncovered": 44
     },
     "apps/web/components/molecules": {
       "percent": 51.3,
