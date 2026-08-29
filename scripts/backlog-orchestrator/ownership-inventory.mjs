@@ -151,6 +151,17 @@ export function collisionDomainsForTarget(target) {
   return domains.sort();
 }
 
+export function collisionDomainsForPaths(
+  paths,
+  { repo = JOVIE_EXECUTION_REPO } = {}
+) {
+  return uniqueStrings(
+    (Array.isArray(paths) ? paths : []).flatMap(path =>
+      collisionDomainsForTarget({ target_repo: repo, artifact: path })
+    )
+  ).sort();
+}
+
 export function admissionTargetsCollide(left, right) {
   const leftDomains = new Set(
     left?.collision_domains || collisionDomainsForTarget(left)

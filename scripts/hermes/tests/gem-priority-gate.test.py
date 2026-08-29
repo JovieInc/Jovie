@@ -236,6 +236,20 @@ class ProductionHealthTests(unittest.TestCase):
 
 MAIN_SHA = "a3eeefdd4dc681d1c9b5b4385720d661f5129137"
 
+
+def lane_capacity(
+    ready: int = 0,
+    budget: int = 15,
+    observed_at: MODULE.datetime | None = None,
+) -> dict[str, object]:
+    return {
+        "schema": "jovie-lane-capacity/v1",
+        "observedAt": MODULE.isoformat(observed_at or MODULE.utc_now()),
+        "global": {"ready": ready, "budget": budget},
+        "defaultLaneBudget": 4,
+        "lanes": {},
+    }
+
 GREEN_SIGNALS: dict[str, object] = {
     "main": {"status": "green", "sha": MAIN_SHA},
     "production": {"status": "green", "deployedSha": MAIN_SHA},
@@ -246,6 +260,7 @@ GREEN_SIGNALS: dict[str, object] = {
         "eligiblePrs": 0,
         "greenReadyPrs": 0,
         "target": 15,
+        "laneCapacity": lane_capacity(),
     },
     "closureHealth": {
         "schema": "jovie-closure-health/v1",
@@ -534,6 +549,42 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
         self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
 
+    def test_lane_receipt_classifies_ci_separately_from_product_paths(self):
+        now = MODULE.datetime(2026, 8, 28, 18, 0, tzinfo=MODULE.UTC)
+        receipt = MODULE.build_lane_capacity_receipt(
+            "JovieInc/Jovie",
+            [
+                {
+                    "files": [
+                        {"path": "scripts/hermes/gem-priority-gate.py"},
+                        {"path": "apps/web/app/page.tsx"},
+                    ]
+                }
+            ],
+            now,
+            15,
+            4,
+        )
+        self.assertEqual(receipt["global"], {"ready": 1, "budget": 15})
+        self.assertEqual(
+            receipt["lanes"]["risk:JovieInc/Jovie:control-plane"],
+            {"ready": 1, "budget": 4},
+        )
+        self.assertEqual(
+            receipt["lanes"]["artifact:JovieInc/Jovie:apps/web"],
+            {"ready": 1, "budget": 4},
+        )
+
+    def test_lane_receipt_rejects_stale_and_future_evidence(self):
+        now = MODULE.datetime(2026, 8, 28, 18, 0, tzinfo=MODULE.UTC)
+        for observed_at in (
+            now - MODULE.QUEUE_SNAPSHOT_TTL - MODULE.timedelta(seconds=1),
+            now + MODULE.timedelta(minutes=2),
+        ):
+            with self.subTest(observed_at=observed_at):
+                receipt = lane_capacity(observed_at=observed_at)
+                self.assertFalse(MODULE.valid_lane_capacity_receipt(receipt, now))
+
     def test_fleet_hold_does_not_pause_pr_remediation(self):
         signals = dict(GREEN_SIGNALS)
         signals["main"] = {"status": "red", "sha": MAIN_SHA}
@@ -708,7 +759,8 @@ class DeploymentBindingTests(unittest.TestCase):
 
         self.assertEqual(live["status"], "known")
         self.assertEqual(live["source"], "live")
-        self.assertEqual(written["schema"], "jovie-queue-snapshot/v1")
+        self.assertEqual(written["schema"], "jovie-queue-snapshot/v2")
+        self.assertEqual(written["laneCapacity"]["schema"], "jovie-lane-capacity/v1")
         self.assertEqual(written["greenReadyPrs"], 1)
         self.assertEqual(cached["status"], "known")
         self.assertEqual(cached["source"], "last-known")
@@ -877,6 +929,7 @@ class DeploymentBindingTests(unittest.TestCase):
             "eligiblePrs": 400,
             "greenReadyPrs": 14,
             "target": 15,
+            "laneCapacity": lane_capacity(14),
         }
 
         receipt = self.evaluate(signals)
@@ -992,10 +1045,11 @@ class DeploymentBindingTests(unittest.TestCase):
         )
 
         signals["queue"]["greenReadyPrs"] = 14
+        signals["queue"]["laneCapacity"] = lane_capacity(14)
         one_landed = self.evaluate(signals)
         self.assertTrue(one_landed["workAdmission"]["newIssueLeaseAllowed"])
 
-    def test_malformed_queue_blocks_promotion_but_not_new_issue_leases(self):
+    def test_malformed_queue_blocks_promotion_and_new_issue_leases(self):
         signals = dict(GREEN_SIGNALS)
         signals["queue"] = {"status": "known"}
 
@@ -1003,7 +1057,7 @@ class DeploymentBindingTests(unittest.TestCase):
 
         self.assertEqual(receipt["state"], "AMBER")
         self.assertFalse(receipt["promotionAdmission"]["allowed"])
-        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertIn(
             "queue-unknown",
             {reason["code"] for reason in receipt["reasons"]},
@@ -1054,6 +1108,16 @@ class IndependentReviewTests(unittest.TestCase):
             signals["concurrencyEvidence"] = {
                 **evidence,
                 "observedAt": MODULE.isoformat(self.NOW),
+            }
+        queue = signals.get("queue")
+        if isinstance(queue, dict):
+            signals["queue"] = {
+                **queue,
+                "laneCapacity": lane_capacity(
+                    int(queue.get("greenReadyPrs", 0)),
+                    int(queue.get("target", 15)),
+                    self.NOW,
+                ),
             }
         return MODULE.evaluate(signals, MODULE.isoformat(self.NOW))
 
@@ -1121,6 +1185,10 @@ class IndependentReviewTests(unittest.TestCase):
 
     def test_review_does_not_bypass_bounded_concurrency_evidence(self):
         signals = dict(GREEN_SIGNALS)
+        signals["queue"] = {
+            **GREEN_SIGNALS["queue"],
+            "laneCapacity": lane_capacity(observed_at=self.NOW),
+        }
         signals["independentReview"] = self.valid_review()
         signals["concurrencyEvidence"] = {
             "schema": MODULE.CONCURRENCY_SCHEMA,
@@ -1176,6 +1244,10 @@ class IndependentReviewTests(unittest.TestCase):
 
     def test_unbound_production_plus_fresh_review_is_hold_intake(self):
         signals = dict(GREEN_SIGNALS)
+        signals["queue"] = {
+            **GREEN_SIGNALS["queue"],
+            "laneCapacity": lane_capacity(observed_at=self.NOW),
+        }
         signals["production"] = {"status": "green", "deployedSha": "b" * 40}
         signals["independentReview"] = self.valid_review()
         receipt = MODULE.evaluate(signals, MODULE.isoformat(self.NOW))
