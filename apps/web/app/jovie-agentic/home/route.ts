@@ -1,32 +1,14 @@
-import { NextResponse } from 'next/server';
 import { AGENTIC_HOMEPAGE_MARKDOWN } from '@/lib/agentic/homepage-markdown';
-import { negotiateAgenticRepresentation } from '@/lib/agentic/markdown-negotiation';
 
-export const dynamic = 'force-dynamic';
+export const dynamic = 'force-static';
+export const revalidate = 86_400;
 
-function markdownResponse(): Response {
+/** Static target for the proxy-owned homepage negotiation boundary. */
+export function GET(): Response {
   return new Response(AGENTIC_HOMEPAGE_MARKDOWN, {
     headers: {
-      'Cache-Control': 'public, max-age=86400, s-maxage=86400',
       'Content-Type': 'text/markdown; charset=utf-8',
       Vary: 'Accept',
     },
   });
-}
-
-/**
- * Internal target for the header-conditioned root rewrite. HTML requests are
- * rewritten back to the canonical page with a marker query so the config rule
- * cannot loop; Markdown requests terminate here with the negotiated body.
- */
-export function GET(request: Request): Response {
-  const requestUrl = new URL(request.url);
-  if (
-    negotiateAgenticRepresentation(request.headers.get('accept')) === 'markdown'
-  ) {
-    return markdownResponse();
-  }
-
-  requestUrl.pathname = '/';
-  return NextResponse.rewrite(requestUrl);
 }

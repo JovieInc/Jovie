@@ -1234,6 +1234,44 @@ describe('proxy.ts middleware', () => {
   });
 
   describe('public homepage navigation', () => {
+    it('rewrites a Markdown-preferred request to the private representation', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        headers: { Accept: 'text/markdown;q=0.9, text/html;q=0.1' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.headers.get('x-middleware-rewrite')).toBe(
+        'https://localhost/jovie-agentic/home'
+      );
+      expect(res.headers.get('vary')).toContain('Accept');
+      expect(mocks.getUserState).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      'text/markdown;q=0.1, text/html;q=0.9',
+      'text/html,application/xhtml+xml,*/*;q=0.8',
+    ])('keeps %s on the normal HTML homepage', async accept => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        headers: { Accept: accept },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.headers.get('x-middleware-rewrite')).toBeNull();
+    });
+
+    it('leaves the internal rewrite target to Next route handling', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/jovie-agentic/home',
+        headers: { Accept: 'text/markdown' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.headers.get('x-middleware-rewrite')).toBeNull();
+      expect(res.status).toBeLessThan(300);
+    });
+
     it('passes through for an authenticated visitor', async () => {
       const req = createAuthenticatedRequest('clerk_user_1', { pathname: '/' });
       const res = await callMiddleware(req);

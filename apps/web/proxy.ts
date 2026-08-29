@@ -6,6 +6,7 @@ import {
 } from 'next/server';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
+import { resolveAgenticHomepageProxyResponse } from '@/lib/agentic/homepage-proxy';
 import { buildProtectedAuthRedirectUrl } from '@/lib/auth/build-auth-route-url';
 import { handleInvestorRequest } from '@/lib/auth/investor-portal';
 import { handleProxyRequest } from '@/lib/auth/proxy-request-handler';
@@ -164,6 +165,9 @@ export default async function middleware(
   if (isMaliciousProbePath(req.nextUrl.pathname)) {
     return createProbeDropResponse();
   }
+
+  const agenticHomepageResponse = resolveAgenticHomepageProxyResponse(req);
+  if (agenticHomepageResponse) return agenticHomepageResponse;
 
   // The profile-mode marker is a private destination for afterFiles rewrites.
   // Proxy executes before those rewrites, so a marker present here can only be
