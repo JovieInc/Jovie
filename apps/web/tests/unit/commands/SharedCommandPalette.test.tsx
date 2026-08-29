@@ -128,7 +128,16 @@ vi.mock('@/lib/queries/useChatCapabilitiesQuery', () => ({
 
 describe('SharedCommandPalette (cmd+k surface)', () => {
   it('matches palette queries against the shared source', () => {
-    void PaletteList;
+    render(
+      <PaletteList
+        sections={[]}
+        selectedIndex={0}
+        setSelectedIndex={() => undefined}
+        commitIndex={() => undefined}
+        emptyHint='No matches'
+      />
+    );
+    expect(screen.getByText('No matches')).toBeInTheDocument();
     expect(fuzzyMatch('SharedCommandPalette', 'palette')).toBe(true);
     expect(fuzzyMatch('SharedCommandPalette', 'missing')).toBe(false);
   });

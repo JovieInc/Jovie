@@ -165,6 +165,10 @@ export function compilerRunHasParseableDiagnostics(result) {
   return status === 0;
 }
 
+export function hasUnparseableTscFailure({ status, counts, globalErrors }) {
+  return !compilerRunHasParseableDiagnostics({ status, counts, globalErrors });
+}
+
 export function describeUnusableCompilerRun({
   status,
   output,
