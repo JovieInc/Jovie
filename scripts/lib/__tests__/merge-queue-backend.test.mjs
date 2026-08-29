@@ -363,7 +363,7 @@ function executeHoldIntakePreflight({
     closureAdmission: {
       allowed: closureIntakeAllowed,
       authority: 'Summer',
-      status: closureIntakeAllowed ? 'green' : 'red',
+      status: closureIntakeAllowed ? 'healthy' : 'red',
       newIssueIntakeAllowed: closureIntakeAllowed,
       newImplementationAllowed: closureIntakeAllowed,
       fallbackPrGenerationAllowed: closureIntakeAllowed,
@@ -424,6 +424,21 @@ describe('merge queue backend resolution', () => {
 });
 
 describe('queue workflow mutation safety', () => {
+  it('accepts the canonical healthy closure receipt during production-unbound repair', () => {
+    const result = executeHoldIntakePreflight({
+      closureIntakeAllowed: true,
+      cohortIntakeAllowed: true,
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain(
+      'FLEET_HOLD_TTL_SECONDS must be an integer from 1 through 3600'
+    );
+    expect(result.stderr).not.toContain(
+      'Fleet receipt does not authorize promotion mode hold-intake'
+    );
+  });
+
   it('accepts Summer stop-line hold-intake while keeping promotion and remediation live', () => {
     const result = executeHoldIntakePreflight({
       closureIntakeAllowed: false,
