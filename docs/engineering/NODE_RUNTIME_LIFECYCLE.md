@@ -16,7 +16,6 @@ Official lifecycle and release metadata come directly from the Node.js Release w
 `.github/workflows/node-runtime-compatibility.yml` checks official lifecycle and patch freshness daily, with the heavier compatibility matrix weekly and on demand. Each candidate gets an isolated exact-lockfile install, declared-engine probe, native `sharp` smoke, web unit suite, runtime contract tests, typecheck, and production build.
 
 The Node 24 candidate lane is required for the workflow to be green. The Node 26 shadow lane is allowed to fail while Current; the failure remains visible. The fast pull-request gate only runs deterministic policy tests, so the weekly build matrix cannot slow ordinary shipping.
-
 This schedule is explicitly approved as part of the runtime lifecycle system. It makes one lightweight policy job daily and two hosted compatibility jobs weekly, uses only public Node metadata, and introduces no paid API, secret, database, or production request.
 
 ## Promotion rings
