@@ -293,8 +293,7 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
   await expect(input).toBeVisible({ timeout: 30_000 });
   const sendButton = page.getByRole('button', { name: 'Send message' });
   const sendChatMessage = async (text: string) => {
-    await input.fill(text);
-    await expect(sendButton).toBeEnabled({ timeout: 30_000 });
+    await fillControlledInputUntilEnabled(input, sendButton, text);
     const [response] = await Promise.all([
       page.waitForResponse(
         candidate =>
@@ -316,7 +315,10 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
     /^confirm_artist:/
   );
   await expect(
-    page.getByText(TEST_SPOTIFY_ARTIST.name, { exact: true }).first(),
+    page
+      .getByText(TEST_SPOTIFY_ARTIST.name, { exact: true })
+      .filter({ visible: true })
+      .first(),
     'Real Spotify artist confirmation did not render the resolved identity'
   ).toBeVisible({ timeout: 60_000 });
 
