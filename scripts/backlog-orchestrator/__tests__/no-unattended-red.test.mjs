@@ -215,6 +215,10 @@ describe('no unattended red loop', () => {
     assert.equal(queue.items[1].terminal, true);
     assert.equal(queue.counts.terminalHidden, 1);
     assert.equal(queue.counts.healthy, 0);
+    assert.equal(queue.terminalTombstones[0].issue, 'JOV-5335');
+    assert.equal(queue.terminalTombstones[0].pr, 16423);
+    assert.equal(queue.terminalTombstones[0].observedAt, NOW);
+    assert.equal(queue.terminalTombstones[0].reason, 'linked-pr-merged-and-linear-done');
   });
 
   it('deliberate red: silent or unattended red is rejected', () => {

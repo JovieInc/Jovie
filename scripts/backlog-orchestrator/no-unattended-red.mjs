@@ -216,7 +216,8 @@ function createApi() {
   function projectSummerQueue(records, { now = new Date().toISOString() } = {}) {
     const source = [...(records || [])];
     const items = source.filter(record => record.outcome !== 'healthy').sort((left, right) => `${left.issueKey}:${left.observedAt}`.localeCompare(`${right.issueKey}:${right.observedAt}`)).map(record => ({ ...Object.fromEntries(QUEUE_KEYS.map(key => [key, record[key]])), issue: record.issue, stallClass: record.stallClass, outcome: record.outcome, escalation: record.escalation || null }));
-    return { schema: SUMMER_QUEUE_SCHEMA, authority: 'Summer', observedAt: iso(now), items, counts: { open: items.filter(item => item.outcome === 'open').length, healthy: 0, escalated: items.filter(item => item.outcome === 'escalated').length, terminalHidden: source.filter(item => item.outcome === 'healthy').length } };
+    const terminalTombstones = source.filter(record => record.outcome === 'healthy').map(record => ({ ...Object.fromEntries(QUEUE_KEYS.map(key => [key, record[key]])), issue: record.issue, pr: record.pr, outcome: record.outcome, terminal: record.terminal, observedAt: record.observedAt, reason: record.reason }));
+    return { schema: SUMMER_QUEUE_SCHEMA, authority: 'Summer', observedAt: iso(now), items, terminalTombstones, counts: { open: items.filter(item => item.outcome === 'open').length, healthy: 0, escalated: items.filter(item => item.outcome === 'escalated').length, terminalHidden: terminalTombstones.length } };
   }
   function evidenceTaskForRecord(record) {
     if (record.mode !== 'collect-evidence' || record.outcome !== 'open') return null;
