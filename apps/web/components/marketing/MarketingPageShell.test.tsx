@@ -33,7 +33,10 @@ describe('MarketingPageShell', () => {
 
   it('merges page-scoped class hooks onto the wrapper', () => {
     const { container } = render(
-      <MarketingPageShell className='system-b-pricing-page'>
+      <MarketingPageShell
+        className='system-b-pricing-page'
+        penContractId={MARKETING_PEN_CONTRACT_IDS.recipe.homepage}
+      >
         body
       </MarketingPageShell>
     );
@@ -41,5 +44,9 @@ describe('MarketingPageShell', () => {
     const wrapper = container.firstElementChild;
     expect(wrapper?.className).toContain('system-b-pricing-page');
     expect(wrapper?.className).toContain('relative');
+    expect(wrapper).toHaveAttribute(
+      'data-pen-contract',
+      MARKETING_PEN_CONTRACT_IDS.recipe.homepage
+    );
   });
 });
