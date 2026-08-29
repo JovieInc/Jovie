@@ -87,6 +87,9 @@ When you add a check, add it to `scripts/design-governance-audit.mjs`. Absence
 from `ci-fast-lanes.mjs` is WARN, not FAIL — the audit must not demand a
 merge halt.
 
+Exception (JOV-5447): `design-exception-registry` compares inventoried
+design-debt registries to the trusted ci-fast base and fails closed on growth.
+
 Do not add a heavy new required workflow for design governance. The weekly
 workflow is the standing safety net for drift that no PR happened to touch.
 

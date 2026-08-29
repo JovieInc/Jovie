@@ -232,6 +232,7 @@
     "design:logo-assets:check": "pnpm --filter @jovie/web exec node ../../scripts/logo-asset-normalization.mjs",
     "design:logo-assets:test": "pnpm --filter @jovie/web exec node --test ../../scripts/logo-asset-normalization.test.mjs",
     "design:oklch-palette:check": "node scripts/oklch-palette-guard.mjs",
+    "design:exception-registry:check": "node scripts/design-exception-registry.mjs",
     "design:shared-ui-visual-arbitrary:check": "node scripts/shared-ui-visual-arbitrary-audit.mjs",
     "design:shared-ui-visual-arbitrary:update": "node scripts/shared-ui-visual-arbitrary-audit.mjs --update-baseline",
     "design:authority:check": "node scripts/design-authority-guard.mjs",
