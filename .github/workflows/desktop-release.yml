@@ -804,7 +804,7 @@ jobs:
     name: ${{ needs.authorize-release.outputs.environment == 'staging' && 'Build staging desktop package' || 'Publish production desktop release' }}
     needs: [authorize-release]
     if: ${{ needs.authorize-release.result == 'success' && needs.authorize-release.outputs.should_release == 'true' }}
-    timeout-minutes: 45
+    timeout-minutes: 75
     # macOS-only for now. Windows/Linux were removed because we don't ship
     # those binaries today and building them on every release wastes runner
     # time. To re-enable, restore the matrix strategy with the desired OSes.
@@ -959,13 +959,12 @@ jobs:
             echo "::error::VERSION is not a valid desktop semver."
             exit 1
           }
-          # publish is null in electron-builder.staging.yml (staging ships as CI
-          # artifacts only, no auto-update), so no staging-mac.yml is produced.
           staging_files=(
             "apps/desktop/dist/Jovie-Staging-${release_version}-universal.dmg"
             "apps/desktop/dist/Jovie-Staging-${release_version}-universal.dmg.blockmap"
             "apps/desktop/dist/Jovie-Staging-${release_version}-universal.zip"
             "apps/desktop/dist/Jovie-Staging-${release_version}-universal.zip.blockmap"
+            "apps/desktop/dist/latest-mac.yml"
           )
           for staging_file in "${staging_files[@]}"; do
             [ -f "$staging_file" ] || {
@@ -1044,6 +1043,32 @@ jobs:
           }
           echo "published_sha=$RELEASE_SHA" >> "$GITHUB_OUTPUT"
           echo "publisher_attempt=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+
+      - name: Generate staging icon for updater feed
+        if: env.ENVIRONMENT == 'production'
+        run: node apps/desktop/scripts/gen-staging-icon.mjs
+
+      - name: Package staging desktop updater feed
+        if: env.ENVIRONMENT == 'production'
+        env:
+          ELECTRON_ENV: staging
+          APPLE_API_KEY: ${{ env.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_KEYCHAIN: ${{ env.KEYCHAIN_PATH }}
+        run: pnpm --filter @jovie/desktop package:staging
+
+      - name: Publish staging desktop update feed
+        if: env.ENVIRONMENT == 'production' || env.ENVIRONMENT == 'staging'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/desktop-release-assets.mjs publish-staging \
+            --sha "$RELEASE_SHA" \
+            --dist "apps/desktop/dist"
 
       - name: Clean up keychain
         if: always() && env.KEYCHAIN_PATH != ''

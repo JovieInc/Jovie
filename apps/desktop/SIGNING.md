@@ -18,7 +18,7 @@ Without code signing:
 The desktop release pipeline is already built and runs automatically on push
 to `main`. It just needs these secrets to actually sign and notarize the
 output. When secrets are absent, the workflow still builds (unsigned DMG)
-but skips signing/notarization with a warning.
+but skips signing/notarization with a warning. Prod/staging register a LaunchAgent for closed-app updates.
 
 ## One-time setup (≈15 minutes)
 

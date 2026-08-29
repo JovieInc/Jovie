@@ -40,12 +40,29 @@ function scalar(value) {
   return trimmed;
 }
 
+export const STAGING_DESKTOP_RELEASE_TAG = 'desktop-staging';
+
 export function expectedDesktopAssetNames(version) {
   invariant(
     SEMVER_PATTERN.test(version),
     'Desktop version is not valid semver.'
   );
   const prefix = `Jovie-${version}-universal`;
+  return [
+    `${prefix}.dmg`,
+    `${prefix}.dmg.blockmap`,
+    `${prefix}.zip`,
+    `${prefix}.zip.blockmap`,
+    'latest-mac.yml',
+  ];
+}
+
+export function expectedStagingDesktopAssetNames(version) {
+  invariant(
+    SEMVER_PATTERN.test(version),
+    'Desktop version is not valid semver.'
+  );
+  const prefix = `Jovie-Staging-${version}-universal`;
   return [
     `${prefix}.dmg`,
     `${prefix}.dmg.blockmap`,
@@ -133,13 +150,21 @@ export function validateReleaseEnvelope({
   releaseSha,
   version,
   draft,
+  tagName = `v${version}`,
+  prerelease = false,
+  titleExact = true,
 }) {
   invariant(
     Number.isInteger(release?.id) && release.id > 0,
     'GitHub release ID is malformed.'
   );
-  invariant(release.tag_name === `v${version}`, 'Release tag is not exact.');
-  invariant(release.name === version, 'Release title is not exact.');
+  invariant(release.tag_name === tagName, 'Release tag is not exact.');
+  invariant(
+    titleExact
+      ? release.name === version
+      : typeof release.name === 'string' && release.name.includes(version),
+    'Release title is not exact.'
+  );
   invariant(
     release.target_commitish === releaseSha,
     'Release target is not the authorized commit.'
@@ -151,8 +176,8 @@ export function validateReleaseEnvelope({
       : 'Production release is not published.'
   );
   invariant(
-    release.prerelease === false,
-    'Production release is a prerelease.'
+    release.prerelease === prerelease,
+    'Release prerelease flag is not exact.'
   );
   invariant(Array.isArray(release.assets), 'Release assets are malformed.');
   if (!draft) {
@@ -164,9 +189,14 @@ export function validateReleaseEnvelope({
   }
 }
 
-export function validateUpdaterMetadata({ buffers, metadata, version }) {
-  const dmgName = `Jovie-${version}-universal.dmg`;
-  const zipName = `Jovie-${version}-universal.zip`;
+export function validateUpdaterMetadata({
+  buffers,
+  metadata,
+  version,
+  assetPrefix = 'Jovie',
+}) {
+  const dmgName = `${assetPrefix}-${version}-universal.dmg`;
+  const zipName = `${assetPrefix}-${version}-universal.zip`;
 
   invariant(metadata.version === version, 'Updater version is not exact.');
   invariant(metadata.path === zipName, 'Updater path does not target the ZIP.');
@@ -229,9 +259,21 @@ export function validateReleaseAssets({
   releaseSha,
   version,
   draft,
+  expectedNames = expectedDesktopAssetNames(version),
+  assetPrefix = 'Jovie',
+  tagName = undefined,
+  prerelease = undefined,
+  titleExact = undefined,
 }) {
-  validateReleaseEnvelope({ release, releaseSha, version, draft });
-  const expectedNames = expectedDesktopAssetNames(version);
+  validateReleaseEnvelope({
+    release,
+    releaseSha,
+    version,
+    draft,
+    tagName,
+    prerelease,
+    titleExact,
+  });
   invariant(
     release.assets.length === expectedNames.length,
     'Release must contain exactly five desktop assets.'
@@ -272,7 +314,27 @@ export function validateReleaseAssets({
   const metadata = parseLatestMacYaml(
     buffers.get('latest-mac.yml').toString('utf8')
   );
-  validateUpdaterMetadata({ buffers, metadata, version });
+  validateUpdaterMetadata({ buffers, metadata, version, assetPrefix });
+}
+
+export function validateStagingReleaseAssets({
+  buffers,
+  release,
+  releaseSha,
+  version,
+}) {
+  validateReleaseAssets({
+    buffers,
+    release,
+    releaseSha,
+    version,
+    draft: false,
+    expectedNames: expectedStagingDesktopAssetNames(version),
+    assetPrefix: 'Jovie-Staging',
+    tagName: STAGING_DESKTOP_RELEASE_TAG,
+    prerelease: true,
+    titleExact: false,
+  });
 }
 
 class GitHubClient {
@@ -388,6 +450,44 @@ class GitHubClient {
     });
   }
 
+  async deleteAsset(assetId) {
+    invariant(
+      Number.isInteger(assetId) && assetId > 0,
+      'Release asset ID is malformed.'
+    );
+    return this.request(
+      `/repos/${this.repository}/releases/assets/${assetId}`,
+      { method: 'DELETE' }
+    );
+  }
+
+  async upsertStagingRelease({ releaseSha, version }) {
+    const existing = await this.releaseOrDraftByTag(
+      STAGING_DESKTOP_RELEASE_TAG,
+      true
+    );
+    const body = {
+      tag_name: STAGING_DESKTOP_RELEASE_TAG,
+      target_commitish: releaseSha,
+      name: `Desktop staging ${version}`,
+      draft: false,
+      prerelease: true,
+      make_latest: 'false',
+    };
+    if (!existing) {
+      return this.request(`/repos/${this.repository}/releases`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    return this.request(`/repos/${this.repository}/releases/${existing.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   async publishRelease(releaseId) {
     return this.request(`/repos/${this.repository}/releases/${releaseId}`, {
       method: 'PATCH',
@@ -436,9 +536,9 @@ async function writeOutputs(path, values) {
   await appendFile(path, `${lines}\n`);
 }
 
-async function readLocalBuffers(dist, version) {
+async function readLocalBuffers(dist, version, expectedNames) {
   const buffers = new Map();
-  for (const name of expectedDesktopAssetNames(version)) {
+  for (const name of expectedNames) {
     const path = join(dist, name);
     const contents = await readFile(path);
     invariant(contents.length > 0, `Local desktop artifact is empty: ${path}`);
@@ -493,7 +593,11 @@ async function uploadAndPublish({ client, dist, output, releaseSha, version }) {
   const tag = `v${version}`;
   let release = await client.releaseOrDraftByTag(tag);
   validateReleaseEnvelope({ release, releaseSha, version, draft: true });
-  const localBuffers = await readLocalBuffers(dist, version);
+  const localBuffers = await readLocalBuffers(
+    dist,
+    version,
+    expectedDesktopAssetNames(version)
+  );
   const existingAssets = new Map();
 
   for (const rawAsset of release.assets) {
@@ -555,6 +659,74 @@ async function uploadAndPublish({ client, dist, output, releaseSha, version }) {
   });
 }
 
+async function assertProductionDesktopReleaseGreen(client, version) {
+  const release = await client.releaseByTag(`v${version}`, true);
+  invariant(
+    release,
+    'Staging updater feed requires a published production desktop release.'
+  );
+  invariant(
+    release.draft === false,
+    'Production desktop release is still a draft.'
+  );
+  invariant(
+    release.prerelease === false,
+    'Production desktop release is a prerelease.'
+  );
+}
+
+async function publishStaging({ client, dist, output, releaseSha, version }) {
+  await assertProductionDesktopReleaseGreen(client, version);
+  const expectedNames = expectedStagingDesktopAssetNames(version);
+  const localBuffers = await readLocalBuffers(dist, version, expectedNames);
+  let release = await client.upsertStagingRelease({ releaseSha, version });
+  validateReleaseEnvelope({
+    release,
+    releaseSha,
+    version,
+    draft: false,
+    tagName: STAGING_DESKTOP_RELEASE_TAG,
+    prerelease: true,
+    titleExact: false,
+  });
+
+  for (const rawAsset of release.assets ?? []) {
+    invariant(
+      Number.isInteger(rawAsset?.id) && rawAsset.id > 0,
+      'Existing staging asset ID is malformed.'
+    );
+    await client.deleteAsset(rawAsset.id);
+  }
+
+  for (const [name, buffer] of localBuffers) {
+    await client.uploadAsset(release, name, buffer);
+  }
+
+  release = await client.releaseById(release.id);
+  validateStagingReleaseAssets({
+    buffers: localBuffers,
+    release,
+    releaseSha,
+    version,
+  });
+  invariant(
+    (await client.currentMainSha()) === releaseSha,
+    'Desktop generation was superseded before staging feed publication.'
+  );
+  invariant(
+    (await client.resolveTagCommit(STAGING_DESKTOP_RELEASE_TAG)) === releaseSha,
+    'Staging release tag does not target the authorized commit.'
+  );
+
+  await writeOutputs(output, {
+    asset_count: release.assets.length,
+    release_id: release.id,
+    release_sha: releaseSha,
+    release_tag: STAGING_DESKTOP_RELEASE_TAG,
+    release_version: version,
+  });
+}
+
 async function verifyPublished({ client, output, releaseSha, version }) {
   const tag = `v${version}`;
   const release = await client.releaseByTag(tag);
@@ -603,6 +775,9 @@ async function main() {
   } else if (command === 'upload-and-publish') {
     invariant(args.dist, '--dist is required.');
     await uploadAndPublish({ ...common, dist: args.dist });
+  } else if (command === 'publish-staging') {
+    invariant(args.dist, '--dist is required.');
+    await publishStaging({ ...common, dist: args.dist });
   } else if (command === 'verify-published') {
     await verifyPublished(common);
   } else {

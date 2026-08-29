@@ -6,6 +6,8 @@ import { createRequire } from 'node:module';
 import test from 'node:test';
 import {
   expectedDesktopAssetNames,
+  expectedStagingDesktopAssetNames,
+  STAGING_DESKTOP_RELEASE_TAG,
   validateReleaseAssets,
 } from './desktop-release-assets.mjs';
 import { evaluateDesktopReleaseGuard } from './desktop-release-guard.mjs';
@@ -411,10 +413,25 @@ test('desktop staging is a bounded artifact and production is separately proven'
     /desktop-staging-/,
     /retention-days: 7/,
   ]);
-  // publish is null in electron-builder.staging.yml, so staging produces no
-  // auto-update metadata (staging-mac.yml) and must not try to upload it.
   assert.doesNotMatch(stagingUpload, /staging-mac\.yml/);
   assert.doesNotMatch(stagingUpload, /desktop-production-published|GH_TOKEN/);
+  const stagingFeed = step(
+    desktopWorkflow,
+    'Publish staging desktop update feed'
+  );
+  assertPatterns(stagingFeed, [
+    /desktop-release-assets\.mjs publish-staging/,
+    /GH_TOKEN/,
+    /--dist "apps\/desktop\/dist"/,
+  ]);
+  assert.match(desktopWorkflow, /latest-mac\.yml/);
+  assert.match(
+    readFileSync(
+      new URL('../apps/desktop/electron-builder.staging.yml', import.meta.url),
+      'utf8'
+    ),
+    /releases\/download\/desktop-staging/
+  );
   assert.ok(
     publish.indexOf('commits/main') <
       publish.indexOf('desktop-release-assets.mjs upload-and-publish')
@@ -446,6 +463,12 @@ test('desktop staging is a bounded artifact and production is separately proven'
     /electron-builder publish|--publish always/
   );
   assert.match(desktopReleaseAssets, /releases\?per_page=100/);
+  assert.equal(STAGING_DESKTOP_RELEASE_TAG, 'desktop-staging');
+  assert.equal(
+    expectedStagingDesktopAssetNames('26.7.1').includes('latest-mac.yml'),
+    true
+  );
+  assert.match(desktopReleaseAssets, /published production desktop release/);
 });
 
 test('desktop release proof rejects zero-asset and mismatched-digest releases', () => {

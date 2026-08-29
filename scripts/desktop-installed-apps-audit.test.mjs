@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   commandExposesRemoteDebugging,
   evaluateDesktopInstalledAppsAudit,
+  evaluateDesktopUpdateFreshness,
   KNOWN_DESKTOP_BUNDLE_IDS,
 } from './desktop-installed-apps-audit.mjs';
 
@@ -98,4 +99,25 @@ test('KNOWN_DESKTOP_BUNDLE_IDS marks only production as canonical', () => {
   assert.equal(KNOWN_DESKTOP_BUNDLE_IDS['app.jov.ie'].canonical, true);
   assert.equal(KNOWN_DESKTOP_BUNDLE_IDS['app.jov.ie.staging'].canonical, false);
   assert.equal(KNOWN_DESKTOP_BUNDLE_IDS['app.jov.ie.local'].canonical, false);
+});
+
+test('evaluateDesktopUpdateFreshness is red when installed is behind >24h', () => {
+  const now = new Date('2026-08-29T12:00:00Z');
+  const sample = (
+    installedVersion,
+    latestPublishedAt,
+    latestVersion = '26.8.1'
+  ) =>
+    evaluateDesktopUpdateFreshness({
+      channel: 'staging',
+      installedVersion,
+      latestVersion,
+      latestPublishedAt,
+      now,
+    });
+  assert.equal(sample('26.8.1', '2026-08-20T00:00:00Z').status, 'current');
+  assert.equal(sample('26.6.61', '2026-08-29T01:00:00Z').red, false);
+  assert.equal(sample('26.6.61', '2026-07-21T00:00:00Z').red, true);
+  assert.equal(sample('26.8.1', null, null).red, true);
+  assert.equal(sample(null, '2026-07-21T00:00:00Z').status, 'not-installed');
 });
