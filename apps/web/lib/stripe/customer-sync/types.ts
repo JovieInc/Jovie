@@ -209,6 +209,8 @@ export interface UpdateBillingStatusOptions {
  */
 export interface UpdateBillingStatusResult {
   success: boolean;
+  /** Canonical app `users.id`, present whenever an existing user was resolved. */
+  appUserId?: string;
   error?: string;
   skipped?: boolean;
   reason?: string;
