@@ -42,6 +42,39 @@ export interface CardDetails {
   postal: string;
 }
 
+const STRIPE_FIELD_SELECTOR_ALIASES: Readonly<Record<string, string>> = {
+  'input[name="cardnumber"]': [
+    'input[name="cardnumber"]',
+    'input[name="number"]',
+    'input[autocomplete="cc-number"]',
+    'input[aria-label*="card number" i]',
+    'input[placeholder*="1234"]',
+  ].join(', '),
+  'input[name="exp-date"]': [
+    'input[name="exp-date"]',
+    'input[name="expiry"]',
+    'input[autocomplete="cc-exp"]',
+    'input[aria-label*="expiration" i]',
+    'input[aria-label*="expiry" i]',
+    'input[placeholder*="MM"]',
+  ].join(', '),
+  'input[name="cvc"]': [
+    'input[name="cvc"]',
+    'input[name="securityCode"]',
+    'input[autocomplete="cc-csc"]',
+    'input[aria-label*="security code" i]',
+    'input[aria-label*="CVC" i]',
+    'input[aria-label*="CVV" i]',
+  ].join(', '),
+  'input[name="postal"]': [
+    'input[name="postal"]',
+    'input[name="postalCode"]',
+    'input[autocomplete="postal-code"]',
+    'input[aria-label*="postal" i]',
+    'input[aria-label*="ZIP" i]',
+  ].join(', '),
+};
+
 export const TEST_CARD_SUCCESS: CardDetails = {
   number: '4242424242424242',
   exp: '12/34',
@@ -228,11 +261,12 @@ export async function fillStripeInput(
   value: string,
   timeout = 15_000
 ) {
+  const resolvedSelector = STRIPE_FIELD_SELECTOR_ALIASES[selector] ?? selector;
   const deadline = Date.now() + timeout;
 
   while (Date.now() < deadline) {
     for (const frame of page.frames()) {
-      const inputs = frame.locator(selector);
+      const inputs = frame.locator(resolvedSelector);
       const count = await inputs.count();
 
       for (let index = 0; index < count; index += 1) {
@@ -247,8 +281,32 @@ export async function fillStripeInput(
     await page.waitForTimeout(250);
   }
 
+  const diagnostics = await Promise.all(
+    page.frames().map(async frame => {
+      let frameLocation = frame.url();
+      try {
+        const url = new URL(frameLocation);
+        frameLocation = `${url.hostname}${url.pathname}`;
+      } catch {
+        // Preserve non-URL frame labels such as about:blank.
+      }
+
+      const inputs = await frame.locator('input').evaluateAll(elements =>
+        elements.slice(0, 20).map(element => ({
+          type: element.getAttribute('type'),
+          name: element.getAttribute('name'),
+          autocomplete: element.getAttribute('autocomplete'),
+          ariaLabel: element.getAttribute('aria-label'),
+          placeholder: element.getAttribute('placeholder'),
+        }))
+      );
+
+      return { frame: frameLocation, inputs };
+    })
+  );
+
   throw new Error(
-    `Visible Stripe input not found within ${timeout}ms for selector: ${selector}`
+    `Visible Stripe input not found within ${timeout}ms for selector: ${selector}; fields=${JSON.stringify(diagnostics)}`
   );
 }
 
