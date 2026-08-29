@@ -111,14 +111,14 @@ describe('Textarea', () => {
     it('applies md size classes by default', () => {
       render(<Textarea data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
-      expect(textarea.className).toContain('text-[13px]');
+      expect(textarea.className).toContain('text-app');
       expect(textarea.className).toContain('min-h-[80px]');
     });
 
     it('applies lg size classes', () => {
       render(<Textarea textareaSize='lg' data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
-      expect(textarea.className).toContain('text-[13px]');
+      expect(textarea.className).toContain('text-app');
       expect(textarea.className).toContain('min-h-[120px]');
     });
 
