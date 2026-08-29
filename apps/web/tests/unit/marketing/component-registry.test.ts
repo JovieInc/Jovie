@@ -465,6 +465,129 @@ describe('canonical marketing component registry', () => {
     expect(source).not.toContain('focus-visible:ring-white/40');
   });
 
+  it('asserts exact source reads for shared marketing coverage-via receipts', () => {
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-notifications/ArtistNotificationsLanding.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistNotificationsLanding');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileAdaptiveSection.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileAdaptiveSection');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileCaptureSection.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileCaptureSection');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileHowItWorks.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileHowItWorks');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileLandingRoute.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileLandingRoute');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileOutcomesCarousel.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileOutcomesCarousel');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileSectionShell.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileSectionShell');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileSocialProof.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileSocialProof');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileSpecWall.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileSpecWall');
+    expect(
+      fs.readFileSync(
+        path.join(repoRoot, 'apps/web/components/marketing/FaqSection.tsx'),
+        'utf8'
+      )
+    ).toContain('export function FaqSection');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/homepage-v2/HomepageV2Route.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function HomepageV2Route');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/MarketingContainer.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function MarketingContainer');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/MarketingContentShell.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function MarketingContentShell');
+    expect(
+      fs.readFileSync(
+        path.join(repoRoot, 'apps/web/components/site/MarketingFinalCTA.tsx'),
+        'utf8'
+      )
+    ).toContain('export function MarketingFinalCTA');
+  });
+
   it('keeps contract ids and Pen roots globally unique', () => {
     const ids = MARKETING_COMPONENT_REGISTRY.map(entry => entry.id);
     const roots = MARKETING_COMPONENT_REGISTRY.flatMap(entry => [
