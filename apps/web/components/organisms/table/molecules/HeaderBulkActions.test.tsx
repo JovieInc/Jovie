@@ -55,7 +55,11 @@ describe('HeaderBulkActions', () => {
       <HeaderBulkActions
         selectedCount={2}
         bulkActions={[
-          { label: 'Archive', onClick: onArchive },
+          {
+            label: 'Archive',
+            icon: <span aria-hidden='true'>A</span>,
+            onClick: onArchive,
+          },
           {
             label: 'Export',
             onClick: vi.fn(),
