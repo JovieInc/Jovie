@@ -672,23 +672,16 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
                    )::int AS "spotifyProviderCount",
                    COUNT(DISTINCT r.id) FILTER (
                      WHERE r.source_type <> 'ingested'
-                       OR NOT (
-                         r.metadata @> jsonb_build_object(
-                         'spotifyArtists',
-                          jsonb_build_array(
-                            jsonb_build_object(
-                              'id',
-                              ${TEST_SPOTIFY_ARTIST.id}::text
-                            )
-                          )
-                        )
-                       )
                    )::int AS "wrongReleaseCount",
+                   COUNT(DISTINCT r.id) FILTER (
+                     WHERE cp.spotify_id IS DISTINCT FROM ${TEST_SPOTIFY_ARTIST.id}::text
+                   )::int AS "wrongArtistOwnerCount",
                    COUNT(DISTINCT rt.id) FILTER (
                      WHERE rt.source_type <> 'ingested'
                        OR rec.creator_profile_id <> ${profileId}
                    )::int AS "wrongTrackCount"
             FROM discog_releases r
+            INNER JOIN creator_profiles cp ON cp.id = r.creator_profile_id
             LEFT JOIN discog_release_tracks rt ON rt.release_id = r.id
             LEFT JOIN discog_recordings rec ON rec.id = rt.recording_id
             LEFT JOIN provider_links pl ON pl.release_id = r.id
@@ -702,6 +695,7 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
               Number(proof?.trackCount ?? 0) > 0 &&
               Number(proof?.spotifyProviderCount ?? 0) > 0 &&
               proof?.wrongReleaseCount === 0 &&
+              proof?.wrongArtistOwnerCount === 0 &&
               proof?.wrongTrackCount === 0,
           };
         },
@@ -715,6 +709,7 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
       .toMatchObject({
         ready: true,
         wrongReleaseCount: 0,
+        wrongArtistOwnerCount: 0,
         wrongTrackCount: 0,
       });
     const [importedRelease] = await sql`

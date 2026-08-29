@@ -3189,9 +3189,15 @@ describe('CI E2E smoke workflow', () => {
     expect(goldenPathSpec).toContain('user_profile_claims upc');
     expect(goldenPathSpec).toContain('sync-spotify-empty-state');
     expect(goldenPathSpec).toContain('FROM discog_releases r');
+    expect(goldenPathSpec).toContain(
+      'INNER JOIN creator_profiles cp ON cp.id = r.creator_profile_id'
+    );
     expect(goldenPathSpec).toContain('LEFT JOIN discog_release_tracks rt');
     expect(goldenPathSpec).toContain('LEFT JOIN provider_links pl');
-    expect(goldenPathSpec).toContain('${TEST_SPOTIFY_ARTIST.id}::text');
+    expect(goldenPathSpec).toContain(
+      'cp.spotify_id IS DISTINCT FROM ${TEST_SPOTIFY_ARTIST.id}::text'
+    );
+    expect(goldenPathSpec).not.toContain('r.metadata @> jsonb_build_object(');
     expect(releasesActions).toContain(
       'function getE2EFastSpotifyImportOptions()'
     );
