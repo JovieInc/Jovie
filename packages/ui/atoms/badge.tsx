@@ -11,17 +11,21 @@ const badgeVariants = cva(
           'border-(--color-border-strong) bg-(--color-bg-primary) text-(--linear-text-primary)',
         secondary:
           'border-(--color-border-strong) bg-(--color-bg-primary) text-(--linear-text-tertiary)',
-        destructive: 'border-error/20 bg-(--color-error-subtle) text-error',
+        destructive:
+          'border-error/20 bg-(--color-error-subtle) text-primary-token dark:text-error',
         outline:
           'border-(--color-border-default) bg-transparent text-(--linear-text-secondary)',
-        success: 'border-success/20 bg-(--color-success-subtle) text-success',
-        warning: 'border-warning/20 bg-(--color-warning-subtle) text-warning',
+        success:
+          'border-success/20 bg-(--color-success-subtle) text-primary-token dark:text-success',
+        warning:
+          'border-warning/20 bg-(--color-warning-subtle) text-primary-token dark:text-warning',
         'permission-restricted':
           'border-(--state-permission-border) bg-(--state-permission-bg) text-(--state-permission-fg)',
         // Backwards-compat aliases
         primary:
           'border-(--color-border-strong) bg-(--color-bg-primary) text-(--linear-text-primary)',
-        error: 'border-error/20 bg-(--color-error-subtle) text-error',
+        error:
+          'border-error/20 bg-(--color-error-subtle) text-primary-token dark:text-error',
       },
       size: {
         sm: 'px-1.5 py-0 text-3xs leading-[18px]',
@@ -31,11 +35,15 @@ const badgeVariants = cva(
       },
       tone: {
         neutral: 'border-subtle bg-surface-1 text-tertiary-token',
-        info: 'border-info/20 bg-surface-1 text-info',
-        success: 'border-success/20 bg-surface-1 text-success',
-        accent: 'border-accent/20 bg-surface-1 text-accent',
-        warning: 'border-warning/20 bg-surface-1 text-warning',
-        error: 'border-error/20 bg-surface-1 text-error',
+        info: 'border-info/20 bg-surface-1 text-primary-token dark:text-info',
+        success:
+          'border-success/20 bg-surface-1 text-primary-token dark:text-success',
+        accent:
+          'border-accent/20 bg-surface-1 text-primary-token dark:text-accent',
+        warning:
+          'border-warning/20 bg-surface-1 text-primary-token dark:text-warning',
+        error:
+          'border-error/20 bg-surface-1 text-primary-token dark:text-error',
       },
     },
     defaultVariants: {

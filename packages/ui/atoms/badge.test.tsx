@@ -58,7 +58,8 @@ describe('Badge', () => {
       );
       const badge = screen.getByTestId('badge');
       expect(badge.className).toContain('bg-(--color-success-subtle)');
-      expect(badge.className).toContain('text-success');
+      expect(badge.className).toContain('text-primary-token');
+      expect(badge.className).toContain('dark:text-success');
       expect(badge.className).toContain('border-success/20');
     });
 
@@ -70,7 +71,8 @@ describe('Badge', () => {
       );
       const badge = screen.getByTestId('badge');
       expect(badge.className).toContain('bg-(--color-warning-subtle)');
-      expect(badge.className).toContain('text-warning');
+      expect(badge.className).toContain('text-primary-token');
+      expect(badge.className).toContain('dark:text-warning');
     });
 
     it('applies error variant', () => {
@@ -81,7 +83,8 @@ describe('Badge', () => {
       );
       const badge = screen.getByTestId('badge');
       expect(badge.className).toContain('bg-(--color-error-subtle)');
-      expect(badge.className).toContain('text-error');
+      expect(badge.className).toContain('text-primary-token');
+      expect(badge.className).toContain('dark:text-error');
     });
 
     it('applies neutral tone overrides', () => {
@@ -103,7 +106,8 @@ describe('Badge', () => {
       );
       const badge = screen.getByTestId('badge');
       expect(badge.className).toContain('border-accent/20');
-      expect(badge.className).toContain('text-accent');
+      expect(badge.className).toContain('text-primary-token');
+      expect(badge.className).toContain('dark:text-accent');
       expect(badge).toHaveAttribute('data-tone', 'accent');
     });
   });
@@ -176,7 +180,8 @@ describe('Badge', () => {
       );
       expect(badge).not.toHaveClass('whitespace-nowrap', 'overflow-hidden');
       expect(badge.className).toContain('bg-(--color-error-subtle)');
-      expect(badge.className).toContain('text-error');
+      expect(badge.className).toContain('text-primary-token');
+      expect(badge.className).toContain('dark:text-error');
     });
 
     it('keeps hover color neutral unless a semantic variant explicitly owns it', () => {
