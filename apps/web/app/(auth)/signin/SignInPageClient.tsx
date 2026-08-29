@@ -69,7 +69,7 @@ function SignInOauthErrorBanner() {
 
   return (
     <div
-      className='mb-4 rounded-(--linear-radius-sm) border border-destructive/30 bg-destructive/5 px-4 py-3 text-left'
+      className='mb-4 rounded-sm border border-destructive/30 bg-destructive/5 px-4 py-3 text-left'
       role='alert'
     >
       <p className='text-sm font-medium text-destructive'>{message}</p>

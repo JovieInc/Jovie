@@ -1077,7 +1077,9 @@ mark intentional marketing sentence-case headlines with
 | File | Responsibility |
 |------|----------------|
 | `apps/web/design/oklch-palette.json` | **Authored OKLCH palette** — locked light/dark semantics, elevation, and hex projections (JOV-5388) |
-| `apps/web/styles/design-system.css` | **Live token emitter** — CSS custom properties; color hex must match the OKLCH registry |
+| `apps/web/design/tokens.json` | **Machine-readable base-token source** — compiler-owned brand, gray, and radius values plus explicit migration divergences |
+| `apps/web/styles/generated/design-tokens.css` | **Generated base-token emitter** — CSS projection of `design/tokens.json`; never hand-edit |
+| `apps/web/styles/design-system.css` | **Live semantic emitter** — imports generated base tokens and projects unmigrated semantic/color properties; color hex must match the OKLCH registry |
 | `apps/web/styles/linear-tokens.css` | Marketing-specific Linear-extracted tokens |
 | `apps/web/styles/theme.css` | Feature accents & animations only |
 | `apps/web/app/globals.css` | Tailwind registration + shared utilities |

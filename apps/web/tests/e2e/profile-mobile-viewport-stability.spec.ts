@@ -1157,7 +1157,7 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
               variant === 'choice'
                 ? '1px solid var(--linear-btn-primary-bg)'
                 : '1px solid var(--linear-border-default)',
-            borderRadius: 'var(--linear-radius-sm)',
+            borderRadius: 'var(--radius-sm)',
             fontSize: '12px',
             fontWeight: 'var(--linear-font-weight-medium)',
             padding: variant === 'choice' ? '6px 8px' : '6px',
