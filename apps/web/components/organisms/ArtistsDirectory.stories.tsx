@@ -10,7 +10,7 @@ const meta = {
     pen: {
       registryId: 'web-155-artists',
       contractId: 'vPmnG',
-      sourceSha: '0892cccf39d72c62890ad4bc797cfd6f2d651af6',
+      sourceSha: '8b0353fcbeb0cffef614fa47afbbbd8eeae48997',
       receipts: {
         desktop: { id: 'eArgX', width: 1024, height: 1200 },
         narrow: { id: 't0iTE', width: 390, height: 844 },

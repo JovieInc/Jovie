@@ -36,7 +36,7 @@ const meta = {
         'apps/web/components/features/library-asset-share/LibraryAssetShareSurface.tsx',
       sourceExport: 'LibraryAssetShareSurface',
       storyExport: 'Web194PrivateRelease',
-      sourceSha: '02193d203a6dce76657f5e3988a173fc35ae07ff',
+      sourceSha: '8b0353fcbeb0cffef614fa47afbbbd8eeae48997',
       fixture: 'FOUNDER_DEMO_PERSONA.releases[0]',
       proofTier: 'source-backed',
     },
