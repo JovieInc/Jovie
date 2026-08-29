@@ -110,6 +110,22 @@ describe('useAuthRouteConfig', () => {
     expect(result.current.showMobileTabs).toBe(false);
   });
 
+  it('hides app chrome only for fullscreen Ops and restores it on the same route', () => {
+    mockUsePathname.mockReturnValue(APP_ROUTES.ADMIN_OPS);
+    mockUseSearchParams.mockReturnValue(
+      new URLSearchParams('ovie=mac&fs=1&runtime=electron')
+    );
+
+    const { result, rerender } = renderHook(() => useAuthRouteConfig('ov'));
+    expect(result.current.hideAppChrome).toBe(true);
+
+    mockUseSearchParams.mockReturnValue(
+      new URLSearchParams('ovie=mac&runtime=electron')
+    );
+    rerender();
+    expect(result.current.hideAppChrome).toBe(false);
+  });
+
   it('keeps customer routes in customer sections', () => {
     mockUsePathname.mockReturnValue(APP_ROUTES.CHAT);
 

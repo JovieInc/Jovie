@@ -4,7 +4,8 @@ import { APP_ROUTES } from '@/constants/routes';
 type SearchParams = Record<string, string | string[] | undefined>;
 
 /**
- * Legacy TV URL. Canonical Ops lives at /hud. Preserve the kiosk token.
+ * Legacy TV URL. Preserve token-authenticated kiosk mode; ordinary fullscreen
+ * returns to the canonical in-shell Ops route.
  */
 export default async function HudTvRedirectPage({
   searchParams,
@@ -14,5 +15,5 @@ export default async function HudTvRedirectPage({
   if (kiosk) {
     redirect(`${APP_ROUTES.HUD}?kiosk=${encodeURIComponent(kiosk)}`);
   }
-  redirect(`${APP_ROUTES.HUD}?fs=1`);
+  redirect(`${APP_ROUTES.ADMIN_OPS}?fs=1`);
 }

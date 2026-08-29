@@ -13,18 +13,18 @@ import {
 } from '@/lib/ovie/ops-entrypoint';
 
 describe('Ovie Ops packaged-app entry contract', () => {
-  it('hands M1 exactly one Ops product at /hud', () => {
+  it('hands M1 exactly one in-shell Ops product', () => {
     expect(OVIE_OPS_PRODUCT_NAME).toBe('Ops');
-    expect(OVIE_OPS_ROUTE).toBe(APP_ROUTES.HUD);
+    expect(OVIE_OPS_ROUTE).toBe(APP_ROUTES.ADMIN_OPS);
     expect(OVIE_OPS_COMPONENT).toBe('HudDashboardClient');
-    expect(OVIE_PACKAGED_DEFAULT_ROUTE).toBe(APP_ROUTES.HUD);
-    expect(OVIE_OPS_ENTRY.packagedDefaultRoute).toBe('/hud');
+    expect(OVIE_PACKAGED_DEFAULT_ROUTE).toBe(APP_ROUTES.ADMIN_OPS);
+    expect(OVIE_OPS_ENTRY.packagedDefaultRoute).toBe('/app/ov/ops');
     expect(OVIE_PACKAGED_TALK_ROUTE).toBe(APP_ROUTES.ADMIN_CHAT);
     expect(OVIE_OPS_ENTRY.packagedTalkRoute).toBe('/app/ov/chat');
   });
 
-  it('keeps fullscreen and kiosk as presentation inputs, not products', () => {
-    expect(ovieOpsFullscreenHref()).toBe(`${APP_ROUTES.HUD}?fs=1`);
+  it('keeps authenticated fullscreen on the in-shell route and kiosk isolated', () => {
+    expect(ovieOpsFullscreenHref()).toBe(`${APP_ROUTES.ADMIN_OPS}?fs=1`);
     expect(ovieOpsKioskHref('token-1')).toBe(
       `${APP_ROUTES.HUD}?kiosk=${encodeURIComponent('token-1')}`
     );
@@ -34,13 +34,11 @@ describe('Ovie Ops packaged-app entry contract', () => {
     expect(OVIE_OPS_ENTRY.presentations.mac.component).toBe('OvieMacHud');
   });
 
-  it('maps compatibility aliases onto /hud', () => {
-    expect(OVIE_OPS_COMPAT_ALIASES[APP_ROUTES.OV]).toBe(APP_ROUTES.HUD);
-    expect(OVIE_OPS_COMPAT_ALIASES[`${APP_ROUTES.OV}/ops`]).toBe(
-      APP_ROUTES.HUD
-    );
+  it('maps compatibility aliases onto the in-shell Ops route', () => {
+    expect(OVIE_OPS_COMPAT_ALIASES[APP_ROUTES.OV]).toBe(APP_ROUTES.ADMIN_OPS);
+    expect(OVIE_OPS_COMPAT_ALIASES[APP_ROUTES.HUD]).toBe(APP_ROUTES.ADMIN_OPS);
     expect(OVIE_OPS_COMPAT_ALIASES[APP_ROUTES.HUD_TV]).toBe(
-      `${APP_ROUTES.HUD}?fs=1`
+      `${APP_ROUTES.ADMIN_OPS}?fs=1`
     );
   });
 });

@@ -42,6 +42,26 @@ describe('AppShellFrame', () => {
     expect(mainContent).toContainElement(headers[0] as HTMLElement);
   });
 
+  it('keeps the shell mounted while fullscreen mode deliberately removes its chrome', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        header={<header>Header</header>}
+        main={<div>Fullscreen Ovie</div>}
+        audioPlayer={<div>Audio tray</div>}
+        hideChrome
+      />
+    );
+
+    const frame = screen
+      .getByText('Fullscreen Ovie')
+      .closest('[data-app-shell-frame]');
+    expect(frame).toHaveAttribute('data-app-shell-chrome', 'hidden');
+    expect(screen.queryByText('Sidebar')).not.toBeInTheDocument();
+    expect(screen.queryByText('Header')).not.toBeInTheDocument();
+    expect(screen.queryByText('Audio tray')).not.toBeInTheDocument();
+  });
+
   it('allocates the right rail inside main beside route content instead of overlaying it', () => {
     render(
       <AppShellFrame

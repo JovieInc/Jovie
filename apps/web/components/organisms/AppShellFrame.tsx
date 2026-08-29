@@ -26,6 +26,8 @@ interface AppShellFrameProps {
    * fill and JovieChat deferring its own gradient layer.
    */
   readonly chatAmbientGradient?: boolean;
+  /** Fullscreen route mode: retain the shell frame/context but hide its chrome. */
+  readonly hideChrome?: boolean;
 }
 
 /**
@@ -56,10 +58,12 @@ export const AppShellFrame = memo(function AppShellFrame({
   containerClassName,
   composerFocusActive = false,
   chatAmbientGradient = false,
+  hideChrome = false,
 }: Readonly<AppShellFrameProps>) {
   return (
     <div
       data-app-shell-frame='true'
+      data-app-shell-chrome={hideChrome ? 'hidden' : 'visible'}
       data-composer-focus={composerFocusActive ? 'true' : undefined}
       className={cn(
         'relative flex h-full w-full flex-col overflow-hidden bg-(--linear-bg-page)',
@@ -68,7 +72,7 @@ export const AppShellFrame = memo(function AppShellFrame({
         containerClassName
       )}
     >
-      <DesktopTitlebar />
+      {hideChrome ? null : <DesktopTitlebar />}
       <div
         data-app-shell-body='true'
         data-shell-rail-motion='coordinated'
@@ -76,16 +80,19 @@ export const AppShellFrame = memo(function AppShellFrame({
           // Allocation belongs to the shell, not individual routes. Keeping the
           // side slots and main plane on the same motion contract means a rail
           // can yield canvas without its content or adjacent route snapping.
-          'flex min-h-0 min-w-0 flex-1 overflow-hidden transition-[gap,padding] duration-cinematic ease-cinematic motion-reduce:transition-none lg:gap-(--app-shell-gap) lg:p-(--app-shell-gap)'
+          'flex min-h-0 min-w-0 flex-1 overflow-hidden transition-[gap,padding] duration-cinematic ease-cinematic motion-reduce:transition-none',
+          !hideChrome && 'lg:gap-(--app-shell-gap) lg:p-(--app-shell-gap)'
         )}
       >
-        <div
-          data-app-shell-sidebar-mount='true'
-          data-testid='app-shell-sidebar-mount'
-          className='flex h-full min-h-0 shrink-0 flex-col transition-[flex-basis,width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none'
-        >
-          {sidebar}
-        </div>
+        {hideChrome ? null : (
+          <div
+            data-app-shell-sidebar-mount='true'
+            data-testid='app-shell-sidebar-mount'
+            className='flex h-full min-h-0 shrink-0 flex-col transition-[flex-basis,width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none'
+          >
+            {sidebar}
+          </div>
+        )}
 
         <div
           data-app-shell-content-column='true'
@@ -102,7 +109,8 @@ export const AppShellFrame = memo(function AppShellFrame({
                 // Do not use a translucent recessed well here: it makes the
                 // frame, header, and content read as unrelated backgrounds.
                 'relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-(--app-shell-content-surface)',
-                'lg:rounded-(--app-shell-radius) lg:border lg:border-(--app-shell-border) lg:bg-(--app-shell-content-surface) lg:shadow-(--linear-app-shell-shadow)'
+                !hideChrome &&
+                  'lg:rounded-(--app-shell-radius) lg:border lg:border-(--app-shell-border) lg:bg-(--app-shell-content-surface) lg:shadow-(--linear-app-shell-shadow)'
               )}
             >
               <div
@@ -122,7 +130,7 @@ export const AppShellFrame = memo(function AppShellFrame({
                   />
                 ) : null}
                 {isCodeFlagEnabled('CANVAS_GRAIN') && <CanvasGrain />}
-                {header}
+                {hideChrome ? null : header}
                 <div className='flex min-h-0 min-w-0 flex-1 overflow-hidden'>
                   <div
                     data-testid='app-shell-scroll'
@@ -137,7 +145,7 @@ export const AppShellFrame = memo(function AppShellFrame({
                   </div>
                 </div>
               </div>
-              {rightPanel ? (
+              {!hideChrome && rightPanel ? (
                 <AppShellRightRail>{rightPanel}</AppShellRightRail>
               ) : null}
             </main>
@@ -145,7 +153,7 @@ export const AppShellFrame = memo(function AppShellFrame({
           {/* The player is shell chrome, not content-card chrome. Keeping it as
               an in-flow sibling reserves its own tray below <main>, matching
               the sidebar's canvas elevation without obscuring routes or rails. */}
-          {audioPlayer ? (
+          {!hideChrome && audioPlayer ? (
             <div data-testid='app-shell-audio-tray' className='shrink-0'>
               {audioPlayer}
             </div>
@@ -153,7 +161,7 @@ export const AppShellFrame = memo(function AppShellFrame({
         </div>
       </div>
 
-      {mobileBottomNav ? (
+      {!hideChrome && mobileBottomNav ? (
         <div
           className='system-b-app-mobile-bottom-surface shrink-0 lg:hidden'
           data-testid='app-shell-mobile-bottom-surface'

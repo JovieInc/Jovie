@@ -23,6 +23,7 @@ export interface AuthRouteConfig {
   isChatRoute: boolean;
   isDemoRoute: boolean;
   isLyricsRoute: boolean;
+  hideAppChrome: boolean;
 }
 
 function isChatThreadPath(parts: readonly string[]): boolean {
@@ -189,6 +190,11 @@ export function useAuthRouteConfig(
     [pathname]
   );
 
+  const isOpsRoute =
+    pathname === APP_ROUTES.ADMIN_OPS ||
+    pathname === `${APP_ROUTES.LEGACY_ADMIN}/ops`;
+  const hideAppChrome = isOpsRoute && searchParams.get('fs') === '1';
+
   return {
     section,
     breadcrumbs,
@@ -198,5 +204,6 @@ export function useAuthRouteConfig(
     isChatRoute,
     isDemoRoute,
     isLyricsRoute,
+    hideAppChrome,
   };
 }

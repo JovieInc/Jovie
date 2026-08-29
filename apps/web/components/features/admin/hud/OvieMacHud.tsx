@@ -1,7 +1,15 @@
+'use client';
+
+import { Button } from '@jovie/ui';
+import { ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { HudStatusPill } from '@/app/app/(shell)/admin/ops/HudStatusPill';
-import { DesktopTitlebar } from '@/components/atoms/DesktopTitlebar';
+import { HudFullscreenControl } from '@/components/features/admin/hud/HudFullscreenControl';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
+import { APP_ROUTES } from '@/constants/routes';
 import { type OvieMacHudSnapshot, ycBarLabel } from '@/lib/hud/ovie-mac-hud';
 import { getDefaultStatusTone } from '@/lib/hud/tone-determination';
 
@@ -29,10 +37,20 @@ function aliveLabel(status: OvieMacHudSnapshot['alive']['status']): string {
 
 const VALUE_CLASS =
   'min-h-8 text-3xl font-semibold leading-none tracking-tight';
+const REFRESH_INTERVAL_MS = 30_000;
+
+function formatGeneratedAt(generatedAtIso: string): string {
+  return new Date(generatedAtIso).toISOString().slice(11, 19);
+}
 
 export function OvieMacHud({
   snapshot,
-}: Readonly<{ readonly snapshot: OvieMacHudSnapshot }>) {
+  fullscreen = false,
+}: Readonly<{
+  readonly snapshot: OvieMacHudSnapshot;
+  readonly fullscreen?: boolean;
+}>) {
+  const router = useRouter();
   const { alive, growth, shipping } = snapshot;
   const growthValue = growth.available ? formatPercent(growth.rate) : '\u2014';
   const shippingValue = shipping.available
@@ -40,19 +58,49 @@ export function OvieMacHud({
     : '\u2014';
   const status = aliveLabel(alive.status);
 
+  useEffect(() => {
+    const refreshTimer = globalThis.setInterval(() => {
+      const refreshUrl = new URL(globalThis.location.href);
+      refreshUrl.searchParams.set('ovie_refresh', Date.now().toString());
+      router.replace(
+        `${refreshUrl.pathname}${refreshUrl.search}${refreshUrl.hash}`,
+        { scroll: false }
+      );
+    }, REFRESH_INTERVAL_MS);
+
+    return () => globalThis.clearInterval(refreshTimer);
+  }, [router]);
+
   return (
     <div
-      className='flex min-h-svh flex-col bg-page text-primary-token'
+      className='flex h-full min-h-0 flex-col overflow-y-auto bg-page text-primary-token'
+      data-generated-at={snapshot.generatedAtIso}
+      data-presentation-mode={fullscreen ? 'fullscreen' : 'shell'}
       data-testid='ovie-mac-hud'
     >
-      <DesktopTitlebar />
       <main className='mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 px-6 py-6'>
-        <header className='flex min-h-10 items-center justify-between gap-3'>
+        <header className='flex min-h-10 flex-wrap items-center justify-between gap-3'>
           <h1 className='text-lg font-semibold tracking-tight'>Ovie</h1>
-          <HudStatusPill
-            label={status}
-            tone={getDefaultStatusTone(alive.status)}
-          />
+          <div className='flex flex-wrap items-center justify-end gap-2'>
+            <Button asChild className='gap-1.5' size='sm' variant='tertiary'>
+              <Link href={APP_ROUTES.CHAT}>
+                <ArrowLeft className='h-3.5 w-3.5' aria-hidden='true' />
+                Back to Jovie
+              </Link>
+            </Button>
+            <HudFullscreenControl fullscreen={fullscreen} />
+            <time
+              className='w-36 text-right text-2xs tabular-nums text-tertiary-token'
+              dateTime={snapshot.generatedAtIso}
+              data-testid='ovie-mac-refresh-receipt'
+            >
+              Updated {formatGeneratedAt(snapshot.generatedAtIso)} UTC
+            </time>
+            <HudStatusPill
+              label={status}
+              tone={getDefaultStatusTone(alive.status)}
+            />
+          </div>
         </header>
         <div className='grid min-h-40 gap-3 md:grid-cols-3'>
           <ContentMetricCard
@@ -96,12 +144,18 @@ export function OvieMacHud({
                     growth.source === 'revenue' ? 'Revenue' : 'Active Users'
                   }
                   value={
-                    growth.source === 'revenue'
-                      ? formatUsd(growth.thisWeek)
-                      : growth.thisWeek.toLocaleString('en-US')
+                    !growth.available
+                      ? '\u2014'
+                      : growth.source === 'revenue'
+                        ? formatUsd(growth.thisWeek)
+                        : growth.thisWeek.toLocaleString('en-US')
                   }
                 />
-                <p>{ycBarLabel(growth.ycBar)}</p>
+                <p>
+                  {growth.available
+                    ? ycBarLabel(growth.ycBar)
+                    : 'Revenue and active-user inputs are unavailable. Reload Jovie to retry.'}
+                </p>
               </div>
             }
           />

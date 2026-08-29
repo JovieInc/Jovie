@@ -39,12 +39,10 @@ describe('OV mode routing', () => {
     expect(APP_ROUTES.OV).toBe('/app/ov');
     expect(APP_ROUTES.LEGACY_ADMIN).toBe('/app/admin');
     expect(adminRoutes.length).toBeGreaterThan(20);
-    expect(
-      adminRoutes.every(
-        route => route.startsWith(APP_ROUTES.OV) || route === APP_ROUTES.HUD
-      )
-    ).toBe(true);
-    expect(APP_ROUTES.ADMIN_OPS).toBe(APP_ROUTES.HUD);
+    expect(adminRoutes.every(route => route.startsWith(APP_ROUTES.OV))).toBe(
+      true
+    );
+    expect(APP_ROUTES.ADMIN_OPS).toBe('/app/ov/ops');
   });
 
   it('redirects all legacy admin URLs to the matching OV URL', async () => {

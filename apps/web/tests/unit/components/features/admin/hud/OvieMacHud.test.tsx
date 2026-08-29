@@ -1,7 +1,13 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { OvieMacHud } from '@/components/features/admin/hud/OvieMacHud';
 import type { OvieMacHudSnapshot } from '@/lib/hud/ovie-mac-hud';
+
+const navigationMocks = vi.hoisted(() => ({ replace: vi.fn() }));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: navigationMocks.replace }),
+}));
 
 vi.mock('@/components/atoms/DesktopTitlebar', () => ({
   DesktopTitlebar: () => <div data-testid='electron-titlebar-row' />,
@@ -77,6 +83,74 @@ describe('OvieMacHud', () => {
     );
     expect(screen.getByTestId('ovie-mac-hud-shipping')).toHaveTextContent(
       '\u2014'
+    );
+  });
+
+  it('keeps the unavailable state truthful with a named recovery and escape', () => {
+    render(
+      <OvieMacHud
+        snapshot={{
+          ...BASE,
+          alive: {
+            ...BASE.alive,
+            status: 'unknown',
+            cashUsd: null,
+            weeklyBurnUsd: null,
+            weeklyRevenueUsd: null,
+            reachesProfitBeforeZero: null,
+            detail:
+              'Cash, burn, or revenue inputs are unavailable. Reload Jovie to retry.',
+            available: false,
+          },
+          growth: { ...BASE.growth, available: false },
+          shipping: {
+            ...BASE.shipping,
+            available: false,
+            detail: 'Shipping receipts are unavailable. Reload Jovie to retry.',
+          },
+        }}
+      />
+    );
+
+    expect(screen.getByRole('link', { name: 'Back to Jovie' })).toHaveAttribute(
+      'href',
+      '/app/chat'
+    );
+    expect(screen.queryByTestId('electron-titlebar-row')).toBeNull();
+    expect(screen.getByTestId('ovie-mac-refresh-receipt')).toHaveTextContent(
+      'Updated 00:00:00 UTC'
+    );
+    const growth = screen.getByTestId('ovie-mac-hud-growth');
+    expect(within(growth).getAllByText('\u2014')).toHaveLength(2);
+    expect(growth).not.toHaveTextContent(/Active Users0/);
+    expect(growth).not.toHaveTextContent('1% means not figured out');
+    expect(growth).toHaveTextContent(/unavailable.*reload jovie/i);
+  });
+
+  it('enters and exits fullscreen on the same in-shell route', () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/app/ov/ops?ovie=mac&runtime=electron'
+    );
+    const { rerender } = render(<OvieMacHud snapshot={BASE} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enter fullscreen' }));
+    expect(navigationMocks.replace).toHaveBeenLastCalledWith(
+      '/app/ov/ops?ovie=mac&runtime=electron&fs=1',
+      { scroll: false }
+    );
+
+    window.history.replaceState(
+      {},
+      '',
+      '/app/ov/ops?ovie=mac&runtime=electron&fs=1'
+    );
+    rerender(<OvieMacHud snapshot={BASE} fullscreen />);
+    fireEvent.click(screen.getByRole('button', { name: 'Exit fullscreen' }));
+    expect(navigationMocks.replace).toHaveBeenLastCalledWith(
+      '/app/ov/ops?ovie=mac&runtime=electron',
+      { scroll: false }
     );
   });
 });

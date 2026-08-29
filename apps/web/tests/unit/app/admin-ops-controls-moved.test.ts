@@ -100,12 +100,13 @@ describe('JOV-4639 admin settings are owned by their workspace', () => {
     expect(source).not.toContain('SettingsToggleRow');
   });
 
-  it('points the Ops URL at the one HUD', () => {
+  it('keeps operational controls on the in-shell Ops route', () => {
     const opsPage = readFileSync(OPS_PAGE, 'utf8');
     const panel = readFileSync(OPERATIONAL_CONTROL_PANEL, 'utf8');
 
-    expect(opsPage).toContain('redirect(APP_ROUTES.HUD)');
-    expect(opsPage).not.toContain('OperationalControlPanel');
+    expect(opsPage).not.toContain('redirect(APP_ROUTES.HUD)');
+    expect(opsPage).toContain('OperationalControlPanel');
+    expect(opsPage).toContain('<OvieMacHud');
     expect(panel).toContain("data-testid='operational-control-panel'");
     expect(panel).toContain('Dev toolbar');
     expect(panel).not.toContain('WaitlistSettingsPanel');

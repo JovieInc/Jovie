@@ -32,6 +32,8 @@ export interface AuthShellProps {
    * the content panel (#13386).
    */
   readonly isChatRoute?: boolean;
+  /** Keep the route mounted while deliberately removing shell chrome. */
+  readonly hideAppChrome?: boolean;
   readonly onSidebarOpenChange?: (open: boolean) => void;
   readonly sidebarDefaultOpen?: boolean;
   readonly children: ReactNode;
@@ -53,6 +55,7 @@ function AuthShellInner({
   isTableRoute = false,
   isLyricsRoute = false,
   isChatRoute = false,
+  hideAppChrome = false,
   children,
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
   const { isMobile, state: sidebarState } = useSidebar();
@@ -73,13 +76,14 @@ function AuthShellInner({
   // The sidebar only depends on `section` — it shouldn't remount when
   // navigating between pages within the same section.
   const sidebar = useMemo(
-    () => (
-      <UnifiedSidebar
-        section={section}
-        variant={section === 'ov' ? 'ov' : 'jovie'}
-      />
-    ),
-    [section]
+    () =>
+      hideAppChrome ? null : (
+        <UnifiedSidebar
+          section={section}
+          variant={section === 'ov' ? 'ov' : 'jovie'}
+        />
+      ),
+    [hideAppChrome, section]
   );
 
   // Memoize mobile bottom nav — stable across route changes
@@ -97,8 +101,9 @@ function AuthShellInner({
   return (
     <AppShellFrame
       sidebar={sidebar}
+      hideChrome={hideAppChrome}
       header={
-        hideTopHeader ? null : (
+        hideAppChrome || hideTopHeader ? null : (
           <DashboardHeader
             breadcrumbs={breadcrumbs}
             sidebarTrigger={sidebarTrigger}
@@ -118,9 +123,9 @@ function AuthShellInner({
       }
       chatAmbientGradient={isChatRoute}
       main={children}
-      rightPanel={rightPanel}
-      audioPlayer={audioPlayer}
-      mobileBottomNav={mobileBottomNav}
+      rightPanel={hideAppChrome ? null : rightPanel}
+      audioPlayer={hideAppChrome ? null : audioPlayer}
+      mobileBottomNav={hideAppChrome ? null : mobileBottomNav}
       contentClassName={getContentClassName(hasMobileBottomNav, isTableRoute)}
       composerFocusActive={isComposerFocused && !isMobile}
     />

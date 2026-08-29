@@ -260,6 +260,7 @@ function AuthShellWrapperInner({
                 isTableRoute={config.isTableRoute}
                 isLyricsRoute={config.isLyricsRoute}
                 isChatRoute={config.isChatRoute}
+                hideAppChrome={config.hideAppChrome}
                 onSidebarOpenChange={
                   persistSidebarCollapsed ? handleSidebarOpenChange : undefined
                 }

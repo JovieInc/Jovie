@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import HudPage from '@/app/hud/page';
+import { APP_ROUTES } from '@/constants/routes';
 
 const {
   redirectMock,
@@ -8,17 +9,10 @@ const {
   authorizeHudMock,
   getCurrentAdminPageAccessMock,
   getHudMetricsMock,
-  getFounderFunnelDataMock,
-  getOvieMacHudSnapshotMock,
 } = vi.hoisted(() => ({
   redirectMock: vi.fn((url: string) => {
     throw new Error(`NEXT_REDIRECT:${url}`);
   }),
-  // Real next/navigation `unauthorized()`/`forbidden()` always throw (they
-  // never return to the caller) -- mirror that here so a mutation that lets
-  // execution continue past the gate (e.g. `getHudMetrics` firing before or
-  // regardless of the gate check) fails the suite instead of silently
-  // passing, the same way `redirectMock` above already does for `redirect()`.
   unauthorizedMock: vi.fn(() => {
     throw new Error('NEXT_UNAUTHORIZED');
   }),
@@ -28,8 +22,6 @@ const {
   authorizeHudMock: vi.fn(),
   getCurrentAdminPageAccessMock: vi.fn(),
   getHudMetricsMock: vi.fn(),
-  getFounderFunnelDataMock: vi.fn(),
-  getOvieMacHudSnapshotMock: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -37,35 +29,16 @@ vi.mock('next/navigation', () => ({
   unauthorized: unauthorizedMock,
   forbidden: forbiddenMock,
 }));
-
 vi.mock('@/lib/admin/page-access', () => ({
   getCurrentAdminPageAccess: getCurrentAdminPageAccessMock,
 }));
-
-vi.mock('@/lib/auth/hud', () => ({
-  authorizeHud: authorizeHudMock,
-}));
-
-vi.mock('@/lib/hud/metrics', () => ({
-  getHudMetrics: getHudMetricsMock,
-}));
-
-vi.mock('@/lib/admin/founder-funnel', () => ({
-  getFounderFunnelData: getFounderFunnelDataMock,
-}));
-
-vi.mock('@/lib/hud/ovie-mac-hud.server', () => ({
-  getOvieMacHudSnapshot: getOvieMacHudSnapshotMock,
-}));
-
+vi.mock('@/lib/auth/hud', () => ({ authorizeHud: authorizeHudMock }));
+vi.mock('@/lib/hud/metrics', () => ({ getHudMetrics: getHudMetricsMock }));
 vi.mock('@/lib/hud/source-trust', () => ({
   isHudMetricValueAvailable: () => false,
 }));
-
 vi.mock('@/lib/env-server', () => ({
-  env: {
-    HUD_AGENT_RUNS_FIXTURES: '0',
-  },
+  env: { HUD_AGENT_RUNS_FIXTURES: '0' },
 }));
 
 type ReactElementLike = {
@@ -76,12 +49,6 @@ type ReactElementLike = {
   };
 };
 
-/**
- * Depth-first search for the first element whose component function/tag is
- * named `name`. Matching by component name keeps this focused gate test from
- * importing and mocking the nested client dashboard solely to compare its
- * function reference.
- */
 function findElementByName(
   node: unknown,
   name: string
@@ -103,22 +70,15 @@ function findElementByName(
   return findElementByName(children, name);
 }
 
-describe('/hud page auth', () => {
+describe('/hud kiosk and compatibility boundary', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authorizeHudMock.mockResolvedValue({ ok: false, reason: 'unauthorized' });
-    getHudMetricsMock.mockResolvedValue({ accessMode: 'admin' });
-    getFounderFunnelDataMock.mockResolvedValue(null);
   });
 
-  it('renders kiosk HUD when the token is valid', async () => {
+  it('renders only the token-authenticated kiosk at the standalone route', async () => {
     authorizeHudMock.mockResolvedValue({ ok: true, mode: 'kiosk' });
-    const metrics = {
-      accessMode: 'kiosk' as const,
-      generatedAt: 'now',
-      sources: { stripe: { available: false }, mercury: { available: false } },
-      overview: { mrrUsd: 0, balanceUsd: 0, defaultStatusDetail: 'unknown' },
-    };
+    const metrics = { accessMode: 'kiosk' as const, generatedAt: 'now' };
     getHudMetricsMock.mockResolvedValue(metrics);
 
     const result = await HudPage({
@@ -128,123 +88,74 @@ describe('/hud page auth', () => {
     expect(authorizeHudMock).toHaveBeenCalledWith('test-token');
     expect(getCurrentAdminPageAccessMock).not.toHaveBeenCalled();
     expect(getHudMetricsMock).toHaveBeenCalledWith('kiosk');
-    const dashboardElement = findElementByName(result, 'HudDashboardClient');
-    expect(dashboardElement).not.toBeNull();
-    expect(dashboardElement?.props?.initialMetrics).toEqual(metrics);
-    expect(dashboardElement?.props?.density).toBe('kiosk');
-    expect(dashboardElement?.props?.presentationMode).toBe('token');
-    expect(getFounderFunnelDataMock).not.toHaveBeenCalled();
+    const dashboard = findElementByName(result, 'HudDashboardClient');
+    expect(dashboard?.props).toMatchObject({
+      initialMetrics: metrics,
+      density: 'kiosk',
+      presentationMode: 'token',
+      kioskToken: 'test-token',
+    });
   });
 
-  it('calls unauthorized for signed-out users', async () => {
+  it('redirects ordinary signed-in Ops into the app shell before loading data', async () => {
+    await expect(
+      HudPage({ searchParams: Promise.resolve({}) })
+    ).rejects.toThrow(`NEXT_REDIRECT:${APP_ROUTES.ADMIN_OPS}`);
+
+    expect(authorizeHudMock).not.toHaveBeenCalled();
+    expect(getCurrentAdminPageAccessMock).not.toHaveBeenCalled();
+    expect(getHudMetricsMock).not.toHaveBeenCalled();
+  });
+
+  it('preserves packaged Ovie and fullscreen presentation inputs on the in-shell redirect', async () => {
+    await expect(
+      HudPage({
+        searchParams: Promise.resolve({
+          ovie: 'mac',
+          runtime: 'electron',
+          ovie_refresh: '123',
+          fs: '1',
+        }),
+      })
+    ).rejects.toThrow(
+      `NEXT_REDIRECT:${APP_ROUTES.ADMIN_OPS}?ovie=mac&runtime=electron&ovie_refresh=123&fs=1`
+    );
+    expect(getHudMetricsMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid kiosk token for signed-out users', async () => {
     getCurrentAdminPageAccessMock.mockResolvedValue({
       isAuthenticated: false,
       hasAdminRole: false,
-      userId: null,
     });
 
     await expect(
-      HudPage({ searchParams: Promise.resolve({}) })
+      HudPage({ searchParams: Promise.resolve({ kiosk: 'wrong' }) })
     ).rejects.toThrow('NEXT_UNAUTHORIZED');
-
-    expect(unauthorizedMock).toHaveBeenCalled();
-    expect(forbiddenMock).not.toHaveBeenCalled();
     expect(getHudMetricsMock).not.toHaveBeenCalled();
   });
 
-  it('calls forbidden for signed-in non-admin users', async () => {
+  it('rejects an invalid kiosk token for non-admin users', async () => {
     getCurrentAdminPageAccessMock.mockResolvedValue({
       isAuthenticated: true,
       hasAdminRole: false,
-      userId: 'user_123',
     });
 
     await expect(
-      HudPage({ searchParams: Promise.resolve({}) })
+      HudPage({ searchParams: Promise.resolve({ kiosk: 'wrong' }) })
     ).rejects.toThrow('NEXT_FORBIDDEN');
-
-    expect(forbiddenMock).toHaveBeenCalled();
-    expect(unauthorizedMock).not.toHaveBeenCalled();
     expect(getHudMetricsMock).not.toHaveBeenCalled();
   });
 
-  it('renders the metrics dashboard for signed-in admins', async () => {
+  it('contains an invalid kiosk handoff for admins by returning to in-shell fullscreen', async () => {
     getCurrentAdminPageAccessMock.mockResolvedValue({
       isAuthenticated: true,
       hasAdminRole: true,
-      userId: 'admin_1',
-    });
-    const metrics = {
-      accessMode: 'admin' as const,
-      generatedAt: 'now',
-      sources: { stripe: { available: false }, mercury: { available: false } },
-      overview: { mrrUsd: 0, balanceUsd: 0, defaultStatusDetail: 'unknown' },
-    };
-    getHudMetricsMock.mockResolvedValue(metrics);
-
-    const result = await HudPage({ searchParams: Promise.resolve({}) });
-
-    // The gate passed cleanly -- neither escape hatch fired, and the real
-    // admin data fetch happened. A mutation that makes the admin gate
-    // unconditionally call forbidden()/unauthorized() (breaking all real
-    // admin access) would fail these assertions.
-    expect(unauthorizedMock).not.toHaveBeenCalled();
-    expect(forbiddenMock).not.toHaveBeenCalled();
-    expect(getHudMetricsMock).toHaveBeenCalledWith('admin');
-
-    // Full DOM rendering of HudDashboardClient would require a QueryClient
-    // provider and mocks for a dozen nested admin panels/charts -- assert
-    // directly on the returned React element tree instead so this stays a
-    // fast, focused test of the auth-gate wiring (metrics reach the
-    // dashboard) rather than an integration test of dashboard internals.
-    const dashboardElement = findElementByName(result, 'HudDashboardClient');
-    expect(dashboardElement).not.toBeNull();
-    expect(dashboardElement?.props?.initialMetrics).toEqual(metrics);
-    expect(dashboardElement?.props?.density).toBe('shell');
-    expect(dashboardElement?.props?.presentationMode).toBe('shell');
-    expect(getFounderFunnelDataMock).toHaveBeenCalledWith('30d');
-  });
-
-  it('uses kiosk density for fullscreen on the same HudDashboardClient', async () => {
-    getCurrentAdminPageAccessMock.mockResolvedValue({
-      isAuthenticated: true,
-      hasAdminRole: true,
-      userId: 'admin_1',
-    });
-    const metrics = {
-      accessMode: 'admin' as const,
-      generatedAt: 'now',
-      sources: { stripe: { available: false }, mercury: { available: false } },
-      overview: { mrrUsd: 0, balanceUsd: 0, defaultStatusDetail: 'unknown' },
-    };
-    getHudMetricsMock.mockResolvedValue(metrics);
-
-    const result = await HudPage({
-      searchParams: Promise.resolve({ fs: '1' }),
     });
 
-    const dashboardElement = findElementByName(result, 'HudDashboardClient');
-    expect(dashboardElement).not.toBeNull();
-    expect(dashboardElement?.props?.density).toBe('kiosk');
-    expect(dashboardElement?.props?.presentationMode).toBe('shell');
-    expect(dashboardElement?.props?.initialMetrics).toEqual(metrics);
-  });
-
-  it('renders the three-metric Mac HUD instead of the seven-band dashboard', async () => {
-    getCurrentAdminPageAccessMock.mockResolvedValue({
-      isAuthenticated: true,
-      hasAdminRole: true,
-      userId: 'admin_1',
-    });
-    const macSnapshot = { alive: { status: 'dead' } };
-    getOvieMacHudSnapshotMock.mockResolvedValue(macSnapshot);
-    const result = await HudPage({
-      searchParams: Promise.resolve({ ovie: 'mac' }),
-    });
+    await expect(
+      HudPage({ searchParams: Promise.resolve({ kiosk: 'expired' }) })
+    ).rejects.toThrow(`NEXT_REDIRECT:${APP_ROUTES.ADMIN_OPS}?fs=1`);
     expect(getHudMetricsMock).not.toHaveBeenCalled();
-    expect(findElementByName(result, 'HudDashboardClient')).toBeNull();
-    expect(findElementByName(result, 'OvieMacHud')?.props?.snapshot).toEqual(
-      macSnapshot
-    );
   });
 });

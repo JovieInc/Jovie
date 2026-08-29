@@ -37,6 +37,10 @@ import {
   shouldGrantTrustedHudScreenPermissionCheck,
 } from './desktop-permissions';
 import { createDesktopSecurityReporter } from './desktop-security-reporting';
+import {
+  resolveLocalDesignCertCdp,
+  resolveLocalDesignCertProfile,
+} from './design-cert-profile';
 import { APP_ENV, APP_URL } from './env';
 import {
   decideHudBuildReload,
@@ -52,6 +56,7 @@ import {
   type UrlDisposition,
 } from './navigation';
 import {
+  CUSTOMER_JOVIE_ENTRY_ROUTE,
   OVIE_OPERATOR_TALK_ROUTE,
   ovieOperatorOpsHref,
   packagedDesktopAppId,
@@ -89,15 +94,50 @@ import { sanitizeWindowState, type WindowState } from './window-state';
 
 // Separate userData for non-production shells so local, staging, and production
 // sessions coexist without sharing cookies or corrupted renderer state.
+let localIsolatedDesignCertCdp = false;
 if (APP_ENV === 'staging') {
   app.setPath('userData', path.join(app.getPath('appData'), 'Jovie-Staging'));
 } else if (APP_ENV === 'local') {
-  app.setPath('userData', path.join(app.getPath('appData'), 'Jovie-Local'));
+  const designCertProfile = resolveLocalDesignCertProfile({
+    appEnv: APP_ENV,
+    appDataPath: app.getPath('appData'),
+    argv: process.argv,
+    environmentProfile: process.env.JOVIE_DESIGN_CERT_PROFILE,
+  });
+  if (designCertProfile.kind === 'invalid') {
+    console.error('[Jovie Desktop] Invalid local design-cert profile', {
+      profile: designCertProfile.profile,
+    });
+    app.exit(1);
+  } else {
+    const designCertCdp = resolveLocalDesignCertCdp({
+      appEnv: APP_ENV,
+      profile: designCertProfile,
+      argv: process.argv,
+    });
+    if (designCertCdp.kind === 'invalid') {
+      console.error('[Jovie Desktop] Invalid local design-cert CDP port');
+      app.exit(1);
+    } else if (designCertCdp.kind === 'enabled') {
+      app.commandLine.appendSwitch('remote-debugging-address', '127.0.0.1');
+      app.commandLine.appendSwitch(
+        'remote-debugging-port',
+        String(designCertCdp.port)
+      );
+      localIsolatedDesignCertCdp = true;
+    }
+    app.setPath(
+      'userData',
+      designCertProfile.kind === 'isolated'
+        ? designCertProfile.userDataPath
+        : path.join(app.getPath('appData'), 'Jovie-Local')
+    );
+  }
 }
 
 const APP_ORIGIN = new URL(APP_URL).origin;
 const URL_DISPOSITION_OPTIONS = { appUrl: APP_URL, appEnv: APP_ENV } as const;
-const APP_ENTRY_URL = buildAppUrl('/app/chat');
+const APP_ENTRY_URL = buildAppUrl(CUSTOMER_JOVIE_ENTRY_ROUTE);
 const OVIE_OPERATOR_TALK_URL = buildAppUrl(OVIE_OPERATOR_TALK_ROUTE);
 const OVIE_OPERATOR_OPS_URL = buildAppUrl(ovieOperatorOpsHref());
 const SETTINGS_URL = buildAppUrl('/app/settings');
@@ -245,14 +285,16 @@ function getDesktopAppDisplayName(): string {
 
 app.setName(getDesktopAppDisplayName());
 
-// Refuse to run a packaged shell that was launched with a Chrome DevTools
-// Protocol switch. A packaged .app can be started by ANY local process, so an
-// exposed CDP port lets any process running as the same user read the renderer's
-// cookies (incl. the Clerk session) and inject JS — a full session hijack. Source
-// runs may still opt in via JOVIE_DEV=1 (see scripts/launch-electron.mjs).
+// Refuse a packaged shell launched with an arbitrary Chrome DevTools Protocol
+// switch. The only packaged exception is the local design-cert path above:
+// it first moves the shell to a separately named, blank userData directory and
+// validates a bounded loopback port. Staging/production and default local
+// profiles always remain under the normal packaged guard.
 const remoteDebuggingGuard = evaluateRemoteDebuggingGuard({
   isPackaged: app.isPackaged,
-  hasRemoteDebuggingPort: app.commandLine.hasSwitch('remote-debugging-port'),
+  hasRemoteDebuggingPort:
+    app.commandLine.hasSwitch('remote-debugging-port') &&
+    !localIsolatedDesignCertCdp,
   hasRemoteDebuggingPipe: app.commandLine.hasSwitch('remote-debugging-pipe'),
   jovieDev: process.env.JOVIE_DEV,
 });
@@ -1931,6 +1973,16 @@ function openOvieOperatorTalkDoor(): void {
   showWindow(mainWindow);
 }
 
+function openCustomerJovieDoor(): void {
+  if (isAuthHandoffOpen()) return;
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow(APP_ENTRY_URL);
+    return;
+  }
+  void mainWindow.loadURL(APP_ENTRY_URL);
+  showWindow(mainWindow);
+}
+
 function openOvieOperatorOpsDoor(): void {
   if (isAuthHandoffOpen()) return;
   if (!mainWindow || mainWindow.isDestroyed()) {
@@ -2067,6 +2119,10 @@ function buildApplicationMenu(): Menu {
             label: 'Preferences...',
             accelerator: 'Command+,',
             click: openPreferences,
+          },
+          {
+            label: 'Back to Jovie',
+            click: openCustomerJovieDoor,
           },
           {
             label: 'Ovie',

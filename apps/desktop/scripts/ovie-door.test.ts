@@ -60,9 +60,23 @@ test('operator talk and ops stay distinct from customer Jovie chat', () => {
     customerJovie: CUSTOMER_JOVIE_ENTRY_ROUTE,
   });
   expect(OVIE_OPERATOR_TALK_ROUTE).toBe('/app/ov/chat');
-  expect(OVIE_OPERATOR_OPS_ROUTE).toBe('/hud');
-  expect(ovieOperatorOpsHref()).toBe('/hud?ovie=mac');
+  expect(OVIE_OPERATOR_OPS_ROUTE).toBe('/app/ov/ops');
+  expect(ovieOperatorOpsHref()).toBe('/app/ov/ops?ovie=mac');
   expect(CUSTOMER_JOVIE_ENTRY_ROUTE).toBe('/app/chat');
+});
+
+test('Ovie Ops stays in the primary BrowserWindow instead of creating an isolated product window', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const handler = mainSource.match(
+    /function openOvieOperatorOpsDoor\(\): void \{[\s\S]*?\n\}/
+  )?.[0];
+
+  expect(handler).toBeDefined();
+  expect(handler).toMatch(/mainWindow\.loadURL\(OVIE_OPERATOR_OPS_URL\)/);
+  expect(handler).toMatch(/showWindow\(mainWindow\)/);
+  expect(handler).not.toMatch(
+    /new BrowserWindow|publicProfilePreviewWindow|authHandoffWindow/
+  );
 });
 
 test('package proof requires signature, staple, exact source, and no staging shell', () => {
@@ -109,4 +123,23 @@ test('packaged main enters the Ovie talk door and starts the Summer bridge', asy
   expect(mainSource).toMatch(/click: openOvieOperatorTalkDoor/);
   expect(mainSource).toMatch(/createSummerRuntimeBridge/);
   expect(mainSource).toMatch(/event\.sender\.session\.fetch/);
+});
+
+test('every Ovie door has a named same-window escape to customer Jovie', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  expect(mainSource).toMatch(
+    /const APP_ENTRY_URL = buildAppUrl\(CUSTOMER_JOVIE_ENTRY_ROUTE\);/
+  );
+  expect(mainSource).toMatch(
+    /label: 'Back to Jovie',\s*click: openCustomerJovieDoor/
+  );
+
+  const handler = mainSource.match(
+    /function openCustomerJovieDoor\(\): void \{[\s\S]*?\n\}/
+  )?.[0];
+  expect(handler).toBeDefined();
+  expect(handler).toMatch(/createWindow\(APP_ENTRY_URL\)/);
+  expect(handler).toMatch(/mainWindow\.loadURL\(APP_ENTRY_URL\)/);
+  expect(handler).toMatch(/showWindow\(mainWindow\)/);
+  expect(handler).not.toMatch(/about:blank|\.close\(|\.destroy\(|app\.quit\(/);
 });

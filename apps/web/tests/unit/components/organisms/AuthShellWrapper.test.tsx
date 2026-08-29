@@ -20,6 +20,7 @@ const { previewPanelProviderMock, useAuthRouteConfigMock } = vi.hoisted(() => ({
     isDemoRoute: false,
     isChatRoute: false,
     isLyricsRoute: false,
+    hideAppChrome: false,
   })),
 }));
 // AuthShellWrapper pulls in context providers, @jovie/ui Sheet components,
@@ -182,6 +183,7 @@ describe('AuthShellWrapper', () => {
       isDemoRoute: false,
       isChatRoute: false,
       isLyricsRoute: false,
+      hideAppChrome: false,
     });
   });
 
@@ -237,6 +239,7 @@ describe('AuthShellWrapper', () => {
       isDemoRoute: false,
       isChatRoute: true,
       isLyricsRoute: false,
+      hideAppChrome: false,
     });
 
     render(
@@ -285,6 +288,7 @@ describe('AuthShellWrapper', () => {
       isDemoRoute: false,
       isChatRoute: false,
       isLyricsRoute: false,
+      hideAppChrome: false,
     });
 
     render(
@@ -309,6 +313,7 @@ describe('AuthShellWrapper', () => {
       isDemoRoute: false,
       isChatRoute: true,
       isLyricsRoute: false,
+      hideAppChrome: false,
     });
 
     render(
@@ -337,6 +342,7 @@ describe('AuthShellWrapper', () => {
       isDemoRoute: false,
       isChatRoute: false,
       isLyricsRoute: false,
+      hideAppChrome: false,
       ...overrides,
     });
 

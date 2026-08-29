@@ -1,75 +1,108 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
-  authorizeHudMock,
-  getCurrentAdminPageAccessMock,
   getHudMetricsMock,
-  unauthorizedMock,
-  forbiddenMock,
+  getFounderFunnelDataMock,
+  getOvieMacHudSnapshotMock,
 } = vi.hoisted(() => ({
-  authorizeHudMock: vi.fn(),
-  getCurrentAdminPageAccessMock: vi.fn(),
   getHudMetricsMock: vi.fn(),
-  unauthorizedMock: vi.fn(() => {
-    throw new Error('NEXT_UNAUTHORIZED');
-  }),
-  forbiddenMock: vi.fn(() => {
-    throw new Error('NEXT_FORBIDDEN');
-  }),
+  getFounderFunnelDataMock: vi.fn(),
+  getOvieMacHudSnapshotMock: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
-vi.mock('next/navigation', () => ({
-  unauthorized: unauthorizedMock,
-  forbidden: forbiddenMock,
-}));
-vi.mock('@/lib/admin/page-access', () => ({
-  getCurrentAdminPageAccess: getCurrentAdminPageAccessMock,
-}));
-vi.mock('@/lib/auth/hud', () => ({
-  authorizeHud: authorizeHudMock,
-}));
 vi.mock('@/lib/hud/metrics', () => ({ getHudMetrics: getHudMetricsMock }));
-vi.mock('@/lib/env-server', () => ({ env: { HUD_AGENT_RUNS_FIXTURES: '0' } }));
+vi.mock('@/lib/admin/founder-funnel', () => ({
+  getFounderFunnelData: getFounderFunnelDataMock,
+}));
+vi.mock('@/lib/hud/ovie-mac-hud.server', () => ({
+  getOvieMacHudSnapshot: getOvieMacHudSnapshotMock,
+}));
+vi.mock('@/lib/env-server', () => ({
+  env: { HUD_AGENT_RUNS_FIXTURES: '0' },
+}));
 vi.mock('@/lib/hud/source-trust', () => ({
   isHudMetricValueAvailable: () => false,
 }));
-vi.mock('@/components/features/admin/hud/HudFullscreenControl', () => ({
-  HudFullscreenControl: () => null,
-}));
-vi.mock('@/components/features/admin/OperationalControlPanel', () => ({
-  OperationalControlPanel: () => null,
-}));
-vi.mock('@/app/app/(shell)/admin/ops/HudDashboardClient', () => ({
-  HudDashboardClient: () => null,
-}));
-vi.mock('@/components/features/admin/layout/AdminPage', () => ({
-  AdminPage: ({ children }: { children: unknown }) => children,
-}));
-vi.mock('@/components/organisms/StandaloneProductPage', () => ({
-  StandaloneProductPage: ({ children }: { children: unknown }) => children,
-}));
 
-import HudPage from '@/app/hud/page';
+import AdminOpsPage from '@/app/app/(shell)/admin/ops/page';
 
-describe('HudPage access boundary', () => {
+type ReactElementLike = {
+  readonly type: unknown;
+  readonly props?: {
+    readonly children?: unknown;
+    readonly [key: string]: unknown;
+  };
+};
+
+function findElementByName(
+  node: unknown,
+  name: string
+): ReactElementLike | null {
+  if (!node || typeof node !== 'object') return null;
+  const element = node as ReactElementLike;
+  const type = element.type as { name?: string } | string | undefined;
+  const typeName = typeof type === 'string' ? type : type?.name;
+  if (typeName === name) return element;
+
+  const children = element.props?.children;
+  if (Array.isArray(children)) {
+    for (const child of children) {
+      const found = findElementByName(child, name);
+      if (found) return found;
+    }
+    return null;
+  }
+  return findElementByName(children, name);
+}
+
+describe('authenticated in-shell Ops page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    authorizeHudMock.mockResolvedValue({ ok: false, reason: 'unauthorized' });
-    getCurrentAdminPageAccessMock.mockResolvedValue({
-      isAuthenticated: false,
-      hasAdminRole: false,
+    getHudMetricsMock.mockResolvedValue({ accessMode: 'admin' });
+    getFounderFunnelDataMock.mockResolvedValue(null);
+    getOvieMacHudSnapshotMock.mockResolvedValue({
+      generatedAtIso: '2026-08-28T00:00:00.000Z',
     });
   });
 
-  it('starts no admin data work before a non-admin is rejected', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch');
+  it('renders packaged Ovie inside the shell route without loading the full dashboard', async () => {
+    const result = await AdminOpsPage({
+      searchParams: Promise.resolve({ ovie: 'mac', runtime: 'electron' }),
+    });
 
-    await expect(
-      HudPage({ searchParams: Promise.resolve({}) })
-    ).rejects.toThrow('NEXT_UNAUTHORIZED');
-
+    expect(findElementByName(result, 'OvieMacHud')?.props).toMatchObject({
+      snapshot: { generatedAtIso: '2026-08-28T00:00:00.000Z' },
+      fullscreen: false,
+    });
     expect(getHudMetricsMock).not.toHaveBeenCalled();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(findElementByName(result, 'HudDashboardClient')).toBeNull();
+  });
+
+  it('keeps fullscreen as a presentation of the same in-shell Ovie route', async () => {
+    const result = await AdminOpsPage({
+      searchParams: Promise.resolve({ ovie: 'mac', fs: '1' }),
+    });
+
+    expect(findElementByName(result, 'OvieMacHud')?.props?.fullscreen).toBe(
+      true
+    );
+  });
+
+  it('restores the full Ops dashboard body inside the shared shell', async () => {
+    const metrics = { accessMode: 'admin', generatedAt: 'now' };
+    getHudMetricsMock.mockResolvedValue(metrics);
+
+    const result = await AdminOpsPage({ searchParams: Promise.resolve({}) });
+    const dashboard = findElementByName(result, 'HudDashboardClient');
+
+    expect(getHudMetricsMock).toHaveBeenCalledWith('admin');
+    expect(getFounderFunnelDataMock).toHaveBeenCalledWith('30d');
+    expect(dashboard?.props).toMatchObject({
+      initialMetrics: metrics,
+      density: 'shell',
+      presentationMode: 'shell',
+      kioskToken: null,
+    });
   });
 });
