@@ -1,6 +1,8 @@
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
+import { isWaitlistApprovedUserStatus } from '@/lib/auth/canonical-user-state';
+import { getDbUser } from '@/lib/auth/session';
 import { decodeToolEvents } from '@/lib/chat/tool-events';
 import { db } from '@/lib/db';
 import {
@@ -282,6 +284,10 @@ export async function POST(req: Request) {
         return true;
       }
     );
+    const currentDbUser = await getDbUser(userId);
+    const alreadyApproved = isWaitlistApprovedUserStatus(
+      currentDbUser?.userStatus
+    );
     const ipAddress = extractClientIPFromRequest(req);
     const userAgent = req.headers.get('user-agent') ?? null;
 
@@ -321,7 +327,8 @@ export async function POST(req: Request) {
           alreadyClaimed.id
         );
         const mustWaitlist =
-          accessControlled || hasWaitlistDecision(messageRows);
+          !alreadyApproved &&
+          (accessControlled || hasWaitlistDecision(messageRows));
         if (mustWaitlist && !hasDurablePublicArtistIdentity(messageRows)) {
           return NextResponse.json({
             claimed: 0,
@@ -357,7 +364,9 @@ export async function POST(req: Request) {
 
     try {
       const messageRows = await loadConversationMessageRows(primary.id);
-      const mustWaitlist = accessControlled || hasWaitlistDecision(messageRows);
+      const mustWaitlist =
+        !alreadyApproved &&
+        (accessControlled || hasWaitlistDecision(messageRows));
 
       // Do not consume the anonymous transcript until a public artist
       // identity exists. The same /start conversation retries after the next

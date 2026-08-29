@@ -65,9 +65,15 @@ const blobUploadMock = vi.hoisted(() => vi.fn());
 const libraryMutationMocks = vi.hoisted(() => ({
   archiveMerch: vi.fn().mockResolvedValue({ success: true }),
   archiveRelease: vi.fn().mockResolvedValue({ success: true }),
+  captureError: vi.fn(),
   restoreMerch: vi.fn().mockResolvedValue({ success: true }),
   restoreRelease: vi.fn().mockResolvedValue({ success: true }),
+  syncSpotify: vi.fn(),
   updateProfileVisibility: vi.fn().mockResolvedValue('hidden'),
+}));
+const feedbackMocks = vi.hoisted(() => ({
+  error: vi.fn(),
+  success: vi.fn(),
 }));
 
 const audioMock = vi.hoisted(() => {
@@ -117,6 +123,17 @@ vi.mock('@/lib/library/profile-visibility/client-mutations', () => ({
   updateLibraryProfileVisibility: libraryMutationMocks.updateProfileVisibility,
 }));
 
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: libraryMutationMocks.captureError,
+}));
+
+vi.mock('@/lib/queries', () => ({
+  useSyncReleasesFromSpotifyMutation: () => ({
+    isPending: false,
+    mutate: libraryMutationMocks.syncSpotify,
+  }),
+}));
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: vi.fn(),
@@ -127,9 +144,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('sonner', () => ({
-  toast: {
-    error: vi.fn(),
-  },
+  toast: feedbackMocks,
 }));
 
 vi.mock('next/image', () => ({
@@ -203,11 +218,14 @@ function renderLibraryWithHeader(assets: readonly LibraryReleaseAsset[]) {
   );
 }
 
-function renderLibrary(assets: readonly LibraryReleaseAsset[]) {
+function renderLibrary(
+  assets: readonly LibraryReleaseAsset[],
+  props: Partial<ComponentProps<typeof LibrarySurface>> = {}
+) {
   return render(
     <TooltipProvider>
       <RightPanelProvider>
-        <LibrarySurface assets={assets} />
+        <LibrarySurface assets={assets} {...props} />
         <RightPanelOutlet />
       </RightPanelProvider>
     </TooltipProvider>
@@ -274,12 +292,16 @@ describe('LibrarySurface', () => {
     libraryMutationMocks.archiveMerch.mockResolvedValue({ success: true });
     libraryMutationMocks.archiveRelease.mockReset();
     libraryMutationMocks.archiveRelease.mockResolvedValue({ success: true });
+    libraryMutationMocks.captureError.mockReset();
     libraryMutationMocks.restoreRelease.mockReset();
     libraryMutationMocks.restoreRelease.mockResolvedValue({ success: true });
     libraryMutationMocks.restoreMerch.mockReset();
     libraryMutationMocks.restoreMerch.mockResolvedValue({ success: true });
     libraryMutationMocks.updateProfileVisibility.mockReset();
     libraryMutationMocks.updateProfileVisibility.mockResolvedValue('hidden');
+    libraryMutationMocks.syncSpotify.mockReset();
+    feedbackMocks.error.mockReset();
+    feedbackMocks.success.mockReset();
   });
 
   afterEach(() => {
@@ -405,6 +427,64 @@ describe('LibrarySurface', () => {
     expect(
       screen.getByRole('heading', { name: 'No Library Items' })
     ).toHaveClass('text-2xl', 'font-semibold', 'text-primary-token');
+  });
+
+  it('uses the canonical Spotify sync owner for an empty connected library', () => {
+    renderLibrary([], {
+      profileId: 'profile-1',
+      canSyncSpotify: true,
+    });
+
+    fireEvent.click(screen.getByTestId('library-sync-spotify-empty-state'));
+
+    expect(libraryMutationMocks.syncSpotify).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('link', { name: 'Open Releases' })).toBeNull();
+  });
+
+  it('refreshes the empty library after a successful Spotify sync', () => {
+    libraryMutationMocks.syncSpotify.mockImplementation(
+      (_variables, options) => {
+        options.onSuccess({ success: true, message: 'Catalog synced' });
+      }
+    );
+    renderLibrary([], {
+      profileId: 'profile-1',
+      canSyncSpotify: true,
+    });
+
+    fireEvent.click(screen.getByTestId('library-sync-spotify-empty-state'));
+
+    expect(feedbackMocks.success).toHaveBeenCalledWith('Catalog synced');
+    expect(navigationMock.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the sync recovery action available when Spotify sync fails', () => {
+    libraryMutationMocks.syncSpotify.mockImplementation(
+      (_variables, options) => {
+        options.onError(new Error('spotify unavailable'));
+      }
+    );
+    renderLibrary([], {
+      profileId: 'profile-1',
+      canSyncSpotify: true,
+    });
+
+    fireEvent.click(screen.getByTestId('library-sync-spotify-empty-state'));
+
+    expect(feedbackMocks.error).toHaveBeenCalledWith(
+      'Failed to sync from Spotify'
+    );
+    expect(libraryMutationMocks.captureError).toHaveBeenCalledWith(
+      'Failed to sync releases from Spotify',
+      expect.any(Error),
+      expect.objectContaining({
+        context: 'library-empty-state',
+        profileId: 'profile-1',
+      })
+    );
+    expect(
+      screen.getByTestId('library-sync-spotify-empty-state')
+    ).toBeEnabled();
   });
 
   it('defaults to grid view on first load', () => {
