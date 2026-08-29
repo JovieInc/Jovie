@@ -649,7 +649,7 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
     });
     const syncButton = page
       .locator(
-        '[data-testid="sync-spotify-empty-state"], [data-testid="shell-releases-sync-empty-state"]'
+        '[data-testid="library-sync-spotify-empty-state"], [data-testid="sync-spotify-empty-state"], [data-testid="shell-releases-sync-empty-state"]'
       )
       .filter({ visible: true })
       .first();

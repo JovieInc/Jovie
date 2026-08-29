@@ -153,6 +153,7 @@ export function ReleaseCatalogPageClient({
       <LibrarySurface
         profileId={profileId}
         artistHandle={artistHandle}
+        canSyncSpotify={spotifyConnected}
         assets={[
           ...buildLibraryReleaseAssets(
             [...releases, ...archivedReleases],
