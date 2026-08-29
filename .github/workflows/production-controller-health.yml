@@ -2,10 +2,10 @@ name: Production Controller Health
 
 on:
   # Production Controller completion is the primary reconciliation signal.
-  # Marker Recovery completion retriggers this workflow only after recovered
-  # bytes are durable, so reconciliation resumes without founder input.
+  # Marker Recovery dispatches Fleet Gate Refresh directly after durable bytes;
+  # keeping it out of this trigger also prevents duplicate CI replays.
   workflow_run:
-    workflows: [Production Controller, Production Marker Recovery]
+    workflows: [Production Controller]
     types: [completed]
     branches: [main]
   # polling-exception: GitHub may drop a workflow_run delivery. This once-daily

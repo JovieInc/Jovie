@@ -2994,14 +2994,14 @@ class TestReleaseQueueDeferred:
         fleet_gate_refresh = _FLEET_GATE_REFRESH_WORKFLOW.read_text(encoding="utf-8")
         assert "schedule:" not in workflow
         assert "workflow_run:" in workflow
-        # CI, Production Controller, and durable Marker Recovery completion are
-        # upstream semantic inputs to Fleet Gate Refresh. Queue-Deferred Release
-        # consumes only the resulting fresh gate receipt, so the controllers
-        # cannot recursively wake each other without new upstream evidence.
+        # CI and Production Controller are direct upstream semantic inputs.
+        # Marker Recovery dispatches a fresh Fleet Gate event after durable
+        # bytes so downstream release remains inside the workflow_run cap.
         assert (
-            "workflows: [CI, Production Controller, Production Marker Recovery]"
+            "workflows: [CI, Production Controller]"
             in fleet_gate_refresh
         )
+        assert "Production Marker Recovery]" not in fleet_gate_refresh
         assert "Queue-Deferred Release]" not in fleet_gate_refresh
         assert "workflows: ['Fleet Gate Refresh']" in workflow
         assert "workflows: ['CI', 'Production Controller', 'Fleet Gate Refresh']" not in workflow

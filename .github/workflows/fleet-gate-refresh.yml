@@ -17,8 +17,10 @@ on:
     # Queue-Deferred Release is downstream of this gate. Listening to it here
     # formed a reciprocal workflow_run loop that could retrigger both
     # controllers without a new upstream capacity signal. Marker Recovery is
-    # upstream evidence: its completed run makes recovered bytes authoritative.
-    workflows: [CI, Production Controller, Production Marker Recovery]
+    # upstream evidence. Marker Recovery starts a fresh workflow_dispatch after
+    # durable bytes so Queue-Deferred Release stays within GitHub's three-level
+    # workflow_run chain ceiling.
+    workflows: [CI, Production Controller]
     types: [completed]
   push:
     branches: [main]

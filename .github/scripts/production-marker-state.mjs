@@ -132,8 +132,7 @@ function markerNameForAttempt(sha, attempt) {
 function validateMarkerRecoveryRun(run, context, attempt) {
   if (!run || typeof run !== 'object') return false;
   const trustedRecoveryEvent =
-    run.event === 'workflow_dispatch' ||
-    (run.event === 'workflow_run' && run.head_sha === context.sha);
+    run.event === 'workflow_dispatch' || run.event === 'workflow_run';
   return (
     sameInteger(run.id, context.controllerRun) &&
     sameInteger(run.run_attempt, attempt) &&

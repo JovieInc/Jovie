@@ -1005,7 +1005,8 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     block = _job_block("fleet-gate-refresh.yml", "refresh")
 
     assert "schedule:" not in trigger
-    assert "workflows: [CI, Production Controller, Production Marker Recovery]" in trigger
+    assert "workflows: [CI, Production Controller]" in trigger
+    assert "Production Marker Recovery]" not in trigger
     assert "workflows: [CI, Production Controller, Queue-Deferred Release]" not in trigger
     assert "group: fleet-gate-event-admission" in workflow
     assert "cancel-in-progress: false" in workflow

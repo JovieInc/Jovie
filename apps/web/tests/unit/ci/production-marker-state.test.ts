@@ -442,7 +442,10 @@ describe('recovered production marker state', () => {
       run_attempt: 1,
       workflow_id: workflowId + 1,
       path: '.github/workflows/production-marker-recovery.yml',
-      head_sha: event === 'workflow_run' ? sha : 'c'.repeat(40),
+      // workflow_run jobs execute from the then-current default branch. The
+      // recovered generation is authenticated by the payload-bound source
+      // controller, not this downstream checkout SHA.
+      head_sha: 'c'.repeat(40),
       head_branch: 'main',
       head_repository: { full_name: repo },
       event,
@@ -495,7 +498,7 @@ describe('recovered production marker state', () => {
     });
   });
 
-  it('verifies an event-driven recovered marker bound to the exact generation', () => {
+  it('verifies event recovery when the default branch advanced after promotion', () => {
     const marker = recoveredMarker();
     marker.attemptRun = markerRecoveryRun(
       'completed',
@@ -515,10 +518,15 @@ describe('recovered production marker state', () => {
     });
   });
 
-  it('rejects event-driven recovery provenance for a different generation', () => {
+  it('rejects event recovery bound to a different source generation', () => {
     const marker = recoveredMarker();
-    marker.attemptRun = {
-      ...markerRecoveryRun('completed', 'success', 'workflow_run'),
+    marker.attemptRun = markerRecoveryRun(
+      'completed',
+      'success',
+      'workflow_run'
+    );
+    marker.originalRun = {
+      ...run(1, 'completed', 'failure'),
       head_sha: 'd'.repeat(40),
     };
 
@@ -526,7 +534,7 @@ describe('recovered production marker state', () => {
       classifyProductionMarkerEvidence(evidence({ markers: [marker] }))
     ).toMatchObject({
       state: 'manual',
-      reason: 'contradictory_marker_attempt',
+      reason: 'contradictory_recovery_source_run',
     });
   });
 

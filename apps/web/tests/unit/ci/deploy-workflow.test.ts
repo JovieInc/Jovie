@@ -4472,7 +4472,8 @@ describe('production promotion exact-artifact contract', () => {
     );
 
     expect(health).toContain('workflow_run:');
-    expect(health).toContain(
+    expect(health).toContain('workflows: [Production Controller]');
+    expect(health).not.toContain(
       'workflows: [Production Controller, Production Marker Recovery]'
     );
     expect(health).toContain("cron: '17 4 * * *'");
@@ -4771,7 +4772,9 @@ describe('production marker recovery workflow (JOV-4965)', () => {
     expect(workflow).not.toContain('push:');
     expect(workflow).not.toContain('schedule:');
     expect(workflow).toContain('group: production-mutation');
+    expect(workflow).toContain('queue: max');
     expect(workflow).toContain('cancel-in-progress: false');
+    expect(workflow).toContain('actions: write');
     expect(workflow).toContain('REQUEST_MODE: ${{ github.event_name }}');
     expect(workflow).toContain(
       "if: steps.admission.outputs.recovery_required == 'true'"
@@ -4788,12 +4791,17 @@ describe('production marker recovery workflow (JOV-4965)', () => {
     expect(workflow).not.toContain('overwrite: true');
     expect(workflow).toContain('EXPECTED_DEPLOYMENT_ID="$canonical_id"');
     expect(workflow).toContain(
+      'EXPECTED_PRODUCTION_DEPLOYMENT_ID=$EXPECTED_DEPLOYMENT_ID'
+    );
+    expect(workflow).toContain(
+      'gh workflow run fleet-gate-refresh.yml --ref main'
+    );
+    expect(workflow).toContain(
       'name: production-generation-verified-${{ env.EXPECTED_SHA }}'
     );
     const fleetRefresh = readFileSync(fleetGateRefreshWorkflowPath, 'utf8');
-    expect(fleetRefresh).toContain(
-      'workflows: [CI, Production Controller, Production Marker Recovery]'
-    );
+    expect(fleetRefresh).toContain('workflows: [CI, Production Controller]');
+    expect(fleetRefresh).not.toContain('Production Marker Recovery]');
   });
 
   it('preserves the marker only after canonical ownership and exact probes pass', () => {
@@ -4842,6 +4850,9 @@ describe('production marker recovery workflow (JOV-4965)', () => {
     expect(oauth).toContain('refusing to preserve a marker');
     expect(preserve).toContain('recoveredFromControllerRun');
     expect(preserve).toContain('recoveredFromControllerAttempt');
+    expect(preserve).toContain('marker_upload_required=false');
+    expect(preserve).toContain('marker_upload_required=true');
+    expect(preserve).toContain('artifacts?name=$marker_name&per_page=100');
     expect(workflow).toContain(
       'name: production-generation-verified-${{ env.EXPECTED_SHA }}'
     );
@@ -4868,7 +4879,9 @@ describe('production marker recovery workflow (JOV-4965)', () => {
     expect(markerState).toContain("'exact_recovered_generation_verified'");
     expect(markerState).toContain("run.event === 'workflow_dispatch'");
     expect(markerState).toContain("run.event === 'workflow_run'");
-    expect(markerState).toContain('run.head_sha === context.sha');
+    expect(markerState).toContain(
+      "run.event === 'workflow_dispatch' || run.event === 'workflow_run'"
+    );
     expect(markerState).toContain('unsafe_or_contradictory_rollback');
   });
 });
