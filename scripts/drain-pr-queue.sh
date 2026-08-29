@@ -28,7 +28,7 @@
 #     pass for admission events replaced while pending in the workflow mutex
 #   DRAIN_QUEUE_REENTRY_MAX_PER_RUN  total event + recovery admission cap (1-2)
 #   DRAIN_PROMOTION_MODE  normal, isolated-only, draft-only, hold-intake, or blocked
-#   DRAIN_FLEET_GATE_B64  fresh typed fleet receipt; mandatory outside normal
+#   DRAIN_FLEET_GATE_B64  bounded admission projection; required outside normal
 #   DRAIN_RECOVER_FLEET_HOLDS  exact production-controller recovery event only
 #   FLEET_HOLD_TTL_SECONDS  pending jovie-fleet-queue-hold/v1 deadline (default 720)
 #   MERGE_QUEUE_BACKEND  native (default); test-label-fixture is test-only
@@ -133,15 +133,15 @@ case "$DRAIN_PROMOTION_MODE" in
       exit 2
     fi
     if ! FLEET_GATE_JSON="$(node -e '
-      const value = Buffer.from(process.argv[1], "base64").toString("utf8");
-      const receipt = JSON.parse(value);
+      const value = process.env.DRAIN_FLEET_GATE_B64 || "";
+      const receipt = JSON.parse(Buffer.from(value, "base64").toString("utf8"));
       const observed = Date.parse(receipt.observedAt || "");
       const now = Date.now();
       if (!Number.isFinite(observed) || observed > now + 60_000 || now - observed > 600_000) {
         throw new Error("stale fleet receipt");
       }
       process.stdout.write(JSON.stringify(receipt));
-    ' "$DRAIN_FLEET_GATE_B64" 2>/dev/null)"; then
+    ' 2>/dev/null)"; then
       echo "::error::Refusing $DRAIN_PROMOTION_MODE with a malformed or stale fleet receipt" >&2
       exit 2
     fi
