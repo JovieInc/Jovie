@@ -99,6 +99,19 @@ describe('shadcn outcome inventory', () => {
       evaluateOutcomeInventory({ inventory: imported }).issues.join('\n')
     ).toMatch(/forbidden Shadcn\/Typeset implementation import/);
   });
+
+  it('blocks a valid outcome mutation that contradicts the nested comparative receipt', () => {
+    const contradictory = clone(OUTCOME_INVENTORY);
+    contradictory.entries.find(
+      entry => entry.id === 'atom.select'
+    ).disposition = 'keep';
+    const result = runOutcomeCertification({ inventory: contradictory });
+    expect(result.ok).toBe(false);
+    expect(result.receipt.comparativeQualityBar.ok).toBe(false);
+    expect(result.receipt.issues.join('\n')).toContain(
+      'comparative quality bar: atom.select: approved Shadcn outcome contradicts the comparative registry'
+    );
+  });
 });
 
 describe('shadcn outcome inventory composition', () => {

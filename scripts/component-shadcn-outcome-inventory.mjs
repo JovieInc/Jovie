@@ -4,6 +4,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runComparativeQualityBar } from './component-comparative-quality-bar.mjs';
 import {
   listComponentsInRoot,
   REPO_ROOT as POLICY_REPO_ROOT,
@@ -543,6 +544,20 @@ export function runOutcomeCertification(options = {}) {
     inventory,
   });
   const issues = [...inventoryResult.issues];
+  const comparative = runComparativeQualityBar({
+    repoRoot: options.repoRoot ?? REPO_ROOT,
+    approvedOutcomeEntries: inventory?.entries,
+    inventory: options.comparativeInventory,
+    redFixtures: options.comparativeRedFixtures,
+    qualificationControls: options.qualificationControls,
+  });
+  if (!comparative.ok) {
+    issues.push(
+      ...comparative.receipt.issues.map(
+        issue => `comparative quality bar: ${issue}`
+      )
+    );
+  }
   if (!Array.isArray(redFixtures) || redFixtures.length === 0) {
     issues.push('outcome deliberate-red fixtures are missing; fail closed');
   }
@@ -583,6 +598,7 @@ export function runOutcomeCertification(options = {}) {
       enrolled: inventoryResult.enrolledIds,
       catalogCount: inventoryResult.catalogCount,
       unenrolledCount: inventoryResult.unenrolledCount,
+      comparativeQualityBar: comparative.receipt,
       fixtures: fixtureReceipts,
       enrolledBatch: batchReceipts,
     },
