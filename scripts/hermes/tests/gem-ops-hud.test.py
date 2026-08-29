@@ -572,6 +572,29 @@ class VersionedHudContractTests(unittest.TestCase):
         self.assertEqual(loaded["terminalTombstones"][0]["observedAt"], observed_at)
         self.assertIsNone(loaded["error"])
 
+    def test_terminal_tombstone_requires_typed_identity_and_timestamp(self):
+        moment = dt.datetime(2026, 8, 28, 22, 0, tzinfo=dt.timezone.utc)
+        for tombstone in (
+            "not-an-object",
+            {"issue": "JOV-1", "outcome": "healthy", "terminal": True, "observedAt": 1},
+            {"pr": True, "outcome": "healthy", "terminal": True, "observedAt": HUD.iso(moment)},
+            {"issue": "JOV-1", "outcome": "open", "terminal": True, "observedAt": HUD.iso(moment)},
+        ):
+            with self.subTest(tombstone=tombstone), tempfile.TemporaryDirectory() as tmp:
+                path = pathlib.Path(tmp) / "summer-queue.json"
+                path.write_text(json.dumps({
+                    "schema": "jovie-summer-red-queue/v2",
+                    "authority": "Summer",
+                    "observedAt": HUD.iso(moment),
+                    "terminalTombstones": [tombstone],
+                    "items": [],
+                }), encoding="utf-8")
+                with mock.patch.object(HUD, "now", return_value=moment):
+                    loaded = HUD.load_summer_queue(path)
+
+            self.assertEqual(loaded["items"], [])
+            self.assertEqual(loaded["error"], "summer-queue-malformed-tombstone")
+
     def test_fresh_active_summer_item_is_preserved_with_source_timestamp(self):
         moment = dt.datetime(2026, 8, 28, 22, 0, tzinfo=dt.timezone.utc)
         observed_at = HUD.iso(moment - dt.timedelta(minutes=5))

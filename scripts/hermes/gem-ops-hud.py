@@ -200,11 +200,23 @@ def load_summer_queue(path: Path | None = None) -> dict[str, Any]:
         if not isinstance(raw_tombstone, dict):
             return {**empty, "error": "summer-queue-malformed-tombstone"}
         tombstone = dict(raw_tombstone)
-        tombstone_stamp = parse_time(tombstone.get("observedAt"))
+        tombstone_observed_at = tombstone.get("observedAt")
+        tombstone_stamp = (
+            parse_time(tombstone_observed_at)
+            if isinstance(tombstone_observed_at, str)
+            else None
+        )
         has_identity = (
             isinstance(tombstone.get("issue"), str)
             and bool(tombstone["issue"].strip())
-        ) or (isinstance(tombstone.get("pr"), int) and tombstone["pr"] > 0)
+        ) or (
+            isinstance(tombstone.get("issueKey"), str)
+            and bool(tombstone["issueKey"].strip())
+        ) or (
+            isinstance(tombstone.get("pr"), int)
+            and not isinstance(tombstone.get("pr"), bool)
+            and tombstone["pr"] > 0
+        )
         if (
             tombstone.get("outcome") != "healthy"
             or tombstone.get("terminal") is not True
