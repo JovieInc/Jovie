@@ -352,6 +352,17 @@ on a feature branch.
 
 **Spam protection:** `changelog:send` enforces a 24-hour cooldown between product update emails. If subscribers were emailed within the last 24h, the send is skipped automatically. Use `--force` to override for critical announcements.
 
+## Production Release Routing Invariant
+
+A coalesced release wave must never route from only the newest merge receipt.
+The Production Controller anchors to the exact SHA currently served by the
+canonical production alias, requires its payload-bound verified deployment
+marker, and classifies the complete first-parent delta to current main. When
+that range affects Web, the latest Web-affecting combined head must have one
+exact passing product-lane receipt before any production mutation. A no-op
+marker is authoritative only when it records the deployed base, contains no
+Web lane, and is bound to the exact controller attempt.
+
 <!-- ci-harness:start -->
 ## CI Agent Harness
 

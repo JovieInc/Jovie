@@ -268,11 +268,14 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/linear-issue-intake.test.mjs',
   'scripts/lib/__tests__/agent-qc-wires.test.mjs',
   'scripts/lib/__tests__/needs-human-autoclose.test.mjs',
+  'scripts/lib/__tests__/production-lane-range.test.mjs',
 ];
 const PRODUCT_LANE_FOUNDATION_PRIMARY_INPUTS = new Set([
   'scripts/lib/product-lane-classifier.mjs',
   'scripts/lib/product-lane-finalize.mjs',
+  'scripts/lib/production-lane-range.mjs',
   'scripts/lib/__tests__/product-lane-classifier.test.mjs',
+  'scripts/lib/__tests__/production-lane-range.test.mjs',
 ]);
 const PRODUCT_LANE_FOUNDATION_LANE = new Set([
   ...PRODUCT_LANE_FOUNDATION_PRIMARY_INPUTS,
