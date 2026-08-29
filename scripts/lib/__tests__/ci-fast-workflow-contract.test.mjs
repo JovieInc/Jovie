@@ -240,6 +240,11 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(structuralDecision).toContain(
       'grep -qE "$STRUCTURAL_CONTROL_PATTERN|$STRUCTURAL_UI_PATTERN"'
     );
+    expect(remaining).toMatch(/timeout-minutes:\s*40/);
+    expect(remaining).toContain('uses: ./.github/actions/setup-playwright');
+    expect(CI_FAST_SOURCE).toContain(
+      'lib/__tests__/component-live-storybook-certification.test.mjs'
+    );
   });
 
   it('runs the lockfile specifier preflight before expensive fast lanes', () => {

@@ -11,10 +11,12 @@
  *   5. Multi-root story-coverage ratchet (lock_up + no uncovered growth)
  *   6. Fail-closed source-blind rendered certification (JOV-5400)
  *      including the Shadcn/Typeset outcome inventory (JOV-5438)
+ *   7. Fail-closed live Storybook certification for enrolled canonical
+ *      Badge/Button/Card stories (JOV-5454)
  *
  * Usage:
  *   pnpm component-ship-gate
- *   node scripts/component-ship-gate.mjs [--diff-base=origin/main] [--skip-quality] [--skip-ratchet] [--skip-rendered-cert]
+ *   node scripts/component-ship-gate.mjs [--diff-base=origin/main] [--skip-quality] [--skip-ratchet] [--skip-rendered-cert] [--skip-live-storybook]
  *
  * Env:
  *   COMPONENT_SHIP_DIFF_BASE / STORY_COVERAGE_DIFF_BASE / TURBO_SCM_BASE / GITHUB_BASE_REF
@@ -25,6 +27,7 @@ import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
+import { runLiveStorybookCertification } from './component-live-storybook-certification.mjs';
 import { runRenderedCertification } from './component-rendered-certification.mjs';
 import {
   COVERAGE_ROOTS,
@@ -60,6 +63,7 @@ function parseArgs(argv) {
     skipQuality: false,
     skipRatchet: false,
     skipRenderedCert: false,
+    skipLiveStorybook: false,
     json: false,
     auditCoverageVia: false,
   };
@@ -69,6 +73,7 @@ function parseArgs(argv) {
     else if (arg === '--skip-quality') flags.skipQuality = true;
     else if (arg === '--skip-ratchet') flags.skipRatchet = true;
     else if (arg === '--skip-rendered-cert') flags.skipRenderedCert = true;
+    else if (arg === '--skip-live-storybook') flags.skipLiveStorybook = true;
     else if (arg === '--audit-coverage-via') flags.auditCoverageVia = true;
     else if (arg === '--json') flags.json = true;
     else if (arg === '--help' || arg === '-h') flags.help = true;
@@ -1214,8 +1219,11 @@ export function runComponentShipGate(options = {}) {
     skipQuality: options.skipQuality ?? false,
     skipRatchet: options.skipRatchet ?? false,
     skipRenderedCert: options.skipRenderedCert ?? false,
+    skipLiveStorybook: options.skipLiveStorybook ?? false,
     headSha: options.headSha ?? null,
     comparativeQualificationControls: options.comparativeQualificationControls,
+    liveObservations: options.liveObservations,
+    liveNodeVersion: options.liveNodeVersion,
   };
 
   const report = {
@@ -1307,6 +1315,36 @@ export function runComponentShipGate(options = {}) {
     }
   } else {
     report.sections.renderedCertification = { ok: true, skipped: true };
+  }
+
+  // 5) Live Storybook certification (JOV-5454)
+  if (!flags.skipLiveStorybook) {
+    try {
+      const live = runLiveStorybookCertification({
+        headSha: flags.headSha ?? undefined,
+        observations: flags.liveObservations,
+        nodeVersion: flags.liveNodeVersion,
+      });
+      report.sections.liveStorybookCertification = {
+        ok: live.ok,
+        schema: live.schema,
+        receipt: live.receipt,
+      };
+      const outcome =
+        report.sections.renderedCertification?.receipt?.shadcnOutcome;
+      if (outcome && live.receipt?.liveVisualCertification) {
+        outcome.liveVisualCertification = live.receipt.liveVisualCertification;
+      }
+      if (!live.ok) report.ok = false;
+    } catch (error) {
+      report.sections.liveStorybookCertification = {
+        ok: false,
+        message: error instanceof Error ? error.message : String(error),
+      };
+      report.ok = false;
+    }
+  } else {
+    report.sections.liveStorybookCertification = { ok: true, skipped: true };
   }
 
   return report;
@@ -1407,11 +1445,28 @@ function printReport(report) {
     }
   }
 
+  const live = report.sections.liveStorybookCertification;
+  if (live?.skipped) {
+    console.log('[component-ship-gate] live-storybook-cert: skipped');
+  } else if (live?.ok) {
+    const head = live.receipt?.headSha ?? 'unknown';
+    console.log(`[component-ship-gate] live-storybook-cert: ok head=${head}`);
+    for (const item of live.receipt?.observations ?? []) {
+      console.log(`  live ${item.id}: ${item.verdict}`);
+    }
+  } else {
+    console.error('[component-ship-gate] live-storybook-cert: FAIL');
+    if (live?.message) console.error(live.message);
+    for (const issue of live?.receipt?.issues ?? []) {
+      console.error(`- ${issue}`);
+    }
+  }
+
   if (report.ok) {
     console.log('[component-ship-gate] PASS');
   } else {
     console.error(
-      '[component-ship-gate] FAIL — shippable UI components require matching tests + stories + rendered certification (JOV-4421, JOV-5400, JOV-5438)'
+      '[component-ship-gate] FAIL — shippable UI components require matching tests + stories + rendered certification + live Storybook certification (JOV-4421, JOV-5400, JOV-5438, JOV-5454)'
     );
   }
 }
@@ -1424,6 +1479,7 @@ function main(argv = process.argv.slice(2)) {
   --skip-quality         Skip storybook quality guard
   --skip-ratchet         Skip multi-root story coverage ratchet
   --skip-rendered-cert   Skip source-blind rendered certification
+  --skip-live-storybook  Skip live Storybook certification
   --audit-coverage-via   Whole-tree executable @coverage-via receipt audit
   --json                 Print machine-readable report`);
     return 0;
@@ -1454,6 +1510,7 @@ function main(argv = process.argv.slice(2)) {
     skipQuality: flags.skipQuality,
     skipRatchet: flags.skipRatchet,
     skipRenderedCert: flags.skipRenderedCert,
+    skipLiveStorybook: flags.skipLiveStorybook,
   });
 
   if (flags.json) {

@@ -240,6 +240,7 @@ describe('shadcn outcome inventory composition', () => {
       diffBase: null,
       skipQuality: true,
       skipRatchet: true,
+      skipLiveStorybook: true,
       headSha: HEAD,
     });
     expect(report.ok).toBe(true);

@@ -6,16 +6,28 @@ import { fileURLToPath } from 'url';
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Literal paths so the live-cert build stays bounded and statically analyzable.
+const LIVE_CERT_STORIES = [
+  '../../../packages/ui/atoms/badge.stories.tsx',
+  '../../../packages/ui/atoms/button.stories.tsx',
+  '../../../packages/ui/atoms/Card.stories.tsx',
+] as const;
+
+const FULL_CATALOG_STORIES = [
+  // Local story matrices (e.g. the surface-elevation visual-regression
+  // matrix, JOV-2156) that are not tied to a single component directory.
+  './stories/**/*.stories.@(js|jsx|ts|tsx|mdx)',
+  '../components/**/*.stories.@(js|jsx|ts|tsx|mdx)',
+  // packages/ui atoms — highest-reuse surface; must enter Chromatic/Storybook
+  // (Phase 2 visual-testing coverage; see docs/VISUAL_TESTING_POLICY.md).
+  '../../../packages/ui/**/*.stories.@(js|jsx|ts|tsx|mdx)',
+] as const;
+
 const config: StorybookConfig = {
-  stories: [
-    // Local story matrices (e.g. the surface-elevation visual-regression
-    // matrix, JOV-2156) that are not tied to a single component directory.
-    './stories/**/*.stories.@(js|jsx|ts|tsx|mdx)',
-    '../components/**/*.stories.@(js|jsx|ts|tsx|mdx)',
-    // packages/ui atoms — highest-reuse surface; must enter Chromatic/Storybook
-    // (Phase 2 visual-testing coverage; see docs/VISUAL_TESTING_POLICY.md).
-    '../../../packages/ui/**/*.stories.@(js|jsx|ts|tsx|mdx)',
-  ],
+  stories:
+    process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
+      ? [...LIVE_CERT_STORIES]
+      : [...FULL_CATALOG_STORIES],
   addons: [
     '@storybook/addon-docs',
     '@storybook/addon-a11y',

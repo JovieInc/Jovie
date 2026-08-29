@@ -1173,9 +1173,11 @@ jobs:
     name: ci-fast (remaining)
     # JOV-4477: the structural Docker/Python actions stay isolated to the
     # remaining group, where their path-gated lane can actually run.
+    # JOV-5454: live Storybook certification needs Chromium plus bounded
+    # build/serve budget inside the structural lane.
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission]
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     if: >-
       !cancelled() &&
       needs.ci-lockfile-preflight.result == 'success' &&
@@ -1247,6 +1249,9 @@ jobs:
       - name: Install pytest (structural regression tests)
         if: steps.structural.outputs.skip != 'true'
         run: python -m pip install --quiet --require-hashes -r .github/requirements/pytest.txt
+      - name: Setup Playwright (Chromium)
+        if: steps.structural.outputs.skip != 'true'
+        uses: ./.github/actions/setup-playwright
       - name: Run ci-fast lanes
         id: lanes
         env:

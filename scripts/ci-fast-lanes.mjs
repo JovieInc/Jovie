@@ -576,6 +576,8 @@ function runStructural() {
     'pnpm design:shared-ui-visual-arbitrary:check',
     // JOV-4421: hard ship gate — tests + matching stories for shippable UI.
     'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-ship-gate.test.mjs',
+    // JOV-5454: live Storybook certification evaluator + lifecycle.
+    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs',
     'pnpm component-ship-gate',
     'pnpm screen-certification-gate',
     // CI workflow changes live at the repo root, so Turbo --affected can select
