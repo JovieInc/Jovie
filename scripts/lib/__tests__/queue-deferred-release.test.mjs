@@ -79,9 +79,10 @@ describe('queue-deferred release closed loop (JOV-5054)', () => {
   });
 
   it('keeps Fleet Gate Refresh as the one-way workflow_run bridge', () => {
-    // CI and Production Controller are upstream semantic inputs. Fleet Gate
-    // Refresh turns them into one canonical receipt; Queue-Deferred Release
-    // consumes only that receipt and must never wake the gate again.
+    // CI, Production Controller, and durable Marker Recovery completion are
+    // upstream semantic inputs. Fleet Gate Refresh turns them into one
+    // canonical receipt; Queue-Deferred Release consumes only that receipt and
+    // must never wake the gate again.
     const upstream = fleetGateRefreshWorkflow.match(
       /workflow_run:\s*\n(?:\s*#[^\n]*\n)*\s*workflows:\s*\[([^\]]+)\]/
     )?.[1];
@@ -89,7 +90,9 @@ describe('queue-deferred release closed loop (JOV-5054)', () => {
       /workflow_run:\s*\n\s*workflows:\s*\[([^\]]+)\]/
     )?.[1];
 
-    expect(upstream).toBe('CI, Production Controller');
+    expect(upstream).toBe(
+      'CI, Production Controller, Production Marker Recovery'
+    );
     expect(downstream).toBe("'Fleet Gate Refresh'");
     expect(upstream).not.toContain('Queue-Deferred Release');
     expect(downstream).not.toContain('CI');
