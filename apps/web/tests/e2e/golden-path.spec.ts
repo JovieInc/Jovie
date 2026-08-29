@@ -29,7 +29,7 @@ import {
  * paywall. Checkout is a post-activation upgrade path, not part of this
  * journey; it is covered separately by billing-checkout.spec.ts (JOV-3757).
  *
- * Test artist: "Tim White" (~50 releases, deterministic)
+ * Test artist: "UNMARKED" (public catalog, no known Jovie owner)
  */
 
 /* ------------------------------------------------------------------ */
@@ -38,6 +38,12 @@ import {
 
 const REQUIRED_ENV = {
   DATABASE_URL: process.env.DATABASE_URL,
+} as const;
+
+const TEST_SPOTIFY_ARTIST = {
+  id: '1ZlSI1juLMMN1HU8X7RViN',
+  name: 'UNMARKED',
+  url: 'https://open.spotify.com/artist/1ZlSI1juLMMN1HU8X7RViN',
 } as const;
 
 const IS_LOCAL_AUTH_BYPASS =
@@ -86,8 +92,6 @@ async function clearOnboardingRateLimits() {
  * Provisioning happens in the Better Auth create hook; this update makes the
  * ephemeral test identity eligible to enter onboarding.
  *
- * Also releases the test Spotify artist ID from any previous test profiles
- * to avoid unique constraint violations on repeated runs.
  */
 async function ensureDbUser(betterAuthUserId: string) {
   const dbUrl = process.env.DATABASE_URL;
@@ -97,30 +101,6 @@ async function ensureDbUser(betterAuthUserId: string) {
 
   // Clear onboarding rate limits from previous test runs
   await clearOnboardingRateLimits();
-
-  // Release ALL test-linked Spotify artist IDs from previous test profiles.
-  // Multiple artists named "Tim White" exist on Spotify; the user might
-  // select any of them, so clear any spotify_id linked to test user profiles.
-  await sql`
-    UPDATE creator_profiles
-    SET spotify_id = NULL, spotify_url = NULL
-    WHERE user_id IN (
-      SELECT id
-      FROM users
-      WHERE email LIKE ${'gp-%+e2e@test.jovie.com'}
-    ) AND spotify_id IS NOT NULL
-  `;
-
-  // Also release the known primary "Tim White" Spotify ID from ANY profile.
-  // The top search result is deterministic (Spotify's ranking) and its ID can
-  // be held by non-test profiles from previous manual or dev-env runs, causing
-  // a unique constraint violation when the test tries to claim the same artist.
-  const KNOWN_TIM_WHITE_SPOTIFY_ID = '4Uwpa6zW3zzCSQvooQNksm';
-  await sql`
-    UPDATE creator_profiles
-    SET spotify_id = NULL, spotify_url = NULL
-    WHERE spotify_id = ${KNOWN_TIM_WHITE_SPOTIFY_ID}
-  `;
 
   await expect
     .poll(
@@ -144,99 +124,6 @@ async function ensureDbUser(betterAuthUserId: string) {
   // The sign-in response is still withheld at this point, so the browser has
   // neither the new session cookie nor a chance to cache the pending state.
   // Approving here removes the old cache-invalidation race entirely.
-}
-
-/**
- * Ensure the Spotify URL and ID are saved on the creator profile.
- *
- * During onboarding, `connectSpotifyArtist` and `enrichProfileFromDsp` are
- * both fire-and-forget with the flaky WebSocket pool — they often fail
- * silently in test environments. This function uses the reliable Neon HTTP
- * driver to guarantee the Spotify data is persisted, so we can hard-assert
- * that DSP links render on the public profile.
- */
-async function ensureSpotifyUrlOnProfile(
-  betterAuthUserId: string,
-  spotifyUrl: string,
-  spotifyId: string | null
-) {
-  const dbUrl = process.env.DATABASE_URL;
-  if (!dbUrl) return;
-
-  const sql = neon(dbUrl);
-
-  // Verify the profile exists before attempting update
-  const profiles = await sql`
-    SELECT cp.id, cp.spotify_url FROM creator_profiles cp
-    INNER JOIN users u ON u.id = cp.user_id
-    WHERE u.better_auth_user_id = ${betterAuthUserId}
-  `;
-
-  if (profiles.length === 0) {
-    console.warn(
-      'WARN: No creator_profiles row found for clerk user — cannot set spotify_url'
-    );
-    return;
-  }
-
-  // Get the username so we can invalidate the Redis cache
-  const profileData = await sql`
-    SELECT cp.username_normalized FROM creator_profiles cp
-    INNER JOIN users u ON u.id = cp.user_id
-    WHERE u.better_auth_user_id = ${betterAuthUserId}
-  `;
-  const username = profileData[0]?.username_normalized;
-
-  // Also ensure avatar_url and onboarding_completed_at are set so the proxy
-  // considers the profile "complete" (hasCompleteProfile checks both).
-  // Without this, the proxy rewrites all non-/app/ non-/api/ paths to
-  // /onboarding, preventing the public profile listen page from loading.
-  const result = await sql`
-    UPDATE creator_profiles
-    SET spotify_url = ${spotifyUrl},
-        spotify_id = ${spotifyId},
-        avatar_url = COALESCE(avatar_url, 'https://images.unsplash.com/placeholder'),
-        onboarding_completed_at = COALESCE(onboarding_completed_at, NOW()),
-        updated_at = NOW()
-    WHERE user_id = (SELECT id FROM users WHERE better_auth_user_id = ${betterAuthUserId})
-    RETURNING id, spotify_url, spotify_id
-  `;
-
-  if (result.length === 0) {
-    console.warn('WARN: ensureSpotifyUrlOnProfile update matched 0 rows');
-    return;
-  }
-
-  // Invalidate Redis caches so the next page load fetches fresh data:
-  // 1. Profile edge cache (profile:data:{username}) — stale spotify_url
-  // 2. Proxy user state (proxy:user-state:{clerkId}) — stale needsOnboarding
-  //    (the proxy considers profiles without avatar_url as "needs onboarding"
-  //    and rewrites all non-/app/ paths to /onboarding)
-  const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
-  const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (redisUrl && redisToken) {
-    const keysToDelete = [
-      ...(username ? [`profile:data:${username}`] : []),
-      `proxy:user-state:${betterAuthUserId}`,
-    ];
-    try {
-      // Upstash REST API: pipeline multiple DEL commands
-      const pipeline = keysToDelete.map(key => ['DEL', key]);
-      await fetch(`${redisUrl}/pipeline`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${redisToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(pipeline),
-      });
-      console.log(
-        `[golden-path] Invalidated Redis caches: ${keysToDelete.join(', ')}`
-      );
-    } catch {
-      console.warn('WARN: Failed to invalidate Redis caches');
-    }
-  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -376,9 +263,9 @@ async function createFreshUserOnce(page: import('@playwright/test').Page) {
   }
 }
 
-async function seedAnonymousOnboardingJourney(page: Page, handle: string) {
+async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
   const dbUrl = process.env.DATABASE_URL;
-  if (!dbUrl) throw new Error('DATABASE_URL required for onboarding seed');
+  if (!dbUrl) throw new Error('DATABASE_URL required for onboarding proof');
 
   // Mark only this browser as local automation before React initializes so
   // the anonymous turn bypasses Turnstile without enabling auth bypass.
@@ -404,21 +291,56 @@ async function seedAnonymousOnboardingJourney(page: Page, handle: string) {
     .toBe('1');
   const input = page.locator('[aria-label="Chat message input" i]');
   await expect(input).toBeVisible({ timeout: 30_000 });
-  await input.fill('I am Tim White');
   const sendButton = page.getByRole('button', { name: 'Send message' });
-  // Synchronize on the real user-facing composer without coupling the fixture
-  // to component attributes that the canonical chat does not expose.
-  await expect(sendButton).toBeEnabled({ timeout: 30_000 });
-  const [response] = await Promise.all([
+  const sendChatMessage = async (text: string) => {
+    await input.fill(text);
+    await expect(sendButton).toBeEnabled({ timeout: 30_000 });
+    const [response] = await Promise.all([
+      page.waitForResponse(
+        candidate =>
+          candidate.request().method() === 'POST' &&
+          new URL(candidate.url()).pathname === '/api/chat'
+      ),
+      sendButton.click(),
+    ]);
+    expect(response.status()).toBe(200);
+    await expect(input).toBeEditable({ timeout: 60_000 });
+    return response;
+  };
+
+  // The product receives the real artist URL and resolves it through the
+  // canonical deterministic onboarding engine. No tool event, profile field,
+  // or catalog row is synthesized by the test.
+  const artistResponse = await sendChatMessage(TEST_SPOTIFY_ARTIST.url);
+  expect(artistResponse.headers()['x-onboarding-fallback']).toMatch(
+    /^confirm_artist:/
+  );
+  await expect(
+    page.getByText(TEST_SPOTIFY_ARTIST.name, { exact: true }).first(),
+    'Real Spotify artist confirmation did not render the resolved identity'
+  ).toBeVisible({ timeout: 60_000 });
+
+  const handleResponse = await sendChatMessage('Set my profile handle');
+  expect(handleResponse.headers()['x-onboarding-fallback']).toMatch(/^handle:/);
+  const handleCard = page.getByTestId('onboarding-handle-check');
+  await expect(handleCard).toBeVisible({ timeout: 60_000 });
+  await handleCard.getByLabel('Edit Proposed Handle').fill(handle);
+  await expect(handleCard.getByText('is available')).toBeVisible({
+    timeout: 30_000,
+  });
+  const confirmHandle = handleCard.getByTestId('onboarding-confirm-handle');
+  await expect(confirmHandle).toBeEnabled({ timeout: 30_000 });
+  const [confirmedHandleResponse] = await Promise.all([
     page.waitForResponse(
       candidate =>
         candidate.request().method() === 'POST' &&
         new URL(candidate.url()).pathname === '/api/chat'
     ),
-    sendButton.click(),
+    confirmHandle.click(),
   ]);
-  expect(response.status()).toBe(200);
-  const requestBody = response.request().postDataJSON() as {
+  expect(confirmedHandleResponse.status()).toBe(200);
+
+  const requestBody = artistResponse.request().postDataJSON() as {
     messages?: Array<{ id?: string; role?: string }>;
   };
   const clientMessageId = requestBody.messages
@@ -447,44 +369,6 @@ async function seedAnonymousOnboardingJourney(page: Page, handle: string) {
     conversationId,
     'Anonymous chat did not reserve a conversation'
   ).toBeTruthy();
-
-  const toolCalls = [
-    {
-      schemaVersion: 2,
-      toolCallId: `golden-artist-${Date.now()}`,
-      toolName: 'confirmSpotifyArtist',
-      state: 'succeeded',
-      output: {
-        action: 'spotify_artist_confirmed',
-        spotifyArtistId: '4Uwpa6zW3zzCSQvooQNksm',
-        artist: {
-          id: '4Uwpa6zW3zzCSQvooQNksm',
-          name: 'Tim White',
-          url: 'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm',
-        },
-      },
-      uiHint: 'artifact',
-    },
-    {
-      schemaVersion: 2,
-      toolCallId: `golden-handle-${Date.now()}`,
-      toolName: 'checkHandle',
-      state: 'succeeded',
-      output: { action: 'check_handle', handle },
-      uiHint: 'artifact',
-    },
-  ];
-  const updated = await sql`
-    UPDATE chat_messages
-    SET tool_calls = ${JSON.stringify(toolCalls)}::jsonb
-    WHERE id = (
-      SELECT id FROM chat_messages
-      WHERE conversation_id = ${conversationId}
-      ORDER BY created_at DESC LIMIT 1
-    )
-    RETURNING id
-  `;
-  expect(updated.length, 'Anonymous chat message was not persisted').toBe(1);
   return conversationId;
 }
 
@@ -571,7 +455,7 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
     // ──────────────────────────────────────────────────────────────────
     const randomSuffix = Math.random().toString(36).slice(2, 8);
     const uniqueHandle = `t${Date.now().toString(36)}${randomSuffix}`;
-    const conversationId = await seedAnonymousOnboardingJourney(
+    const conversationId = await driveAnonymousOnboardingJourney(
       page,
       uniqueHandle
     );
@@ -579,9 +463,19 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
     // ──────────────────────────────────────────────────────────────────
     // STEP 3: Create account
     // ──────────────────────────────────────────────────────────────────
+    const sql = neon(process.env.DATABASE_URL!);
+    const conflictingProfiles = await sql`
+      SELECT cp.id, cp.username_normalized, u.email
+      FROM creator_profiles cp
+      INNER JOIN users u ON u.id = cp.user_id
+      WHERE cp.spotify_id = ${TEST_SPOTIFY_ARTIST.id}
+    `;
+    expect(
+      conflictingProfiles,
+      `Protected Golden Path fixture is already owned; refusing to detach ${TEST_SPOTIFY_ARTIST.id}: ${JSON.stringify(conflictingProfiles)}`
+    ).toHaveLength(0);
+
     const { betterAuthUserId, claimPayload } = await createFreshUser(page);
-    const TEST_SPOTIFY_ID = '4Uwpa6zW3zzCSQvooQNksm';
-    const testSpotifyUrl = `https://open.spotify.com/artist/${TEST_SPOTIFY_ID}`;
 
     // Assert the real client auto-claim response captured during OTP completion.
     // A duplicate request here would race the hook and mask which caller won.
@@ -589,34 +483,61 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
       claimed: 1,
       conversationId,
     });
-    const sql = neon(process.env.DATABASE_URL!);
-    await expect
-      .poll(async () => {
-        const rows = await sql`
-          SELECT cp.id FROM creator_profiles cp
-          INNER JOIN users u ON u.id = cp.user_id
-          WHERE u.better_auth_user_id = ${betterAuthUserId}
-            AND cp.username_normalized = ${uniqueHandle}
-        `;
-        return rows.length;
-      })
-      .toBe(1);
 
-    // Ensure Spotify URL is saved on the profile via direct DB write.
-    // The fire-and-forget connectSpotifyArtist uses the flaky WebSocket pool
-    // and often fails silently in test envs. This guarantees the URL is persisted
-    // so we can hard-assert DSP links render on the public profile.
-    //
-    const spotifyIdToSave = TEST_SPOTIFY_ID;
-    const spotifyUrlToSave = testSpotifyUrl;
-    console.log(
-      `[golden-path] Activated conversation=${conversationId}; setting spotify_url=${spotifyUrlToSave}`
-    );
-    await ensureSpotifyUrlOnProfile(
-      betterAuthUserId,
-      spotifyUrlToSave,
-      spotifyIdToSave
-    );
+    const readClaimedProfileProof = async () => {
+      const [proof] = await sql`
+        SELECT cp.id,
+               cp.spotify_id AS "spotifyId",
+               cp.spotify_url AS "spotifyUrl",
+               cp.display_name AS "displayName",
+               cp.avatar_url AS "avatarUrl",
+               cp.is_public AS "isPublic",
+               cp.is_claimed AS "isClaimed",
+               cp.onboarding_completed_at AS "onboardingCompletedAt",
+               cp.settings #>> '{onboarding,selectedSpotifyArtistId}' AS "selectedSpotifyArtistId",
+               u.id AS "appUserId",
+               u.active_profile_id AS "activeProfileId",
+               c.user_id AS "conversationUserId",
+               c.creator_profile_id AS "conversationProfileId",
+               (
+                 SELECT COUNT(*)::int
+                 FROM user_profile_claims upc
+                 WHERE upc.user_id = u.id
+                   AND upc.creator_profile_id = cp.id
+                   AND upc.role = 'owner'
+               ) AS "ownerClaimCount"
+        FROM creator_profiles cp
+        INNER JOIN users u ON u.id = cp.user_id
+        INNER JOIN chat_conversations c ON c.id = ${conversationId}
+        WHERE u.better_auth_user_id = ${betterAuthUserId}
+          AND cp.username_normalized = ${uniqueHandle}
+      `;
+      return proof ?? null;
+    };
+
+    await expect
+      .poll(readClaimedProfileProof, {
+        message:
+          'Claim did not persist the real Spotify identity and exact owner links',
+        timeout: 60_000,
+      })
+      .toMatchObject({
+        spotifyId: TEST_SPOTIFY_ARTIST.id,
+        spotifyUrl: TEST_SPOTIFY_ARTIST.url,
+        displayName: TEST_SPOTIFY_ARTIST.name,
+        avatarUrl: expect.stringMatching(/^https?:\/\//),
+        isPublic: true,
+        isClaimed: true,
+        onboardingCompletedAt: expect.anything(),
+        selectedSpotifyArtistId: TEST_SPOTIFY_ARTIST.id,
+        ownerClaimCount: 1,
+      });
+    const claimedProfile = await readClaimedProfileProof();
+    expect(claimedProfile).not.toBeNull();
+    const profileId = claimedProfile?.id as string;
+    expect(claimedProfile?.activeProfileId).toBe(profileId);
+    expect(claimedProfile?.conversationProfileId).toBe(profileId);
+    expect(claimedProfile?.conversationUserId).toBe(claimedProfile?.appUserId);
 
     // ──────────────────────────────────────────────────────────────────
     // STEP 7: Dashboard loaded — profile is sufficiently complete
@@ -636,8 +557,6 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
       intervals: [5_000, 10_000, 20_000],
     });
 
-    // Direct DB repair runs before the dashboard check, so a redirect here
-    // means auth or profile completion regressed rather than slow enrichment.
     const currentUrl = page.url();
     expect(
       currentUrl,
@@ -647,47 +566,89 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
       '/sign-in'
     );
 
-    // Verify the DB write took effect by querying directly
-    {
-      const dbUrl = process.env.DATABASE_URL!;
-      const sql = neon(dbUrl);
-      const check = await sql`
-        SELECT cp.spotify_url, cp.spotify_id, cp.is_public
-        FROM creator_profiles cp
-        INNER JOIN users u ON u.id = cp.user_id
-        WHERE u.better_auth_user_id = ${betterAuthUserId}
-      `;
-      console.log('[golden-path] Profile DB check:', JSON.stringify(check));
-    }
+    // Drive the canonical product import owner. The test never writes profile
+    // identity or catalog rows; the server action performs a real Spotify sync.
+    await page.goto(APP_ROUTES.RELEASES, {
+      waitUntil: 'domcontentloaded',
+      timeout: 90_000,
+    });
+    const syncButton = page
+      .locator(
+        '[data-testid="sync-spotify-empty-state"], [data-testid="shell-releases-sync-empty-state"]'
+      )
+      .filter({ visible: true })
+      .first();
+    await expect(
+      syncButton,
+      'Claimed Spotify profile did not expose the canonical catalog import action'
+    ).toBeVisible({ timeout: 60_000 });
+    await syncButton.click();
 
-    // Verify DSP links are persisted by checking the DB directly first, as a
-    // fast, unambiguous signal before STEP 8 renders the public listen page.
-    // This hard-asserts the prerequisite for DSP buttons rendering there.
-    {
-      const dbUrl = process.env.DATABASE_URL!;
-      const sql = neon(dbUrl);
-      const profileCheck = await sql`
-        SELECT cp.spotify_url, cp.spotify_id, cp.is_public, cp.avatar_url,
-               cp.onboarding_completed_at
-        FROM creator_profiles cp
-        INNER JOIN users u ON u.id = cp.user_id
-        WHERE u.better_auth_user_id = ${betterAuthUserId}
-      `;
-
-      expect(profileCheck.length, 'No profile found for test user').toBe(1);
-      const p = profileCheck[0];
-      expect(
-        p.spotify_url,
-        'spotify_url not saved — DSP links will not render'
-      ).toBeTruthy();
-      expect(p.is_public, 'Profile is not public — listen page will 404').toBe(
-        true
-      );
-
-      console.log(
-        `[golden-path] DSP check passed: spotify_url=${p.spotify_url}, spotify_id=${p.spotify_id}, is_public=${p.is_public}`
-      );
-    }
+    await expect
+      .poll(
+        async () => {
+          const [proof] = await sql`
+            SELECT COUNT(DISTINCT r.id)::int AS "releaseCount",
+                   COUNT(DISTINCT rt.id)::int AS "trackCount",
+                   COUNT(DISTINCT pl.id) FILTER (
+                     WHERE pl.provider_id = 'spotify'
+                       AND pl.source_type = 'ingested'
+                       AND pl.url LIKE 'https://open.spotify.com/album/%'
+                   )::int AS "spotifyProviderCount",
+                   COUNT(DISTINCT r.id) FILTER (
+                     WHERE r.source_type <> 'ingested'
+                       OR NOT (
+                         r.metadata @> jsonb_build_object(
+                           'spotifyArtists',
+                           jsonb_build_array(jsonb_build_object('id', ${TEST_SPOTIFY_ARTIST.id}))
+                         )
+                       )
+                   )::int AS "wrongReleaseCount",
+                   COUNT(DISTINCT rt.id) FILTER (
+                     WHERE rt.source_type <> 'ingested'
+                       OR rec.creator_profile_id <> ${profileId}
+                   )::int AS "wrongTrackCount"
+            FROM discog_releases r
+            LEFT JOIN discog_release_tracks rt ON rt.release_id = r.id
+            LEFT JOIN discog_recordings rec ON rec.id = rt.recording_id
+            LEFT JOIN provider_links pl ON pl.release_id = r.id
+            WHERE r.creator_profile_id = ${profileId}
+              AND r.deleted_at IS NULL
+          `;
+          return {
+            ...proof,
+            ready:
+              Number(proof?.releaseCount ?? 0) > 0 &&
+              Number(proof?.trackCount ?? 0) > 0 &&
+              Number(proof?.spotifyProviderCount ?? 0) > 0 &&
+              proof?.wrongReleaseCount === 0 &&
+              proof?.wrongTrackCount === 0,
+          };
+        },
+        {
+          message:
+            'Real Spotify import did not persist an owned release, track, and provider link',
+          timeout: 180_000,
+          intervals: [2_000, 5_000, 10_000],
+        }
+      )
+      .toMatchObject({
+        ready: true,
+        wrongReleaseCount: 0,
+        wrongTrackCount: 0,
+      });
+    const [importedRelease] = await sql`
+      SELECT r.title, pl.url AS "spotifyUrl"
+      FROM discog_releases r
+      INNER JOIN provider_links pl
+        ON pl.release_id = r.id AND pl.provider_id = 'spotify'
+      WHERE r.creator_profile_id = ${profileId}
+        AND r.source_type = 'ingested'
+        AND r.deleted_at IS NULL
+      ORDER BY r.release_date DESC NULLS LAST, r.created_at DESC
+      LIMIT 1
+    `;
+    expect(importedRelease, 'Imported catalog proof disappeared').toBeTruthy();
 
     // Verify the newly created user is visible in the admin dashboard.
     if (hasAdminCredentials()) {
@@ -771,14 +732,20 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
           'Artist name does not match imported artist'
         ).toHaveText(/tim white/i, { timeout: 10_000 });
 
-        // Verify the imported Spotify link is actually rendered — not just a
-        // generic tab bar, which would pass even if DSP import silently failed.
         await expect(
           fanPage
-            .locator('a[href*="spotify"]')
-            .filter({ visible: true })
+            .getByText(String(importedRelease?.title), { exact: true })
             .first(),
-          'No Spotify listen link — imported DSP content not live'
+          'Imported release title is missing from the public profile'
+        ).toBeVisible({ timeout: 10_000 });
+
+        // Match the exact release-provider URL persisted by the real import;
+        // a generic artist-level Spotify button cannot satisfy this proof.
+        await expect(
+          fanPage
+            .locator(`a[href="${String(importedRelease?.spotifyUrl)}"]`)
+            .first(),
+          'Imported Spotify release link is not live on the public profile'
         ).toBeVisible({ timeout: 10_000 });
       }).toPass({
         timeout: 180_000,

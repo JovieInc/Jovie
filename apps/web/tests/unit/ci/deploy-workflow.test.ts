@@ -3086,6 +3086,13 @@ describe('CI E2E smoke workflow', () => {
       resolve(repoRoot, 'apps/web/tests/e2e/golden-path.spec.ts'),
       'utf8'
     );
+    const releasesActions = readFileSync(
+      resolve(
+        repoRoot,
+        'apps/web/app/app/(shell)/dashboard/releases/actions.ts'
+      ),
+      'utf8'
+    );
     const smokeManifest = readFileSync(
       resolve(repoRoot, 'apps/web/tests/e2e/smoke-manifest.ts'),
       'utf8'
@@ -3096,6 +3103,8 @@ describe('CI E2E smoke workflow', () => {
     expect(smokeStep).not.toContain('export E2E_TEST_MODE=1');
     expect(smokeStep).not.toContain('export PUBLIC_NOAUTH_SMOKE=1');
     expect(goldenPathStep).toContain('export E2E_TEST_MODE=1');
+    expect(goldenPathStep).toContain('export E2E_FAST_ONBOARDING=1');
+    expect(goldenPathStep).toContain("E2E_FAST_ONBOARDING: '1'");
     expect(goldenPathStep).toContain('export CHAT_LLM_FAILURE_INJECTION=1');
     expect(goldenPathStep).toContain('export PUBLIC_NOAUTH_SMOKE=1');
     expect(goldenPathStep).not.toContain('E2E_USE_TEST_AUTH_BYPASS');
@@ -3162,6 +3171,27 @@ describe('CI E2E smoke workflow', () => {
     expect(goldenPathSpec).toContain(
       'resetAuthStatePreservingOnboardingSession(page.context())'
     );
+    expect(goldenPathSpec).not.toContain('ensureSpotifyUrlOnProfile');
+    expect(goldenPathSpec).not.toContain(
+      'SET spotify_id = NULL, spotify_url = NULL'
+    );
+    expect(goldenPathSpec).not.toContain('UPDATE chat_messages');
+    expect(goldenPathSpec).toContain(
+      'sendChatMessage(TEST_SPOTIFY_ARTIST.url)'
+    );
+    expect(goldenPathSpec).toContain(
+      'Protected Golden Path fixture is already owned; refusing to detach'
+    );
+    expect(goldenPathSpec).toContain('user_profile_claims upc');
+    expect(goldenPathSpec).toContain('sync-spotify-empty-state');
+    expect(goldenPathSpec).toContain('FROM discog_releases r');
+    expect(goldenPathSpec).toContain('LEFT JOIN discog_release_tracks rt');
+    expect(goldenPathSpec).toContain('LEFT JOIN provider_links pl');
+    expect(releasesActions).toContain(
+      'function getE2EFastSpotifyImportOptions()'
+    );
+    expect(releasesActions).toContain('maxReleases: 1');
+    expect(releasesActions).toContain('maxTracksPerRelease: 6');
   });
 
   it('seeds public QA fixtures on ephemeral Neon before PR smoke runs', () => {
