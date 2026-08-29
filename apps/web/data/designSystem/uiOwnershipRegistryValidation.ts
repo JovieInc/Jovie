@@ -3,6 +3,8 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { APP_SCREEN_COMPONENT_REGISTRY } from '@/data/appScreens';
 import { MARKETING_SHELL_REGISTRY } from '@/data/marketing';
 import { DESIGN_SYSTEM_COMPONENT_REGISTRY } from './componentRegistry';
+import { INTERACTION_REGISTRY } from './interactionRegistry';
+import { validateInteractionRegistry } from './interactionRegistryValidation';
 import {
   UI_OWNERSHIP_BREAKPOINTS,
   UI_OWNERSHIP_ENTRY_IDS,
@@ -478,11 +480,29 @@ function validateAuthority(
   issues: UIOwnershipRegistryIssue[]
 ) {
   const { sourceAuthority: authority, canonicalOwner: owner } = entry;
+  if (
+    (entry.layer === 'interaction') !==
+    (authority.registry === 'interactions')
+  ) {
+    badEntry(issues, entry, 'invalid-interaction-layer');
+  }
   if (authority.registry === 'direct')
     return (
       owner.registryId === null ||
       badEntry(issues, entry, 'unresolved-source-authority')
     );
+  if (authority.registry === 'interactions') {
+    const source = INTERACTION_REGISTRY.find(item => item.id === authority.id);
+    if (
+      !source ||
+      owner.sourcePath !== source.owner.sourcePath ||
+      owner.exportName !== source.owner.exportName ||
+      owner.registryId !== source.id
+    ) {
+      badEntry(issues, entry, 'unresolved-source-authority');
+    }
+    return;
+  }
   const source =
     authority.registry === 'design-system'
       ? DESIGN_SYSTEM_COMPONENT_REGISTRY.find(item => item.id === authority.id)
@@ -612,6 +632,7 @@ export function validateUIOwnershipRegistry({
   const owners = new Set<string>();
   const sourcePaths = new Set<string>();
   const aliases = new Set<string>();
+  const ownerExports = new Map<string, Set<string>>();
   const coveredSurfaces = new Set<string>();
   for (const entry of entries) {
     if (ids.has(entry.id)) badEntry(issues, entry, 'duplicate-entry-id');
@@ -622,6 +643,10 @@ export function validateUIOwnershipRegistry({
       badEntry(issues, entry, 'missing-owner');
     else if (owners.has(ownerKey)) badEntry(issues, entry, 'duplicate-owner');
     owners.add(ownerKey);
+    const exportOwners =
+      ownerExports.get(owner.exportName) ?? new Set<string>();
+    exportOwners.add(entry.id);
+    ownerExports.set(owner.exportName, exportOwners);
     if (!entry.sourcePaths.includes(owner.sourcePath))
       badEntry(issues, entry, 'missing-source-path');
     for (const sourcePath of entry.sourcePaths) {
@@ -679,8 +704,18 @@ export function validateUIOwnershipRegistry({
     if (!coveredSurfaces.has(surface)) bad(issues, 'missing-surface', surface);
   for (const entry of entries)
     for (const alias of entry.duplicateAliases)
-      if (ids.has(alias))
+      if (ids.has(alias)) {
         badEntry(issues, entry, 'alias-collides-with-entry-id');
+      } else if (
+        [...(ownerExports.get(alias) ?? [])].some(
+          ownerId => ownerId !== entry.id
+        )
+      ) {
+        badEntry(issues, entry, 'alias-collides-with-owner');
+      }
+  for (const issue of validateInteractionRegistry({ repoRoot })) {
+    bad(issues, issue.code, issue.id);
+  }
   validateNativeButtonOwnership(entries, swiftSources, issues, repoRoot);
   return issues;
 }

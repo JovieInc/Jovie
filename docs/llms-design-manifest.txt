@@ -13,6 +13,7 @@
 - **Token registry:** `apps/web/styles/design-system.css`
 - **Token docs:** `docs/DESIGN_TOKENS.md`
 - **Shared primitives:** `packages/ui/atoms/*` via `import { ... } from '@jovie/ui'`
+- **Interaction owners:** `apps/web/data/designSystem/interactionRegistry.ts` projected through `UI_OWNERSHIP_REGISTRY`
 - **Canonical surfaces:** `apps/web/lib/canonical-surfaces.ts`
 - **Tailwind mapping:** `apps/web/tailwind.config.js`
 
@@ -20,6 +21,7 @@
 
 - Never invent design tokens — add shared tokens only in `design-system.css`.
 - Never import local `@/components/atoms/*` for primitives covered by `@jovie/ui`.
+- Resolve menu, tooltip, popover, sheet, drawer, dialog, toast, banner, tabs, picker, search, and form behavior through the interaction ownership registry before composing a surface.
 - Use semantic Tailwind utilities (`text-primary-token`, `bg-surface-1`, `duration-subtle`) instead of raw colors, hex, or arbitrary motion.
 - Motion: only `duration-subtle ease-subtle` or `duration-cinematic ease-cinematic`.
 - Public/marketing width: `max-w-public-content` (`--ds-public-content-max` = 1298px).
@@ -51,7 +53,7 @@
 - `border-subtle`, `border-default`, `border-strong`
 - `focus-ring-themed` or `focus-visible:*` on interactive elements
 
-## Design Tokens (246 contract tokens; 464 total in CSS)
+## Design Tokens (235 contract tokens; 453 total in CSS)
 
 Contract tokens below are the semantic surface for AI edits. DSP brand colors and extended accent palettes live in `apps/web/styles/design-system.css` only.
 
@@ -163,13 +165,13 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--system-b-chat-user-bubble-bg`: var(--color-text-primary-token)
 - `--system-b-chat-user-bubble-border`: color-mix( in oklab, var(--color-text-primary-token) 80%, transparent )
 - `--system-b-chat-user-bubble-shadow`: 0 var(--space-3) 38px -28px color-mix(in oklab, var(--system-b-cinematic-black) 85%, transparent), inset 0 var(--space-px) 0 color-mix(in oklab, var(--color-text-primary-token) 90%, transparent)
-- `--system-b-chat-user-bubble-text`: var(--system-b-cinematic-black)
+- `--system-b-chat-user-bubble-text`: var(--color-bg-base)
 - `--system-b-cinematic-black`: #06070a
 - `--system-b-duration-fast`: var(--ds-motion-subtle-duration)
 - `--system-b-ease`: var(--ds-motion-subtle-easing)
 - `--system-b-entity-chip-artist-accent`: var(--color-accent-purple)
 - `--system-b-entity-chip-event-accent`: var(--color-accent-orange)
-- `--system-b-entity-chip-on-light-text`: var(--color-text-primary-token)
+- `--system-b-entity-chip-on-light-text`: var(--system-b-chat-user-bubble-text)
 - `--system-b-entity-chip-release-accent`: var(--color-accent)
 - `--system-b-entity-chip-track-accent`: var(--color-accent-blue)
 - `--system-b-header-height`: var(--linear-header-height)
@@ -237,20 +239,6 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--profile-shell-card-radius`: 24px
 - `--profile-shell-header-max-width`: 38rem
 - `--profile-shell-max-width`: 430px
-
-### Border Radius
-
-- `--radius-2xl`: 20px
-- `--radius-3xl`: 24px
-- `--radius-default`: 4px
-- `--radius-full`: 9999px
-- `--radius-lg`: 12px
-- `--radius-md`: 10px
-- `--radius-none`: 0
-- `--radius-pill`: 9999px
-- `--radius-sm`: 8px
-- `--radius-xl`: 16px
-- `--radius-xs`: 2px
 
 ### Typography Scale
 

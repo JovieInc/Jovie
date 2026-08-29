@@ -316,6 +316,36 @@ describe('cross-surface UI ownership registry', () => {
     );
   });
 
+  it('RED: rejects detached interaction projections and owner-name aliases', () => {
+    expectIssue(
+      mutate('interaction.menu', () => ({ layer: 'atom' })),
+      'invalid-interaction-layer'
+    );
+    expectIssue(
+      mutate('molecule.entity-sidebar', () => ({
+        duplicateAliases: ['RightDrawer'],
+      })),
+      'alias-collides-with-owner'
+    );
+
+    const sharedExportOwners = UI_OWNERSHIP_REGISTRY.map(entry => {
+      if (entry.id === 'atom.button' || entry.id === 'atom.icon-button') {
+        return {
+          ...entry,
+          canonicalOwner: {
+            ...entry.canonicalOwner,
+            exportName: 'SharedExport',
+          },
+        };
+      }
+      if (entry.id === 'atom.link') {
+        return { ...entry, duplicateAliases: ['SharedExport'] };
+      }
+      return entry;
+    }) as readonly Entry[];
+    expectIssue(sharedExportOwners, 'alias-collides-with-owner');
+  });
+
   it('RED: rejects a detached native pill-style consumer', () => {
     const swiftSources = [
       ...productionSwiftSources,

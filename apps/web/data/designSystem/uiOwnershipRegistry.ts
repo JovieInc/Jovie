@@ -11,6 +11,12 @@ import {
   designSystemCanonicalPenRoot,
   getDesignSystemComponent,
 } from './componentRegistry';
+import {
+  INTERACTION_FAMILY_IDS,
+  INTERACTION_REGISTRY,
+  type InteractionFamilyId,
+  type InteractionRegistryEntry,
+} from './interactionRegistry';
 
 const words = (value: string): readonly string[] => value.split(' ');
 export const UI_OWNERSHIP_REGISTRY_SCHEMA = 'jovie.ui-ownership/v1' as const;
@@ -26,7 +32,7 @@ export const UI_OWNERSHIP_STATES = words(
   'default hover focus-visible pressed visited selected disabled loading pending empty partial success error offline recovery collapsed expanded'
 );
 export type UIOwnershipState = (typeof UI_OWNERSHIP_STATES)[number];
-export type UIOwnershipLayer = 'atom' | 'molecule' | 'organism';
+export type UIOwnershipLayer = 'atom' | 'interaction' | 'molecule' | 'organism';
 export type UIOwnershipTypography =
   | 'inter'
   | 'satoshi-display'
@@ -38,6 +44,7 @@ export type UIPenStatus =
   | 'not-applicable';
 type UIRegistrySourceAuthority =
   | { readonly registry: 'design-system'; readonly id: DesignSystemComponentId }
+  | { readonly registry: 'interactions'; readonly id: InteractionFamilyId }
   | {
       readonly registry: 'marketing';
       readonly id: MarketingShellRegistryEntry['id'];
@@ -93,9 +100,13 @@ type UIVisibleControlGeometry = {
   readonly hitTargetPx: 44;
   readonly appliesTo: 'marketing-control';
 };
-export const UI_OWNERSHIP_ENTRY_IDS = words(
+const UI_OWNERSHIP_COMPOSITION_ENTRY_IDS = words(
   'atom.button atom.icon-button atom.link atom.brand-logo atom.logo atom.logo-link molecule.auth-actions organism.public-page-shell organism.marketing-header organism.marketing-footer organism.app-shell-frame organism.app-shell-content-panel molecule.entity-sidebar organism.auth-layout organism.onboarding-chat organism.waitlist-intake-chat organism.profile-shell molecule.profile-primary-cta molecule.claim-banner organism.opportunity-row organism.jovie-work-feed organism.standalone-product-page organism.chat-workspace organism.calendar-surface organism.admin-shell'
 );
+export const UI_OWNERSHIP_ENTRY_IDS = [
+  ...UI_OWNERSHIP_COMPOSITION_ENTRY_IDS,
+  ...INTERACTION_FAMILY_IDS,
+] as const;
 export type UIOwnershipEntryId = (typeof UI_OWNERSHIP_ENTRY_IDS)[number];
 export type UIOwnershipRegistryEntry = {
   readonly id: UIOwnershipEntryId;
@@ -145,6 +156,8 @@ const direct = (sourcePath: string, exportName: string): UICanonicalOwner => ({
   registryId: null,
 });
 const dsSource = (id: DesignSystemComponentId) => source('design-system', id);
+const interactionSource = (id: InteractionFamilyId) =>
+  source('interactions', id);
 const marketingSource = (id: MarketingShellRegistryEntry['id']) =>
   source('marketing', id);
 const appSource = (id: AppScreenComponentId) => source('app-screens', id);
@@ -153,6 +166,12 @@ const dsOwner = (id: DesignSystemComponentId): UICanonicalOwner => {
   if (!e) throw new Error(`Unknown design-system component: ${id}`);
   return { sourcePath: e.source, exportName: e.exportName, registryId: id };
 };
+const interactionOwner = (
+  entry: InteractionRegistryEntry
+): UICanonicalOwner => ({
+  ...entry.owner,
+  registryId: entry.id,
+});
 const marketingOwner = (
   id: MarketingShellRegistryEntry['id']
 ): UICanonicalOwner => {
@@ -218,6 +237,13 @@ const appPen = (id: AppScreenComponentId): UIPenIdentity => {
   if (!e) throw new Error(`Unknown authenticated-screen component: ${id}`);
   return unresolved(e.penIdentityReason ?? 'No source-backed Pen identity.');
 };
+const interactionPen = (role: string): UIPenIdentity => ({
+  status: 'not-applicable',
+  identity: null,
+  sourceBacked: false,
+  evidencePaths: [],
+  reason: `${role} behavior is source-owned; Pen remains visual review evidence.`,
+});
 const adapter = (
   platform: UIOwnershipPlatform,
   role: UIPlatformAdapter['role'],
@@ -470,7 +496,7 @@ const stateSets = packed(
 );
 type Row = string;
 const rows =
-  'atom.button|atom|all|button|control|default focus-visible disabled loading|44px-hit-target|32px-visible|32px-visible|CTAButton PrimaryCTA marketing-cta;atom.icon-button|atom|all|iconButton|control|default focus-visible pressed disabled loading|44px-hit-target|32px-visible|32px-visible|CircleIconButton AppIconButton HeaderIconButton InlineIconButton DrawerInlineIconButton OverflowMenuTrigger RailToggleButton;atom.link|atom|all|link|controlVisited|default focus-visible disabled|inline|inline|inline|TextLink InlineLink;atom.brand-logo|atom|authProfile|brand|logo|default|compact-mark|wordmark|wordmark|JovieLogo BrandMark;atom.logo|atom|authProfile|logo|logo|default|icon|word|word|LogoIcon Wordmark;atom.logo-link|atom|authProfile|logoLink|logoLink|default focus-visible|icon-link|word-link|word-link|LogoAnchor BrandLink;molecule.auth-actions|molecule|auth|authActions|control|default focus-visible loading|stacked|inline|inline|AuthButtons SignInActions;organism.public-page-shell|organism|public|publicPage|shell|default loading error|single-column|contained|contained|PublicShell MarketingPageFrame;organism.marketing-header|organism|public|header|shell|default focus-visible collapsed expanded|icon-only|compact-nav|full-nav|PublicHeader MarketingNav;organism.marketing-footer|organism|public|footer|shell|default collapsed expanded|stacked|grouped|multi-column|PublicFooter SiteFooter;organism.app-shell-frame|organism|workspace|shell|shell|default loading error offline|drawer|rail|rail-and-panel|DashboardShell AppShell;organism.app-shell-content-panel|organism|workspace|content|content|default loading empty error|stacked|split|split|MainContentPanel WorkspacePanel PageShell;molecule.entity-sidebar|molecule|workspace|sidebar|sidebar|default focus-visible selected expanded|sheet|rail|rail|RightDrawer EntityRail;organism.auth-layout|organism|auth|authLayout|content|default loading error recovery|keyboard-aware|centered|centered|AuthShell AuthFormFrame;organism.onboarding-chat|organism|onboarding|onboarding|content|default loading empty error recovery|composer-stacked|chat-with-rail|chat-with-rail|StartChat OnboardingAssistant;organism.waitlist-intake-chat|organism|waitlist|waitlist|waitlist|default loading pending success error recovery|single-column|single-column|contained|WaitlistForm AccessRequestChat;organism.profile-shell|organism|profile|profile|profile|default loading empty error|drawer-driven|single-column|expanded|ArtistPageShell ProfileLayout;molecule.profile-primary-cta|molecule|public|cta|cta|default focus-visible disabled loading error|full-width|inline|inline|ProfileAction ArtistProfileCTA;molecule.claim-banner|molecule|profile|claimBanner|claim|default focus-visible disabled error|stacked|inline|inline|ClaimNotice ArtistClaimBanner;organism.opportunity-row|organism|chat|opportunityRow|opportunity|default hover focus-visible selected disabled loading|swipe-enabled|action-row|action-row|OpportunityListRow WorkOpportunityRow;organism.jovie-work-feed|organism|app|jovieWorkFeed|feed|default loading empty partial success error recovery|single-column|single-column|single-column|AutonomousWorkFeed WorkFeed;organism.standalone-product-page|organism|all|standaloneProductPage|standalone|default loading error|compact-gutter|contained|contained|ProductPageFrame StandaloneShell;organism.chat-workspace|organism|chat|chat|expanded|default loading empty error recovery|composer-stacked|split-panel|split-panel|ConversationWorkspace ChatSurface;organism.calendar-surface|organism|calendar|calendar|expanded|default loading empty error|agenda|grid|grid|CalendarView ReleaseCalendar;organism.admin-shell|organism|admin|admin|content|default loading empty error recovery|stacked|table-with-panel|table-with-panel|AdminFrame OperatorShell'.split(
+  'atom.button|atom|all|button|control|default focus-visible disabled loading|44px-hit-target|32px-visible|32px-visible|CTAButton PrimaryCTA marketing-cta;atom.icon-button|atom|all|iconButton|control|default focus-visible pressed disabled loading|44px-hit-target|32px-visible|32px-visible|CircleIconButton AppIconButton HeaderIconButton InlineIconButton DrawerInlineIconButton OverflowMenuTrigger RailToggleButton;atom.link|atom|all|link|controlVisited|default focus-visible disabled|inline|inline|inline|TextLink InlineLink;atom.brand-logo|atom|authProfile|brand|logo|default|compact-mark|wordmark|wordmark|JovieLogo BrandMark;atom.logo|atom|authProfile|logo|logo|default|icon|word|word|LogoIcon Wordmark;atom.logo-link|atom|authProfile|logoLink|logoLink|default focus-visible|icon-link|word-link|word-link|LogoAnchor BrandLink;molecule.auth-actions|molecule|auth|authActions|control|default focus-visible loading|stacked|inline|inline|AuthButtons SignInActions;organism.public-page-shell|organism|public|publicPage|shell|default loading error|single-column|contained|contained|PublicShell MarketingPageFrame;organism.marketing-header|organism|public|header|shell|default focus-visible collapsed expanded|icon-only|compact-nav|full-nav|PublicHeader MarketingNav;organism.marketing-footer|organism|public|footer|shell|default collapsed expanded|stacked|grouped|multi-column|PublicFooter SiteFooter;organism.app-shell-frame|organism|workspace|shell|shell|default loading error offline|drawer|rail|rail-and-panel|DashboardShell AppShell;organism.app-shell-content-panel|organism|workspace|content|content|default loading empty error|stacked|split|split|MainContentPanel WorkspacePanel PageShell;molecule.entity-sidebar|molecule|workspace|sidebar|sidebar|default focus-visible selected expanded|sheet|rail|rail|EntityRail;organism.auth-layout|organism|auth|authLayout|content|default loading error recovery|keyboard-aware|centered|centered|AuthShell AuthFormFrame;organism.onboarding-chat|organism|onboarding|onboarding|content|default loading empty error recovery|composer-stacked|chat-with-rail|chat-with-rail|StartChat OnboardingAssistant;organism.waitlist-intake-chat|organism|waitlist|waitlist|waitlist|default loading pending success error recovery|single-column|single-column|contained|WaitlistForm AccessRequestChat;organism.profile-shell|organism|profile|profile|profile|default loading empty error|drawer-driven|single-column|expanded|ArtistPageShell ProfileLayout;molecule.profile-primary-cta|molecule|public|cta|cta|default focus-visible disabled loading error|full-width|inline|inline|ProfileAction ArtistProfileCTA;molecule.claim-banner|molecule|profile|claimBanner|claim|default focus-visible disabled error|stacked|inline|inline|ClaimNotice ArtistClaimBanner;organism.opportunity-row|organism|chat|opportunityRow|opportunity|default hover focus-visible selected disabled loading|swipe-enabled|action-row|action-row|OpportunityListRow WorkOpportunityRow;organism.jovie-work-feed|organism|app|jovieWorkFeed|feed|default loading empty partial success error recovery|single-column|single-column|single-column|AutonomousWorkFeed WorkFeed;organism.standalone-product-page|organism|all|standaloneProductPage|standalone|default loading error|compact-gutter|contained|contained|ProductPageFrame StandaloneShell;organism.chat-workspace|organism|chat|chat|expanded|default loading empty error recovery|composer-stacked|split-panel|split-panel|ConversationWorkspace ChatSurface;organism.calendar-surface|organism|calendar|calendar|expanded|default loading empty error|agenda|grid|grid|CalendarView ReleaseCalendar;organism.admin-shell|organism|admin|admin|content|default loading empty error recovery|stacked|table-with-panel|table-with-panel|AdminFrame OperatorShell'.split(
     ';'
   ) as readonly Row[];
 
@@ -518,9 +544,36 @@ const makeEntry = (row: Row): UIOwnershipRegistryEntry => {
     visibleControlGeometry: f.options.g,
   };
 };
-export const UI_OWNERSHIP_REGISTRY = rows.map(
+const UI_OWNERSHIP_COMPOSITION_REGISTRY = rows.map(
   makeEntry
 ) as readonly UIOwnershipRegistryEntry[];
+
+const makeInteractionEntry = (
+  entry: InteractionRegistryEntry
+): UIOwnershipRegistryEntry => {
+  const owner = interactionOwner(entry);
+  return {
+    id: entry.id,
+    layer: 'interaction',
+    surfaces: entry.surfaces as readonly UIOwnershipSurface[],
+    sourceAuthority: interactionSource(entry.id),
+    canonicalOwner: owner,
+    sourcePaths: [owner.sourcePath],
+    platformAdapters: adapters(owner),
+    states: entry.states as readonly UIOwnershipState[],
+    requiredStates: entry.requiredStates as readonly UIOwnershipState[],
+    breakpoints: UI_OWNERSHIP_BREAKPOINTS,
+    adaptiveModes: entry.adaptiveModes,
+    typography: { family: 'inter', serifException: null },
+    pen: interactionPen(entry.role),
+    duplicateAliases: entry.duplicateAliases,
+  };
+};
+
+export const UI_OWNERSHIP_REGISTRY = [
+  ...UI_OWNERSHIP_COMPOSITION_REGISTRY,
+  ...INTERACTION_REGISTRY.map(makeInteractionEntry),
+] as readonly UIOwnershipRegistryEntry[];
 export const getUIOwnershipEntry = (
   id: UIOwnershipEntryId
 ): UIOwnershipRegistryEntry | null =>

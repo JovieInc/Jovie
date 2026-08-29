@@ -21,6 +21,7 @@ export default defineConfig({
     ],
     include: [
       'tests/unit/lib/sentry/**/*.test.ts',
+      'tests/unit/design-system/interaction-registry.test.ts',
       'tests/unit/design-system/ui-ownership-registry.test.ts',
     ],
     pool: 'forks',
