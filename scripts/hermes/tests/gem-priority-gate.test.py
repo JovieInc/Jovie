@@ -485,6 +485,119 @@ class PreviousClosureHealthTests(unittest.TestCase):
             self.assertEqual(MODULE.previous_closure_health(state_dir), expected)
 
 
+class ConcurrencyObservationTests(unittest.TestCase):
+    def test_missing_capacity_evidence_is_typed_and_unaccepted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            evidence = MODULE.observe_concurrency(
+                pathlib.Path(tmp) / "concurrency.json",
+                MODULE.utc_now(),
+            )
+
+        self.assertEqual(
+            evidence,
+            {
+                "schema": MODULE.CONCURRENCY_SCHEMA,
+                "accepted": False,
+                "reason": "capacity-evidence-missing",
+            },
+        )
+
+    def test_non_object_capacity_evidence_is_typed_and_unaccepted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "concurrency.json"
+            path.write_text("null\n", encoding="utf-8")
+
+            evidence = MODULE.observe_concurrency(path, MODULE.utc_now())
+
+        self.assertEqual(
+            evidence,
+            {
+                "schema": MODULE.CONCURRENCY_SCHEMA,
+                "accepted": False,
+                "reason": "capacity-evidence-malformed",
+            },
+        )
+
+    def test_missing_capacity_does_not_collapse_live_signal_observation(self):
+        now = MODULE.utc_now()
+        main = {
+            "status": "green",
+            "sha": MAIN_SHA,
+            "sourceGate": {
+                "status": "completed",
+                "conclusion": "success",
+                "completedAt": MODULE.isoformat(now),
+            },
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            args = MODULE.argparse.Namespace(
+                repo="JovieInc/Jovie",
+                queue_target=15,
+                production_url="https://example.test/api/health/deploy",
+                symphony_url="http://127.0.0.1:4041/api/v1/state",
+                lease_guard_bin="/missing/symphony-lease-guard",
+                state_dir=state_dir,
+                integrity_receipt=None,
+                concurrency_evidence=None,
+                independent_review_receipt=None,
+            )
+            with (
+                mock.patch.object(MODULE, "observe_main", return_value=main),
+                mock.patch.object(
+                    MODULE,
+                    "observe_production",
+                    return_value={"status": "green", "deployedSha": MAIN_SHA},
+                ),
+                mock.patch.object(
+                    MODULE,
+                    "observe_controller",
+                    return_value={"status": "green"},
+                ),
+                mock.patch.object(
+                    MODULE,
+                    "observe_integrity",
+                    return_value={"status": "clear"},
+                ),
+                mock.patch.object(
+                    MODULE,
+                    "observe_queue",
+                    return_value={
+                        "status": "known",
+                        "eligiblePrs": 0,
+                        "greenReadyPrs": 0,
+                        "target": 15,
+                        "laneCapacity": lane_capacity(observed_at=now),
+                    },
+                ) as queue_observer,
+                mock.patch.object(
+                    MODULE,
+                    "observe_closure_health",
+                    return_value=GREEN_SIGNALS["closureHealth"],
+                ),
+                mock.patch.object(
+                    MODULE,
+                    "observe_lease",
+                    return_value={"status": "unknown", "reason": "missing"},
+                ),
+            ):
+                signals = MODULE.observe_signals(args, now)
+
+        self.assertEqual(
+            signals["concurrencyEvidence"],
+            {
+                "schema": MODULE.CONCURRENCY_SCHEMA,
+                "accepted": False,
+                "reason": "capacity-evidence-missing",
+            },
+        )
+        self.assertEqual(queue_observer.call_args.args[2], 0)
+        receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
+        self.assertEqual(receipt["signals"]["main"]["sha"], MAIN_SHA)
+        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
+
+
 class PersistedRefreshTests(unittest.TestCase):
     def test_refresh_persists_canonical_receipt_atomically(self):
         with tempfile.TemporaryDirectory() as tmp:

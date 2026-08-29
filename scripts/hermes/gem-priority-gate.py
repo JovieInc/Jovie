@@ -499,13 +499,27 @@ def observe_integrity(path: Path) -> dict[str, Any]:
     }
 
 
-def observe_concurrency(path: Path, now: datetime) -> dict[str, Any] | None:
+def observe_concurrency(path: Path, now: datetime) -> dict[str, Any]:
     if not path.exists():
-        return None
+        return {
+            "schema": CONCURRENCY_SCHEMA,
+            "accepted": False,
+            "reason": "capacity-evidence-missing",
+        }
     try:
         receipt = read_json(path)
     except (OSError, ValueError, json.JSONDecodeError):
-        return None
+        return {
+            "schema": CONCURRENCY_SCHEMA,
+            "accepted": False,
+            "reason": "capacity-evidence-malformed",
+        }
+    if not isinstance(receipt, dict):
+        return {
+            "schema": CONCURRENCY_SCHEMA,
+            "accepted": False,
+            "reason": "capacity-evidence-malformed",
+        }
     observed_at = parse_time(receipt.get("observedAt"))
     target = receipt.get("target")
     required_clean_runs = 20 if isinstance(target, int) and target > 4 else 1
