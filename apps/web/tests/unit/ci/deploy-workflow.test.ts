@@ -4723,7 +4723,7 @@ describe('production marker recovery workflow (JOV-4965)', () => {
     );
     const confirm = getStepBlock(
       job,
-      'Confirm recovered marker classifies as verified'
+      'Confirm uploaded recovered marker bytes'
     );
 
     const order = [
@@ -4732,7 +4732,7 @@ describe('production marker recovery workflow (JOV-4965)', () => {
       job.indexOf('Re-probe production Better Auth OAuth runtime'),
       job.indexOf('Preserve recovered verified-generation marker'),
       job.indexOf('Upload recovered verified-generation marker'),
-      job.indexOf('Confirm recovered marker classifies as verified'),
+      job.indexOf('Confirm uploaded recovered marker bytes'),
     ];
     expect(order.every(index => index >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
@@ -4754,7 +4754,16 @@ describe('production marker recovery workflow (JOV-4965)', () => {
     expect(workflow).toContain(
       'name: production-generation-verified-${{ inputs.sha }}'
     );
-    expect(confirm).toContain('exact_recovered_generation_verified');
+    expect(confirm).not.toContain('production-marker-state.mjs');
+    expect(confirm).toContain(
+      'actions/runs/${{ github.run_id }}/artifacts?name=$marker_name'
+    );
+    expect(confirm).toContain('.artifacts[0].workflow_run.id == $run_id');
+    expect(confirm).toContain('cmp --silent');
+    expect(confirm).toContain('.recoveredFromControllerRun == $source_run');
+    expect(confirm).toContain(
+      'authoritative classification follows successful workflow completion'
+    );
   });
 
   it('binds the recovered marker classifier to the exact source attempt', () => {
