@@ -185,8 +185,9 @@ case "$DRAIN_PROMOTION_MODE" in
         .productionUnboundRepairAdmission.deploymentsAllowed == false and
         .alreadyAdmittedCohort.preserve == true and
         .closureAdmission.authority == "Summer" and
-        (.closureAdmission.status | IN("green", "red")) and
+        (.closureAdmission.status | IN("healthy", "grace", "red")) and
         (.closureAdmission.newIssueIntakeAllowed | type == "boolean") and
+        .closureAdmission.newIssueIntakeAllowed == (.closureAdmission.status == "healthy") and
         .closureAdmission.allowed == .closureAdmission.newIssueIntakeAllowed and
         .closureAdmission.newImplementationAllowed == .closureAdmission.newIssueIntakeAllowed and
         .closureAdmission.fallbackPrGenerationAllowed == .closureAdmission.newIssueIntakeAllowed and
