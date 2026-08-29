@@ -62,9 +62,11 @@ permanent check:
    invariants. The generated LLM manifest, design authority guard, and this
    audit consume that record. The audit injects a contract-change probe and
    fails unless both generator output and authority-guard rejection change.
-9. **Shared-UI visual arbitrary values** — `packages/ui/{atoms,lib}` production
-   files cannot grow one-off visual Tailwind values. Exact file/value/count
-   debt may only shrink (`pnpm design:shared-ui-visual-arbitrary:check`).
+9. **Shared-UI visual arbitrary values** — every production TypeScript source
+   under `packages/ui` cannot grow one-off visual Tailwind values. Tests,
+   stories, fixtures, generated output, and build/tooling artifacts stay
+   excluded. Exact file/value/count debt may only shrink
+   (`pnpm design:shared-ui-visual-arbitrary:check`).
 
 Exit code is non-zero on any FAIL; WARN never blocks. Failures print the
 exact offending values so remediation is mechanical.

@@ -37,8 +37,27 @@ const CI_FAST_SOURCE = readFileSync(
   'utf8'
 );
 const GATE_SOURCE = readFileSync(resolve(REPO_ROOT, 'package.json'), 'utf8');
-const SCOPE = ['packages/ui/atoms', 'packages/ui/lib'];
+const SCOPE = ['packages/ui'];
 const ATOM = 'packages/ui/atoms/button.tsx';
+const COVERED_PRODUCTION_SOURCES = [
+  'packages/ui/index.ts',
+  'packages/ui/confirm-dialog.tsx',
+  'packages/ui/hooks/index.ts',
+  'packages/ui/hooks/useTabOverflow.ts',
+  'packages/ui/media/logo-normalization.ts',
+  'packages/ui/theme/motion-policy.ts',
+  'packages/ui/theme/tokens.ts',
+];
+const EXCLUDED_NON_PRODUCTION_SOURCES = [
+  'packages/ui/index.test.ts',
+  'packages/ui/confirm-dialog.stories.tsx',
+  'packages/ui/confirm-dialog.test.tsx',
+  'packages/ui/vitest.setup.ts',
+  'packages/ui/media/logo-normalization.test.ts',
+  'packages/ui/theme/motion-policy.test.ts',
+  'packages/ui/atoms/fixtures/cropped-artwork-avatar.tsx',
+  'packages/ui/generated/red.tsx',
+];
 
 const DELIBERATE_RED = `
 export function DeliberateRedVisualArbitrary() {
@@ -63,7 +82,21 @@ test('repo shared-UI visual arbitrary findings match the shrink-only baseline', 
   assert.equal(result.ok, true, result.issues.join('\n'));
   assert.equal(result.status, 'pass');
   assert.equal(result.totalFindings, 52);
-  assert.equal(result.scannedFiles.length, 50);
+  assert.equal(result.scannedFiles.length, 57);
+  for (const relativePath of COVERED_PRODUCTION_SOURCES) {
+    assert.equal(
+      result.scannedFiles.includes(relativePath),
+      true,
+      relativePath
+    );
+  }
+  for (const relativePath of EXCLUDED_NON_PRODUCTION_SOURCES) {
+    assert.equal(
+      result.scannedFiles.includes(relativePath),
+      false,
+      relativePath
+    );
+  }
 });
 
 test('baseline schema is exact file/value/count and sorted', () => {
@@ -72,6 +105,7 @@ test('baseline schema is exact file/value/count and sorted', () => {
   );
   assert.deepEqual(validateVisualArbitraryBaseline(baseline), []);
   assert.equal(baseline.schema, SCHEMA);
+  assert.deepEqual(baseline.scope, SCOPE);
   assert.equal(baseline.totalFindings, 52);
   assert.equal(baseline.findings.length, 41);
   assert.ok(
@@ -99,6 +133,39 @@ test('baseline schema is exact file/value/count and sorted', () => {
         scope: SCOPE,
         totalFindings: 1,
         findings: [{ file: 'apps/web/button.tsx', value: 'w-[1px]', count: 1 }],
+      },
+      /outside production scope/,
+    ],
+    [
+      {
+        schema: SCHEMA,
+        scope: ['packages/ui/atoms', 'packages/ui/lib'],
+        totalFindings: 1,
+        findings: [
+          { file: 'packages/ui/atoms/a.tsx', value: 'w-[1px]', count: 1 },
+        ],
+      },
+      /scope must be/,
+    ],
+    [
+      {
+        schema: SCHEMA,
+        scope: SCOPE,
+        totalFindings: 1,
+        findings: [
+          { file: 'packages/ui/generated/red.tsx', value: 'w-[1px]', count: 1 },
+        ],
+      },
+      /outside production scope/,
+    ],
+    [
+      {
+        schema: SCHEMA,
+        scope: SCOPE,
+        totalFindings: 1,
+        findings: [
+          { file: 'packages/ui/vitest.setup.ts', value: 'w-[1px]', count: 1 },
+        ],
       },
       /outside production scope/,
     ],
@@ -198,12 +265,14 @@ test('classifier keeps exclusions narrow', () => {
 });
 
 test('growth is a regression in every event, including merge_group', () => {
+  const hook = 'packages/ui/hooks/useTabOverflow.ts';
   const baseline = toVisualArbitraryBaseline([
     { file: ATOM, value: 'text-[13px]', count: 1 },
   ]);
   const current = [
     { file: ATOM, value: 'text-[13px]', count: 1 },
     { file: ATOM, value: 'w-[327px]', count: 1 },
+    { file: hook, value: 'min-h-[80px]', count: 1 },
   ];
   for (const eventName of ['local', 'pull_request', 'merge_group']) {
     const verdict = compareVisualArbitraryBaseline(current, baseline, {
@@ -212,6 +281,7 @@ test('growth is a regression in every event, including merge_group', () => {
     assert.equal(verdict.ok, false);
     assert.equal(verdict.status, 'regression');
     assert.match(verdict.issues.join('\n'), /w-\[327px\]/);
+    assert.match(verdict.issues.join('\n'), /min-h-\[80px\]/);
   }
 });
 
@@ -232,18 +302,50 @@ test('unbaselined shrink fails locally and is sibling-safe on merge_group', () =
   assert.equal(mergeGroup.status, 'sibling_shrink');
 });
 
-test('scanner skips tests, stories, and fixtures', () => {
+test('root, hooks, media, and theme production sources are in scope', () => {
+  for (const relativePath of COVERED_PRODUCTION_SOURCES) {
+    assert.equal(isSharedUiProductionSource(relativePath), true, relativePath);
+  }
+  for (const relativePath of EXCLUDED_NON_PRODUCTION_SOURCES) {
+    assert.equal(isSharedUiProductionSource(relativePath), false, relativePath);
+  }
+  assert.equal(
+    isSharedUiProductionSource('packages/ui/atoms/button.tsx'),
+    true
+  );
+  assert.equal(
+    isSharedUiProductionSource('packages/ui/lib/overlay-styles.ts'),
+    true
+  );
+});
+
+test('scanner covers the full package and skips non-production sources', () => {
   const root = mkdtempSync(join(tmpdir(), 'shared-ui-visual-arbitrary-'));
   try {
     mkdirSync(join(root, 'packages/ui/atoms/fixtures'), { recursive: true });
+    mkdirSync(join(root, 'packages/ui/generated'), { recursive: true });
+    mkdirSync(join(root, 'packages/ui/hooks'), { recursive: true });
     mkdirSync(join(root, 'packages/ui/lib'), { recursive: true });
+    mkdirSync(join(root, 'packages/ui/media'), { recursive: true });
+    mkdirSync(join(root, 'packages/ui/theme'), { recursive: true });
     const files = {
+      'packages/ui/root-live.tsx': 'export const x = "rounded-[12px]";\n',
+      'packages/ui/index.test.ts': 'export const x = "w-[1px]";\n',
+      'packages/ui/root-live.stories.tsx': 'export const x = "h-[1px]";\n',
+      'packages/ui/vitest.setup.ts': 'export const x = "text-[#111111]";\n',
       'packages/ui/atoms/live.tsx': 'export const x = "w-[327px]";\n',
       'packages/ui/atoms/live.test.tsx': 'export const x = "text-[#ff00aa]";\n',
       'packages/ui/atoms/live.stories.tsx': 'export const x = "h-[42px]";\n',
       'packages/ui/atoms/fixtures/red.tsx':
         'export const x = "rounded-[12px]";\n',
+      'packages/ui/generated/red.tsx': 'export const x = "w-[999px]";\n',
+      'packages/ui/hooks/live.ts': 'export const x = "min-h-[80px]";\n',
+      'packages/ui/hooks/live.test.ts': 'export const x = "w-[2px]";\n',
       'packages/ui/lib/overlay-styles.ts': 'export const x = "z-[65]";\n',
+      'packages/ui/media/live.ts': 'export const x = "max-h-[120px]";\n',
+      'packages/ui/media/live.test.ts': 'export const x = "h-[3px]";\n',
+      'packages/ui/theme/live.ts': 'export const x = "tracking-[-0.01em]";\n',
+      'packages/ui/theme/live.test.ts': 'export const x = "text-[9px]";\n',
     };
     for (const [relativePath, source] of Object.entries(files)) {
       writeFileSync(join(root, relativePath), source);
@@ -251,9 +353,24 @@ test('scanner skips tests, stories, and fixtures', () => {
     const measured = scanSharedUiVisualArbitrary(root);
     assert.deepEqual(measured.scannedFiles, [
       'packages/ui/atoms/live.tsx',
+      'packages/ui/hooks/live.ts',
       'packages/ui/lib/overlay-styles.ts',
+      'packages/ui/media/live.ts',
+      'packages/ui/root-live.tsx',
+      'packages/ui/theme/live.ts',
     ]);
-    assert.equal(measured.totalFindings, 2);
+    assert.equal(measured.totalFindings, 6);
+    assert.deepEqual(
+      measured.findings.map(item => `${item.file} ${item.value}`),
+      [
+        'packages/ui/atoms/live.tsx w-[327px]',
+        'packages/ui/hooks/live.ts min-h-[80px]',
+        'packages/ui/lib/overlay-styles.ts z-[65]',
+        'packages/ui/media/live.ts max-h-[120px]',
+        'packages/ui/root-live.tsx rounded-[12px]',
+        'packages/ui/theme/live.ts tracking-[-0.01em]',
+      ]
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
