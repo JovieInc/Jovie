@@ -1,4 +1,5 @@
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
+import { buildSiteLlmsGuidance } from '@/lib/agent/site-llms-guidance';
 import { PLAN_PRICES } from '@/lib/config/plan-prices';
 
 /**
@@ -112,6 +113,8 @@ AI that knows your actual career data:
 - **Release links**: ${BASE_URL}/{username}/{release-slug}
 - **Privacy Policy**: ${BASE_URL}/legal/privacy
 - **Terms of Service**: ${BASE_URL}/legal/terms
+
+${buildSiteLlmsGuidance()}
 
 ## Blog / Content
 

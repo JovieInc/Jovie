@@ -6,6 +6,7 @@ import {
 } from 'next/server';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
+import { negotiateAgentMarkdown } from '@/lib/agent/markdown-negotiation';
 import { buildProtectedAuthRedirectUrl } from '@/lib/auth/build-auth-route-url';
 import { handleInvestorRequest } from '@/lib/auth/investor-portal';
 import { handleProxyRequest } from '@/lib/auth/proxy-request-handler';
@@ -194,6 +195,9 @@ export default async function middleware(
   if (pathname.startsWith('/api/auth/')) {
     return NextResponse.next();
   }
+
+  const markdownResponse = negotiateAgentMarkdown(req);
+  if (markdownResponse) return markdownResponse;
 
   // ========================================================================
   // Investor portal: handle before auth (token-based access, not BA sessions)
