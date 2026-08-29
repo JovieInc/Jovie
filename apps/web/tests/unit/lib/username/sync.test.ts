@@ -19,9 +19,13 @@ function createTx(selectResults: SelectResult[]) {
   return {
     select: vi.fn(() => ({
       from: vi.fn(() => ({
-        where: vi.fn(() => ({
-          limit: vi.fn(async () => queue.shift() ?? []),
-        })),
+        where: vi.fn(() => {
+          const chain = {
+            orderBy: vi.fn(() => chain),
+            limit: vi.fn(async () => queue.shift() ?? []),
+          };
+          return chain;
+        }),
       })),
     })),
     update: vi.fn(() => ({
@@ -40,7 +44,6 @@ describe('syncCanonicalUsernameFromApp', () => {
 
   it('invalidates old and new profile caches when username changes', async () => {
     const tx = createTx([
-      [{ id: 'user-1', activeProfileId: 'profile-1' }],
       [{ id: 'profile-1', usernameNormalized: 'oldname' }],
       [],
     ]);
@@ -63,7 +66,6 @@ describe('syncCanonicalUsernameFromApp', () => {
 
   it('does not invalidate caches when username is unchanged', async () => {
     const tx = createTx([
-      [{ id: 'user-1', activeProfileId: 'profile-1' }],
       [{ id: 'profile-1', usernameNormalized: 'samehandle' }],
     ]);
 
@@ -78,5 +80,54 @@ describe('syncCanonicalUsernameFromApp', () => {
     await syncCanonicalUsernameFromApp('clerk_1', 'samehandle');
 
     expect(invalidateUsernameChangeMock).not.toHaveBeenCalled();
+  });
+
+  it('syncs by profile user_id without a users.activeProfileId lookup', async () => {
+    const tx = createTx([
+      [{ id: 'profile-1', usernameNormalized: 'oldname' }],
+      [],
+    ]);
+
+    withDbSessionTxMock.mockImplementation(async (operation, options) =>
+      operation(tx, options.clerkUserId)
+    );
+
+    const { syncCanonicalUsernameFromApp } = await import(
+      '@/lib/username/sync'
+    );
+
+    await expect(
+      syncCanonicalUsernameFromApp(
+        '7b4b948f-9720-4c5f-98da-8a7335015da9',
+        'newname'
+      )
+    ).resolves.toBeUndefined();
+
+    expect(invalidateUsernameChangeMock).toHaveBeenCalledWith(
+      'newname',
+      'oldname'
+    );
+  });
+
+  it('does not throw User not found when the authenticated user has no profile yet', async () => {
+    const tx = createTx([[]]);
+
+    withDbSessionTxMock.mockImplementation(async (operation, options) =>
+      operation(tx, options.clerkUserId)
+    );
+
+    const { syncCanonicalUsernameFromApp } = await import(
+      '@/lib/username/sync'
+    );
+
+    await expect(
+      syncCanonicalUsernameFromApp(
+        '7b4b948f-9720-4c5f-98da-8a7335015da9',
+        'newname'
+      )
+    ).resolves.toBeUndefined();
+
+    expect(invalidateUsernameChangeMock).not.toHaveBeenCalled();
+    expect(tx.update).not.toHaveBeenCalled();
   });
 });
