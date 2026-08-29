@@ -449,13 +449,18 @@ export function resolveCoverageViaPath(
 }
 
 /**
- * Verify a coverage-via target exists and imports the component.
+ * Verify a coverage-via target exists and contains executable evidence:
+ * an exact module import plus runtime use of the imported binding, or an
+ * asserted node:fs read of the exact component source. Comments, mocks
+ * without a real import, same-name text, and unasserted reads fail closed.
  */
 export function verifyCoverageVia({
   viaRel,
   componentRel,
   componentBase,
   repoRoot = REPO_ROOT,
+  componentSource,
+  hasExecutableEvidence,
 }) {
   const abs = join(repoRoot, viaRel);
   if (!existsSync(abs) || !statSync(abs).isFile()) {
@@ -465,13 +470,19 @@ export function verifyCoverageVia({
     };
   }
   const text = readFileSync(abs, 'utf8');
-  const importsComponent =
-    text.includes(componentBase) ||
-    text.includes(basename(componentRel).replace(/\.tsx$/i, ''));
-  if (!importsComponent) {
+  const executable =
+    typeof hasExecutableEvidence === 'function' &&
+    Boolean(componentSource) &&
+    hasExecutableEvidence({
+      testSource: text,
+      testRel: viaRel,
+      sourceRel: componentRel,
+      componentSource,
+    });
+  if (!executable) {
     return {
       ok: false,
-      detail: `@coverage-via ${viaRel} does not reference ${componentRel}`,
+      detail: `@coverage-via ${viaRel} must import ${componentRel} (${componentBase}) and use the imported binding, or assert an exact node:fs read of that source`,
     };
   }
   return { ok: true, detail: null };
