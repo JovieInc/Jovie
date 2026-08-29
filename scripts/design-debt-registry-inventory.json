@@ -1,0 +1,141 @@
+{
+  "schema": "jovie.design-debt-registry-inventory/v1",
+  "registries": [
+    {
+      "id": "web-arbitrary-values",
+      "path": "apps/web/tests/unit/design-system/arbitrary-values.baseline.json",
+      "projection": { "kind": "count", "pointer": ["count"] }
+    },
+    {
+      "id": "web-linear-namespace",
+      "path": "apps/web/tests/unit/design-system/linear-namespace.baseline.json",
+      "projection": { "kind": "count", "pointer": ["count"] }
+    },
+    {
+      "id": "component-family-counts",
+      "path": "apps/web/tests/unit/design-system/component-family.baseline.json",
+      "projection": {
+        "kind": "number-map",
+        "pointer": ["counts"],
+        "keys": ["button", "palette", "emptyState", "shell"]
+      }
+    },
+    {
+      "id": "component-family-empty-state-paths",
+      "path": "apps/web/tests/unit/design-system/component-family.baseline.json",
+      "projection": {
+        "kind": "string-set",
+        "pointer": ["allowedEmptyStatePaths"]
+      }
+    },
+    {
+      "id": "button-surface-class-ceiling",
+      "path": "apps/web/tests/unit/design-system/button-surface-classes-remaining.json",
+      "projection": { "kind": "count", "pointer": ["maxRemaining"] }
+    },
+    {
+      "id": "button-surface-class-paths",
+      "path": "apps/web/tests/unit/design-system/button-surface-classes-remaining.json",
+      "projection": { "kind": "string-set", "pointer": ["remaining"] }
+    },
+    {
+      "id": "web-raw-buttons",
+      "path": "apps/web/tests/unit/design-system/raw-button.baseline.json",
+      "projection": { "kind": "count", "pointer": ["count"] }
+    },
+    {
+      "id": "shared-layer-server-imports",
+      "path": "apps/web/tests/unit/design-system/server-imports.baseline.json",
+      "projection": { "kind": "count", "pointer": ["count"] }
+    },
+    {
+      "id": "sidebar-nav-row",
+      "path": "apps/web/tests/unit/design-system/sidebar-nav-row.baseline.json",
+      "projection": { "kind": "count", "pointer": ["count"] }
+    },
+    {
+      "id": "sidebar-nav-row-allowlist",
+      "path": "apps/web/tests/unit/design-system/sidebar-nav-row-ratchet.test.ts",
+      "format": {
+        "kind": "typescript-string-set",
+        "binding": "ALLOWLIST"
+      },
+      "projection": { "kind": "string-set", "pointer": ["values"] }
+    },
+    {
+      "id": "destructive-dialog-allowlist",
+      "path": "apps/web/tests/unit/design-system/destructive-confirm-dialog-audit.test.ts",
+      "format": {
+        "kind": "typescript-string-set",
+        "binding": "DIRECT_DESTRUCTIVE_ALERT_DIALOG_ALLOWLIST"
+      },
+      "projection": { "kind": "string-set", "pointer": ["values"] }
+    },
+    {
+      "id": "contrast-raw-color-counts",
+      "path": "apps/web/contrast-ratchet.baseline.json",
+      "projection": {
+        "kind": "number-map",
+        "pointer": [],
+        "keys": [
+          "bareTextBlack",
+          "bareBgWhite",
+          "bareTextWhite",
+          "bareBgBlack",
+          "arbitraryHex"
+        ],
+        "ignoredKeys": ["_comment"]
+      }
+    },
+    {
+      "id": "touch-target-count",
+      "path": "apps/web/touch-target-ratchet.baseline.json",
+      "projection": { "kind": "count", "pointer": ["count"] }
+    },
+    {
+      "id": "shared-ui-visual-arbitrary",
+      "path": "scripts/shared-ui-visual-arbitrary.baseline.json",
+      "projection": {
+        "kind": "finding-count-set",
+        "pointer": ["findings"],
+        "totalPointer": ["totalFindings"]
+      }
+    },
+    {
+      "id": "serif-authority-exceptions",
+      "path": "scripts/design-authority-exceptions.json",
+      "projection": {
+        "kind": "object-set",
+        "pointer": ["serif"],
+        "keyFields": ["path", "match", "kind"],
+        "validator": "serif-exception"
+      }
+    },
+    {
+      "id": "story-coverage-floors",
+      "path": "scripts/story-coverage-baseline.json",
+      "projection": {
+        "kind": "coverage-floor-map",
+        "pointer": ["roots"],
+        "keys": [
+          "packages/ui/atoms",
+          "packages/ui",
+          "apps/web/components/atoms",
+          "apps/web/components/molecules",
+          "apps/web/components/organisms",
+          "apps/web/components/marketing",
+          "apps/web/components/site",
+          "apps/web/components"
+        ]
+      }
+    },
+    {
+      "id": "design-conformance-unbound-components",
+      "path": "docs/design-system/design-conformance-manifest.json",
+      "projection": {
+        "kind": "string-set",
+        "pointer": ["legacy", "unboundComponentIds"]
+      }
+    }
+  ]
+}
