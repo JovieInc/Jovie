@@ -41,10 +41,39 @@ export const APPROVED_ENROLLMENT_BATCH_IDS = Object.freeze([
   'atom.field',
   'typography.system-b',
 ]);
-export const CATALOG_ROOTS = Object.freeze([
-  Object.freeze({ root: 'packages/ui/atoms', layer: 'atom' }),
-  Object.freeze({ root: 'apps/web/components/molecules', layer: 'molecule' }),
+export const COMPARISON_STATUSES = Object.freeze([
+  'rubric-enrolled',
+  'pending-comparison',
 ]);
+export const PACKAGE_ATOM_ROOT = 'packages/ui/atoms';
+export const WEB_COMPONENT_ROOT = 'apps/web/components';
+export const CATALOG_ROOTS = Object.freeze([
+  Object.freeze({ root: PACKAGE_ATOM_ROOT, layer: 'atom' }),
+  Object.freeze({
+    root: `${WEB_COMPONENT_ROOT}/**/atoms`,
+    layer: 'atom',
+  }),
+  Object.freeze({
+    root: `${WEB_COMPONENT_ROOT}/**/molecules`,
+    layer: 'molecule',
+  }),
+  Object.freeze({
+    root: 'registered-out-of-taxonomy/atoms',
+    layer: 'atom',
+  }),
+  Object.freeze({
+    root: 'registered-out-of-taxonomy/molecules',
+    layer: 'molecule',
+  }),
+]);
+/** Shrink-only floors for the closed-world atom/molecule catalog. */
+export const CATALOG_FLOOR = Object.freeze({
+  [PACKAGE_ATOM_ROOT]: 38,
+  [`${WEB_COMPONENT_ROOT}/**/atoms`]: 137,
+  [`${WEB_COMPONENT_ROOT}/**/molecules`]: 169,
+  'registered-out-of-taxonomy/atoms': 0,
+  'registered-out-of-taxonomy/molecules': 1,
+});
 export const OUTCOME_PROVENANCE = Object.freeze({
   license: 'MIT',
   licenseUrl: 'https://github.com/shadcn-ui/ui/blob/main/LICENSE.md',
@@ -81,6 +110,7 @@ export const OUTCOME_PROVENANCE = Object.freeze({
 });
 
 const DIMENSION_SET = new Set(BENCHMARK_DIMENSIONS);
+const COMPARISON_STATUS_SET = new Set(COMPARISON_STATUSES);
 const DISPOSITION_SET = new Set(DISPOSITIONS);
 const CONTEXT_SET = new Set(PRODUCT_CONTEXTS);
 const LAYER_SET = new Set(INVENTORY_LAYERS);
@@ -175,6 +205,7 @@ function parseEntries(raw) {
         source,
         exportName,
         enrolled: true,
+        comparisonStatus: 'rubric-enrolled',
         enrollmentBatch: ENROLLMENT_BATCH,
         nearestPublicPattern: Object.freeze({
           name: exportName,
@@ -216,21 +247,75 @@ typography.system-b|system|DESIGN.md|Typography|typography|diverge|typography-rh
 export function ownerIdFromSource(sourceRel, layer) {
   return `${layer}.${kebabName(basename(sourceRel, '.tsx'))}`;
 }
-export function listScalableOwners(repoRoot = REPO_ROOT) {
-  const owners = [];
-  for (const { root, layer } of CATALOG_ROOTS) {
-    for (const component of listComponentsInRoot(root, repoRoot)) {
-      owners.push(
-        Object.freeze({
-          id: ownerIdFromSource(component.sourceRel, layer),
-          layer,
-          source: component.sourceRel,
-          enrolled: false,
-        })
-      );
+
+function webTaxonomyFor(sourceRel) {
+  if (!sourceRel.startsWith(`${WEB_COMPONENT_ROOT}/`)) return null;
+  const segments = sourceRel.slice(`${WEB_COMPONENT_ROOT}/`.length).split('/');
+  const atomIndex = segments.lastIndexOf('atoms');
+  const moleculeIndex = segments.lastIndexOf('molecules');
+  if (atomIndex < 0 && moleculeIndex < 0) return null;
+  const layer = atomIndex > moleculeIndex ? 'atom' : 'molecule';
+  return { layer, root: `${WEB_COMPONENT_ROOT}/**/${layer}s` };
+}
+
+function enrolledSourceMap(inventory = OUTCOME_INVENTORY) {
+  const sources = new Map();
+  const entries = Array.isArray(inventory?.entries) ? inventory.entries : [];
+  for (const entry of entries) {
+    if (entry?.enrolled === true && typeof entry.source === 'string') {
+      sources.set(entry.source, entry);
     }
   }
-  return owners.sort((a, b) => a.id.localeCompare(b.id));
+  return sources;
+}
+
+function catalogEntry(source, layer, root, enrolled) {
+  const match = enrolled.get(source);
+  return Object.freeze({
+    id: match?.id ?? ownerIdFromSource(source, layer),
+    layer,
+    root,
+    source,
+    enrolled: Boolean(match),
+    comparisonStatus: match ? 'rubric-enrolled' : 'pending-comparison',
+  });
+}
+
+/**
+ * Closed-world atom/molecule catalog. Enrolled batch-1 owners are marked
+ * rubric-enrolled; every other discovered owner stays pending-comparison.
+ */
+export function listScalableOwners(
+  repoRoot = REPO_ROOT,
+  inventory = OUTCOME_INVENTORY
+) {
+  const enrolled = enrolledSourceMap(inventory);
+  const owners = [];
+  const seen = new Set();
+  const push = (source, layer, root) => {
+    if (seen.has(source)) return;
+    seen.add(source);
+    owners.push(catalogEntry(source, layer, root, enrolled));
+  };
+
+  for (const component of listComponentsInRoot(PACKAGE_ATOM_ROOT, repoRoot)) {
+    push(component.sourceRel, 'atom', PACKAGE_ATOM_ROOT);
+  }
+  for (const component of listComponentsInRoot(WEB_COMPONENT_ROOT, repoRoot)) {
+    const taxonomy = webTaxonomyFor(component.sourceRel);
+    if (!taxonomy) continue;
+    push(component.sourceRel, taxonomy.layer, taxonomy.root);
+  }
+  for (const entry of enrolled.values()) {
+    if (entry.layer !== 'atom' && entry.layer !== 'molecule') continue;
+    if (seen.has(entry.source)) continue;
+    push(
+      entry.source,
+      entry.layer,
+      `registered-out-of-taxonomy/${entry.layer}s`
+    );
+  }
+  return owners.sort((a, b) => a.source.localeCompare(b.source));
 }
 
 // biome-ignore format: compact fail-closed dimension contract
@@ -346,14 +431,89 @@ export function evaluateOutcomeInventory(options = {}) {
   for (const id of APPROVED_ENROLLMENT_BATCH_IDS) {
     if (!enrolledIds.includes(id)) issues.push(`approved batch member ${id} is not enrolled`);
   }
-  const catalog = listScalableOwners(repoRoot);
-  if (catalog.length === 0) issues.push('scalable atom/molecule catalog is empty; fail closed');
+  const catalog = Array.isArray(options.catalog)
+    ? options.catalog
+    : listScalableOwners(repoRoot, inventory);
+  if (!Array.isArray(catalog) || catalog.length === 0) {
+    issues.push('scalable atom/molecule catalog is empty; fail closed');
+  }
+  const catalogSources = [];
+  /** @type {Map<string, number>} */
+  const counts = new Map();
+  for (const item of CATALOG_ROOTS) counts.set(item.root, 0);
+  const enrolledSources = new Set(
+    entries
+      .filter(item => item?.enrolled === true && typeof item.source === 'string')
+      .map(item => item.source)
+  );
+  for (const owner of catalog) {
+    if (!isObject(owner) || typeof owner.source !== 'string' || !owner.source) {
+      issues.push('catalog owner requires a source path');
+      continue;
+    }
+    catalogSources.push(owner.source);
+    if (owner.layer !== 'atom' && owner.layer !== 'molecule') {
+      issues.push(`${owner.source}: catalog layer must be atom or molecule`);
+    }
+    if (typeof owner.root !== 'string' || !counts.has(owner.root)) {
+      issues.push(
+        `${owner.source}: unknown catalog root ${String(owner.root)}`
+      );
+    } else {
+      counts.set(owner.root, (counts.get(owner.root) ?? 0) + 1);
+    }
+    const enrolledHere = enrolledSources.has(owner.source);
+    if (!COMPARISON_STATUS_SET.has(owner.comparisonStatus)) {
+      issues.push(`${owner.source}: invalid comparison status`);
+    } else if (enrolledHere && owner.comparisonStatus !== 'rubric-enrolled') {
+      issues.push(
+        `${owner.source}: enrolled catalog owner must be rubric-enrolled`
+      );
+    } else if (!enrolledHere && owner.comparisonStatus === 'rubric-enrolled') {
+      issues.push(
+        `${owner.source}: pending catalog owner cannot be rubric-enrolled`
+      );
+    }
+  }
+  if (new Set(catalogSources).size !== catalogSources.length) {
+    issues.push('catalog source paths must be unique');
+  }
+  for (const item of CATALOG_ROOTS) {
+    const actual = counts.get(item.root) ?? 0;
+    const floor = CATALOG_FLOOR[item.root];
+    if (actual < floor) {
+      issues.push(
+        `${item.root}: closed-world catalog shrank below floor (${actual}/${floor})`
+      );
+    }
+  }
+  for (const entry of entries) {
+    if (
+      entry?.enrolled !== true ||
+      (entry.layer !== 'atom' && entry.layer !== 'molecule')
+    ) {
+      continue;
+    }
+    if (!catalogSources.includes(entry.source)) {
+      issues.push(
+        `${entry.id}: enrolled owner is missing from the scalable atom/molecule catalog`
+      );
+    }
+  }
+  const pendingComparison = catalog.filter(
+    owner => owner?.comparisonStatus === 'pending-comparison'
+  ).length;
+  const rubricEnrolled = catalog.filter(
+    owner => owner?.comparisonStatus === 'rubric-enrolled'
+  ).length;
   return {
     ok: issues.length === 0,
     issues,
     enrolledIds,
     catalogCount: catalog.length,
-    unenrolledCount: catalog.filter(owner => !enrolledIds.includes(owner.id)).length,
+    unenrolledCount: pendingComparison,
+    rubricEnrolled,
+    pendingComparison,
   };
 }
 
@@ -583,6 +743,8 @@ export function runOutcomeCertification(options = {}) {
       enrolled: inventoryResult.enrolledIds,
       catalogCount: inventoryResult.catalogCount,
       unenrolledCount: inventoryResult.unenrolledCount,
+      rubricEnrolled: inventoryResult.rubricEnrolled,
+      pendingComparison: inventoryResult.pendingComparison,
       fixtures: fixtureReceipts,
       enrolledBatch: batchReceipts,
     },

@@ -69,9 +69,10 @@ permanent check:
    (`pnpm design:shared-ui-visual-arbitrary:check`).
 10. **Shadcn / Typeset outcome inventory** — enrolled primitives keep a
     machine-readable comparison rubric against public Shadcn docs and Typeset
-    typography concepts (`pnpm component-ship-gate` + this audit). Missing or
-    unknown benchmark dimensions fail closed. No Shadcn/Typeset implementation
-    is imported.
+    typography concepts (`pnpm component-ship-gate` + this audit). The catalog
+    is closed-world across all Jovie atoms/molecules; only the approved batch
+    is rubric-enrolled. Missing or unknown benchmark dimensions fail closed.
+    No Shadcn/Typeset implementation is imported.
 
 Exit code is non-zero on any FAIL; WARN never blocks. Failures print the
 exact offending values so remediation is mechanical.

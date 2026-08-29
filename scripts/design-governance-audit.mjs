@@ -521,7 +521,7 @@ export function runDesignGovernanceAudit(repoRoot = DEFAULT_REPO_ROOT) {
       'shadcn-outcome-inventory',
       outcome.ok ? 'PASS' : 'FAIL',
       outcome.ok
-        ? `${(outcome.receipt.enrolled ?? []).length} enrolled primitives; MIT public-outcome boundary; catalog=${outcome.receipt.catalogCount}`
+        ? `${(outcome.receipt.enrolled ?? []).length} enrolled primitives; ${outcome.receipt.pendingComparison ?? outcome.receipt.unenrolledCount ?? 0} pending; MIT public-outcome boundary; catalog=${outcome.receipt.catalogCount}`
         : outcome.receipt.issues.join('; ')
     );
   } catch (error) {

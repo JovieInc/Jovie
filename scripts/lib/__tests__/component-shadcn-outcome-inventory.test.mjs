@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { runRenderedCertification } from '../../component-rendered-certification.mjs';
 import {
   APPROVED_ENROLLMENT_BATCH_IDS,
+  CATALOG_FLOOR,
   evaluateOutcomeInventory,
   evaluateOutcomeSample,
   listScalableOwners,
@@ -22,13 +23,56 @@ describe('shadcn outcome inventory', () => {
   it('declares a scalable catalog while enrolling only the approved batch', () => {
     const catalog = listScalableOwners();
     const inventory = evaluateOutcomeInventory();
+    const floor = Object.values(CATALOG_FLOOR).reduce(
+      (total, count) => total + count,
+      0
+    );
+    const rubric = catalog.filter(
+      owner => owner.comparisonStatus === 'rubric-enrolled'
+    );
     expect(inventory.ok).toBe(true);
     expect(inventory.enrolledIds).toEqual([...APPROVED_ENROLLMENT_BATCH_IDS]);
-    expect(catalog.length).toBeGreaterThan(inventory.enrolledIds.length);
-    expect(inventory.unenrolledCount).toBeGreaterThan(0);
+    expect(catalog.length).toBeGreaterThanOrEqual(floor);
+    expect(inventory.pendingComparison).toBe(catalog.length - rubric.length);
+    expect(inventory.unenrolledCount).toBe(inventory.pendingComparison);
+    expect(rubric.map(owner => owner.id).sort()).toEqual(
+      APPROVED_ENROLLMENT_BATCH_IDS.filter(
+        id => id !== 'typography.system-b'
+      ).sort()
+    );
+    expect(
+      catalog.find(
+        owner => owner.source === 'apps/web/components/shell/SidebarNavItem.tsx'
+      )
+    ).toMatchObject({
+      root: 'registered-out-of-taxonomy/molecules',
+      comparisonStatus: 'rubric-enrolled',
+    });
     expect(OUTCOME_PROVENANCE).toMatchObject({ license: 'MIT' });
     expect(OUTCOME_PROVENANCE.boundary).toMatch(/does not import/i);
     expect(OUTCOME_INVENTORY.schema).toBe(OUTCOME_INVENTORY_SCHEMA);
+  });
+
+  it('fails closed when the closed-world catalog shrinks or enrollment is basename-colliding', () => {
+    const catalog = listScalableOwners();
+    const shrunk = evaluateOutcomeInventory({ catalog: catalog.slice(0, 2) });
+    expect(shrunk.ok).toBe(false);
+    expect(shrunk.issues.join('\n')).toMatch(/shrank below floor/);
+    const empty = evaluateOutcomeInventory({ catalog: [] });
+    expect(empty.ok).toBe(false);
+    expect(empty.issues.join('\n')).toMatch(/catalog is empty/);
+    const cards = catalog.filter(owner => owner.id === 'atom.card');
+    expect(cards).toEqual([
+      expect.objectContaining({
+        source: 'packages/ui/atoms/card.tsx',
+        comparisonStatus: 'rubric-enrolled',
+      }),
+    ]);
+    const twins = catalog.filter(owner => owner.id === 'atom.auth-text-input');
+    expect(twins.length).toBeGreaterThan(1);
+    expect(
+      twins.every(owner => owner.comparisonStatus === 'pending-comparison')
+    ).toBe(true);
   });
 
   it('fails closed on missing or unknown applicable benchmark dimensions', () => {
@@ -111,6 +155,10 @@ describe('shadcn outcome inventory composition', () => {
       section: 'shadcnOutcome',
       ok: true,
     });
+    expect(rendered.receipt.shadcnOutcome.catalogCount).toBeGreaterThan(
+      rendered.receipt.shadcnOutcome.enrolled.length
+    );
+    expect(rendered.receipt.shadcnOutcome.pendingComparison).toBeGreaterThan(0);
     expect(rendered.receipt.landingBatch).toHaveLength(4);
     expect(rendered.receipt.fixtures).toHaveLength(3);
     const report = runComponentShipGate({

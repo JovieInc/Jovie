@@ -49,7 +49,10 @@ source lacks:
    Deliberate-red fixtures must block; the current design-system landing batch
    emits exact-head pass/block receipts. The same receipt records the Shadcn /
    Typeset outcome inventory for the enrolled primitive batch (MIT public
-   references only; missing/unknown benchmark dimensions fail closed).
+   references only; missing/unknown benchmark dimensions fail closed). The
+   inventory model is closed-world across all Jovie atoms/molecules; only the
+   approved high-value batch is rubric-enrolled, and every other owner stays
+   pending-comparison.
 
 ### Commands
 
