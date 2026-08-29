@@ -4,6 +4,11 @@ import { APP_SCREEN_COMPONENT_REGISTRY } from '@/data/appScreens';
 import { MARKETING_SHELL_REGISTRY } from '@/data/marketing';
 import { DESIGN_SYSTEM_COMPONENT_REGISTRY } from './componentRegistry';
 import {
+  INTERACTION_REGISTRY,
+  type InteractionFamilyId,
+} from './interactionRegistry';
+import { validateInteractionRegistry } from './interactionRegistryValidation';
+import {
   UI_OWNERSHIP_BREAKPOINTS,
   UI_OWNERSHIP_ENTRY_IDS,
   UI_OWNERSHIP_PLATFORMS,
@@ -483,6 +488,20 @@ function validateAuthority(
       owner.registryId === null ||
       badEntry(issues, entry, 'unresolved-source-authority')
     );
+  if (authority.registry === 'interactions') {
+    const interaction = INTERACTION_REGISTRY.find(
+      item => item.id === authority.id
+    );
+    if (
+      !interaction ||
+      owner.sourcePath !== interaction.owner.sourcePath ||
+      owner.exportName !== interaction.owner.exportName ||
+      owner.registryId !== interaction.id
+    ) {
+      badEntry(issues, entry, 'unresolved-source-authority');
+    }
+    return;
+  }
   const source =
     authority.registry === 'design-system'
       ? DESIGN_SYSTEM_COMPONENT_REGISTRY.find(item => item.id === authority.id)
@@ -681,6 +700,45 @@ export function validateUIOwnershipRegistry({
     for (const alias of entry.duplicateAliases)
       if (ids.has(alias))
         badEntry(issues, entry, 'alias-collides-with-entry-id');
+      else if (
+        [...entries].some(
+          ownerEntry =>
+            ownerEntry.id !== entry.id &&
+            ownerEntry.canonicalOwner.exportName === alias
+        )
+      )
+        badEntry(issues, entry, 'alias-collides-with-owner');
+  for (const issue of validateInteractionRegistry({
+    entries: entries.flatMap(entry => {
+      if (entry.layer !== 'interaction' || !entry.interaction) return [];
+      return [
+        {
+          id: entry.id as InteractionFamilyId,
+          role: entry.interaction.role,
+          owner: {
+            sourcePath: entry.canonicalOwner.sourcePath,
+            exportName: entry.canonicalOwner.exportName,
+          },
+          surfaces: entry.surfaces,
+          states: entry.states,
+          requiredStates: entry.requiredStates,
+          geometry: entry.interaction.geometry,
+          focus: entry.interaction.focus,
+          keyboard: entry.interaction.keyboard,
+          dismissal: entry.interaction.dismissal,
+          motion: entry.interaction.motion,
+          reducedMotion: entry.interaction.reducedMotion,
+          adaptiveModes: entry.adaptiveModes,
+          storySource: entry.interaction.storySource,
+          testSources: entry.interaction.testSources,
+          duplicateAliases: entry.duplicateAliases,
+        },
+      ];
+    }),
+    repoRoot,
+  })) {
+    bad(issues, issue.code, issue.id);
+  }
   validateNativeButtonOwnership(entries, swiftSources, issues, repoRoot);
   return issues;
 }
