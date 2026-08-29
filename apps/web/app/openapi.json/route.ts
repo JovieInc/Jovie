@@ -1,4 +1,4 @@
-import { GET as getCanonicalArtistOpenApi } from '@/app/api/v1/openapi.json/route';
+import { artistOpenApiGET } from '@/lib/api/v1/openapi';
 
 /**
  * Conventional `/openapi.json` compatibility alias.
@@ -10,6 +10,7 @@ import { GET as getCanonicalArtistOpenApi } from '@/app/api/v1/openapi.json/rout
 export const revalidate = false;
 export const dynamic = 'force-static';
 
+/** Conventional root discovery surface. Same contract as `/api/v1/openapi.json`. */
 export function GET() {
-  return getCanonicalArtistOpenApi();
+  return artistOpenApiGET();
 }

@@ -157,6 +157,12 @@ function allDraftsTerminal(
   return drafts.items.every(draft => isTerminalDraftStatus(draft.status));
 }
 
+function hasDispatchedDraft(
+  drafts: ReleaseDistributionDrafts | undefined
+): boolean {
+  return Boolean(drafts?.items.some(draft => draft.status === 'dispatched'));
+}
+
 async function loadOwnedRun(input: {
   readonly runId: string;
   readonly userId: string;
@@ -272,7 +278,10 @@ async function persistStepOutputs(input: {
     })
     .where(eq(workflowRuns.id, input.runId));
 
-  if (input.nextRunStatus === 'completed') {
+  if (
+    input.nextRunStatus === 'completed' &&
+    hasDispatchedDraft(input.stepOutputs.distributionDrafts)
+  ) {
     try {
       await recordWorkflowRunOutcome(input.runId);
     } catch (err) {

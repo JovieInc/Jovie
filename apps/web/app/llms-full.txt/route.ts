@@ -132,6 +132,12 @@ Tim White is the founder of ${APP_NAME}. Background:
 - Ran campaigns for brands including Google and the NFL
 - Professional music producer
 
+## Public API
+
+- OpenAPI 3.1: ${BASE_URL}/openapi.json
+- Canonical contract: ${BASE_URL}/api/v1/openapi.json
+- Public artist profile: ${BASE_URL}/api/v1/{username}
+
 ## Contact
 
 - Website: ${BASE_URL}

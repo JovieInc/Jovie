@@ -96,9 +96,9 @@
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
 | `/api/artist/theme` | GET, PUT | `auth` | Get/update artist theme |
-| `/api/v1/[username]` | GET | `public` | Public read-only artist profile, releases, events, and merch |
-| `/api/v1/openapi.json` | GET | `public` | Canonical OpenAPI 3.1 description of the public artist API |
-| `/openapi.json` | GET | `public` | Conventional OpenAPI 3.1 compatibility alias for `/api/v1/openapi.json` |
+| `/api/v1/[username]` | GET | `public` | Public read-only artist profile with releases, events, and merch |
+| `/api/v1/openapi.json` | GET | `public` | Canonical OpenAPI 3.1 contract for the public artist API |
+| `/openapi.json` | GET | `public` | Conventional discovery surface; identical contract to `/api/v1/openapi.json` |
 
 ### Audience
 

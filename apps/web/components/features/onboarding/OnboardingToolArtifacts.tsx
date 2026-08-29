@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import type { ReactNode } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import {
   ATTACH_ACCOUNT_CTA_LABEL,
   CONFIRM_HANDLE_CTA_LABEL,
@@ -31,6 +31,7 @@ import { parseSocialLinkInput } from '@/lib/onboarding/social-link-parse';
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
 import { useHandleAvailabilityQuery } from '@/lib/queries/useHandleAvailabilityQuery';
 import { cn } from '@/lib/utils';
+import { OnboardingToolField } from './OnboardingToolField';
 
 type ToolState =
   | 'input-streaming'
@@ -324,6 +325,7 @@ export function OnboardingSpotifyArtistPickerCard({
   readonly onNoneOfThese?: () => void;
 }) {
   const initialQuery = output?.query ?? inputQuery ?? '';
+  const fieldId = useId();
   const [query, setQuery] = useState(initialQuery);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const artistSearch = useArtistSearchQuery({
@@ -391,17 +393,18 @@ export function OnboardingSpotifyArtistPickerCard({
         </p>
       </div>
 
-      <label className='mt-3 flex items-center gap-2 rounded-lg border border-subtle bg-surface-0 px-3 py-2 focus-within:border-white/[0.16] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.035)]'>
+      <OnboardingToolField density='picker' htmlFor={fieldId}>
         <Search className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
         <span className='sr-only'>Search Spotify artists</span>
         <input
+          id={fieldId}
           value={query}
           onChange={event => setQuery(event.target.value)}
           placeholder='Search Spotify artists'
           className='min-w-0 flex-1 bg-transparent text-sm leading-6 text-primary-token placeholder:text-quaternary-token focus:outline-none'
           disabled={disabled}
         />
-      </label>
+      </OnboardingToolField>
 
       <div className='mt-2 space-y-1'>
         {isSearching ? (
@@ -593,6 +596,7 @@ export function OnboardingHandleCheckCard({
   readonly disabled?: boolean;
 }) {
   const handle = output?.handle?.replace(/^@/, '').toLowerCase() ?? null;
+  const fieldId = useId();
   const [draftHandle, setDraftHandle] = useState(handle ?? '');
   const [confirmed, setConfirmed] = useState(false);
   const normalizedDraft = draftHandle.replace(/^@/, '').trim().toLowerCase();
@@ -692,12 +696,13 @@ export function OnboardingHandleCheckCard({
                   : 'is not available'}
             </span>
           </div>
-          <label className='mt-2 flex h-9 items-center rounded-lg border border-subtle bg-surface-0 px-2.5 focus-within:border-white/[0.16] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.035)]'>
+          <OnboardingToolField density='compact' htmlFor={fieldId}>
             <span className='text-app text-tertiary-token' aria-hidden>
               @
             </span>
             <span className='sr-only'>Edit Proposed Handle</span>
             <input
+              id={fieldId}
               aria-label='Edit Proposed Handle'
               value={draftHandle}
               onChange={event => setDraftHandle(event.target.value)}
@@ -708,7 +713,7 @@ export function OnboardingHandleCheckCard({
               spellCheck={false}
               disabled={disabled || confirmed}
             />
-          </label>
+          </OnboardingToolField>
           <p className='mt-1.5 text-xs leading-5 text-secondary-token'>
             {error ??
               (available === false
@@ -755,6 +760,7 @@ export function OnboardingSocialLinkCard({
   readonly disabled?: boolean;
 }) {
   const initialUrl = output?.url ?? '';
+  const fieldId = useId();
   const [draftUrl, setDraftUrl] = useState(initialUrl);
   const [attached, setAttached] = useState(false);
 
@@ -821,9 +827,10 @@ export function OnboardingSocialLinkCard({
               ? 'Link ready to attach'
               : 'Attach a public social account'}
           </p>
-          <label className='mt-2 flex h-9 items-center rounded-lg border border-subtle bg-surface-0 px-2.5 focus-within:border-white/[0.16] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.035)]'>
+          <OnboardingToolField density='compact' htmlFor={fieldId}>
             <span className='sr-only'>Social Profile URL</span>
             <input
+              id={fieldId}
               aria-label='Social Profile URL'
               value={draftUrl}
               onChange={event => setDraftUrl(event.target.value)}
@@ -834,7 +841,7 @@ export function OnboardingSocialLinkCard({
               spellCheck={false}
               disabled={disabled || attached}
             />
-          </label>
+          </OnboardingToolField>
           <p className='mt-1.5 text-xs leading-5 text-secondary-token'>
             {parseHint ?? host ?? 'Paste the full URL fans already use.'}
           </p>
