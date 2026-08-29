@@ -323,8 +323,16 @@ export async function completeCardPayment(page: Page, card: CardDetails) {
       .locator('[data-testid="card-accordion-item-button"]')
       .filter({ visible: true })
       .first();
-    await expect(cardPaymentButton).toBeVisible({ timeout: 15_000 });
-    await cardPaymentButton.click();
+    if (await cardPaymentButton.isVisible()) {
+      await cardPaymentButton.click();
+    } else {
+      const cardPaymentLabel = page
+        .locator('#payment-method-label-card')
+        .filter({ visible: true })
+        .first();
+      await expect(cardPaymentLabel).toBeVisible({ timeout: 15_000 });
+      await cardPaymentLabel.click();
+    }
     await expect(cardPaymentMethod).toBeChecked();
   }
 
