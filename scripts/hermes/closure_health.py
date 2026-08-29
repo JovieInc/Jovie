@@ -33,6 +33,9 @@ EXPLICIT_ISSUE_MARKER = re.compile(
 )
 HOLD_LABELS = {"hold", "gated", "queue-deferred", "needs-human"}
 CLOSE_LABELS = {"duplicate"}
+ACTIVE_WRITER_STATES = frozenset({"repair", "promote", "queued"})
+CHANGED_FILES_PAGE = 100
+EVIDENCE_STATUSES = frozenset({"complete", "missing", "malformed", "truncated"})
 
 
 def isoformat(value: datetime) -> str:
@@ -80,9 +83,142 @@ def _issue_references(pr: dict[str, Any]) -> list[str]:
     return sorted({match.upper() for match in ISSUE_REFERENCE.findall(text)})
 
 
+def _non_negative_int(value: object) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
+def _changed_file_evidence(pr: dict[str, Any]) -> dict[str, Any]:
+    """Classify GitHub changed-file evidence. Truncation fails closed."""
+    files = pr.get("files")
+    changed_files = pr.get("changedFiles")
+    if files is None:
+        return {"status": "missing"}
+    if not isinstance(files, dict):
+        return {"status": "malformed"}
+    nodes = files.get("nodes")
+    if not isinstance(nodes, list):
+        return {"status": "malformed"}
+    paths: list[str] = []
+    seen: set[str] = set()
+    for node in nodes:
+        if not isinstance(node, dict):
+            return {"status": "malformed"}
+        path = node.get("path")
+        if not isinstance(path, str) or not path.strip():
+            return {"status": "malformed"}
+        normalized = path.strip()
+        if normalized in seen:
+            return {"status": "malformed"}
+        seen.add(normalized)
+        paths.append(normalized)
+    total_count = files.get("totalCount")
+    expected_values: list[int] = []
+    if total_count is not None:
+        parsed_total = _non_negative_int(total_count)
+        if parsed_total is None:
+            return {"status": "malformed"}
+        expected_values.append(parsed_total)
+    if changed_files is not None:
+        parsed_changed = _non_negative_int(changed_files)
+        if parsed_changed is None:
+            return {"status": "malformed"}
+        expected_values.append(parsed_changed)
+    if len(set(expected_values)) > 1:
+        return {"status": "malformed"}
+    observed = len(paths)
+    expected = expected_values[0] if expected_values else observed
+    if expected > observed:
+        return {
+            "status": "truncated",
+            "observedCount": observed,
+            "expectedCount": expected,
+        }
+    if expected < observed:
+        return {"status": "malformed"}
+    return {"status": "complete", "files": sorted(paths)}
+
+
+def _changed_file_record(number: int, pr: dict[str, Any]) -> dict[str, Any]:
+    evidence = _changed_file_evidence(pr)
+    record: dict[str, Any] = {"number": number, "status": evidence["status"]}
+    if evidence["status"] == "complete":
+        record["files"] = evidence["files"]
+    if "observedCount" in evidence:
+        record["observedCount"] = evidence["observedCount"]
+    if "expectedCount" in evidence:
+        record["expectedCount"] = evidence["expectedCount"]
+    return record
+
+
+def _duplicate_active_lanes(
+    dispositions: list[dict[str, Any]],
+    evidence_by_number: dict[int, dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Held/draft PRs are not writers. Split work is allowed only when disjoint."""
+    active_by_issue: dict[str, list[int]] = {}
+    for disposition in dispositions:
+        issue = disposition.get("issue")
+        parsed_number = _non_negative_int(disposition.get("number"))
+        if (
+            disposition.get("state") not in ACTIVE_WRITER_STATES
+            or not isinstance(issue, str)
+            or not issue
+            or parsed_number is None
+            or parsed_number == 0
+        ):
+            continue
+        active_by_issue.setdefault(issue, []).append(parsed_number)
+
+    duplicates: list[dict[str, Any]] = []
+    extra_unclassified: list[dict[str, Any]] = []
+    seen_unclassified: set[int] = set()
+    for issue, numbers in sorted(active_by_issue.items()):
+        if len(numbers) < 2:
+            continue
+        complete: dict[int, frozenset[str]] = {}
+        for number in numbers:
+            evidence = evidence_by_number.get(number) or {"status": "missing"}
+            status = evidence.get("status")
+            if status == "complete":
+                files = evidence.get("files")
+                if not isinstance(files, list) or not all(
+                    isinstance(path, str) and path for path in files
+                ):
+                    status = "malformed"
+                else:
+                    complete[number] = frozenset(files)
+                    continue
+            reason_status = status if status in EVIDENCE_STATUSES else "missing"
+            if number not in seen_unclassified:
+                extra_unclassified.append(
+                    {
+                        "number": number,
+                        "reason": f"changed-file-evidence-{reason_status}",
+                    }
+                )
+                seen_unclassified.add(number)
+        classified_numbers = [number for number in numbers if number in complete]
+        if len(classified_numbers) < 2:
+            continue
+        overlap: set[str] = set()
+        for index, left in enumerate(classified_numbers):
+            for right in classified_numbers[index + 1 :]:
+                overlap |= complete[left] & complete[right]
+        if overlap:
+            duplicates.append(
+                {
+                    "issue": issue,
+                    "prs": sorted(classified_numbers),
+                    "overlap": sorted(overlap),
+                }
+            )
+    return duplicates, extra_unclassified
+
+
 def classify_open_prs(prs: list[dict[str, Any]], now: datetime) -> dict[str, Any]:
     """Map every usable open PR to close/repair/promote/queued/held."""
-    issue_lanes: dict[str, list[dict[str, Any]]] = {}
     refs_by_number: dict[int, list[str]] = {}
     unclassified: list[dict[str, Any]] = []
     usable: list[dict[str, Any]] = []
@@ -99,18 +235,13 @@ def classify_open_prs(prs: list[dict[str, Any]], now: datetime) -> dict[str, Any
             unclassified.append(
                 {"number": number, "reason": "multiple-issue-lane-identities"}
             )
-        elif len(references) == 1:
-            issue_lanes.setdefault(references[0], []).append(pr)
 
-    duplicates = [
-        {"issue": issue, "prs": sorted(int(pr["number"]) for pr in lane)}
-        for issue, lane in sorted(issue_lanes.items())
-        if len(lane) > 1
-    ]
     dispositions: list[dict[str, Any]] = []
     expired_holds: list[int] = []
+    prs_by_number: dict[int, dict[str, Any]] = {}
     for pr in sorted(usable, key=lambda item: int(item["number"])):
         number = int(pr["number"])
+        prs_by_number[number] = pr
         if any(item.get("number") == number for item in unclassified):
             continue
         labels = _labels(pr)
@@ -178,6 +309,19 @@ def classify_open_prs(prs: list[dict[str, Any]], now: datetime) -> dict[str, Any
                 }
             )
 
+    changed_file_evidence = [
+        _changed_file_record(number, prs_by_number[number])
+        for number in sorted(prs_by_number)
+    ]
+    evidence_by_number = {item["number"]: item for item in changed_file_evidence}
+    duplicates, extra_unclassified = _duplicate_active_lanes(
+        dispositions, evidence_by_number
+    )
+    drop = {item["number"] for item in extra_unclassified}
+    if drop:
+        dispositions = [item for item in dispositions if item["number"] not in drop]
+        unclassified.extend(extra_unclassified)
+
     counts = {state: 0 for state in ("close", "repair", "promote", "queued", "held")}
     for disposition in dispositions:
         counts[disposition["state"]] += 1
@@ -187,6 +331,7 @@ def classify_open_prs(prs: list[dict[str, Any]], now: datetime) -> dict[str, Any
         "unclassified": sorted(unclassified, key=lambda item: int(item.get("number") or 0)),
         "duplicateIssueLanes": duplicates,
         "expiredHolds": sorted(expired_holds),
+        "changedFileEvidence": changed_file_evidence,
     }
 
 
@@ -354,6 +499,8 @@ query($owner:String!,$name:String!,$endCursor:String){
         author{login}
         labels(first:50){nodes{name}}
         mergeQueueEntry{position enqueuedAt state}
+        changedFiles
+        files(first:__FILES_PAGE__){totalCount nodes{path}}
       }
     }
     merged:pullRequests(first:100,states:MERGED,orderBy:{field:UPDATED_AT,direction:DESC}){
@@ -361,7 +508,7 @@ query($owner:String!,$name:String!,$endCursor:String){
     }
   }
 }
-""".strip()
+""".replace("__FILES_PAGE__", str(CHANGED_FILES_PAGE)).strip()
     completed = subprocess.run(
         [
             "gh",
@@ -502,5 +649,6 @@ def observe_closure_health(
                 "unclassified": [],
                 "duplicateIssueLanes": [],
                 "expiredHolds": [],
+                "changedFileEvidence": [],
             },
         }
