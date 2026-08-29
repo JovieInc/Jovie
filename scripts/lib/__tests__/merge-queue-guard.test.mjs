@@ -477,7 +477,7 @@ describe('aggregate required checks', () => {
     expect(visualWorkflowYaml).not.toContain('vars.CI_FAST_RUNNER');
   });
 
-  it('runs FAQ disclosure geometry in the combined layout gate', () => {
+  it('runs required Storybook geometry contracts in the combined layout gate', () => {
     const ciWorkflowYaml = readFileSync(
       resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.ciWorkflow),
       'utf8'
@@ -489,6 +489,9 @@ describe('aggregate required checks', () => {
 
     expect(combinedLayoutBlock).toMatch(
       /tests\/e2e\/storybook-marketing-faq\.spec\.ts/
+    );
+    expect(combinedLayoutBlock).toMatch(
+      /tests\/e2e\/storybook-skeleton\.spec\.ts/
     );
     expect(combinedLayoutBlock).toMatch(
       /--config=playwright\.config\.storybook\.ts/
