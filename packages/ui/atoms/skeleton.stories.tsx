@@ -10,7 +10,7 @@ const meta: Meta<typeof Skeleton> = {
     docs: {
       description: {
         component:
-          'Loading shimmer uses .skeleton on JovieColor.surface1 (--color-skeleton-base). See packages/ui/docs/loading-states.md.',
+          'Loading shimmer uses .skeleton on --color-skeleton-base / --color-skeleton-shimmer. LoadingSkeleton is the single status owner. See packages/ui/docs/loading-states.md.',
       },
     },
   },
@@ -47,6 +47,21 @@ export const StaticPlaceholder: Story = {
   },
 };
 
+export const ReducedMotion: Story = {
+  args: {
+    className: 'h-10 w-64',
+    shimmer: true,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Reduced motion keeps the reserved box and loading meaning; only the shimmer animation is removed.',
+      },
+    },
+  },
+};
+
 export const MultiLine: Story = {
   render: () => (
     <LoadingSkeleton
@@ -59,7 +74,35 @@ export const MultiLine: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'LoadingSkeleton wrapper exposes aria-busy for assistive tech.',
+        story:
+          'LoadingSkeleton is the single role=status / aria-busy / aria-live owner. Decorative lines stay aria-hidden.',
+      },
+    },
+  },
+};
+
+export const LoadingToContent: Story = {
+  render: () => (
+    <div className='grid w-72 grid-cols-2 gap-6'>
+      <div className='grid gap-2'>
+        <span className='text-2xs text-tertiary-token'>Loading</span>
+        <div className='h-4 w-48'>
+          <LoadingSkeleton height='h-4' width='w-48' label='Loading title' />
+        </div>
+      </div>
+      <div className='grid gap-2'>
+        <span className='text-2xs text-tertiary-token'>Loaded</span>
+        <p className='h-4 w-48 truncate text-sm text-primary-token'>
+          Loaded title
+        </p>
+      </div>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Declared h-4 w-48 geometry is reserved in both the loading and loaded slots.',
       },
     },
   },

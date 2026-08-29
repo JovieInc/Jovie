@@ -11,9 +11,10 @@ Three loading primitives — never mix them on the same surface.
 ## Rules
 
 1. **Never nest** — no `Spinner` inside a `Skeleton` block.
-2. **Skeleton fill** — placeholders use `JovieColor.surface1` (`bg-surface-1` / `--color-skeleton-base`).
+2. **Skeleton fill** — placeholders use `--color-skeleton-base` / `--color-skeleton-shimmer`, not `bg-surface-1` directly.
 3. **Layout shift** — skeleton dimensions must match the loaded UI; reserve space before data arrives.
-4. **Accessibility** — `LoadingSkeleton` exposes `role="status"`; `Spinner` uses `aria-label`; `ProgressBar` uses `role="progressbar"`.
+4. **Accessibility** — `LoadingSkeleton` is the only `role="status"` / `aria-busy` / `aria-live` owner. `Skeleton` is always `aria-hidden`; decorative descendants do not announce.
+5. **Reduced motion** — shimmer animation stops; reserved geometry and loading meaning stay the same.
 
 ## Imports
 

@@ -1,6 +1,4 @@
-'use client';
-
-import * as React from 'react';
+import type * as React from 'react';
 
 import { cn } from '../lib/utils';
 
@@ -27,22 +25,36 @@ const roundedClasses: Record<RoundedVariant, string> = {
   full: 'rounded-full',
 };
 
+const SKELETON_FILL_CLASS = 'bg-(--color-skeleton-base)';
+const REDUCED_MOTION_CLASS =
+  'motion-reduce:animate-none motion-reduce:[background-image:none]';
+
+function omitAnnouncementProps(
+  props: React.HTMLAttributes<HTMLDivElement>
+): React.HTMLAttributes<HTMLDivElement> {
+  const {
+    role: _role,
+    'aria-hidden': _ariaHidden,
+    'aria-busy': _ariaBusy,
+    'aria-live': _ariaLive,
+    'aria-atomic': _ariaAtomic,
+    'aria-label': _ariaLabel,
+    'aria-labelledby': _ariaLabelledBy,
+    'aria-describedby': _ariaDescribedBy,
+    ...safeProps
+  } = props;
+
+  return safeProps;
+}
+
 /**
- * Base skeleton component with shimmer animation.
- * Uses the `.skeleton` CSS class defined in globals.css for the animation.
- * Respects `prefers-reduced-motion` automatically.
+ * Decorative skeleton placeholder. Geometry, fill tokens, and reduced-motion
+ * behavior live here; announcement ownership lives on `LoadingSkeleton`.
  *
- * @example
- * ```tsx
- * // Simple skeleton with width/height
- * <Skeleton className="h-4 w-full" />
- *
- * // Avatar skeleton
- * <Skeleton className="h-10 w-10" rounded="full" />
- *
- * // Card skeleton
- * <Skeleton className="h-32 w-full" rounded="lg" />
- * ```
+ * Shimmer uses the shared `.skeleton` class (canonical
+ * `--color-skeleton-base` / `--color-skeleton-shimmer`). Static fill uses the
+ * same base token. `prefers-reduced-motion` removes the shimmer without
+ * changing the reserved box or loading meaning.
  */
 export function Skeleton({
   className,
@@ -50,17 +62,21 @@ export function Skeleton({
   shimmer = true,
   ...props
 }: SkeletonProps) {
+  const safeProps = omitAnnouncementProps(props);
+  const state = shimmer ? 'shimmer' : 'static';
+
   return (
     <div
+      {...safeProps}
       className={cn(
-        shimmer && 'skeleton motion-reduce:animate-none',
-        !shimmer && 'bg-surface-1 motion-reduce:animate-none',
+        SKELETON_FILL_CLASS,
+        shimmer && 'skeleton',
+        REDUCED_MOTION_CLASS,
         roundedClasses[rounded],
         className
       )}
-      data-state={shimmer ? 'shimmer' : 'static'}
+      data-state={state}
       aria-hidden='true'
-      {...props}
     />
   );
 }
@@ -94,6 +110,7 @@ export interface LoadingSkeletonProps {
 /**
  * Configurable skeleton with support for multiple lines.
  * Last line renders at 75% width for natural text appearance.
+ * This wrapper is the single `role="status"` / `aria-busy` / live-region owner.
  *
  * @example
  * ```tsx
@@ -118,21 +135,19 @@ export function LoadingSkeleton({
   const normalizedLines = Number.isFinite(lines)
     ? Math.max(1, Math.floor(lines))
     : 1;
-
-  // Generate stable keys for multi-line skeletons.
-  const lineKeys = React.useMemo(
-    () =>
-      Array.from({ length: normalizedLines }, (_, i) => `skeleton-line-${i}`),
-    [normalizedLines]
+  const lineKeys = Array.from(
+    { length: normalizedLines },
+    (_, lineNumber) => `skeleton-line-${lineNumber}`
   );
 
   return (
     <div
-      className={normalizedLines === 1 ? 'w-full' : 'space-y-2'}
+      className={cn(width, normalizedLines > 1 && 'space-y-2')}
       role='status'
       aria-busy='true'
       aria-live='polite'
       aria-atomic='true'
+      data-state='loading'
       data-lines={normalizedLines}
     >
       <span className='sr-only'>{label}</span>
