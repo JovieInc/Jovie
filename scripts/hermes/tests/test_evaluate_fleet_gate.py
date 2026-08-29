@@ -289,6 +289,10 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
             )
         self.assertIn("Base64 bounded admission projection", action)
         self.assertIn(
+            "value: ${{ steps.evaluate.outputs.receipt_b64 }}",
+            action,
+        )
+        self.assertIn(
             'needs.fleet-policy.outputs.receipt_b64 }}" | base64 -d',
             deferred_release,
         )
