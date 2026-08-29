@@ -129,10 +129,73 @@ function markerNameForAttempt(sha, attempt) {
  * uploading recovery run replaces the controller-run binding; the payload must
  * name the exact original controller run attempt it recovers.
  */
-function validateMarkerRecoveryRun(run, context, attempt) {
+function validatePostWriteRefreshFailure(jobs, context, attempt) {
+  if (!Array.isArray(jobs) || jobs.length !== 1) return false;
+  const job = jobs[0];
+  if (
+    !job ||
+    typeof job !== 'object' ||
+    !sameInteger(job.run_id, context.controllerRun) ||
+    !sameInteger(job.run_attempt, attempt) ||
+    job.name !== 'Recover exact verified-generation marker' ||
+    job.head_branch !== 'main' ||
+    job.status !== 'completed' ||
+    job.conclusion !== 'failure' ||
+    !Array.isArray(job.steps)
+  ) {
+    return false;
+  }
+  const requiredSuccessfulSteps = [
+    'Validate bounded recovery request',
+    'Verify canonical ownership and exact runtime probes',
+    'Re-probe production Better Auth OAuth runtime',
+    'Preserve recovered verified-generation marker',
+    'Upload recovered verified-generation marker',
+    'Confirm uploaded recovered marker bytes',
+  ];
+  const dispatchName = 'Dispatch fresh fleet reconciliation';
+  const requiredSteps = [...requiredSuccessfulSteps, dispatchName].map(name =>
+    job.steps.filter(step => step?.name === name)
+  );
+  if (requiredSteps.some(matches => matches.length !== 1)) return false;
+  const dispatch = requiredSteps.at(-1)[0];
+  if (
+    dispatch.status !== 'completed' ||
+    dispatch.conclusion !== 'failure' ||
+    !positiveInteger(dispatch.number)
+  ) {
+    return false;
+  }
+  for (const [index, name] of requiredSuccessfulSteps.entries()) {
+    const step = requiredSteps[index][0];
+    if (
+      step.name !== name ||
+      step.status !== 'completed' ||
+      step.conclusion !== 'success' ||
+      !positiveInteger(step.number) ||
+      step.number >= dispatch.number
+    ) {
+      return false;
+    }
+  }
+  return job.steps.every(
+    step =>
+      step?.status === 'completed' &&
+      (step.name === dispatchName
+        ? step.conclusion === 'failure'
+        : step.conclusion === 'success')
+  );
+}
+
+function validateMarkerRecoveryRun(run, context, attempt, jobs) {
   if (!run || typeof run !== 'object') return false;
   const trustedRecoveryEvent =
     run.event === 'workflow_dispatch' || run.event === 'workflow_run';
+  const completedWithDurableProof =
+    run.status === 'completed' &&
+    (run.conclusion === 'success' ||
+      (run.conclusion === 'failure' &&
+        validatePostWriteRefreshFailure(jobs, context, attempt)));
   return (
     sameInteger(run.id, context.controllerRun) &&
     sameInteger(run.run_attempt, attempt) &&
@@ -140,8 +203,7 @@ function validateMarkerRecoveryRun(run, context, attempt) {
     run.head_branch === 'main' &&
     run.head_repository?.full_name === context.repo &&
     trustedRecoveryEvent &&
-    run.status === 'completed' &&
-    run.conclusion === 'success'
+    completedWithDurableProof
   );
 }
 
@@ -164,7 +226,14 @@ function classifyRecoveredMarkerEntry(entry, context) {
     return { error: 'malformed_or_contradictory_marker' };
   }
   const markerContext = { ...context, controllerRun };
-  if (!validateMarkerRecoveryRun(entry.attemptRun, markerContext, attempt)) {
+  if (
+    !validateMarkerRecoveryRun(
+      entry.attemptRun,
+      markerContext,
+      attempt,
+      entry.attemptJobs
+    )
+  ) {
     return { error: 'contradictory_marker_attempt' };
   }
   const sourceContext = { ...context, controllerRun: sourceRun };
