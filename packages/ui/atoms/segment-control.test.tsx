@@ -164,6 +164,7 @@ describe('SegmentControl', () => {
       );
       const tab = screen.getByRole('tab', { name: 'Links' });
       expect(tab.className).toContain('text-app');
+      expect(tab.className).toContain('h-7');
       expect(tab.className).toContain('px-2.5');
     });
 
