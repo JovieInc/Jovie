@@ -216,6 +216,16 @@ class JovieOwnershipTests(unittest.TestCase):
         ):
             MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
 
+    def test_stale_capacity_zero_remediation_reproduces_original_contract_failure(self):
+        receipt = stale_capacity_receipt()
+        receipt["remediationAdmission"]["maxConcurrent"] = 0
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "remediation concurrency must be a positive integer",
+        ):
+            MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
+
     def test_null_capacity_evidence_fails_closed_with_typed_contract_error(self):
         receipt = stale_capacity_receipt()
         receipt["signals"]["concurrencyEvidence"] = None
