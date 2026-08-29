@@ -24,13 +24,12 @@ Canonical contract for Storybook + visual evidence on shippable UI (JOV-4421).
 source lacks:
 
 1. **Test** — colocated `*.test.ts(x)` / `*.spec.ts(x)`, **touched in the same
-   diff**, or a verified `// @coverage-via <path>` whose target imports and
-   exercises the exact component, or asserts an exact `node:fs` source read.
-   Comment-only references, barrel-only mentions, mocks, and unasserted reads
-   fail closed. Existing components may also use a changed central test that
-   imports and exercises the exact component module, or asserts against an
-   exact source-file read; name mentions, mocks, and unasserted reads do not
-   count. Newly added components may not use this exception.
+   diff**, or a verified `// @coverage-via <path>` whose target imports the
+   exact component module and uses the imported binding, or asserts an exact
+   `node:fs` read of that source. Comments, mocks without a real import,
+   same-name text, and unasserted reads do not count. Existing components may
+   also use a changed central test with the same executable evidence. Newly
+   added components may not use the central-test exception.
 2. **Story** — colocated `*.stories.ts(x)`. Existing marketing/site components
    may use a verified real-component story in the canonical
    `MarketingRecipes`, `MarketingSections`, or `MarketingShells` catalog;

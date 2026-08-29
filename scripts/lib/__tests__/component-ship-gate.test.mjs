@@ -461,73 +461,135 @@ describe('diff gate', () => {
   });
 });
 
+const VIA_COMPONENT_REL = 'apps/web/components/atoms/ViaPanel.tsx';
+const VIA_TEST_REL = 'apps/web/tests/unit/atoms/ViaPanel.test.tsx';
+const VIA_STORY_REL = 'apps/web/components/atoms/ViaPanel.stories.tsx';
+const VIA_DIRECTIVE =
+  '// @coverage-via apps/web/tests/unit/atoms/ViaPanel.test.tsx\n';
+const VIA_COMPONENT_SOURCE =
+  `${VIA_DIRECTIVE}` + 'export function ViaPanel() { return <div>Via</div> }\n';
+const VIA_STORY_SOURCE =
+  "import { ViaPanel } from './ViaPanel';\n" +
+  'export default { component: ViaPanel };\n' +
+  'export const Default = { render: () => <ViaPanel /> };\n';
+
+function coverageViaResult({
+  componentSource = VIA_COMPONENT_SOURCE,
+  testSource = '',
+  testRel = VIA_TEST_REL,
+} = {}) {
+  const root = fixtureRepo({
+    [VIA_COMPONENT_REL]: componentSource,
+    [testRel]: testSource,
+    [VIA_STORY_REL]: VIA_STORY_SOURCE,
+  });
+  return checkChangedComponents([VIA_COMPONENT_REL, testRel, VIA_STORY_REL], {
+    repoRoot: root,
+  });
+}
+
 describe('coverage-via executable evidence', () => {
-  const viaSourceRel = 'apps/web/components/marketing/via/ViaPanel.tsx';
-  const viaTestRel = 'apps/web/tests/unit/marketing/ViaPanel.test.tsx';
-  const viaStoryRel = 'apps/web/components/marketing/via/ViaPanel.stories.tsx';
-  const viaComponentSource = [
-    `// @coverage-via ${viaTestRel}`,
-    'export function ViaPanel() { return <div /> }',
-  ].join('\n');
-  const viaStorySource = [
-    "import { ViaPanel } from './ViaPanel';",
-    'export default { component: ViaPanel };',
-    'export const Default = {};',
-  ].join('\n');
-
-  function coverageViaResult(testSource) {
-    const root = fixtureRepo({
-      [viaSourceRel]: viaComponentSource,
-      [viaTestRel]: testSource,
-      [viaStoryRel]: viaStorySource,
-    });
-    return checkChangedComponents([viaSourceRel, viaTestRel, viaStoryRel], {
-      repoRoot: root,
-    });
-  }
-
-  it.each([
-    [
-      'a commented import',
-      [
-        "// import { ViaPanel } from '@/components/marketing/via/ViaPanel';",
-        'void ViaPanel;',
+  it('rejects a deliberate-red commented basename as coverage-via evidence', () => {
+    const result = coverageViaResult({
+      testSource: [
+        '// ViaPanel',
+        "// import { ViaPanel } from '@/components/atoms/ViaPanel';",
+        'void 0;',
       ].join('\n'),
-    ],
-    [
-      'a name mention without an exact import',
-      [
-        "const note = 'ViaPanel lives in marketing/via/ViaPanel';",
-        'expect(note).toContain("ViaPanel");',
-      ].join('\n'),
-    ],
-  ])('rejects %s as @coverage-via evidence', (_case, testSource) => {
-    const result = coverageViaResult(testSource);
+    });
     expect(result.ok).toBe(false);
     expect(
       result.issues.some(issue => issue.rule === 'coverage-via-invalid')
     ).toBe(true);
   });
 
-  it('accepts an exact import that exercises the component', () => {
-    const result = coverageViaResult(
-      [
-        "import { ViaPanel } from '@/components/marketing/via/ViaPanel';",
+  it('accepts an exact module import plus runtime use', () => {
+    const result = coverageViaResult({
+      testSource: [
+        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
         'void ViaPanel;',
-      ].join('\n')
-    );
+      ].join('\n'),
+    });
     expect(result.ok).toBe(true);
   });
 
-  it('accepts an asserted exact node:fs source read', () => {
-    const result = coverageViaResult(
+  it('accepts an asserted exact source read through node:fs', () => {
+    const result = coverageViaResult({
+      testSource: [
+        "import { readFileSync } from 'node:fs';",
+        "import { resolve } from 'node:path';",
+        "const source = readFileSync(resolve(process.cwd(), 'components/atoms/ViaPanel.tsx'), 'utf8');",
+        "expect(source).toContain('ViaPanel');",
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts a dynamic exact-module import plus runtime use', () => {
+    const result = coverageViaResult({
+      testSource: [
+        "const { ViaPanel } = await import('@/components/atoms/ViaPanel');",
+        'void ViaPanel;',
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts an asserted join-of-literals node:fs read', () => {
+    const result = coverageViaResult({
+      testSource: [
+        "import { readFileSync } from 'node:fs';",
+        "import { join } from 'node:path';",
+        "const source = readFileSync(join(process.cwd(), 'components', 'atoms', 'ViaPanel.tsx'), 'utf8');",
+        "expect(source).toContain('ViaPanel');",
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts an asserted exact source read through a local node:fs helper', () => {
+    const result = coverageViaResult({
+      testSource: [
+        "import { readFileSync } from 'node:fs';",
+        "import { resolve } from 'node:path';",
+        'function readWebSource(path) {',
+        "  return readFileSync(resolve(process.cwd(), path), 'utf8');",
+        '}',
+        "const source = readWebSource('components/atoms/ViaPanel.tsx');",
+        "expect(source).toContain('ViaPanel');",
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it.each([
+    [
+      'a mock without a real import',
+      [
+        "const target = '@/components/atoms/ViaPanel';",
+        'vi.mock(target, () => ({ ViaPanel: () => null }));',
+        'void ViaPanel;',
+      ].join('\n'),
+    ],
+    [
+      'unrelated same-name text',
+      "const note = 'ViaPanel is mentioned only as text';\nvoid note;",
+    ],
+    [
+      'an unasserted exact source read',
       [
         "import { readFileSync } from 'node:fs';",
-        "const source = readFileSync('apps/web/components/marketing/via/ViaPanel.tsx', 'utf8');",
-        "expect(source).toContain('ViaPanel');",
-      ].join('\n')
-    );
-    expect(result.ok).toBe(true);
+        "import { resolve } from 'node:path';",
+        "const source = readFileSync(resolve(process.cwd(), 'components/atoms/ViaPanel.tsx'), 'utf8');",
+        'void source;',
+      ].join('\n'),
+    ],
+  ])('rejects %s as coverage-via evidence', (_case, testSource) => {
+    const result = coverageViaResult({ testSource });
+    expect(result.ok).toBe(false);
+    expect(
+      result.issues.some(issue => issue.rule === 'coverage-via-invalid')
+    ).toBe(true);
   });
 
   it('has zero invalid existing coverage-via receipts', () => {

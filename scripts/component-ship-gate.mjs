@@ -189,16 +189,56 @@ function collectBindingNames(name, names = new Set()) {
   return names;
 }
 
+function isDynamicImportExpression(node) {
+  let current = node;
+  while (
+    current &&
+    (ts.isAsExpression(current) ||
+      ts.isParenthesizedExpression(current) ||
+      ts.isSatisfiesExpression(current) ||
+      ts.isAwaitExpression(current))
+  ) {
+    current = current.expression;
+  }
+  return (
+    Boolean(current) &&
+    ts.isCallExpression(current) &&
+    current.expression.kind === ts.SyntaxKind.ImportKeyword
+  );
+}
+
+function isDynamicImportBinding(node) {
+  let current = node.parent;
+  while (
+    current &&
+    (ts.isObjectBindingPattern(current) ||
+      ts.isArrayBindingPattern(current) ||
+      ts.isBindingElement(current))
+  ) {
+    current = current.parent;
+  }
+  return (
+    current &&
+    ts.isVariableDeclaration(current) &&
+    isDynamicImportExpression(current.initializer)
+  );
+}
+
 function shadowedBindingNames(sourceFile, importedNames) {
   const candidates = new Set(importedNames);
   const shadowed = new Set();
   walkAst(sourceFile, node => {
     let bindingName = null;
-    if (
-      ts.isVariableDeclaration(node) ||
-      ts.isParameter(node) ||
-      ts.isBindingElement(node)
-    ) {
+    if (ts.isVariableDeclaration(node) || ts.isParameter(node)) {
+      if (
+        ts.isVariableDeclaration(node) &&
+        isDynamicImportExpression(node.initializer)
+      ) {
+        return;
+      }
+      bindingName = node.name;
+    } else if (ts.isBindingElement(node)) {
+      if (isDynamicImportBinding(node)) return;
       bindingName = node.name;
     } else if (
       (ts.isFunctionDeclaration(node) ||
@@ -269,6 +309,74 @@ function exactRuntimeImports({
     }
   }
 
+  walkAst(sourceFile, node => {
+    if (
+      !ts.isCallExpression(node) ||
+      node.expression.kind !== ts.SyntaxKind.ImportKeyword
+    ) {
+      return;
+    }
+    if (
+      !node.arguments[0] ||
+      !ts.isStringLiteral(node.arguments[0]) ||
+      !moduleResolvesToSource({
+        moduleSpecifier: node.arguments[0].text,
+        importerRel,
+        sourceRel,
+      })
+    ) {
+      return;
+    }
+
+    let parent = node.parent;
+    if (parent && ts.isAwaitExpression(parent)) parent = parent.parent;
+    while (
+      parent &&
+      (ts.isAsExpression(parent) ||
+        ts.isParenthesizedExpression(parent) ||
+        ts.isSatisfiesExpression(parent))
+    ) {
+      parent = parent.parent;
+    }
+    if (!parent || !ts.isVariableDeclaration(parent)) return;
+
+    const importedNames = [];
+    if (ts.isIdentifier(parent.name)) {
+      for (const exportName of exportNames) {
+        importedNames.push({
+          exportName,
+          localName: exportName,
+        });
+      }
+    } else if (ts.isObjectBindingPattern(parent.name)) {
+      for (const element of parent.name.elements) {
+        if (
+          !ts.isBindingElement(element) ||
+          element.dotDotDotToken ||
+          !ts.isIdentifier(element.name)
+        ) {
+          continue;
+        }
+        const exportName =
+          element.propertyName && ts.isIdentifier(element.propertyName)
+            ? element.propertyName.text
+            : element.name.text;
+        if (!exportNames.includes(exportName)) continue;
+        importedNames.push({
+          exportName,
+          localName: element.name.text,
+        });
+      }
+    }
+
+    if (importedNames.length > 0) {
+      imports.push({
+        statement: node.getText(sourceFile),
+        importedNames,
+      });
+    }
+  });
+
   return imports;
 }
 
@@ -329,6 +437,9 @@ function isExactModuleMocked({ sourceFile, importerRel, sourceRel }) {
 function isTypeOrImportUse(node) {
   for (let current = node.parent; current; current = current.parent) {
     if (ts.isImportDeclaration(current) || ts.isTypeNode(current)) return true;
+    if (ts.isBindingElement(current) && isDynamicImportBinding(current)) {
+      return true;
+    }
     if (ts.isStatement(current)) return false;
   }
   return false;
@@ -417,6 +528,63 @@ function isReadFileSyncCall(node, bindings) {
   );
 }
 
+function joinedLiteralPath(node) {
+  if (!ts.isCallExpression(node)) return null;
+  const callee = node.expression;
+  const name = ts.isIdentifier(callee)
+    ? callee.text
+    : ts.isPropertyAccessExpression(callee)
+      ? callee.name.text
+      : null;
+  if (!name || !['join', 'resolve'].includes(name)) return null;
+  const parts = [];
+  for (const argument of node.arguments) {
+    const literal = unwrapStringLiteral(argument);
+    if (literal !== null) parts.push(literal);
+  }
+  if (parts.length === 0) return null;
+  return parts.join('/').replaceAll(/\/+/g, '/');
+}
+
+function localReadWrappers(sourceFile, readBindings) {
+  const wrappers = new Set();
+  const consider = (name, body) => {
+    if (!name || !body) return;
+    let callsRead = false;
+    walkAst(body, node => {
+      if (isReadFileSyncCall(node, readBindings)) callsRead = true;
+    });
+    if (callsRead) wrappers.add(name);
+  };
+
+  for (const statement of sourceFile.statements) {
+    if (ts.isFunctionDeclaration(statement)) {
+      consider(statement.name?.text, statement.body);
+      continue;
+    }
+    if (!ts.isVariableStatement(statement)) continue;
+    for (const declaration of statement.declarationList.declarations) {
+      if (!ts.isIdentifier(declaration.name) || !declaration.initializer) {
+        continue;
+      }
+      const init = declaration.initializer;
+      if (ts.isArrowFunction(init) || ts.isFunctionExpression(init)) {
+        consider(declaration.name.text, init.body);
+      }
+    }
+  }
+  return wrappers;
+}
+
+function isSourceReadCall(node, readBindings, wrappers) {
+  if (isReadFileSyncCall(node, readBindings)) return true;
+  return (
+    ts.isCallExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    wrappers.has(node.expression.text)
+  );
+}
+
 function hasExplicitSourceRead(sourceFile, sourceRel) {
   const readBindings = nodeFsReadBindings(sourceFile);
   if (readBindings.direct.size === 0 && readBindings.namespace.size === 0) {
@@ -426,6 +594,7 @@ function hasExplicitSourceRead(sourceFile, sourceRel) {
     sourceRel,
     sourceRel.replace(/^apps\/web\//, ''),
   ]);
+  const wrappers = localReadWrappers(sourceFile, readBindings);
   const pathBindings = new Set();
   walkAst(sourceFile, node => {
     if (!ts.isVariableDeclaration(node) || !ts.isIdentifier(node.name)) return;
@@ -433,15 +602,21 @@ function hasExplicitSourceRead(sourceFile, sourceRel) {
     if (value && exactPaths.has(value)) pathBindings.add(node.name.text);
   });
 
+  const nodeReadsExactPath = node => {
+    const literal = unwrapStringLiteral(node);
+    if (literal && exactPaths.has(literal)) return true;
+    const joined = joinedLiteralPath(node);
+    if (joined && exactPaths.has(joined)) return true;
+    return ts.isIdentifier(node) && pathBindings.has(node.text);
+  };
+
   const callReadsExactPath = call => {
+    if (nodeReadsExactPath(call)) return true;
     let matches = false;
     for (const argument of call.arguments) {
       walkAst(argument, node => {
         if (matches) return;
-        const literal = unwrapStringLiteral(node);
-        if (literal && exactPaths.has(literal)) matches = true;
-        if (ts.isIdentifier(node) && pathBindings.has(node.text))
-          matches = true;
+        if (nodeReadsExactPath(node)) matches = true;
       });
     }
     return matches;
@@ -462,7 +637,7 @@ function hasExplicitSourceRead(sourceFile, sourceRel) {
     if (ts.isIdentifier(subject)) assertedNames.add(subject.text);
     walkAst(subject, child => {
       if (
-        isReadFileSyncCall(child, readBindings) &&
+        isSourceReadCall(child, readBindings, wrappers) &&
         callReadsExactPath(child)
       ) {
         directReadAssertion = true;
@@ -485,7 +660,7 @@ function hasExplicitSourceRead(sourceFile, sourceRel) {
     }
     walkAst(node.initializer, child => {
       if (
-        isReadFileSyncCall(child, readBindings) &&
+        isSourceReadCall(child, readBindings, wrappers) &&
         callReadsExactPath(child)
       ) {
         assertedReadBinding = true;
@@ -525,28 +700,14 @@ export function inspectCoverageViaReceipt({
   componentSource,
   repoRoot = REPO_ROOT,
 }) {
-  const verified = verifyCoverageVia({
+  return verifyCoverageVia({
     viaRel,
     componentRel: sourceRel,
     componentBase,
     repoRoot,
+    componentSource,
+    hasExecutableEvidence: hasRealLegacyTestEvidence,
   });
-  if (!verified.ok) return verified;
-  const testSource = readText(viaRel, repoRoot);
-  if (
-    hasRealLegacyTestEvidence({
-      testSource,
-      testRel: viaRel,
-      sourceRel,
-      componentSource,
-    })
-  ) {
-    return { ok: true, detail: null };
-  }
-  return {
-    ok: false,
-    detail: `@coverage-via ${viaRel} does not import and exercise ${sourceRel} (or assert an exact node:fs source read)`,
-  };
 }
 
 export function auditCoverageViaReceipts({ repoRoot = REPO_ROOT } = {}) {
