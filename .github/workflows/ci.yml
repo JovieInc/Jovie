@@ -154,7 +154,7 @@ jobs:
             --volume "$PWD:/repo:ro" \
             "$IMAGE_TAG" -lc '
               set -euo pipefail
-              test "$(node --version)" = v22.23.1
+              test "$(node --version)" = v22.23.2
               test "$(cd / && COREPACK_ENABLE_NETWORK=0 pnpm --version)" = 9.15.4
 
               dependency_status=$(JOVIE_RUNNER_REPO_ROOT=/repo \
@@ -283,7 +283,7 @@ jobs:
           assert_line 'pnpm store path' 'pnpm_store_path=/opt/jovie-pnpm-store' "$dependency_status"
           assert_line 'Playwright warm status' 'playwright_warm=true' "$playwright_status"
           assert_line 'Playwright browser path' 'playwright_browsers_path=/opt/ms-playwright' "$playwright_status"
-          assert_equal 'Node version' v22.23.1 "$(node --version)"
+          assert_equal 'Node version' v22.23.2 "$(node --version)"
           assert_equal 'pnpm version' 9.15.4 "$(pnpm --version)"
           assert_equal 'PLAYWRIGHT_BROWSERS_PATH' /opt/ms-playwright "$PLAYWRIGHT_BROWSERS_PATH"
           assert_executable 'Chromium' /opt/ms-playwright/chromium-1223/chrome-linux64/chrome
