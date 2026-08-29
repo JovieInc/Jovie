@@ -174,4 +174,15 @@ describe('LoadingSkeleton', () => {
     expect(skeleton).not.toHaveClass('h-[13px]', 'w-[29px]');
     expect(loggerWarn).toHaveBeenCalledTimes(2);
   });
+
+  it('falls back for malformed runtime sizes and zero-denominator fractions', () => {
+    const { container } = render(
+      <LoadingSkeleton height={null as unknown as string} width='w-1/0' />
+    );
+
+    const skeleton = container.querySelector('[data-slot="skeleton"]');
+    expect(skeleton).toHaveClass('h-4', 'w-full');
+    expect(skeleton).not.toHaveClass('w-1/0');
+    expect(loggerWarn).toHaveBeenCalledTimes(2);
+  });
 });

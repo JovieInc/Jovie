@@ -261,6 +261,25 @@ describe('LoadingSkeleton', () => {
       expect(skeleton).not.toHaveClass('h-[13px]', 'w-[29px]');
     });
 
+    it('removes important and responsive caller geometry overrides', () => {
+      render(
+        <LoadingSkeleton
+          className='!h-[13px] sm:!w-[29px] min-h-24 max-w-0 shrink-0'
+          height='h-6'
+          width='w-48'
+        />
+      );
+
+      const skeleton = document.querySelector('[data-slot="skeleton"]');
+      expect(skeleton).toHaveClass('h-6', 'w-48', 'shrink-0');
+      expect(skeleton).not.toHaveClass(
+        '!h-[13px]',
+        'sm:!w-[29px]',
+        'min-h-24',
+        'max-w-0'
+      );
+    });
+
     it('applies height to all lines', () => {
       render(<LoadingSkeleton lines={2} height='h-6' />);
       const skeletons = document.querySelectorAll('.skeleton');

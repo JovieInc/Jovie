@@ -20,7 +20,7 @@ export type LoadingSkeletonProps = Pick<
 >;
 
 const SIZE_TOKEN_PATTERN = /^\d+(?:\.\d+)?$/;
-const FRACTION_TOKEN_PATTERN = /^\d+\/\d+$/;
+const FRACTION_TOKEN_PATTERN = /^(\d+)\/(\d+)$/;
 
 const VALID_HEIGHT_KEYWORDS = new Set([
   'auto',
@@ -49,12 +49,12 @@ const VALID_WIDTH_KEYWORDS = new Set([
 ]);
 
 function isValidSizeClass(
-  value: string,
+  value: unknown,
   propName: 'height' | 'width'
-): boolean {
+): value is string {
   const prefix = propName === 'height' ? 'h-' : 'w-';
 
-  if (!value.startsWith(prefix)) {
+  if (typeof value !== 'string' || !value.startsWith(prefix)) {
     return false;
   }
 
@@ -67,8 +67,11 @@ function isValidSizeClass(
     return true;
   }
 
-  if (propName === 'width' && FRACTION_TOKEN_PATTERN.test(token)) {
-    return true;
+  if (propName === 'width') {
+    const fractionMatch = FRACTION_TOKEN_PATTERN.exec(token);
+    if (fractionMatch) {
+      return Number(fractionMatch[2]) > 0;
+    }
   }
 
   return propName === 'height'
@@ -76,12 +79,12 @@ function isValidSizeClass(
     : VALID_WIDTH_KEYWORDS.has(token);
 }
 
-function validateSizeClass(value: string, propName: string): string {
+function validateSizeClass(value: unknown, propName: string): string {
   const sizePropName = propName === 'height' ? 'height' : 'width';
 
   if (!isValidSizeClass(value, sizePropName)) {
     logger.warn(
-      `Invalid ${propName} class "${value}". Using default value instead.`,
+      `Invalid ${propName} class "${String(value)}". Using default value instead.`,
       undefined,
       'LoadingSkeleton'
     );

@@ -27,6 +27,22 @@ const roundedClasses: Record<RoundedVariant, string> = {
   full: 'rounded-full',
 };
 
+const RESERVED_GEOMETRY_UTILITY_PATTERN =
+  /^(?:min-|max-)?(?:h|w)-.+$|^size-.+$/;
+
+function withoutReservedGeometry(className: string | undefined): string {
+  if (!className) return '';
+
+  return className
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter(token => {
+      const utility = token.split(':').at(-1)?.replace(/^!|!$/g, '');
+      return !utility || !RESERVED_GEOMETRY_UTILITY_PATTERN.test(utility);
+    })
+    .join(' ');
+}
+
 /**
  * Base skeleton component with shimmer animation.
  * Uses the `.skeleton` CSS class defined in globals.css for the animation.
@@ -126,6 +142,7 @@ export function LoadingSkeleton({
     typeof label === 'string' && label.trim()
       ? label.trim()
       : 'Loading content';
+  const nonGeometryClassName = withoutReservedGeometry(className);
 
   // Generate stable keys for multi-line skeletons.
   const lineKeys = React.useMemo(
@@ -157,7 +174,7 @@ export function LoadingSkeleton({
         <Skeleton
           key={key}
           className={cn(
-            className,
+            nonGeometryClassName,
             height,
             normalizedLines > 1 && index === normalizedLines - 1
               ? 'w-3/4'

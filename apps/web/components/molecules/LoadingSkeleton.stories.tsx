@@ -69,6 +69,23 @@ export const Button: Story = {
   render: () => <ButtonSkeleton />,
 };
 
+export const ButtonGeometryComparison: Story = {
+  render: () => (
+    <div className='w-100 space-y-4'>
+      <div data-testid='button-skeleton-geometry'>
+        <ButtonSkeleton />
+      </div>
+      <button
+        className='block h-12 w-full max-w-sm rounded-lg bg-surface-1'
+        data-testid='loaded-button-geometry'
+        type='button'
+      >
+        Loaded action
+      </button>
+    </div>
+  ),
+};
+
 export const SocialBar: Story = {
   render: () => <SocialBarSkeleton />,
 };
