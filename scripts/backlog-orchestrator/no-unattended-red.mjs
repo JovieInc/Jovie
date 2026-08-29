@@ -8,7 +8,7 @@ import { mkdir, open, readdir, readFile, rename } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 export const NO_UNATTENDED_RED_SCHEMA = 'jovie-no-unattended-red/v1';
-export const SUMMER_QUEUE_SCHEMA = 'jovie-summer-red-queue/v1';
+export const SUMMER_QUEUE_SCHEMA = 'jovie-summer-red-queue/v2';
 export const EVIDENCE_TASK_SCHEMA = 'jovie-symphony-evidence-task/v1';
 export const ATTEMPT_BUDGET = 3;
 export const AUTHORITY_BUDGET = 1;
@@ -82,6 +82,8 @@ const QUEUE_KEYS = [
   'headSha',
   'leaseKey',
   'action',
+  'observedAt',
+  'terminal',
 ];
 
 // biome-ignore format: compact No Unattended Red implementation for the PR size guard
@@ -212,8 +214,9 @@ function createApi() {
     return (observedSignals || []).map(signal => classifyStall(signal, { now })).filter(classified => !persisted.has(classified.issueKey)).map(classified => openLoopRecord(classified, { now }));
   }
   function projectSummerQueue(records, { now = new Date().toISOString() } = {}) {
-    const items = [...(records || [])].sort((left, right) => `${left.issueKey}:${left.observedAt}`.localeCompare(`${right.issueKey}:${right.observedAt}`)).map(record => ({ ...Object.fromEntries(QUEUE_KEYS.map(key => [key, record[key]])), issue: record.issue, stallClass: record.stallClass, outcome: record.outcome, escalation: record.escalation || null }));
-    return { schema: SUMMER_QUEUE_SCHEMA, authority: 'Summer', observedAt: iso(now), items, counts: { open: items.filter(item => item.outcome === 'open').length, healthy: items.filter(item => item.outcome === 'healthy').length, escalated: items.filter(item => item.outcome === 'escalated').length } };
+    const source = [...(records || [])];
+    const items = source.filter(record => record.outcome !== 'healthy').sort((left, right) => `${left.issueKey}:${left.observedAt}`.localeCompare(`${right.issueKey}:${right.observedAt}`)).map(record => ({ ...Object.fromEntries(QUEUE_KEYS.map(key => [key, record[key]])), issue: record.issue, stallClass: record.stallClass, outcome: record.outcome, escalation: record.escalation || null }));
+    return { schema: SUMMER_QUEUE_SCHEMA, authority: 'Summer', observedAt: iso(now), items, counts: { open: items.filter(item => item.outcome === 'open').length, healthy: 0, escalated: items.filter(item => item.outcome === 'escalated').length, terminalHidden: source.filter(item => item.outcome === 'healthy').length } };
   }
   function evidenceTaskForRecord(record) {
     if (record.mode !== 'collect-evidence' || record.outcome !== 'open') return null;
