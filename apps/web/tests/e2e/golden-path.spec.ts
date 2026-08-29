@@ -346,6 +346,9 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
     confirmHandle.click(),
   ]);
   expect(confirmedHandleResponse.status()).toBe(200);
+  await expect(page.getByTestId('onboarding-social-link')).toBeVisible({
+    timeout: 60_000,
+  });
 
   const requestBody = artistResponse.request().postDataJSON() as {
     messages?: Array<{ id?: string; role?: string }>;
@@ -418,7 +421,7 @@ async function createFreshUser(page: import('@playwright/test').Page) {
 /* ------------------------------------------------------------------ */
 
 test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', () => {
-  test.describe.configure({ mode: 'serial' });
+  test.describe.configure({ mode: 'serial', retries: 0 });
 
   // Fresh browser — no inherited auth state
   test.use({ storageState: { cookies: [], origins: [] } });
