@@ -60,6 +60,27 @@ export const recipeViewports = {
   },
 };
 
+/** Viewports for terminal marketing CTA stories (JOV-4954). */
+export const terminalCtaViewports = {
+  desktop: {
+    name: 'Desktop 1024',
+    styles: { width: '1024px', height: '768px' },
+  },
+  mobile: {
+    name: 'Mobile 390',
+    styles: { width: '390px', height: '844px' },
+  },
+};
+
+export const terminalCtaStoryParameters = {
+  ...marketingFullscreenParameters,
+  chromatic: { viewports: [390, 1024] },
+  viewport: {
+    viewports: terminalCtaViewports,
+    defaultViewport: 'desktop',
+  },
+};
+
 export function marketingMeta<T>(
   partial: Meta<T> & { readonly title: string }
 ): Meta<T> {

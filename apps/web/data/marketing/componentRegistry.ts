@@ -318,7 +318,7 @@ const SECTION_RESOLUTIONS = {
     'data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.faq}'
   ),
   cta: unresolved(
-    'A production shell root exists, but section.cta convergence is pending JOV-4954.'
+    'A production shell root exists, but section.cta convergence is pending JOV-5356.'
   ),
   'spec-wall': sourceRoot(
     'apps/web/components/marketing/artist-profile/ArtistProfileSpecWall.tsx',
