@@ -453,6 +453,35 @@ class StaleAlarmTests(unittest.TestCase):
             self.assertEqual(self.alarm(state_dir), "")
 
 
+class PreviousClosureHealthTests(unittest.TestCase):
+    def test_null_signals_in_persisted_receipt_is_ignored(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp)
+            (state_dir / "latest.json").write_text(
+                json.dumps({"schema": MODULE.SCHEMA, "signals": None}),
+                encoding="utf-8",
+            )
+
+            self.assertIsNone(MODULE.previous_closure_health(state_dir))
+
+    def test_valid_typed_closure_health_is_preserved(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp)
+            expected = {
+                "schema": MODULE.CLOSURE_HEALTH_SCHEMA,
+                "status": "grace",
+                "episodeId": "closure-health-episode",
+            }
+            (state_dir / "latest.json").write_text(
+                json.dumps(
+                    {"schema": MODULE.SCHEMA, "signals": {"closureHealth": expected}}
+                ),
+                encoding="utf-8",
+            )
+
+            self.assertEqual(MODULE.previous_closure_health(state_dir), expected)
+
+
 class PersistedRefreshTests(unittest.TestCase):
     def test_refresh_persists_canonical_receipt_atomically(self):
         with tempfile.TemporaryDirectory() as tmp:

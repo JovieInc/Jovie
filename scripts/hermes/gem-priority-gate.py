@@ -138,7 +138,10 @@ def previous_closure_health(state_dir: Path) -> dict[str, Any] | None:
         receipt = read_json(state_dir / "latest.json")
     except (OSError, ValueError, json.JSONDecodeError):
         return None
-    candidate = receipt.get("signals", {}).get("closureHealth")
+    signals = receipt.get("signals")
+    if not isinstance(signals, dict):
+        return None
+    candidate = signals.get("closureHealth")
     if not isinstance(candidate, dict) or candidate.get("schema") != CLOSURE_HEALTH_SCHEMA:
         return None
     return candidate
