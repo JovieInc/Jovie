@@ -21,10 +21,13 @@ describe('public OpenAPI surfaces', () => {
 
     expect(compatibilityBody).toEqual(canonicalBody);
     expect(canonicalBody.openapi).toBe('3.1.0');
-    expect(canonicalBody.paths['/{username}'].get.operationId).toBe(
+    expect(canonicalBody.paths['/api/v1'].get.operationId).toBe(
+      'getArtistApiIndex'
+    );
+    expect(canonicalBody.paths['/api/v1/{username}'].get.operationId).toBe(
       'getArtist'
     );
-    expect(canonicalBody.paths['/{username}'].get.description).toContain(
+    expect(canonicalBody.paths['/api/v1/{username}'].get.description).toContain(
       'read-only'
     );
   });
