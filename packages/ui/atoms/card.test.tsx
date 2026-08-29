@@ -210,7 +210,7 @@ describe('CardDescription', () => {
     render(<CardDescription>Description text</CardDescription>);
     const description = screen.getByText('Description text');
     expect(description.tagName).toBe('P');
-    expect(description.className).toContain('text-[13px]');
+    expect(description.className).toContain('text-app');
     expect(description.className).toContain('text-secondary-token');
   });
 
@@ -232,7 +232,7 @@ describe('CardDescription', () => {
     );
     const description = screen.getByTestId('div-description');
     expect(description.tagName).toBe('DIV');
-    expect(description.className).toContain('text-[13px]');
+    expect(description.className).toContain('text-app');
   });
 });
 

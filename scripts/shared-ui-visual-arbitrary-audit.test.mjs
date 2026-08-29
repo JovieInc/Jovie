@@ -81,7 +81,7 @@ test('repo shared-UI visual arbitrary findings match the shrink-only baseline', 
   const result = evaluateSharedUiVisualArbitraryAudit({ eventName: 'local' });
   assert.equal(result.ok, true, result.issues.join('\n'));
   assert.equal(result.status, 'pass');
-  assert.equal(result.totalFindings, 52);
+  assert.equal(result.totalFindings, 22);
   assert.equal(result.scannedFiles.length, 57);
   for (const relativePath of COVERED_PRODUCTION_SOURCES) {
     assert.equal(
@@ -106,8 +106,8 @@ test('baseline schema is exact file/value/count and sorted', () => {
   assert.deepEqual(validateVisualArbitraryBaseline(baseline), []);
   assert.equal(baseline.schema, SCHEMA);
   assert.deepEqual(baseline.scope, SCOPE);
-  assert.equal(baseline.totalFindings, 52);
-  assert.equal(baseline.findings.length, 41);
+  assert.equal(baseline.totalFindings, 22);
+  assert.equal(baseline.findings.length, 18);
   assert.ok(
     baseline.findings.every(
       finding => isSharedUiProductionSource(finding.file) && finding.count > 0
@@ -115,7 +115,7 @@ test('baseline schema is exact file/value/count and sorted', () => {
   );
   assert.match(
     serializeVisualArbitraryBaseline(baseline),
-    /"totalFindings": 52/
+    /"totalFindings": 22/
   );
   const bad = evaluateSharedUiVisualArbitraryAudit({
     baseline: { schema: 'nope' },
