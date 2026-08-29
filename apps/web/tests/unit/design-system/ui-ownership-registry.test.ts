@@ -154,6 +154,114 @@ describe('cross-surface UI ownership registry', () => {
       )
     ).toBe(false);
   });
+
+  it('certifies the revenue-loop families as direct adaptive owners', () => {
+    const expected = [
+      {
+        id: 'molecule.claim-banner',
+        sourcePath: 'apps/web/components/features/profile/ClaimBanner.tsx',
+        exportName: 'ClaimBanner',
+        surfaces: ['public-profile'],
+        states: ['default', 'focus-visible', 'disabled', 'error'],
+        adaptiveModes: { compact: 'stacked', medium: 'inline', wide: 'inline' },
+      },
+      {
+        id: 'organism.opportunity-row',
+        sourcePath:
+          'apps/web/components/organisms/opportunity-card/OpportunityRow.tsx',
+        exportName: 'OpportunityRow',
+        surfaces: ['app', 'chat'],
+        states: [
+          'default',
+          'hover',
+          'focus-visible',
+          'selected',
+          'disabled',
+          'loading',
+        ],
+        adaptiveModes: {
+          compact: 'swipe-enabled',
+          medium: 'action-row',
+          wide: 'action-row',
+        },
+      },
+      {
+        id: 'organism.jovie-work-feed',
+        sourcePath:
+          'apps/web/components/features/dashboard/organisms/jovie-work-feed/JovieWorkFeed.tsx',
+        exportName: 'JovieWorkFeed',
+        surfaces: ['app'],
+        states: [
+          'default',
+          'loading',
+          'empty',
+          'partial',
+          'success',
+          'error',
+          'recovery',
+        ],
+        adaptiveModes: {
+          compact: 'single-column',
+          medium: 'single-column',
+          wide: 'single-column',
+        },
+      },
+      {
+        id: 'organism.standalone-product-page',
+        sourcePath: 'apps/web/components/organisms/StandaloneProductPage.tsx',
+        exportName: 'StandaloneProductPage',
+        surfaces: [
+          'app',
+          'admin',
+          'marketing',
+          'auth',
+          'onboarding',
+          'waitlist',
+          'public-profile',
+          'chat',
+          'calendar',
+        ],
+        states: ['default', 'loading', 'error'],
+        adaptiveModes: {
+          compact: 'compact-gutter',
+          medium: 'contained',
+          wide: 'contained',
+        },
+      },
+    ] as const;
+
+    for (const contract of expected) {
+      const entry = item(contract.id);
+      expect(entry).toMatchObject({
+        id: contract.id,
+        sourceAuthority: { registry: 'direct', id: null },
+        canonicalOwner: {
+          sourcePath: contract.sourcePath,
+          exportName: contract.exportName,
+          registryId: null,
+        },
+        surfaces: contract.surfaces,
+        states: contract.states,
+        requiredStates: contract.states,
+        adaptiveModes: contract.adaptiveModes,
+        pen: {
+          status: 'unresolved',
+          identity: null,
+          sourceBacked: true,
+          evidencePaths: [],
+        },
+      });
+    }
+
+    const claimBanner = item('molecule.claim-banner');
+    expectIssue(
+      mutate('organism.opportunity-row', () => ({
+        canonicalOwner: { ...claimBanner.canonicalOwner },
+      })),
+      'duplicate-owner'
+    );
+  });
+
   it('fails closed on duplicate ownership, source paths, and aliases', () => {
     const [first, second] = UI_OWNERSHIP_REGISTRY;
     expectIssue(
