@@ -3,12 +3,13 @@ import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   normalizeFailureEvents,
+  planFailureDispatch,
   runDispatch,
   TRUSTED_CI_WORKFLOW_PATH,
 } from '../rolling-ci-dispatch.mjs';
 import {
   classifyRunnerFailure,
-  FX_RUNNER_IDEMPOTENCY_KEY,
+  FX_EXECUTION_RECEIPT_SCHEMA,
   findOwnedAgents,
   launchCursorAgent,
   listCursorAgents,
@@ -154,6 +155,7 @@ describe('rolling CI FX webhook remediation', () => {
       implementer: 'tim',
       fxAdapter,
       cursorApiKey: 'cursor-key',
+      remoteMutationAllowed: true,
       repository: 'JovieInc/Jovie',
       prNumber: 16180,
       headSha: head,
@@ -204,6 +206,7 @@ describe('rolling CI FX webhook remediation', () => {
       implementer: 'tim',
       fxAdapter,
       cursorApiKey: 'cursor-key',
+      remoteMutationAllowed: true,
       repository: 'JovieInc/Jovie',
       prNumber: 16180,
       headSha: queueSha,
@@ -230,6 +233,7 @@ describe('rolling CI FX webhook remediation', () => {
       implementer: 'tim',
       fxAdapter,
       cursorApiKey: 'cursor-key',
+      remoteMutationAllowed: true,
       repository: 'JovieInc/Jovie',
       prNumber: 17,
       headSha: head,
@@ -263,6 +267,7 @@ describe('rolling CI FX webhook remediation', () => {
         fingerprint: events[0].fingerprint,
         cursorAgents: [{ id: 'agent-1', prompt: events[0].fingerprint }],
         cursorApiKey: 'cursor-key',
+        remoteMutationAllowed: true,
       })
     ).toMatchObject({
       action: 'dedup',
@@ -305,6 +310,7 @@ describe('rolling CI FX webhook remediation', () => {
       headSha: head,
       fingerprint: 'ci:request-schema',
       cursorApiKey: 'cursor-key',
+      remoteMutationAllowed: true,
     }).request;
     const fetchImpl = vi.fn().mockResolvedValue({
       ok: true,
@@ -364,6 +370,21 @@ describe('rolling CI FX webhook remediation', () => {
     expect(error.message.length).toBeLessThan(700);
   });
 
+  it('rejects launch acceptance without a bound agent and run', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      text: async () => JSON.stringify({ agent: { id: 'bc-agent-1' } }),
+    });
+    await expect(
+      launchCursorAgent({
+        request: {},
+        cursorApiKey: 'cursor-key',
+        fetchImpl,
+      })
+    ).rejects.toThrow('cursor launch returned no bound agent/run acceptance');
+  });
+
   it('does not steal a live implementer comment claim when dispatching', () => {
     expect(
       resolveDispatchWriter({
@@ -407,7 +428,7 @@ describe('rolling CI FX webhook remediation', () => {
     ).toBe(FX_ADAPTER_NAME);
   });
 
-  it('plans merge_group FX launch when LIVE_AUTHOR is empty', () => {
+  it('deliberate red: terminalizes merge_group FX when only a remote-writing executor exists', () => {
     const input = {
       repository: 'JovieInc/Jovie',
       prNumber: 16418,
@@ -417,7 +438,10 @@ describe('rolling CI FX webhook remediation', () => {
       headRef: 'cursor/measured-merge-group',
       workflowRunId: 32621638955,
       workflowRunAttempt: 1,
-      failedJobs: [{ name: 'ci-fast', steps: ['Typecheck'] }],
+      failedJobs: [
+        { name: 'ci-fast', steps: ['Typecheck'] },
+        { name: 'runner-bootstrap', steps: ['Set up job'] },
+      ],
       source: { ...trustedSource, producerEvent: 'merge_group' },
       checkSuiteId: 44,
       checks: [
@@ -443,11 +467,74 @@ describe('rolling CI FX webhook remediation', () => {
     const planned = JSON.parse(launched.stdout);
     expect(planned).toMatchObject({
       route: { route: 'fx' },
-      launch: { action: 'launch' },
-      dispatch: { mutate: true, action: 'dispatch_implementer' },
-      outcome: 'launched',
+      launch: {
+        action: 'configuration_incident',
+        reason: 'fx-safe-executor-unavailable',
+        receipt: {
+          schema: FX_EXECUTION_RECEIPT_SCHEMA,
+          terminal: true,
+          result: 'remote_mutation_not_authorized',
+          repository: 'JovieInc/Jovie',
+          prNumber: 16418,
+          headSha: head,
+        },
+      },
+      dispatch: { mutate: true, action: 'terminal_configuration_incident' },
+      outcome: 'blocked_executor',
     });
     expect(planned.dispatch.state.claim.writer).toBe(FX_ADAPTER_NAME);
+    expect(planned.dispatch.state.claim.status).toBe('terminal');
+    const terminalFingerprint = planned.launch.receipt.fingerprint;
+    const unrelatedFingerprint = Object.keys(
+      planned.dispatch.state.failures
+    ).find(fingerprint => fingerprint !== terminalFingerprint);
+    expect(
+      planned.dispatch.state.failures[terminalFingerprint].terminalReceipt
+        .terminal
+    ).toBe(true);
+    expect(unrelatedFingerprint).toBeDefined();
+    expect(
+      planned.dispatch.state.failures[unrelatedFingerprint].terminalReceipt
+    ).toBeUndefined();
+    expect(planned.dispatch.body).toContain('## FX execution terminal');
+    expect(planned.dispatch.body).toContain('jovie-fx-execution-receipt');
+
+    const terminalEvent = planned.dispatch.events.find(
+      event => event.fingerprint === terminalFingerprint
+    );
+    const unrelatedEvent = planned.dispatch.events.find(
+      event => event.fingerprint === unrelatedFingerprint
+    );
+    expect(
+      planFailureDispatch({
+        event: {
+          ...terminalEvent,
+          attempt: 2,
+          delivery: `44:2:${terminalFingerprint}`,
+        },
+        liveHead: head,
+        writer: FX_ADAPTER_NAME,
+        priorState: planned.dispatch.state,
+      })
+    ).toMatchObject({
+      action: 'terminal_configuration_incident',
+      mutate: false,
+    });
+    expect(
+      planFailureDispatch({
+        event: {
+          ...unrelatedEvent,
+          attempt: 2,
+          delivery: `44:2:${unrelatedFingerprint}`,
+        },
+        liveHead: head,
+        writer: FX_ADAPTER_NAME,
+        priorState: planned.dispatch.state,
+      })
+    ).toMatchObject({
+      action: 'dispatch_implementer',
+      mutate: true,
+    });
 
     const missingAuth = spawnSync(process.execPath, [CLI], {
       input: JSON.stringify({ ...input, cursorApiKey: '' }),
@@ -463,7 +550,7 @@ describe('rolling CI FX webhook remediation', () => {
     });
   });
 
-  it('CLI plans an FX launch from a trusted failure event', () => {
+  it('CLI fails closed instead of launching a remote-writing FX executor', () => {
     const input = {
       repository: 'JovieInc/Jovie',
       prNumber: 17,
@@ -496,8 +583,12 @@ describe('rolling CI FX webhook remediation', () => {
     expect(launched.status).toBe(0);
     expect(JSON.parse(launched.stdout)).toMatchObject({
       route: { route: 'fx' },
-      launch: { action: 'launch' },
-      dispatch: { mutate: true },
+      launch: {
+        action: 'configuration_incident',
+        reason: 'fx-safe-executor-unavailable',
+      },
+      dispatch: { mutate: true, action: 'terminal_configuration_incident' },
+      outcome: 'blocked_executor',
     });
     const held = spawnSync(process.execPath, [CLI], {
       input: JSON.stringify({
@@ -542,9 +633,17 @@ describe('rolling CI FX webhook remediation', () => {
         launch: { action: 'configuration_incident', reason: 'fx-auth-missing' },
       })
     ).toBe('no_key');
+    expect(
+      resolveFxNamedOutcome({
+        launch: {
+          action: 'configuration_incident',
+          reason: 'fx-safe-executor-unavailable',
+        },
+      })
+    ).toBe('blocked_executor');
   });
 
-  it('launches FX for checkout failures even while an implementer lease is live', () => {
+  it('terminalizes checkout failures when only a remote-writing executor exists', () => {
     const checkoutJobs = [
       { name: 'ci-fast', steps: ['Checkout exact PR head'] },
     ];
@@ -558,21 +657,16 @@ describe('rolling CI FX webhook remediation', () => {
       now: '2026-08-22T01:00:00Z',
       failedJobs: checkoutJobs,
     });
-    expect(planned.launch.action).toBe('launch');
+    expect(planned.launch).toMatchObject({
+      action: 'configuration_incident',
+      reason: 'fx-safe-executor-unavailable',
+    });
     expect(planned.runnerClass).toBe('checkout');
-    expect(planned.outcome).toBe('launched');
-    expect(planned.launch.request.prompt.text).toContain(
-      'Runner-class failure'
-    );
-    expect(planned.launch.request.prompt.text).toContain(
-      FX_RUNNER_IDEMPOTENCY_KEY
-    );
-    expect(planned.launch.request.prompt.text).toContain(
-      'Do not change product tests or weaken gates'
-    );
+    expect(planned.outcome).toBe('blocked_executor');
+    expect(planned.dispatch.state.claim.status).toBe('terminal');
   });
 
-  it('CLI launches FX for checkout failures when LIVE_AUTHOR is empty', () => {
+  it('CLI terminalizes checkout failures when LIVE_AUTHOR is empty', () => {
     const input = {
       repository: 'JovieInc/Jovie',
       prNumber: 17,
@@ -605,10 +699,13 @@ describe('rolling CI FX webhook remediation', () => {
     expect(launched.status).toBe(0);
     expect(launched.stderr).not.toContain('writer is required');
     expect(JSON.parse(launched.stdout)).toMatchObject({
-      launch: { action: 'launch' },
-      outcome: 'launched',
+      launch: {
+        action: 'configuration_incident',
+        reason: 'fx-safe-executor-unavailable',
+      },
+      outcome: 'blocked_executor',
       runnerClass: 'checkout',
-      dispatch: { mutate: true },
+      dispatch: { mutate: true, action: 'terminal_configuration_incident' },
     });
     expect(JSON.parse(launched.stdout).dispatch.state.claim.writer).toBe(
       FX_ADAPTER_NAME
@@ -629,8 +726,11 @@ describe('rolling CI FX webhook remediation', () => {
     expect(heldCheckout.status).toBe(0);
     expect(heldCheckout.stderr).not.toContain('writer is required');
     expect(JSON.parse(heldCheckout.stdout)).toMatchObject({
-      launch: { action: 'launch' },
-      outcome: 'launched',
+      launch: {
+        action: 'configuration_incident',
+        reason: 'fx-safe-executor-unavailable',
+      },
+      outcome: 'blocked_executor',
       runnerClass: 'checkout',
     });
   });
