@@ -22,6 +22,9 @@
  *   fixing errors must shrink the baseline in the same PR:
  *     pnpm run typecheck:scripts:update
  *   Regrowing the baseline via that command is visible as JSON diff in review.
+ * - FAIL CLOSED before any baseline write when tsc exits nonzero with no
+ *   parseable TypeScript diagnostics (missing binary, crash, OOM). An empty
+ *   parse from a failed compiler must not publish a false zero-error baseline.
  * - Config-level errors (no file prefix, e.g. TS2688 missing @types/node)
  *   always fail — they mean the check itself is broken and must never pass.
  *
@@ -144,8 +147,42 @@ export function totalErrors(counts) {
   return total;
 }
 
+export function isSupportedTypecheckNode(version = process.version) {
+  return /^v22\./.test(String(version));
+}
+
+/**
+ * A compiler run is only authoritative when tsc either succeeded (status 0)
+ * or produced at least one parseable TypeScript diagnostic. Nonzero exits
+ * with an empty parse are missing/crashed compilers, not a clean tree.
+ * @param {{ status?: number | null, counts?: ErrorCounts, globalErrors?: string[] }} result
+ */
+export function compilerRunHasParseableDiagnostics(result) {
+  const status = result?.status ?? 1;
+  const counts = result?.counts ?? new Map();
+  const globalErrors = result?.globalErrors ?? [];
+  if (totalErrors(counts) > 0 || globalErrors.length > 0) return true;
+  return status === 0;
+}
+
 export function hasUnparseableTscFailure({ status, counts, globalErrors }) {
-  return status !== 0 && counts.size === 0 && globalErrors.length === 0;
+  return !compilerRunHasParseableDiagnostics({ status, counts, globalErrors });
+}
+
+export function describeUnusableCompilerRun({
+  status,
+  output,
+  prefix = 'scripts-typecheck',
+}) {
+  const renderedOutput =
+    String(output ?? '').trim() === ''
+      ? 'Compiler produced no output.'
+      : `Compiler output:\n${output}`;
+  return (
+    `[${prefix}] FAIL — compiler exited ${status ?? 1} without parseable TypeScript diagnostics.\n` +
+    'Refusing to write or shrink the baseline; a missing or crashed compiler would publish a false zero-error baseline.\n' +
+    renderedOutput
+  );
 }
 
 /** @param {ErrorCounts} counts */
@@ -188,8 +225,8 @@ export function runTscProject({
   extraArgs = [],
   env = process.env,
   prefix = 'scripts-typecheck',
+  tscEntrypoint = resolve(REPO_ROOT, 'node_modules/typescript/bin/tsc'),
 }) {
-  const tscEntrypoint = resolve(REPO_ROOT, 'node_modules/typescript/bin/tsc');
   if (!existsSync(tscEntrypoint)) {
     return {
       status: 1,
@@ -242,29 +279,41 @@ export function evaluateTypecheckBaseline({
   updateMode = process.argv.includes('--update-baseline'),
   env = process.env,
   tool,
+  tscEntrypoint = undefined,
+  runTsc = runTscProject,
+  exit = code => process.exit(code),
+  nodeVersion = process.version,
 }) {
-  const { status, output } = runTscProject({
+  if (!isSupportedTypecheckNode(nodeVersion)) {
+    console.error(
+      `[${prefix}] FAIL — refusing to typecheck or write the baseline on Node ${nodeVersion}; a real Node 22 compiler run is required.`
+    );
+    exit(1);
+    return;
+  }
+
+  const { status, output } = runTsc({
     tsconfig,
     extraArgs,
     env,
     prefix,
+    tscEntrypoint,
   });
   const { counts, globalErrors, lines } = parseTscOutput(output);
-
-  if (hasUnparseableTscFailure({ status, counts, globalErrors })) {
-    console.error(
-      `[${prefix}] FAIL — tsc exited ${status} without parseable diagnostics; the check itself is broken.`
-    );
-    if (output.trim()) console.error(output.trim());
-    process.exit(1);
-  }
 
   if (globalErrors.length > 0) {
     console.error(
       `[${prefix}] FAIL — tsc reported config-level errors; the check itself is broken.`
     );
     for (const line of globalErrors) console.error(`  ${line}`);
-    process.exit(1);
+    exit(1);
+    return;
+  }
+
+  if (!compilerRunHasParseableDiagnostics({ status, counts, globalErrors })) {
+    console.error(describeUnusableCompilerRun({ status, output, prefix }));
+    exit(1);
+    return;
   }
 
   if (updateMode) {
@@ -282,7 +331,8 @@ export function evaluateTypecheckBaseline({
       `[${prefix}] baseline updated → ${baselineFile} ` +
         `(${baseline.totalErrors} errors across ${Object.keys(baseline.files).length} files)`
     );
-    process.exit(0);
+    exit(0);
+    return;
   }
 
   const baseline = loadBaselineFile(baselineFile, prefix, updateCommand);
@@ -293,7 +343,8 @@ export function evaluateTypecheckBaseline({
       `[${prefix}] PASS — ${totalErrors(counts)} pre-existing errors match the baseline ` +
         `(${baseline.totalErrors} baselined); no new errors.`
     );
-    process.exit(0);
+    exit(0);
+    return;
   }
 
   if (newErrors.length > 0) {
@@ -323,7 +374,7 @@ export function evaluateTypecheckBaseline({
         'in the same PR that removes the errors.'
     );
   }
-  process.exit(1);
+  exit(1);
 }
 
 function main() {

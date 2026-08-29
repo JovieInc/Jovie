@@ -1,10 +1,15 @@
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   BASELINE_SCHEMA_VERSION,
   compareWithBaseline,
+  compilerRunHasParseableDiagnostics,
+  describeUnusableCompilerRun,
+  evaluateTypecheckBaseline,
   hasUnparseableTscFailure,
+  isSupportedTypecheckNode,
   parseTscOutput,
 } from '../../typecheck-scripts.mjs';
 
@@ -42,6 +47,63 @@ describe('scripts-typecheck: parseTscOutput', () => {
     const { counts: parsed, globalErrors } = parseTscOutput('');
     expect(parsed.size).toBe(0);
     expect(globalErrors).toHaveLength(0);
+  });
+});
+
+describe('scripts-typecheck: compilerRunHasParseableDiagnostics', () => {
+  it('treats a clean status-0 compile as authoritative even with an empty parse', () => {
+    expect(
+      compilerRunHasParseableDiagnostics({
+        status: 0,
+        counts: new Map(),
+        globalErrors: [],
+      })
+    ).toBe(true);
+  });
+
+  it('treats parseable file or global diagnostics as authoritative on a nonzero exit', () => {
+    expect(
+      compilerRunHasParseableDiagnostics({
+        status: 1,
+        counts: counts({ 'scripts/a.mjs': { TS2305: 1 } }),
+        globalErrors: [],
+      })
+    ).toBe(true);
+    expect(
+      compilerRunHasParseableDiagnostics({
+        status: 1,
+        counts: new Map(),
+        globalErrors: [
+          "error TS2688: Cannot find type definition file for 'node'.",
+        ],
+      })
+    ).toBe(true);
+  });
+
+  it('rejects a nonzero compiler exit with no parseable TypeScript diagnostics', () => {
+    expect(
+      compilerRunHasParseableDiagnostics({
+        status: 1,
+        counts: new Map(),
+        globalErrors: [],
+      })
+    ).toBe(false);
+    expect(
+      compilerRunHasParseableDiagnostics({
+        status: 137,
+        counts: new Map(),
+        globalErrors: [],
+      })
+    ).toBe(false);
+    expect(isSupportedTypecheckNode('v22.23.1')).toBe(true);
+    expect(isSupportedTypecheckNode('v20.19.0')).toBe(false);
+    expect(
+      describeUnusableCompilerRun({
+        status: 1,
+        output: '',
+        prefix: 'web-test-typecheck',
+      })
+    ).toContain('without parseable TypeScript diagnostics');
   });
 });
 
@@ -187,6 +249,147 @@ describe('scripts-typecheck: lane contract', () => {
     );
     expect(pkg.scripts['typecheck:scripts:update']).toContain(
       '--update-baseline'
+    );
+  });
+});
+
+describe('scripts-typecheck: fail closed before baseline write (JOV-5450)', () => {
+  const temporaryDirectories = [];
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    for (const directory of temporaryDirectories.splice(0)) {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  const sentinelBaseline = {
+    schemaVersion: BASELINE_SCHEMA_VERSION,
+    tool: 'scripts/typecheck-scripts.mjs',
+    generatedAt: '2026-01-01T00:00:00.000Z',
+    totalErrors: 3,
+    files: { 'scripts/a.mjs': { TS2305: 3 } },
+  };
+
+  function makeBaselineDir() {
+    const directory = mkdtempSync(
+      resolve(tmpdir(), 'jovie-typecheck-baseline-')
+    );
+    temporaryDirectories.push(directory);
+    const baselineFile = resolve(directory, 'baseline.json');
+    writeFileSync(
+      baselineFile,
+      `${JSON.stringify(sentinelBaseline, null, 2)}\n`
+    );
+    return { directory, baselineFile };
+  }
+
+  function captureEvaluate(options) {
+    const exits = [];
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    evaluateTypecheckBaseline({
+      prefix: 'scripts-typecheck',
+      tsconfig: resolve(options.directory, 'tsconfig.json'),
+      updateCommand: 'pnpm run typecheck:scripts:update',
+      nodeVersion: 'v22.23.1',
+      exit: code => {
+        exits.push(code);
+      },
+      ...options,
+    });
+    return {
+      exits,
+      errors: errorSpy.mock.calls.map(call => call.join(' ')).join('\n'),
+      logs: logSpy.mock.calls.map(call => call.join(' ')).join('\n'),
+    };
+  }
+
+  it('deliberate-red: missing compiler does not write a zero-error baseline', () => {
+    const { directory, baselineFile } = makeBaselineDir();
+    const result = captureEvaluate({
+      directory,
+      baselineFile,
+      updateMode: true,
+      tscEntrypoint: resolve(directory, 'missing-tsc'),
+    });
+    expect(result.exits).toEqual([1]);
+    expect(result.errors).toContain('without parseable TypeScript diagnostics');
+    expect(result.errors).toContain('false zero-error baseline');
+    expect(JSON.parse(readFileSync(baselineFile, 'utf8'))).toEqual(
+      sentinelBaseline
+    );
+  });
+
+  it('deliberate-red: nonzero compiler execution with no diagnostics does not write a baseline', () => {
+    const { directory, baselineFile } = makeBaselineDir();
+    const result = captureEvaluate({
+      directory,
+      baselineFile,
+      updateMode: true,
+      runTsc: () => ({
+        status: 1,
+        output: 'FATAL ERROR: Reached heap limit Allocation failed\n',
+      }),
+    });
+    expect(result.exits).toEqual([1]);
+    expect(result.errors).toContain(
+      'compiler exited 1 without parseable TypeScript diagnostics'
+    );
+    expect(result.errors).not.toContain('baseline is stale');
+    expect(JSON.parse(readFileSync(baselineFile, 'utf8'))).toEqual(
+      sentinelBaseline
+    );
+  });
+
+  it('check mode fails closed on a crashed compiler instead of asking to shrink', () => {
+    const { directory, baselineFile } = makeBaselineDir();
+    const result = captureEvaluate({
+      directory,
+      baselineFile,
+      updateMode: false,
+      runTsc: () => ({ status: 137, output: '' }),
+    });
+    expect(result.exits).toEqual([1]);
+    expect(result.errors).toContain('without parseable TypeScript diagnostics');
+    expect(result.errors).not.toContain('baseline is stale');
+    expect(JSON.parse(readFileSync(baselineFile, 'utf8'))).toEqual(
+      sentinelBaseline
+    );
+  });
+
+  it('refuses to write a baseline on a non-Node-22 runtime', () => {
+    const { directory, baselineFile } = makeBaselineDir();
+    const result = captureEvaluate({
+      directory,
+      baselineFile,
+      updateMode: true,
+      nodeVersion: 'v20.19.0',
+      runTsc: () => ({ status: 0, output: '' }),
+    });
+    expect(result.exits).toEqual([1]);
+    expect(result.errors).toContain('real Node 22 compiler run is required');
+    expect(JSON.parse(readFileSync(baselineFile, 'utf8'))).toEqual(
+      sentinelBaseline
+    );
+  });
+
+  it('writes a shrink only after a real compiler produces parseable diagnostics', () => {
+    const { directory, baselineFile } = makeBaselineDir();
+    const output = `${REPO_ROOT}/scripts/a.mjs(3,10): error TS2305: Module '"node:fs"' has no exported member 'chdirSync'.`;
+    const result = captureEvaluate({
+      directory,
+      baselineFile,
+      updateMode: true,
+      pretty: true,
+      runTsc: () => ({ status: 1, output }),
+    });
+    expect(result.exits).toEqual([0]);
+    const written = JSON.parse(readFileSync(baselineFile, 'utf8'));
+    expect(written.totalErrors).toBe(1);
+    expect(written.files).toEqual({ 'scripts/a.mjs': { TS2305: 1 } });
+    expect(written.files['scripts/a.mjs'].TS2305).toBeLessThan(
+      sentinelBaseline.files['scripts/a.mjs'].TS2305
     );
   });
 });
