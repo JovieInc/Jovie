@@ -63,6 +63,17 @@ describe('rendered component certification', () => {
         { verdict: 'block' },
         { verdict: 'block' },
       ],
+      shadcnOutcome: {
+        ok: true,
+        comparativeQualityBar: {
+          ok: true,
+          claimBoundary: 'rubric-and-evaluator-qualification-only',
+          inventory: {
+            total: expect.any(Number),
+            pendingComparison: expect.any(Number),
+          },
+        },
+      },
     });
     expect(
       result.receipt.landingBatch.map(item => [item.id, item.verdict])
@@ -107,6 +118,35 @@ describe('rendered component certification', () => {
     expect(report.sections.renderedCertification.receipt).toMatchObject({
       gate: 'component-ship-gate',
       headSha: HEAD,
+      shadcnOutcome: {
+        ok: true,
+        section: 'shadcnOutcome',
+        comparativeQualityBar: {
+          schema: 'jovie.component-comparative-quality-bar/v1',
+          ok: true,
+        },
+      },
     });
+  });
+
+  it('propagates comparative failures through rendered certification and the native gate', () => {
+    const rendered = runRenderedCertification({
+      headSha: HEAD,
+      comparativeQualificationControls: [],
+    });
+    expect(rendered.ok).toBe(false);
+    expect(rendered.receipt.issues.join('\n')).toMatch(
+      /comparative quality bar: atom\.select: enrolled baseline requires exactly one qualification control/
+    );
+
+    const gate = runComponentShipGate({
+      diffBase: null,
+      skipQuality: true,
+      skipRatchet: true,
+      headSha: HEAD,
+      comparativeQualificationControls: [],
+    });
+    expect(gate.ok).toBe(false);
+    expect(gate.sections.renderedCertification.ok).toBe(false);
   });
 });

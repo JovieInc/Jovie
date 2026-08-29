@@ -276,7 +276,7 @@ describe('SegmentControl', () => {
         'tracking-(--linear-caption-tracking)'
       );
       expect(activeTab.className).toContain('text-caption');
-      expect(activeTab.className).not.toContain('font-[510]');
+      expect(activeTab.className).not.toContain('font-medium');
       expect(activeTab.className).not.toContain('tracking-[-0.01em]');
       expect(activeTab.className).not.toContain('text-xs');
     });

@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
- * Source-blind rendered component certification (JOV-5400).
+ * Source-blind rendered component certification (JOV-5400 / JOV-5438).
  *
  * Extends the component-ship gate. Evaluates rendered samples only — never
  * component source — against an explicit applicable-invariant contract.
  * Unknown, missing, or skipped applicable invariants fail closed.
+ * JOV-5438 composes the Shadcn/Typeset outcome inventory into the same receipt.
  *
  * Usage:
  *   node scripts/component-rendered-certification.mjs
@@ -13,6 +14,7 @@
 import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runOutcomeCertification } from './component-shadcn-outcome-inventory.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = resolve(__dirname, '..');
@@ -525,7 +527,7 @@ function receiptFor(sample, evaluation) {
 }
 
 /**
- * @param {{ headSha?: string, redFixtures?: any[], landingBatch?: any[] }} [options]
+ * @param {{ headSha?: string, redFixtures?: any[], landingBatch?: any[], repoRoot?: string, inventory?: object, outcomeRedFixtures?: object[], outcomeBatch?: object[], comparativeInventory?: object[], comparativeRedFixtures?: any[], comparativeQualificationControls?: any[] }} [options]
  */
 export function runRenderedCertification(options = {}) {
   const headSha = resolveHeadSha(options.headSha);
@@ -560,6 +562,20 @@ export function runRenderedCertification(options = {}) {
     return receipt;
   });
 
+  const outcome = runOutcomeCertification({
+    headSha,
+    repoRoot: options.repoRoot,
+    inventory: options.inventory,
+    redFixtures: options.outcomeRedFixtures,
+    enrolledBatch: options.outcomeBatch,
+    comparativeInventory: options.comparativeInventory,
+    comparativeRedFixtures: options.comparativeRedFixtures,
+    qualificationControls: options.comparativeQualificationControls,
+  });
+  if (!outcome.ok) {
+    issues.push(...outcome.receipt.issues);
+  }
+
   const ok = issues.length === 0;
   return {
     ok,
@@ -573,6 +589,7 @@ export function runRenderedCertification(options = {}) {
       issues,
       fixtures: fixtureReceipts,
       landingBatch: landingReceipts,
+      shadcnOutcome: outcome.receipt,
     },
   };
 }

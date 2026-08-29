@@ -51,7 +51,8 @@ describe('waitlist column renderers', () => {
 
     const badge = screen.getByText(label);
 
-    expect(badge.className).toContain('text-[10px]');
+    expect(badge.className).toContain('text-3xs');
+    expect(badge.className).not.toContain('text-[10px]');
     expect(badge.className).toContain(expectedClassToken);
   });
 });
