@@ -254,10 +254,39 @@ def ready_autonomous_draft(pr):
             "result": "skipped",
             "reason": blocker,
         }
+    head_sha = pr.get("head", {}).get("sha")
+    if not isinstance(head_sha, str) or not re.fullmatch(r"[0-9a-f]{40}", head_sha):
+        return {
+            **result,
+            "result": "skipped",
+            "reason": "expected_head_sha_invalid_fail_closed",
+        }
+    lease = acquire_pr_lease(pr)
+    if lease is None:
+        return {**result, "result": "skipped", "reason": "single_writer_active"}
     try:
+        blocker = work_mutation_blocker(max_age=0)
+        if blocker:
+            return {**result, "result": "skipped", "reason": blocker}
+        observed_head = run(
+            "gh",
+            "api",
+            f"repos/{REPO}/pulls/{pr['number']}",
+            "--jq",
+            ".head.sha",
+            timeout=60,
+        ).strip()
+        if observed_head != head_sha:
+            return {
+                **result,
+                "result": "skipped",
+                "reason": "expected_head_changed_fail_closed",
+            }
         run("gh", "pr", "ready", str(pr["number"]), "--repo", REPO, timeout=60)
     except Exception as error:
         return {**result, "result": "error", "error": type(error).__name__}
+    finally:
+        release_pr_lease(lease)
     return {**result, "result": "ok"}
 
 
@@ -493,13 +522,13 @@ def main():
             print(json.dumps(document, indent=2))
             return 0
 
-        remote_capacity = effective_capacity(capacity(), gate)
-        if remote_capacity == 0:
+        worker_capacity = effective_capacity(capacity(), gate)
+        if worker_capacity == 0:
             document.update(
                 status="ok",
-                remediation_admission="idle_zero_remote_capacity",
+                remediation_admission="local_only",
                 capacity=0,
-                intake="paused_zero_remote_capacity",
+                intake="blocked_missing_capacity_evidence",
                 selected=[],
                 processed=[],
             )
@@ -512,7 +541,6 @@ def main():
         if not authenticated:
             raise RuntimeError(reason)
         all_open, eligible = inventory()
-        worker_capacity = remote_capacity
         document.update(
             open_count=len(all_open),
             eligible_count=len(eligible),

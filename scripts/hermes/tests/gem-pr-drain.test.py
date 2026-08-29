@@ -21,7 +21,7 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 GATE_SOURCE = ROOT / "scripts/hermes/gem-priority-gate.py"
-GATE_SPEC = importlib.util.spec_from_file_location("gem_priority_gate_for_drain", GATE_SOURCE)
+GATE_SPEC = importlib.util.spec_from_file_location("gem_gate_for_drain", GATE_SOURCE)
 if GATE_SPEC is None or GATE_SPEC.loader is None:
     raise RuntimeError(f"could not load {GATE_SOURCE}")
 GATE_MODULE = importlib.util.module_from_spec(GATE_SPEC)
@@ -29,8 +29,7 @@ GATE_SPEC.loader.exec_module(GATE_MODULE)
 
 
 def stale_capacity_receipt():
-    now = GATE_MODULE.utc_now()
-    observed_at = GATE_MODULE.isoformat(now)
+    observed_at = GATE_MODULE.isoformat(GATE_MODULE.utc_now())
     main_sha = "a" * 40
     return GATE_MODULE.evaluate(
         {
@@ -90,12 +89,64 @@ class JovieOwnershipTests(unittest.TestCase):
         self.assertFalse(MODULE.repo_drain_enabled("other/repo", False))
         self.assertTrue(MODULE.repo_drain_enabled("other/repo", True))
 
+    def test_stale_capacity_exits_cleanly_before_auth_inventory_or_mutation(self):
+        receipt = stale_capacity_receipt()
+        with tempfile.TemporaryDirectory() as tmp:
+            state = pathlib.Path(tmp)
+            stdout = io.StringIO()
+            with (
+                mock.patch.object(MODULE, "STATE", state),
+                mock.patch.object(MODULE, "ARTIFACT", state / "latest.json"),
+                mock.patch.object(MODULE, "POLICY_ENABLED", True),
+                mock.patch.object(MODULE, "evaluate_remediation_gate", return_value=receipt),
+                mock.patch.object(MODULE, "capacity", return_value=8),
+                mock.patch.object(MODULE, "auth_status") as auth,
+                mock.patch.object(MODULE, "inventory") as inventory,
+                mock.patch.object(MODULE, "run") as remote,
+                mock.patch.object(MODULE.sys, "argv", [str(SOURCE)]),
+                redirect_stdout(stdout),
+            ):
+                exit_code = MODULE.main()
+        document = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 0, document)
+        self.assertEqual(document["capacity"], 0)
+        self.assertEqual(document["selected"], [])
+        self.assertEqual(document["intake"], "blocked_missing_capacity_evidence")
+        auth.assert_not_called()
+        inventory.assert_not_called()
+        remote.assert_not_called()
+
+    def test_stale_capacity_contract_rejects_remote_or_multiple_mutation(self):
+        receipt = stale_capacity_receipt()
+        validated = MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
+        self.assertEqual(MODULE.effective_capacity(8, validated), 0)
+        self.assertEqual(validated["concurrency"]["gem"]["runtimeFloor"], 1)
+        for field, value, expected in (
+            ("pushAllowed", True, "remote remediation must require"),
+            ("maxConcurrent", 2, "stale capacity must keep remediation maxConcurrent at zero"),
+        ):
+            with self.subTest(field=field):
+                broken = json.loads(json.dumps(receipt))
+                broken["remediationAdmission"][field] = value
+                if field == "pushAllowed":
+                    broken["remediationAdmission"]["activities"].append("expected-head-pr-update")
+                with self.assertRaisesRegex(RuntimeError, expected):
+                    MODULE.validate_gate_result(0, json.dumps(broken), "remediation")
+
+    def test_failed_gate_receipt_is_valid_zero_capacity_remediation(self):
+        receipt = GATE_MODULE.failed_evaluation_receipt(ValueError("capacity unavailable"))
+        validated = MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
+        self.assertEqual(validated["state"], "RED")
+        self.assertEqual(validated["remediationAdmission"]["maxConcurrent"], 0)
+
     def test_typed_remediation_capacity_caps_host_parallelism(self):
         gate = {"remediationAdmission": {"maxConcurrent": 1}}
         self.assertEqual(MODULE.effective_capacity(4, gate), 1)
         self.assertEqual(MODULE.effective_capacity(1, gate), 1)
         self.assertEqual(
-            MODULE.effective_capacity(4, {"remediationAdmission": {"maxConcurrent": 0}}),
+            MODULE.effective_capacity(
+                4, {"remediationAdmission": {"maxConcurrent": 0}}
+            ),
             0,
         )
         for maximum in (None, -1, True, 1.5):
@@ -143,7 +194,8 @@ class JovieOwnershipTests(unittest.TestCase):
         self.assertEqual(document["capacity"], 0)
         self.assertEqual(document["selected"], [])
         self.assertEqual(document["processed"], [])
-        self.assertEqual(document["intake"], "paused_zero_remote_capacity")
+        self.assertEqual(document["intake"], "blocked_missing_capacity_evidence")
+        self.assertEqual(document["remediation_admission"], "local_only")
         auth_status.assert_not_called()
         inventory.assert_not_called()
         update_one.assert_not_called()
@@ -329,12 +381,45 @@ class JovieOwnershipTests(unittest.TestCase):
         pr["head"]["ref"] = "grok/JOV-4894-fix"
         with (
             mock.patch.object(MODULE, "work_mutation_blocker", return_value=None),
-            mock.patch.object(MODULE, "run", return_value="") as run,
+            mock.patch.object(MODULE, "run", side_effect=[pr["head"]["sha"], ""]) as run,
         ):
-            result = MODULE.ready_autonomous_draft(pr)
+            with tempfile.TemporaryDirectory() as tmp, mock.patch.object(
+                MODULE, "STATE", pathlib.Path(tmp)
+            ):
+                result = MODULE.ready_autonomous_draft(pr)
         self.assertEqual(result["result"], "ok")
-        self.assertEqual(run.call_args.args[:3], ("gh", "pr", "ready"))
-        self.assertEqual(run.call_args.args[3], "16211")
+        self.assertEqual(run.call_args_list[0].args[:3], ("gh", "api", "repos/JovieInc/Jovie/pulls/16211"))
+        self.assertEqual(run.call_args_list[1].args[:3], ("gh", "pr", "ready"))
+        self.assertEqual(run.call_args_list[1].args[3], "16211")
+
+    def test_ready_autonomous_draft_rechecks_gate_and_exact_head_before_mutation(self):
+        pr = self._open_pr(16211, mergeable_state="unstable", created_at="2026-08-19T18:59:08Z")
+        pr["draft"] = True
+        pr["head"]["ref"] = "grok/JOV-4894-fix"
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(
+            MODULE, "STATE", pathlib.Path(tmp)
+        ):
+            with (
+                mock.patch.object(
+                    MODULE,
+                    "work_mutation_blocker",
+                    return_value="remediation_push_gate_amber",
+                ) as gate,
+                mock.patch.object(MODULE, "run") as run,
+            ):
+                blocked = MODULE.ready_autonomous_draft(pr)
+            self.assertEqual(blocked["reason"], "remediation_push_gate_amber")
+            gate.assert_called_once_with(max_age=0)
+            run.assert_not_called()
+
+            with (
+                mock.patch.object(MODULE, "work_mutation_blocker", return_value=None),
+                mock.patch.object(MODULE, "run", return_value="b" * 40) as run,
+            ):
+                changed = MODULE.ready_autonomous_draft(pr)
+            self.assertEqual(changed["reason"], "expected_head_changed_fail_closed")
+            self.assertEqual(run.call_count, 1)
+            self.assertEqual(run.call_args.args[:3], ("gh", "api", "repos/JovieInc/Jovie/pulls/16211"))
 
     def test_ready_autonomous_draft_ignores_unrelated_drafts(self):
         pr = self._open_pr(1, mergeable_state="clean", created_at="2026-08-19T18:00:00Z")

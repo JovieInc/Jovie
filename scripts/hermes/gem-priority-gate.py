@@ -63,7 +63,7 @@ SEVERE_REASONS = {
     "severe-integrity-incident",
 }
 DEFAULT_GEM_CONCURRENCY = 4
-LOCAL_REMEDIATION_RUNTIME_FLOOR = 1
+LOCAL_REMEDIATION_CONCURRENCY_FLOOR = 1
 CONTROL_PLANE_PREFIXES = (
     ".github/workflows/",
     "canon/",
@@ -1187,11 +1187,19 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         # or capacity evidence is missing/stale.
         work_activities = ["tests", "review"]
     else:
-        work_activities = (
-            ["approved-issue-lease"]
-            if queue_shape_valid and lane_global_available
-            else []
-        ) + ["isolated-implementation", "tests", "review", "draft-pr"]
+        new_implementation_allowed = (
+            capacity_fresh
+            and queue_shape_valid
+            and lane_global_available
+        )
+        work_activities = ["tests", "review"]
+        if new_implementation_allowed:
+            work_activities = [
+                "approved-issue-lease",
+                "isolated-implementation",
+                *work_activities,
+                "draft-pr",
+            ]
     # Remediation is a liveness capability, not issue intake or promotion.
     # A fleet hold must never hide the evidence or disable the bounded local
     # work needed to diagnose and repair the hold. Remote PR mutation requires
@@ -1304,7 +1312,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         "concurrency": {
             "gem": {
                 "maxConcurrent": gem_concurrency,
-                "runtimeFloor": LOCAL_REMEDIATION_RUNTIME_FLOOR,
+                "runtimeFloor": LOCAL_REMEDIATION_CONCURRENCY_FLOOR,
                 "baseline": DEFAULT_GEM_CONCURRENCY,
                 "evidenceAccepted": capacity_fresh,
                 "newMutationAllowed": capacity_fresh,
@@ -1540,7 +1548,7 @@ def failed_evaluation_receipt(
         "concurrency": {
             "gem": {
                 "maxConcurrent": 0,
-                "runtimeFloor": LOCAL_REMEDIATION_RUNTIME_FLOOR,
+                "runtimeFloor": LOCAL_REMEDIATION_CONCURRENCY_FLOOR,
                 "evidenceAccepted": False,
                 "newMutationAllowed": False,
                 "preserveQueuedWork": True,

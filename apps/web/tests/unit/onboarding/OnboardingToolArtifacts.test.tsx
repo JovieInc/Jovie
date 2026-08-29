@@ -385,4 +385,49 @@ describe('onboarding tool artifacts', () => {
     fireEvent.click(screen.getByRole('button', { name: 'None of These' }));
     expect(onNoneOfThese).toHaveBeenCalled();
   });
+
+  it('routes picker, handle, and social fields through one focus owner', () => {
+    mocks.handleAvailability.data = { available: true };
+
+    fastRender(
+      <>
+        <OnboardingSpotifyArtistPickerCard
+          state='output-available'
+          output={{ action: 'open_artist_picker', query: 'Test Artist' }}
+          onSelectArtist={vi.fn()}
+        />
+        <OnboardingHandleCheckCard
+          state='output-available'
+          output={{ action: 'check_handle', handle: 'validartist' }}
+        />
+        <OnboardingSocialLinkCard
+          state='output-available'
+          output={{
+            action: 'propose_social_link',
+            url: 'https://instagram.com/testartist',
+          }}
+        />
+      </>
+    );
+
+    const fields = screen
+      .getAllByRole('textbox')
+      .map(input => input.closest('[data-slot="onboarding-tool-field"]'))
+      .filter((field): field is HTMLElement => field instanceof HTMLElement);
+    expect(fields).toHaveLength(3);
+    for (const field of fields) {
+      expect(field).toHaveClass(
+        'border-subtle',
+        'bg-surface-0',
+        'focus-within:border-focus',
+        'focus-within:ring-focus/16'
+      );
+      expect(field.className).not.toContain(
+        'focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.035)]'
+      );
+    }
+    expect(fields[0]).toHaveAttribute('data-density', 'picker');
+    expect(fields[1]).toHaveAttribute('data-density', 'compact');
+    expect(fields[2]).toHaveAttribute('data-density', 'compact');
+  });
 });

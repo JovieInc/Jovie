@@ -11,7 +11,7 @@ export function GET() {
       title: 'Jovie Artist API',
       version: '1.0.0',
       description:
-        'Public read-only API for Jovie artist profiles. Returns artist bio, releases, tour events, and merch. Designed for AI agents and third-party integrations.',
+        'Public read-only API for Jovie artist profiles. Returns artist bio, releases, tour events, and merch. Designed for AI agents and third-party integrations. Published at /openapi.json and /api/v1/openapi.json.',
       contact: { url: `${BASE_URL}/llms.txt` },
     },
     servers: [{ url: `${BASE_URL}/api/v1`, description: 'Production' }],
@@ -20,6 +20,8 @@ export function GET() {
         get: {
           operationId: 'getArtist',
           summary: 'Get artist profile with releases, events, and merch',
+          description:
+            'Public read-only lookup for one independent artist. Returns profile fields, releases, upcoming tour events, merch, and related resource links. Responds 404 when the username is unknown or not public.',
           parameters: [
             {
               name: 'username',

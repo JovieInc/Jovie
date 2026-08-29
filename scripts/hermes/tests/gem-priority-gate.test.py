@@ -817,6 +817,23 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertTrue(receipt["remediationAdmission"]["allowed"])
         self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
 
+    def test_stale_or_missing_capacity_blocks_new_and_remote_mutation(self):
+        for evidence in (
+            {**GREEN_SIGNALS["concurrencyEvidence"], "accepted": False},
+            None,
+            {"schema": "malformed"},
+        ):
+            with self.subTest(evidence=evidence):
+                signals = dict(GREEN_SIGNALS)
+                signals["concurrencyEvidence"] = evidence
+                receipt = self.evaluate(signals)
+                self.assertFalse(receipt["signals"]["concurrencyEvidence"]["accepted"])
+                self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+                self.assertFalse(receipt["workAdmission"]["newImplementationAllowed"])
+                self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
+                self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
+                self.assertEqual(receipt["concurrency"]["gem"]["runtimeFloor"], 1)
+
     def test_missing_closure_health_fails_new_intake_closed_without_stopping_promotion(self):
         signals = dict(GREEN_SIGNALS)
         signals.pop("closureHealth")

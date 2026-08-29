@@ -23,6 +23,27 @@ export const RETAINED_SWEEP_WORKFLOWS = Object.freeze([
   { path: '.github/workflows/visual-a11y.yml', cron: '37 7 * * *' },
 ]);
 
+/**
+ * @typedef {
+ *   | 'apps/web/app/(dynamic)/start/page.tsx'
+ *   | 'apps/web/app/app/(shell)/page.tsx'
+ *   | 'apps/web/app/app/(shell)/jovie-work/page.tsx'
+ *   | 'apps/web/app/app/(shell)/settings/billing/page.tsx'
+ *   | 'apps/web/app/onboarding/checkout/page.tsx'
+ *   | 'apps/web/app/billing/success/page.tsx'
+ * } ProtectedRevenueScreenSource
+ */
+
+/** @type {Readonly<Record<ProtectedRevenueScreenSource, true>>} */
+export const PROTECTED_REVENUE_SCREEN_SOURCES = Object.freeze({
+  'apps/web/app/(dynamic)/start/page.tsx': true,
+  'apps/web/app/app/(shell)/page.tsx': true,
+  'apps/web/app/app/(shell)/jovie-work/page.tsx': true,
+  'apps/web/app/app/(shell)/settings/billing/page.tsx': true,
+  'apps/web/app/onboarding/checkout/page.tsx': true,
+  'apps/web/app/billing/success/page.tsx': true,
+});
+
 function parseRegistry(raw) {
   return raw
     .trim()
@@ -50,6 +71,12 @@ web.public-profile|web|public-profile|apps/web/app/[username]/page.tsx|desktop,m
 web.release-landing|web|release-landing|apps/web/app/r/[slug]/page.tsx,apps/web/app/r/[slug]/ReleaseLandingPage.tsx|desktop,mobile
 web.dashboard-releases|web|dashboard-releases|apps/web/app/app/(shell)/dashboard/releases/page.tsx|desktop
 web.settings-artist-profile|web|settings-artist-profile|apps/web/app/app/(shell)/settings/artist-profile/page.tsx|desktop
+web.start|web|organism.onboarding-chat|apps/web/app/(dynamic)/start/page.tsx|desktop,mobile
+web.app-root|web|screen.root|apps/web/app/app/(shell)/page.tsx|desktop,mobile
+web.jovie-work|web|screen.jovie.work|apps/web/app/app/(shell)/jovie-work/page.tsx|desktop,mobile
+web.settings-billing|web|screen.settings.billing|apps/web/app/app/(shell)/settings/billing/page.tsx|desktop,mobile
+web.onboarding-checkout|web|onboarding-checkout|apps/web/app/onboarding/checkout/page.tsx|desktop,mobile
+web.billing-success|web|billing-success|apps/web/app/billing/success/page.tsx|desktop,mobile
 macos-electron.hud|macos-electron|desktop-hud|apps/desktop/src/main.ts,apps/desktop/src/navigation.ts|desktop
 ios.dashboard|ios|ios-dashboard|apps/ios/Jovie/Features/Dashboard/DashboardView.swift|compact
 macos-electron.ovie-door|macos-electron|ovie|apps/desktop/src/ovie-door.ts|desktop|x|Product-surface implementation owned by Ovie
@@ -70,6 +97,13 @@ function normalizeRepoPath(value) {
   return String(value || '')
     .trim()
     .replace(/\\/g, '/');
+}
+
+function isProtectedRevenueScreenSource(path) {
+  return Object.hasOwn(
+    PROTECTED_REVENUE_SCREEN_SOURCES,
+    normalizeRepoPath(path)
+  );
 }
 
 function matchesSource(file, source) {
@@ -230,6 +264,17 @@ export const DELIBERATE_RED_FIXTURES = Object.freeze([
     ],
   },
   {
+    id: 'deliberate-red.modified-protected-missing-registration',
+    kind: 'missing-registration',
+    removeScreenId: 'web.jovie-work',
+    changedFiles: [
+      {
+        path: 'apps/web/app/app/(shell)/jovie-work/page.tsx',
+        status: 'M',
+      },
+    ],
+  },
+  {
     id: 'deliberate-red.stale-head',
     kind: 'stale-head',
     screenId: 'web.homepage',
@@ -327,6 +372,36 @@ export function validateScreenRegistry(
   return issues;
 }
 
+/** @param {readonly object[]} [registry] */
+export function validateProtectedRevenueScreenRegistry(
+  registry = SCREEN_REGISTRY
+) {
+  const issues = [];
+  for (const source of Object.keys(PROTECTED_REVENUE_SCREEN_SOURCES)) {
+    const owners = registry.filter(
+      entry =>
+        !entry.excluded &&
+        Array.isArray(entry.sources) &&
+        entry.sources.some(candidate => normalizeRepoPath(candidate) === source)
+    );
+    if (owners.length !== 1) {
+      issues.push(
+        `protected revenue screen ${source} must have exactly one non-excluded registry owner; found ${owners.length}`
+      );
+      continue;
+    }
+    const viewports = new Set(owners[0].viewports || []);
+    for (const viewport of ['desktop', 'mobile']) {
+      if (!viewports.has(viewport)) {
+        issues.push(
+          `protected revenue screen ${source} must include ${viewport} viewport proof`
+        );
+      }
+    }
+  }
+  return issues;
+}
+
 export function validateRetainedSweeps({
   repoRoot = REPO_ROOT,
   workflows = RETAINED_SWEEP_WORKFLOWS,
@@ -418,10 +493,13 @@ function evaluateDeliberateRed({ registry, headSha, fixtures }) {
   for (const fixture of fixtures) {
     const findings = [];
     if (fixture.kind === 'missing-registration') {
+      const fixtureRegistry = fixture.removeScreenId
+        ? registry.filter(entry => entry.id !== fixture.removeScreenId)
+        : registry;
       findings.push(
         ...evaluateChangedScreens({
           changedFiles: fixture.changedFiles,
-          registry,
+          registry: fixtureRegistry,
           headSha,
           proofs: [],
           mintFromSamples: false,
@@ -494,7 +572,9 @@ export function evaluateChangedScreens({
     }
     if (classified.kind === 'out-of-scope') continue;
     if (classified.kind === 'unregistered') {
-      if (file.status === 'A' || file.status === 'C') {
+      const protectedModification =
+        file.status === 'M' && isProtectedRevenueScreenSource(file.path);
+      if (file.status === 'A' || file.status === 'C' || protectedModification) {
         issues.push(
           `missing registration for changed in-scope screen ${file.path}`
         );
@@ -538,6 +618,7 @@ export function runScreenCertification(options = {}) {
       repoRoot,
       verifySources: options.verifySources !== false,
     }),
+    ...validateProtectedRevenueScreenRegistry(registry),
     ...validateRetainedSweeps({
       repoRoot,
       workflows: options.workflows ?? RETAINED_SWEEP_WORKFLOWS,

@@ -22,3 +22,13 @@ test('audit requires the standing enforcement commands', () => {
   const scripts = results.find(item => item.id === 'package-scripts');
   assert.equal(scripts?.status, 'PASS');
 });
+
+test('binds design projections to the canonical invariant registry', () => {
+  const { results } = runDesignGovernanceAudit();
+  const projection = results.find(
+    item => item.id === 'design-invariant-projection'
+  );
+  assert.equal(projection?.status, 'PASS');
+  assert.match(projection.detail, /JOV-INV-019/);
+  assert.match(projection.detail, /executable generator and guard bindings/);
+});
