@@ -218,13 +218,16 @@ describe('ci-fast bounded parallel workflow', () => {
     for (const requiredPath of [
       'apps/web/app/.*\\.(tsx|css)$',
       'apps/web/components/',
-      'apps/web/styles/',
-      'apps/web/tests/',
       'apps/web/\\.storybook/',
+      'apps/web/package\\.json$',
+      'apps/web/scripts/',
+      'apps/web/tests/',
+      'apps/web/styles/',
       'packages/ui/',
+      'chromatic\\.config\\.json$',
+      'package\\.json$',
       'DESIGN\\.md$',
       'design\\.tokens\\.json$',
-      'chromatic\\.config\\.json$',
       'scripts/(component-',
       'screen-certification',
       'shared-ui-visual-arbitrary',
@@ -494,6 +497,57 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(new RegExp(uiPattern).test('packages/ui/atoms/badge.test.tsx')).toBe(
       true
     );
+    for (const receiptRepairPath of [
+      'apps/web/tests/components/organisms/RightDrawer.interaction.test.tsx',
+      'apps/web/tests/unit/marketing/component-registry.test.ts',
+      'apps/web/tests/unit/marketing/support-route-header-contract.test.ts',
+      'apps/web/tests/e2e/utils/public-surface-manifest.ts',
+    ]) {
+      expect(selectsStructural.test(receiptRepairPath)).toBe(true);
+    }
+    // These paths feed the live rendered component harness, not just the
+    // shadow UI-story audit; a harness change must not skip runStructural.
+    for (const storybookHarnessPath of [
+      'apps/web/.storybook/main.ts',
+      'apps/web/.storybook/preview.tsx',
+      'apps/web/.storybook/stories/elevation-matrix.stories.tsx',
+      'chromatic.config.json',
+    ]) {
+      expect(selectsStructural.test(storybookHarnessPath)).toBe(true);
+    }
+    for (const tokenAuditPath of [
+      'scripts/shared-ui-visual-arbitrary-audit.mjs',
+      'scripts/shared-ui-visual-arbitrary-audit.test.mjs',
+      'scripts/shared-ui-visual-arbitrary.baseline.json',
+    ]) {
+      expect(selectsStructural.test(tokenAuditPath)).toBe(true);
+    }
+    for (const directStructuralInput of [
+      'package.json',
+      'apps/web/package.json',
+      'apps/web/scripts/check-reliability-detectors.ts',
+      'apps/web/scripts/lint-contrast-ratchet.mjs',
+      'apps/web/scripts/lint-no-native-dialogs.mjs',
+      'apps/web/scripts/next-proxy-guard.mjs',
+      'apps/web/scripts/seo-ratchet-guard.mjs',
+      'apps/web/scripts/tailwind-guard.mjs',
+      'scripts/doc-freshness-lint.mjs',
+    ]) {
+      expect(selectsStructural.test(directStructuralInput)).toBe(true);
+    }
+    for (const nonUiPath of [
+      'apps/web/app/api/health/deploy/route.ts',
+      'apps/web/data/designSystem/componentRegistry.ts',
+      'apps/web/lib/queries/useDashboardProfileQuery.ts',
+      'apps/web/scripts/test-performance-guard.ts',
+      'docs/design-system/design-conformance-manifest.json',
+      'docs/product/README.md',
+      'apps/web/storybook/main.ts',
+      'chromatic.config.json.bak',
+      'apps/web/tests-not-centralized/unit/foo.test.ts',
+    ]) {
+      expect(selectsStructural.test(nonUiPath)).toBe(false);
+    }
     expect(selectsStructural.test('.claude/skills/qa/SKILL.md')).toBe(false);
     expect(selectsStructural.test('.claude/rules/auth.md')).toBe(false);
   });
@@ -507,8 +561,13 @@ describe('ci-fast bounded parallel workflow', () => {
       remaining.indexOf('- name: Decide structural lane'),
       remaining.indexOf('- name: Install actionlint')
     );
+    const controlPattern = remaining.match(
+      /STRUCTURAL_CONTROL_PATTERN='([^']+)'/
+    )?.[1];
     const uiPattern = remaining.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
+    expect(controlPattern).toBeDefined();
     expect(uiPattern).toBeDefined();
+    const selectsStructural = new RegExp(`${controlPattern}|${uiPattern}`);
     const uiRe = new RegExp(uiPattern);
 
     // Source PRs path-gate the remaining structural lane; merge groups never skip.
@@ -537,6 +596,17 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(uiRe.test('scripts/shared-ui-visual-arbitrary.baseline.json')).toBe(
       true
     );
+    expect(uiRe.test('package.json')).toBe(true);
+    expect(uiRe.test('apps/web/package.json')).toBe(true);
+    expect(uiRe.test('apps/web/scripts/check-reliability-detectors.ts')).toBe(
+      true
+    );
+    expect(uiRe.test('apps/web/scripts/lint-contrast-ratchet.mjs')).toBe(true);
+    expect(uiRe.test('apps/web/scripts/lint-no-native-dialogs.mjs')).toBe(true);
+    expect(uiRe.test('apps/web/scripts/next-proxy-guard.mjs')).toBe(true);
+    expect(uiRe.test('apps/web/scripts/seo-ratchet-guard.mjs')).toBe(true);
+    expect(uiRe.test('apps/web/scripts/tailwind-guard.mjs')).toBe(true);
+    expect(selectsStructural.test('scripts/doc-freshness-lint.mjs')).toBe(true);
 
     // JOV-5435 centralized web-test boundary stays selected.
     expect(uiRe.test('apps/web/tests/unit/atoms/ViaPanel.test.tsx')).toBe(true);
@@ -556,6 +626,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(
       uiRe.test('apps/web/scripts/shared-ui-visual-arbitrary-audit.mjs')
     ).toBe(false);
+    expect(uiRe.test('apps/web/scripts/test-performance-guard.ts')).toBe(false);
     expect(uiRe.test('apps/web/lib/env.ts')).toBe(false);
   });
 

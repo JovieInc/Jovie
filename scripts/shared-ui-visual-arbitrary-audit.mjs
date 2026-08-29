@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 /**
- * Shared-UI visual arbitrary-value audit (JOV-5434): shrink-only
- * file/value/count for packages/ui/{atoms,lib}. Exclusions: state/aria,
- * CSS vars, transition lists, empty content-[], CSS-property syntax.
+ * Shared-UI visual arbitrary-value audit (JOV-5437): shrink-only
+ * file/value/count for all production TypeScript under packages/ui.
+ * Exclusions: tests, stories, fixtures, generated output, build/tooling,
+ * plus token kinds that are not one-off visual values (state/aria, CSS
+ * vars, transition lists, empty content-[], CSS-property syntax).
  * pnpm design:shared-ui-visual-arbitrary:{check,update}
  */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -13,15 +15,21 @@ const THIS_DIR = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = join(THIS_DIR, '..');
 export const SCHEMA = 'jovie.shared-ui-visual-arbitrary/v1';
 export const BASELINE_PATH = 'scripts/shared-ui-visual-arbitrary.baseline.json';
-export const SCAN_ROOTS = Object.freeze([
-  'packages/ui/atoms',
-  'packages/ui/lib',
-]);
+export const SCAN_ROOTS = Object.freeze(['packages/ui']);
 export const CHECK_COMMAND = 'pnpm design:shared-ui-visual-arbitrary:check';
 export const UPDATE_COMMAND = 'pnpm design:shared-ui-visual-arbitrary:update';
 
 const SOURCE_EXT = /\.(tsx|ts)$/;
-const SKIP_PRODUCTION = /\.(?:test|spec|stories)\.[cm]?[jt]sx?$|\/fixtures\//;
+const SKIP_DIR_NAMES = new Set([
+  'node_modules',
+  '.next',
+  'dist',
+  'coverage',
+  'generated',
+  'fixtures',
+]);
+const SKIP_PRODUCTION =
+  /\.(?:test|spec|stories)\.[cm]?[jt]sx?$|\/(?:fixtures|generated|dist|coverage)\/|(?:^|\/)(?:vitest|jest)\.(?:config|setup)\.[cm]?[jt]sx?$/;
 const ARBITRARY_TOKEN =
   /(?:^|[\s"'`])((?:[!a-z][\w-]*:)*!?[a-z][\w-]*-\[[^\]]+\]|\[[a-z-]+:[^\]]+\])/g;
 const STATE_UTILITY = /^(?:group-|peer-)?(?:data|aria)-\[/;
@@ -101,7 +109,7 @@ function walkSourceFiles(dir, shouldSkip, repoRoot, out) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (entry.name === 'node_modules' || entry.name === '.next') continue;
+      if (SKIP_DIR_NAMES.has(entry.name)) continue;
       walkSourceFiles(full, shouldSkip, repoRoot, out);
       continue;
     }

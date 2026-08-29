@@ -253,8 +253,12 @@ describe('merge_group workflow contract', () => {
     expect(remaining).toContain('github.event_name }}" != "pull_request"');
     expect(remaining).toContain('echo "skip=false"');
     expect(remaining).toContain('apps/web/\\.storybook/');
+    expect(remaining).toContain('apps/web/package\\.json$');
+    expect(remaining).toContain('apps/web/scripts/');
     expect(remaining).toContain('chromatic\\.config\\.json$');
+    expect(remaining).toContain('package\\.json$');
     expect(remaining).toContain('shared-ui-visual-arbitrary');
+    expect(remaining).toContain('scripts/doc-freshness-lint');
     expect(remaining).toContain('apps/web/tests/');
 
     for (const jobId of [
