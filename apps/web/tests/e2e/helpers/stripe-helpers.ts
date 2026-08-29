@@ -225,23 +225,35 @@ export async function createCheckoutSession(
 export async function fillStripeInput(
   page: Page,
   selector: string,
-  value: string
+  value: string,
+  timeout = 15_000
 ) {
-  for (const frame of page.frames()) {
-    const input = frame.locator(selector);
-    if ((await input.count()) > 0) {
-      await input.first().fill(value);
-      return;
+  const deadline = Date.now() + timeout;
+
+  while (Date.now() < deadline) {
+    for (const frame of page.frames()) {
+      const inputs = frame.locator(selector);
+      const count = await inputs.count();
+
+      for (let index = 0; index < count; index += 1) {
+        const input = inputs.nth(index);
+        if (await input.isVisible()) {
+          await input.fill(value);
+          return;
+        }
+      }
     }
+
+    await page.waitForTimeout(250);
   }
 
-  throw new Error(`Stripe input not found for selector: ${selector}`);
+  throw new Error(
+    `Visible Stripe input not found within ${timeout}ms for selector: ${selector}`
+  );
 }
 
 /** Complete card payment in the Stripe checkout page. */
 export async function completeCardPayment(page: Page, card: CardDetails) {
-  await page.waitForSelector('iframe', { timeout: 15_000 });
-
   await fillStripeInput(page, 'input[name="cardnumber"]', card.number);
   await fillStripeInput(page, 'input[name="exp-date"]', card.exp);
   await fillStripeInput(page, 'input[name="cvc"]', card.cvc);
