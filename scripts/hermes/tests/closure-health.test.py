@@ -28,12 +28,14 @@ def pr(
     body: str = "",
     merge_state: str = "CLEAN",
     draft: bool = False,
+    cross_repository: bool | None = False,
     queued: bool = False,
     queue_state: str = "AWAITING_CHECKS",
     labels: tuple[str, ...] = (),
     updated_at: datetime = NOW,
     author: str = "summer-test",
     files: tuple[str, ...] | None = None,
+    change_type: str = "MODIFIED",
     changed_files: int | None = None,
     files_payload: object | None = None,
 ) -> dict[str, object]:
@@ -43,6 +45,7 @@ def pr(
         "body": body,
         "headRefName": f"symphony/test-pr-{number}",
         "isDraft": draft,
+        "isCrossRepository": cross_repository,
         "mergeStateStatus": merge_state,
         "createdAt": (updated_at - timedelta(hours=1)).isoformat(),
         "updatedAt": updated_at.isoformat(),
@@ -65,7 +68,7 @@ def pr(
         return payload
     if files is None and changed_files is None:
         return payload
-    nodes = [{"path": path} for path in (files or ())]
+    nodes = [{"path": path, "changeType": change_type} for path in (files or ())]
     expected = len(nodes) if changed_files is None else changed_files
     payload["changedFiles"] = expected
     payload["files"] = {"totalCount": expected, "nodes": nodes}
@@ -243,6 +246,87 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(health["status"], "healthy")
         self.assertTrue(health["newIssueIntakeAllowed"])
 
+    def test_only_overlapping_prs_are_duplicate_participants(self):
+        result = MODULE.classify_open_prs(
+            [
+                pr(20, title="feat: ship JOV-779", files=("scripts/shared.py",)),
+                pr(21, title="fix: ship JOV-779", files=("scripts/shared.py",)),
+                pr(22, title="test: ship JOV-779", files=("scripts/disjoint.py",)),
+            ],
+            NOW,
+        )
+
+        self.assertEqual(
+            result["duplicateIssueLanes"],
+            [
+                {
+                    "issue": "JOV-779",
+                    "prs": [20, 21],
+                    "overlap": ["scripts/shared.py"],
+                }
+            ],
+        )
+
+    def test_renamed_file_evidence_fails_closed_as_unclassified(self):
+        result = MODULE.classify_open_prs(
+            [
+                pr(
+                    23,
+                    title="feat: ship JOV-780",
+                    files=("scripts/new.py",),
+                    change_type="RENAMED",
+                ),
+                pr(24, title="fix: ship JOV-780", files=("scripts/old.py",)),
+            ],
+            NOW,
+        )
+
+        self.assertEqual(result["duplicateIssueLanes"], [])
+        self.assertEqual(
+            {item["number"]: item["reason"] for item in result["unclassified"]},
+            {
+                23: "changed-file-evidence-malformed",
+                24: "changed-file-evidence-incomplete-peer",
+            },
+        )
+
+    def test_cross_repository_pr_cannot_spoof_an_internal_issue_lane(self):
+        result = MODULE.classify_open_prs(
+            [
+                pr(25, title="fix: ship JOV-781", files=("scripts/shared.py",)),
+                pr(
+                    26,
+                    title="fix: forged JOV-781",
+                    cross_repository=True,
+                    files=("scripts/shared.py",),
+                ),
+            ],
+            NOW,
+        )
+
+        self.assertEqual(result["duplicateIssueLanes"], [])
+        dispositions = {item["number"]: item for item in result["dispositions"]}
+        self.assertEqual(dispositions[25]["issue"], "JOV-781")
+        self.assertIsNone(dispositions[26]["issue"])
+
+    def test_missing_repository_provenance_is_unclassified(self):
+        result = MODULE.classify_open_prs(
+            [
+                pr(
+                    27,
+                    title="fix: ship JOV-782",
+                    cross_repository=None,
+                    files=("scripts/shared.py",),
+                )
+            ],
+            NOW,
+        )
+
+        self.assertEqual(
+            result["unclassified"],
+            [{"number": 27, "reason": "missing-repository-provenance"}],
+        )
+
     def test_incomplete_changed_file_evidence_fails_closed_as_unclassified(self):
         missing = pr(8, title="feat: ship JOV-777")
         truncated = pr(
@@ -272,10 +356,11 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(reasons[8], "changed-file-evidence-missing")
         self.assertEqual(reasons[9], "changed-file-evidence-truncated")
         self.assertEqual(reasons[10], "changed-file-evidence-malformed")
+        self.assertEqual(reasons[11], "changed-file-evidence-incomplete-peer")
         self.assertEqual(result["duplicateIssueLanes"], [])
         self.assertEqual(
             [item["number"] for item in result["dispositions"]],
-            [11],
+            [],
         )
         evidence = {item["number"]: item for item in result["changedFileEvidence"]}
         self.assertEqual(evidence[9]["status"], "truncated")
@@ -296,6 +381,33 @@ class ClosureClassificationTests(unittest.TestCase):
         )
         self.assertEqual(later["status"], "red")
         self.assertIn("unclassified-open-pr-over-15m", later["reasons"])
+
+    def test_changed_file_evidence_requires_both_completeness_counts(self):
+        missing_changed_files = pr(
+            12,
+            title="feat: ship JOV-779",
+            files_payload={
+                "totalCount": 1,
+                "nodes": [{"path": "scripts/a.py", "changeType": "MODIFIED"}],
+            },
+        )
+        missing_total_count = pr(
+            13,
+            title="feat: ship JOV-779",
+            files_payload={
+                "nodes": [{"path": "scripts/b.py", "changeType": "MODIFIED"}],
+            },
+            changed_files=1,
+        )
+
+        self.assertEqual(
+            MODULE._changed_file_evidence(missing_changed_files)["status"],
+            "malformed",
+        )
+        self.assertEqual(
+            MODULE._changed_file_evidence(missing_total_count)["status"],
+            "malformed",
+        )
 
     def test_explicit_linear_marker_overrides_legacy_branch_and_title_identity(self):
         child = pr(
@@ -608,13 +720,22 @@ class ClosureObservationTests(unittest.TestCase):
             if argument.startswith("query=")
         )
         self.assertIn("number title body headRefName", query_arg)
+        self.assertIn("isCrossRepository", query_arg)
         self.assertIn("changedFiles", query_arg)
         self.assertIn(f"files(first:{MODULE.CHANGED_FILES_PAGE})", query_arg)
+        self.assertIn("nodes{path changeType}", query_arg)
 
         pages[0]["data"]["repository"]["pullRequests"]["totalCount"] = 3
         completed.stdout = MODULE.json.dumps(pages)
         with mock.patch.object(MODULE.subprocess, "run", return_value=completed):
             with self.assertRaisesRegex(ValueError, "snapshot incomplete"):
+                MODULE._run_graphql_snapshot("JovieInc/Jovie")
+
+        pages[0]["data"]["repository"]["pullRequests"]["totalCount"] = 2
+        pages[1]["errors"] = [{"message": "partial GraphQL failure"}]
+        completed.stdout = MODULE.json.dumps(pages)
+        with mock.patch.object(MODULE.subprocess, "run", return_value=completed):
+            with self.assertRaisesRegex(ValueError, "GraphQL errors"):
                 MODULE._run_graphql_snapshot("JovieInc/Jovie")
         with self.assertRaisesRegex(ValueError, "owner/name"):
             MODULE._repo_parts("Jovie")
