@@ -320,10 +320,16 @@ export async function completeCardPayment(page: Page, card: CardDetails) {
 
   if (!(await cardPaymentMethod.isChecked())) {
     const cardPaymentButton = page
-      .locator('[data-testid="card-accordion-item-button"]')
+      .locator(
+        '[data-testid="card-accordion-item-button"], button[aria-label*="card" i]'
+      )
       .filter({ visible: true })
       .first();
-    if (await cardPaymentButton.isVisible()) {
+    const cardButtonVisible = await cardPaymentButton
+      .waitFor({ state: 'visible', timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (cardButtonVisible) {
       await cardPaymentButton.click();
     } else {
       const cardPaymentLabel = page
@@ -331,7 +337,13 @@ export async function completeCardPayment(page: Page, card: CardDetails) {
         .filter({ visible: true })
         .first();
       await expect(cardPaymentLabel).toBeVisible({ timeout: 15_000 });
-      await cardPaymentLabel.click();
+      await cardPaymentLabel.click({ timeout: 5_000 }).catch(async error => {
+        if (await cardPaymentButton.isVisible()) {
+          await cardPaymentButton.click();
+          return;
+        }
+        throw error;
+      });
     }
     await expect(cardPaymentMethod).toBeChecked();
   }
