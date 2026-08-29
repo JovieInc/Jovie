@@ -96,8 +96,8 @@ fi
 prepare_user_systemd_context
 
 mkdir -p "${BACKUP_DIR}" "${GEM_ROOT}/scripts" "${GEM_ROOT}/config" "${UNIT_ROOT}"
-# Persistence (enabled) and liveness (active) are independent. Rollback must
-# restore both to the captured prior states, including a disabled-but-active timer.
+# Enablement survives host restarts; activity describes the current user-systemd
+# session. Rollback restores both captured states, including a disabled-but-active timer.
 timer_was_active=false
 timer_was_enabled=false
 install_started=false
@@ -164,6 +164,7 @@ install_atomic() {
   install -m "${mode}" "${source}" "${temporary}"
   mv "${temporary}" "${target}"
 }
+
 for index in "${!TARGETS[@]}"; do
   mode=0644
   case "${RELATIVE_SOURCES[$index]}" in

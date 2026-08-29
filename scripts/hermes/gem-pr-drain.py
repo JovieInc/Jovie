@@ -158,6 +158,8 @@ def effective_capacity(host_capacity, gate):
     maximum = gate.get("remediationAdmission", {}).get("maxConcurrent")
     if isinstance(maximum, bool) or not isinstance(maximum, int) or maximum < 0:
         raise ValueError("typed remediation maxConcurrent is missing or invalid")
+    if maximum == 0:
+        return 0
     return min(host_capacity, maximum)
 
 
@@ -245,6 +247,13 @@ def ready_autonomous_draft(pr):
         return {**result, "result": "skipped", "reason": "too_large_for_queue"}
     if pr.get("mergeable_state") == "dirty":
         return {**result, "result": "skipped", "reason": "conflicting"}
+    blocker = work_mutation_blocker(max_age=0)
+    if blocker:
+        return {
+            **result,
+            "result": "skipped",
+            "reason": blocker,
+        }
     head_sha = pr.get("head", {}).get("sha")
     if not isinstance(head_sha, str) or not re.fullmatch(r"[0-9a-f]{40}", head_sha):
         return {
@@ -521,6 +530,7 @@ def main():
                 capacity=0,
                 intake="blocked_missing_capacity_evidence",
                 selected=[],
+                processed=[],
             )
             write_artifact(document)
             print(json.dumps(document, indent=2))
@@ -585,11 +595,13 @@ def main():
                 for pr in selected
             ]
         else:
-            ready_results = [
-                ready_autonomous_draft(pr)
-                for pr in all_open
-                if pr.get("draft") and autonomous_head(pr)
-            ]
+            ready_results = []
+            if gate["remediationAdmission"]["pushAllowed"]:
+                ready_results = [
+                    ready_autonomous_draft(pr)
+                    for pr in all_open
+                    if pr.get("draft") and autonomous_head(pr)
+                ]
             with concurrent.futures.ThreadPoolExecutor(
                 max_workers=max(1, len(selected))
             ) as executor:

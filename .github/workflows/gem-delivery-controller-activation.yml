@@ -2,7 +2,8 @@ name: Activate Gem Delivery Controller
 
 # A production receipt is the only authority to replace Gem's local controller
 # configuration. The installer refuses a dirty or mismatched source revision,
-# keeps a timestamped rollback copy, reloads systemd, and writes the attestation.
+# keeps a timestamped rollback copy, reloads systemd, enables and starts the
+# recurring drain timer, and attests both its enabled and active states.
 on:
   workflow_run:
     workflows: ["Production Controller"]

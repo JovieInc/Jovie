@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   humanizeSlug,
+  JOVIE_WORK_OUTCOME_SLOT,
   mapAgentRunStatusToPhase,
   mapFanNotificationToJovieWorkItem,
   mapMetadataSubmissionStatusToPhase,
@@ -38,7 +39,32 @@ describe('jovie work feed contract', () => {
       title: 'Release autopilot',
       description: 'Jovie ran release-to-revenue for Midnight Drive.',
       statusLabel: 'Done',
+      outcomeSlot: JOVIE_WORK_OUTCOME_SLOT,
+      outcome: { state: 'unavailable', metrics: null },
     });
+  });
+
+  it.each([
+    'waiting_for_approval',
+    'running',
+    'completed',
+  ])('reserves the same typed outcome slot while a release run is %s', status => {
+    const item = mapWorkflowRunToJovieWorkItem({
+      id: `run-${status}`,
+      kind: RELEASE_TO_REVENUE_WORKFLOW_KIND,
+      status,
+      currentStep: null,
+      stepOutputs: {},
+      createdAt: '2026-06-20T00:00:00.000Z',
+      updatedAt: '2026-06-21T12:00:00.000Z',
+    });
+
+    expect(item.outcomeSlot).toBe(JOVIE_WORK_OUTCOME_SLOT);
+    expect(item.outcome).toEqual(
+      status === 'completed'
+        ? { state: 'unavailable', metrics: null }
+        : undefined
+    );
   });
 
   it('maps suggested actions to pending approvals', () => {
@@ -126,6 +152,16 @@ describe('jovie work feed contract', () => {
             icon: 'workflow',
             timestamp: '2026-06-23T00:00:00.000Z',
             statusLabel: 'Done',
+            outcomeSlot: JOVIE_WORK_OUTCOME_SLOT,
+            outcome: {
+              state: 'measured_positive',
+              metrics: {
+                gmvDeltaCents: 1800,
+                clickDelta: 0,
+                dspClickDelta: 7,
+                newFansDelta: 0,
+              },
+            },
           },
           {
             id: 42,
@@ -139,6 +175,94 @@ describe('jovie work feed contract', () => {
           },
         ],
       })
-    ).toHaveLength(1);
+    ).toEqual([
+      expect.objectContaining({
+        id: 'workflow:1',
+        outcomeSlot: JOVIE_WORK_OUTCOME_SLOT,
+        outcome: {
+          state: 'measured_positive',
+          metrics: {
+            gmvDeltaCents: 1800,
+            clickDelta: 0,
+            dspClickDelta: 7,
+            newFansDelta: 0,
+          },
+        },
+      }),
+    ]);
+  });
+
+  it('drops a fabricated positive outcome with no positive metric', () => {
+    expect(
+      parseJovieWorkFeedResponse({
+        items: [
+          {
+            id: 'workflow:1',
+            source: 'workflow_run',
+            phase: 'completed',
+            title: 'Release autopilot',
+            description: 'Done',
+            icon: 'workflow',
+            timestamp: '2026-06-23T00:00:00.000Z',
+            statusLabel: 'Done',
+            outcomeSlot: JOVIE_WORK_OUTCOME_SLOT,
+            outcome: {
+              state: 'measured_positive',
+              metrics: {
+                gmvDeltaCents: 0,
+                clickDelta: 0,
+                dspClickDelta: 0,
+                newFansDelta: 0,
+              },
+            },
+          },
+        ],
+      })
+    ).toEqual([]);
+  });
+
+  it('preserves a reserved release slot before outcome data exists', () => {
+    expect(
+      parseJovieWorkFeedResponse({
+        items: [
+          {
+            id: 'workflow:pending',
+            source: 'workflow_run',
+            phase: 'pending',
+            title: 'Release autopilot',
+            description: 'Waiting for approval',
+            icon: 'workflow',
+            timestamp: '2026-06-23T00:00:00.000Z',
+            statusLabel: 'Needs approval',
+            outcomeSlot: JOVIE_WORK_OUTCOME_SLOT,
+          },
+        ],
+      })
+    ).toEqual([
+      expect.objectContaining({
+        id: 'workflow:pending',
+        outcomeSlot: JOVIE_WORK_OUTCOME_SLOT,
+      }),
+    ]);
+  });
+
+  it('drops outcome data that is not paired with the typed release slot', () => {
+    expect(
+      parseJovieWorkFeedResponse({
+        items: [
+          {
+            id: 'workflow:1',
+            source: 'workflow_run',
+            phase: 'completed',
+            title: 'Release autopilot',
+            description: 'Done',
+            icon: 'workflow',
+            timestamp: '2026-06-23T00:00:00.000Z',
+            statusLabel: 'Done',
+            outcome: { state: 'unavailable', metrics: null },
+          },
+        ],
+      })
+    ).toEqual([]);
   });
 });

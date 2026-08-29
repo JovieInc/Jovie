@@ -8,7 +8,8 @@ Guards the contract that the orphan beam.smp incident violated:
   policy, a clean stop (beam exits 1 on SIGTERM), and a single-listener guard
   for 127.0.0.1:4041;
 - the install script materializes both onto a target home idempotently, keeps
-  timestamped backups, and detects drift in --check mode.
+  timestamped backups, and detects drift in --check mode except the bounded
+  runtime overlay on agent.max_concurrent_agents (1..8).
 
 No network, no systemd, no host state: everything runs against the repo
 checkout and a tmp_path target home. CI's pytest lane has no PyYAML, so the
@@ -495,6 +496,21 @@ def _run_installer(target_home: Path, *args: str) -> subprocess.CompletedProcess
     )
 
 
+def _rewrite_installed_concurrency(workflow: Path, value: str) -> None:
+    def replace(match: re.Match[str]) -> str:
+        return f"{match.group(1)}{value}{match.group(3)}"
+
+    updated, count = re.subn(
+        r"^(\s*max_concurrent_agents:\s*)([0-9]+)(\s*)$",
+        replace,
+        workflow.read_text(),
+        count=1,
+        flags=re.MULTILINE,
+    )
+    assert count == 1, "installed workflow must contain one concurrency scalar"
+    workflow.write_text(updated)
+
+
 def test_installer_deploys_workflow_and_unit(tmp_path: Path) -> None:
     result = _run_installer(tmp_path, "--no-daemon-reload")
     assert result.returncode == 0, result.stderr
@@ -749,12 +765,10 @@ def test_installer_accepts_only_the_bounded_runtime_concurrency_overlay(tmp_path
     source = WORKFLOW.read_text()
 
     for target in range(1, 9):
-        runtime = source.replace(
-            "  max_concurrent_agents: 4", f"  max_concurrent_agents: {target}", 1
-        )
-        workflow.write_text(runtime)
+        _rewrite_installed_concurrency(workflow, str(target))
         accepted = _run_installer(tmp_path, "--check")
         assert accepted.returncode == 0, accepted.stdout
+        assert f"OK {workflow}" in accepted.stdout
         assert f"runtime max_concurrent_agents={target}" in accepted.stdout
 
     for invalid in ("0", "9", "01", "08", "0001", "0008", "not-a-number"):
@@ -766,6 +780,7 @@ def test_installer_accepts_only_the_bounded_runtime_concurrency_overlay(tmp_path
         assert f"DRIFT {workflow}" in rejected.stdout
 
     for malformed in (
+        source.replace("  max_concurrent_agents: 4\n", ""),
         source.replace("  max_concurrent_agents: 4", "  max_concurrent_workers: 4", 1),
         source.replace(
             "  max_concurrent_agents: 4",

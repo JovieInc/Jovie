@@ -27,6 +27,21 @@ const roundedClasses: Record<RoundedVariant, string> = {
   full: 'rounded-full',
 };
 
+const RESERVED_GEOMETRY_UTILITY_PATTERN = /^(?:min-|max-)?[hw]-.+$|^size-.+$/;
+
+function withoutReservedGeometry(className: string | undefined): string {
+  if (!className) return '';
+
+  return className
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter(token => {
+      const utility = token.split(':').at(-1)?.replace(/^!|!$/g, '');
+      return !utility || !RESERVED_GEOMETRY_UTILITY_PATTERN.test(utility);
+    })
+    .join(' ');
+}
+
 /**
  * Base skeleton component with shimmer animation.
  * Uses the `.skeleton` CSS class defined in globals.css for the animation.
@@ -52,15 +67,16 @@ export function Skeleton({
 }: SkeletonProps) {
   return (
     <div
+      {...props}
       className={cn(
-        shimmer && 'skeleton motion-reduce:animate-none',
+        shimmer && 'skeleton motion-reduce:animate-none motion-reduce:bg-none',
         !shimmer && 'bg-surface-1 motion-reduce:animate-none',
         roundedClasses[rounded],
         className
       )}
       data-state={shimmer ? 'shimmer' : 'static'}
+      data-slot='skeleton'
       aria-hidden='true'
-      {...props}
     />
   );
 }
@@ -89,6 +105,8 @@ export interface LoadingSkeletonProps {
   readonly rounded?: RoundedVariant;
   /** Accessible text announced while the placeholder is busy. */
   readonly label?: string;
+  /** Whether this placeholder owns the loading announcement. */
+  readonly announce?: boolean;
 }
 
 /**
@@ -114,10 +132,16 @@ export function LoadingSkeleton({
   width = 'w-full',
   rounded = 'sm',
   label = 'Loading content',
+  announce = true,
 }: LoadingSkeletonProps) {
   const normalizedLines = Number.isFinite(lines)
     ? Math.max(1, Math.floor(lines))
     : 1;
+  const accessibleLabel =
+    typeof label === 'string' && label.trim()
+      ? label.trim()
+      : 'Loading content';
+  const nonGeometryClassName = withoutReservedGeometry(className);
 
   // Generate stable keys for multi-line skeletons.
   const lineKeys = React.useMemo(
@@ -125,26 +149,35 @@ export function LoadingSkeleton({
       Array.from({ length: normalizedLines }, (_, i) => `skeleton-line-${i}`),
     [normalizedLines]
   );
+  const ownerAttributes = announce
+    ? {
+        role: 'status' as const,
+        'aria-busy': 'true' as const,
+        'aria-live': 'polite' as const,
+        'aria-atomic': 'true' as const,
+        'aria-label': accessibleLabel,
+      }
+    : {};
 
   return (
     <div
+      {...ownerAttributes}
       className={normalizedLines === 1 ? 'w-full' : 'space-y-2'}
-      role='status'
-      aria-busy='true'
-      aria-live='polite'
-      aria-atomic='true'
       data-lines={normalizedLines}
+      data-height={height}
+      data-width={width}
+      data-rounded={rounded}
+      data-slot='loading-skeleton'
     >
-      <span className='sr-only'>{label}</span>
       {lineKeys.map((key, index) => (
         <Skeleton
           key={key}
           className={cn(
+            nonGeometryClassName,
             height,
             normalizedLines > 1 && index === normalizedLines - 1
               ? 'w-3/4'
-              : width,
-            className
+              : width
           )}
           rounded={rounded}
         />

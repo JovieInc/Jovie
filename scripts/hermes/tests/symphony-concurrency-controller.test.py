@@ -130,5 +130,63 @@ class WorkflowMutationTests(unittest.TestCase):
             self.assertFalse((path.parent / ".WORKFLOW.md.tmp").exists())
 
 
+class WorkflowOverlayIdentityTests(unittest.TestCase):
+    SOURCE = "---\nagent:\n  max_concurrent_agents: 4\n  max_turns: 24\n---\nprompt\n"
+
+    def overlay(self, value: str) -> str:
+        return self.SOURCE.replace("max_concurrent_agents: 4", f"max_concurrent_agents: {value}")
+
+    def test_accepts_each_bounded_runtime_value(self):
+        for value in range(MODULE.MIN_CONCURRENCY, MODULE.MAX_CONCURRENCY + 1):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    MODULE.verify_concurrency_overlay(self.SOURCE, self.overlay(str(value))),
+                    value,
+                )
+
+    def test_identical_source_is_accepted(self):
+        self.assertEqual(MODULE.verify_concurrency_overlay(self.SOURCE, self.SOURCE), 4)
+
+    def test_padded_runtime_concurrency_fails_closed(self):
+        for value in ("01", "08", "0001", "0008"):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValueError, "outside the bounded policy"):
+                    MODULE.verify_concurrency_overlay(self.SOURCE, self.overlay(value))
+
+    def test_missing_runtime_concurrency_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "exactly one max_concurrent_agents"):
+            MODULE.verify_concurrency_overlay(
+                self.SOURCE,
+                self.SOURCE.replace("  max_concurrent_agents: 4\n", ""),
+            )
+
+    def test_duplicated_runtime_concurrency_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "exactly one max_concurrent_agents"):
+            MODULE.verify_concurrency_overlay(
+                self.SOURCE,
+                self.SOURCE.replace(
+                    "  max_concurrent_agents: 4\n",
+                    "  max_concurrent_agents: 1\n  max_concurrent_agents: 2\n",
+                ),
+            )
+
+    def test_non_numeric_runtime_concurrency_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "exactly one max_concurrent_agents"):
+            MODULE.verify_concurrency_overlay(self.SOURCE, self.overlay("n"))
+
+    def test_zero_runtime_concurrency_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "outside the bounded policy"):
+            MODULE.verify_concurrency_overlay(self.SOURCE, self.overlay("0"))
+
+    def test_above_policy_runtime_concurrency_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "outside the bounded policy"):
+            MODULE.verify_concurrency_overlay(self.SOURCE, self.overlay("9"))
+
+    def test_any_other_workflow_drift_fails_closed(self):
+        drifted = self.overlay("1").replace("max_turns: 24", "max_turns: 99")
+        with self.assertRaisesRegex(ValueError, "beyond concurrency overlay"):
+            MODULE.verify_concurrency_overlay(self.SOURCE, drifted)
+
+
 if __name__ == "__main__":
     unittest.main()
