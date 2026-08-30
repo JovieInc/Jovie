@@ -72,6 +72,8 @@ describe('public CTA guard', () => {
     expect(headerNav).toContain(
       "<MarketingSignInLink variant='ghost' label={minimalLabel} />"
     );
+    expect(headerNav).toContain('blur(var(--blur-header))');
+    expect(headerNav).not.toContain('--linear-blur-header');
     expect(headerNav).not.toMatch(
       /minimalAuth[\s\S]*?<Button[\s\S]*?>Get started<\/Button>/
     );
