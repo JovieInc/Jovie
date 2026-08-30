@@ -133,6 +133,28 @@ describe('JOV-INV-018 screen-certification/v1', () => {
     ]);
   });
 
+  it('registers the public CLI landing page for desktop and mobile certification', () => {
+    const source = 'apps/web/app/(marketing)/cli/page.tsx';
+    const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.cli');
+
+    assert.deepEqual(screen, {
+      id: 'web.cli',
+      platform: 'web',
+      owner: 'cli-landing',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'A' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      { id: 'web.cli', verdict: 'pass', findings: [] },
+    ]);
+  });
+
   it('registers the public API versioning policy for changed-surface certification', () => {
     const source = 'apps/web/app/(marketing)/api-versioning/page.tsx';
     const screen = SCREEN_REGISTRY.find(

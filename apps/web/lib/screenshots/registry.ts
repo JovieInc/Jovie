@@ -175,6 +175,21 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       waitFor: 'main',
     },
     {
+      id: 'jovie-cli-desktop',
+      title: 'Jovie CLI Landing Page',
+      route: '/cli',
+      waitFor: '[data-testid="cli-landing-page"]',
+      fullPage: true,
+    },
+    {
+      id: 'jovie-cli-mobile',
+      title: 'Jovie CLI Landing Page Mobile',
+      route: '/cli',
+      waitFor: '[data-testid="cli-landing-page"]',
+      viewport: 'mobile',
+      fullPage: true,
+    },
+    {
       id: 'release-landing-desktop',
       title: 'Release Landing Page',
       route: '/demo/showcase/release-landing',

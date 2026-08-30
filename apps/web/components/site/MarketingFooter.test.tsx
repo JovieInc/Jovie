@@ -101,14 +101,22 @@ describe('MarketingFooter', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('omits the terminal CTA on the support route', () => {
-    mockUsePathname.mockReturnValue('/support');
+  it.each([
+    '/support',
+    '/cli',
+  ])('omits the duplicate terminal CTA on the %s route', pathname => {
+    mockUsePathname.mockReturnValue(pathname);
 
     render(<MarketingFooter />);
 
     expect(
       screen.queryByTestId('marketing-footer-cta')
     ).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Resources' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'CLI' })).toHaveAttribute(
+      'href',
+      '/cli'
+    );
   });
 
   it('honors the expanded footer variant when the full-footer flag is enabled', () => {

@@ -48,6 +48,7 @@ const PAGE_OWNS_FINAL_CTA_PATHS = new Set<string>([
   APP_ROUTES.LAUNCH,
   APP_ROUTES.DOWNLOAD,
   APP_ROUTES.SUPPORT,
+  APP_ROUTES.CLI,
 ]);
 
 interface MarketingFooterProps {

@@ -49,4 +49,15 @@ describe('MarketingPageShell', () => {
       MARKETING_PEN_CONTRACT_IDS.recipe.homepage
     );
   });
+
+  it('forwards a stable review selector without changing layout ownership', () => {
+    render(
+      <MarketingPageShell testId='review-surface'>body</MarketingPageShell>
+    );
+
+    expect(screen.getByTestId('review-surface')).toHaveClass(
+      'relative',
+      'grow'
+    );
+  });
 });

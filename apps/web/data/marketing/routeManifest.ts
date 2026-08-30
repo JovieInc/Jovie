@@ -19,6 +19,7 @@ import type { RecipeId } from './recipes';
 import { getMarketingRecipe } from './recipes';
 import type { MarketingSectionId } from './sections';
 import { getMarketingSection } from './sections';
+import { MARKETING_SPEC_VERSION } from './spec';
 
 export type RenderedSectionBinding =
   | {
@@ -468,6 +469,36 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     url: '/developers',
     healthCheck: {
       path: '/developers',
+      expected: 'page',
+    },
+  },
+  {
+    glob: '(marketing)/cli/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/cli/page.tsx',
+        'hero',
+        'centered-none'
+      ),
+      approvedBinding('apps/web/app/(marketing)/cli/page.tsx', 'feature-grid'),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/cli/page.tsx',
+        'cta',
+        'final-dual-path'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source: 'JOV-5472 source-backed CLI landing route',
+      notes:
+        'Intentional partial feature recipe: shared centered hero, command feature grid, and final dual-path CTA only.',
+    },
+    status: 'active',
+    specVersion: MARKETING_SPEC_VERSION,
+    url: '/cli',
+    healthCheck: {
+      path: '/cli',
       expected: 'page',
     },
   },

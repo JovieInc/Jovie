@@ -8,6 +8,7 @@ export interface MarketingPageShellProps {
   readonly className?: string;
   readonly children: React.ReactNode;
   readonly penContractId?: MarketingPenContractId;
+  readonly testId?: string;
 }
 
 /**
@@ -31,11 +32,13 @@ export function MarketingPageShell({
   className,
   children,
   penContractId = MARKETING_PEN_CONTRACT_IDS.shell.page,
+  testId,
 }: Readonly<MarketingPageShellProps>) {
   return (
     <div
       className={cn('relative grow', className)}
       data-pen-contract={penContractId}
+      data-testid={testId}
     >
       {children}
     </div>

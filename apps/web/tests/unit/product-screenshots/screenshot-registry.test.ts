@@ -42,6 +42,30 @@ describe('screenshot registry', () => {
     }
   });
 
+  it('registers source-backed desktop and mobile CLI review captures', () => {
+    const desktop = SCREENSHOT_SCENARIOS.find(
+      scenario => scenario.id === 'jovie-cli-desktop'
+    );
+    const mobile = SCREENSHOT_SCENARIOS.find(
+      scenario => scenario.id === 'jovie-cli-mobile'
+    );
+
+    expect(desktop).toMatchObject({
+      group: 'marketing',
+      route: '/cli',
+      viewport: 'desktop',
+      fullPage: true,
+      waitFor: '[data-testid="cli-landing-page"]',
+    });
+    expect(mobile).toMatchObject({
+      group: 'marketing',
+      route: '/cli',
+      viewport: 'mobile',
+      fullPage: true,
+      waitFor: '[data-testid="cli-landing-page"]',
+    });
+  });
+
   it('maps canonical surface screenshots back to the canonical surface registry', () => {
     for (const surface of CANONICAL_SURFACES) {
       for (const screenshotId of surface.screenshotIds) {
