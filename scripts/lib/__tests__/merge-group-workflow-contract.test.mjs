@@ -378,7 +378,7 @@ describe('merge_group workflow contract', () => {
     expect(unitJobHeader).toContain('always() &&\n      !cancelled() &&');
     expect(unitJobHeader).not.toContain('continue-on-error');
     expect(unitTests).toContain(
-      "fail-fast: ${{ github.event_name == 'merge_group' }}"
+      "fail-fast: ${{ github.event_name == 'merge_group' || (github.event_name == 'workflow_dispatch' && inputs.run_unit_fail_fast_canary == true) }}"
     );
     expect(unitTests).not.toContain('fail-fast: true');
     expect(unitTests).not.toContain('fail-fast: false');
