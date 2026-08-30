@@ -19,7 +19,7 @@ import { LINEAR_SURFACE } from '@/components/tokens/linear-surface';
 
 function ShellCanvas({ children }: { readonly children: ReactNode }) {
   return (
-    <div className='min-h-[360px] w-full bg-(--linear-app-content-surface) p-8'>
+    <div className='min-h-[360px] w-full bg-(--app-shell-content-surface) p-8'>
       {children}
     </div>
   );
@@ -182,7 +182,7 @@ export const ContentContainerOnShell: Story = {
 export const EntitySidebarShellDefault: Story = {
   name: 'Allowed: EntitySidebarShell drawer surface',
   render: () => (
-    <div className='relative min-h-[480px] w-full bg-(--linear-app-content-surface)'>
+    <div className='relative min-h-[480px] w-full bg-(--app-shell-content-surface)'>
       <EntitySidebarShell
         isOpen
         ariaLabel='Elevation matrix sidebar'
@@ -324,12 +324,12 @@ export const BannedContentSurfaceCard: Story = {
   render: () => (
     <ShellCanvas>
       <Note tone='banned'>
-        BANNED (should look BROKEN): bg-(--linear-app-content-surface) on a
+        BANNED (should look BROKEN): bg-(--app-shell-content-surface) on a
         card-like element inside the shell — only shell chrome
         (toolbar/header/frame) may use the canvas tone. The &quot;card&quot;
         below blends into the canvas; that is the bug.
       </Note>
-      <div className='rounded-lg bg-(--linear-app-content-surface) p-6'>
+      <div className='rounded-lg bg-(--app-shell-content-surface) p-6'>
         {PLACEHOLDER}
       </div>
     </ShellCanvas>

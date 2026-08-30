@@ -76,7 +76,7 @@ export function AdminTablePagination({
   );
 
   return (
-    <div className='flex min-w-0 items-center gap-3 overflow-x-auto overflow-y-hidden border-t border-subtle px-(--linear-app-header-padding-x) py-2.5 text-xs text-secondary-token scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+    <div className='flex min-w-0 items-center gap-3 overflow-x-auto overflow-y-hidden border-t border-subtle px-(--app-shell-header-padding-x) py-2.5 text-xs text-secondary-token scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
       {/* Page info */}
       <div className='flex shrink-0 items-center gap-2'>
         <span className='tabular-nums'>

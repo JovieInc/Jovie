@@ -157,7 +157,7 @@ export function LyricsView({
                 <button
                   type='button'
                   onClick={onPaste}
-                  className='inline-flex items-center h-8 px-4 rounded-full border border-(--linear-app-shell-border) bg-surface-1/60 text-xs font-caption text-secondary-token transition-colors duration-subtle ease-subtle hover:text-primary-token hover:bg-surface-1'
+                  className='inline-flex items-center h-8 px-4 rounded-full border border-(--app-shell-border) bg-surface-1/60 text-xs font-caption text-secondary-token transition-colors duration-subtle ease-subtle hover:text-primary-token hover:bg-surface-1'
                 >
                   Paste lyrics
                 </button>

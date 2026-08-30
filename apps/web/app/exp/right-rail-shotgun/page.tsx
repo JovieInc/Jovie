@@ -36,9 +36,9 @@ import { cn } from '@/lib/utils';
 // dark theme and picked up automatically. Only surface/border overrides here.
 const CARBON_VARS: React.CSSProperties = {
   ['--linear-bg-page' as string]: '#06070a',
-  ['--linear-app-content-surface' as string]: '#0a0c0f',
-  ['--linear-app-shell-border' as string]: '#171a20',
-  ['--linear-app-shell-radius' as string]: '12px',
+  ['--app-shell-content-surface' as string]: '#0a0c0f',
+  ['--app-shell-border' as string]: '#171a20',
+  ['--app-shell-radius' as string]: '12px',
   ['--surface-0' as string]: '#0a0b0e',
   ['--surface-1' as string]: '#101216',
   ['--surface-2' as string]: '#161a20',
@@ -139,7 +139,7 @@ export default function RightRailShotgunPage() {
         }
       `}</style>
 
-      <header className='shrink-0 h-12 px-5 flex items-center gap-3 border-b border-(--linear-app-shell-border)'>
+      <header className='shrink-0 h-12 px-5 flex items-center gap-3 border-b border-(--app-shell-border)'>
         <Link
           href='/exp/shell-v1'
           className='inline-flex items-center gap-1 text-xs text-tertiary-token hover:text-primary-token transition-colors duration-subtle ease-out'
@@ -160,7 +160,7 @@ export default function RightRailShotgunPage() {
       </header>
 
       <div className='flex-1 overflow-x-auto overflow-y-hidden'>
-        <div className='flex min-w-max h-full divide-x divide-(--linear-app-shell-border)'>
+        <div className='flex min-w-max h-full divide-x divide-(--app-shell-border)'>
           <RailColumn
             label='A. Single scroll'
             description='Refined baseline — header → stats → perf → DSPs → cues → activity → sticky footer.'
@@ -208,7 +208,7 @@ function RailColumn({
 }) {
   return (
     <div className='w-97 shrink-0 flex flex-col h-[calc(100dvh-48px)]'>
-      <div className='shrink-0 px-4 pt-3 pb-2 border-b border-(--linear-app-shell-border)/60'>
+      <div className='shrink-0 px-4 pt-3 pb-2 border-b border-(--app-shell-border)/60'>
         <p className='text-3xs uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
           {label}
         </p>
@@ -216,7 +216,7 @@ function RailColumn({
           {description}
         </p>
       </div>
-      <div className='flex-1 min-h-0 flex flex-col bg-(--linear-app-content-surface) overflow-hidden'>
+      <div className='flex-1 min-h-0 flex flex-col bg-(--app-shell-content-surface) overflow-hidden'>
         {children}
       </div>
     </div>
@@ -230,7 +230,7 @@ function RailColumn({
 function ArtworkTile({ size = 56 }: { size?: number }) {
   return (
     <div
-      className='shrink-0 rounded-md border border-(--linear-app-shell-border) bg-(--surface-2) overflow-hidden grid place-items-center'
+      className='shrink-0 rounded-md border border-(--app-shell-border) bg-(--surface-2) overflow-hidden grid place-items-center'
       style={{ height: size, width: size }}
     >
       <div
@@ -248,7 +248,7 @@ function ArtworkTile({ size = 56 }: { size?: number }) {
 
 function TypeBadge({ type }: { type: 'Single' | 'EP' | 'Album' }) {
   return (
-    <span className='inline-flex items-center h-4 px-1.5 rounded text-3xs font-medium uppercase tracking-[0.06em] border border-(--linear-app-shell-border) text-tertiary-token bg-(--surface-1)/40'>
+    <span className='inline-flex items-center h-4 px-1.5 rounded text-3xs font-medium uppercase tracking-[0.06em] border border-(--app-shell-border) text-tertiary-token bg-(--surface-1)/40'>
       {type}
     </span>
   );
@@ -267,7 +267,7 @@ function StatusBadge({ status }: { status: typeof release.status }) {
   };
   const c = cfg[status];
   return (
-    <span className='inline-flex items-center gap-1.5 h-5 pl-1.5 pr-2 rounded border border-(--linear-app-shell-border)/70 bg-(--surface-1)/40 text-tertiary-token text-3xs font-caption uppercase tracking-[0.06em]'>
+    <span className='inline-flex items-center gap-1.5 h-5 pl-1.5 pr-2 rounded border border-(--app-shell-border)/70 bg-(--surface-1)/40 text-tertiary-token text-3xs font-caption uppercase tracking-[0.06em]'>
       <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', c.dot)} />
       <span className='text-secondary-token'>{c.label}</span>
     </span>
@@ -276,7 +276,7 @@ function StatusBadge({ status }: { status: typeof release.status }) {
 
 function HeaderCard() {
   return (
-    <section className='shrink-0 px-4 pt-4 pb-3 border-b border-(--linear-app-shell-border)/60'>
+    <section className='shrink-0 px-4 pt-4 pb-3 border-b border-(--app-shell-border)/60'>
       <div className='flex items-stretch gap-3'>
         <ArtworkTile size={64} />
         <div className='flex-1 min-w-0 flex flex-col justify-between py-0.5'>
@@ -304,7 +304,7 @@ function HeaderCard() {
 function ShareUrlRow() {
   const [copied, setCopied] = useState(false);
   return (
-    <div className='mt-3 flex items-center gap-1.5 h-7 pl-2 pr-1 rounded-md border border-(--linear-app-shell-border) bg-(--surface-0)/60 text-2xs text-tertiary-token'>
+    <div className='mt-3 flex items-center gap-1.5 h-7 pl-2 pr-1 rounded-md border border-(--app-shell-border) bg-(--surface-0)/60 text-2xs text-tertiary-token'>
       <LinkIcon
         className='h-3 w-3 text-quaternary-token shrink-0'
         strokeWidth={2.25}
@@ -354,13 +354,13 @@ function ActionRow() {
       </button>
       <button
         type='button'
-        className='inline-flex items-center h-7 px-2.5 rounded-md text-xs text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
+        className='inline-flex items-center h-7 px-2.5 rounded-md text-xs text-secondary-token hover:text-primary-token border border-(--app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
       >
         Open
       </button>
       <button
         type='button'
-        className='ml-auto inline-flex items-center justify-center h-7 w-7 rounded-md text-tertiary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 hover:text-primary-token transition-colors duration-subtle ease-out'
+        className='ml-auto inline-flex items-center justify-center h-7 w-7 rounded-md text-tertiary-token border border-(--app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 hover:text-primary-token transition-colors duration-subtle ease-out'
         aria-label='Pin'
       >
         <Pin className='h-3.5 w-3.5' strokeWidth={2.25} />
@@ -371,7 +371,7 @@ function ActionRow() {
 
 function StatsTriad() {
   return (
-    <div className='grid grid-cols-3 gap-2 rounded-md border border-(--linear-app-shell-border)/60 bg-(--surface-0)/50 px-3 py-2.5'>
+    <div className='grid grid-cols-3 gap-2 rounded-md border border-(--app-shell-border)/60 bg-(--surface-0)/50 px-3 py-2.5'>
       <Stat label='BPM' value={String(release.bpm)} tabular />
       <Stat label='Key' value={release.key} mono />
       <Stat
@@ -594,7 +594,7 @@ function ActivityRow({
   accent?: boolean;
 }) {
   return (
-    <div className='flex items-center gap-2.5 px-2.5 h-9 rounded-md border border-(--linear-app-shell-border)/70 bg-(--surface-0)/40'>
+    <div className='flex items-center gap-2.5 px-2.5 h-9 rounded-md border border-(--app-shell-border)/70 bg-(--surface-0)/40'>
       <Icon
         className={cn(
           'h-3.5 w-3.5 shrink-0',
@@ -614,7 +614,7 @@ function ActivityRow({
 
 function FooterActions() {
   return (
-    <footer className='shrink-0 grid grid-cols-2 gap-1.5 p-3 border-t border-(--linear-app-shell-border)/70 bg-(--surface-0)/50'>
+    <footer className='shrink-0 grid grid-cols-2 gap-1.5 p-3 border-t border-(--app-shell-border)/70 bg-(--surface-0)/50'>
       <FooterBtn icon={LinkIcon}>Smart link</FooterBtn>
       <FooterBtn icon={Copy}>Duplicate</FooterBtn>
       <FooterBtn icon={ExternalLink}>Open page</FooterBtn>
@@ -638,7 +638,7 @@ function FooterBtn({
     <button
       type='button'
       className={cn(
-        'inline-flex items-center justify-center gap-1.5 h-7 rounded-md text-xs border border-(--linear-app-shell-border) bg-(--surface-0) transition-colors duration-subtle ease-out',
+        'inline-flex items-center justify-center gap-1.5 h-7 rounded-md text-xs border border-(--app-shell-border) bg-(--surface-0) transition-colors duration-subtle ease-out',
         danger
           ? 'text-rose-300/85 hover:bg-rose-500/10 hover:text-rose-200'
           : 'text-secondary-token hover:bg-surface-1/60 hover:text-primary-token'
@@ -676,14 +676,14 @@ function RailA() {
     <>
       <HeaderCard />
       <div className='flex-1 min-h-0 overflow-y-auto'>
-        <section className='px-4 py-3 border-b border-(--linear-app-shell-border)/50'>
+        <section className='px-4 py-3 border-b border-(--app-shell-border)/50'>
           <StatsTriad />
         </section>
-        <section className='px-4 py-3 border-b border-(--linear-app-shell-border)/50'>
+        <section className='px-4 py-3 border-b border-(--app-shell-border)/50'>
           <SectionLabel label='Performance' />
           <PerformanceBlock />
         </section>
-        <section className='px-4 py-3 border-b border-(--linear-app-shell-border)/50'>
+        <section className='px-4 py-3 border-b border-(--app-shell-border)/50'>
           <SectionLabel
             label='Distribution'
             trailing={
@@ -694,7 +694,7 @@ function RailA() {
           />
           <DistributionList />
         </section>
-        <section className='px-4 py-3 border-b border-(--linear-app-shell-border)/50'>
+        <section className='px-4 py-3 border-b border-(--app-shell-border)/50'>
           <SectionLabel
             label='Cues'
             trailing={
@@ -732,7 +732,7 @@ function RailB() {
   return (
     <>
       <HeaderCard />
-      <div className='shrink-0 flex items-center gap-0.5 px-2 border-b border-(--linear-app-shell-border)/60'>
+      <div className='shrink-0 flex items-center gap-0.5 px-2 border-b border-(--app-shell-border)/60'>
         {tabs.map(t => {
           const active = tab === t.id;
           return (
@@ -885,7 +885,7 @@ function AccordionRow({
   children: React.ReactNode;
 }) {
   return (
-    <section className='border-b border-(--linear-app-shell-border)/50'>
+    <section className='border-b border-(--app-shell-border)/50'>
       <button
         type='button'
         onClick={onToggle}
@@ -989,8 +989,8 @@ function RailD() {
   return (
     <>
       <HeaderCard />
-      <div className='shrink-0 px-3 py-2 border-b border-(--linear-app-shell-border)/60'>
-        <div className='flex items-center gap-2 h-8 px-2.5 rounded-md border border-(--linear-app-shell-border) bg-(--surface-0)/60 focus-within:border-cyan-400/40 transition-colors duration-subtle ease-out'>
+      <div className='shrink-0 px-3 py-2 border-b border-(--app-shell-border)/60'>
+        <div className='flex items-center gap-2 h-8 px-2.5 rounded-md border border-(--app-shell-border) bg-(--surface-0)/60 focus-within:border-cyan-400/40 transition-colors duration-subtle ease-out'>
           <Search
             className='h-3.5 w-3.5 text-quaternary-token shrink-0'
             strokeWidth={2.25}
@@ -1001,7 +1001,7 @@ function RailD() {
             placeholder='What can I do with this?'
             className='flex-1 min-w-0 bg-transparent border-0 outline-none text-xs text-primary-token placeholder:text-quaternary-token'
           />
-          <kbd className='inline-flex items-center h-4 px-1 rounded text-3xs font-caption uppercase tracking-[0.04em] text-quaternary-token bg-(--surface-2)/60 border border-(--linear-app-shell-border)'>
+          <kbd className='inline-flex items-center h-4 px-1 rounded text-3xs font-caption uppercase tracking-[0.04em] text-quaternary-token bg-(--surface-2)/60 border border-(--app-shell-border)'>
             /
           </kbd>
         </div>
@@ -1025,7 +1025,7 @@ function RailD() {
                   />
                   <span className='flex-1 truncate'>{it.label}</span>
                   {it.shortcut && (
-                    <kbd className='inline-flex items-center h-4 px-1 rounded text-3xs font-caption uppercase tracking-[0.04em] text-quaternary-token bg-(--surface-2)/60 border border-(--linear-app-shell-border)'>
+                    <kbd className='inline-flex items-center h-4 px-1 rounded text-3xs font-caption uppercase tracking-[0.04em] text-quaternary-token bg-(--surface-2)/60 border border-(--app-shell-border)'>
                       {it.shortcut}
                     </kbd>
                   )}
@@ -1090,7 +1090,7 @@ function SplitCard({
 }) {
   const [open, setOpen] = useState(true);
   return (
-    <section className='rounded-lg border border-(--linear-app-shell-border) bg-(--surface-0)/60 overflow-hidden'>
+    <section className='rounded-lg border border-(--app-shell-border) bg-(--surface-0)/60 overflow-hidden'>
       <button
         type='button'
         onClick={() => setOpen(v => !v)}

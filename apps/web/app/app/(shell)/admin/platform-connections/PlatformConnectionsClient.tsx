@@ -230,7 +230,7 @@ function SpotifyTabContent({
   return (
     <ContentSurfaceCard
       surface='settings'
-      className='divide-y divide-(--linear-app-frame-seam) overflow-hidden'
+      className='divide-y divide-(--app-shell-frame-seam) overflow-hidden'
       data-testid='platform-connections-spotify-surface'
     >
       <div className='flex flex-wrap items-start justify-between gap-3 px-4 py-3'>
@@ -419,7 +419,7 @@ function EngineTabContent({
     <>
       <ContentSurfaceCard
         surface='settings'
-        className='divide-y divide-(--linear-app-frame-seam) overflow-hidden'
+        className='divide-y divide-(--app-shell-frame-seam) overflow-hidden'
         data-testid='platform-connections-engine-surface'
       >
         <div className='flex flex-wrap items-center justify-between gap-3 px-4 py-3'>
@@ -466,7 +466,7 @@ function EngineTabContent({
                 setIntervalUnit(event.target.value as IntervalUnit)
               }
               aria-label='Playlist Generation Interval Unit'
-              className='h-8 rounded-md border border-(--linear-app-frame-seam) bg-surface-0 px-2 text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-2'
+              className='h-8 rounded-md border border-(--app-shell-frame-seam) bg-surface-0 px-2 text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-2'
             >
               {INTERVAL_UNITS.map(unit => (
                 <option key={unit} value={unit}>

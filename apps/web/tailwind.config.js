@@ -59,10 +59,10 @@ module.exports = {
         'linear-4': 'var(--linear-space-4)',
         'linear-6': 'var(--linear-space-6)',
         'linear-8': 'var(--linear-space-8)',
-        'app-control-sm': 'var(--linear-app-control-height-sm)',
+        'app-control-sm': 'var(--app-shell-control-height-sm)',
         'button-md': 'var(--linear-button-height-md)',
-        'app-control-x': 'var(--linear-app-control-padding-x)',
-        'app-header': 'var(--linear-app-header-padding-x)',
+        'app-control-x': 'var(--app-shell-control-padding-x)',
+        'app-header': 'var(--app-shell-header-padding-x)',
         'profile-notification-icon': 'var(--profile-notification-icon-size)',
       },
 
@@ -200,9 +200,9 @@ module.exports = {
       // Background colors for semantic states
       backgroundColor: {
         'app-control':
-          'color-mix(in oklab, var(--linear-app-content-surface) 97%, var(--linear-bg-surface-0))',
+          'color-mix(in oklab, var(--app-shell-content-surface) 97%, var(--linear-bg-surface-0))',
         'toolbar-pill':
-          'color-mix(in oklab, var(--linear-app-content-surface) 98%, var(--linear-bg-surface-0))',
+          'color-mix(in oklab, var(--app-shell-content-surface) 98%, var(--linear-bg-surface-0))',
         'success-subtle': 'var(--color-success-subtle)',
         'error-subtle': 'var(--color-error-subtle)',
         'warning-subtle': 'var(--color-warning-subtle)',

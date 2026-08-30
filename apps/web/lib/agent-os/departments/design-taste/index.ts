@@ -108,7 +108,7 @@ const RULES: readonly {
   {
     ruleId: 'elevation',
     severity: 'warning',
-    pattern: /bg-\(--linear-app-content-surface\)/,
+    pattern: /bg-\(--app-shell-content-surface\)/,
     message: 'App-shell canvas on a child often creates invisible cards.',
     remediation: 'Use bg-surface-1 for cards.',
   },

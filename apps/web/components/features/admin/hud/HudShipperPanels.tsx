@@ -71,7 +71,7 @@ function HudStatusPill({
         'inline-flex items-center rounded-full border px-3 py-1 text-2xs font-medium leading-none'
       )}
       style={{
-        borderColor: `color-mix(in oklab, ${accent.solid} 26%, var(--linear-app-frame-seam))`,
+        borderColor: `color-mix(in oklab, ${accent.solid} 26%, var(--app-shell-frame-seam))`,
         backgroundColor: accent.subtle,
         color:
           tone === 'neutral'

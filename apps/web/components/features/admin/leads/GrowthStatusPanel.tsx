@@ -69,11 +69,11 @@ export function GrowthStatusPanel() {
       <ContentSectionHeader
         title='Automation'
         actions={headerActions}
-        className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+        className='min-h-0 px-(--app-shell-header-padding-x) py-3'
         actionsClassName='shrink-0'
       />
 
-      <div className='space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
+      <div className='space-y-4 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)'>
         {settings ? (
           <div className='grid gap-3 md:grid-cols-2 xl:grid-cols-4'>
             <ContentMetricCard

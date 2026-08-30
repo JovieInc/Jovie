@@ -88,20 +88,46 @@
   --ds-marketing-eyebrow-tracking: 0;
   --ds-marketing-eyebrow-color: var(--color-text-tertiary-token);
 
-  /* Shell V1 semantic aliases — app chrome should prefer these names when
-     touching shared shell geometry. They intentionally resolve to the current
-     Linear-derived values so this pass changes the token contract, not visuals. */
-  --app-shell-sidebar-width: var(--linear-app-sidebar-width);
-  --app-shell-header-height: var(--linear-app-header-height);
-  --app-shell-header-height-compact: var(--linear-app-header-height-compact);
+  /* Shell V1 canonical app-shell tokens — app chrome should prefer these
+     names when touching shared shell geometry. Values are centralized here
+     (migrated from linear-tokens.css, JOV-5466). Dark-mode overrides below. */
+  --app-shell-sidebar-width: 224px;
+  --app-shell-header-height: 40px;
+  --app-shell-header-height-compact: 36px;
+  --app-shell-header-padding-x: 12px;
   --app-shell-footer-row-height: calc(var(--space-6) + var(--space-1-5));
-  --app-shell-gap: var(--linear-app-shell-gap);
-  --app-shell-radius: var(--linear-app-shell-radius);
-  --app-shell-border: var(--linear-app-shell-border);
-  --app-shell-frame-seam: var(--linear-app-frame-seam);
-  --app-shell-content-surface: var(--linear-app-content-surface);
-  --app-shell-audio-bar-max-height: var(--linear-app-audio-bar-max-height);
-  --app-shell-audio-compact-height: var(--linear-app-audio-compact-height);
+  --app-shell-gap: 8px;
+  --app-shell-radius: 12px;
+  --app-shell-radius-item: 8px;
+  --app-shell-radius-menu: 8px;
+  --app-shell-border: rgba(0, 0, 0, 0.05);
+  --app-shell-sidebar-seam: rgba(0, 0, 0, 0.05);
+  --app-shell-frame-seam: rgba(0, 0, 0, 0.045);
+  --app-shell-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.03), 0 14px 30px rgba(0, 0, 0, 0.045);
+  --app-shell-sidebar-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.022), 0 14px 28px rgba(0, 0, 0, 0.035);
+  --app-shell-card-shadow: none;
+  --app-shell-drawer-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.03), 0 14px 32px rgba(0, 0, 0, 0.05);
+  --app-shell-content-padding-x: 12px;
+  --app-shell-content-padding-y: 8px;
+  --app-shell-content-surface: var(--linear-bg-surface-0);
+  --app-shell-control-height-sm: 28px;
+  --app-shell-control-padding-x: 11px;
+  --app-shell-control-radius: 9999px;
+  --app-shell-toolbar-gap: 4px;
+  --app-shell-audio-bar-max-height: 120px;
+  --app-shell-audio-compact-height: 64px;
+  --app-shell-sidebar-background: rgb(247 248 248);
+  --app-shell-sidebar-background-rgb: 247 248 248;
+  --app-shell-sidebar-foreground-rgb: 18 18 20;
+  --app-shell-sidebar-border-rgb: 0 0 0 / 0.06;
+  --app-shell-sidebar-accent-rgb: 242 243 245;
+  --app-shell-sidebar-accent-active-rgb: 236 238 241;
+  --app-shell-sidebar-item-foreground-rgb: 88 90 96;
+  --app-shell-sidebar-item-icon-rgb: 122 125 132;
+  --app-shell-sidebar-muted-rgb: 112 116 124;
 
   /* System B semantic aliases for public app surfaces. Keep page-level recipes
      on these names instead of route-local Tailwind literals. */
@@ -158,7 +184,7 @@
   --system-b-chat-activity-icon-size: 0.875rem;
   --system-b-chat-activity-timeline-color: color-mix(
     in oklab,
-    var(--linear-app-shell-border) 70%,
+    var(--app-shell-border) 70%,
     transparent
   );
   --system-b-chat-composer-max-width: 45rem;
@@ -831,7 +857,7 @@ html[data-profile-initial-mode]
   --color-bg-surface-0: #f5f5f5;
   /* Page bg */
   /* prettier-ignore */
-  --color-bg-surface-1: var(--linear-app-content-surface);
+  --color-bg-surface-1: var(--app-shell-content-surface);
   /* App shell canvas in light mode */
   /* prettier-ignore */
   --color-bg-surface-2: #f2f3f5;
@@ -1121,6 +1147,29 @@ html[data-profile-initial-mode]
   --noir-ion-border-strong: rgba(199, 237, 255, 0.26);
   --noir-ion-border-interactive: rgba(17, 175, 255, 0.48);
   --noir-ion-focus-ring: rgba(17, 175, 255, 0.72);
+
+  /* App-shell token dark-mode overrides (migrated from linear-tokens.css,
+     JOV-5466). Only tokens that differ from light mode are listed here. */
+  --app-shell-content-surface: #0a0d16;
+  --app-shell-card-shadow: none;
+  --app-shell-border: rgba(168, 176, 195, 0.12);
+  --app-shell-sidebar-seam: rgba(168, 176, 195, 0.1);
+  --app-shell-frame-seam: rgba(168, 176, 195, 0.1);
+  --app-shell-shadow:
+    0 0 0 1px rgba(168, 176, 195, 0.06), 0 14px 36px rgba(0, 0, 0, 0.22);
+  --app-shell-sidebar-shadow:
+    0 0 0 1px rgba(168, 176, 195, 0.05), 0 12px 28px rgba(0, 0, 0, 0.18);
+  --app-shell-drawer-shadow:
+    0 0 0 1px rgba(168, 176, 195, 0.1), 0 18px 42px rgba(0, 0, 0, 0.32);
+  --app-shell-sidebar-background: rgb(6 8 13);
+  --app-shell-sidebar-background-rgb: 6 8 13;
+  --app-shell-sidebar-foreground-rgb: 245 247 251;
+  --app-shell-sidebar-border-rgb: 168 176 195 / 0.1;
+  --app-shell-sidebar-accent-rgb: 168 176 195 / 0.06;
+  --app-shell-sidebar-accent-active-rgb: 17 175 255 / 0.1;
+  --app-shell-sidebar-item-foreground-rgb: 215 220 232;
+  --app-shell-sidebar-item-icon-rgb: 125 135 157;
+  --app-shell-sidebar-muted-rgb: 125 135 157;
 
   /* Dark mode surfaces — Noir Ion stepped near-black ladder */
   --color-bg-base: var(--noir-ion-canvas);

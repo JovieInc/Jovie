@@ -19,14 +19,14 @@ export function DashboardHeaderActionGroup({
   return (
     <div
       className={cn(
-        'flex min-w-0 items-center gap-(--linear-app-toolbar-gap) overflow-x-auto overflow-y-hidden scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+        'flex min-w-0 items-center gap-(--app-shell-toolbar-gap) overflow-x-auto overflow-y-hidden scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         className
       )}
     >
       {children ? (
         <div
           className={cn(
-            'flex shrink-0 items-center gap-(--linear-app-toolbar-gap)',
+            'flex shrink-0 items-center gap-(--app-shell-toolbar-gap)',
             leadingClassName
           )}
         >
@@ -36,7 +36,7 @@ export function DashboardHeaderActionGroup({
       {trailing ? (
         <div
           className={cn(
-            'ml-auto flex shrink-0 items-center gap-(--linear-app-toolbar-gap)',
+            'ml-auto flex shrink-0 items-center gap-(--app-shell-toolbar-gap)',
             trailingClassName
           )}
         >

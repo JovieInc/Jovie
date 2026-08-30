@@ -717,7 +717,7 @@ function TaskDocumentPanel({
 
             <div
               className={cn(
-                'flex items-center border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_68%,transparent)] pb-2 text-3xs text-secondary-token',
+                'flex items-center border-b border-[color-mix(in_oklab,var(--app-shell-frame-seam)_68%,transparent)] pb-2 text-3xs text-secondary-token',
                 compactMetadata
                   ? 'flex-nowrap gap-1'
                   : 'flex-wrap gap-x-2 gap-y-1'
@@ -1048,7 +1048,7 @@ function MobileTaskScopeTabs({
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-2xs font-semibold transition-[background-color,color] duration-subtle',
                 isActive
-                  ? 'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,transparent)] text-primary-token shadow-[0_0_0_1px_color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)]'
+                  ? 'bg-[color-mix(in_oklab,var(--app-shell-content-surface)_96%,transparent)] text-primary-token shadow-[0_0_0_1px_color-mix(in_oklab,var(--app-shell-border)_72%,transparent)]'
                   : 'text-secondary-token hover:text-primary-token'
               )}
             >
@@ -1091,7 +1091,7 @@ function MobileTaskSection({
         <h2 className='text-2xs font-semibold text-tertiary-token'>{title}</h2>
         <span className='text-3xs text-tertiary-token'>{tasks.length}</span>
       </div>
-      <div className='space-y-1 overflow-hidden rounded-2xl bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,transparent)] p-1 shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-shell-border)_65%,transparent)]'>
+      <div className='space-y-1 overflow-hidden rounded-2xl bg-[color-mix(in_oklab,var(--app-shell-content-surface)_98%,transparent)] p-1 shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--app-shell-border)_65%,transparent)]'>
         {tasks.map(task => (
           <MobileTaskListItem
             key={task.id}
@@ -2425,7 +2425,7 @@ export function TasksPageClient() {
                   'min-h-0 min-w-0',
                   TASK_WORKSPACE_PANE_CLASSNAME,
                   viewMode !== 'board'
-                    ? 'lg:border-r lg:border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]'
+                    ? 'lg:border-r lg:border-[color-mix(in_oklab,var(--app-shell-border)_74%,transparent)]'
                     : !selectedTask && 'lg:col-span-1',
                   showTaskListPane ? 'block' : 'hidden',
                   !selectedTask && 'lg:max-w-none'
@@ -2462,7 +2462,7 @@ export function TasksPageClient() {
                 className={cn(
                   'min-h-0 min-w-0 overflow-hidden',
                   isBoardMode
-                    ? 'lg:border-l lg:border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]'
+                    ? 'lg:border-l lg:border-[color-mix(in_oklab,var(--app-shell-border)_74%,transparent)]'
                     : '',
                   TASK_WORKSPACE_PANE_CLASSNAME,
                   showTaskDocumentPane
