@@ -392,7 +392,7 @@
   /* Shadows — restrained depth on near-black */
   /* Dark-mode card shadows retired (JOV-5465) — use --shadow-card,
      --shadow-card-elevated from design-system.css. */
-  /* --linear-app-* dark overrides retired (JOV-5466) — canonical
+  /* App-shell dark overrides retired (JOV-5466) — canonical
      --app-shell-* values live in design-system.css :root.dark. */
   --linear-row-hover: rgba(168, 176, 195, 0.06);
   --linear-row-selected: rgba(17, 175, 255, 0.1);

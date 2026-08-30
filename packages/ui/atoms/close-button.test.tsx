@@ -121,7 +121,7 @@ describe('closeButtonClassName', () => {
     expect(closeButtonClassName).toContain('rounded-full');
     expect(closeButtonClassName).toContain('size-12');
     expect(closeButtonClassName).not.toContain(
-      'rounded-(--linear-app-radius-item)'
+      'rounded-(--app-shell-radius-item)'
     );
   });
 });

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { LabelPill, LabelPills } from './LabelPills';
@@ -32,5 +34,12 @@ describe('LabelPills', () => {
     expect(screen.getByText('a')).toBeInTheDocument();
     expect(screen.getByText('b')).toBeInTheDocument();
     expect(screen.getByText('c')).toBeInTheDocument();
+  });
+});
+
+describe('JOV-5466 token retire', () => {
+  it('does not keep retired --linear-app-* tokens', () => {
+    const source = readFileSync(resolve(__dirname, './LabelPills.tsx'), 'utf8');
+    expect(source).not.toMatch(/--linear-app-/);
   });
 });

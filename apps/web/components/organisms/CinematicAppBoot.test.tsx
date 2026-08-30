@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CinematicAppBoot } from './CinematicAppBoot';
@@ -108,5 +110,15 @@ describe('CinematicAppBoot', () => {
 
     expect(queryByTestId('cinematic-app-boot')).not.toBeNull();
     expect(globalThis.sessionStorage.getItem(STORAGE_KEY)).toBe('1');
+  });
+});
+
+describe('JOV-5466 token retire', () => {
+  it('does not keep retired --linear-app-* tokens', () => {
+    const source = readFileSync(
+      resolve(__dirname, './CinematicAppBoot.tsx'),
+      'utf8'
+    );
+    expect(source).not.toMatch(/--linear-app-/);
   });
 });

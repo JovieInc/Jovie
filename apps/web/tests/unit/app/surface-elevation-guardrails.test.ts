@@ -413,8 +413,8 @@ describe('surface elevation guardrails', () => {
       join(ROOT, 'components/molecules/drawer/RightDrawer.tsx'),
       'utf-8'
     );
-    const linearTokens = readFileSync(
-      join(ROOT, 'styles/linear-tokens.css'),
+    const designSystem = readFileSync(
+      join(ROOT, 'styles/design-system.css'),
       'utf-8'
     );
     const adminTableShell = readFileSync(

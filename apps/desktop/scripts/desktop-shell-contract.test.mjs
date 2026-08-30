@@ -732,7 +732,7 @@ test('hosted web app has an early Electron runtime marker before first paint', a
   assert.match(globalsCss, /--electron-traffic-light-y: 17px;/);
   assert.match(
     globalsCss,
-    /--electron-sidebar-width: var\(--linear-app-sidebar-width\);/
+    /--electron-sidebar-width: var\(--app-shell-sidebar-width\);/
   );
   assert.match(globalsCss, /--electron-sidebar-collapsed-width: 52px;/);
   assert.match(
