@@ -60,6 +60,35 @@ def evidence(checks: list[dict[str, object]]) -> dict[str, object]:
     }
 
 
+def promotion_candidate(number: int) -> dict[str, object]:
+    return {
+        "number": number,
+        "headRefOid": f"{number:040x}",
+        "baseRefName": "main",
+        "isDraft": False,
+        "isCrossRepository": False,
+        "mergeStateStatus": "CLEAN",
+        "updatedAt": "2026-08-30T16:00:00Z",
+        "author": {"login": "summer-test"},
+        "labels": {"totalCount": 0, "nodes": []},
+        "mergeQueueEntry": None,
+    }
+
+
+def promotion_state(candidate: dict[str, object]) -> dict[str, object]:
+    commit = named_commit()
+    commit["oid"] = candidate["headRefOid"]
+    return {
+        **candidate,
+        "state": "OPEN",
+        "headOid": candidate["headRefOid"],
+        "checkEvidenceStatus": "complete",
+        "requiredChecks": MODULE._normalize_named_required_checks(
+            commit, MODULE.EXPECTED_REQUIRED_CHECKS
+        ),
+    }
+
+
 class ClosurePromotionEvidenceTests(unittest.TestCase):
     def test_required_contract_matches_checked_in_ruleset(self):
         ruleset = (ROOT / ".github/rulesets/branch-protection.yml").read_text(
@@ -302,6 +331,76 @@ class ClosurePromotionEvidenceTests(unittest.TestCase):
         )
 
         self.assertEqual(observed["status"], "malformed")
+
+    def test_observer_revalidates_exact_checks_and_comparison(self):
+        candidate = promotion_candidate(31)
+        state = promotion_state(candidate)
+        readback = {"baseOid": "a" * 40, "prs": {31: state}}
+        comparison = {
+            "status": "complete",
+            "headOid": candidate["headRefOid"],
+            "baseOid": "a" * 40,
+            "comparisonStatus": "ahead",
+            "aheadBy": 1,
+            "behindBy": 0,
+        }
+        with mock.patch.object(
+            MODULE,
+            "_observe_live_required_checks",
+            return_value=MODULE.EXPECTED_REQUIRED_CHECKS,
+        ), mock.patch.object(
+            MODULE, "_readback_promotion_state", return_value=readback
+        ), mock.patch.object(
+            MODULE, "_observe_one_comparison", return_value=comparison
+        ) as compare:
+            observed = MODULE.observe_promotion_evidence(
+                "JovieInc/Jovie", [candidate], "a" * 40
+            )[0]
+
+        self.assertEqual(observed["promotionEvidence"]["status"], "complete")
+        self.assertEqual(observed["promotionEvidence"]["behindBy"], 0)
+        self.assertEqual(compare.call_count, 1)
+
+    def test_final_atomic_state_overrides_checks_and_lifecycle(self):
+        candidate = promotion_candidate(32)
+        initial = promotion_state(candidate)
+        final = json.loads(json.dumps(initial))
+        final["isDraft"] = True
+        final["labels"] = {"totalCount": 1, "nodes": [{"name": "needs-human"}]}
+        check = next(
+            item
+            for item in final["requiredChecks"]
+            if item["sources"][0]["kind"] == "check-run"
+        )
+        check["sources"][0]["status"] = "IN_PROGRESS"
+        check["sources"][0]["conclusion"] = None
+        with mock.patch.object(
+            MODULE,
+            "_observe_live_required_checks",
+            return_value=MODULE.EXPECTED_REQUIRED_CHECKS,
+        ), mock.patch.object(
+            MODULE,
+            "_readback_promotion_state",
+            side_effect=[
+                {"baseOid": "a" * 40, "prs": {32: initial}},
+                {"baseOid": "a" * 40, "prs": {32: final}},
+            ],
+        ), mock.patch.object(
+            MODULE,
+            "_observe_one_comparison",
+            return_value={
+                "status": "complete",
+                "headOid": candidate["headRefOid"],
+                "baseOid": "a" * 40,
+                "behindBy": 0,
+            },
+        ):
+            observed = MODULE.observe_promotion_evidence(
+                "JovieInc/Jovie", [candidate], "a" * 40
+            )[0]
+
+        self.assertTrue(observed["isDraft"])
+        self.assertFalse(MODULE._required_checks_green(observed["promotionEvidence"]))
 
 
 if __name__ == "__main__":

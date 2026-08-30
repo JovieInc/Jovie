@@ -1045,6 +1045,227 @@ def _native_stack_components(
     return {number: find(number) for number in numbers}
 
 
+
+def observe_promotion_evidence(
+    repo: str,
+    prs: list[dict[str, Any]],
+    current_base_oid: str,
+    deadline: float | None = None,
+    *,
+    run_impl: Any = subprocess.run,
+) -> list[dict[str, Any]]:
+    """Attach exact-head, live-policy evidence to every checkable candidate."""
+    observation_deadline = deadline or time.monotonic() + CLOSURE_OBSERVATION_SECONDS
+    observed: list[dict[str, Any]] = []
+    candidates: list[dict[str, Any]] = []
+    for pr in prs:
+        enriched = dict(pr)
+        if enriched.get("baseRefName") == "main":
+            enriched["currentBaseOid"] = current_base_oid
+        if _needs_promotion_evidence(enriched):
+            candidates.append(enriched)
+        observed.append(enriched)
+    if not candidates:
+        return observed
+    try:
+        live_required = _observe_live_required_checks(
+            repo, observation_deadline, run_impl=run_impl
+        )
+    except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError):
+        live_required = None
+    if live_required != EXPECTED_REQUIRED_CHECKS:
+        status = "policy-drift" if isinstance(live_required, frozenset) else "policy-error"
+        for candidate in candidates:
+            candidate["promotionEvidence"] = {
+                "status": status,
+                "headOid": candidate.get("headRefOid"),
+                "baseOid": current_base_oid,
+                "requiredCheckNames": sorted(live_required or []),
+            }
+        return observed
+    try:
+        readback = _readback_promotion_state(
+            repo,
+            candidates,
+            live_required,
+            observation_deadline,
+            run_impl=run_impl,
+        )
+    except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError):
+        readback = None
+    comparison_candidates: list[dict[str, Any]] = []
+    for candidate in candidates:
+        number = int(candidate["number"])
+        current = readback.get("prs", {}).get(number) if isinstance(readback, dict) else None
+        if (
+            not isinstance(readback, dict)
+            or readback.get("baseOid") != current_base_oid
+            or not isinstance(current, dict)
+            or current.get("headOid") != candidate.get("headRefOid")
+            or current.get("baseRefName") != "main"
+        ):
+            candidate["promotionEvidence"] = {
+                "status": "stale" if isinstance(readback, dict) else "error",
+                "headOid": candidate.get("headRefOid"),
+                "baseOid": current_base_oid,
+            }
+            continue
+        check_evidence_status = current.get("checkEvidenceStatus")
+        if check_evidence_status != "complete":
+            candidate["promotionEvidence"] = {
+                "status": (
+                    check_evidence_status
+                    if isinstance(check_evidence_status, str)
+                    and check_evidence_status
+                    else "malformed"
+                ),
+                "headOid": candidate.get("headRefOid"),
+                "baseOid": current_base_oid,
+            }
+            continue
+        candidate["promotionEvidence"] = {
+            "status": "complete",
+            "headOid": candidate.get("headRefOid"),
+            "baseOid": current_base_oid,
+            "requiredCheckNames": sorted(live_required),
+            "requiredChecks": current["requiredChecks"],
+        }
+        if _required_checks_green(candidate["promotionEvidence"]):
+            comparison_candidates.append(candidate)
+    comparison_candidates.sort(key=lambda item: int(item["number"]))
+    workers = min(PROMOTION_EVIDENCE_WORKERS, len(comparison_candidates))
+    if workers:
+        executor = ThreadPoolExecutor(max_workers=workers)
+        futures: dict[Future[dict[str, Any]], dict[str, Any]] = {}
+        completed: set[Future[dict[str, Any]]] = set()
+        pending: set[Future[dict[str, Any]]] = set()
+        try:
+            for candidate in comparison_candidates:
+                future = executor.submit(
+                    _observe_one_comparison,
+                    repo,
+                    candidate,
+                    current_base_oid,
+                    observation_deadline,
+                    run_impl=run_impl,
+                )
+                futures[future] = candidate
+            completed, pending = wait(
+                futures,
+                timeout=_remaining_timeout(
+                    observation_deadline, PROMOTION_EVIDENCE_PHASE_SECONDS
+                ),
+            )
+            for future in completed:
+                candidate = futures[future]
+                try:
+                    comparison = future.result()
+                except Exception:  # fail closed if a bounded evidence worker crashes
+                    comparison = {
+                        "status": "error",
+                        "headOid": candidate.get("headRefOid"),
+                        "baseOid": current_base_oid,
+                    }
+                evidence = candidate["promotionEvidence"]
+                if comparison.get("status") == "complete":
+                    evidence.update(
+                        {
+                            key: value
+                            for key, value in comparison.items()
+                            if key not in {"requiredCheckNames", "requiredChecks"}
+                        }
+                    )
+                else:
+                    candidate["promotionEvidence"] = comparison
+            for future in pending:
+                candidate = futures[future]
+                candidate["promotionEvidence"] = {
+                    "status": "deadline-exceeded",
+                    "headOid": candidate.get("headRefOid"),
+                    "baseOid": current_base_oid,
+                }
+                future.cancel()
+        except Exception:
+            for future, candidate in futures.items():
+                if future not in completed:
+                    candidate["promotionEvidence"] = {
+                        "status": "error",
+                        "headOid": candidate.get("headRefOid"),
+                        "baseOid": current_base_oid,
+                    }
+                    future.cancel()
+        finally:
+            # Comparison workers return values only, so ignored late results
+            # cannot overwrite the deadline disposition.
+            executor.shutdown(wait=False, cancel_futures=True)
+    try:
+        final_required = _observe_live_required_checks(
+            repo, observation_deadline, run_impl=run_impl
+        )
+        if final_required != live_required:
+            raise ValueError("GitHub required-check policy changed during observation")
+        final_readback = _readback_promotion_state(
+            repo,
+            candidates,
+            final_required,
+            observation_deadline,
+            run_impl=run_impl,
+        )
+    except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError):
+        final_readback = None
+    for candidate in candidates:
+        number = int(candidate["number"])
+        final = (
+            final_readback.get("prs", {}).get(number)
+            if isinstance(final_readback, dict)
+            else None
+        )
+        if isinstance(final, dict):
+            for key in (
+                "author",
+                "baseRefName",
+                "isCrossRepository",
+                "isDraft",
+                "labels",
+                "mergeQueueEntry",
+                "mergeStateStatus",
+                "updatedAt",
+            ):
+                candidate[key] = final.get(key)
+            if final.get("state") in {"CLOSED", "MERGED"}:
+                candidate["observedTerminalState"] = final["state"]
+                continue
+        if (
+            not isinstance(final_readback, dict)
+            or final_readback.get("baseOid") != current_base_oid
+            or not isinstance(final, dict)
+            or final.get("headOid") != candidate.get("headRefOid")
+            or final.get("baseRefName") != "main"
+            or final.get("state") != "OPEN"
+        ):
+            candidate["promotionEvidence"] = {
+                "status": "stale" if isinstance(final_readback, dict) else "error",
+                "headOid": candidate.get("headRefOid"),
+                "baseOid": current_base_oid,
+            }
+            continue
+        final_check_status = final.get("checkEvidenceStatus")
+        if final_check_status != "complete":
+            candidate["promotionEvidence"] = {
+                "status": (
+                    final_check_status
+                    if isinstance(final_check_status, str) and final_check_status
+                    else "malformed"
+                ),
+                "headOid": candidate.get("headRefOid"),
+                "baseOid": current_base_oid,
+            }
+            continue
+        evidence = candidate.get("promotionEvidence")
+        if isinstance(evidence, dict) and evidence.get("status") == "complete":
+            evidence["requiredCheckNames"] = sorted(final_required)
+            evidence["requiredChecks"] = final["requiredChecks"]
+    return [pr for pr in observed if "observedTerminalState" not in pr]
 def _duplicate_active_lanes(
     dispositions: list[dict[str, Any]],
     evidence_by_number: dict[int, dict[str, Any]],

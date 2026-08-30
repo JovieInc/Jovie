@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import pathlib
+import re
 import unittest
 from datetime import datetime, timedelta, timezone
 from unittest import mock
@@ -19,6 +21,107 @@ SPEC.loader.exec_module(MODULE)
 
 UTC = timezone.utc
 NOW = datetime(2026, 8, 28, 5, 0, tzinfo=UTC)
+DEFAULT_PROMOTION_EVIDENCE = object()
+
+
+def exact_green_promotion_evidence(number: int) -> dict[str, object]:
+    return {
+        "status": "complete",
+        "headOid": f"{number:040x}",
+        "baseOid": "a" * 40,
+        "comparisonStatus": "ahead",
+        "aheadBy": 1,
+        "behindBy": 0,
+        "requiredCheckNames": sorted(MODULE.EXPECTED_REQUIRED_CHECKS),
+        "requiredChecks": [
+            {
+                "name": name,
+                "kind": "required-check",
+                "sources": [
+                    (
+                        {
+                            "producer": "legacy-status",
+                            "name": name,
+                            "kind": "status-context",
+                            "state": "SUCCESS",
+                        }
+                        if name == "Fork PR Gate"
+                        else {
+                            "producer": "check-app:ci",
+                            "name": name,
+                            "kind": "check-run",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS",
+                        }
+                    )
+                ],
+            }
+            for name in sorted(MODULE.EXPECTED_REQUIRED_CHECKS)
+        ],
+    }
+
+
+def live_required_ruleset() -> list[dict[str, object]]:
+    return [
+        {
+            "type": "required_status_checks",
+            "ruleset_id": 10512119,
+            "parameters": {
+                "required_status_checks": [
+                    {"context": name}
+                    for name in sorted(MODULE.EXPECTED_REQUIRED_CHECKS)
+                ]
+            },
+        }
+    ]
+
+
+def exact_named_check_commit(
+    number: int, *, check_status: str = "COMPLETED", check_conclusion: str | None = "SUCCESS"
+) -> dict[str, object]:
+    status: dict[str, object] = {}
+    suite: dict[str, object] = {"app": {"id": "ci", "slug": "github-actions"}}
+    commit: dict[str, object] = {
+        "oid": f"{number:040x}",
+        "status": status,
+        "requiredSuites": {"totalCount": 1, "nodes": [suite]},
+    }
+    for index, name in enumerate(sorted(MODULE.EXPECTED_REQUIRED_CHECKS)):
+        suite[f"runs_{index}"] = {"totalCount": 0, "nodes": []}
+        if name == "Fork PR Gate":
+            status[f"legacy_{index}"] = {
+                "context": name,
+                "state": "SUCCESS",
+                "createdAt": "2026-08-30T16:00:00Z",
+            }
+            continue
+        suite[f"runs_{index}"] = {
+            "totalCount": 1,
+            "nodes": [
+                {
+                    "databaseId": 100 + index,
+                    "name": name,
+                    "status": check_status,
+                    "conclusion": check_conclusion,
+                }
+            ],
+        }
+    return commit
+
+
+def promotion_pr_state(number: int, *, head_oid: str | None = None) -> dict[str, object]:
+    return {
+        "state": "OPEN",
+        "headRefOid": head_oid or f"{number:040x}",
+        "baseRefName": "main",
+        "isDraft": False,
+        "isCrossRepository": False,
+        "mergeStateStatus": "CLEAN",
+        "updatedAt": NOW.isoformat(),
+        "author": {"login": "summer-test"},
+        "labels": {"totalCount": 0, "nodes": []},
+        "mergeQueueEntry": None,
+    }
 
 
 def pr(
@@ -42,6 +145,7 @@ def pr(
     head_ref: str | None = None,
     head_oid: str | None = None,
     created_at: datetime | None = None,
+    promotion_evidence: object = DEFAULT_PROMOTION_EVIDENCE,
 ) -> dict[str, object]:
     exact_head = head_oid or f"{number if isinstance(number, int) else 0:040x}"[-40:]
     payload: dict[str, object] = {
@@ -51,13 +155,18 @@ def pr(
         "baseRefName": base_ref,
         "headRefName": head_ref or f"symphony/test-pr-{number}",
         "headRefOid": exact_head,
+        "baseRefOid": "a" * 40,
+        "currentBaseOid": "a" * 40 if base_ref == "main" else None,
         "isDraft": draft,
         "isCrossRepository": cross_repository,
         "mergeStateStatus": merge_state,
         "createdAt": (created_at or updated_at - timedelta(hours=1)).isoformat(),
         "updatedAt": updated_at.isoformat(),
         "author": {"login": author},
-        "labels": {"nodes": [{"name": label} for label in labels]},
+        "labels": {
+            "totalCount": len(labels),
+            "nodes": [{"name": label} for label in labels],
+        },
         "mergeQueueEntry": (
             {
                 "position": 1,
@@ -68,6 +177,10 @@ def pr(
             else None
         ),
     }
+    if promotion_evidence is DEFAULT_PROMOTION_EVIDENCE:
+        payload["promotionEvidence"] = exact_green_promotion_evidence(number)
+    elif promotion_evidence is not None:
+        payload["promotionEvidence"] = promotion_evidence
     if files_payload is not None:
         payload["files"] = files_payload
         if changed_files is not None:
