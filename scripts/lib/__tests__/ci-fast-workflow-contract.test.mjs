@@ -1,5 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -101,6 +107,63 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(typecheck).toMatch(
       /name: Validate CI\/release incident prevention contract[\s\S]*?run: node scripts\/ci-release-incident-contract\.mjs/
     );
+  });
+
+  it('fails red when hydration is skipped but the exact diff requires typecheck', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'ci-fast-selector-mismatch-'));
+    const outPath = join(repo, 'ci-fast-lanes.json');
+    const runGit = args =>
+      spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+    try {
+      expect(runGit(['init', '--initial-branch=main']).status).toBe(0);
+      expect(
+        runGit(['config', 'user.email', 'ci-contract@jov.ie']).status
+      ).toBe(0);
+      expect(runGit(['config', 'user.name', 'CI Contract']).status).toBe(0);
+      mkdirSync(join(repo, 'apps/web'), { recursive: true });
+      writeFileSync(
+        join(repo, 'apps/web/package.json'),
+        '{"name":"@jovie/web","scripts":{"typecheck":"tsc"}}\n'
+      );
+      expect(runGit(['add', '.']).status).toBe(0);
+      expect(runGit(['commit', '-m', 'base']).status).toBe(0);
+      const baseSha = runGit(['rev-parse', 'HEAD']).stdout.trim();
+      writeFileSync(
+        join(repo, 'apps/web/package.json'),
+        '{"name":"@jovie/web","scripts":{"typecheck":"tsc -b"}}\n'
+      );
+      expect(runGit(['add', '.']).status).toBe(0);
+      expect(runGit(['commit', '-m', 'change typecheck graph']).status).toBe(0);
+
+      const result = spawnSync(
+        process.execPath,
+        [resolve(REPO_ROOT, 'scripts/ci-fast-lanes.mjs')],
+        {
+          cwd: repo,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            CI_FAST_LANE_GROUP: 'typecheck',
+            CI_FAST_LANES_OUT: outPath,
+            GITHUB_EVENT_NAME: 'pull_request',
+            GITHUB_BASE_REF: 'main',
+            TURBO_SCM_BASE: baseSha,
+            // Model a false-negative preselector: setup was skipped, so pnpm
+            // is intentionally unavailable. The lane must execute and fail.
+            PATH: '/usr/bin:/bin',
+          },
+        }
+      );
+
+      expect(result.status).not.toBe(0);
+      const payload = JSON.parse(readFileSync(outPath, 'utf8'));
+      expect(payload.lanes).toEqual([
+        expect.objectContaining({ id: 'typecheck', status: 'failure' }),
+      ]);
+      expect(payload.lanes[0].logExcerpt).toMatch(/pnpm.*not found/i);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 
   it('does not restore or save an unused local Turbo cache in either fast job', () => {
