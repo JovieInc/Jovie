@@ -3,7 +3,11 @@ import {
   buildHomepageMarkdown,
   buildNotFoundMarkdown,
 } from '@/lib/agent/homepage-markdown';
-import { isNextRscRequest, negotiateAccept } from '@/lib/http/accept-header';
+import {
+  HOMEPAGE_HTML_ALTERNATE_LINK,
+  isNextRscRequest,
+  negotiateAccept,
+} from '@/lib/http/accept-header';
 import {
   getPublicProfileCandidate,
   isDedicatedRootSegment,
@@ -63,15 +67,18 @@ function markdownResponse(
   body: string,
   status: number,
   cacheControl: string,
-  method: string
+  method: string,
+  link?: string
 ): NextResponse {
+  const headers: Record<string, string> = {
+    'Content-Type': MARKDOWN_CONTENT_TYPE,
+    Vary: 'Accept',
+    'Cache-Control': cacheControl,
+  };
+  if (link) headers.Link = link;
   return new NextResponse(method === 'HEAD' ? null : body, {
     status,
-    headers: {
-      'Content-Type': MARKDOWN_CONTENT_TYPE,
-      Vary: 'Accept',
-      'Cache-Control': cacheControl,
-    },
+    headers,
   });
 }
 
@@ -113,7 +120,8 @@ export function negotiateAgentMarkdown(req: NextRequest): NextResponse | null {
       buildHomepageMarkdown(),
       200,
       'public, max-age=3600',
-      method
+      method,
+      HOMEPAGE_HTML_ALTERNATE_LINK
     );
   }
 

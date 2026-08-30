@@ -119,6 +119,9 @@ export async function generateMetadata(): Promise<Metadata> {
       languages: {
         'en-US': '/',
       },
+      types: {
+        'text/markdown': '/',
+      },
     },
     openGraph: {
       type: 'website',
