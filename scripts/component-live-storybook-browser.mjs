@@ -256,14 +256,32 @@ async function measureStory(page, story, viewport, axePath) {
       // ignore
     }
   });
+  const pageErrors = [];
+  const onPageError = error => {
+    pageErrors.push(error instanceof Error ? error.message : String(error));
+  };
+  page.on('pageerror', onPageError);
   await page.goto(`/iframe.html?id=${story.id}&viewMode=story`, {
     waitUntil: 'domcontentloaded',
     timeout: 60_000,
   });
   const selector = ownerSelector(story.owner);
-  await page.waitForSelector(`#storybook-root ${selector}, ${selector}`, {
-    timeout: 30_000,
-  });
+  const rootLocator = page.locator('#storybook-root, #root').first();
+  const ownerLocator = rootLocator.locator(selector).first();
+  try {
+    await rootLocator.waitFor({ timeout: 15_000, state: 'attached' });
+    await ownerLocator.waitFor({ timeout: 15_000, state: 'attached' });
+  } catch (error) {
+    const body = await page
+      .locator('body')
+      .innerText()
+      .catch(() => '');
+    failCollect(
+      `${story.id}@${viewport.id}: story did not render (${error instanceof Error ? error.message : error}). pageErrors=${pageErrors.join(' | ') || 'none'} url=${page.url()} body=${body.slice(0, 1500)}`
+    );
+  } finally {
+    page.off('pageerror', onPageError);
+  }
   await page.addScriptTag({ path: axePath });
 
   const snapshot = await page.evaluate(
@@ -298,10 +316,25 @@ async function measureStory(page, story, viewport, axePath) {
         }
         return getComputedStyle(document.body).backgroundColor;
       };
-      const overflowOf = node => ({
-        x: node.scrollWidth > node.clientWidth + 1,
-        y: node.scrollHeight > node.clientHeight + 1,
-      });
+      const storyFrameOverflow = () => {
+        const { innerWidth, innerHeight } = /** @type {any} */ (globalThis);
+        const scrolling = document.scrollingElement || document.documentElement;
+        const body = document.body;
+        const width = Math.max(
+          scrolling.scrollWidth,
+          body.scrollWidth,
+          document.documentElement.scrollWidth
+        );
+        const height = Math.max(
+          scrolling.scrollHeight,
+          body.scrollHeight,
+          document.documentElement.scrollHeight
+        );
+        return {
+          x: width > innerWidth + 1,
+          y: height > innerHeight + 1,
+        };
+      };
       const cssLengthToPx = value => {
         const raw = String(value || '').trim();
         if (!raw) return null;
@@ -355,7 +388,7 @@ async function measureStory(page, story, viewport, axePath) {
           style.getPropertyValue('--system-b-radius-card-inner')
         ),
         insetPx: cssLengthToPx(style.getPropertyValue('--space-1')),
-        overflow: overflowOf(el),
+        overflow: storyFrameOverflow(),
         box: { width: box.width, height: box.height },
         theme: htmlTheme,
         matchesOwner,
@@ -373,9 +406,8 @@ async function measureStory(page, story, viewport, axePath) {
   const before = snapshot.box;
   let hoverShiftPx = { width: 0, height: 0 };
   try {
-    const locator = page.locator(`#storybook-root ${selector}`).first();
-    await locator.hover({ timeout: 5_000 });
-    const after = await locator.boundingBox();
+    await ownerLocator.hover({ timeout: 5_000 });
+    const after = await ownerLocator.boundingBox();
     if (after) {
       hoverShiftPx = {
         width: after.width - before.width,
@@ -407,26 +439,31 @@ async function measureStory(page, story, viewport, axePath) {
     }
   }
 
-  await page.evaluate(() => {
-    const { document } = /** @type {any} */ (globalThis);
-    document.documentElement.style.zoom = '2';
-  });
-  const zoomOverflow = await page.evaluate(ownerSel => {
-    const { document } = /** @type {any} */ (globalThis);
-    const root =
-      document.getElementById('storybook-root') ||
-      document.getElementById('root') ||
-      document.body;
-    const el = root.querySelector(ownerSel) || root.firstElementChild;
-    if (!el) return { x: true, y: true };
-    return {
-      x: el.scrollWidth > el.clientWidth + 1,
-      y: el.scrollHeight > el.clientHeight + 1,
+  const zoomOverflow = await page.evaluate(() => {
+    const { document, innerWidth, innerHeight, getComputedStyle } =
+      /** @type {any} */ (globalThis);
+    const html = document.documentElement;
+    const prev = html.style.fontSize;
+    const computed = getComputedStyle(html).fontSize;
+    html.style.fontSize = `calc(${computed} * 2)`;
+    const scrolling = document.scrollingElement || html;
+    const body = document.body;
+    const width = Math.max(
+      scrolling.scrollWidth,
+      body.scrollWidth,
+      html.scrollWidth
+    );
+    const height = Math.max(
+      scrolling.scrollHeight,
+      body.scrollHeight,
+      html.scrollHeight
+    );
+    const result = {
+      x: width > innerWidth + 1,
+      y: height > innerHeight + 1,
     };
-  }, selector);
-  await page.evaluate(() => {
-    const { document } = /** @type {any} */ (globalThis);
-    document.documentElement.style.zoom = '';
+    html.style.fontSize = prev;
+    return result;
   });
 
   const axe = await page.evaluate(async () => {

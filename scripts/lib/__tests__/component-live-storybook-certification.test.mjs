@@ -2,11 +2,12 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   CANONICAL_LIVE_STORIES,
@@ -225,6 +226,19 @@ describe('live Storybook component certification', () => {
       live.sections.liveStorybookCertification.receipt.liveVisualCertification
         .status
     ).toBe('certified');
+  });
+
+  it('maps compiled react-dom/client before the generic react-dom Storybook alias', () => {
+    const source = readFileSync(
+      resolve(import.meta.dirname, '../../../apps/web/.storybook/main.ts'),
+      'utf8'
+    );
+    const clientBare = source.indexOf("bare = 'react-dom/client'");
+    const genericBare = source.indexOf("bare = 'react-dom';");
+    expect(clientBare).toBeGreaterThan(-1);
+    expect(genericBare).toBeGreaterThan(clientBare);
+    expect(source).toContain('jovie-storybook-react-dom-client-interop');
+    expect(source).toContain('jovie-react-dom-client');
   });
 });
 
