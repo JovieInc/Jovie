@@ -3,8 +3,10 @@ import { GET as getCanonical } from '@/app/api/v1/openapi.json/route';
 import { GET as getDiscovery } from '@/app/openapi.json/route';
 import { PUBLIC_ARTIST_API_POLICY_LINK } from '@/lib/api/v1/contract';
 import {
+  API_VERSIONING_POLICY,
   ARTIST_OPENAPI_CACHE_CONTROL,
   ARTIST_OPENAPI_DOCUMENT,
+  type ArtistOpenApiDocument,
 } from '@/lib/api/v1/openapi';
 
 async function readOpenApiResponse(response: Response) {
@@ -21,6 +23,39 @@ async function readOpenApiResponse(response: Response) {
 
 function collectOperations(document: typeof ARTIST_OPENAPI_DOCUMENT) {
   return Object.values(document.paths).map(pathItem => pathItem.get);
+}
+
+type ArtistOperation = ArtistOpenApiDocument['paths'][string]['get'];
+
+function resolvesToObjectSchema(
+  document: ArtistOpenApiDocument,
+  schema: { readonly $ref?: string; readonly type?: string }
+) {
+  if (schema.type === 'object') return true;
+
+  const schemaName = schema.$ref?.split('/').at(-1);
+  return schemaName
+    ? document.components.schemas[schemaName]?.type === 'object'
+    : false;
+}
+
+function isFunctionCallable(
+  document: ArtistOpenApiDocument,
+  operation: ArtistOperation
+) {
+  const hasTypedRequest = operation.parameters?.some(parameter =>
+    Boolean(parameter.schema.type || parameter.schema.$ref)
+  );
+  const successSchema =
+    operation.responses['200']?.content['application/json']?.schema;
+
+  return Boolean(
+    operation.operationId &&
+      (operation.description || operation.summary) &&
+      hasTypedRequest &&
+      successSchema &&
+      resolvesToObjectSchema(document, successSchema)
+  );
 }
 
 describe('public artist OpenAPI contract', () => {
@@ -48,6 +83,67 @@ describe('public artist OpenAPI contract', () => {
     expect(pathItems.length).toBeGreaterThan(0);
     for (const pathItem of pathItems) {
       expect(Object.keys(pathItem)).toEqual(['get']);
+    }
+  });
+
+  it('gives every function-callable operation a typed input and object output', () => {
+    const operations = collectOperations(ARTIST_OPENAPI_DOCUMENT);
+
+    expect(
+      operations.every(operation =>
+        isFunctionCallable(ARTIST_OPENAPI_DOCUMENT, operation)
+      )
+    ).toBe(true);
+    expect(ARTIST_OPENAPI_DOCUMENT.paths['/api/v1'].get.parameters).toEqual([
+      expect.objectContaining({
+        name: 'Accept',
+        in: 'header',
+        required: false,
+        schema: { type: 'string', enum: ['application/json'] },
+      }),
+    ]);
+  });
+
+  it('deliberately rejects a function operation with no typed request input', () => {
+    const indexOperation = ARTIST_OPENAPI_DOCUMENT.paths['/api/v1'].get;
+    const missingInputOperation: ArtistOperation = {
+      ...indexOperation,
+      parameters: [],
+    };
+
+    expect(
+      isFunctionCallable(ARTIST_OPENAPI_DOCUMENT, missingInputOperation)
+    ).toBe(false);
+  });
+
+  it('publishes a machine-readable version policy without deprecating active v1', () => {
+    expect(ARTIST_OPENAPI_DOCUMENT['x-jovie-versioning']).toEqual(
+      API_VERSIONING_POLICY
+    );
+    expect(API_VERSIONING_POLICY).toMatchObject({
+      strategy: 'url',
+      activeVersion: 'v1',
+      additiveChanges: 'remain-within-active-version',
+      breakingChanges: 'publish-a-new-url-version',
+      lifecycle: {
+        deprecation: {
+          header: 'Deprecation',
+          standard: 'RFC 9745',
+          active: false,
+        },
+        sunset: {
+          header: 'Sunset',
+          standard: 'RFC 8594',
+          active: false,
+        },
+      },
+    });
+
+    for (const operation of collectOperations(ARTIST_OPENAPI_DOCUMENT)) {
+      for (const response of Object.values(operation.responses)) {
+        expect(response.headers?.Deprecation).toBeUndefined();
+        expect(response.headers?.Sunset).toBeUndefined();
+      }
     }
   });
 

@@ -108,15 +108,48 @@ type OpenApiOperation = {
   readonly operationId: string;
   readonly summary: string;
   readonly description?: string;
-  readonly parameters?: readonly {
-    readonly name: string;
-    readonly in: 'path' | 'query';
-    readonly required: boolean;
-    readonly schema: JsonSchema;
-    readonly description: string;
-  }[];
+  readonly parameters?: readonly OpenApiParameter[];
   readonly responses: Readonly<Record<string, OpenApiResponse>>;
 };
+
+type OpenApiParameter = {
+  readonly name: string;
+  readonly in: 'header' | 'path' | 'query';
+  readonly required: boolean;
+  readonly schema: JsonSchema;
+  readonly description: string;
+};
+
+/**
+ * Machine-readable lifecycle policy for the active public API.
+ *
+ * The policy is intentionally descriptive: v1 is active, so its responses do
+ * not carry Deprecation or Sunset headers. Those headers become applicable
+ * only to a genuinely retired version after a dated migration decision.
+ */
+export const API_VERSIONING_POLICY = {
+  strategy: 'url',
+  activeVersion: 'v1',
+  additiveChanges: 'remain-within-active-version',
+  breakingChanges: 'publish-a-new-url-version',
+  policyUrl: PUBLIC_ARTIST_API_REFERENCE_URL,
+  lifecycle: {
+    deprecation: {
+      header: 'Deprecation',
+      standard: 'RFC 9745',
+      active: false,
+      trigger:
+        'Only when a version is genuinely deprecated and migration guidance is published.',
+    },
+    sunset: {
+      header: 'Sunset',
+      standard: 'RFC 8594',
+      active: false,
+      trigger:
+        'Only when a dated retirement window is announced for a deprecated version.',
+    },
+  },
+} as const;
 
 /**
  * Canonical OpenAPI 3.1 document for the public artist API.
@@ -147,6 +180,7 @@ export type ArtistOpenApiDocument = {
   readonly components: {
     readonly schemas: Readonly<Record<string, JsonSchema>>;
   };
+  readonly 'x-jovie-versioning': typeof API_VERSIONING_POLICY;
 };
 
 export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
@@ -155,7 +189,7 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
     title: 'Jovie Artist API',
     version: '1.0.0',
     description:
-      'Anonymous, read-only API for public Jovie artist profiles. The stable /api/v1 capability index is a machine-verifiable 200 surface; artist data is served by GET /api/v1/{username}. No API key, OAuth token, or write endpoint is required or supported.',
+      'Anonymous, read-only API for public Jovie artist profiles. The stable /api/v1 capability index is a machine-verifiable 200 surface; artist data is served by GET /api/v1/{username}. No API key, OAuth token, or write endpoint is required or supported. Versioning policy: URL-versioned /api/v1; additive changes remain in v1, breaking changes use a new URL version. Active v1 does not emit Deprecation or Sunset headers; RFC 9745 Deprecation and RFC 8594 Sunset apply only after a genuinely retired version has a dated migration policy.',
     contact: { url: `${BASE_URL}/llms.txt` },
   },
   servers: [{ url: BASE_URL, description: 'Production API origin' }],
@@ -163,6 +197,7 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
     description: 'API reference, rate limits, and version lifecycle policy',
     url: PUBLIC_ARTIST_API_REFERENCE_URL,
   },
+  'x-jovie-versioning': API_VERSIONING_POLICY,
   paths: {
     '/api/v1': {
       get: {
@@ -170,6 +205,16 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
         summary: 'Discover public artist API capabilities',
         description:
           'Stable, non-enumerating capability document. It identifies the anonymous read-only scope, supported GET resources, profile rate-limit metadata, and canonical discovery links without depending on a particular artist handle.',
+        parameters: [
+          {
+            name: 'Accept',
+            in: 'header',
+            required: false,
+            schema: { type: 'string', enum: ['application/json'] },
+            description:
+              'Optional standard media-type preference. This endpoint always returns its capability document as application/json.',
+          },
+        ],
         responses: {
           '200': {
             description: 'Public artist API capability document',
