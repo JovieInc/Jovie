@@ -37,7 +37,7 @@ const selectedProductLanes = () =>
       .filter(Boolean)
   );
 
-/** @typedef {{ id: string, name: string, nextLocalCommand: string, status: 'success'|'failure'|'skipped', logExcerpt: string }} LaneResult */
+/** @typedef {{ id: string, name: string, nextLocalCommand: string, status: 'success'|'failure'|'skipped', logExcerpt: string, durationMs: number }} LaneResult */
 
 const LANES = [
   {
@@ -726,7 +726,7 @@ function writeLaneResults(results, laneGroup, setupError) {
     outPath,
     JSON.stringify(
       {
-        schemaVersion: 1,
+        schemaVersion: 2,
         job: 'ci-fast',
         group: laneGroup || 'all',
         lanes: results,
@@ -753,6 +753,7 @@ function main() {
 
     for (const lane of selectedLanes) {
       console.log(`\n======== lane: ${lane.id} ========`);
+      const laneStartedAt = Date.now();
       let outcome;
       try {
         outcome = lane.run();
@@ -785,6 +786,7 @@ function main() {
         nextLocalCommand: lane.nextLocalCommand,
         status,
         logExcerpt,
+        durationMs: Math.max(0, Date.now() - laneStartedAt),
       });
     }
   } catch (error) {

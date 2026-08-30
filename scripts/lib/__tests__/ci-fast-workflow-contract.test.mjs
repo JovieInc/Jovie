@@ -81,6 +81,37 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain('**/tsconfig*.json');
   });
 
+  it('preselects source-PR typecheck before dependency hydration', () => {
+    const typecheck = jobBlock('ci-fast-typecheck', 'ci-fast-remaining');
+
+    expect(typecheck).toContain('filter: blob:none');
+    expect(typecheck).toMatch(
+      /uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+if: >-\n\s+github\.event_name != 'pull_request' \|\|\n\s+needs\.ci-path-changes\.outputs\.run_jovie_typecheck == 'true'/
+    );
+    // The lane runner remains unconditional and independently evaluates the
+    // diff. A false-negative selector therefore tries to execute without pnpm
+    // and fails red instead of silently skipping the gate.
+    expect(typecheck).toMatch(
+      /- name: Run ci-fast lanes\n\s+id: lanes\n(?!\s+if:)/
+    );
+    expect(typecheck).not.toContain('CI_FAST_PRESELECTED_SKIP');
+    expect(typecheck).toMatch(
+      /name: Validate CI\/release incident prevention contract[\s\S]*?run: node scripts\/ci-release-incident-contract\.mjs/
+    );
+  });
+
+  it('does not restore or save an unused local Turbo cache in either fast job', () => {
+    for (const { jobId, nextJobId } of HOSTED_GROUP_JOBS) {
+      const block = jobBlock(jobId, nextJobId);
+      expect(block).not.toContain('name: Cache Turbo');
+      expect(block).not.toContain('path: .turbo');
+      expect(block).not.toContain('runner.os }}-turbo-');
+    }
+
+    expect(CI_FAST_SOURCE).toContain('pnpm turbo typecheck --affected --force');
+    expect(CI_FAST_SOURCE).not.toContain('turbo run');
+  });
+
   it('isolates Jovie product typecheck from Symphony/control-plane suites', () => {
     expect(CI_FAST_SOURCE).toContain("from './lib/ci-repo-lanes.mjs'");
     expect(CI_FAST_SOURCE).toContain(
@@ -358,7 +389,7 @@ describe('ci-fast bounded parallel workflow', () => {
       );
       expect(result.status).not.toBe(0);
       const payload = JSON.parse(readFileSync(outPath, 'utf8'));
-      expect(payload.schemaVersion).toBe(1);
+      expect(payload.schemaVersion).toBe(2);
       expect(payload.job).toBe('ci-fast');
       expect(payload.group).toBe('not-a-real-group');
       expect(payload.lanes).toEqual([]);
@@ -366,6 +397,12 @@ describe('ci-fast bounded parallel workflow', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it('records a non-negative duration for every emitted lane receipt', () => {
+    expect(CI_FAST_SOURCE).toContain('durationMs');
+    expect(CI_FAST_SOURCE).toContain('laneStartedAt');
+    expect(CI_FAST_SOURCE).toContain('Date.now() - laneStartedAt');
   });
 
   it('uploads ci-fast lane artifacts with warn-not-error missing policy (JOV-4446)', () => {

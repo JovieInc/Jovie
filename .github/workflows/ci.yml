@@ -474,6 +474,9 @@ jobs:
       has_code_changes: ${{ steps.detect.outputs.has_code_changes || 'false' }}
       is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}
       run_jovie_product: ${{ steps.detect.outputs.run_jovie_product || 'false' }}
+      # Missing selector output fails closed. Only exact source-PR evidence may
+      # bypass the multi-gigabyte dependency bootstrap in ci-fast typecheck.
+      run_jovie_typecheck: ${{ steps.detect.outputs.run_jovie_typecheck || 'true' }}
       run_symphony_control: ${{ steps.detect.outputs.run_symphony_control || 'false' }}
       run_summer_ops: ${{ steps.detect.outputs.run_summer_ops || 'false' }}
     steps:
@@ -1209,13 +1212,22 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          filter: blob:none
       - uses: ./.github/actions/setup-node-pnpm
+        if: >-
+          github.event_name != 'pull_request' ||
+          needs.ci-path-changes.outputs.run_jovie_typecheck == 'true'
       - name: Validate CI/release incident prevention contract
         # This is intentionally outside the path-gated Structural Contract.
         # The required prevention receipt must exist for every source PR and
         # exact merge-group head, even when no contract file changed.
-        run: pnpm ci:incident-contract:validate
+        # Keep it dependency-free so a proven no-typecheck source PR can skip
+        # pnpm hydration without skipping the every-head incident contract.
+        run: node scripts/ci-release-incident-contract.mjs
       - name: Verify Node and tsx seed-loader compatibility
+        if: >-
+          github.event_name != 'pull_request' ||
+          needs.ci-path-changes.outputs.run_jovie_typecheck == 'true'
         shell: bash
         run: |
           if ! output=$(node --import tsx --import ./apps/web/tests/eval/promptfoo/server-only-preload.mjs -e 'console.log("seed-loader-runtime-ok")' 2>&1); then
@@ -1224,13 +1236,6 @@ jobs:
             exit 1
           fi
           printf '%s\n' "$output"
-      - name: Cache Turbo
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .turbo
-          key: ${{ runner.os }}-turbo-${{ hashFiles('turbo.json', '**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-turbo-
       - name: Run ci-fast lanes
         id: lanes
         env:
@@ -1273,6 +1278,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          filter: blob:none
       - uses: ./.github/actions/setup-node-pnpm
       - name: Validate CI/release incident prevention contract
         # This is intentionally outside the path-gated Structural Contract.
@@ -1288,13 +1294,6 @@ jobs:
             exit 1
           fi
           printf '%s\n' "$output"
-      - name: Cache Turbo
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .turbo
-          key: ${{ runner.os }}-turbo-${{ hashFiles('turbo.json', '**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-turbo-
       - name: Decide structural lane
         id: structural
         shell: bash

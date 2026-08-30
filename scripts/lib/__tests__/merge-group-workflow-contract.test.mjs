@@ -597,6 +597,9 @@ describe('merge_group workflow contract', () => {
       "run_jovie_product: ${{ steps.detect.outputs.run_jovie_product || 'false' }}"
     );
     expect(pathChanges).toContain(
+      "run_jovie_typecheck: ${{ steps.detect.outputs.run_jovie_typecheck || 'true' }}"
+    );
+    expect(pathChanges).toContain(
       "run_symphony_control: ${{ steps.detect.outputs.run_symphony_control || 'false' }}"
     );
     expect(pathChanges).toContain(

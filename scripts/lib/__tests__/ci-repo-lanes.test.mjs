@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
+  affectsJovieTypecheck,
   CI_LANES,
   classifyChangedFile,
   classifyCiRepoLanes,
@@ -41,6 +42,36 @@ describe('JOV-5288 CI repo lanes', () => {
     expect(classifyChangedFile('scripts/lib/ci-repo-lanes.mjs')).toEqual([
       CI_LANES.SYMPHONY_CONTROL,
     ]);
+  });
+
+  it('selects the product typecheck only for exact TypeScript graph inputs', () => {
+    for (const path of [
+      'apps/web/app/page.tsx',
+      'packages/ui/src/index.ts',
+      'packages/ui/tsconfig.build.json',
+      'package.json',
+      'pnpm-lock.yaml',
+      'turbo.json',
+    ]) {
+      expect(affectsJovieTypecheck(path), path).toBe(true);
+    }
+    for (const path of [
+      'README.md',
+      'apps/web/app/icon.png',
+      'apps/web/app/globals.css',
+      'scripts/hermes/gem-ops-hud.py',
+      'apps/eve-pilot/package.json',
+    ]) {
+      expect(affectsJovieTypecheck(path), path).toBe(false);
+    }
+
+    expect(
+      classifyCiRepoLanes(['scripts/hermes/job.ts']).runJovieTypecheck
+    ).toBe(false);
+    expect(
+      classifyCiRepoLanes(['apps/web/app/page.tsx']).runJovieTypecheck
+    ).toBe(true);
+    expect(classifyCiRepoLanes(['README.md']).runJovieTypecheck).toBe(false);
   });
 
   it('keeps Jovie product files off Symphony and Summer/ops suites', () => {
@@ -89,16 +120,19 @@ describe('JOV-5288 CI repo lanes', () => {
     const plan = classifyCiRepoLanes(['scripts/hermes/codex-rotate']);
     expect(githubLaneOutputs(plan)).toEqual([
       'run_jovie_product=false',
+      'run_jovie_typecheck=false',
       'run_symphony_control=true',
       'run_summer_ops=false',
     ]);
     expect(githubLaneOutputs(plan, { forceAll: true })).toEqual([
       'run_jovie_product=true',
+      'run_jovie_typecheck=true',
       'run_symphony_control=true',
       'run_summer_ops=true',
     ]);
     expect(githubLaneOutputs(plan, { forceNone: true })).toEqual([
       'run_jovie_product=false',
+      'run_jovie_typecheck=false',
       'run_symphony_control=false',
       'run_summer_ops=false',
     ]);
@@ -144,7 +178,7 @@ describe('JOV-5288 CI repo lanes', () => {
       else process.env.GITHUB_OUTPUT = previous;
     }
     expect(readFileSync(outputPath, 'utf8')).toBe(
-      'run_jovie_product=false\nrun_symphony_control=false\nrun_summer_ops=false\n'
+      'run_jovie_product=false\nrun_jovie_typecheck=false\nrun_symphony_control=false\nrun_summer_ops=false\n'
     );
   });
 });
