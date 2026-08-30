@@ -560,7 +560,7 @@ describe('rolling CI dispatch CLI and workflow', () => {
     expect(writerStart).toBeGreaterThan(dispatchStart);
     const dispatchJob = WORKFLOW.slice(dispatchStart, writerStart);
 
-    const dispatchStep = (name) => {
+    const dispatchStep = name => {
       const marker = `      - name: ${name}\n`;
       expect(dispatchJob.split(marker), name).toHaveLength(2);
       const start = dispatchJob.indexOf(marker);
@@ -570,9 +570,7 @@ describe('rolling CI dispatch CLI and workflow', () => {
     };
 
     const checkout = dispatchStep('Checkout exact source PR head');
-    expect(checkout).toContain(
-      'ref: ${{ steps.plan.outputs.source_head }}'
-    );
+    expect(checkout).toContain('ref: ${{ steps.plan.outputs.source_head }}');
     expect(checkout).toMatch(/^          path: source$/m);
     expect(checkout).toMatch(/^          persist-credentials: false$/m);
 
