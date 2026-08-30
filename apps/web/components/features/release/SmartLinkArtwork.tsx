@@ -2,6 +2,10 @@
 
 import Image from 'next/image';
 import { useState } from 'react';
+import {
+  ARTWORK_FIT_CLASSNAME,
+  ArtworkFrame,
+} from '@/components/atoms/ArtworkFrame';
 import { Icon } from '@/components/atoms/Icon';
 import {
   AlbumArtworkContextMenu,
@@ -20,9 +24,9 @@ interface SmartLinkArtworkProps {
 }
 
 /**
- * Album artwork for smart link pages, sized to match the profile avatar (224px / size-56).
- * This ensures visual consistency and eliminates layout shift between profile and release pages.
- * Includes right-click context menu for downloading artwork at multiple sizes.
+ * Album artwork for smart link pages. The 224px square footprint is reserved
+ * so profile and release pages do not shift; the frame uses the shared
+ * scale-aware artwork radius and contain fit instead of avatar geometry.
  */
 export function SmartLinkArtwork({
   src,
@@ -41,13 +45,16 @@ export function SmartLinkArtwork({
         sizes={sizes}
         allowDownloads={allowDownloads}
       >
-        <div className='relative size-56 overflow-hidden rounded bg-white/5 shadow-2xl shadow-black/50 ring-1 ring-white/10'>
+        <ArtworkFrame
+          size={224}
+          className='size-56 bg-white/5 shadow-2xl shadow-black/50 ring-1 ring-white/10'
+        >
           {src && !imgError ? (
             <Image
               src={src}
               alt={alt}
               fill
-              className='object-cover'
+              className={ARTWORK_FIT_CLASSNAME}
               sizes='224px'
               priority
               onError={() => setImgError(true)}
@@ -61,7 +68,7 @@ export function SmartLinkArtwork({
               />
             </div>
           )}
-        </div>
+        </ArtworkFrame>
       </AlbumArtworkContextMenu>
     </div>
   );

@@ -205,7 +205,15 @@ describe('ProfileHomeRail', () => {
     const pacMedia = pacCard.querySelector('.aspect-square');
     expect(pacMedia?.className).toContain('self-stretch');
     expect(pacMedia?.className).toContain('w-auto');
-    expect(pacMedia?.className).toContain('rounded-(--profile-action-radius)');
+    expect(pacMedia?.className).toContain('rounded-lg');
+    expect(pacMedia?.className).not.toContain(
+      'rounded-(--profile-action-radius)'
+    );
+    const pacArtwork = screen.getByRole('img', {
+      name: 'Never Say A Word artwork',
+    });
+    expect(pacArtwork).toHaveClass('object-contain');
+    expect(pacArtwork).not.toHaveClass('object-cover');
     expect(screen.getByRole('link', { name: 'Listen' })).toHaveClass(
       'h-11',
       'px-3',
