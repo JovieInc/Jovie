@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   auditCoverageViaReceipts,
   checkChangedComponents,
+  runComponentShipGate,
 } from '../../component-ship-gate.mjs';
 import {
   checkStoryMatchesComponent,
@@ -216,6 +217,42 @@ describe('story match checks', () => {
 });
 
 describe('diff gate', () => {
+  it('honors an explicit null diffBase instead of re-resolving origin/main', () => {
+    // Regression for JOV-5454 contract failure: in CI origin/main is always
+    // present, so re-resolving an explicit opt-out turned into a diff scan
+    // against main and reported false missing-test/story issues for unrelated
+    // changed components. With an explicit null base and quality/ratchet
+    // skipped, the report must be green and skip the diff section.
+    const report = runComponentShipGate({
+      diffBase: null,
+      skipQuality: true,
+      skipRatchet: true,
+      skipRenderedCert: true,
+      skipLiveStorybook: true,
+    });
+    expect(report.ok).toBe(true);
+    expect(report.diffBase).toBeUndefined();
+    expect(report.sections.diff.applicable).toBe(false);
+    expect(report.sections.diff.note).toMatch(/no diff base/);
+  });
+
+  it('still auto-resolves a base when diffBase is omitted', () => {
+    // When diffBase is not provided at all, the gate may fall back to
+    // origin/main; the diff section then reflects a real scan.
+    const report = runComponentShipGate({
+      skipQuality: true,
+      skipRatchet: true,
+      skipRenderedCert: true,
+      skipLiveStorybook: true,
+    });
+    // An omitted base must not be treated as an explicit opt-out: the gate
+    // auto-resolves a base (origin/main is present in CI and locally), so
+    // report.diffBase is set. `applicable` additionally requires the resolved
+    // diff to contain an in-scope component, so it is not asserted here.
+    expect(report.diffBase).toBeTruthy();
+    expect(report.sections.diff.note).toBeUndefined();
+  });
+
   it('fails closed without test and story', () => {
     const root = fixtureRepo({
       'apps/web/components/atoms/NewThing.tsx':
