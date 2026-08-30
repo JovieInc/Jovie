@@ -1064,8 +1064,10 @@ html[data-profile-initial-mode]
     transparent
   );
 
-  /* Focus ring — Jovie/Linear keyboard focus token */
-  --color-focus-ring: var(--linear-border-focus);
+  /* Focus ring — Jovie/Linear keyboard focus token.
+     Light literal (identical to the legacy linear border-focus light value);
+     dark is fully overridden by the :root.dark Noir Ion mapping below. */
+  --color-focus-ring: rgba(0, 0, 0, 0.28);
   --focus-ring-width: 1px;
   --focus-ring-offset: 0px;
 

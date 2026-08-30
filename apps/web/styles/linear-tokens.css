@@ -480,9 +480,6 @@
   --linear-color-bg: var(--linear-bg-page);
   --linear-color-bg-elevated: var(--linear-bg-surface-0);
   --linear-color-bg-card: var(--linear-bg-surface-2);
-  /* Semantic borders */
-  --linear-color-border: var(--linear-border-default);
-  --linear-color-divider: var(--linear-border-subtle);
 }
 
 /* Reduced motion — zero the raw linear duration scale so every consumer
