@@ -1,0 +1,2585 @@
+'use client';
+
+import {
+  Button,
+  ConfirmDialog,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  UserAvatar,
+} from '@jovie/ui';
+import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import {
+  ArrowLeft,
+  ChevronDown,
+  Disc3,
+  FileText,
+  Plus,
+  Sparkles,
+  Trash2,
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import {
+  type ComponentPropsWithoutRef,
+  type FormEvent,
+  forwardRef,
+  startTransition,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { providerConfig } from '@/app/app/(shell)/dashboard/releases/config';
+import { DashboardHeaderActionButton } from '@/components/features/dashboard/atoms/DashboardHeaderActionButton';
+import { DashboardHeaderActionGroup } from '@/components/features/dashboard/atoms/DashboardHeaderActionGroup';
+import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
+import { ReleaseTaskDueBadge } from '@/components/features/dashboard/release-tasks/ReleaseTaskDueBadge';
+import { TaskDataTable } from '@/components/features/dashboard/tasks/TaskDataTable';
+import { TaskDescriptionHelper } from '@/components/features/dashboard/tasks/TaskDescriptionHelper';
+import {
+  PriorityBars,
+  TaskListRow,
+} from '@/components/features/dashboard/tasks/TaskListRow';
+import { TaskRowActionMenu } from '@/components/features/dashboard/tasks/TaskRowActionMenu';
+import { toast } from '@/components/feedback';
+import {
+  HIDDEN_DIV_STYLES,
+  useTextareaAutosize,
+} from '@/components/jovie/hooks/useTextareaAutosize';
+import { EntitySidebarShell } from '@/components/molecules/drawer';
+import { EmptyState } from '@/components/molecules/EmptyState';
+import {
+  TOOLBAR_MENU_CONTENT_CLASS,
+  TOOLBAR_MENU_SEPARATOR_CLASS,
+  ToolbarMenuChoiceItem,
+} from '@/components/molecules/menus/ToolbarMenuPrimitives';
+import { ReleaseDueBadge } from '@/components/molecules/ReleaseDueBadge';
+import { PageShell } from '@/components/organisms/PageShell';
+import {
+  RichTextEditor,
+  type RichTextEditorChange,
+  type RichTextEditorHandle,
+} from '@/components/organisms/RichTextEditor';
+import { ReleaseSidebar } from '@/components/organisms/release-sidebar';
+import {
+  ShellListRowButton,
+  TableEmptyState,
+} from '@/components/organisms/table';
+import {
+  isFormElement,
+  resolveTableNavAction,
+  type TableNavAction,
+} from '@/components/organisms/table/utils/tableKeyMap';
+import { useViewMode } from '@/components/organisms/table/utils/useViewMode';
+import type { FilterPill } from '@/components/shell/pill-search.types';
+import { APP_ROUTES } from '@/constants/routes';
+import {
+  useRegisterHeaderActions,
+  useRegisterHeaderSearch,
+} from '@/contexts/HeaderActionsContext';
+import { useBreakpoint } from '@/hooks/useBreakpoint';
+import { useIsomorphicLayoutEffect } from '@/hooks/useIsomorphicLayoutEffect';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
+import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
+import { useReleaseEntityQuery } from '@/lib/queries/useReleaseEntityQuery';
+import {
+  useCreateTaskMutation,
+  useDeleteTaskMutation,
+  useMoveTaskMutation,
+  useUpdateTaskMutation,
+} from '@/lib/queries/useTaskMutations';
+import {
+  useTaskBoardQuery,
+  useTaskQuery,
+  useTasksQuery,
+} from '@/lib/queries/useTasksQuery';
+import { DEFAULT_RELEASE_TASK_TEMPLATE } from '@/lib/release-tasks/default-template';
+import {
+  emptyRichTextDocument,
+  type RichTextDocument,
+} from '@/lib/rich-text/document';
+import {
+  buildTaskPitchChatPrompt,
+  isPitchRelatedText,
+} from '@/lib/services/pitch/targets';
+import {
+  compareTasksByBoardOrder,
+  getVisibleTaskBoardStatuses,
+} from '@/lib/tasks/task-board';
+import {
+  readTaskDescriptionHelper,
+  type TaskDescriptionHelperPayload,
+} from '@/lib/tasks/task-description-helper';
+import { readTaskDescriptionContent } from '@/lib/tasks/task-rich-text';
+import type {
+  MoveTaskInput,
+  TaskAssigneeKind,
+  TaskFilters,
+  TaskPriority,
+  TaskStatus,
+  TaskView,
+} from '@/lib/tasks/types';
+import { getAccentCssVars } from '@/lib/ui/accent-palette';
+import { cn } from '@/lib/utils';
+import { TaskBoard } from './TaskBoard';
+import {
+  type TaskSubviewId,
+  type TaskSubviewOption,
+  TaskSubviewTabs,
+  TaskWorkspaceHeaderBar,
+} from './TaskWorkspaceHeaderBar';
+import { TaskWorkspaceLoadingRows } from './TaskWorkspaceLoadingRows';
+import {
+  buildTaskActionMenuItems,
+  TASK_ASSIGNEE_OPTIONS,
+  TASK_PRIORITY_OPTIONS,
+  TASK_STATUS_OPTIONS,
+} from './task-action-registry';
+import { distinctTaskTitles, taskSearchFromPills } from './task-header-search';
+import {
+  getTaskAssigneeVisual,
+  getTaskPriorityVisual,
+  getTaskStageVisual,
+  getTaskStatusVisual,
+  TASK_STATUS_LABEL_CLASSNAME,
+} from './task-presentation';
+
+const columnHelper = createColumnHelper<TaskView>();
+
+function shouldIgnoreTaskShortcut(event: KeyboardEvent): boolean {
+  return (
+    event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey
+  );
+}
+
+function isTaskRowNavigationAction(
+  action: TableNavAction
+): action is 'next' | 'prev' {
+  return action === 'next' || action === 'prev';
+}
+
+const NOOP = () => {};
+const NOOP_TASK_OPEN = (_task: TaskView) => {};
+const NOOP_TASK_STATUS_UPDATE = (_taskId: string, _status: TaskStatus) => {};
+const NOOP_TASK_PRIORITY_UPDATE = (
+  _taskId: string,
+  _priority: TaskPriority
+) => {};
+const NOOP_TASK_ASSIGNEE_UPDATE = (
+  _taskId: string,
+  _assigneeKind: TaskAssigneeKind
+) => {};
+
+const TASK_WORKSPACE_PANE_CLASSNAME = 'min-h-0 overflow-hidden';
+const TASK_VIEW_MODES: Array<'board' | 'list'> = ['board', 'list'];
+
+type MobileTaskScope = 'all' | 'open' | 'done';
+type ReleasePanelStatus = 'loading' | 'error' | 'empty';
+type TaskEditorSaveStatus =
+  | 'idle'
+  | 'dirty'
+  | 'saving'
+  | 'saved'
+  | 'conflict'
+  | 'error';
+
+const MOBILE_TASK_SCOPE_OPTIONS = [
+  ['all', 'All'],
+  ['open', 'Open'],
+  ['done', 'Closed'],
+] as const satisfies ReadonlyArray<readonly [MobileTaskScope, string]>;
+
+function getTaskSubviewForAssigneeFilter(
+  assigneeFilter: TaskAssigneeKind | 'all'
+): TaskSubviewId {
+  if (assigneeFilter === 'human') {
+    return 'mine';
+  }
+
+  if (assigneeFilter === 'jovie') {
+    return 'jovie';
+  }
+
+  return 'all';
+}
+
+function getAssigneeFilterForTaskSubview(
+  subview: TaskSubviewId
+): TaskAssigneeKind | 'all' {
+  if (subview === 'mine') {
+    return 'human';
+  }
+
+  if (subview === 'jovie') {
+    return 'jovie';
+  }
+
+  return 'all';
+}
+
+function isTaskClosed(task: Readonly<TaskView>): boolean {
+  return task.status === 'done' || task.status === 'cancelled';
+}
+
+function getMobileScopedTasks(
+  tasks: ReadonlyArray<TaskView>,
+  scope: MobileTaskScope
+): TaskView[] {
+  if (scope === 'open') {
+    return tasks.filter(task => !isTaskClosed(task));
+  }
+
+  if (scope === 'done') {
+    return tasks.filter(isTaskClosed);
+  }
+
+  return [...tasks];
+}
+
+function partitionTasksForMobile(tasks: ReadonlyArray<TaskView>): {
+  readonly activeTasks: TaskView[];
+  readonly completedTasks: TaskView[];
+} {
+  return {
+    activeTasks: tasks.filter(task => !isTaskClosed(task)),
+    completedTasks: tasks.filter(isTaskClosed),
+  };
+}
+
+function resolveArtistName(
+  profile: Readonly<{
+    display_name?: string | null;
+    username_normalized?: string | null;
+    username?: string | null;
+  }> | null
+): string | null {
+  return (
+    profile?.display_name ??
+    profile?.username_normalized ??
+    profile?.username ??
+    null
+  );
+}
+
+function TaskReleasePanelStatus({
+  status,
+  onClose,
+  onRetry,
+}: Readonly<{
+  status: ReleasePanelStatus;
+  onClose: () => void;
+  onRetry?: () => void;
+}>) {
+  const copy = {
+    loading: {
+      title: 'Loading release',
+      body: 'Getting release context for this task.',
+    },
+    error: {
+      title: 'Release unavailable',
+      body: 'We hit a problem loading this release. Try again when the connection settles.',
+    },
+    empty: {
+      title: 'Release not found',
+      body: 'This task still has a release link, but the release is not available in this profile.',
+    },
+  } satisfies Record<ReleasePanelStatus, { title: string; body: string }>;
+
+  const state = copy[status];
+
+  return (
+    <EntitySidebarShell
+      isOpen
+      width={344}
+      ariaLabel='Release Details'
+      title='Release'
+      onClose={onClose}
+      scrollStrategy='shell'
+      workspaceSurface='raised'
+      data-testid='task-release-panel-status'
+    >
+      <div
+        className='rounded-lg border border-subtle bg-surface-1 px-3 py-3'
+        data-testid={`task-release-panel-${status}`}
+      >
+        {status === 'loading' ? (
+          <div className='mb-3 h-20 rounded-md skeleton' aria-hidden='true' />
+        ) : null}
+        <p className='text-sm font-medium text-primary-token'>{state.title}</p>
+        <p className='mt-1 text-xs leading-5 text-secondary-token'>
+          {state.body}
+        </p>
+        {status === 'error' && onRetry ? (
+          <Button
+            type='button'
+            size='sm'
+            variant='secondary'
+            className='mt-3'
+            onClick={onRetry}
+          >
+            Retry
+          </Button>
+        ) : null}
+      </div>
+    </EntitySidebarShell>
+  );
+}
+
+function TaskStageInline({
+  task,
+  withChevron = false,
+}: Readonly<{
+  task: TaskView;
+  withChevron?: boolean;
+}>) {
+  const stage = getTaskStageVisual(task.status, task.agentStatus);
+  const accent = getAccentCssVars(stage.accent);
+  const StageIcon = stage.icon;
+
+  return (
+    <span
+      className='inline-flex items-center gap-1.5 text-secondary-token'
+      title={`Progress ${stage.label}`}
+    >
+      <StageIcon
+        className={cn('h-3.5 w-3.5', task.status === 'done' && 'fill-current')}
+        style={{ color: accent.solid }}
+      />
+      <span
+        className={cn(
+          'font-semibold text-secondary-token',
+          TASK_STATUS_LABEL_CLASSNAME
+        )}
+      >
+        {stage.label}
+      </span>
+      {withChevron ? (
+        <ChevronDown className='h-3 w-3 shrink-0 text-tertiary-token' />
+      ) : null}
+    </span>
+  );
+}
+
+function TaskPriorityInline({
+  priority,
+  withChevron = false,
+}: Readonly<{
+  priority: TaskPriority;
+  withChevron?: boolean;
+}>) {
+  const visual = getTaskPriorityVisual(priority);
+  const accent = getAccentCssVars(visual.accent);
+
+  return (
+    <span
+      className='inline-flex items-center gap-1.5 text-secondary-token'
+      title={`Priority ${visual.label}`}
+    >
+      <PriorityBars bars={visual.bars} accentColor={accent.solid} />
+      <span className='font-semibold text-secondary-token'>{visual.label}</span>
+      {withChevron ? (
+        <ChevronDown className='h-3 w-3 shrink-0 text-tertiary-token' />
+      ) : null}
+    </span>
+  );
+}
+
+function TaskAssigneeInline({
+  assigneeKind,
+  artistName,
+  withChevron = false,
+  compact = false,
+}: Readonly<{
+  assigneeKind: TaskAssigneeKind;
+  artistName?: string | null;
+  withChevron?: boolean;
+  compact?: boolean;
+}>) {
+  const meta = getTaskAssigneeVisual(assigneeKind, artistName);
+  const accent = getAccentCssVars(meta.accent);
+
+  return (
+    <span
+      className='inline-flex items-center gap-2 text-secondary-token'
+      title={`Assignee ${meta.label}`}
+    >
+      <span
+        aria-hidden='true'
+        className='inline-flex rounded-full'
+        style={{
+          boxShadow: `0 0 0 1px color-mix(in oklab, ${accent.solid} 18%, transparent)`,
+        }}
+      >
+        <UserAvatar name={meta.avatarName} size='xs' />
+      </span>
+      {compact ? (
+        <span className='sr-only'>{meta.label}</span>
+      ) : (
+        <span className='font-semibold text-secondary-token'>{meta.label}</span>
+      )}
+      {withChevron ? (
+        <ChevronDown className='h-3 w-3 shrink-0 text-tertiary-token' />
+      ) : null}
+    </span>
+  );
+}
+
+function TaskStatusLeadingVisual({
+  status,
+}: Readonly<{
+  status: TaskStatus;
+}>) {
+  const visual = getTaskStatusVisual(status);
+  const accent = getAccentCssVars(visual.accent);
+  const StatusIcon = visual.icon;
+
+  return (
+    <StatusIcon
+      className={cn('h-4 w-4', visual.filled && 'fill-current')}
+      style={{ color: accent.solid }}
+    />
+  );
+}
+
+function TaskPriorityLeadingVisual({
+  priority,
+}: Readonly<{
+  priority: TaskPriority;
+}>) {
+  const visual = getTaskPriorityVisual(priority);
+  const accent = getAccentCssVars(visual.accent);
+
+  return (
+    <span
+      className='inline-flex h-4 w-4 items-center justify-center'
+      aria-hidden='true'
+    >
+      <PriorityBars bars={visual.bars} accentColor={accent.solid} />
+    </span>
+  );
+}
+
+function TaskAssigneeLeadingVisual({
+  assigneeKind,
+  artistName,
+}: Readonly<{
+  assigneeKind: TaskAssigneeKind;
+  artistName?: string | null;
+}>) {
+  const meta = getTaskAssigneeVisual(assigneeKind, artistName);
+
+  return <UserAvatar name={meta.avatarName} size='xs' />;
+}
+
+const TaskMetaTrigger = forwardRef<
+  HTMLButtonElement,
+  ComponentPropsWithoutRef<'button'> & {
+    ariaLabel: string;
+  }
+>(function TaskMetaTrigger({ children, ariaLabel, className, ...props }, ref) {
+  return (
+    <button
+      ref={ref}
+      type='button'
+      aria-label={ariaLabel}
+      className={cn(
+        '-mx-1 inline-flex min-w-0 items-center rounded-full px-1.5 py-1 text-secondary-token transition-[background-color,color] duration-subtle hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,transparent)] hover:text-primary-token data-[state=open]:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,transparent)] data-[state=open]:text-primary-token',
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+});
+
+function TaskMetaMenuNumber({
+  task,
+  onOpenRelease,
+  onUpdateStatus,
+  onUpdatePriority,
+  onUpdateAssignee,
+}: Readonly<{
+  task: TaskView;
+  onOpenRelease: (task: TaskView) => void;
+  onUpdateStatus: (status: TaskStatus) => void;
+  onUpdatePriority: (priority: TaskPriority) => void;
+  onUpdateAssignee: (assigneeKind: TaskAssigneeKind) => void;
+}>) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <TaskMetaTrigger ariaLabel='Open Task Controls'>
+          <span className='inline-flex items-center gap-1 text-2xs font-semibold text-tertiary-token'>
+            <span className='shrink-0'>J-{task.taskNumber}</span>
+            <ChevronDown className='h-3 w-3 shrink-0 text-tertiary-token' />
+          </span>
+        </TaskMetaTrigger>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align='start'
+        sideOffset={8}
+        data-menu-surface='toolbar'
+        className={TOOLBAR_MENU_CONTENT_CLASS}
+      >
+        {task.releaseId ? (
+          <ToolbarMenuChoiceItem
+            active={false}
+            leadingVisual={<Disc3 className='h-4 w-4' />}
+            label='Open Release'
+            onSelect={() => onOpenRelease(task)}
+          />
+        ) : null}
+        {task.releaseId ? (
+          <DropdownMenuSeparator className={TOOLBAR_MENU_SEPARATOR_CLASS} />
+        ) : null}
+        {TASK_STATUS_OPTIONS.map(([value, label]) => {
+          return (
+            <ToolbarMenuChoiceItem
+              key={value}
+              active={task.status === value}
+              leadingVisual={<TaskStatusLeadingVisual status={value} />}
+              label={label}
+              onSelect={() => onUpdateStatus(value)}
+              disabled={task.status === value}
+            />
+          );
+        })}
+        <DropdownMenuSeparator className={TOOLBAR_MENU_SEPARATOR_CLASS} />
+        {TASK_PRIORITY_OPTIONS.map(([value, label]) => {
+          return (
+            <ToolbarMenuChoiceItem
+              key={value}
+              active={task.priority === value}
+              leadingVisual={<TaskPriorityLeadingVisual priority={value} />}
+              label={label}
+              onSelect={() => onUpdatePriority(value)}
+              disabled={task.priority === value}
+            />
+          );
+        })}
+        <DropdownMenuSeparator className={TOOLBAR_MENU_SEPARATOR_CLASS} />
+        {TASK_ASSIGNEE_OPTIONS.map(([value, label]) => {
+          return (
+            <ToolbarMenuChoiceItem
+              key={value}
+              active={task.assigneeKind === value}
+              leadingVisual={
+                <span aria-hidden='true'>
+                  <TaskAssigneeLeadingVisual assigneeKind={value} />
+                </span>
+              }
+              label={label}
+              onSelect={() => onUpdateAssignee(value)}
+              disabled={task.assigneeKind === value}
+            />
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function findTemplateDescriptionHelper(
+  title: string,
+  category: string | null
+): TaskDescriptionHelperPayload | null {
+  return (
+    DEFAULT_RELEASE_TASK_TEMPLATE.find(
+      item =>
+        item.descriptionHelper &&
+        item.title === title &&
+        item.category === category
+    )?.descriptionHelper ?? null
+  );
+}
+
+function TaskDocumentPanel({
+  task,
+  title,
+  description,
+  descriptionContent,
+  saveStatus,
+  onTitleChange,
+  onDescriptionChange,
+  onRetrySave,
+  onResolveConflict,
+  onClose,
+  onOpenRelease,
+  onUpdateStatus,
+  onUpdatePriority,
+  onUpdateAssignee,
+  actionItems,
+  artistName,
+  isDesktopLayout,
+  compactMetadata = false,
+}: Readonly<{
+  task: TaskView | null;
+  title: string;
+  description: string;
+  descriptionContent: RichTextDocument;
+  saveStatus: TaskEditorSaveStatus;
+  onTitleChange: (value: string) => void;
+  onDescriptionChange: (change: RichTextEditorChange) => void;
+  onRetrySave: () => void;
+  onResolveConflict: () => void;
+  onClose: () => void;
+  onOpenRelease: (task: TaskView) => void;
+  onUpdateStatus: (taskId: string, status: TaskStatus) => void;
+  onUpdatePriority: (taskId: string, priority: TaskPriority) => void;
+  onUpdateAssignee: (taskId: string, assigneeKind: TaskAssigneeKind) => void;
+  actionItems: ReturnType<typeof buildTaskActionMenuItems>;
+  artistName?: string | null;
+  isDesktopLayout: boolean;
+  compactMetadata?: boolean;
+}>) {
+  const descriptionEditorRef = useRef<RichTextEditorHandle>(null);
+  const [descriptionHelperDismissed, setDescriptionHelperDismissed] =
+    useState(false);
+  const metadataDescriptionHelper = readTaskDescriptionHelper(task?.metadata);
+  const descriptionHelper =
+    metadataDescriptionHelper ??
+    (task?.releaseId
+      ? findTemplateDescriptionHelper(task.title, task.category)
+      : null);
+  const showDescriptionHelper = Boolean(
+    task &&
+      descriptionHelper &&
+      description.trim() === '' &&
+      !descriptionHelperDismissed
+  );
+
+  useEffect(() => {
+    setDescriptionHelperDismissed(false);
+  }, [task?.id]);
+
+  const focusDescriptionEditor = useCallback(() => {
+    globalThis.requestAnimationFrame(() => {
+      descriptionEditorRef.current?.focus();
+    });
+  }, []);
+
+  const beginDescriptionEditing = useCallback(() => {
+    setDescriptionHelperDismissed(true);
+    focusDescriptionEditor();
+  }, [focusDescriptionEditor]);
+
+  const handleDescriptionFocus = useCallback(() => {
+    if (descriptionHelper && description.trim() === '') {
+      setDescriptionHelperDismissed(true);
+    }
+  }, [description, descriptionHelper]);
+
+  if (!task) {
+    return (
+      <div className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-2 pb-2 pr-2 pt-2'>
+        <div className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'>
+          <div
+            className='min-h-0 flex-1 overflow-y-auto overscroll-contain'
+            data-testid='task-document-scroll-region'
+          >
+            <div className='flex min-h-full items-center justify-center px-6 py-6'>
+              <EmptyState
+                icon={<FileText className='h-4 w-4' strokeWidth={2} />}
+                heading='Select a task'
+                description='Choose a task from the list to view its details.'
+                className='max-w-sm py-8'
+                testId='task-document-empty-state'
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const hasRelease = Boolean(task.releaseId && task.releaseTitle);
+
+  return (
+    <div className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-2 pb-2 pr-2 pt-2'>
+      <div className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'>
+        <div
+          className='min-h-0 flex-1 overflow-y-auto overscroll-contain'
+          data-testid='task-document-scroll-region'
+        >
+          <div className='mx-auto flex w-full max-w-xl flex-col gap-4 px-4 pb-6 pt-5 sm:px-5 sm:pb-7 sm:pt-6'>
+            <div className='flex min-w-0 items-start gap-2'>
+              <div className='min-w-0 flex-1'>
+                <TaskTitleEditor value={title} onChange={onTitleChange} />
+              </div>
+              <TaskRowActionMenu items={actionItems} />
+            </div>
+
+            <div
+              className={cn(
+                'flex items-center border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_68%,transparent)] pb-2 text-3xs text-secondary-token',
+                compactMetadata
+                  ? 'flex-nowrap gap-1'
+                  : 'flex-wrap gap-x-2 gap-y-1'
+              )}
+            >
+              <TaskMetaMenuNumber
+                task={task}
+                onOpenRelease={onOpenRelease}
+                onUpdateStatus={status => onUpdateStatus(task.id, status)}
+                onUpdatePriority={priority =>
+                  onUpdatePriority(task.id, priority)
+                }
+                onUpdateAssignee={assigneeKind =>
+                  onUpdateAssignee(task.id, assigneeKind)
+                }
+              />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <TaskMetaTrigger ariaLabel='Change Task Status'>
+                    <TaskStageInline task={task} withChevron />
+                  </TaskMetaTrigger>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align='start'
+                  sideOffset={8}
+                  data-menu-surface='toolbar'
+                  className={TOOLBAR_MENU_CONTENT_CLASS}
+                >
+                  {TASK_STATUS_OPTIONS.map(([value, label]) => {
+                    return (
+                      <ToolbarMenuChoiceItem
+                        key={value}
+                        active={task.status === value}
+                        leadingVisual={
+                          <TaskStatusLeadingVisual status={value} />
+                        }
+                        label={label}
+                        onSelect={() => onUpdateStatus(task.id, value)}
+                        disabled={task.status === value}
+                      />
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <TaskMetaTrigger ariaLabel='Change Task Priority'>
+                    <TaskPriorityInline priority={task.priority} withChevron />
+                  </TaskMetaTrigger>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align='start'
+                  sideOffset={8}
+                  data-menu-surface='toolbar'
+                  className={TOOLBAR_MENU_CONTENT_CLASS}
+                >
+                  {TASK_PRIORITY_OPTIONS.map(([value, label]) => {
+                    return (
+                      <ToolbarMenuChoiceItem
+                        key={value}
+                        active={task.priority === value}
+                        leadingVisual={
+                          <TaskPriorityLeadingVisual priority={value} />
+                        }
+                        label={label}
+                        onSelect={() => onUpdatePriority(task.id, value)}
+                        disabled={task.priority === value}
+                      />
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <TaskMetaTrigger ariaLabel='Change Task Assignee'>
+                    <TaskAssigneeInline
+                      assigneeKind={task.assigneeKind}
+                      artistName={artistName}
+                      withChevron
+                      compact={compactMetadata}
+                    />
+                  </TaskMetaTrigger>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align='start'
+                  sideOffset={8}
+                  data-menu-surface='toolbar'
+                  className={TOOLBAR_MENU_CONTENT_CLASS}
+                >
+                  {TASK_ASSIGNEE_OPTIONS.map(([value, label]) => {
+                    return (
+                      <ToolbarMenuChoiceItem
+                        key={value}
+                        active={task.assigneeKind === value}
+                        leadingVisual={
+                          <span aria-hidden='true'>
+                            <TaskAssigneeLeadingVisual
+                              assigneeKind={value}
+                              artistName={artistName}
+                            />
+                          </span>
+                        }
+                        label={label}
+                        onSelect={() => onUpdateAssignee(task.id, value)}
+                        disabled={task.assigneeKind === value}
+                      />
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {task.dueAt ? (
+                <ReleaseTaskDueBadge
+                  dueDate={task.dueAt}
+                  dueDaysOffset={null}
+                  isCompleted={task.status === 'done'}
+                />
+              ) : null}
+              {hasRelease ? (
+                <button
+                  type='button'
+                  onClick={() => onOpenRelease(task)}
+                  className='inline-flex min-w-0 items-center gap-1 text-secondary-token transition-colors hover:text-primary-token'
+                >
+                  <Disc3 className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
+                  <span className='truncate font-semibold'>
+                    {task.releaseTitle}
+                  </span>
+                </button>
+              ) : null}
+              {isDesktopLayout ? null : (
+                <button
+                  type='button'
+                  onClick={onClose}
+                  aria-label='Back To Task List'
+                  className='inline-flex h-8 w-8 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
+                >
+                  <ArrowLeft className='h-4 w-4' />
+                </button>
+              )}
+            </div>
+
+            <div className='relative min-h-130'>
+              <RichTextEditor
+                key={task.id}
+                ref={descriptionEditorRef}
+                content={descriptionContent}
+                onChange={onDescriptionChange}
+                ariaLabel='Task Description'
+                placeholder={
+                  showDescriptionHelper
+                    ? ''
+                    : 'Write context, decisions, and next steps…'
+                }
+                onFocus={handleDescriptionFocus}
+                minHeight='32.5rem'
+                statusLabel={
+                  saveStatus === 'saving'
+                    ? 'Saving…'
+                    : saveStatus === 'saved'
+                      ? 'Saved'
+                      : saveStatus === 'error'
+                        ? 'Not saved'
+                        : saveStatus === 'conflict'
+                          ? 'Conflict · reload task changes'
+                          : saveStatus === 'dirty'
+                            ? 'Edited'
+                            : 'Up to date'
+                }
+                statusTone={
+                  saveStatus === 'saving'
+                    ? 'pending'
+                    : saveStatus === 'saved'
+                      ? 'success'
+                      : saveStatus === 'error'
+                        ? 'error'
+                        : saveStatus === 'conflict'
+                          ? 'error'
+                          : 'neutral'
+                }
+                statusAction={
+                  saveStatus === 'error'
+                    ? { label: 'Retry', onClick: onRetrySave }
+                    : saveStatus === 'conflict'
+                      ? { label: 'Reload', onClick: onResolveConflict }
+                      : undefined
+                }
+              />
+              {showDescriptionHelper && descriptionHelper ? (
+                <TaskDescriptionHelper
+                  helper={descriptionHelper}
+                  onBeginEditing={beginDescriptionEditing}
+                />
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TaskTitleEditor({
+  value,
+  onChange,
+}: Readonly<{
+  value: string;
+  onChange: (value: string) => void;
+}>) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { measuredHeight, isAtMaxHeight, containerRef, hiddenDivRef } =
+    useTextareaAutosize({
+      value,
+      minHeight: 48,
+      maxHeight: 176,
+      textareaRef,
+    });
+
+  return (
+    <div ref={containerRef} className='relative min-w-0'>
+      <textarea
+        ref={textareaRef}
+        value={value}
+        rows={1}
+        aria-label='Task Title'
+        onChange={event => onChange(event.target.value)}
+        placeholder='Untitled Task' // ui-casing-allow: default task title placeholder
+        className='w-full resize-none rounded-md border-0 bg-transparent px-0 py-0 text-[1.75rem] font-semibold leading-[1.15] tracking-normal text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_80%,transparent)] transition-colors duration-fast focus:outline-none! focus-visible:ring-0! focus:shadow-none! focus-visible:bg-[color-mix(in_oklab,var(--color-border-focus)_16%,transparent)]'
+        style={{
+          height: measuredHeight,
+          overflowY: isAtMaxHeight ? 'auto' : 'hidden',
+          boxShadow: 'none',
+        }}
+      />
+      <div
+        ref={hiddenDivRef}
+        aria-hidden='true'
+        style={{
+          ...HIDDEN_DIV_STYLES,
+          fontSize: '1.75rem',
+          lineHeight: '1.15',
+          fontWeight: 620,
+          letterSpacing: '0',
+          padding: '0',
+        }}
+      />
+    </div>
+  );
+}
+
+function TaskEmptyState({
+  hasFilters,
+  onClearFilters,
+  onOpenComposer,
+  onOpenReleases,
+}: Readonly<{
+  hasFilters: boolean;
+  onClearFilters: () => void;
+  onOpenComposer: () => void;
+  onOpenReleases: () => void;
+}>) {
+  return (
+    <TableEmptyState
+      heading={
+        hasFilters ? 'No Tasks Match Your Filters' : 'Your Task List Is Empty'
+      }
+      description={
+        hasFilters
+          ? 'Try widening the filters or search query.'
+          : 'Create your first task, or tasks will appear automatically when you set up a release.'
+      }
+      className='min-h-90'
+      action={
+        hasFilters
+          ? {
+              label: 'Clear Filters',
+              onClick: onClearFilters,
+              variant: 'secondary',
+            }
+          : { label: 'New Task', onClick: onOpenComposer }
+      }
+      secondaryAction={
+        hasFilters
+          ? undefined
+          : { label: 'Set Up Release', onClick: onOpenReleases }
+      }
+    />
+  );
+}
+
+function TaskErrorState({
+  onRetry,
+}: Readonly<{
+  onRetry: () => void;
+}>) {
+  return (
+    <div className='flex min-h-0 flex-1 items-center justify-center px-3 py-4'>
+      <TableEmptyState
+        heading="Couldn't Load Tasks"
+        description='Try reloading the task list.'
+        className='min-h-60 max-w-md'
+        action={{ label: 'Retry', onClick: onRetry, variant: 'secondary' }}
+      />
+    </div>
+  );
+}
+
+function MobileTaskScopeTabs({
+  scope,
+  counts,
+  onChange,
+}: Readonly<{
+  scope: MobileTaskScope;
+  counts: Readonly<Record<MobileTaskScope, number>>;
+  onChange: (scope: MobileTaskScope) => void;
+}>) {
+  return (
+    <div className='px-3 pb-1 pt-2'>
+      <div className='inline-flex rounded-full bg-surface-1 p-1'>
+        {MOBILE_TASK_SCOPE_OPTIONS.map(([value, label]) => {
+          const isActive = scope === value;
+
+          return (
+            <button
+              key={value}
+              type='button'
+              onClick={() => onChange(value)}
+              aria-pressed={isActive}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-2xs font-semibold transition-[background-color,color] duration-subtle',
+                isActive
+                  ? 'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,transparent)] text-primary-token shadow-[0_0_0_1px_color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)]'
+                  : 'text-secondary-token hover:text-primary-token'
+              )}
+            >
+              <span>{label}</span>
+              <span className='text-3xs text-tertiary-token'>
+                {counts[value]}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MobileTaskSection({
+  title,
+  tasks,
+  selectedTaskId,
+  artistName,
+  onOpenTask,
+  onOpenRelease,
+  showAssignee,
+}: Readonly<{
+  title: string;
+  tasks: ReadonlyArray<TaskView>;
+  selectedTaskId: string | null;
+  artistName?: string | null;
+  onOpenTask: (task: TaskView) => void;
+  onOpenRelease: (task: TaskView) => void;
+  showAssignee: boolean;
+}>) {
+  if (tasks.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className='px-4 pb-4'>
+      <div className='mb-2 flex items-center justify-between px-1'>
+        <h2 className='text-2xs font-semibold text-tertiary-token'>{title}</h2>
+        <span className='text-3xs text-tertiary-token'>{tasks.length}</span>
+      </div>
+      <div className='space-y-1 overflow-hidden rounded-2xl bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,transparent)] p-1 shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-shell-border)_65%,transparent)]'>
+        {tasks.map(task => (
+          <MobileTaskListItem
+            key={task.id}
+            task={task}
+            artistName={artistName}
+            onOpenTask={onOpenTask}
+            onOpenRelease={onOpenRelease}
+            isSelected={task.id === selectedTaskId}
+            showAssignee={showAssignee}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function MobileTaskListItem({
+  task,
+  artistName,
+  onOpenTask,
+  onOpenRelease,
+  isSelected,
+  showAssignee,
+}: Readonly<{
+  task: TaskView;
+  artistName?: string | null;
+  onOpenTask: (task: TaskView) => void;
+  onOpenRelease: (task: TaskView) => void;
+  isSelected: boolean;
+  showAssignee: boolean;
+}>) {
+  const stage = getTaskStageVisual(task.status, task.agentStatus);
+  const priority = getTaskPriorityVisual(task.priority);
+  const assignee = getTaskAssigneeVisual(task.assigneeKind, artistName);
+  const accent = getAccentCssVars(stage.accent);
+  const priorityAccent = getAccentCssVars(priority.accent);
+  const StageIcon = stage.icon;
+
+  return (
+    <ShellListRowButton
+      onClick={() => onOpenTask(task)}
+      data-testid='mobile-task-row'
+      isSelected={isSelected}
+      className='flex w-full items-start gap-3 px-3 py-2.5 text-left'
+    >
+      <span
+        className='mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center'
+        style={{ color: accent.solid }}
+      >
+        <StageIcon
+          className={cn(
+            'h-3.5 w-3.5',
+            task.status === 'done' && 'fill-current'
+          )}
+        />
+      </span>
+
+      <span className='min-w-0 flex-1'>
+        <span className='block truncate text-sm font-semibold leading-tight text-primary-token'>
+          {task.title}
+        </span>
+        <span className='mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-3xs text-secondary-token'>
+          <span className={cn('truncate', TASK_STATUS_LABEL_CLASSNAME)}>
+            {stage.label}
+          </span>
+          <span className='text-tertiary-token'>J-{task.taskNumber}</span>
+          <span className='inline-flex items-center gap-1'>
+            <PriorityBars
+              bars={priority.bars}
+              accentColor={priorityAccent.solid}
+            />
+            <span>{priority.label}</span>
+          </span>
+          {showAssignee ? (
+            <span className='truncate'>{assignee.label}</span>
+          ) : null}
+        </span>
+        {task.releaseTitle ? (
+          <span className='mt-1.5 flex min-w-0 items-center gap-1.5 text-3xs text-tertiary-token'>
+            <Disc3 className='h-3 w-3 shrink-0' />
+            <span className='min-w-0 truncate'>{task.releaseTitle}</span>
+          </span>
+        ) : null}
+      </span>
+
+      <span className='mt-0.5 flex shrink-0 flex-col items-end gap-1'>
+        {task.dueAt ? (
+          <ReleaseDueBadge
+            dueDate={task.dueAt}
+            dueDaysOffset={null}
+            isCompleted={task.status === 'done' || task.status === 'cancelled'}
+          />
+        ) : null}
+        {task.releaseTitle ? (
+          <span className='text-3xs font-semibold text-tertiary-token'>
+            Release
+          </span>
+        ) : null}
+      </span>
+    </ShellListRowButton>
+  );
+}
+
+function useTaskActions({
+  artistName,
+  onGeneratePitch,
+  onRequestDelete,
+  openReleaseSidebar,
+  openTaskDocument,
+  updateTask,
+  getExpectedMutationVersion,
+  onMutationAcknowledged,
+}: {
+  artistName: string | null | undefined;
+  onGeneratePitch: (task: TaskView) => void;
+  onRequestDelete: (task: TaskView) => void;
+  openReleaseSidebar: (task: TaskView) => void;
+  openTaskDocument: (task: TaskView) => void;
+  updateTask: (
+    params: {
+      taskId: string;
+      data: Partial<Pick<TaskView, 'status' | 'priority' | 'assigneeKind'>> & {
+        readonly expectedMutationVersion?: number;
+      };
+    },
+    opts: { onError: () => void; onSuccess?: (task: TaskView) => void }
+  ) => void;
+  getExpectedMutationVersion: (taskId: string) => number | undefined;
+  onMutationAcknowledged: (taskId: string, task: TaskView) => void;
+}) {
+  const updateTaskField = useCallback(
+    (
+      taskId: string,
+      data: Partial<Pick<TaskView, 'status' | 'priority' | 'assigneeKind'>>
+    ) => {
+      updateTask(
+        {
+          taskId,
+          data: {
+            ...data,
+            expectedMutationVersion: getExpectedMutationVersion(taskId),
+          },
+        },
+        {
+          onError: () => toast.error("Couldn't update task"),
+          onSuccess: task => onMutationAcknowledged(taskId, task),
+        }
+      );
+    },
+    [getExpectedMutationVersion, onMutationAcknowledged, updateTask]
+  );
+
+  const handleDeleteTask = useCallback(
+    (task: TaskView) => {
+      onRequestDelete(task);
+    },
+    [onRequestDelete]
+  );
+
+  const getTaskActionMenuItems = useCallback(
+    (task: TaskView, surface: 'context' | 'overflow' | 'detail') => {
+      const StageIcon = getTaskStageVisual(task.status, task.agentStatus).icon;
+
+      return buildTaskActionMenuItems({
+        task,
+        surface,
+        canGeneratePitch: Boolean(
+          task.releaseId &&
+            task.releaseTitle &&
+            isPitchRelatedText(`${task.title} ${task.category ?? ''}`)
+        ),
+        handlers: {
+          onOpenTask: openTaskDocument,
+          onOpenRelease: openReleaseSidebar,
+          onGeneratePitch,
+          onRequestDelete: handleDeleteTask,
+          onUpdateStatus: (taskId, status) =>
+            updateTaskField(taskId, { status }),
+          onUpdatePriority: (taskId, priority) =>
+            updateTaskField(taskId, { priority }),
+          onUpdateAssignee: (taskId, assigneeKind) =>
+            updateTaskField(taskId, { assigneeKind }),
+        },
+        visuals: {
+          openTask: <FileText className='h-4 w-4' />,
+          openRelease: <Disc3 className='h-4 w-4' />,
+          generatePitch: <Sparkles className='h-4 w-4' />,
+          deleteTask: <Trash2 className='h-4 w-4' />,
+          status: status => {
+            const StatusIcon =
+              status === task.status
+                ? StageIcon
+                : getTaskStatusVisual(status).icon;
+            return (
+              <StatusIcon
+                className={cn('h-4 w-4', status === 'done' && 'fill-current')}
+              />
+            );
+          },
+          priority: priority => (
+            <TaskPriorityLeadingVisual priority={priority} />
+          ),
+          assignee: assigneeKind => (
+            <span aria-hidden='true'>
+              <TaskAssigneeLeadingVisual
+                assigneeKind={assigneeKind}
+                artistName={artistName}
+              />
+            </span>
+          ),
+        },
+      });
+    },
+    [
+      artistName,
+      handleDeleteTask,
+      onGeneratePitch,
+      openReleaseSidebar,
+      openTaskDocument,
+      updateTaskField,
+    ]
+  );
+
+  const getTaskContextMenuItems = useCallback(
+    (task: TaskView) => getTaskActionMenuItems(task, 'context'),
+    [getTaskActionMenuItems]
+  );
+  const getTaskOverflowMenuItems = useCallback(
+    (task: TaskView) => getTaskActionMenuItems(task, 'overflow'),
+    [getTaskActionMenuItems]
+  );
+  const getTaskDetailMenuItems = useCallback(
+    (task: TaskView) => getTaskActionMenuItems(task, 'detail'),
+    [getTaskActionMenuItems]
+  );
+
+  return {
+    getTaskContextMenuItems,
+    getTaskDetailMenuItems,
+    getTaskOverflowMenuItems,
+    updateTaskField,
+  };
+}
+
+export function TasksPageClient() {
+  const router = useRouter();
+  const { selectedProfile } = useDashboardData();
+  const isDesktopTaskLayout = useBreakpoint('lg');
+  const [hasResolvedResponsiveLayout, setHasResolvedResponsiveLayout] =
+    useState(false);
+  const canShowTaskDocumentAlongsideReleaseSidebar = useMediaQuery(
+    '(min-width: 1720px)'
+  );
+  const [headerMode, setHeaderMode] = useState<'default' | 'create'>('default');
+  const [pills, setPills] = useState<FilterPill[]>([]);
+  const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
+  const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>(
+    'all'
+  );
+  const [assigneeFilter, setAssigneeFilter] = useState<
+    TaskAssigneeKind | 'all'
+  >('human');
+  const [mobileScope, setMobileScope] = useState<MobileTaskScope>('all');
+  const [showCancelledColumn, setShowCancelledColumn] = useState(false);
+  const [draftTitle, setDraftTitle] = useState('');
+  const [taskPendingDelete, setTaskPendingDelete] = useState<TaskView | null>(
+    null
+  );
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [selectedReleaseId, setSelectedReleaseId] = useState<string | null>(
+    null
+  );
+  const [editorTitle, setEditorTitle] = useState('');
+  const [editorDescription, setEditorDescription] = useState('');
+  const [editorDescriptionContent, setEditorDescriptionContent] =
+    useState<RichTextDocument>(emptyRichTextDocument);
+  const [editorSaveStatus, setEditorSaveStatus] =
+    useState<TaskEditorSaveStatus>('idle');
+  const [editorSavingTaskIds, setEditorSavingTaskIds] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
+  const [editorTaskId, setEditorTaskId] = useState<string | null>(null);
+  const editorRevisionRef = useRef(0);
+  const editorSaveRequestRef = useRef(0);
+  const editorExpectedMutationVersionRef = useRef<number | null>(null);
+  const latestSelectedTaskIdRef = useRef<string | null>(null);
+  const deferredPills = useDeferredValue(pills);
+  const searchFilter = useMemo(
+    () => taskSearchFromPills(deferredPills),
+    [deferredPills]
+  );
+  const {
+    viewMode,
+    setViewMode,
+    isHydrated: isViewModeHydrated,
+  } = useViewMode({
+    storageKey: 'jovie-dashboard-tasks-view-mode',
+    defaultMode: 'list',
+    availableModes: TASK_VIEW_MODES,
+  });
+  const isBoardMode = isDesktopTaskLayout && viewMode === 'board';
+  const profileId = selectedProfile?.id;
+
+  useIsomorphicLayoutEffect(() => {
+    setHasResolvedResponsiveLayout(true);
+  }, []);
+
+  const createTaskMutation = useCreateTaskMutation();
+  const deleteTaskMutation = useDeleteTaskMutation();
+  const updateTaskMutation = useUpdateTaskMutation();
+  const moveTaskMutation = useMoveTaskMutation();
+  const { mutateAsync: deleteTaskAsync } = deleteTaskMutation;
+  const { mutate: updateTask, mutateAsync: updateTaskAsync } =
+    updateTaskMutation;
+  const { mutate: moveTask } = moveTaskMutation;
+  const selectedReleaseQuery = useReleaseEntityQuery(
+    profileId ?? '',
+    selectedReleaseId ?? ''
+  );
+  const listFilters = useMemo<TaskFilters>(
+    () => ({
+      limit: 100,
+      ...(searchFilter ? { search: searchFilter } : {}),
+      ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+      ...(priorityFilter !== 'all' ? { priority: priorityFilter } : {}),
+    }),
+    [priorityFilter, searchFilter, statusFilter]
+  );
+  const boardFilters = useMemo<Omit<TaskFilters, 'status'>>(
+    () => ({
+      limit: 100,
+      ...(searchFilter ? { search: searchFilter } : {}),
+      ...(priorityFilter !== 'all' ? { priority: priorityFilter } : {}),
+    }),
+    [priorityFilter, searchFilter]
+  );
+  const visibleBoardStatuses = useMemo(
+    () =>
+      getVisibleTaskBoardStatuses({
+        statusFilter,
+        showCancelled: showCancelledColumn,
+      }),
+    [showCancelledColumn, statusFilter]
+  );
+  const isTaskLayoutReady = hasResolvedResponsiveLayout && isViewModeHydrated;
+  const shouldFetchBoard =
+    isTaskLayoutReady && isBoardMode && Boolean(profileId);
+  const shouldFetchList =
+    isTaskLayoutReady && !isBoardMode && Boolean(profileId);
+
+  const { data, isLoading, isError, refetch } = useTasksQuery(
+    profileId,
+    listFilters,
+    {
+      enabled: shouldFetchList,
+    }
+  );
+  const {
+    data: boardData,
+    isLoading: isBoardLoading,
+    isError: isBoardError,
+    refetch: refetchBoard,
+  } = useTaskBoardQuery(profileId, boardFilters, {
+    enabled: shouldFetchBoard,
+  });
+
+  const boardTasks = useMemo(
+    () => boardData?.columns.flatMap(column => column.tasks) ?? [],
+    [boardData?.columns]
+  );
+  const filteredBoardData = useMemo(() => {
+    if (!boardData || assigneeFilter === 'all') return boardData;
+
+    return {
+      ...boardData,
+      columns: boardData.columns.map(column => {
+        const filteredTasks = column.tasks.filter(
+          task => task.assigneeKind === assigneeFilter
+        );
+
+        return {
+          ...column,
+          tasks: filteredTasks,
+          totalCount: filteredTasks.length,
+          nextCursor: null,
+        };
+      }),
+    };
+  }, [assigneeFilter, boardData]);
+  const taskSubviewBaseTasks = useMemo(() => {
+    return data?.tasks ?? boardTasks;
+  }, [boardTasks, data?.tasks]);
+  const taskSubviewOptions = useMemo<readonly TaskSubviewOption[]>(
+    () => [
+      { id: 'all', label: 'All', count: taskSubviewBaseTasks.length },
+      {
+        id: 'mine',
+        label: 'Assigned To Me',
+        count: taskSubviewBaseTasks.filter(
+          task => task.assigneeKind === 'human'
+        ).length,
+      },
+      {
+        id: 'jovie',
+        label: 'Assigned To Jovie',
+        count: taskSubviewBaseTasks.filter(
+          task => task.assigneeKind === 'jovie'
+        ).length,
+      },
+    ],
+    [taskSubviewBaseTasks]
+  );
+  const tasks = useMemo(() => {
+    const filtered =
+      assigneeFilter === 'all'
+        ? taskSubviewBaseTasks
+        : taskSubviewBaseTasks.filter(
+            task => task.assigneeKind === assigneeFilter
+          );
+
+    return [...filtered].sort(compareTasksByBoardOrder);
+  }, [assigneeFilter, taskSubviewBaseTasks]);
+  const activeTaskSubview = getTaskSubviewForAssigneeFilter(assigneeFilter);
+  const setTaskSubview = useCallback((subview: TaskSubviewId) => {
+    setAssigneeFilter(getAssigneeFilterForTaskSubview(subview));
+    setMobileScope('all');
+  }, []);
+  const mobileScopedTasks = useMemo(
+    () => getMobileScopedTasks(tasks, mobileScope),
+    [mobileScope, tasks]
+  );
+  const visibleTasks = isDesktopTaskLayout ? tasks : mobileScopedTasks;
+  const visibleBoardTaskCount = useMemo(
+    () =>
+      (filteredBoardData?.columns ?? [])
+        .filter(column => visibleBoardStatuses.includes(column.status))
+        .reduce((total, column) => total + column.totalCount, 0),
+    [filteredBoardData?.columns, visibleBoardStatuses]
+  );
+  const effectiveSelectedTaskId = selectedTaskId;
+  const { data: selectedTaskData } = useTaskQuery(
+    effectiveSelectedTaskId,
+    profileId
+  );
+  const selectedTask =
+    selectedTaskData ??
+    visibleTasks.find(task => task.id === effectiveSelectedTaskId) ??
+    boardTasks.find(task => task.id === effectiveSelectedTaskId) ??
+    tasks.find(task => task.id === effectiveSelectedTaskId) ??
+    null;
+  const selectedRelease = selectedReleaseQuery.data ?? null;
+  const shouldPrioritizeRightPanel =
+    Boolean(selectedReleaseId) && !canShowTaskDocumentAlongsideReleaseSidebar;
+  const artistName = resolveArtistName(selectedProfile);
+  const hasFilters =
+    pills.length > 0 ||
+    statusFilter !== 'all' ||
+    priorityFilter !== 'all' ||
+    assigneeFilter !== 'human';
+  const isResolvingProfile = !profileId;
+  const hasActiveTaskData = isBoardMode
+    ? boardData !== undefined
+    : data !== undefined;
+  const isResolvingTaskLayout = !isTaskLayoutReady && !hasActiveTaskData;
+  const isActiveBoardLoading =
+    isResolvingProfile ||
+    isResolvingTaskLayout ||
+    (isBoardLoading && boardData === undefined);
+  const isActiveListLoading =
+    isResolvingProfile ||
+    isResolvingTaskLayout ||
+    (isLoading && data === undefined);
+  const showTaskListPane =
+    isBoardMode ||
+    isDesktopTaskLayout ||
+    !selectedTask ||
+    shouldPrioritizeRightPanel;
+  const showTaskDocumentPane =
+    !shouldPrioritizeRightPanel &&
+    ((isDesktopTaskLayout && viewMode !== 'board') || Boolean(selectedTask));
+  const clearFilters = useCallback(() => {
+    setPills([]);
+    setStatusFilter('all');
+    setPriorityFilter('all');
+    setAssigneeFilter('human');
+    setMobileScope('all');
+  }, []);
+  const openReleases = useCallback(() => {
+    router.push(APP_ROUTES.RELEASES);
+  }, [router]);
+  const showTaskWorkbenchEmptyState =
+    !isBoardMode && !isActiveListLoading && tasks.length === 0;
+  const selectedTaskIndex = effectiveSelectedTaskId
+    ? visibleTasks.findIndex(task => task.id === effectiveSelectedTaskId)
+    : -1;
+  const canSelectPrevious = selectedTaskIndex > 0;
+  const canSelectNext =
+    selectedTaskIndex !== -1 && selectedTaskIndex < visibleTasks.length - 1;
+  const mobileScopeCounts = useMemo(
+    () => ({
+      all: tasks.length,
+      open: tasks.filter(task => !isTaskClosed(task)).length,
+      done: tasks.filter(isTaskClosed).length,
+    }),
+    [tasks]
+  );
+  const mobileTaskSections = useMemo(
+    () => partitionTasksForMobile(mobileScopedTasks),
+    [mobileScopedTasks]
+  );
+
+  const taskFilterCategories = useMemo(
+    () => [
+      {
+        id: 'status',
+        label: 'Status',
+        iconName: 'Hash',
+        options: TASK_STATUS_OPTIONS.map(([value, label]) => ({
+          id: value,
+          label,
+          leadingVisual: <TaskStatusLeadingVisual status={value} />,
+        })),
+        selectedIds: statusFilter === 'all' ? [] : [statusFilter],
+        onToggle: (value: string) =>
+          setStatusFilter(current =>
+            current === value ? 'all' : (value as TaskStatus)
+          ),
+        searchPlaceholder: 'Search statuses...',
+      },
+      {
+        id: 'priority',
+        label: 'Priority',
+        iconName: 'AlertTriangle',
+        options: TASK_PRIORITY_OPTIONS.map(([value, label]) => ({
+          id: value,
+          label,
+          leadingVisual: <TaskPriorityLeadingVisual priority={value} />,
+        })),
+        selectedIds: priorityFilter === 'all' ? [] : [priorityFilter],
+        onToggle: (value: string) =>
+          setPriorityFilter(current =>
+            current === value ? 'all' : (value as TaskPriority)
+          ),
+        searchPlaceholder: 'Search priorities...',
+      },
+      {
+        id: 'assignee',
+        label: 'Assignee',
+        iconName: 'Users',
+        options: TASK_ASSIGNEE_OPTIONS.map(([value, label]) => ({
+          id: value,
+          label,
+          leadingVisual: (
+            <TaskAssigneeLeadingVisual
+              assigneeKind={value}
+              artistName={artistName}
+            />
+          ),
+        })),
+        selectedIds: assigneeFilter === 'all' ? [] : [assigneeFilter],
+        onToggle: (value: string) =>
+          setAssigneeFilter(current =>
+            current === value ? 'all' : (value as TaskAssigneeKind)
+          ),
+        searchPlaceholder: 'Search assignees...',
+      },
+    ],
+    [artistName, assigneeFilter, priorityFilter, statusFilter]
+  );
+  const selectedTaskEditorId = selectedTask?.id ?? null;
+  const selectedTaskEditorTitle = selectedTask?.title ?? '';
+  const selectedTaskEditorDescription = selectedTask?.description ?? '';
+  const selectedTaskEditorContent = useMemo(
+    () =>
+      readTaskDescriptionContent(
+        selectedTask?.metadata,
+        selectedTaskEditorDescription
+      ),
+    [selectedTask?.metadata, selectedTaskEditorDescription]
+  );
+
+  useEffect(() => {
+    if (
+      selectedTaskEditorId &&
+      selectedTaskEditorId === editorTaskId &&
+      selectedTask?.mutationVersion !== undefined &&
+      selectedTask.mutationVersion >
+        (editorExpectedMutationVersionRef.current ?? 0)
+    ) {
+      if (editorSaveStatus === 'idle' || editorSaveStatus === 'saved') {
+        editorExpectedMutationVersionRef.current = selectedTask.mutationVersion;
+        setEditorTitle(selectedTaskEditorTitle);
+        setEditorDescription(selectedTaskEditorDescription);
+        setEditorDescriptionContent(selectedTaskEditorContent);
+        setEditorSaveStatus('idle');
+      } else {
+        setEditorSaveStatus('conflict');
+      }
+    }
+  }, [
+    editorSaveStatus,
+    editorTaskId,
+    selectedTask?.mutationVersion,
+    selectedTaskEditorContent,
+    selectedTaskEditorDescription,
+    selectedTaskEditorId,
+    selectedTaskEditorTitle,
+  ]);
+
+  useEffect(() => {
+    if (selectedTaskEditorId === editorTaskId) return;
+    editorSaveRequestRef.current += 1;
+    if (!selectedTaskEditorId) {
+      setEditorTitle('');
+      setEditorDescription('');
+      setEditorDescriptionContent(emptyRichTextDocument);
+      setEditorSaveStatus('idle');
+      setEditorTaskId(null);
+      editorExpectedMutationVersionRef.current = null;
+      editorRevisionRef.current = 0;
+      return;
+    }
+
+    setEditorTitle(selectedTaskEditorTitle);
+    setEditorDescription(selectedTaskEditorDescription);
+    setEditorDescriptionContent(selectedTaskEditorContent);
+    setEditorSaveStatus('idle');
+    setEditorTaskId(selectedTaskEditorId);
+    editorExpectedMutationVersionRef.current =
+      selectedTask?.mutationVersion ?? null;
+    editorRevisionRef.current = 0;
+  }, [
+    editorTaskId,
+    selectedTaskEditorContent,
+    selectedTaskEditorDescription,
+    selectedTaskEditorId,
+    selectedTaskEditorTitle,
+    selectedTask?.mutationVersion,
+  ]);
+
+  const openReleaseSidebar = useCallback((task: TaskView) => {
+    if (task.releaseId) {
+      setSelectedReleaseId(task.releaseId);
+    }
+  }, []);
+
+  const openTaskDocument = useCallback(
+    (task: TaskView) => {
+      if (
+        selectedTaskEditorId &&
+        task.id !== selectedTaskEditorId &&
+        editorSaveStatus !== 'idle' &&
+        editorSaveStatus !== 'saved'
+      ) {
+        toast.error('Wait for this task to save before opening another task.');
+        return;
+      }
+      setHeaderMode(current => (current === 'create' ? 'default' : current));
+      if (!canShowTaskDocumentAlongsideReleaseSidebar) {
+        setSelectedReleaseId(null);
+      }
+      setSelectedTaskId(task.id);
+    },
+    [
+      canShowTaskDocumentAlongsideReleaseSidebar,
+      editorSaveStatus,
+      selectedTaskEditorId,
+    ]
+  );
+
+  const closeTaskDocument = useCallback(() => {
+    if (editorSaveStatus !== 'idle' && editorSaveStatus !== 'saved') {
+      toast.error('Wait for this task to save before closing it.');
+      return;
+    }
+    setSelectedTaskId(null);
+  }, [editorSaveStatus]);
+
+  const handleGenerateTaskPitch = useCallback(
+    (task: TaskView) => {
+      if (!task.releaseId || !task.releaseTitle) {
+        return;
+      }
+
+      openChatWithPrompt(
+        buildTaskPitchChatPrompt({
+          releaseId: task.releaseId,
+          releaseTitle: task.releaseTitle,
+          taskTitle: task.title,
+          taskCategory: task.category,
+        }),
+        router
+      );
+    },
+    [router]
+  );
+
+  const {
+    getTaskContextMenuItems,
+    getTaskDetailMenuItems,
+    getTaskOverflowMenuItems,
+    updateTaskField,
+  } = useTaskActions({
+    artistName,
+    onGeneratePitch: handleGenerateTaskPitch,
+    onRequestDelete: setTaskPendingDelete,
+    openReleaseSidebar,
+    openTaskDocument,
+    updateTask,
+    getExpectedMutationVersion: useCallback(
+      (taskId: string) =>
+        taskId === editorTaskId
+          ? (editorExpectedMutationVersionRef.current ?? undefined)
+          : undefined,
+      [editorTaskId]
+    ),
+    onMutationAcknowledged: useCallback((taskId: string, task: TaskView) => {
+      if (taskId === latestSelectedTaskIdRef.current) {
+        editorExpectedMutationVersionRef.current = task.mutationVersion ?? null;
+      }
+    }, []),
+  });
+  const handleMoveTask = useCallback(
+    (input: MoveTaskInput) => {
+      moveTask(input, {
+        onError: () => {
+          toast.error("Couldn't move task");
+        },
+      });
+    },
+    [moveTask]
+  );
+
+  // Close release sidebar when the active task changes — the sidebar is only
+  // useful alongside the task that owns the release.
+  useEffect(() => {
+    setSelectedReleaseId(null);
+  }, [effectiveSelectedTaskId]);
+
+  useEffect(() => {
+    if (!selectedReleaseId || canShowTaskDocumentAlongsideReleaseSidebar) {
+      return;
+    }
+
+    setHeaderMode(current => (current === 'create' ? 'default' : current));
+  }, [canShowTaskDocumentAlongsideReleaseSidebar, selectedReleaseId]);
+
+  useEffect(() => {
+    if (isBoardMode) {
+      return;
+    }
+
+    if (isLoading) {
+      return;
+    }
+
+    if (tasks.length === 0) {
+      if (
+        selectedTaskId !== null &&
+        (editorSaveStatus === 'idle' || editorSaveStatus === 'saved')
+      ) {
+        setSelectedTaskId(null);
+      }
+      return;
+    }
+
+    const hasVisibleSelection = visibleTasks.some(
+      task => task.id === selectedTaskId
+    );
+    if (selectedTaskId === null) {
+      return;
+    }
+
+    if (
+      !hasVisibleSelection &&
+      (editorSaveStatus === 'idle' || editorSaveStatus === 'saved')
+    ) {
+      setSelectedTaskId(null);
+    }
+  }, [
+    editorSaveStatus,
+    isBoardMode,
+    isLoading,
+    selectedTaskId,
+    tasks,
+    visibleTasks,
+  ]);
+
+  const selectTaskByIndex = useCallback(
+    (index: number) => {
+      const nextTask = visibleTasks[index];
+      if (!nextTask) {
+        return;
+      }
+
+      openTaskDocument(nextTask);
+    },
+    [openTaskDocument, visibleTasks]
+  );
+
+  const selectPreviousTask = useCallback(() => {
+    if (!canSelectPrevious) {
+      return;
+    }
+
+    selectTaskByIndex(selectedTaskIndex - 1);
+  }, [canSelectPrevious, selectTaskByIndex, selectedTaskIndex]);
+
+  const selectNextTask = useCallback(() => {
+    if (!canSelectNext) {
+      return;
+    }
+
+    selectTaskByIndex(selectedTaskIndex + 1);
+  }, [canSelectNext, selectTaskByIndex, selectedTaskIndex]);
+
+  useEffect(() => {
+    latestSelectedTaskIdRef.current = selectedTaskEditorId;
+  }, [selectedTaskEditorId]);
+
+  useEffect(() => {
+    if (!selectedTaskEditorId || editorTaskId !== selectedTaskEditorId) {
+      return;
+    }
+
+    const nextTitle = editorTitle.trim();
+    const nextDescription = editorDescription.trim();
+    const currentDescription = selectedTaskEditorDescription;
+    const contentChanged =
+      JSON.stringify(editorDescriptionContent) !==
+      JSON.stringify(selectedTaskEditorContent);
+    const hasChanges =
+      nextTitle !== selectedTaskEditorTitle ||
+      nextDescription !== currentDescription ||
+      contentChanged;
+
+    if (
+      !hasChanges ||
+      !nextTitle ||
+      editorSaveStatus !== 'dirty' ||
+      editorSavingTaskIds.has(selectedTaskEditorId)
+    ) {
+      return;
+    }
+
+    const selectedTaskIdAtSchedule = selectedTaskEditorId;
+    const revisionAtSchedule = editorRevisionRef.current;
+    const requestAtSchedule = ++editorSaveRequestRef.current;
+
+    const timeoutId = globalThis.setTimeout(() => {
+      if (selectedTaskIdAtSchedule !== latestSelectedTaskIdRef.current) {
+        return;
+      }
+
+      setEditorSaveStatus('saving');
+      setEditorSavingTaskIds(current => {
+        const next = new Set(current);
+        next.add(selectedTaskIdAtSchedule);
+        return next;
+      });
+      void updateTaskAsync({
+        taskId: selectedTaskIdAtSchedule,
+        data: {
+          title: nextTitle,
+          description: nextDescription || null,
+          descriptionContent: editorDescriptionContent,
+          expectedMutationVersion:
+            editorExpectedMutationVersionRef.current ?? undefined,
+        },
+      }).then(
+        savedTask => {
+          if (savedTask?.mutationVersion !== undefined) {
+            editorExpectedMutationVersionRef.current =
+              savedTask.mutationVersion;
+          }
+          setEditorSavingTaskIds(current => {
+            const next = new Set(current);
+            next.delete(selectedTaskIdAtSchedule);
+            return next;
+          });
+          if (
+            latestSelectedTaskIdRef.current !== selectedTaskIdAtSchedule ||
+            editorSaveRequestRef.current !== requestAtSchedule
+          ) {
+            return;
+          }
+          setEditorSaveStatus(
+            editorRevisionRef.current === revisionAtSchedule ? 'saved' : 'dirty'
+          );
+        },
+        () => {
+          setEditorSavingTaskIds(current => {
+            const next = new Set(current);
+            next.delete(selectedTaskIdAtSchedule);
+            return next;
+          });
+          if (
+            latestSelectedTaskIdRef.current !== selectedTaskIdAtSchedule ||
+            editorSaveRequestRef.current !== requestAtSchedule
+          ) {
+            return;
+          }
+          setEditorSaveStatus(
+            editorRevisionRef.current === revisionAtSchedule ? 'error' : 'dirty'
+          );
+          toast.error("Couldn't update task");
+        }
+      );
+    }, 450);
+
+    return () => {
+      globalThis.clearTimeout(timeoutId);
+    };
+  }, [
+    editorDescription,
+    editorDescriptionContent,
+    editorSavingTaskIds,
+    editorSaveStatus,
+    editorTaskId,
+    editorTitle,
+    selectedTaskEditorDescription,
+    selectedTaskEditorId,
+    selectedTaskEditorContent,
+    selectedTaskEditorTitle,
+    updateTaskAsync,
+  ]);
+
+  const handleCloseShortcut = useCallback(
+    (event: KeyboardEvent) => {
+      if (isFormElement(event.target)) return;
+
+      if (headerMode !== 'default') {
+        event.preventDefault();
+        setHeaderMode('default');
+        return;
+      }
+
+      if (selectedTask) {
+        event.preventDefault();
+        closeTaskDocument();
+      }
+    },
+    [closeTaskDocument, headerMode, selectedTask]
+  );
+
+  const handleRowNavigationShortcut = useCallback(
+    (action: 'next' | 'prev', event: KeyboardEvent) => {
+      event.preventDefault();
+
+      if (!selectedTask) {
+        selectTaskByIndex(action === 'next' ? 0 : visibleTasks.length - 1);
+        return;
+      }
+
+      if (action === 'next') {
+        selectNextTask();
+        return;
+      }
+
+      selectPreviousTask();
+    },
+    [
+      selectNextTask,
+      selectPreviousTask,
+      selectTaskByIndex,
+      selectedTask,
+      visibleTasks.length,
+    ]
+  );
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (shouldIgnoreTaskShortcut(event)) return;
+
+      const action = resolveTableNavAction(event.key, event.target);
+      if (action === 'close') {
+        handleCloseShortcut(event);
+        return;
+      }
+
+      if (isTaskRowNavigationAction(action)) {
+        handleRowNavigationShortcut(action, event);
+      }
+    }
+
+    globalThis.addEventListener('keydown', handleKeyDown);
+    return () => {
+      globalThis.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleCloseShortcut, handleRowNavigationShortcut]);
+
+  const closeReleaseSidebar = useCallback(() => {
+    setSelectedReleaseId(null);
+  }, []);
+
+  const sidebarPanel = selectedReleaseId ? (
+    selectedRelease ? (
+      <ReleaseSidebar
+        release={selectedRelease}
+        mode='admin'
+        isOpen
+        providerConfig={providerConfig}
+        artistName={artistName}
+        readOnly
+        onClose={closeReleaseSidebar}
+      />
+    ) : (
+      <TaskReleasePanelStatus
+        status={
+          selectedReleaseQuery.isError
+            ? 'error'
+            : selectedReleaseQuery.isLoading
+              ? 'loading'
+              : 'empty'
+        }
+        onClose={closeReleaseSidebar}
+        onRetry={() => {
+          Promise.resolve(selectedReleaseQuery.refetch()).catch(() => {});
+        }}
+      />
+    )
+  ) : null;
+  useRegisterRightPanel(sidebarPanel);
+
+  const taskTitleOptions = useMemo(
+    () => distinctTaskTitles(taskSubviewBaseTasks),
+    [taskSubviewBaseTasks]
+  );
+
+  const headerSearchAdapter = useMemo(
+    () =>
+      taskSubviewBaseTasks.length === 0
+        ? null
+        : {
+            key: 'tasks',
+            pills,
+            onPillsChange: setPills,
+            artistOptions: [],
+            titleOptions: taskTitleOptions,
+            albumOptions: [],
+            totalCount: taskSubviewBaseTasks.length,
+            visibleCount: tasks.length,
+            triggerLabel:
+              pills.length > 0
+                ? `Filter Tasks (${pills.length})`
+                : 'Filter Tasks',
+            ariaLabel: 'Filter Tasks',
+            placeholder: 'Search tasks',
+            allowedFields: ['title'] as const,
+          },
+    [pills, taskSubviewBaseTasks.length, taskTitleOptions, tasks.length]
+  );
+
+  useRegisterHeaderSearch(headerSearchAdapter);
+
+  const headerActions = useMemo(
+    () => (
+      <DashboardHeaderActionGroup>
+        <DashboardHeaderActionButton
+          ariaLabel='Create Task'
+          icon={<Plus className='h-3.5 w-3.5' />}
+          label='New Task'
+          onClick={() => setHeaderMode('create')}
+          pressed={headerMode === 'create'}
+          hideLabelOnMobile
+          className='lg:hidden'
+        />
+      </DashboardHeaderActionGroup>
+    ),
+    [headerMode]
+  );
+
+  useRegisterHeaderActions(headerActions);
+
+  const showAssigneeInListRows = assigneeFilter === 'all';
+  const hideSelectedRowDue = showTaskDocumentPane && Boolean(selectedTask);
+
+  const renderTaskCell = useCallback(
+    (info: { row: { original: TaskView } }) => {
+      const isRowSelected = info.row.original.id === effectiveSelectedTaskId;
+
+      return (
+        <TaskListRow
+          task={info.row.original}
+          onOpenRelease={openReleaseSidebar}
+          artistName={artistName}
+          isSelected={isRowSelected}
+          showAssignee={showAssigneeInListRows}
+          hideDue={hideSelectedRowDue && isRowSelected}
+          actionSlot={
+            <TaskRowActionMenu
+              items={getTaskOverflowMenuItems(info.row.original)}
+              selected={isRowSelected}
+              visibility='hover'
+            />
+          }
+        />
+      );
+    },
+    [
+      artistName,
+      effectiveSelectedTaskId,
+      getTaskOverflowMenuItems,
+      openReleaseSidebar,
+      showAssigneeInListRows,
+      hideSelectedRowDue,
+    ]
+  );
+
+  const columns = useMemo(
+    () =>
+      [
+        columnHelper.accessor('taskNumber', {
+          id: 'title',
+          header: 'Tasks',
+          size: 9999,
+          cell: renderTaskCell,
+          meta: { className: 'px-0' },
+        }),
+      ] as ColumnDef<TaskView, unknown>[],
+    [renderTaskCell]
+  );
+  const handleCreateTask = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const title = draftTitle.trim();
+    if (!title) {
+      return;
+    }
+
+    try {
+      await createTaskMutation.mutateAsync({ title });
+      setDraftTitle('');
+      startTransition(() => {
+        setHeaderMode('default');
+      });
+    } catch {
+      toast.error("Couldn't create task");
+    }
+  };
+
+  let desktopTaskPane: React.ReactNode;
+  if (
+    isResolvingProfile ||
+    (isBoardMode ? isActiveBoardLoading : isActiveListLoading)
+  ) {
+    desktopTaskPane = <TaskWorkspaceLoadingRows />;
+  } else if (showTaskWorkbenchEmptyState) {
+    desktopTaskPane = (
+      <div className='flex h-full items-center justify-center px-6 py-6'>
+        <div className='w-full max-w-[26rem] px-6 py-8'>
+          <TaskEmptyState
+            hasFilters={hasFilters}
+            onClearFilters={clearFilters}
+            onOpenComposer={() => setHeaderMode('create')}
+            onOpenReleases={openReleases}
+          />
+        </div>
+      </div>
+    );
+  } else if (isBoardMode) {
+    desktopTaskPane = (
+      <TaskBoard
+        board={filteredBoardData}
+        visibleStatuses={visibleBoardStatuses}
+        isLoading={isActiveBoardLoading}
+        artistName={artistName}
+        selectedTaskId={effectiveSelectedTaskId}
+        compactColumnLabels={Boolean(selectedTask)}
+        showAssigneeChip={assigneeFilter === 'all'}
+        onOpenTask={openTaskDocument}
+        onCreateTask={() => setHeaderMode('create')}
+        onMoveTask={handleMoveTask}
+        getTaskContextMenuItems={getTaskOverflowMenuItems}
+      />
+    );
+  } else if (isDesktopTaskLayout) {
+    desktopTaskPane = (
+      <TaskDataTable
+        data={visibleTasks}
+        columns={columns}
+        isLoading={isActiveListLoading}
+        getRowId={row => row.id}
+        onRowClick={row => openTaskDocument(row)}
+        isRowSelected={row => row.id === effectiveSelectedTaskId}
+        getContextMenuItems={getTaskContextMenuItems}
+        emptyState={
+          <TaskEmptyState
+            hasFilters={hasFilters}
+            onClearFilters={clearFilters}
+            onOpenComposer={() => setHeaderMode('create')}
+            onOpenReleases={openReleases}
+          />
+        }
+      />
+    );
+  } else {
+    desktopTaskPane = null;
+  }
+
+  let mobileTaskContent: React.ReactNode;
+  if (isResolvingProfile || isActiveListLoading) {
+    mobileTaskContent = <TaskWorkspaceLoadingRows />;
+  } else if (mobileScopedTasks.length === 0) {
+    mobileTaskContent = (
+      <div className='px-4 pt-6'>
+        <TaskEmptyState
+          hasFilters={hasFilters || mobileScope !== 'all'}
+          onClearFilters={clearFilters}
+          onOpenComposer={() => setHeaderMode('create')}
+          onOpenReleases={openReleases}
+        />
+      </div>
+    );
+  } else if (mobileScope === 'all') {
+    mobileTaskContent = (
+      <>
+        <MobileTaskSection
+          title='Open'
+          tasks={mobileTaskSections.activeTasks}
+          selectedTaskId={selectedTaskId}
+          artistName={artistName}
+          onOpenTask={openTaskDocument}
+          onOpenRelease={openReleaseSidebar}
+          showAssignee={assigneeFilter === 'all'}
+        />
+        <MobileTaskSection
+          title='Closed'
+          tasks={mobileTaskSections.completedTasks}
+          selectedTaskId={selectedTaskId}
+          artistName={artistName}
+          onOpenTask={openTaskDocument}
+          onOpenRelease={openReleaseSidebar}
+          showAssignee={assigneeFilter === 'all'}
+        />
+      </>
+    );
+  } else {
+    mobileTaskContent = (
+      <MobileTaskSection
+        title={mobileScope === 'open' ? 'Open' : 'Closed'}
+        tasks={mobileScopedTasks}
+        selectedTaskId={selectedTaskId}
+        artistName={artistName}
+        onOpenTask={openTaskDocument}
+        onOpenRelease={openReleaseSidebar}
+        showAssignee={assigneeFilter === 'all'}
+      />
+    );
+  }
+  const activeIsError = isBoardMode ? isBoardError : isError;
+  const refetchActiveTasks = isBoardMode ? refetchBoard : refetch;
+
+  return (
+    <>
+      <NavigationDestinationReady
+        destination='tasks'
+        ready={
+          !activeIsError &&
+          !(isBoardMode ? isActiveBoardLoading : isActiveListLoading)
+        }
+      />
+      <PageShell
+        frame='none'
+        contentPadding='none'
+        className='absolute inset-0 overflow-hidden'
+        surfaceClassName='p-0'
+        data-testid='tasks-workspace'
+        toolbar={
+          isDesktopTaskLayout || headerMode !== 'default' ? (
+            <TaskWorkspaceHeaderBar
+              mode={headerMode}
+              draftTitle={draftTitle}
+              taskCount={
+                isBoardMode ? visibleBoardTaskCount : visibleTasks.length
+              }
+              subviews={taskSubviewOptions}
+              activeSubview={activeTaskSubview}
+              onSubviewChange={setTaskSubview}
+              onDraftTitleChange={setDraftTitle}
+              onCancelCreate={() => {
+                setDraftTitle('');
+                setHeaderMode('default');
+              }}
+              onSubmitCreate={handleCreateTask}
+              createPending={createTaskMutation.isPending}
+              filterCategories={taskFilterCategories}
+              onClearFilters={clearFilters}
+              onCreateTask={() => setHeaderMode('create')}
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+              showCancelledColumn={showCancelledColumn}
+              onShowCancelledColumnChange={setShowCancelledColumn}
+              showTaskNavigation={
+                !isBoardMode && isDesktopTaskLayout && Boolean(selectedTask)
+              }
+              canSelectPrevious={canSelectPrevious}
+              canSelectNext={canSelectNext}
+              onSelectPrevious={selectPreviousTask}
+              onSelectNext={selectNextTask}
+            />
+          ) : undefined
+        }
+      >
+        <section
+          className={cn(
+            'flex min-h-0 flex-1 flex-col gap-1 overflow-hidden pb-1'
+          )}
+          data-testid='tasks-content-panel'
+        >
+          {activeIsError ? (
+            <TaskErrorState
+              onRetry={() => {
+                Promise.resolve(refetchActiveTasks()).catch(() => {});
+              }}
+            />
+          ) : (
+            <div
+              className={cn(
+                'grid min-h-0 min-w-0 flex-1 grid-cols-1 overflow-hidden',
+                isBoardMode
+                  ? selectedTask
+                    ? 'lg:grid-cols-[minmax(0,1fr)_minmax(18rem,20rem)] xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]'
+                    : 'lg:grid-cols-1'
+                  : 'lg:grid-cols-[minmax(24rem,28rem)_minmax(0,1fr)]'
+              )}
+            >
+              <div
+                data-testid='task-list-pane'
+                className={cn(
+                  'min-h-0 min-w-0',
+                  TASK_WORKSPACE_PANE_CLASSNAME,
+                  viewMode !== 'board'
+                    ? 'lg:border-r lg:border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]'
+                    : !selectedTask && 'lg:col-span-1',
+                  showTaskListPane ? 'block' : 'hidden',
+                  !selectedTask && 'lg:max-w-none'
+                )}
+              >
+                {desktopTaskPane ?? (
+                  <div
+                    className='flex h-full min-h-0 flex-col overflow-hidden'
+                    data-testid='mobile-task-list'
+                  >
+                    <div className='flex items-center justify-between gap-3 px-4 pb-1 pt-3'>
+                      <p className='text-xs text-secondary-token'>
+                        {mobileScopeCounts.all} total tasks
+                      </p>
+                    </div>
+                    <TaskSubviewTabs
+                      subviews={taskSubviewOptions}
+                      activeSubview={activeTaskSubview}
+                      onSubviewChange={setTaskSubview}
+                      className='px-4 pb-1 pt-2'
+                    />
+                    <MobileTaskScopeTabs
+                      scope={mobileScope}
+                      counts={mobileScopeCounts}
+                      onChange={setMobileScope}
+                    />
+                    <div className='min-h-0 flex-1 overflow-y-auto overscroll-contain pb-6'>
+                      {mobileTaskContent}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div
+                className={cn(
+                  'min-h-0 min-w-0 overflow-hidden',
+                  isBoardMode
+                    ? 'lg:border-l lg:border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]'
+                    : '',
+                  TASK_WORKSPACE_PANE_CLASSNAME,
+                  showTaskDocumentPane
+                    ? isDesktopTaskLayout
+                      ? 'hidden lg:flex'
+                      : 'flex'
+                    : 'hidden'
+                )}
+                data-testid='task-document-pane'
+              >
+                {selectedTask ? (
+                  <TaskDocumentPanel
+                    task={selectedTask}
+                    title={
+                      editorTaskId === selectedTask.id
+                        ? editorTitle
+                        : selectedTaskEditorTitle
+                    }
+                    description={
+                      editorTaskId === selectedTask.id
+                        ? editorDescription
+                        : selectedTaskEditorDescription
+                    }
+                    descriptionContent={
+                      editorTaskId === selectedTask.id
+                        ? editorDescriptionContent
+                        : selectedTaskEditorContent
+                    }
+                    saveStatus={editorSaveStatus}
+                    onTitleChange={value => {
+                      editorRevisionRef.current += 1;
+                      setEditorTitle(value);
+                      setEditorSaveStatus('dirty');
+                    }}
+                    onDescriptionChange={change => {
+                      editorRevisionRef.current += 1;
+                      setEditorDescription(change.plainText);
+                      setEditorDescriptionContent(change.content);
+                      setEditorSaveStatus('dirty');
+                    }}
+                    onRetrySave={() => setEditorSaveStatus('dirty')}
+                    onResolveConflict={() => {
+                      setEditorTitle(selectedTaskEditorTitle);
+                      setEditorDescription(selectedTaskEditorDescription);
+                      setEditorDescriptionContent(selectedTaskEditorContent);
+                      editorExpectedMutationVersionRef.current =
+                        selectedTask.mutationVersion ?? null;
+                      editorRevisionRef.current += 1;
+                      setEditorSaveStatus('idle');
+                    }}
+                    onClose={closeTaskDocument}
+                    onOpenRelease={openReleaseSidebar}
+                    onUpdateStatus={(taskId, status) =>
+                      updateTaskField(taskId, { status })
+                    }
+                    onUpdatePriority={(taskId, priority) =>
+                      updateTaskField(taskId, { priority })
+                    }
+                    onUpdateAssignee={(taskId, assigneeKind) =>
+                      updateTaskField(taskId, { assigneeKind })
+                    }
+                    actionItems={getTaskDetailMenuItems(selectedTask)}
+                    artistName={artistName}
+                    isDesktopLayout={isDesktopTaskLayout}
+                    compactMetadata={isBoardMode}
+                  />
+                ) : (
+                  <TaskDocumentPanel
+                    task={null}
+                    title=''
+                    description=''
+                    descriptionContent={emptyRichTextDocument}
+                    saveStatus='idle'
+                    onTitleChange={NOOP}
+                    onDescriptionChange={NOOP}
+                    onRetrySave={NOOP}
+                    onResolveConflict={NOOP}
+                    onClose={NOOP}
+                    onOpenRelease={NOOP_TASK_OPEN}
+                    onUpdateStatus={NOOP_TASK_STATUS_UPDATE}
+                    onUpdatePriority={NOOP_TASK_PRIORITY_UPDATE}
+                    onUpdateAssignee={NOOP_TASK_ASSIGNEE_UPDATE}
+                    actionItems={[]}
+                    artistName={artistName}
+                    isDesktopLayout={isDesktopTaskLayout}
+                    compactMetadata={false}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+        </section>
+      </PageShell>
+
+      <ConfirmDialog
+        open={taskPendingDelete !== null}
+        onOpenChange={open => {
+          if (!open) setTaskPendingDelete(null);
+        }}
+        title='Delete task?'
+        description={
+          taskPendingDelete
+            ? `"${taskPendingDelete.title}" can't be recovered.`
+            : ''
+        }
+        confirmLabel='Delete'
+        variant='destructive'
+        onConfirm={async () => {
+          if (!taskPendingDelete) return;
+          try {
+            await deleteTaskAsync(taskPendingDelete.id);
+            toast.success('Task deleted');
+          } catch {
+            toast.error("Couldn't delete task");
+          }
+        }}
+      />
+    </>
+  );
+}

@@ -1,0 +1,2597 @@
+/**
+ * Jovie Design System - Linear-inspired OKLCH Theme Generation
+ *
+ * Core Principles (from Linear's redesign):
+ * 1. OKLCH color space for perceptual uniformity
+ * 2. Only 3 theme inputs generate ALL colors
+ * 3. Light/dark modes use identical generation logic
+ * 4. Contrast is a continuous variable (0-100)
+ *
+ * @see https://linear.app/now/how-we-redesigned-the-linear-ui
+ */
+
+/* Import Linear-specific tokens for marketing pages */
+@import "./linear-tokens.css";
+/* Generated from design/tokens.json (JOV #12009) — pnpm tokens:build */
+@import "./generated/design-tokens.css";
+/* DESIGN AGENT: Carbon palette synced to shell-v1 */
+/* Tokens updated: bg-page #06070a, surface0 #0a0b0e, surface1 #101216, 
+   surface2 #161a20, contentSurface #0a0c0f, border #171a20 */
+
+/* ============================================
+   THEME INPUTS - The only 3 variables needed
+   ============================================ */
+:root {
+  /* Public shell semantic aliases — preserve current public surface values while
+     centralizing the contract used by marketing and legal layouts. */
+  --public-shell-header-offset: var(--linear-header-height);
+  --public-shell-bg: var(--color-bg-base);
+  --public-shell-text: var(--color-text-primary-token);
+  /* Legacy variant names — alias to canonical 1298px until Wave 4 consumer sweep */
+  --public-content-max-landing: var(--ds-public-content-max);
+  --public-content-max-page: var(--ds-public-content-max);
+  /* TODO(DS_FOUNDATION_V1 Wave 4): consider deprecating once consumers migrate to --ds-prose-max */
+  --app-shell-content-max-wide: 84rem;
+  --app-shell-content-max-reading: 56rem;
+  --app-shell-content-max-form: 50rem;
+  --profile-shell-max-width: 430px;
+  --profile-shell-header-max-width: 38rem;
+  --profile-shell-card-radius: 24px;
+  --profile-card-radius: 22px;
+  --profile-inner-radius: 18px;
+  --profile-drawer-radius-mobile: 22px;
+  --profile-drawer-radius-desktop: 20px;
+  --profile-action-radius: 14px;
+  --profile-notification-icon-size: 17px;
+  --profile-hero-identity-min-height: calc(var(--space-24) + var(--space-2));
+  --app-dialog-radius: var(--profile-inner-radius);
+  --app-shell-sidebar-floating-radius: 14px;
+  --page-pad: clamp(16px, 4vw, 32px);
+  --cover-height: clamp(220px, 34svh, 400px);
+  --content-max: 720px;
+  /* Extra --space-8 keeps the last Music/catalog row above the floating tab
+     bar. Home/Events/Alerts share this inset so the shell stays aligned. */
+  --profile-bottom-nav-height: calc(
+    var(--space-12) +
+    var(--space-2-5) +
+    max(10px, env(safe-area-inset-bottom)) +
+    var(--space-2) +
+    var(--space-8)
+  );
+
+  /* DS_FOUNDATION_V1: canonical semantic aliases (do not redefine downstream) */
+  --ds-public-content-max: 1298px; /* canonical public/marketing width */
+  --ds-prose-max: 680px; /* prose exception */
+
+  /* Marketing display type scale (System B public surfaces). One canonical
+     ramp for hero display, section titles, and ledes so marketing pages share
+     a single visual hierarchy instead of per-section one-off clamps. Satoshi
+     display + Inter body per the approved exception in DESIGN.md. */
+  --ds-marketing-display-size: clamp(4rem, 6.9vw, 6.25rem);
+  --ds-marketing-display-leading: 0.94;
+  --ds-marketing-display-tracking: -0.045em;
+  --ds-marketing-title-size: clamp(
+    var(--text-4xl),
+    4.6vw,
+    calc(var(--text-5xl) + var(--space-4))
+  );
+  --ds-marketing-title-leading: 1.08;
+  --ds-marketing-title-tracking: 0;
+  --ds-marketing-lede-size: clamp(1.25rem, 1.6vw, 1.375rem);
+  --ds-marketing-lede-leading: var(--leading-normal);
+  --ds-marketing-lede-tracking: -0.015em;
+  /* Eyebrow / kicker spec: quiet uppercase-free label above section titles.
+     0 tracking per the System B contract (see trust-strip style guard). */
+  --ds-marketing-eyebrow-size: calc(var(--text-xs) - 1px);
+  --ds-marketing-eyebrow-weight: var(--font-weight-medium);
+  --ds-marketing-eyebrow-leading: var(--leading-tight);
+  --ds-marketing-eyebrow-tracking: 0;
+  --ds-marketing-eyebrow-color: var(--color-text-tertiary-token);
+
+  /* Shell V1 semantic aliases — app chrome should prefer these names when
+     touching shared shell geometry. They intentionally resolve to the current
+     Linear-derived values so this pass changes the token contract, not visuals. */
+  --app-shell-sidebar-width: var(--linear-app-sidebar-width);
+  --app-shell-header-height: var(--linear-app-header-height);
+  --app-shell-header-height-compact: var(--linear-app-header-height-compact);
+  --app-shell-footer-row-height: calc(var(--space-6) + var(--space-1-5));
+  --app-shell-gap: var(--linear-app-shell-gap);
+  --app-shell-radius: var(--linear-app-shell-radius);
+  --app-shell-border: var(--linear-app-shell-border);
+  --app-shell-frame-seam: var(--linear-app-frame-seam);
+  --app-shell-content-surface: var(--linear-app-content-surface);
+  --app-shell-audio-bar-max-height: var(--linear-app-audio-bar-max-height);
+  --app-shell-audio-compact-height: var(--linear-app-audio-compact-height);
+
+  /* System B semantic aliases for public app surfaces. Keep page-level recipes
+     on these names instead of route-local Tailwind literals. */
+  --system-b-cinematic-black: #06070a;
+  --system-b-text-primary: var(--color-text-primary-token);
+  --system-b-bg-page: var(--color-bg-base);
+  --system-b-bg-surface-0: var(--color-bg-surface-0);
+  --system-b-bg-surface-1: var(--color-bg-surface-1);
+  --system-b-bg-surface-2: var(--color-bg-surface-2);
+  --system-b-primary-bg: var(--linear-btn-primary-bg);
+  --system-b-primary-fg: var(--linear-btn-primary-fg);
+  --system-b-header-height: var(--linear-header-height);
+  --system-b-app-shell-border: var(--app-shell-border);
+  --system-b-app-frame-seam: var(--app-shell-frame-seam);
+  --system-b-app-content-surface: var(--app-shell-content-surface);
+  --system-b-accent-cyan: var(--geist-cyan-solid);
+  --system-b-entity-chip-release-accent: var(--color-accent);
+  --system-b-entity-chip-artist-accent: var(--color-accent-purple);
+  --system-b-entity-chip-track-accent: var(--color-accent-blue);
+  --system-b-entity-chip-event-accent: var(--color-accent-orange);
+  --system-b-entity-chip-on-light-text: var(--system-b-chat-user-bubble-text);
+  --system-b-chat-message-max-width: 78%;
+  --system-b-chat-user-bubble-bg: var(--color-text-primary-token);
+  --system-b-chat-user-bubble-text: var(--color-bg-base);
+  --system-b-chat-user-bubble-border: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 80%,
+    transparent
+  );
+  --system-b-chat-user-bubble-shadow:
+    0 var(--space-3) 38px -28px
+    color-mix(in oklab, var(--system-b-cinematic-black) 85%, transparent),
+    inset 0 var(--space-px) 0
+    color-mix(in oklab, var(--color-text-primary-token) 90%, transparent);
+  --system-b-chat-action-card-min-height: 148px;
+  --system-b-chat-action-card-min-height-compact: 132px;
+  --system-b-chat-action-card-icon-size: 28px;
+  --system-b-chat-action-card-primary-height: 32px;
+  --system-b-opportunity-inbox-max-width: 45rem;
+  --system-b-opportunity-inbox-card-min-height: 168px;
+  --system-b-opportunity-inbox-comment-shell-height: 5.75rem;
+  --system-b-chat-message-content-max: 66ch;
+  --system-b-chat-body-size: var(--text-app);
+  --system-b-chat-body-line-height: 1.5;
+  /* Agent activity (tool-call status rows) — one step subordinate to prose */
+  --system-b-chat-activity-indent: var(--space-4);
+  --system-b-chat-activity-size: var(--text-xs);
+  --system-b-chat-activity-line-height: var(--space-4);
+  --system-b-chat-activity-weight: var(--font-weight-book);
+  --system-b-chat-activity-color: var(--color-text-secondary-token);
+  --system-b-chat-activity-meta-color: var(--color-text-tertiary-token);
+  --system-b-chat-activity-gap: var(--space-0-5);
+  --system-b-chat-activity-row-py: var(--space-1);
+  --system-b-chat-activity-icon-size: 0.875rem;
+  --system-b-chat-activity-timeline-color: color-mix(
+    in oklab,
+    var(--linear-app-shell-border) 70%,
+    transparent
+  );
+  --system-b-chat-composer-max-width: 45rem;
+  /* Content-safe inset so sticky composer dock never covers last messages/cards.
+     Sized for compact dock (input + padding + safe-area); keep ≥ dock height. */
+  --system-b-chat-composer-thread-scroll-padding: 11rem;
+  --system-b-chat-composer-scroll-fade-height: 8rem;
+  --system-b-chat-loading-composer-height: 88px;
+  --system-b-duration-fast: var(--ds-motion-subtle-duration);
+  --system-b-ease: var(--ds-motion-subtle-easing);
+  --system-b-radius-pill: var(--radius-full);
+  /* Concentric nested surfaces: outer radius = inner radius + inset. */
+  --system-b-radius-card: var(--radius-xl);
+  --system-b-radius-card-inner: calc(
+    var(--system-b-radius-card) -
+    var(--space-1)
+  );
+  --system-b-radius-overlay: var(--radius-xl);
+  --system-b-radius-overlay-inner: calc(
+    var(--system-b-radius-overlay) -
+    var(--space-1)
+  );
+  --system-b-radius-panel: var(--radius-3xl);
+  --system-b-radius-panel-inner: calc(
+    var(--system-b-radius-panel) -
+    var(--space-1)
+  );
+  --system-b-onboarding-step-handle: var(--geist-purple-solid);
+  --system-b-onboarding-step-spotify: var(--color-brand-spotify);
+  --system-b-onboarding-step-upgrade: var(--geist-amber-solid);
+  --system-b-onboarding-step-dsp: var(--geist-cyan-solid);
+  --system-b-onboarding-step-social: var(--geist-pink-solid);
+  --system-b-onboarding-step-releases: var(--color-warning);
+  --system-b-onboarding-step-profile-ready: var(--color-success);
+
+  --ds-motion-subtle-duration: 150ms;
+  --ds-motion-subtle-easing: cubic-bezier(0.4, 0, 0.2, 1);
+  --ds-motion-cinematic-duration: 420ms;
+  --ds-motion-cinematic-easing: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Core Theme Inputs */
+  --theme-base-hue: 282;
+  /* Neutral foundation hue — Linear March 2026 refresh (shifted from 272→282) */
+  --theme-base-chroma: 0.015;
+  /* Very low chroma for neutrals */
+  /* Brand accent hue — aligned with base hue per Linear refresh */
+  /* Vibrant accent saturation */
+  --theme-contrast: 65;
+  /* Contrast level (0-100) */
+
+  /* Derived base lightness for light mode */
+  /* Near white for light mode */
+}
+
+.profile-viewport {
+  --page-pad: clamp(16px, 4vw, 32px);
+  --cover-height: clamp(220px, 34svh, 400px);
+  --content-max: 720px;
+}
+
+.public-profile-layout-frame {
+  max-width: min(100%, var(--content-max));
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+.public-profile-layout-frame--desktop {
+  max-width: min(
+    100%,
+    calc(var(--profile-shell-max-width) + (var(--page-pad) * 2))
+  );
+  padding-left: max(var(--page-pad), env(safe-area-inset-left));
+  padding-right: max(var(--page-pad), env(safe-area-inset-right));
+  padding-block: clamp(16px, 2vw, 24px);
+}
+
+.public-profile-layout-frame--compact {
+  max-width: min(100%, calc(var(--content-max) + (var(--page-pad) * 2)));
+  /* Keep the stage geometry independent from lazy floating overlays. Cookie
+     consent clears the phone nav by moving its own fixed card, never by
+     resizing the profile after first paint. */
+  height: 100%;
+  min-height: 100dvh;
+}
+
+.public-profile-layout-compact-slot {
+  display: flex;
+  min-width: 0;
+  width: 100%;
+  flex-direction: column;
+}
+
+/* Mobile: slot fills frame so the card can use full height. */
+.public-profile-layout-frame--compact .public-profile-layout-compact-slot {
+  height: 100%;
+  flex: 1 1 auto;
+}
+
+/* Desktop: slot sizes to the card so vertical centering has spare space. */
+@media (min-width: 768px) {
+  .public-profile-layout-frame--compact {
+    height: auto;
+  }
+
+  .public-profile-layout-frame--compact .public-profile-layout-compact-slot,
+  .public-profile-layout-frame--desktop .public-profile-layout-compact-slot {
+    height: auto;
+    flex: 0 0 auto;
+  }
+}
+
+.public-profile-layout-desktop-shell {
+  display: none;
+  min-width: 0;
+  width: 100%;
+}
+
+.public-profile-layout-desktop-placeholder {
+  height: min(940px, calc(100dvh - 48px));
+  width: 100%;
+  overflow: hidden;
+  border-radius: 28px;
+  background: rgba(8, 10, 14, 0.76);
+}
+
+.public-profile-compact-shell {
+  max-width: min(var(--profile-shell-max-width), 100%);
+}
+
+:where(.profile-aeo-content) {
+  --profile-aeo-text: var(--color-text-tooltip);
+  --profile-aeo-muted: color-mix(
+    in oklab,
+    var(--color-text-tooltip) 70%,
+    transparent
+  );
+  --profile-aeo-border: color-mix(
+    in oklab,
+    var(--color-text-tooltip) 14%,
+    transparent
+  );
+  background:
+    linear-gradient(180deg, var(--profile-stage-bg) 0, transparent 12rem),
+    var(--system-b-cinematic-black);
+  color: var(--profile-aeo-text);
+  color-scheme: dark;
+}
+
+:where(.profile-aeo-content__inner) {
+  border-color: var(--profile-aeo-border);
+}
+
+:where(.profile-aeo-content__heading) {
+  max-inline-size: 18ch;
+}
+
+:where(.profile-aeo-content__body) {
+  max-inline-size: 58ch;
+}
+
+@media (min-width: 1024px) {
+  :where(.profile-aeo-content__inner) {
+    grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+  }
+}
+
+@media (min-width: 640px) {
+  :where(.profile-aeo-content__faq-item) {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  }
+}
+
+:where(.profile-hero-identity-scrim) {
+  min-height: var(--profile-hero-identity-min-height);
+  background: var(--profile-stage-bg);
+}
+
+/* Single hero legibility gradient, limited to the bottom ~55% of the cover so
+   the artist photo stays clearly visible in the upper zone. Replaces the old
+   stacked full-height scrims (profile-cover-home-gradient +
+   profile-cover-home-fade) that darkened the whole photo. */
+:where(.profile-cover-home-gradient) {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 55%;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(3, 4, 6, 0.42) 52%,
+    rgba(5, 6, 8, 0.9) 86%,
+    var(--profile-stage-bg) 100%
+  );
+}
+
+/* The public compact hero reserves identity outside the image, so it needs
+   only a shallow media-edge transition. This modifier preserves the shared
+   legacy class contract while ensuring the live surface never lays a tall
+   scrim across the subject. */
+:where(.profile-cover-home-gradient--face-safe) {
+  height: var(--space-8);
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in oklab, var(--profile-stage-bg) 44%, transparent) 54%,
+    var(--profile-stage-bg) 100%
+  );
+}
+
+/* Profile home carousel card geometry: one 3:4 shape that fills the remaining
+   viewport height. Width derives from height via aspect-ratio; the max-height
+   cap keeps width at or under ~78vw (width = 0.75 × height). Cards center
+   vertically when the track is taller than the capped card height. */
+:where(.profile-entity-card) {
+  aspect-ratio: 3 / 4;
+  height: 100%;
+  max-height: 104vw;
+  align-self: center;
+  /* Size container so card content can respond to the card's own height. */
+  container-type: size;
+  transition: opacity var(--ds-motion-subtle-duration)
+    var(--ds-motion-subtle-easing);
+}
+
+/* Direction C public-profile rail: one full-content-width card per snap. The
+   9:4 footprint gives the inset square media roughly 42% of the card width,
+   leaving a compact copy/action column. Its 4px artwork radius steps down from
+   the 18px card surface and avoids clipping the artwork with the card border.
+   Portrait remains the default for every other EntityCarousel consumer. */
+:where(.profile-entity-card[data-layout="profile-landscape"]) {
+  aspect-ratio: 9 / 4;
+  width: 100%;
+  height: auto;
+  max-height: none;
+  align-self: flex-start;
+  container-type: inline-size;
+}
+
+/* Unified card anatomy: the art zone is a full-width square, so the text
+   zone + CTA share (card height − card width). Progressive disclosure keeps
+   every line whole instead of clipping mid-line: the meta line hides below
+   the height where it fits (~448px), and the eyebrow hides below the height
+   where it fits next to the title (~360px) — title and CTA always fit. */
+@container (max-height: 447px) {
+  :where(.profile-entity-card:not([data-layout="profile-landscape"]))
+    .entity-card-meta {
+    display: none;
+  }
+}
+
+@container (max-height: 359px) {
+  :where(.profile-entity-card:not([data-layout="profile-landscape"]))
+    .entity-card-eyebrow {
+    display: none;
+  }
+}
+
+/* Scroll-driven edge treatment (opacity only; applied via IntersectionObserver
+   and skipped entirely under reduced motion). Card geometry stays invariant
+   throughout drag, momentum, and snap so the rail never appears to breathe. */
+:where(.profile-entity-card[data-edge="true"]) {
+  opacity: 0.75;
+}
+
+:where(
+  .profile-entity-card[data-layout="profile-landscape"][data-edge="true"]
+) {
+  opacity: 0.82;
+}
+
+/* Chromeless top-chrome icon buttons (back / overflow menu): glyph-only by
+   default, with a legibility drop-shadow so the glyph reads over hero media on
+   touch devices that never hover. The pearl circle reveals on hover /
+   focus-visible only. Unlayered on purpose so it beats the layered variant
+   utilities on the same element. */
+.profile-top-chrome-icon {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  color: var(--profile-status-pill-fg);
+}
+
+.profile-top-chrome-icon > svg {
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.72))
+    drop-shadow(0 0 2px rgba(0, 0, 0, 0.6));
+}
+
+@media (hover: hover) {
+  .profile-top-chrome-icon:hover {
+    border-color: var(--profile-pearl-border);
+    background: var(--profile-pearl-bg);
+    box-shadow: var(--profile-pearl-shadow);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+  }
+}
+
+.profile-top-chrome-icon:focus-visible {
+  border-color: var(--profile-pearl-border);
+  background: var(--profile-pearl-bg);
+  box-shadow: var(--profile-pearl-shadow);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+:where(.profile-horizontal-rail) {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+:where(.profile-horizontal-rail::-webkit-scrollbar) {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+:where(.profile-content-scroll-region) {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+:where(.profile-content-scroll-region::-webkit-scrollbar) {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Compact profile tab entry. The outgoing panel is replaced in-place, so this
+   transform never participates in layout and cannot move the dock or header. */
+:where(.profile-primary-tab-transition) {
+  animation: profile-tab-enter var(--ds-motion-subtle-duration)
+    var(--ds-motion-subtle-easing) both;
+}
+
+:where(.profile-primary-tab-transition[data-direction="-1"]) {
+}
+
+:where(.profile-primary-tab-transition[data-direction="1"]) {
+}
+
+@keyframes profile-tab-enter {
+  from {
+    opacity: 0;
+    transform: translateX(var(--profile-tab-enter-offset, 6px));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(.profile-primary-tab-transition) {
+    animation: none;
+  }
+}
+
+:where(.profile-aeo-content__heading),
+:where(.profile-aeo-content__subheading),
+:where(.profile-aeo-content__term),
+:where(.profile-aeo-content__source) {
+  color: var(--profile-aeo-text);
+}
+
+:where(.profile-aeo-content__body),
+:where(.profile-aeo-content__answer) {
+  color: var(--profile-aeo-muted);
+}
+
+.profile-aeo-content__body a,
+.profile-aeo-content__answer a,
+.profile-aeo-content__body .profile-entity-mention,
+.profile-aeo-content__answer .profile-entity-mention {
+  color: var(--profile-aeo-text);
+}
+
+:where(.profile-aeo-content__faq-list) {
+  border-color: var(--profile-aeo-border);
+}
+
+:where(.profile-aeo-content__faq-list > *) {
+  border-color: var(--profile-aeo-border);
+}
+
+:where(.profile-aeo-content__source) {
+  text-decoration-color: var(--profile-aeo-border);
+}
+
+:where(.profile-aeo-content__source:hover) {
+  color: var(--profile-aeo-text);
+  text-decoration-color: var(--profile-aeo-text);
+}
+
+:where(.profile-aeo-content__facts) {
+  border-color: var(--profile-aeo-border);
+}
+
+:where(.profile-aeo-content__fact-value) {
+  color: var(--profile-aeo-text);
+}
+
+:where(.profile-aeo-content__fact-label),
+:where(.profile-aeo-content__link-label),
+:where(.profile-aeo-content__link),
+:where(.profile-aeo-content__share) {
+  color: var(--profile-aeo-muted);
+}
+
+:where(.profile-aeo-content__link:hover),
+:where(.profile-aeo-content__share:hover) {
+  color: var(--profile-aeo-text);
+}
+
+:where(.profile-aeo-claim-card) {
+  --profile-aeo-claim-ink: var(--system-b-cinematic-black);
+  background: var(--color-bg-paper);
+  border-color: color-mix(
+    in oklab,
+    var(--profile-aeo-claim-ink) 14%,
+    transparent
+  );
+  box-shadow:
+    0 22px 64px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  color: var(--profile-aeo-claim-ink);
+}
+
+:where(.profile-aeo-claim-card__heading) {
+  font-size: clamp(3.75rem, 10vw, 7.5rem);
+  letter-spacing: -0.07em;
+  line-height: 0.8;
+  white-space: nowrap;
+}
+
+:where(.profile-aeo-claim-card__domain) {
+  color: color-mix(in oklab, var(--profile-aeo-claim-ink) 48%, transparent);
+}
+
+:where(.profile-aeo-claim-card__note) {
+  color: color-mix(in oklab, var(--profile-aeo-claim-ink) 66%, transparent);
+}
+
+:where(.profile-aeo-claim-card__cta) {
+  background: var(--profile-aeo-claim-ink);
+  color: var(--color-bg-paper);
+}
+
+@media (hover: hover) {
+  :where(.profile-aeo-claim-card__cta:hover) {
+    background: color-mix(
+      in oklab,
+      var(--profile-aeo-claim-ink) 86%,
+      transparent
+    );
+  }
+}
+
+/* Mobile public profiles are a fixed one-screen shell. Keep the AEO copy in the
+   static DOM, but out of mobile layout so it cannot add page scroll below the
+   compact profile. Desktop keeps the readable AEO section. */
+@media (max-width: 767px) {
+  /* The consent card mounts lazily after geo/cookie checks. Keep it in the
+     safe-area top overlay on phones: the bottom region contains both the
+     profile's primary conversion action and the canonical glass dock. */
+  .cookie-banner-card--above-public-profile-dock {
+    top: max(env(safe-area-inset-top), 8px);
+    bottom: auto;
+    left: min(50vw, calc(var(--profile-shell-max-width) / 2));
+    right: auto !important;
+    width: min(254px, calc(100vw - 136px)) !important;
+    max-width: none;
+    transform: translateX(-50%);
+  }
+
+  .profile-viewport ~ .profile-aeo-content {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* The compact consent action row fits as one line at the standard 254px
+   profile card width. At narrower phone widths, preserve visual and tab order
+   while giving the equally prominent choices one row and Customize its own
+   full-width row. */
+@media (max-width: 383px) {
+  .cookie-actions--compact {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cookie-actions--compact > .cookie-action--choice,
+  .cookie-actions--compact > .cookie-action--customize {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .cookie-actions--compact > .cookie-action--customize {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1179px) {
+  /* At tablet and narrow-desktop widths, the centered profile still uses its
+     lower region for the PAC and dock. Keep consent above the card instead. */
+  .cookie-banner-card--above-public-profile-dock {
+    top: var(--page-pad);
+    bottom: auto;
+    left: 50%;
+    right: auto !important;
+    width: 254px !important;
+    max-width: none;
+    transform: translateX(-50%);
+  }
+}
+
+/* Compact mobile home hero: one definite token-driven height on every
+   viewport (--cover-height, clamp(220px, 34svh, 400px)). The hero never
+   shrink-wraps; media crops via object-cover and the carousel below owns the
+   remaining viewport height. */
+/* The fixed token remains the minimum crop-safe media height. On the home
+   surface, the shell gives every additional vertical pixel to the real hero
+   instead of leaving an ownerless flex region below the primary card. The
+   content column stays intrinsic, so the card and dock never stretch and no
+   fake spacer participates in the layout. */
+:where(
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+    > .profile-home-fluid-hero
+) {
+  flex: 1 1 auto;
+  min-height: var(--cover-height);
+  height: auto;
+  /* The base declaration preserves the established media floor; this
+     supported calc also reserves the non-overlay identity band. */
+  min-height: calc(
+    var(--cover-height) +
+    var(--profile-hero-identity-min-height)
+  );
+}
+
+/* Profiles without real hero media keep the identity chrome compact instead
+   of stretching a decorative gradient through most of the first viewport. */
+:where(
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+    > .profile-home-fluid-hero--no-media
+) {
+  flex: 0 0 auto;
+  height: calc(
+    max(env(safe-area-inset-top), 16px) +
+    5rem +
+    var(--profile-hero-identity-min-height)
+  );
+  min-height: calc(
+    max(env(safe-area-inset-top), 16px) +
+    5rem +
+    var(--profile-hero-identity-min-height)
+  );
+}
+
+:where(
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+    > .profile-home-content-column,
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+    .profile-home-content-scroll,
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+    [data-testid="profile-home-rail"]
+) {
+  flex: 0 0 auto;
+}
+
+/* Query-mode profile URLs are served from the ISR home shell, then hydrate into
+   the requested mode from window.location. Match the mode header on first paint
+   so hydration does not move the compact profile frame. */
+html[data-profile-initial-mode]
+[data-testid="profile-compact-surface"][data-mode="profile"] {
+  --cover-height: calc(3.5rem + max(env(safe-area-inset-top), 0px));
+}
+
+html[data-profile-initial-mode]
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+  [data-testid="profile-cover"] {
+  height: calc(3.5rem + max(env(safe-area-inset-top), 0px)) !important;
+  max-height: calc(3.5rem + max(env(safe-area-inset-top), 0px)) !important;
+}
+
+html[data-profile-initial-mode]
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+  .profile-cover-chrome {
+  padding-top: max(env(safe-area-inset-top), 10px) !important;
+}
+
+html[data-profile-initial-mode]
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+  .profile-cover-home-media,
+html[data-profile-initial-mode]
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+  .profile-cover-home-gradient,
+html[data-profile-initial-mode]
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+  [data-testid="profile-hero-identity-block"] {
+  display: none !important;
+}
+
+html[data-profile-initial-mode]
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+  .profile-cover-mode-title {
+  display: block !important;
+}
+
+@media (min-width: 768px) {
+  .public-profile-compact-shell {
+    /* Proportional hero: on short desktop windows the shell shrinks below
+       740px and a fixed 340px hero would crush the carousel to a sliver.
+       Share the shell height instead (45%, floored at 200px). */
+    --cover-height: clamp(200px, 45%, 340px);
+    height: min(740px, calc(100dvh - (var(--page-pad) * 2)));
+  }
+}
+
+@media (min-width: 1180px) {
+  /* Match desktop max-width so SSR compact class produces the same frame width
+     as the JS-switched desktop class, eliminating layout shift on hydration. */
+  .public-profile-layout-frame--compact {
+    max-width: min(
+      100%,
+      calc(var(--profile-shell-max-width) + (var(--page-pad) * 2))
+    );
+    padding-left: max(var(--page-pad), env(safe-area-inset-left));
+    padding-right: max(var(--page-pad), env(safe-area-inset-right));
+    padding-block: clamp(16px, 2vw, 24px);
+  }
+}
+
+:root.dark {
+  /* Dark mode only changes base lightness */
+  /* Deep dark for dark mode */
+}
+
+/* ============================================
+   SURFACE SYSTEM - Layered elevation
+   ============================================
+
+   Linear uses 5 surface levels for depth:
+   - base: App background
+   - surface-0: Elevated (sidebars)
+   - surface-1: Cards/panels
+   - surface-2: Interactive/hover
+   - surface-3: Pressed/active
+*/
+
+:root {
+  /* Light mode surfaces — matching Linear's exact structural hues
+     --bg-base: Sidebar & page background
+     --bg-surface-1: Main app content area
+     --bg-surface-2: Cards and panels
+     --bg-surface-3: Interactive / elevated */
+  /* prettier-ignore */
+  --color-bg-base: #f5f5f5;
+  /* Sidebar bg */
+  /* prettier-ignore */
+  --color-bg-surface-0: #f5f5f5;
+  /* Page bg */
+  /* prettier-ignore */
+  --color-bg-surface-1: var(--linear-app-content-surface);
+  /* App shell canvas in light mode */
+  /* prettier-ignore */
+  --color-bg-surface-2: #f2f3f5;
+  /* Cards */
+  /* prettier-ignore */
+  --color-bg-surface-3: #ebecef;
+  /* Nested / hover */
+
+  --color-bg-page: #f5f5f5;
+  /* Same as base */
+  --color-bg-hover: rgba(0, 0, 0, 0.04);
+  /* Hover overlay */
+  --color-bg-elevated: #f2f3f5;
+  /* Same as surface-2 */
+  --color-bg-input: #ebecef;
+  /* Same as surface-3 */
+  --color-bg-active: #ebecef;
+  /* Same as surface-3 */
+  --color-bg-primary: lch(98.94% 0.5 282);
+  --color-bg-secondary: lch(95.94% 0.5 282);
+  /* Linear March 2026 exact — was lch(93.797% 1.529 282), too dark/saturated */
+  --color-bg-button: #e3e5e8;
+  --color-bg-tooltip: #101012;
+  /* Linear dark background for light mode tooltips */
+  --color-bg-paper: #f7f8f8;
+  /* Paper surface for explicit light reading modes embedded in app shells */
+
+  /* Text hierarchy - contrast-aware */
+  --color-text-primary-token: lch(9.894% 0 282);
+  --color-text-secondary-token: lch(19.788% 1.25 282);
+  --color-text-tertiary-token: lch(34% 1.25 282);
+  --color-text-quaternary-token: lch(65.3% 1.25 282);
+  --color-text-disabled-token: oklch(
+    70% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-tooltip: #ffffff;
+
+  /* Logo muted tokens for label logos bar */
+  --color-logo-muted: rgba(0, 0, 0, 0.4);
+  --color-logo-muted-hover: rgba(0, 0, 0, 0.65);
+
+  /* Border system - semi-transparent for flexibility */
+  --color-border-subtle: oklch(0% 0 0 / 5%);
+  --color-border-default: oklch(0% 0 0 / 8%);
+  --color-border-strong: oklch(0% 0 0 / 15%);
+  --color-border-focus: #7170ff;
+  /* Linear accent for focus */
+  /* Footer seam — promoted from the retired linear border footer alias (JOV-5458). */
+  --color-border-footer: oklch(90% 0.005 282);
+
+  /* Accent palette rotation */
+  --color-accent-gray: #7f7f85;
+  --color-accent-gray-subtle: #efeff2;
+  --color-accent-blue: #2563ff;
+  --color-accent-blue-subtle: #edf3ff;
+  --color-accent-purple: #8b1eff;
+  --color-accent-purple-subtle: #f3ebff;
+  --color-accent-pink: #d61a7f;
+  --color-accent-pink-subtle: #fde9f4;
+  --color-accent-red: #f3122d;
+  --color-accent-red-subtle: #ffeaee;
+  --color-accent-orange: #ff9800;
+  --color-accent-orange-subtle: #fff3e6;
+  --color-accent-green: #2f9e44;
+  --color-accent-green-subtle: #ecf8ee;
+  --color-accent-teal: #0f9b8e;
+  --color-accent-teal-subtle: #e8f7f5;
+
+  /* Interactive accent (focus, links, active) — canonical Jovie DS #7170ff,
+     decoupled from the purple feature accent (carbon palette, title text only) */
+  --color-accent: #7170ff;
+  --color-accent-hover: #9a46ff;
+  --color-accent-active: #7612df;
+  --color-accent-subtle: var(--color-accent-purple-subtle);
+  --color-accent-foreground: oklch(100% 0 0);
+
+  /* Primary button - high contrast */
+  --color-btn-primary-bg: oklch(10% 0 0);
+  --color-btn-primary-fg: oklch(100% 0 0);
+  --color-btn-primary-hover: oklch(20% 0 0);
+
+  /* Secondary button */
+  --color-btn-secondary-bg: oklch(
+    93% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-btn-secondary-fg: oklch(20% 0 0);
+  --color-btn-secondary-hover: oklch(
+    88% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+
+  /* Interactive states */
+  --color-interactive-hover: oklch(0% 0 0 / 6%);
+  --color-interactive-active: oklch(0% 0 0 / 12%);
+
+  /* Badge/tag styles — light mode equivalents */
+  --color-badge-bg: rgba(0, 0, 0, 0.06);
+  --color-badge-border: rgba(0, 0, 0, 0.06);
+  --color-badge-text: oklch(10% 0 0);
+
+  /* Table cell hover */
+  --color-cell-hover: #f0f0f0;
+
+  /* Shadows — Linear's exact values (same hierarchy, lighter in light mode) */
+  --shadow-sm: 0px 4px 4px -1px #0000000a, 0px 1px 1px 0px #00000014;
+  --shadow-md: 0 3px 8px #0000001a, 0 2px 5px #0000001a, 0 1px 1px #0000001a;
+  --shadow-lg:
+    0 4px 40px #00000014, 0 3px 20px #0000001a, 0 2px 6px #00000014,
+    0 1px 1px #0000000f;
+  --shadow-xl: 0 5px 50px #00000033, 0 4px 30px #00000033, 0 3px 10px #0000001a;
+
+  /* Linear card shadow — ring border + soft depth (the signature look) */
+  --shadow-card:
+    oklch(80% 0 283) 0px 0px 0px 1px,
+    oklch(0% 0 0 / 2.2%) 0px 3px 6px -2px,
+    oklch(0% 0 0 / 4.4%) 0px 1px 1px 0px;
+  --shadow-card-elevated:
+    oklch(0% 0 0 / 2.2%) 0px 3px 6px -2px, oklch(0% 0 0 / 4.4%) 0px 1px 1px 0px;
+
+  /* Inset divider shadow (used for section separators) */
+  --shadow-divider: oklch(86% 0 283) 0px -0.5px 0px 0px inset;
+
+  /* Popover/dropdown shadow — the only floating surface with visible depth */
+  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.08);
+
+  /* Button inset shadow */
+  --shadow-button-inset:
+    0px 4px 4px -1px oklch(0% 0 0 / 6%), 0px 1px 1px 0px oklch(0% 0 0 / 12%);
+
+  /* Public profile premium surfaces */
+  --profile-stage-bg: #efeff3;
+  --profile-stage-overlay:
+    radial-gradient(
+      circle at 18% 14%,
+      rgba(255, 255, 255, 0.76),
+      transparent 24%
+    ),
+    radial-gradient(
+      circle at 82% 12%,
+      rgba(255, 255, 255, 0.42),
+      transparent 18%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.54) 0%,
+      rgba(239, 239, 243, 0.12) 44%,
+      rgba(227, 228, 234, 0.28) 100%
+    );
+  --profile-stage-glow-a: rgba(255, 255, 255, 0.84);
+  --profile-stage-glow-b: rgba(226, 228, 235, 0.72);
+  --profile-content-bg: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.95),
+    rgba(247, 247, 249, 0.92)
+  );
+  --profile-panel-border: rgba(255, 255, 255, 0.78);
+  --profile-panel-shadow:
+    0 24px 60px rgba(15, 17, 24, 0.1), 0 8px 22px rgba(15, 17, 24, 0.05);
+  --profile-panel-gradient: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.3),
+    rgba(255, 255, 255, 0.08) 24%,
+    transparent 100%
+  );
+  --profile-drawer-bg: rgb(248, 248, 250);
+  --profile-drawer-highlight: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.48),
+    rgba(255, 255, 255, 0.06) 40%,
+    transparent 100%
+  );
+  --profile-pearl-bg: rgba(255, 255, 255, 0.7);
+  --profile-pearl-bg-hover: rgba(255, 255, 255, 0.84);
+  --profile-pearl-bg-active: rgba(255, 255, 255, 0.96);
+  --profile-pearl-border: rgba(255, 255, 255, 0.74);
+  --profile-pearl-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.64), 0 10px 24px rgba(15, 17, 24, 0.08);
+  --profile-pearl-primary-bg: rgba(12, 12, 15, 0.94);
+  --profile-pearl-primary-fg: rgba(255, 255, 255, 0.98);
+  --profile-accent-primary: #0c0c0f;
+  --profile-accent-on-primary: rgba(255, 255, 255, 0.98);
+  --profile-accent-soft: rgba(12, 12, 15, 0.12);
+  --profile-accent-soft-strong: rgba(12, 12, 15, 0.18);
+  --profile-tab-active-bg: var(--profile-pearl-primary-bg);
+  --profile-tab-active-fg: var(--profile-pearl-primary-fg);
+  --profile-status-pill-bg: rgba(12, 12, 15, 0.16);
+  --profile-status-pill-border: rgba(12, 12, 15, 0.22);
+  --profile-status-pill-fg: rgba(255, 255, 255, 0.98);
+  --profile-rail-dot-active: rgba(12, 12, 15, 0.9);
+  --profile-rail-dot-inactive: rgba(12, 12, 15, 0.18);
+  --profile-composer-border: rgba(255, 255, 255, 0.8);
+  --profile-dock-bg: rgba(247, 247, 249, 0.58);
+  --profile-dock-border: rgba(255, 255, 255, 0.72);
+  --profile-dock-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.66), 0 18px 42px rgba(15, 17, 24, 0.12);
+  --profile-dock-active-bg: rgba(255, 255, 255, 0.54);
+  --profile-dock-active-border: rgba(255, 255, 255, 0.72);
+  --profile-dock-active-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  --profile-dock-active-fg: rgba(12, 12, 15, 0.94);
+  --profile-dock-inactive-fg: rgba(12, 12, 15, 0.56);
+  --profile-dock-solid-bg: rgb(247, 247, 249);
+  --profile-dock-solid-border: rgba(12, 12, 15, 0.24);
+
+  /* Skeleton/loading states — base fill matches surface-1 */
+  --color-skeleton-base: var(--color-bg-surface-1);
+  --color-skeleton-shimmer: oklch(100% 0 0);
+  /* Table/list row states — semantic (shell remaps under Noir Ion D) */
+  --color-row-hover: oklch(96.2% 0.003 282);
+  --color-row-selected: oklch(94.8% 0.006 282);
+
+  /* Cross-cutting interaction state tokens (state-matrix.md) */
+  --color-link-default: var(--linear-accent-blue);
+  --color-link-hover: color-mix(
+    in oklab,
+    var(--linear-accent-blue) 82%,
+    var(--color-text-primary-token)
+  );
+  --color-link-visited: var(--linear-accent-purple);
+  --state-disabled-opacity: 0.5;
+  --state-partial-opacity: 0.62;
+  --state-offline-bg: var(--color-warning-subtle);
+  --state-offline-border: color-mix(
+    in oklab,
+    var(--color-warning) 24%,
+    transparent
+  );
+  --state-offline-fg: var(--color-warning);
+  --state-permission-bg: var(--color-warning-subtle);
+  --state-permission-fg: var(--color-warning);
+  --state-permission-border: color-mix(
+    in oklab,
+    var(--color-warning) 20%,
+    transparent
+  );
+
+  /* Focus ring — Jovie/Linear keyboard focus token */
+  --color-focus-ring: var(--color-border-focus);
+  --focus-ring-width: 1px;
+  --focus-ring-offset: 0px;
+
+  /* Font size scale — extracted from Linear CSS vars (2026-02-17)
+     --font-size-micro: 11px, --font-size-mini: 12px, --font-size-small: 13px,
+     --font-size-regular: 15px, --font-size-large: 18px */
+}
+
+/* Dark mode — Jovie Noir Ion (JOV-4635 / #15244).
+   Dark-first authenticated product palette. Neutral graphite surfaces carry
+   structure; electric blue (Ion) carries routine action/focus/selection.
+   Semantic mapping: --noir-ion-* anchors → product tokens (rollback path). */
+:root.dark {
+  /* —— Noir Ion anchors (canonical approved values) —— */
+  --noir-ion-canvas: #030407;
+  --noir-ion-shell: #06080d;
+  --noir-ion-panel: #0a0d16;
+  --noir-ion-card: #0f1420;
+  --noir-ion-elevated: #151b2a;
+  --noir-ion-floating: #1b2436;
+  --noir-ion-text-strong: #ffffff;
+  --noir-ion-text-primary: #f5f7fb;
+  --noir-ion-text-secondary: #d7dce8;
+  --noir-ion-text-muted: #a8b0c3;
+  --noir-ion-text-tertiary: #7d879d;
+  --noir-ion-text-disabled: #525d75;
+  --noir-ion-text-inverse: #020307;
+  --noir-ion-ion: #11afff;
+  --noir-ion-ion-solid: #0088ff;
+  --noir-ion-ion-soft: rgba(17, 175, 255, 0.12);
+  --noir-ion-pulse: #ff48d2;
+  --noir-ion-pulse-solid: #f725b8;
+  --noir-ion-pulse-soft: rgba(255, 72, 210, 0.12);
+  --noir-ion-ultra: #a982ff;
+  --noir-ion-ultra-solid: #8b5cf6;
+  --noir-ion-ultra-soft: rgba(169, 130, 255, 0.12);
+  --noir-ion-aqua: #24f6d2;
+  --noir-ion-aqua-solid: #00d7c2;
+  --noir-ion-aqua-soft: rgba(36, 246, 210, 0.1);
+  --noir-ion-mint: #39e58c;
+  --noir-ion-mint-solid: #10c76e;
+  --noir-ion-mint-soft: rgba(57, 229, 140, 0.12);
+  --noir-ion-gold: #ffc857;
+  --noir-ion-gold-solid: #f59e0b;
+  --noir-ion-gold-soft: rgba(255, 200, 87, 0.12);
+  --noir-ion-flare: #ff677d;
+  --noir-ion-flare-solid: #ff3b5c;
+  --noir-ion-flare-soft: rgba(255, 103, 125, 0.12);
+  --noir-ion-selected: rgba(17, 175, 255, 0.1);
+  --noir-ion-selected-strong: rgba(17, 175, 255, 0.16);
+  --noir-ion-border-subtle: rgba(168, 176, 195, 0.1);
+  --noir-ion-border-default: rgba(168, 176, 195, 0.16);
+  --noir-ion-border-strong: rgba(199, 237, 255, 0.26);
+  --noir-ion-border-interactive: rgba(17, 175, 255, 0.48);
+  --noir-ion-focus-ring: rgba(17, 175, 255, 0.72);
+
+  /* Dark mode surfaces — Noir Ion stepped near-black ladder */
+  --color-bg-base: var(--noir-ion-canvas);
+  /* app canvas */
+  --color-bg-surface-0: var(--noir-ion-shell);
+  /* recessed wells / shell-adjacent */
+  --color-bg-surface-1: var(--linear-bg-surface-1);
+  /* Shared card surface (maps to --noir-ion-card via linear tokens) */
+  --color-bg-surface-2: var(--noir-ion-elevated);
+  /* elevated / inputs */
+  --color-bg-surface-3: var(--noir-ion-floating);
+  /* floating / modals / tooltips */
+
+  /* Additional dark surface levels */
+  --color-bg-page: var(--noir-ion-canvas);
+  --color-bg-hover: rgba(168, 176, 195, 0.06);
+  /* Row/item hover — graphite, not pure white */
+  --color-bg-elevated: var(--noir-ion-panel);
+  --color-bg-input: var(--noir-ion-card);
+  --color-bg-active: var(--noir-ion-elevated);
+  --color-bg-primary: var(--noir-ion-panel);
+  --color-bg-secondary: var(--noir-ion-shell);
+  --color-bg-button: var(--noir-ion-elevated);
+  --color-bg-tooltip: var(--noir-ion-floating);
+  --color-bg-paper: #f7f8f8;
+  /* Paper surface remains light for explicit light reading modes */
+
+  /* Text hierarchy — Noir Ion */
+  --color-text-primary-token: var(--noir-ion-text-primary);
+  --color-text-secondary-token: var(--noir-ion-text-secondary);
+  --color-text-tertiary-token: var(--noir-ion-text-muted);
+  --color-text-quaternary-token: var(--noir-ion-text-tertiary);
+  --color-text-disabled-token: var(--noir-ion-text-disabled);
+  --color-text-tooltip: var(--noir-ion-text-strong);
+
+  /* Logo muted tokens for label logos bar */
+  --color-logo-muted: rgba(245, 247, 251, 0.55);
+  --color-logo-muted-hover: rgba(245, 247, 251, 0.75);
+
+  /* Borders — Noir Ion cool graphite + ion focus */
+  --color-border-subtle: var(--noir-ion-border-subtle);
+  --color-border-default: var(--noir-ion-border-default);
+  --color-border-strong: var(--noir-ion-border-strong);
+  --color-border-focus: var(--noir-ion-ion);
+  /* Ion focus */
+  /* Footer seam — promoted from the retired linear border footer alias (JOV-5458). */
+  --color-border-footer: rgba(168, 176, 195, 0.16);
+
+  /* Accent palette rotation — Noir Ion semantics
+     blue/Ion: primary action · purple/Ultra: agent · pink/Pulse: creative
+     teal/Aqua: system · green/Mint: success · orange: warning
+     red: danger */
+  --color-accent-gray: #8d8d93;
+  --color-accent-gray-subtle: rgb(127 127 133 / 0.18);
+  --color-accent-blue: #11afff;
+  --color-accent-blue-subtle: rgba(17, 175, 255, 0.12);
+  --color-accent-purple: #a982ff;
+  --color-accent-purple-subtle: rgba(169, 130, 255, 0.12);
+  --color-accent-pink: #ff48d2;
+  --color-accent-pink-subtle: rgba(255, 72, 210, 0.12);
+  --color-accent-red: #ff677d;
+  --color-accent-red-subtle: rgba(255, 103, 125, 0.12);
+  --color-accent-orange: #ffc857;
+  --color-accent-orange-subtle: rgba(255, 200, 87, 0.12);
+  --color-accent-green: #39e58c;
+  --color-accent-green-subtle: rgba(57, 229, 140, 0.12);
+  --color-accent-teal: #24f6d2;
+  --color-accent-teal-subtle: rgba(36, 246, 210, 0.1);
+
+  /* Interactive accent — Ion electric blue (focus, links, active selection).
+     CTAs remain high-contrast light pills per DESIGN.md; Ion carries intent. */
+  --color-accent: var(--noir-ion-ion);
+  --color-accent-hover: #3bc0ff;
+  --color-accent-active: var(--noir-ion-ion-solid);
+  --color-accent-subtle: var(--noir-ion-ion-soft);
+
+  /* Primary button — light-on-dark (restrained; not saturated Ion fill) */
+  --color-btn-primary-bg: #e6e6e6;
+  --color-btn-primary-fg: var(--noir-ion-text-inverse);
+  --color-btn-primary-hover: #f0f0f0;
+
+  /* Secondary button */
+  --color-btn-secondary-bg: var(--noir-ion-elevated);
+  --color-btn-secondary-fg: var(--noir-ion-text-primary);
+  --color-btn-secondary-hover: var(--noir-ion-floating);
+
+  /* Interactive states */
+  --color-interactive-hover: rgba(168, 176, 195, 0.06);
+  --color-interactive-active: var(--noir-ion-selected);
+
+  /* Badge/tag styles */
+  --color-badge-bg: rgba(168, 176, 195, 0.08);
+  --color-badge-border: var(--noir-ion-border-subtle);
+  --color-badge-text: var(--noir-ion-text-primary);
+
+  /* Table cell hover — elevated step */
+  --color-cell-hover: var(--noir-ion-elevated);
+
+  /* Shadows — extracted from Linear CSS vars (2026-02-17)
+     --shadow-tiny: 0px 4px 4px -1px #0000000f, 0px 1px 1px 0px #0000001e
+     --shadow-low:  0 3px 8px #0000002f, 0 2px 5px #0000002f, 0 1px 1px #0000002f
+     --shadow-medium: 0 4px 40px #00000026, 0 3px 20px #00000036, 0 2px 6px #0000001f, 0 1px 1px #0000001a
+     --shadow-high: 0 5px 50px #0000004d, 0 4px 30px #0000004d, 0 3px 10px #0000002f */
+  --shadow-sm: 0px 4px 4px -1px #0000000f, 0px 1px 1px 0px #0000001e;
+  --shadow-md: 0 3px 8px #0000002f, 0 2px 5px #0000002f, 0 1px 1px #0000002f;
+  --shadow-lg:
+    0 4px 40px #00000026, 0 3px 20px #00000036, 0 2px 6px #0000001f,
+    0 1px 1px #0000001a;
+  --shadow-xl: 0 5px 50px #0000004d, 0 4px 30px #0000004d, 0 3px 10px #0000002f;
+
+  /* Dark mode card shadow — 1px ring via box-shadow + soft depth
+     Extracted: ring + depth layer rgba(0,0,0,0.4) 0px 2px 4px */
+  --shadow-card:
+    rgba(0, 0, 0, 0.2) 0px 0px 0px 1px, rgba(0, 0, 0, 0.4) 0px 2px 4px 0px;
+  --shadow-card-elevated:
+    rgba(0, 0, 0, 0.2) 0px 0px 12px 0px inset,
+    rgba(0, 0, 0, 0.2) 0px 4px 24px 0px;
+  --shadow-divider: rgba(255, 255, 255, 0.05) 0px -0.5px 0px 0px inset;
+  /* Popover/dropdown shadow — ring + deep depth for dark backgrounds.
+     JOV-1780: ring opacity lifted 0.06 → 0.12 so menus/popovers have a
+     crisp edge against the app shell in dark mode. */
+  --shadow-popover:
+    0 0 0 1px rgba(255, 255, 255, 0.12), 0 10px 28px rgba(0, 0, 0, 0.45);
+  --shadow-button-inset:
+    rgba(0, 0, 0, 0) 0px 8px 2px 0px,
+    rgba(0, 0, 0, 0.01) 0px 5px 2px 0px,
+    rgba(0, 0, 0, 0.04) 0px 3px 2px 0px,
+    rgba(0, 0, 0, 0.07) 0px 1px 1px 0px,
+    rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
+
+  /* Public profile premium surfaces */
+  --profile-stage-bg: #050608;
+  --profile-stage-overlay:
+    radial-gradient(
+      circle at 50% 12%,
+      rgba(255, 255, 255, 0.09),
+      transparent 20%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(18, 20, 26, 0.18) 0%,
+      rgba(9, 10, 14, 0.68) 54%,
+      rgba(5, 6, 8, 0.92) 100%
+    );
+  --profile-stage-glow-a: rgba(255, 255, 255, 0.1);
+  --profile-stage-glow-b: rgba(38, 42, 54, 0.42);
+  --profile-content-bg: linear-gradient(
+    180deg,
+    rgba(14, 16, 20, 0.96),
+    rgba(10, 12, 16, 0.94)
+  );
+  --profile-panel-border: rgba(255, 255, 255, 0.09);
+  --profile-panel-shadow:
+    0 28px 72px rgba(0, 0, 0, 0.34), 0 12px 28px rgba(0, 0, 0, 0.18);
+  --profile-panel-gradient: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.02) 20%,
+    transparent 100%
+  );
+  --profile-drawer-bg: rgb(14, 16, 20);
+  --profile-drawer-highlight: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.08),
+    rgba(255, 255, 255, 0.02) 36%,
+    transparent 100%
+  );
+  --profile-pearl-bg: rgba(255, 255, 255, 0.12);
+  --profile-pearl-bg-hover: rgba(255, 255, 255, 0.16);
+  --profile-pearl-bg-active: rgba(255, 255, 255, 0.22);
+  --profile-pearl-border: rgba(255, 255, 255, 0.16);
+  --profile-pearl-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 12px 28px rgba(0, 0, 0, 0.24);
+  --profile-pearl-primary-bg: rgba(255, 255, 255, 0.96);
+  --profile-pearl-primary-fg: rgba(8, 9, 10, 0.96);
+  --profile-accent-primary: rgba(255, 255, 255, 0.96);
+  --profile-accent-on-primary: rgba(8, 9, 10, 0.96);
+  --profile-accent-soft: rgba(255, 255, 255, 0.12);
+  --profile-accent-soft-strong: rgba(255, 255, 255, 0.18);
+  --profile-tab-active-bg: var(--profile-pearl-primary-bg);
+  --profile-tab-active-fg: var(--profile-pearl-primary-fg);
+  --profile-status-pill-bg: rgba(255, 255, 255, 0.12);
+  --profile-status-pill-border: rgba(255, 255, 255, 0.18);
+  --profile-status-pill-fg: rgba(255, 255, 255, 0.98);
+  --profile-rail-dot-active: rgba(255, 255, 255, 0.92);
+  --profile-rail-dot-inactive: rgba(255, 255, 255, 0.18);
+  --profile-composer-border: rgba(255, 255, 255, 0.1);
+  --profile-dock-bg: rgba(30, 32, 40, 0.52);
+  --profile-dock-border: rgba(255, 255, 255, 0.18);
+  --profile-dock-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 14px 34px rgba(0, 0, 0, 0.3);
+  --profile-dock-active-bg: rgba(255, 255, 255, 0.16);
+  --profile-dock-active-border: rgba(255, 255, 255, 0.14);
+  --profile-dock-active-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  --profile-dock-active-fg: rgba(255, 255, 255, 0.98);
+  --profile-dock-inactive-fg: rgba(255, 255, 255, 0.58);
+  --profile-dock-solid-bg: rgb(24, 26, 32);
+  --profile-dock-solid-border: rgba(255, 255, 255, 0.28);
+
+  /* Skeleton/loading states — base fill matches surface-1 */
+  --color-skeleton-base: var(--color-bg-surface-1);
+  --color-skeleton-shimmer: oklch(
+    24% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  /* Table/list row states — semantic (shell remaps under Noir Ion D) */
+  --color-row-hover: rgba(255, 255, 255, 0.022);
+  --color-row-selected: rgba(255, 255, 255, 0.048);
+
+  /* Cross-cutting interaction state tokens (state-matrix.md)
+     Links/focus use Ion blue — not marketing linear-accent-blue. */
+  --color-link-default: var(--noir-ion-ion);
+  --color-link-hover: color-mix(
+    in oklab,
+    var(--noir-ion-ion) 78%,
+    var(--noir-ion-text-primary)
+  );
+  --color-link-visited: var(--noir-ion-ultra);
+  --color-focus-ring: var(--noir-ion-focus-ring);
+  --state-disabled-opacity: 0.5;
+  --state-partial-opacity: 0.62;
+  --state-offline-bg: var(--color-warning-subtle);
+  --state-offline-border: color-mix(
+    in oklab,
+    var(--color-warning) 24%,
+    transparent
+  );
+  --state-offline-fg: var(--color-warning);
+  --state-permission-bg: var(--color-warning-subtle);
+  --state-permission-fg: var(--color-warning);
+  --state-permission-border: color-mix(
+    in oklab,
+    var(--color-warning) 20%,
+    transparent
+  );
+  /* Selection roles */
+  --color-bg-selected: var(--noir-ion-selected);
+}
+
+/* Public-profile navigation is one distinct functional glass layer. It floats
+   over the stable content reservation; child states are tint/selection only
+   and never add another backdrop-filter. */
+:where(.profile-floating-tab-bar) {
+  position: absolute;
+  z-index: 30;
+  right: var(--page-pad);
+  bottom: 0;
+  left: var(--page-pad);
+  pointer-events: none;
+}
+
+:where(.profile-liquid-glass-nav) {
+  height: calc(var(--space-12) + var(--space-2-5));
+  pointer-events: auto;
+  border-color: var(--profile-dock-border);
+  border-radius: var(--radius-full);
+  background: var(--liquid-glass-highlight), var(--profile-dock-bg);
+  box-shadow: var(--profile-dock-shadow);
+}
+
+:where(.profile-liquid-glass-nav__grid) {
+  height: calc(var(--space-10) + var(--space-2-5));
+  margin-block: 0;
+}
+
+:where(.profile-liquid-glass-nav__item) {
+  flex-direction: column;
+  gap: var(--space-0-5);
+  border: var(--space-px) solid transparent;
+  border-radius: var(--radius-full);
+  color: var(--profile-dock-inactive-fg);
+  transition:
+    color var(--duration-subtle) var(--ease-subtle),
+    background-color var(--duration-subtle) var(--ease-subtle),
+    border-color var(--duration-subtle) var(--ease-subtle),
+    box-shadow var(--duration-subtle) var(--ease-subtle);
+}
+
+:where(.profile-liquid-glass-nav__item[aria-current="page"]) {
+  border-color: var(--profile-dock-active-border);
+  background: var(--profile-dock-active-bg);
+  color: var(--profile-dock-active-fg);
+  box-shadow: var(--profile-dock-active-shadow);
+}
+
+:where(.profile-liquid-glass-nav__icon) {
+  color: inherit;
+}
+
+/* Deliberately overrides the retained sr-only utility: visible labels make the
+   four navigation destinations immediate while their accessible names remain
+   unchanged. */
+:where(.profile-liquid-glass-nav__label) {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  clip-path: none;
+  border: 0;
+  color: inherit;
+  font-size: var(--text-2xs);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+@media (hover: hover) {
+  :where(.profile-liquid-glass-nav__item:not([aria-current="page"]):hover) {
+    color: var(--profile-dock-active-fg);
+  }
+}
+
+/* Safari/Media Queries 5 plus a deterministic manual hook for testability and
+   clients that expose the OS preference outside CSS. */
+@media (prefers-reduced-transparency: reduce) {
+  :where(.profile-liquid-glass-nav) {
+    border-color: var(--profile-dock-solid-border);
+    background: var(--profile-dock-solid-bg);
+    --tw-backdrop-blur: initial;
+    --tw-backdrop-saturate: initial;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* Keep the nav class outside :where() here so the deterministic hooks outrank
+   Tailwind's backdrop utility custom properties even if layer order changes. */
+:root[data-reduced-transparency="true"] .profile-liquid-glass-nav,
+:root.high-contrast .profile-liquid-glass-nav {
+  border-color: var(--profile-dock-solid-border);
+  background: var(--profile-dock-solid-bg);
+  --tw-backdrop-blur: initial;
+  --tw-backdrop-saturate: initial;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+@media (prefers-contrast: more) {
+  :where(.profile-liquid-glass-nav) {
+    border-color: var(--profile-dock-solid-border);
+    background: var(--profile-dock-solid-bg);
+    --tw-backdrop-blur: initial;
+    --tw-backdrop-saturate: initial;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (forced-colors: active) {
+  :where(.profile-liquid-glass-nav) {
+    border-color: CanvasText;
+    background: Canvas;
+    box-shadow: none;
+    --tw-backdrop-blur: initial;
+    --tw-backdrop-saturate: initial;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  :where(.profile-liquid-glass-nav__item) {
+    color: CanvasText;
+    forced-color-adjust: auto;
+  }
+
+  :where(.profile-liquid-glass-nav__item[aria-current="page"]) {
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(
+    .profile-liquid-glass-nav,
+    .profile-liquid-glass-nav__item,
+    .profile-liquid-glass-nav__icon
+  ) {
+    transition: none;
+  }
+}
+
+/* ============================================
+   CONTRAST SCALING SYSTEM
+   ============================================
+
+   CSS custom property math for accessibility.
+   Higher contrast = more separation between levels.
+*/
+
+/* High contrast mode */
+@media (prefers-contrast: more) {
+  :root {
+    --theme-contrast: 90;
+
+    /* Increase text contrast */
+    --color-text-primary-token: oklch(5% 0 0);
+    --color-text-secondary-token: oklch(
+      25% var(--theme-base-chroma) var(--theme-base-hue)
+    );
+
+    /* Stronger borders */
+    --color-border-subtle: oklch(0% 0 0 / 15%);
+    --color-border-default: oklch(0% 0 0 / 25%);
+    --color-border-strong: oklch(0% 0 0 / 40%);
+  }
+
+  :root.dark {
+    --color-text-primary-token: oklch(100% 0 0);
+    --color-text-secondary-token: oklch(
+      85% var(--theme-base-chroma) var(--theme-base-hue)
+    );
+
+    --color-border-subtle: oklch(100% 0 0 / 15%);
+    --color-border-default: oklch(100% 0 0 / 25%);
+    --color-border-strong: oklch(100% 0 0 / 40%);
+  }
+}
+
+/* ============================================
+   MANUAL HIGH CONTRAST MODE
+   ============================================
+   Applied via .high-contrast class on <html>.
+   Independent of OS prefers-contrast media query.
+   Works in both light and dark modes.
+*/
+
+:root.high-contrast {
+  --theme-contrast: 90;
+
+  /* Text hierarchy — maximum separation */
+  --color-text-primary-token: oklch(5% 0 0);
+  --color-text-secondary-token: oklch(
+    25% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-tertiary-token: oklch(
+    35% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-quaternary-token: oklch(
+    45% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-disabled-token: oklch(
+    55% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+
+  /* Borders — significantly stronger */
+  --color-border-subtle: oklch(0% 0 0 / 15%);
+  --color-border-default: oklch(0% 0 0 / 25%);
+  --color-border-strong: oklch(0% 0 0 / 40%);
+
+  /* Surfaces — increased separation between layers */
+  --color-bg-hover: lch(94% 0 282.863);
+  --color-bg-elevated: lch(90% 0 282.863);
+
+  /* Interactive states — more visible */
+  --color-interactive-hover: oklch(0% 0 0 / 10%);
+  --color-interactive-active: oklch(0% 0 0 / 18%);
+
+  /* Badges — stronger contrast */
+  --color-badge-bg: rgba(0, 0, 0, 0.1);
+  --color-badge-border: rgba(0, 0, 0, 0.15);
+  --color-badge-text: oklch(5% 0 0);
+
+  /* Secondary button — more contrast */
+  --color-btn-secondary-bg: oklch(
+    88% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-btn-secondary-fg: oklch(10% 0 0);
+  --color-btn-secondary-hover: oklch(
+    82% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+
+  /* Shadows — stronger ring for depth perception */
+  --shadow-card:
+    oklch(70% 0 283) 0px 0px 0px 1px,
+    oklch(0% 0 0 / 4%) 0px 3px 6px -2px,
+    oklch(0% 0 0 / 8%) 0px 1px 1px 0px;
+}
+
+:root.dark.high-contrast {
+  --theme-contrast: 90;
+
+  /* Text hierarchy — brighter primaries, more steps */
+  --color-text-primary-token: oklch(100% 0 0);
+  --color-text-secondary-token: oklch(
+    85% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-tertiary-token: oklch(
+    72% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-quaternary-token: oklch(
+    55% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-disabled-token: oklch(40% 0.006 282);
+
+  /* Borders — much stronger */
+  --color-border-subtle: oklch(100% 0 0 / 15%);
+  --color-border-default: oklch(100% 0 0 / 25%);
+  --color-border-strong: oklch(100% 0 0 / 40%);
+
+  /* Surfaces — more separation between layers */
+  --color-bg-hover: rgba(255, 255, 255, 0.05);
+  --color-bg-elevated: lch(8% 0.7 282);
+
+  /* Interactive states — more visible */
+  --color-interactive-hover: rgba(255, 255, 255, 0.08);
+  --color-interactive-active: rgba(255, 255, 255, 0.12);
+
+  /* Badges — stronger contrast */
+  --color-badge-bg: rgba(255, 255, 255, 0.1);
+  --color-badge-border: rgba(255, 255, 255, 0.15);
+  --color-badge-text: rgb(255, 255, 255);
+
+  /* Secondary button — more contrast */
+  --color-btn-secondary-bg: oklch(
+    24% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-btn-secondary-fg: oklch(95% 0 0);
+  --color-btn-secondary-hover: oklch(
+    30% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+
+  /* Shadows — stronger rings */
+  --shadow-card:
+    rgba(0, 0, 0, 0.35) 0px 0px 0px 1px, rgba(0, 0, 0, 0.5) 0px 2px 4px 0px;
+}
+
+/* Reduced contrast mode (for eye comfort) */
+@media (prefers-contrast: less) {
+  :root {
+    --theme-contrast: 40;
+
+    /* Softer text contrast */
+    --color-text-primary-token: oklch(20% 0 0);
+    --color-text-secondary-token: oklch(
+      45% var(--theme-base-chroma) var(--theme-base-hue)
+    );
+  }
+
+  :root.dark {
+    --color-text-primary-token: oklch(85% 0 0);
+    --color-text-secondary-token: oklch(
+      65% var(--theme-base-chroma) var(--theme-base-hue)
+    );
+  }
+}
+
+/* ============================================
+   PLATFORM BRAND COLORS (OKLCH)
+   ============================================
+
+   Consistent brand colors for streaming platforms
+   and other third-party services
+*/
+:root {
+  /* Spotify */
+  --color-brand-spotify: oklch(68% 0.21 145);
+  --color-brand-spotify-hover: oklch(72% 0.21 145);
+  --color-brand-spotify-subtle: oklch(95% 0.05 145);
+
+  /* Apple Music */
+  --color-brand-apple: oklch(60% 0.2 10);
+  --color-brand-apple-hover: oklch(65% 0.2 10);
+  --color-brand-apple-subtle: oklch(95% 0.05 10);
+
+  /* YouTube */
+  --color-brand-youtube: oklch(60% 0.22 25);
+  --color-brand-youtube-hover: oklch(65% 0.22 25);
+  --color-brand-youtube-subtle: oklch(95% 0.05 25);
+
+  /* SoundCloud */
+  --color-brand-soundcloud: oklch(65% 0.2 45);
+  --color-brand-soundcloud-hover: oklch(70% 0.2 45);
+  --color-brand-soundcloud-subtle: oklch(95% 0.05 45);
+
+  /* Tidal */
+  --color-brand-tidal: oklch(0% 0 0);
+  --color-brand-tidal-hover: oklch(15% 0 0);
+  --color-brand-tidal-subtle: oklch(95% 0 0);
+
+  /* Amazon Music */
+  --color-brand-amazon: oklch(75% 0.17 70);
+  --color-brand-amazon-hover: oklch(70% 0.17 70);
+  --color-brand-amazon-subtle: oklch(95% 0.05 70);
+
+  /* Bandcamp */
+  --color-brand-bandcamp: oklch(65% 0.059 204.4);
+
+  /* QQ Music */
+  --color-brand-qq-music: oklch(72.3% 0.158 156.9);
+
+  /* NetEase Music */
+  --color-brand-netease: oklch(51.5% 0.206 28.7);
+
+  /* Beatport */
+  --color-brand-beatport: oklch(84.4% 0.213 128);
+
+  /* Napster */
+  --color-brand-napster: oklch(54.5% 0.252 264.6);
+
+  /* Qobuz */
+  --color-brand-qobuz: oklch(57% 0.21 257.8);
+
+  /* Anghami */
+  --color-brand-anghami: oklch(68% 0.315 327);
+
+  /* Boomplay */
+  --color-brand-boomplay: oklch(52.8% 0.263 262.9);
+
+  /* iHeartRadio */
+  --color-brand-iheartradio: oklch(52.2% 0.21 22.1);
+
+  /* Instagram */
+  --color-brand-instagram: oklch(61.9% 0.2 14.6);
+  --color-brand-venmo: #008cff;
+
+  /* Deezer */
+  --color-brand-deezer: oklch(78% 0.15 75);
+  --color-brand-deezer-hover: oklch(73% 0.15 75);
+  --color-brand-deezer-subtle: oklch(95% 0.05 75);
+
+  /* Pandora */
+  --color-brand-pandora: oklch(52% 0.2 250);
+  --color-brand-pandora-hover: oklch(57% 0.2 250);
+  --color-brand-pandora-subtle: oklch(95% 0.05 250);
+
+  /* Audiomack */
+  --color-brand-audiomack: oklch(74% 0.17 65);
+  --color-brand-audiomack-hover: oklch(69% 0.17 65);
+  --color-brand-audiomack-subtle: oklch(95% 0.05 65);
+}
+
+:root.dark {
+  /* Spotify - slightly brighter in dark mode */
+  --color-brand-spotify: oklch(70% 0.21 145);
+  --color-brand-spotify-subtle: oklch(20% 0.1 145);
+
+  /* Apple Music */
+  --color-brand-apple: oklch(70% 0.2 10);
+  --color-brand-apple-subtle: oklch(20% 0.1 10);
+
+  /* YouTube */
+  --color-brand-youtube: oklch(70% 0.22 25);
+  --color-brand-youtube-subtle: oklch(20% 0.1 25);
+
+  /* SoundCloud */
+  --color-brand-soundcloud: oklch(70% 0.2 45);
+  --color-brand-soundcloud-subtle: oklch(20% 0.1 45);
+
+  /* Tidal */
+  --color-brand-tidal: oklch(90% 0 0);
+  --color-brand-tidal-subtle: oklch(20% 0 0);
+
+  /* Amazon Music */
+  --color-brand-amazon: oklch(80% 0.17 70);
+  --color-brand-amazon-subtle: oklch(20% 0.08 70);
+
+  /* Bandcamp */
+  --color-brand-bandcamp: oklch(70% 0.059 204.4);
+
+  /* QQ Music */
+  --color-brand-qq-music: oklch(76% 0.158 156.9);
+
+  /* NetEase Music */
+  --color-brand-netease: oklch(66% 0.206 28.7);
+
+  /* Beatport */
+  --color-brand-beatport: oklch(86% 0.213 128);
+
+  /* Napster */
+  --color-brand-napster: oklch(68% 0.252 264.6);
+
+  /* Qobuz */
+  --color-brand-qobuz: oklch(68% 0.21 257.8);
+
+  /* Anghami */
+  --color-brand-anghami: oklch(73% 0.315 327);
+
+  /* Boomplay */
+  --color-brand-boomplay: oklch(68% 0.263 262.9);
+
+  /* iHeartRadio */
+  --color-brand-iheartradio: oklch(66% 0.21 22.1);
+
+  /* Instagram */
+  --color-brand-instagram: oklch(70% 0.2 14.6);
+  --color-brand-venmo: #008cff;
+
+  /* Deezer */
+  --color-brand-deezer: oklch(82% 0.15 75);
+  --color-brand-deezer-subtle: oklch(20% 0.08 75);
+
+  /* Pandora */
+  --color-brand-pandora: oklch(60% 0.2 250);
+  --color-brand-pandora-subtle: oklch(20% 0.1 250);
+
+  /* Audiomack */
+  --color-brand-audiomack: oklch(78% 0.17 65);
+  --color-brand-audiomack-subtle: oklch(20% 0.08 65);
+}
+
+/* ============================================
+   SEMANTIC STATUS COLORS (OKLCH)
+   ============================================ */
+:root {
+  /* Success */
+  --color-success: var(--color-accent-green);
+  --color-success-subtle: var(--color-accent-green-subtle);
+  --color-success-foreground: oklch(100% 0 0);
+
+  /* Warning */
+  --color-warning: var(--color-accent-orange);
+  --color-warning-subtle: var(--color-accent-orange-subtle);
+  --color-warning-foreground: oklch(20% 0 0);
+
+  /* Error/Destructive */
+  --color-error: var(--color-accent-red);
+  --color-error-subtle: var(--color-accent-red-subtle);
+  --color-error-foreground: oklch(100% 0 0);
+  --color-danger: var(--color-error);
+  --color-danger-subtle: var(--color-error-subtle);
+
+  /* Info */
+  --color-info: var(--color-accent-blue);
+  --color-info-subtle: var(--color-accent-blue-subtle);
+  --color-info-foreground: oklch(100% 0 0);
+}
+
+:root.dark {
+  /* Success — Mint */
+  --color-success: var(--color-accent-green);
+  --color-success-subtle: var(--color-accent-green-subtle);
+
+  /* Warning — Orange */
+  --color-warning: var(--color-accent-orange);
+  --color-warning-subtle: var(--color-accent-orange-subtle);
+
+  /* Error — Red (danger) */
+  --color-error: var(--color-accent-red);
+  --color-error-subtle: var(--color-accent-red-subtle);
+  --color-danger: var(--color-error);
+  --color-danger-subtle: var(--color-error-subtle);
+
+  /* Info — Aqua/system signal (not Ion blue; Ion is action/focus) */
+  --color-info: var(--color-accent-teal);
+  --color-info-subtle: var(--color-accent-teal-subtle);
+}
+
+/* ============================================
+   FEATURE ACCENT COLORS (OKLCH)
+   ============================================
+
+   Perceptually uniform named endpoints. Dark accents use hue-specific
+   energy bands (not a shared lightness target, not a pastel chroma cap).
+*/
+:root {
+  --accent-conv: var(--color-accent-purple);
+  --accent-analytics: var(--color-accent-blue);
+  --accent-speed: var(--color-accent-green);
+  --accent-beauty: var(--color-accent-pink);
+  --accent-seo: var(--color-accent-red);
+  --accent-links: var(--color-accent-teal);
+  --accent-pro: var(--color-accent-orange);
+}
+
+/* ============================================
+   TYPOGRAPHY SYSTEM
+   ============================================ */
+:root {
+  /* Unified font roles. The Next.js runtime variables resolve to the bundled
+     faces; named-family fallbacks keep the public token export vendor-safe. */
+  --font-sans:
+    var(--font-inter, "Inter Variable"), "Inter", "SF Pro Display",
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+    Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+  --font-body: var(--font-sans);
+  --font-display:
+    var(--font-satoshi, "Satoshi"), -apple-system, "system-ui", sans-serif;
+  --font-mono:
+    "SF Mono", "Fira Code", "Fira Mono", Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+
+  /* Linear font features (extracted 2026-03-16: --font-settings: "cv01","ss03") */
+  --font-features: "cv01", "ss03";
+
+  /* Font weights — Linear uses Inter Variable axis with non-standard stops
+     Extracted from Linear CSS vars (2026-02-17):
+       --font-weight-normal: 450  (book weight — their default!)
+       --font-weight-medium: 510
+       --font-weight-semibold: 600
+       --font-weight-bold: 700 */
+  --font-weight-normal: 400;
+  /* Linear: --font-weight-normal = 400 (extracted 2026-03-16) */
+  --font-weight-book: 450;
+  /* Linear's "book" weight — their default UI weight (confirmed from live extraction) */
+  /* Alias for normal */
+  --font-weight-medium: 510;
+  /* Linear: --font-weight-medium = 510 */
+  --font-weight-nav: 510;
+  /* Linear sidebar nav = --font-weight-medium */
+  --font-weight-semibold: 590;
+  /* Linear: --font-weight-semibold = 590 (extracted 2026-03-16) */
+  --font-weight-bold: 680;
+  /* Linear: --font-weight-bold = 680 (extracted 2026-03-16) */
+  --font-weight-heavy: 680;
+
+  /* Type scale - based on 16px base
+     KEY: Linear uses 13px (0.8125rem) as the primary app UI size */
+  --text-3xs: 0.625rem;
+  /* 10px — micro labels, legal */
+  --text-2xs: 0.6875rem;
+  /* 11px — tiny labels, badges */
+  --text-xs: 0.75rem;
+  /* 12px */
+  --text-app: 0.8125rem;
+  /* 13px — LINEAR'S DEFAULT APP UI SIZE (sidebar, issues, tabs) */
+  --text-sm: 0.875rem;
+  /* 14px */
+  --text-mid: 0.9375rem;
+  /* 15px — between sm and base; intentional tight fit */
+  --text-base: 1rem;
+  /* 16px */
+  --text-lg: 1.125rem;
+  /* 18px */
+  --text-xl: 1.25rem;
+  /* 20px */
+  --text-2xl: 1.5rem;
+  /* 24px */
+  --text-3xl: 1.875rem;
+  /* 30px */
+  --text-4xl: 2.25rem;
+  /* 36px */
+  --text-5xl: 3rem;
+  /* 48px */
+
+  /* Line heights — must match globals.css @theme values (Tailwind v4 source of truth) */
+  --leading-none: 1;
+  --leading-tight: 1.25;
+  --leading-snug: 1.375;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+
+  /* Letter spacing — must match globals.css @theme values (Tailwind v4 source of truth) */
+  --tracking-tighter: -0.02em;
+  --tracking-tight: -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.01em;
+}
+
+/* ============================================
+   SPACING SYSTEM (8px grid)
+   ============================================ */
+:root {
+  --space-0: 0;
+  --space-px: 1px;
+  --space-0-5: 0.125rem;
+  /* 2px */
+  --space-1: 0.25rem;
+  /* 4px */
+  --space-1-5: 0.375rem;
+  /* 6px */
+  --space-2: 0.5rem;
+  /* 8px */
+  --space-2-5: 0.625rem;
+  /* 10px */
+  --space-3: 0.75rem;
+  /* 12px */
+  --space-4: 1rem;
+  /* 16px */
+  --space-5: 1.25rem;
+  /* 20px */
+  --space-6: 1.5rem;
+  /* 24px */
+  --space-8: 2rem;
+  /* 32px */
+  --space-10: 2.5rem;
+  /* 40px */
+  --space-11: 2.75rem;
+  /* 44px */
+  --space-12: 3rem;
+  /* 48px */
+  --space-16: 4rem;
+  /* 64px */
+  --space-20: 5rem;
+  /* 80px */
+  --space-24: 6rem;
+  /* 96px */
+}
+
+/* ============================================
+   ANIMATION SYSTEM
+   ============================================ */
+:root {
+  /* Durations — extracted from Linear CSS vars (2026-02-17)
+     --speed-quickTransition: .1s
+     --speed-regularTransition: .25s
+     --speed-slowTransition: .35s */
+  --duration-instant: 50ms;
+  --duration-fast: 100ms;
+  /* Linear: quickTransition */
+  --duration-normal: 160ms;
+  /* Sidebar/nav transition: 0.16s cubic-bezier */
+  --duration-slow: 250ms;
+  /* Linear: regularTransition */
+  --duration-slower: 350ms;
+  /* Linear: slowTransition */
+  --duration-slowest: 350ms;
+
+  /* Two-tier intent vocabulary (DESIGN.md → Motion):
+     - SUBTLE   = micro-interactions: hover, focus, color, icon swap, toast.
+                  Aim for ≤150ms — anything more reads as "glitchy."
+     - CINEMATIC = high-impact reveals: side drawers, modals, audio player
+                  open/close, chat composer surface morph. 320ms feels
+                  intentional and gives the eye time to track the move.
+     Always prefer these over hardcoded numbers; they pick up reduced-motion. */
+  --duration-subtle: var(--ds-motion-subtle-duration);
+  --duration-cinematic: var(--ds-motion-cinematic-duration);
+
+  /* Easings - Linear uses cubic-bezier for smooth feel */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-interactive: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-linear: var(--ease-interactive);
+  /* Legacy alias */
+  --ease-subtle: var(--ds-motion-subtle-easing);
+  --ease-cinematic: var(--ds-motion-cinematic-easing);
+  /* Drawer/sheet settle curve (iOS-like; adapted from emil-design-eng, MIT —
+     see .claude/rules/motion.md for the easing decision tree) */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* Canonical press-feedback scale for pressable elements
+     (.claude/rules/ui.md + .claude/rules/motion.md — tactile, interruptible) */
+  --scale-press: 0.98;
+
+  /* Pre-composed transition patterns (extracted from Linear)
+     Use duration custom properties so prefers-reduced-motion overrides work */
+  --transition-colors:
+    border var(--duration-normal), background-color var(--duration-normal),
+    color var(--duration-normal), opacity var(--duration-normal);
+  --transition-bg: background-color var(--duration-normal);
+  --transition-opacity: opacity var(--duration-normal);
+  --transition-opacity-fast: opacity var(--duration-instant)
+    var(--ease-interactive);
+  --transition-fill: fill var(--duration-normal), stroke var(--duration-normal);
+  --transition-transform: transform var(--duration-normal);
+  --transition-collapse:
+    height var(--duration-slow) var(--ease-interactive),
+    min-height var(--duration-slow) var(--ease-interactive);
+  --transition-shadow:
+    box-shadow var(--duration-normal), background-color var(--duration-normal);
+}
+
+/* Reduced motion — zero out all duration tokens so transition patterns inherit 0ms */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ds-motion-subtle-duration: 0ms;
+    --ds-motion-cinematic-duration: 0ms;
+    --duration-instant: 0ms;
+    --duration-fast: 0ms;
+    --duration-normal: 0ms;
+    --duration-slow: 0ms;
+    --duration-slower: 0ms;
+    --duration-slowest: 0ms;
+    --duration-subtle: 0ms;
+    --duration-cinematic: 0ms;
+  }
+}
+
+/* ============================================
+   MENU/DROPDOWN TOKENS
+   ============================================ */
+:root {
+  --menu-background: 255 255 255;
+  --menu-border: 229 231 235;
+  --menu-shadow: 0 0 0 / 0.1;
+  --menu-item-hover: 245 246 248;
+  --menu-separator: 229 231 235;
+}
+
+:root.dark {
+  /* Menu tokens aligned to Linear surface hierarchy (2026-02-16)
+     Menu bg = surface-0 (rgb 16,17,18) — elevated menus use darker base */
+  --menu-background: 16 17 18;
+  --menu-border: 255 255 255 / 0.08;
+  --menu-shadow: 0 0 0 / 0.35;
+  --menu-item-hover: 35 37 42;
+  --menu-separator: 255 255 255 / 0.05;
+}
+
+/* ============================================
+   LIQUID GLASS SYSTEM
+   ============================================
+
+   Linear-inspired frosted glass effect with:
+   - Gaussian blur for depth
+   - Subtle gradients for structure
+   - Specular highlights
+   - Dynamic shadows
+*/
+:root {
+  /* Liquid glass base */
+  --liquid-glass-bg: oklch(100% 0 0 / 70%);
+  --liquid-glass-bg-solid: oklch(98% 0.005 var(--theme-base-hue));
+  --liquid-glass-border: oklch(0% 0 0 / 8%);
+  --liquid-glass-shadow:
+    0 8px 32px oklch(0% 0 0 / 8%), 0 4px 16px oklch(0% 0 0 / 5%),
+    inset 0 1px 0 oklch(100% 0 0 / 50%);
+  --liquid-glass-shadow-elevated:
+    0 16px 48px oklch(0% 0 0 / 12%), 0 8px 24px oklch(0% 0 0 / 8%),
+    inset 0 1px 0 oklch(100% 0 0 / 60%);
+
+  /* Highlight/specular */
+  --liquid-glass-highlight: linear-gradient(
+    135deg,
+    oklch(100% 0 0 / 40%) 0%,
+    oklch(100% 0 0 / 10%) 50%,
+    oklch(100% 0 0 / 0%) 100%
+  );
+
+  /* Item states */
+
+  /* Blur values */
+  --liquid-glass-blur: 24px;
+  --liquid-glass-blur-intense: 40px;
+}
+
+:root.dark {
+  /* Dark mode liquid glass */
+  --liquid-glass-bg: oklch(15% 0.01 var(--theme-base-hue) / 75%);
+  --liquid-glass-bg-solid: oklch(18% 0.01 var(--theme-base-hue));
+  --liquid-glass-border: oklch(100% 0 0 / 10%);
+  --liquid-glass-shadow:
+    0 8px 32px oklch(0% 0 0 / 40%), 0 4px 16px oklch(0% 0 0 / 30%),
+    inset 0 1px 0 oklch(100% 0 0 / 8%);
+  --liquid-glass-shadow-elevated:
+    0 16px 48px oklch(0% 0 0 / 50%), 0 8px 24px oklch(0% 0 0 / 40%),
+    inset 0 1px 0 oklch(100% 0 0 / 12%);
+
+  /* Highlight/specular - subtler in dark mode */
+  --liquid-glass-highlight: linear-gradient(
+    135deg,
+    oklch(100% 0 0 / 12%) 0%,
+    oklch(100% 0 0 / 4%) 50%,
+    oklch(100% 0 0 / 0%) 100%
+  );
+
+  /* Item states */
+}
+
+.profile-intent-page {
+  --color-text-primary-token: #f7f8f8;
+  --color-text-secondary-token: #d0d6e0;
+  --color-text-tertiary-token: #8a8f98;
+  --color-text-quaternary-token: #62666d;
+  --profile-drawer-bg: rgb(14, 16, 20);
+  --profile-panel-border: rgba(255, 255, 255, 0.09);
+  --profile-drawer-highlight: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.08),
+    rgba(255, 255, 255, 0.02) 36%,
+    transparent 100%
+  );
+
+  color-scheme: dark;
+}
+
+html:not(.dark) .profile-intent-page :where(a, button, span),
+html:not(.dark) [data-testid="profile-menu-drawer"] :where(a, button, span),
+html:not(.dark) [data-testid^="profile-mode-drawer"] :where(a, button, span) {
+  transition: none !important;
+}
+
+html:not(.dark) .system-b-marketing :where(a, button, span),
+html:not(.dark) [data-testid="header-nav"] a[href="/signin"],
+html:not(.dark) [data-testid="not-found"] :where(a, button, span),
+html:not(.dark) .smart-link-powered-by {
+  transition: none !important;
+}
+
+html:not(.dark) .smart-link-powered-by {
+  color: rgb(64 64 64) !important;
+}
+
+/* Marketing typography: headings use Satoshi (display font). Product controls
+   on semantic System B surfaces use Inter. */
+.system-b-marketing h1,
+.system-b-marketing h2,
+.system-b-marketing h3,
+.system-b-marketing h4 {
+  font-family: var(--marketing-font-display);
+}
+
+.system-b-marketing button,
+.system-b-marketing [role="button"],
+.system-b-marketing a[class*="btn"] {
+  font-family: var(--marketing-font-body);
+  letter-spacing: -0.01em;
+}
+
+/* Keyboard focus fallback — canonical visible focus ring (WCAG SC 2.4.7).
+   Design-system consistent recipe used across shell/chrome (smallwin + a11y polish):
+     focus-visible:outline-none
+     focus-visible:ring-2 focus-visible:ring-(--color-border-focus)/55
+     focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)
+   Box-shadow equivalent ensures global application to any :focus-visible without
+   explicit treatment. :where() keeps specificity at 0 so component-level overrides
+   (stronger CTA rings, public-action-*, Clerk, surface-specific offsets, input borders)
+   win cleanly. Eliminates all browser default outline artifacts.
+   Subtle gray ring provides visible keyboard focus on every surface without
+   clashing with Linear/Jovie app accents. Primary marketing CTAs and key actions
+   layer explicit stronger variants on top where emphasis is required. */
+:where(:focus-visible) {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--linear-bg-page),
+    0 0 0 4px color-mix(in oklab, var(--color-border-focus) 55%, transparent);
+  transition:
+    box-shadow 150ms cubic-bezier(0.32, 0.72, 0, 1),
+    border-color 150ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* FAQ REDUCED MOTION START
+   Disclosure geometry resolves directly. This scoped override follows the
+   global focus transition so keyboard focus stays visible without interpolation. */
+@media (prefers-reduced-motion: reduce) {
+  [data-marketing-section="faq"][data-layout-contract="bounded-local-disclosure"],
+  [data-marketing-section="faq"][data-layout-contract="bounded-local-disclosure"]::before,
+  [data-marketing-section="faq"][data-layout-contract="bounded-local-disclosure"]::after,
+  [data-marketing-section="faq"][data-layout-contract="bounded-local-disclosure"]
+    *,
+  [data-marketing-section="faq"][data-layout-contract="bounded-local-disclosure"]
+    *::before,
+  [data-marketing-section="faq"][data-layout-contract="bounded-local-disclosure"]
+    *::after {
+    animation-duration: 0s !important;
+    transition-duration: 0s !important;
+  }
+}
+/* FAQ REDUCED MOTION END */
+
+/* A quiet disclosure needs a keyboard cue without the global focus halo.
+   This is deliberately declared after the fallback so it wins for pointer and
+   keyboard focus alike; the underline is limited to :focus-visible. */
+[data-focus-treatment="underline-only"]:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+[data-focus-treatment="underline-only"]:focus-visible {
+  box-shadow: none;
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+
+:where(
+  input,
+  textarea,
+  select,
+  [contenteditable="true"],
+  [role="textbox"]
+):focus {
+  outline: none;
+}
+
+:where(
+  input,
+  textarea,
+  select,
+  [contenteditable="true"],
+  [role="textbox"]
+):focus-visible {
+  box-shadow: none;
+}
+
+/* ============================================
+   SYSTEM B ERROR FALLBACK PRIMITIVES
+   ============================================ */
+
+:where(.system-b-error-fallback-body) {
+  min-height: 100dvh;
+  margin: 0;
+  background: var(--system-b-bg-page);
+  color: var(--system-b-text-primary);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+:where(.system-b-error-fallback) {
+  display: flex;
+  min-height: 100dvh;
+  align-items: center;
+  justify-content: center;
+  background: var(--system-b-bg-page);
+  color: var(--system-b-text-primary);
+  color-scheme: dark;
+  padding-inline: var(--space-6);
+  text-align: center;
+}
+
+:where(.system-b-error-fallback__content) {
+  display: flex;
+  width: 100%;
+  max-width: calc(var(--space-24) * 3 + var(--space-4));
+  flex-direction: column;
+  align-items: center;
+}
+
+:where(.system-b-error-fallback__mark) {
+  width: var(--space-8);
+  height: var(--space-8);
+  color: var(--system-b-text-primary);
+}
+
+:where(.system-b-error-fallback__title) {
+  margin: var(--space-5) 0 0;
+  color: var(--system-b-text-primary);
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-normal);
+  line-height: var(--leading-snug);
+}
+
+:where(.system-b-error-fallback__description) {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+:where(.system-b-error-fallback__actions) {
+  display: flex;
+  flex-flow: row wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+:where(.system-b-error-fallback__action) {
+  display: inline-flex;
+  min-height: calc(var(--space-8) + var(--space-1));
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--system-b-radius-pill);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  padding-inline: var(--space-4);
+  text-decoration: none;
+  transition:
+    background-color var(--system-b-duration-fast) var(--system-b-ease),
+    border-color var(--system-b-duration-fast) var(--system-b-ease),
+    color var(--system-b-duration-fast) var(--system-b-ease),
+    opacity var(--system-b-duration-fast) var(--system-b-ease);
+}
+
+:where(.system-b-error-fallback__action--primary) {
+  border: var(--space-px) solid var(--color-btn-primary-bg);
+  background: var(--color-btn-primary-bg);
+  color: var(--color-btn-primary-fg);
+}
+
+:where(.system-b-error-fallback__action--primary:hover) {
+  opacity: 0.95;
+}
+
+:where(.system-b-error-fallback__action--secondary) {
+  border: var(--space-px) solid var(--color-border-subtle);
+  background: transparent;
+  color: var(--color-text-tertiary-token);
+}
+
+:where(.system-b-error-fallback__action--secondary:hover) {
+  border-color: var(--color-border-default);
+  background: var(--color-bg-surface-0);
+  color: var(--system-b-text-primary);
+}
+
+:where(.system-b-error-fallback__details) {
+  margin: var(--space-5) 0 0;
+}
+
+:where(.system-b-error-fallback__details-summary) {
+  cursor: pointer;
+  color: var(--color-text-quaternary-token);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  transition: color var(--system-b-duration-fast) var(--system-b-ease);
+}
+
+:where(.system-b-error-fallback__details-summary:hover) {
+  color: var(--color-text-tertiary-token);
+}
+
+:where(.system-b-error-fallback__digest) {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-quaternary-token);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+/* ============================================
+   SYSTEM B PUBLIC PROFILE NOT FOUND PRIMITIVES
+   ============================================ */
+
+:where(.system-b-public-profile-not-found-main) {
+  position: relative;
+  isolation: isolate;
+  overflow-x: clip;
+  background: var(--profile-stage-bg);
+  color: var(--system-b-text-primary);
+  color-scheme: dark;
+}
+
+:where(.system-b-public-profile-not-found-main)::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--profile-stage-overlay);
+  content: "";
+}
+
+:where(.system-b-public-profile-not-found-container) {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-height: calc(100svh - var(--system-b-header-height));
+  align-items: center;
+  justify-content: center;
+  padding-block: var(--space-16);
+  padding-inline: var(--space-4);
+}
+
+:where(.system-b-public-profile-not-found-content) {
+  display: flex;
+  width: 100%;
+  max-width: calc(var(--space-24) * 3 + var(--space-8));
+  flex-direction: column;
+  align-items: center;
+  margin-inline: auto;
+  text-align: center;
+}
+
+:where(.system-b-public-profile-not-found-code) {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-quaternary-token);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-normal);
+  line-height: var(--leading-tight);
+}
+
+:where(.system-b-public-profile-not-found-title) {
+  margin: 0;
+  color: var(--system-b-text-primary);
+  font-size: var(--text-xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-normal);
+  line-height: var(--leading-tight);
+}
+
+:where(.system-b-public-profile-not-found-description) {
+  max-width: calc(var(--space-24) * 2 + var(--space-4));
+  margin: var(--space-2) auto 0;
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+:where(.system-b-public-profile-not-found-actions) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+:where(.system-b-public-profile-not-found-action),
+:where(.system-b-public-profile-not-found-action-secondary) {
+  display: inline-flex;
+  min-height: var(--space-11);
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--profile-action-radius);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-normal);
+  padding-inline: var(--space-4);
+  text-decoration: none;
+  transition:
+    background var(--system-b-duration-fast) var(--system-b-ease),
+    border-color var(--system-b-duration-fast) var(--system-b-ease),
+    color var(--system-b-duration-fast) var(--system-b-ease),
+    opacity var(--system-b-duration-fast) var(--system-b-ease);
+}
+
+:where(.system-b-public-profile-not-found-action) {
+  background: var(--profile-pearl-primary-bg);
+  color: var(--profile-pearl-primary-fg);
+}
+
+:where(.system-b-public-profile-not-found-action:hover) {
+  background: var(--profile-pearl-bg-active);
+  opacity: 0.96;
+}
+
+:where(.system-b-public-profile-not-found-action-secondary) {
+  border: var(--space-px) solid var(--color-border-subtle);
+  background: transparent;
+  color: var(--color-text-tertiary-token);
+}
+
+:where(.system-b-public-profile-not-found-action-secondary:hover) {
+  border-color: var(--color-border-default);
+  background: var(--profile-pearl-bg-hover);
+  color: var(--system-b-text-primary);
+}
+
+/* Inline entity links in public profile bio/AEO copy. The entity-kind accent
+   is provided via the `--jovie-entity-accent` custom property on the link. */
+.profile-entity-mention {
+  color: var(--jovie-entity-accent, var(--profile-aeo-text, inherit));
+  text-decoration-color: color-mix(
+    in srgb,
+    var(--jovie-entity-accent) 45%,
+    transparent
+  );
+  transition:
+    color var(--system-b-duration-fast) var(--system-b-ease),
+    text-decoration-color var(--system-b-duration-fast) var(--system-b-ease);
+}
+
+.profile-entity-mention:hover,
+.profile-entity-mention:focus-visible {
+  text-decoration-color: var(--jovie-entity-accent);
+}
+
+.profile-entity-mention:focus-visible {
+  outline: 2px solid var(--jovie-entity-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ============================================
+   GEIST ACCENT PALETTE — feature-surface accents
+   ============================================
+
+   Nine hues sourced from the Vercel Geist palette. Each hue exposes three
+   stops: -bg (subtle fill / atmosphere), -solid (text/icon/halo), -fg (legible
+   text on -solid). Used to rotate accents across feature surfaces (Bento,
+   Profile hero, Loop diagram). Never use as primary CTA color — primary CTA
+   stays white-on-black per the neutral-CTA rule (DESIGN.md, 2026-04-11).
+
+   Source: home-page-hero handoff bundle (Claude Design 2026-04).
+*/
+:root {
+  --geist-blue-solid: #0070f3;
+  --geist-purple-solid: #8b5cf6;
+  --geist-pink-solid: #ff0080;
+  --geist-red-solid: #e00000;
+  --geist-amber-solid: #f5a623;
+  --geist-yellow-solid: #f7d600;
+  --geist-green-solid: #0cce6b;
+  --geist-teal-solid: #00bcd4;
+  --geist-cyan-solid: #22c1fc;
+
+  /* Rotation order — blue, purple, pink, amber, green, teal, red, cyan, yellow.
+   * Apple-style hue rotation across feature surfaces. */
+}
