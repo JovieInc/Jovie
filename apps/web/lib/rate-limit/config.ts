@@ -382,6 +382,21 @@ export const RATE_LIMITERS = {
     trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
+  /**
+   * Public artist API: 100 requests per minute per IP. Keep this bucket
+   * separate from `publicProfile`: that limiter also protects profile-view
+   * telemetry and is consumed twice by that route (IP plus handle:IP).
+   */
+  publicArtistApi: {
+    name: 'Public Artist API',
+    limit: 100,
+    window: '1 m',
+    prefix: 'public:artist-api',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+  } satisfies RateLimitConfig,
+
   /** Public click: 50 requests per minute per IP */
   publicClick: {
     name: 'Public Click',

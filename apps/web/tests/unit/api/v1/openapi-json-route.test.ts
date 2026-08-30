@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GET as getCanonical } from '@/app/api/v1/openapi.json/route';
 import { GET as getCompatibility } from '@/app/openapi.json/route';
+import { PUBLIC_ARTIST_API_POLICY_LINK } from '@/lib/api/v1/contract';
 
 describe('public OpenAPI surfaces', () => {
   it('publishes the same OpenAPI 3.1 document at /openapi.json and /api/v1/openapi.json', async () => {
@@ -14,6 +15,10 @@ describe('public OpenAPI surfaces', () => {
     expect(canonical.headers.get('content-type')).toContain('application/json');
     expect(compatibility.headers.get('content-type')).toContain(
       'application/json'
+    );
+    expect(canonical.headers.get('Link')).toBe(PUBLIC_ARTIST_API_POLICY_LINK);
+    expect(compatibility.headers.get('Link')).toBe(
+      PUBLIC_ARTIST_API_POLICY_LINK
     );
 
     const canonicalBody = await canonical.json();

@@ -4,6 +4,14 @@ import { DOCS_URL } from '@/constants/domains';
 /** The public artist API's active semantic version. */
 export const PUBLIC_ARTIST_API_VERSION = '1.0.0';
 
+/** Canonical policy and lifecycle documentation for the active API. */
+export const PUBLIC_ARTIST_API_POLICY_URL = `${DOCS_URL}/docs/api-reference`;
+
+/** Structured-field policy identifier used by the public profile endpoint. */
+export const PUBLIC_ARTIST_API_RATE_LIMIT_POLICY = 'public-artist';
+export const PUBLIC_ARTIST_API_RATE_LIMIT = 100;
+export const PUBLIC_ARTIST_API_RATE_LIMIT_WINDOW_SECONDS = 60;
+
 export const PUBLIC_ARTIST_API_INDEX_URL = `${BASE_URL}/api/v1`;
 export const PUBLIC_ARTIST_API_PROFILE_TEMPLATE_URL = `${BASE_URL}/api/v1/{username}`;
 export const PUBLIC_ARTIST_API_OPENAPI_URL = `${BASE_URL}/api/v1/openapi.json`;
@@ -13,13 +21,22 @@ export const PUBLIC_ARTIST_API_SITEMAP_URL = `${BASE_URL}/sitemap.xml`;
 /** Canonical human-readable API reference. */
 export const PUBLIC_ARTIST_API_REFERENCE_URL = `${DOCS_URL}/docs/api-reference`;
 
+/**
+ * RFC 9745 policy discovery link. It intentionally does not claim that v1 is
+ * deprecated: the linked page documents the active version and future signal.
+ */
+export const PUBLIC_ARTIST_API_POLICY_LINK = `<${PUBLIC_ARTIST_API_POLICY_URL}>; rel="deprecation"; type="text/html"`;
+
 /** Headers shared by public API discovery and profile responses. */
 export const PUBLIC_ARTIST_API_COMMON_HEADERS = {
   'Access-Control-Allow-Origin': '*',
+  Link: PUBLIC_ARTIST_API_POLICY_LINK,
 } as const;
 
 export const PUBLIC_ARTIST_API_DISCOVERY_CACHE_CONTROL =
   'public, max-age=86400, stale-while-revalidate=86400';
+
+export const PUBLIC_ARTIST_API_PROFILE_CACHE_CONTROL = 'private, no-store';
 
 export interface PublicArtistApiIndex {
   readonly name: 'Jovie Artist API';
@@ -28,6 +45,13 @@ export interface PublicArtistApiIndex {
   readonly access: 'anonymous';
   readonly scope: 'read-only';
   readonly methods: readonly ['GET'];
+  readonly rateLimit: {
+    readonly appliesTo: 'artist-profile';
+    readonly policy: typeof PUBLIC_ARTIST_API_RATE_LIMIT_POLICY;
+    readonly limit: typeof PUBLIC_ARTIST_API_RATE_LIMIT;
+    readonly windowSeconds: typeof PUBLIC_ARTIST_API_RATE_LIMIT_WINDOW_SECONDS;
+    readonly key: 'client-ip';
+  };
   readonly endpoints: {
     readonly index: typeof PUBLIC_ARTIST_API_INDEX_URL;
     readonly artistTemplate: typeof PUBLIC_ARTIST_API_PROFILE_TEMPLATE_URL;
@@ -37,6 +61,7 @@ export interface PublicArtistApiIndex {
   };
   readonly _links: {
     readonly self: typeof PUBLIC_ARTIST_API_INDEX_URL;
+    readonly policy: typeof PUBLIC_ARTIST_API_POLICY_URL;
     readonly openapi: typeof PUBLIC_ARTIST_API_OPENAPI_URL;
     readonly developers: typeof PUBLIC_ARTIST_API_DEVELOPERS_URL;
     readonly sitemap: typeof PUBLIC_ARTIST_API_SITEMAP_URL;
@@ -56,6 +81,13 @@ export const PUBLIC_ARTIST_API_INDEX: PublicArtistApiIndex = {
   access: 'anonymous',
   scope: 'read-only',
   methods: ['GET'],
+  rateLimit: {
+    appliesTo: 'artist-profile',
+    policy: PUBLIC_ARTIST_API_RATE_LIMIT_POLICY,
+    limit: PUBLIC_ARTIST_API_RATE_LIMIT,
+    windowSeconds: PUBLIC_ARTIST_API_RATE_LIMIT_WINDOW_SECONDS,
+    key: 'client-ip',
+  },
   endpoints: {
     index: PUBLIC_ARTIST_API_INDEX_URL,
     artistTemplate: PUBLIC_ARTIST_API_PROFILE_TEMPLATE_URL,
@@ -65,6 +97,7 @@ export const PUBLIC_ARTIST_API_INDEX: PublicArtistApiIndex = {
   },
   _links: {
     self: PUBLIC_ARTIST_API_INDEX_URL,
+    policy: PUBLIC_ARTIST_API_POLICY_URL,
     openapi: PUBLIC_ARTIST_API_OPENAPI_URL,
     developers: PUBLIC_ARTIST_API_DEVELOPERS_URL,
     sitemap: PUBLIC_ARTIST_API_SITEMAP_URL,

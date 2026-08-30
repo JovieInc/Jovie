@@ -152,6 +152,21 @@ export default function DevelopersPage() {
               OpenAPI contract as the source of truth.
             </p>
             <p className='mt-4 text-base leading-relaxed text-secondary-token'>
+              Profile requests are limited to 100 per client IP in a fixed
+              60-second window. Read the{' '}
+              <Link
+                href={`${DOCS_URL}/docs/api-reference`}
+                className='text-primary-token underline decoration-subtle underline-offset-4 transition-colors hover:decoration-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+              >
+                API reference
+              </Link>{' '}
+              for the current RateLimit and Retry-After response contract.
+            </p>
+            <p className='mt-4 text-base leading-relaxed text-secondary-token'>
+              Version v1 is active. A policy Link relation points to lifecycle
+              guidance; active v1 responses do not claim Deprecation or Sunset.
+            </p>
+            <p className='mt-4 text-base leading-relaxed text-secondary-token'>
               For a human-oriented overview, visit{' '}
               <Link
                 href={APP_ROUTES.SUPPORT}

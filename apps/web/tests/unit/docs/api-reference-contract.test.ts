@@ -32,4 +32,19 @@ describe('docs API reference contract', () => {
     expect(apiReference).not.toContain('Read and update artist profile');
     expect(apiReference).not.toContain('Manage releases');
   });
+
+  it('documents the enforced profile quota and active v1 lifecycle policy', () => {
+    expect(apiReference).toMatch(/100\s+requests per client IP/);
+    expect(apiReference).toContain(
+      'RateLimit-Policy: "public-artist";q=100;w=60'
+    );
+    expect(apiReference).toContain('Retry-After: 30');
+    expect(apiReference).toContain('Cache-Control: private, no-store');
+    expect(apiReference).toContain('The `v1` public artist API is active');
+    expect(apiReference).toContain(
+      'Link: <https://docs.jov.ie/docs/api-reference>; rel="deprecation"'
+    );
+    expect(apiReference).toContain('RFC 9745');
+    expect(apiReference).toContain('RFC 8594');
+  });
 });

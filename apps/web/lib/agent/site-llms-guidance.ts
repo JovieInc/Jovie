@@ -34,7 +34,7 @@ Do not use ${APP_NAME} for:
 - **Site identity**: ${BASE_URL}/llms.txt
 - **Public API capability index**: \`GET ${BASE_URL}/api/v1\` — stable, non-enumerating contract discovery
 - **OpenAPI 3.1**: ${BASE_URL}/openapi.json — conventional spec URL; same contract as ${BASE_URL}/api/v1/openapi.json
-- **Human API guide**: ${BASE_URL}/developers — public API quickstart and resource guide
+- **Human API guide**: ${BASE_URL}/developers — public API quickstart and active v1 lifecycle boundary
 - **Public artist API**: \`GET ${BASE_URL}/api/v1/{username}\` — profile, releases, events, merch
 - **Per-artist MCP**: ${BASE_URL}/api/mcp/{username} — read-only artist tools
 - **Per-artist llms.txt**: ${BASE_URL}/{username}/llms.txt

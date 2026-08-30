@@ -3,7 +3,11 @@ import { BASE_URL } from '@/constants/app';
 import {
   PUBLIC_ARTIST_API_INDEX_URL,
   PUBLIC_ARTIST_API_OPENAPI_URL,
+  PUBLIC_ARTIST_API_POLICY_LINK,
   PUBLIC_ARTIST_API_PROFILE_TEMPLATE_URL,
+  PUBLIC_ARTIST_API_RATE_LIMIT,
+  PUBLIC_ARTIST_API_RATE_LIMIT_POLICY,
+  PUBLIC_ARTIST_API_RATE_LIMIT_WINDOW_SECONDS,
   PUBLIC_ARTIST_API_REFERENCE_URL,
   PUBLIC_ARTIST_API_VERSION,
 } from './contract';
@@ -22,11 +26,82 @@ type JsonSchema = {
 
 type OpenApiResponse = {
   readonly description: string;
+  readonly headers?: Readonly<Record<string, OpenApiHeader>>;
   readonly content: {
     readonly 'application/json': {
       readonly schema: JsonSchema;
     };
   };
+};
+
+type OpenApiHeader = {
+  readonly description: string;
+  readonly schema: JsonSchema;
+  readonly example?: string;
+};
+
+const API_LIFECYCLE_HEADERS: Readonly<Record<string, OpenApiHeader>> = {
+  Link: {
+    description:
+      'RFC 9745 deprecation-policy pointer. v1 is active; this relation advertises where future lifecycle signals will be documented.',
+    schema: { type: 'string' },
+    example: PUBLIC_ARTIST_API_POLICY_LINK,
+  },
+};
+
+const API_RATE_LIMIT_HEADERS: Readonly<Record<string, OpenApiHeader>> = {
+  'RateLimit-Policy': {
+    description:
+      'Current IETF HTTPAPI RateLimit draft policy: public-artist permits 100 requests in a 60-second window.',
+    schema: { type: 'string' },
+    example: '"public-artist";q=100;w=60',
+  },
+  RateLimit: {
+    description:
+      'Current IETF HTTPAPI RateLimit draft status for the caller, with remaining requests and seconds to reset.',
+    schema: { type: 'string' },
+    example: '"public-artist";r=99;t=60',
+  },
+  'X-RateLimit-Limit': {
+    description: 'Legacy compatibility field for the request limit.',
+    schema: { type: 'string' },
+    example: String(PUBLIC_ARTIST_API_RATE_LIMIT),
+  },
+  'X-RateLimit-Remaining': {
+    description: 'Legacy compatibility field for remaining requests.',
+    schema: { type: 'string' },
+    example: '99',
+  },
+  'X-RateLimit-Reset': {
+    description: 'Legacy compatibility field containing the Unix reset time.',
+    schema: { type: 'string' },
+  },
+};
+
+const API_THROTTLED_HEADERS: Readonly<Record<string, OpenApiHeader>> = {
+  ...API_LIFECYCLE_HEADERS,
+  ...API_RATE_LIMIT_HEADERS,
+  'Retry-After': {
+    description:
+      'Integer seconds before retrying. On a throttled response this is authoritative for retry timing.',
+    schema: { type: 'string' },
+    example: String(PUBLIC_ARTIST_API_RATE_LIMIT_WINDOW_SECONDS),
+  },
+};
+
+const API_PROFILE_HEADERS: Readonly<Record<string, OpenApiHeader>> = {
+  ...API_LIFECYCLE_HEADERS,
+  ...API_RATE_LIMIT_HEADERS,
+};
+
+const API_SERVICE_HEADERS: Readonly<Record<string, OpenApiHeader>> = {
+  ...API_LIFECYCLE_HEADERS,
+  'Retry-After': {
+    description:
+      'Integer seconds before retrying after a temporary rate-limit backend outage.',
+    schema: { type: 'string' },
+    example: '30',
+  },
 };
 
 type OpenApiOperation = {
@@ -85,7 +160,7 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
   },
   servers: [{ url: BASE_URL, description: 'Production API origin' }],
   externalDocs: {
-    description: 'API reference',
+    description: 'API reference, rate limits, and version lifecycle policy',
     url: PUBLIC_ARTIST_API_REFERENCE_URL,
   },
   paths: {
@@ -94,10 +169,11 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
         operationId: 'getArtistApiIndex',
         summary: 'Discover public artist API capabilities',
         description:
-          'Stable, non-enumerating capability document. It identifies the anonymous read-only scope, supported GET resources, and canonical discovery links without depending on a particular artist handle.',
+          'Stable, non-enumerating capability document. It identifies the anonymous read-only scope, supported GET resources, profile rate-limit metadata, and canonical discovery links without depending on a particular artist handle.',
         responses: {
           '200': {
             description: 'Public artist API capability document',
+            headers: API_LIFECYCLE_HEADERS,
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/ArtistApiIndex' },
@@ -112,7 +188,7 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
         operationId: 'getArtist',
         summary: 'Get artist profile with releases, events, and merch',
         description:
-          'Anonymous read-only lookup for one public independent artist. Returns profile fields, releases, upcoming tour events, merch, and related resource links. Responds 404 when the username is unknown or not public. Use the /api/v1 capability index or sitemap to discover a current handle; this contract does not enumerate artists.',
+          'Anonymous read-only lookup for one public independent artist. Returns profile fields, releases, upcoming tour events, merch, and related resource links. The artist-profile bucket is limited by client IP. Responds 404 when the username is unknown or not public. Use the /api/v1 capability index or sitemap to discover a current handle; this contract does not enumerate artists.',
         parameters: [
           {
             name: 'username',
@@ -126,6 +202,7 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
         responses: {
           '200': {
             description: 'Artist data',
+            headers: API_PROFILE_HEADERS,
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/ArtistResponse' },
@@ -134,9 +211,28 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
           },
           '404': {
             description: 'Artist not found',
+            headers: API_PROFILE_HEADERS,
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/Error' },
+              },
+            },
+          },
+          '429': {
+            description: 'Artist-profile rate limit exceeded',
+            headers: API_THROTTLED_HEADERS,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/RateLimitError' },
+              },
+            },
+          },
+          '503': {
+            description: 'Durable rate-limit service temporarily unavailable',
+            headers: API_SERVICE_HEADERS,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ServiceUnavailable' },
               },
             },
           },
@@ -155,6 +251,7 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
           'access',
           'scope',
           'methods',
+          'rateLimit',
           'endpoints',
           '_links',
         ],
@@ -167,6 +264,26 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
           methods: {
             type: 'array',
             items: { type: 'string', enum: ['GET'] },
+          },
+          rateLimit: {
+            type: 'object',
+            required: ['appliesTo', 'policy', 'limit', 'windowSeconds', 'key'],
+            properties: {
+              appliesTo: { type: 'string', enum: ['artist-profile'] },
+              policy: {
+                type: 'string',
+                examples: [PUBLIC_ARTIST_API_RATE_LIMIT_POLICY],
+              },
+              limit: {
+                type: 'integer',
+                examples: [PUBLIC_ARTIST_API_RATE_LIMIT],
+              },
+              windowSeconds: {
+                type: 'integer',
+                examples: [PUBLIC_ARTIST_API_RATE_LIMIT_WINDOW_SECONDS],
+              },
+              key: { type: 'string', examples: ['client-ip'] },
+            },
           },
           endpoints: {
             type: 'object',
@@ -199,9 +316,10 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
           },
           _links: {
             type: 'object',
-            required: ['self', 'openapi', 'developers', 'sitemap'],
+            required: ['self', 'policy', 'openapi', 'developers', 'sitemap'],
             properties: {
               self: { type: 'string', format: 'uri' },
+              policy: { type: 'string', format: 'uri' },
               openapi: { type: 'string', format: 'uri' },
               developers: { type: 'string', format: 'uri' },
               sitemap: { type: 'string', format: 'uri' },
@@ -313,6 +431,23 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
         required: ['error'],
         properties: {
           error: { type: 'string' },
+          code: { type: 'string' },
+        },
+      },
+      RateLimitError: {
+        type: 'object',
+        required: ['error', 'code'],
+        properties: {
+          error: { type: 'string', examples: ['Too many requests'] },
+          code: { type: 'string', enum: ['RATE_LIMITED'] },
+        },
+      },
+      ServiceUnavailable: {
+        type: 'object',
+        required: ['error', 'code'],
+        properties: {
+          error: { type: 'string' },
+          code: { type: 'string', enum: ['RATE_LIMIT_UNAVAILABLE'] },
         },
       },
     },
@@ -326,6 +461,7 @@ export function artistOpenApiGET(): NextResponse {
     headers: {
       'Cache-Control': ARTIST_OPENAPI_CACHE_CONTROL,
       'Access-Control-Allow-Origin': '*',
+      Link: PUBLIC_ARTIST_API_POLICY_LINK,
     },
   });
 }

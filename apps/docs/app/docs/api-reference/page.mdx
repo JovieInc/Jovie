@@ -41,7 +41,56 @@ endpoint, or manage endpoint is required or supported for this public surface.
 Only data the artist has made public is returned. Do not send private or
 sensitive information.
 
+## Rate limits and response headers
+
+Only `GET /api/v1/{username}` consumes the public artist-profile bucket: 100
+requests per client IP in each fixed 60-second window. The bucket is durable
+across application instances through Redis. The static `/api/v1` capability
+index and the OpenAPI discovery routes do not consume this bucket.
+
+Successful profile responses, including typed `404` responses, include the
+current IETF HTTPAPI draft fields:
+
+```text
+RateLimit-Policy: "public-artist";q=100;w=60
+RateLimit: "public-artist";r=99;t=60
+```
+
+`X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` remain
+available for compatibility with existing clients. A `429` response includes
+the same quota fields plus an integer `Retry-After` in seconds; clients should
+use `Retry-After` as the authoritative retry timing. If the durable limiter is
+temporarily unavailable, the endpoint fails closed with `503` and
+`Retry-After: 30` rather than claiming a durable quota state.
+
+Per-client remaining and reset fields make a shared CDN body cache unsafe for
+profile responses, so those responses use `Cache-Control: private, no-store`
+instead of the former one-hour public cache. This intentionally increases
+origin work until a bounded internal cache can safely separate response data
+from caller-specific headers.
+
+The field names follow the current
+[IETF HTTPAPI RateLimit draft](https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-ratelimit-headers-11);
+the `X-RateLimit-*` fields are legacy compatibility fields.
+
+## Versioning and lifecycle
+
+The `v1` public artist API is active and is not deprecated. Additive changes
+remain within `v1`; a breaking contract requires a new versioned path. Active
+`v1` responses therefore do not emit `Deprecation` or `Sunset` headers.
+
+Responses expose the owned policy page with a `Link` relation:
+
+```text
+Link: <https://docs.jov.ie/docs/api-reference>; rel="deprecation"; type="text/html"
+```
+
+This policy pointer is discovery only and does not deprecate `v1`. When a
+resource is genuinely retired, the service will publish a dated RFC 9745
+`Deprecation` signal and an RFC 8594 `Sunset` date together with migration
+guidance.
+
 ## End of current contract
 
 The OpenAPI document is the source of truth for the response schema and
-supported statuses.
+supported statuses, headers, and the active version boundary.

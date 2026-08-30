@@ -152,6 +152,12 @@ vi.mock('@/lib/rate-limit/config', () => ({
       window: '1 m',
       prefix: 'public:profile',
     },
+    publicArtistApi: {
+      name: 'Public Artist API',
+      limit: 100,
+      window: '1 m',
+      prefix: 'public:artist-api',
+    },
     publicClick: {
       name: 'Public Click',
       limit: 50,
@@ -365,6 +371,7 @@ describe('limiters.ts', () => {
         'trackingIpClicks',
         'trackingIpVisits',
         'publicProfile',
+        'publicArtistApi',
         'claimTokenAccess',
         'publicClick',
         'publicVisit',
@@ -416,6 +423,33 @@ describe('limiters.ts', () => {
         preferRedis: false,
         warnOnFallback: false,
       });
+    });
+
+    it('keeps the public artist API bucket separate from profile-view telemetry', async () => {
+      const { publicArtistApiLimiter, publicProfileLimiter } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const apiConfig = publicArtistApiLimiter.getConfig() as {
+        prefix: string;
+        limit: number;
+      };
+      const profileConfig = publicProfileLimiter.getConfig() as {
+        prefix: string;
+      };
+
+      expect(apiConfig).toMatchObject({
+        prefix: 'public:artist-api',
+        limit: 100,
+      });
+      expect(profileConfig.prefix).toBe('public:profile');
+      expect(apiConfig.prefix).not.toBe(profileConfig.prefix);
+      expect(
+        (
+          publicArtistApiLimiter as unknown as {
+            options: { requireRedis: boolean };
+          }
+        ).options.requireRedis
+      ).toBe(true);
     });
   });
 

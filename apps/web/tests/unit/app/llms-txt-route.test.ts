@@ -13,6 +13,7 @@ describe('GET /llms.txt', () => {
     expect(body).toContain('/api/v1/{username}');
     expect(body).toContain('GET https://jov.ie/api/v1');
     expect(body).toContain('https://jov.ie/developers');
+    expect(body).toContain('active v1 lifecycle boundary');
     expect(body).toContain('## Jovie developer resources');
     expect(body).toContain('https://jov.ie/llms.txt');
     expect(body).toContain('/openapi.json');
