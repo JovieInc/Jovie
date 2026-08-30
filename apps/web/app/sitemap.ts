@@ -184,6 +184,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'monthly',
       priority: 0.7,
     },
+    // These public, root-level machine-readable resources are linked from the
+    // developer guide and are intentionally distinct from the noindex /api/*
+    // surface.
+    {
+      url: `${BASE_URL}/openapi.json`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
+    {
+      url: `${BASE_URL}/llms.txt`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
+    {
+      url: `${BASE_URL}/llms-full.txt`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.5,
+    },
     {
       url: `${BASE_URL}/blog`,
       lastModified: now,
