@@ -16,6 +16,32 @@
     "imagePath": "marketing-home-desktop.png"
   },
   {
+    "id": "jovie-cli-desktop",
+    "title": "Jovie CLI Landing Page",
+    "group": "marketing",
+    "groupLabel": "Marketing",
+    "route": "/cli",
+    "viewport": "desktop",
+    "theme": "dark",
+    "consumers": ["admin", "investor-ready"],
+    "capturedAt": "2026-08-30T22:47:23.475Z",
+    "gitSha": "b2cb9087d10028912c5152cc31eba86d18ff8d88",
+    "imagePath": "jovie-cli-desktop.png"
+  },
+  {
+    "id": "jovie-cli-mobile",
+    "title": "Jovie CLI Landing Page Mobile",
+    "group": "marketing",
+    "groupLabel": "Marketing",
+    "route": "/cli",
+    "viewport": "mobile",
+    "theme": "dark",
+    "consumers": ["admin", "investor-ready"],
+    "capturedAt": "2026-08-30T22:47:54.551Z",
+    "gitSha": "b2cb9087d10028912c5152cc31eba86d18ff8d88",
+    "imagePath": "jovie-cli-mobile.png"
+  },
+  {
     "id": "release-landing-desktop",
     "title": "Release Landing Page",
     "group": "marketing",
