@@ -786,12 +786,19 @@ def _readback_promotion_batch(
     required_names: frozenset[str],
     deadline: float,
     *,
+    check_numbers: frozenset[int] | None = None,
     run_impl: Any = subprocess.run,
 ) -> dict[str, Any]:
     owner, name = _repo_parts(repo)
+    exact_check_numbers = (
+        frozenset(int(pr["number"]) for pr in candidates)
+        if check_numbers is None
+        else check_numbers
+    )
     pr_fields = " ".join(
         f"pr_{int(pr['number'])}:pullRequest(number:{int(pr['number'])}){{"
-        "state headRefOid baseRefName isDraft isCrossRepository mergeStateStatus "
+        "state title body headRefName headRefOid baseRefName baseRefOid "
+        "isDraft isCrossRepository mergeStateStatus "
         "updatedAt author{login} labels(first:100){totalCount nodes{name}} "
         "mergeQueueEntry{position enqueuedAt state}}"
         for pr in candidates
@@ -801,6 +808,7 @@ def _readback_promotion_batch(
         f'commit_{int(pr["number"])}:object(oid:"{pr["headRefOid"]}"){{'
         f"... on Commit{{oid {check_fields}}}}}"
         for pr in candidates
+        if int(pr["number"]) in exact_check_numbers
     )
     query = (
         "query($owner:String!,$name:String!){repository(owner:$owner,name:$name){"
@@ -838,23 +846,30 @@ def _readback_promotion_batch(
     for candidate in candidates:
         number = int(candidate["number"])
         pr = repository.get(f"pr_{number}")
-        commit = repository.get(f"commit_{number}")
-        if not isinstance(pr, dict) or not isinstance(commit, dict):
+        if not isinstance(pr, dict):
             raise ValueError("GitHub promotion readback omitted pull request")
-        if commit.get("oid") != candidate.get("headRefOid"):
-            raise ValueError("GitHub promotion readback returned the wrong commit")
-        try:
-            required_checks = _normalize_named_required_checks(commit, required_names)
-            check_evidence_status = "complete"
-        except ValueError:
-            required_checks = []
-            check_evidence_status = "malformed"
-        prs[number] = {
-            **pr,
-            "headOid": pr.get("headRefOid"),
-            "checkEvidenceStatus": check_evidence_status,
-            "requiredChecks": required_checks,
-        }
+        current = {**pr, "headOid": pr.get("headRefOid")}
+        if number in exact_check_numbers:
+            commit = repository.get(f"commit_{number}")
+            if not isinstance(commit, dict):
+                raise ValueError("GitHub promotion readback omitted pull request commit")
+            if commit.get("oid") != candidate.get("headRefOid"):
+                raise ValueError("GitHub promotion readback returned the wrong commit")
+            try:
+                required_checks = _normalize_named_required_checks(
+                    commit, required_names
+                )
+                check_evidence_status = "complete"
+            except ValueError:
+                required_checks = []
+                check_evidence_status = "malformed"
+            current.update(
+                {
+                    "checkEvidenceStatus": check_evidence_status,
+                    "requiredChecks": required_checks,
+                }
+            )
+        prs[number] = current
     return {"baseOid": base_oid, "prs": prs}
 
 
@@ -864,11 +879,18 @@ def _readback_promotion_state(
     required_names: frozenset[str],
     deadline: float,
     *,
+    check_numbers: frozenset[int] | None = None,
     run_impl: Any = subprocess.run,
 ) -> dict[str, Any]:
     """Bound GraphQL cost while requiring one main identity across all batches."""
     if not candidates:
         raise ValueError("GitHub promotion readback requires candidates")
+    candidate_numbers = frozenset(int(pr["number"]) for pr in candidates)
+    exact_check_numbers = (
+        candidate_numbers if check_numbers is None else check_numbers
+    )
+    if not exact_check_numbers.issubset(candidate_numbers):
+        raise ValueError("GitHub promotion check set exceeds readback candidates")
     batches = [
         candidates[offset : offset + PROMOTION_READBACK_BATCH]
         for offset in range(0, len(candidates), PROMOTION_READBACK_BATCH)
@@ -883,6 +905,7 @@ def _readback_promotion_state(
             batch,
             required_names,
             deadline,
+            check_numbers=exact_check_numbers,
             run_impl=run_impl,
         )
         for batch in batches
@@ -1040,6 +1063,124 @@ def _native_stack_components(
     return {number: find(number) for number in numbers}
 
 
+def _finalize_observed_pr_state(
+    repo: str,
+    observed: list[dict[str, Any]],
+    check_candidates: list[dict[str, Any]],
+    current_base_oid: str,
+    deadline: float,
+    live_required: frozenset[str] | None,
+    *,
+    run_impl: Any = subprocess.run,
+) -> list[dict[str, Any]]:
+    """Bind every actionable PR to one final lifecycle and main readback."""
+    if not observed:
+        return []
+    check_numbers = frozenset(int(pr["number"]) for pr in check_candidates)
+    final_required = frozenset()
+    try:
+        if check_numbers:
+            final_required = _observe_live_required_checks(
+                repo, deadline, run_impl=run_impl
+            )
+            if final_required != live_required:
+                raise ValueError(
+                    "GitHub required-check policy changed during observation"
+                )
+        final_readback = _readback_promotion_state(
+            repo,
+            observed,
+            final_required,
+            deadline,
+            check_numbers=check_numbers,
+            run_impl=run_impl,
+        )
+    except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError):
+        final_readback = None
+
+    finalized: list[dict[str, Any]] = []
+    for pr in observed:
+        number = int(pr["number"])
+        expected_head = pr.get("headRefOid")
+        expected_base = pr.get("baseRefName")
+        final = (
+            final_readback.get("prs", {}).get(number)
+            if isinstance(final_readback, dict)
+            else None
+        )
+        if isinstance(final, dict):
+            for key in (
+                "author",
+                "baseRefOid",
+                "baseRefName",
+                "body",
+                "headRefName",
+                "isCrossRepository",
+                "isDraft",
+                "labels",
+                "mergeQueueEntry",
+                "mergeStateStatus",
+                "title",
+                "updatedAt",
+            ):
+                pr[key] = final.get(key)
+            if final.get("state") in {"CLOSED", "MERGED"}:
+                continue
+
+        final_status = (
+            "complete"
+            if (
+                isinstance(final_readback, dict)
+                and final_readback.get("baseOid") == current_base_oid
+                and isinstance(final, dict)
+                and final.get("headOid") == expected_head
+                and final.get("baseRefName") == expected_base
+                and final.get("state") == "OPEN"
+                and _valid_oid(final.get("baseRefOid"))
+                and isinstance(final.get("title"), str)
+                and bool(final.get("title"))
+                and isinstance(final.get("body"), str)
+                and isinstance(final.get("headRefName"), str)
+                and bool(final.get("headRefName"))
+            )
+            else ("stale" if isinstance(final_readback, dict) else "error")
+        )
+        pr["finalObservationEvidence"] = {
+            "status": final_status,
+            "headOid": expected_head,
+            "baseOid": current_base_oid,
+        }
+        if number not in check_numbers:
+            finalized.append(pr)
+            continue
+        if final_status != "complete":
+            pr["promotionEvidence"] = {
+                "status": final_status,
+                "headOid": expected_head,
+                "baseOid": current_base_oid,
+            }
+            finalized.append(pr)
+            continue
+        final_check_status = final.get("checkEvidenceStatus")
+        if final_check_status != "complete":
+            pr["promotionEvidence"] = {
+                "status": (
+                    final_check_status
+                    if isinstance(final_check_status, str) and final_check_status
+                    else "malformed"
+                ),
+                "headOid": expected_head,
+                "baseOid": current_base_oid,
+            }
+            finalized.append(pr)
+            continue
+        evidence = pr.get("promotionEvidence")
+        if isinstance(evidence, dict) and evidence.get("status") == "complete":
+            evidence["requiredCheckNames"] = sorted(final_required)
+            evidence["requiredChecks"] = final["requiredChecks"]
+        finalized.append(pr)
+    return finalized
+
 
 def observe_promotion_evidence(
     repo: str,
@@ -1061,7 +1202,15 @@ def observe_promotion_evidence(
             candidates.append(enriched)
         observed.append(enriched)
     if not candidates:
-        return observed
+        return _finalize_observed_pr_state(
+            repo,
+            observed,
+            [],
+            current_base_oid,
+            observation_deadline,
+            None,
+            run_impl=run_impl,
+        )
     try:
         live_required = _observe_live_required_checks(
             repo, observation_deadline, run_impl=run_impl
@@ -1077,7 +1226,15 @@ def observe_promotion_evidence(
                 "baseOid": current_base_oid,
                 "requiredCheckNames": sorted(live_required or []),
             }
-        return observed
+        return _finalize_observed_pr_state(
+            repo,
+            observed,
+            [],
+            current_base_oid,
+            observation_deadline,
+            None,
+            run_impl=run_impl,
+        )
     try:
         readback = _readback_promotion_state(
             repo,
@@ -1193,74 +1350,15 @@ def observe_promotion_evidence(
             # Comparison workers return values only, so ignored late results
             # cannot overwrite the deadline disposition.
             executor.shutdown(wait=False, cancel_futures=True)
-    try:
-        final_required = _observe_live_required_checks(
-            repo, observation_deadline, run_impl=run_impl
-        )
-        if final_required != live_required:
-            raise ValueError("GitHub required-check policy changed during observation")
-        final_readback = _readback_promotion_state(
-            repo,
-            candidates,
-            final_required,
-            observation_deadline,
-            run_impl=run_impl,
-        )
-    except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError):
-        final_readback = None
-    for candidate in candidates:
-        number = int(candidate["number"])
-        final = (
-            final_readback.get("prs", {}).get(number)
-            if isinstance(final_readback, dict)
-            else None
-        )
-        if isinstance(final, dict):
-            for key in (
-                "author",
-                "baseRefName",
-                "isCrossRepository",
-                "isDraft",
-                "labels",
-                "mergeQueueEntry",
-                "mergeStateStatus",
-                "updatedAt",
-            ):
-                candidate[key] = final.get(key)
-            if final.get("state") in {"CLOSED", "MERGED"}:
-                candidate["observedTerminalState"] = final["state"]
-                continue
-        if (
-            not isinstance(final_readback, dict)
-            or final_readback.get("baseOid") != current_base_oid
-            or not isinstance(final, dict)
-            or final.get("headOid") != candidate.get("headRefOid")
-            or final.get("baseRefName") != "main"
-            or final.get("state") != "OPEN"
-        ):
-            candidate["promotionEvidence"] = {
-                "status": "stale" if isinstance(final_readback, dict) else "error",
-                "headOid": candidate.get("headRefOid"),
-                "baseOid": current_base_oid,
-            }
-            continue
-        final_check_status = final.get("checkEvidenceStatus")
-        if final_check_status != "complete":
-            candidate["promotionEvidence"] = {
-                "status": (
-                    final_check_status
-                    if isinstance(final_check_status, str) and final_check_status
-                    else "malformed"
-                ),
-                "headOid": candidate.get("headRefOid"),
-                "baseOid": current_base_oid,
-            }
-            continue
-        evidence = candidate.get("promotionEvidence")
-        if isinstance(evidence, dict) and evidence.get("status") == "complete":
-            evidence["requiredCheckNames"] = sorted(final_required)
-            evidence["requiredChecks"] = final["requiredChecks"]
-    return [pr for pr in observed if "observedTerminalState" not in pr]
+    return _finalize_observed_pr_state(
+        repo,
+        observed,
+        candidates,
+        current_base_oid,
+        observation_deadline,
+        live_required,
+        run_impl=run_impl,
+    )
 def _duplicate_active_lanes(
     dispositions: list[dict[str, Any]],
     evidence_by_number: dict[int, dict[str, Any]],
@@ -1429,6 +1527,25 @@ def classify_open_prs(
             unclassified.append({"number": number, "reason": "missing-pr-number"})
             continue
         usable.append(pr)
+        if "finalObservationEvidence" in pr:
+            final_evidence = pr.get("finalObservationEvidence")
+            final_status = (
+                final_evidence.get("status")
+                if isinstance(final_evidence, dict)
+                else None
+            )
+            if final_status != "complete":
+                unclassified.append(
+                    {
+                        "number": number,
+                        "reason": (
+                            "final-observation-"
+                            f"{final_status or 'malformed'}"
+                        ),
+                    }
+                )
+                refs_by_number[number] = []
+                continue
         label_evidence = _label_evidence(pr)
         if label_evidence.get("status") != "complete":
             unclassified.append(
@@ -1566,6 +1683,16 @@ def classify_open_prs(
     for disposition in dispositions:
         counts[disposition["state"]] += 1
     stack_health = _draft_stack_health(repository, usable, prs_by_number, now)
+
+    if any(
+        "finalObservationEvidence" in pr
+        and (
+            not isinstance(pr.get("finalObservationEvidence"), dict)
+            or pr["finalObservationEvidence"].get("status") != "complete"
+        )
+        for pr in usable
+    ):
+        stack_health = {**stack_health, "repairActions": []}
     return {
         "dispositions": dispositions,
         "counts": counts,

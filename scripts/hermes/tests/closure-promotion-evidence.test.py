@@ -60,6 +60,39 @@ def evidence(checks: list[dict[str, object]]) -> dict[str, object]:
     }
 
 
+def promotion_candidate(number: int) -> dict[str, object]:
+    return {
+        "number": number,
+        "title": f"fix: exact JOV-{number}",
+        "body": "",
+        "headRefName": f"symphony/test-pr-{number}",
+        "headRefOid": f"{number:040x}",
+        "baseRefName": "main",
+        "baseRefOid": "a" * 40,
+        "isDraft": False,
+        "isCrossRepository": False,
+        "mergeStateStatus": "CLEAN",
+        "updatedAt": "2026-08-30T16:00:00Z",
+        "author": {"login": "summer-test"},
+        "labels": {"totalCount": 0, "nodes": []},
+        "mergeQueueEntry": None,
+    }
+
+
+def promotion_state(candidate: dict[str, object]) -> dict[str, object]:
+    commit = named_commit()
+    commit["oid"] = candidate["headRefOid"]
+    return {
+        **candidate,
+        "state": "OPEN",
+        "headOid": candidate["headRefOid"],
+        "checkEvidenceStatus": "complete",
+        "requiredChecks": MODULE._normalize_named_required_checks(
+            commit, MODULE.EXPECTED_REQUIRED_CHECKS
+        ),
+    }
+
+
 class ClosurePromotionEvidenceTests(unittest.TestCase):
     def test_required_contract_matches_checked_in_ruleset(self):
         ruleset = (ROOT / ".github/rulesets/branch-protection.yml").read_text(

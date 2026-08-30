@@ -112,8 +112,12 @@ def exact_named_check_commit(
 def promotion_pr_state(number: int, *, head_oid: str | None = None) -> dict[str, object]:
     return {
         "state": "OPEN",
+        "title": f"fix: exact JOV-{number}",
+        "body": "",
+        "headRefName": f"symphony/test-pr-{number}",
         "headRefOid": head_oid or f"{number:040x}",
         "baseRefName": "main",
+        "baseRefOid": "a" * 40,
         "isDraft": False,
         "isCrossRepository": False,
         "mergeStateStatus": "CLEAN",
@@ -327,6 +331,24 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertNotEqual(metadata_key, issue_key)
         layers[-1]["headRefOid"] = None
         self.assertEqual(MODULE.classify_open_prs(layers, NOW)["repairActions"], [])
+
+    def test_stack_repair_action_requires_complete_final_observation(self):
+        layers = [
+            stack_pr(101, "main", body=STACK_BODY),
+            stack_pr(102, "stack/test-101"),
+            stack_pr(103, "stack/test-102"),
+            stack_pr(104, "stack/test-103"),
+            stack_pr(105, "stack/test-104"),
+        ]
+        for layer in layers:
+            layer["finalObservationEvidence"] = {"status": "error"}
+
+        result, health = stack_health(layers)
+
+        self.assertEqual(result["stackHealth"]["violations"][0]["rootPr"], 101)
+        self.assertEqual(result["stackHealth"]["repairActions"], [])
+        self.assertEqual(result["repairActions"], [])
+        self.assertIn("draft-stack-repair-action-unavailable", health["reasons"])
 
     def test_stack_requires_metadata_and_clean_ancestors(self):
         layers = [
@@ -1494,9 +1516,15 @@ class ClosureObservationTests(unittest.TestCase):
             )
             return mock.Mock(returncode=0, stdout=json.dumps(payload))
 
-        observed = MODULE.observe_promotion_evidence(
-            "JovieInc/Jovie", [candidate], "a" * 40, run_impl=run
-        )[0]
+        final = {**promotion_pr_state(23), "headOid": f"{23:040x}"}
+        with mock.patch.object(
+            MODULE,
+            "_readback_promotion_state",
+            return_value={"baseOid": "a" * 40, "prs": {23: final}},
+        ):
+            observed = MODULE.observe_promotion_evidence(
+                "JovieInc/Jovie", [candidate], "a" * 40, run_impl=run
+            )[0]
 
         self.assertEqual(observed["promotionEvidence"]["status"], "policy-drift")
         self.assertEqual(len(calls), 1)
@@ -1514,6 +1542,44 @@ class ClosureObservationTests(unittest.TestCase):
         for name in MODULE.EXPECTED_REQUIRED_CHECKS:
             self.assertIn(f"context(name:{json.dumps(name)})", fields)
             self.assertIn(f"checkName:{json.dumps(name)}", fields)
+
+    def test_final_readback_queries_every_action_driving_pr_field(self):
+        candidate = pr(
+            29,
+            title="fix: duplicate JOV-128",
+            labels=("duplicate",),
+            promotion_evidence=None,
+        )
+        calls: list[list[str]] = []
+
+        def run(command: list[str], **_kwargs: object) -> mock.Mock:
+            calls.append(command)
+            payload = {
+                "data": {
+                    "repository": {
+                        "base": {"target": {"oid": "a" * 40}},
+                        "pr_29": promotion_pr_state(29),
+                    }
+                }
+            }
+            return mock.Mock(returncode=0, stdout=json.dumps(payload))
+
+        MODULE._readback_promotion_batch(
+            "JovieInc/Jovie",
+            [candidate],
+            frozenset(),
+            MODULE.time.monotonic() + 5,
+            check_numbers=frozenset(),
+            run_impl=run,
+        )
+
+        query_arg = next(
+            argument for argument in calls[0] if argument.startswith("query=")
+        )
+        self.assertIn(
+            "state title body headRefName headRefOid baseRefName baseRefOid",
+            query_arg,
+        )
 
     def test_final_atomic_readback_applies_lifecycle_hard_stop(self):
         candidate = pr(25, title="fix: lifecycle JOV-125", promotion_evidence=None)
@@ -1603,6 +1669,84 @@ class ClosureObservationTests(unittest.TestCase):
             )
 
         self.assertEqual(observed, [])
+
+    def test_final_atomic_readback_drops_a_closed_nonpromotion_action_pr(self):
+        stale = pr(
+            27,
+            title="fix: duplicate JOV-127",
+            labels=("duplicate",),
+            promotion_evidence=None,
+        )
+        final = {
+            **promotion_pr_state(27),
+            "headOid": f"{27:040x}",
+            "state": "CLOSED",
+            "labels": {"totalCount": 1, "nodes": [{"name": "duplicate"}]},
+        }
+        with mock.patch.object(
+            MODULE,
+            "_readback_promotion_state",
+            return_value={"baseOid": "a" * 40, "prs": {27: final}},
+        ) as readback:
+            observed = MODULE.observe_promotion_evidence(
+                "JovieInc/Jovie", [stale], "a" * 40
+            )
+
+        self.assertEqual(observed, [])
+        self.assertEqual(readback.call_args.kwargs["check_numbers"], frozenset())
+
+    def test_nonpromotion_action_fails_closed_without_final_observation(self):
+        stale = pr(
+            28,
+            title="fix: duplicate JOV-128",
+            labels=("duplicate",),
+            promotion_evidence=None,
+        )
+        with mock.patch.object(
+            MODULE,
+            "_readback_promotion_state",
+            side_effect=ValueError("transient lifecycle readback failure"),
+        ):
+            observed = MODULE.observe_promotion_evidence(
+                "JovieInc/Jovie", [stale], "a" * 40
+            )
+
+        result = MODULE.classify_open_prs(observed, NOW)
+        self.assertEqual(result["dispositions"], [])
+        self.assertEqual(
+            result["unclassified"],
+            [{"number": 28, "reason": "final-observation-error"}],
+        )
+
+    def test_nonpromotion_action_uses_final_mutable_metadata(self):
+        stale = pr(
+            29,
+            title="fix: duplicate JOV-128",
+            labels=("duplicate",),
+            promotion_evidence=None,
+        )
+        final = {
+            **promotion_pr_state(29),
+            "headOid": f"{29:040x}",
+            "baseRefOid": "b" * 40,
+            "title": "fix: held JOV-129",
+            "body": "",
+            "labels": {"totalCount": 1, "nodes": [{"name": "needs-human"}]},
+        }
+        with mock.patch.object(
+            MODULE,
+            "_readback_promotion_state",
+            return_value={"baseOid": "a" * 40, "prs": {29: final}},
+        ):
+            observed = MODULE.observe_promotion_evidence(
+                "JovieInc/Jovie", [stale], "a" * 40
+            )
+
+        disposition = MODULE.classify_open_prs(observed, NOW)["dispositions"][0]
+        self.assertEqual(disposition["state"], "held")
+        self.assertEqual(disposition["reason"], "needs-human")
+        self.assertEqual(disposition["issue"], "JOV-129")
+        self.assertEqual(disposition["eventBaseOid"], "b" * 40)
 
     def test_more_than_25_green_candidates_are_all_compared(self):
         candidates = [
@@ -1849,6 +1993,20 @@ class ClosureObservationTests(unittest.TestCase):
             MODULE,
             "_observe_queue_controller",
             return_value={"status": "green", "runId": 42},
+        ), mock.patch.object(
+            MODULE,
+            "_readback_promotion_state",
+            return_value={
+                "baseOid": "a" * 40,
+                "prs": {
+                    int(item["number"]): {
+                        **item,
+                        "state": "OPEN",
+                        "headOid": item["headRefOid"],
+                    }
+                    for item in prs
+                },
+            },
         ):
             result = MODULE.observe_closure_health(
                 "JovieInc/Jovie", previous=None, now=NOW
