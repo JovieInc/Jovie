@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
- * Source-blind rendered component certification (JOV-5400).
+ * Source-blind rendered component certification (JOV-5400 / JOV-5438).
  *
  * Extends the component-ship gate. Evaluates rendered samples only — never
  * component source — against an explicit applicable-invariant contract.
  * Unknown, missing, or skipped applicable invariants fail closed.
+ * JOV-5438 composes the Shadcn/Typeset outcome inventory into the same receipt.
  *
  * Usage:
  *   node scripts/component-rendered-certification.mjs
@@ -13,6 +14,7 @@
 import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runOutcomeCertification } from './component-shadcn-outcome-inventory.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = resolve(__dirname, '..');
@@ -51,6 +53,18 @@ const SPACE_TOKEN =
   /^(--space-[\w.-]+|p[xytblr]?-\d+(?:\.\d+)?|px-2\.5|py-0\.5)$/;
 const RADIUS_TOKEN =
   /^(--radius-[\w]+|--system-b-radius-[\w-]+|rounded-(?:none|xs|sm|md|lg|xl|2xl|3xl|full|pill)|rounded-\(--(?:radius|system-b-radius)[\w-]*\))$/;
+const ARTWORK_RADIUS_TOKENS = new Set([
+  'rounded-xs',
+  'rounded-lg',
+  'rounded-xl',
+]);
+const ARTWORK_RECOLOR = /grayscale|blur|recolor/i;
+
+function approvedArtworkRadiusToken(sizePx) {
+  if (sizePx <= 48) return 'rounded-xs';
+  if (sizePx >= 160) return 'rounded-xl';
+  return 'rounded-lg';
+}
 const ARBITRARY_UTIL = /\[[^\]]+\]/;
 const INTERACTIVE_ROLES = new Set([
   'button',
@@ -195,6 +209,48 @@ export function evaluateRenderedSample(sample) {
       }
       if (node.fill?.raw && /^#|rgb\(/i.test(node.fill.raw) && !fillToken) {
         add('design', `${label}: raw fill without a token`);
+      }
+      if (node.mediaKind === 'artwork') {
+        const fit = node.objectFit;
+        const radiusToken =
+          typeof node.radius?.token === 'string' ? node.radius.token : '';
+        const sizePx = typeof node.sizePx === 'number' ? node.sizePx : null;
+        const radiusPx =
+          typeof node.radius?.px === 'number' ? node.radius.px : null;
+        const treatment =
+          typeof node.treatment === 'string' ? node.treatment : '';
+        if (fit !== 'contain') {
+          add(
+            'design',
+            `${label}: artwork must use object-fit contain, not ${fit || 'missing'}`
+          );
+        }
+        if (!ARTWORK_RADIUS_TOKENS.has(radiusToken)) {
+          add(
+            'design',
+            `${label}: artwork radius ${radiusToken || 'missing'} is not a scale-aware artwork radius`
+          );
+        }
+        if (
+          radiusToken === 'rounded-full' ||
+          radiusToken === 'rounded-pill' ||
+          node.radius?.pill === true ||
+          (sizePx != null && radiusPx != null && radiusPx >= sizePx / 2)
+        ) {
+          add('design', `${label}: artwork must not use a pill or circle mask`);
+        }
+        if (sizePx != null && ARTWORK_RADIUS_TOKENS.has(radiusToken)) {
+          const expected = approvedArtworkRadiusToken(sizePx);
+          if (radiusToken !== expected) {
+            add(
+              'design',
+              `${label}: ${sizePx}px artwork requires ${expected}, got ${radiusToken}`
+            );
+          }
+        }
+        if (treatment && ARTWORK_RECOLOR.test(treatment)) {
+          add('design', `${label}: artwork must not be recolored or blurred`);
+        }
       }
     }
 
@@ -474,6 +530,14 @@ export const DELIBERATE_RED_FIXTURES = Object.freeze([
       textNode('Queued', { owner: 'atom.badge', fill: paint('bg-surface-1', 'dark'), foreground: paint('text-tertiary-token', 'light'), padding: { tokens: ['px-[17px]', 'py-[9px]'], ownerTokens: ['px-2', 'py-0.5'], arbitrary: true }, radius: { token: 'rounded-[7px]', px: 16, role: 'outer', arbitrary: true } }),
       textNode('Queued', { owner: 'atom.badge', fill: paint('bg-surface-1', 'dark'), foreground: paint('text-tertiary-token', 'light'), padding: { tokens: ['px-2', 'py-0.5'] }, radius: { token: 'rounded-[7px]', px: 16, role: 'inner', insetPx: 4, arbitrary: true } }),
     ]),
+  sample('deliberate-red.artwork-frame.object-cover-circle', 'deliberate-red', 'atom.artwork-frame',
+    ['design', 'copy', 'accessibility', 'theme', 'layout-stability'],
+    { interaction: STATIC.interaction, 'semantic-variant': 'artwork owner is media, not tone', 'tokenized-padding': 'artwork frame has no padding scale', 'concentric-radius': 'single artwork radius' },
+    [textNode('Never Say A Word', { owner: 'atom.artwork-frame', accessibleName: 'Never Say A Word artwork', mediaKind: 'artwork', objectFit: 'cover', sizePx: 145, layoutContract: 'static', fill: paint('bg-surface-2', 'dark'), foreground: paint('text-primary-token', 'light'), radius: { token: 'rounded-full', px: 72, pill: true } })]),
+  sample('deliberate-red.artwork-frame.excessive-action-radius', 'deliberate-red', 'atom.artwork-frame',
+    ['design', 'copy', 'accessibility', 'theme', 'layout-stability'],
+    { interaction: STATIC.interaction, 'semantic-variant': 'artwork owner is media, not tone', 'tokenized-padding': 'artwork frame has no padding scale', 'concentric-radius': 'single artwork radius' },
+    [textNode('Never Say A Word', { owner: 'atom.artwork-frame', accessibleName: 'Never Say A Word artwork', mediaKind: 'artwork', objectFit: 'cover', sizePx: 145, treatment: 'grayscale', layoutContract: 'static', fill: paint('bg-surface-2', 'dark'), foreground: paint('text-primary-token', 'light'), radius: { token: 'rounded-(--profile-action-radius)', px: 14 } })]),
 ]);
 // biome-ignore format: compact rendered-cert fixtures
 export const LANDING_BATCH_SAMPLES = Object.freeze([
@@ -494,6 +558,14 @@ export const LANDING_BATCH_SAMPLES = Object.freeze([
       textNode('Card Title', { owner: 'atom.card', variant: 'default', layoutContract: 'static', fill: paint('bg-surface-1', 'dark'), foreground: paint('text-primary-token', 'light'), padding: { tokens: ['p-6'], ownerTokens: ['p-6'] }, radius: { token: 'rounded-(--system-b-radius-card)', px: 16, role: 'outer', insetPx: 4 } }),
       textNode('This is the main content of the card.', { owner: 'atom.card', layoutContract: 'static', fill: paint('bg-surface-1', 'dark'), foreground: paint('text-primary-token', 'light'), padding: { tokens: ['p-6'], ownerTokens: ['p-6'] }, radius: { token: 'rounded-(--system-b-radius-card-inner)', px: 12, role: 'inner', insetPx: 4 } }),
     ]),
+  sample('landing-batch.atom.artwork-frame.contain-default', 'landing-batch', 'atom.artwork-frame',
+    ['design', 'copy', 'accessibility', 'layout-stability', 'theme'],
+    { interaction: STATIC.interaction, 'semantic-variant': 'artwork owner is media, not tone', 'tokenized-padding': 'artwork frame has no padding scale', 'concentric-radius': 'single artwork radius' },
+    [textNode('Never Say A Word', { owner: 'atom.artwork-frame', accessibleName: 'Never Say A Word artwork', mediaKind: 'artwork', objectFit: 'contain', sizePx: 145, layoutContract: 'reserved-geometry', fill: paint('bg-surface-2', 'dark'), foreground: paint('text-primary-token', 'light'), radius: { token: 'rounded-lg', px: 8 } })]),
+  sample('landing-batch.atom.artwork-frame.contain-hero', 'landing-batch', 'atom.artwork-frame',
+    ['design', 'copy', 'accessibility', 'layout-stability', 'theme'],
+    { interaction: STATIC.interaction, 'semantic-variant': 'artwork owner is media, not tone', 'tokenized-padding': 'artwork frame has no padding scale', 'concentric-radius': 'single artwork radius' },
+    [textNode('Release artwork', { owner: 'atom.artwork-frame', accessibleName: 'Release artwork', mediaKind: 'artwork', objectFit: 'contain', sizePx: 224, layoutContract: 'reserved-geometry', fill: paint('bg-surface-2', 'dark'), foreground: paint('text-primary-token', 'light'), radius: { token: 'rounded-xl', px: 12 } })]),
 ]);
 
 function resolveHeadSha(explicit) {
@@ -525,7 +597,7 @@ function receiptFor(sample, evaluation) {
 }
 
 /**
- * @param {{ headSha?: string, redFixtures?: any[], landingBatch?: any[] }} [options]
+ * @param {{ headSha?: string, redFixtures?: any[], landingBatch?: any[], repoRoot?: string, inventory?: object, outcomeRedFixtures?: object[], outcomeBatch?: object[], comparativeInventory?: object[], comparativeRedFixtures?: any[], comparativeQualificationControls?: any[] }} [options]
  */
 export function runRenderedCertification(options = {}) {
   const headSha = resolveHeadSha(options.headSha);
@@ -560,6 +632,20 @@ export function runRenderedCertification(options = {}) {
     return receipt;
   });
 
+  const outcome = runOutcomeCertification({
+    headSha,
+    repoRoot: options.repoRoot,
+    inventory: options.inventory,
+    redFixtures: options.outcomeRedFixtures,
+    enrolledBatch: options.outcomeBatch,
+    comparativeInventory: options.comparativeInventory,
+    comparativeRedFixtures: options.comparativeRedFixtures,
+    qualificationControls: options.comparativeQualificationControls,
+  });
+  if (!outcome.ok) {
+    issues.push(...outcome.receipt.issues);
+  }
+
   const ok = issues.length === 0;
   return {
     ok,
@@ -573,6 +659,7 @@ export function runRenderedCertification(options = {}) {
       issues,
       fixtures: fixtureReceipts,
       landingBatch: landingReceipts,
+      shadcnOutcome: outcome.receipt,
     },
   };
 }

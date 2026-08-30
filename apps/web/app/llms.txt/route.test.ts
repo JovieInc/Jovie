@@ -20,6 +20,12 @@ describe('GET /llms.txt', () => {
       'Look up a public independent-artist profile (name, bio, DSP and social links) at https://jov.ie/{username}'
     );
     expect(body).toContain('GET https://jov.ie/api/v1/{username}');
+    expect(body).toContain('GET https://jov.ie/api/v1');
+    expect(body).toContain('https://jov.ie/developers');
+    expect(body).toContain('active v1 lifecycle boundary');
+    expect(body).toContain(
+      '**API versioning and deprecation policy**: https://jov.ie/api-versioning'
+    );
     expect(body).toContain('https://jov.ie/{username}/llms.txt');
     expect(body).toContain('https://jov.ie/{username}/{slug}');
     expect(body).toContain('https://jov.ie/llms.txt');

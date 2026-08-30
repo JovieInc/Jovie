@@ -25,11 +25,15 @@ source lacks:
 
 1. **Test** — colocated `*.test.ts(x)` / `*.spec.ts(x)`, **touched in the same
    diff**, or a verified `// @coverage-via <path>` whose target imports the
-   exact component module and uses the imported binding, or asserts an exact
-   `node:fs` read of that source. Comments, mocks without a real import,
-   same-name text, and unasserted reads do not count. Existing components may
-   also use a changed central test with the same executable evidence. Newly
-   added components may not use the central-test exception.
+   exact component module and uses that binding as a JSX tag, calls or
+   constructs it directly, or passes it as argument zero to an explicitly
+   imported React/test renderer; or asserts an exact `node:fs` read of that
+   source from `readFileSync` argument zero. Comments, mocks without a real
+   import, same-name text, `void`/assignment/metadata mentions, local fake
+   renderers, wrong-argument paths, and unasserted reads do not count.
+   Existing components may also use a changed central test with the same
+   executable evidence. Newly added components may not use the central-test
+   exception.
 2. **Story** — colocated `*.stories.ts(x)`. Existing marketing/site components
    may use a verified real-component story in the canonical
    `MarketingRecipes`, `MarketingSections`, or `MarketingShells` catalog;
@@ -43,16 +47,27 @@ source lacks:
 4. **Hygiene** — `pnpm storybook:quality` (no pure-black voids, no fake CTAs).
 5. **Ratchet** — multi-root floors in `scripts/story-coverage-baseline.json`
    may only improve; new uncovered components fail even if percent holds.
-6. **Rendered certification (JOV-5400)** — source-blind fail-closed evaluator
+6. **Rendered certification (JOV-5400 / JOV-5438)** — source-blind fail-closed evaluator
    for applicable design, copy, accessibility, interaction, layout-stability,
    theme, semantic-variant, tokenized-padding, and concentric-radius invariants.
    Deliberate-red fixtures must block; the current design-system landing batch
-   emits exact-head pass/block receipts.
+   emits exact-head pass/block receipts. The same receipt records the Shadcn /
+   Typeset outcome inventory for the enrolled primitive batch (MIT public
+   references only; missing/unknown benchmark dimensions fail closed).
+7. **Live Storybook certification (JOV-5454)** — build and serve the real web
+   Storybook, resolve the canonical Badge/Button/Card story inventory by exact
+   story id and import path, then evaluate those stories at desktop and compact
+   viewports from computed browser evidence. Fail closed on missing
+   stories/contracts, theme/surface mismatch, semantic drift, off-token
+   padding/radius, geometry/anatomy drift, nonconcentric edges, AA contrast,
+   axe, overflow/200% zoom, keyboard gaps, hover layout shift, placeholder
+   copy, emoji/checkmarks, and decorative caps. This is the enrolled primitive
+   proof path only; it does not certify unenrolled product routes.
 
 ### Commands
 
 ```bash
-pnpm component-ship-gate          # diff + match + quality + ratchet + rendered cert
+pnpm component-ship-gate          # diff + match + quality + ratchet + rendered cert + live Storybook cert
 pnpm story-coverage:check         # multi-root ratchet only
 pnpm story-coverage:update        # explicit floor raise (never silent)
 pnpm storybook:quality            # story hygiene only

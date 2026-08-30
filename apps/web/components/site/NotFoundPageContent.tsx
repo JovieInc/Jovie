@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/components/site/NotFoundPageContent.test.tsx
 import Link from 'next/link';
 import { APP_ROUTES } from '@/constants/routes';
 import {

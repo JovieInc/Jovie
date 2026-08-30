@@ -41,7 +41,7 @@ interface YouTubeApiResponse {
 /**
  * Parse ISO 8601 duration (e.g., "PT4M33S") to seconds.
  */
-function parseDuration(iso: string): number {
+export function parseYouTubeDuration(iso: string): number {
   const match = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec(iso);
   if (!match) return 0;
   const hours = Number.parseInt(match[1] || '0', 10);
@@ -106,7 +106,7 @@ export async function fetchYouTubeMetadata(
         item.liveStreamingDetails?.scheduledStartTime ?? undefined,
       youtubeChannelId: item.snippet.channelId,
       youtubeChannelName: item.snippet.channelTitle,
-      duration: parseDuration(item.contentDetails.duration),
+      duration: parseYouTubeDuration(item.contentDetails.duration),
     };
   } catch (error) {
     console.warn(`[youtube] Failed to fetch metadata for ${videoId}:`, error);

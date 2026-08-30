@@ -3,6 +3,10 @@
 import { Pause, Play, X } from 'lucide-react';
 import Image from 'next/image';
 import React from 'react';
+import {
+  ARTWORK_FIT_CLASSNAME,
+  ArtworkFrame,
+} from '@/components/atoms/ArtworkFrame';
 import { cn } from '@/lib/utils';
 import { IconBtn } from './IconBtn';
 import type { NowPlayingTrack } from './SidebarNowPlaying';
@@ -54,18 +58,18 @@ export const SidebarBottomNowPlaying = React.memo(
           className
         )}
       >
-        <div className='shrink-0 h-9 w-9 rounded overflow-hidden bg-surface-2 relative'>
+        <ArtworkFrame size={36} className='h-9 w-9 shrink-0 bg-surface-2'>
           {artworkUrl && (
             <Image
               src={artworkUrl}
               alt=''
               fill
               sizes='36px'
-              className='object-cover'
+              className={ARTWORK_FIT_CLASSNAME}
               unoptimized
             />
           )}
-        </div>
+        </ArtworkFrame>
         <div className='min-w-0 flex-1'>
           <div
             className='truncate text-xs font-caption text-primary-token leading-tight'

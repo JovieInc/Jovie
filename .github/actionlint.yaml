@@ -19,3 +19,6 @@ paths:
   .github/workflows/production-controller.yml:
     ignore:
       - 'unexpected key "queue" for "concurrency" section.*'
+  .github/workflows/production-marker-recovery.yml:
+    ignore:
+      - 'unexpected key "queue" for "concurrency" section.*'

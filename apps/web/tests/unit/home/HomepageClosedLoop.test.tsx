@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { render, screen } from '@testing-library/react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { HomepageClosedLoop } from '@/components/homepage/HomepageClosedLoop';
 
@@ -26,11 +27,34 @@ describe('HomepageClosedLoop', () => {
     );
     expect(screen.getAllByTestId('homepage-closed-loop-step')).toHaveLength(3);
     expect(
+      screen
+        .getAllByRole('heading', { level: 3 })
+        .map(heading => heading.textContent)
+    ).toEqual(['Connect your music', 'Jovie keeps watch', 'Choose what ships']);
+    expect(
       screen.getAllByRole('listitem').map(step => step.textContent)
     ).toEqual([
       expect.stringContaining('Connect your music'),
       expect.stringContaining('Jovie keeps watch'),
       expect.stringContaining('Choose what ships'),
+    ]);
+  });
+
+  it('keeps the nested heading hierarchy in raw server HTML', () => {
+    const rawDocument = new DOMParser().parseFromString(
+      renderToStaticMarkup(<HomepageClosedLoop />),
+      'text/html'
+    );
+
+    expect(
+      Array.from(rawDocument.querySelectorAll('h1, h2, h3, h4, h5, h6')).map(
+        heading => `${heading.tagName}:${heading.textContent?.trim()}`
+      )
+    ).toEqual([
+      'H2:All your music working while you sleep',
+      'H3:Connect your music',
+      'H3:Jovie keeps watch',
+      'H3:Choose what ships',
     ]);
   });
 

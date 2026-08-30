@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page, type Route } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { getDeterministicDevTestAuthPersonaUserId } from '@/lib/auth/dev-test-auth-identity';
 import type { DevTestAuthPersona } from '@/lib/auth/dev-test-auth-types';
@@ -253,6 +253,134 @@ export async function fillControlledInputUntilEnabled(
       { timeout, intervals: [100, 250, 500] }
     )
     .toBe(true);
+}
+
+export interface BetterAuthEmailOtpPreparation {
+  submit(): Promise<{ betterAuthUserId: string }>;
+  dispose(): Promise<void>;
+}
+
+/**
+ * Prepare the visible Better Auth email-OTP flow while withholding only the
+ * verification response. Callers can finish run-owned DB preparation before
+ * the browser receives its real session cookie, without replacing auth.
+ */
+export async function prepareBetterAuthEmailOtp(
+  page: Page,
+  options: {
+    readonly email: string;
+    readonly entryPath: '/signup' | '/signin';
+    readonly beforeResponseFulfill?: (
+      betterAuthUserId: string
+    ) => Promise<void>;
+    readonly timeout?: number;
+  }
+): Promise<BetterAuthEmailOtpPreparation> {
+  const timeout = options.timeout ?? 30_000;
+  await page.goto(options.entryPath, {
+    waitUntil: 'domcontentloaded',
+    timeout: 60_000,
+  });
+
+  const emailInput = page.getByLabel('Email Address');
+  const emailSubmitButton = page.getByRole('button', {
+    name:
+      options.entryPath === '/signup'
+        ? 'Continue with Email'
+        : 'Email me a Code',
+  });
+  await fillControlledInputUntilEnabled(
+    emailInput,
+    emailSubmitButton,
+    options.email,
+    timeout
+  );
+  await emailSubmitButton.click();
+  await expect(page.locator('[data-auth-email-code-step="code"]')).toBeVisible({
+    timeout,
+  });
+
+  const signInRoute = '**/api/auth/sign-in/email-otp';
+  let betterAuthUserId: string | null = null;
+  let settled = false;
+  let settlePreparation: (error: Error | null) => void = () => undefined;
+  const preparationResult = new Promise<Error | null>(resolve => {
+    settlePreparation = resolve;
+  });
+
+  const routeHandler = async (route: Route): Promise<void> => {
+    let response: Awaited<ReturnType<Route['fetch']>> | null = null;
+    let body: string | null = null;
+    let preparationError: Error | null = null;
+
+    try {
+      response = await route.fetch();
+      body = await response.text();
+      if (response.status() !== 200) {
+        throw new Error(
+          `Better Auth email-OTP sign-in returned ${response.status()}`
+        );
+      }
+
+      const payload = JSON.parse(body) as { user?: { id?: string } };
+      betterAuthUserId = payload.user?.id ?? null;
+      if (!betterAuthUserId) {
+        throw new Error('Better Auth email-OTP response omitted the user id');
+      }
+      await options.beforeResponseFulfill?.(betterAuthUserId);
+    } catch (error) {
+      preparationError =
+        error instanceof Error ? error : new Error(String(error));
+    }
+
+    try {
+      if (response && body !== null) {
+        await route.fulfill({ response, body });
+      } else {
+        await route.abort();
+      }
+    } catch (error) {
+      preparationError ??=
+        error instanceof Error ? error : new Error(String(error));
+    }
+
+    if (!settled) {
+      settled = true;
+      settlePreparation(preparationError);
+    }
+  };
+
+  await page.route(signInRoute, routeHandler);
+
+  return {
+    async submit() {
+      await page.getByLabel('Digit 1 of 6').pressSequentially('424242');
+      let preparationTimer: ReturnType<typeof setTimeout> | undefined;
+      const preparationError = await Promise.race([
+        preparationResult,
+        new Promise<Error>(resolve => {
+          preparationTimer = setTimeout(
+            () =>
+              resolve(
+                new Error(
+                  'Better Auth email-OTP request did not reach the preparation barrier'
+                )
+              ),
+            timeout
+          );
+        }),
+      ]);
+      if (preparationTimer) clearTimeout(preparationTimer);
+      if (preparationError) throw preparationError;
+      if (!betterAuthUserId) {
+        throw new Error('Better Auth sign-in did not expose a user id');
+      }
+      return { betterAuthUserId };
+    },
+    async dispose() {
+      await page.unroute(signInRoute, routeHandler);
+    },
+  };
 }
 
 export async function waitForAuthenticatedHealth(

@@ -143,8 +143,6 @@ function validateMoleculeOwnershipReceipt({
  */
 const CENTRAL_MARKETING_CONTRACT_COVERAGE = [
   'FaqSection',
-  'MarketingContainer',
-  'MarketingContentShell',
   'ArtistNotificationsLanding',
   'ArtistProfileCaptureSection',
   'ArtistProfileHowItWorks',
@@ -261,12 +259,18 @@ function hasSourceBackedButtonFixture(
       );
     }
 
+    const jsxOpening = ts.isJsxElement(node)
+      ? node.openingElement
+      : ts.isJsxSelfClosingElement(node)
+        ? node
+        : null;
     if (
-      ts.isJsxElement(node) &&
-      node.openingElement.tagName.getText() === 'Button'
+      jsxOpening &&
+      (jsxOpening.tagName.getText() === 'Button' ||
+        jsxOpening.tagName.getText() === 'MarketingTerminalCtaAction')
     ) {
       const attributes = new Map(
-        node.openingElement.attributes.properties
+        jsxOpening.attributes.properties
           .filter(ts.isJsxAttribute)
           .map(attribute => [
             attribute.name.getText(),
@@ -458,11 +462,121 @@ describe('canonical marketing component registry', () => {
     );
 
     expect(source).toContain("import { Button } from '@jovie/ui'");
+    expect(source).toContain('function MarketingTerminalCtaAction');
+    expect(source.match(/<MarketingTerminalCtaAction[\s>]/g)).toHaveLength(2);
     expect(source).toContain("variant='primary'");
     expect(source).toContain("variant='tertiary'");
-    expect(source.match(/asChild/g)).toHaveLength(2);
+    expect(source).toContain("size='lg'");
+    expect(source).toContain("size='md'");
+    expect(source).toContain('asChild');
     expect(source).not.toContain('public-action-primary');
     expect(source).not.toContain('focus-visible:ring-white/40');
+    expect(source).not.toContain('inline-flex h-10');
+  });
+
+  it('asserts exact source reads for shared marketing coverage-via receipts', () => {
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-notifications/ArtistNotificationsLanding.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistNotificationsLanding');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileAdaptiveSection.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileAdaptiveSection');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileCaptureSection.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileCaptureSection');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileHowItWorks.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileHowItWorks');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileLandingRoute.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileLandingRoute');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileOutcomesCarousel.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileOutcomesCarousel');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileSectionShell.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileSectionShell');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileSocialProof.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileSocialProof');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileSpecWall.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileSpecWall');
+    expect(
+      fs.readFileSync(
+        path.join(repoRoot, 'apps/web/components/marketing/FaqSection.tsx'),
+        'utf8'
+      )
+    ).toContain('export function FaqSection');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/homepage-v2/HomepageV2Route.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function HomepageV2Route');
+    expect(
+      fs.readFileSync(
+        path.join(repoRoot, 'apps/web/components/site/MarketingFinalCTA.tsx'),
+        'utf8'
+      )
+    ).toContain('export function MarketingFinalCTA');
   });
 
   it('keeps contract ids and Pen roots globally unique', () => {
@@ -522,13 +636,13 @@ describe('canonical marketing component registry', () => {
     );
   });
 
-  it('keeps section.cta unresolved until JOV-4954 converges the production shell root', () => {
+  it('keeps section.cta unresolved until JOV-5356 converges the production shell root', () => {
     expect(
       MARKETING_COMPONENT_REGISTRY.find(entry => entry.id === 'section.cta')
     ).toMatchObject({
       sourceBacked: false,
       unresolvedReason:
-        'A production shell root exists, but section.cta convergence is pending JOV-4954.',
+        'A production shell root exists, but section.cta convergence is pending JOV-5356.',
     });
   });
 });
@@ -981,7 +1095,7 @@ describe('canonical shared source atom registry', () => {
     );
   });
 
-  it('keeps two production CTAs on one Button master with label overrides', () => {
+  it('keeps production and terminal CTAs on one Button master with label overrides', () => {
     for (const fixture of BUTTON_PEN_PROPAGATION_FIXTURES) {
       expect(hasSourceBackedButtonFixture(fixture), fixture.route).toBe(true);
     }
@@ -1000,10 +1114,11 @@ describe('canonical shared source atom registry', () => {
         ref =>
           ref.overrides.find(override => override.property === 'content')?.value
       )
-    ).toEqual(['Download for Mac', 'Get started']);
-    // Both instances carry only their independent label override; neither
+    ).toEqual(['Download for Mac', 'Get started', 'Request Access']);
+    // Each instance carries only its independent label override; none
     // claims a leading-icon slot the Pen master does not expose.
-    expect(refs[0]?.overrides).toHaveLength(1);
-    expect(refs[1]?.overrides).toHaveLength(1);
+    for (const ref of refs) {
+      expect(ref.overrides).toHaveLength(1);
+    }
   });
 });

@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/design-system/linear-token-retire-jov-5465.test.ts
 import { Badge } from '@jovie/ui/atoms/badge';
 import { Button } from '@jovie/ui/atoms/button';
 import { Check } from 'lucide-react';
@@ -74,7 +75,7 @@ export function PricingSection() {
               style={{
                 backgroundColor: 'var(--linear-bg-surface-0)',
                 border: '1px solid var(--linear-border-subtle)',
-                boxShadow: 'var(--linear-shadow-card)',
+                boxShadow: 'var(--shadow-card)',
               }}
             >
               <p className='text-sm font-medium tracking-tight text-tertiary-token'>
@@ -128,7 +129,7 @@ export function PricingSection() {
               style={{
                 backgroundColor: 'var(--linear-bg-surface-0)',
                 border: '1px solid var(--linear-border-subtle)',
-                boxShadow: 'var(--linear-shadow-card-elevated)',
+                boxShadow: 'var(--shadow-card-elevated)',
               }}
             >
               <div className='flex items-center justify-between'>

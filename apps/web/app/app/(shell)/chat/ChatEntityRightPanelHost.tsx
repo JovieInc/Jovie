@@ -148,6 +148,52 @@ function ChatRailContextIcon({
   return <Music2 className='h-3.5 w-3.5' />;
 }
 
+/**
+ * Shared title + meta copy block for chat rail context cards. Label lines,
+ * not paragraph bodies — rendered as block spans so editorial card surfaces
+ * keep a single subheading paragraph (editorial-card-max-v1).
+ */
+function ChatContextCardCopy({
+  title,
+  meta,
+}: Readonly<{ title: string; meta: string }>) {
+  return (
+    <div className='system-b-chat-entity-context-copy'>
+      <span className='system-b-chat-entity-context-title block'>{title}</span>
+      <span className='system-b-chat-entity-context-meta block'>{meta}</span>
+    </div>
+  );
+}
+
+/**
+ * Single shared dismiss affordance for chat rail context cards — one
+ * Button-family CTA per editorial surface (editorial-card-max-v1).
+ */
+function ChatContextDismissControl({
+  label,
+  focusKey,
+  onDismiss,
+  className,
+}: Readonly<{
+  label: string;
+  focusKey: string;
+  onDismiss: (focusKey: string) => void;
+  className?: string;
+}>) {
+  return (
+    <Button
+      type='button'
+      variant='ghost'
+      size='icon'
+      aria-label={label}
+      onClick={() => onDismiss(focusKey)}
+      className={cn('system-b-chat-entity-context-dismiss', className)}
+    >
+      <X className='h-3.5 w-3.5' />
+    </Button>
+  );
+}
+
 function ChatProfileContextCard({
   profile,
   target,
@@ -200,21 +246,13 @@ function ChatProfileContextCard({
             </div>
           )}
         </div>
-        <div className='system-b-chat-entity-context-copy'>
-          <p className='system-b-chat-entity-context-title'>{title}</p>
-          <p className='system-b-chat-entity-context-meta'>{meta}</p>
-        </div>
+        <ChatContextCardCopy title={title} meta={meta} />
       </button>
-      <Button
-        type='button'
-        variant='ghost'
-        size='icon'
-        aria-label='Dismiss Profile Context'
-        onClick={() => onDismiss(target.focusKey)}
-        className='system-b-chat-entity-context-dismiss'
-      >
-        <X className='h-3.5 w-3.5' />
-      </Button>
+      <ChatContextDismissControl
+        label='Dismiss Profile Context'
+        focusKey={target.focusKey}
+        onDismiss={onDismiss}
+      />
     </div>
   );
 }
@@ -246,16 +284,12 @@ function ChatRailEntityCard({
         className='w-full'
         dataTestId={`chat-rail-entity-card-${contextKind}`}
       />
-      <Button
-        type='button'
-        variant='ghost'
-        size='icon'
-        aria-label={dismissLabel}
-        onClick={() => onDismiss(focusKey)}
-        className='system-b-chat-entity-context-dismiss absolute right-2 top-2 z-10'
-      >
-        <X className='h-3.5 w-3.5' />
-      </Button>
+      <ChatContextDismissControl
+        label={dismissLabel}
+        focusKey={focusKey}
+        onDismiss={onDismiss}
+        className='absolute right-2 top-2 z-10'
+      />
     </div>
   );
 
@@ -300,23 +334,16 @@ function ChatEntityContextCard({
           <div className='system-b-chat-entity-context-icon'>
             <ChatRailContextIcon kind={target.kind} />
           </div>
-          <div className='system-b-chat-entity-context-copy'>
-            <p className='system-b-chat-entity-context-title'>{title}</p>
-            <p className='system-b-chat-entity-context-meta'>
-              {contextKindLabel(target.kind)} Context
-            </p>
-          </div>
+          <ChatContextCardCopy
+            title={title}
+            meta={`${contextKindLabel(target.kind)} Context`}
+          />
         </button>
-        <Button
-          type='button'
-          variant='ghost'
-          size='icon'
-          aria-label={dismissLabel}
-          onClick={() => onDismiss(target.focusKey)}
-          className='system-b-chat-entity-context-dismiss'
-        >
-          <X className='h-3.5 w-3.5' />
-        </Button>
+        <ChatContextDismissControl
+          label={dismissLabel}
+          focusKey={target.focusKey}
+          onDismiss={onDismiss}
+        />
       </div>
     );
   }
@@ -330,22 +357,15 @@ function ChatEntityContextCard({
       <div className='system-b-chat-entity-context-icon'>
         <ChatRailContextIcon kind={target.kind} />
       </div>
-      <div className='system-b-chat-entity-context-copy'>
-        <p className='system-b-chat-entity-context-title'>{title}</p>
-        <p className='system-b-chat-entity-context-meta'>
-          {contextKindLabel(target.kind)} Context
-        </p>
-      </div>
-      <Button
-        type='button'
-        variant='ghost'
-        size='icon'
-        aria-label={dismissLabel}
-        onClick={() => onDismiss(target.focusKey)}
-        className='system-b-chat-entity-context-dismiss'
-      >
-        <X className='h-3.5 w-3.5' />
-      </Button>
+      <ChatContextCardCopy
+        title={title}
+        meta={`${contextKindLabel(target.kind)} Context`}
+      />
+      <ChatContextDismissControl
+        label={dismissLabel}
+        focusKey={target.focusKey}
+        onDismiss={onDismiss}
+      />
     </div>
   );
 }
@@ -794,9 +814,9 @@ function ChatReleaseEntityPanel({
                 surface='card'
               >
                 <div className='system-b-chat-entity-note-card'>
-                  <p className='truncate font-semibold text-primary-token'>
+                  <span className='block truncate font-semibold text-primary-token'>
                     {threadTitle}
-                  </p>
+                  </span>
                   <p className='mt-1 text-tertiary-token'>
                     This release was referenced in the current chat.
                   </p>
@@ -950,9 +970,9 @@ function ChatContactEntityPanelLoader({
               collapsible={false}
               surface='card'
             >
-              <p className='system-b-chat-contact-copy'>
+              <span className='system-b-chat-contact-copy block'>
                 {contact.territories.join(', ')}
-              </p>
+              </span>
             </DrawerSection>
           ) : null}
         </>
@@ -1082,10 +1102,12 @@ function ChatTourDateEntityPanelLoader({
           >
             <div className='space-y-1 text-secondary-token'>
               {event.venue && event.venue !== title ? (
-                <p>{event.venue}</p>
+                <span className='block'>{event.venue}</span>
               ) : null}
-              {event.city ? <p>{event.city}</p> : null}
-              {event.provider ? <p>{event.provider}</p> : null}
+              {event.city ? <span className='block'>{event.city}</span> : null}
+              {event.provider ? (
+                <span className='block'>{event.provider}</span>
+              ) : null}
             </div>
           </DrawerSection>
         </>

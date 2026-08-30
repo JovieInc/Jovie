@@ -130,7 +130,12 @@ def _write_native_receipt_fakes(
     is_draft: bool,
     selector: dict[str, object],
     receipt: dict[str, object],
+    changelog_collision: dict[str, object] | None = None,
 ) -> None:
+    changelog_collision_result = changelog_collision or {
+        "action": "allow",
+        "reason": "candidate-omits-changelog",
+    }
     fake_node = tmp_path / "node"
     fake_node.write_text(
         textwrap.dedent(
@@ -152,7 +157,7 @@ def _write_native_receipt_fakes(
               max-queue-depth) echo 16 ;;
               unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
               unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
-              changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+              changelog-collision) printf '%s\\n' '{json.dumps(changelog_collision_result)}' ;;
               changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
               changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
               --classify-queue) echo '[]' ;;
@@ -182,6 +187,10 @@ def _write_native_receipt_fakes(
               echo '{{"state":"OPEN","isDraft":{draft_json},"mergeable":"{mergeable}","labels":[],"headRefOid":"{head}","baseRefName":"main","body":""}}'
               exit 0
             fi
+            if [[ "$1" == "api" && "$2" == *"/commits/{head}/status"* ]]; then
+              echo '{{"statuses":[]}}'
+              exit 0
+            fi
             if [[ "$1" == "api" ]]; then
               exit 1
             fi
@@ -195,6 +204,63 @@ def _write_native_receipt_fakes(
 
 
 class TestExactHeadQueueReceipt:
+    def test_pre_land_changelog_exact_target_fails_without_native_receipt(
+        self, tmp_path: Path
+    ) -> None:
+        head = "6" * 40
+        _write_native_receipt_fakes(
+            tmp_path,
+            head=head,
+            mergeable="MERGEABLE",
+            is_draft=False,
+            selector={
+                "observed": True,
+                "queued": False,
+                "eligible": True,
+                "reason": "eligible",
+            },
+            receipt={
+                "ok": False,
+                "attempts": 2,
+                "state": {
+                    "isInMergeQueue": False,
+                    "queued": False,
+                    "headRefOid": head,
+                    "mergeQueueEntry": None,
+                    "autoMergeRequest": None,
+                },
+                "explanation": {
+                    "ok": False,
+                    "reason": "isInMergeQueue=false mergeQueueEntry=null",
+                },
+            },
+            changelog_collision={
+                "action": "skip",
+                "reason": "pre-land-changelog",
+            },
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=f"DRAIN_ADMISSION_PR=16068 DRAIN_ADMISSION_HEAD={head}",
+            )
+        )
+
+        assert result.returncode == 3, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert (
+            "pre-land CHANGELOG.md edit is prohibited (pre-land-changelog) for #16068"
+            in result.stdout
+        )
+        assert (
+            "queue-noop: classified-skip: exact admission #16068 at "
+            + head
+            + " (pre-land-changelog; native admission refused, hard gate preserved)"
+            in result.stderr
+        )
+        assert "enroll should not run" not in result.stderr
+
     def test_durable_product_failure_receipt_blocks_when_actions_history_aged_out(
         self, tmp_path: Path
     ) -> None:
@@ -855,6 +921,102 @@ class TestGhRetryHelper:
 
 
 class TestDrainPrQueueWiring:
+    def test_exact_admission_rereads_transient_unknown_mergeability(
+        self, tmp_path: Path
+    ) -> None:
+        head = "a" * 40
+        view_calls = tmp_path / "view-calls"
+        view_calls.write_text("0", encoding="utf-8")
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                case "${{2:-}}" in
+                  preflight) exit 0 ;;
+                  list-state) echo '{{"101":{{"headRefOid":"{head}","queued":false}}}}' ;;
+                  enroll) echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":{{"id":"MQE_1","state":"AWAITING_CHECKS","position":1}}}}}}' ;;
+                  dequeue) echo '{{"state":{{"queued":false}}}}' ;;
+                  max-queue-depth) echo 16 ;;
+                  unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
+                  unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
+                  changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
+                  --classify-queue) echo '[]' ;;
+                  *) echo "unexpected node args: $*" >&2; exit 2 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":101,"t":"Transient mergeability","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/transient","headOid":"{head}","base":"main","body":"","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  count=$(<"{view_calls}")
+                  count=$((count + 1))
+                  echo "$count" >"{view_calls}"
+                  mergeable=MERGEABLE
+                  [[ "$count" -eq 1 ]] && mergeable=UNKNOWN
+                  printf '%s\n' '{{"state":"OPEN","isDraft":false,"mergeable":"'"$mergeable"'","labels":[],"headRefOid":"{head}","baseRefName":"main","body":""}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && " $* " == *" -X POST "* && " $* " == *"/statuses/{head} "* ]]; then
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/commits/{head}/status"* ]]; then
+                  echo '{{"statuses":[]}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then
+                  echo '[]'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && "$2" == *"/commits/{head}"* ]]; then
+                  echo '2026-08-29T20:00:00Z'
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then exit 1; fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    f"DRAIN_ADMISSION_PR=101 DRAIN_ADMISSION_HEAD={head} "
+                    "DRAIN_MERGEABLE_RECHECK_ATTEMPTS=3 "
+                    "DRAIN_MERGEABLE_RECHECK_SECONDS=0 "
+                    "GITHUB_RUN_ID=42 GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "mergeable=UNKNOWN for #101" in result.stdout
+        assert "+native-queue on #101" in result.stdout
+        assert int(view_calls.read_text(encoding="utf-8")) >= 2
+
     @pytest.mark.parametrize(
         ("enroll_mode", "dequeue_mode", "expected_returncode", "expected_dequeues"),
         [
@@ -2994,11 +3156,14 @@ class TestReleaseQueueDeferred:
         fleet_gate_refresh = _FLEET_GATE_REFRESH_WORKFLOW.read_text(encoding="utf-8")
         assert "schedule:" not in workflow
         assert "workflow_run:" in workflow
-        # CI and Production Controller are upstream semantic inputs to Fleet
-        # Gate Refresh. Queue-Deferred Release consumes only the resulting
-        # fresh gate receipt, so the controllers cannot recursively wake each
-        # other without a new upstream capacity signal.
-        assert "workflows: [CI, Production Controller]" in fleet_gate_refresh
+        # CI and Production Controller are direct upstream semantic inputs.
+        # Marker Recovery dispatches a fresh Fleet Gate event after durable
+        # bytes so downstream release remains inside the workflow_run cap.
+        assert (
+            "workflows: [CI, Production Controller]"
+            in fleet_gate_refresh
+        )
+        assert "Production Marker Recovery]" not in fleet_gate_refresh
         assert "Queue-Deferred Release]" not in fleet_gate_refresh
         assert "workflows: ['Fleet Gate Refresh']" in workflow
         assert "workflows: ['CI', 'Production Controller', 'Fleet Gate Refresh']" not in workflow

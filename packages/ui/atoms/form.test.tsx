@@ -238,7 +238,7 @@ describe('Form', () => {
     it('applies muted foreground styling', () => {
       render(<TestForm />);
       const description = screen.getByText('Your public display name.');
-      expect(description.className).toContain('text-[13px]');
+      expect(description.className).toContain('text-app');
       expect(description.className).toContain('text-tertiary-token');
     });
 
@@ -313,7 +313,7 @@ describe('Form', () => {
 
       const message = await screen.findByText('Email is required');
       expect(message.className).toContain('text-destructive');
-      expect(message.className).toContain('text-[13px]');
+      expect(message.className).toContain('text-app');
       expect(message.className).toContain('font-medium');
       expect(message).toHaveAttribute('role', 'alert');
       expect(message).toHaveAttribute('aria-live', 'polite');

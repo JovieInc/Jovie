@@ -155,7 +155,7 @@ describe('dashboard status badge semantic ownership', () => {
     }
   });
 
-  it('keeps long labels legible through the canonical DotBadge nowrap owner', () => {
+  it('keeps long labels legible through canonical Badge wrap geometry', () => {
     render(
       <>
         <MatchStatusBadge status='auto_confirmed' />
@@ -171,10 +171,11 @@ describe('dashboard status badge semantic ownership', () => {
     const intent = getBadgeRoot(AUDIENCE_INTENT_BADGE_STYLES.medium.label);
 
     for (const root of [autoConfirmed, confidence, intent]) {
-      expect(root).toHaveClass('whitespace-nowrap');
+      expect(root).toHaveClass('whitespace-normal');
+      expect(root).toHaveClass('break-words');
       expect(root.className).not.toMatch(/\boverflow-hidden\b/);
       expect(root.className).not.toMatch(/\btruncate\b/);
-      expect(root.className).not.toMatch(/\bwhitespace-normal\b/);
+      expect(root.className).not.toMatch(/\bwhitespace-nowrap\b/);
     }
 
     expect(screen.getByText('High')).toBeInTheDocument();

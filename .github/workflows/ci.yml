@@ -1111,6 +1111,26 @@ jobs:
       - name: Fail-closed golden path lock
         run: node scripts/golden-path-lock.mjs merge-gate
 
+  ci-visual-snapshot-compare:
+    name: Visual Snapshot Compare
+    # JOV-5459: missing baseline/ENOENT is FAIL, not advisory. No Neon and no
+    # Playwright. Snapshot refresh stays on visual-regression.yml.
+    if: github.event_name == 'merge_group'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      # Dependency-free Node stdlib compare. Avoid setup-node-pnpm so this
+      # merge-group gate stays off the Neon/Playwright path.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+      - name: Fail-closed visual snapshot compare
+        run: node scripts/visual-snapshot-compare.mjs compare
+
   ci-fast-typecheck:
     name: ci-fast (typecheck)
     # JOV-4477: dedicated jobs keep structural Docker/Python action setup out of
@@ -1173,9 +1193,11 @@ jobs:
     name: ci-fast (remaining)
     # JOV-4477: the structural Docker/Python actions stay isolated to the
     # remaining group, where their path-gated lane can actually run.
+    # JOV-5454: live Storybook certification needs Chromium plus bounded
+    # build/serve budget inside the structural lane.
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission]
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     if: >-
       !cancelled() &&
       needs.ci-lockfile-preflight.result == 'success' &&
@@ -1227,8 +1249,10 @@ jobs:
           # origin/<base>; a --depth=1 fetch leaves the base tip shallow and fails
           # desktop-release-guard / version-fanout-guard on PRs.
           git fetch origin "${{ github.base_ref }}" --no-tags
-          STRUCTURAL_CONTROL_PATTERN='^(\.github/|\.claude/rules/(ci-branching|release|testing|gstack)\.md|AGENTS\.md|CODEX\.md|canon/invariants\.jsonl|scripts/invariants/|scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|ownership-inventory)|scripts/backlog-orchestrator/__tests__/(pre-lease-gates|gate-next-hold|ownership-inventory)|scripts/lib/(ci-|merge-queue|product-lane-(classifier|finalize)|production-lane-range)|scripts/lib/__tests__/(ci-fast-workflow-contract|merge-group-workflow-contract|product-lane-classifier|production-lane-range)\.test\.mjs|scripts/ci-|scripts/hermes/(gem-|gem_|install-gem-pr-rehabilitation)|scripts/brand-scrub\.py|scripts/tests/test_(brand_scrub|agent_workflow_hygiene|vercel_prebuilt_deploy)\.py)'
-          STRUCTURAL_UI_PATTERN='^(apps/web/app/.*\.(tsx|css)$|apps/web/components/|apps/web/styles/|packages/ui/|DESIGN\.md$|design\.tokens\.json$|scripts/(component-|design-|ds-offscale|screen-certification|story-coverage|storybook-story-quality|ui-story-coverage)|scripts/lib/__tests__/(component-|design-|screen-certification|story-coverage|storybook-story-quality|ui-story-coverage))'
+          STRUCTURAL_CONTROL_PATTERN='^(\.github/|\.claude/rules/(ci-branching|release|testing|gstack)\.md|AGENTS\.md|CODEX\.md|canon/invariants\.jsonl|scripts/invariants/|scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|ownership-inventory)|scripts/backlog-orchestrator/__tests__/(pre-lease-gates|gate-next-hold|ownership-inventory)|scripts/doc-freshness-lint|scripts/(drain-pr-queue\.sh|merge-queue-backend\.mjs)|scripts/lib/(ci-|merge-queue|product-lane-(classifier|finalize)|production-lane-range)|scripts/lib/__tests__/(ci-fast-workflow-contract|merge-group-workflow-contract|merge-queue-backend|product-lane-classifier|production-lane-range)\.test\.mjs|scripts/ci-|scripts/hermes/(gem-|gem_|install-gem-pr-rehabilitation)|scripts/brand-scrub\.py|scripts/tests/test_(agent_workflow_hygiene|brand_scrub|gh_retry|vercel_prebuilt_deploy)\.py)'
+          # Component receipts are executable test evidence; Storybook/Chromatic
+          # config and the shared-UI token audit feed structural component proof.
+          STRUCTURAL_UI_PATTERN='^(apps/web/app/.*\.(tsx|css)$|apps/web/components/|apps/web/\.storybook/|apps/web/package\.json$|apps/web/scripts/(check-reliability-detectors|lint-contrast-|lint-no-native-dialogs|next-proxy-guard|seo-ratchet-|tailwind-guard)|apps/web/tests/|apps/web/styles/|packages/ui/|chromatic\.config\.json$|package\.json$|DESIGN\.md$|design\.tokens\.json$|scripts/(component-|design-|ds-offscale|screen-certification|shared-ui-visual-arbitrary|story-coverage|storybook-story-quality|ui-story-coverage)|scripts/lib/__tests__/(component-|design-|screen-certification|story-coverage|storybook-story-quality|ui-story-coverage))'
           if git diff --name-only "origin/${{ github.base_ref }}" HEAD | grep -qE "$STRUCTURAL_CONTROL_PATTERN|$STRUCTURAL_UI_PATTERN"; then
             echo "skip=false" >> "$GITHUB_OUTPUT"
           else
@@ -1245,6 +1269,9 @@ jobs:
       - name: Install pytest (structural regression tests)
         if: steps.structural.outputs.skip != 'true'
         run: python -m pip install --quiet --require-hashes -r .github/requirements/pytest.txt
+      - name: Setup Playwright (Chromium)
+        if: steps.structural.outputs.skip != 'true'
+        uses: ./.github/actions/setup-playwright
       - name: Run ci-fast lanes
         id: lanes
         env:
@@ -3405,6 +3432,7 @@ jobs:
     needs: [ci-path-changes, ci-merge-group-admission]
     if: >-
       always() &&
+      !cancelled() &&
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
@@ -3428,7 +3456,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
-      fail-fast: false
+      # The first failing shard is sufficient to reject an exact combined head.
+      # Main and ordinary manual runs stay exhaustive for post-merge diagnosis.
+      # PR Ready still runs with always() and requires exact matrix success.
+      fail-fast: ${{ github.event_name == 'merge_group' }}
       # Org hosted capacity ceiling ~120 concurrent jobs. Do not artificially
       # serialize unit shards — wall-clock merge latency is the bottleneck.
       max-parallel: 120
@@ -3560,6 +3591,15 @@ jobs:
           ((github.event_name == 'merge_group' && matrix.shard == '4/10') ||
           (github.event_name != 'merge_group' && matrix.shard == '1/10'))
         run: pnpm turbo test --filter=@jovie/ui
+
+      - name: Preserve failed unit-shard diagnosis
+        if: ${{ failure() && !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: unit-test-failure-${{ github.run_id }}-${{ github.run_attempt }}-${{ strategy.job-index }}
+          path: apps/web/test-report.*.junit.xml
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Upload test results to Codecov
         # Queue evidence must not consume external service credentials.
@@ -4273,6 +4313,9 @@ jobs:
           MUSICFETCH_API_TOKEN: ${{ secrets.MUSICFETCH_API_TOKEN }}
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          STRIPE_PRICE_PRO_MONTHLY: ${{ secrets.STRIPE_PRICE_PRO_MONTHLY }}
 
       - name: Upload Playwright Artifacts on Failure
         if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
@@ -4913,6 +4956,7 @@ jobs:
         ci-golden-eval-set,
         ci-secret-scan,
         ci-golden-path-lock,
+        ci-visual-snapshot-compare,
         drizzle-migration-guard,
       ]
     if: ${{ always() && github.event_name == 'merge_group' }}
@@ -4937,6 +4981,7 @@ jobs:
           GOLDEN_EVAL_RESULT="${{ needs.ci-golden-eval-set.result }}"
           SECRET_RESULT="${{ needs.ci-secret-scan.result }}"
           GOLDEN_PATH_LOCK_RESULT="${{ needs.ci-golden-path-lock.result }}"
+          VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"
           MIGRATION_RESULT="${{ needs.drizzle-migration-guard.result }}"
           NOOP_GROUP="${{ needs.ci-path-changes.outputs.is_noop_merge_group }}"
           RUN_JOVIE_PRODUCT="${{ needs.ci-path-changes.outputs.run_jovie_product }}"
@@ -4974,6 +5019,7 @@ jobs:
             echo "| Golden Eval Set (path-selected) | $GOLDEN_EVAL_RESULT |"
             echo "| Secret Scan | $SECRET_RESULT |"
             echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT |"
+            echo "| Visual Snapshot Compare | $VISUAL_COMPARE_RESULT |"
             echo "| Migration Guard | $MIGRATION_RESULT |"
             echo
             echo "Preview/A11y evidence is explicit opt-in or post-merge; merge groups do not provision Neon."
@@ -4986,6 +5032,7 @@ jobs:
             "ci-fast:$FAST_RESULT" \
             "Secret Scan:$SECRET_RESULT" \
             "Golden Path Lock:$GOLDEN_PATH_LOCK_RESULT" \
+            "Visual Snapshot Compare:$VISUAL_COMPARE_RESULT" \
             "Migration Guard:$MIGRATION_RESULT"; do
             name="${gate%%:*}"
             result="${gate#*:}"

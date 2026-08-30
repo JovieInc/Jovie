@@ -1,5 +1,6 @@
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { DOCS_URL } from '@/constants/domains';
+import { PUBLIC_ARTIST_API_POLICY_URL } from '@/lib/api/v1/contract';
 import {
   OVIE_MCP_RESOURCE_PATH,
   OVIE_OAUTH_AUTHORIZATION_SERVER_METADATA_PATH,
@@ -32,7 +33,10 @@ Do not use ${APP_NAME} for:
 ## ${APP_NAME} developer resources
 
 - **Site identity**: ${BASE_URL}/llms.txt
+- **Public API capability index**: \`GET ${BASE_URL}/api/v1\` — stable, non-enumerating contract discovery
 - **OpenAPI 3.1**: ${BASE_URL}/openapi.json — conventional spec URL; same contract as ${BASE_URL}/api/v1/openapi.json
+- **Human API guide**: ${BASE_URL}/developers — public API quickstart and active v1 lifecycle boundary
+- **API versioning and deprecation policy**: ${PUBLIC_ARTIST_API_POLICY_URL} — active v1, additive versus breaking changes, and future Deprecation/Sunset signals
 - **Public artist API**: \`GET ${BASE_URL}/api/v1/{username}\` — profile, releases, events, merch
 - **Per-artist MCP**: ${BASE_URL}/api/mcp/{username} — read-only artist tools
 - **Per-artist llms.txt**: ${BASE_URL}/{username}/llms.txt

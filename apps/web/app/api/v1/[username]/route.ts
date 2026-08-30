@@ -1,22 +1,89 @@
 import { NextResponse } from 'next/server';
 import { BASE_URL } from '@/constants/app';
+import {
+  PUBLIC_ARTIST_API_COMMON_HEADERS,
+  PUBLIC_ARTIST_API_PROFILE_CACHE_CONTROL,
+  PUBLIC_ARTIST_API_RATE_LIMIT_POLICY,
+  PUBLIC_ARTIST_API_RATE_LIMIT_WINDOW_SECONDS,
+} from '@/lib/api/v1/contract';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
-import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { NO_STORE_HEADERS, RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { getLiveMerchCardsForProfile } from '@/lib/merch/service';
 import { getPublicProfileDiscoveryExclusionResponse } from '@/lib/profile/public-profile-discovery-response';
+import {
+  createRateLimitHeaders,
+  getClientIP,
+  publicArtistApiLimiter,
+} from '@/lib/rate-limit';
 import { getProfileByUsername } from '@/lib/services/profile';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
 
-export const revalidate = 3600;
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+function getPublicProfileRateLimitHeaders(
+  result: Parameters<typeof createRateLimitHeaders>[0]
+): Record<string, string> {
+  return createRateLimitHeaders(result, {
+    policyName: PUBLIC_ARTIST_API_RATE_LIMIT_POLICY,
+    windowSeconds: PUBLIC_ARTIST_API_RATE_LIMIT_WINDOW_SECONDS,
+  });
+}
+
+function addPublicApiHeaders(
+  response: NextResponse,
+  headers: Record<string, string>
+): NextResponse {
+  for (const [name, value] of Object.entries({
+    ...PUBLIC_ARTIST_API_COMMON_HEADERS,
+    ...headers,
+  })) {
+    response.headers.set(name, value);
+  }
+  return response;
+}
 
 export async function GET(
-  _req: Request,
+  request: Request,
   { params }: { params: Promise<{ username: string }> }
 ) {
+  const rateLimit = await publicArtistApiLimiter.limit(getClientIP(request));
+  if (!rateLimit.success && rateLimit.unavailable) {
+    return NextResponse.json(
+      {
+        error: 'Public API temporarily unavailable',
+        code: 'RATE_LIMIT_UNAVAILABLE',
+      },
+      {
+        status: 503,
+        headers: {
+          ...NO_STORE_HEADERS,
+          ...PUBLIC_ARTIST_API_COMMON_HEADERS,
+          'Retry-After': RETRY_AFTER_SERVICE,
+        },
+      }
+    );
+  }
+
+  const rateLimitHeaders = getPublicProfileRateLimitHeaders(rateLimit);
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: 'Too many requests', code: 'RATE_LIMITED' },
+      {
+        status: 429,
+        headers: {
+          ...NO_STORE_HEADERS,
+          ...PUBLIC_ARTIST_API_COMMON_HEADERS,
+          ...rateLimitHeaders,
+        },
+      }
+    );
+  }
+
   const { username } = await params;
   const requestExclusion = getPublicProfileDiscoveryExclusionResponse(username);
   if (requestExclusion) {
-    return requestExclusion;
+    return addPublicApiHeaders(requestExclusion, rateLimitHeaders);
   }
 
   const profile = await getProfileByUsername(username);
@@ -24,14 +91,21 @@ export async function GET(
   if (!profile || !profile.isPublic) {
     return NextResponse.json(
       { error: 'Artist not found' },
-      { status: 404, headers: NO_STORE_HEADERS }
+      {
+        status: 404,
+        headers: {
+          ...NO_STORE_HEADERS,
+          ...PUBLIC_ARTIST_API_COMMON_HEADERS,
+          ...rateLimitHeaders,
+        },
+      }
     );
   }
   const profileExclusion = getPublicProfileDiscoveryExclusionResponse(
     profile.username
   );
   if (profileExclusion) {
-    return profileExclusion;
+    return addPublicApiHeaders(profileExclusion, rateLimitHeaders);
   }
 
   const [releases, merch, events] = await Promise.all([
@@ -96,7 +170,9 @@ export async function GET(
     },
     {
       headers: {
-        'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
+        ...PUBLIC_ARTIST_API_COMMON_HEADERS,
+        ...rateLimitHeaders,
+        'Cache-Control': PUBLIC_ARTIST_API_PROFILE_CACHE_CONTROL,
       },
     }
   );

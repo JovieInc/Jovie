@@ -154,9 +154,27 @@ describe('marketing Storybook catalog coverage (JOV-4420)', () => {
       'MarketingFooter',
       'MarketingFooterCta',
       'MarketingFinalCTA',
+      'MarketingFinalCTA/secondary',
+      'MarketingTerminalCta',
+      'MarketingTerminalCta/secondary',
+      'MarketingTerminalCta/cinematic',
+      'MarketingTerminalCta/cinematic-secondary',
     ];
     const missing = required.filter(id => !shells.has(id));
     expect(missing, `Missing shell stories: ${missing.join(', ')}`).toEqual([]);
+  });
+
+  it('covers terminal CTA cinematic and standard actions at 390 and 1024', async () => {
+    const storyFile = join(STORYBOOK_DIR, 'MarketingShells.stories.tsx');
+    const storySource = await readFile(storyFile, 'utf8');
+    const metaFile = join(STORYBOOK_DIR, 'marketingStoryMeta.ts');
+    const metaSource = await readFile(metaFile, 'utf8');
+
+    expect(metaSource).toContain('viewports: [390, 1024]');
+    expect(storySource).toContain('terminalCtaStoryParameters');
+    expect(storySource).toContain("variant='cinematic'");
+    expect(storySource).toContain('secondaryLabel');
+    expect(storySource).toContain('secondaryHref');
   });
 
   it('maps every shell registry identity to exactly one canonical story body', async () => {

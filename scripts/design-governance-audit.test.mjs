@@ -31,4 +31,15 @@ test('binds design projections to the canonical invariant registry', () => {
   assert.equal(projection?.status, 'PASS');
   assert.match(projection.detail, /JOV-INV-019/);
   assert.match(projection.detail, /executable generator and guard bindings/);
+  const audit = results.find(item => item.id === 'shared-ui-visual-arbitrary');
+  assert.equal(audit?.status, 'PASS');
+  assert.match(audit.detail, /visual findings/);
+  const outcome = results.find(item => item.id === 'shadcn-outcome-inventory');
+  assert.equal(outcome?.status, 'PASS');
+  assert.match(outcome.detail, /MIT public-outcome boundary/);
+  const wiring = results.find(
+    item => item.id === 'shared-ui-visual-arbitrary-wiring'
+  );
+  assert.equal(wiring?.status, 'PASS');
+  assert.match(wiring.detail, /design:shared-ui-visual-arbitrary:check/);
 });

@@ -769,11 +769,16 @@ jobs:
     outputs:
       verified: ${{ steps.finalize.outputs.verified || 'false' }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
       - name: Resolve current main before final verification
         id: current
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
+          PRODUCTION_BUILD_INFO_URL: https://jov.ie/api/health/build-info
         run: |
           set -euo pipefail
           current_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
@@ -782,8 +787,9 @@ jobs:
             exit 1
           }
           if [ "$current_sha" != "$EXPECTED_SHA" ]; then
-            echo "::notice::Post-deploy verification for $EXPECTED_SHA was superseded by $current_sha; neutral with no notification."
+            echo "::warning::Post-deploy verification for $EXPECTED_SHA was superseded by $current_sha; proving live jov.ie bind before skip-success."
             echo "is_current=false" >> "$GITHUB_OUTPUT"
+            node .github/scripts/assert-live-production-bind.mjs --main-sha "$current_sha"
           else
             echo "is_current=true" >> "$GITHUB_OUTPUT"
           fi
@@ -871,7 +877,8 @@ jobs:
             exit 1
           fi
           if [ "$boundary_sha" != "$EXPECTED_COMMIT_SHA" ]; then
-            echo "Main advanced to $boundary_sha before canonical verification; neutral with no notification."
+            echo "Main advanced to $boundary_sha before canonical verification; proving live jov.ie bind before skip-success."
+            node .github/scripts/assert-live-production-bind.mjs --main-sha "$boundary_sha"
             exit 0
           fi
 
@@ -910,7 +917,8 @@ jobs:
             exit 1
           fi
           if [ "$boundary_sha" != "$EXPECTED_SHA" ]; then
-            echo "Main advanced to $boundary_sha before finalization; neutral."
+            echo "Main advanced to $boundary_sha before finalization; proving live jov.ie bind before skip-success."
+            node .github/scripts/assert-live-production-bind.mjs --main-sha "$boundary_sha"
             exit 0
           fi
 

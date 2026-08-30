@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { LibraryShareAssetCard } from '@/components/features/library-share/LibraryShareAssetCard';
 import { LibraryShareAssetLayouts } from '@/components/features/library-share/LibraryShareAssetLayouts';
 import type { LibraryShareDropAsset } from '@/lib/library-share/types';
 
@@ -20,6 +21,19 @@ const asset: LibraryShareDropAsset = {
 };
 
 describe('LibraryShareAssetLayouts', () => {
+  it('preserves complete release artwork in the shared asset card', () => {
+    render(
+      <LibraryShareAssetCard
+        asset={asset}
+        downloadsEnabled={false}
+        layout='list'
+      />
+    );
+    const image = screen.getByRole('img', { name: 'Midnight Drive' });
+    expect(image).toHaveClass('object-contain');
+    expect(image).not.toHaveClass('object-cover');
+  });
+
   it('renders the grid layout by default', () => {
     render(
       <LibraryShareAssetLayouts

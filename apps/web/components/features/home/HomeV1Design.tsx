@@ -100,14 +100,22 @@ export function HomeV1Design() {
               working on, and we will save the context before opening the app.
             </p>
 
-            <div className='mt-10 w-full max-w-190 rounded-3xl border border-white/[0.08] bg-(--color-bg-surface-0)/88 p-3 text-left shadow-[0_34px_120px_rgba(0,0,0,0.48)] backdrop-blur-2xl'>
+            <section
+              aria-labelledby='home-request-heading'
+              className='mt-10 w-full max-w-190 rounded-3xl border border-white/[0.08] bg-(--color-bg-surface-0)/88 p-3 text-left shadow-[0_34px_120px_rgba(0,0,0,0.48)] backdrop-blur-2xl'
+            >
               <div className='flex items-start gap-3 rounded-3xl bg-white/[0.035] px-4 py-4 ring-1 ring-white/[0.04] sm:px-5'>
                 <Sparkles className='mt-1 h-4 w-4 shrink-0 text-cyan-200/70' />
-                <p className='text-mid leading-6 text-white/78'>
+                {/* eslint-disable @jovie/canonical-ui-label-casing -- Preserve approved sentence-case homepage copy; this change only adds semantic heading markup. */}
+                <h2
+                  id='home-request-heading'
+                  className='text-mid leading-6 text-white/78'
+                >
                   Tell Jovie what you are releasing next. Your request becomes
                   the context we use to shape setup, profile work, and the
                   launch queue.
-                </p>
+                </h2>
+                {/* eslint-enable @jovie/canonical-ui-label-casing */}
               </div>
 
               <div className='mt-3 flex flex-col gap-3 rounded-3xl border border-white/[0.07] bg-black/30 p-3 sm:flex-row sm:items-center'>
@@ -137,7 +145,7 @@ export function HomeV1Design() {
                   </Link>
                 ))}
               </div>
-            </div>
+            </section>
           </div>
 
           <div className='grid gap-5 border-t border-white/[0.07] pt-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center'>

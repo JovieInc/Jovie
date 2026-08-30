@@ -149,7 +149,7 @@ const FormDescription = React.forwardRef<
     <p
       ref={ref}
       id={formDescriptionId}
-      className={cn('text-[13px] text-tertiary-token', className)}
+      className={cn('text-app text-tertiary-token', className)}
       data-slot='form-description'
       {...props}
     />
@@ -172,7 +172,7 @@ const FormMessage = React.forwardRef<
     <p
       ref={ref}
       id={formMessageId}
-      className={cn('text-[13px] font-medium text-destructive', className)}
+      className={cn('text-app font-medium text-destructive', className)}
       data-slot='form-message'
       role={error ? 'alert' : undefined}
       aria-live={error ? 'polite' : undefined}

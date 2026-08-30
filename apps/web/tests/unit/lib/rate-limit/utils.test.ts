@@ -196,6 +196,42 @@ describe('Rate Limit Utils', () => {
 
       expect(headers['Retry-After']).toBe('0');
     });
+
+    it('emits draft-IETF structured fields when a public policy is provided', () => {
+      const result: RateLimitResult = {
+        success: true,
+        limit: 100,
+        remaining: 95,
+        reset: new Date('2025-01-01T12:01:00Z'),
+      };
+
+      const headers = createRateLimitHeaders(result, {
+        policyName: 'public-artist',
+        windowSeconds: 60,
+      });
+
+      expect(headers['RateLimit-Policy']).toBe('"public-artist";q=100;w=60');
+      expect(headers.RateLimit).toBe('"public-artist";r=95;t=60');
+      expect(headers['X-RateLimit-Limit']).toBe('100');
+      expect(headers['X-RateLimit-Remaining']).toBe('95');
+    });
+
+    it('keeps Retry-After authoritative on a throttled structured response', () => {
+      const result: RateLimitResult = {
+        success: false,
+        limit: 100,
+        remaining: 0,
+        reset: new Date('2025-01-01T12:01:00Z'),
+      };
+
+      const headers = createRateLimitHeaders(result, {
+        policyName: 'public-artist',
+        windowSeconds: 60,
+      });
+
+      expect(headers.RateLimit).toBe('"public-artist";r=0;t=60');
+      expect(headers['Retry-After']).toBe('60');
+    });
   });
 
   describe('createRateLimitHeadersFromStatus', () => {

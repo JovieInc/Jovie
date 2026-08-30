@@ -25,6 +25,7 @@ const ROUTE_TABLE = [
   ['provider-unavailable', 'gem', 'restore-provider-availability', 'typed-remediation'],
   ['missing-owner-lease', 'symphony', 'reconcile-exact-head-lease', 'typed-remediation'],
   ['dropped-controller-event', 'gem', 'restore-event-trigger-and-reconcile', 'typed-remediation'],
+  ['draft-stack-policy', 'symphony', 'split-or-retarget-draft-stack', 'typed-remediation'], // JOV-INV-020
   ['not-proven', 'controller', 'collect-missing-evidence', 'collect-evidence'],
 ];
 // biome-ignore format: compact stall tables for the PR size guard

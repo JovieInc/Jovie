@@ -503,6 +503,8 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Secret Scan (gitleaks + trufflehog)',
   'CI / Golden Path Lock',
   'Golden Path Lock',
+  'CI / Visual Snapshot Compare',
+  'Visual Snapshot Compare',
   'CI / Layout Guard',
   'Layout Guard',
   'CI / Build + Layout (combined)',

@@ -1,5 +1,4 @@
 import { Badge } from '@jovie/ui';
-import { cn } from '@/lib/utils';
 
 export interface TableBadgeProps
   extends Readonly<{
@@ -16,11 +15,7 @@ export function TableBadge({
   size = 'sm',
 }: TableBadgeProps) {
   return (
-    <Badge
-      size={size}
-      variant={variant}
-      className={cn('line-clamp-1', className)}
-    >
+    <Badge size={size} variant={variant} className={className}>
       {children}
     </Badge>
   );

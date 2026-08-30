@@ -36,6 +36,9 @@ describe('product lane classifier', () => {
     expect(web.selectedLanes).toEqual(['web']);
     expect(web.skippedLanes.map(item => item.lane)).toContain('ios');
     expect(web.skippedLanes.map(item => item.lane)).toContain('mac');
+
+    const cli = classifyProductLanes(['packages/jovie-cli/src/client.ts']);
+    expect(cli.selectedLanes).toEqual(['web']);
   });
 
   it('names every affected product and cross-product gate for shared contracts', () => {

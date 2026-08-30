@@ -1,8 +1,14 @@
 'use client';
 
+// @coverage-via apps/web/components/features/library-asset-share/LibraryAssetShareSurface.test.tsx
+
 import { ExternalLink, Lock, Unlock } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import {
+  ARTWORK_FIT_CLASSNAME,
+  ArtworkFrame,
+} from '@/components/atoms/ArtworkFrame';
 import type { LibraryAssetSharePublicView } from '@/lib/library/asset-share';
 import { formatLibraryAssetVisibility } from '@/lib/library/asset-share';
 import { cn } from '@/lib/utils';
@@ -27,16 +33,19 @@ export function LibraryAssetShareSurface({
       </header>
 
       {view.artworkUrl ? (
-        <div className='relative mx-auto aspect-square w-full max-w-sm overflow-hidden rounded-xl border border-subtle'>
+        <ArtworkFrame
+          size='hero'
+          className='mx-auto aspect-square w-full max-w-sm border border-subtle'
+        >
           <Image
             src={view.artworkUrl}
             alt={`${view.title} artwork`}
             fill
             sizes='(max-width: 640px) 100vw, 384px'
-            className='object-cover'
+            className={ARTWORK_FIT_CLASSNAME}
             unoptimized
           />
-        </div>
+        </ArtworkFrame>
       ) : null}
 
       <div

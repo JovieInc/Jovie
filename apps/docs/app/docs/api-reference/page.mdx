@@ -4,32 +4,100 @@ title: API Reference
 
 # API Reference
 
-The Jovie API allows you to programmatically interact with the platform.
+Jovie currently publishes one public API: an anonymous, read-only JSON surface
+for artist profiles. The capability index at
+`https://jov.ie/api/v1` is a stable, machine-verifiable 200 response. It does
+not enumerate artist handles or depend on a particular profile being live.
 
-> This section is under development. Full API documentation is coming soon.
+The canonical machine-readable contract is
+[`https://jov.ie/api/v1/openapi.json`](https://jov.ie/api/v1/openapi.json),
+also available at [`https://jov.ie/openapi.json`](https://jov.ie/openapi.json).
+The human-oriented guide is [`https://jov.ie/developers`](https://jov.ie/developers).
 
-## Overview
+## Current contract
 
-The Jovie API is a RESTful JSON API. All endpoints require authentication via
-API key or OAuth token.
+- `GET https://jov.ie/api/v1` -- capability and discovery index. This static
+  document is stable and non-enumerating.
+- `GET https://jov.ie/api/v1/{username}` -- one public artist profile with
+  public identity, releases, upcoming events, merch, and related links.
+- `GET https://jov.ie/api/v1/openapi.json` -- canonical OpenAPI 3.1 contract.
+- `GET https://jov.ie/openapi.json` -- equivalent conventional discovery URL.
 
-## Authentication
+Replace `{username}` with a current public Jovie handle discovered from an
+artist's own profile or the sitemap. The generic example below is deliberately
+not presented as a provisioned fixture:
 
+```bash
+curl https://jov.ie/api/v1
+curl https://jov.ie/api/v1/{username}
 ```
-Authorization: Bearer YOUR_API_KEY
+
+Unknown or non-public handles return JSON `404`.
+
+## Authentication and scope
+
+No API key, OAuth token, `Authorization` header, developer account, write
+endpoint, or manage endpoint is required or supported for this public surface.
+Only data the artist has made public is returned. Do not send private or
+sensitive information.
+
+## Rate limits and response headers
+
+Only `GET /api/v1/{username}` consumes the public artist-profile bucket: 100
+requests per client IP in each fixed 60-second window. The bucket is durable
+across application instances through Redis. The static `/api/v1` capability
+index and the OpenAPI discovery routes do not consume this bucket.
+
+Successful profile responses, including typed `404` responses, include the
+current IETF HTTPAPI draft fields:
+
+```text
+RateLimit-Policy: "public-artist";q=100;w=60
+RateLimit: "public-artist";r=99;t=60
 ```
 
-## Base URL
+`X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` remain
+available for compatibility with existing clients. A `429` response includes
+the same quota fields plus an integer `Retry-After` in seconds; clients should
+use `Retry-After` as the authoritative retry timing. If the durable limiter is
+temporarily unavailable, the endpoint fails closed with `503` and
+`Retry-After: 30` rather than claiming a durable quota state.
 
+Per-client remaining and reset fields make a shared CDN body cache unsafe for
+profile responses, so those responses use `Cache-Control: private, no-store`
+instead of the former one-hour public cache. This intentionally increases
+origin work until a bounded internal cache can safely separate response data
+from caller-specific headers.
+
+The field names follow the current
+[IETF HTTPAPI RateLimit draft](https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-ratelimit-headers-11);
+the `X-RateLimit-*` fields are legacy compatibility fields.
+
+## Versioning and lifecycle
+
+The `v1` public artist API is active and is not deprecated. Additive changes
+remain within `v1`; a breaking contract requires a new versioned path. Active
+`v1` responses therefore do not emit `Deprecation` or `Sunset` headers.
+
+The machine-readable OpenAPI contract repeats this policy in its
+`x-jovie-versioning` extension: the strategy is URL versioning, additive
+changes remain within the active version, and breaking changes receive a new
+URL version. `Deprecation` follows RFC 9745 and `Sunset` follows RFC 8594;
+both are inactive until a version is genuinely retired and a dated migration
+policy is published.
+
+Responses expose the owned policy page with a `Link` relation:
+
+```text
+Link: <https://jov.ie/api-versioning>; rel="deprecation"; type="text/html"
 ```
-https://api.jov.ie/v1
-```
 
-## Endpoints
+This policy pointer is discovery only and does not deprecate `v1`. The
+[canonical versioning and deprecation policy](https://jov.ie/api-versioning)
+describes the active version and the future conditions for sending
+`Deprecation` or `Sunset` headers.
 
-Detailed endpoint documentation will be added here. Planned sections include:
+## End of current contract
 
-- **Profile** -- Read and update artist profile data.
-- **Releases** -- Manage releases and smart links.
-- **Audience** -- Query audience data and segments.
-- **Analytics** -- Retrieve analytics data programmatically.
+The OpenAPI document is the source of truth for the response schema and
+supported statuses, headers, and the active version boundary.

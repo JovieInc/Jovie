@@ -12,6 +12,8 @@
  *   6. code-style.md custom-rule count matches eslint.config.js.
  *   7. DESIGN_COMPLETE.md carries a superseded banner.
  *   8. Design-agent invariants project from canon/invariants.jsonl only.
+ *   9. Shared-UI visual arbitrary values are shrink-only (JOV-5437).
+ *  10. Shadcn/Typeset outcome inventory is fail-closed (JOV-5438).
  *
  * Invariant consumer: JOV-INV-019.
  *
@@ -31,13 +33,17 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-
+import { runOutcomeCertification } from './component-shadcn-outcome-inventory.mjs';
 import { findDesignManifestProjectionViolations } from './design-authority-guard.mjs';
 import { buildLlmsDesignManifest } from './generate-llms-design-manifest.mjs';
 import {
   findDesignInvariantProjectionViolations,
   readDesignAgentContract,
 } from './invariants/design-agent-contract.mjs';
+import {
+  evaluateSharedUiVisualArbitraryAudit,
+  CHECK_COMMAND as SHARED_UI_VISUAL_ARBITRARY_CHECK,
+} from './shared-ui-visual-arbitrary-audit.mjs';
 
 const THIS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REPO_ROOT = path.join(THIS_DIR, '..');
@@ -66,6 +72,7 @@ const ROOT_REQUIRED_SCRIPTS = [
   'design:authority:check',
   'design:tokens:export:check',
   'design:governance:audit',
+  'design:shared-ui-visual-arbitrary:check',
 ];
 const WEB_REQUIRED_SCRIPTS = ['lint:touch-target', 'lint:eslint'];
 const CI_FAST_REQUIRED_COMMANDS = [
@@ -476,6 +483,52 @@ export function runDesignGovernanceAudit(repoRoot = DEFAULT_REPO_ROOT) {
       'design-invariant-projection',
       'FAIL',
       `canonical projection unreadable: ${error instanceof Error ? error.message : error}`
+    );
+  }
+
+  try {
+    const lanes = readRepoFile(CI_FAST_LANES_PATH);
+    const wired = lanes.includes(SHARED_UI_VISUAL_ARBITRARY_CHECK);
+    report(
+      'shared-ui-visual-arbitrary-wiring',
+      wired ? 'PASS' : 'FAIL',
+      wired
+        ? `${CI_FAST_LANES_PATH} runs ${SHARED_UI_VISUAL_ARBITRARY_CHECK}`
+        : `${CI_FAST_LANES_PATH} must run ${SHARED_UI_VISUAL_ARBITRARY_CHECK} in hosted structural CI`
+    );
+    const audit = evaluateSharedUiVisualArbitraryAudit({
+      repoRoot,
+      eventName: 'local',
+    });
+    report(
+      'shared-ui-visual-arbitrary',
+      audit.ok ? 'PASS' : 'FAIL',
+      audit.ok
+        ? `${audit.totalFindings} visual findings across ${audit.scannedFiles.length} production files match the shrink-only baseline`
+        : audit.issues.join('; ')
+    );
+  } catch (error) {
+    report(
+      'shared-ui-visual-arbitrary',
+      'FAIL',
+      `shared-UI visual arbitrary audit unreadable: ${error instanceof Error ? error.message : error}`
+    );
+  }
+
+  try {
+    const outcome = runOutcomeCertification({ repoRoot });
+    report(
+      'shadcn-outcome-inventory',
+      outcome.ok ? 'PASS' : 'FAIL',
+      outcome.ok
+        ? `${(outcome.receipt.enrolled ?? []).length} enrolled primitives; MIT public-outcome boundary; catalog=${outcome.receipt.catalogCount}`
+        : outcome.receipt.issues.join('; ')
+    );
+  } catch (error) {
+    report(
+      'shadcn-outcome-inventory',
+      'FAIL',
+      `Shadcn outcome inventory unreadable: ${error instanceof Error ? error.message : error}`
     );
   }
 

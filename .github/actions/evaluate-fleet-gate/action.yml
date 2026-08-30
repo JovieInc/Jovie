@@ -51,7 +51,7 @@ outputs:
     description: Path to the written receipt JSON.
     value: ${{ steps.evaluate.outputs.receipt_path }}
   receipt_b64:
-    description: Base64 receipt for job outputs.
+    description: Base64 bounded admission projection for job outputs.
     value: ${{ steps.evaluate.outputs.receipt_b64 }}
 
 runs:
