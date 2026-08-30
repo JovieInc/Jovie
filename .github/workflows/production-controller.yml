@@ -755,8 +755,6 @@ jobs:
       ${{
         always() &&
         github.event.workflow_run.event == 'push' &&
-        needs.authorize-production.result == 'success' &&
-        needs.authorize-production.outputs.authorized == 'true' &&
         needs.authorize-production.outputs.already_verified != 'true'
       }}
     # The workflow-level production lease is still held here. Every probe
@@ -773,7 +771,8 @@ jobs:
         id: current
         env:
           GH_TOKEN: ${{ github.token }}
-          EXPECTED_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+          PRODUCTION_BUILD_INFO_URL: https://jov.ie/api/health/build-info
         run: |
           set -euo pipefail
           current_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
@@ -781,8 +780,19 @@ jobs:
             echo "::error::Could not resolve an exact current main SHA."
             exit 1
           }
-          if [ "$current_sha" != "$EXPECTED_SHA" ]; then
-            echo "::notice::Post-deploy verification for $EXPECTED_SHA was superseded by $current_sha; neutral with no notification."
+          if [ "$current_sha" != "$EXPECTED_SHA" ] ||
+            [ "${{ needs.authorize-production.result }}" != "success" ] ||
+            [ "${{ needs.authorize-production.outputs.authorized }}" != "true" ]; then
+            live_sha="$(curl --fail --silent --show-error "$PRODUCTION_BUILD_INFO_URL" | jq -r '.commitSha // empty')"
+            [[ "$live_sha" =~ ^[0-9a-f]{40}$ ]] || {
+              echo "::error::Superseded production verification could not resolve the live commit SHA."
+              exit 1
+            }
+            if [ "$live_sha" != "$current_sha" ]; then
+              echo "::error::Superseded controller is unbound: live production $live_sha does not match current main $current_sha."
+              exit 1
+            fi
+            echo "Superseded controller is bound to live current main $current_sha."
             echo "is_current=false" >> "$GITHUB_OUTPUT"
           else
             echo "is_current=true" >> "$GITHUB_OUTPUT"

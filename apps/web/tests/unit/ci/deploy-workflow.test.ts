@@ -4563,7 +4563,9 @@ describe('production promotion exact-artifact contract', () => {
       "always() && steps.evaluate.outputs.needs_manual == 'true'"
     );
     expect(health).not.toContain('issues: write');
-    expect(health).not.toContain('exit 1');
+    expect(healthEvaluation).toContain(
+      'Superseded health policy is unbound:'
+    );
     expect(health.indexOf('exact_attempt="$(gh api')).toBeLessThan(
       health.indexOf('gh run rerun "$run_id"')
     );
@@ -4585,6 +4587,23 @@ describe('production promotion exact-artifact contract', () => {
     );
     expect(healthEvaluation).toContain(
       'recovery_reason=policy_generation_superseded'
+    );
+    expect(healthEvaluation).toContain(
+      'https://jov.ie/api/health/build-info'
+    );
+    expect(healthEvaluation).toContain('trap - EXIT\n                exit 1');
+    const productionVerified = getJobBlock(controller, 'production-verified');
+    expect(productionVerified).toContain(
+      'EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}'
+    );
+    expect(productionVerified).toContain(
+      'https://jov.ie/api/health/build-info'
+    );
+    expect(productionVerified).toContain(
+      'Superseded controller is unbound:'
+    );
+    expect(productionVerified).not.toContain(
+      'superseded by $current_sha; neutral'
     );
     expect(
       healthEvaluation.indexOf('checked_out_sha="$(git rev-parse')

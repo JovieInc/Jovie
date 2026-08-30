@@ -89,8 +89,16 @@ jobs:
               incident invalid_checked_out_policy
               ;;
             superseded)
+              live_sha="$(curl --fail --silent --show-error \
+                https://jov.ie/api/health/build-info | jq -r '.commitSha // empty')"
+              [[ "$live_sha" =~ ^[0-9a-f]{40}$ ]] || incident invalid_live_production_sha
+              if [ "$live_sha" != "$current_sha" ]; then
+                echo "::error::Superseded health policy is unbound: live production $live_sha does not match current main $current_sha."
+                trap - EXIT
+                exit 1
+              fi
               echo "recovery_reason=policy_generation_superseded" >> "$GITHUB_OUTPUT"
-              echo "::notice::Health policy $checked_out_sha does not match current main $current_sha; neutral."
+              echo "Health policy $checked_out_sha was superseded; live production is bound to current main $current_sha."
               exit 0
               ;;
             current) ;;

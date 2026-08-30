@@ -216,15 +216,29 @@ jobs:
             exit 1
           fi
 
+          production_controller_in_progress() {
+            gh api \
+              "repos/${{ github.repository }}/actions/workflows/production-controller.yml/runs?status=in_progress&per_page=1" \
+              --jq '.workflow_runs | length > 0'
+          }
+
           if [ -n "$EXISTING_PR" ]; then
             echo "Updated existing PR #$EXISTING_PR via force-push"
             # Re-apply native queue intent after the screenshot update.
             # The native auto-enroll controller owns authoritative admission.
+            if [ "$(production_controller_in_progress)" = "true" ]; then
+              echo "Production Controller is in progress; leaving screenshot PR outside the merge queue."
+              exit 0
+            fi
             gh pr edit --add-label "merge-queue" "$EXISTING_PR" || { echo "::error::Failed to add merge-queue label to $EXISTING_PR"; exit 1; }
           else
             PR_URL=$(gh pr create \
               --title "chore: update product screenshots" \
               --body "Auto-generated screenshot update triggered by ${GITHUB_SHA::8}.")
             # The label records intent; the native auto-enroll controller owns admission.
+            if [ "$(production_controller_in_progress)" = "true" ]; then
+              echo "Production Controller is in progress; leaving screenshot PR outside the merge queue."
+              exit 0
+            fi
             gh pr edit --add-label "merge-queue" "$PR_URL" || { echo "::error::Failed to add merge-queue label to $PR_URL"; exit 1; }
           fi
