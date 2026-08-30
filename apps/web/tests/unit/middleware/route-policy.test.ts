@@ -38,6 +38,11 @@ describe('route-policy (proxy-routing)', () => {
 
       expect(getPublicProfileCandidate('/playlists')).toBeNull();
       expect(isPublicProfileAudienceBlockCandidate('/playlists')).toBe(false);
+
+      expect(getPublicProfileCandidate('/cli')).toBeNull();
+      expect(isPublicProfileAudienceBlockCandidate('/cli')).toBe(false);
+      expect(getPublicProfileCandidate('/developers')).toBeNull();
+      expect(isPublicProfileAudienceBlockCandidate('/developers')).toBe(false);
     });
 
     it('returns null for other reserved APP_ROUTES and system segments', () => {

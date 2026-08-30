@@ -17,6 +17,7 @@ const RESERVED_FIRST_SEGMENTS = new Set([
   'blog',
   'brand',
   'changelog',
+  'cli',
   'demo',
   'download',
   'exp',
