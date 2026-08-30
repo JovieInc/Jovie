@@ -1,4 +1,4 @@
-name: CI Unit Fail-Fast Proof
+name: CI
 
 on:
   pull_request:
@@ -14,11 +14,6 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
-      run_unit_fail_fast_canary:
-        description: Deliberately fail one unit shard to prove sibling cancellation.
-        required: false
-        default: false
-        type: boolean
       run_runner_image_canary:
         description: Build and validate the candidate fixed-runner image.
         required: false
@@ -3444,7 +3439,7 @@ jobs:
       # The first failing shard is sufficient to reject an exact combined head.
       # Main and ordinary manual runs stay exhaustive for post-merge diagnosis.
       # PR Ready still runs with always() and requires exact matrix success.
-      fail-fast: ${{ github.event_name == 'merge_group' || (github.event_name == 'workflow_dispatch' && inputs.run_unit_fail_fast_canary == true) }}
+      fail-fast: ${{ github.event_name == 'merge_group' }}
       # Org hosted capacity ceiling ~120 concurrent jobs. Do not artificially
       # serialize unit shards — wall-clock merge latency is the bottleneck.
       max-parallel: 120
@@ -3502,25 +3497,6 @@ jobs:
         id: check_changes
         shell: bash
         run: echo "run_full_ci=true" >> "$GITHUB_OUTPUT"
-
-      - name: Run unit fail-fast proof canary
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_unit_fail_fast_canary == true }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ "${{ matrix.shard }}" == "1/10" ]]; then
-            sleep 30
-            mkdir -p apps/web
-            printf '%s\n' \
-              '<?xml version="1.0" encoding="UTF-8"?>' \
-              '<testsuites tests="1" failures="1"><testsuite name="unit-fail-fast-proof" tests="1" failures="1"><testcase name="deliberate-red"><failure message="deliberate fail-fast proof"/></testcase></testsuite></testsuites>' \
-              > apps/web/test-report.1-10.junit.xml
-            echo "::error::Deliberate unit fail-fast proof"
-            exit 86
-          fi
-          sleep 90
-          echo "::error::Unit fail-fast proof sibling was not cancelled"
-          exit 87
 
       # Skip remaining steps if no relevant changes
       - name: Skip notification
