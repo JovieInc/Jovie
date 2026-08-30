@@ -78,7 +78,10 @@ describe('ci-fast bounded parallel workflow', () => {
   it('skips forced typecheck on source PRs with no TypeScript graph files', () => {
     expect(CI_FAST_SOURCE).toContain('No TypeScript graph files changed');
     expect(CI_FAST_SOURCE).toContain('pnpm turbo typecheck --affected --force');
-    expect(CI_FAST_SOURCE).toContain('**/tsconfig*.json');
+    expect(CI_FAST_SOURCE).toContain('affectsJovieTypecheck');
+    expect(CI_FAST_SOURCE).toContain(
+      'files.some(file => affectsJovieTypecheck(file))'
+    );
   });
 
   it('preselects source-PR typecheck before dependency hydration', () => {

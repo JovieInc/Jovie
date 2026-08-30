@@ -27,7 +27,10 @@ import { spawnSync } from 'node:child_process';
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { classifyCiRepoLanes } from './lib/ci-repo-lanes.mjs';
+import {
+  affectsJovieTypecheck,
+  classifyCiRepoLanes,
+} from './lib/ci-repo-lanes.mjs';
 
 const REPO_ROOT = process.cwd();
 const selectedProductLanes = () =>
@@ -352,17 +355,8 @@ function runTypecheck() {
     };
   }
   if (event === 'pull_request') {
-    const files = changedFiles([
-      '**/*.ts',
-      '**/*.tsx',
-      '**/*.mts',
-      '**/*.cts',
-      '**/tsconfig*.json',
-      'turbo.json',
-      'package.json',
-      'pnpm-lock.yaml',
-    ]);
-    if (files && files.length === 0) {
+    const files = listAllChangedFiles();
+    if (files && !files.some(file => affectsJovieTypecheck(file))) {
       return {
         code: 0,
         output: 'No TypeScript graph files changed\n',

@@ -49,8 +49,11 @@ describe('JOV-5288 CI repo lanes', () => {
       'apps/web/app/page.tsx',
       'packages/ui/src/index.ts',
       'packages/ui/tsconfig.build.json',
+      'apps/web/package.json',
+      'packages/ui/package.json',
       'package.json',
       'pnpm-lock.yaml',
+      'pnpm-workspace.yaml',
       'turbo.json',
     ]) {
       expect(affectsJovieTypecheck(path), path).toBe(true);
@@ -60,7 +63,6 @@ describe('JOV-5288 CI repo lanes', () => {
       'apps/web/app/icon.png',
       'apps/web/app/globals.css',
       'scripts/hermes/gem-ops-hud.py',
-      'apps/eve-pilot/package.json',
     ]) {
       expect(affectsJovieTypecheck(path), path).toBe(false);
     }

@@ -143,6 +143,7 @@ const SHARED_ROOT_FILES = new Set([
 const TYPECHECK_ROOT_FILES = new Set([
   'package.json',
   'pnpm-lock.yaml',
+  'pnpm-workspace.yaml',
   'turbo.json',
 ]);
 
@@ -151,6 +152,7 @@ export function affectsJovieTypecheck(file) {
   const normalized = normalizeFile(file);
   if (!normalized) return false;
   if (TYPECHECK_ROOT_FILES.has(normalized)) return true;
+  if (normalized.endsWith('/package.json')) return true;
   if (/(?:^|\/)tsconfig[^/]*\.json$/i.test(normalized)) return true;
   return /\.(?:ts|tsx|mts|cts)$/i.test(normalized);
 }
