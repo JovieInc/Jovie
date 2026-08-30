@@ -29,6 +29,15 @@ describe('web-195 pitch source contract', () => {
     expect(component).toContain('data-pitch-demo-video');
   });
 
+  it('keeps exactly one primary-variant CTA on the screen', () => {
+    const component = read('components/features/pitch/InvestorBrief.tsx');
+    const primaries =
+      component.match(/<Button\b[^>]*variant='primary'[^>]*>/g) ?? [];
+
+    expect(primaries).toHaveLength(1);
+    expect(primaries[0]).toContain("size='md'");
+  });
+
   it('registers one deterministic story for the exact production component', () => {
     const story = read('components/features/pitch/InvestorBrief.stories.tsx');
 
