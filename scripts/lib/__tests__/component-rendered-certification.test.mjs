@@ -122,6 +122,7 @@ describe('rendered component certification', () => {
       diffBase: null,
       skipQuality: true,
       skipRatchet: true,
+      skipLiveStorybook: true,
       headSha: HEAD,
     });
     expect(report.ok).toBe(true);
@@ -153,6 +154,7 @@ describe('rendered component certification', () => {
       diffBase: null,
       skipQuality: true,
       skipRatchet: true,
+      skipLiveStorybook: true,
       headSha: HEAD,
       comparativeQualificationControls: [],
     });
