@@ -1,14 +1,17 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   CANONICAL_LIVE_STORIES,
@@ -23,8 +26,12 @@ import {
   validateCanonicalStoryInventory,
 } from '../../component-live-storybook-certification.mjs';
 import {
+  findOwnedPlaywrightBrowsers,
   isProcessGone,
   killProcessGroup,
+  planOwnedBrowserSignals,
+  reapStaleStorybookVitestLeases,
+  STORYBOOK_VITEST_OWNER_ARG,
   spawnProcessGroup,
   waitUntilProcessGone,
   withBoundedLifecycle,
@@ -40,6 +47,164 @@ const STORYBOOK_CONFIG = resolve(
   '../../../apps/web/.storybook/main.ts'
 );
 const REPO_ROOT = resolve(import.meta.dirname, '../../../');
+const LIFECYCLE_MODULE_URL = pathToFileURL(
+  resolve(import.meta.dirname, '../../component-live-storybook-lifecycle.mjs')
+).href;
+const LIFECYCLE_TEST_TIMEOUT_MS = 30_000;
+const ownedPids = [];
+const lifecycleIt = process.platform === 'win32' ? it.skip : it;
+
+async function waitFor(predicate, timeoutMs = 15_000) {
+  const started = Date.now();
+  while (!predicate()) {
+    if (Date.now() - started >= timeoutMs) {
+      throw new Error(`condition was not met within ${timeoutMs}ms`);
+    }
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
+}
+
+async function waitForExit(child, timeoutMs = 15_000) {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return { code: child.exitCode, signal: child.signalCode };
+  }
+  return new Promise((resolveExit, rejectExit) => {
+    const timer = setTimeout(() => {
+      rejectExit(
+        new Error(`child ${child.pid} did not exit within ${timeoutMs}ms`)
+      );
+    }, timeoutMs);
+    child.once('exit', (code, signal) => {
+      clearTimeout(timer);
+      resolveExit({ code, signal });
+    });
+  });
+}
+
+async function spawnLifecycleHarness(action, timeoutMs = 5_000) {
+  const dir = mkdtempSync(join(tmpdir(), 'storybook-vitest-owner-test-'));
+  temps.push(dir);
+  const readyFile = join(dir, 'ready.json');
+  const helperPidFile = join(dir, 'browser-helper.pid');
+  const helperSignalFile = join(dir, 'browser-helper-signals.log');
+  const browserExecutable = join(dir, 'chromium');
+  symlinkSync(process.execPath, browserExecutable);
+  const browserScript = `
+    const { spawn } = require('node:child_process');
+    const { writeFileSync } = require('node:fs');
+    const helper = spawn(
+      process.execPath,
+      [
+        '-e',
+        "const { appendFileSync } = require('node:fs'); process.on('SIGTERM', () => appendFileSync(process.argv[1], 'SIGTERM\\n')); appendFileSync(process.argv[1], 'READY\\n'); setInterval(() => {}, 1000)",
+        process.argv[2],
+      ],
+      { stdio: 'ignore' }
+    );
+    helper.unref();
+    writeFileSync(process.argv[1], String(helper.pid));
+    setInterval(() => {}, 1000);
+  `;
+  const script = `
+    import { spawn } from 'node:child_process';
+    import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+    import {
+      STORYBOOK_VITEST_OWNER_ARG,
+      startStorybookVitestLifecycle,
+    } from ${JSON.stringify(LIFECYCLE_MODULE_URL)};
+
+    const controller = ${JSON.stringify(action)} === 'controller-cancel'
+      ? spawn(process.execPath, ['-e', 'setTimeout(() => process.exit(0), 500)'], {
+          detached: true,
+          stdio: 'ignore',
+        })
+      : null;
+    controller?.unref();
+    const lifecycle = await startStorybookVitestLifecycle({
+      leaseDir: ${JSON.stringify(dir)},
+      runMode: true,
+      timeoutMs: ${timeoutMs},
+      controllerPids: controller ? [controller.pid] : undefined,
+    });
+    const duplicate = ${JSON.stringify(action)} === 'duplicate'
+      ? await startStorybookVitestLifecycle({
+          leaseDir: ${JSON.stringify(dir)},
+          token: lifecycle.token,
+          runMode: true,
+          timeoutMs: ${timeoutMs},
+        })
+      : null;
+    const browser = spawn(
+      ${JSON.stringify(browserExecutable)},
+      [
+        '-e',
+        ${JSON.stringify(browserScript)},
+        ${JSON.stringify(helperPidFile)},
+        ${JSON.stringify(helperSignalFile)},
+        '--',
+        STORYBOOK_VITEST_OWNER_ARG + lifecycle.token,
+        '--user-data-dir=' + lifecycle.tempRoot + '/playwright_chromiumdev_profile-fixture',
+      ],
+      { detached: true, stdio: 'ignore' }
+    );
+    browser.unref();
+    while (!existsSync(${JSON.stringify(helperPidFile)})) {
+      await new Promise(resolve => setTimeout(resolve, 25));
+    }
+    while (!existsSync(${JSON.stringify(helperSignalFile)})) {
+      await new Promise(resolve => setTimeout(resolve, 25));
+    }
+    const helperPid = Number(readFileSync(${JSON.stringify(helperPidFile)}, 'utf8'));
+    writeFileSync(
+      ${JSON.stringify(readyFile)},
+      JSON.stringify({
+        ownerPid: process.pid,
+        browserPid: browser.pid,
+        helperPid,
+        helperSignalFile: ${JSON.stringify(helperSignalFile)},
+        token: lifecycle.token,
+        tempRoot: lifecycle.tempRoot,
+        leasePath: lifecycle.leasePath,
+        duplicateTempRoot: duplicate?.tempRoot ?? null,
+      })
+    );
+
+    if (
+      ${JSON.stringify(action)} === 'success' ||
+      ${JSON.stringify(action)} === 'duplicate'
+    ) {
+      setTimeout(() => process.exit(0), 100);
+    } else if (${JSON.stringify(action)} === 'failure') {
+      setTimeout(() => { throw new Error('deliberate lifecycle failure'); }, 100);
+    } else {
+      setInterval(() => {}, 1000);
+    }
+  `;
+  const child = spawn(
+    process.execPath,
+    ['--input-type=module', '--eval', script],
+    {
+      cwd: REPO_ROOT,
+      stdio: 'ignore',
+    }
+  );
+  ownedPids.push(child.pid);
+  await waitFor(() => existsSync(readyFile));
+  const ready = JSON.parse(readFileSync(readyFile, 'utf8'));
+  ownedPids.push(ready.browserPid, ready.helperPid);
+  return { child, ready };
+}
+
+async function expectLifecycleArtifactsGone(ready) {
+  expect(await waitUntilProcessGone(ready.browserPid, 10_000)).toBe(true);
+  expect(await waitUntilProcessGone(ready.helperPid, 10_000)).toBe(true);
+  await waitFor(
+    () => !existsSync(ready.leasePath) && !existsSync(ready.tempRoot)
+  );
+  expect(existsSync(ready.leasePath)).toBe(false);
+  expect(existsSync(ready.tempRoot)).toBe(false);
+  expect(readFileSync(ready.helperSignalFile, 'utf8')).toContain('SIGTERM');
+}
 
 function readStorybookAddons(liveCertMarker) {
   const env = { ...process.env };
@@ -101,6 +266,9 @@ async function runAxeRunners(addons) {
 }
 
 afterEach(() => {
+  for (const pid of ownedPids.splice(0)) {
+    killProcessGroup({ pid }, 'SIGKILL');
+  }
   for (const dir of temps.splice(0)) {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -340,6 +508,247 @@ describe('live Storybook component certification', () => {
 });
 
 describe('live Storybook lifecycle', () => {
+  it('selects only the exact owned Playwright profile and never normal Chrome', () => {
+    const token = randomUUID();
+    const tempRoot = mkdtempSync(
+      join(tmpdir(), 'jovie-storybook-vitest-owned-')
+    );
+    temps.push(tempRoot);
+    const rows = [
+      {
+        pid: 100,
+        ppid: 1,
+        pgid: 100,
+        command:
+          '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --profile-directory=Default',
+      },
+      {
+        pid: 101,
+        ppid: 1,
+        pgid: 101,
+        command:
+          'chromium --user-data-dir=/tmp/playwright_chromiumdev_profile-other',
+      },
+      {
+        pid: 102,
+        ppid: 1,
+        pgid: 102,
+        command: `chromium ${STORYBOOK_VITEST_OWNER_ARG}${token}`,
+      },
+      {
+        pid: 103,
+        ppid: 1,
+        pgid: 103,
+        command: `chromium ${STORYBOOK_VITEST_OWNER_ARG}${token}-decoy --user-data-dir=${tempRoot}/playwright_chromiumdev_profile-decoy`,
+      },
+      {
+        pid: 104,
+        ppid: 1,
+        pgid: 104,
+        command: `node /tmp/chromium ${STORYBOOK_VITEST_OWNER_ARG}${token} --user-data-dir=${tempRoot}/playwright_chromiumdev_profile-node-decoy`,
+      },
+      {
+        pid: 105,
+        ppid: 1,
+        pgid: 105,
+        command: `chromium ${STORYBOOK_VITEST_OWNER_ARG}${token} --other=--user-data-dir=${tempRoot}/playwright_chromiumdev_profile-nested-decoy`,
+      },
+      {
+        pid: 106,
+        ppid: 1,
+        pgid: 106,
+        command: `chromium ${STORYBOOK_VITEST_OWNER_ARG}${token} --user-data-dir=${tempRoot}/playwright_chromiumdev_profile-owned`,
+      },
+    ];
+
+    expect(findOwnedPlaywrightBrowsers(rows, token, tempRoot)).toEqual([
+      rows[6],
+    ]);
+  });
+
+  it('fails closed on missing process data and never group-kills a reused leader', () => {
+    const token = randomUUID();
+    const tempRoot = mkdtempSync(
+      join(tmpdir(), 'jovie-storybook-vitest-plan-')
+    );
+    temps.push(tempRoot);
+    const leaderCommand = `chromium ${STORYBOOK_VITEST_OWNER_ARG}${token} --user-data-dir=${tempRoot}/playwright_chromiumdev_profile-plan`;
+    const helperCommand =
+      'chromium --type=renderer --field-trial-handle=owned-fixture';
+    const commandHash = command =>
+      createHash('sha256').update(command).digest('hex');
+    const group = {
+      leader: {
+        pid: 200,
+        pgid: 200,
+        startedAt: 'Sun Aug 30 15:00:00 2026',
+        commandHash: commandHash(leaderCommand),
+      },
+      members: [
+        {
+          pid: 200,
+          pgid: 200,
+          startedAt: 'Sun Aug 30 15:00:00 2026',
+          commandHash: commandHash(leaderCommand),
+        },
+        {
+          pid: 201,
+          pgid: 200,
+          startedAt: 'Sun Aug 30 15:00:00 2026',
+          commandHash: commandHash(helperCommand),
+        },
+      ],
+    };
+    const reusedRows = [
+      {
+        pid: 200,
+        pgid: 200,
+        startedAt: 'Sun Aug 30 15:00:00 2026',
+        command:
+          '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --profile-directory=Default',
+      },
+      {
+        pid: 201,
+        pgid: 200,
+        startedAt: 'Sun Aug 30 15:00:00 2026',
+        command: helperCommand,
+      },
+    ];
+
+    expect(planOwnedBrowserSignals([group], null, token, tempRoot)).toEqual({
+      ok: false,
+      groupPids: [],
+      individualPids: [],
+    });
+    expect(
+      planOwnedBrowserSignals([group], reusedRows, token, tempRoot)
+    ).toEqual({ ok: true, groupPids: [], individualPids: [201] });
+    expect(
+      planOwnedBrowserSignals(
+        [group],
+        [
+          {
+            pid: 200,
+            pgid: 200,
+            startedAt: 'Sun Aug 30 15:00:00 2026',
+            command: leaderCommand,
+          },
+          reusedRows[1],
+        ],
+        token,
+        tempRoot
+      )
+    ).toEqual({ ok: true, groupPids: [200], individualPids: [] });
+  });
+
+  lifecycleIt(
+    'reaps the owned browser group after a successful runner exit',
+    async () => {
+      const { child, ready } = await spawnLifecycleHarness('success');
+      expect((await waitForExit(child)).code).toBe(0);
+      await expectLifecycleArtifactsGone(ready);
+    },
+    LIFECYCLE_TEST_TIMEOUT_MS
+  );
+
+  lifecycleIt(
+    'deduplicates repeated global setup for the same owner token',
+    async () => {
+      const { child, ready } = await spawnLifecycleHarness('duplicate');
+      expect(ready.duplicateTempRoot).toBe(ready.tempRoot);
+      expect((await waitForExit(child)).code).toBe(0);
+      await expectLifecycleArtifactsGone(ready);
+    },
+    LIFECYCLE_TEST_TIMEOUT_MS
+  );
+
+  lifecycleIt(
+    'reaps the owned browser group after a failed runner exit',
+    async () => {
+      const { child, ready } = await spawnLifecycleHarness('failure');
+      expect((await waitForExit(child)).code).toBe(1);
+      await expectLifecycleArtifactsGone(ready);
+    },
+    LIFECYCLE_TEST_TIMEOUT_MS
+  );
+
+  lifecycleIt(
+    'reaps the owned browser group when the runner is cancelled',
+    async () => {
+      const { child, ready } = await spawnLifecycleHarness('controller-cancel');
+      const exit = await waitForExit(child);
+      expect(
+        exit.code === 143 ||
+          exit.signal === 'SIGTERM' ||
+          exit.signal === 'SIGKILL',
+        JSON.stringify(exit)
+      ).toBe(true);
+      await expectLifecycleArtifactsGone(ready);
+    },
+    LIFECYCLE_TEST_TIMEOUT_MS
+  );
+
+  lifecycleIt(
+    'preserves native SIGINT cancellation and reaps the browser group',
+    async () => {
+      const { child, ready } = await spawnLifecycleHarness('hang');
+      child.kill('SIGINT');
+      const exit = await waitForExit(child);
+      expect(
+        exit.code === 130 || exit.signal === 'SIGINT',
+        JSON.stringify(exit)
+      ).toBe(true);
+      await expectLifecycleArtifactsGone(ready);
+    },
+    LIFECYCLE_TEST_TIMEOUT_MS
+  );
+
+  lifecycleIt(
+    'bounds a hung runner and reaps its owned browser group on timeout',
+    async () => {
+      const { child, ready } = await spawnLifecycleHarness('hang', 250);
+      const exit = await waitForExit(child);
+      expect([143, null]).toContain(exit.code);
+      await expectLifecycleArtifactsGone(ready);
+    },
+    LIFECYCLE_TEST_TIMEOUT_MS
+  );
+
+  lifecycleIt(
+    'reaps a leaderless browser group from its persisted lease on restart',
+    async () => {
+      const { child, ready } = await spawnLifecycleHarness('hang', 30_000);
+      await waitFor(() => {
+        const lease = JSON.parse(readFileSync(ready.leasePath, 'utf8'));
+        return lease.browserGroups?.some(group =>
+          group.members.some(member => member.pid === ready.helperPid)
+        );
+      });
+      const lease = JSON.parse(readFileSync(ready.leasePath, 'utf8'));
+      expect(lease.watchdogPid).toBeGreaterThan(0);
+      expect(lease.watchdogStartedAt).toEqual(expect.any(String));
+      ownedPids.push(lease.watchdogPid);
+      killProcessGroup({ pid: lease.watchdogPid }, 'SIGKILL');
+      expect(await waitUntilProcessGone(lease.watchdogPid, 10_000)).toBe(true);
+
+      process.kill(ready.browserPid, 'SIGTERM');
+      expect(await waitUntilProcessGone(ready.browserPid, 10_000)).toBe(true);
+      expect(isProcessGone(ready.helperPid)).toBe(false);
+      child.kill('SIGKILL');
+      await waitForExit(child);
+
+      const result = await reapStaleStorybookVitestLeases({
+        leaseDir: dirname(ready.leasePath),
+      });
+
+      expect(result.reapedTokens).toContain(ready.token);
+      expect(await waitUntilProcessGone(ready.helperPid, 10_000)).toBe(true);
+      expect(existsSync(ready.tempRoot)).toBe(false);
+      expect(existsSync(ready.leasePath)).toBe(false);
+    },
+    LIFECYCLE_TEST_TIMEOUT_MS
+  );
+
   it('kills process groups and removes temp output on timeout', async () => {
     const child = spawnProcessGroup(
       process.execPath,
