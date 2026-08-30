@@ -88,25 +88,20 @@
   --linear-btn-accent-fg: oklch(100% 0 0);
   --linear-btn-accent-hover: #9a46ff;
   /* ============================================
-     ACCENT COLORS (mode-independent)
+     SEMANTIC ALIASES (accent colors)
+     Accent colors are now canonical --color-accent-* in design-system.css.
+     These --linear-* aliases remain for backward compatibility but point
+     to the canonical tokens (JOV-5460).
      ============================================ */
-  --linear-accent-gray: #7f7f85;
-  --linear-accent-blue: #2563ff;
-  --linear-accent-purple: #8b1eff;
-  --linear-accent-pink: #d61a7f;
-  --linear-accent-red: #f3122d;
-  --linear-accent-orange: #ff9800;
-  --linear-accent-green: #2f9e44;
-  --linear-accent-teal: #0f9b8e;
-  --linear-success: var(--linear-accent-green);
+  --linear-success: var(--color-accent-green);
   --linear-success-subtle: rgb(47 158 68 / 0.14);
-  --linear-warning: var(--linear-accent-orange);
+  --linear-warning: var(--color-accent-orange);
   --linear-warning-subtle: rgb(255 152 0 / 0.15);
-  --linear-error: var(--linear-accent-red);
+  --linear-error: var(--color-accent-red);
   --linear-error-subtle: rgb(243 18 45 / 0.14);
-  --linear-info: var(--linear-accent-blue);
+  --linear-info: var(--color-accent-blue);
   --linear-info-subtle: rgb(37 99 255 / 0.14);
-  --linear-accent: var(--linear-accent-purple);
+  --linear-accent: var(--color-accent-purple);
   /* ============================================
      HERO-SPECIFIC TOKENS
      Used by RedesignedHero for theme-aware gradients
