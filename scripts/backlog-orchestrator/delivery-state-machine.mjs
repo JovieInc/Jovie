@@ -27,6 +27,8 @@ import {
 
 export const DELIVERY_RECEIPT_SCHEMA = 'jovie-delivery-receipt/v1';
 export const REPAIR_TASK_SCHEMA = 'jovie-symphony-repair-task/v1';
+export const STACK_HEALTH_ACTION_SCHEMA = 'jovie-stack-health-action/v1';
+export const STACK_REPAIR_ACTION = 'split-or-retarget-draft-stack'; // JOV-INV-020
 export const DEFAULT_DELIVERY_STATE_DIR = resolve(
   process.env.GEM_WORKSPACE || '/home/timwhite/gem-workspace',
   'state/jovie-delivery-controller'
@@ -57,6 +59,10 @@ const AUTOMATED_FAILURES = Object.freeze({
   'missing-trigger': {
     owner: 'gem',
     action: 'restore-event-trigger-and-reconcile',
+  },
+  'draft-stack-policy': {
+    owner: 'symphony',
+    action: STACK_REPAIR_ACTION,
   },
   ...STALL_AUTOMATED_FAILURES,
 });
@@ -95,6 +101,132 @@ function exactSha(value) {
 
 function exactPositiveInteger(value) {
   return Number.isInteger(value) && value > 0 ? value : null;
+}
+
+function boundedStackHealthAction(action) {
+  if (!action || typeof action !== 'object' || Array.isArray(action)) {
+    throw new Error('stack health repair action must be an object');
+  }
+  if (action.schema !== STACK_HEALTH_ACTION_SCHEMA) {
+    throw new Error('stack health repair action schema is invalid');
+  }
+  if (action.action !== STACK_REPAIR_ACTION) {
+    throw new Error('stack health repair action is unsupported');
+  }
+  const taskKey = nonEmpty(action.taskKey);
+  if (!taskKey || !/^[0-9a-f]{64}$/i.test(taskKey)) {
+    throw new Error('stack health repair action requires a SHA-256 task key');
+  }
+  const deliveryKey = nonEmpty(action.deliveryKey);
+  if (!deliveryKey || deliveryKey.length > 160) {
+    throw new Error(
+      'stack health repair action requires a bounded delivery key'
+    );
+  }
+  if (action.owner !== 'symphony' || action.writer !== 'symphony') {
+    throw new Error('stack health repair action must remain Symphony-owned');
+  }
+  const rootPr = exactPositiveInteger(action.rootPr);
+  const rootHeadSha = exactSha(action.rootHeadSha);
+  if (!rootPr || !rootHeadSha) {
+    throw new Error(
+      'stack health repair action requires an exact root PR head SHA'
+    );
+  }
+  if (
+    !Array.isArray(action.prNumbers) ||
+    action.prNumbers.length === 0 ||
+    action.prNumbers.length > 100
+  ) {
+    throw new Error(
+      'stack health repair action PR members are malformed or unbounded'
+    );
+  }
+  const prNumbers = action.prNumbers.map(exactPositiveInteger);
+  if (
+    prNumbers.some(value => !value) ||
+    new Set(prNumbers).size !== prNumbers.length ||
+    !prNumbers.includes(rootPr)
+  ) {
+    throw new Error('stack health repair action PR members are invalid');
+  }
+  const maxDepth = exactPositiveInteger(action.maxDepth);
+  if (!maxDepth || maxDepth > 100) {
+    throw new Error('stack health repair action max depth is invalid');
+  }
+  if (
+    !Array.isArray(action.promotionPath) ||
+    action.promotionPath.length === 0 ||
+    action.promotionPath.length > 100
+  ) {
+    throw new Error(
+      'stack health repair action promotion path is malformed or unbounded'
+    );
+  }
+  const promotionPath = action.promotionPath.map((entry, index) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      throw new Error(
+        `stack health repair action promotion path ${index} is invalid`
+      );
+    }
+    const pr = exactPositiveInteger(entry.pr);
+    const base = nonEmpty(entry.base);
+    const head = nonEmpty(entry.head);
+    if (!pr || !base || !head || base.length > 255 || head.length > 255) {
+      throw new Error(
+        `stack health repair action promotion path ${index} is invalid`
+      );
+    }
+    return { pr, base, head };
+  });
+  if (!promotionPath.some(entry => entry.pr === rootPr)) {
+    throw new Error('stack health repair action promotion path omits root PR');
+  }
+  if (
+    !Array.isArray(action.violations) ||
+    action.violations.length === 0 ||
+    action.violations.length > 32 ||
+    action.violations.some(value => !nonEmpty(value) || value.length > 96)
+  ) {
+    throw new Error(
+      'stack health repair action violations are malformed or unbounded'
+    );
+  }
+  const issue = action.issue == null ? null : nonEmpty(action.issue);
+  if (action.issue != null && (!issue || issue.length > 80)) {
+    throw new Error('stack health repair action issue is malformed');
+  }
+  const integrator =
+    action.integrator == null ? null : nonEmpty(action.integrator);
+  const deadline = action.deadline == null ? null : nonEmpty(action.deadline);
+  if (action.integrator != null && (!integrator || integrator.length > 80)) {
+    throw new Error('stack health repair action integrator is malformed');
+  }
+  if (action.deadline != null && (!deadline || deadline.length > 80)) {
+    throw new Error('stack health repair action deadline is malformed');
+  }
+  const safety = nonEmpty(action.safety);
+  if (!safety || safety.length > 255) {
+    throw new Error('stack health repair action safety is malformed');
+  }
+  return {
+    schema: STACK_HEALTH_ACTION_SCHEMA,
+    taskKey,
+    deliveryKey,
+    action: STACK_REPAIR_ACTION,
+    owner: 'symphony',
+    writer: 'symphony',
+    issue,
+    rootPr,
+    rootHeadSha,
+    prNumbers,
+    maxDepth,
+    promotionPath,
+    integrator,
+    deadline,
+    violations: action.violations.map(value => nonEmpty(value)),
+    safety,
+  };
 }
 
 function failureRoute(failure, externalAction) {
@@ -277,6 +409,10 @@ export function receiptPath(stateDir, receipt) {
 export function repairTaskForReceipt(receipt) {
   if (receipt.stage !== 'repair-pending' || receipt.next.mode !== 'automated')
     return null;
+  const stackEvidence =
+    receipt.event.failure === 'draft-stack-policy'
+      ? boundedStackHealthAction(receipt.event.evidence)
+      : null;
   return {
     schema: REPAIR_TASK_SCHEMA,
     taskKey: digest({ receiptKey: receipt.receiptKey, route: receipt.next }),
@@ -290,7 +426,28 @@ export function repairTaskForReceipt(receipt) {
     headSha: receipt.event.headSha,
     failure: receipt.event.failure,
     safety: 'normal-pr-ci-review-native-queue-deploy-gates-remain-required',
+    ...(stackEvidence ? { evidence: stackEvidence } : {}),
   };
+}
+
+export function buildStackHealthReceipt(
+  action,
+  { now = new Date().toISOString() } = {}
+) {
+  const evidence = boundedStackHealthAction(action);
+  return buildDeliveryReceipt(
+    {
+      delivery_key: evidence.deliveryKey,
+      source: 'summer-closure-health',
+      event: 'draft-stack-policy',
+      failure: 'draft-stack-policy',
+      issue_identifier: evidence.issue,
+      pr_number: evidence.rootPr,
+      head_sha: evidence.rootHeadSha,
+      evidence,
+    },
+    { now }
+  );
 }
 
 async function atomicPersist(destination, value) {
@@ -350,6 +507,61 @@ export async function persistDeliveryOutcome(
     loop: persistedLoop.record,
     queue: persistedLoop.queue,
     queuePath: persistedLoop.queuePath,
+  };
+}
+
+export async function persistClosureHealthActions(
+  closureHealth,
+  {
+    stateDir = DEFAULT_DELIVERY_STATE_DIR,
+    dryRun = false,
+    now = new Date().toISOString(),
+  } = {}
+) {
+  const candidate = closureHealth?.signals?.closureHealth || closureHealth;
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+    throw new Error('closure health action source is missing or malformed');
+  }
+  const actions = candidate.repairActions;
+  if (!Array.isArray(actions) || actions.length > 100) {
+    throw new Error('closure health repair actions are missing or unbounded');
+  }
+  const boundedActions = actions.map(boundedStackHealthAction);
+  const observedAt = nonEmpty(candidate.observedAt) || now;
+  if (!Number.isFinite(Date.parse(observedAt))) {
+    throw new Error('closure health observedAt is invalid');
+  }
+  const roots = new Set();
+  for (const action of boundedActions) {
+    if (roots.has(action.rootPr)) {
+      throw new Error(`duplicate stack repair root: ${action.rootPr}`);
+    }
+    roots.add(action.rootPr);
+  }
+  const results = [];
+  for (const action of boundedActions) {
+    const receipt = buildStackHealthReceipt(action, { now: observedAt });
+    results.push(await persistDeliveryOutcome(receipt, { stateDir, dryRun }));
+  }
+  const statuses = results.map(result => result.status);
+  return {
+    schema: 'jovie-stack-health-action-ingress/v1',
+    observedAt,
+    actionCount: results.length,
+    status:
+      results.length === 0
+        ? 'none'
+        : statuses.every(status => status === 'duplicate')
+          ? 'duplicate'
+          : 'created',
+    actions: results.map(result => ({
+      status: result.status,
+      rootPr: result.receipt.event.pr,
+      task: result.task,
+      taskPath: result.taskPath,
+      receiptPath: result.receiptPath,
+      loop: result.loop,
+    })),
   };
 }
 
@@ -447,11 +659,27 @@ async function main() {
   const heartbeatFile = process.argv
     .find(arg => arg.startsWith('--heartbeat-file='))
     ?.slice('--heartbeat-file='.length);
+  const closureHealthFile = process.argv
+    .find(arg => arg.startsWith('--closure-health-file='))
+    ?.slice('--closure-health-file='.length);
   const reconcile = process.argv.includes('--reconcile');
-  if (!eventFile && !reconcile)
+  if (!eventFile && !reconcile && !closureHealthFile)
     throw new Error(
-      'usage: delivery-state-machine.mjs --event-file=<path> [--state-dir=<path>] [--dry-run]'
+      'usage: delivery-state-machine.mjs --event-file=<path> | --closure-health-file=<path> | --reconcile [--state-dir=<path>] [--dry-run]'
     );
+  if (
+    [eventFile, closureHealthFile].filter(Boolean).length > 1 ||
+    (reconcile && (eventFile || closureHealthFile))
+  ) {
+    throw new Error('delivery state machine accepts exactly one input mode');
+  }
+  if (closureHealthFile) {
+    const closureHealth = JSON.parse(await readFile(closureHealthFile, 'utf8'));
+    process.stdout.write(
+      `${JSON.stringify(await persistClosureHealthActions(closureHealth, { stateDir, dryRun: process.argv.includes('--dry-run') }))}\n`
+    );
+    return;
+  }
   let heartbeat = null;
   if (reconcile && heartbeatFile) {
     try {

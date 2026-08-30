@@ -1046,13 +1046,13 @@ html[data-profile-initial-mode]
   --color-row-selected: oklch(94.8% 0.006 282);
 
   /* Cross-cutting interaction state tokens (state-matrix.md) */
-  --color-link-default: var(--linear-accent-blue);
+  --color-link-default: var(--color-accent-blue);
   --color-link-hover: color-mix(
     in oklab,
-    var(--linear-accent-blue) 82%,
+    var(--color-accent-blue) 82%,
     var(--linear-text-primary)
   );
-  --color-link-visited: var(--linear-accent-purple);
+  --color-link-visited: var(--color-accent-purple);
   --state-disabled-opacity: 0.5;
   --state-partial-opacity: 0.62;
   --state-offline-bg: var(--color-warning-subtle);
@@ -1070,8 +1070,10 @@ html[data-profile-initial-mode]
     transparent
   );
 
-  /* Focus ring — Jovie/Linear keyboard focus token */
-  --color-focus-ring: var(--linear-border-focus);
+  /* Focus ring — Jovie/Linear keyboard focus token.
+     Light literal (identical to the legacy linear border-focus light value);
+     dark is fully overridden by the :root.dark Noir Ion mapping below. */
+  --color-focus-ring: rgba(0, 0, 0, 0.28);
   --focus-ring-width: 1px;
   --focus-ring-offset: 0px;
 

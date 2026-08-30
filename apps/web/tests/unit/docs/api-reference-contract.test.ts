@@ -42,7 +42,10 @@ describe('docs API reference contract', () => {
     expect(apiReference).toContain('Cache-Control: private, no-store');
     expect(apiReference).toContain('The `v1` public artist API is active');
     expect(apiReference).toContain(
-      'Link: <https://docs.jov.ie/docs/api-reference>; rel="deprecation"'
+      'Link: <https://jov.ie/api-versioning>; rel="deprecation"'
+    );
+    expect(apiReference).toContain(
+      'canonical versioning and deprecation policy](https://jov.ie/api-versioning)'
     );
     expect(apiReference).toContain('`x-jovie-versioning` extension');
     expect(apiReference).toContain(
