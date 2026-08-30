@@ -50,14 +50,14 @@ vi.mock('@/hooks/useMobileKeyboard', () => ({
   useMobileKeyboard: () => ({ isKeyboardVisible: keyboardVisible }),
 }));
 
+import { AuthLayout } from '@/components/features/auth/AuthLayout';
+
 describe('AuthLayout', () => {
   beforeEach(() => {
     keyboardVisible = false;
   });
 
   it('renders a skip link to a focusable main landmark', async () => {
-    const { AuthLayout } = await import('@/features/auth/AuthLayout');
-
     render(
       <AuthLayout formTitle='Sign In'>
         <div>Auth form body</div>
@@ -73,8 +73,6 @@ describe('AuthLayout', () => {
   });
 
   it('keeps the homepage logo link available when the logo is shown', async () => {
-    const { AuthLayout } = await import('@/features/auth/AuthLayout');
-
     render(
       <AuthLayout formTitle='Sign In'>
         <div>Auth form body</div>
@@ -89,8 +87,6 @@ describe('AuthLayout', () => {
   });
 
   it('keeps the footer prompt opt-in through the auth shell contract', async () => {
-    const { AuthLayout } = await import('@/features/auth/AuthLayout');
-
     render(
       <AuthLayout
         formTitle='Sign In'
@@ -111,8 +107,6 @@ describe('AuthLayout', () => {
   });
 
   it('renders the logout menu trigger only when enabled', async () => {
-    const { AuthLayout } = await import('@/features/auth/AuthLayout');
-
     const { rerender } = render(
       <AuthLayout formTitle='Sign In'>
         <div>Auth form body</div>
@@ -136,8 +130,6 @@ describe('AuthLayout', () => {
   });
 
   it('keeps the split auth rail mounted when the split layout variant is used', async () => {
-    const { AuthLayout } = await import('@/features/auth/AuthLayout');
-
     render(
       <AuthLayout formTitle='Sign In' layoutVariant='split'>
         <div>Auth form body</div>
@@ -148,8 +140,6 @@ describe('AuthLayout', () => {
   });
 
   it('keeps legal disclosure in document flow so it cannot overlay Need help', async () => {
-    const { AuthLayout } = await import('@/features/auth/AuthLayout');
-
     const { container } = render(
       <AuthLayout formTitle='Sign In' layoutVariant='split'>
         <p data-auth-legal-copy>Legal disclosure</p>
@@ -163,8 +153,6 @@ describe('AuthLayout', () => {
   });
 
   it('centers the 32px mark on splash-B chrome without film grain', async () => {
-    const { AuthLayout } = await import('@/features/auth/AuthLayout');
-
     const { container } = render(
       <AuthLayout formTitle='Sign In' chrome='splash-b'>
         <div>Auth form body</div>
@@ -181,8 +169,6 @@ describe('AuthLayout', () => {
 
   it('hides non-form chrome while the mobile keyboard is visible', async () => {
     keyboardVisible = true;
-    const { AuthLayout } = await import('@/features/auth/AuthLayout');
-
     render(
       <AuthLayout
         formTitle='Sign In'

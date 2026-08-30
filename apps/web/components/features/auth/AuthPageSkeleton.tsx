@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/auth/auth-page-skeleton.test.tsx
 import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { AuthLayout } from './AuthLayout';
 
