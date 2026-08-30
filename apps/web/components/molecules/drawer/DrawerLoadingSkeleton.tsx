@@ -108,7 +108,7 @@ export function DrawerLoadingSkeleton({
           </div>
         ) : null}
 
-        <div className='flex-1 space-y-2.5 overflow-hidden bg-(--color-bg-surface-0) px-3 py-2.5'>
+        <div className='flex-1 space-y-2.5 overflow-hidden bg-(--linear-bg-surface-0) px-3 py-2.5'>
           {contentRowIds.map((rowId, index) => (
             <div
               key={rowId}

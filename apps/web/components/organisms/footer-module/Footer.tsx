@@ -113,7 +113,7 @@ export function Footer({
       // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label needed for footer accessibility
       <footer
         className={className}
-        style={{ backgroundColor: 'var(--color-bg-footer)' }}
+        style={{ backgroundColor: 'var(--linear-bg-footer)' }}
         aria-label='Site Footer'
       >
         <div
@@ -212,7 +212,7 @@ export function Footer({
   return (
     <footer
       className={className}
-      style={{ backgroundColor: 'var(--color-bg-footer)' }}
+      style={{ backgroundColor: 'var(--linear-bg-footer)' }}
     >
       {/* Gradient separator — matches logo bar treatment */}
       <div

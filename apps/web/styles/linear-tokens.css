@@ -52,7 +52,17 @@
      BACKGROUNDS — LIGHT MODE
      Clean, warm off-whites inspired by Linear's light UI
      ============================================ */
+  --linear-bg-page: oklch(98.5% 0.002 282);
+  --linear-bg-header: oklch(98.5% 0.002 282 / 0.85);
+  --linear-bg-surface-0: oklch(100% 0 0);
+  /* Pure white — elevated surfaces (menus, popovers, cards) */
+  --linear-bg-surface-1: oklch(97% 0.002 282);
+  /* Item hover / secondary surface */
+  --linear-bg-surface-2: oklch(95% 0.003 282);
+  --linear-bg-button: oklch(92% 0.005 282);
+  --linear-bg-footer: oklch(98.5% 0.002 282);
   --linear-border-footer: oklch(90% 0.005 282);
+  --linear-bg-hover: rgba(0, 0, 0, 0.04);
   /* ============================================
      BORDERS — LIGHT MODE
      ============================================ */
@@ -88,15 +98,15 @@
   --linear-accent-orange: #ff9800;
   --linear-accent-green: #2f9e44;
   --linear-accent-teal: #0f9b8e;
-  --linear-success: var(--linear-accent-green);
+  --linear-success: #2f9e44;
   --linear-success-subtle: rgb(47 158 68 / 0.14);
-  --linear-warning: var(--linear-accent-orange);
+  --linear-warning: #ff9800;
   --linear-warning-subtle: rgb(255 152 0 / 0.15);
-  --linear-error: var(--linear-accent-red);
+  --linear-error: #f3122d;
   --linear-error-subtle: rgb(243 18 45 / 0.14);
-  --linear-info: var(--linear-accent-blue);
+  --linear-info: #2563ff;
   --linear-info-subtle: rgb(37 99 255 / 0.14);
-  --linear-accent: var(--linear-accent-purple);
+  --linear-accent: #8b1eff;
   /* ============================================
      HERO-SPECIFIC TOKENS
      Used by RedesignedHero for theme-aware gradients
@@ -234,7 +244,7 @@
   --linear-app-control-padding-x: 11px;
   --linear-app-control-radius: 9999px;
   --linear-app-toolbar-gap: 4px;
-  --linear-app-content-surface: var(--color-bg-surface-0);
+  --linear-app-content-surface: var(--linear-bg-surface-0);
   --linear-app-card-shadow: none;
   --linear-app-drawer-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.03), 0 14px 32px rgba(0, 0, 0, 0.05);
@@ -287,7 +297,7 @@
     transparent 65%
   );
   /* Pricing accent */
-  --linear-pricing-accent: var(--linear-accent);
+  --linear-pricing-accent: #8b1eff;
   --linear-pricing-accent-border: rgba(94, 106, 210, 0.4);
   --linear-pricing-accent-shadow: rgba(94, 106, 210, 0.15);
   /* Audience CRM section */
@@ -376,14 +386,22 @@
   --linear-text-quaternary: #7d879d;
   --linear-text-inverse: #020307;
   /* Backgrounds — Noir Ion stepped surfaces */
+  --linear-bg-page: #06080d;
   /* app canvas / sidebar base — the shell's recess is one continuous plane */
+  --linear-bg-header: transparent;
+  --linear-bg-surface-0: #06080d;
   /* shell / recessed wells */
+  --linear-bg-surface-1: #0f1420;
   /* card */
+  --linear-bg-surface-2: #151b2a;
   /* elevated */
   --linear-panel-bg: #0a0d16;
   /* panel */
   --linear-panel-ring: rgba(199, 237, 255, 0.26);
+  --linear-bg-button: #151b2a;
+  --linear-bg-footer: #030407;
   --linear-border-footer: rgba(168, 176, 195, 0.16);
+  --linear-bg-hover: rgba(168, 176, 195, 0.06);
   /* Borders — Noir Ion cool graphite */
   --linear-border-subtle: rgba(168, 176, 195, 0.1);
   --linear-border-default: rgba(168, 176, 195, 0.16);
@@ -459,9 +477,9 @@
   --linear-color-text-muted: var(--linear-text-secondary);
   --linear-color-text-subtle: var(--linear-text-tertiary);
   /* Semantic backgrounds */
-  --linear-color-bg: var(--color-bg-page);
-  --linear-color-bg-elevated: var(--color-bg-surface-0);
-  --linear-color-bg-card: var(--color-bg-surface-2);
+  --linear-color-bg: var(--linear-bg-page);
+  --linear-color-bg-elevated: var(--linear-bg-surface-0);
+  --linear-color-bg-card: var(--linear-bg-surface-2);
   /* Semantic borders */
   --linear-color-border: var(--linear-border-default);
   --linear-color-divider: var(--linear-border-subtle);

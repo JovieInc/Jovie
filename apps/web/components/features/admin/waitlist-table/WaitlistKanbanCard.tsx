@@ -45,7 +45,7 @@ export function WaitlistKanbanCard({
   return (
     <ContentSurfaceCard
       className={cn(
-        'bg-[color-mix(in_oklab,var(--color-bg-surface-0)_96%,transparent)] p-2.5',
+        'bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_96%,transparent)] p-2.5',
         'transition-[border-color,box-shadow,background-color] duration-subtle hover:border-default hover:bg-surface-0',
         'cursor-grab active:cursor-grabbing'
       )}

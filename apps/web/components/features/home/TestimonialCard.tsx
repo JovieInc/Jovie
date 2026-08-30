@@ -15,7 +15,7 @@ export function TestimonialCard({
     <div
       className='relative flex flex-col items-center rounded-xl p-8 text-center transition-colors duration-(--linear-duration-normal)'
       style={{
-        backgroundColor: 'var(--color-bg-surface-0)',
+        backgroundColor: 'var(--linear-bg-surface-0)',
         border: '1px solid var(--linear-border-subtle)',
         boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
       }}

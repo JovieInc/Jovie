@@ -2205,10 +2205,10 @@ function ShellV1ExperimentContent() {
         style={
           {
             // Live-editable palette tokens (controlled by the dev picker).
-            '--color-bg-page': palette.page,
-            '--color-bg-surface-0': palette.surface0,
-            '--color-bg-surface-1': palette.surface1,
-            '--color-bg-surface-2': palette.surface2,
+            '--linear-bg-page': palette.page,
+            '--linear-bg-surface-0': palette.surface0,
+            '--linear-bg-surface-1': palette.surface1,
+            '--linear-bg-surface-2': palette.surface2,
             '--linear-app-content-surface': palette.contentSurface,
             '--linear-app-shell-border': palette.border,
             '--linear-app-shell-radius': '12px',
@@ -2217,7 +2217,7 @@ function ShellV1ExperimentContent() {
             transition: `opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), transform var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), background-color var(--ds-motion-subtle-duration) ease-out`,
           } as React.CSSProperties
         }
-        className='shell-v1 flex h-dvh w-full overflow-hidden bg-(--color-bg-page) lg:gap-2 lg:p-2'
+        className='shell-v1 flex h-dvh w-full overflow-hidden bg-(--linear-bg-page) lg:gap-2 lg:p-2'
       >
         {/* Theme focus-visible globally inside this experiment so we never get
           the browser's royal-blue ring on any tabbable element. Cyan-300 at
@@ -2746,7 +2746,7 @@ function ShellV1ExperimentContent() {
           aria-hidden={
             hideNowPlaying || barCollapsed || cinematic || onboardingActive
           }
-          className='fixed inset-x-0 bottom-0 z-30 hidden lg:block overflow-hidden bg-(--color-bg-page)'
+          className='fixed inset-x-0 bottom-0 z-30 hidden lg:block overflow-hidden bg-(--linear-bg-page)'
           style={{
             maxHeight:
               hideNowPlaying || barCollapsed || cinematic || onboardingActive
@@ -5286,7 +5286,7 @@ function ReleaseDrawer({
       // dividing line between drawer and canvas, no shared border. The gap
       // around the cards is the visual separator. Page bg is darkest;
       // cards are contentSurface with a soft drop shadow.
-      className='hidden md:flex flex-col h-full overflow-hidden bg-(--color-bg-page)'
+      className='hidden md:flex flex-col h-full overflow-hidden bg-(--linear-bg-page)'
       style={{
         opacity: open ? 1 : 0,
         transform: open ? 'translateX(0)' : 'translateX(16px)',

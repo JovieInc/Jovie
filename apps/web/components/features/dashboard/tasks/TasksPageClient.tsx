@@ -488,7 +488,7 @@ const TaskMetaTrigger = forwardRef<
       type='button'
       aria-label={ariaLabel}
       className={cn(
-        '-mx-1 inline-flex min-w-0 items-center rounded-full px-1.5 py-1 text-secondary-token transition-[background-color,color] duration-subtle hover:bg-[color-mix(in_oklab,var(--color-bg-surface-1)_70%,transparent)] hover:text-primary-token data-[state=open]:bg-[color-mix(in_oklab,var(--color-bg-surface-1)_82%,transparent)] data-[state=open]:text-primary-token',
+        '-mx-1 inline-flex min-w-0 items-center rounded-full px-1.5 py-1 text-secondary-token transition-[background-color,color] duration-subtle hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,transparent)] hover:text-primary-token data-[state=open]:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,transparent)] data-[state=open]:text-primary-token',
         className
       )}
       {...props}

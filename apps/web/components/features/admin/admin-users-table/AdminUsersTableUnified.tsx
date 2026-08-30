@@ -98,7 +98,7 @@ function AdminUserMobileCard({
   return (
     <ContentSurfaceCard
       as='article'
-      className='overflow-hidden bg-[color-mix(in_oklab,var(--color-bg-surface-0)_96%,transparent)] p-0'
+      className='overflow-hidden bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_96%,transparent)] p-0'
     >
       <div className='flex items-start justify-between gap-3 px-3 py-2'>
         <label className='flex min-w-0 flex-1 cursor-pointer items-start gap-3'>

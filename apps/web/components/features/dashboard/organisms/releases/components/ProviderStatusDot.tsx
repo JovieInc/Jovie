@@ -81,7 +81,7 @@ function getProviderStatusConfig(
         label: PROVIDER_STATUS_LABELS.missing,
         icon: <Dot className='h-2.5 w-2.5' aria-hidden='true' />,
         className:
-          'border-subtle bg-[color-mix(in_oklab,var(--color-bg-surface-1)_82%,var(--color-bg-surface-0))] text-tertiary-token',
+          'border-subtle bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] text-tertiary-token',
       };
   }
 }

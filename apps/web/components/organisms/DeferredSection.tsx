@@ -67,7 +67,7 @@ export function DeferredSection({
           style={{
             minHeight: placeholderHeight,
             minWidth: placeholderWidth,
-            backgroundColor: 'var(--color-bg-surface-0)',
+            backgroundColor: 'var(--linear-bg-surface-0)',
             opacity: 0.4,
             borderRadius: 'var(--radius-lg)',
           }}

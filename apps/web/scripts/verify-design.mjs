@@ -6,10 +6,10 @@ import {
 } from './design-verify-output.mjs';
 
 const CARBON_PALETTE = {
-  '--color-bg-page': '#06070a',
-  '--color-bg-surface-0': '#0a0b0e',
-  '--color-bg-surface-1': '#101216',
-  '--color-bg-surface-2': '#161a20',
+  '--linear-bg-page': '#06070a',
+  '--linear-bg-surface-0': '#0a0b0e',
+  '--linear-bg-surface-1': '#101216',
+  '--linear-bg-surface-2': '#161a20',
   '--linear-app-content-surface': '#0a0c0f',
   '--linear-app-shell-border': '#171a20',
 };

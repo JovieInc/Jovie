@@ -54,9 +54,9 @@ describe('Noir Ion — approved dark anchors', () => {
   });
 
   it('maps shell canvas + sidebar to Noir Ion shell ladder', () => {
-    expect(dsDark).toContain('--color-bg-page: var(--noir-ion-canvas);');
+    expect(linearDark).toContain('--linear-bg-page: #06080d;');
     expect(linearDark).toContain('--linear-app-content-surface: #0a0d16;');
-    expect(dsDark).toContain('--color-bg-surface-1: var(--noir-ion-card);');
+    expect(linearDark).toContain('--linear-bg-surface-1: #0f1420;');
     expect(linearDark).toContain(
       '--linear-app-sidebar-background-rgb: 6 8 13;'
     );

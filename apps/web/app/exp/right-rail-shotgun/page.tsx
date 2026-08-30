@@ -35,7 +35,7 @@ import { cn } from '@/lib/utils';
 // Text token vars omitted: already defined by the global design-system.css
 // dark theme and picked up automatically. Only surface/border overrides here.
 const CARBON_VARS: React.CSSProperties = {
-  ['--color-bg-page' as string]: '#06070a',
+  ['--linear-bg-page' as string]: '#06070a',
   ['--linear-app-content-surface' as string]: '#0a0c0f',
   ['--linear-app-shell-border' as string]: '#171a20',
   ['--linear-app-shell-radius' as string]: '12px',
@@ -123,7 +123,7 @@ const release = {
 export default function RightRailShotgunPage() {
   return (
     <div
-      className='shotgun min-h-dvh w-full bg-(--color-bg-page) text-primary-token flex flex-col'
+      className='shotgun min-h-dvh w-full bg-(--linear-bg-page) text-primary-token flex flex-col'
       style={{
         ...CARBON_VARS,
         fontFamily:

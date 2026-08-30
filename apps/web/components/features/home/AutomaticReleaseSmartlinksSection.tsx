@@ -66,7 +66,7 @@ export function AutomaticReleaseSmartlinksSection() {
               <div
                 className='relative overflow-hidden rounded-t-xl md:rounded-t-2xl rounded-b-none flex-1 min-w-0'
                 style={{
-                  backgroundColor: 'var(--color-bg-surface-0)',
+                  backgroundColor: 'var(--linear-bg-surface-0)',
                   boxShadow: [
                     'var(--linear-panel-ring) 0px 0px 0px 1px inset',
                     '0 8px 40px rgba(0,0,0,0.35)',
@@ -122,7 +122,7 @@ export function AutomaticReleaseSmartlinksSection() {
                     className='pointer-events-none absolute inset-x-0 bottom-0 h-32 z-[2]'
                     style={{
                       background:
-                        'linear-gradient(to top, var(--color-bg-surface-0), transparent)',
+                        'linear-gradient(to top, var(--linear-bg-surface-0), transparent)',
                     }}
                   />
                 </div>
@@ -132,7 +132,7 @@ export function AutomaticReleaseSmartlinksSection() {
               <div
                 className='hidden md:flex flex-col w-68 shrink-0 overflow-hidden rounded-t-2xl rounded-b-none'
                 style={{
-                  backgroundColor: 'var(--color-bg-surface-0)',
+                  backgroundColor: 'var(--linear-bg-surface-0)',
                   color: 'var(--linear-text-primary)',
                   boxShadow: [
                     'var(--linear-panel-ring) 0px 0px 0px 1px inset',

@@ -35,9 +35,9 @@ export const mobileReleaseTokens = {
       'flex w-16 flex-col items-center justify-center gap-1 text-white dark:text-white transition-colors',
     // ui-casing-allow: tailwind class documentation string
     label: 'Text-3xs Font-caption Tracking-normal',
-    edit: 'bg-[color-mix(in_oklab,var(--color-bg-surface-1)_72%,var(--linear-accent))] active:bg-[color-mix(in_oklab,var(--color-bg-surface-1)_60%,var(--linear-accent))]',
-    link: 'bg-[color-mix(in_oklab,var(--color-bg-surface-1)_70%,var(--linear-info))] active:bg-[color-mix(in_oklab,var(--color-bg-surface-1)_58%,var(--linear-info))]',
+    edit: 'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_72%,var(--linear-accent))] active:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,var(--linear-accent))]',
+    link: 'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,var(--linear-info))] active:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_58%,var(--linear-info))]',
     locked:
-      'bg-[color-mix(in_oklab,var(--color-bg-surface-1)_82%,var(--linear-accent-gray))] opacity-75',
+      'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-accent-gray))] opacity-75',
   },
 } as const;

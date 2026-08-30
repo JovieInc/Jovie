@@ -62,7 +62,7 @@ export const AppShellFrame = memo(function AppShellFrame({
       data-app-shell-frame='true'
       data-composer-focus={composerFocusActive ? 'true' : undefined}
       className={cn(
-        'relative flex h-full w-full flex-col overflow-hidden bg-(--color-bg-page)',
+        'relative flex h-full w-full flex-col overflow-hidden bg-(--linear-bg-page)',
         /* PWA safe area: pad top for notch/Dynamic Island in standalone mode (mobile only) */
         'max-lg:pt-[env(safe-area-inset-top)]',
         containerClassName

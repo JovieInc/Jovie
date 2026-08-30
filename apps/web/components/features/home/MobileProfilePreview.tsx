@@ -62,7 +62,7 @@ export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
           className='flex w-full items-center justify-center gap-2.5 rounded-xl py-4 text-mid font-semibold'
           style={{
             backgroundColor: 'var(--linear-text-primary)',
-            color: 'var(--color-bg-page)',
+            color: 'var(--linear-bg-page)',
           }}
         >
           <Bell className='h-5 w-5' aria-hidden='true' />

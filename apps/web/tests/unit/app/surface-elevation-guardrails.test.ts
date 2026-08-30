@@ -57,13 +57,13 @@ describe('surface elevation guardrails', () => {
     );
 
     expect(designSystem).toMatch(
-      /:root\.dark[\s\S]*--color-bg-surface-1:\s*var\(--noir-ion-card\);/
+      /:root\.dark[\s\S]*--color-bg-surface-1:\s*var\(--linear-bg-surface-1\);/
     );
     expect(designSystem).toMatch(
       /:root\.dark[\s\S]*--sidebar-background:\s*var\(--linear-app-sidebar-background-rgb\);/
     );
-    expect(designSystem).toMatch(
-      /:root\.dark[\s\S]*--color-bg-page:\s*var\(--noir-ion-canvas\);/
+    expect(linearTokens).toMatch(
+      /:root\.dark[\s\S]*--linear-bg-page:\s*#06080d;/
     );
     expect(linearTokens).toMatch(
       /:root\.dark[\s\S]*--linear-app-sidebar-background-rgb:\s*6 8 13;/
@@ -86,7 +86,7 @@ describe('surface elevation guardrails', () => {
     );
     expect(designSystem).toContain('--focus-ring-width: 1px;');
     expect(designSystem).toMatch(
-      /:where\(:focus-visible\)\s*{[\s\S]*box-shadow:[\s\S]*0 0 0 2px var\(--color-bg-page\)[\s\S]*0 0 0 4px color-mix\(in oklab, var\(--linear-border-focus\) 55%/
+      /:where\(:focus-visible\)\s*{[\s\S]*box-shadow:[\s\S]*0 0 0 2px var\(--linear-bg-page\)[\s\S]*0 0 0 4px color-mix\(in oklab, var\(--linear-border-focus\) 55%/
     );
     expect(designSystem).toMatch(
       /:where\([\s\S]*input,[\s\S]*textarea,[\s\S]*\[role="textbox"\][\s\S]*\):focus\s*{[\s\S]*outline:\s*none;/

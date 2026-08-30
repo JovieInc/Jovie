@@ -51,7 +51,7 @@ export const LIBRARY_DEMO_NOW_MS = new Date(
 // Text tokens are omitted here: they are already defined in the global
 // design-system.css and picked up automatically via the dark theme.
 const CARBON_VARS: React.CSSProperties = {
-  ['--color-bg-page' as string]: '#06070a',
+  ['--linear-bg-page' as string]: '#06070a',
   ['--linear-app-content-surface' as string]: '#0a0c0f',
   ['--linear-app-shell-border' as string]: '#171a20',
   ['--linear-app-shell-radius' as string]: '12px',
@@ -705,7 +705,7 @@ export default function LibraryV1Page() {
 
   return (
     <div
-      className='h-full w-full grid bg-(--color-bg-page) text-primary-token'
+      className='h-full w-full grid bg-(--linear-bg-page) text-primary-token'
       style={{
         ...CARBON_VARS,
         gridTemplateColumns: '220px 1fr',
@@ -1134,7 +1134,7 @@ function TopBar({
   count: number;
 }) {
   return (
-    <header className='shrink-0 h-12 px-4 flex items-center gap-3 border-b border-(--linear-app-shell-border) bg-(--color-bg-page)/95 backdrop-blur-xl'>
+    <header className='shrink-0 h-12 px-4 flex items-center gap-3 border-b border-(--linear-app-shell-border) bg-(--linear-bg-page)/95 backdrop-blur-xl'>
       <h1
         className='text-sm font-semibold text-primary-token'
         style={{ letterSpacing: '-0.01em' }}
@@ -1483,7 +1483,7 @@ export function Table({
   return (
     <div className='px-2 py-2'>
       <div
-        className='grid items-center px-2 py-1.5 text-3xs uppercase tracking-[0.06em] text-quaternary-token border-b border-(--linear-app-shell-border) sticky top-0 bg-(--color-bg-page)/95 backdrop-blur z-10'
+        className='grid items-center px-2 py-1.5 text-3xs uppercase tracking-[0.06em] text-quaternary-token border-b border-(--linear-app-shell-border) sticky top-0 bg-(--linear-bg-page)/95 backdrop-blur z-10'
         style={{
           gridTemplateColumns: '32px 48px 1fr 100px 80px 1fr 100px 110px 28px',
         }}

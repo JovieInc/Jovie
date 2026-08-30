@@ -18,7 +18,7 @@ export function PhoneFrame({ children, className }: PhoneFrameProps) {
         className='relative h-full w-full overflow-hidden rounded-[2rem] p-px'
         style={{
           backgroundColor:
-            'color-mix(in oklab, var(--color-bg-surface-1) 92%, var(--color-bg-page))',
+            'color-mix(in oklab, var(--linear-bg-surface-1) 92%, var(--linear-bg-page))',
           boxShadow: [
             '0 0 0 1px var(--linear-border-default)',
             '0 0 0 3px rgba(255,255,255,0.015)',

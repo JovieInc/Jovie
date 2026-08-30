@@ -25,7 +25,7 @@ export function DashboardMockup({
       className='relative overflow-hidden rounded-[0.95rem] md:rounded-xl'
       style={{
         border: '1px solid var(--linear-border-subtle)',
-        backgroundColor: 'var(--color-bg-surface-0)',
+        backgroundColor: 'var(--linear-bg-surface-0)',
         boxShadow: isHero
           ? [
               '0 0 0 1px rgba(255,255,255,0.03)',

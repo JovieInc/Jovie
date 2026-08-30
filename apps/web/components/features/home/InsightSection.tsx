@@ -5,7 +5,7 @@ export function InsightSection() {
     <section
       className='section-spacing-linear'
       style={{
-        backgroundColor: 'var(--color-bg-page)',
+        backgroundColor: 'var(--linear-bg-page)',
         borderTop: '1px solid var(--linear-border-subtle)',
       }}
     >

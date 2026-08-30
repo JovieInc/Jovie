@@ -549,7 +549,7 @@ export function HeaderNav({
         backgroundColor:
           presentation === 'homepage-embedded' || isMarketingGlass
             ? 'transparent'
-            : 'var(--color-bg-header)',
+            : 'var(--linear-bg-header)',
         zIndex: 100,
         backdropFilter:
           presentation === 'homepage-embedded' || isMarketingGlass

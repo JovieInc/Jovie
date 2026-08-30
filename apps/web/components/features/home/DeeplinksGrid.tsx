@@ -166,7 +166,7 @@ function MobileCard({ mode }: { readonly mode: ModeData }) {
     <div
       className='rounded-xl px-6 py-6'
       style={{
-        backgroundColor: 'var(--color-bg-hover)',
+        backgroundColor: 'var(--linear-bg-hover)',
         border: '1px solid var(--linear-border-subtle)',
       }}
     >
@@ -305,7 +305,7 @@ export function DeeplinksGrid() {
                               : 'var(--linear-border-subtle)',
                           backgroundColor:
                             i === activeIndex
-                              ? 'var(--color-bg-hover)'
+                              ? 'var(--linear-bg-hover)'
                               : 'transparent',
                           color:
                             i === activeIndex

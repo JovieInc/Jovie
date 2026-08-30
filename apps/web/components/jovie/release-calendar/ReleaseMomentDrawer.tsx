@@ -49,7 +49,7 @@ export function ReleaseMomentDrawer({
         >
           <SheetHeader>
             <div className='flex items-center gap-2'>
-              <span className='rounded-full border border-(--linear-border-subtle) bg-(--color-bg-surface-1) px-2 py-0.5 text-3xs font-semibold uppercase tracking-wide text-(--linear-text-secondary)'>
+              <span className='rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2 py-0.5 text-3xs font-semibold uppercase tracking-wide text-(--linear-text-secondary)'>
                 {MOMENT_LABEL[moment.momentType]}
               </span>
               <span className='text-xs text-(--linear-text-tertiary)'>
@@ -73,7 +73,7 @@ export function ReleaseMomentDrawer({
                     key={slug}
                     data-testid={`release-moment-workflow-task-${slug}`}
                     data-relative-days={task.relativeDays}
-                    className='flex items-start justify-between gap-2 rounded-md border border-(--linear-border-subtle) bg-(--color-bg-surface-1) px-3 py-2'
+                    className='flex items-start justify-between gap-2 rounded-md border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-2'
                   >
                     <div className='flex flex-col gap-0.5'>
                       <span className='text-sm text-(--linear-text-primary)'>
@@ -96,7 +96,7 @@ export function ReleaseMomentDrawer({
 
           <SheetClose
             data-testid='release-moment-drawer-close'
-            className='self-end rounded-md border border-(--linear-border-subtle) bg-(--color-bg-surface-1) px-3 py-1.5 text-sm text-(--linear-text-primary) hover:bg-(--color-bg-surface-2)'
+            className='self-end rounded-md border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-1.5 text-sm text-(--linear-text-primary) hover:bg-(--linear-bg-surface-2)'
           >
             Close
           </SheetClose>
@@ -111,7 +111,7 @@ function FanNotificationPreview({ moment }: { readonly moment: DemoMoment }) {
   return (
     <section
       data-testid='fan-notification-preview'
-      className='flex flex-col gap-1.5 rounded-md border border-(--linear-border-subtle) bg-(--color-bg-surface-1) px-3 py-3'
+      className='flex flex-col gap-1.5 rounded-md border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-3'
     >
       <div className='flex items-center justify-between'>
         <h3 className='text-xs font-semibold uppercase tracking-wide text-(--linear-text-secondary)'>

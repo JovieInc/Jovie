@@ -174,7 +174,7 @@ export function HeroCinematic({
             className='rounded-full px-3 py-1 text-2xs font-mono tracking-tighter transition-colors duration-slower'
             style={{
               backgroundColor:
-                i === 0 ? 'var(--color-bg-surface-2)' : 'transparent',
+                i === 0 ? 'var(--linear-bg-surface-2)' : 'transparent',
               color:
                 i === 0
                   ? 'var(--linear-text-primary)'

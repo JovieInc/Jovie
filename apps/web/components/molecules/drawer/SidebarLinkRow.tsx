@@ -109,7 +109,7 @@ export function SidebarLinkRow({
         disabled={!hasUrl}
         className={cn(
           SWIPE_ACTION_BUTTON_CLASS,
-          'h-auto w-auto rounded-none bg-[color-mix(in_oklab,var(--color-bg-surface-1)_70%,#3182ce)]'
+          'h-auto w-auto rounded-none bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,#3182ce)]'
         )}
         aria-label={copied ? 'Copied!' : `Copy ${label} link`}
       >
@@ -125,7 +125,7 @@ export function SidebarLinkRow({
         disabled={!hasUrl}
         className={cn(
           SWIPE_ACTION_BUTTON_CLASS,
-          'h-auto w-auto rounded-none bg-[color-mix(in_oklab,var(--color-bg-surface-1)_82%,var(--color-bg-surface-0))] text-primary-token'
+          'h-auto w-auto rounded-none bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] text-primary-token'
         )}
         aria-label={`Open ${label}`}
       >
@@ -140,7 +140,7 @@ export function SidebarLinkRow({
           disabled={isRemoving}
           className={cn(
             SWIPE_ACTION_BUTTON_CLASS,
-            'h-auto w-auto rounded-none bg-[color-mix(in_oklab,var(--color-bg-surface-1)_70%,#c43d4b)] disabled:opacity-50'
+            'h-auto w-auto rounded-none bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,#c43d4b)] disabled:opacity-50'
           )}
           aria-label={`Remove ${label}`}
         >

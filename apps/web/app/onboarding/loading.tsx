@@ -62,8 +62,8 @@ export default function OnboardingLoading() {
             </p>
           </div>
 
-          <div className='w-full rounded-xl border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--color-bg-surface-0))] p-4 sm:p-5'>
-            <div className='flex w-full items-center gap-3 rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,var(--color-bg-surface-0))] px-4 py-3'>
+          <div className='w-full rounded-xl border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] p-4 sm:p-5'>
+            <div className='flex w-full items-center gap-3 rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,var(--linear-bg-surface-0))] px-4 py-3'>
               <span className='text-app text-tertiary-token'>@</span>
               <div className='h-2 flex-1 rounded-full bg-[color-mix(in_oklab,var(--linear-app-frame-seam)_76%,transparent)]' />
             </div>

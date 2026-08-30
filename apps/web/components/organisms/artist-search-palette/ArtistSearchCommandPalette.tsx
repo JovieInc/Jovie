@@ -285,7 +285,7 @@ export function ArtistSearchCommandPalette({
                 {SKELETON_KEYS.map((key, index) => (
                   <div
                     key={key}
-                    className='flex items-center gap-3 rounded-xl border border-(--app-shell-frame-seam) bg-[color-mix(in_oklab,var(--color-bg-surface-1)_88%,var(--color-bg-surface-0))] px-4 py-2.5'
+                    className='flex items-center gap-3 rounded-xl border border-(--app-shell-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_88%,var(--linear-bg-surface-0))] px-4 py-2.5'
                   >
                     <div className='w-10 h-10 rounded-full skeleton shrink-0' />
                     <div className='flex-1 space-y-1.5'>

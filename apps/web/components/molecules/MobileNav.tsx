@@ -38,7 +38,7 @@ const OVERLAY_STYLE: CSSProperties = {
 
 const NAV_PANEL_STYLE: CSSProperties = {
   backgroundColor:
-    'color-mix(in oklab, var(--color-bg-surface-0) 95%, white 5%)',
+    'color-mix(in oklab, var(--linear-bg-surface-0) 95%, white 5%)',
   borderTop:
     '1px solid color-mix(in oklab, var(--linear-border-subtle) 85%, white 15%)',
   boxShadow:
@@ -178,7 +178,7 @@ export function MobileNav({
           'text-primary-token',
           'transition-colors duration-subtle ease-subtle',
           '[-webkit-tap-highlight-color:transparent]',
-          'hover:bg-(--color-bg-hover)',
+          'hover:bg-(--linear-bg-hover)',
           'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--linear-accent)'
         )}
         aria-label={isOpen ? 'Close menu' : 'Open menu'}
@@ -240,7 +240,7 @@ export function MobileNav({
                       'text-base font-medium',
                       'text-primary-token',
                       'transition-colors duration-subtle ease-subtle',
-                      'hover:bg-(--color-bg-hover)',
+                      'hover:bg-(--linear-bg-hover)',
                       'animate-[mobile-nav-item-in_400ms_ease-out_both]'
                     )}
                     style={{

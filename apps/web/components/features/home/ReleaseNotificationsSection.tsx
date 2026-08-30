@@ -65,7 +65,7 @@ export function ReleaseNotificationsSection() {
                 className='mt-8 flex items-center gap-3 rounded-xl px-5 py-4 w-fit'
                 style={{
                   border: '1px solid var(--linear-border-subtle)',
-                  backgroundColor: 'var(--color-bg-surface-0)',
+                  backgroundColor: 'var(--linear-bg-surface-0)',
                 }}
               >
                 <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
@@ -91,7 +91,7 @@ export function ReleaseNotificationsSection() {
                 className='relative grid grid-cols-[1fr_auto_1fr] gap-0 overflow-hidden rounded-xl md:rounded-2xl'
                 style={{
                   border: '1px solid var(--linear-border-subtle)',
-                  backgroundColor: 'var(--color-bg-surface-0)',
+                  backgroundColor: 'var(--linear-bg-surface-0)',
                   boxShadow: 'var(--linear-shadow-card-elevated)',
                 }}
               >
@@ -153,7 +153,7 @@ export function ReleaseNotificationsSection() {
                   <div
                     className='relative overflow-hidden rounded-xl'
                     style={{
-                      backgroundColor: 'var(--color-bg-surface-1)',
+                      backgroundColor: 'var(--linear-bg-surface-1)',
                       border: '1px solid var(--linear-border-subtle)',
                     }}
                   >

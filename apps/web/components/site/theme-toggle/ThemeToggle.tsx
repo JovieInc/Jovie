@@ -103,7 +103,7 @@ export function ThemeToggle({
 
   const iconButtonStyle = isLinear
     ? {
-        backgroundColor: 'var(--color-bg-button)',
+        backgroundColor: 'var(--linear-bg-button)',
         border: '1px solid var(--linear-border-subtle)',
         color: 'var(--linear-text-tertiary)',
       }

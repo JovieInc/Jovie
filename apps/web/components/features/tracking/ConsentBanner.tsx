@@ -92,7 +92,7 @@ export function ConsentBanner({ className }: ConsentBannerProps) {
       )}
       style={{
         backgroundColor:
-          'color-mix(in oklch, var(--color-bg-surface-0) 95%, transparent)',
+          'color-mix(in oklch, var(--linear-bg-surface-0) 95%, transparent)',
         borderTop: '1px solid var(--linear-border-subtle)',
         boxShadow: 'var(--linear-shadow-card)',
       }}

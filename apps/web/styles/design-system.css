@@ -842,10 +842,6 @@ html[data-profile-initial-mode]
 
   --color-bg-page: #f5f5f5;
   /* Same as base */
-  --color-bg-header: oklch(98.5% 0.002 282 / 0.85);
-  /* Sticky header surface — semi-transparent page tone for blur-through */
-  --color-bg-footer: oklch(98.5% 0.002 282);
-  /* Footer surface — matches page base */
   --color-bg-hover: rgba(0, 0, 0, 0.04);
   /* Hover overlay */
   --color-bg-elevated: #f2f3f5;
@@ -1044,13 +1040,13 @@ html[data-profile-initial-mode]
   --color-row-selected: oklch(94.8% 0.006 282);
 
   /* Cross-cutting interaction state tokens (state-matrix.md) */
-  --color-link-default: var(--linear-accent-blue);
+  --color-link-default: var(--color-accent-blue);
   --color-link-hover: color-mix(
     in oklab,
-    var(--linear-accent-blue) 82%,
+    var(--color-accent-blue) 82%,
     var(--linear-text-primary)
   );
-  --color-link-visited: var(--linear-accent-purple);
+  --color-link-visited: var(--color-accent-purple);
   --state-disabled-opacity: 0.5;
   --state-partial-opacity: 0.62;
   --state-offline-bg: var(--color-warning-subtle);
@@ -1131,7 +1127,7 @@ html[data-profile-initial-mode]
   /* app canvas */
   --color-bg-surface-0: var(--noir-ion-shell);
   /* recessed wells / shell-adjacent */
-  --color-bg-surface-1: var(--noir-ion-card);
+  --color-bg-surface-1: var(--linear-bg-surface-1);
   /* Shared card surface (maps to --noir-ion-card via linear tokens) */
   --color-bg-surface-2: var(--noir-ion-elevated);
   /* elevated / inputs */
@@ -1140,10 +1136,6 @@ html[data-profile-initial-mode]
 
   /* Additional dark surface levels */
   --color-bg-page: var(--noir-ion-canvas);
-  --color-bg-header: transparent;
-  /* Sticky header — transparent so canvas shows through the blur layer */
-  --color-bg-footer: #030407;
-  /* Footer — deeper than canvas for visual grounding */
   --color-bg-hover: rgba(168, 176, 195, 0.06);
   /* Row/item hover — graphite, not pure white */
   --color-bg-elevated: var(--noir-ion-panel);
@@ -2232,7 +2224,7 @@ html:not(.dark) .smart-link-powered-by {
    Design-system consistent recipe used across shell/chrome (smallwin + a11y polish):
      focus-visible:outline-none
      focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55
-     focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-page)
+     focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)
    Box-shadow equivalent ensures global application to any :focus-visible without
    explicit treatment. :where() keeps specificity at 0 so component-level overrides
    (stronger CTA rings, public-action-*, Clerk, surface-specific offsets, input borders)
@@ -2243,7 +2235,7 @@ html:not(.dark) .smart-link-powered-by {
 :where(:focus-visible) {
   outline: none;
   box-shadow:
-    0 0 0 2px var(--color-bg-page),
+    0 0 0 2px var(--linear-bg-page),
     0 0 0 4px color-mix(in oklab, var(--linear-border-focus) 55%, transparent);
   transition:
     box-shadow 150ms cubic-bezier(0.32, 0.72, 0, 1),

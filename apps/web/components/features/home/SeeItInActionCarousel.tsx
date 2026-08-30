@@ -210,7 +210,7 @@ function ReleaseCard({
             }}
             className='group flex w-full flex-col rounded-xl p-6 text-left no-underline transition-colors duration-(--linear-duration-normal) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-text-secondary)'
             style={{
-              backgroundColor: 'var(--color-bg-surface-0)',
+              backgroundColor: 'var(--linear-bg-surface-0)',
               border: '1px solid var(--linear-border-subtle)',
               boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
             }}
@@ -332,7 +332,7 @@ export function SeeItInActionCarousel({
             <div
               className='rounded-xl p-6'
               style={{
-                backgroundColor: 'var(--color-bg-surface-0)',
+                backgroundColor: 'var(--linear-bg-surface-0)',
                 border: '1px solid var(--linear-border-subtle)',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
               }}

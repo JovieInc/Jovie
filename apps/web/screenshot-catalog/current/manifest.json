@@ -127,8 +127,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-28T22:37:18.305Z",
-    "gitSha": "44a0329aa174a7a4f01381fb50e1e1da3e386273",
+    "capturedAt": "2026-08-30T14:25:22.971Z",
+    "gitSha": "ec9a2125f10a5699d16a07c0587264865a0f70c5",
     "imagePath": "artist-profile-adaptive-section-desktop.png"
   },
   {
@@ -218,8 +218,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-30T12:18:10.109Z",
-    "gitSha": "dfd7cbd3fe38e35533ada85bb943d45f5ed0f4b2",
+    "capturedAt": "2026-08-30T14:28:30.714Z",
+    "gitSha": "ec9a2125f10a5699d16a07c0587264865a0f70c5",
     "imagePath": "artist-profile-final-cta-section-desktop.png"
   },
   {
@@ -609,8 +609,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-30T12:27:28.076Z",
-    "gitSha": "dfd7cbd3fe38e35533ada85bb943d45f5ed0f4b2",
+    "capturedAt": "2026-08-30T14:37:48.082Z",
+    "gitSha": "ec9a2125f10a5699d16a07c0587264865a0f70c5",
     "imagePath": "dashboard-releases-desktop.png",
     "publicExportPath": "releases-dashboard-full.png"
   },
@@ -626,8 +626,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-30T12:27:55.411Z",
-    "gitSha": "dfd7cbd3fe38e35533ada85bb943d45f5ed0f4b2",
+    "capturedAt": "2026-08-30T14:38:15.397Z",
+    "gitSha": "ec9a2125f10a5699d16a07c0587264865a0f70c5",
     "imagePath": "dashboard-releases-sidebar-desktop.png",
     "publicExportPath": "releases-dashboard-sidebar.png"
   },
@@ -677,8 +677,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-30T08:52:37.616Z",
-    "gitSha": "f83f3b0d02d77d68cd0003f2f5a441d73bf53c3f",
+    "capturedAt": "2026-08-30T14:39:35.624Z",
+    "gitSha": "ec9a2125f10a5699d16a07c0587264865a0f70c5",
     "imagePath": "dashboard-audience-desktop.png",
     "publicExportPath": "audience-crm.png"
   },

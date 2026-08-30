@@ -92,7 +92,7 @@ export const SidebarNowPlaying = React.memo(function SidebarNowPlaying({
           visible={playOverlayVisible}
         />
         {isPlaying && (
-          <span className='absolute bottom-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-emerald-400 ring-2 ring-(--color-bg-page)' />
+          <span className='absolute bottom-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-emerald-400 ring-2 ring-(--linear-bg-page)' />
         )}
       </ArtworkFrame>
     );

@@ -35,11 +35,11 @@ function getButtonClass(isActive: boolean, isLinear: boolean): string {
 // Linear-specific styles
 const LINEAR_STYLES = {
   container: {
-    backgroundColor: 'var(--color-bg-button)',
+    backgroundColor: 'var(--linear-bg-button)',
     border: '1px solid var(--linear-border-subtle)',
   },
   indicator: {
-    backgroundColor: 'var(--color-bg-surface-1)',
+    backgroundColor: 'var(--linear-bg-surface-1)',
     boxShadow: 'inset 0 0 0 1px var(--linear-border-subtle)',
   },
   buttonActive: { color: 'var(--linear-text-primary)' },

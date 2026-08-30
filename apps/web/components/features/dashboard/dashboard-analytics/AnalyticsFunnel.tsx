@@ -84,7 +84,7 @@ export function AnalyticsFunnel({
                   bg-gradient-to-r from-surface-1 to-surface-2
                   px-6 py-5 text-center
                   ${isLast ? '' : 'hover:border-default'}
-                  ${isLast ? 'border-primary/20 ring-1 ring-primary/15 bg-gradient-to-r from-[color-mix(in_srgb,var(--linear-accent)_12%,var(--color-bg-surface-1))] to-surface-1' : ''}
+                  ${isLast ? 'border-primary/20 ring-1 ring-primary/15 bg-gradient-to-r from-[color-mix(in_srgb,var(--linear-accent)_12%,var(--linear-bg-surface-1))] to-surface-1' : ''}
                   transition-colors duration-subtle
                 `}
               >

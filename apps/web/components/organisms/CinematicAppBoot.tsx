@@ -140,7 +140,7 @@ export function CinematicAppBoot({
       style={{
         position: 'absolute',
         inset: 0,
-        background: 'var(--color-bg-page, #08090a)',
+        background: 'var(--linear-bg-page, #08090a)',
         overflow: 'hidden',
       }}
     >

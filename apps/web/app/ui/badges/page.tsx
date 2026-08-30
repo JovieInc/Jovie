@@ -111,7 +111,7 @@ export default function BadgesPage() {
           className='w-full max-w-lg rounded-lg border px-4 py-3'
           style={{
             borderColor: 'var(--linear-border-subtle)',
-            backgroundColor: 'var(--color-bg-surface-0)',
+            backgroundColor: 'var(--linear-bg-surface-0)',
           }}
         >
           <div className='flex items-center justify-between'>

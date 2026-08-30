@@ -97,7 +97,7 @@ export function TaskStatusIcon({
           role='img'
           aria-label='Done'
           className={cn(
-            'inline-flex items-center justify-center h-3.5 w-3.5 rounded-full bg-emerald-500/85 text-(--color-bg-page)',
+            'inline-flex items-center justify-center h-3.5 w-3.5 rounded-full bg-emerald-500/85 text-(--linear-bg-page)',
             className
           )}
         >
