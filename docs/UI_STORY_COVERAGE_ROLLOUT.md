@@ -8,10 +8,12 @@ changes do not enter these lanes.
 
 - Reusable components under `apps/web/components` and `packages/ui` require an
   adjacent Storybook story. `packages/ui/atoms` is ratcheted at 100% coverage.
-- **Hard ship gate (JOV-4421 / JOV-5400):** `pnpm component-ship-gate` runs
+- **Hard ship gate (JOV-4421 / JOV-5400 / JOV-5454):** `pnpm component-ship-gate` runs
   inside the `ci-fast` structural lane. Changed shippable components must have
   matching tests + stories (import/prop match), green story quality, and
-  fail-closed rendered certification receipts. Multi-root floors live in
+  fail-closed rendered certification receipts. The same gate builds the real
+  web Storybook and fail-closes live-browser certification for the enrolled
+  canonical Badge, Button, and Card stories. Multi-root floors live in
   `scripts/story-coverage-baseline.json` (schema v2). See
   `docs/VISUAL_TESTING_POLICY.md`.
 - Route surfaces (`page`, `layout`, `loading`, `error`, and `not-found` TSX

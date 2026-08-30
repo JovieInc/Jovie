@@ -27,7 +27,7 @@ export function getDeterministicTestBetterAuthUserId(email: string): string {
 
 export function getDeterministicDevTestAuthPersonaUserId(
   persona: DevTestAuthPersona,
-  adminEmail = DEFAULT_DEV_TEST_AUTH_EMAILS.admin
+  adminEmail: string = DEFAULT_DEV_TEST_AUTH_EMAILS.admin
 ): string {
   const email =
     persona === 'admin' ? adminEmail : DEFAULT_DEV_TEST_AUTH_EMAILS[persona];

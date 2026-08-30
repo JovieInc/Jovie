@@ -36,6 +36,9 @@ describe('product lane classifier', () => {
     expect(web.selectedLanes).toEqual(['web']);
     expect(web.skippedLanes.map(item => item.lane)).toContain('ios');
     expect(web.skippedLanes.map(item => item.lane)).toContain('mac');
+
+    const cli = classifyProductLanes(['packages/jovie-cli/src/client.ts']);
+    expect(cli.selectedLanes).toEqual(['web']);
   });
 
   it('names every affected product and cross-product gate for shared contracts', () => {
@@ -54,7 +57,9 @@ describe('product lane classifier', () => {
       '.github/ci-harness/manifest.json',
       'scripts/ci-fast-lanes.mjs',
       'scripts/lib/product-lane-classifier.mjs',
+      'scripts/lib/production-lane-range.mjs',
       'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
+      'scripts/lib/__tests__/production-lane-range.test.mjs',
       'apps/web/tests/unit/ci/deploy-workflow.test.ts',
     ]);
 

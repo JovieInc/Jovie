@@ -266,6 +266,18 @@ export const publicProfileLimiter = createRateLimiter(
 );
 
 /**
+ * Rate limiter for the anonymous public artist API.
+ * Limit: 100 requests per minute per IP. This is intentionally isolated from
+ * `publicProfileLimiter`, which also meters profile-view telemetry.
+ */
+export const publicArtistApiLimiter = createRateLimiter(
+  RATE_LIMITERS.publicArtistApi,
+  {
+    requireRedis: true,
+  }
+);
+
+/**
  * Rate limiter for the public claim-token entry route (`/claim/[token]`)
  * Limit: 20 requests per minute per IP. Durable (Redis) so the throttle holds
  * across serverless instances; callers treat a degraded backend as advisory
@@ -1111,6 +1123,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     trackingIpClicks: trackingIpClicksLimiter,
     trackingIpVisits: trackingIpVisitsLimiter,
     publicProfile: publicProfileLimiter,
+    publicArtistApi: publicArtistApiLimiter,
     claimTokenAccess: claimTokenAccessLimiter,
     publicClick: publicClickLimiter,
     publicVisit: publicVisitLimiter,

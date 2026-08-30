@@ -98,6 +98,7 @@ export {
   navigationTelemetryLimiter,
   onboardingLimiter,
   paymentIntentLimiter,
+  publicArtistApiLimiter,
   publicClickLimiter,
   publicProfileCaptureDismissalLimiter,
   publicProfileLimiter,
@@ -152,6 +153,7 @@ export type {
   RateLimitStatus,
   TrackingEndpointType,
 } from './types';
+export type { StandardRateLimitHeaderOptions } from './utils';
 // Utilities
 export {
   allowIfRateLimitBackendDegraded,

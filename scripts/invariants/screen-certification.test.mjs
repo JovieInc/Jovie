@@ -111,6 +111,52 @@ describe('JOV-INV-018 screen-certification/v1', () => {
     assert.deepEqual(rows, [['web.homepage', 'pass']]);
   });
 
+  it('registers the public developer guide for changed-surface certification', () => {
+    const source = 'apps/web/app/(marketing)/developers/page.tsx';
+    const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.developers');
+
+    assert.deepEqual(screen, {
+      id: 'web.developers',
+      platform: 'web',
+      owner: 'developer-documentation',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'A' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      { id: 'web.developers', verdict: 'pass', findings: [] },
+    ]);
+  });
+
+  it('registers the public API versioning policy for changed-surface certification', () => {
+    const source = 'apps/web/app/(marketing)/api-versioning/page.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.api-versioning-policy'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.api-versioning-policy',
+      platform: 'web',
+      owner: 'api-versioning-policy',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'A' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      { id: 'web.api-versioning-policy', verdict: 'pass', findings: [] },
+    ]);
+  });
+
   it('retains scheduled whole-system sweeps', () => {
     assert.deepEqual(validateRetainedSweeps(), []);
     for (const workflow of RETAINED_SWEEP_WORKFLOWS) {

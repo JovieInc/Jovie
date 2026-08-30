@@ -149,6 +149,7 @@ describe('Button', () => {
     expect(btn).toHaveAttribute('data-variant', 'primary');
     expect(btn).toHaveAttribute('data-size', 'md');
     expect(btn.className).toContain('h-9');
+    expect(btn.className).toContain('text-app');
     expect(btn.className).toContain('bg-btn-primary');
   });
 

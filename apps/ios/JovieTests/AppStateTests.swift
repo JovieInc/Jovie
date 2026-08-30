@@ -334,7 +334,9 @@ struct AppStateTests {
     appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange("user_123")
-    await appState.signOut()
+    try await withNativeSessionTokenStoreTestIsolation {
+      await appState.signOut()
+    }
 
     #expect(appState.route == .signedOut)
     #expect(appState.dashboardState == .idle)
@@ -361,7 +363,9 @@ struct AppStateTests {
     appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange("user_123")
-    await appState.signOut()
+    try await withNativeSessionTokenStoreTestIsolation {
+      await appState.signOut()
+    }
 
     #expect(appState.route == .signedOut)
     #expect(appState.activeUserID == nil)
@@ -386,7 +390,9 @@ struct AppStateTests {
     appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange("user_123")
-    await appState.handleExpiredSession()
+    try await withNativeSessionTokenStoreTestIsolation {
+      await appState.handleExpiredSession()
+    }
 
     #expect(appState.route == .signedOut)
     #expect(appState.dashboardState == .idle)
@@ -416,7 +422,9 @@ struct AppStateTests {
     appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange(userID)
-    await appState.signOut()
+    try await withNativeSessionTokenStoreTestIsolation {
+      await appState.signOut()
+    }
 
     #expect(appState.route == .signedOut)
     #expect(appState.activeUserID == nil)
@@ -444,7 +452,9 @@ struct AppStateTests {
     appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange(userID)
-    await appState.handleExpiredSession()
+    try await withNativeSessionTokenStoreTestIsolation {
+      await appState.handleExpiredSession()
+    }
 
     #expect(appState.route == .signedOut)
     #expect(appState.activeUserID == nil)
@@ -482,7 +492,9 @@ struct AppStateTests {
     appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange(userID)
-    await appState.signOut()
+    try await withNativeSessionTokenStoreTestIsolation {
+      await appState.signOut()
+    }
 
     #expect(appState.route == .signedOut)
     #expect(appState.activeUserID == nil)
@@ -522,7 +534,9 @@ struct AppStateTests {
     appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange(userID)
-    await appState.handleExpiredSession()
+    try await withNativeSessionTokenStoreTestIsolation {
+      await appState.handleExpiredSession()
+    }
 
     #expect(appState.route == .signedOut)
     #expect(appState.activeUserID == nil)
@@ -619,7 +633,9 @@ struct AppStateTests {
 
     async let load: Void = appState.handleSignedInUserChange("user_123")
     try await Task.sleep(for: .milliseconds(10))
-    await appState.signOut()
+    try await withNativeSessionTokenStoreTestIsolation {
+      await appState.signOut()
+    }
     _ = await load
 
     #expect(appState.route == .signedOut)
@@ -732,7 +748,9 @@ struct AppStateTests {
     )
     appState.didInitializeAuth = true
 
-    await appState.handleSignedInUserChange("user_123")
+    try await withNativeSessionTokenStoreTestIsolation {
+      await appState.handleSignedInUserChange("user_123")
+    }
 
     #expect(appState.route == .signedOut)
     #expect(appState.dashboardState == .idle)
@@ -760,7 +778,9 @@ struct AppStateTests {
     )
     appState.didInitializeAuth = true
 
-    await appState.handleSignedInUserChange("user_123")
+    try await withNativeSessionTokenStoreTestIsolation {
+      await appState.handleSignedInUserChange("user_123")
+    }
 
     #expect(appState.route == .signedOut)
     #expect(appState.activeUserID == nil)

@@ -32,7 +32,7 @@ export function JovieLogo({
   const colorClass =
     variant === 'light'
       ? 'text-tertiary-token hover:text-primary-token'
-      : 'text-white hover:text-white/80';
+      : 'text-white dark:text-white hover:text-white/80';
 
   const wrapperClasses = cn('flex items-center gap-2', className);
   const sizeClass = size === 'sm' ? 'h-4' : 'h-6';

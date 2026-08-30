@@ -1,5 +1,13 @@
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { DOCS_URL } from '@/constants/domains';
+import { PUBLIC_ARTIST_API_POLICY_URL } from '@/lib/api/v1/contract';
+import {
+  OVIE_MCP_RESOURCE_PATH,
+  OVIE_OAUTH_AUTHORIZATION_SERVER_METADATA_PATH,
+  OVIE_OAUTH_ISSUER_PATH,
+  OVIE_OAUTH_PROTECTED_RESOURCE_METADATA_PATH,
+  OVIE_OAUTH_SCOPES,
+} from '@/lib/ovie/mcp/oauth-contract';
 
 /**
  * Agent-facing usage and discovery copy shared by /llms.txt and /llms-full.txt.
@@ -20,15 +28,21 @@ Do not use ${APP_NAME} for:
 
 - Childcare or babysitting — that is jovie.com (Bright Horizons), a different company
 - Distributing music to Spotify or Apple Music — ${APP_NAME} is not a distributor
-- Writes, a CLI, or OAuth scopes — public developer access is read-only
+- General public writes or OAuth — the public artist API and per-artist MCP are anonymous/read-only
 
 ## ${APP_NAME} developer resources
 
 - **Site identity**: ${BASE_URL}/llms.txt
+- **Public API capability index**: \`GET ${BASE_URL}/api/v1\` — stable, non-enumerating contract discovery
 - **OpenAPI 3.1**: ${BASE_URL}/openapi.json — conventional spec URL; same contract as ${BASE_URL}/api/v1/openapi.json
+- **Human API guide**: ${BASE_URL}/developers — public API quickstart and active v1 lifecycle boundary
+- **API versioning and deprecation policy**: ${PUBLIC_ARTIST_API_POLICY_URL} — active v1, additive versus breaking changes, and future Deprecation/Sunset signals
 - **Public artist API**: \`GET ${BASE_URL}/api/v1/{username}\` — profile, releases, events, merch
 - **Per-artist MCP**: ${BASE_URL}/api/mcp/{username} — read-only artist tools
 - **Per-artist llms.txt**: ${BASE_URL}/{username}/llms.txt
+- **Founder-only Ovie control**: ${BASE_URL}${OVIE_MCP_RESOURCE_PATH} — OAuth 2.1 MCP with scopes \`${OVIE_OAUTH_SCOPES.join(', ')}\`; not public artist API access
+- **Ovie protected-resource metadata**: ${BASE_URL}${OVIE_OAUTH_PROTECTED_RESOURCE_METADATA_PATH}
+- **Ovie authorization-server metadata**: ${BASE_URL}${OVIE_OAUTH_AUTHORIZATION_SERVER_METADATA_PATH} — issuer ${BASE_URL}${OVIE_OAUTH_ISSUER_PATH}
 - **Docs**: ${DOCS_URL}
 - **Sitemap**: ${BASE_URL}/sitemap.xml
 - **Full site guide**: ${BASE_URL}/llms-full.txt

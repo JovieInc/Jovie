@@ -12,11 +12,14 @@ name: Fleet Gate Refresh
 
 on:
   pull_request:
-    types: [closed, labeled, unlabeled, ready_for_review, reopened]
+    types: [opened, edited, synchronize, closed, labeled, unlabeled, ready_for_review, reopened]
   workflow_run:
     # Queue-Deferred Release is downstream of this gate. Listening to it here
     # formed a reciprocal workflow_run loop that could retrigger both
-    # controllers without a new upstream capacity signal.
+    # controllers without a new upstream capacity signal. Marker Recovery is
+    # upstream evidence. Marker Recovery starts a fresh workflow_dispatch after
+    # durable bytes so Queue-Deferred Release stays within GitHub's three-level
+    # workflow_run chain ceiling.
     workflows: [CI, Production Controller]
     types: [completed]
   push:
@@ -81,6 +84,22 @@ jobs:
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           dry-run: 'false'
+
+      # Source PR/fork workflow definitions never execute their code here.
+      # Consume actions only after the reviewed CLI is present on main.
+      - name: Persist stack policy repair actions (JOV-INV-020)
+        if: >-
+          steps.refresh.outcome == 'success' &&
+          ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'main'))
+        env:
+          GEM_WORKSPACE: /home/timwhite/gem-workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          node "$GITHUB_WORKSPACE/scripts/backlog-orchestrator/delivery-state-machine.mjs" \
+            --closure-health-file="$GEM_WORKSPACE/state/gem-priority-gate/latest.json"
 
       - name: Reconcile Symphony pressure-driven concurrency
         if: always() && steps.refresh.outcome == 'success'

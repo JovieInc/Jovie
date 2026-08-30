@@ -13,6 +13,7 @@ describe('InlineOfflineNotice', () => {
     expect(notice).toHaveAttribute('aria-live', 'polite');
     expect(notice).toHaveAttribute('aria-atomic', 'true');
     expect(notice).toHaveAttribute('data-state', 'offline');
+    expect(notice.className).toContain('text-app');
     expect(notice.className).toContain('bg-(--state-offline-bg)');
   });
 

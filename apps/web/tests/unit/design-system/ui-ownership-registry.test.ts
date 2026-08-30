@@ -6,6 +6,10 @@ import {
   APP_SCREEN_RECIPE_REGISTRY,
 } from '@/data/appScreens';
 import {
+  INTERACTION_FAMILY_IDS,
+  INTERACTION_REGISTRY,
+  INTERACTION_REGISTRY_SCHEMA,
+  type InteractionRegistryEntry,
   loadProductionSwiftSources,
   UI_OWNERSHIP_ENTRY_IDS,
   UI_OWNERSHIP_PLATFORMS,
@@ -15,6 +19,7 @@ import {
   UI_OWNERSHIP_SURFACES,
   type UINativeSwiftSource,
   type UIOwnershipRegistryEntry,
+  validateInteractionRegistry,
   validateUIOwnershipRegistry,
 } from '@/data/designSystem';
 
@@ -586,5 +591,136 @@ describe('cross-surface UI ownership registry', () => {
       })),
       'pen-status-conflict'
     );
+  });
+});
+
+describe('interaction ownership layer', () => {
+  const interactionCodes = (entries: readonly InteractionRegistryEntry[]) =>
+    validateInteractionRegistry({ entries, repoRoot: root }).map(
+      issue => issue.code
+    );
+  const mutateInteraction = (
+    id: InteractionRegistryEntry['id'],
+    change: (
+      entry: InteractionRegistryEntry
+    ) => Partial<InteractionRegistryEntry>
+  ) =>
+    INTERACTION_REGISTRY.map(entry =>
+      entry.id === id ? { ...entry, ...change(entry) } : entry
+    ) as readonly InteractionRegistryEntry[];
+
+  it('registers exactly twelve source-backed interaction families', () => {
+    const projected = UI_OWNERSHIP_REGISTRY.filter(
+      entry => entry.layer === 'interaction'
+    );
+    expect(INTERACTION_REGISTRY_SCHEMA).toBe('jovie.interaction-ownership/v1');
+    expect(INTERACTION_REGISTRY.map(entry => entry.id)).toEqual(
+      INTERACTION_FAMILY_IDS
+    );
+    expect(INTERACTION_REGISTRY).toHaveLength(12);
+    expect(projected.map(entry => entry.id)).toEqual(INTERACTION_FAMILY_IDS);
+    expect(validateInteractionRegistry({ repoRoot: root })).toEqual([]);
+
+    for (const entry of projected) {
+      expect(entry.sourceAuthority).toEqual({
+        registry: 'interactions',
+        id: entry.id,
+      });
+      expect(entry.canonicalOwner.registryId).toBe(entry.id);
+      expect(entry.interaction).toMatchObject({
+        role: entry.id.replace('interaction.', ''),
+      });
+      expect(entry.interaction?.storySource).toMatch(/\.stories\.tsx$/);
+      expect(entry.interaction?.testSources.length).toBeGreaterThan(0);
+      expect(entry.adaptiveModes.compact).toBeTruthy();
+      expect(entry.adaptiveModes.medium).toBeTruthy();
+      expect(entry.adaptiveModes.wide).toBeTruthy();
+    }
+  });
+
+  it('RED: rejects missing families, duplicate roles, and duplicate owners', () => {
+    expect(interactionCodes(INTERACTION_REGISTRY.slice(1))).toContain(
+      'missing-interaction-family'
+    );
+
+    const [menu, tooltip] = INTERACTION_REGISTRY;
+    expect(menu).toBeDefined();
+    expect(tooltip).toBeDefined();
+    expect(
+      interactionCodes(
+        mutateInteraction(tooltip.id, () => ({ role: menu.role }))
+      )
+    ).toEqual(
+      expect.arrayContaining([
+        'duplicate-interaction-role',
+        'invalid-interaction-id',
+      ])
+    );
+    expect(
+      interactionCodes(
+        mutateInteraction(tooltip.id, () => ({ owner: { ...menu.owner } }))
+      )
+    ).toContain('duplicate-interaction-owner');
+    expectIssue(
+      UI_OWNERSHIP_REGISTRY.filter(entry => entry.id !== 'interaction.menu'),
+      'missing-interaction-family'
+    );
+  });
+
+  it('RED: rejects missing rendered and behavior evidence', () => {
+    expect(
+      interactionCodes(
+        mutateInteraction('interaction.toast', () => ({ storySource: '' }))
+      )
+    ).toContain('missing-story-evidence');
+    expect(
+      interactionCodes(
+        mutateInteraction('interaction.banner', () => ({ testSources: [] }))
+      )
+    ).toContain('missing-test-evidence');
+    expect(
+      interactionCodes(
+        mutateInteraction('interaction.search', () => ({
+          testSources: ['apps/web/components/molecules/missing.test.tsx'],
+        }))
+      )
+    ).toContain('missing-test-evidence');
+    expectIssue(
+      mutate('interaction.toast', entry => ({
+        interaction: { ...entry.interaction, storySource: '' },
+      })),
+      'missing-story-evidence'
+    );
+  });
+
+  it('RED: rejects unsupported contract values and duplicate aliases', () => {
+    const invalidValues = [
+      ['geometry', 'invalid-geometry-mode'],
+      ['focus', 'invalid-focus-policy'],
+      ['keyboard', 'invalid-keyboard-policy'],
+      ['dismissal', 'invalid-dismissal-policy'],
+      ['motion', 'invalid-motion-intent'],
+      ['reducedMotion', 'invalid-reduced-motion-policy'],
+    ] as const;
+
+    for (const [key, expectedCode] of invalidValues) {
+      expect(
+        interactionCodes(
+          mutateInteraction('interaction.dialog', () => ({
+            [key]: 'route-local',
+          }))
+        )
+      ).toContain(expectedCode);
+    }
+
+    const menuAlias = INTERACTION_REGISTRY[0]?.duplicateAliases[0];
+    expect(menuAlias).toBeDefined();
+    expect(
+      interactionCodes(
+        mutateInteraction('interaction.tooltip', () => ({
+          duplicateAliases: [menuAlias as string],
+        }))
+      )
+    ).toContain('duplicate-alias');
   });
 });

@@ -246,6 +246,21 @@ describe('merge_group workflow contract', () => {
       );
     }
 
+    const remaining = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining');
+    expect(remaining).toContain(
+      'CI_FAST_SKIP_STRUCTURAL: ${{ steps.structural.outputs.skip }}'
+    );
+    expect(remaining).toContain('github.event_name }}" != "pull_request"');
+    expect(remaining).toContain('echo "skip=false"');
+    expect(remaining).toContain('apps/web/\\.storybook/');
+    expect(remaining).toContain('apps/web/package\\.json$');
+    expect(remaining).toContain('apps/web/scripts/');
+    expect(remaining).toContain('chromatic\\.config\\.json$');
+    expect(remaining).toContain('package\\.json$');
+    expect(remaining).toContain('shared-ui-visual-arbitrary');
+    expect(remaining).toContain('scripts/doc-freshness-lint');
+    expect(remaining).toContain('apps/web/tests/');
+
     for (const jobId of [
       'ci-unit-tests',
       'ci-build-layout',
@@ -304,6 +319,11 @@ describe('merge_group workflow contract', () => {
     const aggregate = getJobBlock(CI_WORKFLOW, 'ci-merge-group-ready');
     const sourceAggregate = getJobBlock(CI_WORKFLOW, 'ci-pr-ready');
     const unitTests = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
+    const unitJobHeader = unitTests.slice(0, unitTests.indexOf('    runs-on:'));
+    const triggerBlock = CI_WORKFLOW.slice(
+      0,
+      CI_WORKFLOW.indexOf('\npermissions:')
+    );
     expect(aggregate).toContain(
       "github.event_name == 'merge_group' && 'PR Ready'"
     );
@@ -355,6 +375,29 @@ describe('merge_group workflow contract', () => {
     );
     expect(unitTests).toContain("github.event_name == 'workflow_dispatch'");
     expect(unitTests).not.toContain("github.event_name == 'pull_request'");
+    expect(unitJobHeader).toContain('always() &&\n      !cancelled() &&');
+    expect(unitJobHeader).not.toContain('continue-on-error');
+    expect(unitTests).toContain(
+      "fail-fast: ${{ github.event_name == 'merge_group' }}"
+    );
+    expect(unitTests).not.toContain('fail-fast: true');
+    expect(unitTests).not.toContain('fail-fast: false');
+    expect(unitTests).toContain('Preserve failed unit-shard diagnosis');
+    expect(unitTests).toContain(
+      "if: ${{ failure() && !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' }}"
+    );
+    expect(unitTests).toContain(
+      'unit-test-failure-${{ github.run_id }}-${{ github.run_attempt }}-${{ strategy.job-index }}'
+    );
+    expect(unitTests).toContain(
+      'uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1'
+    );
+    expect(unitTests).toContain('path: apps/web/test-report.*.junit.xml');
+    expect(unitTests).toContain('if-no-files-found: warn');
+    expect(unitTests).toContain('retention-days: 14');
+    expect(triggerBlock).not.toMatch(
+      /^\s+(?:workflow_run|check_run|check_suite):/m
+    );
     expect(aggregate).not.toMatch(
       /github\.event\.pull_request|github\.(base_ref|head_ref)/
     );
@@ -639,6 +682,8 @@ unselected Web rejects unit execution|false|success|skipped|false|skipped|1
 unselected Web rejects build execution|false|skipped|success|false|skipped|1
 healthy Web passes with iOS skipped|true|success|success|false|skipped|0
 selected Web rejects skipped jobs|true|skipped|skipped|false|skipped|1
+selected Web rejects failed unit shard|true|failure|success|false|skipped|1
+selected Web rejects cancelled unit siblings|true|cancelled|success|false|skipped|1
 deliberate-red iOS fails with Web skipped|false|skipped|skipped|true|failure|1`;
     for (const testCase of cases.split('\n')) {
       const [name, web, unit, build, runIos, iosResult, status] =

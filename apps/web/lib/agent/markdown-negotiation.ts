@@ -3,8 +3,15 @@ import {
   buildHomepageMarkdown,
   buildNotFoundMarkdown,
 } from '@/lib/agent/homepage-markdown';
-import { isNextRscRequest, negotiateAccept } from '@/lib/http/accept-header';
-import { isDedicatedRootSegment } from '@/lib/routing/proxy-routing';
+import {
+  HOMEPAGE_HTML_ALTERNATE_LINK,
+  isNextRscRequest,
+  negotiateAccept,
+} from '@/lib/http/accept-header';
+import {
+  getPublicProfileCandidate,
+  isDedicatedRootSegment,
+} from '@/lib/routing/proxy-routing';
 
 const MARKDOWN_CONTENT_TYPE = 'text/markdown; charset=utf-8';
 const FILE_EXTENSION_PATTERN = /\.[a-z0-9]{1,8}$/i;
@@ -50,6 +57,9 @@ export function shouldPassThroughMarkdownNegotiation(
   const root = segments[0];
   if (!root) return false;
   if (isDedicatedRootSegment(root)) return true;
+  // Artist profiles and smart links are a known HTML surface, not unknown
+  // routes. Do not intercept them as Markdown 404s.
+  if (getPublicProfileCandidate(`/${root}`)) return true;
   return segments.some(hasFileExtension);
 }
 
@@ -57,15 +67,18 @@ function markdownResponse(
   body: string,
   status: number,
   cacheControl: string,
-  method: string
+  method: string,
+  link?: string
 ): NextResponse {
+  const headers: Record<string, string> = {
+    'Content-Type': MARKDOWN_CONTENT_TYPE,
+    Vary: 'Accept',
+    'Cache-Control': cacheControl,
+  };
+  if (link) headers.Link = link;
   return new NextResponse(method === 'HEAD' ? null : body, {
     status,
-    headers: {
-      'Content-Type': MARKDOWN_CONTENT_TYPE,
-      Vary: 'Accept',
-      'Cache-Control': cacheControl,
-    },
+    headers,
   });
 }
 
@@ -107,7 +120,8 @@ export function negotiateAgentMarkdown(req: NextRequest): NextResponse | null {
       buildHomepageMarkdown(),
       200,
       'public, max-age=3600',
-      method
+      method,
+      HOMEPAGE_HTML_ALTERNATE_LINK
     );
   }
 

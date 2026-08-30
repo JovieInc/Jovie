@@ -166,8 +166,11 @@ describe('ci-fast bounded parallel workflow', () => {
       'profile-admission':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts',
       structural:
-        'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm component-ship-gate && pnpm screen-certification-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
+        'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-certification-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
     });
+    expect(CI_FAST_SOURCE).toContain(
+      "'pnpm design:shared-ui-visual-arbitrary:check'"
+    );
   });
 
   it('keeps the iOS design gate independent from Ubuntu operations', () => {
@@ -199,6 +202,48 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(structuralDecision).toContain('scripts/invariants/');
     expect(CI_FAST_SOURCE).toMatch(
       /function runDesignConformance\(\)[\s\S]*LANE_COMMANDS\['design-conformance'\]/
+    );
+  });
+
+  it('fails closed onto structural UI gates for every web UI source and guard', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const structuralDecision = remaining.slice(
+      remaining.indexOf('- name: Decide structural lane'),
+      remaining.indexOf('- name: Install actionlint')
+    );
+
+    for (const requiredPath of [
+      'apps/web/app/.*\\.(tsx|css)$',
+      'apps/web/components/',
+      'apps/web/\\.storybook/',
+      'apps/web/package\\.json$',
+      'apps/web/scripts/',
+      'apps/web/tests/',
+      'apps/web/styles/',
+      'packages/ui/',
+      'chromatic\\.config\\.json$',
+      'package\\.json$',
+      'DESIGN\\.md$',
+      'design\\.tokens\\.json$',
+      'scripts/(component-',
+      'screen-certification',
+      'shared-ui-visual-arbitrary',
+      'story-coverage',
+      'ui-story-coverage',
+      'scripts/lib/__tests__/(component-',
+    ]) {
+      expect(structuralDecision).toContain(requiredPath);
+    }
+    expect(structuralDecision).toContain(
+      'grep -qE "$STRUCTURAL_CONTROL_PATTERN|$STRUCTURAL_UI_PATTERN"'
+    );
+    expect(remaining).toMatch(/timeout-minutes:\s*40/);
+    expect(remaining).toContain('uses: ./.github/actions/setup-playwright');
+    expect(CI_FAST_SOURCE).toContain(
+      'lib/__tests__/component-live-storybook-certification.test.mjs'
     );
   });
 
@@ -420,12 +465,14 @@ describe('ci-fast bounded parallel workflow', () => {
       'ci-fast-remaining',
       'ci-profile-admission-browser'
     );
-    const selectorPattern = remaining.match(
-      /git diff --name-only[^\n]*\|\s*grep -qE '([^']+)'/
+    const controlPattern = remaining.match(
+      /STRUCTURAL_CONTROL_PATTERN='([^']+)'/
     )?.[1];
-    expect(selectorPattern).toBeDefined();
+    const uiPattern = remaining.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
+    expect(controlPattern).toBeDefined();
+    expect(uiPattern).toBeDefined();
 
-    const selectsStructural = new RegExp(selectorPattern);
+    const selectsStructural = new RegExp(`${controlPattern}|${uiPattern}`);
     expect(
       selectsStructural.test(
         'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs'
@@ -441,8 +488,157 @@ describe('ci-fast bounded parallel workflow', () => {
     ).toBe(false);
     expect(selectsStructural.test('.github/workflows/ci.yml')).toBe(true);
     expect(selectsStructural.test('.claude/rules/ci-branching.md')).toBe(true);
+    expect(selectsStructural.test('apps/web/components/atoms/Button.tsx')).toBe(
+      true
+    );
+    expect(selectsStructural.test('apps/web/app/(home)/page.tsx')).toBe(true);
+    expect(selectsStructural.test('packages/ui/atoms/badge.tsx')).toBe(true);
+    expect(selectsStructural.test('scripts/component-ship-gate.mjs')).toBe(
+      true
+    );
+    expect(
+      selectsStructural.test('apps/web/tests/unit/atoms/ViaPanel.test.tsx')
+    ).toBe(true);
+    expect(
+      new RegExp(uiPattern).test('apps/web/tests/unit/atoms/ViaPanel.test.tsx')
+    ).toBe(true);
+    expect(
+      new RegExp(uiPattern).test('apps/web/components/atoms/Button.test.tsx')
+    ).toBe(true);
+    expect(new RegExp(uiPattern).test('packages/ui/atoms/badge.test.tsx')).toBe(
+      true
+    );
+    for (const receiptRepairPath of [
+      'apps/web/tests/components/organisms/RightDrawer.interaction.test.tsx',
+      'apps/web/tests/unit/marketing/component-registry.test.ts',
+      'apps/web/tests/unit/marketing/support-route-header-contract.test.ts',
+      'apps/web/tests/e2e/utils/public-surface-manifest.ts',
+    ]) {
+      expect(selectsStructural.test(receiptRepairPath)).toBe(true);
+    }
+    // These paths feed the live rendered component harness, not just the
+    // shadow UI-story audit; a harness change must not skip runStructural.
+    for (const storybookHarnessPath of [
+      'apps/web/.storybook/main.ts',
+      'apps/web/.storybook/preview.tsx',
+      'apps/web/.storybook/stories/elevation-matrix.stories.tsx',
+      'chromatic.config.json',
+    ]) {
+      expect(selectsStructural.test(storybookHarnessPath)).toBe(true);
+    }
+    for (const tokenAuditPath of [
+      'scripts/shared-ui-visual-arbitrary-audit.mjs',
+      'scripts/shared-ui-visual-arbitrary-audit.test.mjs',
+      'scripts/shared-ui-visual-arbitrary.baseline.json',
+    ]) {
+      expect(selectsStructural.test(tokenAuditPath)).toBe(true);
+    }
+    for (const directStructuralInput of [
+      'package.json',
+      'apps/web/package.json',
+      'apps/web/scripts/check-reliability-detectors.ts',
+      'apps/web/scripts/lint-contrast-ratchet.mjs',
+      'apps/web/scripts/lint-no-native-dialogs.mjs',
+      'apps/web/scripts/next-proxy-guard.mjs',
+      'apps/web/scripts/seo-ratchet-guard.mjs',
+      'apps/web/scripts/tailwind-guard.mjs',
+      'scripts/doc-freshness-lint.mjs',
+    ]) {
+      expect(selectsStructural.test(directStructuralInput)).toBe(true);
+    }
+    for (const nonUiPath of [
+      'apps/web/app/api/health/deploy/route.ts',
+      'apps/web/data/designSystem/componentRegistry.ts',
+      'apps/web/lib/queries/useDashboardProfileQuery.ts',
+      'apps/web/scripts/test-performance-guard.ts',
+      'docs/design-system/design-conformance-manifest.json',
+      'docs/product/README.md',
+      'apps/web/storybook/main.ts',
+      'chromatic.config.json.bak',
+      'apps/web/tests-not-centralized/unit/foo.test.ts',
+    ]) {
+      expect(selectsStructural.test(nonUiPath)).toBe(false);
+    }
     expect(selectsStructural.test('.claude/skills/qa/SKILL.md')).toBe(false);
     expect(selectsStructural.test('.claude/rules/auth.md')).toBe(false);
+  });
+
+  it('runs hosted structural CI for Storybook, Chromatic, and token-guard inputs', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const structuralDecision = remaining.slice(
+      remaining.indexOf('- name: Decide structural lane'),
+      remaining.indexOf('- name: Install actionlint')
+    );
+    const controlPattern = remaining.match(
+      /STRUCTURAL_CONTROL_PATTERN='([^']+)'/
+    )?.[1];
+    const uiPattern = remaining.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
+    expect(controlPattern).toBeDefined();
+    expect(uiPattern).toBeDefined();
+    const selectsStructural = new RegExp(`${controlPattern}|${uiPattern}`);
+    const uiRe = new RegExp(uiPattern);
+
+    // Source PRs path-gate the remaining structural lane; merge groups never skip.
+    expect(structuralDecision).toContain(
+      'github.event_name }}" != "pull_request"'
+    );
+    expect(structuralDecision).toContain('echo "skip=false"');
+    expect(remaining).toMatch(/github\.event_name != 'merge_group'/);
+    expect(remaining).toMatch(
+      /needs\.ci-merge-group-admission\.result == 'success'/
+    );
+
+    // Direct rendered-harness and token-guard inputs must select structural.
+    expect(uiRe.test('apps/web/.storybook/main.ts')).toBe(true);
+    expect(uiRe.test('apps/web/.storybook/preview.tsx')).toBe(true);
+    expect(
+      uiRe.test('apps/web/.storybook/stories/elevation-matrix.stories.tsx')
+    ).toBe(true);
+    expect(uiRe.test('chromatic.config.json')).toBe(true);
+    expect(uiRe.test('scripts/shared-ui-visual-arbitrary-audit.mjs')).toBe(
+      true
+    );
+    expect(uiRe.test('scripts/shared-ui-visual-arbitrary-audit.test.mjs')).toBe(
+      true
+    );
+    expect(uiRe.test('scripts/shared-ui-visual-arbitrary.baseline.json')).toBe(
+      true
+    );
+    expect(uiRe.test('package.json')).toBe(true);
+    expect(uiRe.test('apps/web/package.json')).toBe(true);
+    expect(uiRe.test('apps/web/scripts/check-reliability-detectors.ts')).toBe(
+      true
+    );
+    expect(uiRe.test('apps/web/scripts/lint-contrast-ratchet.mjs')).toBe(true);
+    expect(uiRe.test('apps/web/scripts/lint-no-native-dialogs.mjs')).toBe(true);
+    expect(uiRe.test('apps/web/scripts/next-proxy-guard.mjs')).toBe(true);
+    expect(uiRe.test('apps/web/scripts/seo-ratchet-guard.mjs')).toBe(true);
+    expect(uiRe.test('apps/web/scripts/tailwind-guard.mjs')).toBe(true);
+    expect(selectsStructural.test('scripts/doc-freshness-lint.mjs')).toBe(true);
+
+    // JOV-5435 centralized web-test boundary stays selected.
+    expect(uiRe.test('apps/web/tests/unit/atoms/ViaPanel.test.tsx')).toBe(true);
+    expect(uiRe.test('apps/web/tests/e2e/smoke-public.spec.ts')).toBe(true);
+
+    // Similar-looking non-inputs must remain excluded.
+    expect(uiRe.test('apps/web/storybook/main.ts')).toBe(false);
+    expect(uiRe.test('.storybook/main.ts')).toBe(false);
+    expect(uiRe.test('apps/desktop/.storybook/preview.tsx')).toBe(false);
+    expect(uiRe.test('apps/web/chromatic.config.json')).toBe(false);
+    expect(uiRe.test('chromatic.config.js')).toBe(false);
+    expect(uiRe.test('docs/chromatic.config.json')).toBe(false);
+    expect(uiRe.test('scripts/shared-ui-visual.mjs')).toBe(false);
+    expect(uiRe.test('scripts/lib/shared-ui-visual-arbitrary-audit.mjs')).toBe(
+      false
+    );
+    expect(
+      uiRe.test('apps/web/scripts/shared-ui-visual-arbitrary-audit.mjs')
+    ).toBe(false);
+    expect(uiRe.test('apps/web/scripts/test-performance-guard.ts')).toBe(false);
+    expect(uiRe.test('apps/web/lib/env.ts')).toBe(false);
   });
 
   it('skips the aggregate when the original ci-fast eligibility is skipped', () => {

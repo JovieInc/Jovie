@@ -2,6 +2,10 @@
 
 import Image from 'next/image';
 import React from 'react';
+import {
+  ARTWORK_FIT_CLASSNAME,
+  ArtworkFrame,
+} from '@/components/atoms/ArtworkFrame';
 import { cn } from '@/lib/utils';
 import { ArtworkPlayOverlay } from './ArtworkPlayOverlay';
 
@@ -65,11 +69,9 @@ export const SidebarNowPlaying = React.memo(function SidebarNowPlaying({
 
   if (collapsed) {
     return (
-      <div
-        className={cn(
-          'relative h-10 w-10 mx-auto rounded-md overflow-hidden',
-          className
-        )}
+      <ArtworkFrame
+        size={40}
+        className={cn('mx-auto h-10 w-10', className)}
         title={
           trackTitle && artistName ? `${trackTitle} — ${artistName}` : undefined
         }
@@ -80,7 +82,7 @@ export const SidebarNowPlaying = React.memo(function SidebarNowPlaying({
             alt=''
             fill
             sizes='40px'
-            className='object-cover'
+            className={ARTWORK_FIT_CLASSNAME}
             unoptimized
           />
         )}
@@ -92,21 +94,21 @@ export const SidebarNowPlaying = React.memo(function SidebarNowPlaying({
         {isPlaying && (
           <span className='absolute bottom-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-emerald-400 ring-2 ring-(--linear-bg-page)' />
         )}
-      </div>
+      </ArtworkFrame>
     );
   }
 
   return (
     <div className={cn('flex min-w-0 items-center gap-2 px-0.5', className)}>
       {/* Small docked thumbnail — never full-bleed artwork (JOV-3511). */}
-      <div className='relative h-8 w-8 shrink-0 overflow-hidden rounded-md bg-surface-2'>
+      <ArtworkFrame size={32} className='h-8 w-8 bg-surface-2'>
         {artworkUrl && (
           <Image
             src={artworkUrl}
             alt=''
             fill
             sizes='32px'
-            className='object-cover'
+            className={ARTWORK_FIT_CLASSNAME}
             unoptimized
           />
         )}
@@ -115,7 +117,7 @@ export const SidebarNowPlaying = React.memo(function SidebarNowPlaying({
           onPlay={onPlay}
           visible={playOverlayVisible}
         />
-      </div>
+      </ArtworkFrame>
       <div className='min-w-0 flex-1'>
         <div className='truncate text-xs font-caption text-primary-token leading-[1.2]'>
           {trackTitle}

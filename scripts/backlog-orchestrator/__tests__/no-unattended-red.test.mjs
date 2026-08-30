@@ -51,6 +51,7 @@ describe('no unattended red loop', () => {
       'provider-unavailable': 'typed-remediation',
       'missing-owner-lease': 'typed-remediation',
       'dropped-controller-event': 'typed-remediation',
+      'draft-stack-policy': 'typed-remediation',
       'not-proven': 'collect-evidence',
     };
     for (const stallClass of STALL_CLASSES) {

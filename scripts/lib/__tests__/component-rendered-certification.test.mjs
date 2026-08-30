@@ -50,6 +50,12 @@ describe('rendered component certification', () => {
     expect(details(evaluateRenderedSample(DELIBERATE_RED_FIXTURES[2]))).toMatch(
       /arbitrary padding[\s\S]*outer 16px !== inner 16px \+ inset 4px/
     );
+    expect(details(evaluateRenderedSample(DELIBERATE_RED_FIXTURES[3]))).toMatch(
+      /object-fit contain[\s\S]*pill or circle mask/
+    );
+    expect(details(evaluateRenderedSample(DELIBERATE_RED_FIXTURES[4]))).toMatch(
+      /object-fit contain[\s\S]*scale-aware artwork radius[\s\S]*recolored or blurred/
+    );
   });
 
   it('emits exact-head pass/block receipts for the landing batch', () => {
@@ -62,7 +68,20 @@ describe('rendered component certification', () => {
         { verdict: 'block' },
         { verdict: 'block' },
         { verdict: 'block' },
+        { verdict: 'block' },
+        { verdict: 'block' },
       ],
+      shadcnOutcome: {
+        ok: true,
+        comparativeQualityBar: {
+          ok: true,
+          claimBoundary: 'rubric-and-evaluator-qualification-only',
+          inventory: {
+            total: expect.any(Number),
+            pendingComparison: expect.any(Number),
+          },
+        },
+      },
     });
     expect(
       result.receipt.landingBatch.map(item => [item.id, item.verdict])
@@ -71,6 +90,8 @@ describe('rendered component certification', () => {
       ['landing-batch.atom.badge.tone-success', 'pass'],
       ['landing-batch.atom.button.primary', 'pass'],
       ['landing-batch.atom.card.default', 'pass'],
+      ['landing-batch.atom.artwork-frame.contain-default', 'pass'],
+      ['landing-batch.atom.artwork-frame.contain-hero', 'pass'],
     ]);
   });
 
@@ -101,12 +122,43 @@ describe('rendered component certification', () => {
       diffBase: null,
       skipQuality: true,
       skipRatchet: true,
+      skipLiveStorybook: true,
       headSha: HEAD,
     });
     expect(report.ok).toBe(true);
     expect(report.sections.renderedCertification.receipt).toMatchObject({
       gate: 'component-ship-gate',
       headSha: HEAD,
+      shadcnOutcome: {
+        ok: true,
+        section: 'shadcnOutcome',
+        comparativeQualityBar: {
+          schema: 'jovie.component-comparative-quality-bar/v1',
+          ok: true,
+        },
+      },
     });
+  });
+
+  it('propagates comparative failures through rendered certification and the native gate', () => {
+    const rendered = runRenderedCertification({
+      headSha: HEAD,
+      comparativeQualificationControls: [],
+    });
+    expect(rendered.ok).toBe(false);
+    expect(rendered.receipt.issues.join('\n')).toMatch(
+      /comparative quality bar: atom\.select: enrolled baseline requires exactly one qualification control/
+    );
+
+    const gate = runComponentShipGate({
+      diffBase: null,
+      skipQuality: true,
+      skipRatchet: true,
+      skipLiveStorybook: true,
+      headSha: HEAD,
+      comparativeQualificationControls: [],
+    });
+    expect(gate.ok).toBe(false);
+    expect(gate.sections.renderedCertification.ok).toBe(false);
   });
 });
