@@ -29,12 +29,12 @@ function setCookie(value: string) {
 
 describe('cookie banner coverage receipts', () => {
   it('asserts exact CookieBannerSection and CookieModal sources', () => {
-    expect(
-      readFileSync(
-        resolve(process.cwd(), 'components/organisms/CookieBannerSection.tsx'),
-        'utf8'
-      )
-    ).toContain('export function CookieBannerSection');
+    const bannerSource = readFileSync(
+      resolve(process.cwd(), 'components/organisms/CookieBannerSection.tsx'),
+      'utf8'
+    );
+    expect(bannerSource).toContain('export function CookieBannerSection');
+    expect(bannerSource).not.toMatch(/--linear-app-/);
     expect(
       readFileSync(
         resolve(process.cwd(), 'components/organisms/CookieModal.tsx'),
