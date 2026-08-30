@@ -1103,6 +1103,7 @@ def _finalize_observed_pr_state(
         number = int(pr["number"])
         expected_head = pr.get("headRefOid")
         expected_base = pr.get("baseRefName")
+        expected_base_oid = pr.get("baseRefOid")
         final = (
             final_readback.get("prs", {}).get(number)
             if isinstance(final_readback, dict)
@@ -1135,6 +1136,7 @@ def _finalize_observed_pr_state(
                 and isinstance(final, dict)
                 and final.get("headOid") == expected_head
                 and final.get("baseRefName") == expected_base
+                and final.get("baseRefOid") == expected_base_oid
                 and final.get("state") == "OPEN"
                 and _valid_oid(final.get("baseRefOid"))
                 and isinstance(final.get("title"), str)

@@ -1728,7 +1728,6 @@ class ClosureObservationTests(unittest.TestCase):
         final = {
             **promotion_pr_state(29),
             "headOid": f"{29:040x}",
-            "baseRefOid": "b" * 40,
             "title": "fix: held JOV-129",
             "body": "",
             "labels": {"totalCount": 1, "nodes": [{"name": "needs-human"}]},
@@ -1746,7 +1745,36 @@ class ClosureObservationTests(unittest.TestCase):
         self.assertEqual(disposition["state"], "held")
         self.assertEqual(disposition["reason"], "needs-human")
         self.assertEqual(disposition["issue"], "JOV-129")
-        self.assertEqual(disposition["eventBaseOid"], "b" * 40)
+        self.assertEqual(disposition["eventBaseOid"], "a" * 40)
+
+    def test_nonpromotion_action_fails_closed_when_base_oid_moves(self):
+        stale = pr(
+            33,
+            title="fix: duplicate JOV-133",
+            labels=("duplicate",),
+            promotion_evidence=None,
+        )
+        final = {
+            **promotion_pr_state(33),
+            "headOid": f"{33:040x}",
+            "baseRefOid": "b" * 40,
+            "labels": {"totalCount": 1, "nodes": [{"name": "duplicate"}]},
+        }
+        with mock.patch.object(
+            MODULE,
+            "_readback_promotion_state",
+            return_value={"baseOid": "a" * 40, "prs": {33: final}},
+        ):
+            observed = MODULE.observe_promotion_evidence(
+                "JovieInc/Jovie", [stale], "a" * 40
+            )
+
+        result = MODULE.classify_open_prs(observed, NOW)
+        self.assertEqual(result["dispositions"], [])
+        self.assertEqual(
+            result["unclassified"],
+            [{"number": 33, "reason": "final-observation-stale"}],
+        )
 
     def test_more_than_25_green_candidates_are_all_compared(self):
         candidates = [
