@@ -2449,12 +2449,16 @@ describe('canary health gate workflow', () => {
     expect(prove).toContain('https://staging.jov.ie/api/health/build-info');
     expect(prove).toContain('.commitSha == $sha and .environment == "preview"');
     expect(prove).toContain('https://staging.jov.ie/robots.txt');
+    expect(prove).toContain('staging-homepage-headers.txt');
+    expect(prove).toContain("grep -Eiq '^x-robots-tag:.*noindex'");
     expect(prove).toContain("$'User-Agent: *\\nDisallow: /'");
     expect(prove).toContain('[[ "$robots" == *\'Sitemap:\'* ]]');
     expect(writeReceipt).toContain("'jovie-staging-deployment/v1'");
     expect(writeReceipt).toContain('state: "deployed"');
     expect(writeReceipt).toContain('terminal: true');
-    expect(writeReceipt).toContain('privacy: "robots-block-all"');
+    expect(writeReceipt).toContain(
+      'privacy: "robots-block-all-and-http-noindex"'
+    );
     expect(receiptJob).toContain(
       'name: staging-deployment-${{ inputs.expected_sha }}'
     );

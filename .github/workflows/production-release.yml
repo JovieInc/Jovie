@@ -1296,7 +1296,14 @@ jobs:
             echo "::error::Staging build-info is not the exact preview SHA."
             exit 1
           }
-          curl "${curl_args[@]}" --output /dev/null https://staging.jov.ie/
+          homepage_headers="$RUNNER_TEMP/staging-homepage-headers.txt"
+          curl "${curl_args[@]}" --dump-header "$homepage_headers" \
+            --output /dev/null https://staging.jov.ie/
+          if ! tr -d '\r' < "$homepage_headers" | \
+            grep -Eiq '^x-robots-tag:.*noindex'; then
+            echo "::error::Staging homepage is missing the HTTP noindex policy."
+            exit 1
+          fi
           robots="$(curl "${curl_args[@]}" https://staging.jov.ie/robots.txt)"
           if [[ "$robots" != *$'User-Agent: *\nDisallow: /'* ]] ||
             [[ "$robots" == *'Sitemap:'* ]]; then
@@ -1346,7 +1353,7 @@ jobs:
               promotionResult: $promotionResult,
               exactIdentity: "passed",
               routeSmoke: "passed",
-              privacy: "robots-block-all",
+              privacy: "robots-block-all-and-http-noindex",
               observedAt: $observedAt
             }' > "$RUNNER_TEMP/staging-deployment-receipt.json"
           echo "deployed=true" >> "$GITHUB_OUTPUT"
