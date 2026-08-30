@@ -157,7 +157,7 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
               href={entry.primarySocialUrlNormalized}
               target='_blank'
               rel='noopener noreferrer'
-              className='flex min-w-0 items-center gap-1.5 text-sm text-(--linear-accent) hover:underline'
+              className='flex min-w-0 items-center gap-1.5 text-sm text-(--color-accent-purple) hover:underline'
             >
               <span className='truncate'>
                 {entry.primarySocialUrlNormalized.replace(/^https?:\/\//, '')}
@@ -177,7 +177,7 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
                 href={entry.spotifyUrlNormalized}
                 target='_blank'
                 rel='noopener noreferrer'
-                className='flex min-w-0 items-center gap-1.5 text-sm text-(--linear-accent) hover:underline'
+                className='flex min-w-0 items-center gap-1.5 text-sm text-(--color-accent-purple) hover:underline'
               >
                 <span className='truncate'>
                   {entry.spotifyUrlNormalized.replace(/^https?:\/\//, '')}

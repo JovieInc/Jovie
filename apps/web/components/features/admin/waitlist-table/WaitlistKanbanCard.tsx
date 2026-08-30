@@ -90,7 +90,7 @@ export function WaitlistKanbanCard({
             href={entry.primarySocialUrlNormalized}
             target='_blank'
             rel='noopener noreferrer'
-            className='block truncate text-(--linear-accent) hover:underline'
+            className='block truncate text-(--color-accent-purple) hover:underline'
           >
             {entry.primarySocialUrlNormalized.replace(/^https?:\/\//, '')}
           </a>
@@ -103,7 +103,7 @@ export function WaitlistKanbanCard({
               href={entry.spotifyUrlNormalized}
               target='_blank'
               rel='noopener noreferrer'
-              className='text-(--linear-accent) hover:underline'
+              className='text-(--color-accent-purple) hover:underline'
             >
               Profile
             </a>

@@ -371,7 +371,7 @@ function RhythmAtmosphere({
         totalFridays={totalFridays}
         variant='section'
       />
-      <div className='absolute left-1/2 top-[52%] h-px w-[168vw] -translate-x-1/2 bg-gradient-to-r from-transparent via-[var(--linear-accent,#5e6ad2)]/18 to-transparent opacity-70 blur-[0.5px]' />
+      <div className='absolute left-1/2 top-[52%] h-px w-[168vw] -translate-x-1/2 bg-gradient-to-r from-transparent via-[var(--color-accent-purple,#5e6ad2)]/18 to-transparent opacity-70 blur-[0.5px]' />
       <div className='absolute inset-0 bg-[radial-gradient(circle_at_15%_58%,rgba(139,92,246,0.045),transparent_16%),radial-gradient(circle_at_86%_32%,rgba(20,184,166,0.04),transparent_18%),linear-gradient(180deg,transparent,rgba(0,0,0,0.48)_76%)]' />
       {Array.from({ length: 18 }, (_, index) => {
         const x = (index * 29) % 100;
@@ -414,7 +414,7 @@ function RhythmHeartbeatLine({
     <svg
       aria-hidden='true'
       className={cn(
-        'pointer-events-none absolute z-0 overflow-visible text-[var(--linear-accent,#5e6ad2)]',
+        'pointer-events-none absolute z-0 overflow-visible text-[var(--color-accent-purple,#5e6ad2)]',
         variant === 'section'
           ? 'left-1/2 top-[38%] h-[22rem] w-[190vw] -translate-x-1/2 opacity-80 [mask-image:linear-gradient(90deg,transparent,black_16%,black_84%,transparent)]'
           : 'inset-x-8 top-8 h-[calc(100%-3.25rem)] w-[calc(100%-4rem)]'

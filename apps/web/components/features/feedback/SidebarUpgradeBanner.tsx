@@ -170,8 +170,8 @@ function buildVariant(input: {
 
 const ICON_TONE: Record<Urgency, string> = {
   calm: 'text-cyan-300/85',
-  building: 'text-(--linear-accent)',
-  high: 'text-(--linear-accent)',
+  building: 'text-(--color-accent-purple)',
+  high: 'text-(--color-accent-purple)',
 };
 
 export function SidebarUpgradeBanner() {

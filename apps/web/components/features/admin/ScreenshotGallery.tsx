@@ -268,7 +268,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                   aria-pressed={surfaceFilter === filter.id}
                   className={`h-auto rounded-full border px-3 py-1.5 text-xs ${
                     surfaceFilter === filter.id
-                      ? 'border-(--linear-accent) bg-(--linear-accent)/10 text-primary-token'
+                      ? 'border-(--color-accent-purple) bg-(--color-accent-purple)/10 text-primary-token'
                       : 'border-subtle bg-surface-0 text-secondary-token'
                   }`}
                 >
@@ -303,7 +303,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                       aria-pressed={groupFilter === filter.id}
                       className={`h-auto rounded-full border px-3 py-1.5 text-xs ${
                         groupFilter === filter.id
-                          ? 'border-(--linear-accent) bg-(--linear-accent)/10 text-primary-token'
+                          ? 'border-(--color-accent-purple) bg-(--color-accent-purple)/10 text-primary-token'
                           : 'border-subtle bg-surface-1 text-secondary-token'
                       }`}
                     >
@@ -327,7 +327,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                       aria-pressed={consumerFilter === filter.id}
                       className={`h-auto rounded-full border px-3 py-1.5 text-xs ${
                         consumerFilter === filter.id
-                          ? 'border-(--linear-accent) bg-(--linear-accent)/10 text-primary-token'
+                          ? 'border-(--color-accent-purple) bg-(--color-accent-purple)/10 text-primary-token'
                           : 'border-subtle bg-surface-1 text-secondary-token'
                       }`}
                     >

@@ -50,10 +50,10 @@ function dateKeyFromDate(date: Date): string {
 
 function getLevelClassName(level: number, inYear: boolean): string {
   if (!inYear) return 'bg-white/[0.015]';
-  if (level >= 4) return 'bg-[var(--linear-accent,#5e6ad2)]';
-  if (level === 3) return 'bg-[var(--linear-accent,#5e6ad2)]/75';
-  if (level === 2) return 'bg-[var(--linear-accent,#5e6ad2)]/50';
-  if (level === 1) return 'bg-[var(--linear-accent,#5e6ad2)]/25';
+  if (level >= 4) return 'bg-[var(--color-accent-purple,#5e6ad2)]';
+  if (level === 3) return 'bg-[var(--color-accent-purple,#5e6ad2)]/75';
+  if (level === 2) return 'bg-[var(--color-accent-purple,#5e6ad2)]/50';
+  if (level === 1) return 'bg-[var(--color-accent-purple,#5e6ad2)]/25';
   return 'bg-white/[0.035]';
 }
 

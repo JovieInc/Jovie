@@ -70,7 +70,7 @@ export function DashboardAnalyticsDemo() {
                 className='flex-1 rounded-t-sm'
                 style={{
                   height: visible ? `${heightPct}%` : '0%',
-                  backgroundColor: 'var(--linear-accent)',
+                  backgroundColor: 'var(--color-accent-purple)',
                   opacity: 0.7 + (i / DAILY_CLICKS.length) * 0.3,
                   transition: `height 0.6s var(--ds-motion-cinematic-easing) ${i * 20}ms`,
                 }}

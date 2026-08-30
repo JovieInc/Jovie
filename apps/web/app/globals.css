@@ -965,7 +965,7 @@ body {
     background: color-mix(
       in oklab,
       var(--linear-text-secondary) 70%,
-      var(--linear-accent)
+      var(--color-accent-purple)
     );
     box-shadow: 0 0 0 4px rgba(113, 112, 255, 0.08);
   }

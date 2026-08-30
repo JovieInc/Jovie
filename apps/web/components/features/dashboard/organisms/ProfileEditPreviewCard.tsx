@@ -201,7 +201,7 @@ export function ProfileEditPreviewCard({
           </div>
         </div>
         <div className='rounded-lg border border-accent/20 bg-accent/5 px-2.5 py-2'>
-          <div className='mb-0.5 text-app font-caption tracking-normal text-(--linear-accent)'>
+          <div className='mb-0.5 text-app font-caption tracking-normal text-(--color-accent-purple)'>
             New
           </div>
           <div className='text-app tracking-tight text-primary-token'>
