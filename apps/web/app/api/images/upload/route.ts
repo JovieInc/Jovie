@@ -2,6 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { getOptionalAuth } from '@/lib/auth/cached';
 import { withDbSessionTx } from '@/lib/auth/session';
+import { isBlobStorageConfigured } from '@/lib/blob-config';
 import { invalidateAvatarCache, invalidateProfileCache } from '@/lib/cache';
 import { isPressPhotoSchemaUnavailableError } from '@/lib/db/queries/press-photos';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
@@ -327,9 +328,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Early check for blob token in production
-  if (env.NODE_ENV === 'production' && !env.BLOB_READ_WRITE_TOKEN) {
-    logger.error('BLOB_READ_WRITE_TOKEN is not configured');
+  // Early check for blob storage in production (static token or OIDC)
+  if (env.NODE_ENV === 'production' && !isBlobStorageConfigured()) {
+    logger.error('Vercel Blob storage is not configured');
     return errorResponse(
       'Image upload is temporarily unavailable. Please try again later.',
       UPLOAD_ERROR_CODES.MISSING_BLOB_TOKEN,

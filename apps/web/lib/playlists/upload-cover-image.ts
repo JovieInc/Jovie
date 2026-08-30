@@ -1,4 +1,5 @@
 import 'server-only';
+import { isBlobStorageConfigured } from '@/lib/blob-config';
 import { captureError } from '@/lib/error-tracking';
 import { executeWithRetry, withTimeout } from '@/lib/resilience/primitives';
 
@@ -30,9 +31,9 @@ export async function uploadPlaylistCoverImage(options: {
     const blobModule = await import('@vercel/blob');
     const token = process.env.BLOB_READ_WRITE_TOKEN;
 
-    if (!token) {
+    if (!isBlobStorageConfigured()) {
       if (process.env.NODE_ENV === 'production') {
-        throw new Error('Blob storage token is not configured');
+        throw new Error('Blob storage is not configured');
       }
       return `https://blob.vercel-storage.com/playlists/${slug}/cover.jpg`;
     }

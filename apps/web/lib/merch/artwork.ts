@@ -6,6 +6,7 @@ import { put } from '@vercel/blob';
 import sharp from 'sharp';
 import { uploadBufferToBlob } from '@/app/api/images/upload/lib/blob-upload';
 import { PROCESSING_TIMEOUT_MS } from '@/app/api/images/upload/lib/constants';
+import { isBlobStorageConfigured } from '@/lib/blob-config';
 import { env } from '@/lib/env-server';
 import { withTimeout } from '@/lib/resilience/primitives';
 import { logger } from '@/lib/utils/logger';
@@ -83,13 +84,16 @@ async function uploadPublicBuffer(params: {
   readonly buffer: Buffer;
   readonly contentType: string;
 }): Promise<string> {
-  if (!env.BLOB_READ_WRITE_TOKEN) {
+  if (!isBlobStorageConfigured()) {
     if (env.NODE_ENV === 'production') {
       throw new TypeError('Blob storage not configured');
     }
-    logger.warn('[merch] Blob token missing; returning development URL', {
-      path: params.path,
-    });
+    logger.warn(
+      '[merch] Blob storage not configured; returning development URL',
+      {
+        path: params.path,
+      }
+    );
     return fallbackBlobUrl(params.path);
   }
 

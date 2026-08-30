@@ -13,6 +13,7 @@ import 'server-only';
  */
 
 import { z } from 'zod';
+import { isBlobStorageConfigured } from '@/lib/blob-config';
 import { env } from '@/lib/env-server';
 import {
   createMockupTask,
@@ -119,7 +120,7 @@ async function uploadPrintFile(
   const objectPath = `merch/printfiles/${fileName}`;
   let publicUrl: string;
 
-  if (env.BLOB_READ_WRITE_TOKEN) {
+  if (isBlobStorageConfigured()) {
     const { put } = await import('@vercel/blob');
     const blob = await put(objectPath, svgContent, {
       access: 'public',

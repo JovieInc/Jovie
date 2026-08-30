@@ -20,7 +20,7 @@ vi.mock('@/lib/analytics', () => ({
 }));
 
 vi.mock('@vercel/blob/client', () => ({
-  upload: vi.fn(),
+  uploadPresigned: vi.fn(),
 }));
 
 const payload = {

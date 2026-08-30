@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   requireAuth: vi.fn(),
-  handleUpload: vi.fn(),
+  handleUploadPresigned: vi.fn(),
+  issueSignedToken: vi.fn(),
   loadCapture: vi.fn(),
 }));
 
@@ -12,7 +13,11 @@ vi.mock('@/lib/auth/require-auth', () => ({
 }));
 
 vi.mock('@vercel/blob/client', () => ({
-  handleUpload: hoisted.handleUpload,
+  handleUploadPresigned: hoisted.handleUploadPresigned,
+}));
+
+vi.mock('@vercel/blob', () => ({
+  issueSignedToken: hoisted.issueSignedToken,
 }));
 
 vi.mock('@/lib/workflow-capture/server', () => ({
@@ -42,13 +47,22 @@ describe('POST /api/workflow-captures/[id]/upload-token', () => {
       executionResult: null,
       payload: { expiresAt: '2099-01-01T00:00:00.000Z' },
     });
-    hoisted.handleUpload.mockImplementation(async options => {
-      await options.onBeforeGenerateToken(
-        'workflow-captures/user-1/capture-1/recording.webm'
+    hoisted.issueSignedToken.mockResolvedValue({
+      delegationToken: 'delegation',
+      clientSigningToken: 'signing',
+      validUntil: Date.now() + 60_000,
+    });
+    hoisted.handleUploadPresigned.mockImplementation(async options => {
+      await options.getSignedToken(
+        'workflow-captures/user-1/capture-1/recording.webm',
+        null,
+        false
       );
       return {
-        type: 'blob.generate-client-token',
-        clientToken: 'private-token',
+        type: 'blob.generate-presigned-url',
+        presignedUrlPayload: {
+          url: 'https://api.vercel.com/v2/blob/presigned',
+        },
       };
     });
   });
@@ -59,7 +73,7 @@ describe('POST /api/workflow-captures/[id]/upload-token', () => {
         'https://jov.ie/api/workflow-captures/capture-1/upload-token',
         {
           method: 'POST',
-          body: JSON.stringify({ type: 'blob.generate-client-token' }),
+          body: JSON.stringify({ type: 'blob.generate-presigned-url' }),
         }
       ),
       routeParams
@@ -68,14 +82,18 @@ describe('POST /api/workflow-captures/[id]/upload-token', () => {
     expect(response.status).toBe(200);
     expect(hoisted.loadCapture).toHaveBeenCalledWith('capture-1', 'user-1');
     expect(await response.json()).toMatchObject({
-      clientToken: 'private-token',
+      presignedUrlPayload: {
+        url: 'https://api.vercel.com/v2/blob/presigned',
+      },
     });
   });
 
   it('rejects a pathname outside the owner-scoped prefix', async () => {
-    hoisted.handleUpload.mockImplementation(async options => {
-      await options.onBeforeGenerateToken(
-        'workflow-captures/other/capture-1/x.webm'
+    hoisted.handleUploadPresigned.mockImplementation(async options => {
+      await options.getSignedToken(
+        'workflow-captures/other/capture-1/x.webm',
+        null,
+        false
       );
     });
 
@@ -84,7 +102,7 @@ describe('POST /api/workflow-captures/[id]/upload-token', () => {
         'https://jov.ie/api/workflow-captures/capture-1/upload-token',
         {
           method: 'POST',
-          body: JSON.stringify({ type: 'blob.generate-client-token' }),
+          body: JSON.stringify({ type: 'blob.generate-presigned-url' }),
         }
       ),
       routeParams
@@ -106,7 +124,7 @@ describe('POST /api/workflow-captures/[id]/upload-token', () => {
         'https://jov.ie/api/workflow-captures/capture-1/upload-token',
         {
           method: 'POST',
-          body: JSON.stringify({ type: 'blob.generate-client-token' }),
+          body: JSON.stringify({ type: 'blob.generate-presigned-url' }),
         }
       ),
       routeParams

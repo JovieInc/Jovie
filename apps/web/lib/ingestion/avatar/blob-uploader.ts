@@ -5,6 +5,7 @@
  */
 
 import { put } from '@vercel/blob';
+import { isBlobStorageConfigured } from '@/lib/blob-config';
 
 /**
  * Upload a buffer to Vercel Blob storage.
@@ -15,7 +16,7 @@ export async function uploadBufferToBlob(params: {
   contentType: string;
 }): Promise<string> {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
-  if (!token) {
+  if (!isBlobStorageConfigured()) {
     if (process.env.NODE_ENV === 'production') {
       throw new TypeError('Blob storage not configured');
     }

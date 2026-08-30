@@ -2,6 +2,7 @@ import { del } from '@vercel/blob';
 import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { withDbSessionTx } from '@/lib/auth/session';
+import { isBlobStorageConfigured } from '@/lib/blob-config';
 import { invalidateProfileCache } from '@/lib/cache';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { creatorProfiles, profilePhotos } from '@/lib/db/schema/profiles';
@@ -19,7 +20,7 @@ export const runtime = 'nodejs';
 async function deletePressPhotoBlobs(urls: string[]): Promise<void> {
   const token = env.BLOB_READ_WRITE_TOKEN;
 
-  if (!token || urls.length === 0) {
+  if (!isBlobStorageConfigured() || urls.length === 0) {
     return;
   }
 

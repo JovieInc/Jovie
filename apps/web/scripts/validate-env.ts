@@ -39,11 +39,6 @@ const CRITICAL_VARS = [
     label: 'Cron Auth',
     validate: (v: string) => v.length >= 16,
   },
-  {
-    key: 'BLOB_READ_WRITE_TOKEN',
-    label: 'Blob Storage',
-    validate: (v: string) => v.length > 0,
-  },
 ] as const;
 
 // Important but not critical for MVP launch
@@ -59,8 +54,8 @@ const PRODUCTION_VARS = [
     validate: (v: string) => v !== 'default-key-change-in-production-32-chars',
   },
   {
-    key: 'AI_GATEWAY_API_KEY',
-    label: 'AI Gateway',
+    key: 'BLOB_STORE_ID',
+    label: 'Blob Store ID (OIDC)',
     validate: (v: string) => v.length > 0,
   },
 ] as const;

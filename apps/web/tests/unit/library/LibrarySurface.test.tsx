@@ -106,7 +106,7 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
 }));
 
 vi.mock('@vercel/blob/client', () => ({
-  upload: blobUploadMock,
+  uploadPresigned: blobUploadMock,
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({

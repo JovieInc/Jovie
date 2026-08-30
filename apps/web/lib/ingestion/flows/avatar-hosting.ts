@@ -8,6 +8,7 @@
  */
 
 import { put as uploadBlob } from '@vercel/blob';
+import { isBlobStorageConfigured } from '@/lib/blob-config';
 import {
   BLOCKED_HOSTNAMES,
   INTERNAL_DOMAIN_SUFFIXES,
@@ -72,8 +73,8 @@ export async function copyAvatarToBlob(
   handle: string
 ): Promise<string | null> {
   const token = env.BLOB_READ_WRITE_TOKEN;
-  if (!token) {
-    logger.warn('Skipping avatar copy: BLOB_READ_WRITE_TOKEN is not set');
+  if (!isBlobStorageConfigured()) {
+    logger.warn('Skipping avatar copy: Vercel Blob storage is not configured');
     return null;
   }
 

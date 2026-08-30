@@ -49,7 +49,9 @@ export class RetouchNoImageReturnedError extends Error {
 }
 
 export function isRetouchConfigured(): boolean {
-  return Boolean(env.AI_GATEWAY_API_KEY?.trim());
+  // On Vercel the AI Gateway authenticates via OIDC (VERCEL_OIDC_TOKEN is
+  // auto-injected); off-Vercel the static key comes from Doppler.
+  return Boolean(env.AI_GATEWAY_API_KEY?.trim()) || process.env.VERCEL === '1';
 }
 
 export interface RetouchModelResult {

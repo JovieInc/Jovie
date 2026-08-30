@@ -308,24 +308,6 @@ const checkUrlEncryptionKey: ValidationRule = ({ server, vercelEnv }) => {
 };
 
 /**
- * Validation rule: Check AI Gateway API key in production/preview.
- */
-const checkAiGatewayApiKey: ValidationRule = ({ server, vercelEnv }) => {
-  if (
-    (vercelEnv === 'production' || vercelEnv === 'preview') &&
-    !server.AI_GATEWAY_API_KEY
-  ) {
-    return {
-      type: 'critical',
-      message:
-        'AI_GATEWAY_API_KEY is required in production/preview for chat completions',
-    };
-  }
-
-  return null;
-};
-
-/**
  * Validation rule: Warn when XAI_API_KEY is missing in production/preview.
  *
  * xAI powers album-art generation, which gracefully degrades when the key is
@@ -357,7 +339,9 @@ export const RUNTIME_VALIDATION_RULES: ValidationRule[] = [
   checkStripePublishableFormat,
   checkStripePairConsistency,
   checkUrlEncryptionKey,
-  checkAiGatewayApiKey,
+  // No AI_GATEWAY_API_KEY rule: it only fires on Vercel (production/preview),
+  // where OIDC (VERCEL_OIDC_TOKEN) is always injected and @ai-sdk/gateway
+  // falls back to it automatically; off-Vercel runs use Doppler's key.
   checkXaiApiKey,
 ];
 

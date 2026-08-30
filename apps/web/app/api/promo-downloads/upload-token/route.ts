@@ -1,12 +1,19 @@
 /**
  * Promo Download Upload Token
  *
- * Generates a Vercel Blob client upload token so the browser can upload
+ * Issues a Vercel Blob presigned upload URL so the browser can upload
  * audio files directly to Blob storage (bypassing the 4.5MB serverless body limit).
  * Pro-gated.
+ *
+ * Uses `handleUploadPresigned` + `issueSignedToken` so the route works with
+ * Vercel OIDC federation (no static BLOB_READ_WRITE_TOKEN required).
  */
 
-import { type HandleUploadBody, handleUpload } from '@vercel/blob/client';
+import { issueSignedToken } from '@vercel/blob';
+import {
+  type HandleUploadPresignedBody,
+  handleUploadPresigned,
+} from '@vercel/blob/client';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAudioBlobPathPrefix } from '@/lib/audio/blob-path';
 import {
@@ -32,17 +39,17 @@ export async function POST(request: NextRequest) {
   if (error) return error;
 
   try {
-    const body = (await request.json()) as HandleUploadBody;
+    const body = (await request.json()) as HandleUploadPresignedBody;
     const { user, profile } = await getSessionContext({
       clerkUserId,
       requireUser: true,
       requireProfile: false,
     });
 
-    const jsonResponse = await handleUpload({
+    const jsonResponse = await handleUploadPresigned({
       body,
       request,
-      onBeforeGenerateToken: async pathname => {
+      getSignedToken: async pathname => {
         if (!profile) {
           throw new Error('Creator profile not found');
         }
@@ -58,19 +65,20 @@ export async function POST(request: NextRequest) {
           throw new Error('Pro plan required for promo downloads');
         }
 
-        return {
+        const token = await issueSignedToken({
+          pathname,
+          operations: ['put'],
           allowedContentTypes: [...ALLOWED_MIME_TYPES],
           maximumSizeInBytes: MAX_FILE_SIZE_BYTES,
-          tokenPayload: JSON.stringify({
-            creatorProfileId: profile.id,
-            userId: clerkUserId,
-          }),
+        });
+
+        return {
+          token,
+          urlOptions: {
+            allowedContentTypes: [...ALLOWED_MIME_TYPES],
+            maximumSizeInBytes: MAX_FILE_SIZE_BYTES,
+          },
         };
-      },
-      onUploadCompleted: async ({ blob, tokenPayload }) => {
-        // This callback fires after the client upload completes.
-        // We don't insert the DB record here because the client
-        // needs to call /api/promo-downloads/confirm with metadata.
       },
     });
 

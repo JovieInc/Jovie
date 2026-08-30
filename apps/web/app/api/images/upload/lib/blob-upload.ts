@@ -4,6 +4,7 @@
  * Handles uploading images to Vercel Blob storage.
  */
 
+import { isBlobStorageConfigured } from '@/lib/blob-config';
 import { env } from '@/lib/env';
 import { logger } from '@/lib/utils/logger';
 import { BLOB_RETRY_DELAY_MS, MAX_BLOB_UPLOAD_RETRIES } from './constants';
@@ -38,12 +39,12 @@ export async function uploadBufferToBlob(
 ): Promise<string> {
   const token = env.BLOB_READ_WRITE_TOKEN;
 
-  if (!put || !token) {
+  if (!put || !isBlobStorageConfigured()) {
     if (process.env.NODE_ENV === 'production') {
       throw new TypeError('Blob storage not configured');
     }
     logger.warn(
-      '[DEV] BLOB_READ_WRITE_TOKEN missing, returning mock URL for:',
+      '[DEV] Blob storage not configured, returning mock URL for:',
       path
     );
     return `https://blob.vercel-storage.com/${path}`;

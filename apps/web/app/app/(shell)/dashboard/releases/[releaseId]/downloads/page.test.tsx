@@ -12,7 +12,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/hooks/useJovieAuth', () => ({
   useAuthSafe: () => ({ userId: 'user-1' }),
 }));
-vi.mock('@vercel/blob/client', () => ({ upload: mocks.upload }));
+vi.mock('@vercel/blob/client', () => ({ uploadPresigned: mocks.upload }));
 
 import PromoDownloadsPage from './page';
 

@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSessionTx } from '@/lib/auth/session';
+import { isBlobStorageConfigured } from '@/lib/blob-config';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -38,7 +39,7 @@ async function uploadArtworkSizes(
     Object.entries(processed).map(async ([sizeKey, buffer]) => {
       const blobPath = `artwork/releases/${releaseId}/${sizeKey}.avif`;
 
-      if (!put || !token) {
+      if (!put || !isBlobStorageConfigured()) {
         if (env.NODE_ENV === 'production') {
           throw new TypeError('Blob storage not configured');
         }
@@ -113,8 +114,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (env.NODE_ENV === 'production' && !env.BLOB_READ_WRITE_TOKEN) {
-    logger.error('BLOB_READ_WRITE_TOKEN is not configured');
+  if (env.NODE_ENV === 'production' && !isBlobStorageConfigured()) {
+    logger.error('Vercel Blob storage is not configured');
     return errorResponse(
       'Image upload is temporarily unavailable. Please try again later.',
       UPLOAD_ERROR_CODES.MISSING_BLOB_TOKEN,

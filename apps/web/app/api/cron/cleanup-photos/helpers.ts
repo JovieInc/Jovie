@@ -6,6 +6,7 @@
 
 import { del } from '@vercel/blob';
 import { and, eq, lt, or, type SQL } from 'drizzle-orm';
+import { isBlobStorageConfigured } from '@/lib/blob-config';
 import { profilePhotos } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
@@ -71,7 +72,7 @@ export function collectBlobUrls(records: OrphanedPhotoRecord[]): string[] {
 export async function deleteBlobsIfConfigured(urls: string[]): Promise<number> {
   const token = env.BLOB_READ_WRITE_TOKEN;
 
-  if (!token || urls.length === 0) {
+  if (!isBlobStorageConfigured() || urls.length === 0) {
     return 0;
   }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { upload } from '@vercel/blob/client';
+import { uploadPresigned } from '@vercel/blob/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuthSafe } from '@/hooks/useJovieAuth';
 import { buildAudioBlobPath } from '@/lib/audio/blob-path';
@@ -127,7 +127,7 @@ export function useChatAudioAttachments({
       };
 
       try {
-        const blob = await upload(
+        const blob = await uploadPresigned(
           buildAudioBlobPath('chat', userId ?? 'unknown', file.name),
           file,
           {
