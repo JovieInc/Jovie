@@ -30,6 +30,10 @@ import {
 } from './desktop-auth-security';
 import { installDesktopCspWatchdog } from './desktop-csp-watchdog';
 import {
+  buildDesktopUpdateMenuItem,
+  shouldScheduleDesktopAutoUpdate as shouldScheduleDesktopAutoUpdateForEnvironment,
+} from './desktop-update-menu';
+import {
   isDesktopCaptureRouteUrl,
   shouldGrantTrustedAudioPermission,
   shouldGrantTrustedAudioPermissionCheck,
@@ -2098,14 +2102,13 @@ function checkForUpdatesFromMenu(): void {
 }
 
 function shouldScheduleDesktopAutoUpdate(): boolean {
-  // Local dev shells never auto-update. Production publishes to the
-  // electron-updater channel; staging ships as CI artifacts and its update
-  // check is a no-op (publish: null). See apps/desktop/SIGNING.md.
-  if (APP_ENV === 'local' || process.platform === 'linux') {
-    return false;
-  }
-
-  return true;
+  // Local dev shells never auto-update. Release-channel capability is selected
+  // by the packaged environment; Linux remains unsupported by electron-updater.
+  // See apps/desktop/SIGNING.md.
+  return shouldScheduleDesktopAutoUpdateForEnvironment({
+    appEnv: APP_ENV,
+    platform: process.platform,
+  });
 }
 
 function scheduleDesktopAutoUpdate(): void {
@@ -2137,12 +2140,11 @@ function scheduleHudBuildAutoReload(): void {
 }
 
 function buildUpdateMenuItem(): MenuItemConstructorOptions {
-  return {
-    label: updateReadyToInstall
-      ? 'Restart to install update…'
-      : 'Check for updates…',
-    click: checkForUpdatesFromMenu,
-  };
+  return buildDesktopUpdateMenuItem({
+    updaterSupported: shouldScheduleDesktopAutoUpdate(),
+    updateReadyToInstall,
+    onClick: checkForUpdatesFromMenu,
+  });
 }
 
 function buildViewMenu(): MenuItemConstructorOptions[] {
