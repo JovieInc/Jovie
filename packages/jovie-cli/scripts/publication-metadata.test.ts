@@ -18,6 +18,7 @@ type PackageManifest = {
     readonly provenance?: unknown;
     readonly registry?: unknown;
   };
+  readonly scripts?: { readonly 'test:fast'?: unknown };
 };
 
 function readManifest(): PackageManifest {
@@ -58,5 +59,13 @@ describe('public CLI publication metadata', () => {
     expect(readme).toContain('jovie --help');
     expect(readme).toContain('jovie --version');
     expect(readme).toContain('artist get <username>');
+  });
+
+  it('leaves CI-injected singleton test flags to the caller', () => {
+    const manifest = readManifest();
+    const testFast = manifest.scripts?.['test:fast'];
+
+    expect(testFast).toBe('vitest run');
+    expect(testFast).not.toContain('--passWithNoTests');
   });
 });
