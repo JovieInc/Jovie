@@ -461,10 +461,6 @@
    ============================================ */
 
 :root {
-  /* Semantic text */
-  --linear-color-text: var(--linear-text-primary);
-  --linear-color-text-muted: var(--linear-text-secondary);
-  --linear-color-text-subtle: var(--linear-text-tertiary);
   /* Semantic backgrounds */
   --linear-color-bg: var(--linear-bg-page);
   --linear-color-bg-elevated: var(--linear-bg-surface-0);
