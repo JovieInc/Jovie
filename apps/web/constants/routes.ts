@@ -167,6 +167,8 @@ export const APP_ROUTES = {
   /** Legacy campaign URL. Kept only for inbound-link compatibility; do not use for new navigation. */
   LAUNCH_PRICING: '/launch/pricing',
   CHANGELOG: '/changelog',
+  ENGINEERING: '/engineering',
+  ENGINEERING_PREVIEW: '/engineering/preview',
   DOWNLOAD: '/download',
   SUPPORT: '/support',
   PAY: '/pay',
