@@ -71,10 +71,10 @@ import {
 import { evaluateRemoteDebuggingGuard } from './remote-debugging-guard';
 import {
   classifyDesktopLoadFailure,
+  createLocalHostedLoadRetryController,
   decideAbortedMainFrameRecovery,
   decideDidFinishLoadRecovery,
   decideHostedLoadRetry,
-  decideLocalMainFrameLoadFailure,
   decideRecoveryUnlatch,
   decideRendererBootWatchdogAfterLoad,
   decideRendererLoadStart,
@@ -82,7 +82,6 @@ import {
   decideRendererWatchdogExpiry,
   describeDesktopLoadFailure,
   hostedUrlCandidates,
-  LOCAL_HOSTED_LOAD_RETRY_DELAY_MS,
   parseDidStartNavigation,
   RECOVERY_UNLATCH_POLL_MS,
   rendererWatchdogMs,
@@ -1461,11 +1460,16 @@ function attachRendererRecovery(
   let lastHostedUrl = APP_ENTRY_URL;
   let bootWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
   let loadWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
-  let localHostedLoadRetryCount = 0;
-  let localHostedLoadRetryTimer: ReturnType<typeof setTimeout> | null = null;
   let recoveryUnlatchTimer: ReturnType<typeof setTimeout> | null = null;
   const armWatchdogs = shouldArmRendererWatchdogsForAppEnv(APP_ENV);
   const webContentsId = win.webContents.id;
+  const localHostedLoadRecovery = createLocalHostedLoadRetryController({
+    retry: retryUrl => {
+      if (win.isDestroyed()) return;
+      void win.loadURL(retryUrl);
+    },
+    isWindowDestroyed: () => win.isDestroyed(),
+  });
 
   const clearBootWatchdog = (): void => {
     if (bootWatchdogTimer !== null) {
@@ -1481,17 +1485,9 @@ function attachRendererRecovery(
     }
   };
 
-  const clearLocalHostedLoadRetry = (): void => {
-    if (localHostedLoadRetryTimer !== null) {
-      clearTimeout(localHostedLoadRetryTimer);
-      localHostedLoadRetryTimer = null;
-    }
-  };
-
   const clearAllWatchdogs = (): void => {
     clearBootWatchdog();
     clearLoadWatchdog();
-    clearLocalHostedLoadRetry();
   };
 
   const stopRecoveryUnlatch = (): void => {
@@ -1664,7 +1660,7 @@ function attachRendererRecovery(
     rendererBooted = true;
     rendererEverBooted = true;
     rendererCrashReloadCount = 0;
-    localHostedLoadRetryCount = 0;
+    localHostedLoadRecovery.reset();
     hostedLoadRetryCount = 0;
     clearAllWatchdogs();
     stopRecoveryUnlatch();
@@ -1675,6 +1671,7 @@ function attachRendererRecovery(
     beginRecoveryUnlatch,
     dispose: () => {
       clearAllWatchdogs();
+      localHostedLoadRecovery.dispose();
       stopRecoveryUnlatch();
       rendererBootControllers.delete(webContentsId);
     },
@@ -1700,18 +1697,32 @@ function attachRendererRecovery(
     }
   });
 
+  // did-finish-load is unqualified and can arrive late for the splash or
+  // Chromium error document. did-navigate carries the committed URL, so only
+  // a positively identified hosted app document may complete local recovery.
+  win.webContents.on('did-navigate', (_event, url) => {
+    localHostedLoadRecovery.onMainFrameDocumentCommitted({
+      isHostedAppDocument:
+        decideRendererLoadStart({
+          url,
+          appOrigin: APP_ORIGIN,
+          isMainFrame: true,
+          isInPlace: false,
+        }) === 'arm-load-watchdog',
+    });
+  });
+
   win.webContents.on('did-finish-load', () => {
     // Chromium still emits did-finish-load for chrome-error://chromewebdata/
-    // after did-fail-load. That is not a hosted app load — resetting the
-    // local retry budget and calling clearAllWatchdogs() here cancels the
-    // pending retry and leaves Jovie Local black (JOV-5474).
+    // after did-fail-load. That is not a hosted app load, so it must not arm
+    // the boot watchdog. Local retry completion is owned by the URL-bearing
+    // did-navigate handler above (JOV-5474).
     if (
       decideDidFinishLoadRecovery({ url: win.webContents.getURL() }) ===
       'ignore'
     ) {
       return;
     }
-    localHostedLoadRetryCount = 0;
     armBootWatchdog();
   });
 
@@ -1757,27 +1768,26 @@ function attachRendererRecovery(
           typeof validatedURL === 'string' && validatedURL.startsWith('http')
             ? resolveNavigationUrl(validatedURL)
             : APP_ENTRY_URL;
-        const localAction = decideLocalMainFrameLoadFailure({
+        const localResult = localHostedLoadRecovery.onMainFrameLoadFailure({
           errorCode,
-          retryCount: localHostedLoadRetryCount,
+          retryUrl,
         });
-        if (localAction === 'retry') {
-          localHostedLoadRetryCount += 1;
+        if (localResult.action === 'retry') {
           console.warn('[Jovie Desktop] Local hosted load not ready, retrying', {
             errorCode,
-            attempt: localHostedLoadRetryCount,
+            attempt: localResult.attempt,
             validatedURL:
               typeof validatedURL === 'string'
                 ? validatedURL.split('?')[0]
                 : validatedURL,
           });
-          localHostedLoadRetryTimer = setTimeout(() => {
-            localHostedLoadRetryTimer = null;
-            if (win.isDestroyed()) return;
-            void win.loadURL(retryUrl);
-          }, LOCAL_HOSTED_LOAD_RETRY_DELAY_MS);
+          // Chromium commits chrome-error://chromewebdata/ after a refused
+          // loopback load. Keep the app-owned shell painted while the bounded
+          // retry obligation remains active.
+          void win.loadURL(buildDesktopBootSplashUrl());
           return;
         }
+        void win.loadURL(buildDesktopBootSplashUrl());
       }
 
       console.error('[Jovie Desktop] Shell load failure (graceful recovery)', {
@@ -1795,6 +1805,7 @@ function attachRendererRecovery(
 
   win.webContents.on('render-process-gone', (_event, details) => {
     clearAllWatchdogs();
+    localHostedLoadRecovery.reset();
     const action = decideRendererRecovery({
       reason: details.reason,
       reloadCount: rendererCrashReloadCount,
