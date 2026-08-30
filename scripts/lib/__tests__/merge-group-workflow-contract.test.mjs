@@ -370,6 +370,16 @@ describe('merge_group workflow contract', () => {
     );
     expect(unitTests).toContain("github.event_name == 'workflow_dispatch'");
     expect(unitTests).not.toContain("github.event_name == 'pull_request'");
+    expect(unitTests).toContain('fail-fast: true');
+    expect(unitTests).not.toContain('fail-fast: false');
+    expect(unitTests).toContain('Preserve first unit-test failure diagnosis');
+    expect(unitTests).toContain(
+      "if: ${{ failure() && !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' }}"
+    );
+    expect(unitTests).toContain(
+      'unit-test-failure-${{ github.run_id }}-${{ github.run_attempt }}-${{ strategy.job-index }}'
+    );
+    expect(unitTests).toContain('if-no-files-found: warn');
     expect(aggregate).not.toMatch(
       /github\.event\.pull_request|github\.(base_ref|head_ref)/
     );
