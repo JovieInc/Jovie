@@ -14,9 +14,9 @@ export interface CookieActionsProps {
 }
 
 const customizeButtonStyle: CSSProperties = {
-  backgroundColor: 'var(--linear-bg-button)',
-  color: 'var(--linear-text-primary)',
-  border: '1px solid var(--linear-border-default)',
+  backgroundColor: 'var(--color-bg-button)',
+  color: 'var(--color-text-primary-token)',
+  border: '1px solid var(--color-border-default)',
   borderRadius: 'var(--radius-sm)',
   fontSize: '12px',
   fontWeight: 'var(--linear-font-weight-medium)',
@@ -27,9 +27,9 @@ const customizeButtonStyle: CSSProperties = {
 
 /** Shared by Accept all and Reject all so neither choice is visually stronger. */
 const choiceButtonStyle: CSSProperties = {
-  backgroundColor: 'var(--linear-btn-primary-bg)',
-  color: 'var(--linear-btn-primary-fg)',
-  border: '1px solid var(--linear-btn-primary-bg)',
+  backgroundColor: 'var(--color-btn-primary-bg)',
+  color: 'var(--color-btn-primary-fg)',
+  border: '1px solid var(--color-btn-primary-bg)',
   borderRadius: 'var(--radius-sm)',
   fontSize: '12px',
   fontWeight: 'var(--linear-font-weight-medium)',

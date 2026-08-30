@@ -17,7 +17,7 @@ describe('Founder demo System B source contract', () => {
     expect(source).not.toContain('hover:opacity-90');
 
     expect(source).toContain('h-8 w-full rounded-md');
-    expect(source).toContain('border-(--linear-btn-primary-border)');
+    expect(source).toContain('border-(--color-btn-primary-border)');
     expect(source).toContain('bg-btn-primary');
     expect(source).toContain('text-btn-primary-foreground');
     expect(source).toContain('hover:bg-btn-primary-hover');

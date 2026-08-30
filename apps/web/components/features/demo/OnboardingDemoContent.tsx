@@ -61,7 +61,7 @@ function StepSwitcher({
           className={cn(
             'min-h-7 shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-subtle',
             currentStep === step
-              ? 'border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover'
+              ? 'border-(--color-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--color-btn-primary-hover) hover:bg-btn-primary-hover'
               : 'border-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
           )}
         >

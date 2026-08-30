@@ -76,7 +76,7 @@ export function JovieOverlay({
           )}
         >
           <div className='flex items-center gap-3 self-start'>
-            <span className='relative h-8 w-8 rounded-full border border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset grid place-items-center'>
+            <span className='relative h-8 w-8 rounded-full border border-(--color-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset grid place-items-center'>
               <Mic className='h-3.5 w-3.5' strokeWidth={2.5} />
               <span
                 aria-hidden='true'

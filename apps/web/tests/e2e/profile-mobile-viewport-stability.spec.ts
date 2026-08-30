@@ -1147,15 +1147,15 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
           Object.assign(button.style, {
             backgroundColor:
               variant === 'choice'
-                ? 'var(--linear-btn-primary-bg)'
-                : 'var(--linear-bg-button)',
+                ? 'var(--color-btn-primary-bg)'
+                : 'var(--color-bg-button)',
             color:
               variant === 'choice'
-                ? 'var(--linear-btn-primary-fg)'
-                : 'var(--linear-text-primary)',
+                ? 'var(--color-btn-primary-fg)'
+                : 'var(--color-text-primary-token)',
             border:
               variant === 'choice'
-                ? '1px solid var(--linear-btn-primary-bg)'
+                ? '1px solid var(--color-btn-primary-bg)'
                 : '1px solid var(--linear-border-default)',
             borderRadius: 'var(--radius-sm)',
             fontSize: '12px',

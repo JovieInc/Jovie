@@ -24,9 +24,9 @@ type NavLink = { href: string; label: string };
 // ── Hoisted style objects (avoid re-creating on every render → less GC pressure) ──
 
 const CTA_BUTTON_STYLE: CSSProperties = {
-  color: 'var(--linear-btn-primary-fg)',
-  backgroundColor: 'var(--linear-btn-primary-bg)',
-  border: '1px solid var(--linear-btn-primary-border)',
+  color: 'var(--color-btn-primary-fg)',
+  backgroundColor: 'var(--color-btn-primary-bg)',
+  border: '1px solid var(--color-btn-primary-border)',
   boxShadow: 'var(--linear-shadow-button)',
 };
 
@@ -38,9 +38,9 @@ const OVERLAY_STYLE: CSSProperties = {
 
 const NAV_PANEL_STYLE: CSSProperties = {
   backgroundColor:
-    'color-mix(in oklab, var(--linear-bg-surface-0) 95%, white 5%)',
+    'color-mix(in oklab, var(--color-bg-surface-0) 95%, white 5%)',
   borderTop:
-    '1px solid color-mix(in oklab, var(--linear-border-subtle) 85%, white 15%)',
+    '1px solid color-mix(in oklab, var(--color-border-subtle) 85%, white 15%)',
   boxShadow:
     '0 -8px 40px oklch(0% 0 0 / 0.25), 0 -2px 12px oklch(0% 0 0 / 0.15)',
   paddingBottom: 'calc(24px + env(safe-area-inset-bottom))',
@@ -51,7 +51,7 @@ const NAV_PANEL_STYLE: CSSProperties = {
 
 const GRABBER_STYLE: CSSProperties = {
   background:
-    'color-mix(in oklab, var(--linear-text-tertiary) 40%, transparent)',
+    'color-mix(in oklab, var(--color-text-tertiary-token) 40%, transparent)',
 };
 
 function buildNavLinks(
@@ -178,7 +178,7 @@ export function MobileNav({
           'text-primary-token',
           'transition-colors duration-subtle ease-subtle',
           '[-webkit-tap-highlight-color:transparent]',
-          'hover:bg-(--linear-bg-hover)',
+          'hover:bg-(--color-bg-hover)',
           'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--linear-accent)'
         )}
         aria-label={isOpen ? 'Close menu' : 'Open menu'}
@@ -240,7 +240,7 @@ export function MobileNav({
                       'text-base font-medium',
                       'text-primary-token',
                       'transition-colors duration-subtle ease-subtle',
-                      'hover:bg-(--linear-bg-hover)',
+                      'hover:bg-(--color-bg-hover)',
                       'animate-[mobile-nav-item-in_400ms_ease-out_both]'
                     )}
                     style={{

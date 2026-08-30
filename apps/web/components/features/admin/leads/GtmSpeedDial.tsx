@@ -172,7 +172,7 @@ export function GtmSpeedDial() {
             className={cn(
               'h-auto rounded-lg border px-3.5 py-1.5 text-app font-medium transition-colors',
               currentSpeed === speed
-                ? 'border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover'
+                ? 'border-(--color-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--color-btn-primary-hover) hover:bg-btn-primary-hover'
                 : 'border-transparent bg-surface-0 text-secondary-token hover:bg-surface-0/80 hover:text-primary-token'
             )}
           >

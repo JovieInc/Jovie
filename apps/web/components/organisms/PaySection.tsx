@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 const CARD_CLASSES =
   'rounded-2xl border border-subtle bg-surface-1 p-6 shadow-sm';
 const PAY_METHOD_BUTTON_CLASSES =
-  'flex w-full items-center justify-center rounded-lg border border-(--linear-btn-primary-border) bg-btn-primary px-4 py-3 text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--linear-btn-primary-hover) hover:bg-(--linear-btn-primary-hover) active:opacity-80';
+  'flex w-full items-center justify-center rounded-lg border border-(--color-btn-primary-border) bg-btn-primary px-4 py-3 text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--color-btn-primary-hover) hover:bg-(--color-btn-primary-hover) active:opacity-80';
 
 function ApplePayLogo({ className }: { readonly className?: string }) {
   return (

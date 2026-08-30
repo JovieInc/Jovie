@@ -56,7 +56,7 @@ export function LibrarySharePassphraseGate({
           value={passphrase}
           onChange={event => setPassphrase(event.target.value)}
           placeholder='Passphrase'
-          className='w-full rounded-xl border border-subtle bg-surface-0 px-4 py-3 text-sm text-primary-token outline-none transition-colors focus-visible:border-(--linear-border-focus)'
+          className='w-full rounded-xl border border-subtle bg-surface-0 px-4 py-3 text-sm text-primary-token outline-none transition-colors focus-visible:border-(--color-border-focus)'
           disabled={loading}
         />
         {error ? (
@@ -67,7 +67,7 @@ export function LibrarySharePassphraseGate({
         <button
           type='submit'
           disabled={loading || passphrase.length === 0}
-          className='w-full rounded-xl border border-(--linear-btn-primary-border) bg-btn-primary px-4 py-3 text-sm font-medium text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover disabled:opacity-50'
+          className='w-full rounded-xl border border-(--color-btn-primary-border) bg-btn-primary px-4 py-3 text-sm font-medium text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--color-btn-primary-hover) hover:bg-btn-primary-hover disabled:opacity-50'
         >
           {loading ? 'Unlocking…' : 'Unlock drop'}
         </button>

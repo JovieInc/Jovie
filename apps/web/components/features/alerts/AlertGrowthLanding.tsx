@@ -343,7 +343,7 @@ export function AlertGrowthLanding({
             <button
               type='submit'
               disabled={isPending}
-              className='h-12 w-full rounded-(--profile-action-radius) border border-(--linear-btn-primary-border) bg-btn-primary px-4 text-sm font-semibold text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover disabled:opacity-60'
+              className='h-12 w-full rounded-(--profile-action-radius) border border-(--color-btn-primary-border) bg-btn-primary px-4 text-sm font-semibold text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle hover:border-(--color-btn-primary-hover) hover:bg-btn-primary-hover disabled:opacity-60'
             >
               {isPending ? 'Sending…' : 'Get alerts'}
             </button>

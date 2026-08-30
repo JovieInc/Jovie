@@ -305,7 +305,7 @@ function RecordingChatPanel({
               performance.
             </div>
             <button
-              className='h-8 w-full rounded-md border border-(--linear-btn-primary-border) bg-btn-primary text-xs font-medium text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover'
+              className='h-8 w-full rounded-md border border-(--color-btn-primary-border) bg-btn-primary text-xs font-medium text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--color-btn-primary-hover) hover:bg-btn-primary-hover'
               type='button'
             >
               Approve drop

@@ -42,10 +42,10 @@ export function AuthProviderButtonSlot({
       className={cn(
         'flex h-(--linear-button-height-md) min-h-(--linear-button-height-md) w-full items-center justify-center gap-(--linear-gap-buttons) rounded-full border px-(--linear-space-4) text-caption font-caption tracking-normal',
         'transition-[background-color,border-color,color,box-shadow,opacity] duration-subtle ease-out',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/40',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-border-focus)/40',
         isDisabled && 'cursor-wait opacity-75',
         provider === 'google'
-          ? 'border-(--linear-btn-primary-border) bg-(--linear-btn-primary-bg) text-(--linear-btn-primary-fg) shadow-(--linear-shadow-button) hover:bg-(--linear-btn-primary-hover)'
+          ? 'border-(--color-btn-primary-border) bg-(--color-btn-primary-bg) text-(--color-btn-primary-fg) shadow-(--linear-shadow-button) hover:bg-(--color-btn-primary-hover)'
           : 'border-subtle bg-surface-1 text-primary-token hover:border-default hover:bg-surface-0'
       )}
     >

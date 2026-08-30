@@ -13,7 +13,7 @@ describe('admin growth speed dial System B source contract', () => {
     expect(source).not.toContain('text-accent hover:underline');
     expect(source).not.toMatch(/\bbg-(?:blue|purple|violet|indigo)-\d/);
 
-    expect(source).toContain('border-(--linear-btn-primary-border)');
+    expect(source).toContain('border-(--color-btn-primary-border)');
     expect(source).toContain('bg-btn-primary');
     expect(source).toContain('text-btn-primary-foreground');
     expect(source).toContain('hover:bg-btn-primary-hover');

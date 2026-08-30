@@ -612,7 +612,7 @@ function HermesDispatchControls({
           size='sm'
           onClick={() => void dispatchWorker(false)}
           disabled={isDispatching}
-          className='inline-flex min-h-10 items-center gap-2 rounded-lg border border-(--linear-btn-primary-border) bg-btn-primary px-3 text-app font-semibold text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover disabled:cursor-not-allowed disabled:opacity-60'
+          className='inline-flex min-h-10 items-center gap-2 rounded-lg border border-(--color-btn-primary-border) bg-btn-primary px-3 text-app font-semibold text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--color-btn-primary-hover) hover:bg-btn-primary-hover disabled:cursor-not-allowed disabled:opacity-60'
         >
           {isDispatching ? (
             <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' />

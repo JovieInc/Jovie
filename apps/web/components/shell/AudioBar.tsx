@@ -141,7 +141,7 @@ export function AudioBar({
         <button
           type='button'
           onClick={onPlay}
-          className='h-8 w-8 rounded-full grid place-items-center border border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle ease-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover'
+          className='h-8 w-8 rounded-full grid place-items-center border border-(--color-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle ease-subtle hover:border-(--color-btn-primary-hover) hover:bg-btn-primary-hover'
           aria-label={isPlaying ? 'Pause (space)' : 'Play (space)'}
         >
           {isPlaying ? (

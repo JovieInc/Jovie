@@ -368,7 +368,7 @@ export function LibraryShareDropCreator({
           onClick={() => {
             handleCreate().catch(() => {});
           }}
-          className='rounded-xl border border-(--linear-btn-primary-border) bg-btn-primary px-4 py-2 text-sm font-medium text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover disabled:opacity-50'
+          className='rounded-xl border border-(--color-btn-primary-border) bg-btn-primary px-4 py-2 text-sm font-medium text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--color-btn-primary-hover) hover:bg-btn-primary-hover disabled:opacity-50'
           data-testid='library-share-create-submit'
         >
           {loading ? 'Creating…' : 'Create link'}

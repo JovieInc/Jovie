@@ -103,7 +103,7 @@ export function CelebrationCardPreview({
             }}
             className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
               selectedSize === size
-                ? 'border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover'
+                ? 'border-(--color-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--color-btn-primary-hover) hover:bg-btn-primary-hover'
                 : 'border-transparent bg-surface-2 text-secondary-token hover:text-primary-token'
             }`}
           >

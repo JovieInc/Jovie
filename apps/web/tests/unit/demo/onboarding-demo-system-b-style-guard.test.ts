@@ -41,6 +41,6 @@ describe('Onboarding demo System B source contract', () => {
 
     expect(source).toContain('min-h-7');
     expect(source).toContain('border-transparent');
-    expect(source).toContain('border-(--linear-btn-primary-border)');
+    expect(source).toContain('border-(--color-btn-primary-border)');
   });
 });

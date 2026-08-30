@@ -43,50 +43,27 @@
   /* ============================================
      TEXT COLORS — LIGHT MODE
      ============================================ */
-  --linear-text-primary: oklch(12% 0.005 282);
-  --linear-text-secondary: oklch(42% 0.012 282);
-  --linear-text-tertiary: oklch(45% 0.01 282);
-  --linear-text-quaternary: oklch(55% 0.008 282);
+  --color-text-primary-token: oklch(12% 0.005 282);
+  --color-text-secondary-token: oklch(42% 0.012 282);
+  --color-text-tertiary-token: oklch(45% 0.01 282);
+  --color-text-quaternary-token: oklch(55% 0.008 282);
   --linear-text-inverse: oklch(97% 0.005 282);
   /* ============================================
      BACKGROUNDS — LIGHT MODE
      Clean, warm off-whites inspired by Linear's light UI
      ============================================ */
-  --linear-bg-page: oklch(98.5% 0.002 282);
-  --linear-bg-header: oklch(98.5% 0.002 282 / 0.85);
-  --linear-bg-surface-0: oklch(100% 0 0);
+  --color-bg-page: oklch(98.5% 0.002 282);
+  --color-bg-surface-0: oklch(100% 0 0);
   /* Pure white — elevated surfaces (menus, popovers, cards) */
-  --linear-bg-surface-1: oklch(97% 0.002 282);
+  --color-bg-surface-1: oklch(97% 0.002 282);
   /* Item hover / secondary surface */
-  --linear-bg-surface-2: oklch(95% 0.003 282);
-  --linear-bg-button: oklch(92% 0.005 282);
-  --linear-bg-footer: oklch(98.5% 0.002 282);
-  --linear-border-footer: oklch(90% 0.005 282);
-  --linear-bg-hover: rgba(0, 0, 0, 0.04);
+  --color-bg-surface-2: oklch(95% 0.003 282);
+  --color-bg-button: oklch(92% 0.005 282);
+  --color-bg-hover: rgba(0, 0, 0, 0.04);
+  /* Border tokens retired to canonical --color-border-* in design-system.css (JOV-5458). */
   /* ============================================
-     BORDERS — LIGHT MODE
+     BUTTON COLORS — retired (JOV-5461): migrated to canonical --color-btn-* in design-system.css
      ============================================ */
-  --linear-border-subtle: rgba(0, 0, 0, 0.06);
-  /* Low-emphasis separators inside shell chrome must stay quieter than a frame seam. */
-  --linear-border-default: rgba(0, 0, 0, 0.1);
-  --linear-border-strong: rgba(0, 0, 0, 0.15);
-  --linear-border-focus: rgba(0, 0, 0, 0.28);
-  /* ============================================
-     BUTTON COLORS — LIGHT MODE
-     ============================================ */
-  /* Primary button — dark on light */
-  --linear-btn-primary-bg: oklch(15% 0.005 282);
-  --linear-btn-primary-fg: oklch(98% 0 0);
-  --linear-btn-primary-hover: oklch(22% 0.005 282);
-  --linear-btn-primary-border: oklch(15% 0.005 282);
-  /* Secondary button — subtle gray */
-  --linear-btn-secondary-bg: oklch(94% 0.005 282);
-  --linear-btn-secondary-fg: oklch(20% 0.005 282);
-  --linear-btn-secondary-hover: oklch(90% 0.005 282);
-  /* Accent button — palette purple */
-  --linear-btn-accent-bg: #8b1eff;
-  --linear-btn-accent-fg: oklch(100% 0 0);
-  --linear-btn-accent-hover: #9a46ff;
   /* ============================================
      ACCENT COLORS (mode-independent)
      ============================================ */
@@ -244,7 +221,7 @@
   --linear-app-control-padding-x: 11px;
   --linear-app-control-radius: 9999px;
   --linear-app-toolbar-gap: 4px;
-  --linear-app-content-surface: var(--linear-bg-surface-0);
+  --linear-app-content-surface: var(--color-bg-surface-0);
   --linear-app-card-shadow: none;
   --linear-app-drawer-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.03), 0 14px 32px rgba(0, 0, 0, 0.05);
@@ -380,42 +357,27 @@
 .system-b-marketing.dark,
 [data-theme="linear"].dark {
   /* Text — Jovie Noir Ion (JOV-4635) */
-  --linear-text-primary: #f5f7fb;
-  --linear-text-secondary: #d7dce8;
-  --linear-text-tertiary: #a8b0c3;
-  --linear-text-quaternary: #7d879d;
+  --color-text-primary-token: #f5f7fb;
+  --color-text-secondary-token: #d7dce8;
+  --color-text-tertiary-token: #a8b0c3;
+  --color-text-quaternary-token: #7d879d;
   --linear-text-inverse: #020307;
   /* Backgrounds — Noir Ion stepped surfaces */
-  --linear-bg-page: #06080d;
+  --color-bg-page: #06080d;
   /* app canvas / sidebar base — the shell's recess is one continuous plane */
-  --linear-bg-header: transparent;
-  --linear-bg-surface-0: #06080d;
+  --color-bg-surface-0: #06080d;
   /* shell / recessed wells */
-  --linear-bg-surface-1: #0f1420;
+  --color-bg-surface-1: #0f1420;
   /* card */
-  --linear-bg-surface-2: #151b2a;
+  --color-bg-surface-2: #151b2a;
   /* elevated */
   --linear-panel-bg: #0a0d16;
   /* panel */
   --linear-panel-ring: rgba(199, 237, 255, 0.26);
-  --linear-bg-button: #151b2a;
-  --linear-bg-footer: #030407;
-  --linear-border-footer: rgba(168, 176, 195, 0.16);
-  --linear-bg-hover: rgba(168, 176, 195, 0.06);
-  /* Borders — Noir Ion cool graphite */
-  --linear-border-subtle: rgba(168, 176, 195, 0.1);
-  --linear-border-default: rgba(168, 176, 195, 0.16);
-  --linear-border-strong: rgba(199, 237, 255, 0.26);
-  --linear-border-focus: rgba(17, 175, 255, 0.72);
-  /* Ion focus */
-  /* Buttons — white primary on dark (restrained CTA; Ion is focus/selection) */
-  --linear-btn-primary-bg: #ffffff;
-  --linear-btn-primary-fg: #020307;
-  --linear-btn-primary-hover: #e8e9ec;
-  --linear-btn-primary-border: #ffffff;
-  --linear-btn-secondary-bg: #151b2a;
-  --linear-btn-secondary-fg: #f5f7fb;
-  --linear-btn-secondary-hover: #1b2436;
+  --color-bg-button: #151b2a;
+  --color-bg-hover: rgba(168, 176, 195, 0.06);
+  /* Border tokens retired to canonical color-border tokens in design-system.css (JOV-5458). */
+  /* Button tokens retired to canonical color-btn tokens in design-system.css (JOV-5461). */
   /* Hero-specific — cool ion atmosphere (sparse) */
   --linear-hero-glow: radial-gradient(
     ellipse 80% 60% at 50% 0%,
@@ -473,16 +435,16 @@
 
 :root {
   /* Semantic text */
-  --linear-color-text: var(--linear-text-primary);
-  --linear-color-text-muted: var(--linear-text-secondary);
-  --linear-color-text-subtle: var(--linear-text-tertiary);
+  --linear-color-text: var(--color-text-primary-token);
+  --linear-color-text-muted: var(--color-text-secondary-token);
+  --linear-color-text-subtle: var(--color-text-tertiary-token);
   /* Semantic backgrounds */
-  --linear-color-bg: var(--linear-bg-page);
-  --linear-color-bg-elevated: var(--linear-bg-surface-0);
-  --linear-color-bg-card: var(--linear-bg-surface-2);
+  --linear-color-bg: var(--color-bg-page);
+  --linear-color-bg-elevated: var(--color-bg-surface-0);
+  --linear-color-bg-card: var(--color-bg-surface-2);
   /* Semantic borders */
-  --linear-color-border: var(--linear-border-default);
-  --linear-color-divider: var(--linear-border-subtle);
+  --linear-color-border: var(--color-border-default);
+  --linear-color-divider: var(--color-border-subtle);
 }
 
 /* Reduced motion — zero the raw linear duration scale so every consumer

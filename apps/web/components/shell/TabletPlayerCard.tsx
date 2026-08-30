@@ -3,10 +3,6 @@
 import { Pause, Play, SkipBack, SkipForward } from 'lucide-react';
 import Image from 'next/image';
 import React from 'react';
-import {
-  ARTWORK_FIT_CLASSNAME,
-  ArtworkFrame,
-} from '@/components/atoms/ArtworkFrame';
 import { formatTime } from '@/lib/format-time';
 import { cn } from '@/lib/utils';
 import type { NowPlayingTrack } from './SidebarNowPlaying';
@@ -84,18 +80,18 @@ export const TabletPlayerCard = React.memo(function TabletPlayerCard({
 
         <div className='grid grid-cols-[minmax(160px,1fr)_auto_minmax(200px,2fr)] items-center gap-4 px-3 py-2.5'>
           <div className='flex items-center gap-3 min-w-0'>
-            <ArtworkFrame size={40} className='h-10 w-10 shrink-0 bg-surface-2'>
+            <div className='relative h-10 w-10 rounded-lg overflow-hidden shrink-0 bg-surface-2'>
               {artworkUrl && (
                 <Image
                   src={artworkUrl}
                   alt=''
                   fill
                   sizes='40px'
-                  className={ARTWORK_FIT_CLASSNAME}
+                  className='object-cover'
                   unoptimized
                 />
               )}
-            </ArtworkFrame>
+            </div>
             <div className='min-w-0'>
               <div className='truncate text-app font-caption text-primary-token leading-tight'>
                 {trackTitle}
@@ -110,7 +106,7 @@ export const TabletPlayerCard = React.memo(function TabletPlayerCard({
             <button
               type='button'
               onClick={onPrevious}
-              className='h-8 w-8 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
+              className='h-8 w-8 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-page) outline-none'
               aria-label='Previous'
             >
               <SkipBack
@@ -122,7 +118,7 @@ export const TabletPlayerCard = React.memo(function TabletPlayerCard({
             <button
               type='button'
               onClick={onPlay}
-              className='h-9 w-9 rounded-full grid place-items-center border border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle ease-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
+              className='h-9 w-9 rounded-full grid place-items-center border border-(--color-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle ease-subtle hover:border-(--color-btn-primary-hover) hover:bg-btn-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-page) outline-none'
               aria-label={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
@@ -142,7 +138,7 @@ export const TabletPlayerCard = React.memo(function TabletPlayerCard({
             <button
               type='button'
               onClick={onNext}
-              className='h-8 w-8 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
+              className='h-8 w-8 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-page) outline-none'
               aria-label='Next'
             >
               <SkipForward
