@@ -16,11 +16,12 @@ function assertPublishWorkflowContract(source: string): void {
   expect(source).toMatch(/permissions:\n  contents: read/);
   expect(source).toMatch(/id-token: write/);
   expect(source).toMatch(/runs-on: ubuntu-latest/);
+  expect(source).toContain('timeout-minutes: 25');
   expect(source).toContain(
     'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
   );
   expect(source).toContain(
-    'pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320'
+    'pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86'
   );
   expect(source).toContain(
     'actions/setup-node@820762786026740c76f36085b0efc47a31fe5020'
@@ -35,7 +36,12 @@ function assertPublishWorkflowContract(source: string): void {
   expect(source).toContain('pnpm --filter @jovie/cli run pack:dry');
   expect(source).toContain('test "$GITHUB_REF" = refs/heads/main');
   expect(source).toContain('git rev-parse origin/main');
-  expect(source).toContain('test "$checked_out_sha" = "$current_main_sha"');
+  expect(
+    source.match(/test "\$checked_out_sha" = "\$current_main_sha"/g)
+  ).toHaveLength(2);
+  expect(source).toContain(
+    'Checkout drifted from current origin/main immediately before publication.'
+  );
   expect(source).toContain("tr -d '[:space:]' < VERSION");
   expect(source).toContain(
     "manifest.repository?.url === 'git+https://github.com/JovieInc/Jovie.git'"
@@ -59,6 +65,19 @@ function assertPublishWorkflowContract(source: string): void {
   expect(source).toContain(
     'npm publish --provenance --access public "$PACKAGE_DIR"'
   );
+  expect(source).toContain('- name: Prove public registry release');
+  expect(source).toContain('for attempt in {1..12}');
+  expect(source).toContain('metadata.dist?.attestations?.url');
+  expect(source).toContain('metadata.dist?.attestations?.provenance');
+  expect(source).toContain('Array.isArray(metadata.maintainers)');
+  expect(source).toContain('npm access list collaborators "$PACKAGE_NAME"');
+  expect(source).toContain(
+    "Object.values(collaborators).includes('read-write')"
+  );
+  expect(source).toContain('"$PACKAGE_NAME@$RELEASE_VERSION"');
+  expect(source).toContain('"$installed_cli" --version');
+  expect(source).toContain('"$installed_cli" api openapi');
+  expect(source).toContain("contract.info?.title !== 'Jovie Artist API'");
 }
 
 describe('manual npm provenance workflow', () => {
@@ -87,11 +106,29 @@ describe('manual npm provenance workflow', () => {
       workflow.replace('--provenance --access public', '--access public'),
     ],
     [
+      'final current-main publication recheck',
+      workflow.replace(
+        '          test "$checked_out_sha" = "$current_main_sha" || {\n            echo "::error::Checkout drifted from current origin/main immediately before publication."\n            exit 1\n          }\n          npm publish',
+        '          npm publish'
+      ),
+    ],
+    [
       'publish auth config override',
       workflow.replace(
         '          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}',
         '          NPM_CONFIG_USERCONFIG: ${{ github.workspace }}/.npmrc\n          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}'
       ),
+    ],
+    [
+      'public provenance receipt',
+      workflow.replace(
+        "['dist.attestations.url', typeof metadata.dist?.attestations?.url === 'string']",
+        "['dist.attestations.url', true]"
+      ),
+    ],
+    [
+      'fresh install runtime receipt',
+      workflow.replace('"$installed_cli" api openapi', 'echo api openapi'),
     ],
   ])('fails closed when the %s is weakened', (_, unsafeWorkflow) => {
     expect(() => assertPublishWorkflowContract(unsafeWorkflow)).toThrow();
