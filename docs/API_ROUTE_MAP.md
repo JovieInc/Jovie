@@ -357,6 +357,12 @@
 | `/api/merch/checkout` | POST | `public` | Create a Stripe Checkout session for a live Jovie merch card |
 | `/{username}/merch/{cardId}` | GET | `public` | Public merch product page with mockups, size/quantity selection, and checkout |
 
+### Mobile
+
+| Route | Methods | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/mobile/v1/eyes-free-capture` | POST | mobile session | Closed-destination eyes-free capture. `jovie` runs the existing creative chat turn; `summer` is founder-only via the OV admin gate. Idempotent on `clientTurnId`. |
+
 ### Notifications
 
 | Route | Methods | Auth | Description |
