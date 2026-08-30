@@ -599,7 +599,7 @@ describe('queue workflow mutation safety', () => {
       'DEQUEUE (pre-land CHANGELOG.md → drain without CI bypass)'
     );
     expect(drain).toContain(
-      'classified skip; enroll is not a product-quality failure'
+      'queue-noop: classified-skip: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD'
     );
     expect(drain).toContain(
       '.state.mergeQueueEntry.position | type == "number" and floor == . and . > 0'
