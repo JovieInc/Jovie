@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/design-system/linear-token-retire-jov-5465.test.ts
 'use client';
 
 import { Bell } from 'lucide-react';
@@ -94,7 +95,7 @@ function StickyPhone({ activeIndex }: { readonly activeIndex: number }) {
         {MODES.map((mode, i) => (
           <div
             key={mode.id}
-            className='rounded-full transition-colors duration-(--linear-duration-slow) ease-subtle'
+            className='rounded-full transition-colors duration-(--duration-slow) ease-subtle'
             style={{
               width: i === activeIndex ? 16 : 6,
               height: 6,
@@ -322,7 +323,7 @@ export function DeeplinksGrid() {
                     {MODES.map((mode, i) => (
                       <div
                         key={mode.id}
-                        className='h-1 rounded-full transition-colors duration-(--linear-duration-slow) ease-subtle'
+                        className='h-1 rounded-full transition-colors duration-(--duration-slow) ease-subtle'
                         style={{
                           width: i === activeIndex ? 32 : 8,
                           backgroundColor:
@@ -341,7 +342,7 @@ export function DeeplinksGrid() {
                     href='https://jov.ie/tim'
                     target='_blank'
                     rel='noopener noreferrer'
-                    className='inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-(--linear-duration-normal)'
+                    className='inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-(--duration-normal)'
                     style={{
                       color: 'var(--linear-text-tertiary)',
                       border: '1px solid var(--linear-border-subtle)',

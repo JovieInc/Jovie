@@ -164,13 +164,31 @@ evidence fails new intake closed.
 Closure health is red when the sole queue controller stays non-green for more
 than 10 minutes, the native queue stays empty with eligible clean PRs for more
 than 15 minutes, an open PR stays unclassified for more than 15 minutes,
-duplicate Linear issue lanes remain unresolved, an explicit hold expires, or no
-PR merges for one hour while open PRs remain. A native queue entry becoming
+overlapping active artifacts for one Linear issue remain unresolved, an
+explicit hold expires, or no PR merges for one hour while open PRs remain.
+Held or draft PRs are not duplicate active writers; hold expiry governs them
+separately. Multiple active PRs for one issue are allowed only when
+changed-file sets are disjoint, and a duplicate receipt names only PRs that
+participate in an overlap. Only same-repository PRs may assert a Linear lane
+identity; cross-repository markers are ignored, while missing repository
+provenance fails closed. Missing, malformed, truncated, or rename-ambiguous
+changed-file evidence makes the complete multi-active lane unclassified. A
+native queue entry becoming
 `UNMERGEABLE` is red immediately: a nonempty queue is not progress. A grace
 episode also pauses new intake until the writer and queue prove progress. This
 stop-line never disables native promotion, exact-head PR remediation, tests, or
 review; those are the mechanisms that recover closure health. The executable
 authority is `JOV-INV-011` in `canon/invariants.jsonl`.
+
+Draft stacks are a bounded exception with a four-layer maximum. A root must name
+an integrator, expose a promotion path through open exact-base parents, retain a
+clean ancestor chain, and carry an unexpired deadline no more than seven days
+after root creation. Any depth-five stack or missing/expired contract is red
+immediately: new intake stops while promotion and remediation remain live. The
+observer emits one idempotent `split-or-retarget-draft-stack` action per
+violating root through the existing delivery repair-task and No Unattended Red
+path. That receipt is consumed evidence only; it never mutates a pull request
+automatically. The executable stack contract is `JOV-INV-020`.
 
 ### Update Branch control-plane safety
 

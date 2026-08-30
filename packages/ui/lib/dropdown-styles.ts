@@ -346,16 +346,6 @@ export const SELECT_TRIGGER_BASE =
 export const MENU_ICON_TRIGGER_BASE =
   'inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token transition-colors duration-fast ease-interactive hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-focus/50';
 
-/**
- * Overflow trigger variants for tab and drawer menus.
- */
-export const MENU_OVERFLOW_TRIGGER_BASE =
-  'relative inline-flex shrink-0 items-center justify-center rounded-full border bg-transparent text-xs font-medium tracking-normal text-tertiary-token transition-colors duration-fast ease-interactive hover:border-default hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/35 focus-visible:ring-offset-1 focus-visible:ring-offset-surface-page';
-
-export const MENU_OVERFLOW_TRIGGER_DRAWER = 'min-h-7 border-subtle px-2';
-
-export const MENU_OVERFLOW_TRIGGER_SEGMENT = 'h-7 border-subtle px-2';
-
 // ============================================================================
 // SUB-CONTENT STYLES
 // ============================================================================

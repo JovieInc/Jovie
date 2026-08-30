@@ -189,7 +189,8 @@ function TourDatesContent({
         <Button
           type='button'
           variant='primary'
-          className='h-11 w-full rounded-full'
+          size='marketing'
+          className='w-full'
           disabled
         >
           Turn On Event Alerts
@@ -202,8 +203,8 @@ function TourDatesContent({
           source={emptyStateSourceContext.ctaLocation}
           sourceContext={emptyStateSourceContext}
           triggerLabel='Turn On Event Alerts'
-          // Public-profile primary actions keep the shared 44px touch floor.
-          triggerClassName={`${subscriptionPrimaryActionClassName} h-11! w-full justify-center gap-2 px-4 text-xs`}
+          // Canonical Button owns the 32px control and 44px touch floor.
+          triggerClassName={`${subscriptionPrimaryActionClassName} w-full justify-center gap-2 px-4 text-xs`}
           presentation='overlay'
         />
       );

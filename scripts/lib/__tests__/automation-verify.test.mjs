@@ -64,9 +64,14 @@ const CI_UI_DRIFT_GUARDRAIL_INPUTS = [
   'scripts/setup.sh',
 ];
 const FLEET_PROMOTION_GATE_LANE = [
+  '.github/actions/evaluate-fleet-gate/action.yml',
   'apps/web/tests/unit/api/health/deploy.critical.test.ts',
+  'scripts/hermes/evaluate-fleet-gate.sh',
+  'scripts/hermes/fleet_admission_receipt.py',
   'scripts/hermes/gem-priority-gate.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+  'scripts/hermes/tests/test_fleet_admission_receipt.py',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/run-affected-tests.mjs',
 ];
@@ -75,8 +80,10 @@ const GEM_PR_REHABILITATION_LANE = [
   '.github/requirements/pytest.txt',
   '.github/workflows/gem-delivery-controller-activation.yml',
   '.github/workflows/ci.yml',
+  'docs/PR_FLOW.md',
   'scripts/hermes/config/gem-repo-registry.json',
   'scripts/hermes/config/model-registry.json',
+  'scripts/hermes/closure_health.py',
   'scripts/hermes/gem-pr-drain.py',
   'scripts/hermes/gem-ops-hud.py',
   'scripts/hermes/gem-priority-gate.py',
@@ -87,6 +94,7 @@ const GEM_PR_REHABILITATION_LANE = [
   'scripts/hermes/install-gem-fleet-controller.sh',
   'scripts/hermes/install-gem-pr-rehabilitation.sh',
   'scripts/hermes/model-router.py',
+  'scripts/hermes/symphony-reconciler.py',
   'scripts/hermes/systemd/gem-pr-drain.service',
   'scripts/hermes/systemd/gem-pr-drain.timer',
   'scripts/hermes/tests/gem-pr-drain.test.py',
@@ -94,6 +102,8 @@ const GEM_PR_REHABILITATION_LANE = [
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
+  'scripts/hermes/tests/closure-health.test.py',
+  'scripts/hermes/tests/symphony-reconciler.test.py',
   'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
   'scripts/hermes/tests/test-model-router.py',
   'scripts/ci-fast-lanes.mjs',
@@ -102,10 +112,15 @@ const GEM_PR_REHABILITATION_LANE = [
   'scripts/run-affected-tests.mjs',
 ];
 const MERGE_QUEUE_CONTROLLER_INPUTS = [
+  '.github/actions/evaluate-fleet-gate/action.yml',
   '.github/workflows/merge-queue-autoenroll.yml',
   'docs/PR_FLOW.md',
   'scripts/ci-merge-queue-check.mjs',
   'scripts/drain-pr-queue.sh',
+  'scripts/hermes/evaluate-fleet-gate.sh',
+  'scripts/hermes/fleet_admission_receipt.py',
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+  'scripts/hermes/tests/test_fleet_admission_receipt.py',
   'scripts/lib/merge-queue-guard.mjs',
   'scripts/lib/pre-land-changelog.mjs',
   'scripts/lib/resolve-merge-group-path-diff.mjs',
@@ -602,6 +617,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/linear-issue-intake.test.mjs',
         'scripts/lib/__tests__/agent-qc-wires.test.mjs',
         'scripts/lib/__tests__/needs-human-autoclose.test.mjs',
+        'scripts/lib/__tests__/production-lane-range.test.mjs',
         'scripts/lib/__tests__/hermes-launchd.test.mjs',
       ],
     });
@@ -720,6 +736,10 @@ describe('automation-verify affected scope', () => {
         selectedTests: [
           'apps/web/tests/unit/api/health/deploy.critical.test.ts',
         ],
+        pythonTests: [
+          'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+          'scripts/hermes/tests/test_fleet_admission_receipt.py',
+        ],
         pythonUnittestTests: ['scripts/hermes/tests/gem-priority-gate.test.py'],
         scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
       });
@@ -738,11 +758,13 @@ describe('automation-verify affected scope', () => {
       mode: 'selected',
       selectedTests: [],
       pythonUnittestTests: [
+        'scripts/hermes/tests/closure-health.test.py',
         'scripts/hermes/tests/gem-priority-gate.test.py',
         'scripts/hermes/tests/gem-pr-drain.test.py',
         'scripts/hermes/tests/gem-ops-hud.test.py',
         'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
         'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
+        'scripts/hermes/tests/symphony-reconciler.test.py',
         'scripts/hermes/tests/test-model-router.py',
       ],
       scriptVitestTests: [
@@ -754,6 +776,58 @@ describe('automation-verify affected scope', () => {
       buildAffectedTestPlan([
         ...GEM_PR_REHABILITATION_LANE,
         'apps/ios/Jovie/RootView.swift',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('routes a closure-health source-only repair to its Python regression suite', () => {
+    expect(
+      buildAffectedTestPlan(['scripts/hermes/closure_health.py'])
+    ).toMatchObject({
+      mode: 'selected',
+      pythonUnittestTests: expect.arrayContaining([
+        'scripts/hermes/tests/closure-health.test.py',
+      ]),
+      scriptVitestTests: expect.arrayContaining([
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+      ]),
+    });
+  });
+
+  it('selects the No Unattended Red contracts without unrelated product tests', () => {
+    const lane = [
+      'scripts/backlog-orchestrator/no-unattended-red.mjs',
+      'scripts/backlog-orchestrator/delivery-state-machine.mjs',
+      'scripts/backlog-orchestrator/__tests__/no-unattended-red.test.mjs',
+      'scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs',
+      '.github/workflows/delivery-control-receipts.yml',
+      'canon/invariants.jsonl',
+      'scripts/hermes/gem-ops-hud.py',
+      'scripts/hermes/tests/gem-ops-hud.test.py',
+      'scripts/lib/ownerless-recovery-policy.mjs',
+      'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
+      'scripts/invariants/registry.test.mjs',
+      ...AFFECTED_TEST_SELECTOR_MANIFEST,
+    ];
+    expect(buildAffectedTestPlan(lane)).toMatchObject({
+      mode: 'selected',
+      selectedTests: [],
+      pythonUnittestTests: ['scripts/hermes/tests/gem-ops-hud.test.py'],
+      scriptVitestTests: [
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
+      ],
+      nodeTests: [
+        'scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs',
+        'scripts/backlog-orchestrator/__tests__/no-unattended-red.test.mjs',
+        'scripts/invariants/registry.test.mjs',
+      ],
+    });
+    expect(
+      buildAffectedTestPlan([
+        ...lane,
+        'scripts/backlog-orchestrator/unknown-red-peer.mjs',
       ]).mode
     ).toBe('full');
   });
@@ -819,6 +893,19 @@ describe('automation-verify affected scope', () => {
         'apps/web/lib/unknown-safe-remediation-peer.ts',
       ]).mode
     ).toBe('full');
+  });
+
+  it('keeps reconciler-only changes inside the bounded rehabilitation lane', () => {
+    for (const changedPath of [
+      'scripts/hermes/symphony-reconciler.py',
+      'scripts/hermes/tests/symphony-reconciler.test.py',
+    ]) {
+      const plan = buildAffectedTestPlan([changedPath]);
+      expect(plan.mode).toBe('selected');
+      expect(plan.pythonUnittestTests).toContain(
+        'scripts/hermes/tests/symphony-reconciler.test.py'
+      );
+    }
   });
 
   it('routes fleet controller installer repairs to the Gem rehabilitation lane', () => {
@@ -1041,7 +1128,11 @@ describe('automation-verify affected scope', () => {
 
     expect(plan.mode).toBe('selected');
     expect(plan.scriptVitestTests).toEqual(MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS);
-    expect(plan.pythonTests).toEqual(['scripts/tests/test_gh_retry.py']);
+    expect(plan.pythonTests).toEqual([
+      'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+      'scripts/hermes/tests/test_fleet_admission_receipt.py',
+      'scripts/tests/test_gh_retry.py',
+    ]);
     expect(plan.selectedTests).toEqual([]);
   });
 
@@ -1052,7 +1143,11 @@ describe('automation-verify affected scope', () => {
 
     expect(plan.mode).toBe('selected');
     expect(plan.scriptVitestTests).toEqual(MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS);
-    expect(plan.pythonTests).toEqual(['scripts/tests/test_gh_retry.py']);
+    expect(plan.pythonTests).toEqual([
+      'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+      'scripts/hermes/tests/test_fleet_admission_receipt.py',
+      'scripts/tests/test_gh_retry.py',
+    ]);
   });
 
   it('fails closed when merge-queue controller changes include unknown automation', () => {

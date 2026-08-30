@@ -92,10 +92,6 @@ module.exports = {
         dialog: 'var(--app-dialog-radius)',
         'sidebar-floating': 'var(--app-shell-sidebar-floating-radius)',
         pill: 'var(--radius-pill)', // 48px — pill buttons
-        // Legacy linear-prefixed aliases
-        'linear-sm': 'var(--linear-radius-sm)',
-        'linear-md': 'var(--linear-radius-md)',
-        'linear-lg': 'var(--linear-radius-lg)',
       },
 
       // Linear max-width for containers
@@ -222,6 +218,7 @@ module.exports = {
         'card-elevated': 'var(--shadow-card-elevated)',
         divider: 'var(--shadow-divider)',
         'button-inset': 'var(--shadow-button-inset)',
+        button: 'var(--shadow-button)',
         popover: 'var(--shadow-popover)',
         'app-control':
           '0 1px 1px rgba(0,0,0,0.04), 0 3px 6px -4px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.04)',

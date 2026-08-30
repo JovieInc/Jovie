@@ -112,6 +112,7 @@ const PUBLIC_PROFILE_RESERVED_ROOT_SEGMENTS = new Set([
   'llms.txt',
   'og',
   'onboarding',
+  'openapi.json',
   'out',
   'r',
   's',

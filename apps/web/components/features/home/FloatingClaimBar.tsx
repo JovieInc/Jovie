@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/design-system/linear-token-retire-jov-5465.test.ts
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -57,7 +58,7 @@ export function FloatingClaimBar() {
         style={{
           backgroundColor: 'var(--linear-bg-surface-0)',
           border: '1px solid var(--linear-border-default)',
-          boxShadow: 'var(--linear-shadow-card-elevated)',
+          boxShadow: 'var(--shadow-card-elevated)',
         }}
       >
         {/* Shine edge */}

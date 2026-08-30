@@ -105,6 +105,8 @@ export async function POST(request: NextRequest) {
     // If the claim fails, the unprocessed record remains and Stripe's retry
     // will re-attempt without requiring a transaction.
     let leaseClaimed = false;
+    let leaseStartedAt: Date | null = null;
+    let webhookRecordId: string | null = null;
     try {
       // Attempt insert; unique constraint on stripeEventId handles duplicates
       const [insertedRecord] = await db
@@ -118,8 +120,6 @@ export async function POST(request: NextRequest) {
         })
         .onConflictDoNothing()
         .returning({ id: stripeWebhookEvents.id });
-
-      let webhookRecordId: string;
 
       if (insertedRecord) {
         // New event — use the newly inserted record
@@ -158,9 +158,10 @@ export async function POST(request: NextRequest) {
       // with a compare-and-set lease closes that race without requiring a
       // transaction, which the Neon HTTP driver does not support.
       const leaseCutoff = new Date(Date.now() - WEBHOOK_PROCESSING_LEASE_MS);
+      leaseStartedAt = new Date();
       const [claimedRecord] = await db
         .update(stripeWebhookEvents)
-        .set({ processingStartedAt: new Date() })
+        .set({ processingStartedAt: leaseStartedAt })
         .where(
           and(
             eq(stripeWebhookEvents.id, webhookRecordId),
@@ -174,11 +175,15 @@ export async function POST(request: NextRequest) {
         .returning({ id: stripeWebhookEvents.id });
 
       if (!claimedRecord) {
-        // Another request owns the active lease. Acknowledge the duplicate so
-        // Stripe does not retry while the original request is still running.
+        // Another request owns the active lease, but it has not durably
+        // completed yet. A 2xx here could make Stripe stop retrying before the
+        // owner fails, so keep this delivery retryable until processed_at exists.
         return NextResponse.json(
-          { received: true },
-          { headers: NO_STORE_HEADERS }
+          { error: 'Webhook processing in progress' },
+          {
+            status: 503,
+            headers: { ...NO_STORE_HEADERS, 'Retry-After': '5' },
+          }
         );
       }
       leaseClaimed = true;
@@ -187,19 +192,38 @@ export async function POST(request: NextRequest) {
       await processWebhookEvent(event, stripeCreatedAt);
 
       // Mark event as processed
-      await db
+      const [processedRecord] = await db
         .update(stripeWebhookEvents)
         .set({ processedAt: new Date(), processingStartedAt: null })
-        .where(eq(stripeWebhookEvents.id, webhookRecordId));
+        .where(
+          and(
+            eq(stripeWebhookEvents.id, webhookRecordId),
+            eq(stripeWebhookEvents.processingStartedAt, leaseStartedAt),
+            isNull(stripeWebhookEvents.processedAt)
+          )
+        )
+        .returning({ id: stripeWebhookEvents.id });
+
+      if (!processedRecord) {
+        throw new Error(
+          'Webhook processing lease ownership was lost before completion'
+        );
+      }
     } catch (processingError) {
       // Release the lease on handled failures so Stripe retries immediately;
       // an abrupt process exit still self-heals when the lease expires.
-      if (leaseClaimed) {
+      if (leaseClaimed && leaseStartedAt && webhookRecordId) {
         try {
           await db
             .update(stripeWebhookEvents)
             .set({ processingStartedAt: null })
-            .where(eq(stripeWebhookEvents.stripeEventId, event.id));
+            .where(
+              and(
+                eq(stripeWebhookEvents.id, webhookRecordId),
+                eq(stripeWebhookEvents.processingStartedAt, leaseStartedAt),
+                isNull(stripeWebhookEvents.processedAt)
+              )
+            );
         } catch (leaseReleaseError) {
           logger.warn('Stripe webhook lease release failed', {
             eventId: event.id,

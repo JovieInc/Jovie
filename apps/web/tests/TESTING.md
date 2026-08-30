@@ -45,8 +45,12 @@ Run the commands below from the repo root.
 # Web app suite with pinned Doppler scope
 pnpm run test:web
 
-# CI mode with coverage
+# CI-matching unit selector (same graph as merge-group Unit Tests)
+pnpm test:fast
 pnpm test:ci
+
+# Bounded changed-surface receipt (regression vs fleet typecheck debt)
+pnpm test:web:surface-receipt
 
 # Watch mode
 pnpm run test:web:watch

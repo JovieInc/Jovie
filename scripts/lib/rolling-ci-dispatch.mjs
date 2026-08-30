@@ -297,6 +297,22 @@ export function planFailureDispatch({
     check: event.check,
     deliveryCount: 0,
   };
+  if (priorFailure.terminalReceipt?.terminal === true) {
+    return {
+      action: 'terminal_configuration_incident',
+      mutate: false,
+      state,
+      incident: {
+        type: 'terminal_remediation_receipt',
+        head: event.head,
+        fingerprint: event.fingerprint,
+        owner: 'CI Platform',
+        remedy:
+          priorFailure.terminalReceipt.result ??
+          'inspect the terminal remediation receipt',
+      },
+    };
+  }
   if (priorFailure.deliveryCount >= maxDeliveries) {
     return {
       action: 'terminal_configuration_incident',

@@ -116,14 +116,14 @@ describe('Input', () => {
       render(<Input data-testid='input' />);
       const input = screen.getByTestId('input');
       expect(input.className).toContain('h-8');
-      expect(input.className).toContain('text-[13px]');
+      expect(input.className).toContain('text-app');
     });
 
     it('applies lg size classes', () => {
       render(<Input inputSize='lg' data-testid='input' />);
       const input = screen.getByTestId('input');
       expect(input.className).toContain('h-10');
-      expect(input.className).toContain('text-[13px]');
+      expect(input.className).toContain('text-app');
     });
 
     it('supports size prop as alias for inputSize', () => {

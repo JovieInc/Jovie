@@ -2,7 +2,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { checkChangedComponents } from '../../component-ship-gate.mjs';
+import {
+  auditCoverageViaReceipts,
+  checkChangedComponents,
+} from '../../component-ship-gate.mjs';
 import {
   checkStoryMatchesComponent,
   extractRequiredPropNames,
@@ -45,7 +48,7 @@ const LEGACY_COMPONENT_SOURCE =
   'export interface LegacyPanelProps { readonly title: string }\n' +
   'export function LegacyPanel({ title }: LegacyPanelProps) { return <h2>{title}</h2> }';
 const LEGACY_TEST_SOURCE =
-  "import { LegacyPanel } from '@/components/marketing/legacy/LegacyPanel';\nvoid LegacyPanel;";
+  "import { LegacyPanel } from '@/components/marketing/legacy/LegacyPanel';\nexport const node = <LegacyPanel title='Legacy' />;";
 const LEGACY_STORY_SOURCE =
   "import { LegacyPanel } from '@/components/marketing/legacy/LegacyPanel';\n" +
   "export const Legacy = { render: () => <LegacyPanel title='Legacy' /> };";
@@ -76,6 +79,23 @@ describe('component-ship-policy scope', () => {
   it('includes shippable surfaces and excludes tests/stories/utils', () => {
     expect(isUnderShipScope('packages/ui/atoms/button.tsx')).toBe(true);
     expect(
+      isUnderShipScope(
+        'apps/web/components/features/profile/ProfileHeroCard.tsx'
+      )
+    ).toBe(true);
+    expect(
+      isUnderShipScope('apps/web/components/shell/AppShellRightRail.tsx')
+    ).toBe(true);
+    expect(isUnderShipScope('apps/web/components/jovie/JovieChat.tsx')).toBe(
+      true
+    );
+    expect(
+      isUnderShipScope('apps/web/components/providers/CoreProviders.tsx')
+    ).toBe(true);
+    expect(isUnderShipScope('apps/web/components/feedback/Banner.tsx')).toBe(
+      true
+    );
+    expect(
       isUnderShipScope('apps/web/components/molecules/ArtistCard.tsx')
     ).toBe(true);
     expect(
@@ -86,6 +106,9 @@ describe('component-ship-policy scope', () => {
     );
     expect(isUnderShipScope('packages/ui/atoms/button.test.tsx')).toBe(false);
     expect(isUnderShipScope('packages/ui/hooks/useX.tsx')).toBe(false);
+    expect(isUnderShipScope('packages/ui/lib/class-names.utils.tsx')).toBe(
+      false
+    );
     expect(isUnderShipScope('apps/web/app/(marketing)/page.tsx')).toBe(false);
     expect(
       isUnderShipScope(
@@ -110,6 +133,15 @@ describe('component-ship-policy scope', () => {
     expect(list.find(c => c.component === 'button')?.covered).toBe(true);
     expect(list.find(c => c.component === 'button')?.tested).toBe(true);
     expect(list.find(c => c.component === 'orphan')?.covered).toBe(false);
+  });
+
+  it('keeps the complete web component inventory inside the hard diff gate', () => {
+    const inventory = listComponentsInRoot('apps/web/components');
+
+    expect(inventory.length).toBeGreaterThan(1000);
+    expect(
+      inventory.filter(component => !isUnderShipScope(component.sourceRel))
+    ).toEqual([]);
   });
 });
 
@@ -201,6 +233,52 @@ describe('diff gate', () => {
     expect(m.total).toBe(1);
     expect(m.covered).toBe(0);
     expect(m.percent).toBe(0);
+  });
+
+  it('fails closed for a changed feature component outside the legacy layer roots', () => {
+    const sourceRel =
+      'apps/web/components/features/profile/UnownedProfileCard.tsx';
+    const root = fixtureRepo({
+      [sourceRel]: 'export function UnownedProfileCard() { return null }\n',
+    });
+
+    const result = checkChangedComponents([sourceRel], { repoRoot: root });
+
+    expect(result.applicable).toBe(true);
+    expect(result.ok).toBe(false);
+    expect(result.changedComponents).toEqual([sourceRel]);
+    expect(result.issues.map(issue => issue.rule)).toEqual(
+      expect.arrayContaining(['missing-test', 'missing-story'])
+    );
+  });
+
+  it('accepts a changed feature component only with touched real test and story evidence', () => {
+    const sourceRel = 'apps/web/components/features/profile/ProfileSignal.tsx';
+    const testRel =
+      'apps/web/components/features/profile/ProfileSignal.test.tsx';
+    const storyRel =
+      'apps/web/components/features/profile/ProfileSignal.stories.tsx';
+    const root = fixtureRepo({
+      [sourceRel]:
+        'export interface ProfileSignalProps { readonly label: string }\n' +
+        'export function ProfileSignal({ label }: ProfileSignalProps) { return <span>{label}</span> }\n',
+      [testRel]:
+        "import { ProfileSignal } from './ProfileSignal';\nvoid ProfileSignal;\n",
+      [storyRel]:
+        "import { ProfileSignal } from './ProfileSignal';\n" +
+        'export default { component: ProfileSignal };\n' +
+        "export const Default = { args: { label: 'Signal' } };\n",
+    });
+
+    const result = checkChangedComponents([sourceRel, testRel, storyRel], {
+      repoRoot: root,
+    });
+
+    expect(result).toMatchObject({
+      applicable: true,
+      ok: true,
+      changedComponents: [sourceRel],
+    });
   });
 
   it('reports missing test/story for changed components in a fixture root', () => {
@@ -383,6 +461,259 @@ describe('diff gate', () => {
   });
 });
 
+const VIA_COMPONENT_REL = 'apps/web/components/atoms/ViaPanel.tsx';
+const VIA_TEST_REL = 'apps/web/tests/unit/atoms/ViaPanel.test.tsx';
+const VIA_STORY_REL = 'apps/web/components/atoms/ViaPanel.stories.tsx';
+const VIA_DIRECTIVE =
+  '// @coverage-via apps/web/tests/unit/atoms/ViaPanel.test.tsx\n';
+const VIA_COMPONENT_SOURCE =
+  `${VIA_DIRECTIVE}` + 'export function ViaPanel() { return <div>Via</div> }\n';
+const VIA_STORY_SOURCE =
+  "import { ViaPanel } from './ViaPanel';\n" +
+  'export default { component: ViaPanel };\n' +
+  'export const Default = { render: () => <ViaPanel /> };\n';
+
+function coverageViaResult({
+  componentSource = VIA_COMPONENT_SOURCE,
+  testSource = '',
+  testRel = VIA_TEST_REL,
+} = {}) {
+  const root = fixtureRepo({
+    [VIA_COMPONENT_REL]: componentSource,
+    [testRel]: testSource,
+    [VIA_STORY_REL]: VIA_STORY_SOURCE,
+  });
+  return checkChangedComponents([VIA_COMPONENT_REL, testRel, VIA_STORY_REL], {
+    repoRoot: root,
+  });
+}
+
+describe('coverage-via executable evidence', () => {
+  it('rejects a deliberate-red commented basename as coverage-via evidence', () => {
+    const result = coverageViaResult({
+      testSource: [
+        '// ViaPanel',
+        "// import { ViaPanel } from '@/components/atoms/ViaPanel';",
+        'void 0;',
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(false);
+    expect(
+      result.issues.some(issue => issue.rule === 'coverage-via-invalid')
+    ).toBe(true);
+  });
+
+  it('accepts an exact module import used as a JSX tag', () => {
+    const result = coverageViaResult({
+      testSource: [
+        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
+        'export const node = <ViaPanel />;',
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts a direct call of the imported binding', () => {
+    const result = coverageViaResult({
+      testSource: [
+        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
+        'ViaPanel();',
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts a direct construct of the imported binding', () => {
+    const result = coverageViaResult({
+      testSource: [
+        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
+        'new ViaPanel();',
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts argument zero of an imported React renderer', () => {
+    const result = coverageViaResult({
+      testSource: [
+        "import { createElement } from 'react';",
+        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
+        'createElement(ViaPanel);',
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts argument zero of a namespaced React renderer', () => {
+    const result = coverageViaResult({
+      testSource: [
+        "import * as React from 'react';",
+        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
+        'React.createElement(ViaPanel);',
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts argument zero of an imported test renderer', () => {
+    const result = coverageViaResult({
+      testSource: [
+        "import { render } from '@testing-library/react';",
+        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
+        'render(ViaPanel);',
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts argument zero of createRoot().render', () => {
+    const result = coverageViaResult({
+      testSource: [
+        "import { createRoot } from 'react-dom/client';",
+        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
+        'createRoot(globalThis.document.createElement("div")).render(ViaPanel);',
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts an asserted exact source read through node:fs', () => {
+    const result = coverageViaResult({
+      testSource: [
+        "import { readFileSync } from 'node:fs';",
+        "import { resolve } from 'node:path';",
+        "const source = readFileSync(resolve(process.cwd(), 'components/atoms/ViaPanel.tsx'), 'utf8');",
+        "expect(source).toContain('ViaPanel');",
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts a dynamic exact-module import used as a JSX tag', () => {
+    const result = coverageViaResult({
+      testSource: [
+        "const { ViaPanel } = await import('@/components/atoms/ViaPanel');",
+        'export const node = <ViaPanel />;',
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts an asserted join-of-literals node:fs read', () => {
+    const result = coverageViaResult({
+      testSource: [
+        "import { readFileSync } from 'node:fs';",
+        "import { join } from 'node:path';",
+        "const source = readFileSync(join(process.cwd(), 'components', 'atoms', 'ViaPanel.tsx'), 'utf8');",
+        "expect(source).toContain('ViaPanel');",
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts an asserted exact source read through a local node:fs helper', () => {
+    const result = coverageViaResult({
+      testSource: [
+        "import { readFileSync } from 'node:fs';",
+        "import { resolve } from 'node:path';",
+        'function readWebSource(path) {',
+        "  return readFileSync(resolve(process.cwd(), path), 'utf8');",
+        '}',
+        "const source = readWebSource('components/atoms/ViaPanel.tsx');",
+        "expect(source).toContain('ViaPanel');",
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it.each([
+    [
+      'import-only evidence',
+      "import { ViaPanel } from '@/components/atoms/ViaPanel';\n",
+    ],
+    [
+      'void evidence',
+      [
+        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
+        'void ViaPanel;',
+      ].join('\n'),
+    ],
+    [
+      'assignment evidence',
+      [
+        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
+        'const Comp = ViaPanel;',
+        'expect(Comp).toBeTruthy();',
+      ].join('\n'),
+    ],
+    [
+      'metadata evidence',
+      [
+        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
+        'expect(ViaPanel).toBeDefined();',
+        "expect(ViaPanel.name).toBe('ViaPanel');",
+      ].join('\n'),
+    ],
+    [
+      'fake-renderer evidence',
+      [
+        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
+        'function render(Component) { return Component; }',
+        'render(ViaPanel);',
+      ].join('\n'),
+    ],
+    [
+      'wrong-argument source evidence',
+      [
+        "import { readFileSync } from 'node:fs';",
+        "import { resolve } from 'node:path';",
+        "const source = readFileSync('utf8', resolve(process.cwd(), 'components/atoms/ViaPanel.tsx'));",
+        "expect(source).toContain('ViaPanel');",
+      ].join('\n'),
+    ],
+    [
+      'unlinked-source evidence',
+      [
+        "const source = 'apps/web/components/atoms/ViaPanel.tsx';",
+        "expect(source).toContain('ViaPanel');",
+      ].join('\n'),
+    ],
+    [
+      'a mock without a real import',
+      [
+        "const target = '@/components/atoms/ViaPanel';",
+        'vi.mock(target, () => ({ ViaPanel: () => null }));',
+        'void ViaPanel;',
+      ].join('\n'),
+    ],
+    [
+      'unrelated same-name text',
+      "const note = 'ViaPanel is mentioned only as text';\nvoid note;",
+    ],
+    [
+      'an unasserted exact source read',
+      [
+        "import { readFileSync } from 'node:fs';",
+        "import { resolve } from 'node:path';",
+        "const source = readFileSync(resolve(process.cwd(), 'components/atoms/ViaPanel.tsx'), 'utf8');",
+        'void source;',
+      ].join('\n'),
+    ],
+  ])('rejects %s as coverage-via evidence', (_case, testSource) => {
+    const result = coverageViaResult({ testSource });
+    expect(result.ok).toBe(false);
+    expect(
+      result.issues.some(issue => issue.rule === 'coverage-via-invalid')
+    ).toBe(true);
+  });
+
+  it('has zero invalid existing coverage-via receipts', () => {
+    const audit = auditCoverageViaReceipts();
+    expect(audit.invalid).toEqual([]);
+    expect(audit.ok).toBe(true);
+  });
+});
+
 describe('multi-root ratchet', () => {
   it('normalizes v1 baseline and blocks uncovered growth at 0%', () => {
     const v1 = {
@@ -488,6 +819,13 @@ describe('multi-root ratchet', () => {
           uncoveredComponents: [],
         },
         'apps/web/components/site': {
+          percent: 0,
+          covered: 0,
+          total: 0,
+          uncovered: 0,
+          uncoveredComponents: [],
+        },
+        'apps/web/components': {
           percent: 0,
           covered: 0,
           total: 0,

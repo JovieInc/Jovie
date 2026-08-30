@@ -1,7 +1,13 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/profile/ReleasesView.test.tsx
+
 import { Play } from 'lucide-react';
 import { useMemo } from 'react';
+import {
+  ARTWORK_FIT_CLASSNAME,
+  ArtworkFrame,
+} from '@/components/atoms/ArtworkFrame';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { track } from '@/lib/analytics';
 import type { PublicRelease } from '../releases/types';
@@ -163,7 +169,7 @@ export function ReleasesView({
               className='group flex min-h-16 items-center gap-3 border-t border-white/[0.075] px-4 py-2.5 first:border-t-0 transition-colors duration-subtle hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
               aria-label={getReleaseAriaLabel(release)}
             >
-              <div className='relative h-11 w-11 shrink-0 overflow-hidden rounded-md bg-white/[0.04]'>
+              <ArtworkFrame size={44} className='h-11 w-11 bg-white/[0.04]'>
                 <ImageWithFallback
                   src={release.artworkUrl}
                   alt={release.title}
@@ -171,10 +177,10 @@ export function ReleasesView({
                   sizes='44px'
                   priority={index === 0}
                   loading={index === 0 ? undefined : 'lazy'}
-                  className='object-cover grayscale contrast-[1.04]'
+                  className={ARTWORK_FIT_CLASSNAME}
                   fallbackVariant='release'
                 />
-              </div>
+              </ArtworkFrame>
 
               <div className='min-w-0 flex-1 space-y-px'>
                 <div className='flex min-w-0 items-center gap-1.5'>

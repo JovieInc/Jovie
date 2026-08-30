@@ -1,5 +1,6 @@
 'use client';
 
+import { getAvatarShapeClassName, getAvatarSizePx } from '@jovie/ui';
 import { Activity, Pause, Play } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
@@ -47,6 +48,14 @@ const RELEASE_TYPE_LABELS: Record<string, string> = {
 };
 
 const DEFAULT_DSP_COLOR = 'var(--color-text-quaternary-token)';
+const RELEASE_HEADER_ARTWORK_SIZE = 'xl';
+const RELEASE_HEADER_ARTWORK_SIZE_PX = getAvatarSizePx(
+  RELEASE_HEADER_ARTWORK_SIZE
+);
+const RELEASE_HEADER_ARTWORK_RADIUS_CLASSNAME = getAvatarShapeClassName(
+  'artwork',
+  RELEASE_HEADER_ARTWORK_SIZE_PX
+);
 
 function getPreviewAriaLabel(hasPreview: boolean, isPlaying: boolean): string {
   if (!hasPreview) return 'No preview available';
@@ -263,8 +272,8 @@ export function ReleaseEntityHeader({
                   src={release.artworkUrl}
                   alt={artworkAlt}
                   name={release.title}
-                  size='md'
-                  rounded='md'
+                  size={RELEASE_HEADER_ARTWORK_SIZE}
+                  shape='artwork'
                   uploadable={canUploadArtwork}
                   onUpload={onArtworkUpload}
                   showHoverOverlay
@@ -273,9 +282,13 @@ export function ReleaseEntityHeader({
                 <DrawerMediaThumb
                   src={release.artworkUrl}
                   alt={artworkAlt}
-                  dimension={48}
-                  sizeClassName='h-12 w-12 rounded-lg'
-                  sizes='48px'
+                  dimension={RELEASE_HEADER_ARTWORK_SIZE_PX}
+                  sizeClassName={cn(
+                    'h-10 w-10',
+                    RELEASE_HEADER_ARTWORK_RADIUS_CLASSNAME
+                  )}
+                  imageClassName='object-contain'
+                  sizes={`${RELEASE_HEADER_ARTWORK_SIZE_PX}px`}
                   fallback={
                     <Icon
                       name='Disc3'
@@ -293,7 +306,8 @@ export function ReleaseEntityHeader({
               disabled={!previewUrl}
               aria-pressed={isPlaying}
               className={cn(
-                'absolute inset-0 flex items-center justify-center rounded-lg transition-[background-color,opacity] duration-subtle',
+                'absolute inset-0 flex items-center justify-center transition-[background-color,opacity] duration-subtle',
+                RELEASE_HEADER_ARTWORK_RADIUS_CLASSNAME,
                 'bg-black/0 opacity-0',
                 'group-hover/artwork:bg-black/40 group-hover/artwork:opacity-100',
                 'aria-[pressed=true]:bg-black/40 aria-[pressed=true]:opacity-100',

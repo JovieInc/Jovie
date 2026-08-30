@@ -12,6 +12,7 @@ import { MarketingPageShell } from '../MarketingPageShell';
 import {
   MARKETING_STORY_DESCRIPTION,
   marketingFullscreenParameters,
+  terminalCtaStoryParameters,
 } from './marketingStoryMeta';
 
 /**
@@ -153,6 +154,7 @@ export const MarketingFooterDefault: Story = {
 
 export const MarketingFooterCtaDefault: Story = {
   name: 'MarketingFooterCta',
+  parameters: terminalCtaStoryParameters,
   render: () => (
     <div className='bg-base'>
       <MarketingFooterCta
@@ -165,6 +167,7 @@ export const MarketingFooterCtaDefault: Story = {
 
 export const MarketingFinalCtaDefault: Story = {
   name: 'MarketingFinalCTA',
+  parameters: terminalCtaStoryParameters,
   render: () => (
     <div className='bg-base'>
       <MarketingFinalCTA
@@ -175,8 +178,24 @@ export const MarketingFinalCtaDefault: Story = {
   ),
 };
 
+export const MarketingFinalCtaWithSecondary: Story = {
+  name: 'MarketingFinalCTA/secondary',
+  parameters: terminalCtaStoryParameters,
+  render: () => (
+    <div className='bg-base'>
+      <MarketingFinalCTA
+        title='Request private launch access.'
+        body='One adaptive profile for every drop.'
+        secondaryLabel='See Pricing'
+        secondaryHref='/pricing'
+      />
+    </div>
+  ),
+};
+
 export const MarketingTerminalCtaDefault: Story = {
   name: 'MarketingTerminalCta',
+  parameters: terminalCtaStoryParameters,
   render: () => (
     <div className='bg-base'>
       <MarketingTerminalCta
@@ -185,6 +204,60 @@ export const MarketingTerminalCtaDefault: Story = {
         ctaHref='/signup'
         testId='storybook-marketing-terminal-cta'
         penContractId={MARKETING_PEN_CONTRACT_IDS.shell.finalCta}
+      />
+    </div>
+  ),
+};
+
+export const MarketingTerminalCtaWithSecondary: Story = {
+  name: 'MarketingTerminalCta/secondary',
+  parameters: terminalCtaStoryParameters,
+  render: () => (
+    <div className='bg-base'>
+      <MarketingTerminalCta
+        title='A shared terminal call to action.'
+        ctaLabel='Request Access'
+        ctaHref='/signup'
+        secondaryLabel='See Pricing'
+        secondaryHref='/pricing'
+        testId='storybook-marketing-terminal-cta-secondary'
+        penContractId={MARKETING_PEN_CONTRACT_IDS.shell.finalCta}
+      />
+    </div>
+  ),
+};
+
+export const MarketingTerminalCtaCinematic: Story = {
+  name: 'MarketingTerminalCta/cinematic',
+  parameters: terminalCtaStoryParameters,
+  render: () => (
+    <div className='bg-base'>
+      <MarketingTerminalCta
+        variant='cinematic'
+        title='A cinematic terminal call to action.'
+        ctaLabel='Request Access'
+        ctaHref='/signup'
+        testId='storybook-marketing-terminal-cta-cinematic'
+        penContractId={MARKETING_PEN_CONTRACT_IDS.shell.footerCta}
+      />
+    </div>
+  ),
+};
+
+export const MarketingTerminalCtaCinematicWithSecondary: Story = {
+  name: 'MarketingTerminalCta/cinematic-secondary',
+  parameters: terminalCtaStoryParameters,
+  render: () => (
+    <div className='bg-base'>
+      <MarketingTerminalCta
+        variant='cinematic'
+        title='A cinematic terminal call to action.'
+        ctaLabel='Request Access'
+        ctaHref='/signup'
+        secondaryLabel='See Pricing'
+        secondaryHref='/pricing'
+        testId='storybook-marketing-terminal-cta-cinematic-secondary'
+        penContractId={MARKETING_PEN_CONTRACT_IDS.shell.footerCta}
       />
     </div>
   ),

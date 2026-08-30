@@ -12,6 +12,7 @@ import { ChevronLeft } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { type ReactNode, useCallback } from 'react';
+import { ARTWORK_FIT_CLASSNAME } from '@/components/atoms/ArtworkFrame';
 import { Icon } from '@/components/atoms/Icon';
 import {
   PublicSurfaceHeader,
@@ -19,6 +20,7 @@ import {
   PublicSurfaceStage,
 } from '@/components/organisms/public-surface';
 import { Mark } from '@/lib/brand/primitives';
+import { cn } from '@/lib/utils';
 
 /** Shared menu item styling for smart link and profile drawers */
 export const SMART_LINK_MENU_ITEM_CLASS =
@@ -139,7 +141,7 @@ export function SmartLinkShell({
       fill
       priority
       sizes='(max-width: 767px) 100vw, 430px'
-      className='object-cover object-center'
+      className={cn(ARTWORK_FIT_CLASSNAME, 'object-center')}
     />
   ) : (
     <ArtworkFallback />

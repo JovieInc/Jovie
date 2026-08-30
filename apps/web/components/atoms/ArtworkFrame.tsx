@@ -3,6 +3,27 @@ import { cn } from '@/lib/utils';
 
 export type ArtworkFrameSize = number | 'thumbnail' | 'default' | 'hero';
 
+export type ArtworkMediaKind =
+  | 'release'
+  | 'merch'
+  | 'video'
+  | 'image'
+  | 'avatar';
+
+export const ARTWORK_FIT_CLASSNAME = 'object-contain';
+
+export const APPROVED_ARTWORK_RADIUS_CLASSNAMES = [
+  'rounded-xs',
+  'rounded-lg',
+  'rounded-xl',
+] as const;
+
+const ARTWORK_RADIUS_PX = {
+  thumbnail: 2,
+  default: 8,
+  hero: 12,
+} as const;
+
 interface ArtworkFrameProps
   extends Readonly<Omit<HTMLAttributes<HTMLDivElement>, 'children'>> {
   readonly children?: ReactNode;
@@ -30,10 +51,23 @@ export function getArtworkRadiusClassName(size: ArtworkFrameSize): string {
   return 'rounded-lg';
 }
 
-/**
- * Canonical square-media frame for album art, merch, and release thumbnails.
- * It owns only clipping geometry: callers still own dimensions and imagery.
- */
+export function getArtworkRadiusPx(size: ArtworkFrameSize): number {
+  return ARTWORK_RADIUS_PX[resolveArtworkFrameScale(size)];
+}
+
+export function getArtworkFitClassName(
+  kind: ArtworkMediaKind = 'release'
+): string {
+  return kind === 'release' ? ARTWORK_FIT_CLASSNAME : 'object-cover';
+}
+
+export function isApprovedArtworkRadiusClassName(className: string): boolean {
+  return (APPROVED_ARTWORK_RADIUS_CLASSNAMES as readonly string[]).includes(
+    className
+  );
+}
+
+/** Square-media frame. Owns scale-aware radius; release art uses contain. */
 export function ArtworkFrame({
   children,
   className,

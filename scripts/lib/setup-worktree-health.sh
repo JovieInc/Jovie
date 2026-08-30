@@ -9,7 +9,7 @@
 #
 # Skip (return 0) only when ALL of:
 #   1. JOVIE_SETUP_FORCE is not 1
-#   2. Node pin is 22.23.1+
+#   2. Node pin is 22.23.2+
 #   3. pnpm pin is exactly 9.15.4
 #   4. $repo/node_modules/.modules.yaml exists
 #   5. deps fingerprint matches node_modules/.cache/jovie-setup/deps.sha256
@@ -75,10 +75,16 @@ jovie_setup_hash_dependency_inputs() {
 
 jovie_setup_node_pin_ok() {
   command -v node &>/dev/null || return 1
-  local version
+  local repo_root="${1:-${REPO_ROOT:-.}}" version pinned
   version="$(node --version 2>/dev/null || true)"
-  [[ "$version" =~ ^v22\.([0-9]+)\.([0-9]+) ]] || return 1
-  ((10#${BASH_REMATCH[1]} > 23 || (10#${BASH_REMATCH[1]} == 23 && 10#${BASH_REMATCH[2]} >= 1)))
+  pinned="$(tr -d '[:space:]' < "$repo_root/.nvmrc" 2>/dev/null || true)"
+  version="${version#v}"
+  pinned="${pinned#v}"
+  local v_major v_minor v_patch p_major p_minor p_patch
+  IFS='.' read -r v_major v_minor v_patch <<<"$version"
+  IFS='.' read -r p_major p_minor p_patch <<<"$pinned"
+  [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && "$pinned" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && "$v_major" == "$p_major" ]] || return 1
+  ((10#$v_minor > 10#$p_minor || (10#$v_minor == 10#$p_minor && 10#$v_patch >= 10#$p_patch)))
 }
 
 jovie_setup_pnpm_pin_ok() {
@@ -91,7 +97,7 @@ jovie_setup_worktree_healthy() {
   local fingerprint previous fingerprint_file
 
   [[ "${JOVIE_SETUP_FORCE:-0}" != "1" ]] || return 1
-  jovie_setup_node_pin_ok || return 1
+  jovie_setup_node_pin_ok "$repo_root" || return 1
   jovie_setup_pnpm_pin_ok || return 1
   [[ -f "$repo_root/node_modules/.modules.yaml" ]] || return 1
 

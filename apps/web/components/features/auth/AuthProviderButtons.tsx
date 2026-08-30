@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/auth/AuthProviderButtons.test.tsx
 import type { PrimaryAuthOAuthProvider } from '@/lib/auth/oauth-providers';
 import { getAuthOAuthProviderLabel } from '@/lib/auth/oauth-providers';
 import { cn } from '@/lib/utils';
@@ -45,7 +46,7 @@ export function AuthProviderButtonSlot({
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/40',
         isDisabled && 'cursor-wait opacity-75',
         provider === 'google'
-          ? 'border-(--linear-btn-primary-border) bg-(--linear-btn-primary-bg) text-(--linear-btn-primary-fg) shadow-(--linear-shadow-button) hover:bg-(--linear-btn-primary-hover)'
+          ? 'border-(--linear-btn-primary-border) bg-(--linear-btn-primary-bg) text-(--linear-btn-primary-fg) shadow-button hover:bg-(--linear-btn-primary-hover)'
           : 'border-subtle bg-surface-1 text-primary-token hover:border-default hover:bg-surface-0'
       )}
     >

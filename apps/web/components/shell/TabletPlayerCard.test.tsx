@@ -41,6 +41,11 @@ describe('TabletPlayerCard', () => {
       'bg-(--linear-app-content-surface)/70'
     );
     expect(container.innerHTML).not.toContain('border-white/10');
+    expect(
+      container.querySelector('[data-artwork-frame="thumbnail"]')
+    ).toBeInTheDocument();
+    expect(container.innerHTML).toContain('object-contain');
+    expect(container.innerHTML).not.toContain('object-cover');
   });
 
   it('coerces NaN duration to 0:00', () => {

@@ -1,3 +1,4 @@
+import { WIDGET_COMPLETION_ACTIONS } from '@/lib/chat/onboarding-script/widget-events';
 import type { PersistedToolEvent } from '@/lib/chat/tool-events';
 import { decodeToolEvents } from '@/lib/chat/tool-events';
 import {
@@ -121,7 +122,10 @@ export function deriveClaimedOnboardingStateFromToolEvents(
     if (output) {
       artist = readArtist(output) ?? artist;
 
-      if (output.action === 'check_handle') {
+      if (
+        output.action === 'check_handle' ||
+        output.action === WIDGET_COMPLETION_ACTIONS.HANDLE_CONFIRMED
+      ) {
         handle = cleanHandle(output.handle) ?? handle;
       }
 

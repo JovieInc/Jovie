@@ -102,7 +102,7 @@ export const BLOG_AUTHOR_STORY_RECEIPT = {
   bodyPath: 'apps/web/components/organisms/BlogAuthorPage.tsx',
   sourceExport: 'BlogAuthorPage',
   storyExport: 'Web023BlogAuthor',
-  sourceSha: '468cc374b544d64573403e5fa8e047303964e877',
+  sourceSha: '8b0353fcbeb0cffef614fa47afbbbd8eeae48997',
 } as const;
 
 const meta = {

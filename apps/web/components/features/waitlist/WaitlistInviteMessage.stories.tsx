@@ -19,7 +19,7 @@ const meta = {
       route: '/waitlist/invite',
       source: 'apps/web/components/features/waitlist/WaitlistInviteMessage.tsx',
       sourceExport: 'WaitlistInviteMessage',
-      sourceSha: '61690d2a4af920183f4a85366799ff0bafe4540b',
+      sourceSha: '8b0353fcbeb0cffef614fa47afbbbd8eeae48997',
       storyExport: 'Web213MissingToken',
       fixture: 'missing token',
     },

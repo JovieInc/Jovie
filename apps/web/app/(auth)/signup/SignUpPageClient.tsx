@@ -109,7 +109,7 @@ function SignUpClaimDataPersistence() {
 
   return (
     <output
-      className='mb-4 block rounded-(--linear-radius-sm) border border-subtle bg-surface-1 px-4 py-3 text-center lg:text-left'
+      className='mb-4 block rounded-sm border border-subtle bg-surface-1 px-4 py-3 text-center lg:text-left'
       aria-live='polite'
     >
       {availability === 'checking' && (
@@ -186,7 +186,7 @@ function SignUpOauthErrorBanner({
 
   return (
     <div
-      className='mb-4 rounded-(--linear-radius-sm) border border-destructive/30 bg-destructive/5 px-4 py-3 text-left'
+      className='mb-4 rounded-sm border border-destructive/30 bg-destructive/5 px-4 py-3 text-left'
       role='alert'
     >
       <p className='text-sm font-medium text-destructive'>{message}</p>

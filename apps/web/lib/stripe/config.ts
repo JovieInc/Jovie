@@ -31,6 +31,8 @@ export interface PriceMapping {
   description: string;
   /** When true, excluded from checkout and plan-change option lists. */
   legacy?: boolean;
+  /** Product-specific checkout prices stay out of the general pricing grid. */
+  listed?: boolean;
 }
 
 const toMappingRecord = (
@@ -77,6 +79,15 @@ const buildActivePriceMappings = (): Record<string, PriceMapping> => {
       currency: 'usd',
       interval: PRICING.max.annual.interval,
       description: PRICING.max.annual.label,
+    },
+    {
+      priceId: env.STRIPE_PRICE_YOUTUBE_THUMBNAILS_FOUNDER_MONTHLY || '',
+      plan: 'pro',
+      amount: 2900,
+      currency: 'usd',
+      interval: 'month',
+      description: 'YouTube Thumbnails Founder',
+      listed: false,
     },
   ];
 
@@ -160,8 +171,15 @@ export function getPriceMappingDetails(priceId: string): PriceMapping | null {
  * Filters based on what's currently active
  */
 export function getAvailablePricing() {
-  return Object.values(ACTIVE_PRICE_MAPPINGS).sort(
-    (a, b) => a.amount - b.amount
+  return Object.values(ACTIVE_PRICE_MAPPINGS)
+    .filter(mapping => mapping.listed !== false)
+    .sort((a, b) => a.amount - b.amount);
+}
+
+export function isYouTubeThumbnailFounderPriceId(priceId: string): boolean {
+  return (
+    Boolean(env.STRIPE_PRICE_YOUTUBE_THUMBNAILS_FOUNDER_MONTHLY) &&
+    priceId === env.STRIPE_PRICE_YOUTUBE_THUMBNAILS_FOUNDER_MONTHLY
   );
 }
 
