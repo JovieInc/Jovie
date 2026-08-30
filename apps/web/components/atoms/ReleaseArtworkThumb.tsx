@@ -3,7 +3,10 @@
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { ArtworkFallbackTile } from '@/components/atoms/ArtworkFallbackTile';
-import { ArtworkFrame } from '@/components/atoms/ArtworkFrame';
+import {
+  ARTWORK_FIT_CLASSNAME,
+  ArtworkFrame,
+} from '@/components/atoms/ArtworkFrame';
 import { cn } from '@/lib/utils';
 
 interface ReleaseArtworkThumbProps {
@@ -47,7 +50,7 @@ export function ReleaseArtworkThumb({
           src={src}
           alt={alt}
           fill
-          className='object-cover'
+          className={ARTWORK_FIT_CLASSNAME}
           sizes={`${size}px`}
           onError={() => setImgError(true)}
         />

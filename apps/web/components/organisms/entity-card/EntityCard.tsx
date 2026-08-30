@@ -2,6 +2,11 @@
 
 import Link from 'next/link';
 import type { CSSProperties, MouseEvent, ReactNode } from 'react';
+import {
+  ARTWORK_FIT_CLASSNAME,
+  getArtworkFitClassName,
+  getArtworkRadiusClassName,
+} from '@/components/atoms/ArtworkFrame';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import {
   getProfileCardShapeClassName,
@@ -44,11 +49,11 @@ interface EntityCardProps {
   readonly artFit?: 'square' | 'fill';
   /**
    * 'unified': the single profile-card anatomy — full-bleed square art zone
-   * (object-cover, no letterboxing), eyebrow/title/meta text zone, and a
-   * full-width CTA anchored to the bottom. Public-profile landscape actions
-   * use the 44px mobile touch-target floor; portrait cards retain their
-   * compact 36px action. Used by every card in the profile home carousel so
-   * the featured card, entity cards, and slot cards share one design.
+   * (release art uses contain; merch/video keep cover), eyebrow/title/meta
+   * text zone, and a full-width CTA anchored to the bottom. Public-profile
+   * landscape actions use the 44px mobile touch-target floor; portrait cards
+   * retain their compact 36px action. Used by every card in the profile home
+   * carousel so the featured card, entity cards, and slot cards share one design.
    * 'default' keeps the legacy per-treatment layout (chat/app consumers).
    */
   readonly anatomy?: 'default' | 'unified' | 'profile-landscape';
@@ -247,10 +252,15 @@ export function EntityCard({
     ? cn(getProfileCardShapeClassName(shape), 'overflow-hidden')
     : null;
   const artClassName = isProfileLandscape
-    ? 'aspect-square self-stretch w-auto rounded-(--profile-action-radius)'
+    ? cn(
+        'aspect-square self-stretch w-auto',
+        model.kind === 'music'
+          ? getArtworkRadiusClassName('default')
+          : 'rounded-(--profile-action-radius)'
+      )
     : isUnified
-      ? // Unified anatomy: the art zone is a full-width square (album art is
-        // square by default; non-square art object-covers the square zone).
+      ? // Unified anatomy: the art zone is a full-width square. Album art
+        // stays complete with contain; merch/video may cover the square zone.
         'aspect-square rounded-none'
       : artFit === 'fill'
         ? 'min-h-0 w-full flex-1 rounded-xl'
@@ -341,13 +351,11 @@ export function EntityCard({
                     : '(max-width: 767px) 70vw, 300px'
               }
               className={
-                // Compact profile rows keep non-square video and product
-                // photography intact inside the stable media footprint.
-                preserveLandscapeMedia
-                  ? 'object-contain'
-                  : isUnified || model.kind !== 'music'
-                    ? 'object-cover'
-                    : 'object-contain'
+                preserveLandscapeMedia || model.kind === 'music'
+                  ? ARTWORK_FIT_CLASSNAME
+                  : getArtworkFitClassName(
+                      model.kind === 'merch' ? 'merch' : 'video'
+                    )
               }
               fallbackVariant={preset.fallbackVariant}
               fallbackClassName='bg-transparent'

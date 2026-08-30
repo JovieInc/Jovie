@@ -1,3 +1,4 @@
+import { getArtworkRadiusPx } from '@/components/atoms/ArtworkFrame';
 import { THEME } from './image-utils';
 import { StoryLayout } from './story-layout';
 
@@ -61,12 +62,14 @@ function StoryImage({
   src,
   alt,
   size,
-  rounded = 36,
+  rounded,
+  objectFit,
 }: {
   readonly src: string;
   readonly alt: string;
   readonly size: number;
-  readonly rounded?: number;
+  readonly rounded: number;
+  readonly objectFit: 'contain' | 'cover';
 }) {
   return (
     <div
@@ -87,7 +90,7 @@ function StoryImage({
         alt={alt}
         width={size}
         height={size}
-        style={{ objectFit: 'cover' }}
+        style={{ objectFit }}
       />
     </div>
   );
@@ -151,6 +154,7 @@ export function renderProfileStoryCard(params: {
             alt={params.artistName}
             size={420}
             rounded={210}
+            objectFit='cover'
           />
         ) : null}
         <Headline fontSize={78}>{clampText(params.artistName, 44)}</Headline>
@@ -186,6 +190,8 @@ export function renderReleaseStoryCard(params: {
             src={params.artworkDataUrl}
             alt={params.title}
             size={520}
+            rounded={getArtworkRadiusPx(520)}
+            objectFit='contain'
           />
         ) : null}
         <Headline fontSize={66}>{clampText(params.title, 80)}</Headline>
@@ -223,6 +229,8 @@ export function renderPlaylistStoryCard(params: {
             src={params.artworkDataUrl}
             alt={params.title}
             size={520}
+            rounded={getArtworkRadiusPx(520)}
+            objectFit='contain'
           />
         ) : null}
         <Headline fontSize={64}>{clampText(params.title, 72)}</Headline>
