@@ -14,7 +14,7 @@ export function InsightSection() {
           <h2
             style={{
               fontSize: 'var(--linear-h2-size)',
-              fontWeight: 'var(--linear-font-weight-medium)',
+              fontWeight: 'var(--font-weight-medium)',
               lineHeight: 'var(--linear-h2-leading)',
               letterSpacing: 'var(--linear-h2-tracking)',
               color: 'var(--linear-text-primary)',

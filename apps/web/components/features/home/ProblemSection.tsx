@@ -28,7 +28,7 @@ export function ProblemSection() {
             className='text-center heading-gap-linear text-primary-token'
             style={{
               fontSize: 'var(--linear-h2-size)',
-              fontWeight: 'var(--linear-font-weight-medium)',
+              fontWeight: 'var(--font-weight-medium)',
               lineHeight: 'var(--linear-h2-leading)',
               letterSpacing: 'var(--linear-h2-tracking)',
             }}
@@ -55,7 +55,7 @@ export function ProblemSection() {
                     className='text-primary-token'
                     style={{
                       fontSize: 'var(--linear-h4-size)',
-                      fontWeight: 'var(--linear-font-weight-medium)',
+                      fontWeight: 'var(--font-weight-medium)',
                       marginBottom: 'var(--linear-space-1)',
                     }}
                   >

@@ -1904,6 +1904,8 @@ html[data-profile-initial-mode]
 
   /* Linear font features (extracted 2026-03-16: --font-settings: "cv01","ss03") */
   --font-features: "cv01", "ss03";
+  /* Linear optical sizing value (extracted 2026-03-16: opsz 28) */
+  --font-optical-sizing: 28;
 
   /* Font weights — Linear uses Inter Variable axis with non-standard stops
      Extracted from Linear CSS vars (2026-02-17):
@@ -1961,12 +1963,21 @@ html[data-profile-initial-mode]
   --leading-snug: 1.375;
   --leading-normal: 1.5;
   --leading-relaxed: 1.625;
+  /* Linear-specific line heights (extracted 2026-03-16) */
+  --leading-linear-tight: 1.06;
+  --leading-linear-snug: 1.08;
+  --leading-linear-normal: 1.6;
+  --leading-linear-relaxed: 1.33;
 
   /* Letter spacing — must match globals.css @theme values (Tailwind v4 source of truth) */
   --tracking-tighter: -0.02em;
   --tracking-tight: -0.01em;
   --tracking-normal: 0;
   --tracking-wide: 0.01em;
+  /* Linear-specific tracking values (extracted 2026-03-16) */
+  --tracking-headline: -0.022em;
+  --tracking-subheadline: -0.0175em;
+  --tracking-body: -0.011em;
 }
 
 /* ============================================

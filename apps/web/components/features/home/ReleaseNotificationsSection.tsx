@@ -75,7 +75,7 @@ export function ReleaseNotificationsSection() {
                   />
                 </div>
                 <div>
-                  <p className='text-(--linear-caption-size) font-[number:var(--linear-font-weight-medium)] text-primary-token'>
+                  <p className='text-(--linear-caption-size) font-[number:var(--font-weight-medium)] text-primary-token'>
                     4,218 fans notified
                   </p>
                   <p className='text-(--linear-label-size) text-tertiary-token'>

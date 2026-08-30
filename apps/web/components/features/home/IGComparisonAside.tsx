@@ -22,7 +22,7 @@ export function IGComparisonAside() {
           <h2
             style={{
               fontSize: 'var(--linear-h2-size)',
-              fontWeight: 'var(--linear-font-weight-bold)',
+              fontWeight: 'var(--font-weight-bold)',
               lineHeight: 'var(--linear-h2-leading)',
               letterSpacing: 'var(--linear-h2-tracking)',
               color: 'var(--linear-text-primary)',

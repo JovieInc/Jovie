@@ -22,7 +22,7 @@ export async function RedesignedHero() {
           <ClaimHandleForm size='hero' />
         </div>
 
-        <p className='mt-5 text-[length:var(--linear-label-size)] font-[number:var(--linear-font-weight-normal)] tracking-wide text-tertiary-token'>
+        <p className='mt-5 text-[length:var(--linear-label-size)] font-[number:var(--font-weight-normal)] tracking-wide text-tertiary-token'>
           <span
             aria-hidden='true'
             className='mr-2 inline-block h-1.5 w-1.5 rounded-full bg-(--linear-success)'

@@ -122,7 +122,8 @@ html[data-desktop-runtime="electron"]
    p-[--linear-app-shell-gap] on all sides, so the sidebar column starts at
    gap offset from the left edge. Mirror that offset in the titlebar so the
    sidebar-cell left edge aligns with the sidebar rail. */
-html[data-desktop-runtime="electron"] [data-app-shell-frame="true"]
+html[data-desktop-runtime="electron"]
+  [data-app-shell-frame="true"]
   [data-electron-titlebar="true"] {
   padding-left: var(--linear-app-shell-gap);
   grid-template-columns: var(--electron-sidebar-width) minmax(0, 1fr);
@@ -856,18 +857,18 @@ body {
 
 @layer components {
   .heading-linear {
-    font-feature-settings: var(--linear-font-features);
-    font-variation-settings: "opsz" var(--linear-font-optical-sizing);
-    letter-spacing: var(--linear-tracking-headline);
-    font-weight: var(--linear-font-weight-semibold);
-    line-height: var(--linear-leading-snug);
+    font-feature-settings: var(--font-features);
+    font-variation-settings: "opsz" var(--font-optical-sizing);
+    letter-spacing: var(--tracking-headline);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--leading-linear-snug);
     text-wrap: balance;
   }
   .text-linear {
-    font-feature-settings: var(--linear-font-features);
-    font-variation-settings: "opsz" var(--linear-font-optical-sizing);
-    letter-spacing: var(--linear-tracking-body);
-    line-height: var(--linear-leading-normal);
+    font-feature-settings: var(--font-features);
+    font-variation-settings: "opsz" var(--font-optical-sizing);
+    letter-spacing: var(--tracking-body);
+    line-height: var(--leading-linear-normal);
   }
   .marketing-h1-linear {
     /* Discrete breakpoints matching Linear.app (verified 2026-03-23):
@@ -878,8 +879,8 @@ body {
     font-weight: 510;
     letter-spacing: -0.022em;
     line-height: 1.1;
-    font-feature-settings: var(--linear-font-features);
-    font-variation-settings: "opsz" var(--linear-font-optical-sizing);
+    font-feature-settings: var(--font-features);
+    font-variation-settings: "opsz" var(--font-optical-sizing);
     text-wrap: balance;
   }
   @media (min-width: 768px) {
@@ -901,8 +902,8 @@ body {
     font-weight: 510;
     letter-spacing: -0.022em;
     line-height: 1.33;
-    font-feature-settings: var(--linear-font-features);
-    font-variation-settings: "opsz" var(--linear-font-optical-sizing);
+    font-feature-settings: var(--font-features);
+    font-variation-settings: "opsz" var(--font-optical-sizing);
     text-wrap: balance;
   }
   @media (min-width: 768px) {
@@ -940,8 +941,8 @@ body {
     /* Exact Linear.app: 15px, 400wt, -0.165px tracking, 24px line-height */
     font-size: 18px;
     font-weight: 400;
-    font-feature-settings: var(--linear-font-features);
-    font-variation-settings: "opsz" var(--linear-font-optical-sizing);
+    font-feature-settings: var(--font-features);
+    font-variation-settings: "opsz" var(--font-optical-sizing);
     letter-spacing: -0.011em;
     /* -0.165px at 15px = -0.011em */
     line-height: 1.65;
@@ -952,7 +953,7 @@ body {
     align-items: center;
     gap: 0.5rem;
     font-size: 0.75rem;
-    font-weight: var(--linear-font-weight-medium);
+    font-weight: var(--font-weight-medium);
     letter-spacing: 0.02em;
     color: var(--linear-text-tertiary);
   }
@@ -1199,7 +1200,7 @@ body {
     gap: 0.35rem;
     padding: 0;
     font-size: var(--linear-body-sm-size);
-    font-weight: var(--linear-font-weight-medium);
+    font-weight: var(--font-weight-medium);
     color: var(--color-accent);
     transition: color 150ms var(--ease-interactive);
   }
@@ -1208,7 +1209,7 @@ body {
   }
   .public-doc-label {
     font-size: 0.75rem;
-    font-weight: var(--linear-font-weight-medium);
+    font-weight: var(--font-weight-medium);
     letter-spacing: -0.01em;
     color: var(--color-text-tertiary-token);
   }
@@ -1257,7 +1258,7 @@ body {
   .public-doc-nav-item-active {
     background: var(--color-bg-surface-1);
     color: var(--color-text-primary-token);
-    font-weight: var(--linear-font-weight-medium);
+    font-weight: var(--font-weight-medium);
   }
   .public-legal-shell [data-testid="header-nav"] a[href="/signin"] {
     color: rgb(64 64 64) !important;
@@ -1306,15 +1307,15 @@ body {
   /* Numbered section label — Linear's "1.0 Intake →" pattern */
   .section-number-label {
     font-size: var(--linear-label-size, 12px);
-    font-weight: var(--linear-font-weight-medium, 510);
+    font-weight: var(--font-weight-medium, 510);
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.02em;
     color: var(--linear-text-tertiary);
-    font-feature-settings: var(--linear-font-features);
+    font-feature-settings: var(--font-features);
   }
   .section-title-link {
     font-size: var(--linear-body-sm-size, 14px);
-    font-weight: var(--linear-font-weight-medium, 510);
+    font-weight: var(--font-weight-medium, 510);
     letter-spacing: -0.013em;
     color: var(--linear-text-secondary);
     transition: color var(--linear-duration-fast) var(--linear-ease);
@@ -1342,7 +1343,7 @@ body {
     width: 100%;
     padding: 0.75rem 1rem;
     font-size: var(--linear-body-sm-size, 14px);
-    font-weight: var(--linear-font-weight-medium, 510);
+    font-weight: var(--font-weight-medium, 510);
     color: var(--linear-text-secondary);
     background: transparent;
     border: 1px solid var(--linear-border-subtle);
@@ -1376,7 +1377,7 @@ body {
   /* FIG card label — Linear's "FIG 0.1" pattern */
   .fig-label {
     font-size: 11px;
-    font-weight: var(--linear-font-weight-medium, 510);
+    font-weight: var(--font-weight-medium, 510);
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -1674,7 +1675,7 @@ body {
     );
     padding: 0.4rem 0.8rem;
     font-size: 0.75rem;
-    font-weight: var(--linear-font-weight-medium);
+    font-weight: var(--font-weight-medium);
     letter-spacing: -0.01em;
     color: var(--linear-text-tertiary);
     backdrop-filter: blur(12px);
@@ -2342,9 +2343,9 @@ body {
   --border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   font-family: var(--font-sans), system-ui, sans-serif;
-  font-feature-settings: var(--linear-font-features);
-  font-variation-settings: "opsz" var(--linear-font-optical-sizing);
-  letter-spacing: var(--linear-tracking-body);
+  font-feature-settings: var(--font-features);
+  font-variation-settings: "opsz" var(--font-optical-sizing);
+  letter-spacing: var(--tracking-body);
   backdrop-filter: blur(10px);
   border-width: 1px;
 }

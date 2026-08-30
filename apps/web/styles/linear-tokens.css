@@ -135,26 +135,10 @@
   /* ============================================
      TYPOGRAPHY (mode-independent)
      ============================================ */
-  /* Font weights - Linear CSS vars (extracted 2026-03-16) */
-  --linear-font-weight-normal: 400;
-  /* Linear: --font-weight-normal = 400 */
-  --linear-font-weight-medium: 510;
-  --linear-font-weight-semibold: 590;
-  --linear-font-weight-bold: 680;
-  /* Letter spacing */
-  --linear-tracking-headline: -0.022em;
-  --linear-tracking-subheadline: -0.0175em;
-  --linear-tracking-body: -0.011em;
-  --linear-tracking-normal: normal;
-  /* Line heights */
-  --linear-leading-none: 1;
-  --linear-leading-tight: 1.06;
-  --linear-leading-snug: 1.08;
-  --linear-leading-normal: 1.6;
-  --linear-leading-relaxed: 1.33;
-  /* Font features - Linear's OpenType features */
-  --linear-font-features: "cv01", "ss03";
-  --linear-font-optical-sizing: 28;
+  /* Font weights, letter spacing, line heights, and font features
+     migrated to canonical design-system.css tokens:
+     --font-weight-*, --tracking-*, --leading-*, --font-features,
+     --font-optical-sizing (JOV-5463) */
   /* ============================================
      TYPE SCALE (Desktop) — mode-independent
      ============================================ */
