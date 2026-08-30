@@ -44,6 +44,10 @@ describe('docs API reference contract', () => {
     expect(apiReference).toContain(
       'Link: <https://docs.jov.ie/docs/api-reference>; rel="deprecation"'
     );
+    expect(apiReference).toContain('`x-jovie-versioning` extension');
+    expect(apiReference).toContain(
+      'both are inactive until a version is genuinely retired'
+    );
     expect(apiReference).toContain('RFC 9745');
     expect(apiReference).toContain('RFC 8594');
   });

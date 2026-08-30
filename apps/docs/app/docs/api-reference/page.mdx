@@ -79,6 +79,13 @@ The `v1` public artist API is active and is not deprecated. Additive changes
 remain within `v1`; a breaking contract requires a new versioned path. Active
 `v1` responses therefore do not emit `Deprecation` or `Sunset` headers.
 
+The machine-readable OpenAPI contract repeats this policy in its
+`x-jovie-versioning` extension: the strategy is URL versioning, additive
+changes remain within the active version, and breaking changes receive a new
+URL version. `Deprecation` follows RFC 9745 and `Sunset` follows RFC 8594;
+both are inactive until a version is genuinely retired and a dated migration
+policy is published.
+
 Responses expose the owned policy page with a `Link` relation:
 
 ```text
