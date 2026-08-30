@@ -1215,7 +1215,12 @@ function runRatchet() {
 
 export function runComponentShipGate(options = {}) {
   const flags = {
-    diffBase: options.diffBase ?? resolveDiffBase(null),
+    // Distinguish an explicit null (skip the diff gate) from undefined
+    // (auto-resolve a base). The CLI entry already pre-resolves null via
+    // resolveDiffBase, so this only affects programmatic callers that pass
+    // diffBase: null to run the non-diff sections in isolation.
+    diffBase:
+      options.diffBase === undefined ? resolveDiffBase(null) : options.diffBase,
     skipQuality: options.skipQuality ?? false,
     skipRatchet: options.skipRatchet ?? false,
     skipRenderedCert: options.skipRenderedCert ?? false,

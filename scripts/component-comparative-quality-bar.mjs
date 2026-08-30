@@ -99,11 +99,34 @@ export function resolveTrustedBaseEnrollment(repoRoot = REPO_ROOT) {
     if (!/^[0-9a-f]{40}$/.test(ref)) {
       throw new Error('trusted base did not resolve to a commit');
     }
-    const source = execFileSync(
-      'git',
-      ['show', `${ref}:${REGISTRY_SOURCE_PATH}`],
-      { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
-    );
+    // A PR branched before the comparative quality bar landed has a merge-base
+    // that predates the registry source. Reading from that base fails closed and
+    // permanently blocks such PRs. The trust property only requires a ref the PR
+    // head cannot modify, so fall back to origin/main (the integration target)
+    // when the merge-base does not yet contain the registry.
+    const trustedRefs = [ref, 'origin/main'];
+    let source;
+    for (const candidate of trustedRefs) {
+      try {
+        source = execFileSync(
+          'git',
+          ['show', `${candidate}:${REGISTRY_SOURCE_PATH}`],
+          {
+            cwd: repoRoot,
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'pipe'],
+          }
+        );
+        break;
+      } catch {
+        // Try the next trusted ref; the final failure is reported below.
+      }
+    }
+    if (source === undefined) {
+      throw new Error(
+        `trusted base comparative registry is unavailable at merge-base ${ref} and origin/main`
+      );
+    }
     const baselines = JSON.parse(
       execFileSync(
         process.execPath,
