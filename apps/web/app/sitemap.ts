@@ -6,6 +6,7 @@ import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { getAlternativeSlugs } from '@/content/alternatives';
 import { getComparisonSlugs } from '@/content/comparisons';
+import { PUBLIC_ARTIST_API_POLICY_URL } from '@/lib/api/v1/contract';
 import { getBlogPosts, slugifyCategory } from '@/lib/blog/getBlogPosts';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { getChangelogReleases } from '@/lib/changelog-source';
@@ -183,6 +184,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.7,
+    },
+    {
+      url: PUBLIC_ARTIST_API_POLICY_URL,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.6,
     },
     // These public, root-level machine-readable resources are linked from the
     // developer guide and are intentionally distinct from the noindex /api/*
