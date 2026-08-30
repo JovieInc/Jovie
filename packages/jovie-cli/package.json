@@ -1,0 +1,45 @@
+{
+  "name": "@jovie/cli",
+  "private": true,
+  "type": "module",
+  "description": "Read-only client for Jovie public artist profiles and agent resources.",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JovieInc/Jovie.git",
+    "directory": "packages/jovie-cli"
+  },
+  "bugs": {
+    "url": "https://github.com/JovieInc/Jovie/issues"
+  },
+  "homepage": "https://jov.ie/developers",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.23.2 <23"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "biome check .",
+    "test": "vitest run",
+    "test:ci": "vitest run --passWithNoTests",
+    "test:coverage": "vitest run --coverage",
+    "test:fast": "vitest run --passWithNoTests",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "@vitest/coverage-v8": "4.1.10",
+    "typescript": "^6.0.3",
+    "vitest": "4.1.10"
+  }
+}
