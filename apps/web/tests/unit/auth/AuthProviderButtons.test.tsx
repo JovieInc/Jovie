@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AuthProviderButtonSlot,
   AuthProviderButtonSlots,
-} from '@/features/auth';
+} from '@/components/features/auth/AuthProviderButtons';
 import { getEnabledAuthOAuthProviders } from '@/lib/auth/oauth-providers';
 
 describe('AuthProviderButtonSlots', () => {
@@ -36,5 +36,11 @@ describe('AuthProviderButtonSlots', () => {
     expect(
       screen.getByRole('button', { name: 'Continue with Google' })
     ).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: 'Continue with Google' }).className
+    ).toContain('shadow-button');
+    expect(
+      screen.getByRole('button', { name: 'Continue with Google' }).className
+    ).not.toContain('--linear-shadow-button');
   });
 });

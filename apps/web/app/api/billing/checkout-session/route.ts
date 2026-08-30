@@ -70,24 +70,27 @@ export async function GET(request: NextRequest) {
     }
 
     if (session.mode !== 'subscription' || session.status !== 'complete') {
-      return NextResponse.json({ plan: null }, { headers: NO_STORE_HEADERS });
-    }
-
-    const metadataPlan = resolvePaidPlan(session.metadata?.plan ?? null);
-    if (metadataPlan) {
       return NextResponse.json(
-        { plan: metadataPlan },
+        { plan: null, priceId: null },
         { headers: NO_STORE_HEADERS }
       );
     }
 
     const lineItemPriceId = getLineItemPriceId(session.line_items?.data);
+    const metadataPlan = resolvePaidPlan(session.metadata?.plan ?? null);
+    if (metadataPlan) {
+      return NextResponse.json(
+        { plan: metadataPlan, priceId: lineItemPriceId },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
     const mappedPlan = lineItemPriceId
       ? resolvePaidPlan(getPriceMappingDetails(lineItemPriceId)?.plan ?? null)
       : null;
 
     return NextResponse.json(
-      { plan: mappedPlan },
+      { plan: mappedPlan, priceId: lineItemPriceId },
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {

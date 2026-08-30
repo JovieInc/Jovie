@@ -11,6 +11,11 @@
  */
 
 import {
+  APP_SCREEN_ARCHETYPE_REGISTRY,
+  type AppScreenArchetypeId,
+  type AppScreenArchetypeRegistryEntry,
+} from './archetypes';
+import {
   APP_SCREEN_COMPONENT_REGISTRY,
   APP_SCREEN_RECIPE_REGISTRY,
   APP_SCREEN_REGISTRY,
@@ -22,11 +27,7 @@ import {
 } from './registry';
 import { validateAppScreenSystem } from './validation';
 
-/**
- * v2 adds per-component native Pen-root resolution. Consumers must treat an
- * unresolved component as non-referenceable rather than guessing an ID.
- */
-export const APP_SCREEN_PEN_EXPORT_SCHEMA = 'app-screen-pen-export/v2';
+export const APP_SCREEN_PEN_EXPORT_SCHEMA = 'app-screen-pen-export/v3';
 
 export interface AppScreenPenExportScreen {
   readonly id: string;
@@ -35,6 +36,7 @@ export interface AppScreenPenExportScreen {
   readonly kind: AppScreenKind;
   readonly conceptId: string;
   readonly recipeId: AppScreenRecipeId;
+  readonly archetypeId: AppScreenArchetypeId | null;
   readonly componentIds: readonly AppScreenComponentId[];
   readonly storyId: string | null;
   readonly sourceSha: string | null;
@@ -49,9 +51,11 @@ export interface AppScreenPenExport {
     readonly designReferences: number;
     readonly components: number;
     readonly recipes: number;
+    readonly archetypes: number;
   };
   readonly components: readonly AppScreenComponentRegistryEntry[];
   readonly recipes: readonly AppScreenRecipeRegistryEntry[];
+  readonly archetypes: readonly AppScreenArchetypeRegistryEntry[];
   readonly screens: readonly AppScreenPenExportScreen[];
 }
 
@@ -90,6 +94,7 @@ export function buildAppScreenPenExport(
       kind: screen.kind,
       conceptId: screen.conceptId,
       recipeId: screen.recipeId,
+      archetypeId: screen.archetypeId,
       componentIds: recipeComponents.get(screen.recipeId) ?? [],
       storyId: screen.story?.id ?? null,
       sourceSha: input.hashSource?.(screen.source) ?? null,
@@ -104,9 +109,11 @@ export function buildAppScreenPenExport(
       designReferences: screens.filter(screen => screen.designReference).length,
       components: APP_SCREEN_COMPONENT_REGISTRY.length,
       recipes: APP_SCREEN_RECIPE_REGISTRY.length,
+      archetypes: APP_SCREEN_ARCHETYPE_REGISTRY.length,
     },
     components: APP_SCREEN_COMPONENT_REGISTRY,
     recipes: APP_SCREEN_RECIPE_REGISTRY,
+    archetypes: APP_SCREEN_ARCHETYPE_REGISTRY,
     screens,
   };
 }

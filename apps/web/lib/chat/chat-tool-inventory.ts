@@ -36,6 +36,7 @@ export const CHAT_ROUTE_TOOL_IDS = [
   'showTopInsights',
   'proposeProfileEdit',
   'importBioFromUrl',
+  'inspectPressSource',
   'checkCanvasStatus',
   'suggestRelatedArtists',
   'writeWorldClassBio',

@@ -20,12 +20,9 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
-import { attributeLeadPaidConversionByClerkUserId } from '@/lib/leads/funnel-events';
+import { attributeLeadPaidConversionByAppUserId } from '@/lib/leads/funnel-events';
 import { notifySlackUpgrade } from '@/lib/notifications/providers/slack';
-import {
-  expireReferralOnChurn,
-  getInternalUserId,
-} from '@/lib/referrals/service';
+import { expireReferralOnChurn } from '@/lib/referrals/service';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
 
@@ -167,16 +164,25 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
 
     // Send Slack notification for new subscription (fire-and-forget)
     if (result.success && result.isActive && result.plan) {
-      this.sendUpgradeNotification(userId, result.plan).catch(err => {
+      if (!result.appUserId) {
+        throw new Error('Billing update omitted canonical app user ID');
+      }
+      this.sendUpgradeNotification(result.appUserId, result.plan).catch(err => {
         logger.warn('[subscription-handler] Slack notification failed', err);
       });
     }
 
-    await invalidateBillingCache(userId);
+    await invalidateBillingCache(result.appUserId ?? userId);
 
     if (result.success && result.isActive) {
+      if (!result.appUserId) {
+        throw new Error('Billing update omitted canonical app user ID');
+      }
       try {
-        await attributeLeadPaidConversionByClerkUserId(userId, subscription.id);
+        await attributeLeadPaidConversionByAppUserId(
+          result.appUserId,
+          subscription.id
+        );
       } catch (error) {
         logger.warn(
           'Failed to attribute lead paid conversion on subscription created',
@@ -199,7 +205,7 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
    * @private
    */
   private async sendUpgradeNotification(
-    clerkUserId: string,
+    appUserId: string,
     plan: string
   ): Promise<void> {
     // Fetch user's display name from database
@@ -210,7 +216,7 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       })
       .from(users)
       .leftJoin(creatorProfiles, eq(creatorProfiles.userId, users.id))
-      .where(eq(users.clerkId, clerkUserId))
+      .where(eq(users.id, appUserId))
       .limit(1);
 
     const displayName = userData?.displayName ?? userData?.email ?? 'A user';
@@ -247,11 +253,17 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       eventType: 'subscription_updated',
     });
 
-    await invalidateBillingCache(userId);
+    await invalidateBillingCache(result.appUserId ?? userId);
 
     if (result.success && result.isActive) {
+      if (!result.appUserId) {
+        throw new Error('Billing update omitted canonical app user ID');
+      }
       try {
-        await attributeLeadPaidConversionByClerkUserId(userId, subscription.id);
+        await attributeLeadPaidConversionByAppUserId(
+          result.appUserId,
+          subscription.id
+        );
       } catch (error) {
         logger.warn(
           'Failed to attribute lead paid conversion on subscription updated',
@@ -319,9 +331,8 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
     // Awaited so failures are surfaced instead of silently dropped.
     // If the user re-subscribes later via a new referral link, a fresh referral is created.
     try {
-      const internalId = await getInternalUserId(userId);
-      if (internalId) {
-        await expireReferralOnChurn(internalId);
+      if (result.appUserId) {
+        await expireReferralOnChurn(result.appUserId);
       }
     } catch (error) {
       // Log but don't fail the webhook — referral churn tracking is secondary
@@ -330,7 +341,7 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       });
     }
 
-    await invalidateBillingCache(userId);
+    await invalidateBillingCache(result.appUserId ?? userId);
 
     return {
       success: true,

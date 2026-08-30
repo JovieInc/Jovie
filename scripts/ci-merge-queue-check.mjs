@@ -14,6 +14,10 @@ import {
   validateMergeQueueRepoConfig,
   validateNativeDrainQueueLabelIsolation,
 } from './lib/merge-queue-guard.mjs';
+import {
+  buildChangelogCollisionInventory,
+  changelogCollisionDrainDecision,
+} from './lib/pre-land-changelog.mjs';
 import { DEFAULT_MERGE_QUEUE_BACKEND } from './merge-queue-backend.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
@@ -217,9 +221,29 @@ async function main() {
       console.log(JSON.stringify(changelogGroupCollisionDecision(input)));
       break;
     }
+    case 'changelog-inventory': {
+      let input = {};
+      try {
+        input = JSON.parse(process.env.CHANGELOG_COLLISION_JSON ?? '{}');
+      } catch {
+        input = {};
+      }
+      console.log(JSON.stringify(buildChangelogCollisionInventory(input)));
+      break;
+    }
+    case 'changelog-drain': {
+      let input = {};
+      try {
+        input = JSON.parse(process.env.CHANGELOG_COLLISION_JSON ?? '{}');
+      } catch {
+        input = {};
+      }
+      console.log(JSON.stringify(changelogCollisionDrainDecision(input)));
+      break;
+    }
     default:
       console.error(
-        'Usage: node scripts/ci-merge-queue-check.mjs <validate|verify|policy|max-queue-depth|front-churn|unmergeable-eject|unmergeable-reenqueue|changelog-collision>'
+        'Usage: node scripts/ci-merge-queue-check.mjs <validate|verify|policy|max-queue-depth|front-churn|unmergeable-eject|unmergeable-reenqueue|changelog-collision|changelog-inventory|changelog-drain>'
       );
       process.exitCode = 1;
   }

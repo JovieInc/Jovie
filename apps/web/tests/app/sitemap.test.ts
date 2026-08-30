@@ -179,6 +179,11 @@ describe('sitemap', () => {
       expect.arrayContaining([
         'https://jov.ie',
         'https://jov.ie/blog',
+        'https://jov.ie/developers',
+        'https://jov.ie/api-versioning',
+        'https://jov.ie/openapi.json',
+        'https://jov.ie/llms.txt',
+        'https://jov.ie/llms-full.txt',
         'https://jov.ie/blog/hello-world',
         'https://jov.ie/changelog/26.8.0',
         'https://jov.ie/legal/privacy',
@@ -202,6 +207,7 @@ describe('sitemap', () => {
       'https://jov.ie/ui/buttons',
       'https://jov.ie/hud',
       'https://jov.ie/investor-portal',
+      'https://jov.ie/api/v1',
     ]) {
       expect(entries.map(entry => entry.url)).not.toContain(blockedUrl);
     }

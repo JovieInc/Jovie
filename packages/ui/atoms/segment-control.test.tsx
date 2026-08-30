@@ -163,7 +163,8 @@ describe('SegmentControl', () => {
         />
       );
       const tab = screen.getByRole('tab', { name: 'Links' });
-      expect(tab.className).toContain('text-[13px]');
+      expect(tab.className).toContain('text-app');
+      expect(tab.className).toContain('h-7');
       expect(tab.className).toContain('px-2.5');
     });
 
@@ -177,7 +178,7 @@ describe('SegmentControl', () => {
         />
       );
       const tab = screen.getByRole('tab', { name: 'Links' });
-      expect(tab.className).toContain('text-[12px]');
+      expect(tab.className).toContain('text-xs');
       expect(tab.className).toContain('px-2');
     });
 
@@ -275,9 +276,9 @@ describe('SegmentControl', () => {
         'tracking-(--linear-caption-tracking)'
       );
       expect(activeTab.className).toContain('text-caption');
-      expect(activeTab.className).not.toContain('font-[510]');
+      expect(activeTab.className).not.toContain('font-medium');
       expect(activeTab.className).not.toContain('tracking-[-0.01em]');
-      expect(activeTab.className).not.toContain('text-[12px]');
+      expect(activeTab.className).not.toContain('text-xs');
     });
 
     it('resyncs and disconnects the indicator resize observer', () => {

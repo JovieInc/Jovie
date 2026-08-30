@@ -115,7 +115,7 @@ that unautomatable behavior was manually verified.
 
 | Rule | Automated evidence when applicable | Manual/device or design-review evidence |
 |---|---|---|
-| Component ownership and changed interaction behavior | `pnpm component-ship-gate` requires a changed shared component's real test and story; focused Vitest asserts the user-visible transition for shared and feature components | Confirm the component belongs to the existing family, not a fork |
+| Component ownership and changed interaction behavior | `pnpm component-ship-gate` requires a changed shared component's real test and story plus fail-closed rendered certification receipts; focused Vitest asserts the user-visible transition for shared and feature components | Confirm the component belongs to the existing family, not a fork |
 | Semantic controls, names, and keyboard behavior | Focused Testing Library/Playwright behavior tests, `apps/web/tests/utils/a11y.ts`, and `pnpm --filter @jovie/web run a11y:ci` for affected routes | Screen-reader reading/order and hardware-keyboard pass |
 | Contrast and touch alternatives | `pnpm --filter @jovie/web run lint:contrast-ratchet` and `pnpm --filter @jovie/web run lint:touch-target` | Touch target usability at device scale and non-color cue review |
 | Focus, selection, layout, and state retention | Focus assertions plus the applicable Playwright bounding-box, visual, or layout-stability test | Real browser checks for scroll/caret/selection and unexpected movement |
@@ -161,7 +161,7 @@ apps/web/components/
 - `molecules/` must NOT import from `organisms/`
 - `features/{x}/` must NOT import from `features/{y}/` — if a component is needed by 2+ features, **promote it** to the shared `atoms/`, `molecules/`, or `organisms/` layer
 
-**Token reference style:** Use Tailwind-named utilities (`text-primary-token`, `bg-surface-1`, `border-subtle`), NOT CSS variable arbitrary values (`text-(--linear-text-primary)`). Arbitrary Tailwind values (`w-[327px]`, `text-[#fff]`) are tracked by a drift ratchet (`apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts`) — the count may only go DOWN. Converge to tokens; never add new arbitrary values.
+**Token reference style:** Use Tailwind-named utilities (`text-primary-token`, `bg-surface-1`, `border-subtle`), NOT CSS variable arbitrary values (`text-(--linear-text-primary)`). Arbitrary Tailwind values (`w-[327px]`, `text-[#fff]`) are tracked by shrink-only ratchets — the count may only go DOWN. Shared UI foundation: `packages/ui` via `pnpm design:shared-ui-visual-arbitrary:check`. Broader web surfaces: `apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts`. Converge to tokens; never add new arbitrary values.
 
 **Server-import isolation:** `apps/web/components/{atoms,molecules,organisms}` are shared presentation layers that must bundle for the browser. Files in these layers must not import server-only specifiers (`server-only`, `@clerk/nextjs/server`, `drizzle-orm`, `@/lib/db/*`, `next/headers`, `/actions` modules, etc.) or contain `'use server'`. Violations are tracked by a drift ratchet (`apps/web/tests/unit/design-system/server-imports-ratchet.test.ts`) — the count may only go DOWN. Move server dependencies to a feature wrapper or API route.
 

@@ -5,6 +5,7 @@
  * their existing ownership while CI can reject unregistered screens and
  * recipes before they become new design references.
  */
+import { type AppScreenArchetypeId, archetypeIdForScreen } from './archetypes';
 
 export type AppScreenKind = 'canonical' | 'alias' | 'legacy' | 'operator';
 
@@ -70,6 +71,8 @@ export interface AppScreenRegistryEntry {
    */
   readonly conceptId: string;
   readonly recipeId: AppScreenRecipeId;
+  /** Set on design references only. Alias/legacy/non-reference stay null. */
+  readonly archetypeId: AppScreenArchetypeId | null;
   readonly designReference: boolean;
   /** Redirect receipt: literal destination for redirect-only sources. */
   readonly redirectTo: string | null;
@@ -611,6 +614,7 @@ export const APP_SCREEN_REGISTRY: readonly AppScreenRegistryEntry[] =
       kind,
       conceptId: mapping?.conceptId ?? route,
       recipeId,
+      archetypeId: archetypeIdForScreen({ route, kind, designReference }),
       designReference,
       redirectTo: mapping?.redirectTo ?? null,
       story: designReference

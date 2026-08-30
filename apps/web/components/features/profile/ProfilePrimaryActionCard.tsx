@@ -3,9 +3,12 @@
 import { Play } from 'lucide-react';
 import Link from 'next/link';
 import { type ReactNode, useMemo } from 'react';
+import {
+  ARTWORK_FIT_CLASSNAME,
+  ArtworkFrame,
+} from '@/components/atoms/ArtworkFrame';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { ReleaseCountdown } from '@/components/features/release/ReleaseCountdown';
-import { profileSecondaryPillClassName } from '@/features/profile/artist-notifications-cta/shared';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
 import {
   startOfProfileSurfaceLocalDay as startOfLocalDay,
@@ -161,7 +164,10 @@ function ReleaseCard({
             alt={`${state.release.title} artwork`}
             fill
             sizes='(max-width: 430px) 100vw, 340px'
-            className='object-cover opacity-90 transition-opacity duration-subtle group-hover:opacity-100'
+            className={cn(
+              ARTWORK_FIT_CLASSNAME,
+              'opacity-90 transition-opacity duration-subtle group-hover:opacity-100'
+            )}
             fallbackVariant='release'
           />
         ) : (
@@ -215,21 +221,16 @@ function ReleaseCard({
       dataTestId={dataTestId}
     >
       {state.release.artworkUrl ? (
-        <div
-          className={cn(
-            'relative shrink-0 overflow-hidden',
-            styles.artClassName
-          )}
-        >
+        <ArtworkFrame size={44} className='h-11 w-11 bg-white/[0.05]'>
           <ImageWithFallback
             src={state.release.artworkUrl}
             alt={`${state.release.title} artwork`}
             fill
-            sizes={styles.isShowcase ? '56px' : '44px'}
-            className='object-cover'
+            sizes='44px'
+            className={ARTWORK_FIT_CLASSNAME}
             fallbackVariant='release'
           />
-        </div>
+        </ArtworkFrame>
       ) : (
         <div
           className={cn(
@@ -439,8 +440,8 @@ function ListenCard({
 }
 
 const CTA_PILL_CLASS_NAME = cn(
-  profileSecondaryPillClassName,
-  'h-7 rounded-full border-white/14 bg-white dark:bg-surface-1 text-2xs font-semibold text-black dark:text-white shadow-[0_10px_24px_rgba(255,255,255,0.16)] hover:bg-white dark:bg-surface-1 hover:text-black dark:text-white'
+  'inline-flex h-7 items-center justify-center rounded-full border border-white/14 bg-white dark:bg-surface-1 px-5 text-2xs font-semibold text-black dark:text-white shadow-[0_10px_24px_rgba(255,255,255,0.16)]',
+  'group-hover:bg-white dark:group-hover:bg-surface-1 group-hover:text-black dark:group-hover:text-white'
 );
 
 function getReleaseArtistNames(

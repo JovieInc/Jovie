@@ -1,9 +1,15 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/library-share/LibraryShareAssetLayouts.test.tsx
+
 import { Button } from '@jovie/ui';
 import { ArrowDownToLine, Disc3, FileText, PlayCircle } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import {
+  ARTWORK_FIT_CLASSNAME,
+  ArtworkFrame,
+} from '@/components/atoms/ArtworkFrame';
 import type { LibraryShareDropAsset } from '@/lib/library-share/types';
 
 interface LibraryShareAssetCardProps {
@@ -45,13 +51,14 @@ export function LibraryShareAssetCard({
       }
       data-testid={`library-share-asset-${asset.id}`}
     >
-      <div
+      <ArtworkFrame
+        size={isList ? 96 : 'hero'}
         className={
           isList
-            ? 'relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-surface-1'
+            ? 'h-24 w-24 bg-surface-1'
             : isReel
-              ? 'relative aspect-[9/16] w-full overflow-hidden bg-surface-1'
-              : 'relative aspect-square w-full overflow-hidden bg-surface-1'
+              ? 'aspect-[9/16] w-full bg-surface-1'
+              : 'aspect-square w-full bg-surface-1'
         }
       >
         {asset.includeArtwork && asset.artworkUrl ? (
@@ -60,7 +67,7 @@ export function LibraryShareAssetCard({
             alt={asset.title}
             fill
             sizes={isList ? '96px' : '(max-width: 768px) 100vw, 320px'}
-            className='object-cover'
+            className={ARTWORK_FIT_CLASSNAME}
             priority={priorityArtwork}
           />
         ) : (
@@ -68,7 +75,7 @@ export function LibraryShareAssetCard({
             <Disc3 className='h-8 w-8' strokeWidth={2} />
           </div>
         )}
-      </div>
+      </ArtworkFrame>
 
       <div className={isList ? 'min-w-0 flex-1 py-1' : 'space-y-3 p-4'}>
         <div>

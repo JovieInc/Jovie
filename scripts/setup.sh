@@ -312,7 +312,7 @@ hash_dependency_inputs() {
 
 # Warm SessionStart skip. Claude and Codex both call this script on every
 # session. When the worktree is already healthy (deps fingerprint matches,
-# Node 22.23.1+, pnpm 9.15.4), do not rerun Doppler/gh/Clerk/migration/lsof.
+# Node 22.23.2+, pnpm 9.15.4), do not rerun Doppler/gh/Clerk/migration/lsof.
 # Cold or stale worktrees fall through to the full body. Codex gbrain sync
 # is not part of this script and still runs after we return.
 # Force the full body with JOVIE_SETUP_FORCE=1.
@@ -328,18 +328,18 @@ echo ""
 echo "── Node.js ─────────────────────────────────────────────────────────────"
 if command -v node &>/dev/null; then
   NODE_VERSION=$(node --version)
-  if [[ "$NODE_VERSION" =~ ^v22\.([0-9]+)\.([0-9]+) ]] &&
-    ((10#${BASH_REMATCH[1]} > 23 || (10#${BASH_REMATCH[1]} == 23 && 10#${BASH_REMATCH[2]} >= 1))); then
-    success "Node.js $NODE_VERSION (22.23.1+ ✓)"
+  REQUIRED_NODE_VERSION="$(tr -d '[:space:]' < "$REPO_ROOT/.nvmrc")"
+  if jovie_setup_node_pin_ok "$REPO_ROOT"; then
+    success "Node.js $NODE_VERSION ($REQUIRED_NODE_VERSION+ ✓)"
   else
-    warn "Node.js $NODE_VERSION detected — MUST be 22.x (22.23.1+)"
-    info "Fix: nvm use 22  (or: nvm install 22)"
-    MISSING+=("Node.js 22.23.1+")
+    warn "Node.js $NODE_VERSION detected — MUST satisfy .nvmrc ($REQUIRED_NODE_VERSION+)"
+    info "Fix: nvm use $REQUIRED_NODE_VERSION  (or: nvm install $REQUIRED_NODE_VERSION)"
+    MISSING+=("Node.js $REQUIRED_NODE_VERSION+")
   fi
 else
   warn "Node.js not found"
   info "Install via nvm: https://github.com/nvm-sh/nvm"
-  MISSING+=("Node.js 22.23.1+")
+  MISSING+=("Node.js $(tr -d '[:space:]' < "$REPO_ROOT/.nvmrc")+")
 fi
 
 # ─── 2. pnpm ────────────────────────────────────────────────────────────────

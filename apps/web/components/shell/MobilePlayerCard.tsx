@@ -3,6 +3,10 @@
 import { Pause, Play } from 'lucide-react';
 import Image from 'next/image';
 import React from 'react';
+import {
+  ARTWORK_FIT_CLASSNAME,
+  ArtworkFrame,
+} from '@/components/atoms/ArtworkFrame';
 import { cn } from '@/lib/utils';
 import type { NowPlayingTrack } from './SidebarNowPlaying';
 
@@ -66,18 +70,18 @@ export const MobilePlayerCard = React.memo(function MobilePlayerCard({
           style={{ width: `${safePct}%` }}
         />
 
-        <div className='relative h-10 w-10 rounded-lg overflow-hidden shrink-0 bg-surface-2'>
+        <ArtworkFrame size={40} className='h-10 w-10 shrink-0 bg-surface-2'>
           {artworkUrl && (
             <Image
               src={artworkUrl}
               alt=''
               fill
               sizes='40px'
-              className='object-cover'
+              className={ARTWORK_FIT_CLASSNAME}
               unoptimized
             />
           )}
-        </div>
+        </ArtworkFrame>
 
         <div className='min-w-0 flex-1'>
           <div className='truncate text-app font-caption text-primary-token leading-tight'>

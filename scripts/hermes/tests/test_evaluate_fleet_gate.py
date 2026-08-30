@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import pathlib
@@ -44,6 +45,13 @@ def signals(**overrides):
             "eligiblePrs": 0,
             "greenReadyPrs": 0,
             "target": 15,
+            "laneCapacity": {
+                "schema": "jovie-lane-capacity/v1",
+                "observedAt": now_iso(),
+                "global": {"ready": 0, "budget": 15},
+                "defaultLaneBudget": 4,
+                "lanes": {},
+            },
         },
         "closureHealth": {
             "schema": "jovie-closure-health/v1",
@@ -242,6 +250,56 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         code, outputs, receipt = run_wrapper(signals(), consumer="promotion")
         self.assertEqual(code, 2)
         self.assertEqual(receipt, {})
+
+    def test_wrapper_transports_a_bounded_admission_projection(self):
+        files = [f"apps/web/generated/File{index:04d}.tsx" for index in range(80)]
+        closure = {
+            **signals()["closureHealth"],
+            "classifications": {
+                "changedFileEvidence": [{"number": 1, "status": "complete", "files": files}],
+                "duplicateIssueLanes": [{"issue": "JOV-1", "prs": [1, 2], "overlap": files}],
+            },
+            "episodes": {"controller": {"since": now_iso(), "active": True}},
+        }
+        code, outputs, receipt = run_wrapper(signals(closureHealth=closure))
+        self.assertEqual(code, 0)
+        self.assertIn("classifications", receipt["signals"]["closureHealth"])
+        projection = json.loads(base64.b64decode(outputs["receipt_b64"]))
+        self.assertNotIn("classifications", projection["signals"]["closureHealth"])
+        self.assertNotIn("episodes", projection["signals"]["closureHealth"])
+        self.assertEqual(projection["promotionMode"], "normal")
+        self.assertLess(len(outputs["receipt_b64"]), 32_768)
+
+    def test_queue_consumers_pass_only_the_bounded_projection(self):
+        action = (ROOT / ".github/actions/evaluate-fleet-gate/action.yml").read_text()
+        autoenroll = (
+            ROOT / ".github/workflows/merge-queue-autoenroll.yml"
+        ).read_text()
+        deferred_release = (
+            ROOT / ".github/workflows/queue-deferred-release.yml"
+        ).read_text()
+        wrapper = SCRIPT.read_text()
+        self.assertIn(
+            "DRAIN_FLEET_GATE_B64: ${{ needs.fleet-policy.outputs.receipt_b64 }}",
+            autoenroll,
+        )
+        for workflow in (autoenroll, deferred_release):
+            self.assertIn(
+                "receipt_b64: ${{ steps.policy.outputs.receipt_b64 }}", workflow
+            )
+        self.assertIn("Base64 bounded admission projection", action)
+        self.assertIn(
+            "value: ${{ steps.evaluate.outputs.receipt_b64 }}",
+            action,
+        )
+        self.assertIn(
+            'needs.fleet-policy.outputs.receipt_b64 }}" | base64 -d',
+            deferred_release,
+        )
+        self.assertIn("fleet_admission_receipt.py", wrapper)
+        self.assertIn("base64 -w0 <\"$admission\"", wrapper)
+        self.assertNotIn("base64 -w0 <\"$receipt\"", wrapper)
+        self.assertIn("has(\"classifications\") | not", wrapper)
 
 
 if __name__ == "__main__":

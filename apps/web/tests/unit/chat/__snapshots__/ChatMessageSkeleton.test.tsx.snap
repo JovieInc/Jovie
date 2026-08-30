@@ -13,7 +13,8 @@ exports[`ChatMessageSkeleton > matches snapshot 1`] = `
     >
       <div
         aria-hidden="true"
-        class="skeleton motion-reduce:animate-none rounded-full system-b-chat-message-skeleton-user-line"
+        class="skeleton motion-reduce:animate-none motion-reduce:bg-none rounded-full system-b-chat-message-skeleton-user-line"
+        data-slot="skeleton"
         data-state="shimmer"
       />
     </div>
@@ -26,17 +27,20 @@ exports[`ChatMessageSkeleton > matches snapshot 1`] = `
     >
       <div
         aria-hidden="true"
-        class="skeleton motion-reduce:animate-none rounded-lg system-b-chat-message-skeleton-line system-b-chat-message-skeleton-line-wide"
+        class="skeleton motion-reduce:animate-none motion-reduce:bg-none rounded-lg system-b-chat-message-skeleton-line system-b-chat-message-skeleton-line-wide"
+        data-slot="skeleton"
         data-state="shimmer"
       />
       <div
         aria-hidden="true"
-        class="skeleton motion-reduce:animate-none rounded-lg system-b-chat-message-skeleton-line system-b-chat-message-skeleton-line-medium"
+        class="skeleton motion-reduce:animate-none motion-reduce:bg-none rounded-lg system-b-chat-message-skeleton-line system-b-chat-message-skeleton-line-medium"
+        data-slot="skeleton"
         data-state="shimmer"
       />
       <div
         aria-hidden="true"
-        class="skeleton motion-reduce:animate-none rounded-lg system-b-chat-message-skeleton-line system-b-chat-message-skeleton-line-short"
+        class="skeleton motion-reduce:animate-none motion-reduce:bg-none rounded-lg system-b-chat-message-skeleton-line system-b-chat-message-skeleton-line-short"
+        data-slot="skeleton"
         data-state="shimmer"
       />
     </div>

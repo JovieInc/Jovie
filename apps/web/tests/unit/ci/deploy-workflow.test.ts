@@ -102,6 +102,10 @@ const productionControllerHealthPath = resolve(
   repoRoot,
   '.github/workflows/production-controller-health.yml'
 );
+const fleetGateRefreshWorkflowPath = resolve(
+  repoRoot,
+  '.github/workflows/fleet-gate-refresh.yml'
+);
 const productionMarkerStatePath = resolve(
   repoRoot,
   '.github/scripts/production-marker-state.mjs'
@@ -1968,6 +1972,10 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(verified).toContain('repos/${{ github.repository }}/commits/main');
     expect(verified).toContain('verify-production-alias.sh');
     expect(verified).toContain('superseded by $current_sha');
+    expect(verified).toContain(
+      'node .github/scripts/assert-live-production-bind.mjs'
+    );
+    expect(verified).not.toContain('neutral with no notification');
     expect(verified).toContain("steps.current.outputs.is_current == 'true'");
     expect(verified).toContain(
       "always() && steps.current.outputs.is_current == 'true'"
@@ -3086,6 +3094,24 @@ describe('CI E2E smoke workflow', () => {
       resolve(repoRoot, 'apps/web/tests/e2e/golden-path.spec.ts'),
       'utf8'
     );
+    const moneyPathSpec = readFileSync(
+      resolve(repoRoot, 'apps/web/tests/e2e/money-path-persistence.spec.ts'),
+      'utf8'
+    );
+    const authHelper = readFileSync(
+      resolve(repoRoot, 'apps/web/tests/helpers/auth.ts'),
+      'utf8'
+    );
+    const packageJson = JSON.parse(
+      readFileSync(resolve(repoRoot, 'apps/web/package.json'), 'utf8')
+    ) as { scripts: Record<string, string> };
+    const releasesActions = readFileSync(
+      resolve(
+        repoRoot,
+        'apps/web/app/app/(shell)/dashboard/releases/actions.ts'
+      ),
+      'utf8'
+    );
     const smokeManifest = readFileSync(
       resolve(repoRoot, 'apps/web/tests/e2e/smoke-manifest.ts'),
       'utf8'
@@ -3096,25 +3122,47 @@ describe('CI E2E smoke workflow', () => {
     expect(smokeStep).not.toContain('export E2E_TEST_MODE=1');
     expect(smokeStep).not.toContain('export PUBLIC_NOAUTH_SMOKE=1');
     expect(goldenPathStep).toContain('export E2E_TEST_MODE=1');
+    expect(goldenPathStep).toContain('export E2E_FAST_ONBOARDING=1');
+    expect(goldenPathStep).toContain("E2E_FAST_ONBOARDING: '1'");
     expect(goldenPathStep).toContain('export CHAT_LLM_FAILURE_INJECTION=1');
     expect(goldenPathStep).toContain('export PUBLIC_NOAUTH_SMOKE=1');
     expect(goldenPathStep).not.toContain('E2E_USE_TEST_AUTH_BYPASS');
+    expect(goldenPathStep).toContain(
+      'STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}'
+    );
+    expect(goldenPathStep).toContain(
+      'STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}'
+    );
+    expect(goldenPathStep).toContain(
+      'STRIPE_PRICE_PRO_MONTHLY: ${{ secrets.STRIPE_PRICE_PRO_MONTHLY }}'
+    );
+    expect(packageJson.scripts['test:e2e:golden-path:ci']).toContain(
+      'tests/e2e/golden-path.spec.ts'
+    );
+    expect(packageJson.scripts['test:e2e:golden-path:ci']).toContain(
+      'tests/e2e/money-path-persistence.spec.ts'
+    );
     expect(goldenPathSpec).toContain(
       "process.env.E2E_USE_TEST_AUTH_BYPASS === '1'"
     );
     expect(goldenPathSpec).toContain(
       'Golden path requires the dedicated real-auth lane'
     );
-    expect(goldenPathSpec).toContain(
+    expect(goldenPathSpec).toContain('prepareBetterAuthEmailOtp(page, {');
+    expect(goldenPathSpec).toContain('beforeResponseFulfill: ensureDbUser,');
+    expect(authHelper).toContain(
       "const signInRoute = '**/api/auth/sign-in/email-otp'"
     );
-    const routeFetchIndex = goldenPathSpec.indexOf(
+    expect(authHelper).toContain("options.entryPath === '/signup'");
+    expect(authHelper).toContain("'Continue with Email'");
+    expect(authHelper).toContain("'Email me a Code'");
+    const routeFetchIndex = authHelper.indexOf(
       'response = await route.fetch()'
     );
-    const approveAppUserIndex = goldenPathSpec.indexOf(
-      'await ensureDbUser(betterAuthUserId)'
+    const prepareAppUserIndex = authHelper.indexOf(
+      'await options.beforeResponseFulfill?.(betterAuthUserId)'
     );
-    const signInFulfillIndex = goldenPathSpec.indexOf(
+    const signInFulfillIndex = authHelper.indexOf(
       'await route.fulfill({ response, body })'
     );
     const navigationArmIndex = goldenPathSpec.indexOf(
@@ -3124,28 +3172,21 @@ describe('CI E2E smoke workflow', () => {
       'const claimResponsePromise = page.waitForResponse('
     );
     const otpSubmitIndex = goldenPathSpec.indexOf(
-      "pressSequentially('424242')"
+      'await preparedAuth.submit()'
     );
-    const authPreparationIndex = goldenPathSpec.indexOf(
-      'const authPreparationError = await Promise.race(['
-    );
-    const unrouteIndex = goldenPathSpec.indexOf(
-      'await page.unroute(signInRoute)'
-    );
+    const disposeIndex = goldenPathSpec.indexOf('await preparedAuth.dispose()');
     expect(routeFetchIndex).toBeGreaterThan(-1);
-    expect(approveAppUserIndex).toBeGreaterThan(routeFetchIndex);
-    expect(signInFulfillIndex).toBeGreaterThan(approveAppUserIndex);
+    expect(prepareAppUserIndex).toBeGreaterThan(routeFetchIndex);
+    expect(signInFulfillIndex).toBeGreaterThan(prepareAppUserIndex);
     expect(navigationArmIndex).toBeGreaterThan(-1);
     expect(navigationArmIndex).toBeLessThan(otpSubmitIndex);
     expect(claimArmIndex).toBeGreaterThan(navigationArmIndex);
     expect(claimArmIndex).toBeLessThan(otpSubmitIndex);
-    expect(authPreparationIndex).toBeGreaterThan(otpSubmitIndex);
-    expect(unrouteIndex).toBeGreaterThan(authPreparationIndex);
-    expect(goldenPathSpec).toContain('authPreparationResult,');
+    expect(disposeIndex).toBeGreaterThan(otpSubmitIndex);
     expect(goldenPathSpec).toContain(
       'without racing the start-route auth gate'
     );
-    expect(goldenPathSpec).toContain(
+    expect(authHelper).toContain(
       'Better Auth email-OTP request did not reach the preparation barrier'
     );
     expect(goldenPathSpec).not.toContain('heldClaimResponsePromise');
@@ -3162,6 +3203,49 @@ describe('CI E2E smoke workflow', () => {
     expect(goldenPathSpec).toContain(
       'resetAuthStatePreservingOnboardingSession(page.context())'
     );
+    expect(moneyPathSpec).toContain('getRequiredStripeTestContext()');
+    expect(moneyPathSpec).toContain('materializeTestCheckoutCompletion(');
+    expect(moneyPathSpec).toContain("'checkout.session.completed'");
+    expect(moneyPathSpec).toContain('invalidResponse.status()).toBe(400)');
+    expect(moneyPathSpec).toContain('deleteRunOwnedStripeCustomer(');
+    expect(moneyPathSpec).not.toContain('completeCardPayment(');
+    expect(moneyPathSpec).not.toContain('ensureUserIsFree');
+    expect(goldenPathSpec).not.toContain('ensureSpotifyUrlOnProfile');
+    expect(goldenPathSpec).not.toContain(
+      'SET spotify_id = NULL, spotify_url = NULL'
+    );
+    expect(goldenPathSpec).not.toContain('UPDATE chat_messages');
+    expect(goldenPathSpec).toContain(
+      'sendChatMessage(TEST_SPOTIFY_ARTIST.url)'
+    );
+    expect(goldenPathSpec).toContain(
+      '.toHaveText(TEST_SPOTIFY_ARTIST.name, { timeout: 10_000 })'
+    );
+    expect(goldenPathSpec).not.toContain('/tim white/i');
+    expect(goldenPathSpec).toContain(
+      'fillControlledInputUntilEnabled(input, sendButton, text)'
+    );
+    expect(goldenPathSpec).toContain('.filter({ visible: true })');
+    expect(goldenPathSpec).toContain(
+      'Protected Golden Path fixture is already owned; refusing to detach'
+    );
+    expect(goldenPathSpec).toContain('user_profile_claims upc');
+    expect(goldenPathSpec).toContain('sync-spotify-empty-state');
+    expect(goldenPathSpec).toContain('FROM discog_releases r');
+    expect(goldenPathSpec).toContain(
+      'INNER JOIN creator_profiles cp ON cp.id = r.creator_profile_id'
+    );
+    expect(goldenPathSpec).toContain('LEFT JOIN discog_release_tracks rt');
+    expect(goldenPathSpec).toContain('LEFT JOIN provider_links pl');
+    expect(goldenPathSpec).toContain(
+      'cp.spotify_id IS DISTINCT FROM ${TEST_SPOTIFY_ARTIST.id}::text'
+    );
+    expect(goldenPathSpec).not.toContain('r.metadata @> jsonb_build_object(');
+    expect(releasesActions).toContain(
+      'function getE2EFastSpotifyImportOptions()'
+    );
+    expect(releasesActions).toContain('maxReleases: 1');
+    expect(releasesActions).toContain('maxTracksPerRelease: 6');
   });
 
   it('seeds public QA fixtures on ephemeral Neon before PR smoke runs', () => {
@@ -4074,7 +4158,10 @@ describe('production promotion exact-artifact contract', () => {
     expect(verified).not.toContain('concurrency:');
     expect(reusable).not.toContain('concurrency:');
     expect(verified).toContain('canonical_verified=true');
-    expect(verified).toContain('neutral with no notification');
+    expect(verified).toContain(
+      'node .github/scripts/assert-live-production-bind.mjs'
+    );
+    expect(verified).not.toContain('neutral with no notification');
     expect(verified).toContain('Finalize exact current release generation');
     expect(verified).toContain('Notify exact verified production generation');
     expect(verified.match(/commits\/main/g)).toHaveLength(3);
@@ -4391,7 +4478,14 @@ describe('production promotion exact-artifact contract', () => {
       readFileSync(productionControllerRunLiveFixturePath, 'utf8')
     );
 
-    expect(health).toContain("cron: '*/15 * * * *'");
+    expect(health).toContain('workflow_run:');
+    expect(health).toContain('workflows: [Production Controller]');
+    expect(health).not.toContain(
+      'workflows: [Production Controller, Production Marker Recovery]'
+    );
+    expect(health).toContain("cron: '17 4 * * *'");
+    expect(health).toContain('polling-exception:');
+    expect(health).toContain('safety net only');
     expect(controller).toContain(
       'run-name: Production Controller ${{ github.event.workflow_run.head_sha }} from CI'
     );
@@ -4418,6 +4512,14 @@ describe('production promotion exact-artifact contract', () => {
     expect(health).toContain('[ "$source_ci_attempt" -ne 1 ]');
     expect(health).toContain('.id == $id and .run_attempt == 1');
     expect(health).toContain('gh run rerun "$source_ci_id"');
+    expect(health).toContain('predeploy_controller_ci_replayed');
+    expect(health).toContain(
+      'select(.name == "Production Release" and .status == "completed" and .conclusion == "skipped")'
+    );
+    expect(health).toContain(
+      'select(.name | startswith("Production Release /"))'
+    );
+    expect(health).toContain('controller_attempt="$(jq -r');
     expect(health).toContain('gh run rerun "$run_id"');
     expect(health).not.toContain('gh run rerun "$run_id" --failed');
     expect(health).toContain('needs_manual=true');
@@ -4491,6 +4593,9 @@ describe('production promotion exact-artifact contract', () => {
     expect(healthEvaluation).toContain(
       'recovery_reason=policy_generation_superseded'
     );
+    expect(healthEvaluation).toContain(
+      'node .github/scripts/assert-live-production-bind.mjs --main-sha "$current_sha"'
+    );
     expect(
       healthEvaluation.indexOf('checked_out_sha="$(git rev-parse')
     ).toBeLessThan(healthEvaluation.indexOf('production-marker-state.mjs'));
@@ -4562,6 +4667,59 @@ describe('production promotion exact-artifact contract', () => {
         `controller listing must reject a run missing ${missingField}`
       ).not.toBe(0);
     }
+
+    const predeployFilterMatch =
+      /controller_jobs="\$\(gh api[\s\S]*?if jq -e --argjson run_id "\$controller_id" --arg sha "\$current_sha" '\n([\s\S]*?)\n\s+' >\/dev\/null <<<"\$controller_jobs"; then/.exec(
+        healthEvaluation
+      );
+    expect(predeployFilterMatch).not.toBeNull();
+    const predeployFilter = predeployFilterMatch?.[1] ?? 'false';
+    const controllerRunId = 456;
+    const skippedReleaseJob = {
+      id: 1,
+      run_id: controllerRunId,
+      run_attempt: 1,
+      head_sha: exactPolicySha,
+      head_branch: 'main',
+      name: 'Production Release',
+      status: 'completed',
+      conclusion: 'skipped',
+    };
+    const runPredeployFilter = (jobs: object[]) =>
+      spawnSync(
+        'jq',
+        [
+          '-e',
+          '--argjson',
+          'run_id',
+          String(controllerRunId),
+          '--arg',
+          'sha',
+          exactPolicySha,
+          predeployFilter,
+        ],
+        {
+          encoding: 'utf8',
+          input: JSON.stringify({ total_count: jobs.length, jobs }),
+        }
+      ).status;
+
+    expect(runPredeployFilter([skippedReleaseJob])).toBe(0);
+    expect(
+      runPredeployFilter([
+        skippedReleaseJob,
+        {
+          ...skippedReleaseJob,
+          id: 2,
+          name: 'Production Release / deploy-staging',
+          conclusion: 'success',
+        },
+      ])
+    ).not.toBe(0);
+    expect(
+      runPredeployFilter([{ ...skippedReleaseJob, conclusion: 'success' }])
+    ).not.toBe(0);
+
     expect(reusable).toContain(
       'Could not resolve exact main at the release-result boundary'
     );
@@ -4613,20 +4771,52 @@ describe('production promotion exact-artifact contract', () => {
 });
 
 describe('production marker recovery workflow (JOV-4965)', () => {
-  it('is a bounded manual path that never redeploys or mutates aliases', () => {
+  it('is event-driven with a bounded manual fallback and never mutates release state', () => {
     const workflow = readFileSync(productionMarkerRecoveryWorkflowPath, 'utf8');
 
     expect(workflow).toContain('workflow_dispatch:');
-    expect(workflow).not.toContain('workflow_run:');
+    expect(workflow).toContain('workflow_run:');
+    expect(workflow).toContain('workflows: [Production Controller]');
+    expect(workflow).toContain('types: [completed]');
+    expect(workflow).toContain('branches: [main]');
     expect(workflow).not.toContain('push:');
     expect(workflow).not.toContain('schedule:');
     expect(workflow).toContain('group: production-mutation');
+    expect(workflow).toContain('queue: max');
     expect(workflow).toContain('cancel-in-progress: false');
+    expect(workflow).toContain(`jobs:
+  recover-marker:
+    name: Recover exact verified-generation marker`);
+    expect(workflow).toContain(`    permissions:
+      contents: read
+      actions: write`);
+    expect(workflow).toContain('REQUEST_MODE: ${{ github.event_name }}');
+    expect(workflow).toContain(
+      "if: steps.admission.outputs.recovery_required == 'true'"
+    );
+    expect(workflow).toContain('recovery_required=false');
+    expect(workflow).toContain('recovery_required=true');
+    expect(workflow).toContain(
+      'Controller attempt did not finish the exact promotion path; marker recovery is not applicable.'
+    );
     expect(workflow).not.toContain('vercel promote');
     expect(workflow).not.toContain('vercel alias');
     expect(workflow).not.toContain('vercel deploy');
     expect(workflow).not.toContain('vercel rollback');
     expect(workflow).not.toContain('overwrite: true');
+    expect(workflow).toContain('EXPECTED_DEPLOYMENT_ID="$canonical_id"');
+    expect(workflow).toContain(
+      'EXPECTED_PRODUCTION_DEPLOYMENT_ID=$EXPECTED_DEPLOYMENT_ID'
+    );
+    expect(workflow).toContain(
+      'gh workflow run fleet-gate-refresh.yml --ref main'
+    );
+    expect(workflow).toContain(
+      'name: production-generation-verified-${{ env.EXPECTED_SHA }}'
+    );
+    const fleetRefresh = readFileSync(fleetGateRefreshWorkflowPath, 'utf8');
+    expect(fleetRefresh).toContain('workflows: [CI, Production Controller]');
+    expect(fleetRefresh).not.toContain('Production Marker Recovery]');
   });
 
   it('preserves the marker only after canonical ownership and exact probes pass', () => {
@@ -4647,7 +4837,7 @@ describe('production marker recovery workflow (JOV-4965)', () => {
     );
     const confirm = getStepBlock(
       job,
-      'Confirm recovered marker classifies as verified'
+      'Confirm uploaded recovered marker bytes'
     );
 
     const order = [
@@ -4656,7 +4846,7 @@ describe('production marker recovery workflow (JOV-4965)', () => {
       job.indexOf('Re-probe production Better Auth OAuth runtime'),
       job.indexOf('Preserve recovered verified-generation marker'),
       job.indexOf('Upload recovered verified-generation marker'),
-      job.indexOf('Confirm recovered marker classifies as verified'),
+      job.indexOf('Confirm uploaded recovered marker bytes'),
     ];
     expect(order.every(index => index >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
@@ -4675,10 +4865,22 @@ describe('production marker recovery workflow (JOV-4965)', () => {
     expect(oauth).toContain('refusing to preserve a marker');
     expect(preserve).toContain('recoveredFromControllerRun');
     expect(preserve).toContain('recoveredFromControllerAttempt');
+    expect(preserve).toContain('marker_upload_required=false');
+    expect(preserve).toContain('marker_upload_required=true');
+    expect(preserve).toContain('artifacts?name=$marker_name&per_page=100');
     expect(workflow).toContain(
-      'name: production-generation-verified-${{ inputs.sha }}'
+      'name: production-generation-verified-${{ env.EXPECTED_SHA }}'
     );
-    expect(confirm).toContain('exact_recovered_generation_verified');
+    expect(confirm).not.toContain('production-marker-state.mjs');
+    expect(confirm).toContain(
+      'actions/runs/${{ github.run_id }}/artifacts?name=$marker_name'
+    );
+    expect(confirm).toContain('.artifacts[0].workflow_run.id == $run_id');
+    expect(confirm).toContain('cmp --silent');
+    expect(confirm).toContain('.recoveredFromControllerRun == $source_run');
+    expect(confirm).toContain(
+      'authoritative classification follows successful workflow completion'
+    );
   });
 
   it('binds the recovered marker classifier to the exact source attempt', () => {
@@ -4691,6 +4893,10 @@ describe('production marker recovery workflow (JOV-4965)', () => {
     expect(markerState).toContain('recoveredFromControllerAttempt');
     expect(markerState).toContain("'exact_recovered_generation_verified'");
     expect(markerState).toContain("run.event === 'workflow_dispatch'");
+    expect(markerState).toContain("run.event === 'workflow_run'");
+    expect(markerState).toContain(
+      "run.event === 'workflow_dispatch' || run.event === 'workflow_run'"
+    );
     expect(markerState).toContain('unsafe_or_contradictory_rollback');
   });
 });

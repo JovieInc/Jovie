@@ -42,6 +42,23 @@ vi.mock('@jovie/ui', () => ({
     readonly pressFeedback?: boolean;
     readonly static?: boolean;
   }) => <button {...props}>{children}</button>,
+  IconButton: ({
+    children,
+    variant,
+    size,
+    ...props
+  }: React.ComponentProps<'button'> & {
+    readonly variant?: string;
+    readonly size?: string;
+  }) => (
+    <button
+      data-icon-button-variant={variant}
+      data-icon-button-size={size}
+      {...props}
+    >
+      {children}
+    </button>
+  ),
   TooltipShortcut: ({ children }: { children: React.ReactNode }) => children,
 }));
 
@@ -61,6 +78,8 @@ describe('ArtistProfileRailToggle', () => {
     expect(button).toHaveAttribute('aria-pressed', 'false');
     expect(button).toHaveAttribute('aria-expanded', 'false');
     expect(button).toHaveAttribute('data-rail-toggle', 'right');
+    expect(button).toHaveAttribute('data-icon-button-variant', 'secondary');
+    expect(button).toHaveAttribute('data-icon-button-size', 'sm');
     expect(button).toHaveAttribute('aria-label', 'Show Tim White profile');
     expect(screen.getByTestId('artist-profile-rail-icon')).toHaveAttribute(
       'aria-hidden',

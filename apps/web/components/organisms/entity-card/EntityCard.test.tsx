@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ProfilePacCard } from '@/features/profile/pac/ProfilePacCard';
+import { ProfilePacCard } from '@/components/features/profile/pac/ProfilePacCard';
 import { DEFAULT_PROFILE_PAC_ASSIGNMENT } from '@/lib/flags/profile-pac';
 import type { Artist } from '@/types/db';
 import { EntityCard } from './EntityCard';
@@ -238,7 +238,7 @@ describe('EntityCard', () => {
       expect(card.className).toContain('p-0');
     });
 
-    it('fits music artwork with object-cover (no letterbox bands)', () => {
+    it('fits music artwork with object-contain so the square is complete', () => {
       const music: EntityCardModel = {
         id: 'r1',
         kind: 'music',
@@ -251,8 +251,8 @@ describe('EntityCard', () => {
       render(
         <EntityCard model={music} treatment='detailed' anatomy='unified' />
       );
-      expect(screen.getByRole('img').className).toContain('object-cover');
-      expect(screen.getByRole('img').className).not.toContain('object-contain');
+      expect(screen.getByRole('img').className).toContain('object-contain');
+      expect(screen.getByRole('img').className).not.toContain('object-cover');
     });
 
     it('renders a full-width 36px CTA and folds the price into the meta line', () => {

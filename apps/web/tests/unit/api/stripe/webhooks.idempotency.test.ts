@@ -28,6 +28,7 @@ import {
   mockStripeTimestampToDate,
   setSimulateActiveLease,
   setSimulateLeaseClaimFailure,
+  setSimulateLeaseLossBeforeFinalize,
   setSimulateRaceDisappear,
   setSimulateUnprocessedRetry,
   setSkipProcessing,
@@ -43,6 +44,7 @@ describe('/api/stripe/webhooks - Idempotency Handling', () => {
     setSimulateUnprocessedRetry(false);
     setSimulateActiveLease(false);
     setSimulateLeaseClaimFailure(false);
+    setSimulateLeaseLossBeforeFinalize(false);
     mockGetPlanFromPriceId.mockReturnValue('standard');
     mockGetHandler.mockReturnValue(null);
   });
@@ -161,7 +163,7 @@ describe('/api/stripe/webhooks - Idempotency Handling', () => {
     );
   });
 
-  it('acknowledges a duplicate while another request holds the processing lease', async () => {
+  it('keeps an overlapping duplicate retryable while another request holds the lease', async () => {
     const event = {
       id: 'evt_active_lease',
       type: 'checkout.session.completed',
@@ -170,6 +172,7 @@ describe('/api/stripe/webhooks - Idempotency Handling', () => {
     } as any;
 
     mockConstructEvent.mockReturnValue(event);
+    setSimulateUnprocessedRetry(true);
     setSimulateActiveLease(true);
 
     const request = new NextRequest(
@@ -182,8 +185,12 @@ describe('/api/stripe/webhooks - Idempotency Handling', () => {
     );
 
     const response = await POST(request);
-    expect(response.status).toBe(200);
-    expect((await response.json()).received).toBe(true);
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('5');
+    expect((await response.json()).error).toBe(
+      'Webhook processing in progress'
+    );
+    expect(mockDbSelect).toHaveBeenCalledOnce();
     expect(mockHandlerHandle).not.toHaveBeenCalled();
   });
 

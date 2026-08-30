@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -8,6 +8,7 @@ import {
   attestGemService,
   buildDeliveryReceipt,
   DELIVERY_RECEIPT_SCHEMA,
+  persistClosureHealthActions,
   persistDeliveryOutcome,
   reconcileDeliveryHeartbeat,
   transitionDeliveryReceipt,
@@ -26,6 +27,14 @@ describe('delivery state machine', () => {
       ['lease-ambiguous', 'reconcile-exact-head-lease'],
       ['stale-config', 'reload-and-attest-controller-service'],
       ['missing-trigger', 'restore-event-trigger-and-reconcile'],
+      ['size-guard', 'split-source-aligned-size-guard'],
+      ['missing-failing-checks', 'create-bounded-ci-repair-pr'],
+      ['stale-conflicted-head', 'exact-head-branch-update'],
+      ['queue-eviction', 'reconcile-exact-head-queue-admission'],
+      ['provider-unavailable', 'restore-provider-availability'],
+      ['missing-owner-lease', 'reconcile-exact-head-lease'],
+      ['dropped-controller-event', 'restore-event-trigger-and-reconcile'],
+      ['draft-stack-policy', 'split-or-retarget-draft-stack'],
     ]) {
       const receipt = buildDeliveryReceipt({ delivery_key: failure, failure });
       assert.equal(receipt.schema, DELIVERY_RECEIPT_SCHEMA);
@@ -162,6 +171,64 @@ describe('delivery state machine', () => {
     }
   });
 
+  it('consumes one bounded stack repair action per root idempotently and refuses a stack action without exact root-head evidence', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'jovie-stack-repair-'));
+    try {
+      const action = {
+        schema: 'jovie-stack-health-action/v1',
+        taskKey: 'b'.repeat(64),
+        deliveryKey: 'closure-stack:test-root',
+        action: 'split-or-retarget-draft-stack',
+        owner: 'symphony',
+        writer: 'symphony',
+        issue: 'JOV-5362',
+        rootPr: 16510,
+        rootHeadSha: HEAD,
+        prNumbers: [16510, 16511],
+        maxDepth: 5,
+        promotionPath: [
+          { pr: 16510, base: 'main', head: 'stack/root' },
+          { pr: 16511, base: 'stack/root', head: 'stack/child' },
+        ],
+        integrator: null,
+        deadline: null,
+        violations: ['stack-depth-over-4', 'missing-stack-integrator'],
+        safety: 'receipt-only; requalify exact heads before split-or-retarget',
+      };
+      const source = {
+        schema: 'jovie-closure-health/v1',
+        observedAt: '2026-08-28T22:00:00.000Z',
+        repairActions: [action],
+      };
+      const first = await persistClosureHealthActions(source, {
+        stateDir: directory,
+      });
+      const duplicate = await persistClosureHealthActions(source, {
+        stateDir: directory,
+      });
+      assert.equal(first.status, 'created');
+      assert.equal(duplicate.status, 'duplicate');
+      assert.equal(
+        first.actions[0].task.action,
+        'split-or-retarget-draft-stack'
+      );
+      const task = JSON.parse(
+        await readFile(first.actions[0].taskPath, 'utf8')
+      );
+      assert.deepEqual(task.evidence.prNumbers, [16510, 16511]);
+      assert.equal(task.evidence.rootHeadSha, HEAD);
+      await assert.rejects(
+        persistClosureHealthActions(
+          { ...source, repairActions: [{ ...action, rootHeadSha: null }] },
+          { stateDir: directory }
+        ),
+        /exact root PR head SHA/
+      );
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it('writes handed-off repair work as one exact-head Gem-to-FX task', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'jovie-delivery-fx-'));
     try {
@@ -211,5 +278,48 @@ describe('delivery state machine', () => {
     assert.equal(receipt.event.failure, 'missing-trigger');
     assert.equal(receipt.next.action, 'restore-event-trigger-and-reconcile');
     assert.equal(receipt.externalMutations, 0);
+  });
+
+  it('keeps not-proven and unbound production as evidence, never a repair claim', () => {
+    const missing = buildDeliveryReceipt({
+      delivery_key: 'not-proven-1',
+      failure: 'not-proven',
+    });
+    assert.equal(missing.stage, 'evidence-pending');
+    assert.equal(missing.next.action, 'collect-missing-evidence');
+    const unbound = buildDeliveryReceipt({
+      delivery_key: 'prod-unbound-1',
+      failure: 'production-deployment-unbound',
+    });
+    assert.equal(unbound.stage, 'evidence-pending');
+    assert.equal(unbound.next.mode, 'evidence');
+  });
+
+  it('classifies CI and size-guard workflow failures without treating them as queue-noop', async () => {
+    const ci = buildDeliveryReceipt({
+      workflow_run: { id: 7, conclusion: 'failure', name: 'CI' },
+    });
+    assert.equal(ci.event.failure, 'missing-failing-checks');
+    const size = buildDeliveryReceipt({
+      workflow_run: { id: 8, conclusion: 'failure', name: 'PR Size Guard' },
+    });
+    assert.equal(size.next.action, 'split-source-aligned-size-guard');
+    const directory = await mkdtemp(join(tmpdir(), 'jovie-delivery-red-'));
+    try {
+      const result = await persistDeliveryOutcome(
+        buildDeliveryReceipt({
+          delivery_key: 'ci-failed-loop',
+          failure: 'ci-failed',
+          issue: 'JOV-5390',
+          pr_number: 16019,
+          head_sha: HEAD,
+        }),
+        { stateDir: directory }
+      );
+      assert.equal(result.loop.stallClass, 'missing-failing-checks');
+      assert.equal(result.queue.items[0].issue, 'JOV-5390');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });

@@ -66,7 +66,7 @@ export function InvestorBrief({
           manual, and planned.
         </p>
         <div className='mt-10 flex flex-wrap gap-3'>
-          <Button asChild variant='primary'>
+          <Button asChild variant='secondary'>
             <a href='#demo'>Watch The Product</a>
           </Button>
           <Button asChild variant='secondary'>
@@ -290,7 +290,7 @@ export function InvestorBrief({
             </p>
           </div>
           <div className='flex flex-wrap gap-3'>
-            <Button asChild variant='primary'>
+            <Button asChild variant='secondary'>
               <a
                 href={`mailto:${CONTACT_EMAIL}?subject=Jovie%20Investor%20Meeting`}
                 data-pitch-event='meeting_cta_clicked'

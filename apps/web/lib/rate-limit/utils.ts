@@ -8,6 +8,20 @@ import * as Sentry from '@sentry/nextjs';
 import type { RateLimitResult, RateLimitStatus } from './types';
 
 /**
+ * Options for emitting the current IETF HTTPAPI RateLimit draft fields.
+ *
+ * The legacy X-RateLimit-* fields remain the default for existing callers.
+ * Public API routes opt in to the structured fields so their contract is
+ * explicit without changing unrelated endpoints.
+ */
+export interface StandardRateLimitHeaderOptions {
+  /** Structured-field policy identifier, e.g. `public-artist`. */
+  readonly policyName: string;
+  /** Nominal fixed-window duration in seconds. */
+  readonly windowSeconds: number;
+}
+
+/**
  * Treat a denied rate-limit result as allowed when the durable backend was
  * degraded or unavailable (Redis down / circuit open → per-instance memory).
  *
@@ -93,7 +107,8 @@ export function getClientIP(request: Request): string {
  * Create standardized rate limit headers for HTTP responses
  */
 export function createRateLimitHeaders(
-  result: RateLimitResult
+  result: RateLimitResult,
+  options?: StandardRateLimitHeaderOptions
 ): Record<string, string> {
   const resetTimestamp = Math.floor(result.reset.getTime() / 1000);
   const retryAfter = Math.max(
@@ -101,10 +116,20 @@ export function createRateLimitHeaders(
     Math.ceil((result.reset.getTime() - Date.now()) / 1000)
   );
 
+  const standardHeaders: Record<string, string> = {};
+  if (options) {
+    // RateLimit-Policy and RateLimit are Structured Fields. JSON string
+    // quoting is valid Structured Field String quoting for this identifier.
+    standardHeaders['RateLimit-Policy'] =
+      `${JSON.stringify(options.policyName)};q=${Math.max(0, Math.floor(result.limit))};w=${Math.max(0, Math.floor(options.windowSeconds))}`;
+    standardHeaders.RateLimit = `${JSON.stringify(options.policyName)};r=${Math.max(0, Math.floor(result.remaining))};t=${retryAfter}`;
+  }
+
   return {
     'X-RateLimit-Limit': String(result.limit),
     'X-RateLimit-Remaining': String(result.remaining),
     'X-RateLimit-Reset': String(resetTimestamp),
+    ...standardHeaders,
     ...(result.success ? {} : { 'Retry-After': String(retryAfter) }),
   };
 }

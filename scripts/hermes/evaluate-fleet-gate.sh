@@ -12,6 +12,8 @@
 #   EXPECTED_SHA             when set, receipt main.sha must match (deployment)
 #   FLEET_GATE_RECEIPT       output path (default $RUNNER_TEMP/jovie-fleet-gate.json)
 #   GITHUB_OUTPUT            optional Actions output file
+#
+# Job-output `receipt_b64` is a bounded admission projection, not FLEET_GATE_RECEIPT.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -79,6 +81,22 @@ if [[ "$gate_rc" -ne 0 && "$gate_rc" -ne 2 ]]; then
   exit 2
 fi
 
+admission="${receipt}.admission.json"
+if ! python3 "$repo_root/scripts/hermes/fleet_admission_receipt.py" <"$receipt" >"$admission"; then
+  echo '::error::Fleet gate admission projection failed.' >&2
+  exit 2
+fi
+jq -e '
+  .schema == "jovie-fleet-gate/v1" and
+  (.signals.closureHealth | has("classifications") | not) and
+  (.signals.closureHealth | has("changedFileEvidence") | not) and
+  (.signals.closureHealth | has("duplicateIssueLanes") | not) and
+  (.workAdmission.allowed | type == "boolean")
+' "$admission" >/dev/null || {
+  echo '::error::Fleet gate emitted a malformed admission projection.' >&2
+  exit 2
+}
+
 work_allowed=false
 new_issue_intake_allowed=false
 promotion_allowed=false
@@ -114,7 +132,7 @@ else
   work_out=false
 fi
 
-receipt_b64="$(base64 -w0 <"$receipt" 2>/dev/null || base64 <"$receipt" | tr -d '\n')"
+receipt_b64="$(base64 -w0 <"$admission" 2>/dev/null || base64 <"$admission" | tr -d '\n')"
 
 if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
   {

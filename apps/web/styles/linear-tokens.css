@@ -98,15 +98,15 @@
   --linear-accent-orange: #ff9800;
   --linear-accent-green: #2f9e44;
   --linear-accent-teal: #0f9b8e;
-  --linear-success: var(--linear-accent-green);
+  --linear-success: #2f9e44;
   --linear-success-subtle: rgb(47 158 68 / 0.14);
-  --linear-warning: var(--linear-accent-orange);
+  --linear-warning: #ff9800;
   --linear-warning-subtle: rgb(255 152 0 / 0.15);
-  --linear-error: var(--linear-accent-red);
+  --linear-error: #f3122d;
   --linear-error-subtle: rgb(243 18 45 / 0.14);
-  --linear-info: var(--linear-accent-blue);
+  --linear-info: #2563ff;
   --linear-info-subtle: rgb(37 99 255 / 0.14);
-  --linear-accent: var(--linear-accent-purple);
+  --linear-accent: #8b1eff;
   /* ============================================
      HERO-SPECIFIC TOKENS
      Used by RedesignedHero for theme-aware gradients
@@ -123,15 +123,8 @@
   /* ============================================
      SHADOWS — LIGHT MODE
      ============================================ */
-  --linear-shadow-button:
-    rgba(0, 0, 0, 0) 0px 8px 2px 0px, rgba(0, 0, 0, 0.01) 0px 5px 2px 0px, rgba(
-      0,
-      0,
-      0,
-      0.04
-    ) 0px 3px 2px 0px, rgba(0, 0, 0, 0.07) 0px 1px 1px 0px, rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
-  --linear-shadow-card: 0px 4px 24px rgba(0, 0, 0, 0.08);
-  --linear-shadow-card-elevated: 0px 7px 32px rgba(0, 0, 0, 0.12);
+  /* Shadow tokens retired (JOV-5465) — use --shadow-button, --shadow-card,
+     --shadow-card-elevated from design-system.css. */
   /* ============================================
      TYPOGRAPHY (mode-independent)
      ============================================ */
@@ -217,15 +210,11 @@
   --linear-button-height-md: 40px;
   --linear-pill-track-padding: 3px;
   --linear-pill-height-md: 36px;
-  --linear-pill-surface-shadow: var(--linear-shadow-button);
+  --linear-pill-surface-shadow: var(--shadow-button);
   --linear-pill-indicator-shadow: var(
     --shadow-button-inset,
-    var(--linear-shadow-button)
+    var(--shadow-button)
   );
-  --linear-radius-sm: 8px;
-  --linear-radius-md: 8px;
-  --linear-radius-lg: 12px;
-  --linear-radius-full: 9999px;
   /* App UI tokens (distinct from marketing page tokens) */
   --linear-app-radius-item: 8px;
   --linear-app-radius-menu: 8px;
@@ -301,7 +290,7 @@
     transparent 65%
   );
   /* Pricing accent */
-  --linear-pricing-accent: var(--linear-accent);
+  --linear-pricing-accent: #8b1eff;
   --linear-pricing-accent-border: rgba(94, 106, 210, 0.4);
   --linear-pricing-accent-shadow: rgba(94, 106, 210, 0.15);
   /* Audience CRM section */
@@ -355,11 +344,8 @@
   /* ============================================
      EFFECTS — mode-independent
      ============================================ */
-  --linear-blur-header: 20px;
-  --linear-ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  --linear-duration-fast: 100ms;
-  --linear-duration-normal: 160ms;
-  --linear-duration-slow: 300ms;
+  /* Blur/ease/duration tokens retired (JOV-5465) — use --blur-header,
+     --ease-interactive, --duration-* from design-system.css. */
   /* ============================================
      RESPONSIVE TYPOGRAPHY — mode-independent
      ============================================ */
@@ -441,9 +427,8 @@
   --linear-separator-from: rgba(168, 176, 195, 0.1);
   --linear-separator-via: rgba(168, 176, 195, 0.04);
   /* Shadows — restrained depth on near-black */
-  --linear-shadow-card: 0px 4px 24px rgba(0, 0, 0, 0.4);
-  --linear-shadow-card-elevated:
-    0 0 0 1px rgba(168, 176, 195, 0.12), 0px 8px 40px rgba(0, 0, 0, 0.55);
+  /* Dark-mode card shadows retired (JOV-5465) — use --shadow-card,
+     --shadow-card-elevated from design-system.css. */
   --linear-app-content-surface: #0a0d16;
   /* panel — primary framed main-pane surface */
   --linear-app-card-shadow: none;
@@ -484,18 +469,8 @@
   --linear-color-bg: var(--linear-bg-page);
   --linear-color-bg-elevated: var(--linear-bg-surface-0);
   --linear-color-bg-card: var(--linear-bg-surface-2);
-  /* Semantic borders */
-  --linear-color-border: var(--linear-border-default);
-  --linear-color-divider: var(--linear-border-subtle);
 }
 
-/* Reduced motion — zero the raw linear duration scale so every consumer
-   inherits 0ms (mirrors the --duration-* zeroing in design-system.css).
-   Guarded by tests/unit/design-system/reduced-motion-tokens.test.ts. */
-@media (prefers-reduced-motion: reduce) {
-  :root {
-    --linear-duration-fast: 0ms;
-    --linear-duration-normal: 0ms;
-    --linear-duration-slow: 0ms;
-  }
-}
+/* Reduced motion — linear duration zeroing retired (JOV-5465); the
+   canonical --duration-* scale in design-system.css is already zeroed under
+   prefers-reduced-motion. */

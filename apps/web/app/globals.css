@@ -122,7 +122,8 @@ html[data-desktop-runtime="electron"]
    p-[--linear-app-shell-gap] on all sides, so the sidebar column starts at
    gap offset from the left edge. Mirror that offset in the titlebar so the
    sidebar-cell left edge aligns with the sidebar rail. */
-html[data-desktop-runtime="electron"] [data-app-shell-frame="true"]
+html[data-desktop-runtime="electron"]
+  [data-app-shell-frame="true"]
   [data-electron-titlebar="true"] {
   padding-left: var(--linear-app-shell-gap);
   grid-template-columns: var(--electron-sidebar-width) minmax(0, 1fr);
@@ -1317,7 +1318,7 @@ body {
     font-weight: var(--linear-font-weight-medium, 510);
     letter-spacing: -0.013em;
     color: var(--linear-text-secondary);
-    transition: color var(--linear-duration-fast) var(--linear-ease);
+    transition: color var(--duration-fast) var(--ease-interactive);
   }
   .section-title-link:hover {
     color: var(--linear-text-primary);
@@ -1346,12 +1347,12 @@ body {
     color: var(--linear-text-secondary);
     background: transparent;
     border: 1px solid var(--linear-border-subtle);
-    border-radius: var(--linear-radius-sm, 8px);
+    border-radius: var(--radius-sm, 8px);
     cursor: pointer;
     transition:
-      background-color var(--linear-duration-fast) var(--linear-ease),
-      border-color var(--linear-duration-fast) var(--linear-ease),
-      color var(--linear-duration-fast) var(--linear-ease);
+      background-color var(--duration-fast) var(--ease-interactive),
+      border-color var(--duration-fast) var(--ease-interactive),
+      color var(--duration-fast) var(--ease-interactive);
     letter-spacing: -0.011em;
   }
   .accordion-trigger:hover {
@@ -1365,7 +1366,7 @@ body {
   }
   .accordion-trigger .accordion-icon {
     margin-left: auto;
-    transition: transform 0.2s var(--linear-ease);
+    transition: transform 0.2s var(--ease-interactive);
     font-size: 13px;
     color: var(--linear-text-quaternary);
   }
@@ -1691,8 +1692,8 @@ body {
       0 0 0 1px rgba(255, 255, 255, 0.02),
       0 24px 60px rgba(0, 0, 0, 0.28);
     transition:
-      transform 0.3s var(--linear-ease),
-      box-shadow 0.3s var(--linear-ease);
+      transform 0.3s var(--ease-interactive),
+      box-shadow 0.3s var(--ease-interactive);
   }
   .homepage-surface-card:hover {
     transform: translateY(-2px);
@@ -1828,8 +1829,8 @@ body {
       0 0 0 1px rgba(255, 255, 255, 0.02),
       0 24px 60px rgba(0, 0, 0, 0.3);
     transition:
-      transform 0.3s var(--linear-ease),
-      box-shadow 0.3s var(--linear-ease);
+      transform 0.3s var(--ease-interactive),
+      box-shadow 0.3s var(--ease-interactive);
   }
   .bento-card:hover {
     transform: translateY(-2px);
@@ -1872,7 +1873,7 @@ body {
     inset: 0;
     pointer-events: none;
     opacity: 0.5;
-    transition: opacity 0.3s var(--linear-ease);
+    transition: opacity 0.3s var(--ease-interactive);
   }
   .bento-card:hover .bento-card-glow {
     opacity: 0.7;
@@ -2339,7 +2340,7 @@ body {
 }
 
 [data-sonner-toast] {
-  --border-radius: var(--linear-radius-lg);
+  --border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   font-family: var(--font-sans), system-ui, sans-serif;
   font-feature-settings: var(--linear-font-features);
@@ -2369,7 +2370,7 @@ body {
   background: var(--color-bg-surface-1);
   border-color: var(--color-border-subtle);
   color: var(--color-text-tertiary-token);
-  border-radius: var(--linear-radius-sm);
+  border-radius: var(--radius-sm);
   transition:
     background 150ms ease,
     color 150ms ease;

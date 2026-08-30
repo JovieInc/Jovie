@@ -22,13 +22,16 @@
 #   DRAIN_MAX_SECONDS  hard wall-clock budget between GitHub calls (default 900)
 #   DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS  hard cap per exact-head isolation
 #     evaluator process (default 45)
+#   DRAIN_MERGEABLE_RECHECK_ATTEMPTS / DRAIN_MERGEABLE_RECHECK_SECONDS
+#     bounded live reread for GitHub's transient UNKNOWN mergeability window
+#     immediately before exact-head enrollment (defaults 6 / 2)
 #   DRAIN_ADMISSION_PR / DRAIN_ADMISSION_HEAD  optional exact new-admission
 #     scope; when both are empty this run is maintenance-only
 #   DRAIN_RECONCILE_MISSED_ADMISSION  permit one bounded exact-green recovery
 #     pass for admission events replaced while pending in the workflow mutex
 #   DRAIN_QUEUE_REENTRY_MAX_PER_RUN  total event + recovery admission cap (1-2)
 #   DRAIN_PROMOTION_MODE  normal, isolated-only, draft-only, hold-intake, or blocked
-#   DRAIN_FLEET_GATE_B64  fresh typed fleet receipt; mandatory outside normal
+#   DRAIN_FLEET_GATE_B64  bounded admission projection; required outside normal
 #   DRAIN_RECOVER_FLEET_HOLDS  exact production-controller recovery event only
 #   FLEET_HOLD_TTL_SECONDS  pending jovie-fleet-queue-hold/v1 deadline (default 720)
 #   MERGE_QUEUE_BACKEND  native (default); test-label-fixture is test-only
@@ -72,9 +75,18 @@ case "$MERGE_QUEUE_BACKEND" in
 esac
 DRAIN_MAX_SECONDS="${DRAIN_MAX_SECONDS:-900}"
 DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS="${DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS:-45}"
+DRAIN_MERGEABLE_RECHECK_ATTEMPTS="${DRAIN_MERGEABLE_RECHECK_ATTEMPTS:-6}"
+DRAIN_MERGEABLE_RECHECK_SECONDS="${DRAIN_MERGEABLE_RECHECK_SECONDS:-2}"
 if [[ ! "$DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]] \
   || (( DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS > DRAIN_MAX_SECONDS )); then
   echo "::error::DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS must be positive and no larger than DRAIN_MAX_SECONDS" >&2
+  exit 2
+fi
+if [[ ! "$DRAIN_MERGEABLE_RECHECK_ATTEMPTS" =~ ^[1-9][0-9]*$ ]] \
+  || (( DRAIN_MERGEABLE_RECHECK_ATTEMPTS > 10 )) \
+  || [[ ! "$DRAIN_MERGEABLE_RECHECK_SECONDS" =~ ^[0-9]+$ ]] \
+  || (( DRAIN_MERGEABLE_RECHECK_SECONDS > 30 )); then
+  echo "::error::DRAIN_MERGEABLE_RECHECK_ATTEMPTS must be 1-10 and DRAIN_MERGEABLE_RECHECK_SECONDS must be 0-30" >&2
   exit 2
 fi
 DRAIN_STARTED_AT="$SECONDS"
@@ -133,15 +145,15 @@ case "$DRAIN_PROMOTION_MODE" in
       exit 2
     fi
     if ! FLEET_GATE_JSON="$(node -e '
-      const value = Buffer.from(process.argv[1], "base64").toString("utf8");
-      const receipt = JSON.parse(value);
+      const value = process.env.DRAIN_FLEET_GATE_B64 || "";
+      const receipt = JSON.parse(Buffer.from(value, "base64").toString("utf8"));
       const observed = Date.parse(receipt.observedAt || "");
       const now = Date.now();
       if (!Number.isFinite(observed) || observed > now + 60_000 || now - observed > 600_000) {
         throw new Error("stale fleet receipt");
       }
       process.stdout.write(JSON.stringify(receipt));
-    ' "$DRAIN_FLEET_GATE_B64" 2>/dev/null)"; then
+    ' 2>/dev/null)"; then
       echo "::error::Refusing $DRAIN_PROMOTION_MODE with a malformed or stale fleet receipt" >&2
       exit 2
     fi
@@ -185,8 +197,9 @@ case "$DRAIN_PROMOTION_MODE" in
         .productionUnboundRepairAdmission.deploymentsAllowed == false and
         .alreadyAdmittedCohort.preserve == true and
         .closureAdmission.authority == "Summer" and
-        (.closureAdmission.status | IN("green", "red")) and
+        (.closureAdmission.status | IN("healthy", "grace", "red")) and
         (.closureAdmission.newIssueIntakeAllowed | type == "boolean") and
+        .closureAdmission.newIssueIntakeAllowed == (.closureAdmission.status == "healthy") and
         .closureAdmission.allowed == .closureAdmission.newIssueIntakeAllowed and
         .closureAdmission.newImplementationAllowed == .closureAdmission.newIssueIntakeAllowed and
         .closureAdmission.fallbackPrGenerationAllowed == .closureAdmission.newIssueIntakeAllowed and
@@ -720,8 +733,9 @@ pr_changed_paths_json() {  # <num> → JSON string array or null
 }
 
 changelog_collision_decision_for_pr() {  # <num>
-  local n="$1" candidate queued members='[]' files
+  local n="$1" candidate queued members='[]' files branch
   candidate="$(pr_changed_paths_json "$n")"
+  branch="$(echo "$SNAP" | jq -r --argjson n "$n" '.[] | select(.n == $n) | .head // empty')"
   while read -r queued; do
     [[ -n "$queued" ]] || continue
     files="$(pr_changed_paths_json "$queued")"
@@ -729,8 +743,8 @@ changelog_collision_decision_for_pr() {  # <num>
       '. + [{prNumber:$pr, files:$files}]' <<<"$members")"
   done < <(echo "$SNAP" | jq -r --argjson self "$n" \
     '.[] | select(.q == true) | select(.n != $self) | .n')
-  CHANGELOG_COLLISION_JSON="$(jq -nc --argjson candidateFiles "$candidate" --argjson queuedMemberFiles "$members" \
-    '{candidateFiles:$candidateFiles, queuedMemberFiles:$queuedMemberFiles}')" \
+  CHANGELOG_COLLISION_JSON="$(jq -nc --argjson candidateFiles "$candidate" --argjson queuedMemberFiles "$members" --arg branch "$branch" \
+    '{candidateFiles:$candidateFiles, queuedMemberFiles:$queuedMemberFiles, branch:$branch}')" \
     node scripts/ci-merge-queue-check.mjs changelog-collision
 }
 
@@ -875,14 +889,37 @@ reconcile_deferred_auto_merge_after_main_push() {
 # a queue-deferred hold cannot be overwritten by this controller.
 enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr authorized-head]
   local n="$1" authorized_pr="${2:-$DRAIN_ADMISSION_PR}" authorized_head="${3:-$DRAIN_ADMISSION_HEAD}"
-  local current enrollment_receipt head_oid expected_head json_fields queue_position queue_state
+  local current enrollment_receipt head_oid expected_head json_fields live_head mergeability_attempt mergeability_state queue_position queue_state
   LAST_ENROLL_SKIP_REASON=""
   json_fields="state,isDraft,mergeable,labels,headRefOid,baseRefName,body"
-  if ! current="$(gh_retry pr view "$n" -R "$REPO" \
-    --json "$json_fields" 2>/dev/null)"; then
-    echo "    !! could not refresh #$n eligibility; refusing enrollment" >&2
-    return 1
-  fi
+  for ((mergeability_attempt = 1; mergeability_attempt <= DRAIN_MERGEABLE_RECHECK_ATTEMPTS; mergeability_attempt++)); do
+    if ! current="$(gh_retry pr view "$n" -R "$REPO" \
+      --json "$json_fields" 2>/dev/null)"; then
+      echo "    !! could not refresh #$n eligibility; refusing enrollment" >&2
+      return 1
+    fi
+    mergeability_state="$(jq -r '.mergeable // "UNKNOWN"' <<<"$current")"
+    [[ "$mergeability_state" == "MERGEABLE" ]] && break
+    [[ "$mergeability_state" == "UNKNOWN" ]] || break
+    live_head="$(jq -r '.headRefOid // empty' <<<"$current" | tr '[:upper:]' '[:lower:]')"
+    if [[ "$n" != "$authorized_pr" || "$live_head" != "$authorized_head" ]] \
+      || ! jq -e '
+        .state == "OPEN"
+        and (.isDraft | not)
+        and .baseRefName == "main"
+        and ([.labels[].name] | any(
+          . == "needs-human" or . == "hold" or . == "gated"
+          or . == "needs-conflict-resolution" or . == "fast"
+          or '"$NO_AUTO_HOLD_JQ"'
+        ) | not)
+      ' <<<"$current" >/dev/null; then
+      break
+    fi
+    if (( mergeability_attempt < DRAIN_MERGEABLE_RECHECK_ATTEMPTS )); then
+      echo "    ~ mergeable=UNKNOWN for #$n at $live_head; bounded live reread $mergeability_attempt/$DRAIN_MERGEABLE_RECHECK_ATTEMPTS"
+      sleep "$DRAIN_MERGEABLE_RECHECK_SECONDS"
+    fi
+  done
   if ! jq -e --arg backend "$MERGE_QUEUE_BACKEND" '
     .state == "OPEN"
     and (.isDraft | not)
@@ -970,8 +1007,8 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     collision_decision="$(changelog_collision_decision_for_pr "$n")"
     collision_action="$(jq -r '.action // empty' <<<"$collision_decision")"
     if [[ "$collision_action" == "skip" ]]; then
-      echo "    ⏸ pre-land CHANGELOG.md edit is prohibited; refusing native queue admission for #$n"
-      LAST_ENROLL_SKIP_REASON="preland-changelog"
+      echo "    ⏸ pre-land CHANGELOG.md edit is prohibited ($(jq -r '.reason' <<<"$collision_decision")) for #$n; refusing native queue admission without bypassing CI"
+      LAST_ENROLL_SKIP_REASON="$(jq -r '.reason // "pre-land-changelog"' <<<"$collision_decision")"
       return 2
     fi
   fi
@@ -1618,9 +1655,44 @@ if waiting_lane_allows_clean_enroll \
     fi
   done < <(echo "$SNAP" | jq -c '.[]
     | select(.q == true)
-    | select(.qs == "UNMERGEABLE")
+    | select(([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)')
+fi
+
+# --- INVENTORY + DEQUEUE: pre-land CHANGELOG.md (JOV-5378) ---
+# Implementation PRs must not edit CHANGELOG.md. Queued members that still
+# carry the file are dequeued with reenqueue=false. Enrollment skip is a
+# classified skip, not a CI bypass.
+echo "=== INVENTORY (pre-land CHANGELOG.md) ==="
+echo "=== DEQUEUE (pre-land CHANGELOG.md → drain without CI bypass) ==="
+if waiting_lane_allows_clean_enroll \
+  || [[ "$DRAIN_PROMOTION_MODE" == "blocked" && "$DRAIN_FREEZE_EXISTING_QUEUE" == "0" ]]; then
+  changelog_open='[]'
+  while read -r pr; do
+    n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
+    head_ref="$(jq -r '.head // empty' <<<"$pr")"
+    files="$(pr_changed_paths_json "$n")"
+    changelog_open="$(jq -c --argjson n "$n" --argjson files "$files" --arg head "$head_ref" \
+      '. + [{number:$n, files:$files, headRefName:$head, queued:true}]' <<<"$changelog_open")"
+    drain_decision="$(CHANGELOG_COLLISION_JSON="$(jq -nc --argjson files "$files" --argjson queued true --arg branch "$head_ref" \
+      '{files:$files, queued:$queued, branch:$branch}')" \
+      node scripts/ci-merge-queue-check.mjs changelog-drain)"
+    drain_action="$(jq -r '.action // empty' <<<"$drain_decision")"
+    if [[ "$drain_action" != "dequeue" ]]; then
+      continue
+    fi
+    echo "  #$n  $t  ✗ pre-land-changelog"
+    if ! dequeue_strict "$n"; then
+      echo "::error::Failed to prove CHANGELOG PR #$n is outside native merge queue" >&2
+      exit 1
+    fi
+  done < <(echo "$SNAP" | jq -c '.[]
+    | select(.q == true)
     | select(.draft | not)
     | select(([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)')
+  inventory="$(CHANGELOG_COLLISION_JSON="$(jq -nc --argjson openPrs "$changelog_open" '{openPrs:$openPrs}')" \
+    node scripts/ci-merge-queue-check.mjs changelog-inventory)"
+  echo "  inventory count=$(jq -r '.count' <<<"$inventory") reason=$(jq -r '.reason' <<<"$inventory")"
+  echo "$inventory" | jq -r '.prs[]? | "  #\(.number)  \(.headRefName // "unknown")  queued=\(.queued)"'
 fi
 
 # --- DEQUEUE: only GENUINELY un-mergeable PRs (conflict or real failing checks) ---
@@ -1886,6 +1958,9 @@ if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 ]]; then
     if [[ "$LAST_ENROLL_SKIP_REASON" == "product-failure-tombstone" ]]; then
       echo "  #$DRAIN_ADMISSION_PR  ⏸ $LAST_ENROLL_SKIP_REASON (durable exact-head product failure; source repair required)"
     elif [[ "$LAST_ENROLL_SKIP_REASON" == "changelog-collision" \
+      || "$LAST_ENROLL_SKIP_REASON" == "pre-land-changelog" \
+      || "$LAST_ENROLL_SKIP_REASON" == "preland-changelog" \
+      || "$LAST_ENROLL_SKIP_REASON" == "preland-changelog-prohibited" \
       || "$LAST_ENROLL_SKIP_REASON" == "unmergeable-tombstone" ]]; then
       echo "  #$DRAIN_ADMISSION_PR  ⏸ $LAST_ENROLL_SKIP_REASON (classified skip; enroll is not a product-quality failure)"
     elif [[ "$ADMISSION_ELIGIBLE" == "true" ]]; then

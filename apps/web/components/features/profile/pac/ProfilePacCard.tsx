@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/components/organisms/entity-card/EntityCard.test.tsx
+
 import {
   Bell,
   HandHeart,
@@ -21,6 +23,11 @@ import {
   useRef,
   useState,
 } from 'react';
+import {
+  ARTWORK_FIT_CLASSNAME,
+  getArtworkFitClassName,
+  getArtworkRadiusClassName,
+} from '@/components/atoms/ArtworkFrame';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SeekBar } from '@/components/atoms/SeekBar';
 import type { EntityCarouselLayout } from '@/components/organisms/entity-card';
@@ -819,6 +826,8 @@ export function ProfilePacCard({
       : release
         ? `${release.title} artwork`
         : artist.name;
+  const isReleaseArtwork =
+    state.kind !== 'merch' && Boolean(release?.artworkUrl);
 
   // Exposure ref on the outer card (callback ref).
   const sectionRef = useCallback(
@@ -853,7 +862,10 @@ export function ProfilePacCard({
           'relative aspect-square flex-none overflow-hidden bg-surface-2',
           isProfileLandscape
             ? cn(
-                'self-stretch w-auto rounded-(--profile-action-radius)',
+                'self-stretch w-auto',
+                isReleaseArtwork
+                  ? getArtworkRadiusClassName('default')
+                  : 'rounded-(--profile-action-radius)',
                 usesFullWidthCaptureLayout && 'invisible'
               )
             : 'w-full border-b border-subtle'
@@ -871,7 +883,13 @@ export function ProfilePacCard({
                 ? '(max-width: 767px) 44vw, 180px'
                 : '(max-width: 767px) 70vw, 300px'
             }
-            className='object-cover'
+            className={
+              isReleaseArtwork
+                ? ARTWORK_FIT_CLASSNAME
+                : getArtworkFitClassName(
+                    state.kind === 'merch' ? 'merch' : 'avatar'
+                  )
+            }
             fallbackVariant='release'
             fallbackClassName='bg-transparent'
           />

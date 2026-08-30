@@ -129,7 +129,7 @@ export function ProfilePrimaryCTA({
   if (nextAction.kind === 'tickets') {
     return (
       <div className='space-y-4'>
-        <Button asChild variant='primary' size='lg' className='w-full'>
+        <Button asChild variant='primary' size='marketing' className='w-full'>
           <a href={nextAction.url} target='_blank' rel='noopener noreferrer'>
             Find tickets
           </a>
@@ -141,7 +141,7 @@ export function ProfilePrimaryCTA({
   if (nextAction.kind === 'shop') {
     return (
       <div className='space-y-4'>
-        <Button asChild variant='primary' size='lg' className='w-full'>
+        <Button asChild variant='primary' size='marketing' className='w-full'>
           <a href={nextAction.url} target='_blank' rel='noopener noreferrer'>
             Shop merch
           </a>

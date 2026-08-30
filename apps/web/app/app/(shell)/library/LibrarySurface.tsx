@@ -39,6 +39,7 @@ import {
   Music2,
   Pause,
   PlayCircle,
+  RefreshCw,
   Shirt,
   Table2,
   Video,
@@ -115,6 +116,7 @@ import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
 import type { ProviderKey } from '@/lib/discography/types';
+import { captureError } from '@/lib/error-tracking';
 import {
   formatLibraryApprovalStatus,
   LIBRARY_APPROVAL_STATUSES,
@@ -132,6 +134,7 @@ import {
   releaseStatusClasses,
   releaseStatusDotClasses,
 } from '@/lib/library/release-status';
+import { useSyncReleasesFromSpotifyMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 import {
@@ -1697,7 +1700,15 @@ function LibraryReleaseTable({
   );
 }
 
-function EmptyCatalog() {
+function EmptyCatalog({
+  canSyncSpotify,
+  isSyncing,
+  onSyncSpotify,
+}: {
+  readonly canSyncSpotify: boolean;
+  readonly isSyncing: boolean;
+  readonly onSyncSpotify: () => void;
+}) {
   return (
     <PageShell
       aria-label='Library'
@@ -1715,15 +1726,34 @@ function EmptyCatalog() {
         testId='library-workspace-empty-state'
         className='min-h-90'
         actionSlot={
-          <Link
-            href={APP_ROUTES.RELEASES}
-            className={cn(
-              'system-b-library-action system-b-library-action--standard system-b-library-action--surface-0 inline-flex items-center border border-subtle',
-              LIBRARY_BUTTON_FOCUS_CLASS
-            )}
-          >
-            Open Releases
-          </Link>
+          canSyncSpotify ? (
+            <Button
+              type='button'
+              size='sm'
+              disabled={isSyncing}
+              onClick={onSyncSpotify}
+              data-testid='library-sync-spotify-empty-state'
+            >
+              <RefreshCw
+                className={cn(
+                  'h-4 w-4',
+                  isSyncing && 'animate-spin motion-reduce:animate-none'
+                )}
+                aria-hidden='true'
+              />
+              {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
+            </Button>
+          ) : (
+            <Link
+              href={APP_ROUTES.RELEASES}
+              className={cn(
+                'system-b-library-action system-b-library-action--standard system-b-library-action--surface-0 inline-flex items-center border border-subtle',
+                LIBRARY_BUTTON_FOCUS_CLASS
+              )}
+            >
+              Open Releases
+            </Link>
+          )
         }
       />
     </PageShell>
@@ -2325,13 +2355,37 @@ export function LibrarySurface({
   assets,
   profileId = null,
   artistHandle = null,
+  canSyncSpotify = false,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
   readonly profileId?: string | null;
   readonly artistHandle?: string | null;
+  readonly canSyncSpotify?: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { mutate: syncSpotify, isPending: isSyncingSpotify } =
+    useSyncReleasesFromSpotifyMutation(profileId ?? '');
+  const handleSyncSpotify = useCallback(() => {
+    syncSpotify(undefined, {
+      onSuccess: result => {
+        if (result.success) {
+          toast.success(result.message);
+          router.refresh();
+          return;
+        }
+        toast.error(result.message);
+      },
+      onError: error => {
+        void captureError('Failed to sync releases from Spotify', error, {
+          context: 'library-empty-state',
+          profileId,
+          action: 'sync-from-spotify',
+        });
+        toast.error('Failed to sync from Spotify');
+      },
+    });
+  }, [profileId, router, syncSpotify]);
   const { playbackState, toggleTrack } = useTrackAudioPlayer();
   const [audioOverrides, setAudioOverrides] = useState<Record<string, string>>(
     {}
@@ -2907,7 +2961,13 @@ export function LibrarySurface({
   useRegisterRightPanel(assetDrawerPanel);
 
   if (effectiveAssets.length === 0) {
-    return <EmptyCatalog />;
+    return (
+      <EmptyCatalog
+        canSyncSpotify={canSyncSpotify}
+        isSyncing={isSyncingSpotify}
+        onSyncSpotify={handleSyncSpotify}
+      />
+    );
   }
 
   return (

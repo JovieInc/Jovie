@@ -273,7 +273,8 @@ function ProfileMusicEmptyState({
       <Button
         type='button'
         variant='primary'
-        className='h-11 w-full rounded-full'
+        size='marketing'
+        className='w-full'
         disabled
       >
         Turn On Music Alerts

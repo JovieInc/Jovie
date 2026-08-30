@@ -18,7 +18,6 @@ const {
   mockCaptureCriticalError,
   mockLogFallback,
   mockRecordCommission,
-  mockGetInternalUserId,
   mockSendPaymentFailedEmail,
   mockSendPaymentRecoveredEmail,
   mockShouldSendDunningEmail,
@@ -32,7 +31,6 @@ const {
   mockCaptureCriticalError: vi.fn(),
   mockLogFallback: vi.fn(),
   mockRecordCommission: vi.fn(),
-  mockGetInternalUserId: vi.fn(),
   mockSendPaymentFailedEmail: vi.fn(),
   mockSendPaymentRecoveredEmail: vi.fn(),
   mockShouldSendDunningEmail: vi.fn(),
@@ -74,7 +72,6 @@ vi.mock('@/lib/error-tracking', () => ({
 
 vi.mock('@/lib/referrals/service', () => ({
   recordCommission: mockRecordCommission,
-  getInternalUserId: mockGetInternalUserId,
 }));
 
 vi.mock('@/lib/stripe/dunning', () => ({
@@ -108,9 +105,11 @@ describe('@critical PaymentHandler', () => {
 
     // Default mock implementations
     mockGetPlanFromPriceId.mockReturnValue('standard');
-    mockUpdateUserBillingStatus.mockResolvedValue({ success: true });
+    mockUpdateUserBillingStatus.mockResolvedValue({
+      success: true,
+      appUserId: 'app_user_default',
+    });
     mockInvalidateBillingCache.mockResolvedValue(undefined);
-    mockGetInternalUserId.mockResolvedValue(null);
     mockRecordCommission.mockResolvedValue(undefined);
     mockSendPaymentFailedEmail.mockResolvedValue({ success: true });
     mockSendPaymentRecoveredEmail.mockResolvedValue({ success: true });
@@ -291,7 +290,10 @@ describe('@critical PaymentHandler', () => {
       } as unknown as Stripe.Subscription;
 
       mockStripeSubscriptionsRetrieve.mockResolvedValue(mockSubscription);
-      mockGetInternalUserId.mockResolvedValue('internal_123');
+      mockUpdateUserBillingStatus.mockResolvedValue({
+        success: true,
+        appUserId: 'internal_123',
+      });
 
       const context: WebhookContext = {
         event: {
@@ -319,7 +321,6 @@ describe('@critical PaymentHandler', () => {
 
       await handler.handle(context);
 
-      expect(mockGetInternalUserId).toHaveBeenCalledWith('user_referral');
       expect(mockRecordCommission).toHaveBeenCalledWith(
         expect.objectContaining({
           referredUserId: 'internal_123',
@@ -365,7 +366,6 @@ describe('@critical PaymentHandler', () => {
 
       await handler.handle(context);
 
-      expect(mockGetInternalUserId).not.toHaveBeenCalled();
       expect(mockRecordCommission).not.toHaveBeenCalled();
     });
 
@@ -407,7 +407,7 @@ describe('@critical PaymentHandler', () => {
       await handler.handle(context);
 
       expect(mockSendPaymentRecoveredEmail).toHaveBeenCalledWith({
-        userId: 'user_recover',
+        userId: 'app_user_default',
         amountPaid: 2999,
         currency: 'usd',
         priceId: 'price_pro',
@@ -734,7 +734,7 @@ describe('@critical PaymentHandler', () => {
 
       expect(mockShouldSendDunningEmail).toHaveBeenCalledWith(2);
       expect(mockSendPaymentFailedEmail).toHaveBeenCalledWith({
-        userId: 'user_dunning',
+        userId: 'app_user_default',
         amountDue: 2999,
         currency: 'usd',
         attemptCount: 2,
@@ -1157,7 +1157,10 @@ describe('@critical PaymentHandler', () => {
       } as unknown as Stripe.Subscription;
 
       mockStripeSubscriptionsRetrieve.mockResolvedValue(mockSubscription);
-      mockGetInternalUserId.mockResolvedValue('internal_fail');
+      mockUpdateUserBillingStatus.mockResolvedValue({
+        success: true,
+        appUserId: 'internal_fail',
+      });
       mockRecordCommission.mockRejectedValue(new Error('Commission DB error'));
 
       const context: WebhookContext = {

@@ -12,3 +12,4 @@ Compound documentation index for the Jovie monorepo.
 - [API Route Map](./API_ROUTE_MAP.md)
 - [Cron Registry](./CRON_REGISTRY.md)
 - [Mac stack / Swift-control invariants](./macos/swift-control-invariants.md)
+- [Node runtime lifecycle](./engineering/NODE_RUNTIME_LIFECYCLE.md)

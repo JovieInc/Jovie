@@ -232,6 +232,10 @@ export function OpportunityInboxPageClient({
     [cards, dismissMutation, scheduleStackFocusRecovery]
   );
 
+  const handleCaptureCompleted = useCallback((id: string) => {
+    setCards(current => current.filter(card => card.id !== id));
+  }, []);
+
   /** Open chat with the card pinned (JOV-3932/3933). */
   const handleOpen = useCallback(
     (id: string) => {
@@ -478,6 +482,7 @@ export function OpportunityInboxPageClient({
                 stackKeyboardControlRef={stackKeyboardControlRef}
                 onStackActionInitiated={beginStackAction}
                 onStackNextStep={handleStackNextStep}
+                onCaptureCompleted={handleCaptureCompleted}
               />
             ) : (
               <p

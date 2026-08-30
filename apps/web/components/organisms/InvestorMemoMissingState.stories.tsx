@@ -18,7 +18,7 @@ const meta = {
       source: 'apps/web/app/not-found.tsx',
       sourceExport: 'default',
       storyExport: 'Web187MissingInvestorMemo',
-      sourceSha: '12224180f432e72653646f5588a5e320a92b493e',
+      sourceSha: '8b0353fcbeb0cffef614fa47afbbbd8eeae48997',
       fixtureState: 'missing-access-or-memo',
       proofTier: 'source-backed-missing-state',
     },

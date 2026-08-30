@@ -30,7 +30,7 @@ function getJobBlock(workflow: string, jobKey: string): string {
 
 describe('Node runtime contract', () => {
   it('keeps canonical version files and workspace engines aligned', () => {
-    expect(canonicalNodeVersion).toBe('22.23.1');
+    expect(canonicalNodeVersion).toBe('22.23.2');
     expect(read('.node-version').trim()).toBe(canonicalNodeVersion);
 
     const node22OnlyPackagePaths = [
@@ -48,14 +48,14 @@ describe('Node runtime contract', () => {
       const packageJson = JSON.parse(read(packagePath)) as {
         engines?: { node?: string };
       };
-      expect(packageJson.engines?.node, packagePath).toBe('>=22.23.1 <23');
+      expect(packageJson.engines?.node, packagePath).toBe('>=22.23.2 <23');
     }
 
     for (const packagePath of minimumOnlyPackagePaths) {
       const packageJson = JSON.parse(read(packagePath)) as {
         engines?: { node?: string };
       };
-      expect(packageJson.engines?.node, packagePath).toBe('>=22.23.1');
+      expect(packageJson.engines?.node, packagePath).toBe('>=22.23.2');
     }
   });
 

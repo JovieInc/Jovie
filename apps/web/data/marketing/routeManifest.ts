@@ -365,6 +365,26 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     url: '/instant-merch',
   },
   {
+    glob: '(marketing)/youtube-thumbnails/page.tsx',
+    recipeId: 'feature',
+    renderedSections: approvedBindings(
+      'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx',
+      'hero',
+      'how-it-works',
+      'feature-grid',
+      'pricing'
+    ),
+    bindingEvidence: {
+      status: 'verified',
+      source: 'route implementation 2026-08-28',
+      notes:
+        'Uses canonical System B marketing primitives and a product-callout preview without identity imagery.',
+    },
+    status: 'active',
+    specVersion: '1.2.0',
+    url: '/youtube-thumbnails',
+  },
+  {
     glob: '(marketing)/launch/page.tsx',
     recipeId: 'launch',
     renderedSections: approvedBindings(
@@ -426,6 +446,30 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/support',
+  },
+  {
+    glob: '(marketing)/developers/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'JOV-5412 public developer guide',
+      notes:
+        'Public API documentation page uses the marketing shell but is prose-led rather than recipe-composable.',
+    },
+    exempt: {
+      reason:
+        'public developer documentation page — prose API reference; not recipe-composable',
+      linearId: 'JOV-5412',
+      approvedBy: 'tw',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/16619',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/developers',
+    healthCheck: {
+      path: '/developers',
+      expected: 'page',
+    },
   },
   {
     glob: '(marketing)/compare/[slug]/page.tsx',

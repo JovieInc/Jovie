@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { ReleasesView } from '@/components/features/profile/views/ReleasesView';
 import type { PublicRelease } from '@/features/profile/releases/types';
-import { ReleasesView } from '@/features/profile/views/ReleasesView';
 
 const { trackMock } = vi.hoisted(() => ({
   trackMock: vi.fn(),
@@ -15,17 +15,20 @@ vi.mock('@/components/atoms/ImageWithFallback', () => ({
   ImageWithFallback: ({
     alt,
     src,
+    className,
     priority,
     loading,
   }: {
     readonly alt: string;
     readonly src?: string | null;
+    readonly className?: string;
     readonly priority?: boolean;
     readonly loading?: 'eager' | 'lazy';
   }) => (
     <img
       alt={alt}
       src={src ?? undefined}
+      className={className}
       data-priority={priority ? 'true' : 'false'}
       data-loading={loading}
     />
@@ -70,6 +73,8 @@ describe('ReleasesView', () => {
     expect(screen.getByText('Latest')).toBeVisible();
     expect(screen.queryByText('Latest Release')).not.toBeInTheDocument();
     expect(screen.queryByText('More Releases')).not.toBeInTheDocument();
+    expect(screen.getByAltText('Newest Song')).toHaveClass('object-contain');
+    expect(screen.getByAltText('Newest Song')).not.toHaveClass('object-cover');
     expect(screen.getByAltText('Newest Song')).toHaveAttribute(
       'data-priority',
       'true'

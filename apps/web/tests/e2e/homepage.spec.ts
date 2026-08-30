@@ -84,7 +84,7 @@ test.describe('Homepage', () => {
     await expect(hero.getByPlaceholder('Ask Jovie...')).toHaveCount(0);
   });
 
-  test('header uses compact homepage presentation and waitlist CTA', async ({
+  test('header uses compact homepage presentation and text-only login', async ({
     page,
   }) => {
     const header = page.getByTestId('header-nav');
@@ -107,9 +107,9 @@ test.describe('Homepage', () => {
       'href',
       '/signin'
     );
-    await expect(
-      header.getByRole('link', { name: 'Get started' })
-    ).toHaveAttribute('href', /\/start\?starter_prompt=/);
+    await expect(header.getByRole('link', { name: 'Get started' })).toHaveCount(
+      0
+    );
 
     await page.evaluate(() =>
       window.scrollTo({ top: 320, behavior: 'instant' })
@@ -126,11 +126,7 @@ test.describe('Homepage', () => {
     const floatingRadius = await floatingShell.evaluate(element =>
       Number.parseFloat(getComputedStyle(element).borderRadius)
     );
-    const ctaHeight = await header
-      .getByRole('link', { name: 'Get started' })
-      .evaluate(element => element.getBoundingClientRect().height);
     expect(floatingRadius).toBe(22);
-    expect(ctaHeight).toBe(36);
   });
 
   test('header flyouts are not mounted by default', async ({ page }) => {
@@ -361,15 +357,8 @@ test.describe('Homepage', () => {
         name: 'Jovie is the AI workspace for artists. Built around your artist presence.',
       })
     ).toBeVisible();
-    for (const outcome of [
-      'Sell Out',
-      'Capture Fans',
-      'Get Paid',
-      'Drop Music',
-    ]) {
-      await expect(
-        artistProfiles.getByRole('heading', { name: outcome })
-      ).toBeVisible();
+    for (const preview of ['Tour', 'Subscribe', 'Pay', 'Presave']) {
+      await expect(artistProfiles.getByText(preview)).toBeVisible();
     }
     await artistProfiles.scrollIntoViewIfNeeded();
     await page.waitForFunction(() => {
@@ -395,7 +384,7 @@ test.describe('Homepage', () => {
         })
       );
 
-    expect(profileImageQuality).toHaveLength(3);
+    expect(profileImageQuality).toHaveLength(4);
     for (const image of profileImageQuality) {
       expect(
         image.naturalWidth,
@@ -504,7 +493,7 @@ test.describe('Homepage', () => {
     const profiles = page.getByTestId('homepage-artist-profiles');
     await profiles.scrollIntoViewIfNeeded();
     await expect(
-      profiles.locator('.homepage-artist-outcome__device')
+      profiles.locator('.homepage-artist-profile-preview__device')
     ).toHaveCount(4);
     await expect(profiles.locator('img')).toHaveCount(4);
     const profileRailGeometry = await profiles.evaluate(section => {
@@ -735,13 +724,11 @@ test.describe('Homepage', () => {
     const ctaLinks = page.locator('[data-cta-sign-up="true"]');
     const count = await ctaLinks.count();
 
-    // Must have at least one CTA on the homepage
     expect(
       count,
       'Homepage must have at least one data-cta-sign-up CTA'
     ).toBeGreaterThan(0);
 
-    // Every anchor CTA must point to /start (or /start?...)
     for (let i = 0; i < count; i += 1) {
       const cta = ctaLinks.nth(i);
       const tagName = await cta.evaluate(el => el.tagName.toLowerCase());

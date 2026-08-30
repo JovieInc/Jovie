@@ -82,6 +82,7 @@ describe('NativeSelect', () => {
 
     const select = screen.getByRole('combobox', { name: 'Status' });
     expect(select).toHaveClass('custom-select');
+    expect(select.className).toContain('text-app');
     expect(select.className).toContain('border-(--linear-border-subtle)');
     expect(select.className).toContain(
       'focus-visible:border-(--linear-border-focus)'

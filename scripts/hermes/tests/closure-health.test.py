@@ -28,20 +28,33 @@ def pr(
     body: str = "",
     merge_state: str = "CLEAN",
     draft: bool = False,
+    cross_repository: bool | None = False,
     queued: bool = False,
     queue_state: str = "AWAITING_CHECKS",
     labels: tuple[str, ...] = (),
     updated_at: datetime = NOW,
     author: str = "summer-test",
+    files: tuple[str, ...] | None = None,
+    change_type: str = "MODIFIED",
+    changed_files: int | None = None,
+    files_payload: object | None = None,
+    base_ref: str = "main",
+    head_ref: str | None = None,
+    head_oid: str | None = None,
+    created_at: datetime | None = None,
 ) -> dict[str, object]:
-    return {
+    exact_head = head_oid or f"{number if isinstance(number, int) else 0:040x}"[-40:]
+    payload: dict[str, object] = {
         "number": number,
         "title": title,
         "body": body,
-        "headRefName": f"symphony/test-pr-{number}",
+        "baseRefName": base_ref,
+        "headRefName": head_ref or f"symphony/test-pr-{number}",
+        "headRefOid": exact_head,
         "isDraft": draft,
+        "isCrossRepository": cross_repository,
         "mergeStateStatus": merge_state,
-        "createdAt": (updated_at - timedelta(hours=1)).isoformat(),
+        "createdAt": (created_at or updated_at - timedelta(hours=1)).isoformat(),
         "updatedAt": updated_at.isoformat(),
         "author": {"login": author},
         "labels": {"nodes": [{"name": label} for label in labels]},
@@ -55,6 +68,18 @@ def pr(
             else None
         ),
     }
+    if files_payload is not None:
+        payload["files"] = files_payload
+        if changed_files is not None:
+            payload["changedFiles"] = changed_files
+        return payload
+    if files is None and changed_files is None:
+        return payload
+    nodes = [{"path": path, "changeType": change_type} for path in (files or ())]
+    expected = len(nodes) if changed_files is None else changed_files
+    payload["changedFiles"] = expected
+    payload["files"] = {"totalCount": expected, "nodes": nodes}
+    return payload
 
 
 def snapshot(**overrides: object) -> dict[str, object]:
@@ -81,13 +106,119 @@ def snapshot(**overrides: object) -> dict[str, object]:
             "unclassified": [],
             "duplicateIssueLanes": [],
             "expiredHolds": [],
+            "changedFileEvidence": [],
         },
     }
     value.update(overrides)
     return value
 
 
+def stack_pr(
+    number: int,
+    base_ref: str,
+    *,
+    body: str = "",
+    merge_state: str = "CLEAN",
+) -> dict[str, object]:
+    return pr(
+        number,
+        title=f"wip: stack layer {number}",
+        body=body,
+        merge_state=merge_state,
+        draft=True,
+        base_ref=base_ref,
+        head_ref=f"stack/test-{number}",
+    )
+
+
+STACK_BODY = "<!-- stack-integrator: summer-test -->\n<!-- stack-deadline: 2026-09-02T00:00:00Z -->"
+
+
+def stack_health(layers: list[dict[str, object]]) -> tuple[dict[str, object], dict[str, object]]:
+    result = MODULE.classify_open_prs(layers, NOW)
+    return result, MODULE.evaluate_closure_health(
+        snapshot(
+            openPrs=len(layers),
+            eligiblePrs=len(layers),
+            greenReadyPrs=len(layers),
+            classifications=result,
+        ),
+        previous=None,
+        now=NOW,
+    )
+
+
 class ClosureClassificationTests(unittest.TestCase):
+    def test_four_layer_stack_with_owner_deadline_and_clean_path_is_green(self):
+        layers = [
+            stack_pr(101, "main", body=STACK_BODY),
+            stack_pr(102, "stack/test-101"),
+            stack_pr(103, "stack/test-102"),
+            stack_pr(104, "stack/test-103"),
+        ]
+        result, health = stack_health(layers)
+        self.assertEqual(result["stackHealth"]["violations"], [])
+        self.assertEqual(result["repairActions"], [])
+        self.assertEqual(health["status"], "healthy")
+        self.assertTrue(health["newIssueIntakeAllowed"])
+
+    def test_five_layer_stack_is_immediate_red_with_one_split_action(self):
+        layers = [
+            stack_pr(101, "main", body=STACK_BODY),
+            stack_pr(102, "stack/test-101"),
+            stack_pr(103, "stack/test-102"),
+            stack_pr(104, "stack/test-103"),
+            stack_pr(105, "stack/test-104"),
+        ]
+        result, health = stack_health(layers)
+        self.assertEqual(result["stackHealth"]["violations"][0]["rootPr"], 101)
+        self.assertIn(
+            "stack-depth-over-4",
+            result["stackHealth"]["violations"][0]["codes"],
+        )
+        self.assertEqual(len(result["repairActions"]), 1)
+        self.assertEqual(result["repairActions"][0]["action"], MODULE.STACK_REPAIR_ACTION)
+        self.assertEqual(result["repairActions"][0]["rootPr"], 101)
+        self.assertEqual(health["status"], "red")
+        self.assertIn("draft-stack-policy-violation", health["reasons"])
+        self.assertFalse(health["newIssueIntakeAllowed"])
+        self.assertTrue(health["promotionContinues"])
+        self.assertTrue(health["remediationContinues"])
+
+    def test_stack_requires_metadata_and_clean_ancestors(self):
+        layers = [
+            stack_pr(111, "main"),
+            stack_pr(112, "stack/test-111", merge_state="DIRTY"),
+        ]
+        result = MODULE.classify_open_prs(layers, NOW)
+        codes = result["stackHealth"]["violations"][0]["codes"]
+        self.assertIn("missing-stack-integrator", codes)
+        self.assertIn("missing-stack-deadline", codes)
+        self.assertIn("non-clean-stack-ancestor", codes)
+        self.assertEqual(len(result["repairActions"]), 1)
+
+    def test_expired_stack_deadline_and_orphaned_base_are_red(self):
+        expired = stack_pr(
+            121,
+            "main",
+            body=(
+                "<!-- stack-integrator: summer-test -->\n"
+                "<!-- stack-deadline: 2026-08-27T00:00:00Z -->"
+            ),
+        )
+        child = stack_pr(122, "stack/test-121")
+        orphan = stack_pr(123, "stack/closed-ancestor")
+        result, _ = stack_health([expired, child, orphan])
+        by_root = {
+            item["rootPr"]: item["codes"]
+            for item in result["stackHealth"]["violations"]
+        }
+        self.assertIn("expired-stack-deadline", by_root[121])
+        self.assertIn("orphaned-stack-base", by_root[123])
+        self.assertEqual(
+            [action["rootPr"] for action in result["repairActions"]], [121, 123]
+        )
+
     def test_every_open_pr_receives_a_deterministic_lifecycle_disposition(self):
         result = MODULE.classify_open_prs(
             [
@@ -112,17 +243,283 @@ class ClosureClassificationTests(unittest.TestCase):
     def test_duplicate_issue_lanes_stop_the_line_without_guessing_a_loser(self):
         result = MODULE.classify_open_prs(
             [
-                pr(8, title="feat: ship JOV-777", merge_state="DIRTY"),
-                pr(9, title="feat: ship JOV-777", queued=True),
+                pr(
+                    8,
+                    title="feat: ship JOV-777",
+                    merge_state="DIRTY",
+                    files=("scripts/a.py", "scripts/shared.py"),
+                ),
+                pr(
+                    9,
+                    title="feat: ship JOV-777",
+                    queued=True,
+                    files=("scripts/b.py", "scripts/shared.py"),
+                ),
             ],
             NOW,
         )
 
-        self.assertEqual(result["duplicateIssueLanes"], [{"issue": "JOV-777", "prs": [8, 9]}])
+        self.assertEqual(
+            result["duplicateIssueLanes"],
+            [
+                {
+                    "issue": "JOV-777",
+                    "prs": [8, 9],
+                    "overlap": ["scripts/shared.py"],
+                }
+            ],
+        )
         dispositions = {item["number"]: item for item in result["dispositions"]}
         self.assertEqual(dispositions[9]["state"], "queued")
         self.assertEqual(dispositions[9]["queueState"], "AWAITING_CHECKS")
         self.assertEqual(dispositions[8]["state"], "repair")
+        evidence = {item["number"]: item for item in result["changedFileEvidence"]}
+        self.assertEqual(evidence[8]["status"], "complete")
+        self.assertEqual(evidence[9]["status"], "complete")
+
+        health = MODULE.evaluate_closure_health(
+            snapshot(classifications=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "red")
+        self.assertIn("duplicate-issue-lanes-unresolved", health["reasons"])
+
+    def test_held_or_draft_plus_active_is_not_a_duplicate_lane(self):
+        result = MODULE.classify_open_prs(
+            [
+                pr(
+                    8,
+                    title="feat: ship JOV-777",
+                    files=("scripts/shared.py",),
+                ),
+                pr(
+                    9,
+                    title="wip: JOV-777",
+                    draft=True,
+                    files=("scripts/shared.py",),
+                ),
+                pr(
+                    10,
+                    title="feat: held JOV-778",
+                    files=("apps/web/a.ts",),
+                ),
+                pr(
+                    11,
+                    title="feat: held JOV-778",
+                    labels=("hold",),
+                    files=("apps/web/a.ts",),
+                ),
+            ],
+            NOW,
+        )
+
+        self.assertEqual(result["duplicateIssueLanes"], [])
+        dispositions = {item["number"]: item["state"] for item in result["dispositions"]}
+        self.assertEqual(
+            dispositions,
+            {8: "promote", 9: "held", 10: "promote", 11: "held"},
+        )
+        health = MODULE.evaluate_closure_health(
+            snapshot(classifications=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "healthy")
+        self.assertNotIn("duplicate-issue-lanes-unresolved", health["reasons"])
+
+    def test_disjoint_active_artifacts_are_allowed(self):
+        result = MODULE.classify_open_prs(
+            [
+                pr(
+                    8,
+                    title="feat: ship JOV-777",
+                    merge_state="DIRTY",
+                    files=("scripts/a.py",),
+                ),
+                pr(
+                    9,
+                    title="feat: ship JOV-777",
+                    queued=True,
+                    files=("scripts/b.py",),
+                ),
+            ],
+            NOW,
+        )
+
+        self.assertEqual(result["duplicateIssueLanes"], [])
+        dispositions = {item["number"]: item["state"] for item in result["dispositions"]}
+        self.assertEqual(dispositions, {8: "repair", 9: "queued"})
+        health = MODULE.evaluate_closure_health(
+            snapshot(classifications=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "healthy")
+        self.assertTrue(health["newIssueIntakeAllowed"])
+
+    def test_only_overlapping_prs_are_duplicate_participants(self):
+        result = MODULE.classify_open_prs(
+            [
+                pr(20, title="feat: ship JOV-779", files=("scripts/shared.py",)),
+                pr(21, title="fix: ship JOV-779", files=("scripts/shared.py",)),
+                pr(22, title="test: ship JOV-779", files=("scripts/disjoint.py",)),
+            ],
+            NOW,
+        )
+
+        self.assertEqual(
+            result["duplicateIssueLanes"],
+            [
+                {
+                    "issue": "JOV-779",
+                    "prs": [20, 21],
+                    "overlap": ["scripts/shared.py"],
+                }
+            ],
+        )
+
+    def test_renamed_file_evidence_fails_closed_as_unclassified(self):
+        result = MODULE.classify_open_prs(
+            [
+                pr(
+                    23,
+                    title="feat: ship JOV-780",
+                    files=("scripts/new.py",),
+                    change_type="RENAMED",
+                ),
+                pr(24, title="fix: ship JOV-780", files=("scripts/old.py",)),
+            ],
+            NOW,
+        )
+
+        self.assertEqual(result["duplicateIssueLanes"], [])
+        self.assertEqual(
+            {item["number"]: item["reason"] for item in result["unclassified"]},
+            {
+                23: "changed-file-evidence-malformed",
+                24: "changed-file-evidence-incomplete-peer",
+            },
+        )
+
+    def test_cross_repository_pr_cannot_spoof_an_internal_issue_lane(self):
+        result = MODULE.classify_open_prs(
+            [
+                pr(25, title="fix: ship JOV-781", files=("scripts/shared.py",)),
+                pr(
+                    26,
+                    title="fix: forged JOV-781",
+                    cross_repository=True,
+                    files=("scripts/shared.py",),
+                ),
+            ],
+            NOW,
+        )
+
+        self.assertEqual(result["duplicateIssueLanes"], [])
+        dispositions = {item["number"]: item for item in result["dispositions"]}
+        self.assertEqual(dispositions[25]["issue"], "JOV-781")
+        self.assertIsNone(dispositions[26]["issue"])
+
+    def test_missing_repository_provenance_is_unclassified(self):
+        result = MODULE.classify_open_prs(
+            [
+                pr(
+                    27,
+                    title="fix: ship JOV-782",
+                    cross_repository=None,
+                    files=("scripts/shared.py",),
+                )
+            ],
+            NOW,
+        )
+
+        self.assertEqual(
+            result["unclassified"],
+            [{"number": 27, "reason": "missing-repository-provenance"}],
+        )
+
+    def test_incomplete_changed_file_evidence_fails_closed_as_unclassified(self):
+        missing = pr(8, title="feat: ship JOV-777")
+        truncated = pr(
+            9,
+            title="feat: ship JOV-777",
+            files=("scripts/a.py",),
+            changed_files=3,
+        )
+        malformed = pr(
+            10,
+            title="feat: ship JOV-778",
+            files_payload={"totalCount": 1, "nodes": [{"path": ""}]},
+            changed_files=1,
+        )
+        sibling = pr(
+            11,
+            title="feat: ship JOV-778",
+            files=("scripts/b.py",),
+        )
+
+        result = MODULE.classify_open_prs(
+            [missing, truncated, malformed, sibling],
+            NOW,
+        )
+
+        reasons = {item["number"]: item["reason"] for item in result["unclassified"]}
+        self.assertEqual(reasons[8], "changed-file-evidence-missing")
+        self.assertEqual(reasons[9], "changed-file-evidence-truncated")
+        self.assertEqual(reasons[10], "changed-file-evidence-malformed")
+        self.assertEqual(reasons[11], "changed-file-evidence-incomplete-peer")
+        self.assertEqual(result["duplicateIssueLanes"], [])
+        self.assertEqual(
+            [item["number"] for item in result["dispositions"]],
+            [],
+        )
+        evidence = {item["number"]: item for item in result["changedFileEvidence"]}
+        self.assertEqual(evidence[9]["status"], "truncated")
+        self.assertEqual(evidence[9]["observedCount"], 1)
+        self.assertEqual(evidence[9]["expectedCount"], 3)
+
+        first = MODULE.evaluate_closure_health(
+            snapshot(classifications=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(first["status"], "grace")
+        self.assertNotIn("duplicate-issue-lanes-unresolved", first["reasons"])
+        later = MODULE.evaluate_closure_health(
+            snapshot(classifications=result),
+            previous=first,
+            now=NOW + timedelta(minutes=16),
+        )
+        self.assertEqual(later["status"], "red")
+        self.assertIn("unclassified-open-pr-over-15m", later["reasons"])
+
+    def test_changed_file_evidence_requires_both_completeness_counts(self):
+        missing_changed_files = pr(
+            12,
+            title="feat: ship JOV-779",
+            files_payload={
+                "totalCount": 1,
+                "nodes": [{"path": "scripts/a.py", "changeType": "MODIFIED"}],
+            },
+        )
+        missing_total_count = pr(
+            13,
+            title="feat: ship JOV-779",
+            files_payload={
+                "nodes": [{"path": "scripts/b.py", "changeType": "MODIFIED"}],
+            },
+            changed_files=1,
+        )
+
+        self.assertEqual(
+            MODULE._changed_file_evidence(missing_changed_files)["status"],
+            "malformed",
+        )
+        self.assertEqual(
+            MODULE._changed_file_evidence(missing_total_count)["status"],
+            "malformed",
+        )
 
     def test_explicit_linear_marker_overrides_legacy_branch_and_title_identity(self):
         child = pr(
@@ -235,6 +632,9 @@ class ClosureClassificationTests(unittest.TestCase):
 
 
 class ClosureHealthEvaluationTests(unittest.TestCase):
+    def test_boundary_offset_timestamp_is_treated_as_missing_history(self):
+        self.assertIsNone(MODULE.parse_time("0001-01-01T00:00:00+14:00"))
+
     def test_healthy_writer_and_progress_allow_new_intake(self):
         result = MODULE.evaluate_closure_health(snapshot(), previous=None, now=NOW)
 
@@ -268,6 +668,30 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
         )
         self.assertEqual(queue_red["status"], "red")
         self.assertIn("native-queue-empty-with-eligible-over-15m", queue_red["reasons"])
+
+    def test_malformed_previous_episode_containers_restart_bounded_grace(self):
+        stalled = snapshot(
+            controller={"status": "failed", "runId": 43, "observedAt": NOW.isoformat()},
+            nativeQueueCount=0,
+        )
+        malformed_history = (
+            {"episodes": None},
+            {"episodes": []},
+            {"episodes": {"controller": "invalid"}},
+        )
+
+        for previous in malformed_history:
+            with self.subTest(previous=previous):
+                result = MODULE.evaluate_closure_health(
+                    stalled,
+                    previous=previous,
+                    now=NOW,
+                )
+                self.assertEqual(result["status"], "grace")
+                self.assertEqual(
+                    result["episodes"]["controller"]["since"],
+                    MODULE.isoformat(NOW),
+                )
 
     def test_duplicate_lanes_and_stale_merge_progress_are_immediate_red(self):
         duplicate = snapshot(
@@ -407,12 +831,23 @@ class ClosureObservationTests(unittest.TestCase):
             for argument in run.call_args.args[0]
             if argument.startswith("query=")
         )
-        self.assertIn("number title body headRefName", query_arg)
+        self.assertIn("number title body baseRefName headRefName headRefOid", query_arg)
+        self.assertIn("isCrossRepository", query_arg)
+        self.assertIn("changedFiles", query_arg)
+        self.assertIn(f"files(first:{MODULE.CHANGED_FILES_PAGE})", query_arg)
+        self.assertIn("nodes{path changeType}", query_arg)
 
         pages[0]["data"]["repository"]["pullRequests"]["totalCount"] = 3
         completed.stdout = MODULE.json.dumps(pages)
         with mock.patch.object(MODULE.subprocess, "run", return_value=completed):
             with self.assertRaisesRegex(ValueError, "snapshot incomplete"):
+                MODULE._run_graphql_snapshot("JovieInc/Jovie")
+
+        pages[0]["data"]["repository"]["pullRequests"]["totalCount"] = 2
+        pages[1]["errors"] = [{"message": "partial GraphQL failure"}]
+        completed.stdout = MODULE.json.dumps(pages)
+        with mock.patch.object(MODULE.subprocess, "run", return_value=completed):
+            with self.assertRaisesRegex(ValueError, "GraphQL errors"):
                 MODULE._run_graphql_snapshot("JovieInc/Jovie")
         with self.assertRaisesRegex(ValueError, "owner/name"):
             MODULE._repo_parts("Jovie")
