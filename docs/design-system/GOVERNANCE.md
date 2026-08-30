@@ -87,6 +87,12 @@ When you add a check, add it to `scripts/design-governance-audit.mjs`. Absence
 from `ci-fast-lanes.mjs` is WARN, not FAIL — the audit must not demand a
 merge halt.
 
+Exception (JOV-5301): the remaining-group `design-system-source-ratchet` lane
+is a ~100ms filesystem count of apps/web arbitrary Tailwind values and
+`--linear-*` usage. It fails only on growth so a source-green PR cannot enroll
+and UNMERGEABLE an ALLGREEN group. It does not expand `design-conformance:gate`,
+unit tests, or e2e.
+
 Do not add a heavy new required workflow for design governance. The weekly
 workflow is the standing safety net for drift that no PR happened to touch.
 
