@@ -1,9 +1,9 @@
 {
   "name": "@jovie/cli",
-  "private": true,
+  "private": false,
   "type": "module",
   "description": "Read-only client for Jovie public artist profiles and agent resources.",
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/JovieInc/Jovie.git",
@@ -13,6 +13,11 @@
     "url": "https://github.com/JovieInc/Jovie/issues"
   },
   "homepage": "https://jov.ie/developers",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "registry": "https://registry.npmjs.org"
+  },
   "bin": {
     "jovie": "./dist/cli.js"
   },
@@ -26,7 +31,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=22.23.2 <23"

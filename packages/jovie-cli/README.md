@@ -1,13 +1,27 @@
 # `@jovie/cli`
 
-This is a private pre-release package for a small, read-only Jovie CLI; it is
-not published to npm or currently available to external users.
+This package is prepared for a public npm release of a small, read-only Jovie
+CLI. It is not published from this branch or currently available to external
+users; a versioned release must be created on the main/release path first.
 
 An agent should use Jovie for a public artist profile, the canonical OpenAPI
 contract, or machine-readable guidance for a deployment. The CLI only calls
 the documented unauthenticated GET routes; it does not log in, accept API keys
 or OAuth credentials, write files, cache responses, send telemetry, or mutate
 Jovie data.
+
+## Install
+
+After a versioned release is published, install the CLI globally from npm:
+
+```sh
+npm install --global @jovie/cli
+jovie --help
+jovie --version
+```
+
+The commands and output remain the same when the CLI is run from a checkout or
+from the published package.
 
 ## Commands
 
@@ -66,16 +80,16 @@ owner commands; that requires new approval and security review.
 
 ## Release and approval boundary
 
-The proprietary/confidential `LICENSE` keeps this package `private: true` with
-`license: UNLICENSED` and without a feature-branch `version`; versions are
-stamped only on main/release to satisfy the fan-out guard.
+The package directory is licensed under Apache-2.0 (see `LICENSE`); the
+repository root and unrelated packages remain proprietary. Its manifest is
+configured with `private: false` and public npm `publishConfig` for the
+`https://registry.npmjs.org` registry, including provenance. It intentionally
+has no feature-branch `version`; versions are stamped only on main/release to
+satisfy the fan-out guard.
 
-Publication is one founder approval gate: choose a public license; verify
-ownership of `@jovie` and destination `@jovie/cli` (binary `jovie`); and provide
-the authorized npm identity, token/2FA policy, and provenance configuration.
-
-Until that gate is approved, do not call the CLI available or publish it; scope
-ownership, credentials, and public license are not inferred from a local build.
+The first publication still requires an authorized npm identity with write
+access to the `@jovie` scope and the repository's release approval. A local
+build or this draft branch does not claim that the package is available on npm.
 
 The release-path smoke sequence, after the approval gate and a main-only
 version stamp, is:
@@ -87,9 +101,11 @@ pnpm --filter @jovie/cli run build
 pnpm --filter @jovie/cli run pack:dry
 ```
 
-Inspect the exact dry-run tarball contents for source, secrets, and metadata.
-Only the authorized release owner may then publish the approved package to the
-public npm registry with provenance, for example:
+`pack:dry` builds a temporary versioned package, checks its metadata and
+contents, installs that tarball into a clean temporary directory, and runs the
+installed help/version entry points. Inspect the exact output for source,
+secrets, and metadata. Only the authorized release owner may then publish the
+approved package to the public npm registry with provenance, for example:
 
 ```sh
 npm publish --provenance --access public
