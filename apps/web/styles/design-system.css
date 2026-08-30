@@ -1040,13 +1040,13 @@ html[data-profile-initial-mode]
   --color-row-selected: oklch(94.8% 0.006 282);
 
   /* Cross-cutting interaction state tokens (state-matrix.md) */
-  --color-link-default: var(--linear-accent-blue);
+  --color-link-default: var(--color-accent-blue);
   --color-link-hover: color-mix(
     in oklab,
-    var(--linear-accent-blue) 82%,
+    var(--color-accent-blue) 82%,
     var(--linear-text-primary)
   );
-  --color-link-visited: var(--linear-accent-purple);
+  --color-link-visited: var(--color-accent-purple);
   --state-disabled-opacity: 0.5;
   --state-partial-opacity: 0.62;
   --state-offline-bg: var(--color-warning-subtle);
