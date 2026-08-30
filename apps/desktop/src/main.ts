@@ -28,6 +28,10 @@ import {
   parseAuthReturnDeepLink,
   reportDesktopAuthBindingFailure,
 } from './desktop-auth-security';
+import {
+  buildDesktopUpdateMenuItem,
+  shouldScheduleDesktopAutoUpdate,
+} from './desktop-auto-update';
 import { installDesktopCspWatchdog } from './desktop-csp-watchdog';
 import {
   isDesktopCaptureRouteUrl,
@@ -2082,8 +2086,15 @@ function refreshApplicationMenu(): void {
   Menu.setApplicationMenu(buildApplicationMenu());
 }
 
+function desktopUpdatesSupported(): boolean {
+  return shouldScheduleDesktopAutoUpdate({
+    appEnv: APP_ENV,
+    platform: process.platform,
+  });
+}
+
 function checkForUpdatesFromMenu(): void {
-  if (!shouldScheduleDesktopAutoUpdate()) {
+  if (!desktopUpdatesSupported()) {
     return;
   }
 
@@ -2097,19 +2108,8 @@ function checkForUpdatesFromMenu(): void {
   });
 }
 
-function shouldScheduleDesktopAutoUpdate(): boolean {
-  // Local dev shells never auto-update. Production publishes to the
-  // electron-updater channel; staging ships as CI artifacts and its update
-  // check is a no-op (publish: null). See apps/desktop/SIGNING.md.
-  if (APP_ENV === 'local' || process.platform === 'linux') {
-    return false;
-  }
-
-  return true;
-}
-
 function scheduleDesktopAutoUpdate(): void {
-  if (!shouldScheduleDesktopAutoUpdate()) {
+  if (!desktopUpdatesSupported()) {
     return;
   }
 
@@ -2138,9 +2138,11 @@ function scheduleHudBuildAutoReload(): void {
 
 function buildUpdateMenuItem(): MenuItemConstructorOptions {
   return {
-    label: updateReadyToInstall
-      ? 'Restart to install update…'
-      : 'Check for updates…',
+    ...buildDesktopUpdateMenuItem({
+      appEnv: APP_ENV,
+      platform: process.platform,
+      updateReadyToInstall,
+    }),
     click: checkForUpdatesFromMenu,
   };
 }
