@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { buildVitestArgs } from './test-fast.mjs';
+
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 type PackageManifest = {
@@ -65,7 +67,22 @@ describe('public CLI publication metadata', () => {
     const manifest = readManifest();
     const testFast = manifest.scripts?.['test:fast'];
 
-    expect(testFast).toBe('vitest run');
+    expect(testFast).toBe('node scripts/test-fast.mjs');
     expect(testFast).not.toContain('--passWithNoTests');
+  });
+
+  it('adds passWithNoTests for an empty sharded run', () => {
+    expect(buildVitestArgs(['--shard=5/10'])).toEqual([
+      'run',
+      '--shard=5/10',
+      '--passWithNoTests',
+    ]);
+  });
+
+  it('does not duplicate a caller-provided passWithNoTests flag', () => {
+    const args = buildVitestArgs(['--passWithNoTests', '--shard=5/10']);
+
+    expect(args).toEqual(['run', '--passWithNoTests', '--shard=5/10']);
+    expect(args.filter(arg => arg === '--passWithNoTests')).toHaveLength(1);
   });
 });
