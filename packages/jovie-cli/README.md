@@ -120,4 +120,5 @@ been run for this pre-release package.
 * [Commander](https://www.npmjs.com/package/commander)
 * [yargs](https://www.npmjs.com/package/yargs)
 * [oclif introduction](https://oclif.io/docs/introduction/)
+* [Jovie CLI](https://jov.ie/cli)
 * [Jovie developer resources](https://jov.ie/developers)
