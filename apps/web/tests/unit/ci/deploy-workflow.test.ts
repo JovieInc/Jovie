@@ -1972,6 +1972,10 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(verified).toContain('repos/${{ github.repository }}/commits/main');
     expect(verified).toContain('verify-production-alias.sh');
     expect(verified).toContain('superseded by $current_sha');
+    expect(verified).toContain(
+      'node .github/scripts/assert-live-production-bind.mjs'
+    );
+    expect(verified).not.toContain('neutral with no notification');
     expect(verified).toContain("steps.current.outputs.is_current == 'true'");
     expect(verified).toContain(
       "always() && steps.current.outputs.is_current == 'true'"
@@ -4154,7 +4158,10 @@ describe('production promotion exact-artifact contract', () => {
     expect(verified).not.toContain('concurrency:');
     expect(reusable).not.toContain('concurrency:');
     expect(verified).toContain('canonical_verified=true');
-    expect(verified).toContain('neutral with no notification');
+    expect(verified).toContain(
+      'node .github/scripts/assert-live-production-bind.mjs'
+    );
+    expect(verified).not.toContain('neutral with no notification');
     expect(verified).toContain('Finalize exact current release generation');
     expect(verified).toContain('Notify exact verified production generation');
     expect(verified.match(/commits\/main/g)).toHaveLength(3);
@@ -4585,6 +4592,9 @@ describe('production promotion exact-artifact contract', () => {
     );
     expect(healthEvaluation).toContain(
       'recovery_reason=policy_generation_superseded'
+    );
+    expect(healthEvaluation).toContain(
+      'node .github/scripts/assert-live-production-bind.mjs --main-sha "$current_sha"'
     );
     expect(
       healthEvaluation.indexOf('checked_out_sha="$(git rev-parse')

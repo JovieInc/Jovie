@@ -1,0 +1,10 @@
+{
+  "id": "skip-success-unbound",
+  "source": "JOV-5458 2026-08-30 measured skip-promote false-green: PC 33317814247 skip-promoted while live jov.ie stayed on dbcf787",
+  "originMainSha": "4c44a9489de7cbfbea3506ac1ddcca753f80500c",
+  "mainSha": "4c44a9489de7cbfbea3506ac1ddcca753f80500c",
+  "live": {
+    "commitSha": "dbcf7874da481aea6707d38fb9de32b5fa58de44",
+    "buildId": "5ZLRJYa0EqfpfocAliS3j"
+  }
+}
