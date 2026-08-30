@@ -8,7 +8,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -950,7 +950,7 @@ function collectViaSubprocess(options, inventory, priorIssues, redReceipts) {
     const result = spawnSync(
       process.execPath,
       [
-        resolve(__dirname, 'component-live-storybook-certification.mjs'),
+        resolve(__dirname, 'component-live-storybook-browser.mjs'),
         '--collect',
         `--head=${headSha}`,
         `--receipt=${receiptFile}`,
@@ -1005,23 +1005,7 @@ const isMain =
   typeof process.argv[1] === 'string' &&
   resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
-if (isMain && process.argv.includes('--collect')) {
-  const head = process.argv
-    .find(arg => arg.startsWith('--head='))
-    ?.slice('--head='.length);
-  const receiptArg = process.argv
-    .find(arg => arg.startsWith('--receipt='))
-    ?.slice('--receipt='.length);
-  const { collectAndCertify } = await import(
-    './component-live-storybook-browser.mjs'
-  );
-  const result = await collectAndCertify({ headSha: head });
-  if (receiptArg) writeFileSync(receiptArg, JSON.stringify(result));
-  if (!result.ok) {
-    for (const issue of result.receipt.issues) console.error(issue);
-  }
-  process.exit(result.ok ? 0 : 1);
-} else if (isMain) {
+if (isMain) {
   const result = runLiveStorybookCertification();
   if (!result.ok) {
     for (const issue of result.receipt.issues) console.error(issue);

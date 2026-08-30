@@ -2,10 +2,11 @@
  * Bounded Playwright collector for live Storybook certification (JOV-5454).
  */
 
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { extname, join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   CANONICAL_LIVE_STORIES,
   LIVE_VIEWPORTS,
@@ -555,4 +556,23 @@ export async function collectAndCertify(options = {}) {
     observations: merged,
     repoRoot: options.repoRoot,
   });
+}
+
+const isMain =
+  typeof process.argv[1] === 'string' &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  const head = process.argv
+    .find(arg => arg.startsWith('--head='))
+    ?.slice('--head='.length);
+  const receiptArg = process.argv
+    .find(arg => arg.startsWith('--receipt='))
+    ?.slice('--receipt='.length);
+  const result = await collectAndCertify({ headSha: head });
+  if (receiptArg) writeFileSync(receiptArg, JSON.stringify(result));
+  if (!result.ok) {
+    for (const issue of result.receipt.issues) console.error(issue);
+  }
+  process.exit(result.ok ? 0 : 1);
 }
