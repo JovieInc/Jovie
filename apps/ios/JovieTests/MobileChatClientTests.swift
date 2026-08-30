@@ -7,8 +7,138 @@ import Testing
 actor NativeSessionTokenStoreTestLock {
   static let shared = NativeSessionTokenStoreTestLock()
 
+  private var isHeld = false
+  private var waiters: [CheckedContinuation<Void, Never>] = []
+
   func withExclusive<T: Sendable>(_ body: @Sendable () async throws -> T) async rethrows -> T {
-    try await body()
+    await acquire()
+    defer { release() }
+    return try await body()
+  }
+
+  private func acquire() async {
+    guard isHeld else {
+      isHeld = true
+      return
+    }
+
+    await withCheckedContinuation { continuation in
+      waiters.append(continuation)
+    }
+  }
+
+  private func release() {
+    if waiters.isEmpty {
+      isHeld = false
+      return
+    }
+
+    waiters.removeFirst().resume()
+  }
+}
+
+private actor NativeSessionTokenStoreTestObservation {
+  struct Record: Equatable, Sendable {
+    let savedToken: String
+    let loadedToken: String?
+  }
+
+  private var activeSections = 0
+  private var maxActiveSections = 0
+  private var records: [Record] = []
+
+  func beginSection() {
+    activeSections += 1
+    maxActiveSections = max(maxActiveSections, activeSections)
+  }
+
+  func endSection(savedToken: String, loadedToken: String?) {
+    records.append(Record(savedToken: savedToken, loadedToken: loadedToken))
+    activeSections -= 1
+  }
+
+  func result() -> (maxActiveSections: Int, records: [Record]) {
+    (maxActiveSections, records)
+  }
+}
+
+private actor NativeSessionTokenStoreTestGate {
+  private var isOpen = false
+  private var waiters: [CheckedContinuation<Void, Never>] = []
+
+  func wait() async {
+    guard !isOpen else { return }
+    await withCheckedContinuation { continuation in
+      waiters.append(continuation)
+    }
+  }
+
+  func open() {
+    guard !isOpen else { return }
+    isOpen = true
+    waiters.forEach { $0.resume() }
+    waiters.removeAll()
+  }
+}
+
+@Suite(.serialized)
+struct NativeSessionTokenStoreTestLockTests {
+  @Test func serializesConcurrentAsyncCriticalSectionsWithoutStoreClobbering() async {
+    let observation = NativeSessionTokenStoreTestObservation()
+    let tokens = ["first-critical-section", "second-critical-section"]
+    let firstEntered = NativeSessionTokenStoreTestGate()
+    let releaseFirst = NativeSessionTokenStoreTestGate()
+
+    defer { NativeSessionTokenStore.clear() }
+
+    await withTaskGroup(of: Void.self) { group in
+      group.addTask {
+        await NativeSessionTokenStoreTestLock.shared.withExclusive {
+          await observation.beginSection()
+          NativeSessionTokenStore.save(
+            token: tokens[0],
+            userID: tokens[0],
+            expiresAt: Date().addingTimeInterval(60 * 60)
+          )
+          await firstEntered.open()
+          await releaseFirst.wait()
+          let loadedToken = NativeSessionTokenStore.load()?.token
+          await observation.endSection(savedToken: tokens[0], loadedToken: loadedToken)
+        }
+      }
+
+      await firstEntered.wait()
+      group.addTask {
+        await NativeSessionTokenStoreTestLock.shared.withExclusive {
+          await observation.beginSection()
+          NativeSessionTokenStore.save(
+            token: tokens[1],
+            userID: tokens[1],
+            expiresAt: Date().addingTimeInterval(60 * 60)
+          )
+          let loadedToken = NativeSessionTokenStore.load()?.token
+          await observation.endSection(savedToken: tokens[1], loadedToken: loadedToken)
+        }
+      }
+
+      // Give a broken pass-through actor enough time to enter the second
+      // section while the first one is deliberately suspended.
+      try? await Task.sleep(for: .milliseconds(50))
+      let beforeRelease = await observation.result()
+      #expect(beforeRelease.maxActiveSections == 1)
+      #expect(beforeRelease.records.isEmpty)
+      await releaseFirst.open()
+    }
+
+    let result = await observation.result()
+    #expect(result.maxActiveSections == 1)
+    #expect(result.records.count == tokens.count)
+    #expect(result.records.map(\.savedToken).sorted() == tokens.sorted())
+    #expect(result.records.map(\.loadedToken).compactMap { $0 }.sorted() == tokens.sorted())
+
+    await NativeSessionTokenStoreTestLock.shared.withExclusive {
+      NativeSessionTokenStore.clear()
+    }
   }
 }
 
