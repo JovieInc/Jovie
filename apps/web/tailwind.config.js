@@ -200,9 +200,9 @@ module.exports = {
       // Background colors for semantic states
       backgroundColor: {
         'app-control':
-          'color-mix(in oklab, var(--linear-app-content-surface) 97%, var(--linear-bg-surface-0))',
+          'color-mix(in oklab, var(--linear-app-content-surface) 97%, var(--color-bg-surface-0))',
         'toolbar-pill':
-          'color-mix(in oklab, var(--linear-app-content-surface) 98%, var(--linear-bg-surface-0))',
+          'color-mix(in oklab, var(--linear-app-content-surface) 98%, var(--color-bg-surface-0))',
         'success-subtle': 'var(--color-success-subtle)',
         'error-subtle': 'var(--color-error-subtle)',
         'warning-subtle': 'var(--color-warning-subtle)',
@@ -250,7 +250,7 @@ module.exports = {
 
       // Ring colors (for focus rings)
       ringColor: {
-        ring: 'var(--linear-border-focus)',
+        ring: 'var(--color-border-focus)',
         accent: 'var(--color-accent)',
         focus: 'var(--color-border-focus)',
         success: 'var(--color-success)',

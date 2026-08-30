@@ -48,15 +48,15 @@ export function FloatingClaimBar() {
         className='pointer-events-none absolute inset-x-0 bottom-0 h-32'
         style={{
           background:
-            'linear-gradient(to top, var(--linear-bg-page) 30%, transparent)',
+            'linear-gradient(to top, var(--color-bg-page) 30%, transparent)',
         }}
       />
 
       <div
         className='relative w-full max-w-140 overflow-hidden rounded-2xl p-2 backdrop-blur-2xl supports-[backdrop-filter]:bg-surface-0/85'
         style={{
-          backgroundColor: 'var(--linear-bg-surface-0)',
-          border: '1px solid var(--linear-border-default)',
+          backgroundColor: 'var(--color-bg-surface-0)',
+          border: '1px solid var(--color-border-default)',
           boxShadow: 'var(--linear-shadow-card-elevated)',
         }}
       >
@@ -64,7 +64,7 @@ export function FloatingClaimBar() {
         <div
           aria-hidden='true'
           className='pointer-events-none absolute inset-0 rounded-2xl'
-          style={{ border: '1px solid var(--linear-border-subtle)' }}
+          style={{ border: '1px solid var(--color-border-subtle)' }}
         />
         <ClaimHandleForm />
       </div>

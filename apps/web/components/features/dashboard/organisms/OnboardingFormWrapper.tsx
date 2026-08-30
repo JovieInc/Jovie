@@ -45,9 +45,9 @@ function OnboardingFormLoadingShell() {
             <div className='mt-2 h-5 w-72 skeleton rounded-md' />
           </div>
 
-          <div className='rounded-xl border border-subtle bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] p-4 sm:p-5'>
+          <div className='rounded-xl border border-subtle bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--color-bg-surface-0))] p-4 sm:p-5'>
             <div className='w-full space-y-3'>
-              <div className='flex w-full items-center gap-3 rounded-full border border-subtle bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,var(--linear-bg-surface-0))] px-4 py-3'>
+              <div className='flex w-full items-center gap-3 rounded-full border border-subtle bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,var(--color-bg-surface-0))] px-4 py-3'>
                 <div className='h-4 w-3 skeleton rounded' />
                 <div className='h-5 flex-1 skeleton rounded-md' />
               </div>

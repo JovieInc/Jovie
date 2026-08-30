@@ -20,9 +20,9 @@ export const AUTH_STORAGE_KEYS = {
 export const FORM_LAYOUT = {
   /** Title styling - consistent across all auth/onboarding/waitlist screens */
   title:
-    'text-[22px] font-[510] text-(--linear-text-primary) text-center tracking-[-0.019em] leading-[1.2] [font-feature-settings:"cv01","ss03","rlig"_1,"calt"_1]',
+    'text-[22px] font-[510] text-(--color-text-primary-token) text-center tracking-[-0.019em] leading-[1.2] [font-feature-settings:"cv01","ss03","rlig"_1,"calt"_1]',
   /** Hint/prompt text below titles */
-  hint: 'text-[15px] font-[400] text-(--linear-text-secondary) text-center tracking-[-0.011em] leading-[1.5] mt-2',
+  hint: 'text-[15px] font-[400] text-(--color-text-secondary-token) text-center tracking-[-0.011em] leading-[1.5] mt-2',
   /** Container for title + optional hint with consistent spacing */
   headerSection: 'flex flex-col items-center justify-center mb-8',
   /** Main form container with spacing between header and form elements */
@@ -31,7 +31,7 @@ export const FORM_LAYOUT = {
   formInner: 'space-y-3 w-full',
   /** Footer hint text below the main CTA button - prevents layout shift */
   footerHint:
-    'min-h-[40px] w-full max-w-full flex flex-wrap items-center justify-center gap-1 text-[13px] font-[450] text-(--linear-text-tertiary) text-center px-2 mt-6',
+    'min-h-[40px] w-full max-w-full flex flex-wrap items-center justify-center gap-1 text-[13px] font-[450] text-(--color-text-tertiary-token) text-center px-2 mt-6',
   /** Reserved space for error messages to prevent layout shift */
   errorContainer: 'min-h-[24px] flex items-center justify-center mb-4',
 } as const;
@@ -41,9 +41,9 @@ export const FORM_LAYOUT = {
  * Keeps public flows aligned with the app-shell card and pill system.
  */
 export const AUTH_SURFACE = {
-  card: 'rounded-xl border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] shadow-none',
+  card: 'rounded-xl border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--color-bg-surface-0))] shadow-none',
   fieldShell:
-    'flex w-full items-center gap-3 rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,var(--linear-bg-surface-0))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-[background-color,border-color,box-shadow] duration-subtle hover:border-default hover:bg-surface-0 focus-within:border-(--linear-border-focus) focus-within:bg-surface-0 focus-within:ring-2 focus-within:ring-(--linear-border-focus)/16',
+    'flex w-full items-center gap-3 rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,var(--color-bg-surface-0))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-[background-color,border-color,box-shadow] duration-subtle hover:border-default hover:bg-surface-0 focus-within:border-(--linear-border-focus) focus-within:bg-surface-0 focus-within:ring-2 focus-within:ring-(--linear-border-focus)/16',
   fieldShellError: 'border-destructive/60',
   fieldInput:
     'min-w-0 flex-1 bg-transparent text-[14px] leading-5 text-primary-token placeholder:text-tertiary-token focus-visible:outline-none',

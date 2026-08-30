@@ -67,7 +67,7 @@ export default async function LibraryShareDropPage({ params }: DropPageProps) {
     <PublicPageShell
       headerVariant='landing'
       logoSize='xs'
-      mainClassName='bg-(--linear-bg-page)'
+      mainClassName='bg-(--color-bg-page)'
     >
       <LibraryShareDropSurface view={view} initialUnlocked={initialUnlocked} />
     </PublicPageShell>

@@ -488,7 +488,7 @@ const TaskMetaTrigger = forwardRef<
       type='button'
       aria-label={ariaLabel}
       className={cn(
-        '-mx-1 inline-flex min-w-0 items-center rounded-full px-1.5 py-1 text-secondary-token transition-[background-color,color] duration-subtle hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,transparent)] hover:text-primary-token data-[state=open]:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,transparent)] data-[state=open]:text-primary-token',
+        '-mx-1 inline-flex min-w-0 items-center rounded-full px-1.5 py-1 text-secondary-token transition-[background-color,color] duration-subtle hover:bg-[color-mix(in_oklab,var(--color-bg-surface-1)_70%,transparent)] hover:text-primary-token data-[state=open]:bg-[color-mix(in_oklab,var(--color-bg-surface-1)_82%,transparent)] data-[state=open]:text-primary-token',
         className
       )}
       {...props}
@@ -944,7 +944,7 @@ function TaskTitleEditor({
         aria-label='Task Title'
         onChange={event => onChange(event.target.value)}
         placeholder='Untitled Task' // ui-casing-allow: default task title placeholder
-        className='w-full resize-none rounded-md border-0 bg-transparent px-0 py-0 text-[1.75rem] font-semibold leading-[1.15] tracking-normal text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_80%,transparent)] transition-colors duration-fast focus:outline-none! focus-visible:ring-0! focus:shadow-none! focus-visible:bg-[color-mix(in_oklab,var(--linear-border-focus)_16%,transparent)]'
+        className='w-full resize-none rounded-md border-0 bg-transparent px-0 py-0 text-[1.75rem] font-semibold leading-[1.15] tracking-normal text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_80%,transparent)] transition-colors duration-fast focus:outline-none! focus-visible:ring-0! focus:shadow-none! focus-visible:bg-[color-mix(in_oklab,var(--color-border-focus)_16%,transparent)]'
         style={{
           height: measuredHeight,
           overflowY: isAtMaxHeight ? 'auto' : 'hidden',

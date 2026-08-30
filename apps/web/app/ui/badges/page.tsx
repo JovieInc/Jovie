@@ -110,14 +110,14 @@ export default function BadgesPage() {
         <div
           className='w-full max-w-lg rounded-lg border px-4 py-3'
           style={{
-            borderColor: 'var(--linear-border-subtle)',
-            backgroundColor: 'var(--linear-bg-surface-0)',
+            borderColor: 'var(--color-border-subtle)',
+            backgroundColor: 'var(--color-bg-surface-0)',
           }}
         >
           <div className='flex items-center justify-between'>
             <span
               className='text-app'
-              style={{ color: 'var(--linear-text-primary)' }}
+              style={{ color: 'var(--color-text-primary-token)' }}
             >
               Midnight Rain — Single
             </span>
@@ -141,7 +141,7 @@ export default function BadgesPage() {
             </Badge>
             <span
               className='text-2xs'
-              style={{ color: 'var(--linear-text-tertiary)' }}
+              style={{ color: 'var(--color-text-tertiary-token)' }}
             >
               2 days ago
             </span>

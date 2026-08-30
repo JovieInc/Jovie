@@ -87,7 +87,7 @@ export function getSidebarNavRowClassName({
   const nonCollapsedSize = tight ? 'h-6 px-2.5' : 'h-7 px-2.5';
 
   return cn(
-    'relative grid items-center rounded-full transition-[background-color,box-shadow,color] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
+    'relative grid items-center rounded-full transition-[background-color,box-shadow,color] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-page)',
     tone === 'primary' || tone === 'secondary' ? undefined : 'w-full',
     'font-normal',
     tight ? 'gap-x-2 text-xs' : 'gap-x-2.5 text-xs',

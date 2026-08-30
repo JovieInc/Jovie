@@ -211,7 +211,7 @@ function AuthShellWrapperInner({
           data-testid='releases-shell-ready'
           role='status'
         >
-          <div className='w-full max-w-3xl rounded-2xl border border-(--app-shell-frame-seam) bg-[color-mix(in_oklab,var(--app-shell-content-surface)_96%,var(--linear-bg-surface-0))] px-4 py-4 shadow-[0_16px_40px_rgba(0,0,0,0.16)] sm:px-5'>
+          <div className='w-full max-w-3xl rounded-2xl border border-(--app-shell-frame-seam) bg-[color-mix(in_oklab,var(--app-shell-content-surface)_96%,var(--color-bg-surface-0))] px-4 py-4 shadow-[0_16px_40px_rgba(0,0,0,0.16)] sm:px-5'>
             <div className='flex items-center justify-between gap-4'>
               <div>
                 <p className='text-sm font-semibold tracking-tighter text-primary-token'>

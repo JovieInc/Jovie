@@ -243,7 +243,7 @@ test.describe('Dropdown Parity — Linear.app match', () => {
         const pageBgToken =
           globalThis
             .getComputedStyle(globalThis.document.documentElement)
-            .getPropertyValue('--linear-bg-page')
+            .getPropertyValue('--color-bg-page')
             .trim() || 'rgb(9,9,9)';
 
         const menuRgb = resolveColor(menuBg);

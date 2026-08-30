@@ -34,8 +34,8 @@
 }
 
 :where(.system-b-root-not-found-page) {
-  --linear-bg-header: var(--system-b-cinematic-black);
-  --linear-border-default: var(--color-border-subtle);
+  --color-bg-header: var(--system-b-cinematic-black);
+  --color-border-default: var(--color-border-subtle);
   --system-b-primary-bg: var(--color-text-tooltip);
   --system-b-primary-fg: var(--system-b-cinematic-black);
   --system-b-text-primary: var(--color-text-tooltip);

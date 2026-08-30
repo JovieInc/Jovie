@@ -113,14 +113,14 @@ export function Footer({
       // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label needed for footer accessibility
       <footer
         className={className}
-        style={{ backgroundColor: 'var(--linear-bg-footer)' }}
+        style={{ backgroundColor: 'var(--color-bg-footer)' }}
         aria-label='Site Footer'
       >
         <div
           aria-hidden='true'
           className='h-px'
           style={{
-            background: `linear-gradient(to right, var(--linear-border-footer), var(--linear-border-footer) 40%, transparent)`,
+            background: `linear-gradient(to right, var(--color-border-footer), var(--color-border-footer) 40%, transparent)`,
           }}
         />
         <div
@@ -180,16 +180,16 @@ export function Footer({
                 <Link
                   href={APP_ROUTES.LEGAL_PRIVACY}
                   prefetch={false}
-                  className='text-app tracking-tight transition-colors duration-subtle hover:[color:var(--linear-text-primary)]'
-                  style={{ color: 'var(--linear-text-tertiary)' }}
+                  className='text-app tracking-tight transition-colors duration-subtle hover:[color:var(--color-text-primary-token)]'
+                  style={{ color: 'var(--color-text-tertiary-token)' }}
                 >
                   Privacy
                 </Link>
                 <Link
                   href={APP_ROUTES.LEGAL_TERMS}
                   prefetch={false}
-                  className='text-app tracking-tight transition-colors duration-subtle hover:[color:var(--linear-text-primary)]'
-                  style={{ color: 'var(--linear-text-tertiary)' }}
+                  className='text-app tracking-tight transition-colors duration-subtle hover:[color:var(--color-text-primary-token)]'
+                  style={{ color: 'var(--color-text-tertiary-token)' }}
                 >
                   Terms
                 </Link>
@@ -198,7 +198,7 @@ export function Footer({
                 variant='light'
                 className='text-2xs leading-4 font-normal tracking-tight opacity-100'
                 style={{
-                  color: 'var(--linear-text-tertiary)',
+                  color: 'var(--color-text-tertiary-token)',
                 }}
               />
             </div>
@@ -212,14 +212,14 @@ export function Footer({
   return (
     <footer
       className={className}
-      style={{ backgroundColor: 'var(--linear-bg-footer)' }}
+      style={{ backgroundColor: 'var(--color-bg-footer)' }}
     >
       {/* Gradient separator — matches logo bar treatment */}
       <div
         aria-hidden='true'
         className='h-px'
         style={{
-          background: `linear-gradient(to right, var(--linear-border-footer), var(--linear-border-footer) 40%, transparent)`,
+          background: `linear-gradient(to right, var(--color-border-footer), var(--color-border-footer) 40%, transparent)`,
         }}
       />
       <div
@@ -243,8 +243,8 @@ export function Footer({
                       key={link.href}
                       href={link.href}
                       prefetch={false}
-                      className='text-app leading-[19.5px] font-normal tracking-tight transition-colors duration-subtle hover:[color:var(--linear-text-secondary)]'
-                      style={{ color: 'var(--linear-text-tertiary)' }}
+                      className='text-app leading-[19.5px] font-normal tracking-tight transition-colors duration-subtle hover:[color:var(--color-text-secondary-token)]'
+                      style={{ color: 'var(--color-text-tertiary-token)' }}
                     >
                       {link.label}
                     </Link>
@@ -256,7 +256,7 @@ export function Footer({
               variant={config.colorVariant}
               className='text-2xs leading-4 font-normal tracking-tight opacity-100'
               style={{
-                color: 'var(--linear-text-tertiary)',
+                color: 'var(--color-text-tertiary-token)',
               }}
             />
           </>

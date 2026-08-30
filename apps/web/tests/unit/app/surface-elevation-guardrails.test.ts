@@ -57,13 +57,13 @@ describe('surface elevation guardrails', () => {
     );
 
     expect(designSystem).toMatch(
-      /:root\.dark[\s\S]*--color-bg-surface-1:\s*var\(--linear-bg-surface-1\);/
+      /:root\.dark[\s\S]*--color-bg-surface-1:\s*var\(--noir-ion-card\);/
     );
     expect(designSystem).toMatch(
       /:root\.dark[\s\S]*--sidebar-background:\s*var\(--linear-app-sidebar-background-rgb\);/
     );
     expect(linearTokens).toMatch(
-      /:root\.dark[\s\S]*--linear-bg-page:\s*#06080d;/
+      /:root\.dark[\s\S]*--color-bg-page:\s*#06080d;/
     );
     expect(linearTokens).toMatch(
       /:root\.dark[\s\S]*--linear-app-sidebar-background-rgb:\s*6 8 13;/
@@ -75,18 +75,14 @@ describe('surface elevation guardrails', () => {
       readFileSync(join(ROOT, 'styles/design-system.css'), 'utf-8'),
       readFileSync(join(ROOT, 'styles/system-b-app.css'), 'utf-8'),
     ].join('\n');
-    const linearTokens = readFileSync(
-      join(ROOT, 'styles/linear-tokens.css'),
-      'utf-8'
-    );
 
-    // Noir Ion focus ring (electric blue) — not a white halo
-    expect(linearTokens).toContain(
-      '--linear-border-focus: rgba(17, 175, 255, 0.72);'
-    );
+    // Noir Ion focus ring (electric blue) — not a white halo.
+    // Border tokens retired to canonical --color-border-* (JOV-5458); the
+    // focus ring now resolves through --color-border-focus in design-system.css.
+    expect(designSystem).toContain('--color-border-focus: var(--noir-ion-ion);');
     expect(designSystem).toContain('--focus-ring-width: 1px;');
     expect(designSystem).toMatch(
-      /:where\(:focus-visible\)\s*{[\s\S]*box-shadow:[\s\S]*0 0 0 2px var\(--linear-bg-page\)[\s\S]*0 0 0 4px color-mix\(in oklab, var\(--linear-border-focus\) 55%/
+      /:where\(:focus-visible\)\s*{[\s\S]*box-shadow:[\s\S]*0 0 0 2px var\(--color-bg-page\)[\s\S]*0 0 0 4px color-mix\(in oklab, var\(--color-border-focus\) 55%/
     );
     expect(designSystem).toMatch(
       /:where\([\s\S]*input,[\s\S]*textarea,[\s\S]*\[role="textbox"\][\s\S]*\):focus\s*{[\s\S]*outline:\s*none;/

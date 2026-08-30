@@ -5,8 +5,8 @@ export function InsightSection() {
     <section
       className='section-spacing-linear'
       style={{
-        backgroundColor: 'var(--linear-bg-page)',
-        borderTop: '1px solid var(--linear-border-subtle)',
+        backgroundColor: 'var(--color-bg-page)',
+        borderTop: '1px solid var(--color-border-subtle)',
       }}
     >
       <Container size='homepage'>
@@ -17,7 +17,7 @@ export function InsightSection() {
               fontWeight: 'var(--linear-font-weight-medium)',
               lineHeight: 'var(--linear-h2-leading)',
               letterSpacing: 'var(--linear-h2-tracking)',
-              color: 'var(--linear-text-primary)',
+              color: 'var(--color-text-primary-token)',
               marginBottom: 'var(--linear-space-8)',
             }}
           >
@@ -30,7 +30,7 @@ export function InsightSection() {
             style={{
               fontSize: 'var(--linear-body-lg-size)',
               lineHeight: 'var(--linear-body-lg-leading)',
-              color: 'var(--linear-text-tertiary)',
+              color: 'var(--color-text-tertiary-token)',
             }}
           >
             Jovie shows each fan the single best next step—subscribe, stream, or

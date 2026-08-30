@@ -140,7 +140,7 @@ export function CinematicAppBoot({
       style={{
         position: 'absolute',
         inset: 0,
-        background: 'var(--linear-bg-page, #08090a)',
+        background: 'var(--color-bg-page, #08090a)',
         overflow: 'hidden',
       }}
     >
@@ -262,7 +262,7 @@ export function CinematicAppBoot({
             style={{
               fontSize: 40,
               fontWeight: 600,
-              color: 'var(--linear-text-primary, #f7f8f8)',
+              color: 'var(--color-text-primary-token, #f7f8f8)',
               letterSpacing: '-0.022em',
             }}
           >
@@ -276,7 +276,7 @@ export function CinematicAppBoot({
               border: '1px solid rgba(255, 255, 255, 0.07)',
               borderRadius: 9999,
               fontSize: 14,
-              color: 'var(--linear-text-quaternary, #62666d)',
+              color: 'var(--color-text-quaternary-token, #62666d)',
               backdropFilter: 'blur(8px)',
               display: 'flex',
               alignItems: 'center',
@@ -338,7 +338,7 @@ function CinematicSidebarStub() {
         inset: 0,
         background: 'var(--linear-app-sidebar-background, #0c0d0f)',
         borderRight:
-          '1px solid var(--linear-border-subtle, rgba(255,255,255,0.055))',
+          '1px solid var(--color-border-subtle, rgba(255,255,255,0.055))',
         display: 'flex',
         flexDirection: 'column',
         gap: 6,

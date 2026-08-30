@@ -405,8 +405,8 @@ export function PhoneShowcase({
               }}
               className={`relative z-10 rounded-full px-3 py-1 text-2xs font-mono tracking-tighter transition-colors duration-cinematic ${
                 i === activeIndex
-                  ? 'text-(--linear-text-primary)'
-                  : 'text-(--linear-text-quaternary) hover:text-(--linear-text-secondary)'
+                  ? 'text-(--color-text-primary-token)'
+                  : 'text-(--color-text-quaternary-token) hover:text-(--color-text-secondary-token)'
               }`}
             >
               {MODE_TAB_LABELS[mode.id] ?? `/${mode.id}`}
@@ -427,8 +427,8 @@ export function MobileCard({ mode }: { readonly mode: ModeData }) {
     <div
       className='rounded-xl px-6 py-6'
       style={{
-        backgroundColor: 'var(--linear-bg-hover)',
-        border: '1px solid var(--linear-border-subtle)',
+        backgroundColor: 'var(--color-bg-hover)',
+        border: '1px solid var(--color-border-subtle)',
       }}
     >
       <div className='flex items-center justify-between gap-3'>

@@ -18,7 +18,7 @@ interface ConsentBannerProps {
 
 const secondaryButtonStyle: CSSProperties = {
   backgroundColor: 'transparent',
-  color: 'var(--linear-text-secondary)',
+  color: 'var(--color-text-secondary-token)',
   fontSize: '12px',
   fontWeight: 'var(--linear-font-weight-medium)',
   padding: '4px 10px',
@@ -92,8 +92,8 @@ export function ConsentBanner({ className }: ConsentBannerProps) {
       )}
       style={{
         backgroundColor:
-          'color-mix(in oklch, var(--linear-bg-surface-0) 95%, transparent)',
-        borderTop: '1px solid var(--linear-border-subtle)',
+          'color-mix(in oklch, var(--color-bg-surface-0) 95%, transparent)',
+        borderTop: '1px solid var(--color-border-subtle)',
         boxShadow: 'var(--linear-shadow-card)',
       }}
       aria-label='Cookie Consent'
@@ -107,7 +107,7 @@ export function ConsentBanner({ className }: ConsentBannerProps) {
           style={{
             fontSize: '12px',
             lineHeight: 1.5,
-            color: 'var(--linear-text-secondary)',
+            color: 'var(--color-text-secondary-token)',
           }}
         >
           We use cookies to understand how you use this page and improve your
@@ -115,7 +115,7 @@ export function ConsentBanner({ className }: ConsentBannerProps) {
           <a
             href={APP_ROUTES.LEGAL_PRIVACY}
             className='underline hover:opacity-80'
-            style={{ color: 'var(--linear-text-primary)' }}
+            style={{ color: 'var(--color-text-primary-token)' }}
             target='_blank'
             rel='noopener noreferrer'
           >
@@ -148,7 +148,7 @@ export function ConsentBanner({ className }: ConsentBannerProps) {
             onClick={handleReject}
             className='h-8 w-8 sm:hidden flex items-center justify-center transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
             style={{
-              color: 'var(--linear-text-secondary)',
+              color: 'var(--color-text-secondary-token)',
               borderRadius: 'var(--radius-sm)',
             }}
             aria-label='Close'

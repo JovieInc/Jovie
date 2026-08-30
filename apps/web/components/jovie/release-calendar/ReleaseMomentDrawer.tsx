@@ -49,10 +49,10 @@ export function ReleaseMomentDrawer({
         >
           <SheetHeader>
             <div className='flex items-center gap-2'>
-              <span className='rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2 py-0.5 text-3xs font-semibold uppercase tracking-wide text-(--linear-text-secondary)'>
+              <span className='rounded-full border border-(--color-border-subtle) bg-(--color-bg-surface-1) px-2 py-0.5 text-3xs font-semibold uppercase tracking-wide text-(--color-text-secondary-token)'>
                 {MOMENT_LABEL[moment.momentType]}
               </span>
-              <span className='text-xs text-(--linear-text-tertiary)'>
+              <span className='text-xs text-(--color-text-tertiary-token)'>
                 {formatFridayLong(moment.friday)}
               </span>
             </div>
@@ -60,7 +60,7 @@ export function ReleaseMomentDrawer({
           </SheetHeader>
 
           <section className='flex flex-col gap-2'>
-            <h3 className='text-xs font-semibold uppercase tracking-wide text-(--linear-text-secondary)'>
+            <h3 className='text-xs font-semibold uppercase tracking-wide text-(--color-text-secondary-token)'>
               Workflow
             </h3>
             <ul className='flex flex-col gap-1.5'>
@@ -73,16 +73,16 @@ export function ReleaseMomentDrawer({
                     key={slug}
                     data-testid={`release-moment-workflow-task-${slug}`}
                     data-relative-days={task.relativeDays}
-                    className='flex items-start justify-between gap-2 rounded-md border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-2'
+                    className='flex items-start justify-between gap-2 rounded-md border border-(--color-border-subtle) bg-(--color-bg-surface-1) px-3 py-2'
                   >
                     <div className='flex flex-col gap-0.5'>
-                      <span className='text-sm text-(--linear-text-primary)'>
-                        <span className='mr-2 font-mono text-xs text-(--linear-text-tertiary)'>
+                      <span className='text-sm text-(--color-text-primary-token)'>
+                        <span className='mr-2 font-mono text-xs text-(--color-text-tertiary-token)'>
                           {formatRelativeDays(task.relativeDays)}
                         </span>
                         · <span className='font-medium'>{task.title}</span>
                       </span>
-                      <span className='text-2xs text-(--linear-text-tertiary)'>
+                      <span className='text-2xs text-(--color-text-tertiary-token)'>
                         {task.category} · due {dueDate}
                       </span>
                     </div>
@@ -96,7 +96,7 @@ export function ReleaseMomentDrawer({
 
           <SheetClose
             data-testid='release-moment-drawer-close'
-            className='self-end rounded-md border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-1.5 text-sm text-(--linear-text-primary) hover:bg-(--linear-bg-surface-2)'
+            className='self-end rounded-md border border-(--color-border-subtle) bg-(--color-bg-surface-1) px-3 py-1.5 text-sm text-(--color-text-primary-token) hover:bg-(--color-bg-surface-2)'
           >
             Close
           </SheetClose>
@@ -111,21 +111,21 @@ function FanNotificationPreview({ moment }: { readonly moment: DemoMoment }) {
   return (
     <section
       data-testid='fan-notification-preview'
-      className='flex flex-col gap-1.5 rounded-md border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-3'
+      className='flex flex-col gap-1.5 rounded-md border border-(--color-border-subtle) bg-(--color-bg-surface-1) px-3 py-3'
     >
       <div className='flex items-center justify-between'>
-        <h3 className='text-xs font-semibold uppercase tracking-wide text-(--linear-text-secondary)'>
+        <h3 className='text-xs font-semibold uppercase tracking-wide text-(--color-text-secondary-token)'>
           Fan Notification
         </h3>
         <span className='rounded-full bg-emerald-500/15 px-2 py-0.5 text-3xs font-semibold uppercase text-emerald-300'>
           {notif.channel}
         </span>
       </div>
-      <p className='text-sm font-medium text-(--linear-text-primary)'>
+      <p className='text-sm font-medium text-(--color-text-primary-token)'>
         {notif.headline}
       </p>
-      <p className='text-xs text-(--linear-text-secondary)'>{notif.body}</p>
-      <p className='text-2xs text-(--linear-text-tertiary)'>
+      <p className='text-xs text-(--color-text-secondary-token)'>{notif.body}</p>
+      <p className='text-2xs text-(--color-text-tertiary-token)'>
         Sends Friday {notif.sendsAt}
       </p>
     </section>

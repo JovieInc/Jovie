@@ -54,9 +54,9 @@ describe('Noir Ion — approved dark anchors', () => {
   });
 
   it('maps shell canvas + sidebar to Noir Ion shell ladder', () => {
-    expect(linearDark).toContain('--linear-bg-page: #06080d;');
+    expect(linearDark).toContain('--color-bg-page: #06080d;');
     expect(linearDark).toContain('--linear-app-content-surface: #0a0d16;');
-    expect(linearDark).toContain('--linear-bg-surface-1: #0f1420;');
+    expect(linearDark).toContain('--color-bg-surface-1: #0f1420;');
     expect(linearDark).toContain(
       '--linear-app-sidebar-background-rgb: 6 8 13;'
     );
@@ -70,9 +70,8 @@ describe('Noir Ion — approved dark anchors', () => {
     expect(dsDark).toContain('--color-focus-ring: var(--noir-ion-focus-ring);');
     expect(dsDark).toContain('--color-bg-selected: var(--noir-ion-selected);');
 
-    expect(linearDark).toContain(
-      '--linear-border-focus: rgba(17, 175, 255, 0.72);'
-    );
+    // --linear-border-focus retired to canonical --color-border-focus (JOV-5458);
+    // the electric-blue anchor is locked above via --noir-ion-ion + --color-border-focus.
     expect(linearDark).toContain(
       '--linear-row-selected: rgba(17, 175, 255, 0.1);'
     );

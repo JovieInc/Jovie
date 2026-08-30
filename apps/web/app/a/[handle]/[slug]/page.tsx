@@ -100,7 +100,7 @@ export default async function LibraryAssetPublicSharePage({
       <PublicPageShell
         headerVariant='landing'
         logoSize='xs'
-        mainClassName='bg-(--linear-bg-page)'
+        mainClassName='bg-(--color-bg-page)'
       >
         <LibraryAssetShareSurface view={view} />
       </PublicPageShell>

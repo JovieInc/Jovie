@@ -109,7 +109,7 @@ export function SidebarLinkRow({
         disabled={!hasUrl}
         className={cn(
           SWIPE_ACTION_BUTTON_CLASS,
-          'h-auto w-auto rounded-none bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,#3182ce)]'
+          'h-auto w-auto rounded-none bg-[color-mix(in_oklab,var(--color-bg-surface-1)_70%,#3182ce)]'
         )}
         aria-label={copied ? 'Copied!' : `Copy ${label} link`}
       >
@@ -125,7 +125,7 @@ export function SidebarLinkRow({
         disabled={!hasUrl}
         className={cn(
           SWIPE_ACTION_BUTTON_CLASS,
-          'h-auto w-auto rounded-none bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] text-primary-token'
+          'h-auto w-auto rounded-none bg-[color-mix(in_oklab,var(--color-bg-surface-1)_82%,var(--color-bg-surface-0))] text-primary-token'
         )}
         aria-label={`Open ${label}`}
       >
@@ -140,7 +140,7 @@ export function SidebarLinkRow({
           disabled={isRemoving}
           className={cn(
             SWIPE_ACTION_BUTTON_CLASS,
-            'h-auto w-auto rounded-none bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,#c43d4b)] disabled:opacity-50'
+            'h-auto w-auto rounded-none bg-[color-mix(in_oklab,var(--color-bg-surface-1)_70%,#c43d4b)] disabled:opacity-50'
           )}
           aria-label={`Remove ${label}`}
         >
@@ -162,7 +162,7 @@ export function SidebarLinkRow({
           'group flex min-h-8 items-center justify-between bg-transparent',
           isTrackVariant
             ? 'rounded-lg border border-transparent px-2 py-1.5 shadow-none active:bg-surface-0 lg:hover:bg-surface-0 focus-within:bg-surface-0'
-            : 'rounded-md px-2 py-1 lg:px-2 lg:py-1 active:bg-surface-1 lg:hover:bg-surface-1 focus-within:border-(--linear-border-focus) focus-within:bg-surface-1 focus-within:shadow-inset-ring-focus',
+            : 'rounded-md px-2 py-1 lg:px-2 lg:py-1 active:bg-surface-1 lg:hover:bg-surface-1 focus-within:border-(--color-border-focus) focus-within:bg-surface-1 focus-within:shadow-inset-ring-focus',
           'transition-[background-color,box-shadow,border-color] duration-subtle',
           !isVisible && 'opacity-60',
           className
@@ -199,7 +199,7 @@ export function SidebarLinkRow({
                   'h-auto w-auto rounded-md border border-transparent p-1 text-tertiary-token',
                   'hover:border-subtle hover:bg-surface-0 hover:text-primary-token',
                   'transition-[background-color,border-color,color,box-shadow] duration-subtle focus-visible:outline-none',
-                  'focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-ring'
+                  'focus-visible:border-(--color-border-focus) focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-ring'
                 )}
                 aria-label={`Actions for ${label}`}
               >

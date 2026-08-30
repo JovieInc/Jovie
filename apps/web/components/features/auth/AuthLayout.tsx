@@ -230,7 +230,7 @@ export function AuthLayout({
       data-auth-layout-variant={layoutVariant}
       className={cn(
         // App-shell base — sidebar/page background tone (matches Linear
-        // dark `--linear-bg-page`). The bento card sits inside as the
+        // dark `--color-bg-page`). The bento card sits inside as the
         // elevated content surface with an 8px gap (matches the app
         // shell's frame-shell-gap), so this surface reads as an
         // extension of the shell, not a separate page. Hex-pinned

@@ -174,14 +174,14 @@ export function HeroCinematic({
             className='rounded-full px-3 py-1 text-2xs font-mono tracking-tighter transition-colors duration-slower'
             style={{
               backgroundColor:
-                i === 0 ? 'var(--linear-bg-surface-2)' : 'transparent',
+                i === 0 ? 'var(--color-bg-surface-2)' : 'transparent',
               color:
                 i === 0
-                  ? 'var(--linear-text-primary)'
-                  : 'var(--linear-text-quaternary)',
+                  ? 'var(--color-text-primary-token)'
+                  : 'var(--color-text-quaternary-token)',
               border:
                 i === 0
-                  ? '1px solid var(--linear-border-default)'
+                  ? '1px solid var(--color-border-default)'
                   : '1px solid transparent',
             }}
           >

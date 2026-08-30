@@ -255,12 +255,12 @@ export function ReleaseLyricsSection({
         </DrawerButton>
 
         {showFormatOptions && (
-          <div className='inline-flex items-center rounded-full border border-(--app-shell-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))]'>
+          <div className='inline-flex items-center rounded-full border border-(--app-shell-frame-seam) bg-[color-mix(in_oklab,var(--color-bg-surface-1)_82%,var(--color-bg-surface-0))]'>
             <DrawerButton
               type='button'
               disabled={isActionsDisabled || isFormatting}
               onClick={() => handleFormat(selectedFormat)}
-              className='h-7 rounded-r-none border-r border-r-(--linear-border-subtle) px-2 text-2xs'
+              className='h-7 rounded-r-none border-r border-r-(--color-border-subtle) px-2 text-2xs'
             >
               {isFormatting ? (
                 <Loader2 className='h-3.5 w-3.5 animate-spin' />

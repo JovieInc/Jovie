@@ -545,11 +545,11 @@ export function HeaderNav({
         borderColor:
           presentation === 'homepage-embedded' || isMarketingGlass
             ? 'transparent'
-            : 'var(--linear-border-default)',
+            : 'var(--color-border-default)',
         backgroundColor:
           presentation === 'homepage-embedded' || isMarketingGlass
             ? 'transparent'
-            : 'var(--linear-bg-header)',
+            : 'var(--color-bg-header)',
         zIndex: 100,
         backdropFilter:
           presentation === 'homepage-embedded' || isMarketingGlass
@@ -600,7 +600,7 @@ export function HeaderNav({
           presentation !== 'homepage-embedded' &&
           !isMarketingGlass ? (
             <div
-              className='mx-1.5 max-md:hidden h-4 w-px bg-(--linear-border-subtle)'
+              className='mx-1.5 max-md:hidden h-4 w-px bg-(--color-border-subtle)'
               aria-hidden='true'
             />
           ) : null}

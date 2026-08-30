@@ -841,6 +841,8 @@ html[data-profile-initial-mode]
   /* Nested / hover */
 
   --color-bg-page: #f5f5f5;
+  --color-bg-footer: oklch(98.5% 0.002 282);
+  --color-bg-header: oklch(98.5% 0.002 282 / 0.85);
   /* Same as base */
   --color-bg-hover: rgba(0, 0, 0, 0.04);
   /* Hover overlay */
@@ -879,6 +881,8 @@ html[data-profile-initial-mode]
   --color-border-strong: oklch(0% 0 0 / 15%);
   --color-border-focus: #7170ff;
   /* Linear accent for focus */
+  /* Footer seam — promoted from the retired linear border footer alias (JOV-5458). */
+  --color-border-footer: oklch(90% 0.005 282);
 
   /* Accent palette rotation */
   --color-accent-gray: #7f7f85;
@@ -1044,7 +1048,7 @@ html[data-profile-initial-mode]
   --color-link-hover: color-mix(
     in oklab,
     var(--linear-accent-blue) 82%,
-    var(--linear-text-primary)
+    var(--color-text-primary-token)
   );
   --color-link-visited: var(--linear-accent-purple);
   --state-disabled-opacity: 0.5;
@@ -1065,7 +1069,7 @@ html[data-profile-initial-mode]
   );
 
   /* Focus ring — Jovie/Linear keyboard focus token */
-  --color-focus-ring: var(--linear-border-focus);
+  --color-focus-ring: var(--color-border-focus);
   --focus-ring-width: 1px;
   --focus-ring-offset: 0px;
 
@@ -1127,7 +1131,7 @@ html[data-profile-initial-mode]
   /* app canvas */
   --color-bg-surface-0: var(--noir-ion-shell);
   /* recessed wells / shell-adjacent */
-  --color-bg-surface-1: var(--linear-bg-surface-1);
+  --color-bg-surface-1: var(--noir-ion-card);
   /* Shared card surface (maps to --noir-ion-card via linear tokens) */
   --color-bg-surface-2: var(--noir-ion-elevated);
   /* elevated / inputs */
@@ -1136,6 +1140,8 @@ html[data-profile-initial-mode]
 
   /* Additional dark surface levels */
   --color-bg-page: var(--noir-ion-canvas);
+  --color-bg-footer: #030407;
+  --color-bg-header: transparent;
   --color-bg-hover: rgba(168, 176, 195, 0.06);
   /* Row/item hover — graphite, not pure white */
   --color-bg-elevated: var(--noir-ion-panel);
@@ -1166,6 +1172,8 @@ html[data-profile-initial-mode]
   --color-border-strong: var(--noir-ion-border-strong);
   --color-border-focus: var(--noir-ion-ion);
   /* Ion focus */
+  /* Footer seam — promoted from the retired linear border footer alias (JOV-5458). */
+  --color-border-footer: rgba(168, 176, 195, 0.16);
 
   /* Accent palette rotation — Noir Ion semantics
      blue/Ion: primary action · purple/Ultra: agent · pink/Pulse: creative
@@ -2223,8 +2231,8 @@ html:not(.dark) .smart-link-powered-by {
 /* Keyboard focus fallback — canonical visible focus ring (WCAG SC 2.4.7).
    Design-system consistent recipe used across shell/chrome (smallwin + a11y polish):
      focus-visible:outline-none
-     focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55
-     focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)
+     focus-visible:ring-2 focus-visible:ring-(--color-border-focus)/55
+     focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-page)
    Box-shadow equivalent ensures global application to any :focus-visible without
    explicit treatment. :where() keeps specificity at 0 so component-level overrides
    (stronger CTA rings, public-action-*, Clerk, surface-specific offsets, input borders)
@@ -2235,8 +2243,8 @@ html:not(.dark) .smart-link-powered-by {
 :where(:focus-visible) {
   outline: none;
   box-shadow:
-    0 0 0 2px var(--linear-bg-page),
-    0 0 0 4px color-mix(in oklab, var(--linear-border-focus) 55%, transparent);
+    0 0 0 2px var(--color-bg-page),
+    0 0 0 4px color-mix(in oklab, var(--color-border-focus) 55%, transparent);
   transition:
     box-shadow 150ms cubic-bezier(0.32, 0.72, 0, 1),
     border-color 150ms cubic-bezier(0.32, 0.72, 0, 1);

@@ -32,9 +32,9 @@ export function DspPresenceCard({
     <ContentSurfaceCard
       className={cn(
         'cursor-pointer p-3.5 transition-[border-color,background-color,box-shadow] duration-subtle',
-        'bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_94%,transparent)] hover:border-default hover:bg-surface-0',
+        'bg-[color-mix(in_oklab,var(--color-bg-surface-0)_94%,transparent)] hover:border-default hover:bg-surface-0',
         isSelected &&
-          'border-(--linear-border-focus) bg-surface-0 ring-1 ring-ring'
+          'border-(--color-border-focus) bg-surface-0 ring-1 ring-ring'
       )}
       data-testid={`presence-card-${item.providerId}`}
     >

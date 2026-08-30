@@ -72,7 +72,7 @@ export function ColumnLabel<F extends string>({
       onClick={() => onSort(field)}
       className={cn(
         SHELL_CAPTION_CLASSNAME,
-        'group/col h-6 px-1 -mx-1 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-colors duration-subtle ease-subtle',
+        'group/col h-6 px-1 -mx-1 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-page) transition-colors duration-subtle ease-subtle',
         flex ? 'flex-1 min-w-0' : (width ?? ''),
         'shrink-0 inline-flex items-center gap-1',
         align === 'right' && 'flex-row-reverse',

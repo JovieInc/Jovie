@@ -57,7 +57,7 @@ export function HeroScrollSection() {
                   className='pointer-events-none absolute inset-x-0 bottom-0 h-16 md:h-20'
                   style={{
                     background:
-                      'linear-gradient(180deg, transparent 0%, rgba(8,9,10,0.44) 70%, var(--linear-bg-page) 100%)',
+                      'linear-gradient(180deg, transparent 0%, rgba(8,9,10,0.44) 70%, var(--color-bg-page) 100%)',
                   }}
                 />
               </div>

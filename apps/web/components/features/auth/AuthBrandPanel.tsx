@@ -15,7 +15,7 @@ export function AuthBrandPanel({ className }: Readonly<AuthBrandPanelProps>) {
     <div
       data-testid='auth-brand-panel'
       className={cn(
-        // App-shell content surface elevation (matches `--linear-bg-surface-0`
+        // App-shell content surface elevation (matches `--color-bg-surface-0`
         // = `--linear-app-content-surface` in Linear dark mode). 12px radius
         // matches the app shell frame so this reads as an extension of the
         // shell. Tooltip tokens stay dark in both root themes because auth
