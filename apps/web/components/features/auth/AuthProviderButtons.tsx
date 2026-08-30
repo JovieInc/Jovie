@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/auth/AuthProviderButtons.test.tsx
 import type { PrimaryAuthOAuthProvider } from '@/lib/auth/oauth-providers';
 import { getAuthOAuthProviderLabel } from '@/lib/auth/oauth-providers';
 import { cn } from '@/lib/utils';

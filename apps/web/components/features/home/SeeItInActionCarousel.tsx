@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/components/home/SeeItInActionCarousel.test.tsx
 'use client';
 
 import { Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';

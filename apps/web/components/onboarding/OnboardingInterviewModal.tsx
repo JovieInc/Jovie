@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/onboarding/onboarding-interview-modal-system-b-style-guard.test.ts
 'use client';
 
 import { Button, Textarea } from '@jovie/ui';

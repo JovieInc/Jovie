@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/design-system/linear-token-retire-jov-5465.test.ts
 import { Badge } from '@jovie/ui/atoms/badge';
 import { Button } from '@jovie/ui/atoms/button';
 import { Check } from 'lucide-react';

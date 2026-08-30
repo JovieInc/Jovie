@@ -18,6 +18,7 @@ describe('onboarding interview modal System B source contract', () => {
     expect(source).toContain('border-(--linear-border-subtle)');
     expect(source).toContain('bg-(--linear-bg-surface-0)');
     expect(source).toContain('shadow-card-elevated');
+    expect(source).not.toContain('shadow-(--linear-shadow-card-elevated)');
     expect(source).toContain('backdrop:bg-(--linear-bg-page)');
     expect(source).toContain('<Textarea');
 

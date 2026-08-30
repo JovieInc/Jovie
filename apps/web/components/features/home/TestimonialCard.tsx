@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/design-system/linear-token-retire-jov-5465.test.ts
 interface TestimonialCardProps {
   readonly name: string;
   readonly title: string;
