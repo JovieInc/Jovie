@@ -89,13 +89,13 @@ policy is published.
 Responses expose the owned policy page with a `Link` relation:
 
 ```text
-Link: <https://docs.jov.ie/docs/api-reference>; rel="deprecation"; type="text/html"
+Link: <https://jov.ie/api-versioning>; rel="deprecation"; type="text/html"
 ```
 
-This policy pointer is discovery only and does not deprecate `v1`. When a
-resource is genuinely retired, the service will publish a dated RFC 9745
-`Deprecation` signal and an RFC 8594 `Sunset` date together with migration
-guidance.
+This policy pointer is discovery only and does not deprecate `v1`. The
+[canonical versioning and deprecation policy](https://jov.ie/api-versioning)
+describes the active version and the future conditions for sending
+`Deprecation` or `Sunset` headers.
 
 ## End of current contract
 
