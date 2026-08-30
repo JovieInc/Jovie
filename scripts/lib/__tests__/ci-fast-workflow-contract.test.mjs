@@ -477,6 +477,14 @@ describe('ci-fast bounded parallel workflow', () => {
         'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs'
       )
     ).toBe(true);
+    for (const mergeQueueControllerPath of [
+      'scripts/drain-pr-queue.sh',
+      'scripts/merge-queue-backend.mjs',
+      'scripts/lib/__tests__/merge-queue-backend.test.mjs',
+      'scripts/tests/test_gh_retry.py',
+    ]) {
+      expect(selectsStructural.test(mergeQueueControllerPath)).toBe(true);
+    }
     expect(
       selectsStructural.test('scripts/lib/__tests__/merge-queue-guard.test.mjs')
     ).toBe(false);
