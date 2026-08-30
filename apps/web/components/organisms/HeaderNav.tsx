@@ -545,7 +545,7 @@ export function HeaderNav({
         borderColor:
           presentation === 'homepage-embedded' || isMarketingGlass
             ? 'transparent'
-            : 'var(--color-border-default)',
+            : 'var(--linear-border-default)',
         backgroundColor:
           presentation === 'homepage-embedded' || isMarketingGlass
             ? 'transparent'
@@ -600,7 +600,7 @@ export function HeaderNav({
           presentation !== 'homepage-embedded' &&
           !isMarketingGlass ? (
             <div
-              className='mx-1.5 max-md:hidden h-4 w-px bg-(--color-border-subtle)'
+              className='mx-1.5 max-md:hidden h-4 w-px bg-(--linear-border-subtle)'
               aria-hidden='true'
             />
           ) : null}

@@ -133,7 +133,7 @@ export function AutomaticReleaseSmartlinksSection() {
                 className='hidden md:flex flex-col w-68 shrink-0 overflow-hidden rounded-t-2xl rounded-b-none'
                 style={{
                   backgroundColor: 'var(--color-bg-surface-0)',
-                  color: 'var(--color-text-primary-token)',
+                  color: 'var(--linear-text-primary)',
                   boxShadow: [
                     'var(--linear-panel-ring) 0px 0px 0px 1px inset',
                     '0 8px 40px rgba(0,0,0,0.35)',
@@ -163,7 +163,7 @@ export function AutomaticReleaseSmartlinksSection() {
                   <div
                     className='relative w-full aspect-square overflow-hidden rounded-lg'
                     style={{
-                      border: '1px solid var(--color-border-subtle)',
+                      border: '1px solid var(--linear-border-subtle)',
                       boxShadow:
                         '0 8px 32px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2)',
                     }}
@@ -207,7 +207,7 @@ export function AutomaticReleaseSmartlinksSection() {
                             DSP_LOGO_CONFIG[key as keyof typeof DSP_LOGO_CONFIG]
                               ?.color
                           }
-                          className='bg-surface-1 ring-(--color-border-subtle) hover:bg-hover'
+                          className='bg-surface-1 ring-(--linear-border-subtle) hover:bg-hover'
                         />
                       );
                     })}

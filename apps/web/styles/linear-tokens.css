@@ -43,24 +43,24 @@
   /* ============================================
      TEXT COLORS — LIGHT MODE
      ============================================ */
-  --color-text-primary-token: oklch(12% 0.005 282);
-  --color-text-secondary-token: oklch(42% 0.012 282);
-  --color-text-tertiary-token: oklch(45% 0.01 282);
-  --color-text-quaternary-token: oklch(55% 0.008 282);
+  --linear-text-primary: oklch(12% 0.005 282);
+  --linear-text-secondary: oklch(42% 0.012 282);
+  --linear-text-tertiary: oklch(45% 0.01 282);
+  --linear-text-quaternary: oklch(55% 0.008 282);
   --linear-text-inverse: oklch(97% 0.005 282);
   /* ============================================
      BACKGROUNDS — LIGHT MODE
      Clean, warm off-whites inspired by Linear's light UI
      ============================================ */
-  --color-bg-page: oklch(98.5% 0.002 282);
-  --color-bg-surface-0: oklch(100% 0 0);
-  /* Pure white — elevated surfaces (menus, popovers, cards) */
-  --color-bg-surface-1: oklch(97% 0.002 282);
-  /* Item hover / secondary surface */
-  --color-bg-surface-2: oklch(95% 0.003 282);
-  --color-bg-button: oklch(92% 0.005 282);
-  --color-bg-hover: rgba(0, 0, 0, 0.04);
-  /* Border tokens retired to canonical --color-border-* in design-system.css (JOV-5458). */
+  --linear-border-footer: oklch(90% 0.005 282);
+  /* ============================================
+     BORDERS — LIGHT MODE
+     ============================================ */
+  --linear-border-subtle: rgba(0, 0, 0, 0.06);
+  /* Low-emphasis separators inside shell chrome must stay quieter than a frame seam. */
+  --linear-border-default: rgba(0, 0, 0, 0.1);
+  --linear-border-strong: rgba(0, 0, 0, 0.15);
+  --linear-border-focus: rgba(0, 0, 0, 0.28);
   /* ============================================
      BUTTON COLORS — LIGHT MODE
      ============================================ */
@@ -370,26 +370,26 @@
 .system-b-marketing.dark,
 [data-theme="linear"].dark {
   /* Text — Jovie Noir Ion (JOV-4635) */
-  --color-text-primary-token: #f5f7fb;
-  --color-text-secondary-token: #d7dce8;
-  --color-text-tertiary-token: #a8b0c3;
-  --color-text-quaternary-token: #7d879d;
+  --linear-text-primary: #f5f7fb;
+  --linear-text-secondary: #d7dce8;
+  --linear-text-tertiary: #a8b0c3;
+  --linear-text-quaternary: #7d879d;
   --linear-text-inverse: #020307;
   /* Backgrounds — Noir Ion stepped surfaces */
-  --color-bg-page: #06080d;
   /* app canvas / sidebar base — the shell's recess is one continuous plane */
-  --color-bg-surface-0: #06080d;
   /* shell / recessed wells */
-  --color-bg-surface-1: #0f1420;
   /* card */
-  --color-bg-surface-2: #151b2a;
   /* elevated */
   --linear-panel-bg: #0a0d16;
   /* panel */
   --linear-panel-ring: rgba(199, 237, 255, 0.26);
-  --color-bg-button: #151b2a;
-  --color-bg-hover: rgba(168, 176, 195, 0.06);
-  /* Border tokens retired to canonical color-border tokens in design-system.css (JOV-5458). */
+  --linear-border-footer: rgba(168, 176, 195, 0.16);
+  /* Borders — Noir Ion cool graphite */
+  --linear-border-subtle: rgba(168, 176, 195, 0.1);
+  --linear-border-default: rgba(168, 176, 195, 0.16);
+  --linear-border-strong: rgba(199, 237, 255, 0.26);
+  --linear-border-focus: rgba(17, 175, 255, 0.72);
+  /* Ion focus */
   /* Buttons — white primary on dark (restrained CTA; Ion is focus/selection) */
   --linear-btn-primary-bg: #ffffff;
   --linear-btn-primary-fg: #020307;
@@ -455,16 +455,16 @@
 
 :root {
   /* Semantic text */
-  --linear-color-text: var(--color-text-primary-token);
-  --linear-color-text-muted: var(--color-text-secondary-token);
-  --linear-color-text-subtle: var(--color-text-tertiary-token);
+  --linear-color-text: var(--linear-text-primary);
+  --linear-color-text-muted: var(--linear-text-secondary);
+  --linear-color-text-subtle: var(--linear-text-tertiary);
   /* Semantic backgrounds */
   --linear-color-bg: var(--color-bg-page);
   --linear-color-bg-elevated: var(--color-bg-surface-0);
   --linear-color-bg-card: var(--color-bg-surface-2);
   /* Semantic borders */
-  --linear-color-border: var(--color-border-default);
-  --linear-color-divider: var(--color-border-subtle);
+  --linear-color-border: var(--linear-border-default);
+  --linear-color-divider: var(--linear-border-subtle);
 }
 
 /* Reduced motion — zero the raw linear duration scale so every consumer

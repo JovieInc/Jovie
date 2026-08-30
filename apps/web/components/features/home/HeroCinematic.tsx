@@ -177,11 +177,11 @@ export function HeroCinematic({
                 i === 0 ? 'var(--color-bg-surface-2)' : 'transparent',
               color:
                 i === 0
-                  ? 'var(--color-text-primary-token)'
-                  : 'var(--color-text-quaternary-token)',
+                  ? 'var(--linear-text-primary)'
+                  : 'var(--linear-text-quaternary)',
               border:
                 i === 0
-                  ? '1px solid var(--color-border-default)'
+                  ? '1px solid var(--linear-border-default)'
                   : '1px solid transparent',
             }}
           >

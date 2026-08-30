@@ -40,7 +40,7 @@ const NAV_PANEL_STYLE: CSSProperties = {
   backgroundColor:
     'color-mix(in oklab, var(--color-bg-surface-0) 95%, white 5%)',
   borderTop:
-    '1px solid color-mix(in oklab, var(--color-border-subtle) 85%, white 15%)',
+    '1px solid color-mix(in oklab, var(--linear-border-subtle) 85%, white 15%)',
   boxShadow:
     '0 -8px 40px oklch(0% 0 0 / 0.25), 0 -2px 12px oklch(0% 0 0 / 0.15)',
   paddingBottom: 'calc(24px + env(safe-area-inset-bottom))',
@@ -51,7 +51,7 @@ const NAV_PANEL_STYLE: CSSProperties = {
 
 const GRABBER_STYLE: CSSProperties = {
   background:
-    'color-mix(in oklab, var(--color-text-tertiary-token) 40%, transparent)',
+    'color-mix(in oklab, var(--linear-text-tertiary) 40%, transparent)',
 };
 
 function buildNavLinks(

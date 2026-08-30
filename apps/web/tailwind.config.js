@@ -250,7 +250,7 @@ module.exports = {
 
       // Ring colors (for focus rings)
       ringColor: {
-        ring: 'var(--color-border-focus)',
+        ring: 'var(--linear-border-focus)',
         accent: 'var(--color-accent)',
         focus: 'var(--color-border-focus)',
         success: 'var(--color-success)',

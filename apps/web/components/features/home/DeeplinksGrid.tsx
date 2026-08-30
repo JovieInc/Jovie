@@ -100,8 +100,8 @@ function StickyPhone({ activeIndex }: { readonly activeIndex: number }) {
               height: 6,
               backgroundColor:
                 i === activeIndex
-                  ? 'var(--color-text-primary-token)'
-                  : 'var(--color-border-default)',
+                  ? 'var(--linear-text-primary)'
+                  : 'var(--linear-border-default)',
             }}
           />
         ))}
@@ -167,7 +167,7 @@ function MobileCard({ mode }: { readonly mode: ModeData }) {
       className='rounded-xl px-6 py-6'
       style={{
         backgroundColor: 'var(--color-bg-hover)',
-        border: '1px solid var(--color-border-subtle)',
+        border: '1px solid var(--linear-border-subtle)',
       }}
     >
       <div className='flex items-center justify-between gap-3'>
@@ -301,16 +301,16 @@ export function DeeplinksGrid() {
                         style={{
                           borderColor:
                             i === activeIndex
-                              ? 'var(--color-border-strong)'
-                              : 'var(--color-border-subtle)',
+                              ? 'var(--linear-border-strong)'
+                              : 'var(--linear-border-subtle)',
                           backgroundColor:
                             i === activeIndex
                               ? 'var(--color-bg-hover)'
                               : 'transparent',
                           color:
                             i === activeIndex
-                              ? 'var(--color-text-secondary-token)'
-                              : 'var(--color-text-tertiary-token)',
+                              ? 'var(--linear-text-secondary)'
+                              : 'var(--linear-text-tertiary)',
                         }}
                       >
                         {mode.outcome}
@@ -327,8 +327,8 @@ export function DeeplinksGrid() {
                           width: i === activeIndex ? 32 : 8,
                           backgroundColor:
                             i === activeIndex
-                              ? 'var(--color-text-primary-token)'
-                              : 'var(--color-border-default)',
+                              ? 'var(--linear-text-primary)'
+                              : 'var(--linear-border-default)',
                         }}
                       />
                     ))}
@@ -343,8 +343,8 @@ export function DeeplinksGrid() {
                     rel='noopener noreferrer'
                     className='inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-(--linear-duration-normal)'
                     style={{
-                      color: 'var(--color-text-tertiary-token)',
-                      border: '1px solid var(--color-border-subtle)',
+                      color: 'var(--linear-text-tertiary)',
+                      border: '1px solid var(--linear-border-subtle)',
                       backgroundColor: 'transparent',
                     }}
                   >
@@ -385,8 +385,8 @@ export function DeeplinksGrid() {
                           fontWeight: i === activeIndex ? 590 : 400,
                           color:
                             i === activeIndex
-                              ? 'var(--color-text-primary-token)'
-                              : 'var(--color-text-secondary-token)',
+                              ? 'var(--linear-text-primary)'
+                              : 'var(--linear-text-secondary)',
                           transition:
                             'font-size var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), font-weight var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), color var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)',
                         }}
@@ -396,8 +396,8 @@ export function DeeplinksGrid() {
                           style={{
                             color:
                               i === activeIndex
-                                ? 'var(--color-text-secondary-token)'
-                                : 'var(--color-text-tertiary-token)',
+                                ? 'var(--linear-text-secondary)'
+                                : 'var(--linear-text-tertiary)',
                           }}
                         >
                           {mode.outcome}
@@ -408,8 +408,8 @@ export function DeeplinksGrid() {
                             style={{
                               color:
                                 i === activeIndex
-                                  ? 'var(--color-text-secondary-token)'
-                                  : 'var(--color-text-tertiary-token)',
+                                  ? 'var(--linear-text-secondary)'
+                                  : 'var(--linear-text-tertiary)',
                             }}
                           >
                             /{mode.slug}

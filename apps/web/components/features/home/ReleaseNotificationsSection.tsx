@@ -64,7 +64,7 @@ export function ReleaseNotificationsSection() {
               <div
                 className='mt-8 flex items-center gap-3 rounded-xl px-5 py-4 w-fit'
                 style={{
-                  border: '1px solid var(--color-border-subtle)',
+                  border: '1px solid var(--linear-border-subtle)',
                   backgroundColor: 'var(--color-bg-surface-0)',
                 }}
               >
@@ -90,7 +90,7 @@ export function ReleaseNotificationsSection() {
               <div
                 className='relative grid grid-cols-[1fr_auto_1fr] gap-0 overflow-hidden rounded-xl md:rounded-2xl'
                 style={{
-                  border: '1px solid var(--color-border-subtle)',
+                  border: '1px solid var(--linear-border-subtle)',
                   backgroundColor: 'var(--color-bg-surface-0)',
                   boxShadow: 'var(--linear-shadow-card-elevated)',
                 }}
@@ -121,7 +121,7 @@ export function ReleaseNotificationsSection() {
                         <span className='flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-3xs font-medium text-quaternary-token bg-surface-2'>
                           {i + 1}
                         </span>
-                        <span className='text-app text-tertiary-token line-through decoration-(--color-text-quaternary-token)'>
+                        <span className='text-app text-tertiary-token line-through decoration-(--linear-text-quaternary)'>
                           {step}
                         </span>
                       </div>
@@ -135,7 +135,7 @@ export function ReleaseNotificationsSection() {
                     className='w-px flex-1'
                     style={{
                       background:
-                        'linear-gradient(to bottom, transparent, var(--color-border-default) 20%, var(--color-border-default) 80%, transparent)',
+                        'linear-gradient(to bottom, transparent, var(--linear-border-default) 20%, var(--linear-border-default) 80%, transparent)',
                     }}
                   />
                   <span className='absolute top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-3xs font-semibold uppercase tracking-wider text-quaternary-token bg-surface-2 border border-subtle'>
@@ -154,7 +154,7 @@ export function ReleaseNotificationsSection() {
                     className='relative overflow-hidden rounded-xl'
                     style={{
                       backgroundColor: 'var(--color-bg-surface-1)',
-                      border: '1px solid var(--color-border-subtle)',
+                      border: '1px solid var(--linear-border-subtle)',
                     }}
                   >
                     {/* Email header */}

@@ -15,8 +15,8 @@ export interface CookieActionsProps {
 
 const customizeButtonStyle: CSSProperties = {
   backgroundColor: 'var(--color-bg-button)',
-  color: 'var(--color-text-primary-token)',
-  border: '1px solid var(--color-border-default)',
+  color: 'var(--linear-text-primary)',
+  border: '1px solid var(--linear-border-default)',
   borderRadius: 'var(--radius-sm)',
   fontSize: '12px',
   fontWeight: 'var(--linear-font-weight-medium)',

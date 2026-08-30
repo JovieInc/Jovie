@@ -260,7 +260,7 @@ export function ReleaseLyricsSection({
               type='button'
               disabled={isActionsDisabled || isFormatting}
               onClick={() => handleFormat(selectedFormat)}
-              className='h-7 rounded-r-none border-r border-r-(--color-border-subtle) px-2 text-2xs'
+              className='h-7 rounded-r-none border-r border-r-(--linear-border-subtle) px-2 text-2xs'
             >
               {isFormatting ? (
                 <Loader2 className='h-3.5 w-3.5 animate-spin' />

@@ -21,7 +21,7 @@ export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
         <div
           className='overflow-hidden rounded-full p-1'
           style={{
-            boxShadow: '0 0 0 1px var(--color-border-subtle)',
+            boxShadow: '0 0 0 1px var(--linear-border-subtle)',
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -61,7 +61,7 @@ export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
         <div
           className='flex w-full items-center justify-center gap-2.5 rounded-xl py-4 text-mid font-semibold'
           style={{
-            backgroundColor: 'var(--color-text-primary-token)',
+            backgroundColor: 'var(--linear-text-primary)',
             color: 'var(--color-bg-page)',
           }}
         >

@@ -73,7 +73,7 @@ export function PricingSection() {
               className='relative flex h-full flex-col rounded-xl p-6 md:p-7'
               style={{
                 backgroundColor: 'var(--color-bg-surface-0)',
-                border: '1px solid var(--color-border-subtle)',
+                border: '1px solid var(--linear-border-subtle)',
                 boxShadow: 'var(--linear-shadow-card)',
               }}
             >
@@ -127,7 +127,7 @@ export function PricingSection() {
               className='relative flex h-full flex-col rounded-xl p-6 md:p-7'
               style={{
                 backgroundColor: 'var(--color-bg-surface-0)',
-                border: '1px solid var(--color-border-subtle)',
+                border: '1px solid var(--linear-border-subtle)',
                 boxShadow: 'var(--linear-shadow-card-elevated)',
               }}
             >

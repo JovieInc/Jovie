@@ -271,10 +271,10 @@ export function ReleaseAudioAssetPanel({
           className={cn(
             'flex min-h-30 w-full flex-col items-center justify-center rounded-lg border border-dashed border-subtle bg-surface-0 px-3 py-4 text-center transition-[background-color,border-color,color] duration-subtle ease-subtle',
             isDragging &&
-              'border-(--color-border-focus) bg-[color-mix(in_oklab,var(--color-border-focus)_8%,var(--color-bg-surface-0))]',
+              'border-(--linear-border-focus) bg-[color-mix(in_oklab,var(--linear-border-focus)_8%,var(--color-bg-surface-0))]',
             isEditable &&
               !isUploading &&
-              'hover:border-default hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface)'
+              'hover:border-default hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface)'
           )}
           aria-busy={isUploading || undefined}
         >

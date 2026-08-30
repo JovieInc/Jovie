@@ -15,7 +15,7 @@ describe('onboarding interview modal System B source contract', () => {
     expect(source).toContain("import { Button, Textarea } from '@jovie/ui'");
     expect(source).toContain('rounded-lg');
     expect(source).not.toContain('rounded-(--linear-radius-lg)');
-    expect(source).toContain('border-(--color-border-subtle)');
+    expect(source).toContain('border-(--linear-border-subtle)');
     expect(source).toContain('bg-(--color-bg-surface-0)');
     expect(source).toContain('shadow-(--linear-shadow-card-elevated)');
     expect(source).toContain('backdrop:bg-(--color-bg-page)');
