@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   auditCoverageViaReceipts,
   checkChangedComponents,
+  runComponentShipGate,
 } from '../../component-ship-gate.mjs';
 import {
   checkStoryMatchesComponent,
@@ -216,6 +217,37 @@ describe('story match checks', () => {
 });
 
 describe('diff gate', () => {
+  it('honors an explicit null diffBase instead of re-resolving origin/main', () => {
+    // Regression for JOV-5454 contract failure: in CI origin/main is always
+    // present, so re-resolving an explicit opt-out turned into a diff scan
+    // against main and reported false missing-test/story issues for unrelated
+    // changed components. With an explicit null base and quality/ratchet
+    // skipped, the report must be green and skip the diff section.
+    const report = runComponentShipGate({
+      diffBase: null,
+      skipQuality: true,
+      skipRatchet: true,
+      skipRenderedCert: true,
+      skipLiveStorybook: true,
+    });
+    expect(report.ok).toBe(true);
+    expect(report.sections.diff.applicable).toBe(false);
+  });
+
+  it('still auto-resolves a base when diffBase is omitted', () => {
+    // When diffBase is not provided at all, the gate may fall back to
+    // origin/main; the diff section then reflects a real (applicable) scan.
+    const report = runComponentShipGate({
+      skipQuality: true,
+      skipRatchet: true,
+      skipRenderedCert: true,
+      skipLiveStorybook: true,
+    });
+    // Whether or not origin/main exists locally, an omitted base must not be
+    // treated as an explicit opt-out: diff is applicable iff a base resolved.
+    expect(report.sections.diff.applicable).toBe(Boolean(report.diffBase));
+  });
+
   it('fails closed without test and story', () => {
     const root = fixtureRepo({
       'apps/web/components/atoms/NewThing.tsx':
