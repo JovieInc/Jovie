@@ -755,7 +755,7 @@ export default function LaunchPage() {
                             'Source',
                             'Last action',
                           ].map(heading => (
-                            <th key={heading} scope='col'>
+                            <th key={heading} scope='col' className='line-clamp-1'>
                               {heading}
                             </th>
                           ))}
