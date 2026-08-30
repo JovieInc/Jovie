@@ -489,6 +489,96 @@ export function runHostedVerification({
   });
 }
 
+export function stageHostedRepairArtifact({
+  plan,
+  repository,
+  output,
+  environment = process.env,
+}) {
+  assertHostedRepairPlan(plan);
+  assertCredentialFreeHostedAcceptance(environment);
+  const cleanEnvironment = buildHostedVerificationEnvironment(environment);
+  const currentHead = execFileSync('git', ['rev-parse', 'HEAD'], {
+    cwd: repository,
+    encoding: 'utf8',
+    env: cleanEnvironment,
+  }).trim();
+  if (currentHead !== plan.expectedHeadOid) {
+    throw new Error('candidate checkout is not the exact planned head');
+  }
+  const records = execFileSync(
+    'git',
+    ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+    { cwd: repository, env: cleanEnvironment }
+  )
+    .toString('utf8')
+    .split('\0')
+    .filter(Boolean);
+  const files = {};
+  const changes = validateHostedChanges(
+    records.map(record => {
+      if (!record.startsWith(' M ')) {
+        throw new Error(
+          `unsafe candidate git transition: ${record.slice(0, 2)}`
+        );
+      }
+      const path = record.slice(3);
+      const bytes = readHostedArtifactFile(repository, path, {
+        requirePrivateRoot: false,
+      });
+      files[path] = bytes;
+      return {
+        path,
+        status: 'M',
+        symlink: false,
+        bytes: bytes.length,
+        sha256: sha256(bytes),
+      };
+    })
+  );
+  const patchBytes = execFileSync(
+    'git',
+    [
+      'diff',
+      '--binary',
+      '--no-ext-diff',
+      'HEAD',
+      '--',
+      ...changes.map(change => change.path),
+    ],
+    {
+      cwd: repository,
+      env: cleanEnvironment,
+      maxBuffer: HOSTED_REPAIR_MAX_PATCH_BYTES + 1,
+    }
+  );
+  if (
+    patchBytes.length < 1 ||
+    patchBytes.length > HOSTED_REPAIR_MAX_PATCH_BYTES
+  ) {
+    throw new Error('hosted repair patch is empty or exceeds the byte limit');
+  }
+  assertHostedCandidateState({
+    plan,
+    changes,
+    repository,
+    environment: cleanEnvironment,
+  });
+  mkdirSync(output, { mode: 0o700 });
+  writeFileSync(join(output, 'repair.patch'), patchBytes, { mode: 0o600 });
+  writeJson(join(output, 'changes.json'), changes);
+  for (const change of changes) {
+    const destination = join(output, 'files', change.path);
+    mkdirSync(dirname(destination), { recursive: true });
+    writeFileSync(destination, files[change.path], { mode: 0o600 });
+  }
+  return {
+    staged: true,
+    changedFiles: changes.map(change => change.path),
+    patchSha256: sha256(patchBytes),
+  };
+}
+
 function validateHostedTestReceipt({
   plan,
   receipt,
@@ -920,6 +1010,15 @@ function hostedAcceptanceCommand(args) {
   process.stdout.write(`${JSON.stringify(receipt)}\n`);
 }
 
+function hostedStageCommand(args) {
+  const result = stageHostedRepairArtifact({
+    plan: readTrustedPlan(),
+    repository: args.repository,
+    output: args.output,
+  });
+  process.stdout.write(`${JSON.stringify(result)}\n`);
+}
+
 async function hostedCommitCommand(args) {
   const plan = readTrustedPlan();
   const acceptance = JSON.parse(
@@ -955,6 +1054,7 @@ async function hostedCommitCommand(args) {
 export async function runHostedWriterCli(argv = process.argv.slice(2)) {
   const command = argv[0];
   const args = cliArgs(argv.slice(1));
+  if (command === 'hosted-stage') return hostedStageCommand(args);
   if (command === 'hosted-acceptance') return hostedAcceptanceCommand(args);
   if (command === 'hosted-commit') return hostedCommitCommand(args);
   throw new Error(`unknown hosted remediation command: ${command}`);

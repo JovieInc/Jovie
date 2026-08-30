@@ -1,5 +1,15 @@
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   assertCredentialFreeHostedAcceptance,
@@ -12,6 +22,7 @@ import {
   HOSTED_REPAIR_POLICY_VERSION,
   hostedRepairTestCommands,
   runHostedVerification,
+  stageHostedRepairArtifact,
   validateHostedGateAdmission,
   validateHostedRepairPath,
 } from '../rolling-ci-hosted-writer.mjs';
@@ -369,5 +380,59 @@ describe('hosted rolling CI repair policy', () => {
     expect(workflow).toContain('scripts/lib/rolling-ci-hosted-writer.mjs');
     expect(workflow).toContain('hosted-acceptance');
     expect(workflow).toContain('hosted-commit');
+  });
+
+  it('stages only exact-head modified product files in a private artifact', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'jovie-hosted-stage-'));
+    try {
+      const repository = join(directory, 'candidate');
+      const path = 'apps/web/lib/proof.ts';
+      mkdirSync(join(repository, 'apps/web/lib'), { recursive: true });
+      execFileSync('git', ['init', '-q'], { cwd: repository });
+      writeFileSync(join(repository, path), 'export const repaired = false;\n');
+      execFileSync('git', ['add', path], { cwd: repository });
+      execFileSync(
+        'git',
+        [
+          '-c',
+          'user.name=Test',
+          '-c',
+          'user.email=test@example.com',
+          'commit',
+          '-qm',
+          'base',
+        ],
+        { cwd: repository }
+      );
+      const expectedHead = execFileSync('git', ['rev-parse', 'HEAD'], {
+        cwd: repository,
+        encoding: 'utf8',
+      }).trim();
+      const plan = buildHostedRepairPlan({
+        dispatch: dispatch({ head: expectedHead }),
+        headRefName: 'codex/repair-proof',
+        trustedPolicyOid: head,
+      });
+      writeFileSync(join(repository, path), 'export const repaired = true;\n');
+      const output = join(directory, 'artifact');
+      expect(
+        stageHostedRepairArtifact({ plan, repository, output, environment: {} })
+      ).toMatchObject({ staged: true, changedFiles: [path] });
+      expect(statSync(output).mode & 0o777).toBe(0o700);
+      expect(readFileSync(join(output, 'files', path), 'utf8')).toContain(
+        'true'
+      );
+      writeFileSync(join(repository, 'apps/web/lib/untracked.ts'), 'unsafe\n');
+      expect(() =>
+        stageHostedRepairArtifact({
+          plan,
+          repository,
+          output: join(directory, 'second-artifact'),
+          environment: {},
+        })
+      ).toThrow('unsafe candidate git transition');
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });
