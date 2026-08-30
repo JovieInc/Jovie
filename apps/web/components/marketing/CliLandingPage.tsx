@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/marketing/cli-landing.test.tsx
 import {
   FaqSection,
   MarketingContainer,

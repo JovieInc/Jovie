@@ -157,6 +157,28 @@ describe('JOV-INV-018 screen-certification/v1', () => {
     ]);
   });
 
+  it('registers the canonical /cli landing page for changed-surface certification', () => {
+    const source = 'apps/web/app/(marketing)/cli/page.tsx';
+    const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.cli-landing');
+
+    assert.deepEqual(screen, {
+      id: 'web.cli-landing',
+      platform: 'web',
+      owner: 'cli-landing',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'A' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      { id: 'web.cli-landing', verdict: 'pass', findings: [] },
+    ]);
+  });
+
   it('retains scheduled whole-system sweeps', () => {
     assert.deepEqual(validateRetainedSweeps(), []);
     for (const workflow of RETAINED_SWEEP_WORKFLOWS) {
