@@ -356,7 +356,12 @@ describe('no unattended red loop', () => {
 
   it('serializes queue generations and recovers after a dead writer', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'jovie-red-queue-lock-'));
-    let releaseFirst; let markFirstEntered; let holder;
+    /** @type {((value?: unknown) => void) | undefined} */
+    let releaseFirst;
+    /** @type {((value?: unknown) => void) | undefined} */
+    let markFirstEntered;
+    /** @type {import('node:child_process').ChildProcess | undefined} */
+    let holder;
     const firstEntered = new Promise(resolve => { markFirstEntered = resolve; });
     const holdFirst = new Promise(resolve => { releaseFirst = resolve; });
     try {
