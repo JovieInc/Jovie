@@ -174,6 +174,13 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   // JOV-5339: Jovie Local must not trip packaged recovery on compile/HMR.
   assert.match(mainSource, /shouldArmRendererWatchdogsForAppEnv\(APP_ENV\)/);
   assert.match(mainSource, /decideLocalMainFrameLoadFailure/);
+  assert.match(mainSource, /decideDidFinishLoadRecovery/);
+  assert.match(recoverySource, /isChromiumErrorDocument/);
+  assert.match(recoverySource, /chrome-error:/);
+  assert.match(
+    mainSource,
+    /webContents\.on\(\s*'did-finish-load'[\s\S]{0,500}?decideDidFinishLoadRecovery/
+  );
   assert.match(mainSource, /host-resolver-rules/);
   assert.match(mainSource, /MAP localhost 127\.0\.0\.1/);
   assert.match(mainSource, /if \(!armWatchdogs\) return;/);
@@ -642,6 +649,17 @@ test('desktop main-window hub regression contracts (desktop QA)', async () => {
   assert.doesNotMatch(
     mainSource,
     /'did-finish-load'[\s\S]{0,160}?rendererCrashReloadCount = 0/
+  );
+
+  // JOV-5474: chrome-error://chromewebdata/ must not reset local retry or
+  // cancel the pending retry timer via unconditional did-finish-load.
+  assert.doesNotMatch(
+    mainSource,
+    /win\.webContents\.on\(\s*'did-finish-load',\s*\(\) => \{\s*localHostedLoadRetryCount = 0;/
+  );
+  assert.match(
+    mainSource,
+    /decideDidFinishLoadRecovery\(\{ url: win\.webContents\.getURL\(\) \}\)/
   );
 
   // Fix: an app-booted ping that arrives before did-finish-load remains valid.
