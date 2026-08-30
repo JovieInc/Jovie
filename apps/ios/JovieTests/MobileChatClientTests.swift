@@ -37,6 +37,16 @@ actor NativeSessionTokenStoreTestLock {
   }
 }
 
+func withNativeSessionTokenStoreTestIsolation<T: Sendable>(
+  _ body: @Sendable () async throws -> T
+) async rethrows -> T {
+  try await NativeSessionTokenStoreTestLock.shared.withExclusive {
+    NativeSessionTokenStore.clear()
+    defer { NativeSessionTokenStore.clear() }
+    return try await body()
+  }
+}
+
 private actor NativeSessionTokenStoreTestObservation {
   struct Record: Equatable, Sendable {
     let savedToken: String
@@ -89,8 +99,6 @@ struct NativeSessionTokenStoreTestLockTests {
     let firstEntered = NativeSessionTokenStoreTestGate()
     let releaseFirst = NativeSessionTokenStoreTestGate()
 
-    defer { NativeSessionTokenStore.clear() }
-
     await withTaskGroup(of: Void.self) { group in
       group.addTask {
         await NativeSessionTokenStoreTestLock.shared.withExclusive {
@@ -135,6 +143,43 @@ struct NativeSessionTokenStoreTestLockTests {
     #expect(result.records.count == tokens.count)
     #expect(result.records.map(\.savedToken).sorted() == tokens.sorted())
     #expect(result.records.map(\.loadedToken).compactMap { $0 }.sorted() == tokens.sorted())
+
+    await NativeSessionTokenStoreTestLock.shared.withExclusive {
+      NativeSessionTokenStore.clear()
+    }
+  }
+
+  @Test func serializesFixtureAndTerminalClearAcrossTestSuites() async {
+    let firstEntered = NativeSessionTokenStoreTestGate()
+    let releaseFirst = NativeSessionTokenStoreTestGate()
+
+    await withTaskGroup(of: Void.self) { group in
+      group.addTask {
+        await NativeSessionTokenStoreTestLock.shared.withExclusive {
+          NativeSessionTokenStore.save(
+            token: "fixture-token",
+            userID: "fixture-user",
+            expiresAt: Date().addingTimeInterval(60 * 60)
+          )
+          await firstEntered.open()
+          await releaseFirst.wait()
+          #expect(NativeSessionTokenStore.load()?.token == "fixture-token")
+        }
+      }
+
+      await firstEntered.wait()
+      group.addTask {
+        await NativeSessionTokenStoreTestLock.shared.withExclusive {
+          NativeSessionTokenStore.clear()
+        }
+      }
+
+      // A broken or omitted test lock lets the terminal-unauthorized fixture
+      // clear the first suite's token while its async request is suspended.
+      try? await Task.sleep(for: .milliseconds(50))
+      #expect(NativeSessionTokenStore.load()?.token == "fixture-token")
+      await releaseFirst.open()
+    }
 
     await NativeSessionTokenStoreTestLock.shared.withExclusive {
       NativeSessionTokenStore.clear()
