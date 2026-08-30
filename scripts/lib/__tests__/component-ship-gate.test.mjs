@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   auditCoverageViaReceipts,
   checkChangedComponents,
+  runComponentShipGate,
 } from '../../component-ship-gate.mjs';
 import {
   checkStoryMatchesComponent,
@@ -851,5 +852,35 @@ describe('multi-root ratchet', () => {
       uncovered: 0,
     };
     expect(compareCoverage(measurement, baseline).ok).toBe(true);
+  });
+});
+
+describe('runComponentShipGate diffBase', () => {
+  it('honors explicit null and skips the diff scan even when TURBO_SCM_BASE is set', () => {
+    const previous = process.env.TURBO_SCM_BASE;
+    process.env.TURBO_SCM_BASE = 'origin/main';
+    try {
+      const report = runComponentShipGate({
+        diffBase: null,
+        skipQuality: true,
+        skipRatchet: true,
+        skipRenderedCert: true,
+        skipLiveStorybook: true,
+      });
+      expect(report.ok).toBe(true);
+      expect(report.diffBase).toBeNull();
+      expect(report.sections.diff).toMatchObject({
+        ok: true,
+        applicable: false,
+        changedComponents: [],
+      });
+      expect(report.sections.diff.note).toMatch(/no diff base/);
+    } finally {
+      if (previous === undefined) {
+        delete process.env.TURBO_SCM_BASE;
+      } else {
+        process.env.TURBO_SCM_BASE = previous;
+      }
+    }
   });
 });

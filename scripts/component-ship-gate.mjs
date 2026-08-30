@@ -1215,7 +1215,12 @@ function runRatchet() {
 
 export function runComponentShipGate(options = {}) {
   const flags = {
-    diffBase: options.diffBase ?? resolveDiffBase(null),
+    // Explicit null must skip the diff scan. `??` would treat it as missing and
+    // fall through to TURBO_SCM_BASE / origin/main, which times out the 5s
+    // control tests on large mechanical PRs (JOV-5466).
+    diffBase: Object.hasOwn(options, 'diffBase')
+      ? options.diffBase
+      : resolveDiffBase(null),
     skipQuality: options.skipQuality ?? false,
     skipRatchet: options.skipRatchet ?? false,
     skipRenderedCert: options.skipRenderedCert ?? false,
