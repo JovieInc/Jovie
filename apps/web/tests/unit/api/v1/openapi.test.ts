@@ -48,6 +48,43 @@ describe('public artist OpenAPI contract', () => {
       expect(Object.keys(pathItem)).toEqual(['get']);
     }
   });
+
+  it('describes the live versioned paths, generic handle discovery, and index schema', () => {
+    expect(ARTIST_OPENAPI_DOCUMENT.servers).toEqual([
+      { url: 'https://jov.ie', description: 'Production API origin' },
+    ]);
+    expect(ARTIST_OPENAPI_DOCUMENT.externalDocs.url).toBe(
+      'https://docs.jov.ie/docs/api-reference'
+    );
+    expect(ARTIST_OPENAPI_DOCUMENT.paths).toHaveProperty('/api/v1');
+    expect(ARTIST_OPENAPI_DOCUMENT.paths).toHaveProperty('/api/v1/{username}');
+    expect(ARTIST_OPENAPI_DOCUMENT.paths).not.toHaveProperty('/{username}');
+
+    const indexOperation = ARTIST_OPENAPI_DOCUMENT.paths['/api/v1'].get;
+    expect(indexOperation.operationId).toBe('getArtistApiIndex');
+
+    const profileOperation =
+      ARTIST_OPENAPI_DOCUMENT.paths['/api/v1/{username}'].get;
+    expect(profileOperation.parameters?.[0]?.schema.examples).toEqual([
+      'public-handle',
+    ]);
+    expect(indexOperation.responses['200']).toBeDefined();
+    expect(
+      ARTIST_OPENAPI_DOCUMENT.paths['/api/v1'].get.responses['200'].content[
+        'application/json'
+      ].schema.$ref
+    ).toBe('#/components/schemas/ArtistApiIndex');
+    expect(
+      ARTIST_OPENAPI_DOCUMENT.components.schemas.ArtistApiIndex.properties
+        ?.endpoints?.properties?.artistTemplate?.format
+    ).toBe('uri-template');
+    expect(profileOperation.description).not.toContain('timwhite');
+    expect(Object.keys(profileOperation.responses)).toEqual(['200', '404']);
+
+    const indexSchema =
+      ARTIST_OPENAPI_DOCUMENT.components.schemas.ArtistApiIndex;
+    expect(indexSchema.properties).not.toHaveProperty('rateLimit');
+  });
 });
 
 describe('OpenAPI discovery routes', () => {

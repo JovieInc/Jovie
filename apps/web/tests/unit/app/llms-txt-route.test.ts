@@ -11,9 +11,12 @@ describe('GET /llms.txt', () => {
     const body = await res.text();
     expect(body).toContain('## When to use Jovie');
     expect(body).toContain('/api/v1/{username}');
+    expect(body).toContain('GET https://jov.ie/api/v1');
+    expect(body).toContain('https://jov.ie/developers');
     expect(body).toContain('## Jovie developer resources');
     expect(body).toContain('https://jov.ie/llms.txt');
     expect(body).toContain('/openapi.json');
+    expect(body).toContain('https://jov.ie/developers');
     expect(body).toContain('/api/v1/openapi.json');
     expect(body).toContain('/api/mcp/{username}');
     expect(body).toContain('https://docs.jov.ie');

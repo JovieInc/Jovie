@@ -4,32 +4,44 @@ title: API Reference
 
 # API Reference
 
-The Jovie API allows you to programmatically interact with the platform.
+Jovie currently publishes one public API: an anonymous, read-only JSON surface
+for artist profiles. The capability index at
+`https://jov.ie/api/v1` is a stable, machine-verifiable 200 response. It does
+not enumerate artist handles or depend on a particular profile being live.
 
-> This section is under development. Full API documentation is coming soon.
+The canonical machine-readable contract is
+[`https://jov.ie/api/v1/openapi.json`](https://jov.ie/api/v1/openapi.json),
+also available at [`https://jov.ie/openapi.json`](https://jov.ie/openapi.json).
+The human-oriented guide is [`https://jov.ie/developers`](https://jov.ie/developers).
 
-## Overview
+## Current contract
 
-The Jovie API is a RESTful JSON API. All endpoints require authentication via
-API key or OAuth token.
+- `GET https://jov.ie/api/v1` -- capability and discovery index. This static
+  document is stable and non-enumerating.
+- `GET https://jov.ie/api/v1/{username}` -- one public artist profile with
+  public identity, releases, upcoming events, merch, and related links.
+- `GET https://jov.ie/api/v1/openapi.json` -- canonical OpenAPI 3.1 contract.
+- `GET https://jov.ie/openapi.json` -- equivalent conventional discovery URL.
 
-## Authentication
+Replace `{username}` with a current public Jovie handle discovered from an
+artist's own profile or the sitemap. The generic example below is deliberately
+not presented as a provisioned fixture:
 
+```bash
+curl https://jov.ie/api/v1
+curl https://jov.ie/api/v1/{username}
 ```
-Authorization: Bearer YOUR_API_KEY
-```
 
-## Base URL
+Unknown or non-public handles return JSON `404`.
 
-```
-https://api.jov.ie/v1
-```
+## Authentication and scope
 
-## Endpoints
+No API key, OAuth token, `Authorization` header, developer account, write
+endpoint, or manage endpoint is required or supported for this public surface.
+Only data the artist has made public is returned. Do not send private or
+sensitive information.
 
-Detailed endpoint documentation will be added here. Planned sections include:
+## End of current contract
 
-- **Profile** -- Read and update artist profile data.
-- **Releases** -- Manage releases and smart links.
-- **Audience** -- Query audience data and segments.
-- **Analytics** -- Retrieve analytics data programmatically.
+The OpenAPI document is the source of truth for the response schema and
+supported statuses.

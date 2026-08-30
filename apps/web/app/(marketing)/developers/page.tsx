@@ -31,6 +31,12 @@ const BREADCRUMB_SCHEMA = buildBreadcrumbSchema([
 
 const RESOURCE_LINKS = [
   {
+    href: '/api/v1',
+    label: 'Public API capability index',
+    description:
+      'A stable, non-enumerating 200 response describing the anonymous read-only API.',
+  },
+  {
     href: '/openapi.json',
     label: 'OpenAPI 3.1 contract',
     description: 'The machine-readable contract for the public artist API.',

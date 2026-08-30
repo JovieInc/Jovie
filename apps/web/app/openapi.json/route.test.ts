@@ -22,7 +22,10 @@ describe('GET /openapi.json', () => {
     expect(canonicalSpec).toEqual(versionedSpec);
     expect(canonicalSpec.openapi).toBe('3.1.0');
     expect(canonicalSpec.info.title).toBe('Jovie Artist API');
-    expect(canonicalSpec.paths['/{username}'].get.operationId).toBe(
+    expect(canonicalSpec.paths['/api/v1'].get.operationId).toBe(
+      'getArtistApiIndex'
+    );
+    expect(canonicalSpec.paths['/api/v1/{username}'].get.operationId).toBe(
       'getArtist'
     );
     expect(canonicalSpec.info.description).toMatch(/read-only/i);
