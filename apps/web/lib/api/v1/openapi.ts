@@ -4,6 +4,7 @@ import {
   PUBLIC_ARTIST_API_INDEX_URL,
   PUBLIC_ARTIST_API_OPENAPI_URL,
   PUBLIC_ARTIST_API_POLICY_LINK,
+  PUBLIC_ARTIST_API_POLICY_URL,
   PUBLIC_ARTIST_API_PROFILE_TEMPLATE_URL,
   PUBLIC_ARTIST_API_RATE_LIMIT,
   PUBLIC_ARTIST_API_RATE_LIMIT_POLICY,
@@ -132,7 +133,7 @@ export const API_VERSIONING_POLICY = {
   activeVersion: 'v1',
   additiveChanges: 'remain-within-active-version',
   breakingChanges: 'publish-a-new-url-version',
-  policyUrl: PUBLIC_ARTIST_API_REFERENCE_URL,
+  policyUrl: PUBLIC_ARTIST_API_POLICY_URL,
   lifecycle: {
     deprecation: {
       header: 'Deprecation',
@@ -189,7 +190,7 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
     title: 'Jovie Artist API',
     version: '1.0.0',
     description:
-      'Anonymous, read-only API for public Jovie artist profiles. The stable /api/v1 capability index is a machine-verifiable 200 surface; artist data is served by GET /api/v1/{username}. No API key, OAuth token, or write endpoint is required or supported. Versioning policy: URL-versioned /api/v1; additive changes remain in v1, breaking changes use a new URL version. Active v1 does not emit Deprecation or Sunset headers; RFC 9745 Deprecation and RFC 8594 Sunset apply only after a genuinely retired version has a dated migration policy.',
+      'Anonymous, read-only API for public Jovie artist profiles. The stable /api/v1 capability index is a machine-verifiable 200 surface; artist data is served by GET /api/v1/{username}. No API key, OAuth token, or write endpoint is required or supported. Versioning and deprecation policy: URL-versioned /api/v1; additive changes remain in v1, breaking changes use a new URL version. See the canonical policy page before any retirement. Active v1 does not emit Deprecation or Sunset headers; RFC 9745 Deprecation and RFC 8594 Sunset apply only after a genuinely retired version has a dated migration policy.',
     contact: { url: `${BASE_URL}/llms.txt` },
   },
   servers: [{ url: BASE_URL, description: 'Production API origin' }],

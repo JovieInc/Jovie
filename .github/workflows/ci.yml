@@ -3432,6 +3432,7 @@ jobs:
     needs: [ci-path-changes, ci-merge-group-admission]
     if: >-
       always() &&
+      !cancelled() &&
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
@@ -3455,7 +3456,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
-      fail-fast: false
+      # The first failing shard is sufficient to reject an exact combined head.
+      # Main and ordinary manual runs stay exhaustive for post-merge diagnosis.
+      # PR Ready still runs with always() and requires exact matrix success.
+      fail-fast: ${{ github.event_name == 'merge_group' }}
       # Org hosted capacity ceiling ~120 concurrent jobs. Do not artificially
       # serialize unit shards — wall-clock merge latency is the bottleneck.
       max-parallel: 120
@@ -3587,6 +3591,15 @@ jobs:
           ((github.event_name == 'merge_group' && matrix.shard == '4/10') ||
           (github.event_name != 'merge_group' && matrix.shard == '1/10'))
         run: pnpm turbo test --filter=@jovie/ui
+
+      - name: Preserve failed unit-shard diagnosis
+        if: ${{ failure() && !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: unit-test-failure-${{ github.run_id }}-${{ github.run_attempt }}-${{ strategy.job-index }}
+          path: apps/web/test-report.*.junit.xml
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Upload test results to Codecov
         # Queue evidence must not consume external service credentials.

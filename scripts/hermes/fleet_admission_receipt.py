@@ -25,6 +25,8 @@ DIAGNOSTIC_INVENTORY_KEYS = frozenset(
         "unclassified",
         "expiredHolds",
         "episodes",
+        "stackHealth",
+        "repairActions",
     }
 )
 

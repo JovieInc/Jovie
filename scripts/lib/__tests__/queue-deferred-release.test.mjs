@@ -28,6 +28,26 @@ const fleetGateRefreshWorkflow = readFileSync(
   'utf8'
 );
 
+const STACK_TRIGGER_TYPES =
+  'types: [opened, edited, synchronize, closed, labeled, unlabeled, ready_for_review, reopened]';
+const STACK_EVENT_GUARD =
+  /if: >-\s+steps\.refresh\.outcome == 'success' &&\s+\(\s*\(github\.event_name == 'push' && github\.ref == 'refs\/heads\/main'\)\s+\|\|\s+\(github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main'\)\s+\|\|\s+\(github\.event_name == 'workflow_run' &&\s+github\.event\.workflow_run\.head_branch == 'main'\)\s*\)/;
+
+function assertTrustedStackHealthContract(value) {
+  expect(value).toContain(STACK_TRIGGER_TYPES);
+  expect(value).toMatch(STACK_EVENT_GUARD);
+  expect(value).toMatch(
+    /Checkout exact main gate code[\s\S]*ref: main[\s\S]*persist-credentials: false/
+  );
+  expect(value).not.toMatch(
+    /Checkout exact main gate code[\s\S]*github.event.pull_request.head.sha/
+  );
+  expect(value).toContain(
+    'node "$GITHUB_WORKSPACE/scripts/backlog-orchestrator/delivery-state-machine.mjs"'
+  );
+  expect(value).toContain('--closure-health-file=');
+}
+
 describe('queue-deferred release closed loop (JOV-5054)', () => {
   it('scans every queue-deferred PR, not only agent-branch PRs', () => {
     expect(releaseScript).toContain('scanning open queue-deferred PRs');
@@ -95,9 +115,7 @@ describe('queue-deferred release closed loop (JOV-5054)', () => {
     expect(downstream).not.toContain('CI');
     expect(downstream).not.toContain('Production Controller');
     expect(fleetGateRefreshWorkflow).toContain('pull_request:');
-    expect(fleetGateRefreshWorkflow).toContain(
-      'types: [closed, labeled, unlabeled, ready_for_review, reopened]'
-    );
+    assertTrustedStackHealthContract(fleetGateRefreshWorkflow);
     expect(fleetGateRefreshWorkflow).toContain('push:\n    branches: [main]');
     expect(fleetGateRefreshWorkflow).toContain(
       "github.event.workflow_run.conclusion != 'cancelled'"
@@ -114,5 +132,25 @@ describe('queue-deferred release closed loop (JOV-5054)', () => {
     expect(markerRecovery).toContain(
       'gh workflow run fleet-gate-refresh.yml --ref main'
     );
+  });
+
+  it('keeps stack repair consumption fail-closed under trigger, checkout, and guard regressions', () => {
+    const regressions = [
+      fleetGateRefreshWorkflow.replace(
+        STACK_TRIGGER_TYPES,
+        'types: [closed, labeled, unlabeled, ready_for_review, reopened]'
+      ),
+      fleetGateRefreshWorkflow.replace(
+        'ref: main',
+        'ref: ${{ github.event.pull_request.head.sha }}'
+      ),
+      fleetGateRefreshWorkflow.replace(
+        "github.event.workflow_run.head_branch == 'main'",
+        "github.event.workflow_run.head_branch != 'main'"
+      ),
+    ];
+    for (const workflowValue of regressions) {
+      expect(() => assertTrustedStackHealthContract(workflowValue)).toThrow();
+    }
   });
 });
