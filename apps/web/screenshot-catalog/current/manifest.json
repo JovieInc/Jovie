@@ -166,8 +166,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-30T07:54:15.009Z",
-    "gitSha": "37fd9c002ce626e34911b0503ea051b795a4a474",
+    "capturedAt": "2026-08-30T08:39:48.660Z",
+    "gitSha": "f83f3b0d02d77d68cd0003f2f5a441d73bf53c3f",
     "imagePath": "artist-profile-opinionated-section-desktop.png"
   },
   {
@@ -192,8 +192,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-30T07:55:11.611Z",
-    "gitSha": "37fd9c002ce626e34911b0503ea051b795a4a474",
+    "capturedAt": "2026-08-30T08:40:44.452Z",
+    "gitSha": "f83f3b0d02d77d68cd0003f2f5a441d73bf53c3f",
     "imagePath": "artist-profile-how-it-works-section-desktop.png"
   },
   {
@@ -218,8 +218,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-30T07:56:03.225Z",
-    "gitSha": "37fd9c002ce626e34911b0503ea051b795a4a474",
+    "capturedAt": "2026-08-30T08:41:35.583Z",
+    "gitSha": "f83f3b0d02d77d68cd0003f2f5a441d73bf53c3f",
     "imagePath": "artist-profile-final-cta-section-desktop.png"
   },
   {
@@ -609,8 +609,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-30T08:05:21.265Z",
-    "gitSha": "37fd9c002ce626e34911b0503ea051b795a4a474",
+    "capturedAt": "2026-08-30T08:50:50.576Z",
+    "gitSha": "f83f3b0d02d77d68cd0003f2f5a441d73bf53c3f",
     "imagePath": "dashboard-releases-desktop.png",
     "publicExportPath": "releases-dashboard-full.png"
   },
@@ -626,8 +626,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-30T08:05:48.550Z",
-    "gitSha": "37fd9c002ce626e34911b0503ea051b795a4a474",
+    "capturedAt": "2026-08-30T08:51:17.790Z",
+    "gitSha": "f83f3b0d02d77d68cd0003f2f5a441d73bf53c3f",
     "imagePath": "dashboard-releases-sidebar-desktop.png",
     "publicExportPath": "releases-dashboard-sidebar.png"
   },
@@ -677,8 +677,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-30T00:52:30.899Z",
-    "gitSha": "c0a21ce3fabe9fdc96f7d300ef73f32a0e8fbcc0",
+    "capturedAt": "2026-08-30T08:52:37.616Z",
+    "gitSha": "f83f3b0d02d77d68cd0003f2f5a441d73bf53c3f",
     "imagePath": "dashboard-audience-desktop.png",
     "publicExportPath": "audience-crm.png"
   },
@@ -694,8 +694,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-30T08:07:32.641Z",
-    "gitSha": "37fd9c002ce626e34911b0503ea051b795a4a474",
+    "capturedAt": "2026-08-30T08:53:01.587Z",
+    "gitSha": "f83f3b0d02d77d68cd0003f2f5a441d73bf53c3f",
     "imagePath": "dashboard-analytics-desktop.png"
   },
   {
@@ -710,8 +710,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-30T08:07:37.294Z",
-    "gitSha": "37fd9c002ce626e34911b0503ea051b795a4a474",
+    "capturedAt": "2026-08-30T08:53:06.089Z",
+    "gitSha": "f83f3b0d02d77d68cd0003f2f5a441d73bf53c3f",
     "imagePath": "dashboard-earnings-desktop.png"
   },
   {
@@ -726,8 +726,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin"],
-    "capturedAt": "2026-08-29T21:10:23.666Z",
-    "gitSha": "601d6f1a04e36c6ce307b9a0eb01cb620c6762e2",
+    "capturedAt": "2026-08-30T08:53:30.221Z",
+    "gitSha": "f83f3b0d02d77d68cd0003f2f5a441d73bf53c3f",
     "imagePath": "settings-profile-desktop.png"
   },
   {
@@ -742,8 +742,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-30T08:08:26.098Z",
-    "gitSha": "37fd9c002ce626e34911b0503ea051b795a4a474",
+    "capturedAt": "2026-08-30T08:53:54.763Z",
+    "gitSha": "f83f3b0d02d77d68cd0003f2f5a441d73bf53c3f",
     "imagePath": "settings-links-desktop.png"
   },
   {
