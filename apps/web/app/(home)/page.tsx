@@ -8,6 +8,7 @@ import {
 import { HomepageClosedLoop } from '@/components/homepage/HomepageClosedLoop';
 import { HomepageHeroCommandCenter } from '@/components/homepage/HomepageHeroCommandCenter';
 import { HomepageMeetJovie } from '@/components/homepage/HomepageMeetJovie';
+import { HomepageNoScriptContent } from '@/components/homepage/HomepageNoScriptContent';
 import { HomepageTrackedLink } from '@/components/homepage/HomepageTrackedLink';
 import { HERO_COPY } from '@/components/homepage/intent';
 import {
@@ -288,6 +289,7 @@ function HomePageShell({ children }: { readonly children: React.ReactNode }) {
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
       <script type='application/ld+json'>{FAQ_SCHEMA}</script>
       {children}
+      <HomepageNoScriptContent />
     </>
   );
 }
