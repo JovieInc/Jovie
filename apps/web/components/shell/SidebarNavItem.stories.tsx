@@ -1,6 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { House } from 'lucide-react';
-import { SidebarNavItem } from './SidebarNavItem';
+import { House, SquarePen } from 'lucide-react';
+import {
+  getSidebarNavIconClassName,
+  getSidebarNavRowClassName,
+  SidebarNavItem,
+} from './SidebarNavItem';
 
 const meta: Meta<typeof SidebarNavItem> = {
   title: 'Shell/SidebarNavItem',
@@ -30,4 +34,19 @@ export const ActiveCollapsed: Story = {
     collapsed: true,
     item: { label: 'Inbox', icon: House, active: true },
   },
+};
+
+export const EnabledPrimaryCreate: Story = {
+  render: () => (
+    <button
+      type='button'
+      className={getSidebarNavRowClassName({ tone: 'primary' })}
+    >
+      <SquarePen
+        className={getSidebarNavIconClassName({ tone: 'primary' })}
+        strokeWidth={2}
+      />
+      <span>New Chat</span>
+    </button>
+  ),
 };
