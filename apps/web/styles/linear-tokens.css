@@ -123,15 +123,8 @@
   /* ============================================
      SHADOWS — LIGHT MODE
      ============================================ */
-  --linear-shadow-button:
-    rgba(0, 0, 0, 0) 0px 8px 2px 0px, rgba(0, 0, 0, 0.01) 0px 5px 2px 0px, rgba(
-      0,
-      0,
-      0,
-      0.04
-    ) 0px 3px 2px 0px, rgba(0, 0, 0, 0.07) 0px 1px 1px 0px, rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
-  --linear-shadow-card: 0px 4px 24px rgba(0, 0, 0, 0.08);
-  --linear-shadow-card-elevated: 0px 7px 32px rgba(0, 0, 0, 0.12);
+  /* Shadow tokens retired (JOV-5465) — use --shadow-button, --shadow-card,
+     --shadow-card-elevated from design-system.css. */
   /* ============================================
      TYPOGRAPHY (mode-independent)
      ============================================ */
@@ -217,10 +210,10 @@
   --linear-button-height-md: 40px;
   --linear-pill-track-padding: 3px;
   --linear-pill-height-md: 36px;
-  --linear-pill-surface-shadow: var(--linear-shadow-button);
+  --linear-pill-surface-shadow: var(--shadow-button);
   --linear-pill-indicator-shadow: var(
     --shadow-button-inset,
-    var(--linear-shadow-button)
+    var(--shadow-button)
   );
   /* App UI tokens (distinct from marketing page tokens) */
   --linear-app-radius-item: 8px;
@@ -351,11 +344,8 @@
   /* ============================================
      EFFECTS — mode-independent
      ============================================ */
-  --linear-blur-header: 20px;
-  --linear-ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  --linear-duration-fast: 100ms;
-  --linear-duration-normal: 160ms;
-  --linear-duration-slow: 300ms;
+  /* Blur/ease/duration tokens retired (JOV-5465) — use --blur-header,
+     --ease-interactive, --duration-* from design-system.css. */
   /* ============================================
      RESPONSIVE TYPOGRAPHY — mode-independent
      ============================================ */
@@ -437,9 +427,8 @@
   --linear-separator-from: rgba(168, 176, 195, 0.1);
   --linear-separator-via: rgba(168, 176, 195, 0.04);
   /* Shadows — restrained depth on near-black */
-  --linear-shadow-card: 0px 4px 24px rgba(0, 0, 0, 0.4);
-  --linear-shadow-card-elevated:
-    0 0 0 1px rgba(168, 176, 195, 0.12), 0px 8px 40px rgba(0, 0, 0, 0.55);
+  /* Dark-mode card shadows retired (JOV-5465) — use --shadow-card,
+     --shadow-card-elevated from design-system.css. */
   --linear-app-content-surface: #0a0d16;
   /* panel — primary framed main-pane surface */
   --linear-app-card-shadow: none;
@@ -485,13 +474,6 @@
   --linear-color-divider: var(--linear-border-subtle);
 }
 
-/* Reduced motion — zero the raw linear duration scale so every consumer
-   inherits 0ms (mirrors the --duration-* zeroing in design-system.css).
-   Guarded by tests/unit/design-system/reduced-motion-tokens.test.ts. */
-@media (prefers-reduced-motion: reduce) {
-  :root {
-    --linear-duration-fast: 0ms;
-    --linear-duration-normal: 0ms;
-    --linear-duration-slow: 0ms;
-  }
-}
+/* Reduced motion — linear duration zeroing retired (JOV-5465); the
+   canonical --duration-* scale in design-system.css is already zeroed under
+   prefers-reduced-motion. */

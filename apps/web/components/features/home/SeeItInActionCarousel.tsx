@@ -165,7 +165,7 @@ function ReleasePopoverContent({
 
       <Link
         href={`${releaseHref}?noredirect=1`}
-        className='mt-4 inline-flex text-sm font-medium text-secondary-token transition-colors duration-(--linear-duration-normal) hover:text-primary-token'
+        className='mt-4 inline-flex text-sm font-medium text-secondary-token transition-colors duration-(--duration-normal) hover:text-primary-token'
       >
         All platforms
       </Link>
@@ -208,7 +208,7 @@ function ReleaseCard({
                 onHoverEnd(release.id);
               }
             }}
-            className='group flex w-full flex-col rounded-xl p-6 text-left no-underline transition-colors duration-(--linear-duration-normal) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-text-secondary)'
+            className='group flex w-full flex-col rounded-xl p-6 text-left no-underline transition-colors duration-(--duration-normal) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-text-secondary)'
             style={{
               backgroundColor: 'var(--linear-bg-surface-0)',
               border: '1px solid var(--linear-border-subtle)',
@@ -357,7 +357,7 @@ export function SeeItInActionCarousel({
                 </p>
                 <Link
                   href={PROFILE.profilePath}
-                  className='mt-4 inline-flex items-center gap-2 text-app font-mono text-secondary-token transition-colors duration-(--linear-duration-normal) hover:text-primary-token'
+                  className='mt-4 inline-flex items-center gap-2 text-app font-mono text-secondary-token transition-colors duration-(--duration-normal) hover:text-primary-token'
                 >
                   <span
                     aria-hidden='true'
@@ -367,7 +367,7 @@ export function SeeItInActionCarousel({
                 </Link>
                 <Link
                   href={PROFILE.profilePath}
-                  className='mt-5 inline-flex items-center rounded-lg border border-subtle bg-surface-1 px-4 py-2 text-sm font-medium text-primary-token transition-colors duration-(--linear-duration-normal) hover:bg-hover'
+                  className='mt-5 inline-flex items-center rounded-lg border border-subtle bg-surface-1 px-4 py-2 text-sm font-medium text-primary-token transition-colors duration-(--duration-normal) hover:bg-hover'
                 >
                   View Profile
                 </Link>

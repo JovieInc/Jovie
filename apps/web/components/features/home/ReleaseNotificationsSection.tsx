@@ -92,7 +92,7 @@ export function ReleaseNotificationsSection() {
                 style={{
                   border: '1px solid var(--linear-border-subtle)',
                   backgroundColor: 'var(--linear-bg-surface-0)',
-                  boxShadow: 'var(--linear-shadow-card-elevated)',
+                  boxShadow: 'var(--shadow-card-elevated)',
                 }}
               >
                 {/* Shine border overlay */}
@@ -205,7 +205,7 @@ export function ReleaseNotificationsSection() {
                       {/* Listen Now button */}
                       <button
                         type='button'
-                        className='mt-4 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-app font-semibold transition-colors duration-(--linear-duration-normal) ease-subtle'
+                        className='mt-4 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-app font-semibold transition-colors duration-(--duration-normal) ease-subtle'
                         style={{
                           background:
                             'linear-gradient(135deg, oklch(72% 0.16 75), oklch(68% 0.14 60))',

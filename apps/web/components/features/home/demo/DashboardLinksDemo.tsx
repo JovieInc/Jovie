@@ -118,7 +118,7 @@ export function DashboardLinksDemo() {
                     left: link.active ? 14 : 2,
                     backgroundColor: '#fff',
                     transition: 'left 0.2s',
-                    boxShadow: 'var(--linear-shadow-button)',
+                    boxShadow: 'var(--shadow-button)',
                   }}
                 />
               </div>
