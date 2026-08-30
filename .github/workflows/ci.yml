@@ -1111,6 +1111,26 @@ jobs:
       - name: Fail-closed golden path lock
         run: node scripts/golden-path-lock.mjs merge-gate
 
+  ci-visual-snapshot-compare:
+    name: Visual Snapshot Compare
+    # JOV-5459: missing baseline/ENOENT is FAIL, not advisory. No Neon and no
+    # Playwright. Snapshot refresh stays on visual-regression.yml.
+    if: github.event_name == 'merge_group'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      # Dependency-free Node stdlib compare. Avoid setup-node-pnpm so this
+      # merge-group gate stays off the Neon/Playwright path.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+      - name: Fail-closed visual snapshot compare
+        run: node scripts/visual-snapshot-compare.mjs compare
+
   ci-fast-typecheck:
     name: ci-fast (typecheck)
     # JOV-4477: dedicated jobs keep structural Docker/Python action setup out of
@@ -3412,6 +3432,7 @@ jobs:
     needs: [ci-path-changes, ci-merge-group-admission]
     if: >-
       always() &&
+      !cancelled() &&
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
@@ -3435,7 +3456,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
-      fail-fast: false
+      # The first failing shard is sufficient to reject an exact combined head.
+      # Main and ordinary manual runs stay exhaustive for post-merge diagnosis.
+      # PR Ready still runs with always() and requires exact matrix success.
+      fail-fast: ${{ github.event_name == 'merge_group' }}
       # Org hosted capacity ceiling ~120 concurrent jobs. Do not artificially
       # serialize unit shards — wall-clock merge latency is the bottleneck.
       max-parallel: 120
@@ -3567,6 +3591,15 @@ jobs:
           ((github.event_name == 'merge_group' && matrix.shard == '4/10') ||
           (github.event_name != 'merge_group' && matrix.shard == '1/10'))
         run: pnpm turbo test --filter=@jovie/ui
+
+      - name: Preserve failed unit-shard diagnosis
+        if: ${{ failure() && !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: unit-test-failure-${{ github.run_id }}-${{ github.run_attempt }}-${{ strategy.job-index }}
+          path: apps/web/test-report.*.junit.xml
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Upload test results to Codecov
         # Queue evidence must not consume external service credentials.
@@ -4923,6 +4956,7 @@ jobs:
         ci-golden-eval-set,
         ci-secret-scan,
         ci-golden-path-lock,
+        ci-visual-snapshot-compare,
         drizzle-migration-guard,
       ]
     if: ${{ always() && github.event_name == 'merge_group' }}
@@ -4947,6 +4981,7 @@ jobs:
           GOLDEN_EVAL_RESULT="${{ needs.ci-golden-eval-set.result }}"
           SECRET_RESULT="${{ needs.ci-secret-scan.result }}"
           GOLDEN_PATH_LOCK_RESULT="${{ needs.ci-golden-path-lock.result }}"
+          VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"
           MIGRATION_RESULT="${{ needs.drizzle-migration-guard.result }}"
           NOOP_GROUP="${{ needs.ci-path-changes.outputs.is_noop_merge_group }}"
           RUN_JOVIE_PRODUCT="${{ needs.ci-path-changes.outputs.run_jovie_product }}"
@@ -4984,6 +5019,7 @@ jobs:
             echo "| Golden Eval Set (path-selected) | $GOLDEN_EVAL_RESULT |"
             echo "| Secret Scan | $SECRET_RESULT |"
             echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT |"
+            echo "| Visual Snapshot Compare | $VISUAL_COMPARE_RESULT |"
             echo "| Migration Guard | $MIGRATION_RESULT |"
             echo
             echo "Preview/A11y evidence is explicit opt-in or post-merge; merge groups do not provision Neon."
@@ -4996,6 +5032,7 @@ jobs:
             "ci-fast:$FAST_RESULT" \
             "Secret Scan:$SECRET_RESULT" \
             "Golden Path Lock:$GOLDEN_PATH_LOCK_RESULT" \
+            "Visual Snapshot Compare:$VISUAL_COMPARE_RESULT" \
             "Migration Guard:$MIGRATION_RESULT"; do
             name="${gate%%:*}"
             result="${gate#*:}"

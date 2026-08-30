@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AuthUnavailableCard } from '@/features/auth';
+import { AuthUnavailableCard } from '@/components/features/auth/AuthUnavailableCard';
 
 const pathname = vi.hoisted(() => ({ value: '/signin' }));
 
@@ -19,6 +19,8 @@ describe('AuthUnavailableCard', () => {
     const action = screen.getByRole('link', { name: 'Go to Homepage' });
     expect(action.className).not.toContain('min-h-[3.75rem]');
     expect(action.className).toContain('min-h-10');
+    expect(action.className).toContain('shadow-button');
+    expect(action.className).not.toContain('--linear-shadow-button');
 
     const heading = screen.getByRole('heading', {
       name: 'Sign in is temporarily unavailable',

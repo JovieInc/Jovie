@@ -1006,6 +1006,9 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
 
     assert "schedule:" not in trigger
     assert "workflows: [CI, Production Controller]" in trigger
+    assert "opened" in trigger
+    assert "edited" in trigger
+    assert "synchronize" in trigger
     assert "Production Marker Recovery]" not in trigger
     assert "workflows: [CI, Production Controller, Queue-Deferred Release]" not in trigger
     assert "group: fleet-gate-event-admission" in workflow
@@ -1018,6 +1021,9 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     assert "github.event.label.name == 'needs-human'" in block
     assert "github.event.label.name == 'duplicate'" in block
     assert "runs-on: [self-hosted, Linux, X64, jovie-fixed]" in block
+    assert "Persist stack policy repair actions" in block
+    assert "--closure-health-file=" in block
+    assert "delivery-state-machine.mjs" in block
 
 
 def test_heartbeat_is_the_only_scheduled_generic_fixed_runner_consumer() -> None:

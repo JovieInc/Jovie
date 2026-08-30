@@ -180,6 +180,16 @@ stop-line never disables native promotion, exact-head PR remediation, tests, or
 review; those are the mechanisms that recover closure health. The executable
 authority is `JOV-INV-011` in `canon/invariants.jsonl`.
 
+Draft stacks are a bounded exception with a four-layer maximum. A root must name
+an integrator, expose a promotion path through open exact-base parents, retain a
+clean ancestor chain, and carry an unexpired deadline no more than seven days
+after root creation. Any depth-five stack or missing/expired contract is red
+immediately: new intake stops while promotion and remediation remain live. The
+observer emits one idempotent `split-or-retarget-draft-stack` action per
+violating root through the existing delivery repair-task and No Unattended Red
+path. That receipt is consumed evidence only; it never mutates a pull request
+automatically. The executable stack contract is `JOV-INV-020`.
+
 ### Update Branch control-plane safety
 
 GitHub Update Branch is asynchronous: the branch Git ref can advance before the

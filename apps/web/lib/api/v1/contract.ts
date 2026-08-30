@@ -1,11 +1,12 @@
 import { BASE_URL } from '@/constants/app';
 import { DOCS_URL } from '@/constants/domains';
+import { APP_ROUTES } from '@/constants/routes';
 
 /** The public artist API's active semantic version. */
 export const PUBLIC_ARTIST_API_VERSION = '1.0.0';
 
-/** Canonical policy and lifecycle documentation for the active API. */
-export const PUBLIC_ARTIST_API_POLICY_URL = `${DOCS_URL}/docs/api-reference`;
+/** Canonical same-origin policy and lifecycle page for the active API. */
+export const PUBLIC_ARTIST_API_POLICY_URL = `${BASE_URL}${APP_ROUTES.API_VERSIONING}`;
 
 /** Structured-field policy identifier used by the public profile endpoint. */
 export const PUBLIC_ARTIST_API_RATE_LIMIT_POLICY = 'public-artist';
