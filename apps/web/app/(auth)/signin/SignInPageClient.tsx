@@ -200,7 +200,8 @@ export function SignInPageClient() {
         formTitle='Sign in'
         showFormTitle={false}
         showFooterPrompt={false}
-        layoutVariant='split'
+        layoutVariant='stack'
+        chrome='splash-b'
       >
         <AuthRoutePrefetch href={signUpUrl} />
         <SignInOauthErrorBanner />
