@@ -38,16 +38,23 @@ def pr(
     change_type: str = "MODIFIED",
     changed_files: int | None = None,
     files_payload: object | None = None,
+    base_ref: str = "main",
+    head_ref: str | None = None,
+    head_oid: str | None = None,
+    created_at: datetime | None = None,
 ) -> dict[str, object]:
+    exact_head = head_oid or f"{number if isinstance(number, int) else 0:040x}"[-40:]
     payload: dict[str, object] = {
         "number": number,
         "title": title,
         "body": body,
-        "headRefName": f"symphony/test-pr-{number}",
+        "baseRefName": base_ref,
+        "headRefName": head_ref or f"symphony/test-pr-{number}",
+        "headRefOid": exact_head,
         "isDraft": draft,
         "isCrossRepository": cross_repository,
         "mergeStateStatus": merge_state,
-        "createdAt": (updated_at - timedelta(hours=1)).isoformat(),
+        "createdAt": (created_at or updated_at - timedelta(hours=1)).isoformat(),
         "updatedAt": updated_at.isoformat(),
         "author": {"login": author},
         "labels": {"nodes": [{"name": label} for label in labels]},
@@ -106,7 +113,123 @@ def snapshot(**overrides: object) -> dict[str, object]:
     return value
 
 
+def stack_pr(
+    number: int,
+    base_ref: str,
+    *,
+    body: str = "",
+    merge_state: str = "CLEAN",
+) -> dict[str, object]:
+    return pr(
+        number,
+        title=f"wip: stack layer {number}",
+        body=body,
+        merge_state=merge_state,
+        draft=True,
+        base_ref=base_ref,
+        head_ref=f"stack/test-{number}",
+    )
+
+
 class ClosureClassificationTests(unittest.TestCase):
+    def test_four_layer_stack_with_owner_deadline_and_clean_path_is_green(self):
+        body = (
+            "<!-- stack-integrator: summer-test -->\n"
+            "<!-- stack-deadline: 2026-09-02T00:00:00Z -->"
+        )
+        layers = [
+            stack_pr(101, "main", body=body),
+            stack_pr(102, "stack/test-101"),
+            stack_pr(103, "stack/test-102"),
+            stack_pr(104, "stack/test-103"),
+        ]
+        result = MODULE.classify_open_prs(layers, NOW)
+        self.assertEqual(result["stackHealth"]["violations"], [])
+        self.assertEqual(result["repairActions"], [])
+        health = MODULE.evaluate_closure_health(
+            snapshot(
+                openPrs=4,
+                eligiblePrs=4,
+                greenReadyPrs=4,
+                classifications=result,
+            ),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "healthy")
+        self.assertTrue(health["newIssueIntakeAllowed"])
+
+    def test_five_layer_stack_is_immediate_red_with_one_split_action(self):
+        body = (
+            "<!-- stack-integrator: summer-test -->\n"
+            "<!-- stack-deadline: 2026-09-02T00:00:00Z -->"
+        )
+        layers = [
+            stack_pr(101, "main", body=body),
+            stack_pr(102, "stack/test-101"),
+            stack_pr(103, "stack/test-102"),
+            stack_pr(104, "stack/test-103"),
+            stack_pr(105, "stack/test-104"),
+        ]
+        result = MODULE.classify_open_prs(layers, NOW)
+        health = MODULE.evaluate_closure_health(
+            snapshot(
+                openPrs=5,
+                eligiblePrs=5,
+                greenReadyPrs=5,
+                classifications=result,
+            ),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(result["stackHealth"]["violations"][0]["rootPr"], 101)
+        self.assertIn(
+            "stack-depth-over-4",
+            result["stackHealth"]["violations"][0]["codes"],
+        )
+        self.assertEqual(len(result["repairActions"]), 1)
+        self.assertEqual(result["repairActions"][0]["action"], MODULE.STACK_REPAIR_ACTION)
+        self.assertEqual(result["repairActions"][0]["rootPr"], 101)
+        self.assertEqual(health["status"], "red")
+        self.assertIn("draft-stack-policy-violation", health["reasons"])
+        self.assertFalse(health["newIssueIntakeAllowed"])
+        self.assertTrue(health["promotionContinues"])
+        self.assertTrue(health["remediationContinues"])
+
+    def test_stack_requires_metadata_and_clean_ancestors(self):
+        layers = [
+            stack_pr(111, "main"),
+            stack_pr(112, "stack/test-111", merge_state="DIRTY"),
+        ]
+        result = MODULE.classify_open_prs(layers, NOW)
+        codes = result["stackHealth"]["violations"][0]["codes"]
+        self.assertIn("missing-stack-integrator", codes)
+        self.assertIn("missing-stack-deadline", codes)
+        self.assertIn("non-clean-stack-ancestor", codes)
+        self.assertEqual(len(result["repairActions"]), 1)
+
+    def test_expired_stack_deadline_and_orphaned_base_are_red(self):
+        expired = stack_pr(
+            121,
+            "main",
+            body=(
+                "<!-- stack-integrator: summer-test -->\n"
+                "<!-- stack-deadline: 2026-08-27T00:00:00Z -->"
+            ),
+        )
+        child = stack_pr(122, "stack/test-121")
+        orphan = stack_pr(123, "stack/closed-ancestor")
+        result = MODULE.classify_open_prs([expired, child, orphan], NOW)
+        by_root = {
+            item["rootPr"]: item["codes"]
+            for item in result["stackHealth"]["violations"]
+        }
+        self.assertIn("expired-stack-deadline", by_root[121])
+        self.assertIn("orphaned-stack-base", by_root[123])
+        self.assertEqual(
+            [action["rootPr"] for action in result["repairActions"]], [121, 123]
+        )
+
     def test_every_open_pr_receives_a_deterministic_lifecycle_disposition(self):
         result = MODULE.classify_open_prs(
             [
@@ -719,7 +842,7 @@ class ClosureObservationTests(unittest.TestCase):
             for argument in run.call_args.args[0]
             if argument.startswith("query=")
         )
-        self.assertIn("number title body headRefName", query_arg)
+        self.assertIn("number title body baseRefName headRefName headRefOid", query_arg)
         self.assertIn("isCrossRepository", query_arg)
         self.assertIn("changedFiles", query_arg)
         self.assertIn(f"files(first:{MODULE.CHANGED_FILES_PAGE})", query_arg)

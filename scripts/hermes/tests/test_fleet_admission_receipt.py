@@ -122,6 +122,8 @@ def inject_inventories(receipt: dict[str, object]) -> dict[str, object]:
     closure = dict(receipt["signals"]["closureHealth"])
     closure["classifications"] = huge_classifications()
     closure["episodes"] = {"controller": {"since": now_iso(), "active": True}}
+    closure["stackHealth"] = {"roots": [], "violations": [], "repairActions": []}
+    closure["repairActions"] = []
     signals_value = dict(receipt["signals"])
     signals_value["closureHealth"] = closure
     return {**receipt, "signals": signals_value}
@@ -145,6 +147,8 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         closure = projection["signals"]["closureHealth"]
         self.assertNotIn("classifications", closure)
         self.assertNotIn("episodes", closure)
+        self.assertNotIn("stackHealth", closure)
+        self.assertNotIn("repairActions", closure)
         return receipt, projection
 
     def test_exact_large_fixture_is_bounded_and_strips_inventories(self):
