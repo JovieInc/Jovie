@@ -5,7 +5,6 @@ import { fileURLToPath } from 'url';
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
 // Literal paths so the live-cert build stays bounded and statically analyzable.
 const LIVE_CERT_STORIES = [
   '../../../packages/ui/atoms/badge.stories.tsx',
@@ -23,18 +22,27 @@ const FULL_CATALOG_STORIES = [
   '../../../packages/ui/**/*.stories.@(js|jsx|ts|tsx|mdx)',
 ] as const;
 
+export function storybookAddonsForEnvironment(
+  isLiveStorybookCert = process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
+) {
+  return [
+    '@storybook/addon-docs',
+    // The live cert runs its own pinned, fail-closed axe pass in the preview
+    // iframe. Keep Storybook's automatic scan for normal and scheduled builds,
+    // but omit it from this dedicated build so the two axe runs cannot race.
+    ...(isLiveStorybookCert ? [] : ['@storybook/addon-a11y']),
+    '@storybook/addon-vitest',
+    '@chromatic-com/storybook',
+    '@storybook/addon-mcp',
+  ];
+}
+
 const config: StorybookConfig = {
   stories:
     process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
       ? [...LIVE_CERT_STORIES]
       : [...FULL_CATALOG_STORIES],
-  addons: [
-    '@storybook/addon-docs',
-    '@storybook/addon-a11y',
-    '@storybook/addon-vitest',
-    '@chromatic-com/storybook',
-    '@storybook/addon-mcp',
-  ],
+  addons: storybookAddonsForEnvironment(),
   framework: {
     name: '@storybook/nextjs-vite',
     options: {

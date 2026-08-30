@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -34,6 +35,70 @@ const HEAD = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const clone = value => structuredClone(value);
 const details = result => result.findings.map(item => item.detail).join('\n');
 const temps = [];
+const STORYBOOK_CONFIG = resolve(
+  import.meta.dirname,
+  '../../../apps/web/.storybook/main.ts'
+);
+const REPO_ROOT = resolve(import.meta.dirname, '../../../');
+
+function readStorybookAddons(liveCertMarker) {
+  const env = { ...process.env };
+  if (liveCertMarker === undefined) {
+    delete env.JOVIE_LIVE_STORYBOOK_CERT;
+  } else {
+    env.JOVIE_LIVE_STORYBOOK_CERT = liveCertMarker;
+  }
+  const loader = `
+    import configModule from ${JSON.stringify(STORYBOOK_CONFIG)};
+    const config = configModule.default ?? configModule;
+    process.stdout.write(JSON.stringify(config.addons ?? null));
+  `;
+  return JSON.parse(
+    execFileSync(
+      process.execPath,
+      ['--import', 'tsx', '--input-type=module', '--eval', loader],
+      { cwd: REPO_ROOT, encoding: 'utf8', env }
+    )
+  );
+}
+
+function createAxeConcurrencyFixture() {
+  let active = false;
+  let releaseActiveRun = null;
+  return {
+    run(label) {
+      if (active) {
+        return Promise.reject(
+          new Error(
+            'Axe is already running. Use await axe.run() to wait for the previous run to finish before starting a new run.'
+          )
+        );
+      }
+      active = true;
+      return new Promise(resolve => {
+        releaseActiveRun = () => {
+          active = false;
+          releaseActiveRun = null;
+          resolve(label);
+        };
+      });
+    },
+    release() {
+      releaseActiveRun?.();
+    },
+  };
+}
+
+async function runAxeRunners(addons) {
+  const axe = createAxeConcurrencyFixture();
+  const runs = [];
+  if (addons.includes('@storybook/addon-a11y')) {
+    runs.push(axe.run('storybook automatic scan'));
+  }
+  runs.push(axe.run('custom live-cert scan'));
+  axe.release();
+  return Promise.allSettled(runs);
+}
 
 afterEach(() => {
   for (const dir of temps.splice(0)) {
@@ -239,6 +304,38 @@ describe('live Storybook component certification', () => {
     expect(genericBare).toBeGreaterThan(clientBare);
     expect(source).toContain('jovie-storybook-react-dom-client-interop');
     expect(source).toContain('jovie-react-dom-client');
+  });
+
+  it('omits addon-a11y only from the dedicated live-cert build', () => {
+    const normal = readStorybookAddons();
+    const live = readStorybookAddons('1');
+    const nearMiss = readStorybookAddons('true');
+
+    expect(normal).toContain('@storybook/addon-a11y');
+    expect(live).not.toContain('@storybook/addon-a11y');
+    expect(nearMiss).toContain('@storybook/addon-a11y');
+  });
+
+  it('keeps the deliberate concurrent axe-run fixture red and the live cert green', async () => {
+    const normal = await runAxeRunners(readStorybookAddons());
+    const live = await runAxeRunners(readStorybookAddons('1'));
+
+    expect(normal).toHaveLength(2);
+    expect(normal[0]).toMatchObject({
+      status: 'fulfilled',
+      value: 'storybook automatic scan',
+    });
+    const concurrencyFailure = normal[1];
+    expect(concurrencyFailure.status).toBe('rejected');
+    if (concurrencyFailure.status !== 'rejected') {
+      throw new Error('expected the concurrent custom axe run to be rejected');
+    }
+    expect(concurrencyFailure.reason).toMatchObject({
+      message: expect.stringContaining('Axe is already running'),
+    });
+    expect(live).toEqual([
+      { status: 'fulfilled', value: 'custom live-cert scan' },
+    ]);
   });
 });
 
