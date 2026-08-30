@@ -6,7 +6,6 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
-  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -88,7 +87,6 @@ async function spawnLifecycleHarness(action, timeoutMs = 5_000) {
   const helperPidFile = join(dir, 'browser-helper.pid');
   const helperSignalFile = join(dir, 'browser-helper-signals.log');
   const browserExecutable = join(dir, 'chromium');
-  symlinkSync(process.execPath, browserExecutable);
   // The helper's newline must survive three parse levels (this file -> the
   // generated module -> the browser shim -> the helper). A `\n` escape collapses
   // to a real newline mid-chain and breaks the helper, so build it at runtime.
@@ -138,7 +136,7 @@ async function spawnLifecycleHarness(action, timeoutMs = 5_000) {
         })
       : null;
     const browser = spawn(
-      ${JSON.stringify(browserExecutable)},
+      process.execPath,
       [
         '-e',
         ${JSON.stringify(browserScript)},
@@ -148,8 +146,15 @@ async function spawnLifecycleHarness(action, timeoutMs = 5_000) {
         STORYBOOK_VITEST_OWNER_ARG + lifecycle.token,
         '--user-data-dir=' + lifecycle.tempRoot + '/playwright_chromiumdev_profile-fixture',
       ],
-      { detached: true, stdio: 'ignore' }
+      {
+        argv0: ${JSON.stringify(browserExecutable)},
+        detached: true,
+        stdio: 'ignore',
+      }
     );
+    browser.once('error', error => {
+      throw error;
+    });
     browser.unref();
     while (!existsSync(${JSON.stringify(helperPidFile)})) {
       await new Promise(resolve => setTimeout(resolve, 25));
@@ -188,11 +193,38 @@ async function spawnLifecycleHarness(action, timeoutMs = 5_000) {
     ['--input-type=module', '--eval', script],
     {
       cwd: REPO_ROOT,
-      stdio: 'ignore',
+      stdio: ['ignore', 'ignore', 'pipe'],
     }
   );
+  let childStderr = '';
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', chunk => {
+    childStderr += chunk;
+  });
   ownedPids.push(child.pid);
-  await waitFor(() => existsSync(readyFile));
+  try {
+    await waitFor(
+      () =>
+        existsSync(readyFile) ||
+        child.exitCode !== null ||
+        child.signalCode !== null
+    );
+  } catch (error) {
+    throw new Error(
+      `${error.message}; harness exit=${JSON.stringify({
+        code: child.exitCode,
+        signal: child.signalCode,
+      })}; stderr=${childStderr.trim() || '<empty>'}`
+    );
+  }
+  if (!existsSync(readyFile)) {
+    throw new Error(
+      `lifecycle harness exited before ready.json; exit=${JSON.stringify({
+        code: child.exitCode,
+        signal: child.signalCode,
+      })}; stderr=${childStderr.trim() || '<empty>'}`
+    );
+  }
   const ready = JSON.parse(readFileSync(readyFile, 'utf8'));
   ownedPids.push(ready.browserPid, ready.helperPid);
   return { child, ready };
