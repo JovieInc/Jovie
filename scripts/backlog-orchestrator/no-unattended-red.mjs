@@ -3,7 +3,9 @@
 /** JOV-INV-017 — Summer No Unattended Red loop. Event classification/dispatch;
  * reconciliation recovers missed events only. Receipts/queue only. */
 
+import { spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
+import { once } from 'node:events';
 import { mkdir, open, readdir, readFile, rename } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
@@ -14,6 +16,14 @@ export const ATTEMPT_BUDGET = 3;
 export const AUTHORITY_BUDGET = 1;
 export const BACKOFF_BASE_MS = 60_000;
 export const BACKOFF_MAX_MS = 60 * 60 * 1000;
+export const SUMMER_QUEUE_LOCK_TIMEOUT_MS = 30_000;
+
+const SUMMER_QUEUE_LOCK_HELPER = `import fcntl, sys
+with open(sys.argv[1], 'a+', encoding='utf-8') as handle:
+    fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+    print('locked', flush=True)
+    sys.stdin.buffer.read(1)
+`;
 
 // biome-ignore format: compact stall tables for the PR size guard
 const ROUTE_TABLE = [
@@ -97,7 +107,7 @@ function createApi() {
   const workflowName = signal => text(signal.workflowName) || text(signal.workflow) || text(signal.workflow?.name);
   const identifiedKey = signal => text(signal.issue) || (prn(signal.pr) ? `pr:${prn(signal.pr)}` : null);
   const anonymousIdentity = signal => digest({ stallClass: text(signal.stallClass) || 'not-proven', workflow: workflowName(signal), issue: text(signal.issue), pr: prn(signal.pr), headSha: sha(signal.headSha) });
-  const issueKey = signal => identifiedKey(signal) || text(signal.deliveryKey) || anonymousIdentity(signal);
+  const issueKey = signal => text(signal.stallClass) === 'draft-stack-policy' ? text(signal.deliveryKey) : identifiedKey(signal) || text(signal.deliveryKey) || anonymousIdentity(signal);
   const loopKeyFor = classified => digest({ issueKey: classified.issueKey });
   const leaseKeyFor = classified => digest({ issueKey: classified.issueKey, writer: classified.writer, headSha: classified.headSha });
   const backoffMs = attempt => Math.min(BACKOFF_MAX_MS, BACKOFF_BASE_MS * 2 ** (Math.max(1, Number.isInteger(attempt) ? attempt : 1) - 1));
@@ -224,15 +234,40 @@ function createApi() {
     if (rank(right) !== rank(left)) return rank(right) > rank(left) ? right : left;
     return `${right.observedAt || ''}`.localeCompare(`${left.observedAt || ''}`) >= 0 ? right : left;
   }
+  function preferDraftStackRecord(left, right) {
+    const observed = `${right.observedAt || ''}`.localeCompare(`${left.observedAt || ''}`);
+    if (observed !== 0) return observed > 0 ? right : left;
+    if (right.outcome === 'healthy' && left.outcome !== 'healthy') return right;
+    if (left.outcome === 'healthy' && right.outcome !== 'healthy') return left;
+    return preferQueueRecord(left, right);
+  }
   function projectSummerQueue(records, { now = new Date().toISOString() } = {}) {
     const source = [...(records || [])];
     const collapsed = new Map();
-    for (const record of source.filter(record => record.outcome !== 'healthy')) {
+    const draftStacks = new Map();
+    for (const record of source) {
+      if (record.stallClass === 'draft-stack-policy' && prn(record.pr)) {
+        const key = `draft-stack:${record.pr}`;
+        draftStacks.set(
+          key,
+          draftStacks.has(key)
+            ? preferDraftStackRecord(draftStacks.get(key), record)
+            : record
+        );
+        continue;
+      }
+      if (record.outcome === 'healthy') continue;
       const key = identifiedKey(record) || anonymousIdentity(record);
       collapsed.set(key, collapsed.has(key) ? preferQueueRecord(collapsed.get(key), record) : record);
     }
+    for (const [key, record] of draftStacks) {
+      if (record.outcome !== 'healthy') collapsed.set(key, record);
+    }
     const items = [...collapsed.values()].sort((left, right) => `${left.issueKey}:${left.observedAt}`.localeCompare(`${right.issueKey}:${right.observedAt}`)).map(record => ({ ...Object.fromEntries(QUEUE_KEYS.map(key => [key, record[key]])), issue: record.issue, stallClass: record.stallClass, outcome: record.outcome, escalation: record.escalation || null }));
-    const terminalTombstones = source.filter(record => record.outcome === 'healthy').map(record => ({ ...Object.fromEntries(QUEUE_KEYS.map(key => [key, record[key]])), issue: record.issue, pr: record.pr, outcome: record.outcome, terminal: record.terminal, observedAt: record.observedAt, reason: record.reason }));
+    const terminalTombstones = [
+      ...source.filter(record => record.stallClass !== 'draft-stack-policy' && record.outcome === 'healthy'),
+      ...[...draftStacks.values()].filter(record => record.outcome === 'healthy'),
+    ].map(record => ({ ...Object.fromEntries(QUEUE_KEYS.map(key => [key, record[key]])), issue: record.issue, pr: record.pr, outcome: record.outcome, terminal: record.terminal, observedAt: record.observedAt, reason: record.reason }));
     return { schema: SUMMER_QUEUE_SCHEMA, authority: 'Summer', observedAt: iso(now), items, terminalTombstones, counts: { open: items.filter(item => item.outcome === 'open').length, healthy: 0, escalated: items.filter(item => item.outcome === 'escalated').length, terminalHidden: terminalTombstones.length } };
   }
   function evidenceTaskForRecord(record) {
@@ -257,23 +292,152 @@ function createApi() {
       return records;
     } catch (error) { if (error?.code === 'ENOENT') return []; throw error; }
   }
-  async function persistLoopOutcome(record, { stateDir = '', dryRun = false } = {}) {
-    assertNoUnattendedRed([record]);
-    const destination = join(stateDir, 'red-loop', `${record.loopKey}.json`);
-    const evidence = evidenceTaskForRecord(record);
-    const evidencePath = evidence ? join(stateDir, 'evidence-tasks', `${evidence.taskKey}.json`) : null;
-    if (dryRun) return { status: 'dry-run', record, recordPath: destination, evidence, evidencePath };
-    const persisted = await atomicCreate(destination, record);
-    const persistedEvidence = evidence ? await atomicCreate(evidencePath, evidence) : null;
-    const queue = projectSummerQueue(await loadLoopRecords(stateDir), { now: record.observedAt });
+  async function readSummerQueue(stateDir) {
+    try { return JSON.parse(await readFile(join(stateDir, 'summer-queue.json'), 'utf8')); }
+    catch (error) { if (error?.code === 'ENOENT') return null; throw error; }
+  }
+  async function withSummerQueueLock(
+    stateDir,
+    callback,
+    { timeoutMs = SUMMER_QUEUE_LOCK_TIMEOUT_MS } = {}
+  ) {
+    await mkdir(stateDir, { recursive: true, mode: 0o700 });
+    const lockPath = join(stateDir, '.summer-queue.lock');
+    const child = spawn('python3', ['-c', SUMMER_QUEUE_LOCK_HELPER, lockPath], { stdio: ['pipe', 'pipe', 'pipe'] });
+    const closed = once(child, 'close');
+    let stderr = '';
+    child.stderr.setEncoding('utf8'); child.stderr.on('data', chunk => { stderr += chunk; });
+    let timer; let locked = false;
+    try {
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error(`summer queue writer lock timed out: ${lockPath}`)); }, timeoutMs);
+      });
+      const ready = await Promise.race([
+        once(child.stdout, 'data').then(([chunk]) => `${chunk}`),
+        closed.then(([code]) => { throw new Error(`summer queue writer lock helper exited ${code}: ${stderr.trim()}`); }),
+        timeout,
+      ]);
+      if (!ready.includes('locked')) throw new Error(`summer queue writer lock helper malformed output: ${ready.trim()}`);
+      clearTimeout(timer);
+      locked = true;
+      return await callback();
+    } finally {
+      clearTimeout(timer);
+      if (child.exitCode == null) child.stdin.end();
+      const [code] = child.exitCode == null ? await closed : [child.exitCode];
+      if (locked && code !== 0) throw new Error(`summer queue writer lock helper exited ${code}: ${stderr.trim()}`);
+    }
+  }
+  async function writeSummerQueue(stateDir, observedAt, draftStackAuthority = null) {
+    const records = await loadLoopRecords(stateDir);
+    const current = await readSummerQueue(stateDir);
+    const authority = draftStackAuthority || current?.draftStackAuthority || null;
+    const authorityAt = Date.parse(authority?.observedAt);
+    const visibleRecords = records.filter(record => record.stallClass !== 'draft-stack-policy' || !authority || record.draftStackGeneration === authority.snapshotKey || (!record.draftStackGeneration && Date.parse(record.observedAt) < authorityAt));
+    const queueObservedAt = visibleRecords.reduce(
+      (latest, record) => Date.parse(record.observedAt) > Date.parse(latest) ? record.observedAt : latest,
+      Date.parse(current?.observedAt) > Date.parse(observedAt) ? current.observedAt : observedAt
+    );
+    const queue = projectSummerQueue(visibleRecords, { now: queueObservedAt });
+    queue.draftStackAuthority = authority;
     const queuePath = join(stateDir, 'summer-queue.json');
     const temporary = `${queuePath}.${randomBytes(8).toString('hex')}.tmp`;
     await atomicWrite(temporary, queue, 'w');
     await rename(temporary, queuePath);
-    return { status: persisted.status, record: persisted.value, recordPath: destination, evidence: persistedEvidence?.value || null, evidencePath, queue, queuePath };
+    return { queue, queuePath };
+  }
+  async function persistLoopOutcome(record, { stateDir = '', dryRun = false, beforeProject = null, reactivateDraftStack = false, queueLockHeld = false } = {}) {
+    assertNoUnattendedRed([record]);
+    const destination = join(stateDir, 'red-loop', `${record.loopKey}.json`);
+    let recordPath = destination;
+    const evidence = evidenceTaskForRecord(record);
+    const evidencePath = evidence ? join(stateDir, 'evidence-tasks', `${evidence.taskKey}.json`) : null;
+    if (dryRun) return { status: 'dry-run', record, recordPath: destination, evidence, evidencePath };
+    const persist = async () => {
+      let persisted = await atomicCreate(destination, record);
+      if (reactivateDraftStack && persisted.status === 'duplicate') {
+        const latest = (await loadLoopRecords(stateDir))
+          .filter(item => item.stallClass === 'draft-stack-policy' && item.pr === record.pr)
+          .reduce((current, item) => current ? preferDraftStackRecord(current, item) : item, null);
+        if (
+          latest &&
+          Date.parse(record.observedAt) > Date.parse(latest.observedAt)
+        ) {
+          const reactivated = {
+            ...record,
+            loopKey: digest({ supersedes: latest.loopKey, deliveryKey: record.deliveryKey, observedAt: record.observedAt }),
+            supersedesLoopKey: latest.loopKey,
+          };
+          recordPath = join(stateDir, 'red-loop', `${reactivated.loopKey}.json`);
+          persisted = await atomicCreate(recordPath, reactivated);
+        }
+      }
+      const persistedEvidence = evidence ? await atomicCreate(evidencePath, evidence) : null;
+      if (typeof beforeProject === 'function') await beforeProject();
+      if (queueLockHeld) {
+        return { status: persisted.status, record: persisted.value, recordPath, evidence: persistedEvidence?.value || null, evidencePath, queue: null, queuePath: null };
+      }
+      const { queue, queuePath } = await writeSummerQueue(stateDir, record.observedAt);
+      return { status: persisted.status, record: persisted.value, recordPath, evidence: persistedEvidence?.value || null, evidencePath, queue, queuePath };
+    };
+    return queueLockHeld ? persist() : withSummerQueueLock(stateDir, persist);
+  }
+  async function persistDraftStackResolutions(
+    activeRoots,
+    { stateDir = '', dryRun = false, now = new Date().toISOString(), queueLockHeld = false, draftStackAuthority = null } = {}
+  ) {
+    if (activeRoots == null) {
+      return { status: 'unobserved', resolved: [], queue: null, queuePath: null };
+    }
+    const roots = new Set(
+      [...(activeRoots || [])].map(root => {
+        const parsed = prn(root);
+        if (!parsed) throw new Error('active draft stack root is invalid');
+        return parsed;
+      })
+    );
+    if (dryRun) return { status: 'dry-run', resolved: [], queue: null, queuePath: null };
+    const persist = async () => {
+      const resolutionObservedAt = iso(now);
+      const records = await loadLoopRecords(stateDir);
+      const latest = new Map();
+      for (const record of records) {
+        if (record.stallClass !== 'draft-stack-policy' || !prn(record.pr)) continue;
+        const root = prn(record.pr);
+        latest.set(
+          root,
+          latest.has(root)
+            ? preferDraftStackRecord(latest.get(root), record)
+            : record
+        );
+      }
+      const resolved = [];
+      for (const [root, record] of latest) {
+        if (roots.has(root) || record.outcome === 'healthy' || !(Date.parse(resolutionObservedAt) > Date.parse(record.observedAt))) continue;
+        const tombstone = {
+          ...record,
+          loopKey: digest({ supersedes: record.loopKey, outcome: 'healthy', observedAt: resolutionObservedAt }),
+          issueKey: `draft-stack-resolved:${root}:${resolutionObservedAt}`,
+          outcome: 'healthy',
+          terminal: true,
+          dispatchState: 'complete',
+          observedAt: resolutionObservedAt,
+          reason: 'draft-stack-policy-current-action-absent',
+          supersedesLoopKey: record.loopKey,
+          draftStackGeneration: draftStackAuthority?.snapshotKey || record.draftStackGeneration || null,
+          externalMutations: 0,
+        };
+        const destination = join(stateDir, 'red-loop', `${tombstone.loopKey}.json`);
+        const persisted = await atomicCreate(destination, tombstone);
+        resolved.push({ rootPr: root, status: persisted.status, record: persisted.value });
+      }
+      const { queue, queuePath } = await writeSummerQueue(stateDir, resolutionObservedAt, draftStackAuthority);
+      return { status: resolved.length ? 'resolved' : 'unchanged', resolved, queue, queuePath };
+    };
+    return queueLockHeld ? persist() : withSummerQueueLock(stateDir, persist);
   }
   const classifyAndOpenFromDelivery = (input, options = {}) => openLoopRecord(classifyStall(input, options), options);
-  return { inferStallClass, classifyStall, loopKeyFor, leaseKeyFor, backoffMs, openLoopRecord, dispatchOpenRecords, requalifyExactHead, escalate, advanceAttempt, sourceAlignment, splitSizeGuardChange, reconcileMissedEvents, projectSummerQueue, assertNoUnattendedRed, evidenceTaskForRecord, loadLoopRecords, persistLoopOutcome, classifyAndOpenFromDelivery };
+  return { inferStallClass, classifyStall, loopKeyFor, leaseKeyFor, backoffMs, openLoopRecord, dispatchOpenRecords, requalifyExactHead, escalate, advanceAttempt, sourceAlignment, splitSizeGuardChange, reconcileMissedEvents, projectSummerQueue, assertNoUnattendedRed, evidenceTaskForRecord, loadLoopRecords, readSummerQueue, persistLoopOutcome, persistDraftStackResolutions, withSummerQueueLock, classifyAndOpenFromDelivery };
 }
 
 const api = createApi();
@@ -294,5 +458,8 @@ export const projectSummerQueue = api.projectSummerQueue;
 export const assertNoUnattendedRed = api.assertNoUnattendedRed;
 export const evidenceTaskForRecord = api.evidenceTaskForRecord;
 export const loadLoopRecords = api.loadLoopRecords;
+export const readSummerQueue = api.readSummerQueue;
 export const persistLoopOutcome = api.persistLoopOutcome;
+export const persistDraftStackResolutions = api.persistDraftStackResolutions;
+export const withSummerQueueLock = api.withSummerQueueLock;
 export const classifyAndOpenFromDelivery = api.classifyAndOpenFromDelivery;

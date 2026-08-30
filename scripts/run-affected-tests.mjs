@@ -530,13 +530,19 @@ const NO_UNATTENDED_RED_PRIMARY_INPUTS = new Set([
 const NO_UNATTENDED_RED_LANE = new Set([
   ...NO_UNATTENDED_RED_PRIMARY_INPUTS,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  '.github/workflows/fleet-gate-refresh.yml',
   '.github/workflows/delivery-control-receipts.yml',
   'canon/invariants.jsonl',
+  'scripts/hermes/closure_health.py',
   'scripts/hermes/gem-ops-hud.py',
+  'scripts/hermes/tests/closure-health.test.py',
+  'scripts/hermes/tests/gem-priority-gate.test.py',
   'scripts/hermes/tests/gem-ops-hud.test.py',
   'scripts/lib/ownerless-recovery-policy.mjs',
   'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
+  'scripts/lib/__tests__/queue-deferred-release.test.mjs',
   'scripts/invariants/registry.test.mjs',
+  'scripts/tests/test_agent_workflow_hygiene.py',
 ]);
 const NO_UNATTENDED_RED_NODE_TESTS = [
   'scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs',
@@ -544,11 +550,17 @@ const NO_UNATTENDED_RED_NODE_TESTS = [
   'scripts/invariants/registry.test.mjs',
 ];
 const NO_UNATTENDED_RED_PYTHON_TESTS = [
+  'scripts/hermes/tests/closure-health.test.py',
+  'scripts/hermes/tests/gem-priority-gate.test.py',
   'scripts/hermes/tests/gem-ops-hud.test.py',
+];
+const NO_UNATTENDED_RED_PYTEST_TESTS = [
+  'scripts/tests/test_agent_workflow_hygiene.py',
 ];
 const NO_UNATTENDED_RED_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
+  'scripts/lib/__tests__/queue-deferred-release.test.mjs',
 ];
 const AUTHENTICATED_A11Y_REPAIR_CORE = new Set([
   'apps/web/app/exp/shell-v1/page.tsx',
@@ -965,7 +977,7 @@ export function buildAffectedTestPlan(
       mandatoryTests: [],
       selectedTests: [],
       rootVitestTests: [],
-      pythonTests: [],
+      pythonTests: NO_UNATTENDED_RED_PYTEST_TESTS,
       pythonUnittestTests: NO_UNATTENDED_RED_PYTHON_TESTS,
       scriptVitestTests: NO_UNATTENDED_RED_SCRIPT_TESTS,
       nodeTests: NO_UNATTENDED_RED_NODE_TESTS,

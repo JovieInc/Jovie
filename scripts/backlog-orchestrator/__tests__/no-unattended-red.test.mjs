@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -16,6 +18,7 @@ import {
   loopKeyFor,
   NO_UNATTENDED_RED_SCHEMA,
   openLoopRecord,
+  persistDraftStackResolutions,
   persistLoopOutcome,
   projectSummerQueue,
   reconcileMissedEvents,
@@ -23,6 +26,7 @@ import {
   STALL_CLASSES,
   SUMMER_QUEUE_SCHEMA,
   splitSizeGuardChange,
+  withSummerQueueLock,
 } from '../no-unattended-red.mjs';
 
 const HEAD = 'a'.repeat(40);
@@ -348,6 +352,55 @@ describe('no unattended red loop', () => {
     assert.equal(queue.items.filter(item => item.stallClass === 'missing-failing-checks').length, 1);
     assert.equal(queue.items.filter(item => item.issue === 'JOV-5400').length, 1);
     assert.equal(projectSummerQueue([], { now: NOW }).items.length, 0);
+  });
+
+  it('serializes queue generations and recovers after a dead writer', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'jovie-red-queue-lock-'));
+    let releaseFirst; let markFirstEntered; let holder;
+    const firstEntered = new Promise(resolve => { markFirstEntered = resolve; });
+    const holdFirst = new Promise(resolve => { releaseFirst = resolve; });
+    try {
+      const first = persistLoopOutcome(open('queue-eviction', { issue: 'JOV-LOCK-1', pr: 16601 }), {
+        stateDir: directory,
+        beforeProject: async () => { markFirstEntered(); await holdFirst; },
+      });
+      await firstEntered;
+      let secondCompleted = false;
+      const second = persistLoopOutcome(
+        open('missing-failing-checks', { issue: 'JOV-LOCK-2', pr: 16602 }),
+        { stateDir: directory }
+      ).then(result => { secondCompleted = true; return result; });
+      await new Promise(resolve => setTimeout(resolve, 75));
+      assert.equal(secondCompleted, false);
+      releaseFirst(); await Promise.all([first, second]);
+      const queue = JSON.parse(await readFile(join(directory, 'summer-queue.json'), 'utf8'));
+      assert.deepEqual(queue.items.map(item => item.pr).sort(), [16601, 16602]);
+      const oldKey = '1'.repeat(64); const newKey = '2'.repeat(64); const later = '2026-08-28T23:00:00.000Z';
+      const authority = (snapshotKey, observedAt) => ({ schema: 'jovie-draft-stack-authority/v1', snapshotKey, observedAt });
+      const draft = { ...open('draft-stack-policy', { issue: null, pr: 16603, delivery_key: 'stack-16603' }), draftStackGeneration: oldKey };
+      await withSummerQueueLock(directory, async () => {
+        await persistLoopOutcome(draft, { stateDir: directory, queueLockHeld: true });
+        await persistDraftStackResolutions([16603], { stateDir: directory, now: NOW, queueLockHeld: true, draftStackAuthority: authority(oldKey, NOW) });
+      });
+      const partial = { ...draft, loopKey: 'f'.repeat(64), outcome: 'healthy', terminal: true, observedAt: later, draftStackGeneration: newKey };
+      await withSummerQueueLock(directory, () => persistLoopOutcome(partial, { stateDir: directory, queueLockHeld: true }));
+      const afterCrash = await persistLoopOutcome(open('queue-eviction', { issue: 'JOV-LOCK-4', pr: 16604 }), { stateDir: directory });
+      assert.equal(afterCrash.queue.items.find(item => item.pr === 16603).outcome, 'open');
+      const recovered = await withSummerQueueLock(directory, () => persistDraftStackResolutions([], { stateDir: directory, now: later, queueLockHeld: true, draftStackAuthority: authority(newKey, later) }));
+      assert.equal(recovered.queue.items.some(item => item.pr === 16603), false);
+      const equalLegacy = { ...draft, loopKey: 'e'.repeat(64), observedAt: later, draftStackGeneration: null };
+      assert.equal((await persistLoopOutcome(equalLegacy, { stateDir: directory })).queue.items.some(item => item.pr === 16603), false);
+      holder = spawn('python3', ['-c', "import fcntl,sys,time; f=open(sys.argv[1],'a+'); fcntl.flock(f,fcntl.LOCK_EX); print('locked',flush=True); time.sleep(30)", join(directory, '.summer-queue.lock')], { stdio: ['ignore', 'pipe', 'pipe'] });
+      await once(holder.stdout, 'data');
+      let completed = false;
+      const pending = persistLoopOutcome(open('queue-eviction', { issue: 'JOV-DEAD', pr: 16605 }), { stateDir: directory }).then(result => { completed = true; return result; });
+      await new Promise(resolve => setTimeout(resolve, 75)); assert.equal(completed, false);
+      holder.kill('SIGKILL'); await once(holder, 'exit');
+      assert.equal((await pending).queue.items.some(item => item.pr === 16605), true);
+    } finally {
+      releaseFirst?.(); holder?.kill('SIGKILL');
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it('deliberate red: silent or unattended red is rejected', () => {
