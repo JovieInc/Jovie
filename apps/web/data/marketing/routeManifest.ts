@@ -474,6 +474,44 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
   },
   {
+    glob: '(marketing)/cli/page.tsx',
+    recipeId: 'seo',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/components/marketing/CliLandingPage.tsx',
+        'hero',
+        'centered-none'
+      ),
+      ...approvedBindings(
+        'apps/web/components/marketing/CliLandingPage.tsx',
+        'content-prose'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/CliLandingPage.tsx',
+        'faq',
+        'structured-data-list'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/CliLandingPage.tsx',
+        'cta',
+        'final-single-claim'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source: 'JOV-5472 CLI landing page',
+      notes:
+        'Canonical /cli uses MarketingHero centered-none, prose command docs, FAQPage schema, and MarketingFooterCta. content-prose has no active variant.',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/cli',
+    healthCheck: {
+      path: '/cli',
+      expected: 'page',
+    },
+  },
+  {
     glob: '(marketing)/compare/[slug]/page.tsx',
     recipeId: 'comparison',
     renderedSections: approvedBindings(
