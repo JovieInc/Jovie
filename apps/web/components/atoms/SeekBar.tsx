@@ -86,7 +86,7 @@ export function SeekBar({
       aria-label='Seek track'
       disabled={isDisabled}
       className={cn(
-        'seek-range cursor-pointer appearance-none rounded-full accent-(--color-accent-purple) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) disabled:cursor-default disabled:opacity-50',
+        'seek-range cursor-pointer appearance-none rounded-full accent-(--linear-accent) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) disabled:cursor-default disabled:opacity-50',
         className
       )}
       style={

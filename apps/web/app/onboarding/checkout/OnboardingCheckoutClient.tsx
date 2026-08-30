@@ -109,7 +109,7 @@ function ProfilePreviewCard({
 
       {spotifyFollowers && spotifyFollowers > 0 ? (
         <ContentSurfaceCard className='mb-4 px-4 py-3'>
-          <Sparkles className='mt-0.5 h-4 w-4 shrink-0 text-(--color-accent-purple)' />
+          <Sparkles className='mt-0.5 h-4 w-4 shrink-0 text-(--linear-accent)' />
           <p className='text-app text-secondary-token'>
             You have{' '}
             <span className='font-medium text-primary-token'>
@@ -170,7 +170,7 @@ function BillingIntervalSelector({
             onChange={() => onSelect(true)}
           />
           Annual{' '}
-          <span aria-hidden='true' className='text-(--color-accent-purple)'>
+          <span aria-hidden='true' className='text-(--linear-accent)'>
             -{savingsPercent}%
           </span>
         </label>
@@ -298,7 +298,7 @@ export function OnboardingCheckoutClient({
             {PRO_HIGHLIGHTS.map(item => (
               <div key={item.label} className='flex items-start gap-3'>
                 <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-1'>
-                  <item.icon className='h-4 w-4 text-(--color-accent-purple)' />
+                  <item.icon className='h-4 w-4 text-(--linear-accent)' />
                 </div>
                 <div>
                   <p className='text-app font-medium text-primary-token'>

@@ -179,7 +179,7 @@ export function MobileNav({
           'transition-colors duration-subtle ease-subtle',
           '[-webkit-tap-highlight-color:transparent]',
           'hover:bg-(--linear-bg-hover)',
-          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-accent-purple)'
+          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--linear-accent)'
         )}
         aria-label={isOpen ? 'Close menu' : 'Open menu'}
         aria-expanded={isOpen}

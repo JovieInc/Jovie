@@ -32,7 +32,7 @@ export function ActiveFilterPill({
         )}
         <span className='text-tertiary-token'>{groupLabel}</span>
         <span className='text-tertiary-token'>is</span>
-        <span className='font-caption text-(--color-accent-purple)'>
+        <span className='font-caption text-(--linear-accent)'>
           {displayValue}
         </span>
       </div>

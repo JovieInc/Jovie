@@ -84,7 +84,7 @@ export const ReleaseCell = memo(function ReleaseCell({
             className={cn(
               'h-4 w-4 rounded-xs p-0 transition-opacity duration-subtle focus-visible:opacity-100',
               isPlaying
-                ? 'text-(--color-accent-purple) opacity-100'
+                ? 'text-(--linear-accent) opacity-100'
                 : 'text-quaternary-token opacity-0 group-hover:opacity-100 aria-[pressed=true]:opacity-100'
             )}
             aria-label={

@@ -202,7 +202,7 @@ export function GetStartedChecklistCard({
       {/* Progress bar */}
       <div className='mx-3 mt-2 h-1 rounded-full bg-surface-0'>
         <div
-          className='h-1 rounded-full bg-(--color-accent-purple) transition-[width] duration-subtle'
+          className='h-1 rounded-full bg-(--linear-accent) transition-[width] duration-subtle'
           style={{
             width: `${(completedCount / CHECKLIST_ITEMS.length) * 100}%`,
           }}
@@ -222,7 +222,7 @@ export function GetStartedChecklistCard({
               }}
               className={`flex h-4.5 w-4.5 flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
                 isDone
-                  ? 'border-(--color-accent-purple) bg-(--color-accent-purple)'
+                  ? 'border-(--linear-accent) bg-(--linear-accent)'
                   : 'border-subtle bg-(--linear-app-content-surface) hover:border-secondary-token'
               }`}
               aria-label={

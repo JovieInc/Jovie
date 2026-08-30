@@ -90,7 +90,7 @@ export function DashboardLinksDemo() {
                       width: visible
                         ? `${(link.clicks / maxClicks) * 100}%`
                         : '0%',
-                      backgroundColor: 'var(--color-accent-purple)',
+                      backgroundColor: 'var(--linear-accent)',
                       opacity: 0.7,
                       transition: `width 0.8s var(--ds-motion-cinematic-easing) ${i * 60}ms`,
                     }}
