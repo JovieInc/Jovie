@@ -61,6 +61,7 @@ import { evaluateRemoteDebuggingGuard } from './remote-debugging-guard';
 import {
   classifyDesktopLoadFailure,
   decideAbortedMainFrameRecovery,
+  decideDidFinishLoadRecovery,
   decideHostedLoadRetry,
   decideLocalMainFrameLoadFailure,
   decideRecoveryUnlatch,
@@ -1589,6 +1590,16 @@ function attachRendererRecovery(
   });
 
   win.webContents.on('did-finish-load', () => {
+    // Chromium still emits did-finish-load for chrome-error://chromewebdata/
+    // after did-fail-load. That is not a hosted app load — resetting the
+    // local retry budget and calling clearAllWatchdogs() here cancels the
+    // pending retry and leaves Jovie Local black (JOV-5474).
+    if (
+      decideDidFinishLoadRecovery({ url: win.webContents.getURL() }) ===
+      'ignore'
+    ) {
+      return;
+    }
     localHostedLoadRetryCount = 0;
     armBootWatchdog();
   });
