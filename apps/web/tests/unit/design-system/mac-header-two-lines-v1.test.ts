@@ -25,10 +25,12 @@ import {
  * miss this invariant bans.
  *
  * Detector (source contract, fail closed): every <h1>/<h2> opening tag in
- * the shell surfaces (apps/web/components/shell/** and apps/web/app/app/**,
- * the tree the desktop app renders) must carry an explicit wrap bound:
- * `line-clamp-1`, `line-clamp-2`, `truncate`, or be `sr-only`. Anything
- * else can exceed two lines and is red. No baseline, no allowlist.
+ * the surfaces the Mac app renders — the app shell (components/shell/**,
+ * app/app/**) AND the marketing pages (Tim add 2026-08-30: marketing routes
+ * and components are in scope for the blocking layout tests) — must carry
+ * an explicit wrap bound: `line-clamp-1`, `line-clamp-2`, `truncate`, or be
+ * `sr-only`. Anything else can exceed two lines and is red. No baseline,
+ * no allowlist.
  */
 
 const CLAMP_BOUND = /(line-clamp-1|line-clamp-2|truncate|sr-only)/;
@@ -38,6 +40,12 @@ function shellSurfaceFiles(): string[] {
   const roots = [
     join(WEB_ROOT, 'components', 'shell'),
     join(WEB_ROOT, 'app', 'app'),
+    // Marketing surfaces (in scope per Tim, 2026-08-30).
+    join(WEB_ROOT, 'app', '(marketing)'),
+    join(WEB_ROOT, 'app', '(home)'),
+    join(WEB_ROOT, 'components', 'marketing'),
+    join(WEB_ROOT, 'components', 'site'),
+    join(WEB_ROOT, 'components', 'features', 'home'),
   ];
   for (const root of roots) requireDir(root, relative(REPO_ROOT, root));
   const files: string[] = [];
