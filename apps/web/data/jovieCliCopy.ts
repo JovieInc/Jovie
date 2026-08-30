@@ -12,7 +12,7 @@ export const JOVIE_CLI_COPY = {
   hero: {
     headline: 'Public Jovie Data, From Your Terminal.',
     subtitle:
-      'A read-only Node.js CLI for public artist profiles, OpenAPI, and llms.txt—without login or an API key.',
+      'A read-only CLI for public artist profiles, OpenAPI, and llms.txt—no login or API key.',
     primaryCta: {
       href: JOVIE_CLI_SOURCE_URL,
       label: 'View The CLI Source',
