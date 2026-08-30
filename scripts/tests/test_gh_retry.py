@@ -130,7 +130,12 @@ def _write_native_receipt_fakes(
     is_draft: bool,
     selector: dict[str, object],
     receipt: dict[str, object],
+    changelog_collision: dict[str, object] | None = None,
 ) -> None:
+    changelog_collision_result = changelog_collision or {
+        "action": "allow",
+        "reason": "candidate-omits-changelog",
+    }
     fake_node = tmp_path / "node"
     fake_node.write_text(
         textwrap.dedent(
@@ -152,7 +157,7 @@ def _write_native_receipt_fakes(
               max-queue-depth) echo 16 ;;
               unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
               unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
-              changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+              changelog-collision) printf '%s\\n' '{json.dumps(changelog_collision_result)}' ;;
               changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
               changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
               --classify-queue) echo '[]' ;;
@@ -182,6 +187,10 @@ def _write_native_receipt_fakes(
               echo '{{"state":"OPEN","isDraft":{draft_json},"mergeable":"{mergeable}","labels":[],"headRefOid":"{head}","baseRefName":"main","body":""}}'
               exit 0
             fi
+            if [[ "$1" == "api" && "$2" == *"/commits/{head}/status"* ]]; then
+              echo '{{"statuses":[]}}'
+              exit 0
+            fi
             if [[ "$1" == "api" ]]; then
               exit 1
             fi
@@ -195,6 +204,63 @@ def _write_native_receipt_fakes(
 
 
 class TestExactHeadQueueReceipt:
+    def test_pre_land_changelog_exact_target_fails_without_native_receipt(
+        self, tmp_path: Path
+    ) -> None:
+        head = "6" * 40
+        _write_native_receipt_fakes(
+            tmp_path,
+            head=head,
+            mergeable="MERGEABLE",
+            is_draft=False,
+            selector={
+                "observed": True,
+                "queued": False,
+                "eligible": True,
+                "reason": "eligible",
+            },
+            receipt={
+                "ok": False,
+                "attempts": 2,
+                "state": {
+                    "isInMergeQueue": False,
+                    "queued": False,
+                    "headRefOid": head,
+                    "mergeQueueEntry": None,
+                    "autoMergeRequest": None,
+                },
+                "explanation": {
+                    "ok": False,
+                    "reason": "isInMergeQueue=false mergeQueueEntry=null",
+                },
+            },
+            changelog_collision={
+                "action": "skip",
+                "reason": "pre-land-changelog",
+            },
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=f"DRAIN_ADMISSION_PR=16068 DRAIN_ADMISSION_HEAD={head}",
+            )
+        )
+
+        assert result.returncode == 3, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert (
+            "pre-land CHANGELOG.md edit is prohibited (pre-land-changelog) for #16068"
+            in result.stdout
+        )
+        assert (
+            "queue-noop: classified-skip: exact admission #16068 at "
+            + head
+            + " (pre-land-changelog; native admission refused, hard gate preserved)"
+            in result.stderr
+        )
+        assert "enroll should not run" not in result.stderr
+
     def test_durable_product_failure_receipt_blocks_when_actions_history_aged_out(
         self, tmp_path: Path
     ) -> None:
