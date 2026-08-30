@@ -841,13 +841,8 @@ def _readback_promotion_batch(
         commit = repository.get(f"commit_{number}")
         if not isinstance(pr, dict) or not isinstance(commit, dict):
             raise ValueError("GitHub promotion readback omitted pull request")
-        expected_head_oid = candidate.get("headRefOid")
-        if commit.get("oid") != expected_head_oid:
+        if commit.get("oid") != candidate.get("headRefOid"):
             raise ValueError("GitHub promotion readback returned the wrong commit")
-        if pr.get("headRefOid") != expected_head_oid:
-            raise ValueError(
-                "GitHub promotion readback returned the wrong pull request head"
-            )
         try:
             required_checks = _normalize_named_required_checks(commit, required_names)
             check_evidence_status = "complete"
@@ -1357,6 +1352,69 @@ def _duplicate_active_lanes(
     return duplicates, extra_unclassified
 
 
+def _promotion_disposition(
+    pr: dict[str, Any], base: dict[str, Any]
+) -> dict[str, Any]:
+    if pr.get("baseRefName") != "main":
+        return {**base, "state": "repair", "reason": "non-main-base"}
+    if pr.get("mergeStateStatus") not in CHECKABLE_MERGE_STATES:
+        return {
+            **base,
+            "state": "repair",
+            "reason": f"merge-state-{str(pr.get('mergeStateStatus') or 'unknown').lower()}",
+        }
+
+    evidence = pr.get("promotionEvidence")
+    if not isinstance(evidence, dict):
+        return {**base, "state": "repair", "reason": "promotion-evidence-missing"}
+    status = evidence.get("status")
+    if status != "complete":
+        suffix = status if isinstance(status, str) and status else "malformed"
+        return {**base, "state": "repair", "reason": f"promotion-evidence-{suffix}"}
+    if (
+        evidence.get("headOid") != pr.get("headRefOid")
+        or evidence.get("baseOid") != pr.get("currentBaseOid")
+    ):
+        return {**base, "state": "repair", "reason": "promotion-evidence-stale"}
+    required_names = evidence.get("requiredCheckNames")
+    if (
+        not isinstance(required_names, list)
+        or not all(isinstance(name, str) and name for name in required_names)
+        or len(required_names) != len(set(required_names))
+        or set(required_names) != EXPECTED_REQUIRED_CHECKS
+    ):
+        return {**base, "state": "repair", "reason": "required-check-policy-drift"}
+    checks = evidence.get("requiredChecks")
+    if not isinstance(checks, list):
+        return {**base, "state": "repair", "reason": "required-check-evidence-missing"}
+    check_names = {
+        item.get("name")
+        for item in checks
+        if isinstance(item, dict) and isinstance(item.get("name"), str)
+    }
+    if check_names != set(required_names) or len(checks) != len(check_names):
+        return {**base, "state": "repair", "reason": "required-check-evidence-missing"}
+    if not _required_checks_green(evidence):
+        return {**base, "state": "repair", "reason": "required-checks-not-green"}
+    behind_by = _non_negative_int(evidence.get("behindBy"))
+    if behind_by is None:
+        return {**base, "state": "repair", "reason": "promotion-evidence-malformed"}
+    if behind_by > 0:
+        return {
+            **base,
+            "state": "repair",
+            "reason": "stale-base",
+            "behindBy": behind_by,
+        }
+    return {
+        **base,
+        "state": "promote",
+        "reason": "exact-head-current-required-checks-green",
+        "behindBy": 0,
+        "requiredChecks": sorted(check_names),
+    }
+
+
 def classify_open_prs(
     prs: list[dict[str, Any]], now: datetime, repository: str = "JovieInc/Jovie"
 ) -> dict[str, Any]:
@@ -1371,12 +1429,34 @@ def classify_open_prs(
             unclassified.append({"number": number, "reason": "missing-pr-number"})
             continue
         usable.append(pr)
+        label_evidence = _label_evidence(pr)
+        if label_evidence.get("status") != "complete":
+            unclassified.append(
+                {
+                    "number": number,
+                    "reason": (
+                        "label-evidence-"
+                        f"{label_evidence.get('status') or 'malformed'}"
+                    ),
+                }
+            )
+            refs_by_number[number] = []
+            continue
         cross_repository = pr.get("isCrossRepository")
         if not isinstance(cross_repository, bool):
             refs_by_number[number] = []
             unclassified.append(
                 {"number": number, "reason": "missing-repository-provenance"}
             )
+            continue
+        if (
+            not isinstance(pr.get("baseRefName"), str)
+            or not pr.get("baseRefName")
+            or not _valid_oid(pr.get("headRefOid"))
+            or not _valid_oid(pr.get("baseRefOid"))
+        ):
+            refs_by_number[number] = []
+            unclassified.append({"number": number, "reason": "missing-ref-provenance"})
             continue
         if cross_repository:
             refs_by_number[number] = []
@@ -1404,26 +1484,11 @@ def classify_open_prs(
         base = {
             "number": number,
             "issue": refs_by_number[number][0] if refs_by_number[number] else None,
+            "headOid": pr["headRefOid"],
+            "baseOid": pr.get("currentBaseOid") or pr["baseRefOid"],
+            "eventBaseOid": pr["baseRefOid"],
+            "baseRefName": pr["baseRefName"],
         }
-        queue_entry = pr.get("mergeQueueEntry")
-        if isinstance(queue_entry, dict):
-            queue_state = queue_entry.get("state")
-            enqueued_at = parse_time(queue_entry.get("enqueuedAt"))
-            if not isinstance(queue_state, str) or not queue_state or enqueued_at is None:
-                unclassified.append(
-                    {"number": number, "reason": "malformed-native-queue-entry"}
-                )
-                continue
-            dispositions.append(
-                {
-                    **base,
-                    "state": "queued",
-                    "reason": "native-queue-entry",
-                    "queueState": queue_state,
-                    "enqueuedAt": isoformat(enqueued_at),
-                }
-            )
-            continue
         close_reasons = sorted(labels.intersection(CLOSE_LABELS))
         if close_reasons:
             dispositions.append(
@@ -1444,28 +1509,51 @@ def classify_open_prs(
                     "state": "held",
                     "owner": owner,
                     "reason": reason,
+                    "nextAction": "promote-or-supersede-before-expiry",
                     "expiresAt": isoformat(expiry),
                 }
             )
             if expiry <= now:
                 expired_holds.append(number)
             continue
-        if pr.get("mergeStateStatus") == "CLEAN":
-            dispositions.append({**base, "state": "promote", "reason": "clean-ready"})
-        else:
+        queue_entry = pr.get("mergeQueueEntry")
+        if isinstance(queue_entry, dict):
+            queue_state = queue_entry.get("state")
+            enqueued_at = parse_time(queue_entry.get("enqueuedAt"))
+            if not isinstance(queue_state, str) or not queue_state or enqueued_at is None:
+                unclassified.append(
+                    {"number": number, "reason": "malformed-native-queue-entry"}
+                )
+                continue
             dispositions.append(
                 {
                     **base,
-                    "state": "repair",
-                    "reason": f"merge-state-{str(pr.get('mergeStateStatus') or 'unknown').lower()}",
+                    "state": "queued",
+                    "reason": "native-queue-entry",
+                    "queueState": queue_state,
+                    "enqueuedAt": isoformat(enqueued_at),
                 }
             )
+            continue
+        dispositions.append(_promotion_disposition(pr, base))
 
     changed_file_evidence = [
         _changed_file_record(number, prs_by_number[number])
         for number in sorted(prs_by_number)
     ]
     evidence_by_number = {item["number"]: item for item in changed_file_evidence}
+    promotion_evidence = [
+        {
+            "number": number,
+            **(
+                prs_by_number[number]["promotionEvidence"]
+                if isinstance(prs_by_number[number].get("promotionEvidence"), dict)
+                else {"status": "missing"}
+            ),
+        }
+        for number in sorted(prs_by_number)
+        if _needs_promotion_evidence(prs_by_number[number])
+    ]
     duplicates, extra_unclassified = _duplicate_active_lanes(
         dispositions, evidence_by_number, prs_by_number
     )
@@ -1487,6 +1575,7 @@ def classify_open_prs(
         "changedFileEvidence": changed_file_evidence,
         "stackHealth": stack_health,
         "repairActions": stack_health["repairActions"],
+        "promotionEvidence": promotion_evidence,
     }
 
 
@@ -1631,6 +1720,32 @@ def evaluate_closure_health(
         }
         if roots != action_roots:
             reasons.append("draft-stack-repair-action-unavailable")
+    repair_prs = sorted(
+        item.get("number")
+        for item in dispositions
+        if isinstance(item, dict)
+        and item.get("state") == "repair"
+        and isinstance(item.get("number"), int)
+    )
+    close_prs = sorted(
+        item.get("number")
+        for item in dispositions
+        if isinstance(item, dict)
+        and item.get("state") == "close"
+        and isinstance(item.get("number"), int)
+    )
+    if repair_prs:
+        reasons.append("internally-repairable-prs-open")
+    if close_prs:
+        reasons.append("closure-actions-pending")
+    unmergeable_queue_prs = sorted(
+        item.get("number")
+        for item in dispositions
+        if isinstance(item, dict)
+        and item.get("state") == "queued"
+        and item.get("queueState") == "UNMERGEABLE"
+        and isinstance(item.get("number"), int)
+    )
     if (
         active["unmergeableQueue"]
         and durations["unmergeableQueue"] >= UNMERGEABLE_QUEUE_RED_AFTER
@@ -1680,6 +1795,8 @@ def evaluate_closure_health(
         "greenReadyPrs": green_ready_prs if shape_valid else None,
         "nativeQueueCount": native_queue_count if shape_valid else None,
         "unmergeableNativeQueuePrs": unmergeable_queue_prs,
+        "repairPrs": repair_prs,
+        "closePrs": close_prs,
         "latestMergeAt": snapshot.get("latestMergeAt"),
         "stackHealth": bounded_stack_health(stack_health),
         "repairActions": repair_actions if isinstance(repair_actions, list) else [],
@@ -1694,16 +1811,21 @@ def _repo_parts(repo: str) -> tuple[str, str]:
     return pieces[0], pieces[1]
 
 
-def _run_graphql_snapshot(repo: str) -> dict[str, Any]:
+def _run_graphql_snapshot_once(
+    repo: str, deadline: float | None = None
+) -> dict[str, Any]:
+    observation_deadline = deadline or time.monotonic() + CLOSURE_OBSERVATION_SECONDS
     owner, name = _repo_parts(repo)
     query = """
 query($owner:String!,$name:String!,$endCursor:String){
   repository(owner:$owner,name:$name){
+    main:ref(qualifiedName:"refs/heads/main"){target{oid}}
     pullRequests(first:100,after:$endCursor,states:OPEN,orderBy:{field:CREATED_AT,direction:ASC}){
       totalCount
       pageInfo{hasNextPage endCursor}
       nodes{
-        number title body baseRefName headRefName headRefOid isDraft isCrossRepository mergeStateStatus createdAt updatedAt
+        number title body headRefName headRefOid baseRefName baseRefOid
+        isDraft isCrossRepository mergeStateStatus createdAt updatedAt
         author{login}
         labels(first:100){totalCount nodes{name}}
         mergeQueueEntry{position enqueuedAt state}
@@ -1734,7 +1856,7 @@ query($owner:String!,$name:String!,$endCursor:String){
         check=True,
         capture_output=True,
         text=True,
-        timeout=30,
+        timeout=_remaining_timeout(observation_deadline, 30),
     )
     pages = json.loads(completed.stdout)
     if not isinstance(pages, list) or not pages:
@@ -1742,6 +1864,11 @@ query($owner:String!,$name:String!,$endCursor:String){
     repository = pages[0].get("data", {}).get("repository")
     if not isinstance(repository, dict):
         raise ValueError("GitHub closure snapshot omitted repository")
+    main = repository.get("main")
+    main_target = main.get("target") if isinstance(main, dict) else None
+    main_oid = main_target.get("oid") if isinstance(main_target, dict) else None
+    if not _valid_oid(main_oid):
+        raise ValueError("GitHub closure snapshot omitted main OID")
     prs: list[dict[str, Any]] = []
     for page in pages:
         if page.get("errors"):
@@ -1762,11 +1889,27 @@ query($owner:String!,$name:String!,$endCursor:String){
     latest_merge = max((value for value in merged_times if value is not None), default=None)
     return {
         "prs": prs,
+        "mainOid": main_oid,
         "latestMergeAt": isoformat(latest_merge) if latest_merge is not None else None,
     }
 
 
-def _observe_queue_controller(repo: str) -> dict[str, Any]:
+def _run_graphql_snapshot(repo: str, deadline: float | None = None) -> dict[str, Any]:
+    """Retry a fleet read when open/close churn crosses a pagination boundary."""
+    observation_deadline = deadline or time.monotonic() + CLOSURE_OBSERVATION_SECONDS
+    last_error: ValueError | None = None
+    for _attempt in range(SNAPSHOT_ATTEMPTS):
+        try:
+            return _run_graphql_snapshot_once(repo, observation_deadline)
+        except ValueError as error:
+            last_error = error
+    raise last_error or ValueError("GitHub closure snapshot failed")
+
+
+def _observe_queue_controller(
+    repo: str, deadline: float | None = None
+) -> dict[str, Any]:
+    observation_deadline = deadline or time.monotonic() + CLOSURE_OBSERVATION_SECONDS
     completed = subprocess.run(
         [
             "gh",
@@ -1776,7 +1919,7 @@ def _observe_queue_controller(repo: str) -> dict[str, Any]:
         check=True,
         capture_output=True,
         text=True,
-        timeout=20,
+        timeout=_remaining_timeout(observation_deadline, 20),
     )
     payload = json.loads(completed.stdout)
     runs = payload.get("workflow_runs") if isinstance(payload, dict) else None
@@ -1829,18 +1972,26 @@ def observe_closure_health(
     now: datetime,
 ) -> dict[str, Any]:
     """Read GitHub closure state and emit a typed Summer admission signal."""
+    deadline = time.monotonic() + CLOSURE_OBSERVATION_SECONDS
     try:
-        observed = _run_graphql_snapshot(repo)
-        prs = observed["prs"]
+        observed = _run_graphql_snapshot(repo, deadline)
+        prs = observe_promotion_evidence(
+            repo, observed["prs"], observed["mainOid"], deadline
+        )
         classifications = classify_open_prs(prs, now, repo)
         labels_by_pr = {int(pr["number"]): _labels(pr) for pr in prs}
         eligible = [
             pr
             for pr in prs
-            if not pr.get("isDraft")
+            if _label_evidence(pr).get("status") == "complete"
+            and not pr.get("isDraft")
             and not labels_by_pr[int(pr["number"])].intersection(HOLD_LABELS)
         ]
-        green_ready = [pr for pr in eligible if pr.get("mergeStateStatus") == "CLEAN"]
+        green_ready = [
+            disposition
+            for disposition in classifications["dispositions"]
+            if disposition.get("state") == "promote"
+        ]
         native_queue = [pr for pr in prs if pr.get("mergeQueueEntry")]
         oldest_open = min(
             (parse_time(pr.get("createdAt")) for pr in prs),
@@ -1850,6 +2001,8 @@ def observe_closure_health(
         snapshot = {
             "repository": repo,
             "controller": _observe_queue_controller(repo),
+
+            "controller": _observe_queue_controller(repo, deadline),
             "openPrs": len(prs),
             "eligiblePrs": len(eligible),
             "greenReadyPrs": len(green_ready),
