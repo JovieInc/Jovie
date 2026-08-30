@@ -12,7 +12,7 @@ describe('untrusted-source-fence', () => {
       'https://timwhite.co'
     );
     expect(wrapped).toBe(
-      '<untrusted-source url="https://timwhite.co">Hello world</untrusted-source>'
+      '<untrusted-source url="https://timwhite.co" encoding="entities-v1">Hello world</untrusted-source>'
     );
     expect(stripUntrustedSourceFence(wrapped)).toBe('Hello world');
     expect(isUntrustedSourceFenced(wrapped)).toBe(true);
@@ -21,6 +21,28 @@ describe('untrusted-source-fence', () => {
   it('returns plain content unchanged when not fenced', () => {
     expect(stripUntrustedSourceFence('plain bio')).toBe('plain bio');
     expect(isUntrustedSourceFenced('plain bio')).toBe(false);
+  });
+
+  it('round-trips entity-shaped text and escapes the source attribute', () => {
+    const content = 'A & B &lt;literal&gt; <tag> "quoted"';
+    const wrapped = wrapUntrustedSourceContent(
+      content,
+      'https://example.com/?q="&<>'
+    );
+
+    expect(wrapped).toContain(
+      'url="https://example.com/?q=&quot;&amp;&lt;&gt;" encoding="entities-v1"'
+    );
+    expect(wrapped).not.toContain('<tag>');
+    expect(stripUntrustedSourceFence(wrapped)).toBe(content);
+  });
+
+  it('preserves entity-shaped text in legacy unencoded fences', () => {
+    const legacy =
+      '<untrusted-source url="https://example.com">A &lt; B &amp; C</untrusted-source>';
+
+    expect(isUntrustedSourceFenced(legacy)).toBe(true);
+    expect(stripUntrustedSourceFence(legacy)).toBe('A &lt; B &amp; C');
   });
 
   it('keeps source text from terminating or nesting the trust fence', () => {
