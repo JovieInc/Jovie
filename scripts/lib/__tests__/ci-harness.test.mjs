@@ -33,6 +33,7 @@ const EXPECTED_MERGE_GATE_NAMES = [
   'CI Risk Classifier',
   'Secret Scan (gitleaks + trufflehog)',
   'Golden Path Lock',
+  'Visual Snapshot Compare',
   'Migration Guard',
   'Unit Tests',
   'Build + Layout (combined)',

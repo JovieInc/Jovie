@@ -384,7 +384,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 
 | Tier | Purpose | Merge-gate jobs |
 | --- | --- | --- |
-| Source Fast Gate | Cheap deterministic checks required on each source PR and repeated on the synthetic combined head. | `Path Changes` (both), `ci-fast` (both), `Secret Scan (gitleaks + trufflehog)` (both), `Golden Path Lock` (both), `Migration Guard` (both), `Unit Tests` (merge-group) |
+| Source Fast Gate | Cheap deterministic checks required on each source PR and repeated on the synthetic combined head. | `Path Changes` (both), `ci-fast` (both), `Secret Scan (gitleaks + trufflehog)` (both), `Golden Path Lock` (both), `Visual Snapshot Compare` (merge-group), `Migration Guard` (both), `Unit Tests` (merge-group) |
 | Structural Contract | Mechanical architecture, workflow, docs, and repo-rule checks. | `CI Risk Classifier` (both) |
 | Explicit Deep Evidence | Manual, scheduled, or event-driven deep evidence that never starts from or delays ordinary PR Ready. | none |
 | Preview Evidence | Hosted manual/event visual, a11y, performance, and preview evidence outside the source-PR event. | none |
@@ -404,6 +404,7 @@ Source `PR Ready` may require only `source-pr`/`both` jobs below. Merge-group `P
 | `CI Risk Classifier` | both | structural-contract | `pnpm ci:harness:check` |
 | `Secret Scan (gitleaks + trufflehog)` | both | fast-gate | `./scripts/security/scan-secrets.sh ci-pr origin/main` |
 | `Golden Path Lock` | both | fast-gate | `node scripts/golden-path-lock.mjs merge-gate` |
+| `Visual Snapshot Compare` | merge-group | fast-gate | `node scripts/visual-snapshot-compare.mjs compare` |
 | `Migration Guard` | both | fast-gate | `cd apps/web && ./scripts/check-migrations.sh && ./scripts/validate-migrations.sh` |
 | `Unit Tests` | merge-group | fast-gate | `pnpm --filter=@jovie/web run test:fast` |
 | `Build + Layout (combined)` | merge-group | combined-integration | `pnpm run build:web && pnpm --filter @jovie/web exec playwright test tests/e2e/hud-scroll.spec.ts --config=playwright.config.noauth.ts --project=chromium` |
