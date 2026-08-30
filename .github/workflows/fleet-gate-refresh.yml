@@ -85,14 +85,20 @@ jobs:
           github-token: ${{ steps.app-token.outputs.token }}
           dry-run: 'false'
 
+      # Source PR/fork workflow definitions never execute their code here.
+      # Consume actions only after the reviewed CLI is present on main.
       - name: Persist stack policy repair actions (JOV-INV-020)
-        if: steps.refresh.outcome == 'success'
+        if: >-
+          steps.refresh.outcome == 'success' &&
+          ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'main'))
         env:
           GEM_WORKSPACE: /home/timwhite/gem-workspace
         shell: bash
         run: |
           set -euo pipefail
-          node scripts/backlog-orchestrator/delivery-state-machine.mjs \
+          node "$GITHUB_WORKSPACE/scripts/backlog-orchestrator/delivery-state-machine.mjs" \
             --closure-health-file="$GEM_WORKSPACE/state/gem-priority-gate/latest.json"
 
       - name: Reconcile Symphony pressure-driven concurrency

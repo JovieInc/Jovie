@@ -131,57 +131,46 @@ def stack_pr(
     )
 
 
+STACK_BODY = "<!-- stack-integrator: summer-test -->\n<!-- stack-deadline: 2026-09-02T00:00:00Z -->"
+
+
+def stack_health(layers: list[dict[str, object]]) -> tuple[dict[str, object], dict[str, object]]:
+    result = MODULE.classify_open_prs(layers, NOW)
+    return result, MODULE.evaluate_closure_health(
+        snapshot(
+            openPrs=len(layers),
+            eligiblePrs=len(layers),
+            greenReadyPrs=len(layers),
+            classifications=result,
+        ),
+        previous=None,
+        now=NOW,
+    )
+
+
 class ClosureClassificationTests(unittest.TestCase):
     def test_four_layer_stack_with_owner_deadline_and_clean_path_is_green(self):
-        body = (
-            "<!-- stack-integrator: summer-test -->\n"
-            "<!-- stack-deadline: 2026-09-02T00:00:00Z -->"
-        )
         layers = [
-            stack_pr(101, "main", body=body),
+            stack_pr(101, "main", body=STACK_BODY),
             stack_pr(102, "stack/test-101"),
             stack_pr(103, "stack/test-102"),
             stack_pr(104, "stack/test-103"),
         ]
-        result = MODULE.classify_open_prs(layers, NOW)
+        result, health = stack_health(layers)
         self.assertEqual(result["stackHealth"]["violations"], [])
         self.assertEqual(result["repairActions"], [])
-        health = MODULE.evaluate_closure_health(
-            snapshot(
-                openPrs=4,
-                eligiblePrs=4,
-                greenReadyPrs=4,
-                classifications=result,
-            ),
-            previous=None,
-            now=NOW,
-        )
         self.assertEqual(health["status"], "healthy")
         self.assertTrue(health["newIssueIntakeAllowed"])
 
     def test_five_layer_stack_is_immediate_red_with_one_split_action(self):
-        body = (
-            "<!-- stack-integrator: summer-test -->\n"
-            "<!-- stack-deadline: 2026-09-02T00:00:00Z -->"
-        )
         layers = [
-            stack_pr(101, "main", body=body),
+            stack_pr(101, "main", body=STACK_BODY),
             stack_pr(102, "stack/test-101"),
             stack_pr(103, "stack/test-102"),
             stack_pr(104, "stack/test-103"),
             stack_pr(105, "stack/test-104"),
         ]
-        result = MODULE.classify_open_prs(layers, NOW)
-        health = MODULE.evaluate_closure_health(
-            snapshot(
-                openPrs=5,
-                eligiblePrs=5,
-                greenReadyPrs=5,
-                classifications=result,
-            ),
-            previous=None,
-            now=NOW,
-        )
+        result, health = stack_health(layers)
         self.assertEqual(result["stackHealth"]["violations"][0]["rootPr"], 101)
         self.assertIn(
             "stack-depth-over-4",
@@ -219,7 +208,7 @@ class ClosureClassificationTests(unittest.TestCase):
         )
         child = stack_pr(122, "stack/test-121")
         orphan = stack_pr(123, "stack/closed-ancestor")
-        result = MODULE.classify_open_prs([expired, child, orphan], NOW)
+        result, _ = stack_health([expired, child, orphan])
         by_root = {
             item["rootPr"]: item["codes"]
             for item in result["stackHealth"]["violations"]

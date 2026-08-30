@@ -178,17 +178,9 @@ def _stack_metadata(pr: dict[str, Any]) -> dict[str, Any]:
     body = pr.get("body") if isinstance(pr.get("body"), str) else ""
     integrators = STACK_INTEGRATOR_MARKER.findall(body)
     deadlines = STACK_DEADLINE_MARKER.findall(body)
-    integrator_status = (
-        "valid" if len(integrators) == 1 else "missing" if not integrators else "malformed"
-    )
-    deadline_status = (
-        "missing"
-        if not deadlines
-        else "valid"
-        if len(deadlines) == 1 and _stack_deadline(deadlines[0]) is not None
-        else "malformed"
-    )
-    deadline = _stack_deadline(deadlines[0]) if deadline_status == "valid" else None
+    integrator_status = "valid" if len(integrators) == 1 else "missing" if not integrators else "malformed"
+    deadline = _stack_deadline(deadlines[0]) if len(deadlines) == 1 else None
+    deadline_status = "valid" if deadline is not None else "missing" if not deadlines else "malformed"
     return {
         "integrator": integrators[0] if integrator_status == "valid" else None,
         "integratorStatus": integrator_status,
@@ -200,9 +192,14 @@ def _stack_metadata(pr: dict[str, Any]) -> dict[str, Any]:
 
 def _stack_head_sha(pr: dict[str, Any]) -> str | None:
     value = pr.get("headRefOid")
-    if not isinstance(value, str) or not STACK_HEAD_SHA.fullmatch(value):
-        return None
-    return value.lower()
+    return value.lower() if isinstance(value, str) and STACK_HEAD_SHA.fullmatch(value) else None
+
+
+def _stack_path(numbers: list[int], prs_by_number: dict[int, dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {"pr": number, "base": prs_by_number[number].get("baseRefName"), "head": prs_by_number[number].get("headRefName")}
+        for number in numbers
+    ]
 
 
 def _stack_action(
@@ -216,14 +213,7 @@ def _stack_action(
     max_depth: int,
 ) -> dict[str, Any]:
     root_number = int(root["number"])
-    promotion_path = [
-        {
-            "pr": number,
-            "base": prs_by_number[number].get("baseRefName"),
-            "head": prs_by_number[number].get("headRefName"),
-        }
-        for number in longest_path
-    ]
+    promotion_path = _stack_path(longest_path, prs_by_number)
     root_head_sha = _stack_head_sha(root)
     fingerprint = {
         "rootPr": root_number,
@@ -276,7 +266,6 @@ def _draft_stack_health(
         head = pr.get("headRefName")
         if isinstance(head, str) and head:
             heads.setdefault(head, []).append(number)
-
     parents: dict[int, int] = {}
     parent_errors: dict[int, set[str]] = {}
     children: dict[int, list[int]] = {}
@@ -295,7 +284,6 @@ def _draft_stack_health(
             parent_errors[number] = {"orphaned-stack-base"}
         else:
             parent_errors[number] = {"ambiguous-stack-parent"}
-
     memo: dict[int, tuple[str, list[int], set[str]]] = {}
 
     def resolve(number: int, trail: tuple[int, ...] = ()) -> tuple[str, list[int], set[str]]:
@@ -321,7 +309,6 @@ def _draft_stack_health(
         result = (key, path + [number], set(errors))
         memo[number] = result
         return result
-
     groups: dict[str, dict[str, Any]] = {}
     for number in sorted(internal):
         key, path, errors = resolve(number)
@@ -332,7 +319,6 @@ def _draft_stack_health(
         group["members"].update(path)
         group["paths"].append(path)
         group["violations"].update(errors)
-
     roots: list[dict[str, Any]] = []
     actions: list[dict[str, Any]] = []
     for group in groups.values():
@@ -370,19 +356,11 @@ def _draft_stack_health(
         ):
             violations.add("non-clean-stack-ancestor")
         if metadata["integratorStatus"] != "valid":
-            violations.add(
-                "missing-stack-integrator"
-                if metadata["integratorStatus"] == "missing"
-                else "malformed-stack-integrator"
-            )
+            violations.add({"missing": "missing-stack-integrator"}.get(metadata["integratorStatus"], "malformed-stack-integrator"))
         root_created = parse_time(root.get("createdAt"))
         deadline_at = metadata["deadlineAt"]
         if metadata["deadlineStatus"] != "valid":
-            violations.add(
-                "missing-stack-deadline"
-                if metadata["deadlineStatus"] == "missing"
-                else "malformed-stack-deadline"
-            )
+            violations.add({"missing": "missing-stack-deadline"}.get(metadata["deadlineStatus"], "malformed-stack-deadline"))
         elif root_created is None:
             violations.add("missing-stack-root-created-at")
         elif deadline_at <= now:
@@ -391,7 +369,6 @@ def _draft_stack_health(
             violations.add("stack-deadline-over-7d")
         elif deadline_at <= root_created:
             violations.add("stack-deadline-before-root")
-
         sorted_violations = sorted(violations)
         root_issue_refs = _issue_references(root)
         issue = root_issue_refs[0] if len(root_issue_refs) == 1 else None
@@ -400,14 +377,7 @@ def _draft_stack_health(
             "prNumbers": members,
             "maxDepth": max_depth,
             "violations": sorted_violations,
-            "promotionPath": [
-                {
-                    "pr": number,
-                    "base": internal[number].get("baseRefName"),
-                    "head": internal[number].get("headRefName"),
-                }
-                for number in longest_path
-            ],
+            "promotionPath": _stack_path(longest_path, internal),
         }
         roots.append(diagnostic)
         if sorted_violations:
@@ -423,7 +393,6 @@ def _draft_stack_health(
                     max_depth,
                 )
             )
-
     return {
         "maxDepth": STACK_MAX_DEPTH,
         "roots": sorted(roots, key=lambda item: item["rootPr"]),
