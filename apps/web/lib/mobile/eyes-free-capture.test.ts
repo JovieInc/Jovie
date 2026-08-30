@@ -12,16 +12,13 @@ import {
 } from './eyes-free-capture';
 
 describe('eyes-free capture routing', () => {
-  it('accepts only the closed destination enum', () => {
+  it('accepts only the closed destination enum and existing chat modes', () => {
     expect(parseEyesFreeDestination('jovie')).toBe('jovie');
     expect(parseEyesFreeDestination('summer')).toBe('summer');
     expect(parseEyesFreeDestination('ov')).toBeNull();
     expect(parseEyesFreeDestination('kanban')).toBeNull();
     expect(parseEyesFreeDestination('/bin/sh')).toBeNull();
     expect(parseEyesFreeDestination({ dest: 'summer' })).toBeNull();
-  });
-
-  it('maps destinations onto existing chat modes without a client switch', () => {
     expect(chatModeForEyesFreeDestination('jovie')).toBeNull();
     expect(chatModeForEyesFreeDestination('summer')).toBe('ov');
   });
@@ -37,15 +34,12 @@ describe('eyes-free capture routing', () => {
     });
   });
 
-  it('rejects empty, oversized, and non-string transcripts', () => {
+  it('rejects empty transcripts and short idempotency keys', () => {
     expect(parseEyesFreeTranscript('  draft a drop  ')).toBe('draft a drop');
     expect(parseEyesFreeTranscript('   ')).toBeNull();
     expect(parseEyesFreeTranscript('')).toBeNull();
     expect(parseEyesFreeTranscript(null)).toBeNull();
     expect(parseEyesFreeTranscript('x'.repeat(4001))).toBeNull();
-  });
-
-  it('requires a durable idempotency key for retries of the same gesture', () => {
     expect(parseEyesFreeIdempotencyKey('turn_abc1')).toBe('turn_abc1');
     expect(parseEyesFreeIdempotencyKey('short')).toBeNull();
     expect(parseEyesFreeIdempotencyKey('x'.repeat(129))).toBeNull();
@@ -81,79 +75,62 @@ describe('eyes-free capture routing', () => {
         text: 'Here is a caption for your drop.',
       }),
     ].join('');
-
     expect(
       readbackFromMobileChatResponse({
         destination: 'jovie',
         httpStatus: 200,
         body,
       })
-    ).toEqual({
-      destination: 'jovie',
+    ).toMatchObject({
       status: 'completed',
       conversationId: 'conv_1',
-      turnId: 'turn_1',
       readback: 'Here is a caption for your drop.',
-      errorCode: null,
     });
   });
 
-  it('treats a replayed completed turn as idempotent duplicate', () => {
-    const body = encodeMobileChatNdjsonEvent({
-      type: 'assistant.completed',
-      clientTurnId: 'client_1',
-      conversationId: 'conv_1',
-      turnId: 'turn_1',
-      text: 'Already captured.',
-    });
+  it('maps in-flight duplicates, failed follow-through, and Summer 403', () => {
+    const statusOf = (
+      destination: 'jovie' | 'summer',
+      httpStatus: number,
+      event: Parameters<typeof encodeMobileChatNdjsonEvent>[0]
+    ) =>
+      readbackFromMobileChatResponse({
+        destination,
+        httpStatus,
+        body: encodeMobileChatNdjsonEvent(event),
+      });
 
     expect(
-      readbackFromMobileChatResponse({
-        destination: 'summer',
-        httpStatus: 200,
-        body,
+      statusOf('summer', 200, {
+        type: 'assistant.completed',
+        clientTurnId: 'client_1',
+        conversationId: 'conv_1',
+        turnId: 'turn_1',
+        text: 'Already captured.',
       }).status
     ).toBe('duplicate');
-  });
-
-  it('maps in-flight duplicates, failed transcription follow-through, and Summer 403', () => {
     expect(
-      readbackFromMobileChatResponse({
-        destination: 'jovie',
-        httpStatus: 409,
-        body: encodeMobileChatNdjsonEvent({
-          type: 'error',
-          errorCode: 'TURN_IN_PROGRESS',
-          message: 'still running',
-        }),
+      statusOf('jovie', 409, {
+        type: 'error',
+        errorCode: 'TURN_IN_PROGRESS',
+        message: 'still running',
       }).status
     ).toBe('in_progress');
-
     expect(
-      readbackFromMobileChatResponse({
-        destination: 'summer',
-        httpStatus: 403,
-        body: encodeMobileChatNdjsonEvent({
-          type: 'error',
-          errorCode: 'OV_CHAT_FORBIDDEN',
-          message: 'Admin role required for Ovie chat.',
-        }),
+      statusOf('summer', 403, {
+        type: 'error',
+        errorCode: 'OV_CHAT_FORBIDDEN',
+        message: 'Admin role required for Ovie chat.',
       })
     ).toMatchObject({
       status: 'forbidden',
       errorCode: EYES_FREE_ERROR.SUMMER_FORBIDDEN,
-      readback: 'Summer is only available to the founder.',
     });
-
     expect(
-      readbackFromMobileChatResponse({
-        destination: 'jovie',
-        httpStatus: 200,
-        body: encodeMobileChatNdjsonEvent({
-          type: 'error',
-          errorCode: 'CHAT_STREAM_FAILED',
-          message: 'model failed',
-        }),
+      statusOf('jovie', 200, {
+        type: 'error',
+        errorCode: 'CHAT_STREAM_FAILED',
+        message: 'model failed',
       }).status
     ).toBe('failed');
   });

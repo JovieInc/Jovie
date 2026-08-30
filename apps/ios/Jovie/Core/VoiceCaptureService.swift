@@ -79,20 +79,15 @@ enum EyesFreeCaptureGate: Equatable {
 
   var message: String {
     switch self {
-    case .ready:
-      return ""
-    case .unavailable, .unsigned:
-      return Self.unavailableMessage
-    case .offline:
-      return Self.offlineMessage
-    case .summerForbidden:
-      return Self.summerForbiddenMessage
+    case .ready: ""
+    case .unavailable, .unsigned: Self.unavailableMessage
+    case .offline: Self.offlineMessage
+    case .summerForbidden: Self.summerForbiddenMessage
     case .permission:
-      return VoiceCaptureError.microphoneDenied.errorDescription ?? Self.unavailableMessage
+      VoiceCaptureError.microphoneDenied.errorDescription ?? Self.unavailableMessage
     case .transcriptionEmpty:
-      return VoiceCaptureError.emptyTranscript.errorDescription ?? "Nothing heard."
-    case .uploadFailed:
-      return Self.retryMessage
+      VoiceCaptureError.emptyTranscript.errorDescription ?? "Nothing heard."
+    case .uploadFailed: Self.retryMessage
     }
   }
 }

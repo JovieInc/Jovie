@@ -86,52 +86,24 @@ struct AppShellIntentNavigationTests {
   }
 
   @Test func summerCaptureRejectsOrdinaryUsersWithoutStartingMic() {
-    var state = AppShellIntentNavigationState(
-      selectedTab: .profile,
-      chatDraft: "",
-      autoSendMessage: nil,
-      openConversationID: nil,
-      pendingRequest: .startEyesFreeCapture(
-        EyesFreeCaptureLaunch(
-          destination: .summer,
-          spokenText: "what is blocked",
-          idempotencyKey: "turn_summer_1"
-        )
-      )
-    )
-
+    var state = eyesFreeState(.summer, spokenText: "what is blocked")
     AppShellIntentNavigation.applyPendingRequest(
       chatEnabled: true,
       canUseSummer: false,
       state: &state
     )
-
     #expect(state.shouldStartVoiceCapture == false)
     #expect(state.autoSendMessage == nil)
     #expect(state.unavailableMessage == EyesFreeCaptureGate.summerForbiddenMessage)
   }
 
   @Test func founderSummerSpokenTextAutoSubmits() {
-    var state = AppShellIntentNavigationState(
-      selectedTab: .profile,
-      chatDraft: "",
-      autoSendMessage: nil,
-      openConversationID: nil,
-      pendingRequest: .startEyesFreeCapture(
-        EyesFreeCaptureLaunch(
-          destination: .summer,
-          spokenText: "park the teardown",
-          idempotencyKey: "turn_summer_2"
-        )
-      )
-    )
-
+    var state = eyesFreeState(.summer, spokenText: "park the teardown")
     AppShellIntentNavigation.applyPendingRequest(
       chatEnabled: true,
       canUseSummer: true,
       state: &state
     )
-
     #expect(state.selectedTab == .chat)
     #expect(state.autoSendMessage == "park the teardown")
     #expect(state.talkAutoSubmit)
@@ -141,26 +113,12 @@ struct AppShellIntentNavigationTests {
   }
 
   @Test func offlineEyesFreeCaptureSurfacesRetryWithoutListening() {
-    var state = AppShellIntentNavigationState(
-      selectedTab: .chat,
-      chatDraft: "",
-      autoSendMessage: nil,
-      openConversationID: nil,
-      pendingRequest: .startEyesFreeCapture(
-        EyesFreeCaptureLaunch(
-          destination: .jovie,
-          spokenText: nil,
-          idempotencyKey: "turn_offline_1"
-        )
-      )
-    )
-
+    var state = eyesFreeState(.jovie, spokenText: nil)
     AppShellIntentNavigation.applyPendingRequest(
       chatEnabled: true,
       isOffline: true,
       state: &state
     )
-
     #expect(state.shouldStartVoiceCapture == false)
     #expect(state.unavailableMessage == EyesFreeCaptureGate.offlineMessage)
   }
@@ -310,4 +268,23 @@ struct AppShellIntentNavigationTests {
     #expect(state.selectedTab == .profile)
     #expect(state.chatDraft == "")
   }
+}
+
+private func eyesFreeState(
+  _ destination: EyesFreeCaptureDestination,
+  spokenText: String?
+) -> AppShellIntentNavigationState {
+  AppShellIntentNavigationState(
+    selectedTab: .profile,
+    chatDraft: "",
+    autoSendMessage: nil,
+    openConversationID: nil,
+    pendingRequest: .startEyesFreeCapture(
+      EyesFreeCaptureLaunch(
+        destination: destination,
+        spokenText: spokenText,
+        idempotencyKey: "turn_\(destination.rawValue)"
+      )
+    )
+  )
 }

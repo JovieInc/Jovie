@@ -234,18 +234,10 @@ final class ChatRepository {
           clientMessageId: clientMessageId
         )
       )
-      let failed = response.status == "failed"
-        || response.status == "forbidden"
-        || response.status == "unavailable"
+      let failed = ["failed", "forbidden", "unavailable"].contains(response.status)
       applyEyesFreeResponse(response, clientTurnId: idempotencyKey, failed: failed)
-      if response.status == "forbidden" || response.status == "unavailable" {
-        isOffline = false
-      } else if failed {
-        isOffline = true
-      } else {
-        isOffline = false
-        lastErrorMessage = nil
-      }
+      isOffline = response.status == "failed"
+      if !failed { lastErrorMessage = nil }
       await persistCache()
       return response.readback
     } catch {

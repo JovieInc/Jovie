@@ -74,9 +74,14 @@ enum AppShellIntentNavigation {
       return true
     }
 
-    if isOffline, isEyesFreeRequest(request) {
-      state.unavailableMessage = EyesFreeCaptureGate.offlineMessage
-      return true
+    if isOffline {
+      switch request {
+      case .startVoiceCapture, .startEyesFreeCapture:
+        state.unavailableMessage = EyesFreeCaptureGate.offlineMessage
+        return true
+      default:
+        break
+      }
     }
 
     switch request {
@@ -112,15 +117,6 @@ enum AppShellIntentNavigation {
     return true
   }
 
-  private static func isEyesFreeRequest(_ request: IntentNavigationRequest) -> Bool {
-    switch request {
-    case .startVoiceCapture, .startEyesFreeCapture:
-      return true
-    default:
-      return false
-    }
-  }
-
   private static func applyEyesFreeLaunch(
     _ launch: EyesFreeCaptureLaunch,
     canUseSummer: Bool,
@@ -140,13 +136,12 @@ enum AppShellIntentNavigation {
 
     state.selectedTab = .chat
     state.eyesFreeLaunch = launch
+    state.talkAutoSubmit = true
     let spoken = VoiceMemoActionDraft.make(fromTranscript: launch.spokenText ?? "")
     if VoiceMemoActionDraft.isReady(spoken) {
       state.autoSendMessage = spoken
-      state.talkAutoSubmit = true
     } else {
       state.shouldStartVoiceCapture = true
-      state.talkAutoSubmit = true
     }
   }
 }

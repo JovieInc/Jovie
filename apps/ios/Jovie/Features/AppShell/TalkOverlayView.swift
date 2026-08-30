@@ -2,8 +2,8 @@ import SwiftUI
 
 /// Full-screen Talk overlay (JOV-3636 / #10380). Single global voice entry from
 /// the shell Talk FAB — composer has no mic. On-device Speech captures a memo;
-/// the in-app FAB path inserts an editable action draft via `onInsertDraft`.
-/// App Intent / Action Button capture sets `autoSubmit` and submits on Stop.
+/// the transcript becomes an editable action draft via `onInsertDraft` (chat
+/// composer), never auto-sent. App Intent capture sets `autoSubmit` and submits on Stop.
 struct TalkOverlayView: View {
   @Bindable var voiceCaptureService: VoiceCaptureService
   let onCancel: () -> Void
@@ -150,44 +150,25 @@ struct TalkOverlayView: View {
   }
 
   private var titleText: String {
-    switch phase {
-    case .reviewing:
-      "Draft"
-    case .unavailable:
-      "Unavailable"
-    default:
-      "Talk"
-    }
+    phase == .reviewing ? "Draft" : phase == .unavailable ? "Unavailable" : "Talk"
   }
 
   private var statusText: String {
     switch phase {
-    case .starting:
-      "Starting…"
-    case .recording:
-      listeningCue
-    case .reviewing:
-      "Edit, then use as action draft"
-    case .submitting:
-      "Sending…"
-    case .unavailable:
-      unavailableMessage ?? EyesFreeCaptureGate.unavailableMessage
+    case .starting: "Starting…"
+    case .recording: listeningCue
+    case .reviewing: "Edit, then use as action draft"
+    case .submitting: "Sending…"
+    case .unavailable: unavailableMessage ?? EyesFreeCaptureGate.unavailableMessage
     }
   }
 
   private var primaryActionTitle: String {
-    switch phase {
-    case .reviewing:
-      "Use Draft"
-    case .submitting:
-      "Sending"
-    case .unavailable:
-      "Retry"
-    case .recording where autoSubmit:
-      "Stop"
-    default:
-      "Done"
-    }
+    if phase == .reviewing { return "Use Draft" }
+    if phase == .submitting { return "Sending" }
+    if phase == .unavailable { return "Retry" }
+    if phase == .recording, autoSubmit { return "Stop" }
+    return "Done"
   }
 
   private var canPrimary: Bool {

@@ -276,25 +276,16 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
       throw MobileChatClientError.requestFailed(statusCode: 401)
     }
 
-    if let decoded = try? decoder.decode(EyesFreeCaptureAPIResponse.self, from: data),
-       !decoded.readback.isEmpty || decoded.errorCode != nil
+    if (200 ... 409).contains(httpResponse.statusCode),
+       let decoded = try? decoder.decode(EyesFreeCaptureAPIResponse.self, from: data)
     {
-      if (200 ... 409).contains(httpResponse.statusCode) {
-        NativeSessionTokenStore.refresh(from: response)
-        return decoded
-      }
+      NativeSessionTokenStore.refresh(from: response)
+      return decoded
     }
-
     guard (200 ... 299).contains(httpResponse.statusCode) else {
       throw MobileChatClientError.requestFailed(statusCode: httpResponse.statusCode)
     }
-
-    NativeSessionTokenStore.refresh(from: response)
-    do {
-      return try decoder.decode(EyesFreeCaptureAPIResponse.self, from: data)
-    } catch {
-      throw MobileChatClientError.decodingFailed
-    }
+    throw MobileChatClientError.decodingFailed
   }
 
   private func appendWorkspaceQuery(to queryItems: inout [URLQueryItem]) {

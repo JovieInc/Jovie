@@ -1,11 +1,6 @@
 import Foundation
 import Observation
 
-/// A navigation request raised by an App Intent (Siri / Shortcuts / Spotlight).
-///
-/// Intents run in a separate execution context from the SwiftUI scene, so they
-/// cannot mutate the shell directly. They enqueue a request here; the running
-/// shell observes ``IntentNavigationStore/shared`` and consumes it when it can.
 enum EyesFreeCaptureDestination: String, Equatable, Sendable {
   case jovie
   case summer

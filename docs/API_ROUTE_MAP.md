@@ -157,6 +157,7 @@
 | `/api/chat/conversations/[id]` | GET, DELETE | `auth` | Get/delete conversation |
 | `/api/chat/conversations/[id]/messages` | GET | `auth` | Get conversation messages |
 | `/api/chat/usage` | GET | `auth` | Get chat usage stats |
+| `/api/mobile/v1/eyes-free-capture` | POST | mobile session | Closed-destination eyes-free capture. `jovie` runs the existing creative chat turn; `summer` is founder-only via the OV admin gate. Idempotent on `clientTurnId`. |
 
 ### Clerk
 
@@ -356,12 +357,6 @@
 |-------|---------|------|-------------|
 | `/api/merch/checkout` | POST | `public` | Create a Stripe Checkout session for a live Jovie merch card |
 | `/{username}/merch/{cardId}` | GET | `public` | Public merch product page with mockups, size/quantity selection, and checkout |
-
-### Mobile
-
-| Route | Methods | Auth | Description |
-|-------|---------|------|-------------|
-| `/api/mobile/v1/eyes-free-capture` | POST | mobile session | Closed-destination eyes-free capture. `jovie` runs the existing creative chat turn; `summer` is founder-only via the OV admin gate. Idempotent on `clientTurnId`. |
 
 ### Notifications
 

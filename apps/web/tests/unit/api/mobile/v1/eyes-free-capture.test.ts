@@ -24,12 +24,50 @@ const routeModulePromise = import(
   '@/app/api/mobile/v1/eyes-free-capture/route'
 );
 
+const VALID_BODY = {
+  destination: 'jovie',
+  transcript: 'draft a drop',
+  clientTurnId: 'turn_1234',
+  clientMessageId: 'msg_1234',
+} as const;
+
 function captureRequest(body: unknown): Request {
   return new Request('https://jov.ie/api/mobile/v1/eyes-free-capture', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+}
+
+function completedTurn(input: {
+  conversationId: string;
+  turnId: string;
+  clientTurnId: string;
+  text: string;
+}): Response {
+  return new Response(
+    [
+      encodeMobileChatNdjsonEvent({
+        type: 'turn.reserved',
+        conversationId: input.conversationId,
+        turnId: input.turnId,
+        clientTurnId: input.clientTurnId,
+      }),
+      encodeMobileChatNdjsonEvent({
+        type: 'assistant.completed',
+        clientTurnId: input.clientTurnId,
+        conversationId: input.conversationId,
+        turnId: input.turnId,
+        text: input.text,
+      }),
+    ].join(''),
+    { status: 200 }
+  );
+}
+
+async function postCapture(body: unknown) {
+  const { POST } = await routeModulePromise;
+  return POST(captureRequest(body));
 }
 
 describe('POST /api/mobile/v1/eyes-free-capture', () => {
@@ -45,63 +83,43 @@ describe('POST /api/mobile/v1/eyes-free-capture', () => {
 
   it('returns 401 when the mobile session is missing', async () => {
     hoisted.getMobileSessionUserId.mockResolvedValue(null);
-    const { POST } = await routeModulePromise;
-    const response = await POST(
-      captureRequest({
-        destination: 'jovie',
-        transcript: 'draft a drop',
-        clientTurnId: 'turn_1234',
-        clientMessageId: 'msg_1234',
-      })
-    );
+    const response = await postCapture(VALID_BODY);
     expect(response.status).toBe(401);
     expect(hoisted.handleMobileChatTurn).not.toHaveBeenCalled();
   });
 
-  it('rejects user-controlled destination strings', async () => {
-    const { POST } = await routeModulePromise;
-    const response = await POST(
-      captureRequest({
-        destination: 'kanban; rm -rf',
-        transcript: 'draft a drop',
-        clientTurnId: 'turn_1234',
-        clientMessageId: 'msg_1234',
-      })
-    );
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toMatchObject({
-      errorCode: EYES_FREE_ERROR.INVALID_DESTINATION,
-    });
-    expect(hoisted.handleMobileChatTurn).not.toHaveBeenCalled();
-  });
+  it('rejects invalid capture payloads before the turn handler', async () => {
+    const cases = [
+      {
+        body: { ...VALID_BODY, destination: 'kanban; rm -rf' },
+        errorCode: EYES_FREE_ERROR.INVALID_DESTINATION,
+      },
+      {
+        body: { ...VALID_BODY, transcript: '   ' },
+        errorCode: EYES_FREE_ERROR.TRANSCRIPTION_EMPTY,
+      },
+      {
+        body: { ...VALID_BODY, clientTurnId: 'short' },
+        errorCode: EYES_FREE_ERROR.INVALID_IDEMPOTENCY,
+      },
+    ] as const;
 
-  it('rejects empty transcription before any creative or Summer route', async () => {
-    const { POST } = await routeModulePromise;
-    const response = await POST(
-      captureRequest({
-        destination: 'jovie',
-        transcript: '   ',
-        clientTurnId: 'turn_1234',
-        clientMessageId: 'msg_1234',
-      })
-    );
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toMatchObject({
-      errorCode: EYES_FREE_ERROR.TRANSCRIPTION_EMPTY,
-    });
-    expect(hoisted.handleMobileChatTurn).not.toHaveBeenCalled();
+    for (const testCase of cases) {
+      const response = await postCapture(testCase.body);
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({
+        errorCode: testCase.errorCode,
+      });
+      expect(hoisted.handleMobileChatTurn).not.toHaveBeenCalled();
+    }
   });
 
   it('rejects ordinary users from Summer before the turn handler', async () => {
-    const { POST } = await routeModulePromise;
-    const response = await POST(
-      captureRequest({
-        destination: 'summer',
-        transcript: 'what is the bottleneck',
-        clientTurnId: 'turn_1234',
-        clientMessageId: 'msg_1234',
-      })
-    );
+    const response = await postCapture({
+      ...VALID_BODY,
+      destination: 'summer',
+      transcript: 'what is the bottleneck',
+    });
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toMatchObject({
       destination: 'summer',
@@ -114,35 +132,18 @@ describe('POST /api/mobile/v1/eyes-free-capture', () => {
 
   it('routes Jovie through the existing creative chat turn path', async () => {
     hoisted.handleMobileChatTurn.mockResolvedValue(
-      new Response(
-        [
-          encodeMobileChatNdjsonEvent({
-            type: 'turn.reserved',
-            conversationId: 'conv_jovie',
-            turnId: 'turn_1',
-            clientTurnId: 'turn_1234',
-          }),
-          encodeMobileChatNdjsonEvent({
-            type: 'assistant.completed',
-            clientTurnId: 'turn_1234',
-            conversationId: 'conv_jovie',
-            turnId: 'turn_1',
-            text: 'Here is a caption for Friday.',
-          }),
-        ].join(''),
-        { status: 200 }
-      )
-    );
-
-    const { POST } = await routeModulePromise;
-    const response = await POST(
-      captureRequest({
-        destination: 'jovie',
-        transcript: 'draft a drop caption',
+      completedTurn({
+        conversationId: 'conv_jovie',
+        turnId: 'turn_1',
         clientTurnId: 'turn_1234',
-        clientMessageId: 'msg_1234',
+        text: 'Here is a caption for Friday.',
       })
     );
+
+    const response = await postCapture({
+      ...VALID_BODY,
+      transcript: 'draft a drop caption',
+    });
 
     expect(response.status).toBe(200);
     expect(hoisted.handleMobileChatTurn).toHaveBeenCalledWith(
@@ -164,38 +165,24 @@ describe('POST /api/mobile/v1/eyes-free-capture', () => {
     });
   });
 
-  it('proves an authorized founder Summer round trip through OV chat', async () => {
+  it('proves an authorized founder Summer round trip and idempotent replay', async () => {
     hoisted.canUseOvChatMode.mockResolvedValue(true);
     hoisted.handleMobileChatTurn.mockResolvedValue(
-      new Response(
-        [
-          encodeMobileChatNdjsonEvent({
-            type: 'turn.reserved',
-            conversationId: 'conv_ov',
-            turnId: 'turn_9',
-            clientTurnId: 'turn_summer',
-          }),
-          encodeMobileChatNdjsonEvent({
-            type: 'assistant.completed',
-            clientTurnId: 'turn_summer',
-            conversationId: 'conv_ov',
-            turnId: 'turn_9',
-            text: 'Queued for the current Summer.',
-          }),
-        ].join(''),
-        { status: 200 }
-      )
-    );
-
-    const { POST } = await routeModulePromise;
-    const response = await POST(
-      captureRequest({
-        destination: 'summer',
-        transcript: 'park the teardown wave',
+      completedTurn({
+        conversationId: 'conv_ov',
+        turnId: 'turn_9',
         clientTurnId: 'turn_summer',
-        clientMessageId: 'msg_summer',
+        text: 'Queued for the current Summer.',
       })
     );
+
+    const summerBody = {
+      destination: 'summer',
+      transcript: 'park the teardown wave',
+      clientTurnId: 'turn_summer',
+      clientMessageId: 'msg_summer',
+    };
+    const response = await postCapture(summerBody);
 
     expect(response.status).toBe(200);
     expect(hoisted.handleMobileChatTurn).toHaveBeenCalledWith(
@@ -209,10 +196,7 @@ describe('POST /api/mobile/v1/eyes-free-capture', () => {
       conversationId: 'conv_ov',
       readback: 'Queued for the current Summer.',
     });
-  });
 
-  it('replays an idempotent founder Summer duplicate without a second reservation', async () => {
-    hoisted.canUseOvChatMode.mockResolvedValue(true);
     hoisted.handleMobileChatTurn.mockResolvedValue(
       new Response(
         encodeMobileChatNdjsonEvent({
@@ -225,39 +209,12 @@ describe('POST /api/mobile/v1/eyes-free-capture', () => {
         { status: 200 }
       )
     );
-
-    const { POST } = await routeModulePromise;
-    const response = await POST(
-      captureRequest({
-        destination: 'summer',
-        transcript: 'park the teardown wave',
-        clientTurnId: 'turn_summer',
-        clientMessageId: 'msg_summer',
-      })
+    await expect((await postCapture(summerBody)).json()).resolves.toMatchObject(
+      {
+        status: 'duplicate',
+        readback: 'Queued for the current Summer.',
+      }
     );
-
-    await expect(response.json()).resolves.toMatchObject({
-      destination: 'summer',
-      status: 'duplicate',
-      readback: 'Queued for the current Summer.',
-    });
-  });
-
-  it('rejects short idempotency keys before routing', async () => {
-    const { POST } = await routeModulePromise;
-    const response = await POST(
-      captureRequest({
-        destination: 'jovie',
-        transcript: 'draft a drop',
-        clientTurnId: 'short',
-        clientMessageId: 'msg_1234',
-      })
-    );
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toMatchObject({
-      errorCode: EYES_FREE_ERROR.INVALID_IDEMPOTENCY,
-    });
-    expect(hoisted.handleMobileChatTurn).not.toHaveBeenCalled();
   });
 
   it('maps a missing mobile chat profile to unavailable', async () => {
@@ -271,16 +228,7 @@ describe('POST /api/mobile/v1/eyes-free-capture', () => {
         { status: 404 }
       )
     );
-
-    const { POST } = await routeModulePromise;
-    const response = await POST(
-      captureRequest({
-        destination: 'jovie',
-        transcript: 'draft a drop',
-        clientTurnId: 'turn_1234',
-        clientMessageId: 'msg_1234',
-      })
-    );
+    const response = await postCapture(VALID_BODY);
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toMatchObject({
       status: 'unavailable',

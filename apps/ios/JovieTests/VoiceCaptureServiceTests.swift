@@ -259,33 +259,22 @@ struct VoiceCaptureServiceTests {
   }
 
   @Test func eyesFreeGateKeepsSummerFounderOnlyAndSurfacesOfflineRetry() {
-    #expect(
+    func gate(
+      destination: EyesFreeCaptureDestination,
+      canUseSummer: Bool,
+      isOffline: Bool
+    ) -> EyesFreeCaptureGate {
       EyesFreeCaptureGate.resolve(
         isSignedIn: true,
         chatEnabled: true,
-        isOffline: false,
-        destination: .jovie,
-        canUseSummer: false
-      ) == .ready
-    )
-    #expect(
-      EyesFreeCaptureGate.resolve(
-        isSignedIn: true,
-        chatEnabled: true,
-        isOffline: false,
-        destination: .summer,
-        canUseSummer: false
-      ) == .summerForbidden
-    )
-    #expect(
-      EyesFreeCaptureGate.resolve(
-        isSignedIn: true,
-        chatEnabled: true,
-        isOffline: true,
-        destination: .jovie,
-        canUseSummer: true
-      ) == .offline
-    )
+        isOffline: isOffline,
+        destination: destination,
+        canUseSummer: canUseSummer
+      )
+    }
+    #expect(gate(destination: .jovie, canUseSummer: false, isOffline: false) == .ready)
+    #expect(gate(destination: .summer, canUseSummer: false, isOffline: false) == .summerForbidden)
+    #expect(gate(destination: .jovie, canUseSummer: true, isOffline: true) == .offline)
     #expect(EyesFreeCaptureGate.summerForbidden.message.contains("founder"))
   }
 

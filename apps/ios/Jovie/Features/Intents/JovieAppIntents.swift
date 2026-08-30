@@ -38,6 +38,23 @@ struct SendMessageIntent: AppIntent {
   }
 }
 
+enum EyesFreeCaptureIntentSupport {
+  @MainActor
+  static func enqueue(
+    destination: EyesFreeCaptureDestination,
+    spokenText: String?
+  ) -> IntentDialog {
+    let launch = EyesFreeCaptureLaunch(
+      destination: destination,
+      spokenText: spokenText,
+      idempotencyKey: UUID().uuidString
+    )
+    IntentNavigationStore.shared.submit(.startEyesFreeCapture(launch))
+    let ready = VoiceMemoActionDraft.isReady(spokenText ?? "")
+    return IntentDialog("\(ready ? destination.sendingCue : destination.listeningCue)")
+  }
+}
+
 struct StartVoiceCaptureIntent: AppIntent {
   static let title: LocalizedStringResource = "Talk to Jovie"
   static let description = IntentDescription(
@@ -50,15 +67,7 @@ struct StartVoiceCaptureIntent: AppIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult & ProvidesDialog {
-    let launch = EyesFreeCaptureLaunch(
-      destination: .jovie,
-      spokenText: spokenText,
-      idempotencyKey: UUID().uuidString
-    )
-    IntentNavigationStore.shared.submit(.startEyesFreeCapture(launch))
-    let ready = VoiceMemoActionDraft.isReady(launch.spokenText ?? "")
-    let cue = ready ? launch.destination.sendingCue : launch.destination.listeningCue
-    return .result(dialog: IntentDialog("\(cue)"))
+    .result(dialog: EyesFreeCaptureIntentSupport.enqueue(destination: .jovie, spokenText: spokenText))
   }
 }
 
@@ -74,15 +83,7 @@ struct CaptureForSummerIntent: AppIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult & ProvidesDialog {
-    let launch = EyesFreeCaptureLaunch(
-      destination: .summer,
-      spokenText: spokenText,
-      idempotencyKey: UUID().uuidString
-    )
-    IntentNavigationStore.shared.submit(.startEyesFreeCapture(launch))
-    let ready = VoiceMemoActionDraft.isReady(launch.spokenText ?? "")
-    let cue = ready ? launch.destination.sendingCue : launch.destination.listeningCue
-    return .result(dialog: IntentDialog("\(cue)"))
+    .result(dialog: EyesFreeCaptureIntentSupport.enqueue(destination: .summer, spokenText: spokenText))
   }
 }
 

@@ -1,9 +1,4 @@
-/**
- * Eyes-free iOS capture routing (JOV-5468).
- *
- * Destination is a closed enum. Summer is founder-only via the existing
- * OV/admin gate — never a client-only switch or free-form string.
- */
+/** Closed-destination eyes-free routing. Summer is founder-only via canUseOvChatMode. */
 
 import { MOBILE_CHAT_MAX_TEXT_LENGTH } from '@/lib/mobile/chat/contract';
 
@@ -91,7 +86,6 @@ export function eyesFreeReadback(input: {
   readonly destination: EyesFreeDestination;
   readonly status: EyesFreeCaptureStatus;
   readonly assistantText?: string | null;
-  readonly errorCode?: string | null;
 }): string {
   if (input.status === 'forbidden') {
     return 'Summer is only available to the founder.';
@@ -105,141 +99,123 @@ export function eyesFreeReadback(input: {
   if (input.status === 'failed') {
     return 'I could not finish that capture. Retry from Jovie.';
   }
-
   const spoken = input.assistantText?.trim();
   if (spoken) return spoken;
-
   return input.destination === 'summer' ? 'Sent to Summer.' : 'Sent to Jovie.';
+}
+
+export function eyesFreeResult(input: {
+  readonly destination: EyesFreeDestination;
+  readonly status: EyesFreeCaptureStatus;
+  readonly conversationId?: string | null;
+  readonly turnId?: string | null;
+  readonly assistantText?: string | null;
+  readonly errorCode?: string | null;
+}): EyesFreeCaptureResult {
+  return {
+    destination: input.destination,
+    status: input.status,
+    conversationId: input.conversationId ?? null,
+    turnId: input.turnId ?? null,
+    readback: eyesFreeReadback(input),
+    errorCode: input.errorCode ?? null,
+  };
 }
 
 type NdjsonEvent = {
   readonly type?: unknown;
   readonly errorCode?: unknown;
-  readonly message?: unknown;
   readonly conversationId?: unknown;
   readonly turnId?: string;
   readonly text?: unknown;
 };
+
+function asString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
+}
+
+function lastEvent(
+  events: readonly NdjsonEvent[],
+  type: string
+): NdjsonEvent | undefined {
+  return [...events].reverse().find(event => event.type === type);
+}
+
+function parseNdjson(body: string): NdjsonEvent[] {
+  return body.split('\n').flatMap(line => {
+    const trimmed = line.trim();
+    if (!trimmed) return [];
+    try {
+      return [JSON.parse(trimmed) as NdjsonEvent];
+    } catch {
+      return [];
+    }
+  });
+}
 
 export function readbackFromMobileChatResponse(input: {
   readonly destination: EyesFreeDestination;
   readonly httpStatus: number;
   readonly body: string;
 }): EyesFreeCaptureResult {
-  const events: NdjsonEvent[] = input.body
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => line.length > 0)
-    .flatMap(line => {
-      try {
-        return [JSON.parse(line) as NdjsonEvent];
-      } catch {
-        return [];
-      }
-    });
-
-  const errorEvent = [...events]
-    .reverse()
-    .find(event => event.type === 'error');
-  const completed = [...events]
-    .reverse()
-    .find(event => event.type === 'assistant.completed');
-  const reserved = [...events]
-    .reverse()
-    .find(event => event.type === 'turn.reserved');
-
-  const errorCode =
-    typeof errorEvent?.errorCode === 'string' ? errorEvent.errorCode : null;
+  const events = parseNdjson(input.body);
+  const errorEvent = lastEvent(events, 'error');
+  const completed = lastEvent(events, 'assistant.completed');
+  const reserved = lastEvent(events, 'turn.reserved');
+  const errorCode = asString(errorEvent?.errorCode);
   const conversationId =
-    (typeof completed?.conversationId === 'string'
-      ? completed.conversationId
-      : null) ??
-    (typeof reserved?.conversationId === 'string'
-      ? reserved.conversationId
-      : null);
-  const turnId =
-    (typeof completed?.turnId === 'string' ? completed.turnId : null) ??
-    (typeof reserved?.turnId === 'string' ? reserved.turnId : null);
-  const assistantText =
-    typeof completed?.text === 'string' ? completed.text : null;
+    asString(completed?.conversationId) ?? asString(reserved?.conversationId);
+  const turnId = asString(completed?.turnId) ?? asString(reserved?.turnId);
+  const assistantText = asString(completed?.text);
+  const dest = input.destination;
 
   if (
     input.httpStatus === 403 ||
     errorCode === 'OV_CHAT_FORBIDDEN' ||
     errorCode === EYES_FREE_ERROR.SUMMER_FORBIDDEN
   ) {
-    return {
-      destination: input.destination,
+    return eyesFreeResult({
+      destination: dest,
       status: 'forbidden',
-      conversationId: null,
-      turnId: null,
-      readback: eyesFreeReadback({
-        destination: input.destination,
-        status: 'forbidden',
-      }),
       errorCode: EYES_FREE_ERROR.SUMMER_FORBIDDEN,
-    };
+    });
   }
-
   if (input.httpStatus === 409 || errorCode === 'TURN_IN_PROGRESS') {
-    return {
-      destination: input.destination,
+    return eyesFreeResult({
+      destination: dest,
       status: 'in_progress',
       conversationId,
       turnId,
-      readback: eyesFreeReadback({
-        destination: input.destination,
-        status: 'in_progress',
-      }),
       errorCode: errorCode ?? 'TURN_IN_PROGRESS',
-    };
+    });
   }
-
   if (
     input.httpStatus === 404 ||
     errorCode === 'MOBILE_CHAT_PROFILE_REQUIRED'
   ) {
-    return {
-      destination: input.destination,
+    return eyesFreeResult({
+      destination: dest,
       status: 'unavailable',
-      conversationId: null,
-      turnId: null,
-      readback: eyesFreeReadback({
-        destination: input.destination,
-        status: 'unavailable',
-      }),
       errorCode: errorCode ?? EYES_FREE_ERROR.UNAVAILABLE,
-    };
+    });
   }
-
   if (input.httpStatus >= 400 || errorEvent) {
-    return {
-      destination: input.destination,
+    return eyesFreeResult({
+      destination: dest,
       status: 'failed',
       conversationId,
       turnId,
-      readback: eyesFreeReadback({
-        destination: input.destination,
-        status: 'failed',
-        errorCode,
-      }),
       errorCode: errorCode ?? 'CAPTURE_FAILED',
-    };
+    });
   }
 
   const isDuplicate =
     Boolean(completed) && !reserved && input.httpStatus === 200;
-
-  return {
-    destination: input.destination,
+  return eyesFreeResult({
+    destination: dest,
     status: isDuplicate ? 'duplicate' : 'completed',
     conversationId,
     turnId,
-    readback: eyesFreeReadback({
-      destination: input.destination,
-      status: isDuplicate ? 'duplicate' : 'completed',
-      assistantText,
-    }),
-    errorCode: null,
-  };
+    assistantText,
+  });
 }
