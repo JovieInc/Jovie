@@ -46,7 +46,7 @@ def test_production_next_cache_experiment_is_bounded_and_restore_only_by_default
 
     save_match = re.search(
         r"      - name: Save bounded production Next build cache\n(?P<body>.*?)"
-        r"\n  production-public-profile-alias-gate:",
+        r"\n  staging-deployment-receipt:",
         workflow,
         re.DOTALL,
     )

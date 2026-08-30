@@ -6,11 +6,13 @@ import {
   bindDispatchLiveHead,
   emptyRollingCiState,
   failureFingerprint,
+  MAX_REPAIR_DELIVERIES,
   normalizeFailureEvents,
   parseMergeQueueFrontBranch,
   parseRollingCiState,
   planFailureDispatch,
   planGreenRecovery,
+  ROLLING_CI_POLICY_VERSION,
   renderDispatchComment,
   resolveCiWorkflowRun,
   resolveDispatchPullRequest,
@@ -18,6 +20,7 @@ import {
   TRUSTED_CI_WORKFLOW_PATH,
   TRUSTED_FAILURE_EVENTS,
   TRUSTED_PRODUCER_EVENTS,
+  TRUSTED_REPOSITORY,
 } from '../rolling-ci-dispatch.mjs';
 
 const head = 'a'.repeat(40);
@@ -83,6 +86,7 @@ function plan(eventValue = event(), extra = {}) {
 describe('rolling CI failure dispatch', () => {
   it('normalizes repository, PR, exact head, check, attempt, and fingerprint', () => {
     expect(event()).toMatchObject({
+      policyVersion: ROLLING_CI_POLICY_VERSION,
       repository: 'JovieInc/Jovie',
       pr: 17,
       head,
@@ -140,27 +144,29 @@ describe('rolling CI failure dispatch', () => {
     expect(run?.id).toBe(11);
   });
 
-  it('deliberate red: dispatch CLI still requires a writer on merge_group', () => {
+  it('deliberate red: dispatch CLI rejects merge_group even with a writer', () => {
     const result = spawnSync(process.execPath, [CLI], {
       input: JSON.stringify(
         dispatchInput({
-          writer: '',
+          writer: 'fx-hosted',
           source: { ...trustedSource, producerEvent: 'merge_group' },
         })
       ),
       encoding: 'utf8',
     });
     expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain('writer is required');
+    expect(result.stderr).toContain(
+      'failure source is not an authenticated CI workflow_run'
+    );
   });
 
-  it('accepts native merge_group CI as an authenticated producer', () => {
-    expect(TRUSTED_PRODUCER_EVENTS).toEqual(['pull_request', 'merge_group']);
-    expect(
+  it('rejects native merge_group CI as a synthetic producer', () => {
+    expect(TRUSTED_PRODUCER_EVENTS).toEqual(['pull_request']);
+    expect(() =>
       event({
         source: { ...trustedSource, producerEvent: 'merge_group' },
-      }).source.producerEvent
-    ).toBe('merge_group');
+      })
+    ).toThrow('failure source is not an authenticated CI workflow_run');
     expect(
       resolveCiWorkflowRun({
         headSha: head,
@@ -176,11 +182,11 @@ describe('rolling CI failure dispatch', () => {
             run_attempt: 1,
           },
         ],
-      })?.id
-    ).toBe(13);
+      })
+    ).toBeNull();
   });
 
-  it('resolves the merge-queue front PR when workflow_run leaves pull_requests empty', () => {
+  it('recognizes but never admits a merge-queue synthetic ref', () => {
     const baseSha = 'c'.repeat(40);
     expect(
       parseMergeQueueFrontBranch(`gh-readonly-queue/main/pr-16180-${baseSha}`)
@@ -190,11 +196,7 @@ describe('rolling CI failure dispatch', () => {
         producerEvent: 'merge_group',
         headBranch: `refs/heads/gh-readonly-queue/main/pr-16180-${baseSha}`,
       })
-    ).toEqual({
-      prNumber: 16180,
-      source: 'merge_queue_front_ref',
-      baseSha,
-    });
+    ).toBeNull();
     expect(
       resolveDispatchPullRequest({
         producerEvent: 'pull_request',
@@ -207,7 +209,7 @@ describe('rolling CI failure dispatch', () => {
         liveHead: nextHead,
         expectedHead: head,
       })
-    ).toEqual({ liveHead: head, reason: 'merge_group_synthetic_head' });
+    ).toBeNull();
     expect(
       bindDispatchLiveHead({
         producerEvent: 'pull_request',
@@ -217,8 +219,8 @@ describe('rolling CI failure dispatch', () => {
     ).toBeNull();
   });
 
-  it('deliberate red: rejects the old pull_request-only producer gate', () => {
-    expect(TRUSTED_PRODUCER_EVENTS).toEqual(['pull_request', 'merge_group']);
+  it('deliberate red: rejects every producer except pull_request', () => {
+    expect(TRUSTED_PRODUCER_EVENTS).toEqual(['pull_request']);
     expect(() =>
       event({
         source: { ...trustedSource, producerEvent: 'push' },
@@ -229,36 +231,13 @@ describe('rolling CI failure dispatch', () => {
         source: { ...trustedSource, producerEvent: 'workflow_dispatch' },
       })
     ).toThrow('failure source is not an authenticated CI workflow_run');
-    const queueSha = 'c'.repeat(40);
-    const bound = bindDispatchLiveHead({
-      producerEvent: 'merge_group',
-      liveHead: nextHead,
-      expectedHead: queueSha,
-    });
-    expect(bound).toEqual({
-      liveHead: queueSha,
-      reason: 'merge_group_synthetic_head',
-    });
-    expect(
+    expect(() =>
       runDispatch(
         dispatchInput({
           source: { ...trustedSource, producerEvent: 'merge_group' },
-          liveHead: bound?.liveHead,
-          headSha: queueSha,
-          checks: [
-            {
-              name: 'ci-fast',
-              conclusion: 'failure',
-              headSha: queueSha,
-              checkSuiteId: 44,
-            },
-          ],
         })
       )
-    ).toMatchObject({
-      action: 'dispatch_implementer',
-      mutate: true,
-    });
+    ).toThrow('failure source is not an authenticated CI workflow_run');
   });
 
   it('deliberate red: rejects unauthenticated or PR-controlled events', () => {
@@ -370,16 +349,12 @@ describe('rolling CI failure dispatch', () => {
 
   it('deliberate red: bounds repeated repair deliveries', () => {
     let state = emptyRollingCiState(head);
-    for (let attempt = 1; attempt <= 3; attempt += 1) {
-      const next = plan(
-        event({ workflowRunId: 9000 + attempt, workflowRunAttempt: attempt }),
-        { priorState: state }
-      );
-      expect(next.mutate).toBe(true);
-      state = next.state;
-    }
+    expect(MAX_REPAIR_DELIVERIES).toBe(1);
+    const first = plan(event(), { priorState: state });
+    expect(first.mutate).toBe(true);
+    state = first.state;
     expect(
-      plan(event({ workflowRunId: 9010, workflowRunAttempt: 4 }), {
+      plan(event({ workflowRunId: 9010, workflowRunAttempt: 2 }), {
         priorState: state,
       })
     ).toMatchObject({
@@ -415,9 +390,17 @@ describe('rolling CI failure dispatch', () => {
     const body = renderDispatchComment({ event: failure, plan: planned });
     expect(body).toContain('@tim (active implementer)');
     expect(planned.state.claim.key).toBe(
-      `JovieInc/Jovie:pr-17:${head}:ci-fast:${failure.fingerprint}`
+      `JovieInc/Jovie:pr-17:${head}:${failure.fingerprint}:${ROLLING_CI_POLICY_VERSION}`
     );
+    expect(planned.state.claim.policyVersion).toBe(ROLLING_CI_POLICY_VERSION);
     expect(parseRollingCiState(body)).toEqual(planned.state);
+  });
+
+  it('deliberate red: rejects LogYourBody even though the Cursor App is installed there', () => {
+    expect(TRUSTED_REPOSITORY).toBe('JovieInc/Jovie');
+    expect(() => event({ repository: 'JovieInc/LogYourBody' })).toThrow(
+      'repository must be JovieInc/Jovie'
+    );
   });
 
   it('supersedes the claim on a green rerun of the same head', () => {
@@ -459,15 +442,12 @@ describe('rolling CI dispatch CLI and workflow', () => {
     );
   });
 
-  it('uses authoritative workflow_run provenance with FX remediation', () => {
+  it('uses authenticated workflow_run provenance and a bounded hosted writer', () => {
     for (const token of [
-      "workflows: ['CI']",
+      'workflows: ["CI"]',
+      "github.repository == 'JovieInc/Jovie'",
       "github.event.workflow_run.event == 'pull_request'",
-      "github.event.workflow_run.event == 'merge_group'",
       "github.event.workflow_run.path == '.github/workflows/ci.yml'",
-      'HEAD_BRANCH:',
-      'resolveDispatchPullRequest',
-      'bindDispatchLiveHead',
       'steps.plan.outputs.pr_number',
       "github.event.workflow_run.conclusion == 'failure'",
       "github.event.workflow_run.conclusion == 'success'",
@@ -485,26 +465,40 @@ describe('rolling CI dispatch CLI and workflow', () => {
       'secrets.CURSOR_API_KEY',
       'node scripts/lib/rolling-ci-fx.mjs',
       'scripts/lib/rolling-ci-handoff.mjs',
-      'Launch FX remediator',
-      'Record FX outcome',
-      'fx_outcome',
-      '::notice::FX outcome=',
+      'group: rolling-ci-remediation-global-v1',
+      'cancel-in-progress: false',
+      'Cursor patch artifact without GitHub authority',
+      'Upload prelaunch receipt before model execution',
+      'Create typed acceptance receipt after tests',
+      'Publish typed terminal receipt',
+      'runs-on: ubuntu-24.04',
+      'runs-on: [self-hosted, Linux, X64, jovie-fixed]',
+      'permission-contents: write',
+      'repositories: Jovie',
+      'hosted-commit',
+      'Shell(*)',
+      'WebFetch(*)',
+      'Mcp(*:*)',
       'startup_failure',
-      'runs-on: ubuntu-latest',
     ]) {
       expect(WORKFLOW, token).toContain(token);
     }
     expect(WORKFLOW).toMatch(/^permissions: \{\}$/m);
-    expect(WORKFLOW).not.toContain('contents: write');
+    expect(WORKFLOW).not.toMatch(/^\s+contents:\s+write\s*$/m);
     expect(WORKFLOW).not.toMatch(/^\s{2}check_suite:\s*$/m);
     expect(WORKFLOW).not.toMatch(/^\s{2}check_run:\s*$/m);
-    expect(WORKFLOW).not.toContain('JOVIE_BOT_PRIVATE_KEY');
+    expect(WORKFLOW).toContain('JOVIE_BOT_PRIVATE_KEY');
     expect(WORKFLOW).not.toContain(
       'ref: ${{ github.event.workflow_run.head_sha }}'
     );
-    expect(WORKFLOW).not.toMatch(
-      /github\.event\.workflow_run\.event == 'pull_request' &&\s*\n\s*github\.event\.workflow_run\.path == '\.github\/workflows\/ci\.yml'/
-    );
+    expect(WORKFLOW).not.toContain("event == 'merge_group'");
+    expect(WORKFLOW).not.toContain('remoteMutationAllowed');
+    expect(WORKFLOW).not.toContain('workflow_dispatch:');
+    expect(WORKFLOW).not.toContain('gh workflow run');
+    expect(WORKFLOW).not.toContain('gh run rerun');
+    expect(WORKFLOW).not.toContain('gh pr merge');
+    expect(WORKFLOW).not.toContain('gh pr ready');
+    expect(WORKFLOW).not.toContain('gh pr edit');
   });
 
   it('binds every jq payload value into the exact planner input', () => {
@@ -529,19 +523,14 @@ describe('rolling CI dispatch CLI and workflow', () => {
       prNumber: 17,
       headSha: head,
       liveHead: head,
-      sourceHead: head,
-      headRef: 'codex/jov-5377-rolling-ci-payload',
       workflowRunId: '9001',
       workflowRunAttempt: 1,
       failedJobs,
       writer: 'tim',
       priorCommentBody: '',
-      handoffCommentBody: '',
       conclusion: 'failure',
       checkSuiteId: 44,
       checks,
-      cursorApiKey: '',
-      remoteMutationAllowed: false,
       source: {
         eventName: 'workflow_run',
         workflow: 'CI',
@@ -565,12 +554,6 @@ describe('rolling CI dispatch CLI and workflow', () => {
       'liveHead',
       values.liveHead,
       '--arg',
-      'sourceHead',
-      values.sourceHead,
-      '--arg',
-      'headRef',
-      values.headRef,
-      '--arg',
       'workflowRunId',
       values.workflowRunId,
       '--argjson',
@@ -585,9 +568,6 @@ describe('rolling CI dispatch CLI and workflow', () => {
       '--arg',
       'priorCommentBody',
       values.priorCommentBody,
-      '--arg',
-      'handoffCommentBody',
-      values.handoffCommentBody,
       '--arg',
       'conclusion',
       values.conclusion,
@@ -612,9 +592,6 @@ describe('rolling CI dispatch CLI and workflow', () => {
       '--arg',
       'trustedPolicyRef',
       values.source.trustedPolicyRef,
-      '--arg',
-      'cursorApiKey',
-      values.cursorApiKey,
       payloadFilter,
     ];
     const result = spawnSync('jq', jqArgs, { encoding: 'utf8' });
