@@ -159,7 +159,9 @@ describe('JOV-INV-018 screen-certification/v1', () => {
 
   it('registers the canonical /cli landing page for changed-surface certification', () => {
     const source = 'apps/web/app/(marketing)/cli/page.tsx';
-    const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.cli-landing');
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.cli-landing'
+    );
 
     assert.deepEqual(screen, {
       id: 'web.cli-landing',
