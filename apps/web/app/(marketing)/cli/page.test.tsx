@@ -46,6 +46,21 @@ describe('CLI landing page', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('wraps long command lines on mobile without changing desktop formatting', () => {
+    const { container } = render(<CliPage />);
+
+    const commandBlocks = container.querySelectorAll('pre code');
+    expect(commandBlocks).toHaveLength(2);
+    for (const commandBlock of commandBlocks) {
+      expect(commandBlock).toHaveClass(
+        'whitespace-pre-wrap',
+        'break-all',
+        'sm:whitespace-pre',
+        'sm:break-normal'
+      );
+    }
+  });
+
   it('repeats the same source and API actions through the hero and terminal CTA', () => {
     render(<CliPage />);
 

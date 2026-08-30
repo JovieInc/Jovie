@@ -80,7 +80,7 @@ export default function CliPage() {
               stateLabel={copy.commands.source.stateLabel}
             >
               <pre className='overflow-x-auto p-5 text-sm leading-relaxed text-secondary-token sm:p-6'>
-                <code className='block min-w-max font-mono'>
+                <code className='block whitespace-pre-wrap break-all font-mono sm:min-w-max sm:whitespace-pre sm:break-normal'>
                   {commandText(copy.commands.source.commands)}
                 </code>
               </pre>
@@ -98,7 +98,7 @@ export default function CliPage() {
                   {copy.commands.npm.description}
                 </p>
                 <pre className='mt-5 overflow-x-auto text-sm leading-relaxed text-secondary-token'>
-                  <code className='block min-w-max font-mono'>
+                  <code className='block whitespace-pre-wrap break-all font-mono sm:min-w-max sm:whitespace-pre sm:break-normal'>
                     {commandText(copy.commands.npm.commands)}
                   </code>
                 </pre>
