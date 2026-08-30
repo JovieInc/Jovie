@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import {
+  chmodSync,
   mkdirSync,
   mkdtempSync,
   rmSync,
@@ -318,6 +319,16 @@ describe('hosted rolling CI repair policy', () => {
       expect(() =>
         readHostedArtifactFile(root, 'apps/web/lib/proof.ts')
       ).toThrow('symlink artifact is forbidden');
+      writeFileSync(join(root, 'apps/web/lib/safe.ts'), 'safe');
+      chmodSync(root, 0o755);
+      expect(() =>
+        readHostedArtifactFile(root, 'apps/web/lib/safe.ts')
+      ).toThrow('private runner-owned directory');
+      expect(
+        readHostedArtifactFile(root, 'apps/web/lib/safe.ts', {
+          requirePrivateRoot: false,
+        }).toString('utf8')
+      ).toBe('safe');
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }

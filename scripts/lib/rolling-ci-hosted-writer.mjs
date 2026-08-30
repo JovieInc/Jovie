@@ -238,7 +238,11 @@ export function validateHostedRepairPath(path) {
   return { allowed: true, path: normalized };
 }
 
-function readPrivateArtifactFile(root, path) {
+function readPrivateArtifactFile(
+  root,
+  path,
+  { requirePrivateRoot = true } = {}
+) {
   if (
     !path ||
     path.startsWith('/') ||
@@ -251,8 +255,10 @@ function readPrivateArtifactFile(root, path) {
   if (
     !rootStat.isDirectory() ||
     rootStat.isSymbolicLink() ||
-    (rootStat.mode & 0o077) !== 0 ||
-    (typeof process.getuid === 'function' && rootStat.uid !== process.getuid())
+    (requirePrivateRoot && (rootStat.mode & 0o077) !== 0) ||
+    (requirePrivateRoot &&
+      typeof process.getuid === 'function' &&
+      rootStat.uid !== process.getuid())
   ) {
     throw new Error('artifact root must be a private runner-owned directory');
   }
@@ -284,10 +290,10 @@ function readPrivateArtifactFile(root, path) {
   }
 }
 
-export function readHostedArtifactFile(root, path) {
+export function readHostedArtifactFile(root, path, options) {
   const policy = validateHostedRepairPath(path);
   if (!policy.allowed) throw new Error(`${path}: ${policy.reason}`);
-  return readPrivateArtifactFile(root, policy.path);
+  return readPrivateArtifactFile(root, policy.path, options);
 }
 
 export function buildHostedVerificationEnvironment(environment = {}) {
@@ -409,7 +415,11 @@ function assertHostedCandidateState({
   }
   for (const change of changes) {
     if (
-      sha256(readHostedArtifactFile(repository, change.path)) !== change.sha256
+      sha256(
+        readHostedArtifactFile(repository, change.path, {
+          requirePrivateRoot: false,
+        })
+      ) !== change.sha256
     ) {
       throw new Error(
         `${change.path}: verification bytes do not match acceptance`
