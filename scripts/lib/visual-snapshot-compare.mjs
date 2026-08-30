@@ -21,12 +21,59 @@ const STATIC_SCREENSHOT_NAME = /toHaveScreenshot\(\s*(['"`])([^$'"`\n]+)\1/g;
 const MISSING_SNAPSHOT_MESSAGE =
   /A snapshot doesn't exist|snapshot(?: file)? does not exist|no snapshot|ENOENT/i;
 
+/**
+ * @typedef {{
+ *   mode?: string,
+ *   updateSnapshots?: boolean,
+ *   error?: any,
+ *   missingBaselinePaths?: readonly string[],
+ *   advisory?: boolean,
+ * }} VisualSnapshotOutcomeInput
+ *
+ * @typedef {{
+ *   ok: boolean,
+ *   status: string,
+ *   reason: string,
+ *   missingBaselinePaths?: readonly string[],
+ *   workflowIssues?: readonly string[],
+ * }} VisualSnapshotOutcome
+ *
+ * @typedef {{
+ *   repoRoot?: string,
+ *   existsSync?: any,
+ *   readFileSync?: any,
+ *   specs?: readonly string[],
+ * }} VisualSnapshotInventoryInput
+ *
+ * @typedef {{
+ *   visualRegressionYaml?: string,
+ *   ciYaml?: string,
+ * }} VisualCompareWorkflowContractInput
+ *
+ * @typedef {{
+ *   repoRoot?: string,
+ *   mode?: string,
+ *   existsSync?: any,
+ *   readFileSync?: any,
+ *   visualRegressionYaml?: string,
+ *   ciYaml?: string,
+ * }} VisualSnapshotCompareInput
+ */
+
+/**
+ * @param {any} [error]
+ * @returns {boolean}
+ */
 export function isMissingBaselineSignal(error = {}) {
   const code = error?.code ?? error?.errnoException?.code;
   const message = String(error?.message ?? error ?? '');
   return code === 'ENOENT' || MISSING_SNAPSHOT_MESSAGE.test(message);
 }
 
+/**
+ * @param {VisualSnapshotOutcomeInput} [input]
+ * @returns {VisualSnapshotOutcome}
+ */
 export function classifyVisualSnapshotOutcome({
   mode,
   updateSnapshots = false,
@@ -120,6 +167,10 @@ export function extractJobBlock(workflow, jobKey) {
   return block.join('\n');
 }
 
+/**
+ * @param {VisualSnapshotInventoryInput} [input]
+ * @returns {string[]}
+ */
 export function inventoryMissingBaselines({
   repoRoot,
   existsSync,
@@ -149,6 +200,10 @@ export function inventoryMissingBaselines({
   return missing;
 }
 
+/**
+ * @param {VisualCompareWorkflowContractInput} [input]
+ * @returns {string[]}
+ */
 export function assertVisualCompareWorkflowContract({
   visualRegressionYaml = '',
   ciYaml = '',
@@ -205,6 +260,10 @@ export function assertVisualCompareWorkflowContract({
   return issues;
 }
 
+/**
+ * @param {VisualSnapshotCompareInput} [input]
+ * @returns {VisualSnapshotOutcome}
+ */
 export function runVisualSnapshotCompare({
   repoRoot,
   mode = VISUAL_COMPARE_MODE,
