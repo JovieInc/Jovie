@@ -89,6 +89,9 @@ async function spawnLifecycleHarness(action, timeoutMs = 5_000) {
   const helperSignalFile = join(dir, 'browser-helper-signals.log');
   const browserExecutable = join(dir, 'chromium');
   symlinkSync(process.execPath, browserExecutable);
+  // The helper's newline must survive three parse levels (this file -> the
+  // generated module -> the browser shim -> the helper). A `\n` escape collapses
+  // to a real newline mid-chain and breaks the helper, so build it at runtime.
   const browserScript = `
     const { spawn } = require('node:child_process');
     const { writeFileSync } = require('node:fs');
@@ -96,7 +99,7 @@ async function spawnLifecycleHarness(action, timeoutMs = 5_000) {
       process.execPath,
       [
         '-e',
-        "const { appendFileSync } = require('node:fs'); process.on('SIGTERM', () => appendFileSync(process.argv[1], 'SIGTERM\\n')); appendFileSync(process.argv[1], 'READY\\n'); setInterval(() => {}, 1000)",
+        "const { appendFileSync } = require('node:fs'); const NL = String.fromCharCode(10); process.on('SIGTERM', () => appendFileSync(process.argv[1], 'SIGTERM' + NL)); appendFileSync(process.argv[1], 'READY' + NL); setInterval(() => {}, 1000)",
         process.argv[2],
       ],
       { stdio: 'ignore' }
@@ -639,6 +642,45 @@ describe('live Storybook lifecycle', () => {
         tempRoot
       )
     ).toEqual({ ok: true, groupPids: [200], individualPids: [] });
+  });
+
+  it('treats a defunct zombie process as gone', async () => {
+    // A live process (this one) is not gone.
+    expect(isProcessGone(process.pid)).toBe(false);
+    // Nonexistent or invalid pids are gone regardless of platform.
+    expect(isProcessGone(2 ** 22 + 12345)).toBe(true);
+    expect(isProcessGone(-1)).toBe(true);
+    // On Linux, an orphaned child that is SIGKILLed and never reaped lingers
+    // as a `<defunct>` zombie: kill(pid, 0) still succeeds on it, but it is
+    // dead and must not block reaping of its process group.
+    if (existsSync('/proc/self/stat')) {
+      const orphanPidFile = join(
+        mkdtempSync(join(tmpdir(), 'jovie-zombie-orphan-')),
+        'orphan.pid'
+      );
+      temps.push(dirname(orphanPidFile));
+      const spawner = spawnProcessGroup(
+        process.execPath,
+        [
+          '-e',
+          "const { spawn } = require('node:child_process'); const { writeFileSync } = require('node:fs'); const orphan = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { detached: true, stdio: 'ignore' }); orphan.unref(); writeFileSync(process.argv[1], String(orphan.pid));",
+          orphanPidFile,
+        ],
+        { stdio: 'ignore' }
+      );
+      ownedPids.push(spawner.pid);
+      await waitFor(() => existsSync(orphanPidFile));
+      const orphanPid = Number(readFileSync(orphanPidFile, 'utf8'));
+      ownedPids.push(orphanPid);
+      // Kill the spawner first so the orphan loses its parent, then SIGKILL the
+      // orphan itself: with no live parent to wait() on it, it becomes a zombie.
+      killProcessGroup(spawner, 'SIGKILL');
+      expect(await waitUntilProcessGone(spawner.pid, 5_000)).toBe(true);
+      process.kill(orphanPid, 'SIGKILL');
+      // The orphan stays in the process table as a zombie (kill(pid, 0) works)
+      // yet isProcessGone must report it gone.
+      expect(await waitUntilProcessGone(orphanPid, 5_000)).toBe(true);
+    }
   });
 
   lifecycleIt(

@@ -95,8 +95,27 @@ export function killProcessGroup(child, signal = 'SIGTERM') {
   }
 }
 
+/**
+ * Read the single-letter process state from /proc (Linux). Returns null when
+ * unavailable (non-Linux, or the process is already reaped). A `Z` state means
+ * the process is a defunct zombie: it has exited and cannot act, so it is gone
+ * even though `kill(pid, 0)` still succeeds until a parent reaps it.
+ */
+function readProcState(pid) {
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+    const closeParen = stat.lastIndexOf(')');
+    if (closeParen === -1) return null;
+    return stat.slice(closeParen + 2, closeParen + 3) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function isProcessGone(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return true;
+  const state = readProcState(pid);
+  if (state === 'Z') return true;
   try {
     process.kill(pid, 0);
     return false;
@@ -129,6 +148,8 @@ function readProcessRows() {
       '-o',
       'lstart=',
       '-o',
+      'stat=',
+      '-o',
       'command=',
     ],
     {
@@ -142,7 +163,7 @@ function readProcessRows() {
     .split('\n')
     .map(line => {
       const match = line.match(
-        /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+\s+\S+\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4})\s+(.+)$/
+        /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+\s+\S+\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4})\s+(\S+)\s+(.+)$/
       );
       if (!match) return null;
       return {
@@ -150,7 +171,8 @@ function readProcessRows() {
         ppid: Number(match[2]),
         pgid: Number(match[3]),
         startedAt: match[4],
-        command: match[5],
+        stat: match[5],
+        command: match[6],
       };
     })
     .filter(Boolean);
@@ -180,9 +202,7 @@ function commandTokens(command) {
 
 function isChromiumLeader(command) {
   const executable = command.match(/^\s*(\S+)/)?.[1];
-  return CHROMIUM_EXECUTABLES.has(
-    basename(executable ?? '').toLowerCase()
-  );
+  return CHROMIUM_EXECUTABLES.has(basename(executable ?? '').toLowerCase());
 }
 
 function isSafeToken(token) {
@@ -291,10 +311,16 @@ function watchdogReceiptFromLease(lease) {
 }
 
 function receiptIsAlive(receipt, rows) {
-  return (
-    Boolean(receipt) &&
-    rows.some(row => sameProcessReceipt(row, receipt))
-  );
+  return Boolean(receipt) && rows.some(row => sameProcessReceipt(row, receipt));
+}
+
+/**
+ * A SIGKILLed browser child whose leader already exited can linger as a
+ * `<defunct>` zombie that init never reaps on some CI runners. Its pgid stays
+ * in the process table forever, so a zombie row must not count as a live group.
+ */
+function isZombieRow(row) {
+  return typeof row?.stat === 'string' && row.stat.startsWith('Z');
 }
 
 function ownerIsAlive(lease, rows) {
@@ -557,10 +583,7 @@ async function finishOwnedRun(lease, ownerSignal) {
     let activeLease = recordBrowserGroups(lease, rows);
     if (!activeLease) return false;
 
-    if (
-      ownerSignal &&
-      ownerIsAlive(activeLease, rows)
-    ) {
+    if (ownerSignal && ownerIsAlive(activeLease, rows)) {
       signalPid(activeLease.ownerPid, ownerSignal);
     }
 
@@ -609,9 +632,7 @@ async function finishOwnedRun(lease, ownerSignal) {
       const updatedLease = recordBrowserGroups(activeLease, rows);
       if (!updatedLease) continue;
       activeLease = updatedLease;
-      if (
-        ownerIsAlive(activeLease, rows)
-      ) {
+      if (ownerIsAlive(activeLease, rows)) {
         signalPid(activeLease.ownerPid, 'SIGKILL');
       }
       const markedBrowserRemains =
@@ -621,7 +642,7 @@ async function finishOwnedRun(lease, ownerSignal) {
           activeLease.tempRoot
         ).length > 0;
       const ownedGroupRemains = activeLease.browserGroups.some(group =>
-        rows.some(row => row.pgid === group.leader.pgid)
+        rows.some(row => row.pgid === group.leader.pgid && !isZombieRow(row))
       );
       if (ownedGroupRemains) {
         signalOwnedBrowserGroups(
@@ -667,8 +688,7 @@ async function runStorybookVitestWatchdog(leasePath) {
       continue;
     }
     const lostOwner =
-      !ownerIsAlive(lease, rows) ||
-      hasLostController(lease, rows);
+      !ownerIsAlive(lease, rows) || hasLostController(lease, rows);
     lostOwnerConfirmations = lostOwner ? lostOwnerConfirmations + 1 : 0;
     if (
       lostOwnerConfirmations >= LOST_OWNER_CONFIRMATIONS ||
