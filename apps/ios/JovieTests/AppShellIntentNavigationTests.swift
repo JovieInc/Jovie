@@ -80,7 +80,89 @@ struct AppShellIntentNavigationTests {
     #expect(state.selectedTab == .chat)
     #expect(state.chatDraft == "keep draft")
     #expect(state.shouldStartVoiceCapture)
+    #expect(state.talkAutoSubmit)
+    #expect(state.eyesFreeLaunch?.destination == .jovie)
     #expect(state.pendingRequest == nil)
+  }
+
+  @Test func summerCaptureRejectsOrdinaryUsersWithoutStartingMic() {
+    var state = AppShellIntentNavigationState(
+      selectedTab: .profile,
+      chatDraft: "",
+      autoSendMessage: nil,
+      openConversationID: nil,
+      pendingRequest: .startEyesFreeCapture(
+        EyesFreeCaptureLaunch(
+          destination: .summer,
+          spokenText: "what is blocked",
+          idempotencyKey: "turn_summer_1"
+        )
+      )
+    )
+
+    AppShellIntentNavigation.applyPendingRequest(
+      chatEnabled: true,
+      canUseSummer: false,
+      state: &state
+    )
+
+    #expect(state.shouldStartVoiceCapture == false)
+    #expect(state.autoSendMessage == nil)
+    #expect(state.unavailableMessage == EyesFreeCaptureGate.summerForbiddenMessage)
+  }
+
+  @Test func founderSummerSpokenTextAutoSubmits() {
+    var state = AppShellIntentNavigationState(
+      selectedTab: .profile,
+      chatDraft: "",
+      autoSendMessage: nil,
+      openConversationID: nil,
+      pendingRequest: .startEyesFreeCapture(
+        EyesFreeCaptureLaunch(
+          destination: .summer,
+          spokenText: "park the teardown",
+          idempotencyKey: "turn_summer_2"
+        )
+      )
+    )
+
+    AppShellIntentNavigation.applyPendingRequest(
+      chatEnabled: true,
+      canUseSummer: true,
+      state: &state
+    )
+
+    #expect(state.selectedTab == .chat)
+    #expect(state.autoSendMessage == "park the teardown")
+    #expect(state.talkAutoSubmit)
+    #expect(state.eyesFreeLaunch?.destination == .summer)
+    #expect(state.shouldStartVoiceCapture == false)
+    #expect(state.unavailableMessage == nil)
+  }
+
+  @Test func offlineEyesFreeCaptureSurfacesRetryWithoutListening() {
+    var state = AppShellIntentNavigationState(
+      selectedTab: .chat,
+      chatDraft: "",
+      autoSendMessage: nil,
+      openConversationID: nil,
+      pendingRequest: .startEyesFreeCapture(
+        EyesFreeCaptureLaunch(
+          destination: .jovie,
+          spokenText: nil,
+          idempotencyKey: "turn_offline_1"
+        )
+      )
+    )
+
+    AppShellIntentNavigation.applyPendingRequest(
+      chatEnabled: true,
+      isOffline: true,
+      state: &state
+    )
+
+    #expect(state.shouldStartVoiceCapture == false)
+    #expect(state.unavailableMessage == EyesFreeCaptureGate.offlineMessage)
   }
 
   @Test func sendMessageWithoutAutoSendPrefillsDraft() {
@@ -159,6 +241,7 @@ struct AppShellIntentNavigationTests {
     #expect(state.selectedTab == .profile)
     #expect(state.chatDraft == "existing draft")
     #expect(state.shouldStartVoiceCapture == false)
+    #expect(state.unavailableMessage == EyesFreeCaptureGate.unavailableMessage)
     #expect(state.pendingRequest == nil)
   }
 

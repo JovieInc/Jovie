@@ -7,11 +7,20 @@ protocol MobileChatClientProtocol: Sendable {
     _ request: MobileChatTurnRequest,
     onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?
   ) async throws -> [MobileChatStreamEvent]
+  func submitEyesFreeCapture(
+    _ request: EyesFreeCaptureAPIRequest
+  ) async throws -> EyesFreeCaptureAPIResponse
 }
 
 extension MobileChatClientProtocol {
   func sendTurn(_ request: MobileChatTurnRequest) async throws -> [MobileChatStreamEvent] {
     try await sendTurn(request, onEvent: nil)
+  }
+
+  func submitEyesFreeCapture(
+    _ request: EyesFreeCaptureAPIRequest
+  ) async throws -> EyesFreeCaptureAPIResponse {
+    throw MobileChatClientError.invalidResponse
   }
 }
 
@@ -226,6 +235,66 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
 
     NativeSessionTokenStore.refresh(from: response)
     return try await readStreamEvents(from: bytes, onEvent: onEvent)
+  }
+
+  func submitEyesFreeCapture(
+    _ request: EyesFreeCaptureAPIRequest
+  ) async throws -> EyesFreeCaptureAPIResponse {
+    try await submitEyesFreeCapture(request, forceRefresh: false)
+  }
+
+  private func submitEyesFreeCapture(
+    _ request: EyesFreeCaptureAPIRequest,
+    forceRefresh: Bool,
+    tokenOverride: String? = nil
+  ) async throws -> EyesFreeCaptureAPIResponse {
+    var urlRequest = try await authorizedRequest(
+      url: baseURL.appending(path: "/api/mobile/v1/eyes-free-capture"),
+      method: "POST",
+      forceRefresh: forceRefresh,
+      tokenOverride: tokenOverride
+    )
+    urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    urlRequest.httpBody = try encoder.encode(request)
+
+    let (data, response) = try await performData(for: urlRequest)
+
+    guard let httpResponse = response as? HTTPURLResponse else {
+      throw MobileChatClientError.invalidResponse
+    }
+
+    if httpResponse.statusCode == 401, !forceRefresh {
+      let token = try await retryTokenOrTerminal(after: failedBearerToken(from: urlRequest))
+      return try await submitEyesFreeCapture(
+        request,
+        forceRefresh: true,
+        tokenOverride: token
+      )
+    }
+    if httpResponse.statusCode == 401 {
+      NativeSessionTokenStore.clear()
+      throw MobileChatClientError.requestFailed(statusCode: 401)
+    }
+
+    if let decoded = try? decoder.decode(EyesFreeCaptureAPIResponse.self, from: data),
+       !decoded.readback.isEmpty || decoded.errorCode != nil
+    {
+      if (200 ... 409).contains(httpResponse.statusCode) {
+        NativeSessionTokenStore.refresh(from: response)
+        return decoded
+      }
+    }
+
+    guard (200 ... 299).contains(httpResponse.statusCode) else {
+      throw MobileChatClientError.requestFailed(statusCode: httpResponse.statusCode)
+    }
+
+    NativeSessionTokenStore.refresh(from: response)
+    do {
+      return try decoder.decode(EyesFreeCaptureAPIResponse.self, from: data)
+    } catch {
+      throw MobileChatClientError.decodingFailed
+    }
   }
 
   private func appendWorkspaceQuery(to queryItems: inout [URLQueryItem]) {

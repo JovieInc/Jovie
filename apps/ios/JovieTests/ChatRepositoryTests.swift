@@ -583,6 +583,122 @@ struct ChatRepositoryTests {
     #expect(await send(workspace: .jovie, suite: "ie.jov.Jovie.tests.chat-repo-jovie-mode") == nil)
   }
 
+  @Test func eyesFreeSubmitReusesIdempotencyKeyAndReadsBack() async {
+    let client = RecordingEyesFreeChatClient(
+      response: EyesFreeCaptureAPIResponse(
+        destination: "jovie",
+        status: "completed",
+        conversationId: "conv_capture",
+        turnId: "turn_capture",
+        readback: "Here is a caption for Friday.",
+        errorCode: nil
+      )
+    )
+    let repository = ChatRepository(
+      client: client,
+      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-eyes-free")!),
+      userID: "user_repo_eyes_free",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+
+    let readback = await repository.submitEyesFreeCapture(
+      transcript: "draft a drop",
+      destination: .jovie,
+      idempotencyKey: "turn_same_key"
+    )
+    #expect(readback == "Here is a caption for Friday.")
+    #expect(client.lastRequest?.clientTurnId == "turn_same_key")
+    #expect(client.lastRequest?.destination == "jovie")
+    #expect(repository.activeConversationID == "conv_capture")
+    #expect(repository.timeline.contains { $0.content == "Here is a caption for Friday." })
+
+    _ = await repository.submitEyesFreeCapture(
+      transcript: "draft a drop",
+      destination: .jovie,
+      idempotencyKey: "turn_same_key"
+    )
+    #expect(client.callCount == 2)
+    #expect(repository.timeline.filter { $0.role == .user }.count == 1)
+  }
+
+  @Test func eyesFreeSummerForbiddenDoesNotExpireSession() async {
+    let client = RecordingEyesFreeChatClient(
+      response: EyesFreeCaptureAPIResponse(
+        destination: "summer",
+        status: "forbidden",
+        conversationId: nil,
+        turnId: nil,
+        readback: "Summer is only available to the founder.",
+        errorCode: "SUMMER_FORBIDDEN"
+      )
+    )
+    let repository = ChatRepository(
+      client: client,
+      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-summer-forbid")!),
+      userID: "user_repo_summer_forbid",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+
+    let readback = await repository.submitEyesFreeCapture(
+      transcript: "what is blocked",
+      destination: .summer,
+      idempotencyKey: "turn_forbidden"
+    )
+    #expect(readback.contains("founder"))
+    #expect(repository.sessionExpired == false)
+    #expect(repository.isOffline == false)
+    #expect(repository.timeline.contains { $0.status == .failed })
+  }
+
+  @Test func eyesFreeEmptyTranscriptDoesNotCallClient() async {
+    let client = RecordingEyesFreeChatClient(
+      response: EyesFreeCaptureAPIResponse(
+        destination: "jovie",
+        status: "completed",
+        conversationId: nil,
+        turnId: nil,
+        readback: "should not send",
+        errorCode: nil
+      )
+    )
+    let repository = ChatRepository(
+      client: client,
+      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-eyes-empty")!),
+      userID: "user_repo_eyes_empty",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+
+    let readback = await repository.submitEyesFreeCapture(
+      transcript: "   ",
+      destination: .jovie,
+      idempotencyKey: "turn_empty_1"
+    )
+    #expect(readback == EyesFreeCaptureGate.transcriptionEmpty.message)
+    #expect(client.callCount == 0)
+  }
+
+  @Test func eyesFreeTransportFailureSurfacesRetryWithoutExpiringSession() async {
+    let client = FailingEyesFreeChatClient(
+      error: MobileChatClientError.transportFailed(code: -1009)
+    )
+    let repository = ChatRepository(
+      client: client,
+      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-eyes-transport")!),
+      userID: "user_repo_eyes_transport",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+
+    let readback = await repository.submitEyesFreeCapture(
+      transcript: "draft a drop",
+      destination: .jovie,
+      idempotencyKey: "turn_transport"
+    )
+    #expect(readback.isEmpty == false)
+    #expect(repository.sessionExpired == false)
+    #expect(repository.isOffline == true)
+    #expect(repository.timeline.contains { $0.status == .failed })
+  }
+
   @Test func sendOnTransportFailureMarksOfflineAndDoesNotExpireSession() async {
     let client = ScriptedChatClient(
       sendTurnResult: .failure(MobileChatClientError.transportFailed(code: -1009)),
@@ -635,6 +751,68 @@ private final class RecordingTurnChatClient: MobileChatClientProtocol, @unchecke
   ) async throws -> [MobileChatStreamEvent] {
     lastRequest = request
     return []
+  }
+}
+
+private final class RecordingEyesFreeChatClient: MobileChatClientProtocol, @unchecked Sendable {
+  private(set) var lastRequest: EyesFreeCaptureAPIRequest?
+  private(set) var callCount = 0
+  private let response: EyesFreeCaptureAPIResponse
+
+  init(response: EyesFreeCaptureAPIResponse) {
+    self.response = response
+  }
+
+  func listConversations(limit: Int) async throws -> [MobileConversationSummary] {
+    []
+  }
+
+  func fetchConversation(id: String, limit: Int) async throws -> MobileConversationDetailResponse {
+    throw MobileChatClientError.requestFailed(statusCode: 404)
+  }
+
+  func sendTurn(
+    _ request: MobileChatTurnRequest,
+    onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?
+  ) async throws -> [MobileChatStreamEvent] {
+    []
+  }
+
+  func submitEyesFreeCapture(
+    _ request: EyesFreeCaptureAPIRequest
+  ) async throws -> EyesFreeCaptureAPIResponse {
+    callCount += 1
+    lastRequest = request
+    return response
+  }
+}
+
+private final class FailingEyesFreeChatClient: MobileChatClientProtocol, @unchecked Sendable {
+  private let error: MobileChatClientError
+
+  init(error: MobileChatClientError) {
+    self.error = error
+  }
+
+  func listConversations(limit: Int) async throws -> [MobileConversationSummary] {
+    []
+  }
+
+  func fetchConversation(id: String, limit: Int) async throws -> MobileConversationDetailResponse {
+    throw error
+  }
+
+  func sendTurn(
+    _ request: MobileChatTurnRequest,
+    onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?
+  ) async throws -> [MobileChatStreamEvent] {
+    throw error
+  }
+
+  func submitEyesFreeCapture(
+    _ request: EyesFreeCaptureAPIRequest
+  ) async throws -> EyesFreeCaptureAPIResponse {
+    throw error
   }
 }
 
