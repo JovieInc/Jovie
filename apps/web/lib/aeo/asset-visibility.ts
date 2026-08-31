@@ -852,6 +852,9 @@ export function aeoProvenanceMismatches(
   for (const k of PROV) if (a[k] !== b[k]) out.push(k);
   if ((a.market ?? '') !== (b.market ?? '')) out.push('market');
   if ((a.locale ?? '') !== (b.locale ?? '')) out.push('locale');
+  if ((a.creatorLifecycle ?? '') !== (b.creatorLifecycle ?? '')) {
+    out.push('creatorLifecycle');
+  }
   return out;
 }
 
