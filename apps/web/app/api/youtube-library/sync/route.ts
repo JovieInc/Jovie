@@ -2,7 +2,10 @@ import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
 import { validateYouTubeProfileMutationRequest } from '@/lib/connectors/youtube/profile-request';
-import { refreshConnectedYouTubeAccount } from '@/lib/connectors/youtube/refresh';
+import {
+  type ConnectedYouTubeRefreshOutcome,
+  refreshConnectedYouTubeAccount,
+} from '@/lib/connectors/youtube/refresh';
 import { db } from '@/lib/db';
 import { connectorAccounts } from '@/lib/db/schema/connectors';
 
@@ -14,7 +17,7 @@ export async function POST(request: Request) {
   if (!validation.ok) return validation.response;
   const { userId, creatorProfileId } = validation;
 
-  const [account] = await db
+  const accounts = await db
     .select({
       id: connectorAccounts.id,
       channelId: connectorAccounts.providerAccountId,
@@ -27,30 +30,66 @@ export async function POST(request: Request) {
         eq(connectorAccounts.provider, CONNECTOR_PROVIDERS.youtube),
         eq(connectorAccounts.status, 'connected')
       )
-    )
-    .limit(1);
-  if (!account) {
+    );
+  if (accounts.length === 0) {
     return NextResponse.json(
       { error: 'Connect YouTube before importing videos' },
       { status: 409 }
     );
   }
 
-  const outcome = await refreshConnectedYouTubeAccount({
-    connectorAccountId: account.id,
-    creatorProfileId,
-    channelId: account.channelId,
-    source: 'manual',
-  });
-  if (outcome.status === 'needs_reauth') {
+  const outcomes: ConnectedYouTubeRefreshOutcome[] = [];
+  for (const account of accounts) {
+    outcomes.push(
+      await refreshConnectedYouTubeAccount({
+        connectorAccountId: account.id,
+        creatorProfileId,
+        channelId: account.channelId,
+        source: 'manual',
+      })
+    );
+  }
+
+  const synced = outcomes.filter(
+    (
+      outcome
+    ): outcome is Extract<
+      ConnectedYouTubeRefreshOutcome,
+      { readonly status: 'synced' }
+    > => outcome.status === 'synced'
+  );
+  const needsReauth = outcomes.filter(
+    outcome => outcome.status === 'needs_reauth'
+  ).length;
+  const failed = outcomes.filter(outcome => outcome.status === 'failed').length;
+  const busy = outcomes.filter(outcome => outcome.status === 'busy').length;
+
+  if (synced.length === 0 && needsReauth > 0 && failed === 0) {
     return NextResponse.json(
       { error: 'Reconnect YouTube to refresh access' },
       { status: 409 }
     );
   }
-  if (outcome.status === 'failed') {
+  if (synced.length === 0 && failed > 0) {
     return NextResponse.json({ error: 'YouTube sync failed' }, { status: 502 });
   }
+  if (synced.length === 0 && busy > 0) {
+    return NextResponse.json(
+      { error: 'YouTube sync already in progress' },
+      { status: 409 }
+    );
+  }
 
-  return NextResponse.json(outcome.result);
+  if (accounts.length === 1 && synced.length === 1) {
+    return NextResponse.json(synced[0].result);
+  }
+
+  return NextResponse.json({
+    attempted: accounts.length,
+    synced: synced.length,
+    needsReauth,
+    failed,
+    busy,
+    results: synced.map(outcome => outcome.result),
+  });
 }

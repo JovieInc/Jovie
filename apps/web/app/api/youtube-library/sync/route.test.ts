@@ -11,9 +11,7 @@ const mocks = vi.hoisted(() => {
     dbMock: {
       select: vi.fn(() => ({
         from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            limit: vi.fn(async () => state.selectRows),
-          })),
+          where: vi.fn(async () => state.selectRows),
         })),
       })),
     },
@@ -101,6 +99,57 @@ describe('POST /api/youtube-library/sync', () => {
       creatorProfileId: profileId,
       channelId: 'channel-1',
       source: 'manual',
+    });
+  });
+
+  it('syncs every connected YouTube channel for the profile', async () => {
+    mocks.selectRows.splice(
+      0,
+      mocks.selectRows.length,
+      { id: 'account-1', channelId: 'channel-1' },
+      { id: 'account-2', channelId: 'channel-2' }
+    );
+    mocks.refreshConnectedYouTubeAccount
+      .mockResolvedValueOnce({
+        status: 'synced',
+        result: { imported: 12, channelId: 'channel-1' },
+      })
+      .mockResolvedValueOnce({
+        status: 'synced',
+        result: { imported: 4, channelId: 'channel-2' },
+      });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      attempted: 2,
+      synced: 2,
+      needsReauth: 0,
+      failed: 0,
+      busy: 0,
+      results: [
+        { imported: 12, channelId: 'channel-1' },
+        { imported: 4, channelId: 'channel-2' },
+      ],
+    });
+    expect(mocks.refreshConnectedYouTubeAccount).toHaveBeenCalledTimes(2);
+    expect(mocks.refreshConnectedYouTubeAccount).toHaveBeenNthCalledWith(2, {
+      connectorAccountId: 'account-2',
+      creatorProfileId: profileId,
+      channelId: 'channel-2',
+      source: 'manual',
+    });
+  });
+
+  it('returns a bounded conflict when the account is already syncing', async () => {
+    mocks.refreshConnectedYouTubeAccount.mockResolvedValueOnce({
+      status: 'busy',
+    });
+    const response = await POST(request());
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: 'YouTube sync already in progress',
     });
   });
 

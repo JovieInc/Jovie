@@ -21,20 +21,24 @@ export async function POST(
 ) {
   try {
     const { id: linkId } = await params;
-    const validation = await validateLinkOwnership(linkId);
+    const validation = await validateLinkOwnership(linkId, {
+      allowedStatuses: ['pending_review', 'approved'],
+    });
     if ('error' in validation) return validation.error;
     const { userId, link } = validation;
 
     const now = new Date();
-    await db
-      .update(youtubeVideoReleaseLinks)
-      .set({
-        status: 'approved',
-        approvedBy: userId,
-        approvedAt: now,
-        updatedAt: now,
-      })
-      .where(eq(youtubeVideoReleaseLinks.id, linkId));
+    if (link.status !== 'approved') {
+      await db
+        .update(youtubeVideoReleaseLinks)
+        .set({
+          status: 'approved',
+          approvedBy: userId,
+          approvedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(youtubeVideoReleaseLinks.id, linkId));
+    }
     await reconcileApprovedYouTubeCollaborators(link.creatorProfileId, now);
 
     return NextResponse.json({

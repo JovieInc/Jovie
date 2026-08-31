@@ -111,6 +111,68 @@ describe('YouTube Library provider', () => {
     ).toHaveLength(2);
   });
 
+  it('caps upload pagination when a sync video limit is configured', async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/channels')) {
+        return jsonResponse({
+          items: [
+            {
+              id: 'channel-1',
+              snippet: { title: 'Artist channel' },
+              contentDetails: { relatedPlaylists: { uploads: 'uploads-1' } },
+            },
+          ],
+        });
+      }
+      if (url.pathname.endsWith('/playlistItems')) {
+        return jsonResponse({
+          items: [
+            { contentDetails: { videoId: 'video-1' } },
+            { contentDetails: { videoId: 'video-2' } },
+          ],
+          nextPageToken: 'page-2',
+        });
+      }
+      return jsonResponse({
+        items: url.searchParams
+          .get('id')
+          ?.split(',')
+          .map(id => ({
+            id,
+            snippet: {
+              channelId: 'channel-1',
+              title: id,
+              thumbnails: {},
+            },
+            contentDetails: { duration: 'PT1M' },
+            status: { privacyStatus: 'public' },
+          })),
+      });
+    });
+    const provider = createYouTubeLibraryProvider({
+      accessToken: 'access-token',
+      fetcher,
+      maxVideosPerSync: 1,
+    });
+
+    const videos = await provider.listChannelVideos('channel-1');
+
+    expect(videos.map(video => video.videoId)).toEqual(['video-1']);
+    expect(
+      fetcher.mock.calls.filter(([input]) =>
+        String(input).includes('/playlistItems')
+      )
+    ).toHaveLength(1);
+    const detailCall = fetcher.mock.calls.find(([input]) =>
+      String(input).includes('/videos')
+    );
+    expect(detailCall).toBeDefined();
+    expect(new URL(String(detailCall?.[0])).searchParams.get('id')).toBe(
+      'video-1'
+    );
+  });
+
   it('fails closed when the authorized account does not own the channel', async () => {
     const fetcher = vi.fn(async () =>
       jsonResponse({

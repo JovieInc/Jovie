@@ -15,6 +15,22 @@ interface RefreshResponse {
   readonly expires_in: number;
 }
 
+interface RefreshErrorResponse {
+  readonly error?: string;
+}
+
+export class GoogleAccessTokenRefreshError extends Error {
+  readonly status: number;
+  readonly providerError: string | null;
+
+  constructor(status: number, providerError: string | null) {
+    super(`Google OAuth token refresh failed with status ${status}`);
+    this.name = 'GoogleAccessTokenRefreshError';
+    this.status = status;
+    this.providerError = providerError;
+  }
+}
+
 export async function loadFreshGoogleAccessToken(
   connectorAccountId: string
 ): Promise<string | null> {
@@ -45,7 +61,15 @@ export async function loadFreshGoogleAccessToken(
       timeoutMs: 10_000,
       context: 'Google OAuth token refresh',
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      const payload = (await response
+        .json()
+        .catch(() => null)) as RefreshErrorResponse | null;
+      const providerError =
+        typeof payload?.error === 'string' ? payload.error : null;
+      if (providerError === 'invalid_grant') return null;
+      throw new GoogleAccessTokenRefreshError(response.status, providerError);
+    }
     const refreshed = (await response.json()) as RefreshResponse;
     const expiresAt = new Date(Date.now() + refreshed.expires_in * 1000);
     await storeTokens({

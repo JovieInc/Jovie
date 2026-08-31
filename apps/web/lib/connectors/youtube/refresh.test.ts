@@ -7,13 +7,22 @@ const mocks = vi.hoisted(() => {
       creatorProfileId: string | null;
       channelId: string;
     }[],
-    setValues: [] as Record<string, unknown>[],
+    connectorSetValues: [] as Record<string, unknown>[],
+    lockSetValues: [] as Record<string, unknown>[],
+    lockAcquired: true,
   };
+  const lockReturning = vi.fn(async () =>
+    state.lockAcquired ? [{ id: 'lock-1' }] : []
+  );
+  const where = vi.fn(() => ({
+    returning: lockReturning,
+  }));
   const orderBy = vi.fn(() => ({
     limit: vi.fn(async () => state.accounts),
   }));
   return {
     ...state,
+    state,
     orderBy,
     loadFreshGoogleAccessToken: vi.fn(),
     createYouTubeLibraryProvider: vi.fn(() => ({ provider: 'youtube' })),
@@ -30,9 +39,18 @@ const mocks = vi.hoisted(() => {
       })),
       update: vi.fn(() => ({
         set: vi.fn((values: Record<string, unknown>) => {
-          state.setValues.push(values);
-          return { where: vi.fn(async () => undefined) };
+          if ('tokenRefreshLockedUntil' in values) {
+            state.lockSetValues.push(values);
+          } else {
+            state.connectorSetValues.push(values);
+          }
+          return { where };
         }),
+      })),
+      insert: vi.fn(() => ({
+        values: vi.fn(() => ({
+          onConflictDoNothing: vi.fn(async () => undefined),
+        })),
       })),
     },
   };
@@ -64,7 +82,9 @@ describe('connected YouTube refresh', () => {
       creatorProfileId: 'profile-1',
       channelId: 'channel-1',
     });
-    mocks.setValues.splice(0);
+    mocks.connectorSetValues.splice(0);
+    mocks.lockSetValues.splice(0);
+    mocks.state.lockAcquired = true;
     mocks.loadFreshGoogleAccessToken.mockResolvedValue('access-token');
     mocks.syncChannelVideos.mockResolvedValue({ imported: 1 });
     mocks.reconcileApprovedYouTubeCollaborators.mockResolvedValue(undefined);
@@ -77,6 +97,7 @@ describe('connected YouTube refresh', () => {
       synced: 0,
       needsReauth: 0,
       failed: 0,
+      skipped: 0,
     });
   });
 
@@ -93,9 +114,10 @@ describe('connected YouTube refresh', () => {
       synced: 0,
       needsReauth: 1,
       failed: 0,
+      skipped: 0,
     });
     expect(mocks.syncChannelVideos).not.toHaveBeenCalled();
-    expect(mocks.setValues.at(-1)).toMatchObject({
+    expect(mocks.connectorSetValues.at(-1)).toMatchObject({
       lastErrorCode: 'youtube_reauth_required',
       lastErrorDevMessage: null,
     });
@@ -108,6 +130,11 @@ describe('connected YouTube refresh', () => {
       synced: 1,
       needsReauth: 0,
       failed: 0,
+      skipped: 0,
+    });
+    expect(mocks.createYouTubeLibraryProvider).toHaveBeenCalledWith({
+      accessToken: 'access-token',
+      maxVideosPerSync: 50,
     });
     expect(mocks.syncChannelVideos).toHaveBeenCalledWith(
       expect.objectContaining({ channelId: 'channel-1', now })
@@ -116,7 +143,7 @@ describe('connected YouTube refresh', () => {
       'profile-1',
       now
     );
-    expect(mocks.setValues.at(-1)).toMatchObject({
+    expect(mocks.connectorSetValues.at(-1)).toMatchObject({
       lastSyncAt: now,
       lastErrorCode: null,
       lastErrorUserMessage: null,
@@ -130,11 +157,47 @@ describe('connected YouTube refresh', () => {
       synced: 0,
       needsReauth: 0,
       failed: 1,
+      skipped: 0,
     });
-    expect(mocks.setValues.at(-1)).toMatchObject({
+    expect(mocks.connectorSetValues.at(-1)).toMatchObject({
       lastErrorCode: 'youtube_sync_failed',
       lastErrorDevMessage: 'provider down',
     });
     expect(mocks.captureError).toHaveBeenCalledOnce();
+  });
+
+  it('skips work when another caller already holds the account sync lock', async () => {
+    mocks.state.lockAcquired = false;
+    await expect(runConnectedYouTubeRefreshes()).resolves.toEqual({
+      attempted: 1,
+      synced: 0,
+      needsReauth: 0,
+      failed: 0,
+      skipped: 1,
+    });
+    expect(mocks.loadFreshGoogleAccessToken).not.toHaveBeenCalled();
+    expect(mocks.syncChannelVideos).not.toHaveBeenCalled();
+    expect(mocks.connectorSetValues).toEqual([]);
+  });
+
+  it('counts a selected account with a missing profile as failed evidence', async () => {
+    mocks.accounts.splice(0, mocks.accounts.length, {
+      id: 'account-1',
+      creatorProfileId: null,
+      channelId: 'channel-1',
+    });
+    await expect(runConnectedYouTubeRefreshes()).resolves.toEqual({
+      attempted: 1,
+      synced: 0,
+      needsReauth: 0,
+      failed: 1,
+      skipped: 0,
+    });
+    expect(mocks.loadFreshGoogleAccessToken).not.toHaveBeenCalled();
+    expect(mocks.captureError).toHaveBeenCalledWith(
+      'Connected YouTube refresh selected an account without a profile',
+      expect.any(Error),
+      { connectorAccountId: 'account-1', channelId: 'channel-1' }
+    );
   });
 });
