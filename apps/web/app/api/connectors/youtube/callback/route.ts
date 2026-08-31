@@ -121,10 +121,7 @@ async function isYouTubeChannelLinkedToAnotherProfile(input: {
   readonly channelId: string;
 }): Promise<boolean> {
   const [existing] = await db
-    .select({
-      creatorProfileId: connectorAccounts.creatorProfileId,
-      status: connectorAccounts.status,
-    })
+    .select({ creatorProfileId: connectorAccounts.creatorProfileId })
     .from(connectorAccounts)
     .where(
       and(
@@ -136,9 +133,7 @@ async function isYouTubeChannelLinkedToAnotherProfile(input: {
     .limit(1);
 
   return Boolean(
-    existing?.status === 'connected' &&
-      existing.creatorProfileId &&
-      existing.creatorProfileId !== input.profileId
+    existing?.creatorProfileId && existing.creatorProfileId !== input.profileId
   );
 }
 
