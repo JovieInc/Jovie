@@ -45,7 +45,11 @@ const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = [
   'scripts/backlog-orchestrator/deterministic-gates.mjs',
   'scripts/backlog-orchestrator/gate-next-hold.mjs',
   'scripts/hermes/codex-rotate',
+  'scripts/hermes/codex-account-probe.sh',
+  'scripts/hermes/symphony-lease-guard',
+  'scripts/hermes/tests/codex-account-probe.test.py',
   'scripts/hermes/tests/codex-rotate.test.py',
+  'scripts/hermes/tests/symphony-lease-guard.test.py',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/pre-push-gate.test.mjs',
   'scripts/run-affected-tests.mjs',
@@ -713,7 +717,11 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/automation-verify.test.mjs',
         'scripts/lib/__tests__/pre-push-gate.test.mjs',
       ],
-      pythonUnittestTests: ['scripts/hermes/tests/codex-rotate.test.py'],
+      pythonUnittestTests: [
+        'scripts/hermes/tests/codex-account-probe.test.py',
+        'scripts/hermes/tests/codex-rotate.test.py',
+        'scripts/hermes/tests/symphony-lease-guard.test.py',
+      ],
     });
     expect(
       buildAffectedTestPlan([
