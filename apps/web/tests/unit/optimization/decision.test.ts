@@ -36,4 +36,10 @@ describe('continuous optimization decision gate', () => {
       })
     ).toEqual({ ok: false, reason: 'sample_insufficient' });
   });
+
+  it('rejects winner decisions unless the experiment is running', () => {
+    expect(validateOptimizationDecision({ ...valid, status: 'paused' })).toEqual(
+      { ok: false, reason: 'experiment_not_running' }
+    );
+  });
 });

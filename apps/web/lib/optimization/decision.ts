@@ -30,7 +30,7 @@ export type OptimizationDecisionResult =
 export function validateOptimizationDecision(
   input: OptimizationDecisionInput
 ): OptimizationDecisionResult {
-  if (input.status !== 'running' && input.status !== 'paused') {
+  if (input.status !== 'running') {
     return { ok: false, reason: 'experiment_not_running' };
   }
   if (!input.objective.trim()) {
