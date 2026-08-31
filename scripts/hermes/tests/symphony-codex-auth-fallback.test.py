@@ -16,6 +16,7 @@ import pathlib
 import re
 import stat
 import subprocess
+import sys
 import tempfile
 import textwrap
 import threading
@@ -36,6 +37,91 @@ MODEL_REGISTRY = SOURCE_DIR / "config/model-registry.json"
 RUNTIME_ARTIFACTS = (WRAPPER, CONTROLLER, SIDECAR, GROK_SHIP, CURSOR_STD, MODEL_ROUTER, MODEL_REGISTRY)
 RUNTIME_NAMES = tuple(path.name for path in RUNTIME_ARTIFACTS)
 LAUNCHER_NAMES = (WRAPPER.name, CONTROLLER.name, SIDECAR.name, GROK_SHIP.name, CURSOR_STD.name)
+
+
+class OfficialServiceOwnershipContract(unittest.TestCase):
+    def test_recovery_targets_only_official_elixir_service(self):
+        module = importlib.util.module_from_spec(
+            spec := importlib.util.spec_from_file_location("symphony_codex_exhausted", CONTROLLER)
+        )
+        assert spec and spec.loader
+        spec.loader.exec_module(module)
+        self.assertEqual(module.PRIMARY_SERVICE, "symphony-elixir.service")
+        self.assertEqual(module.OPTIONAL_SERVICES, ())
+        self.assertNotIn("symphony-ui-pilot.service", module.SERVICES)
+        self.assertNotIn("symphony-lyb.service", module.SERVICES)
+
+
+OWNERSHIP_COVERAGE_MARKERS = (
+    'PRIMARY_SERVICE = "symphony-elixir.service"',
+    "OPTIONAL_SERVICES: tuple[str, ...] = ()",
+    "SERVICES = (PRIMARY_SERVICE, *OPTIONAL_SERVICES)",
+)
+
+
+def required_ownership_coverage_lines() -> set[int]:
+    source_lines = CONTROLLER.read_text(encoding="utf-8").splitlines()
+    required: set[int] = set()
+    for marker in OWNERSHIP_COVERAGE_MARKERS:
+        matches = [index for index, line in enumerate(source_lines, start=1) if marker in line]
+        if len(matches) != 1:
+            raise AssertionError(
+                f"expected one official Symphony ownership marker {marker!r}, found {len(matches)}"
+            )
+        required.add(matches[0])
+    return required
+
+
+def verify_official_service_coverage(report_path: pathlib.Path) -> None:
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    relative_controller = CONTROLLER.relative_to(ROOT).as_posix()
+    file_coverage = report.get("files", {}).get(relative_controller)
+    if not file_coverage:
+        raise AssertionError(f"coverage report missing {relative_controller}")
+    executed = set(file_coverage.get("executed_lines", []))
+    missing = required_ownership_coverage_lines() - executed
+    if missing:
+        raise AssertionError(f"uncovered official Symphony ownership lines: {sorted(missing)}")
+
+
+class OfficialServiceCoverageContract(unittest.TestCase):
+    def test_accepts_exact_ownership_line_coverage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            report_path = pathlib.Path(directory) / "coverage.json"
+            report_path.write_text(
+                json.dumps(
+                    {
+                        "files": {
+                            CONTROLLER.relative_to(ROOT).as_posix(): {
+                                "executed_lines": sorted(required_ownership_coverage_lines())
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            verify_official_service_coverage(report_path)
+
+    def test_rejects_missing_ownership_line_coverage(self):
+        required = required_ownership_coverage_lines()
+        with tempfile.TemporaryDirectory() as directory:
+            report_path = pathlib.Path(directory) / "coverage.json"
+            report_path.write_text(
+                json.dumps(
+                    {
+                        "files": {
+                            CONTROLLER.relative_to(ROOT).as_posix(): {
+                                "executed_lines": sorted(required - {max(required)})
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                AssertionError, "uncovered official Symphony ownership lines"
+            ):
+                verify_official_service_coverage(report_path)
 
 
 def issue_revision(identifier, title="", description=""):
@@ -3098,4 +3184,11 @@ class FallbackLockGcTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) == 3 and sys.argv[1] == "--verify-ownership-coverage":
+        try:
+            verify_official_service_coverage(pathlib.Path(sys.argv[2]))
+        except (AssertionError, KeyError, OSError, ValueError) as error:
+            print(error, file=sys.stderr)
+            raise SystemExit(1) from error
+        raise SystemExit(0)
     unittest.main()
