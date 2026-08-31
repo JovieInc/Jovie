@@ -408,8 +408,9 @@ function assertHostedCandidateState({
     return record.slice(3);
   });
   if (
-    JSON.stringify(paths.sort()) !==
-    JSON.stringify(changes.map(change => change.path))
+    JSON.stringify(
+      paths.sort((left, right) => left.localeCompare(right))
+    ) !== JSON.stringify(changes.map(change => change.path))
   ) {
     throw new Error('candidate dirty set does not match accepted changes');
   }
@@ -884,7 +885,7 @@ function hostedAcceptanceCommand(args) {
     executor: readRunnerOwnedJson('HOSTED_EXECUTOR_B64'),
     testReceipt,
   });
-  mkdirSync(args['writer-root'], { mode: 0o700 });
+  mkdirSync(args['writer-root'], { mode: 0o700, recursive: true });
   writeJson(join(args['writer-root'], 'acceptance.json'), receipt);
   process.stdout.write(`${JSON.stringify(receipt)}\n`);
 }
