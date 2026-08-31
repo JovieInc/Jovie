@@ -136,7 +136,8 @@ jobs:
       - name: Checkout main policy code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          # ref: main is resolved once in fleet-policy; consumers pin that SHA.
+          ref: ${{ needs.fleet-policy.outputs.main_sha }}
           persist-credentials: false
       - name: Verify GitHub CLI
         run: gh --version
@@ -464,7 +465,8 @@ jobs:
       - name: Checkout main policy code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          # ref: main is resolved once in fleet-policy; consumers pin that SHA.
+          ref: ${{ needs.fleet-policy.outputs.main_sha }}
           persist-credentials: false
       - name: Verify GitHub CLI
         run: gh --version
