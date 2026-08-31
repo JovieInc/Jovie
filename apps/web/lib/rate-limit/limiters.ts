@@ -604,41 +604,54 @@ export async function checkSpotifyRefreshRateLimit(
 export const aiChatLimiter = createRateLimiter(RATE_LIMITERS.aiChat);
 
 /**
- * Plan-specific daily AI chat limiters.
- * Each plan has a separate daily quota on top of the hourly burst limiter.
- *
- * @deprecated Use aiChatDailyPlanAwareLimiter instead for new code.
- * These individual limiters are kept for backward compatibility.
+ * Plan-specific weekly AI chat limiters.
+ * Each plan has a separate seven-day quota on top of the hourly burst limiter.
  */
-export const aiChatDailyFreeLimiter = createRateLimiter(
-  RATE_LIMITERS.aiChatDailyFree
+const _aiChatWeeklyFreeLimiter = createRateLimiter(
+  RATE_LIMITERS.aiChatWeeklyFree
 );
-export const aiChatDailyProLimiter = createRateLimiter(
-  RATE_LIMITERS.aiChatDailyPro
+const _aiChatWeeklyTrialLimiter = createRateLimiter(
+  RATE_LIMITERS.aiChatWeeklyTrial
 );
-export const aiChatDailyMaxLimiter = createRateLimiter(
-  RATE_LIMITERS.aiChatDailyMax
+const _aiChatWeeklyProLimiter = createRateLimiter(
+  RATE_LIMITERS.aiChatWeeklyPro
+);
+const _aiChatWeeklyMaxLimiter = createRateLimiter(
+  RATE_LIMITERS.aiChatWeeklyMax
 );
 
 /**
- * Plan-aware AI chat daily limiter.
- * Automatically selects the correct daily quota based on the user's plan tier.
- * - Free: 10 messages/day
- * - Pro: 100 messages/day
- * - Max: 500 messages/day
+ * Rate limiter for weekly AI chat messages by plan.
+ *
+ * @deprecated Use aiChatWeeklyPlanAwareLimiter instead for new code.
+ * These individual limiters are kept for backward compatibility.
  */
-export const aiChatDailyPlanAwareLimiter: PlanAwareRateLimiter =
+export const aiChatWeeklyFreeLimiter = _aiChatWeeklyFreeLimiter;
+export const aiChatWeeklyTrialLimiter = _aiChatWeeklyTrialLimiter;
+export const aiChatWeeklyProLimiter = _aiChatWeeklyProLimiter;
+export const aiChatWeeklyMaxLimiter = _aiChatWeeklyMaxLimiter;
+
+/**
+ * Plan-aware AI chat weekly limiter.
+ * Automatically selects the correct seven-day quota based on the user's plan tier.
+ * - Free: 15 messages/week
+ * - Trial: 50 messages/week
+ * - Pro: 70 messages/week
+ * - Max: 250 messages/week
+ */
+export const aiChatWeeklyPlanAwareLimiter: PlanAwareRateLimiter =
   createPlanAwareRateLimiter({
     configs: {
-      free: RATE_LIMITERS.aiChatDailyFree,
-      pro: RATE_LIMITERS.aiChatDailyPro,
+      free: RATE_LIMITERS.aiChatWeeklyFree,
+      trial: RATE_LIMITERS.aiChatWeeklyTrial,
+      pro: RATE_LIMITERS.aiChatWeeklyPro,
       // founding falls back to pro automatically via the factory
-      max: RATE_LIMITERS.aiChatDailyMax,
+      max: RATE_LIMITERS.aiChatWeeklyMax,
     },
     errorMessage: plan =>
-      plan === 'max' || plan === 'pro'
-        ? 'You have reached your daily AI message limit. Your quota resets tomorrow.'
-        : 'You have reached your daily AI message limit. Upgrade to Pro for 100 messages per day.',
+      plan === 'max' || plan === 'pro' || plan === 'trial'
+        ? 'You have reached your weekly AI message limit. Your quota resets when the current seven-day window ends.'
+        : 'You have reached your weekly AI message limit. Upgrade to Pro for 70 messages per week.',
   });
 
 /**
@@ -657,7 +670,7 @@ export async function checkAiChatRateLimit(
 
 /**
  * Check AI chat rate limits for a specific plan.
- * Applies both the hourly burst limiter (all plans) and the daily plan quota.
+ * Applies both the hourly burst limiter (all plans) and the weekly plan quota.
  * Returns the first failure or success if all pass.
  *
  * Fail-open when the durable rate-limit backend is degraded/unavailable
@@ -685,10 +698,10 @@ export async function checkAiChatRateLimitForPlan(
       return burstAllowed;
     }
 
-    // 2. Check daily plan-specific quota using the plan-aware limiter
-    const dailyResult = await aiChatDailyPlanAwareLimiter.limit(userId, plan);
-    return allowIfRateLimitBackendDegraded(dailyResult, {
-      limiter: 'ai-chat-daily',
+    // 2. Check weekly plan-specific quota using the plan-aware limiter
+    const weeklyResult = await aiChatWeeklyPlanAwareLimiter.limit(userId, plan);
+    return allowIfRateLimitBackendDegraded(weeklyResult, {
+      limiter: 'ai-chat-weekly',
       userId,
       plan,
     });
@@ -833,25 +846,26 @@ export const appleMusicRescanPaidLimiter = _appleMusicRescanPaidLimiter;
  * Plan-aware Apple Music rescan limiter.
  * Automatically selects the correct limit based on the user's plan tier.
  * - Free: 1 per day
- * - Pro/Max: 1 per hour
+ * - Trial/Pro/Max: 1 per hour
  */
 export const appleMusicRescanPlanAwareLimiter: PlanAwareRateLimiter =
   createPlanAwareRateLimiter({
     configs: {
       free: RATE_LIMITERS.appleMusicRescanFree,
+      trial: RATE_LIMITERS.appleMusicRescanPaid,
       pro: RATE_LIMITERS.appleMusicRescanPaid,
       // founding falls back to pro automatically via the factory
       max: RATE_LIMITERS.appleMusicRescanPaid,
     },
     errorMessage: plan =>
-      plan === 'max' || plan === 'pro'
+      plan === 'max' || plan === 'pro' || plan === 'trial'
         ? 'Apple Music was recently refreshed. Please wait 1 hour before refreshing again.'
         : 'Apple Music was recently refreshed. Please wait 24 hours before refreshing again. Upgrade to Pro for hourly refreshes.',
   });
 
 /**
  * Check Apple Music rescan rate limit (plan-aware).
- * Free: 1/day, Paid (pro/max): 1/hour.
+ * Free: 1/day, Paid (trial/pro/max): 1/hour.
  */
 export async function checkAppleMusicRescanRateLimit(
   profileId: string,
@@ -894,25 +908,26 @@ export const releaseRefreshPaidLimiter = _releaseRefreshPaidLimiter;
  * Plan-aware release refresh limiter.
  * Automatically selects the correct limit based on the user's plan tier.
  * - Free: 1 per day
- * - Pro/Max: 1 per hour
+ * - Trial/Pro/Max: 1 per hour
  */
 export const releaseRefreshPlanAwareLimiter: PlanAwareRateLimiter =
   createPlanAwareRateLimiter({
     configs: {
       free: RATE_LIMITERS.releaseRefreshFree,
+      trial: RATE_LIMITERS.releaseRefreshPaid,
       pro: RATE_LIMITERS.releaseRefreshPaid,
       // founding falls back to pro automatically via the factory
       max: RATE_LIMITERS.releaseRefreshPaid,
     },
     errorMessage: plan =>
-      plan === 'max' || plan === 'pro'
+      plan === 'max' || plan === 'pro' || plan === 'trial'
         ? 'This release was recently refreshed. Please wait 1 hour before refreshing again.'
         : 'This release was recently refreshed. Please wait 24 hours before refreshing again. Upgrade to Pro for hourly refreshes.',
   });
 
 /**
  * Check release refresh rate limit (plan-aware).
- * Free: 1/day, Paid (pro/max): 1/hour.
+ * Free: 1/day, Paid (trial/pro/max): 1/hour.
  */
 export async function checkReleaseRefreshRateLimit(
   releaseId: string,
@@ -1146,6 +1161,10 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     spotifyRefresh: spotifyRefreshLimiter,
     spotifyPublicSearch: spotifyPublicSearchLimiter,
     aiChat: aiChatLimiter,
+    aiChatWeeklyFree: _aiChatWeeklyFreeLimiter,
+    aiChatWeeklyTrial: _aiChatWeeklyTrialLimiter,
+    aiChatWeeklyPro: _aiChatWeeklyProLimiter,
+    aiChatWeeklyMax: _aiChatWeeklyMaxLimiter,
     bandsintownSync: bandsintownSyncLimiter,
     appleMusicSearch: appleMusicSearchLimiter,
     musicBrainzLookup: musicBrainzLookupLimiter,

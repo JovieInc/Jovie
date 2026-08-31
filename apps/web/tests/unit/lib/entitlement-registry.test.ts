@@ -12,6 +12,7 @@ import {
   isValidPlanId,
   type NumericEntitlement,
   type PlanId,
+  PRICING_COMPARISON,
   resolveCanonicalPlanId,
   resolveChatUsagePlan,
 } from '@/lib/entitlements/registry';
@@ -66,7 +67,7 @@ describe('Entitlement Registry Consistency', () => {
       'analyticsRetentionDays',
       'contactsLimit',
       'smartLinksLimit',
-      'aiDailyMessageLimit',
+      'aiWeeklyMessageLimit',
       'aiPitchGenPerRelease',
     ];
 
@@ -96,7 +97,7 @@ describe('Entitlement Registry Consistency', () => {
 
     const numericKeys: NumericEntitlement[] = [
       'analyticsRetentionDays',
-      'aiDailyMessageLimit',
+      'aiWeeklyMessageLimit',
     ];
 
     for (const key of numericKeys) {
@@ -174,6 +175,24 @@ describe('Entitlement Registry Consistency', () => {
     for (const planId of planIds) {
       expect(ENTITLEMENT_REGISTRY[planId].marketing.displayName).toBeTruthy();
     }
+  });
+
+  it('pricing comparison uses the canonical weekly chat quota limits', () => {
+    const aiAssistant = PRICING_COMPARISON.find(
+      category => category.category === 'AI Assistant'
+    );
+    const weeklyMessages = aiAssistant?.features.find(
+      feature => feature.name === 'Weekly messages'
+    );
+
+    expect(weeklyMessages).toMatchObject({
+      free: '15 / week',
+      max: '250 / week',
+      pro: '70 / week',
+    });
+    expect(
+      aiAssistant?.features.some(feature => feature.name === 'Daily messages')
+    ).toBe(false);
   });
 
   it('free plan has null price, paid plans have prices', () => {

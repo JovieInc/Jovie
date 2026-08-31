@@ -7,14 +7,10 @@ import { queryKeys } from './keys';
 
 export interface ChatUsageData {
   plan: 'free' | 'pro' | 'max';
-  dailyLimit: number;
+  weeklyLimit: number;
   used: number;
   remaining: number;
   resetAt?: string | null;
-  monthlyLimit?: number | null;
-  monthlyUsed?: number | null;
-  monthlyRemaining?: number | null;
-  monthlyResetAt?: string | null;
   isExhausted: boolean;
   warningThreshold: number;
   isNearLimit: boolean;
