@@ -146,18 +146,6 @@ jobs:
               echo "CodeRabbit blocking. Skipping."; SKIPPED=$((SKIPPED + 1)); continue
             fi
 
-            if ! CHANGED_FILES=$(gh pr diff "$PR_NUMBER" --repo "$GH_REPO" --name-only 2>/dev/null); then
-              echo "Could not fetch changed files. Skipping."; SKIPPED=$((SKIPPED + 1)); continue
-            fi
-
-            printf '%s\n' "$CHANGED_FILES" > "$RUNNER_TEMP/agent-landing-$PR_NUMBER-changed-files.txt"
-            node scripts/ci-harness.mjs classify-risk --files "$RUNNER_TEMP/agent-landing-$PR_NUMBER-changed-files.txt" \
-              > "$RUNNER_TEMP/agent-landing-$PR_NUMBER-ci-risk.json"
-
-            if [[ "$(jq -r '.blocksUnattendedAutoMerge' "$RUNNER_TEMP/agent-landing-$PR_NUMBER-ci-risk.json")" == "true" ]]; then
-              echo "CI harness blocks unattended auto-merge. Skipping."; SKIPPED=$((SKIPPED + 1)); continue
-            fi
-
             if [[ $((READY_COUNT + LANDED)) -ge "$READY_THRESHOLD" ]]; then
               echo "Queue pressure threshold reached. Stopping."; break
             fi

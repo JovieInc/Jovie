@@ -416,9 +416,43 @@ def test_autofix_uses_corepack_for_pnpm_distribution() -> None:
     script = (REPO_ROOT / "scripts" / "auto-fix-lint-agent-drafts.sh").read_text(
         encoding="utf-8"
     )
+    workflow = (WORKFLOWS / "auto-fix-lint-agent-drafts.yml").read_text(
+        encoding="utf-8"
+    )
 
     assert "npm install -g pnpm@" not in script
     assert "corepack prepare pnpm@9.15.4 --activate" in script
+    assert "pnpm install --frozen-lockfile --ignore-scripts" in script
+    assert "env -u GH_TOKEN -u GITHUB_TOKEN -u NODE_AUTH_TOKEN" in script
+    assert ".headOwner == $repo_owner" in script
+    assert "headOwner/$headRepo.git" not in script
+    assert "persist-credentials: false" in workflow
+
+
+def test_agent_landing_does_not_treat_risk_classifier_as_human_merge_gate() -> None:
+    """Autonomous shipping: high-risk paths get stricter CI, not needs-human."""
+    for workflow_name in (
+        "agent-pipeline.yml",
+        "agent-landing-sweep.yml",
+        "agent-tick.yml",
+    ):
+        content = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
+        assert "blocksUnattendedAutoMerge == true" not in content, workflow_name
+        assert "--add-label needs-human" not in content, workflow_name
+
+
+def test_claude_mention_requires_write_capable_association() -> None:
+    """Public @claude mentions must not mint a write token for strangers."""
+    workflow = (WORKFLOWS / "claude.yml").read_text(encoding="utf-8")
+    job = _job_block("claude.yml", "claude")
+
+    assert "github.event.comment.author_association == 'OWNER'" in job
+    assert "github.event.comment.author_association == 'MEMBER'" in job
+    assert "github.event.comment.author_association == 'COLLABORATOR'" in job
+    assert "github.actor == 'coderabbitai[bot]'" in job
+    assert "allowed_bots: 'coderabbitai[bot]'" in workflow
+    assert "author_association == 'CONTRIBUTOR'" not in job
+    assert "author_association == 'NONE'" not in job
 
 
 def test_trigger_guard_materializes_systemic_detector_import_closure() -> None:

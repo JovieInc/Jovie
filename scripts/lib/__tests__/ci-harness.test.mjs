@@ -598,6 +598,7 @@ describe('ci-harness risk classifier', () => {
       'pnpm run test:web:smoke',
       'pnpm run build:web',
     ]);
+    expect(riskLocalCommands(high).join('\n')).not.toContain('needs-human');
 
     const medium = classifyCiRisk(
       ['apps/web/components/features/profile/ProfileCompactSurface.tsx'],
@@ -619,6 +620,31 @@ describe('ci-harness risk classifier', () => {
     expect(low.blocksUnattendedAutoMerge).toBe(false);
     expect(low.matchedRules).toEqual([]);
     expect(riskLocalCommands(low)).toEqual(['pnpm ci:harness:check']);
+  });
+
+  it('never recommends needs-human even if a rule still declares the dead block flag', () => {
+    const risk = classifyCiRisk(['apps/web/lib/auth/gate.ts'], {
+      ...manifest,
+      riskRules: [
+        {
+          id: 'auth-identity',
+          title: 'Auth and identity',
+          level: 'high',
+          reason: 'synthetic',
+          requiresSmoke: true,
+          requiresPreview: true,
+          blocksUnattendedAutoMerge: true,
+          patterns: ['^apps/web/lib/auth/'],
+        },
+      ],
+    });
+    expect(risk.blocksUnattendedAutoMerge).toBe(true);
+    expect(risk.recommendedLabels).toEqual([]);
+    expect(riskLocalCommands(risk)).toEqual([
+      'pnpm ci:harness:check',
+      'pnpm run test:web:smoke',
+      'pnpm run build:web',
+    ]);
   });
 
   it('requires smoke and preview for auth changes (autonomous merge)', () => {
