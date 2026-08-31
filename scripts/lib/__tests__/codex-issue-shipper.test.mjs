@@ -4,6 +4,7 @@ import {
   buildAgentCommand,
   buildAgentPrompt,
   buildDispatchPlans,
+  buildFinisherPromotionBlockerComment,
   buildGbrainCaptureText,
   buildGbrainQuery,
   buildRecoveryStashMessage,
@@ -36,6 +37,7 @@ import {
   MAX_RETRY_RELEASES,
   NO_AUTO_LABEL,
   parseAgentChain,
+  parseCreatedPrNumber,
   parseDirtyPaths,
   planCheckoutGate,
   RETRY_RELEASE_COMMENT_HEADER,
@@ -353,6 +355,7 @@ describe('codex issue shipper prompt', () => {
         queryText: 'Jovie implementation context',
         queryResult: 'Relevant memory result',
       },
+      promotionHelperPath: '/controller/scripts/writer-owned-pr-promote.sh',
     });
 
     expect(prompt).toContain('Load gstack');
@@ -369,7 +372,16 @@ describe('codex issue shipper prompt', () => {
     expect(prompt).toContain('Keep progress file-backed');
     expect(prompt).toContain('agent-run-artifact');
     expect(prompt).toContain('/qa');
-    expect(prompt).toContain('/ship');
+    expect(prompt).not.toContain('for PR creation use `/ship`');
+    expect(prompt).toContain('gh pr create --draft');
+    expect(prompt).toContain('Create a draft PR first');
+    expect(prompt).toContain(
+      "bash '/controller/scripts/writer-owned-pr-promote.sh' --pr <number> --issue GH-123"
+    );
+    expect(prompt).toContain('jovie-writer-pr-proof/v1');
+    expect(prompt).toContain('jovie-writer-pr-promotion-blocker/v1');
+    expect(prompt).toContain('gh pr merge --auto --match-head-commit');
+    expect(prompt).toContain('do not rely on `auto-ready-agent-drafts`');
     expect(prompt).toContain(
       'coderabbit review --agent -c AGENTS.md -t uncommitted'
     );
@@ -778,6 +790,8 @@ describe('deterministic finisher', () => {
   it('finishDispatch commits dirty work, pushes, and opens the PR', () => {
     const { run, calls } = fakeRunner({
       'git status --porcelain': ' M a.ts\n',
+      'gh pr create': 'https://github.com/JovieInc/Jovie/pull/16864\n',
+      'git rev-parse HEAD': 'a'.repeat(40),
     });
     finishDispatch(run, {
       repo: 'JovieInc/Jovie',
@@ -793,6 +807,8 @@ describe('deterministic finisher', () => {
       'git -c',
       'git push',
       'gh pr',
+      'git rev-parse',
+      'env GITHUB_REPOSITORY=JovieInc/Jovie',
     ]);
     const commit = calls[2].args;
     expect(commit).toContain('commit');
@@ -804,6 +820,7 @@ describe('deterministic finisher', () => {
     // hooks get a long timeout
     expect(calls[2].opts?.timeoutMs).toBeGreaterThan(60_000);
     const prCreate = calls[4].args;
+    expect(prCreate).toContain('--draft');
     expect(prCreate).toContain('--head');
     expect(prCreate[prCreate.indexOf('--head') + 1]).toBe('codex/gh-12721-x');
     expect(prCreate[prCreate.indexOf('--body') + 1]).toContain('Fixes #12721');
@@ -814,6 +831,9 @@ describe('deterministic finisher', () => {
       'Verification evidence:'
     );
     expect(prCreate[prCreate.indexOf('--body') + 1]).toContain(
+      'Writer-owned promotion remains required'
+    );
+    expect(prCreate[prCreate.indexOf('--body') + 1]).toContain(
       '<!-- agent-run-artifact'
     );
     expect(prCreate[prCreate.indexOf('--body') + 1]).toContain(
@@ -822,10 +842,21 @@ describe('deterministic finisher', () => {
     expect(prCreate[prCreate.indexOf('--body') + 1]).toContain(
       '"status": "queued"'
     );
+    const blocker = calls[6].args;
+    expect(blocker).toContain('scripts/lib/upsert-pr-comment.sh');
+    expect(blocker).toContain('16864');
+    expect(blocker).toContain('writer-owned-pr-promotion');
+    expect(blocker.at(-1)).toContain('jovie-writer-pr-promotion-blocker/v1');
+    expect(blocker.at(-1)).toContain('deterministic-finisher-proof-missing');
+    expect(blocker.at(-1)).toContain('"writerLogin": "codex-issue-shipper"');
   });
 
   it('finishDispatch skips commit when work is already committed', () => {
-    const { run, calls } = fakeRunner({ 'git status --porcelain': '' });
+    const { run, calls } = fakeRunner({
+      'git status --porcelain': '',
+      'gh pr create': 'https://github.com/JovieInc/Jovie/pull/16864\n',
+      'git rev-parse HEAD': 'a'.repeat(40),
+    });
     finishDispatch(run, {
       repo: 'JovieInc/Jovie',
       branchName: 'codex/gh-12721-x',
@@ -833,7 +864,32 @@ describe('deterministic finisher', () => {
       logPath: '/tmp/agent.log',
     });
     const cmds = calls.map(c => c.args.slice(0, 2).join(' '));
-    expect(cmds).toEqual(['git status', 'git push', 'gh pr']);
+    expect(cmds).toEqual([
+      'git status',
+      'git push',
+      'gh pr',
+      'git rev-parse',
+      'env GITHUB_REPOSITORY=JovieInc/Jovie',
+    ]);
+  });
+
+  it('parses created PR numbers and renders finisher promotion blockers', () => {
+    expect(
+      parseCreatedPrNumber('https://github.com/JovieInc/Jovie/pull/16864')
+    ).toBe(16864);
+    expect(parseCreatedPrNumber('#16864\n')).toBe(16864);
+    expect(parseCreatedPrNumber('created without url')).toBeNull();
+
+    const body = buildFinisherPromotionBlockerComment(
+      issue,
+      'codex/gh-12721-x',
+      'a'.repeat(40)
+    );
+    expect(body).toContain('terminal-blocker');
+    expect(body).toContain('"githubIssueNumber": 12721');
+    expect(body).toContain(
+      '"headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"'
+    );
   });
 
   it('finishDispatch propagates a failing step (caller releases the claim)', () => {

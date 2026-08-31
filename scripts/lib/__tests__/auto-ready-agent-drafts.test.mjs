@@ -4,12 +4,17 @@ import { describe, expect, it } from 'vitest';
 import {
   AUTO_READY_HOLD_LABELS,
   classifyAutoReadyPromotion,
+  classifyFxChildCommit,
   FX_WRITER_EMAIL,
   FX_WRITER_NAME,
   parseFxSourceHeadTrailer,
   TRUSTED_FX_WORKFLOW_NAME,
   TRUSTED_FX_WORKFLOW_PATH,
 } from '../auto-ready-provenance.mjs';
+import {
+  buildWriterProofReceipt,
+  renderWriterProofReceipt,
+} from '../writer-owned-pr-promotion.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
 const fleetScript = readFileSync(
@@ -27,6 +32,7 @@ const fxWorkflow = readFileSync(
 const parent = 'a'.repeat(40);
 const child = 'b'.repeat(40);
 const other = 'c'.repeat(40);
+const prNumber = 14359;
 
 function trustedFxRun(overrides = {}) {
   return {
@@ -55,13 +61,32 @@ function fxCommit(overrides = {}) {
   };
 }
 
+function proofBody(overrides = {}) {
+  return renderWriterProofReceipt(
+    buildWriterProofReceipt({
+      issueId: 'JOV-5751',
+      prNumber,
+      headSha: child,
+      writerLogin: 'itstimwhite',
+      requiredTests: 'passed: focused tests and typecheck',
+      reviewSweep: 'complete: PR comments and reviews checked',
+      ticketEvidence: 'attached: Linear workpad is current',
+      prEvidence: 'attached: PR body has validation evidence',
+      issuedAt: '2026-08-31T00:00:00.000Z',
+      ...overrides,
+    })
+  );
+}
+
 function promotion(overrides = {}) {
   return classifyAutoReadyPromotion({
+    prNumber,
     authorLogin: 'itstimwhite',
     title: 'fix(ci): remediate exact-head failure',
     branch: 'tim/jov-5477-human-draft',
     labels: [],
     headSha: child,
+    body: proofBody(),
     commit: fxCommit(),
     fxRun: trustedFxRun(),
     ...overrides,
@@ -80,9 +105,7 @@ describe('Auto-Ready fleet live-state guard', () => {
   });
 
   it('pins promotion to the exact live head and hold-label snapshot', () => {
-    expect(fleetScript).toContain(
-      'autoMergeRequest{enabledAt} isInMergeQueue mergeQueueEntry{id}'
-    );
+    expect(fleetScript).toContain('headRefOid headRefName body state');
     expect(fleetScript).toContain('labels(first:100){nodes{name}}');
     expect(fleetScript).toContain('HOLD_LABEL_RE=');
     expect(fleetScript).toContain('.head == $expected_head');
@@ -166,19 +189,34 @@ describe('Auto-Ready provenance selector', () => {
     expect(fleetScript).toContain('gh_retry pr ready "$n" -R "$REPO" --undo');
   });
 
-  it('allows an allowlisted bot author on any branch', () => {
+  it('rejects an allowlisted bot author without an author-owned proof receipt', () => {
     expect(
       classifyAutoReadyPromotion({
+        prNumber,
         authorLogin: 'jovie-bot[bot]',
         title: 'fix(ci): repair draft',
         branch: 'tim/jov-5477-bot-repair',
         labels: [],
+        headSha: child,
       })
-    ).toEqual({ eligible: true, reason: 'trusted-bot-author' });
+    ).toEqual({ eligible: false, reason: 'writer-proof-proof-missing' });
   });
 
-  it('allows an exact FX child when trailer, parent, writer, and App/run match', () => {
+  it('allows an exact author-owned proof receipt on any branch', () => {
     expect(promotion()).toEqual({
+      eligible: true,
+      reason: 'writer-proof-complete',
+    });
+  });
+
+  it('keeps FX child provenance as diagnostic context, not promotion authority', () => {
+    expect(
+      classifyFxChildCommit({
+        headSha: child,
+        commit: fxCommit(),
+        fxRun: trustedFxRun(),
+      })
+    ).toEqual({
       eligible: true,
       reason: 'trusted-fx-child',
     });
@@ -189,22 +227,12 @@ describe('Auto-Ready provenance selector', () => {
     expect(fxWorkflow).toContain(TRUSTED_FX_WORKFLOW_NAME);
   });
 
-  it('never promotes a human-authored unrepaired head, even on an agent prefix', () => {
+  it('rejects a stale proof even on an agent prefix', () => {
     expect(
       promotion({
-        commit: {
-          sha: child,
-          message: 'fix: human patch',
-          parentShas: [parent],
-          authorName: 'Tim White',
-          authorEmail: 'tim@example.com',
-          authorLogin: 'itstimwhite',
-          committerLogin: 'itstimwhite',
-          verified: false,
-        },
-        fxRun: null,
+        body: proofBody({ headSha: other }),
       })
-    ).toEqual({ eligible: false, reason: 'human-authored-unrepaired' });
+    ).toEqual({ eligible: false, reason: 'writer-proof-head-mismatch' });
   });
 
   it.each([
@@ -233,28 +261,42 @@ describe('Auto-Ready provenance selector', () => {
   });
 
   it('fails closed when the live head moved away from the classified commit', () => {
-    expect(promotion({ headSha: other })).toEqual({
+    expect(
+      promotion({
+        headSha: other,
+        body: proofBody({ headSha: child }),
+      })
+    ).toEqual({
       eligible: false,
-      reason: 'moved-head',
+      reason: 'writer-proof-head-mismatch',
     });
   });
 
   it('fails closed on ambiguous or unsigned FX provenance', () => {
     expect(
-      promotion({
+      classifyFxChildCommit({
+        headSha: child,
         commit: fxCommit({ parentShas: [parent, other] }),
       })
     ).toEqual({ eligible: false, reason: 'ambiguous-provenance' });
     expect(
-      promotion({
+      classifyFxChildCommit({
+        headSha: child,
         commit: fxCommit({
           committerLogin: '',
           authorLogin: '',
           verified: false,
         }),
+        fxRun: trustedFxRun(),
       })
     ).toEqual({ eligible: false, reason: 'fx-app-provenance-missing' });
-    expect(promotion({ fxRun: null })).toEqual({
+    expect(
+      classifyFxChildCommit({
+        headSha: child,
+        commit: fxCommit(),
+        fxRun: null,
+      })
+    ).toEqual({
       eligible: false,
       reason: 'fx-run-missing',
     });
@@ -279,8 +321,11 @@ describe('Auto-Ready App-token workflow', () => {
     expect(workflow).toContain('persist-credentials: false');
   });
 
-  it('runs on source changes but never on the ready transition', () => {
-    expect(workflow).toContain('types: [opened, synchronize, reopened]');
+  it('keeps workflow recovery manual-only and never source-event driven', () => {
+    expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).not.toContain('pull_request:');
+    expect(workflow).not.toContain('workflow_run:');
+    expect(workflow).not.toContain('types: [opened, synchronize, reopened]');
     expect(workflow).not.toContain('types: [ready_for_review');
     expect(workflow).not.toContain('ready_for_review/CI cascade');
   });

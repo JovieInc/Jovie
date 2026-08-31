@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Ship one already-admitted Linear issue through the canonical model-router fallback.
-# Invariant consumer: JOV-INV-011, JOV-INV-012.
+# Invariant consumer: JOV-INV-011, JOV-INV-012, JOV-INV-022.
 set -euo pipefail
 
 ID="${1:?issue identifier required}"
@@ -11,6 +11,10 @@ case "$ID" in
 esac
 
 export PATH="$HOME/.local/bin:$HOME/.npm-global/bin:/usr/local/bin:$PATH:/usr/bin:/bin"
+SOURCE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PROMOTION_SCRIPT="$SOURCE_ROOT/scripts/writer-owned-pr-promote.sh"
+PROMOTION_LIB="$SOURCE_ROOT/scripts/lib/writer-owned-pr-promotion.mjs"
+UPSERT_PR_COMMENT="$SOURCE_ROOT/scripts/lib/upsert-pr-comment.sh"
 # Husky pre-push defaults to 1 vitest worker (laptop). Gem remounts then take
 # 20–40 min (live JOV-5220). Override without skipping the gate.
 export AUTOMATION_VERIFY_MAX_WORKERS="${AUTOMATION_VERIFY_MAX_WORKERS:-4}"
@@ -283,7 +287,7 @@ $DESC
 Work only in this checkout of $BRANCH. Do not open a second PR. Do not reset to main. If the branch is behind or conflicting with origin/main, finish the merge/rebase onto origin/main, then push to the existing head.
 Satisfy the issue optimization contract (stable variant identity, exposure, outcome, attribution, eligible context dimensions, hypothesis and primary metric, guardrails, privacy and consent, optimizer owner and cadence, decision writeback, and rollback or control) using the existing analytics, model-experiment, audience event, YouTube experiment, and release-to-revenue surfaces. If the work is non-product or non-optimizable, explicitly declare a justified exception instead of omitting the contract.
 Fix the failing checks. If scripts-typecheck exceeds the baseline, fix the new TypeScript errors; do not regenerate the baseline unless the errors are genuinely pre-existing on main.
-Do not weaken or skip gates. Do not merge, deploy, promote, or remove queue-deferred. If blocked, write BLOCKER.md with the exact reason and exit. Start now."
+Do not weaken or skip gates. Do not merge, deploy, remove queue-deferred, or run gh pr ready directly. If the PR must leave draft, run $PROMOTION_SCRIPT only after exact-head author proof is complete. If blocked, write BLOCKER.md with the exact reason and exit. Start now."
 else
   PROMPT="You are implementing admitted Linear issue $ID in $REPO under a revision-scoped fallback lease.
 
@@ -296,9 +300,10 @@ $DESC
 Work only in this checkout. Make the smallest correct issue-scoped change. Do not weaken or skip gates.
 Satisfy the issue optimization contract (stable variant identity, exposure, outcome, attribution, eligible context dimensions, hypothesis and primary metric, guardrails, privacy and consent, optimizer owner and cadence, decision writeback, and rollback or control) using the existing analytics, model-experiment, audience event, YouTube experiment, and release-to-revenue surfaces. If the work is non-product or non-optimizable, explicitly declare a justified exception instead of omitting the contract.
 If scripts-typecheck exceeds the baseline, fix the new TypeScript errors; do not regenerate the baseline unless the errors are genuinely pre-existing on main.
-Create commits on $BRANCH, push normally, and open a ready (non-draft) PR to main with validation evidence and Fixes $ID.
+Create commits on $BRANCH, push normally, and open a draft PR to main with validation evidence and Fixes $ID.
+After required tests, review sweep, ticket evidence, and PR evidence are attached, run $PROMOTION_SCRIPT against the exact PR head. That helper emits jovie-writer-pr-proof/v1, marks ready, and requests native auto-merge with --match-head-commit in one bounded writer action. Do not run gh pr ready directly and do not rely on auto-ready-agent-drafts or agent-tick for successful promotion.
 Do not add the queue-deferred label. Native merge-queue autoenroll is the hold during hold-intake.
-Do not merge, deploy, or promote. If blocked, write BLOCKER.md with the exact reason and exit. Start now."
+Do not merge, deploy, or bypass writer-owned promotion. If blocked, write BLOCKER.md with the exact reason and exit. Start now."
 fi
 
 RECEIPT="$RECEIPT_DIR/$ID.json"
@@ -330,7 +335,7 @@ payload = {
     "model": selection["model"],
     "modelId": selection["id"],
     "ownership": "isolated-implementation-only",
-    "forbidden": ["merge", "deploy", "promote", "remove-queue-deferred"],
+    "forbidden": ["merge", "deploy", "direct-ready", "direct-auto-merge-without-proof", "remove-queue-deferred"],
 }
 path = pathlib.Path(os.environ["RECEIPT_PATH"])
 fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
@@ -461,15 +466,83 @@ if [ "$pr_count" -gt 0 ]; then
     echo "PR exists but number could not be proven" >&2
     exit 2
   fi
-  # Do not add queue-deferred. That label hard-gates native autoenroll during
-  # hold-intake (production-unbound), which is the common AMBER lane while
-  # Production Controller FIFO catches up. Native MQ is the hold.
-  if [ "$(gh pr view "$pr_number" --repo "$REPO" --json isDraft --jq '.isDraft')" = "true" ]; then
-    gh pr ready "$pr_number" --repo "$REPO"
+
+  read_pr_promotion_state() {
+    local owner="${REPO%%/*}"
+    local name="${REPO#*/}"
+    gh api graphql \
+      -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){number state isDraft headRefOid body labels(first:100){nodes{name}} autoMergeRequest{enabledAt} isInMergeQueue mergeQueueEntry{id state position}}}}' \
+      -f owner="$owner" \
+      -f name="$name" \
+      -F number="$pr_number" \
+      --jq '.data.repository.pullRequest | {number, state, draft: .isDraft, head: ((.headRefOid // "") | ascii_downcase), body: (.body // ""), labels: [.labels.nodes[].name], autoMerge: (.autoMergeRequest != null), queued: (.isInMergeQueue == true and .mergeQueueEntry != null), mergeQueueEntry}'
+  }
+
+  promotion_blocker_body() { # promotion_blocker_body <phase> <reason> <attempted> <verified> <state-json>
+    local writer_login
+    writer_login="${GITHUB_ACTOR:-$(gh api user --jq .login 2>/dev/null || true)}"
+    jq -nc \
+      --arg issueId "$ID" \
+      --argjson prNumber "$pr_number" \
+      --arg headSha "$(jq -r '.head // ""' <<<"$5")" \
+      --arg writerLogin "${writer_login:-unknown}" \
+      --arg phase "$1" \
+      --arg reason "$2" \
+      --argjson attempted "$3" \
+      --argjson verified "$4" \
+      --argjson state "$5" \
+      '{issueId:$issueId, prNumber:$prNumber, headSha:$headSha, writerLogin:$writerLogin, phase:$phase, reason:$reason, compensation:{attempted:$attempted, verified:$verified, state:$state}}' \
+      | node "$PROMOTION_LIB" render-blocker
+  }
+
+  upsert_promotion_blocker() { # upsert_promotion_blocker <phase> <reason> <attempted> <verified> <state-json>
+    local body
+    body="$(promotion_blocker_body "$1" "$2" "$3" "$4" "$5")"
+    GITHUB_REPOSITORY="$REPO" bash "$UPSERT_PR_COMMENT" \
+      "$pr_number" "writer-owned-pr-promotion" "$body" || true
+  }
+
+  compensate_ready_unenrolled() {
+    gh pr merge "$pr_number" --repo "$REPO" --disable-auto >/dev/null 2>&1 || true
+    gh pr ready "$pr_number" --repo "$REPO" --undo >/dev/null 2>&1 || true
+    read_pr_promotion_state
+  }
+
+  promotion_state="$(read_pr_promotion_state)"
+  promotion_head="$(jq -r '.head // ""' <<<"$promotion_state")"
+  writer_login="${GITHUB_ACTOR:-$(gh api user --jq .login 2>/dev/null || true)}"
+  promotion_decision="$(jq -nc \
+    --argjson state "$promotion_state" \
+    --arg body "$(jq -r '.body // ""' <<<"$promotion_state")" \
+    --arg expectedHeadSha "$promotion_head" \
+    --arg writerLogin "${writer_login:-unknown}" \
+    --argjson prNumber "$pr_number" \
+    '{state:$state,body:$body,context:{expectedHeadSha:$expectedHeadSha,writerLogin:$writerLogin,prNumber:$prNumber}}' \
+    | node "$PROMOTION_LIB" decision)"
+  promotion_action="$(jq -r '.action' <<<"$promotion_decision")"
+  promotion_reason="$(jq -r '.reason' <<<"$promotion_decision")"
+
+  if [ "$promotion_action" = "already-complete" ]; then
+    update_state "$IN_REVIEW_STATE_ID"
+    echo "END $ID rc=$rc pr=open promotion=complete $(date -u +%FT%TZ)" | tee -a "$LOG"
+    exit "$rc"
   fi
-  update_state "$IN_REVIEW_STATE_ID"
-  echo "END $ID rc=$rc pr=open $(date -u +%FT%TZ)" | tee -a "$LOG"
-  exit "$rc"
+
+  if [ "$promotion_action" = "compensate" ]; then
+    if restored_state="$(compensate_ready_unenrolled)"; then
+      verified="$(jq -r '.draft == true and .autoMerge == false and .queued == false' <<<"$restored_state")"
+    else
+      restored_state="$promotion_state"
+      verified=false
+    fi
+    upsert_promotion_blocker "post-agent" "$promotion_reason" true "$verified" "$restored_state"
+    echo "END $ID rc=2 pr=open promotion=compensated reason=$promotion_reason $(date -u +%FT%TZ)" | tee -a "$LOG"
+    exit 2
+  fi
+
+  upsert_promotion_blocker "post-agent" "writer-owned-promotion-missing:${promotion_reason}" false false "$promotion_state"
+  echo "END $ID rc=2 pr=open promotion=blocked reason=$promotion_reason $(date -u +%FT%TZ)" | tee -a "$LOG"
+  exit 2
 fi
 
 if [ "$changed_state" -eq 1 ] && [ -n "$ORIGINAL_STATE_ID" ]; then

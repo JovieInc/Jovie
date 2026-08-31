@@ -1,4 +1,5 @@
 """Regression tests for self-hosted agent workflow hygiene."""
+import json
 import os
 import re
 import subprocess
@@ -77,6 +78,48 @@ HOSTED_POST_MERGE_JOBS = (
     ("linear-sync-on-merge.yml", "sync_done"),
     ("neon-ephemeral-branch-cleanup.yml", "delete-neon-branch"),
 )
+
+def _writer_proof_body(
+    head: str,
+    pr_number: int,
+    writer: str = "itstimwhite",
+    issue: str = "JOV-5751",
+) -> str:
+    gates = (
+        "exact-head",
+        "writer",
+        "required-tests",
+        "review-sweep",
+        "ticket-evidence",
+        "pr-evidence",
+        "writer-promotion-path",
+    )
+    receipt = {
+        "schema": "jovie-writer-pr-proof/v1",
+        "issuedAt": "2026-08-31T00:00:00.000Z",
+        "issueId": issue,
+        "prNumber": pr_number,
+        "headSha": head,
+        "writerLogin": writer,
+        "ownership": "author-owned",
+        "evidence": {
+            "requiredTests": "passed: focused promotion tests",
+            "reviewSweep": "complete: review comments checked",
+            "ticketEvidence": "attached: Linear workpad current",
+            "prEvidence": "attached: PR body current",
+        },
+        "promotion": {
+            "path": "writer-owned-pr-promote",
+            "readyAndNativeIntent": "same-bounded-action",
+            "reconciliationRequired": False,
+        },
+        "gates": [
+            {"id": gate, "passed": True, "reason": "test proof"} for gate in gates
+        ],
+        "proofComplete": True,
+        "blockedBy": [],
+    }
+    return f"<!-- jovie-writer-pr-proof/v1\n{json.dumps(receipt, separators=(',', ':'))}\n-->"
 
 HOSTED_API_ONLY_PR_CONTROLLERS = (
     ("dependabot-auto-merge.yml", "auto-merge"),
@@ -606,12 +649,18 @@ def test_workflow_run_controllers_ignore_non_pr_and_stale_runs() -> None:
     """Main/merge-group completions must not wake PR fleet controllers."""
     for workflow, job_name in (
         ("merge-queue-autoenroll.yml", "enroll"),
-        ("auto-ready-agent-drafts.yml", "auto-ready"),
         ("pr-conflict-handler.yml", "plan"),
     ):
         block = _job_block(workflow, job_name)
         assert "github.event.workflow_run.event == 'pull_request'" in block, workflow
         assert "github.event.workflow_run.conclusion != 'cancelled'" in block, workflow
+
+    auto_ready = (WORKFLOWS / "auto-ready-agent-drafts.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "workflow_dispatch:" in auto_ready
+    assert "workflow_run:" not in auto_ready
+    assert "pull_request:" not in auto_ready
 
     pipeline = _job_block("agent-pipeline.yml", "guard")
     assert "github.event.workflow_run.event == 'pull_request'" in pipeline
@@ -782,7 +831,7 @@ def test_main_autofix_waits_for_rerun_and_exact_sha_repair_ownership() -> None:
 
 
 def test_auto_ready_compensates_live_hold_race(tmp_path: Path) -> None:
-    """A hold racing in after an FX-provenance promotion restores draft."""
+    """A hold racing in after a writer-proofed promotion restores draft."""
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir()
     state_file = tmp_path / "state"
@@ -790,6 +839,7 @@ def test_auto_ready_compensates_live_hold_race(tmp_path: Path) -> None:
     call_log = tmp_path / "calls.log"
     fx_child_head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     fx_source_head = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    proof_body = json.dumps(_writer_proof_body(fx_child_head, 42))
     fake_gh = fake_bin / "gh"
     fake_gh.write_text(
         textwrap.dedent(
@@ -798,15 +848,15 @@ def test_auto_ready_compensates_live_hold_race(tmp_path: Path) -> None:
             set -euo pipefail
             printf '%s\\n' "$*" >> {call_log}
             if [[ "$1 $2" == "pr list" ]]; then
-              printf '%s\\n' '[{{"n":42,"t":"race guard","draft":true,"head":"codex/race","oid":"{fx_child_head}","author":"itstimwhite","L":[]}}]'
+              printf '%s\\n' '[{{"n":42,"t":"race guard","draft":true,"head":"codex/race","oid":"{fx_child_head}","body":{proof_body},"author":"itstimwhite","L":[]}}]'
             elif [[ "$1 $2" == "pr view" ]]; then
               phase="$(cat {state_file})"
               if [[ "$phase" == "promoted" ]]; then
-                printf '%s\\n' '{{"draft":false,"head":"{fx_child_head}","branch":"codex/race","labels":["gated"],"state":"OPEN","autoMerge":true,"queued":false}}'
+                printf '%s\\n' '{{"draft":false,"head":"{fx_child_head}","branch":"codex/race","body":{proof_body},"labels":["gated"],"state":"OPEN","autoMerge":true,"queued":false}}'
               elif [[ "$phase" == "restored" ]]; then
-                printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","labels":["gated"],"state":"OPEN","autoMerge":false,"queued":false}}'
+                printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","body":{proof_body},"labels":["gated"],"state":"OPEN","autoMerge":false,"queued":false}}'
               else
-                printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","labels":[],"state":"OPEN","autoMerge":false,"queued":false}}'
+                printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","body":{proof_body},"labels":[],"state":"OPEN","autoMerge":false,"queued":false}}'
               fi
             elif [[ "$1 $2" == "pr checks" ]]; then
               printf 'fake gh must never wait for checks before promotion\\n' >&2
@@ -828,11 +878,11 @@ def test_auto_ready_compensates_live_hold_race(tmp_path: Path) -> None:
                 graphql)
                   phase="$(cat {state_file})"
                   if [[ "$phase" == "promoted" ]]; then
-                    printf '%s\\n' '{{"draft":false,"head":"{fx_child_head}","branch":"codex/race","labels":["gated"],"state":"OPEN","autoMerge":true,"queued":false}}'
+                    printf '%s\\n' '{{"draft":false,"head":"{fx_child_head}","branch":"codex/race","body":{proof_body},"labels":["gated"],"state":"OPEN","autoMerge":true,"queued":false}}'
                   elif [[ "$phase" == "restored" ]]; then
-                    printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","labels":["gated"],"state":"OPEN","autoMerge":false,"queued":false}}'
+                    printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","body":{proof_body},"labels":["gated"],"state":"OPEN","autoMerge":false,"queued":false}}'
                   else
-                    printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","labels":[],"state":"OPEN","autoMerge":false,"queued":false}}'
+                    printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","body":{proof_body},"labels":[],"state":"OPEN","autoMerge":false,"queued":false}}'
                   fi
                   ;;
                 repos/*/commits/*)
@@ -967,6 +1017,7 @@ def test_auto_ready_recovers_interrupted_ready_without_auto_merge(
     state_file.write_text("orphan-ready", encoding="utf-8")
     call_log = tmp_path / "calls.log"
     head = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    proof_body = json.dumps(_writer_proof_body(head, 88, "jovie-bot[bot]"))
     fake_gh = fake_bin / "gh"
     fake_gh.write_text(
         textwrap.dedent(
@@ -975,7 +1026,7 @@ def test_auto_ready_recovers_interrupted_ready_without_auto_merge(
             set -euo pipefail
             printf '%s\n' "$*" >> {call_log}
             if [[ "$1 $2" == "pr list" ]]; then
-              printf '%s\n' '[{{"n":88,"t":"interrupted pair","draft":false,"head":"codex/interrupted","oid":"{head}","author":"jovie-bot[bot]","L":[]}}]'
+              printf '%s\n' '[{{"n":88,"t":"interrupted pair","draft":false,"head":"codex/interrupted","oid":"{head}","body":{proof_body},"author":"jovie-bot[bot]","L":[]}}]'
             elif [[ "$1 $2" == "pr ready" ]]; then
               printf 'recovery must not repeat the ready mutation\n' >&2
               exit 2
@@ -988,9 +1039,9 @@ def test_auto_ready_recovers_interrupted_ready_without_auto_merge(
               fi
             elif [[ "$1" == "api" && "$2" == "graphql" ]]; then
               if [[ "$(cat {state_file})" == "auto-enabled" ]]; then
-                printf '%s\n' '{{"draft":false,"head":"{head}","branch":"codex/interrupted","labels":[],"state":"OPEN","autoMerge":true,"queued":false}}'
+                printf '%s\n' '{{"draft":false,"head":"{head}","branch":"codex/interrupted","body":{proof_body},"labels":[],"state":"OPEN","autoMerge":true,"queued":false}}'
               else
-                printf '%s\n' '{{"draft":false,"head":"{head}","branch":"codex/interrupted","labels":[],"state":"OPEN","autoMerge":false,"queued":false}}'
+                printf '%s\n' '{{"draft":false,"head":"{head}","branch":"codex/interrupted","body":{proof_body},"labels":[],"state":"OPEN","autoMerge":false,"queued":false}}'
               fi
             else
               printf 'unexpected fake gh invocation: %s\n' "$*" >&2

@@ -10,6 +10,7 @@ import {
 } from 'node:fs';
 import { extname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { validateControllerHopChanges } from './invariants/controller-hop-contract.mjs';
 
 const MiB = 1024 * 1024;
 
@@ -635,6 +636,12 @@ export function evaluateRepoHygiene({
     paths: scope,
   });
   errors.push(...exception.errors);
+  errors.push(
+    ...validateControllerHopChanges({
+      addedPaths: added,
+      readFile: path => readFileSync(resolve(root, path), 'utf8'),
+    })
+  );
 
   for (const path of added) {
     const parts = path.split('/').filter(Boolean);
