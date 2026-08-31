@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
 
 export const AUTHORITY_MAP_PATH =
@@ -83,7 +83,14 @@ function validatePathList(issues, entryId, paths, repoRoot) {
       add(issues, 'invalid-repo-path', `${entryId}:${sourcePath}`);
       continue;
     }
-    if (repoRoot && !existsSync(resolve(repoRoot, sourcePath))) {
+    if (!repoRoot) {
+      continue;
+    }
+    try {
+      if (!statSync(resolve(repoRoot, sourcePath)).isFile()) {
+        add(issues, 'invalid-repo-path', `${entryId}:${sourcePath}`);
+      }
+    } catch {
       add(issues, 'invalid-repo-path', `${entryId}:${sourcePath}`);
     }
   }

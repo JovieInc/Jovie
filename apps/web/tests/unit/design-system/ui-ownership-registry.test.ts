@@ -183,6 +183,20 @@ describe('design-system authority map', () => {
         }))
       )
     ).toContain('invalid-repo-path');
+    expect(
+      authorityCodes(
+        authorityMapWith('surface.marketing-routes', () => ({
+          canonicalSources: ['apps/web'],
+        }))
+      )
+    ).toContain('invalid-repo-path');
+    expect(
+      authorityCodes(
+        authorityMapWith('interaction.families', () => ({
+          executableChecks: ['scripts'],
+        }))
+      )
+    ).toContain('invalid-repo-path');
   });
 });
 

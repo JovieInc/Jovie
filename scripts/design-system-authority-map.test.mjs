@@ -115,4 +115,18 @@ test('RED: authority map rejects unowned gaps and stale evidence paths', () => {
     'invalid-repo-path',
     process.cwd()
   );
+  expectCode(
+    mutateEntry('surface.marketing-routes', () => ({
+      canonicalSources: ['apps/web'],
+    })),
+    'invalid-repo-path',
+    process.cwd()
+  );
+  expectCode(
+    mutateEntry('interaction.families', () => ({
+      executableChecks: ['scripts'],
+    })),
+    'invalid-repo-path',
+    process.cwd()
+  );
 });

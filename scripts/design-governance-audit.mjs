@@ -112,10 +112,16 @@ function readJson(repoRoot, relativePath) {
 }
 
 /**
+ * @typedef {{ includeAuthorityMap?: boolean }} AuditOptions
+ *
  * @param {string} [repoRoot]
+ * @param {AuditOptions} [options]
  * @returns {{ results: CheckResult[], failed: CheckResult[], warned: CheckResult[] }}
  */
-export function runDesignGovernanceAudit(repoRoot = DEFAULT_REPO_ROOT) {
+export function runDesignGovernanceAudit(
+  repoRoot = DEFAULT_REPO_ROOT,
+  options = {}
+) {
   /** @type {CheckResult[]} */
   const results = [];
   const report = (id, status, detail) => {
@@ -382,27 +388,34 @@ export function runDesignGovernanceAudit(repoRoot = DEFAULT_REPO_ROOT) {
     );
   }
 
-  try {
-    const issues = loadAndValidateDesignSystemAuthorityMap(repoRoot);
-    if (issues.length > 0) {
+  if (options.includeAuthorityMap !== false) {
+    try {
+      const issues = loadAndValidateDesignSystemAuthorityMap(repoRoot);
+      if (issues.length > 0) {
+        const detail = issues
+          .map(issue => `${issue.code}:${issue.detail}`)
+          .join('; ');
+        report(
+          'design-system-authority-map',
+          'FAIL',
+          `${AUTHORITY_MAP_PATH} invalid: ${detail}`
+        );
+      } else {
+        report(
+          'design-system-authority-map',
+          'PASS',
+          `${AUTHORITY_MAP_PATH} validates dependency order, canonical owners, ` +
+            'regular-file evidence paths, immutable status floors, and ' +
+            'executable checks'
+        );
+      }
+    } catch (error) {
       report(
         'design-system-authority-map',
         'FAIL',
-        `${AUTHORITY_MAP_PATH} invalid: ${issues.map(issue => `${issue.code}:${issue.detail}`).join('; ')}`
-      );
-    } else {
-      report(
-        'design-system-authority-map',
-        'PASS',
-        `${AUTHORITY_MAP_PATH} validates dependency order, canonical owners, evidence paths, immutable status floors, and executable checks`
+        `${AUTHORITY_MAP_PATH} unreadable: ${error instanceof Error ? error.message : error}`
       );
     }
-  } catch (error) {
-    report(
-      'design-system-authority-map',
-      'FAIL',
-      `${AUTHORITY_MAP_PATH} unreadable: ${error instanceof Error ? error.message : error}`
-    );
   }
 
   try {

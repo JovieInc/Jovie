@@ -14,7 +14,9 @@ or PR Ready merge gate.
   `pnpm design:conformance:gate` only — same as origin/main. Do not expand the
   always-run remaining group with `design:authority:check`,
   `design:tokens:export:check`, `design:governance:audit`, or
-  `lint:touch-target`.
+  `lint:touch-target`. The merge-gated governance audit tests run a
+  conformance-safe view that excludes local-only checks such as the
+  design-system authority map.
 - **Weekly:** `.github/workflows/design-governance.yml` — Monday 08:17 UTC +
   `workflow_dispatch`. Informational / standing-issue only — **not** a required
   merge-gate workflow. Scheduled runs `exit 0` and file a standing issue on
@@ -78,7 +80,8 @@ permanent check:
     immutable status floors, executable checks for enforced layers, and
     shrink-only classification reasons for gaps. Per-entry status floors live
     in the validators, outside the mutable ledger. The audit delegates to
-    `scripts/design-system-authority-map.mjs`.
+    `scripts/design-system-authority-map.mjs`. This is local/weekly-only and
+    is excluded from merge-gated design-conformance audit tests.
 
 Exit code is non-zero on any FAIL; WARN never blocks. Failures print the
 exact offending values so remediation is mechanical.
