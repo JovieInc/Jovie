@@ -128,7 +128,10 @@ describe('ci-fast bounded parallel workflow', () => {
       'python3 -m coverage json -o "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json"'
     );
     expect(CI_FAST_SOURCE).toContain(
-      'required={72,73,74}; missing=required-set(file["executed_lines"])'
+      'required={72,73,74}; missing=required-set('
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'uncovered official Symphony ownership lines'
     );
   });
 
