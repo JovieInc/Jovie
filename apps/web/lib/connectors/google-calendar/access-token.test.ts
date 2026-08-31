@@ -58,19 +58,12 @@ describe('loadFreshGoogleAccessToken', () => {
     expect(mocks.serverFetch).not.toHaveBeenCalled();
   });
 
-  it('treats invalid_grant as reauthorization', async () => {
+  it.each([
+    'invalid_grant',
+    'admin_policy_enforced',
+  ])('treats %s as reauthorization', async providerError => {
     mocks.serverFetch.mockResolvedValueOnce(
-      Response.json({ error: 'invalid_grant' }, { status: 400 })
-    );
-
-    await expect(loadFreshGoogleAccessToken('account-1')).resolves.toBeNull();
-
-    expect(mocks.storeTokens).not.toHaveBeenCalled();
-  });
-
-  it('treats permanent Google OAuth policy errors as reauthorization', async () => {
-    mocks.serverFetch.mockResolvedValueOnce(
-      Response.json({ error: 'admin_policy_enforced' }, { status: 400 })
+      Response.json({ error: providerError }, { status: 400 })
     );
 
     await expect(loadFreshGoogleAccessToken('account-1')).resolves.toBeNull();
