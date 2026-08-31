@@ -18,9 +18,9 @@ import 'server-only';
  */
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
-import { after } from 'next/server';
 import { db } from '@/lib/db';
 import { merchDesignOptions } from '@/lib/db/schema/merch';
+import { scheduleAfter } from '@/lib/next/schedule-after';
 import { logger } from '@/lib/utils/logger';
 import type { MerchMockupStatus } from './generation-contract';
 import { isPrintfulMockupUrl } from './mockup-urls';
@@ -210,11 +210,5 @@ export function scheduleMerchMockupEnrichment(
       });
     });
   };
-  try {
-    after(guarded);
-  } catch {
-    // No request scope (unit tests, scripts): execute inline so the work is
-    // still tracked and observable rather than silently dropped.
-    guarded();
-  }
+  scheduleAfter(guarded, { fallback: 'inline' });
 }
