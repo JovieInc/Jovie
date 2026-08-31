@@ -2,7 +2,7 @@ import 'server-only';
 
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { artistRules } from '@/lib/db/schema/library-graph';
+import { artistRules } from '@/lib/db/schema/library-content-graph';
 import type { ArtistRuleStrength, ArtistRuleView } from './types';
 
 function toView(rule: typeof artistRules.$inferSelect): ArtistRuleView {
