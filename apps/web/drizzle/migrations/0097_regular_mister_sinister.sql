@@ -65,6 +65,30 @@ CREATE TRIGGER artist_rule_exception_guard
   FOR EACH ROW EXECUTE FUNCTION enforce_artist_rule_exception();
 --> statement-breakpoint
 
+CREATE OR REPLACE FUNCTION enforce_artist_rule_exception_immutable()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF TG_OP = 'DELETE' AND (
+    NOT EXISTS (SELECT 1 FROM artist_rules r WHERE r.id = OLD.rule_id)
+    OR NOT EXISTS (
+      SELECT 1 FROM creator_profiles p WHERE p.id = OLD.creator_profile_id
+    )
+  ) THEN
+    RETURN OLD;
+  END IF;
+  RAISE EXCEPTION 'artist rule exceptions are immutable';
+END;
+$$;
+--> statement-breakpoint
+
+CREATE TRIGGER artist_rule_exception_immutable_guard
+  BEFORE UPDATE OR DELETE ON artist_rule_exceptions
+  FOR EACH ROW EXECUTE FUNCTION enforce_artist_rule_exception_immutable();
+--> statement-breakpoint
+
 CREATE OR REPLACE FUNCTION record_artist_rule_exception_event()
 RETURNS trigger
 LANGUAGE plpgsql
