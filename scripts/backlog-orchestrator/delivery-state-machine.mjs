@@ -33,6 +33,8 @@ export const DEFAULT_DELIVERY_STATE_DIR = resolve(
   process.env.GEM_WORKSPACE || '/home/timwhite/gem-workspace',
   'state/jovie-delivery-controller'
 );
+export const DEFAULT_DELIVERY_REPOSITORY =
+  process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
 
 const AUTOMATED_FAILURES = Object.freeze({
   'workflow-cancelled': {
@@ -94,6 +96,13 @@ function nonEmpty(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+function repositoryName(value) {
+  const normalized = nonEmpty(value);
+  return normalized && /^[^/\s]+\/[^/\s]+$/.test(normalized)
+    ? normalized
+    : null;
+}
+
 function exactSha(value) {
   const normalized = nonEmpty(value)?.toLowerCase();
   return normalized && /^[0-9a-f]{40}$/.test(normalized) ? normalized : null;
@@ -125,6 +134,12 @@ function boundedStackHealthAction(action) {
   }
   if (action.owner !== 'symphony' || action.writer !== 'symphony') {
     throw new Error('stack health repair action must remain Symphony-owned');
+  }
+  const repository = repositoryName(action.repository);
+  if (!repository) {
+    throw new Error(
+      'stack health repair action requires repository owner/name'
+    );
   }
   const rootPr = exactPositiveInteger(action.rootPr);
   const rootHeadSha = exactSha(action.rootHeadSha);
@@ -211,6 +226,7 @@ function boundedStackHealthAction(action) {
   }
   return {
     schema: STACK_HEALTH_ACTION_SCHEMA,
+    repository,
     taskKey,
     deliveryKey,
     action: STACK_REPAIR_ACTION,
@@ -266,12 +282,21 @@ export function normalizeDeliveryEvent(raw = {}) {
   const headSha = exactSha(
     payload.head_sha ?? payload.head ?? workflow.head_sha
   );
+  const repository =
+    repositoryName(payload.repository) ||
+    repositoryName(raw.repository?.full_name) ||
+    repositoryName(raw.repository) ||
+    repositoryName(DEFAULT_DELIVERY_REPOSITORY);
+  if (!repository) {
+    throw new Error('delivery event requires repository owner/name');
+  }
   const deliveryKey =
     nonEmpty(payload.delivery_key) ||
     nonEmpty(payload.event_id) ||
     nonEmpty(raw.delivery_id) ||
     nonEmpty(workflow.id && String(workflow.id)) ||
     digest({
+      repository,
       workflow: nonEmpty(workflow.name),
       status: nonEmpty(workflow.status),
       conclusion: nonEmpty(workflow.conclusion),
@@ -286,6 +311,7 @@ export function normalizeDeliveryEvent(raw = {}) {
     );
   }
   return {
+    repository,
     deliveryKey,
     source: nonEmpty(payload.source) || (workflow.id ? 'github' : 'linear'),
     event: nonEmpty(payload.event) || nonEmpty(raw.action) || 'changed',
@@ -318,7 +344,12 @@ export function buildDeliveryReceipt(
     : 'received';
   return {
     schema: DELIVERY_RECEIPT_SCHEMA,
-    receiptKey: digest({ deliveryKey: event.deliveryKey, failure, stage }),
+    receiptKey: digest({
+      repository: event.repository,
+      deliveryKey: event.deliveryKey,
+      failure,
+      stage,
+    }),
     observedAt: now,
     stage,
     terminal: stage === 'external-blocked',
@@ -389,6 +420,7 @@ export function transitionDeliveryReceipt(
     terminal: stage === 'external-blocked' || stage === 'production-proven',
     previousReceiptKey: receipt.receiptKey,
     receiptKey: digest({
+      repository: receipt.event.repository,
       receiptKey: receipt.receiptKey,
       stage,
       failure: transition.failure || null,
@@ -415,7 +447,12 @@ export function repairTaskForReceipt(receipt) {
       : null;
   return {
     schema: REPAIR_TASK_SCHEMA,
-    taskKey: digest({ receiptKey: receipt.receiptKey, route: receipt.next }),
+    repository: receipt.event.repository,
+    taskKey: digest({
+      repository: receipt.event.repository,
+      receiptKey: receipt.receiptKey,
+      route: receipt.next,
+    }),
     createdAt: receipt.observedAt,
     receiptKey: receipt.receiptKey,
     owner: receipt.next.owner,
@@ -438,6 +475,7 @@ export function buildStackHealthReceipt(
   return buildDeliveryReceipt(
     {
       delivery_key: evidence.deliveryKey,
+      repository: evidence.repository,
       source: 'summer-closure-health',
       event: 'draft-stack-policy',
       failure: 'draft-stack-policy',
@@ -570,6 +608,8 @@ export function attestGemService(
   { sourceSha, installedSha, configSha, loadedConfigSha, active, healthy },
   options = {}
 ) {
+  const repository =
+    repositoryName(options.repository) || DEFAULT_DELIVERY_REPOSITORY;
   const mismatch =
     !exactSha(sourceSha) ||
     sourceSha !== installedSha ||
@@ -581,6 +621,7 @@ export function attestGemService(
     mismatch
       ? {
           delivery_key: `gem-service:${sourceSha || 'unknown'}:${installedSha || 'unknown'}:${loadedConfigSha || 'unknown'}`,
+          repository,
           source: 'gem',
           event: 'service-attestation',
           failure: 'stale-config',
@@ -595,6 +636,7 @@ export function attestGemService(
         }
       : {
           delivery_key: `gem-service:${sourceSha}:${configSha}`,
+          repository,
           source: 'gem',
           event: 'service-attestation',
           evidence: {
@@ -619,6 +661,8 @@ export function reconcileDeliveryHeartbeat(
   heartbeat,
   { now = new Date().toISOString(), maxAgeMs = 15 * 60 * 1000 } = {}
 ) {
+  const repository =
+    repositoryName(heartbeat?.repository) || DEFAULT_DELIVERY_REPOSITORY;
   const observedAt = nonEmpty(heartbeat?.observedAt);
   const ageMs = observedAt
     ? Date.parse(now) - Date.parse(observedAt)
@@ -629,6 +673,7 @@ export function reconcileDeliveryHeartbeat(
     stale
       ? {
           delivery_key: `heartbeat-reconcile:${window}`,
+          repository,
           source: 'gem',
           event: 'reconciliation',
           failure: 'missing-trigger',
@@ -640,6 +685,7 @@ export function reconcileDeliveryHeartbeat(
         }
       : {
           delivery_key: `heartbeat-reconcile:${window}`,
+          repository,
           source: 'gem',
           event: 'reconciliation',
           evidence: { observedAt, ageMs, maxAgeMs },

@@ -84,6 +84,7 @@ def pr(
 
 def snapshot(**overrides: object) -> dict[str, object]:
     value: dict[str, object] = {
+        "repository": "JovieInc/Jovie",
         "controller": {
             "status": "green",
             "runId": 42,
@@ -179,7 +180,9 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(len(result["repairActions"]), 1)
         self.assertEqual(result["repairActions"][0]["action"], MODULE.STACK_REPAIR_ACTION)
         self.assertEqual(result["repairActions"][0]["rootPr"], 101)
+        self.assertEqual(result["repairActions"][0]["repository"], "JovieInc/Jovie")
         self.assertEqual(health["status"], "red")
+        self.assertEqual(health["repository"], "JovieInc/Jovie")
         self.assertIn("draft-stack-policy-violation", health["reasons"])
         self.assertFalse(health["newIssueIntakeAllowed"])
         self.assertTrue(health["promotionContinues"])
@@ -217,6 +220,10 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertIn("orphaned-stack-base", by_root[123])
         self.assertEqual(
             [action["rootPr"] for action in result["repairActions"]], [121, 123]
+        )
+        self.assertEqual(
+            {action["repository"] for action in result["repairActions"]},
+            {"JovieInc/Jovie"},
         )
 
     def test_every_open_pr_receives_a_deterministic_lifecycle_disposition(self):
@@ -761,6 +768,32 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
         self.assertEqual(result["status"], "red")
         self.assertIn("unclassified-open-pr-over-15m", result["reasons"])
 
+    def test_previous_closure_history_is_scoped_to_repository(self):
+        previous = MODULE.evaluate_closure_health(
+            snapshot(
+                repository="JovieInc/Jovie",
+                nativeQueueCount=0,
+            ),
+            previous=None,
+            now=NOW,
+        )
+        current_now = NOW + timedelta(minutes=20)
+        current = MODULE.evaluate_closure_health(
+            snapshot(
+                repository="JovieInc/LogYourBody",
+                nativeQueueCount=0,
+            ),
+            previous=previous,
+            now=current_now,
+        )
+
+        self.assertEqual(previous["status"], "grace")
+        self.assertEqual(current["status"], "grace")
+        self.assertEqual(
+            current["episodes"]["emptyNativeQueue"]["since"],
+            MODULE.isoformat(current_now),
+        )
+
     def test_malformed_observation_and_expired_hold_fail_closed(self):
         result = MODULE.evaluate_closure_health(
             {
@@ -906,6 +939,7 @@ class ClosureObservationTests(unittest.TestCase):
             )
 
         self.assertEqual(result["status"], "healthy")
+        self.assertEqual(result["repository"], "JovieInc/Jovie")
         self.assertEqual(result["openPrs"], 2)
         self.assertEqual(result["eligiblePrs"], 1)
         self.assertEqual(result["nativeQueueCount"], 1)
@@ -917,9 +951,40 @@ class ClosureObservationTests(unittest.TestCase):
                 "JovieInc/Jovie", previous=None, now=NOW
             )
         self.assertEqual(failed["status"], "red")
+        self.assertEqual(failed["repository"], "JovieInc/Jovie")
         self.assertFalse(failed["newIssueIntakeAllowed"])
         self.assertEqual(failed["reasons"], ["closure-observation-unknown"])
         self.assertIn("bad snapshot", failed["error"])
+
+    def test_live_observer_passes_repository_to_stack_repair_actions(self):
+        prs = [
+            stack_pr(201, "main", body=STACK_BODY),
+            stack_pr(202, "stack/test-201"),
+            stack_pr(203, "stack/test-202"),
+            stack_pr(204, "stack/test-203"),
+            stack_pr(205, "stack/test-204"),
+        ]
+        with mock.patch.object(
+            MODULE,
+            "_run_graphql_snapshot",
+            return_value={
+                "prs": prs,
+                "latestMergeAt": (NOW - timedelta(minutes=30)).isoformat(),
+            },
+        ), mock.patch.object(
+            MODULE,
+            "_observe_queue_controller",
+            return_value={"status": "green", "runId": 42},
+        ):
+            result = MODULE.observe_closure_health(
+                "JovieInc/LogYourBody", previous=None, now=NOW
+            )
+
+        self.assertEqual(result["status"], "red")
+        self.assertEqual(result["repository"], "JovieInc/LogYourBody")
+        self.assertEqual(
+            result["repairActions"][0]["repository"], "JovieInc/LogYourBody"
+        )
 
 
 if __name__ == "__main__":
