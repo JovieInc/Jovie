@@ -612,6 +612,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/pr-check-failures.test.mjs',
         'scripts/lib/__tests__/pr-conflict-handler.test.mjs',
         'scripts/lib/__tests__/github-open-prs-rest.test.mjs',
+        'scripts/lib/__tests__/github-merge-queue.test.mjs',
         'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
         'scripts/lib/__tests__/design-exception-registry.test.mjs',
         'scripts/lib/__tests__/design-system-source-ratchet.test.mjs',
