@@ -62,6 +62,7 @@ export function humanPolicyHoldRegex() {
 }
 
 const HEAD_RE = /^[0-9a-f]{40}$/;
+const REPOSITORY_RE = /^[^/\s]+\/[^/\s]+$/;
 const JSON_BLOCK_RE = /```json\s*\n([\s\S]*?)\n```/;
 
 export function validateReceipt(candidate) {
@@ -80,6 +81,9 @@ export function validateReceipt(candidate) {
   const r = candidate;
   if (r.schema !== QUEUE_DEFERRAL_SCHEMA) {
     errors.push(`schema must be "${QUEUE_DEFERRAL_SCHEMA}"`);
+  }
+  if (typeof r.repository !== 'string' || !REPOSITORY_RE.test(r.repository)) {
+    errors.push('repository must be owner/name');
   }
   if (!Number.isInteger(r.pr) || r.pr <= 0) {
     errors.push('pr must be a positive integer');
@@ -107,6 +111,7 @@ export function validateReceipt(candidate) {
   }
   const receipt = {
     schema: QUEUE_DEFERRAL_SCHEMA,
+    repository: r.repository,
     pr: r.pr,
     head: r.head,
     reason: r.reason,
@@ -120,6 +125,7 @@ export function validateReceipt(candidate) {
 }
 
 export function renderReceiptComment({
+  repository,
   pr,
   head,
   reason,
@@ -129,6 +135,7 @@ export function renderReceiptComment({
 }) {
   const { ok, errors, receipt } = validateReceipt({
     schema: QUEUE_DEFERRAL_SCHEMA,
+    repository,
     pr,
     head,
     reason,
@@ -151,6 +158,18 @@ It is released when this exact head, required checks, and a fresh GREEN fleet ga
 Human-policy holds (taste, net-new, outbound) stay held. Untyped ready holds are not a manual trap.`;
 }
 
+function invalidTypedReceipt(parsed, errors) {
+  if (!parsed || parsed.schema !== QUEUE_DEFERRAL_SCHEMA) return null;
+  return {
+    schema: QUEUE_DEFERRAL_SCHEMA,
+    invalid: true,
+    errors,
+    repository: parsed.repository ?? null,
+    pr: parsed.pr ?? null,
+    head: parsed.head ?? null,
+  };
+}
+
 export function extractReceiptFromComment(body) {
   if (typeof body !== 'string' || !body.includes(QUEUE_DEFERRAL_MARKER)) {
     return null;
@@ -165,8 +184,8 @@ export function extractReceiptFromComment(body) {
   } catch {
     return null;
   }
-  const { ok, receipt } = validateReceipt(parsed);
-  return ok ? receipt : null;
+  const { ok, errors, receipt } = validateReceipt(parsed);
+  return ok ? receipt : invalidTypedReceipt(parsed, errors);
 }
 
 export function classifyReceipt(receipt) {
@@ -196,9 +215,9 @@ export function classifyReceipt(receipt) {
 
 /**
  * Decide whether a queue-deferred hold may be lifted once fleet/live
- * checks agree. Typed mechanical receipts stay reason-bound. A missing or
- * structurally invalid receipt is an untyped ready hold — releasable unless
- * a human-policy label is present.
+ * checks agree. Typed mechanical receipts stay reason-bound. A structurally
+ * invalid typed receipt stays held; only missing provenance becomes an
+ * untyped ready hold when no human-policy label is present.
  */
 export function classifyQueueDeferredHold({
   receipt = null,
@@ -214,14 +233,7 @@ export function classifyQueueDeferredHold({
   if (receipt == null) {
     return { releasable: true, detail: 'untyped-ready-hold' };
   }
-  const typed = classifyReceipt(receipt);
-  if (
-    !typed.releasable &&
-    typed.detail === 'untyped-hold-manual-release-required'
-  ) {
-    return { releasable: true, detail: 'untyped-ready-hold' };
-  }
-  return typed;
+  return classifyReceipt(receipt);
 }
 
 function parseArgs(argv) {
@@ -259,6 +271,7 @@ export async function runCli(argv = process.argv.slice(2)) {
   switch (command) {
     case 'render': {
       const body = renderReceiptComment({
+        repository: String(args.repository ?? ''),
         pr: Number.parseInt(String(args.pr ?? ''), 10),
         head: String(args.head ?? ''),
         reason: String(args.reason ?? ''),

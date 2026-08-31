@@ -24,6 +24,18 @@ function issue(overrides = {}) {
   };
 }
 
+const TARGETED_DESCRIPTION = `## Target
+- target_system: jovie-product
+- target_repo: JovieInc/Jovie
+- artifact: scripts/backlog-orchestrator/admission-gate.mjs
+- verification_authority: JovieInc/Jovie CI
+
+## Scope
+Tighten one isolated behaviour.
+
+## Acceptance criteria
+- Focused test passes.`;
+
 describe('intake readiness classifier', () => {
   it('recognizes a bounded contract alias without granting admission', () => {
     const result = classifyIntakeReadiness(issue());
@@ -65,6 +77,24 @@ describe('intake readiness classifier', () => {
       assert.equal(result.reason, 'protected-policy');
       assert.equal(result.requiresHumanDecision, true);
     }
+  });
+
+  it('does not treat a mismatched repository admission receipt as active ownership', () => {
+    const result = classifyIntakeReadiness(
+      issue({
+        description: TARGETED_DESCRIPTION,
+        comments: {
+          nodes: [
+            {
+              body: '<!-- symphony-admission:v1 {"target_system":"jovie-product","target_repo":"JovieInc/LogYourBody","artifact":"scripts/backlog-orchestrator/admission-gate.mjs","verification_authority":"JovieInc/LogYourBody CI"} -->',
+            },
+          ],
+        },
+      })
+    );
+
+    assert.equal(result.disposition, 'mechanical-ready');
+    assert.equal(result.evidence.ownership, 'unowned');
   });
 
   it('chooses at most four independent normal candidates in a control-loop receipt', () => {

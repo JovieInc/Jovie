@@ -954,6 +954,19 @@ describe('deterministic Symphony admission boundary', () => {
     };
   }
 
+  function laneCapacity(ready = 1, budget = 15) {
+    return {
+      schema: 'jovie-lane-capacity/v2',
+      observedAt: '2026-08-09T05:00:00.000Z',
+      repositories: {
+        'JovieInc/Jovie': { ready, budget },
+      },
+      defaultLaneBudget: 4,
+      lanes: {},
+      sharedResources: {},
+    };
+  }
+
   function fleetEvidence(overrides = {}) {
     return {
       main: {
@@ -967,17 +980,12 @@ describe('deterministic Symphony admission boundary', () => {
       controller: { status: 'green' },
       integrity: { status: 'clear' },
       queue: {
+        repository: 'JovieInc/Jovie',
         status: 'known',
         eligiblePrs: 6,
         greenReadyPrs: 1,
         target: 15,
-        laneCapacity: {
-          schema: 'jovie-lane-capacity/v1',
-          observedAt: '2026-08-09T05:00:00.000Z',
-          global: { ready: 1, budget: 15 },
-          defaultLaneBudget: 4,
-          lanes: {},
-        },
+        laneCapacity: laneCapacity(1, 15),
       },
       closureHealth: {
         schema: 'jovie-closure-health/v1',
@@ -1022,10 +1030,12 @@ describe('deterministic Symphony admission boundary', () => {
     const fleetGate = admitter.evaluateFleetGate(
       fleetEvidence({
         queue: {
+          repository: 'JovieInc/Jovie',
           status: 'known',
           eligiblePrs: 40,
           greenReadyPrs: 15,
           target: 15,
+          laneCapacity: laneCapacity(15, 15),
         },
       }),
       { now: '2026-08-09T05:01:00.000Z' }
@@ -1033,7 +1043,7 @@ describe('deterministic Symphony admission boundary', () => {
 
     assert.equal(fleetGate.state, 'GREEN');
     assert.equal(fleetGate.promotionAdmission.allowed, true);
-    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, true);
+    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
     assert.equal(
       fleetGate.reasons.some(reason => reason.code === 'queue-above-target'),
       false
@@ -1041,10 +1051,12 @@ describe('deterministic Symphony admission boundary', () => {
     const oneLanded = admitter.evaluateFleetGate(
       fleetEvidence({
         queue: {
+          repository: 'JovieInc/Jovie',
           status: 'known',
           eligiblePrs: 39,
           greenReadyPrs: 14,
           target: 15,
+          laneCapacity: laneCapacity(14, 15),
         },
       }),
       { now: '2026-08-09T05:01:00.000Z' }
@@ -1052,27 +1064,55 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(oneLanded.workAdmission.newIssueLeaseAllowed, true);
   });
 
-  it('fails lane admission closed when the nested global receipt disagrees with queue evidence', () => {
+  it('fails lane admission closed when the scoped receipt disagrees with queue evidence', () => {
     const fleetGate = admitter.evaluateFleetGate(
       fleetEvidence({
         queue: {
+          repository: 'JovieInc/Jovie',
           status: 'known',
           eligiblePrs: 6,
           greenReadyPrs: 1,
           target: 15,
-          laneCapacity: {
-            schema: 'jovie-lane-capacity/v1',
-            observedAt: '2026-08-09T05:00:00.000Z',
-            global: { ready: 0, budget: 15 },
-            defaultLaneBudget: 4,
-            lanes: {},
-          },
+          laneCapacity: laneCapacity(0, 15),
         },
       }),
       { now: '2026-08-09T05:01:00.000Z' }
     );
 
     assert.equal(fleetGate.laneCapacity, null);
+    assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(
+      fleetGate.reasons.some(
+        reason => reason.code === 'queue-lane-capacity-invalid'
+      ),
+      true
+    );
+
+    const staleSchema = admitter.evaluateFleetGate(
+      fleetEvidence({
+        queue: {
+          repository: 'JovieInc/Jovie',
+          status: 'known',
+          eligiblePrs: 6,
+          greenReadyPrs: 1,
+          target: 15,
+          laneCapacity: {
+            ...laneCapacity(1, 15),
+            schema: 'jovie-lane-capacity/v1',
+          },
+        },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+    assert.equal(staleSchema.laneCapacity, null);
+    assert.equal(
+      staleSchema.reasons.some(
+        reason =>
+          reason.code === 'queue-lane-capacity-invalid' &&
+          reason.detail.includes('jovie-lane-capacity/v1')
+      ),
+      true
+    );
   });
 
   it('blocks a new lease when Summer closure health is red while promotion stays live', () => {
@@ -1429,6 +1469,7 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(invalidQueue.state, 'GREEN');
     assert.equal(invalidQueue.promotionMode, 'normal');
     assert.equal(invalidQueue.workAdmission.allowed, true);
+    assert.equal(invalidQueue.workAdmission.newIssueLeaseAllowed, false);
     assert.equal(invalidQueue.promotionAdmission.allowed, true);
     assert.ok(
       !invalidQueue.reasons.some(reason => reason.code === 'queue-unknown')
@@ -1626,6 +1667,10 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(invalidQueue.exitCode, 0);
     assert.equal(invalidQueue.receipt.state, 'GREEN');
     assert.equal(invalidQueue.receipt.workAdmission.allowed, true);
+    assert.equal(
+      invalidQueue.receipt.workAdmission.newIssueLeaseAllowed,
+      false
+    );
     assert.equal(invalidQueue.receipt.promotionAdmission.allowed, true);
     assert.equal(recovered.exitCode, 0);
     assert.equal(recovered.receipt.state, 'GREEN');
