@@ -19,6 +19,7 @@ workspace:
   root: ~/symphony-burrito-workspaces
 hooks:
   after_create: |
+    export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$HOME/.npm-global/bin:$PATH"
     git clone --depth 1 https://github.com/JovieInc/Jovie.git .
     git fetch --depth 1 origin main
     git checkout -B main origin/main

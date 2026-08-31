@@ -121,6 +121,9 @@ install -m 0755 "${tmpdir}/${BIN_NAME}" "$BIN_DST"
 install -m 0644 "$UNIT_SRC" "$UNIT_DST"
 install -m 0644 "$TIMER_SRC" "$TIMER_DST"
 install -m 0644 "$UPDATE_UNIT_SRC" "$UPDATE_UNIT_DST"
+if [ -f "$WORKFLOW_DST" ] && grep -qE 'git@|mix ' "$WORKFLOW_DST"; then
+  echo "PATCH_HOOK replacing SSH/mix after_create with HTTPS WORKFLOW"
+fi
 install -m 0644 "$WORKFLOW_SRC" "$WORKFLOW_DST"
 echo "INSTALLED $BIN_DST"
 echo "INSTALLED $UNIT_DST"
