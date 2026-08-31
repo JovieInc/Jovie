@@ -160,6 +160,12 @@ export const ServerEnvSchema = z.object({
   STRIPE_PRICE_PRO_MONTHLY: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_PRO_ANNUAL: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_PRO_YEARLY: z.string().startsWith('price_').optional(),
+  // Product-specific founder offer. Maps to Pro base entitlements while the
+  // exact price ID remains the YouTube thumbnail entitlement source of truth.
+  STRIPE_PRICE_YOUTUBE_THUMBNAILS_FOUNDER_MONTHLY: z
+    .string()
+    .startsWith('price_')
+    .optional(),
 
   // Product-specific founder offer. Maps to Pro base entitlements while the
   // exact price ID remains the YouTube thumbnail entitlement source of truth.
