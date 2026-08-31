@@ -1398,6 +1398,48 @@ class TestGhRetryHelper:
         result = _run_bash(script)
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
 
+    def test_does_not_retry_exhausted_installation_quota(
+        self, tmp_path: Path
+    ) -> None:
+        counter = tmp_path / "calls"
+        counter.write_text("0", encoding="utf-8")
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                count_file="${GH_RETRY_TEST_COUNTER:?}"
+                count=$(<"$count_file")
+                echo "$((count + 1))" >"$count_file"
+                echo "GraphQL: API rate limit already exceeded for installation ID 112037986." >&2
+                exit 1
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        stderr_file = tmp_path / "stderr.txt"
+
+        script = textwrap.dedent(
+            f"""\
+            set -euo pipefail
+            source "{_GH_RETRY}"
+            export PATH="{tmp_path}:$PATH"
+            export GH_RETRY_ATTEMPTS=8
+            export GH_RETRY_BASE_DELAY=0
+            export GH_RETRY_TEST_COUNTER="{counter}"
+            if gh_retry api graphql 2>"{stderr_file}"; then
+              exit 2
+            fi
+            grep -q "rate limit already exceeded for installation ID" "{stderr_file}"
+            test "$(wc -l <"{stderr_file}" | tr -d ' ')" = "1"
+            """
+        )
+        result = _run_bash(script)
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert counter.read_text(encoding="utf-8").strip() == "1"
+
 
 class TestDrainPrQueueWiring:
     def test_exact_admission_rereads_transient_unknown_mergeability(
