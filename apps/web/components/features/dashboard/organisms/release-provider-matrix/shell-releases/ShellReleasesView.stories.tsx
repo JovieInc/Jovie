@@ -20,6 +20,28 @@ const meta = {
   component: ShellReleasesView,
   parameters: {
     layout: 'fullscreen',
+    jovie: {
+      uncoveredProps: [
+        'showEmptyState',
+        'showConnectedEmptyState',
+        'visibleReleases',
+        'selectedReleaseId',
+        'pills',
+        'canCreateManualReleases',
+        'isSyncing',
+        'actionMenusByReleaseId',
+        'contextMenuItemsByReleaseId',
+        'isSmartLinkLocked',
+        'getSmartLinkLockReason',
+        'getSyncStatus',
+        'onConnectSpotify',
+        'onNewRelease',
+        'onSync',
+        'onSelect',
+        'onClearFilters',
+        'isLoading',
+      ],
+    },
     nextjs: {
       appDirectory: true,
       navigation: {

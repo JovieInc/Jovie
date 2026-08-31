@@ -23,23 +23,25 @@ const {
   mockUseDspMatchesQuery,
   mockUsePlanGate,
   navigationState,
-} = vi.hoisted(() => ({
-  mockUseDspMatchesQuery: vi.fn(() => ({ data: [], isLoading: false })),
-  mockUsePlanGate: vi.fn(() => ({
-    isLoading: false,
-    isError: false,
-    smartLinksLimit: null as number | null,
-    isPro: true,
-    canCreateManualReleases: true,
-    canGenerateAlbumArt: false,
-    canGenerateReleasePlans: true,
-    canEditSmartLinks: true,
-    canAccessFutureReleases: true,
-  })),
-  navigationState: {
-    searchParams: new URLSearchParams(),
-  },
-}));
+} = vi.hoisted(
+  () => ({
+    mockUseDspMatchesQuery: vi.fn(() => ({ data: [], isLoading: false })),
+    mockUsePlanGate: vi.fn(() => ({
+      isLoading: false,
+      isError: false,
+      smartLinksLimit: null as number | null,
+      isPro: true,
+      canCreateManualReleases: true,
+      canGenerateAlbumArt: false,
+      canGenerateReleasePlans: true,
+      canEditSmartLinks: true,
+      canAccessFutureReleases: true,
+    })),
+    navigationState: {
+      searchParams: new URLSearchParams(),
+    },
+  })
+);
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
