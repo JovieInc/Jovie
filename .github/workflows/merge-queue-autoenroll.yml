@@ -1,6 +1,10 @@
 name: Merge Queue Auto-Enroll
 
 # Event-driven with a bounded maintenance heartbeat.
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Shipping-Control
+# necessary-trust-boundary: Ownerless recovery dispatch is admitted only after exact main/head validation by this controller.
+# revisit-trigger: Revisit when native merge queue exposes durable exact-head admission for recovered PRs.
 #
 # Eligibility changes wake one repo-wide writer mutex. GitHub may replace an
 # older pending run in that mutex, so every surviving clean-admitting pass also
