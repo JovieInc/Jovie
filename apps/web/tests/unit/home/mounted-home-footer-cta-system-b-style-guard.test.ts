@@ -32,6 +32,7 @@ describe('homepage terminal CTA and canonical footer source contract', () => {
 
     expect(layoutSource).toContain('<PublicPageShell');
     expect(layoutSource).toContain("footerVariant='expanded'");
+    expect(layoutSource).not.toContain('showHomepageCenterNav={false}');
     expect(layoutSource).not.toContain(
       "footerClassName='system-b-mounted-home-footer'"
     );
