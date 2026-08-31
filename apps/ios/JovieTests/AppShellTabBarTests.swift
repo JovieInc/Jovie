@@ -329,6 +329,13 @@ struct LibraryItemScreenTests {
     #expect(LibraryItemScreenMetrics.coverSize == 72)
     #expect(LibraryItemScreenMetrics.videoAspect == 16.0 / 9.0)
   }
+
+  @Test func screenIdentifierDoesNotClobberChildIdentifiers() {
+    // The screen container must stay a passthrough container or its
+    // identifier propagates to the back button/title and XCUITest can no
+    // longer find `library-item-back` (ci:901f6f5b1c61b0c7fd39).
+    #expect(LibraryItemScreenMetrics.requiresPassthroughAccessibilityContainer)
+  }
 }
 
 struct LibraryInboxCalendarLaunchModeTests {

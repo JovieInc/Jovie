@@ -83,6 +83,11 @@ enum LibraryItemScreenMetrics {
   static let backAccessibilityIdentifier = "library-item-back"
   static let titleAccessibilityIdentifier = "library-item-title"
   static let videoAccessibilityIdentifier = "library-item-video"
+  /// `LibraryItemScreen` must be a passthrough accessibility container
+  /// (`.accessibilityElement(children: .contain)`): without it the container
+  /// identifier propagates to children and hides `library-item-back` from
+  /// XCUITest (merge-queue failure ci:901f6f5b1c61b0c7fd39).
+  static let requiresPassthroughAccessibilityContainer = true
 }
 
 enum LibraryLandingPolicy {

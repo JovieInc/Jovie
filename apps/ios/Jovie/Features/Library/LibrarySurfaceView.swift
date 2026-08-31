@@ -416,6 +416,16 @@ struct LibraryItemScreen: View {
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .background(JovieColor.backgroundBase)
+    // `.contain` keeps this container out of the accessibility tree so the
+    // back button and friends keep their own identifiers. Without it the
+    // container identifier propagates to every child (SwiftUI accessibility
+    // inheritance), which hid `library-item-back` from XCUITest and failed
+    // the merge queue (ci:901f6f5b1c61b0c7fd39).
+    .accessibilityElement(
+      children: LibraryItemScreenMetrics.requiresPassthroughAccessibilityContainer
+        ? .contain
+        : .ignore
+    )
     .accessibilityIdentifier(LibraryItemScreenMetrics.accessibilityIdentifier)
     .onAppear {
       if let url = asset.localVideoURL, videoPlayer == nil {
