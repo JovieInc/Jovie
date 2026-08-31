@@ -31,7 +31,7 @@ jobs:
   refresh:
     name: Refresh persisted fleet gate receipt
     # Skip cancelled workflow_run so a superseded CI does not occupy a
-    # 5-minute jovie-fixed slot. A merged PR also emits push(main); skip
+    # 8-minute jovie-fixed slot. A merged PR also emits push(main); skip
     # its redundant closed event so one landing cannot enqueue two
     # admission attempts. Unmerged closure still frees green-ready
     # capacity. Labeled/unlabeled only run when the label can change
@@ -53,7 +53,7 @@ jobs:
       )
     # The canonical receipt lives on the Gem host; exact-main gate code only.
     runs-on: [self-hosted, Linux, X64, jovie-fixed]
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - name: Generate read-only Jovie Bot token
         id: app-token
@@ -94,3 +94,9 @@ jobs:
           set -euo pipefail
           node "$GITHUB_WORKSPACE/scripts/backlog-orchestrator/delivery-state-machine.mjs" \
             --closure-health-file="$GEM_WORKSPACE/state/gem-priority-gate/latest.json"
+          linear_env="${HOME}/.config/symphony/linear.env"
+          if [[ -z "${LINEAR_API_KEY:-}" && -r "$linear_env" ]]; then
+            LINEAR_API_KEY="$(tr -d '\r\n' < "$linear_env")"
+            export LINEAR_API_KEY="${LINEAR_API_KEY#LINEAR_API_KEY=}"
+          fi
+          timeout 90s node "$GITHUB_WORKSPACE/scripts/backlog-orchestrator/backlog-orchestrator.mjs" remediate
