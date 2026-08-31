@@ -5,6 +5,7 @@ import { ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
+import { buildReleaseDownloadsRoute } from '@/constants/routes';
 import type {
   LibraryPostReleaseBundle,
   LibraryPresenceFindingView,
@@ -225,6 +226,11 @@ export function PostReleasePanel({
     () => rightsholdersForAsset(asset, bundle.rightsholders),
     [asset, bundle.rightsholders]
   );
+  const downloadFileLabel = downloads.length === 1 ? 'file' : 'files';
+  const downloadsSummary =
+    downloads.length > 0
+      ? `${downloads.length} attested ${downloadFileLabel} live`
+      : 'No attested download is live';
 
   const updateFinding = (next: LibraryPresenceFindingView) => {
     setFindings(current =>
@@ -244,15 +250,13 @@ export function PostReleasePanel({
               Downloads
             </h3>
             <p className='mt-0.5 text-2xs text-tertiary-token'>
-              {downloads.length > 0
-                ? `${downloads.length} attested ${downloads.length === 1 ? 'file' : 'files'} live`
-                : 'No attested download is live'}
+              {downloadsSummary}
             </p>
           </div>
           {releaseId ? (
             <Button asChild size='sm' variant='secondary'>
               <Link
-                href={`/app/releases/${encodeURIComponent(releaseId)}/downloads`}
+                href={buildReleaseDownloadsRoute(releaseId)}
                 tabIndex={disabled ? -1 : undefined}
               >
                 {downloads.length > 0 ? 'Manage' : 'Add download'}
