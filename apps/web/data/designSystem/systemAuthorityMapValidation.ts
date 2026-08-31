@@ -106,10 +106,7 @@ export function validateDesignSystemAuthorityMap({
     if (ids.has(entry.id)) add(issues, 'duplicate-authority-id', entry.id);
     ids.add(entry.id);
 
-    if (map.dependencyOrder[index] !== entry.id) {
-      add(issues, 'missing-authority-entry', entry.id);
-    }
-    if (!orderedIds.has(entry.id)) {
+    if (map.dependencyOrder[index] !== entry.id || !orderedIds.has(entry.id)) {
       add(issues, 'missing-authority-entry', entry.id);
     }
     if (!DESIGN_SYSTEM_AUTHORITY_LAYER_VALUES.includes(entry.layer)) {

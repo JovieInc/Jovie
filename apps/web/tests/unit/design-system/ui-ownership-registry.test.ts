@@ -116,11 +116,28 @@ describe('design-system authority map', () => {
     ).toContain('missing-authority-check');
     expect(
       authorityCodes(
+        authorityMapWith('surface.marketing-routes', () => ({
+          owns: [],
+        }))
+      )
+    ).toContain('missing-owned-capability');
+    expect(
+      authorityCodes(
         authorityMapWith('interaction.families', () => ({
           dependsOn: ['surface.product-routes'],
         }))
       )
     ).toContain('invalid-dependency-order');
+    expect(
+      authorityCodes({
+        ...DESIGN_SYSTEM_AUTHORITY_MAP,
+        entries: DESIGN_SYSTEM_AUTHORITY_MAP.entries.map(entry =>
+          entry.id === 'surface.marketing-routes'
+            ? { ...entry, id: 'surface.marketing-routes-unordered' }
+            : entry
+        ),
+      }).filter(code => code === 'missing-authority-entry')
+    ).toHaveLength(1);
     expect(
       authorityCodes(
         authorityMapWith('surface.marketing-routes', () => ({

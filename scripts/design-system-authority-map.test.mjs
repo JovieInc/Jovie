@@ -52,6 +52,16 @@ test('RED: authority map rejects advisory-only enforced layers', () => {
   );
 });
 
+test('RED: authority map rejects empty capability ownership', () => {
+  assert.ok(
+    codes(
+      mutateEntry('surface.marketing-routes', () => ({
+        owns: [],
+      }))
+    ).includes('missing-owned-capability')
+  );
+});
+
 test('RED: authority map rejects reverse dependency edges', () => {
   assert.ok(
     codes(

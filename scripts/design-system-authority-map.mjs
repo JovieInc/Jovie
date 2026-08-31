@@ -114,7 +114,11 @@ export function validateDesignSystemAuthorityMap(map, repoRoot = null) {
     if (!AUTHORITY_MAP_STATUS_VALUES.includes(entry.status)) {
       add(issues, 'invalid-authority-status', entry.id);
     }
-    if (!Array.isArray(entry.owns) || entry.owns.some(item => !has(item))) {
+    if (
+      !Array.isArray(entry.owns) ||
+      entry.owns.length === 0 ||
+      entry.owns.some(item => !has(item))
+    ) {
       add(issues, 'missing-owned-capability', entry.id);
     }
     if (GAP_STATUSES.has(entry.status) && !has(entry.classificationReason)) {
