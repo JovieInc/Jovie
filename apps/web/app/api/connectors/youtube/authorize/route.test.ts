@@ -67,6 +67,7 @@ describe('GET /api/connectors/youtube/authorize', () => {
     );
     expect(location.searchParams.get('scope')?.split(' ')).toEqual([
       'https://www.googleapis.com/auth/youtube.readonly',
+      'https://www.googleapis.com/auth/youtube.upload',
       'https://www.googleapis.com/auth/yt-analytics.readonly',
     ]);
     expect(location.searchParams.get('redirect_uri')).toBe(
