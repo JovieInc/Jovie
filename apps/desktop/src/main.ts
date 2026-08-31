@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
@@ -28,6 +29,10 @@ import {
   parseAuthReturnDeepLink,
   reportDesktopAuthBindingFailure,
 } from './desktop-auth-security';
+import {
+  buildDesktopUpdateMenuItem,
+  shouldScheduleDesktopAutoUpdate,
+} from './desktop-auto-update';
 import { installDesktopCspWatchdog } from './desktop-csp-watchdog';
 import {
   isDesktopCaptureRouteUrl,
@@ -37,6 +42,17 @@ import {
   shouldGrantTrustedHudScreenPermissionCheck,
 } from './desktop-permissions';
 import { createDesktopSecurityReporter } from './desktop-security-reporting';
+import {
+  DESKTOP_BUILD_IDENTITY_PRINT_FLAG,
+  DESKTOP_BUILD_IDENTITY_RESOURCE_NAME,
+  DESKTOP_BUILD_IDENTITY_SHELL_CSS,
+  DESKTOP_BUILD_IDENTITY_UNAVAILABLE,
+  formatDesktopBuildIdentityDisplay,
+  renderDesktopBuildIdentitySection,
+  resolveDesktopBuildIdentity,
+  toDesktopBuildIdentityJson,
+} from './build-identity';
+import { BAKED_DESKTOP_BUILD_IDENTITY } from './build-identity.generated';
 import { APP_ENV, APP_URL } from './env';
 import {
   decideHudBuildReload,
@@ -57,10 +73,16 @@ import {
   packagedDesktopAppId,
   packagedUsesCompetingStagingShell,
 } from './ovie-door';
+import {
+  decideOperatorLaunch,
+  parseOperatorLaunchRequest,
+  terminalLaunchSpec,
+} from './operator-launch';
 import { evaluateRemoteDebuggingGuard } from './remote-debugging-guard';
 import {
   classifyDesktopLoadFailure,
   decideAbortedMainFrameRecovery,
+  decideDidFinishLoadRecovery,
   decideHostedLoadRetry,
   decideLocalMainFrameLoadFailure,
   decideRecoveryUnlatch,
@@ -122,6 +144,31 @@ const DESKTOP_USER_AGENT_PRODUCT = `JovieDesktop/${app.getVersion()}`;
 const JOVIE_MARK_SVG_PATH =
   'm176.84,0l3.08.05c8.92,1.73,16.9,6.45,23.05,13.18,7.95,8.7,12.87,20.77,12.87,34.14s-4.92,25.44-12.87,34.14c-6.7,7.34-15.59,12.28-25.49,13.57h-.64s0,.01,0,.01h0c-22.2,0-42.3,8.84-56.83,23.13-14.5,14.27-23.49,33.99-23.49,55.77h0v.02c0,21.78,8.98,41.5,23.49,55.77,14.54,14.3,34.64,23.15,56.83,23.15v-.02h.01c22.2,0,42.3-8.84,56.83-23.13,14.51-14.27,23.49-33.99,23.49-55.77h0c0-17.55-5.81-33.75-15.63-46.82-10.08-13.43-24.42-23.61-41.05-28.62l-2.11-.64c4.36-2.65,8.34-5.96,11.84-9.78,9.57-10.47,15.5-24.89,15.5-40.77s-5.93-30.3-15.5-40.77c-1.44-1.57-2.95-3.06-4.55-4.44l7.67,1.58c40.44,8.35,75.81,30.3,100.91,60.75,24.66,29.91,39.44,68.02,39.44,109.5h0c0,48.05-19.81,91.55-51.83,123.05-31.99,31.46-76.19,50.92-125,50.92v.02h-.01c-48.79,0-93-19.47-125-50.94C19.81,265.54,0,222.04,0,173.99h0c0-48.05,19.81-91.56,51.83-123.05C83.84,19.47,128.04,0,176.84,0Z';
 const ENABLE_DEVTOOLS = APP_ENV !== 'production' || !app.isPackaged;
+
+function readPackagedBuildIdentityRecord(): unknown {
+  if (!app.isPackaged) return null;
+  try {
+    return JSON.parse(
+      fs.readFileSync(
+        path.join(process.resourcesPath, DESKTOP_BUILD_IDENTITY_RESOURCE_NAME),
+        'utf8'
+      )
+    );
+  } catch {
+    return null;
+  }
+}
+
+const desktopBuildIdentity = resolveDesktopBuildIdentity({
+  baked: BAKED_DESKTOP_BUILD_IDENTITY,
+  runtimeChannel: APP_ENV,
+  runtimeVersion: app.getVersion(),
+  packaged: app.isPackaged,
+  packagedRecord: readPackagedBuildIdentityRecord(),
+});
+const printBuildIdentityOnStart = process.argv.includes(
+  DESKTOP_BUILD_IDENTITY_PRINT_FLAG
+);
 const MACOS_TRAFFIC_LIGHT_X = 20;
 const MACOS_TRAFFIC_LIGHT_Y = 17;
 const MACOS_TRAFFIC_LIGHT_POSITION = {
@@ -158,6 +205,7 @@ const TRAY_SET_STATE_CHANNEL = 'tray-set-state';
 const TRAY_ACTION_CHANNEL = 'tray-action';
 /** Renderer → main: first successful React paint of the hosted app (JOV-3595). */
 const APP_BOOTED_CHANNEL = 'app-booted';
+const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
 type UpdateChannel =
   | typeof UPDATE_AVAILABLE_CHANNEL
   | typeof UPDATE_DOWNLOADED_CHANNEL;
@@ -214,6 +262,7 @@ let updateReadyToInstall = false;
 let mainWindow: BrowserWindow | null = null;
 let publicProfilePreviewWindow: BrowserWindow | null = null;
 let authHandoffWindow: BrowserWindow | null = null;
+let aboutWindow: BrowserWindow | null = null;
 let menuBarTray: MenuBarTray | null = null;
 let pendingAuthCompletion: DesktopAuthCompletion | null = null;
 let recentAuthCompletion: RecentDesktopAuthCompletion | null = null;
@@ -283,7 +332,7 @@ applyLocalChromiumLoopbackResolver();
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
-if (!gotSingleInstanceLock) {
+if (!gotSingleInstanceLock && !printBuildIdentityOnStart) {
   app.quit();
 }
 
@@ -1052,6 +1101,7 @@ function buildDesktopShellHtml(input: {
   readonly heading: string;
   readonly body: string;
   readonly actions?: string;
+  readonly identityHtml?: string;
 }): string {
   return `<!doctype html>
 <html lang="en">
@@ -1072,6 +1122,7 @@ function buildDesktopShellHtml(input: {
       a { display: inline-flex; height: 34px; align-items: center; justify-content: center; border-radius: var(--system-b-radius-pill); padding: 0 13px; color: var(--system-b-text-primary); font-size: 12px; font-weight: 590; text-decoration: none; }
       .primary { background: var(--system-b-primary-bg); color: var(--system-b-primary-fg); }
       .secondary { color: var(--system-b-text-secondary); }
+      ${DESKTOP_BUILD_IDENTITY_SHELL_CSS}
     </style>
   </head>
   <body>
@@ -1083,6 +1134,7 @@ function buildDesktopShellHtml(input: {
         <h1>${input.heading}</h1>
         <p>${input.body}</p>
       </div>
+      ${input.identityHtml ?? ''}
       ${input.actions ?? ''}
     </main>
   </body>
@@ -1112,8 +1164,79 @@ function buildDesktopBootSplashUrl(): string {
     title: 'Jovie',
     heading: 'Loading Jovie',
     body: 'Starting the app…',
+    identityHtml: renderDesktopBuildIdentitySection(desktopBuildIdentity),
   });
   return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+}
+
+function buildDesktopAboutUrl(): string {
+  const body =
+    desktopBuildIdentity.provenance === 'verified'
+      ? 'Packaged build identity'
+      : desktopBuildIdentity.provenance === 'development'
+        ? 'Development build — build time unavailable'
+        : 'Build identity unverified';
+  const html = buildDesktopShellHtml({
+    title: `About ${getDesktopAppDisplayName()}`,
+    heading: getDesktopAppDisplayName(),
+    body,
+    identityHtml: renderDesktopBuildIdentitySection(desktopBuildIdentity),
+  });
+  return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+}
+
+function persistDesktopBuildIdentityEvidence(): void {
+  try {
+    fs.writeFileSync(
+      path.join(app.getPath('userData'), DESKTOP_BUILD_IDENTITY_RESOURCE_NAME),
+      toDesktopBuildIdentityJson(desktopBuildIdentity)
+    );
+  } catch (error) {
+    console.warn(
+      '[jovie-desktop-build-identity] could not persist evidence',
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+}
+
+function showDesktopAboutWindow(): void {
+  if (aboutWindow && !aboutWindow.isDestroyed()) {
+    showWindow(aboutWindow);
+    return;
+  }
+
+  aboutWindow = new BrowserWindow({
+    width: 440,
+    height: 560,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    autoHideMenuBar: true,
+    backgroundColor: APP_BACKGROUND_COLOR,
+    show: false,
+    title: `About ${getDesktopAppDisplayName()}`,
+    webPreferences: {
+      contextIsolation: true,
+      devTools: ENABLE_DEVTOOLS,
+      nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
+      webviewTag: false,
+    },
+  });
+
+  aboutWindow.once('ready-to-show', () => {
+    if (aboutWindow && !aboutWindow.isDestroyed()) showWindow(aboutWindow);
+  });
+  aboutWindow.on('closed', () => {
+    aboutWindow = null;
+  });
+  aboutWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  aboutWindow.webContents.on('will-navigate', event => {
+    event.preventDefault();
+  });
+  void aboutWindow.loadURL(buildDesktopAboutUrl());
 }
 
 function loadHostedUrlAfterSplash(win: BrowserWindow, hostedUrl: string): void {
@@ -1589,6 +1712,16 @@ function attachRendererRecovery(
   });
 
   win.webContents.on('did-finish-load', () => {
+    // Chromium still emits did-finish-load for chrome-error://chromewebdata/
+    // after did-fail-load. That is not a hosted app load — resetting the
+    // local retry budget and calling clearAllWatchdogs() here cancels the
+    // pending retry and leaves Jovie Local black (JOV-5474).
+    if (
+      decideDidFinishLoadRecovery({ url: win.webContents.getURL() }) ===
+      'ignore'
+    ) {
+      return;
+    }
     localHostedLoadRetryCount = 0;
     armBootWatchdog();
   });
@@ -1960,8 +2093,15 @@ function refreshApplicationMenu(): void {
   Menu.setApplicationMenu(buildApplicationMenu());
 }
 
+function desktopUpdatesSupported(): boolean {
+  return shouldScheduleDesktopAutoUpdate({
+    appEnv: APP_ENV,
+    platform: process.platform,
+  });
+}
+
 function checkForUpdatesFromMenu(): void {
-  if (!shouldScheduleDesktopAutoUpdate()) {
+  if (!desktopUpdatesSupported()) {
     return;
   }
 
@@ -1975,19 +2115,8 @@ function checkForUpdatesFromMenu(): void {
   });
 }
 
-function shouldScheduleDesktopAutoUpdate(): boolean {
-  // Local dev shells never auto-update. Production publishes to the
-  // electron-updater channel; staging ships as CI artifacts and its update
-  // check is a no-op (publish: null). See apps/desktop/SIGNING.md.
-  if (APP_ENV === 'local' || process.platform === 'linux') {
-    return false;
-  }
-
-  return true;
-}
-
 function scheduleDesktopAutoUpdate(): void {
-  if (!shouldScheduleDesktopAutoUpdate()) {
+  if (!desktopUpdatesSupported()) {
     return;
   }
 
@@ -2016,9 +2145,11 @@ function scheduleHudBuildAutoReload(): void {
 
 function buildUpdateMenuItem(): MenuItemConstructorOptions {
   return {
-    label: updateReadyToInstall
-      ? 'Restart to install update…'
-      : 'Check for updates…',
+    ...buildDesktopUpdateMenuItem({
+      appEnv: APP_ENV,
+      platform: process.platform,
+      updateReadyToInstall,
+    }),
     click: checkForUpdatesFromMenu,
   };
 }
@@ -2059,7 +2190,10 @@ function buildApplicationMenu(): Menu {
       {
         label: app.name,
         submenu: [
-          { role: 'about' },
+          {
+            label: `About ${getDesktopAppDisplayName()}`,
+            click: showDesktopAboutWindow,
+          },
           { type: 'separator' },
           buildUpdateMenuItem(),
           { type: 'separator' },
@@ -2115,6 +2249,10 @@ function buildApplicationMenu(): Menu {
           label: 'Preferences...',
           accelerator: 'Ctrl+,',
           click: openPreferences,
+        },
+        {
+          label: `About ${getDesktopAppDisplayName()}`,
+          click: showDesktopAboutWindow,
         },
         buildUpdateMenuItem(),
         { type: 'separator' },
@@ -2397,7 +2535,27 @@ if (gotSingleInstanceLock) {
 }
 
 app.whenReady().then(() => {
-  if (!gotSingleInstanceLock) return;
+  if (!gotSingleInstanceLock && !printBuildIdentityOnStart) return;
+
+  persistDesktopBuildIdentityEvidence();
+  app.setAboutPanelOptions({
+    applicationName: getDesktopAppDisplayName(),
+    applicationVersion: desktopBuildIdentity.version,
+    version:
+      desktopBuildIdentity.sourceRevision ??
+      DESKTOP_BUILD_IDENTITY_UNAVAILABLE,
+    credits: formatDesktopBuildIdentityDisplay(desktopBuildIdentity),
+  });
+  console.info(
+    '[jovie-desktop-build-identity]',
+    toDesktopBuildIdentityJson(desktopBuildIdentity).trim()
+  );
+
+  if (printBuildIdentityOnStart) {
+    process.stdout.write(toDesktopBuildIdentityJson(desktopBuildIdentity));
+    app.exit(0);
+    return;
+  }
 
   const appIconPath = getAppIconPath();
   if (process.platform === 'darwin' && appIconPath && app.dock) {
@@ -2480,5 +2638,37 @@ ipcMain.handle(
     }
     menuBarTray.setState(payload as TrayStatePayload);
     return { ok: true };
+  }
+);
+
+ipcMain.handle(
+  LAUNCH_OPERATOR_CONTROL_CHANNEL,
+  async (event: IpcMainInvokeEvent, payload: unknown, ...rest: unknown[]) => {
+    if (!isTrustedIpcSender(event) || rest.length !== 0) {
+      return { ok: false, reason: 'invalid-request' };
+    }
+    const request = parseOperatorLaunchRequest(payload);
+    if (!request) return { ok: false, reason: 'invalid-payload' };
+    const decision = decideOperatorLaunch(request);
+    if (!decision.ok) return { ok: false, reason: decision.reason };
+    if (decision.action === 'open-external') {
+      try {
+        await shell.openExternal(decision.url);
+        return { ok: true };
+      } catch {
+        return { ok: false, reason: 'open-external-failed' };
+      }
+    }
+    const spec = terminalLaunchSpec(process.platform, decision.command);
+    if (!spec) return { ok: false, reason: 'unsupported-platform' };
+    try {
+      spawn(spec.command, [...spec.args], {
+        detached: true,
+        stdio: 'ignore',
+      }).unref();
+      return { ok: true };
+    } catch {
+      return { ok: false, reason: 'open-terminal-failed' };
+    }
   }
 );

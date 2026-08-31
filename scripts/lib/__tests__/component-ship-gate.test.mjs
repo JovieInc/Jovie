@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   auditCoverageViaReceipts,
   checkChangedComponents,
+  runComponentShipGate,
 } from '../../component-ship-gate.mjs';
 import {
   checkStoryMatchesComponent,
@@ -216,6 +217,68 @@ describe('story match checks', () => {
 });
 
 describe('diff gate', () => {
+  it('honors an explicit null diffBase instead of re-resolving origin/main', () => {
+    // Regression for JOV-5454 contract failure: in CI origin/main is always
+    // present, so re-resolving an explicit opt-out turned into a diff scan
+    // against main and reported false missing-test/story issues for unrelated
+    // changed components. With an explicit null base and quality/ratchet
+    // skipped, the report must be green and skip the diff section.
+    const report = runComponentShipGate({
+      diffBase: null,
+      skipQuality: true,
+      skipRatchet: true,
+      skipRenderedCert: true,
+      skipLiveStorybook: true,
+    });
+    expect(report.ok).toBe(true);
+    expect(report.sections.diff.applicable).toBe(false);
+  });
+
+  it('still auto-resolves a base when diffBase is omitted', () => {
+    // When diffBase is not provided at all, the gate falls back to
+    // COMPONENT_SHIP_DIFF_BASE / origin/main. Pin an empty-diff ref so this
+    // 5s control stays isolated from large mechanical PRs (JOV-5466).
+    const previous = process.env.COMPONENT_SHIP_DIFF_BASE;
+    process.env.COMPONENT_SHIP_DIFF_BASE = 'HEAD';
+    try {
+      const report = runComponentShipGate({
+        skipQuality: true,
+        skipRatchet: true,
+        skipRenderedCert: true,
+        skipLiveStorybook: true,
+      });
+      expect(report.diffBase).toBe('HEAD');
+      expect(report.sections.diff.note).toBeUndefined();
+    } finally {
+      if (previous === undefined) {
+        delete process.env.COMPONENT_SHIP_DIFF_BASE;
+      } else {
+        process.env.COMPONENT_SHIP_DIFF_BASE = previous;
+      }
+    }
+  });
+
+  it('treats a resolved base with no in-scope changes as scanned but not applicable', () => {
+    // Regression for ci:f4bd9bc60a2c6c3c188d: screenshots/manifest-only PRs
+    // resolve a diff base yet contain no ship-scope component changes, so
+    // `applicable` is false even though the scan ran. `applicable` must never
+    // be conflated with "a base resolved" — only the skip note marks an
+    // explicit opt-out. Use HEAD...HEAD (empty) so the 5s control does not
+    // scan this PR against origin/main (JOV-5466).
+    const report = runComponentShipGate({
+      diffBase: 'HEAD',
+      skipQuality: true,
+      skipRatchet: true,
+      skipRenderedCert: true,
+      skipLiveStorybook: true,
+    });
+    expect(report.diffBase).toBe('HEAD');
+    expect(report.sections.diff.note).toBeUndefined();
+    expect(report.sections.diff.ok).toBe(true);
+    expect(report.sections.diff.applicable).toBe(false);
+    expect(report.sections.diff.changedComponents).toEqual([]);
+  });
+
   it('fails closed without test and story', () => {
     const root = fixtureRepo({
       'apps/web/components/atoms/NewThing.tsx':
@@ -851,5 +914,35 @@ describe('multi-root ratchet', () => {
       uncovered: 0,
     };
     expect(compareCoverage(measurement, baseline).ok).toBe(true);
+  });
+});
+
+describe('runComponentShipGate diffBase', () => {
+  it('honors explicit null and skips the diff scan even when TURBO_SCM_BASE is set', () => {
+    const previous = process.env.TURBO_SCM_BASE;
+    process.env.TURBO_SCM_BASE = 'origin/main';
+    try {
+      const report = runComponentShipGate({
+        diffBase: null,
+        skipQuality: true,
+        skipRatchet: true,
+        skipRenderedCert: true,
+        skipLiveStorybook: true,
+      });
+      expect(report.ok).toBe(true);
+      expect(report.diffBase).toBeNull();
+      expect(report.sections.diff).toMatchObject({
+        ok: true,
+        applicable: false,
+        changedComponents: [],
+      });
+      expect(report.sections.diff.note).toMatch(/no diff base/);
+    } finally {
+      if (previous === undefined) {
+        delete process.env.TURBO_SCM_BASE;
+      } else {
+        process.env.TURBO_SCM_BASE = previous;
+      }
+    }
   });
 });

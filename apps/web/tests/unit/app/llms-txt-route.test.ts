@@ -21,12 +21,17 @@ describe('GET /llms.txt', () => {
     expect(body).toContain('https://jov.ie/llms.txt');
     expect(body).toContain('/openapi.json');
     expect(body).toContain('https://jov.ie/developers');
+    expect(body).toContain('https://jov.ie/cli');
     expect(body).toContain('/api/v1/openapi.json');
     expect(body).toContain('/api/mcp/{username}');
     expect(body).toContain('https://docs.jov.ie');
     expect(body).toContain(
-      'the public artist API and per-artist MCP are anonymous/read-only'
+      'the public artist API and anonymous MCP tools are read-only'
     );
+    expect(body).toContain(
+      'owner-only merch and video tools are listed in the manifest and require authenticated ownership'
+    );
+    expect(body).not.toContain('Instagram: @meetjovie');
     expect(body).toContain(
       'https://jov.ie/.well-known/oauth-protected-resource/api/ovie/mcp'
     );
@@ -42,5 +47,10 @@ describe('GET /llms-full.txt', () => {
     expect(body).toContain('## When to use Jovie');
     expect(body).toContain('## Jovie developer resources');
     expect(body).toContain('/openapi.json');
+    expect(body).toContain(
+      'owner-only merch and video tools are listed in the manifest and require authenticated ownership'
+    );
+    expect(body).not.toContain('Instagram: @meetjovie');
+    expect(body).not.toContain('**Instagram**: @meetjovie');
   });
 });

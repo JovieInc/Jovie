@@ -12,7 +12,7 @@
   "bugs": {
     "url": "https://github.com/JovieInc/Jovie/issues"
   },
-  "homepage": "https://jov.ie/developers",
+  "homepage": "https://jov.ie/cli",
   "publishConfig": {
     "access": "public",
     "provenance": true,

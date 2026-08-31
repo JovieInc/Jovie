@@ -1,36 +1,25 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { render, screen } from '@testing-library/react';
-import type { ComponentProps, ReactNode } from 'react';
+import userEvent from '@testing-library/user-event';
+import { Archive } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
+import { TABLE_TOOLBAR_OVERLAY_CLASS } from '@/components/organisms/table/molecules/PageToolbar';
 import { TableBulkActionsToolbar } from '@/components/organisms/table/molecules/TableBulkActionsToolbar';
 
-vi.mock('@jovie/ui', () => ({
-  Button: ({ children, ...props }: ComponentProps<'button'>) => (
-    <button type='button' {...props}>
-      {children}
-    </button>
+const TOOLBAR_SOURCE = readFileSync(
+  join(
+    process.cwd(),
+    'components/organisms/table/molecules/TableBulkActionsToolbar.tsx'
   ),
-  DropdownMenu: ({ children }: { readonly children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  DropdownMenuContent: ({ children }: { readonly children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  DropdownMenuItem: ({
-    children,
-    variant: _variant,
-    ...props
-  }: ComponentProps<'button'> & { readonly variant?: string }) => (
-    <button type='button' {...props}>
-      {children}
-    </button>
-  ),
-  DropdownMenuTrigger: ({ children }: { readonly children: ReactNode }) => (
-    <>{children}</>
-  ),
-  TooltipShortcut: ({ children }: { readonly children: ReactNode }) => (
-    <>{children}</>
-  ),
-}));
+  'utf8'
+);
+
+const SAMPLE_ACTIONS = [
+  { label: 'Archive', icon: <Archive />, onClick: vi.fn() },
+  { label: 'Export', onClick: vi.fn(), disabled: true },
+  { label: 'Delete', onClick: vi.fn(), variant: 'destructive' as const },
+];
 
 describe('TableBulkActionsToolbar', () => {
   it('keeps a hidden mounted overlay when no rows are selected', () => {
@@ -50,24 +39,66 @@ describe('TableBulkActionsToolbar', () => {
     expect(screen.queryByRole('button', { name: 'Clear' })).toBeNull();
   });
 
-  it('renders selected count and actions in the visible state', () => {
+  it('keeps the overlay on the shared horizontal overflow rail', () => {
+    expect(TABLE_TOOLBAR_OVERLAY_CLASS).toContain(
+      'overflow-x-auto overflow-y-hidden'
+    );
+    expect(TABLE_TOOLBAR_OVERLAY_CLASS).toContain('min-h-11');
+  });
+
+  it('renders selected count and overflow actions in the visible overlay', () => {
     render(
       <TableBulkActionsToolbar
         selectedCount={2}
         onClearSelection={vi.fn()}
-        actions={[
-          {
-            label: 'Delete',
-            onClick: vi.fn(),
-            variant: 'destructive',
-          },
-        ]}
+        actions={SAMPLE_ACTIONS}
       />
     );
 
     expect(screen.getByText('2 selected')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Actions' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Clear' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled();
+    expect(
+      screen.queryByRole('button', { name: 'Delete' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('opens the overflow menu and uses semantic destructive item state', async () => {
+    const user = userEvent.setup();
+    const onArchive = vi.fn();
+    const onExport = vi.fn();
+    const onDelete = vi.fn();
+
+    render(
+      <TableBulkActionsToolbar
+        selectedCount={2}
+        onClearSelection={vi.fn()}
+        actions={[
+          { label: 'Archive', onClick: onArchive },
+          { label: 'Export', onClick: onExport, disabled: true },
+          { label: 'Delete', onClick: onDelete, variant: 'destructive' },
+        ]}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Actions' }));
+
+    const deleteItem = await screen.findByRole('menuitem', { name: 'Delete' });
+    expect(deleteItem.className).toContain('text-error');
+    expect(deleteItem.className).toContain('hover:bg-error-subtle');
+    expect(deleteItem.className).not.toContain('text-destructive');
+
+    const exportItem = screen.getByRole('menuitem', { name: 'Export' });
+    expect(exportItem).toHaveAttribute('data-disabled');
+    expect(exportItem).toHaveAttribute('aria-disabled', 'true');
+
+    await user.click(deleteItem);
+    expect(onDelete).toHaveBeenCalledOnce();
+    expect(onExport).not.toHaveBeenCalled();
+  });
+
+  it('rejects the retired text-destructive overlay styling', () => {
+    expect(TOOLBAR_SOURCE).toContain('variant={action.variant}');
+    expect(TOOLBAR_SOURCE).not.toContain('text-destructive');
   });
 });

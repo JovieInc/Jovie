@@ -207,9 +207,22 @@ jobs:
           ref: ${{ steps.plan.outputs.source_head }}
           fetch-depth: 0
           persist-credentials: false
+          path: source
+
+      - name: Require full exact-source checkout
+        if: steps.plan.outputs.launch_action == 'launch_local'
+        working-directory: source
+        env:
+          SOURCE_HEAD: ${{ steps.plan.outputs.source_head }}
+        run: |
+          set -euo pipefail
+          test -f package.json
+          test -f pnpm-lock.yaml
+          test "$(git rev-parse HEAD)" = "$SOURCE_HEAD"
 
       - name: Capture exact failed-run evidence
         if: steps.plan.outputs.launch_action == 'launch_local'
+        working-directory: source
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
@@ -230,12 +243,14 @@ jobs:
 
       - name: Restore source dependencies without model credentials
         if: steps.plan.outputs.launch_action == 'launch_local'
+        working-directory: source
         env:
           CI: 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Require a clean dependency baseline
         if: steps.plan.outputs.launch_action == 'launch_local'
+        working-directory: source
         run: |
           set -euo pipefail
           if [[ -n "$(git status --porcelain --untracked-files=all)" ]]; then
@@ -266,6 +281,7 @@ jobs:
       - name: Run FX on the exact source head
         id: launch
         if: steps.plan.outputs.launch_action == 'launch_local'
+        working-directory: source
         env:
           AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
         run: |
@@ -290,6 +306,7 @@ jobs:
       - name: Guard FX diff
         id: guard
         if: steps.launch.outcome == 'success'
+        working-directory: source
         run: |
           set -euo pipefail
           rm -rf .fx-ci
@@ -315,6 +332,7 @@ jobs:
 
       - name: Independently verify the guarded FX repair
         if: steps.guard.outputs.changed == 'true'
+        working-directory: source
         env:
           CI: 'true'
         run: pnpm ci:control:test
@@ -322,6 +340,7 @@ jobs:
       - name: Create immutable FX repair artifact
         id: artifact
         if: steps.guard.outputs.changed == 'true'
+        working-directory: source
         env:
           PR_NUMBER: ${{ steps.plan.outputs.pr_number }}
           SOURCE_HEAD: ${{ steps.plan.outputs.source_head }}

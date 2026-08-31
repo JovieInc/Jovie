@@ -262,7 +262,7 @@ export function ReviewQueuePanel() {
               {total} queued
             </span>
           }
-          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+          className='min-h-0 px-(--app-shell-header-padding-x) py-3'
           actionsClassName='shrink-0'
         />
 
@@ -284,7 +284,7 @@ export function ReviewQueuePanel() {
         />
 
         {totalPages > 1 && (
-          <div className='border-t border-subtle px-(--linear-app-content-padding-x) py-2'>
+          <div className='border-t border-subtle px-(--app-shell-content-padding-x) py-2'>
             <AdminTablePagination
               page={page}
               totalPages={totalPages}

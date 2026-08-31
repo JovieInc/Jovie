@@ -80,7 +80,8 @@ describe('signin page', () => {
         formTitle: 'Sign in',
         showFormTitle: false,
         showFooterPrompt: false,
-        layoutVariant: 'split',
+        layoutVariant: 'stack',
+        chrome: 'splash-b',
       })
     );
     expect(

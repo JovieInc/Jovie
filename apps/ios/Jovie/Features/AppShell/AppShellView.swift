@@ -141,6 +141,7 @@ struct AppShellView<
   let onSelectConversation: (String) -> Void
   let onStartNewChat: () -> Void
   let onAutoSendMessage: (String) -> Void
+  let onEyesFreeSubmit: (EyesFreeCaptureLaunch, String) -> Void
   let onLogout: @MainActor () async -> Void
   let showsWorkspaceSwitch: Bool
   let workspaceMode: MobileWorkspaceMode
@@ -171,6 +172,9 @@ struct AppShellView<
   @State private var chatDraft = ""
   @State private var voiceCaptureTrigger = 0
   @State private var isShowingTalkOverlay = false
+  @State private var talkAutoSubmit = false
+  @State private var talkUnavailableMessage: String?
+  @State private var eyesFreeLaunch: EyesFreeCaptureLaunch?
   @State private var talkVoiceService = VoiceCaptureService()
   @State private var teleprompterProposal: MobileChatVideoProposalPayload?
   @State private var libraryHome: LibraryHome = .catalog
@@ -198,6 +202,7 @@ struct AppShellView<
     onSelectConversation: @escaping (String) -> Void = { _ in },
     onStartNewChat: @escaping () -> Void = {},
     onAutoSendMessage: @escaping (String) -> Void = { _ in },
+    onEyesFreeSubmit: @escaping (EyesFreeCaptureLaunch, String) -> Void = { _, _ in },
     onLogout: @escaping @MainActor () async -> Void,
     showsWorkspaceSwitch: Bool = false,
     workspaceMode: MobileWorkspaceMode = .jovie,
@@ -238,6 +243,7 @@ struct AppShellView<
     self.onSelectConversation = onSelectConversation
     self.onStartNewChat = onStartNewChat
     self.onAutoSendMessage = onAutoSendMessage
+    self.onEyesFreeSubmit = onEyesFreeSubmit
     self.onLogout = onLogout
     self.showsWorkspaceSwitch = showsWorkspaceSwitch
     self.workspaceMode = workspaceMode
@@ -348,20 +354,40 @@ struct AppShellView<
           .accessibilityHidden(!isShowingRightRail && railDragOffset == 0)
           .allowsHitTesting(isShowingRightRail)
 
-          if isShowingTalkOverlay, chatEnabled {
+          if isShowingTalkOverlay, chatEnabled || talkUnavailableMessage != nil {
             TalkOverlayView(
               voiceCaptureService: talkVoiceService,
               onCancel: {
                 isShowingTalkOverlay = false
+                talkAutoSubmit = false
+                talkUnavailableMessage = nil
+                eyesFreeLaunch = nil
               },
               onInsertDraft: { transcript in
                 // Voice memo → editable action draft (not auto-send). User
                 // reviews/edits in composer, then sends when ready (#10380).
                 let handoff = VoiceMemoActionDraft.shellHandoff(fromTranscript: transcript)
                 isShowingTalkOverlay = false
+                talkAutoSubmit = false
                 selectTab(.chat)
                 chatDraft = handoff.chatDraft
                 // handoff.autoSendMessage is always nil — intentional.
+              },
+              autoSubmit: talkAutoSubmit,
+              unavailableMessage: talkUnavailableMessage,
+              listeningCue: eyesFreeLaunch?.destination.listeningCue
+                ?? EyesFreeCaptureDestination.jovie.listeningCue,
+              onSubmit: { transcript in
+                let launch = eyesFreeLaunch ?? EyesFreeCaptureLaunch(
+                  destination: .jovie,
+                  spokenText: transcript,
+                  idempotencyKey: UUID().uuidString
+                )
+                isShowingTalkOverlay = false
+                talkAutoSubmit = false
+                talkUnavailableMessage = nil
+                selectTab(.chat)
+                onEyesFreeSubmit(launch, transcript)
               }
             )
             .transition(.opacity)
@@ -538,6 +564,9 @@ struct AppShellView<
       chatDraft: chatDraft,
       autoSendMessage: nil,
       shouldStartVoiceCapture: false,
+      talkAutoSubmit: false,
+      eyesFreeLaunch: nil,
+      unavailableMessage: nil,
       openConversationID: nil,
       pendingRequest: intentStore.consume()
     )
@@ -545,12 +574,22 @@ struct AppShellView<
 
     guard AppShellIntentNavigation.applyPendingRequest(
       chatEnabled: chatEnabled,
+      canUseSummer: showsWorkspaceSwitch,
+      isOffline: isOffline,
       state: &state
     ) else { return }
 
     chatDraft = state.chatDraft
+    talkAutoSubmit = state.talkAutoSubmit
+    eyesFreeLaunch = state.eyesFreeLaunch
+    talkUnavailableMessage = state.unavailableMessage
 
-    if let autoSendMessage = state.autoSendMessage {
+    if let launch = state.eyesFreeLaunch,
+       let autoSendMessage = state.autoSendMessage,
+       state.talkAutoSubmit
+    {
+      onEyesFreeSubmit(launch, autoSendMessage)
+    } else if let autoSendMessage = state.autoSendMessage {
       onAutoSendMessage(autoSendMessage)
     }
 
@@ -559,7 +598,16 @@ struct AppShellView<
     }
 
     if state.shouldStartVoiceCapture {
-      voiceCaptureTrigger += 1
+      // Present the overlay directly. Incrementing `voiceCaptureTrigger` would
+      // call `openTalkOverlay()`, which resets auto-submit back to the in-app
+      // draft-only FAB path.
+      dismissKeyboardIfNeeded()
+      isShowingTalkOverlay = true
+    }
+
+    if let unavailable = state.unavailableMessage, !state.shouldStartVoiceCapture {
+      talkUnavailableMessage = unavailable
+      isShowingTalkOverlay = true
     }
 
     if state.shouldOpenSettings, navigationPath.last != .settings {
@@ -596,6 +644,9 @@ struct AppShellView<
   private func openTalkOverlay() {
     guard chatEnabled else { return }
     dismissKeyboardIfNeeded()
+    talkAutoSubmit = false
+    talkUnavailableMessage = nil
+    eyesFreeLaunch = nil
     isShowingTalkOverlay = true
   }
 

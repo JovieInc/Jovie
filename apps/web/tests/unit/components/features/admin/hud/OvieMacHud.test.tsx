@@ -7,6 +7,10 @@ vi.mock('@/components/atoms/DesktopTitlebar', () => ({
   DesktopTitlebar: () => <div data-testid='electron-titlebar-row' />,
 }));
 
+vi.mock('@/components/features/admin/hud/OvieLauncherRail', () => ({
+  OvieLauncherRail: () => <div data-testid='ovie-launcher-rail' />,
+}));
+
 const BASE: OvieMacHudSnapshot = {
   alive: {
     status: 'dead',
@@ -49,6 +53,7 @@ describe('OvieMacHud', () => {
       /P&L|signups?|downloads?|pageviews?/i
     );
     expect(screen.getAllByTestId(/ovie-mac-hud-/)).toHaveLength(3);
+    expect(screen.getByTestId('ovie-launcher-rail')).toBeInTheDocument();
   });
 
   it('keeps the three-card grid reserved when numbers are unavailable', () => {

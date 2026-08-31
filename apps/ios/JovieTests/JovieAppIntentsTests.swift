@@ -40,10 +40,28 @@ struct JovieAppIntentsTests {
 
     _ = try await StartVoiceCaptureIntent().perform()
 
-    #expect(IntentNavigationStore.shared.consume() == .startVoiceCapture)
+    guard case let .startEyesFreeCapture(launch) = IntentNavigationStore.shared.consume() else {
+      Issue.record("expected eyes-free Jovie launch")
+      return
+    }
+    #expect(launch.destination == .jovie)
+    #expect(launch.spokenText == nil)
+  }
+
+  @Test func summerCaptureIntentUsesClosedDestination() async throws {
+    IntentNavigationStore.shared.consume()
+
+    _ = try await CaptureForSummerIntent().perform()
+
+    guard case let .startEyesFreeCapture(launch) = IntentNavigationStore.shared.consume() else {
+      Issue.record("expected eyes-free Summer launch")
+      return
+    }
+    #expect(launch.destination == .summer)
+    #expect(launch.idempotencyKey.isEmpty == false)
   }
 
   @Test func shortcutsExposeVoiceCapture() {
-    #expect(JovieAppShortcuts.appShortcuts.count == 4)
+    #expect(JovieAppShortcuts.appShortcuts.count == 5)
   }
 }

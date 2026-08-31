@@ -53,7 +53,7 @@ describe('proxy routing helpers', () => {
         true
       );
       expect(categorizePath('/billing').isProtectedPath).toBe(true);
-      expect(categorizePath('/waitlist').isProtectedPath).toBe(true);
+      expect(categorizePath('/waitlist').isProtectedPath).toBe(false);
       expect(categorizePath('/onboarding').isProtectedPath).toBe(false);
       expect(categorizePath('/onboarding/checkout').isProtectedPath).toBe(true);
     });

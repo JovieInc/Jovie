@@ -17,6 +17,7 @@ This document tracks required privilege levels by API namespace so new routes ar
 | `/api/dev/**` | Authenticated user (dev-only behavior where applicable) | Non-production test and developer utilities. |
 | `/api/cron/**` | Cron secret | Must validate `CRON_SECRET` before execution. |
 | `/api/webhooks/**` | Signed provider webhook | Must validate provider signature/token. |
+| `/api/mobile/**` | Authenticated mobile session | Native iOS session via `getMobileSessionUserId`. Summer/OV destinations additionally require admin (`canUseOvChatMode`) on the server. |
 | `/api/**` public endpoints (trackers, opt-ins, status probes, etc.) | Public | Must avoid exposing private user/admin data. |
 
 ## Audit Findings (JOV-1692)

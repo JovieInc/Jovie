@@ -115,6 +115,8 @@ export interface RouteManifestEntry {
     readonly path: string;
     readonly expected: 'page' | 'redirect';
     readonly allowedFinalPaths?: readonly string[];
+    readonly allowsAuthShell?: boolean;
+    readonly requiresSharedChrome?: boolean;
   };
   /** noindex flag — true if the route is noindex today (e.g. /ai, /investors, /demo/video). */
   readonly noindex?: boolean;
@@ -472,6 +474,44 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
   },
   {
+    glob: '(marketing)/cli/page.tsx',
+    recipeId: 'seo',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/components/marketing/CliLandingPage.tsx',
+        'hero',
+        'centered-none'
+      ),
+      ...approvedBindings(
+        'apps/web/components/marketing/CliLandingPage.tsx',
+        'content-prose'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/CliLandingPage.tsx',
+        'faq',
+        'structured-data-list'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/CliLandingPage.tsx',
+        'cta',
+        'final-single-claim'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source: 'JOV-5472 CLI landing page',
+      notes:
+        'Canonical /cli uses MarketingHero centered-none, prose command docs, FAQPage schema, and MarketingFooterCta. content-prose has no active variant.',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/cli',
+    healthCheck: {
+      path: '/cli',
+      expected: 'page',
+    },
+  },
+  {
     glob: '(marketing)/compare/[slug]/page.tsx',
     recipeId: 'comparison',
     renderedSections: approvedBindings(
@@ -552,24 +592,25 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       expected: 'page',
     },
   },
-  // waitlist — stub recipe; route lives outside (marketing)/ but manifest binds it
+  // waitlist — public auth front door; route lives outside (marketing)/ but manifest binds it
   {
     glob: 'waitlist/page.tsx',
     recipeId: 'waitlist',
     renderedSections: [],
     bindingEvidence: {
       status: 'unverified',
-      source: 'route audit 2026-07-11',
+      source: 'JOV-5376 public waitlist front door',
       notes:
-        'Route renders an authenticated success view or redirects; canonical recipe mapping is not verified.',
+        'Signed-out visitors render the splash-B auth shell; authenticated states continue through the existing start or receipt flow.',
     },
     status: 'active',
     specVersion: '1.0.0',
     url: '/waitlist',
     healthCheck: {
       path: '/waitlist',
-      expected: 'redirect',
-      allowedFinalPaths: ['/start'],
+      expected: 'page',
+      allowsAuthShell: true,
+      requiresSharedChrome: false,
     },
   },
 
@@ -801,6 +842,7 @@ export interface MarketingRouteHealthTarget {
   readonly path: string;
   readonly expected: 'page' | 'redirect';
   readonly allowedFinalPaths: readonly string[];
+  readonly allowsAuthShell: boolean;
   readonly requiresSharedChrome: boolean;
 }
 
@@ -849,9 +891,11 @@ export function getMarketingRouteHealthTarget(
     path,
     expected,
     allowedFinalPaths,
+    allowsAuthShell: healthCheck?.allowsAuthShell ?? false,
     // Exemptions remain render-gated, but their eventual shell migration is a
     // separate workstream. Recipe routes must prove the shared shell now.
-    requiresSharedChrome: entry.recipeId !== undefined,
+    requiresSharedChrome:
+      healthCheck?.requiresSharedChrome ?? entry.recipeId !== undefined,
   };
 }
 

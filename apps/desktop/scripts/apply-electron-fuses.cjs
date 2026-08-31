@@ -67,6 +67,19 @@ async function updateMacInfoPlist(context) {
   // fail with ATS error -1022 — they are load-bearing for auto-update.
 }
 
+function packagedResourcesPath(context) {
+  const productFilename = context.packager.appInfo.productFilename;
+  if (context.electronPlatformName === 'darwin') {
+    return path.join(
+      context.appOutDir,
+      `${productFilename}.app`,
+      'Contents',
+      'Resources'
+    );
+  }
+  return path.join(context.appOutDir, 'resources');
+}
+
 module.exports = async function applyElectronFuses(context) {
   const { flipFuses, FuseVersion, FuseV1Options } = await import(
     '@electron/fuses'
@@ -97,6 +110,33 @@ module.exports = async function applyElectronFuses(context) {
     [FuseV1Options.GrantFileProtocolExtraPrivileges]: false,
     [FuseV1Options.WasmTrapHandlers]: true,
   });
+
+  const identityPath = path.join(
+    packagedResourcesPath(context),
+    'build-identity.json'
+  );
+  let record;
+  try {
+    record = JSON.parse(await fs.readFile(identityPath, 'utf8'));
+  } catch {
+    throw new Error(
+      `[build-identity] Packaged extraResource missing or invalid at ${identityPath}`
+    );
+  }
+  if (record?.channel === 'production' || record?.channel === 'staging') {
+    const ok =
+      typeof record.version === 'string' &&
+      /^\d+\.\d+\.\d+$/.test(record.version) &&
+      typeof record.sourceRevision === 'string' &&
+      /^[0-9a-f]{40}$/.test(record.sourceRevision) &&
+      typeof record.builtAt === 'string' &&
+      Number.isFinite(Date.parse(record.builtAt));
+    if (!ok) {
+      throw new Error(
+        '[build-identity] Packaged extraResource is incomplete; refusing to ship unverifiable provenance.'
+      );
+    }
+  }
 
   if (context.electronPlatformName === 'darwin') {
     await updateMacInfoPlist(context);

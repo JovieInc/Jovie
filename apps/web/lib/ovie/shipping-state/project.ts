@@ -1,5 +1,6 @@
 import {
   emptyCounts,
+  emptyDurations,
   isExactSha,
   M1_SOURCE_TO_PROJECTION_BUDGET_MS,
   measuredBoolean,
@@ -106,16 +107,10 @@ export function projectMeanings(
   const queuedCount = queue.counts.queued;
   const liveSha = build.correlation.sha;
   const deployedSha = controller.correlation.sha;
-  const exactHint = measuredOrNull(build, 'exactLiveBuild');
   const exact =
-    exactHint != null
-      ? exactHint
-      : isExactSha(liveSha) && isExactSha(deployedSha)
-        ? liveSha === deployedSha
-        : SUCCESS_STATES.has(build.state) &&
-            SUCCESS_STATES.has(controller.state)
-          ? false
-          : null;
+    isExactSha(liveSha) && isExactSha(deployedSha)
+      ? liveSha === deployedSha
+      : null;
   const queuedHint = measuredOrNull(queue, 'queued');
   const queued =
     queuedHint != null
@@ -262,6 +257,40 @@ export function projectShippingState(input: {
   };
 }
 
+export function ageShippingStateProjection(
+  projection: ShippingStateProjection,
+  nowIso: string
+): ShippingStateProjection {
+  const sources = {} as Record<ShippingSourceId, SourceObservation>;
+  for (const sourceId of SHIPPING_SOURCE_IDS) {
+    const source = projection.sources[sourceId];
+    sources[sourceId] = {
+      ...source,
+      state: observationFreshness(
+        source.sourceTimestamp ?? source.observationTimestamp,
+        source.freshnessDeadline,
+        nowIso,
+        source.state
+      ),
+    };
+  }
+  const aggregateState = combineSourceStates(
+    SHIPPING_SOURCE_IDS.map(sourceId => sources[sourceId].state)
+  );
+  return {
+    ...projection,
+    sources,
+    state: projection.publishing
+      ? observationFreshness(
+          projection.observationTimestamp,
+          projection.freshnessDeadline,
+          nowIso,
+          aggregateState
+        )
+      : projection.state,
+  };
+}
+
 export function retainLastKnownOnFailure(
   lastKnown: ShippingStateProjection | null,
   _nowIso: string,
@@ -309,6 +338,7 @@ function emptyObservation(
     },
     entities: [],
     counts: emptyCounts(),
+    durations: emptyDurations(),
   };
 }
 

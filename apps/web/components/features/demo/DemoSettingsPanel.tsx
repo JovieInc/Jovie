@@ -61,7 +61,7 @@ export function DemoSettingsPanel() {
             {PLATFORM_CONNECTIONS.map(platform => (
               <div
                 key={platform.name}
-                className='flex items-center justify-between gap-4 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] px-2 py-2.5 last:border-b-0'
+                className='flex items-center justify-between gap-4 border-b border-[color-mix(in_oklab,var(--app-shell-border)_72%,transparent)] px-2 py-2.5 last:border-b-0'
               >
                 <div className='flex min-w-0 items-center gap-2'>
                   <span
@@ -369,7 +369,7 @@ function SettingsSection({
     <section
       className={
         bordered
-          ? 'border-t border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)]'
+          ? 'border-t border-[color-mix(in_oklab,var(--app-shell-border)_72%,transparent)]'
           : ''
       }
     >
@@ -410,7 +410,7 @@ function ToggleRow({
   return (
     <label
       aria-label={label}
-      className='flex cursor-pointer items-start justify-between gap-3 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] py-2.5 last:border-b-0'
+      className='flex cursor-pointer items-start justify-between gap-3 border-b border-[color-mix(in_oklab,var(--app-shell-border)_72%,transparent)] py-2.5 last:border-b-0'
     >
       <div>
         <p className='text-app font-caption text-primary-token'>{label}</p>

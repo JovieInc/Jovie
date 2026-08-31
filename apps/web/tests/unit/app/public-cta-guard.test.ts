@@ -77,5 +77,8 @@ describe('public CTA guard', () => {
     expect(headerNav).not.toMatch(
       /minimalAuth[\s\S]*?<Button[\s\S]*?>Get started<\/Button>/
     );
+    expect(headerNav).toMatch(
+      /size='marketing'\s+variant='primary'[\s\S]*?<Link href=\{publicCta\.href\}>\{publicCta\.label\}<\/Link>/
+    );
   });
 });

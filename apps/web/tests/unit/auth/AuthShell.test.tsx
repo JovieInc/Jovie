@@ -137,6 +137,15 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     });
   });
 
+  it('suppresses One Tap on public auth landing surfaces', async () => {
+    oneTapConfiguredState.value = true;
+    render(<AuthShell mode='sign-up' suppressOneTap />);
+
+    await waitFor(() => {
+      expect(oneTapMock).not.toHaveBeenCalled();
+    });
+  });
+
   it('keeps the standard Google OAuth button available when One Tap declines', async () => {
     oneTapConfiguredState.value = true;
     oneTapMock.mockRejectedValueOnce(new Error('Google One Tap unavailable'));

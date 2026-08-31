@@ -48,6 +48,10 @@ requests per client IP in each fixed 60-second window. The bucket is durable
 across application instances through Redis. The static `/api/v1` capability
 index and the OpenAPI discovery routes do not consume this bucket.
 
+The index also returns a `versioning` object with the active `v1` identifier,
+the URL-versioning rules, and the policy URL, so an agent can discover the
+lifecycle contract without guessing or parsing prose.
+
 Successful profile responses, including typed `404` responses, include the
 current IETF HTTPAPI draft fields:
 
@@ -61,7 +65,9 @@ available for compatibility with existing clients. A `429` response includes
 the same quota fields plus an integer `Retry-After` in seconds; clients should
 use `Retry-After` as the authoritative retry timing. If the durable limiter is
 temporarily unavailable, the endpoint fails closed with `503` and
-`Retry-After: 30` rather than claiming a durable quota state.
+`RateLimit-Policy: "public-artist";q=100;w=60` plus `Retry-After: 30`. It does
+not emit `RateLimit` or `X-RateLimit-*` remaining/reset fields in that case,
+because the current durable quota state is unavailable.
 
 Per-client remaining and reset fields make a shared CDN body cache unsafe for
 profile responses, so those responses use `Cache-Control: private, no-store`

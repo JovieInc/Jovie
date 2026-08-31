@@ -21,9 +21,9 @@ export async function AdminBraggingRightsSection() {
       <ContentSectionHeader
         title='Platform Reach'
         subtitle='Labels, distributors, and ecosystem adoption signals'
-        className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+        className='min-h-0 px-(--app-shell-header-padding-x) py-3'
       />
-      <div className='px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
+      <div className='px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)'>
         <BraggingRightsStrip data={data} />
       </div>
     </ContentSurfaceCard>
@@ -36,10 +36,10 @@ export function AdminBraggingRightsSectionSkeleton() {
       <ContentSectionHeaderSkeleton
         titleWidth='w-28'
         descriptionWidth='w-56'
-        className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+        className='min-h-0 px-(--app-shell-header-padding-x) py-3'
       />
       <div
-        className='space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'
+        className='space-y-4 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)'
         aria-hidden='true'
       >
         <div className='grid gap-4 sm:grid-cols-2'>

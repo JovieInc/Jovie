@@ -29,6 +29,69 @@ enum VoiceCaptureError: LocalizedError, Equatable {
 /// Shared transcript → editable action/task draft contract for iOS voice memo
 /// capture. Mirrors the web voice-input path: transcript lands in the chat
 /// composer as an editable draft; the user sends when ready.
+enum EyesFreeReadback {
+  @MainActor
+  static func speak(_ text: String) {
+    let utterance = AVSpeechUtterance(string: text)
+    utterance.rate = AVSpeechUtteranceDefaultSpeechRate
+    SpeechCueSynthesizer.shared.speak(utterance)
+  }
+}
+
+@MainActor
+private final class SpeechCueSynthesizer {
+  static let shared = SpeechCueSynthesizer()
+  private let synthesizer = AVSpeechSynthesizer()
+
+  func speak(_ utterance: AVSpeechUtterance) {
+    synthesizer.speak(utterance)
+  }
+}
+
+enum EyesFreeCaptureGate: Equatable {
+  case ready
+  case unavailable
+  case offline
+  case unsigned
+  case summerForbidden
+  case permission
+  case transcriptionEmpty
+  case uploadFailed
+
+  static let unavailableMessage = "Capture is unavailable."
+  static let offlineMessage = "You're offline. Retry when you are back."
+  static let summerForbiddenMessage = "Summer is only available to the founder."
+  static let retryMessage = "Retry this capture from Jovie."
+
+  static func resolve(
+    isSignedIn: Bool,
+    chatEnabled: Bool,
+    isOffline: Bool,
+    destination: EyesFreeCaptureDestination,
+    canUseSummer: Bool
+  ) -> Self {
+    if !isSignedIn { return .unsigned }
+    if !chatEnabled { return .unavailable }
+    if isOffline { return .offline }
+    if destination == .summer, !canUseSummer { return .summerForbidden }
+    return .ready
+  }
+
+  var message: String {
+    switch self {
+    case .ready: ""
+    case .unavailable, .unsigned: Self.unavailableMessage
+    case .offline: Self.offlineMessage
+    case .summerForbidden: Self.summerForbiddenMessage
+    case .permission:
+      VoiceCaptureError.microphoneDenied.errorDescription ?? Self.unavailableMessage
+    case .transcriptionEmpty:
+      VoiceCaptureError.emptyTranscript.errorDescription ?? "Nothing heard."
+    case .uploadFailed: Self.retryMessage
+    }
+  }
+}
+
 enum VoiceMemoActionDraft: Equatable {
   /// Shell handoff outcome for a finished voice memo (never auto-sends).
   struct ShellHandoff: Equatable {

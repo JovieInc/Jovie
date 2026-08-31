@@ -220,7 +220,7 @@ export function CookieBannerSection({
               : 'sm:max-w-95'
           }`}
         >
-          <div className='rounded-2xl border border-(--linear-app-frame-seam) bg-surface-1 px-4 py-3 shadow-card'>
+          <div className='rounded-2xl border border-(--app-shell-frame-seam) bg-surface-1 px-4 py-3 shadow-card'>
             <div className='min-w-0'>
               <p className='text-xs leading-snug text-secondary-token'>
                 Essential cookies keep Jovie working. Choose whether to allow

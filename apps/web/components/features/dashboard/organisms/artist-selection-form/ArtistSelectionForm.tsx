@@ -66,7 +66,7 @@ export function ArtistSelectionForm() {
             )}
 
             {/* Form Card */}
-            <div className='rounded-lg border border-subtle bg-(--linear-app-content-surface) p-6 transition-colors'>
+            <div className='rounded-lg border border-subtle bg-(--app-shell-content-surface) p-6 transition-colors'>
               <form onSubmit={handleSubmit} className='space-y-6'>
                 <div>
                   <Combobox

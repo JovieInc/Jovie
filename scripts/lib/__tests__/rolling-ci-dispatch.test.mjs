@@ -553,6 +553,50 @@ describe('rolling CI dispatch CLI and workflow', () => {
     );
   });
 
+  it('isolates every exact-source repair step from trusted sparse policy', () => {
+    const dispatchStart = WORKFLOW.indexOf('\n  dispatch:\n');
+    const writerStart = WORKFLOW.indexOf('\n  writer:\n');
+    expect(dispatchStart).toBeGreaterThan(-1);
+    expect(writerStart).toBeGreaterThan(dispatchStart);
+    const dispatchJob = WORKFLOW.slice(dispatchStart, writerStart);
+
+    const dispatchStep = name => {
+      const marker = `      - name: ${name}\n`;
+      expect(dispatchJob.split(marker), name).toHaveLength(2);
+      const start = dispatchJob.indexOf(marker);
+      const end = dispatchJob.indexOf('\n      - name:', start + marker.length);
+      expect(end, name).toBeGreaterThan(start);
+      return dispatchJob.slice(start, end);
+    };
+
+    const checkout = dispatchStep('Checkout exact source PR head');
+    expect(checkout).toContain('ref: ${{ steps.plan.outputs.source_head }}');
+    expect(checkout).toMatch(/^          path: source$/m);
+    expect(checkout).toMatch(/^          persist-credentials: false$/m);
+
+    const checkoutGuard = dispatchStep('Require full exact-source checkout');
+    expect(checkoutGuard).toContain('test -f package.json');
+    expect(checkoutGuard).toContain('test -f pnpm-lock.yaml');
+    expect(checkoutGuard).toContain(
+      'test "$(git rev-parse HEAD)" = "$SOURCE_HEAD"'
+    );
+
+    for (const stepName of [
+      'Require full exact-source checkout',
+      'Capture exact failed-run evidence',
+      'Restore source dependencies without model credentials',
+      'Require a clean dependency baseline',
+      'Run FX on the exact source head',
+      'Guard FX diff',
+      'Independently verify the guarded FX repair',
+      'Create immutable FX repair artifact',
+    ]) {
+      expect(dispatchStep(stepName), stepName).toMatch(
+        /^        working-directory: source$/m
+      );
+    }
+  });
+
   it('keeps all repository write credentials outside the FX execution step', () => {
     const fxStart = WORKFLOW.indexOf('Run FX on the exact source head');
     const fxEnd = WORKFLOW.indexOf('Guard FX diff');

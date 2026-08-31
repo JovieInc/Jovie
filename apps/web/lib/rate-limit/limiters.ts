@@ -135,6 +135,14 @@ export const bioImportFromUrlHourlyLimiter = createRateLimiter(
   RATE_LIMITERS.bioImportFromUrlHourly
 );
 
+export const inspectPressSourceLimiter = createRateLimiter(
+  RATE_LIMITERS.inspectPressSource
+);
+
+export const inspectPressSourceHourlyLimiter = createRateLimiter(
+  RATE_LIMITERS.inspectPressSourceHourly
+);
+
 // ============================================================================
 // Payment Operations
 // ============================================================================

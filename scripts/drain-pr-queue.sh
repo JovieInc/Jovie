@@ -347,7 +347,12 @@ fleet_hold_expires_at() {
   ' "$FLEET_HOLD_TTL_SECONDS"
 }
 
-fleet_hold_null_creator_has_provenance() {  # <head> <status-json>
+# Combined commit-status payloads often return creator:null even when the
+# matching plural status is jovie-bot[bot]. Trust that production shape only
+# through this fail-closed proof: expected bot avatar/status URL plus the
+# exact trusted Auto-Enroll workflow run, repository, workflow path, and head
+# SHA. Never accept context, state, or description alone.
+null_creator_receipt_has_provenance() {  # <head> <status-json>
   local head="$1" status="$2" run_id target_url status_url
   local app_identity app_avatar run
   [[ "$head" =~ ^[0-9a-f]{40}$ ]] || return 1
@@ -395,6 +400,14 @@ fleet_hold_null_creator_has_provenance() {  # <head> <status-json>
     ' <<<"$run" >/dev/null
 }
 
+receipt_actor_is_trusted() {  # <head> <status-json>
+  local head="$1" status="$2"
+  if jq -e '.creator.type == "Bot"' <<<"$status" >/dev/null; then
+    return 0
+  fi
+  null_creator_receipt_has_provenance "$head" "$status"
+}
+
 fleet_hold_latest() {  # fleet_hold_latest <head> → latest status JSON or empty
   local head="$1" statuses latest
   [[ "$head" =~ ^[0-9a-f]{40}$ ]] || return 1
@@ -410,11 +423,7 @@ fleet_hold_latest() {  # fleet_hold_latest <head> → latest status JSON or empt
   ' <<<"$statuses" 2>/dev/null)"; then
     return 1
   fi
-  if jq -e '.creator.type == "Bot"' <<<"$latest" >/dev/null; then
-    printf '%s\n' "$latest"
-    return 0
-  fi
-  if fleet_hold_null_creator_has_provenance "$head" "$latest"; then
+  if receipt_actor_is_trusted "$head" "$latest"; then
     printf '%s\n' "$latest"
     return 0
   fi
@@ -513,20 +522,24 @@ clear_fleet_hold() {  # clear_fleet_hold <num> <head>
 # own; recovery still re-reads current PR state, current source checks, and the
 # native queue postcondition.
 queue_reentry_receipt_is_recoverable() {  # <head>
-  local head="$1" statuses
+  local head="$1" statuses latest
   [[ "$head" =~ ^[0-9a-f]{40}$ ]] || return 1
   if ! statuses="$(gh_retry api "repos/$REPO/commits/$head/status" 2>/dev/null)"; then
     return 1
   fi
-  jq -e --arg context "$QUEUE_REENTRY_CONTEXT" --arg repo "$REPO" '
+  latest="$(jq -c --arg context "$QUEUE_REENTRY_CONTEXT" --arg repo "$REPO" '
     [ .statuses[]? | select(.context == $context) ]
     | sort_by(.updated_at)
     | last
-    | .state == "success"
-      and (.creator.type == "Bot")
-      and (.description == "Native queue admission recorded at exact head")
-      and (.target_url | test("^https://github\\.com/" + $repo + "/actions/runs/[1-9][0-9]*$"))
-  ' <<<"$statuses" >/dev/null
+    | select(
+        . != null
+        and .state == "success"
+        and (.description == "Native queue admission recorded at exact head")
+        and (.target_url | test("^https://github\\.com/" + ($repo | gsub("/"; "\\/")) + "/actions/runs/[1-9][0-9]*$"))
+      )
+  ' <<<"$statuses" 2>/dev/null)" || true
+  [[ -n "$latest" ]] || return 1
+  receipt_actor_is_trusted "$head" "$latest"
 }
 
 record_queue_reentry_receipt() {  # <pr> <expected-head>
@@ -575,24 +588,26 @@ record_queue_reentry_receipt() {  # <pr> <expected-head>
 # CLEAN source PR UNSTABLE. They bind the exact head and refuse re-enrollment
 # until that head moves (JOV-5291).
 unmergeable_eject_receipt_head() {  # <head>
-  local head="$1" statuses
+  local head="$1" statuses latest
   [[ "$head" =~ ^[0-9a-f]{40}$ ]] || return 0
   if ! statuses="$(gh_retry api "repos/$REPO/commits/$head/status" 2>/dev/null)"; then
     return 0
   fi
-  jq -r --arg context "$UNMERGEABLE_EJECT_CONTEXT" --arg head "$head" --arg repo "$REPO" '
+  latest="$(jq -c --arg context "$UNMERGEABLE_EJECT_CONTEXT" --arg repo "$REPO" '
     [ .statuses[]? | select(.context == $context) ]
     | sort_by(.updated_at)
     | last
     | select(
         . != null
         and .state == "success"
-        and (.creator.type == "Bot")
         and (.description | startswith("ejected:"))
-        and (.target_url | test("^https://github\\.com/" + $repo + "/actions/runs/[1-9][0-9]*$"))
+        and (.target_url | test("^https://github\\.com/" + ($repo | gsub("/"; "\\/")) + "/actions/runs/[1-9][0-9]*$"))
       )
-    | $head
-  ' <<<"$statuses"
+  ' <<<"$statuses" 2>/dev/null)" || true
+  if [[ -n "$latest" ]] && receipt_actor_is_trusted "$head" "$latest"; then
+    printf '%s\n' "$head"
+  fi
+  return 0
 }
 
 record_unmergeable_eject_receipt() {  # <pr> <expected-head> <reason>
@@ -644,7 +659,7 @@ record_unmergeable_eject_receipt() {  # <pr> <expected-head> <reason>
 # CLEAN while Gem and Summer retain exact-head failure memory after bounded
 # Actions history rolls over. A new source commit is the only automatic reset.
 product_failure_receipt_head() {  # <head>
-  local head="$1" statuses
+  local head="$1" statuses latest
   [[ "$head" =~ ^[0-9a-f]{40}$ ]] || return 1
   if ! statuses="$(gh_retry api "repos/$REPO/commits/$head/status" 2>/dev/null)"; then
     return 2
@@ -652,10 +667,9 @@ product_failure_receipt_head() {  # <head>
   if ! jq -e '.statuses | type == "array"' <<<"$statuses" >/dev/null 2>&1; then
     return 2
   fi
-  jq -r \
+  latest="$(jq -c \
     --arg context "$PRODUCT_FAILURE_CONTEXT" \
     --arg description "$PRODUCT_FAILURE_DESCRIPTION" \
-    --arg head "$head" \
     --arg repo "$REPO" '
       [ .statuses[]? | select(.context == $context) ]
       | sort_by(.updated_at)
@@ -663,12 +677,14 @@ product_failure_receipt_head() {  # <head>
       | select(
           . != null
           and .state == "success"
-          and (.creator.type == "Bot")
           and .description == $description
-          and (.target_url | test("^https://github\\.com/" + $repo + "/actions/runs/[1-9][0-9]*$"))
+          and (.target_url | test("^https://github\\.com/" + ($repo | gsub("/"; "\\/")) + "/actions/runs/[1-9][0-9]*$"))
         )
-      | $head
-    ' <<<"$statuses"
+    ' <<<"$statuses" 2>/dev/null)" || true
+  if [[ -n "$latest" ]] && receipt_actor_is_trusted "$head" "$latest"; then
+    printf '%s\n' "$head"
+  fi
+  return 0
 }
 
 record_product_failure_receipt() {  # <pr> <expected-head>
@@ -1963,6 +1979,8 @@ if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 ]]; then
       || "$LAST_ENROLL_SKIP_REASON" == "preland-changelog-prohibited" \
       || "$LAST_ENROLL_SKIP_REASON" == "unmergeable-tombstone" ]]; then
       echo "  #$DRAIN_ADMISSION_PR  ⏸ $LAST_ENROLL_SKIP_REASON (classified skip; enroll is not a product-quality failure)"
+      echo "::error::queue-noop: classified-skip: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD ($LAST_ENROLL_SKIP_REASON; native admission refused, hard gate preserved)" >&2
+      exit 3
     elif [[ "$ADMISSION_ELIGIBLE" == "true" ]]; then
       echo "::error::queue-noop: missing receipt: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD (${ADMISSION_MISSING_REASON:-missing-receipt})" >&2
       exit 3

@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { type AddressInfo, createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -29,6 +30,89 @@ function isPackResult(value: unknown): value is readonly PackResult[] {
     typeof value[0] === 'object' &&
     value[0] !== null
   );
+}
+
+const PUBLIC_FIXTURES: Readonly<
+  Record<string, { readonly body: string; readonly type: string }>
+> = {
+  '/api/v1/demo': {
+    body: JSON.stringify({ artist: { username: 'demo' } }),
+    type: 'application/json',
+  },
+  '/demo/llms.txt': {
+    body: '# artist guide\n',
+    type: 'text/plain',
+  },
+  '/api/v1/openapi.json': {
+    body: JSON.stringify({ openapi: '3.1.0' }),
+    type: 'application/json',
+  },
+  '/llms.txt': {
+    body: '# site guide\n',
+    type: 'text/plain',
+  },
+  '/llms-full.txt': {
+    body: '# full guide\n',
+    type: 'text/plain',
+  },
+};
+
+async function withLocalPublicApi<T>(
+  run: (origin: string) => Promise<T>
+): Promise<T> {
+  const server = createServer((request, response) => {
+    const fixture = PUBLIC_FIXTURES[request.url ?? ''];
+    if (!fixture || request.method !== 'GET') {
+      response.writeHead(404);
+      response.end();
+      return;
+    }
+    response.writeHead(200, { 'Content-Type': fixture.type });
+    response.end(fixture.body);
+  });
+
+  await new Promise<void>((resolveListen, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => resolveListen());
+  });
+
+  try {
+    const address = server.address();
+    if (!address || typeof address === 'string') {
+      throw new Error('Local CLI fixture server did not bind a TCP port.');
+    }
+    const origin = `http://127.0.0.1:${(address as AddressInfo).port}`;
+    return await run(origin);
+  } finally {
+    await new Promise<void>((resolveClose, reject) => {
+      server.close(error => {
+        if (error) reject(error);
+        else resolveClose();
+      });
+    });
+  }
+}
+
+async function assertInstalledCommand(
+  installedCli: string,
+  cwd: string,
+  args: readonly string[],
+  expectedStdout: string
+): Promise<void> {
+  const { stdout, stderr } = await execFileAsync(installedCli, [...args], {
+    cwd,
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  if (stderr) {
+    throw new Error(
+      `Installed command ${args.join(' ')} wrote to stderr: ${stderr}`
+    );
+  }
+  if (stdout !== expectedStdout && stdout !== `${expectedStdout}\n`) {
+    throw new Error(
+      `Installed command ${args.join(' ')} output ${JSON.stringify(stdout)} instead of ${JSON.stringify(expectedStdout)}.`
+    );
+  }
 }
 
 async function main(): Promise<void> {
@@ -193,6 +277,40 @@ async function main(): Promise<void> {
       );
     }
 
+    const fixtureOrigin = await withLocalPublicApi(async origin => {
+      await assertInstalledCommand(
+        installedCli,
+        installRoot,
+        ['artist', 'get', 'demo', '--json', '--base-url', origin],
+        '{"artist":{"username":"demo"}}'
+      );
+      await assertInstalledCommand(
+        installedCli,
+        installRoot,
+        ['artist', 'llms', 'demo', '--base-url', origin],
+        '# artist guide\n'
+      );
+      await assertInstalledCommand(
+        installedCli,
+        installRoot,
+        ['api', 'openapi', '--json', '--base-url', origin],
+        '{"openapi":"3.1.0"}'
+      );
+      await assertInstalledCommand(
+        installedCli,
+        installRoot,
+        ['docs', 'llms', '--base-url', origin],
+        '# site guide\n'
+      );
+      await assertInstalledCommand(
+        installedCli,
+        installRoot,
+        ['docs', 'llms', '--full', '--base-url', origin],
+        '# full guide\n'
+      );
+      return origin;
+    });
+
     process.stdout.write(
       `${JSON.stringify(
         {
@@ -202,6 +320,8 @@ async function main(): Promise<void> {
           },
           files: [...files].sort(),
           installSmoke: 'passed',
+          commandSmoke: 'passed',
+          fixtureOrigin,
           staging: 'temporary-only',
         },
         null,

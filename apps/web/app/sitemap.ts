@@ -186,6 +186,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     },
     {
+      url: `${BASE_URL}${APP_ROUTES.CLI}`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+    {
       url: PUBLIC_ARTIST_API_POLICY_URL,
       lastModified: now,
       changeFrequency: 'monthly',

@@ -19,6 +19,11 @@ export const MARKETING_DEVELOPER_LINK: MarketingFooterLink = {
   label: 'Developers',
 };
 
+export const MARKETING_CLI_LINK: MarketingFooterLink = {
+  href: APP_ROUTES.CLI,
+  label: 'CLI',
+};
+
 export const MARKETING_NAV_LINKS: readonly MarketingNavLink[] = [
   { href: APP_ROUTES.ARTIST_PROFILES, label: 'Product' },
   { href: APP_ROUTES.ARTIST_NOTIFICATIONS, label: 'Solutions' },
@@ -65,6 +70,7 @@ export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
     title: 'Resources',
     links: [
       MARKETING_DEVELOPER_LINK,
+      MARKETING_CLI_LINK,
       { href: APP_ROUTES.SUPPORT, label: 'Support' },
       { href: APP_ROUTES.COMPARE, label: 'Compare' },
       { href: APP_ROUTES.ALTERNATIVES, label: 'Alternatives' },

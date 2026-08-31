@@ -184,9 +184,9 @@ export async function AdminScoreboardSection() {
           title='Funnel'
           subtitle='Last 7 days'
           density='compact'
-          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+          className='min-h-0 px-(--app-shell-header-padding-x) py-3'
         />
-        <div className='px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
+        <div className='px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)'>
           {isEmpty ? (
             <p className='text-app text-secondary-token'>No funnel data yet</p>
           ) : (
@@ -214,9 +214,9 @@ export async function AdminScoreboardSection() {
         <ContentSectionHeader
           title='4-Week Trend'
           density='compact'
-          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+          className='min-h-0 px-(--app-shell-header-padding-x) py-3'
         />
-        <div className='px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
+        <div className='px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)'>
           <WeeklyTrendChart data={trendData} />
           {/* Visually hidden data table for screen readers */}
           <table className='sr-only'>
@@ -256,9 +256,9 @@ export function AdminScoreboardSectionSkeleton() {
         <ContentSectionHeaderSkeleton
           titleWidth='w-20'
           descriptionWidth='w-24'
-          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+          className='min-h-0 px-(--app-shell-header-padding-x) py-3'
         />
-        <div className='flex gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
+        <div className='flex gap-3 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)'>
           {[
             'scraped',
             'qualified',
@@ -280,9 +280,9 @@ export function AdminScoreboardSectionSkeleton() {
       <ContentSurfaceCard className='overflow-hidden p-0'>
         <ContentSectionHeaderSkeleton
           titleWidth='w-28'
-          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+          className='min-h-0 px-(--app-shell-header-padding-x) py-3'
         />
-        <div className='px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
+        <div className='px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)'>
           <div className='h-36 animate-pulse rounded-lg bg-surface-1' />
         </div>
       </ContentSurfaceCard>

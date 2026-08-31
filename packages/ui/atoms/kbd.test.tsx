@@ -70,7 +70,7 @@ describe('Kbd', () => {
       expect(kbd.className).toContain('inline-flex');
       expect(kbd.className).toContain('items-center');
       expect(kbd.className).toContain('justify-center');
-      expect(kbd.className).toContain('rounded-(--linear-app-radius-item)');
+      expect(kbd.className).toContain('rounded-(--app-shell-radius-item)');
       expect(kbd.className).toContain('min-h-5');
       expect(kbd.className).toContain('min-w-5');
       expect(kbd.className).toContain('px-1.5');
@@ -90,7 +90,7 @@ describe('Kbd', () => {
       );
       const kbd = screen.getByTestId('kbd');
       expect(kbd.className).toContain('custom-class');
-      expect(kbd.className).toContain('rounded-(--linear-app-radius-item)');
+      expect(kbd.className).toContain('rounded-(--app-shell-radius-item)');
     });
   });
 

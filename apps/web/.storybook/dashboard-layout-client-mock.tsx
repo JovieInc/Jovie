@@ -56,3 +56,8 @@ export default function DashboardLayoutClient({
     </TableMetaContext.Provider>
   );
 }
+
+// Storybook aliases the real named-export module to this lightweight mock.
+// Export the same binding under both contracts so aliased shell stories keep
+// the table metadata provider without loading the authenticated app shell.
+export { DashboardLayoutClient as AuthShellWrapper };
