@@ -1335,6 +1335,101 @@ describe('conflict workflow contract', () => {
     }
   );
 
+  it('routes a real valid UTF-8 Git conflict to the credential-isolated FX step', () => {
+    const root = mkdtempSync(join(tmpdir(), 'jovie-conflict-valid-utf8-'));
+    const repository = join(root, 'repository');
+    const runnerTemp = join(root, 'runner');
+    const fxHome = join(runnerTemp, 'fx-home');
+    const mockBin = join(root, 'bin');
+    const conflictPath = join(repository, 'safe.txt');
+    mkdirSync(repository);
+    mkdirSync(join(fxHome, '.fx'), { recursive: true });
+    mkdirSync(mockBin);
+
+    try {
+      runGit(repository, ['init', '-b', 'main']);
+      runGit(repository, ['config', 'user.name', 'Conflict Test']);
+      runGit(repository, ['config', 'user.email', 'conflict@example.test']);
+      writeFileSync(conflictPath, 'root\n');
+      runGit(repository, ['add', '--all']);
+      runGit(repository, ['commit', '-m', 'root']);
+      const rootHead = runGit(repository, ['rev-parse', 'HEAD']);
+
+      runGit(repository, ['switch', '-c', 'source']);
+      writeFileSync(conflictPath, 'source\n');
+      runGit(repository, ['commit', '-am', 'source']);
+      const sourceHead = runGit(repository, ['rev-parse', 'HEAD']);
+
+      runGit(repository, ['switch', '-c', 'base', rootHead]);
+      writeFileSync(conflictPath, 'base\n');
+      runGit(repository, ['commit', '-am', 'base']);
+      const baseHead = runGit(repository, ['rev-parse', 'HEAD']);
+      runGit(repository, ['switch', 'source']);
+
+      writeFileSync(
+        join(mockBin, 'fx'),
+        `#!/usr/bin/env bash
+set -euo pipefail
+test "$1" = permissions
+test "$2" = --json
+printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"deny"},{"permission":"read","pattern":"*","action":"deny"},{"permission":"edit","pattern":"*","action":"deny"},{"permission":"read","pattern":"safe.txt","action":"allow"},{"permission":"edit","pattern":"safe.txt","action":"allow"}]}'
+`,
+        { mode: 0o755 }
+      );
+      const githubOutput = join(root, 'github-output');
+      const result = spawnSync(
+        'bash',
+        [
+          '-c',
+          workflowRunScript(
+            'Prepare exact conflict manifest without credentials'
+          ),
+        ],
+        {
+          cwd: repository,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            ATTEMPT: '1',
+            BASE_HEAD: baseHead,
+            BASE_REF: 'main',
+            COHORT_ID: 'valid-utf8-test',
+            FX_AUTO_UPGRADE: '0',
+            FX_MODEL: 'openai/gpt-5.6-sol',
+            FX_PERMISSION_MODE: 'ask',
+            GITHUB_OUTPUT: githubOutput,
+            HEAD_REF: 'source',
+            HOME: fxHome,
+            MAX_ATTEMPTS: '3',
+            PATH: `${mockBin}:${process.env.PATH ?? ''}`,
+            PR_NUMBER: '1',
+            REPOSITORY: 'JovieInc/Jovie',
+            RUNNER_TEMP: runnerTemp,
+            SOURCE_HEAD: sourceHead,
+          },
+        }
+      );
+
+      expect(result.status, result.stderr).toBe(0);
+      const artifactDir = join(runnerTemp, 'conflict-fx-artifact');
+      const receipt = JSON.parse(
+        readFileSync(join(artifactDir, 'receipt.json'), 'utf8')
+      );
+      expect(receipt).toMatchObject({
+        conflictFiles: ['safe.txt'],
+        outcome: 'model_required',
+      });
+      expect(readFileSync(githubOutput, 'utf8')).toContain(
+        'model_required=true'
+      );
+      expect(readFileSync(join(artifactDir, 'prompt.txt'), 'utf8')).toContain(
+        'Conflicting files: safe.txt'
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('executes the exact trusted-writer UTF-8 guard before accepting live conflict paths', () => {
     const delivery = workflowStep('Validate, reread, and deliver once');
     const match =
