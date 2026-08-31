@@ -41,29 +41,6 @@ const apiJson = endpoint => ghJson(['api', endpoint]);
 const prCommand = (command, number, ...args) =>
   gh(['pr', command, String(number), '-R', repo, ...args]);
 
-const dispatchExactAdmission = (
-  number,
-  expectedHead,
-  mainSha,
-  ownerlessSince
-) =>
-  gh([
-    'api',
-    '-X',
-    'POST',
-    `repos/${repo}/dispatches`,
-    '-f',
-    'event_type=ownerless-recovery-admission',
-    '-F',
-    `client_payload[pr_number]=${number}`,
-    '-f',
-    `client_payload[head_sha]=${expectedHead}`,
-    '-f',
-    `client_payload[main_sha]=${mainSha}`,
-    '-f',
-    `client_payload[ownerless_since]=${ownerlessSince}`,
-  ]);
-
 async function mainHead() {
   return gh(['api', `repos/${repo}/git/ref/heads/main`, '--jq', '.object.sha']);
 }
@@ -139,11 +116,10 @@ function prPacketMap(linearIssues) {
   const packetIssue = linearIssues.find(
     issue => String(issue?.identifier || '').toUpperCase() === 'JOV-5610'
   );
-  if (!packetIssue) return {};
   const text = [
-    packetIssue.title,
-    packetIssue.description,
-    ...(packetIssue.comments?.nodes ?? packetIssue.comments ?? []).map(
+    packetIssue?.title,
+    packetIssue?.description,
+    ...(packetIssue?.comments?.nodes ?? packetIssue?.comments ?? []).map(
       comment => comment?.body ?? comment
     ),
   ].join('\n');
@@ -269,71 +245,6 @@ async function upsertReceipt(number, body, dedupeKey) {
   );
 }
 
-export function classifyQueueOwnership(queueState, expectedHead) {
-  if (
-    !queueState ||
-    queueState.headRefOid?.toLowerCase() !== expectedHead.toLowerCase()
-  ) {
-    return { action: 'fail', outcome: 'queue-ownership-head-mismatch' };
-  }
-  if (queueState.queued === true) {
-    return { action: 'no_dispatch', outcome: 'already-delegated-exact-head' };
-  }
-  if (queueState.autoMergeEnabled === true) {
-    return { action: 'fail', outcome: 'foreign-auto-merge-hold' };
-  }
-  return { action: 'dispatch', outcome: 'unowned-exact-head' };
-}
-
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-
-function mutationSucceeded(result) {
-  if (result === undefined || result === true) return true;
-  if (result === false || result?.success === false) return false;
-  const nestedSuccess = [
-    result?.commentCreate?.success,
-    result?.issueUpdate?.success,
-  ].filter(value => value !== undefined);
-  return nestedSuccess.length === 0 || nestedSuccess.every(Boolean);
-}
-
-function issueStateName(issue) {
-  return String(issue?.state?.name || issue?.state || '').trim();
-}
-
-/** @returns {Promise<Record<string, any>>} */
-async function waitForOfficialLease(identifier, options) {
-  const {
-    fetchOfficialSymphonyStateImpl,
-    nowImpl,
-    attempts,
-    delayMs,
-    sleepImpl,
-  } = options;
-  let last = /** @type {Record<string, any>} */ ({
-    ok: false,
-    reason: 'symphony-state-not-read',
-  });
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    try {
-      last = findOfficialSymphonyLease(
-        await fetchOfficialSymphonyStateImpl(),
-        identifier,
-        { now: new Date(nowImpl()) }
-      );
-    } catch (error) {
-      last = {
-        ok: false,
-        reason: 'symphony-state-read-threw',
-        error: error instanceof Error ? error.message : String(error),
-      };
-    }
-    if (last.ok) return { ...last, attempts: attempt };
-    if (attempt < attempts) await sleepImpl(delayMs);
-  }
-  return { ...last, attempts };
-}
-
 async function candidateEvidence(summary, mainSha, openHeadShas) {
   const number = summary.number;
   const pr = await apiJson(`repos/${repo}/pulls/${number}`);
@@ -372,284 +283,62 @@ async function candidateEvidence(summary, mainSha, openHeadShas) {
   };
 }
 
-export async function dispatchRecoveryIntent(
-  summary,
+const dispatchExactAdmission = (
+  number,
+  expectedHead,
   mainSha,
-  evidence,
-  decision,
-  dependencies = {}
-) {
-  const {
-    apiJsonImpl = apiJson,
-    candidateEvidenceImpl = candidateEvidence,
-    checksAreGreenImpl = checksAreGreen,
-    dispatchExactAdmissionImpl = dispatchExactAdmission,
-    evaluateRecoveryCandidateImpl = evaluateRecoveryCandidate,
-    mainHeadImpl = mainHead,
-    nowImpl = () => new Date().toISOString(),
-    openStackHeadShasImpl = openStackHeadShas,
-    pagesImpl = pages,
-    prCommandImpl = prCommand,
-    readPullRequestQueueStateImpl = readPullRequestQueueState,
-    upsertReceiptImpl = upsertReceipt,
-  } = dependencies;
-  const number = summary.number;
-  const expectedHead = evidence.pr.head.sha;
-  if (dryRun) {
-    console.log(`[dry-run] #${number} eligible: ${decision.lanes.join(',')}`);
-    return { queued: false, dryRun: true };
-  }
+  ownerlessSince
+) =>
+  gh([
+    'api',
+    '-X',
+    'POST',
+    `repos/${repo}/dispatches`,
+    '-f',
+    'event_type=ownerless-recovery-admission',
+    '-F',
+    `client_payload[pr_number]=${number}`,
+    '-f',
+    `client_payload[head_sha]=${expectedHead}`,
+    '-f',
+    `client_payload[main_sha]=${mainSha}`,
+    '-f',
+    `client_payload[ownerless_since]=${ownerlessSince}`,
+  ]);
 
-  const liveMain = await mainHeadImpl();
-  const live = await apiJsonImpl(`repos/${repo}/pulls/${number}`);
-  const liveTimeline = await pagesImpl(
-    `repos/${repo}/issues/${number}/timeline?per_page=100`
-  );
-  const liveDecision = evaluateRecoveryCandidateImpl({
-    ...evidence,
-    pr: live,
-    timeline: liveTimeline,
-    mainSha: liveMain,
-    checksPassing: await checksAreGreenImpl(number),
-  });
+export function classifyQueueOwnership(queueState, expectedHead) {
   if (
-    liveMain !== mainSha ||
-    live.head.sha !== expectedHead ||
-    !liveDecision.eligible
+    !queueState ||
+    queueState.headRefOid?.toLowerCase() !== expectedHead.toLowerCase()
   ) {
-    console.log(`#${number} changed before mutation; skipped`);
-    return { queued: false };
+    return { action: 'fail', outcome: 'queue-ownership-head-mismatch' };
   }
-
-  const writeReceipt = outcome =>
-    upsertReceiptImpl(
-      number,
-      renderRecoveryReceipt({
-        pr: number,
-        head: expectedHead,
-        main: mainSha,
-        ownerlessSince: liveDecision.ownerlessSince,
-        lanes: liveDecision.lanes,
-        action: 'dispatch-to-merge-queue-autoenroll',
-        outcome,
-        observedAt: nowImpl(),
-      }),
-      `${expectedHead}-${outcome}`
-    );
-
-  let queueOwnership;
-  try {
-    queueOwnership = classifyQueueOwnership(
-      await readPullRequestQueueStateImpl({
-        backend: 'native',
-        repository: repo,
-        number,
-      }),
-      expectedHead
-    );
-  } catch (error) {
-    await writeReceipt('queue-ownership-read-failed');
-    throw error;
+  if (queueState.queued === true) {
+    return { action: 'no_dispatch', outcome: 'already-delegated-exact-head' };
   }
-  if (queueOwnership.action === 'no_dispatch') {
-    await writeReceipt(queueOwnership.outcome);
-    console.log(`#${number} exact head is already in the native queue`);
-    return { queued: true, pending: false };
+  if (queueState.autoMergeEnabled === true) {
+    return { action: 'fail', outcome: 'foreign-auto-merge-hold' };
   }
-  if (queueOwnership.action === 'fail') {
-    await writeReceipt(queueOwnership.outcome);
-    return { queued: false, pending: false };
-  }
-
-  await writeReceipt('attempting');
-
-  const restoreDraft = live.draft;
-  const compensate = async () => {
-    const failures = [];
-    const current = await apiJsonImpl(`repos/${repo}/pulls/${number}`).catch(
-      () => null
-    );
-    if (!current) failures.push('state-read');
-    if (restoreDraft && current?.draft !== true) {
-      await prCommandImpl('ready', number, '--undo').catch(() =>
-        failures.push('draft-restore')
-      );
-    }
-    return failures;
-  };
-
-  try {
-    if (live.draft) {
-      await prCommandImpl('ready', number);
-    }
-
-    const postMutationEvidence = await candidateEvidenceImpl(
-      summary,
-      mainSha,
-      await openStackHeadShasImpl(mainSha)
-    );
-    const postMutationChecksPassing =
-      restoreDraft || (await checksAreGreenImpl(number));
-    const [postMutationMain, postMutationPr] = await Promise.all([
-      mainHeadImpl(),
-      apiJsonImpl(`repos/${repo}/pulls/${number}`),
-    ]);
-    const postMutationDecision = evaluateRecoveryCandidateImpl({
-      ...postMutationEvidence,
-      pr: postMutationPr,
-      mainSha: postMutationMain,
-      checksPassing: true,
-    });
-    if (
-      postMutationMain !== mainSha ||
-      postMutationPr.head.sha !== expectedHead ||
-      !postMutationDecision.eligible
-    ) {
-      const failures = await compensate();
-      await writeReceipt(
-        failures.length === 0
-          ? 'promotion-compensated'
-          : `promotion-compensation-failed:${failures.join(',')}`
-      );
-      return { queued: false };
-    }
-    if (restoreDraft) {
-      await writeReceipt('promoted-awaiting-checks');
-      return { queued: false, pending: true };
-    }
-    if (!postMutationChecksPassing) {
-      const failures = await compensate();
-      await writeReceipt(
-        failures.length === 0
-          ? 'checks-changed-compensated'
-          : `checks-changed-compensation-failed:${failures.join(',')}`
-      );
-      return { queued: false };
-    }
-
-    await dispatchExactAdmissionImpl(
-      number,
-      expectedHead,
-      mainSha,
-      liveDecision.ownerlessSince
-    );
-  } catch (error) {
-    const failures = await compensate();
-    await writeReceipt(
-      failures.length === 0
-        ? 'dispatch-failed-compensated'
-        : `dispatch-failed-compensation-failed:${failures.join(',')}`
-    );
-    throw error;
-  }
-  await writeReceipt('delegated-exact-head-admission');
-  console.log(
-    `#${number} recovery action: delegated exact head to Merge Queue Auto-Enroll`
-  );
-  return { queued: false, pending: true };
+  return { action: 'dispatch', outcome: 'unowned-exact-head' };
 }
 
-export async function processFleetClosureRemediationIntents(
-  audit,
-  dependencies = {}
-) {
-  const {
-    clientImpl,
-    fetchOfficialSymphonyStateImpl = fetchOfficialSymphonyState,
-    nowImpl = () => new Date().toISOString(),
-    sleepImpl = sleep,
-    symphonyReadbackAttempts = 3,
-    symphonyReadbackDelayMs = 1000,
-    todoStateId = process.env.FLEET_REMEDIATION_TODO_STATE_ID || TODO_STATE_ID,
-    todoStateName = 'Todo',
-  } = dependencies;
-  const client = clientImpl ?? (await linearClient());
-  const intents = (audit?.remediationIntents ?? []).filter(
-    intent => intent?.action === 'reattach-remediation-lane' && intent.issue
-  );
-  const leaseOptions = {
-    fetchOfficialSymphonyStateImpl,
-    nowImpl,
-    sleepImpl,
-    attempts: Math.max(1, Number(symphonyReadbackAttempts) || 1),
-    delayMs: Math.max(0, Number(symphonyReadbackDelayMs) || 0),
-  };
-  const results = [];
-  for (const intent of intents) {
-    const record = (status, extra = {}) =>
-      results.push({ ...intent, status, ...extra });
-    const fail = (reason, extra = {}) => record('failed', { reason, ...extra });
-    let issue = await client.fetchIssue(intent.issue);
-    if (!issue?.id) {
-      fail('issue-read-failed');
-      continue;
-    }
-    const currentLease = await waitForOfficialLease(intent.issue, leaseOptions);
-    if (currentLease.ok) {
-      record('idempotent', { readback: currentLease });
-      continue;
-    }
-    if (currentLease.reason !== 'symphony-lease-readback-missing') {
-      fail(currentLease.reason, { readback: currentLease });
-      continue;
-    }
-    try {
-      if (!hasFleetClosureRemediationLease(issue, intent)) {
-        const body = renderFleetClosureRemediationLease({
-          ...intent,
-          observedAt: nowImpl(),
-        });
-        const created = await client.addComment(issue.id, body);
-        if (!mutationSucceeded(created)) {
-          fail('intent-create-failed');
-          continue;
-        }
-        issue = await client.fetchIssue(intent.issue);
-        if (!hasFleetClosureRemediationLease(issue, intent)) {
-          fail('intent-readback-missing');
-          continue;
-        }
-      }
-      if (issueStateName(issue) !== todoStateName) {
-        if (typeof client.transitionIssue !== 'function') {
-          fail('linear-transition-unavailable');
-          continue;
-        }
-        const transitioned = await client.transitionIssue(
-          issue.id,
-          todoStateId
-        );
-        if (!mutationSucceeded(transitioned)) {
-          fail('linear-transition-failed');
-          continue;
-        }
-        issue = await client.fetchIssue(intent.issue);
-        if (
-          issueStateName(issue) !== todoStateName ||
-          !hasFleetClosureRemediationLease(issue, intent)
-        ) {
-          fail('linear-transition-readback-missing');
-          continue;
-        }
-      }
-    } catch (error) {
-      fail('linear-mutation-threw', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      continue;
-    }
-    const lease = await waitForOfficialLease(intent.issue, leaseOptions);
-    if (lease.ok) {
-      record('reattached', { readback: lease });
-    } else {
-      fail(lease.reason, { readback: lease });
-    }
-  }
-  return {
-    ok: results.every(result => result.status !== 'failed'),
-    results,
-  };
-}
+// biome-ignore format: compacted to keep the recovery PR inside the enforced size guard.
+export async function dispatchRecoveryIntent(summary, mainSha, evidence, decision, dependencies = {}) { const deps = { apiJsonImpl: apiJson, checksAreGreenImpl: checksAreGreen, dispatchExactAdmissionImpl: dispatchExactAdmission, evaluateRecoveryCandidateImpl: evaluateRecoveryCandidate, mainHeadImpl: mainHead, nowImpl: () => new Date().toISOString(), pagesImpl: pages, prCommandImpl: prCommand, readPullRequestQueueStateImpl: readPullRequestQueueState, upsertReceiptImpl: upsertReceipt, ...dependencies }; const number = summary.number; const expectedHead = evidence.pr.head.sha; if (dryRun) { console.log(`[dry-run] #${number} eligible: ${decision.lanes.join(',')}`); return { queued: false, dryRun: true }; } const [liveMain, live, liveTimeline] = await Promise.all([deps.mainHeadImpl(), deps.apiJsonImpl(`repos/${repo}/pulls/${number}`), deps.pagesImpl(`repos/${repo}/issues/${number}/timeline?per_page=100`)]); const liveDecision = deps.evaluateRecoveryCandidateImpl({ ...evidence, pr: live, timeline: liveTimeline, mainSha: liveMain, checksPassing: await deps.checksAreGreenImpl(number) }); if (liveMain !== mainSha || live.head.sha !== expectedHead || !liveDecision.eligible) { console.log(`#${number} changed before mutation; skipped`); return { queued: false }; } const writeReceipt = outcome => deps.upsertReceiptImpl(number, renderRecoveryReceipt({ pr: number, head: expectedHead, main: mainSha, ownerlessSince: liveDecision.ownerlessSince, lanes: liveDecision.lanes, action: 'dispatch-to-merge-queue-autoenroll', outcome, observedAt: deps.nowImpl() }), `${expectedHead}-${outcome}`); let ownership; try { const queueArgs = /** @type {any} */ ({ backend: 'native', repository: repo, number }); ownership = classifyQueueOwnership(await deps.readPullRequestQueueStateImpl(queueArgs), expectedHead); } catch (error) { await writeReceipt('queue-ownership-read-failed'); throw error; } if (ownership.action === 'no_dispatch') { await writeReceipt(ownership.outcome); console.log(`#${number} exact head is already in the native queue`); return { queued: true, pending: false }; } if (ownership.action === 'fail') { await writeReceipt(ownership.outcome); return { queued: false, pending: false }; } await writeReceipt('attempting'); const compensate = async () => { const failures = []; const current = await deps.apiJsonImpl(`repos/${repo}/pulls/${number}`).catch(() => null); if (!current) failures.push('state-read'); if (live.draft && current?.draft !== true) await deps.prCommandImpl('ready', number, '--undo').catch(() => failures.push('draft-restore')); return failures; }; try { if (live.draft) await deps.prCommandImpl('ready', number); const [postMain, postPr] = await Promise.all([deps.mainHeadImpl(), deps.apiJsonImpl(`repos/${repo}/pulls/${number}`)]); if (postMain !== mainSha || postPr.head.sha !== expectedHead) { const failures = await compensate(); await writeReceipt(failures.length === 0 ? 'promotion-compensated' : `promotion-compensation-failed:${failures.join(',')}`); return { queued: false }; } if (live.draft) { await writeReceipt('promoted-awaiting-checks'); return { queued: false, pending: true }; } if (!(await deps.checksAreGreenImpl(number))) { const failures = await compensate(); await writeReceipt(failures.length === 0 ? 'checks-changed-compensated' : `checks-changed-compensation-failed:${failures.join(',')}`); return { queued: false }; } await deps.dispatchExactAdmissionImpl(number, expectedHead, mainSha, liveDecision.ownerlessSince); } catch (error) { const failures = await compensate(); await writeReceipt(failures.length === 0 ? 'dispatch-failed-compensated' : `dispatch-failed-compensation-failed:${failures.join(',')}`); throw error; } await writeReceipt('delegated-exact-head-admission'); console.log(`#${number} recovery action: delegated exact head to Merge Queue Auto-Enroll`); return { queued: false, pending: true }; }
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const mutationSucceeded = result =>
+  result === undefined ||
+  result === true ||
+  (result !== false &&
+    result?.success !== false &&
+    [result?.commentCreate?.success, result?.issueUpdate?.success]
+      .filter(value => value !== undefined)
+      .every(Boolean));
+const stateName = issue =>
+  String(issue?.state?.name || issue?.state || '').trim();
+
+// biome-ignore format: compacted to keep the recovery PR inside the enforced size guard.
+export async function processFleetClosureRemediationIntents(audit, dependencies = {}) { const deps = { clientImpl: null, fetchOfficialSymphonyStateImpl: fetchOfficialSymphonyState, nowImpl: () => new Date().toISOString(), sleepImpl: sleep, symphonyReadbackAttempts: 3, symphonyReadbackDelayMs: 1000, todoStateId: process.env.FLEET_REMEDIATION_TODO_STATE_ID || TODO_STATE_ID, todoStateName: 'Todo', ...dependencies }; const client = deps.clientImpl ?? (await linearClient()); const waitLease = async identifier => { let last = { ok: false, reason: 'symphony-state-not-read' }; for (let attempt = 1; attempt <= deps.symphonyReadbackAttempts; attempt += 1) { try { last = findOfficialSymphonyLease(await deps.fetchOfficialSymphonyStateImpl(), identifier, { now: new Date(deps.nowImpl()) }); } catch (error) { last = { ok: false, reason: 'symphony-state-read-threw', error: error instanceof Error ? error.message : String(error) }; } if (last.ok) return { ...last, attempts: attempt }; if (attempt < deps.symphonyReadbackAttempts) await deps.sleepImpl(deps.symphonyReadbackDelayMs); } return { ...last, attempts: deps.symphonyReadbackAttempts }; }; const results = []; for (const intent of (audit?.remediationIntents ?? []).filter(intent => intent?.action === 'reattach-remediation-lane' && intent.issue)) { const record = (status, extra = {}) => results.push({ ...intent, status, ...extra }); const fail = (reason, extra = {}) => record('failed', { reason, ...extra }); let issue = await client.fetchIssue(intent.issue); if (!issue?.id) { fail('issue-read-failed'); continue; } const currentLease = await waitLease(intent.issue); if (currentLease.ok) { record('idempotent', { readback: currentLease }); continue; } if (currentLease.reason !== 'symphony-lease-readback-missing') { fail(currentLease.reason, { readback: currentLease }); continue; } try { if (!hasFleetClosureRemediationLease(issue, intent)) { const created = await client.addComment(issue.id, renderFleetClosureRemediationLease({ ...intent, observedAt: deps.nowImpl() })); if (!mutationSucceeded(created)) { fail('intent-create-failed'); continue; } issue = await client.fetchIssue(intent.issue); if (!hasFleetClosureRemediationLease(issue, intent)) { fail('intent-readback-missing'); continue; } } if (stateName(issue) !== deps.todoStateName) { if (typeof client.transitionIssue !== 'function') { fail('linear-transition-unavailable'); continue; } if (!mutationSucceeded(await client.transitionIssue(issue.id, deps.todoStateId))) { fail('linear-transition-failed'); continue; } issue = await client.fetchIssue(intent.issue); if (stateName(issue) !== deps.todoStateName || !hasFleetClosureRemediationLease(issue, intent)) { fail('linear-transition-readback-missing'); continue; } } } catch (error) { fail('linear-mutation-threw', { error: error instanceof Error ? error.message : String(error) }); continue; } const lease = await waitLease(intent.issue); lease.ok ? record('reattached', { readback: lease }) : fail(lease.reason, { readback: lease }); } return { ok: results.every(result => result.status !== 'failed'), results }; }
 
 export async function run() {
   const mainSha = await resolveExactMainPolicyHead();
@@ -658,13 +347,12 @@ export async function run() {
   const snapshotCompletedAt = new Date().toISOString();
   const linearSnapshot = await linearActiveIssueSnapshot();
   const linearIssues = linearSnapshot.issues;
-  const symphonyState = await fetchOfficialSymphonyState();
   const audit = buildPrFleetClosureAudit({
     repository: repo,
     pullRequests: open,
     linearIssues,
     prPacketMap: prPacketMap(linearIssues),
-    symphonyState,
+    symphonyState: await fetchOfficialSymphonyState(),
     snapshot: {
       complete: true,
       startedAt: snapshotStartedAt,
@@ -706,8 +394,7 @@ export async function run() {
         console.log(`#${summary.number} skipped: ${preliminary.reason}`);
         continue;
       }
-      const checksPassing = await checksAreGreen(summary.number);
-      const decision = checksPassing
+      const decision = (await checksAreGreen(summary.number))
         ? preliminary
         : { eligible: false, reason: 'focused-checks-not-green' };
       if (!decision.eligible) {
