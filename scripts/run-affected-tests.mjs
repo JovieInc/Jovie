@@ -183,9 +183,11 @@ const ROLLING_CI_FX_CACHE_GC_PRIMARY_INPUTS = new Set([
   'scripts/lib/actions-cache-gc.mjs',
   'scripts/lib/rolling-ci-dispatch.mjs',
   'scripts/lib/rolling-ci-fx.mjs',
+  'scripts/lib/rolling-ci-hosted-writer.mjs',
   'scripts/lib/__tests__/actions-cache-gc.test.mjs',
   'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
   'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+  'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
 ]);
 const ROLLING_CI_FX_CACHE_GC_LANE = new Set([
   ...ROLLING_CI_FX_CACHE_GC_PRIMARY_INPUTS,
@@ -198,6 +200,7 @@ const ROLLING_CI_FX_CACHE_GC_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
   'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+  'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
   'scripts/lib/__tests__/rolling-ci-handoff.test.mjs',
 ];
 const ROLLING_CI_FX_CACHE_GC_NODE_TESTS = ['scripts/typecheck-scripts.mjs'];
@@ -2002,7 +2005,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     ),
     DEFAULT_PROGRESS_INTERVAL_MS
   );
-  const plan = buildAffectedTestPlan(changedFiles(base));
+  const explicitFiles = argValue(args, '--changed-files-json', '');
+  const plan = buildAffectedTestPlan(
+    explicitFiles ? JSON.parse(explicitFiles) : changedFiles(base)
+  );
   if (args.includes('--dry-run')) {
     console.log(JSON.stringify(plan, null, 2));
     process.exit(0);
