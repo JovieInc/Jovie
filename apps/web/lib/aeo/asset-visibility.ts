@@ -424,16 +424,22 @@ const trend = (
   appearanceRateDelta,
   averagePositionChange,
 });
-const compareAveragePosition = (
-  currentAverage: number | null,
-  previousAverage: number | null
-) => {
-  if (currentAverage !== null && previousAverage !== null)
-    return round(previousAverage - currentAverage);
-  if (currentAverage !== null) return 1;
-  if (previousAverage !== null) return -1;
-  return null;
-};
+function compareRankedPositionMovement(
+  current: readonly AssetVisibilityObservation[],
+  previous: readonly AssetVisibilityObservation[]
+) {
+  const previousPositions = new Map(
+    previous.map(item => [identity(item), item.recommendationPosition])
+  );
+  const movements: number[] = [];
+  for (const item of current) {
+    const currentPosition = item.recommendationPosition;
+    const previousPosition = previousPositions.get(identity(item)) ?? null;
+    if (validPosition(currentPosition) && validPosition(previousPosition))
+      movements.push(previousPosition - currentPosition);
+  }
+  return average(movements);
+}
 const combineRankMovement = (
   averagePositionDelta: number | null,
   rankCoverageDelta: number
@@ -491,7 +497,7 @@ function compareRuns(
   const old = summarizeVisibility(previous);
   const rateDelta = round(currentSummary.appearanceRate - old.appearanceRate);
   const positionDelta = combineRankMovement(
-    compareAveragePosition(currentSummary.averagePosition, old.averagePosition),
+    compareRankedPositionMovement(current, previous),
     compareRankCoverage(current, previous)
   );
   const rateStatus =

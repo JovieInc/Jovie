@@ -444,6 +444,60 @@ describe('asset visibility', () => {
     ).toBe(true);
   });
 
+  it('does not treat newly gained rankings as visibility declines', () => {
+    const current = [
+      obs({
+        id: 'current-kept',
+        queryId: 'video:kept',
+        query: 'Recommend a creator to follow.',
+        recommendationPosition: 1,
+        competitors: [],
+      }),
+      obs({
+        id: 'current-gained',
+        queryId: 'video:gained',
+        query: 'Recommend another creator to follow.',
+        recommendationPosition: 100,
+        competitors: [],
+      }),
+    ];
+    const previous = [
+      old({
+        id: 'previous-kept',
+        queryId: 'video:kept',
+        query: 'Recommend a creator to follow.',
+        recommendationPosition: 1,
+        competitors: [],
+      }),
+      old({
+        id: 'previous-gained',
+        queryId: 'video:gained',
+        query: 'Recommend another creator to follow.',
+        recommendationPosition: null,
+        context: 'mentioned',
+        competitors: [],
+      }),
+    ];
+
+    const report = buildAssetVisibilityReport({
+      asset: asset(),
+      current,
+      previous,
+    });
+
+    expect(report.trend).toMatchObject({
+      comparable: true,
+      status: 'up',
+      appearanceRateDelta: 0,
+      averagePositionChange: 1,
+    });
+    expect(
+      report.actions.some(
+        action => action.code === 'investigate_visibility_decline'
+      )
+    ).toBe(false);
+  });
+
   it('matches ranked coverage by comparable observation identity', () => {
     const current = [
       obs({
