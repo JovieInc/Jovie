@@ -57,7 +57,7 @@ describe('public CTA guard', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('keeps homepage public auth as a labeled text MarketingSignInLink', () => {
+  it('keeps public auth on the canonical Log in plus primary CTA contract', () => {
     const headerNav = readFileSync(
       join(ROOT, 'components/organisms/HeaderNav.tsx'),
       'utf8'

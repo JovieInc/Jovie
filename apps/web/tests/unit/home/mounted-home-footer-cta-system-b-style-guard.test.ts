@@ -25,7 +25,8 @@ describe('mounted homepage footer CTA System B source contract', () => {
     );
 
     expect(layoutSource).toContain('<PublicPageShell');
-    expect(layoutSource).toContain("footerVariant='minimal'");
+    expect(layoutSource).toContain("footerVariant='expanded'");
+    expect(layoutSource).not.toContain('showHomepageCenterNav={false}');
     expect(layoutSource).toContain(
       "footerClassName='system-b-mounted-home-footer'"
     );
