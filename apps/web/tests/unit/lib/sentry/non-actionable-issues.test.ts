@@ -6,6 +6,8 @@ import {
   isNonActionableUpstashErrorBag,
   isNonActionableUpstashErrorBagEvent,
   isNonActionableUpstashIssue,
+  isNonActionableVercelIpcEvent,
+  isNonActionableVercelIpcIssue,
   isOpaqueUpstashErrorJsonBag,
   isSpotifyReleaseCreditBoundCapture,
   isTransientInfraHttpIssue,
@@ -14,6 +16,7 @@ import {
   isUpstashQuotaSentryEvent,
   SPOTIFY_RELEASE_CREDIT_BOUND_IGNORE_ERRORS,
   UPSTASH_ERROR_JSON_BAG,
+  VERCEL_IPC_SOCK_IGNORE_ERRORS,
 } from '@/lib/sentry/non-actionable-issues';
 
 const JOV_5185_TITLE =
@@ -425,6 +428,45 @@ describe('non-actionable Sentry issues', () => {
 
     it('does not match unrelated transactions', () => {
       expect(isTransientInfraHttpTransaction('GET /api/health')).toBe(false);
+    });
+  });
+
+  describe('isNonActionableVercelIpcIssue (JOV-5605)', () => {
+    const title = 'Error: connect ECONNREFUSED /opt/vercel/ipc.sock';
+
+    it('matches the Linear/Sentry title', () => {
+      expect(isNonActionableVercelIpcIssue({ title })).toBe(true);
+      expect(
+        VERCEL_IPC_SOCK_IGNORE_ERRORS.some(pattern => pattern.test(title))
+      ).toBe(true);
+    });
+
+    it('matches a Sentry exception event', () => {
+      expect(
+        isNonActionableVercelIpcEvent({
+          exception: {
+            values: [
+              {
+                type: 'Error',
+                value: 'connect ECONNREFUSED /opt/vercel/ipc.sock',
+              },
+            ],
+          },
+        })
+      ).toBe(true);
+    });
+
+    it('does not match unrelated connection failures', () => {
+      expect(
+        isNonActionableVercelIpcIssue({
+          title: 'Error: connect ECONNREFUSED 127.0.0.1:5432',
+        })
+      ).toBe(false);
+      expect(
+        isNonActionableVercelIpcEvent({
+          exception: { values: [{ value: 'Unauthorized' }] },
+        })
+      ).toBe(false);
     });
   });
 });

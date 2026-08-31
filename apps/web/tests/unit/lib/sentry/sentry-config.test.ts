@@ -688,6 +688,22 @@ describe('getBaseClientConfig', () => {
     ).toBeNull();
   });
 
+  it('drops the JOV-5605 Vercel IPC socket refusal', () => {
+    const config = getBaseClientConfig();
+    expect(
+      config.beforeSend({
+        exception: {
+          values: [
+            {
+              type: 'Error',
+              value: 'connect ECONNREFUSED /opt/vercel/ipc.sock',
+            },
+          ],
+        },
+      } as never)
+    ).toBeNull();
+  });
+
   it('drops a client object-capture whose originalException is the JOV-5186 bag', () => {
     const config = getBaseClientConfig();
     const inner = new Error(
