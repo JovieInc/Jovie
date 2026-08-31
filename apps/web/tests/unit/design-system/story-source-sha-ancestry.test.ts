@@ -38,7 +38,6 @@ function runGit(args: string[], input?: string): string {
   return execFileSync('git', args, {
     cwd: repoRoot,
     encoding: 'utf8',
-    env: { ...process.env, GIT_NO_LAZY_FETCH: '1' },
     input,
     maxBuffer: 10 * 1024 * 1024,
     stdio: ['pipe', 'pipe', 'pipe'],
