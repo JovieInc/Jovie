@@ -243,11 +243,11 @@ CREATE POLICY "youtube_videos_owner_bridge" ON "youtube_videos" FOR ALL
 CREATE POLICY "youtube_thumbnail_versions_private_access" ON "youtube_thumbnail_versions" FOR ALL
   USING (EXISTS (
     SELECT 1 FROM youtube_videos v
-    WHERE v.id = video_id AND can_manage_private_creator_profile(v.creator_profile_id)
+    WHERE v.id = "youtube_thumbnail_versions"."video_id" AND can_manage_private_creator_profile(v.creator_profile_id)
   ))
   WITH CHECK (EXISTS (
     SELECT 1 FROM youtube_videos v
-    WHERE v.id = video_id AND can_manage_private_creator_profile(v.creator_profile_id)
+    WHERE v.id = "youtube_thumbnail_versions"."video_id" AND can_manage_private_creator_profile(v.creator_profile_id)
   ));
 CREATE POLICY "youtube_thumbnail_versions_system_all" ON "youtube_thumbnail_versions" FOR ALL
   USING (is_system_rls_session()) WITH CHECK (is_system_rls_session());
@@ -259,11 +259,11 @@ CREATE POLICY "youtube_thumbnail_versions_owner_bridge" ON "youtube_thumbnail_ve
 CREATE POLICY "youtube_video_metric_snapshots_private_access" ON "youtube_video_metric_snapshots" FOR ALL
   USING (EXISTS (
     SELECT 1 FROM youtube_videos v
-    WHERE v.id = video_id AND can_manage_private_creator_profile(v.creator_profile_id)
+    WHERE v.id = "youtube_video_metric_snapshots"."video_id" AND can_manage_private_creator_profile(v.creator_profile_id)
   ))
   WITH CHECK (EXISTS (
     SELECT 1 FROM youtube_videos v
-    WHERE v.id = video_id AND can_manage_private_creator_profile(v.creator_profile_id)
+    WHERE v.id = "youtube_video_metric_snapshots"."video_id" AND can_manage_private_creator_profile(v.creator_profile_id)
   ));
 CREATE POLICY "youtube_video_metric_snapshots_system_all" ON "youtube_video_metric_snapshots" FOR ALL
   USING (is_system_rls_session()) WITH CHECK (is_system_rls_session());
@@ -275,11 +275,11 @@ CREATE POLICY "youtube_video_metric_snapshots_owner_bridge" ON "youtube_video_me
 CREATE POLICY "youtube_video_release_links_private_access" ON "youtube_video_release_links" FOR ALL
   USING (EXISTS (
     SELECT 1 FROM youtube_videos v
-    WHERE v.id = video_id AND can_manage_private_creator_profile(v.creator_profile_id)
+    WHERE v.id = "youtube_video_release_links"."video_id" AND can_manage_private_creator_profile(v.creator_profile_id)
   ))
   WITH CHECK (EXISTS (
     SELECT 1 FROM youtube_videos v
-    WHERE v.id = video_id AND can_manage_private_creator_profile(v.creator_profile_id)
+    WHERE v.id = "youtube_video_release_links"."video_id" AND can_manage_private_creator_profile(v.creator_profile_id)
   ));
 CREATE POLICY "youtube_video_release_links_system_all" ON "youtube_video_release_links" FOR ALL
   USING (is_system_rls_session()) WITH CHECK (is_system_rls_session());
