@@ -54,7 +54,8 @@ source lacks:
    emits exact-head pass/block receipts. The same receipt records the Shadcn /
    Typeset outcome inventory for the enrolled primitive batch (MIT public
    references only; missing/unknown benchmark dimensions fail closed).
-7. **Live Storybook certification (JOV-5454)** — build and serve the real web
+7. **Live rendered evaluation (JOV-5721)** — computed DOM/axe/zoom/hover/keyboard/token/screenshot evidence for changed stories when `--require-rendered --storybook-url=<url>` is used; advisory unless required.
+8. **Live Storybook certification (JOV-5454)** — build and serve the real web
    Storybook, resolve the canonical Badge/Button/Card story inventory by exact
    story id and import path, then evaluate those stories at desktop and compact
    viewports from computed browser evidence. Fail closed on missing
@@ -67,7 +68,7 @@ source lacks:
 ### Commands
 
 ```bash
-pnpm component-ship-gate          # diff + match + quality + ratchet + rendered cert + live Storybook cert
+pnpm component-ship-gate          # diff + match + quality + ratchet + rendered cert + rendered eval + live Storybook cert
 pnpm story-coverage:check         # multi-root ratchet only
 pnpm story-coverage:update        # explicit floor raise (never silent)
 pnpm storybook:quality            # story hygiene only

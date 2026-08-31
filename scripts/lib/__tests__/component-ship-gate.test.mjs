@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   auditCoverageViaReceipts,
   checkChangedComponents,
+  resolveRenderedEvaluationSection,
   runComponentShipGate,
 } from '../../component-ship-gate.mjs';
 import {
@@ -40,6 +41,8 @@ function fixtureRepo(tree) {
   return root;
 }
 
+const BADGE_COMPONENT_REL = 'packages/ui/atoms/badge.tsx';
+const STORYBOOK_URL = 'http://127.0.0.1:6006';
 const LEGACY_COMPONENT_REL =
   'apps/web/components/marketing/legacy/LegacyPanel.tsx';
 const LEGACY_TEST_REL = 'apps/web/tests/unit/marketing/LegacyPanel.test.tsx';
@@ -75,6 +78,19 @@ function legacyEvidenceResult({
     }
   );
 }
+
+const renderedPass = {
+  ok: true,
+  status: 0,
+  report: { ok: true, results: [] },
+  output: '{"ok":true}',
+};
+const renderedFailure = {
+  ok: false,
+  status: 1,
+  report: { ok: false },
+  output: 'missing rendered contract',
+};
 
 describe('component-ship-policy scope', () => {
   it('includes shippable surfaces and excludes tests/stories/utils', () => {
@@ -341,6 +357,14 @@ describe('diff gate', () => {
       applicable: true,
       ok: true,
       changedComponents: [sourceRel],
+      componentStories: [
+        {
+          component: sourceRel,
+          story: storyRel,
+          storyName: null,
+          storyNames: [],
+        },
+      ],
     });
   });
 
@@ -363,7 +387,16 @@ describe('diff gate', () => {
   });
 
   it('accepts central evidence only for a changed legacy component', () => {
-    expect(legacyEvidenceResult().ok).toBe(true);
+    const accepted = legacyEvidenceResult();
+    expect(accepted.ok).toBe(true);
+    expect(accepted.componentStories).toEqual([
+      {
+        component: LEGACY_COMPONENT_REL,
+        story: LEGACY_STORY_REL,
+        storyName: 'Legacy',
+        storyNames: ['Legacy'],
+      },
+    ]);
 
     const unchangedTest = legacyEvidenceResult({ changedTest: false });
     expect(unchangedTest.ok).toBe(false);
@@ -497,6 +530,37 @@ describe('diff gate', () => {
     expect(result.ok).toBe(true);
   });
 
+  it('preserves every catalog story export that contributes coverage', () => {
+    const result = legacyEvidenceResult({
+      componentSource: [
+        'export interface LegacyPanelProps {',
+        '  readonly title: string;',
+        '  readonly subtitle: string;',
+        '}',
+        'export function LegacyPanel({ title, subtitle }: LegacyPanelProps) { return <section>{title}{subtitle}</section> }',
+      ].join('\n'),
+      storySource: [
+        "import { LegacyPanel } from '@/components/marketing/legacy/LegacyPanel';",
+        'export const TitleCoverage = {',
+        "  render: () => <LegacyPanel title='Title' />,",
+        '};',
+        'export const SubtitleCoverage = {',
+        "  render: () => <LegacyPanel subtitle='Subtitle' />,",
+        '};',
+      ].join('\n'),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.componentStories).toEqual([
+      {
+        component: LEGACY_COMPONENT_REL,
+        story: LEGACY_STORY_REL,
+        storyName: 'TitleCoverage',
+        storyNames: ['TitleCoverage', 'SubtitleCoverage'],
+      },
+    ]);
+  });
+
   it('does not let one export exempt another export', () => {
     const result = legacyEvidenceResult({
       componentSource: [
@@ -521,6 +585,43 @@ describe('diff gate', () => {
     expect(result.issues.some(issue => issue.rule === 'missing-story')).toBe(
       true
     );
+  });
+});
+
+// biome-ignore format: compact fixture keeps this source-PR under the hard size cap
+function renderedSection(options = {}, response = renderedPass) { const calls = []; const result = resolveRenderedEvaluationSection({ changedComponents: [BADGE_COMPONENT_REL], storybookUrl: STORYBOOK_URL, evaluateRendered: args => { calls.push(args); return response; }, ...options }); return { calls, result }; }
+
+describe('live rendered evaluation section', () => {
+  // biome-ignore format: compact matrix keeps this source-PR under the hard size cap
+  it.each([['empty', {}, true, { applicable: false, skipped: true }], ['advisory without Storybook', { storybookUrl: null }, true, { skipped: true }], ['required without Storybook', { requireRendered: true, storybookUrl: null }, false, { ok: false, skipped: true }], ['advisory failure', {}, true, { ok: false, status: 1 }, renderedFailure], ['required failure', { requireRendered: true }, false, { ok: false, status: 1 }, renderedFailure]])('handles %s', (_name, options, ok, section, response) => {
+    const result =
+      _name === 'empty'
+        ? resolveRenderedEvaluationSection()
+        : renderedSection(options, response).result;
+    expect(result).toMatchObject({ ok, section });
+  });
+
+  it('runs rendered evaluation for adjacent component evidence', () => {
+    const { calls, result } = renderedSection({
+      captureDir: '/tmp/component-evidence',
+    });
+    // biome-ignore format: compact assertion keeps this source-PR under the hard size cap
+    expect(calls).toEqual([{ storybookUrl: STORYBOOK_URL, captureDir: '/tmp/component-evidence', components: [BADGE_COMPONENT_REL], storyPaths: [], expectedFamilies: ['badge'] }]);
+    expect(result.section).toMatchObject({
+      ok: true,
+      required: false,
+      status: 0,
+    });
+  });
+
+  it('forwards deduped canonical catalog exports to rendered evaluation', () => {
+    const { calls } = renderedSection({
+      changedComponents: [LEGACY_COMPONENT_REL],
+      // biome-ignore format: compact fixture keeps this source-PR under the hard size cap
+      componentStories: [{ component: LEGACY_COMPONENT_REL, story: LEGACY_STORY_REL, storyName: 'Legacy' }, { component: LEGACY_COMPONENT_REL, story: LEGACY_STORY_REL, storyName: 'TitleCoverage', storyNames: ['TitleCoverage', 'SubtitleCoverage'] }],
+    });
+    // biome-ignore format: compact assertion keeps this source-PR under the hard size cap
+    expect(calls[0]).toMatchObject({ components: [], storyPaths: [`${LEGACY_STORY_REL}#Legacy`, `${LEGACY_STORY_REL}#TitleCoverage`, `${LEGACY_STORY_REL}#SubtitleCoverage`], expectedFamilies: ['LegacyPanel'] });
   });
 });
 

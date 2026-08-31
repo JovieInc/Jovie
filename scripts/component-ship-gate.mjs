@@ -11,12 +11,13 @@
  *   5. Multi-root story-coverage ratchet (lock_up + no uncovered growth)
  *   6. Fail-closed source-blind rendered certification (JOV-5400)
  *      including the Shadcn/Typeset outcome inventory (JOV-5438)
- *   7. Fail-closed live Storybook certification for enrolled canonical
+ *   7. Live rendered component evaluation from computed Storybook DOM
+ *   8. Fail-closed live Storybook certification for enrolled canonical
  *      Badge/Button/Card stories (JOV-5454)
  *
  * Usage:
  *   pnpm component-ship-gate
- *   node scripts/component-ship-gate.mjs [--diff-base=origin/main] [--skip-quality] [--skip-ratchet] [--skip-rendered-cert] [--skip-live-storybook]
+ *   node scripts/component-ship-gate.mjs [--diff-base=origin/main] [--skip-quality] [--skip-ratchet] [--skip-rendered-cert] [--skip-live-storybook] [--require-rendered --storybook-url=http://127.0.0.1:6006]
  *
  * Env:
  *   COMPONENT_SHIP_DIFF_BASE / STORY_COVERAGE_DIFF_BASE / TURBO_SCM_BASE / GITHUB_BASE_REF
@@ -64,6 +65,9 @@ function parseArgs(argv) {
     skipRatchet: false,
     skipRenderedCert: false,
     skipLiveStorybook: false,
+    requireRendered: false,
+    storybookUrl: null,
+    captureDir: null,
     json: false,
     auditCoverageVia: false,
   };
@@ -74,7 +78,12 @@ function parseArgs(argv) {
     else if (arg === '--skip-ratchet') flags.skipRatchet = true;
     else if (arg === '--skip-rendered-cert') flags.skipRenderedCert = true;
     else if (arg === '--skip-live-storybook') flags.skipLiveStorybook = true;
-    else if (arg === '--audit-coverage-via') flags.auditCoverageVia = true;
+    else if (arg === '--require-rendered') flags.requireRendered = true;
+    else if (arg.startsWith('--storybook-url=')) {
+      flags.storybookUrl = arg.slice('--storybook-url='.length);
+    } else if (arg.startsWith('--capture-dir=')) {
+      flags.captureDir = arg.slice('--capture-dir='.length);
+    } else if (arg === '--audit-coverage-via') flags.auditCoverageVia = true;
     else if (arg === '--json') flags.json = true;
     else if (arg === '--help' || arg === '-h') flags.help = true;
   }
@@ -962,6 +971,7 @@ function findCanonicalMarketingStory({ sourceRel, componentSource, repoRoot }) {
       importedNames.map(item => [item.localName, item.exportName])
     );
     const openingTags = [];
+    const matchedStoryNames = new Set();
     const componentAllowlist = new Set();
 
     for (const statement of sourceFile.statements) {
@@ -996,6 +1006,11 @@ function findCanonicalMarketingStory({ sourceRel, componentSource, repoRoot }) {
       });
       if (statementTags.length === 0) continue;
       openingTags.push(...statementTags);
+      for (const declaration of statement.declarationList.declarations) {
+        if (ts.isIdentifier(declaration.name)) {
+          matchedStoryNames.add(declaration.name.text);
+        }
+      }
 
       if (exportNames.length !== 1) continue;
       walkAst(statement, node => {
@@ -1040,7 +1055,15 @@ function findCanonicalMarketingStory({ sourceRel, componentSource, repoRoot }) {
       componentRel: sourceRel,
       storyRel,
     });
-    if (match.ok) return { storyRel, storySource: scopedStorySource };
+    if (match.ok) {
+      const storyNames = [...matchedStoryNames];
+      return {
+        storyRel,
+        storySource: scopedStorySource,
+        storyName: storyNames[0] ?? null,
+        storyNames,
+      };
+    }
   }
 
   return null;
@@ -1064,6 +1087,7 @@ export function checkChangedComponents(
 ) {
   const issues = [];
   const componentSources = changed.filter(isUnderShipScope);
+  const componentStories = [];
 
   for (const sourceRel of componentSources) {
     const {
@@ -1183,12 +1207,28 @@ export function checkChangedComponents(
         detail: finding.detail,
       });
     }
+    if (match.ok) {
+      const selectedStoryNames = adjacentStoryRel
+        ? [null]
+        : centralStory?.storyNames?.length
+          ? centralStory.storyNames
+          : [centralStory?.storyName ?? null];
+      componentStories.push({
+        component: sourceRel,
+        story: storyRel,
+        storyName: selectedStoryNames[0] ?? null,
+        storyNames: selectedStoryNames.filter(
+          storyName => typeof storyName === 'string' && storyName
+        ),
+      });
+    }
   }
 
   return {
     ok: issues.length === 0,
     applicable: componentSources.length > 0,
     changedComponents: componentSources,
+    componentStories,
     issues,
   };
 }
@@ -1213,6 +1253,132 @@ function runRatchet() {
   return { ok: comparison.ok, comparison, measurement };
 }
 
+function runRenderedEvaluation({
+  storybookUrl,
+  captureDir,
+  components,
+  storyPaths = [],
+  expectedFamilies = [],
+}) {
+  const script = join(__dirname, 'component-rendered-evaluator.mjs');
+  const args = [script, `--storybook-url=${storybookUrl}`];
+  if (captureDir) args.push(`--capture-dir=${captureDir}`);
+  for (const component of components) args.push(`--component=${component}`);
+  for (const storyPath of storyPaths) args.push(`--story-path=${storyPath}`);
+  for (const family of expectedFamilies)
+    args.push(`--expected-family=${family}`);
+  const result = spawnSync(process.execPath, args, {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim();
+  let report = null;
+  try {
+    report = JSON.parse(result.stdout?.trim() ?? '');
+  } catch {
+    report = null;
+  }
+  return {
+    ok: result.status === 0 && report?.ok === true,
+    status: result.status ?? 1,
+    report,
+    output: output.slice(0, 6000),
+  };
+}
+
+export function resolveRenderedEvaluationSection({
+  changedComponents = [],
+  componentStories = [],
+  storybookUrl = null,
+  captureDir = null,
+  requireRendered = false,
+  evaluateRendered = runRenderedEvaluation,
+} = {}) {
+  if (changedComponents.length === 0) {
+    return {
+      ok: true,
+      section: {
+        ok: true,
+        applicable: false,
+        skipped: true,
+        note: 'no changed in-scope components',
+      },
+    };
+  }
+
+  if (!storybookUrl) {
+    const ok = !requireRendered;
+    return {
+      ok,
+      section: {
+        ok,
+        applicable: true,
+        skipped: true,
+        note: requireRendered
+          ? 'rendered evaluation required but --storybook-url was not provided'
+          : 'rendered evaluation not requested (advisory rollout)',
+      },
+    };
+  }
+
+  const componentFamilyName = component =>
+    String(component)
+      .split('/')
+      .pop()
+      .replace(/\.(?:tsx?|jsx?)$/i, '');
+  const expectedFamilies = [
+    ...new Set(changedComponents.map(componentFamilyName).filter(Boolean)),
+  ];
+  const rendered = evaluateRendered({
+    storybookUrl,
+    captureDir,
+    components: changedComponents.filter(
+      component =>
+        !componentStories.some(
+          entry =>
+            entry?.component === component &&
+            typeof entry.story === 'string' &&
+            entry.story
+        )
+    ),
+    storyPaths: [
+      ...new Set(
+        componentStories
+          .flatMap(entry => {
+            if (!entry?.story) return [];
+            const storyNames = Array.isArray(entry.storyNames)
+              ? entry.storyNames.filter(
+                  storyName => typeof storyName === 'string' && storyName
+                )
+              : [];
+            if (storyNames.length > 0)
+              return storyNames.map(storyName => `${entry.story}#${storyName}`);
+            return [
+              entry?.storyName
+                ? `${entry.story}#${entry.storyName}`
+                : entry.story,
+            ];
+          })
+          .filter(storyPath => typeof storyPath === 'string' && storyPath)
+      ),
+    ],
+    expectedFamilies,
+  });
+  const sectionOk = rendered.ok;
+  return {
+    ok: requireRendered ? sectionOk : true,
+    section: {
+      ok: sectionOk,
+      applicable: true,
+      required: requireRendered,
+      status: rendered.status,
+      report: rendered.report,
+      output: rendered.output,
+    },
+  };
+}
+
 export function runComponentShipGate(options = {}) {
   const flags = {
     // Honor an explicit null/empty diffBase as "no diff base" instead of
@@ -1231,6 +1397,9 @@ export function runComponentShipGate(options = {}) {
     skipRenderedCert: options.skipRenderedCert ?? false,
     skipLiveStorybook: options.skipLiveStorybook ?? false,
     headSha: options.headSha ?? null,
+    requireRendered: options.requireRendered ?? false,
+    storybookUrl: options.storybookUrl ?? null,
+    captureDir: options.captureDir ?? null,
     comparativeQualificationControls: options.comparativeQualificationControls,
     liveObservations: options.liveObservations,
     liveNodeVersion: options.liveNodeVersion,
@@ -1260,6 +1429,7 @@ export function runComponentShipGate(options = {}) {
       ok: true,
       applicable: false,
       changedComponents: [],
+      componentStories: [],
       issues: [],
       note: 'no diff base; skipped changed-component checks',
     };
@@ -1327,7 +1497,22 @@ export function runComponentShipGate(options = {}) {
     report.sections.renderedCertification = { ok: true, skipped: true };
   }
 
-  // 5) Live Storybook certification (JOV-5454)
+  // 5) Live source-blind browser evaluation. The declarative certification
+  // above remains the canonical invariant/fixture layer; this measures its
+  // runtime effects from computed DOM and accessibility output.
+  const changedComponents = report.sections.diff?.changedComponents ?? [];
+  const componentStories = report.sections.diff?.componentStories ?? [];
+  const renderedEvaluation = resolveRenderedEvaluationSection({
+    changedComponents,
+    componentStories,
+    storybookUrl: flags.storybookUrl,
+    captureDir: flags.captureDir,
+    requireRendered: flags.requireRendered,
+  });
+  report.sections.rendered = renderedEvaluation.section;
+  if (!renderedEvaluation.ok) report.ok = false;
+
+  // 6) Live Storybook certification (JOV-5454)
   if (!flags.skipLiveStorybook) {
     try {
       const live = runLiveStorybookCertification({
@@ -1455,6 +1640,19 @@ function printReport(report) {
     }
   }
 
+  const renderedEvaluation = report.sections.rendered;
+  if (renderedEvaluation?.skipped) {
+    const method = renderedEvaluation.ok ? 'advisory' : 'FAIL';
+    console[renderedEvaluation.ok ? 'log' : 'error'](
+      `[component-ship-gate] rendered: ${method} - ${renderedEvaluation.note}`
+    );
+  } else if (renderedEvaluation?.ok) {
+    console.log('[component-ship-gate] rendered: ok');
+  } else {
+    console.error('[component-ship-gate] rendered: FAIL');
+    if (renderedEvaluation?.output) console.error(renderedEvaluation.output);
+  }
+
   const live = report.sections.liveStorybookCertification;
   if (live?.skipped) {
     console.log('[component-ship-gate] live-storybook-cert: skipped');
@@ -1476,7 +1674,7 @@ function printReport(report) {
     console.log('[component-ship-gate] PASS');
   } else {
     console.error(
-      '[component-ship-gate] FAIL — shippable UI components require matching tests + stories + rendered certification + live Storybook certification (JOV-4421, JOV-5400, JOV-5438, JOV-5454)'
+      '[component-ship-gate] FAIL - shippable UI components require matching tests + stories + rendered certification + live rendered evaluation + live Storybook certification (JOV-4421, JOV-5400, JOV-5438, JOV-5454, JOV-5721)'
     );
   }
 }
@@ -1490,6 +1688,9 @@ function main(argv = process.argv.slice(2)) {
   --skip-ratchet         Skip multi-root story coverage ratchet
   --skip-rendered-cert   Skip source-blind rendered certification
   --skip-live-storybook  Skip live Storybook certification
+  --require-rendered     Fail closed when changed components lack rendered evidence
+  --storybook-url=URL    Evaluate computed DOM from a running Storybook instance
+  --capture-dir=PATH     Save desktop/compact rendered screenshots
   --audit-coverage-via   Whole-tree executable @coverage-via receipt audit
   --json                 Print machine-readable report`);
     return 0;
@@ -1521,6 +1722,9 @@ function main(argv = process.argv.slice(2)) {
     skipRatchet: flags.skipRatchet,
     skipRenderedCert: flags.skipRenderedCert,
     skipLiveStorybook: flags.skipLiveStorybook,
+    requireRendered: flags.requireRendered,
+    storybookUrl: flags.storybookUrl,
+    captureDir: flags.captureDir,
   });
 
   if (flags.json) {
