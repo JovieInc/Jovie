@@ -455,6 +455,7 @@ test('preload marks the hosted app as Electron after the document root is ready'
     join(desktopRoot, 'src/preload.ts'),
     'utf8'
   );
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
 
   assert.match(preloadSource, /function installElectronRuntimeMarker\(\)/);
   assert.match(preloadSource, /installElectronRuntimeMarker\(\);/);
@@ -468,6 +469,10 @@ test('preload marks the hosted app as Electron after the document root is ready'
   assert.match(preloadSource, /const APP_BOOTED_CHANNEL = 'app-booted'/);
   assert.match(preloadSource, /notifyAppBooted:/);
   assert.match(preloadSource, /ipcRenderer\.send\(APP_BOOTED_CHANNEL\)/);
+  assert.match(preloadSource, /launchOperatorControl:/);
+  assert.match(preloadSource, /LAUNCH_OPERATOR_CONTROL_CHANNEL/);
+  assert.match(mainSource, /from '\.\/operator-launch'/);
+  assert.match(mainSource, /ipcMain\.handle\(\s*LAUNCH_OPERATOR_CONTROL_CHANNEL/);
 });
 
 test('desktop bridge exposes bounded dictation support', async () => {
