@@ -47,20 +47,14 @@ source lacks:
 4. **Hygiene** — `pnpm storybook:quality` (no pure-black voids, no fake CTAs).
 5. **Ratchet** — multi-root floors in `scripts/story-coverage-baseline.json`
    may only improve; new uncovered components fail even if percent holds.
-6. **Rendered certification (JOV-5400 / JOV-5438)** — source-blind
-   fail-closed evaluator for applicable design, copy, accessibility,
-   interaction, layout-stability, theme, semantic-variant, tokenized-padding,
-   and concentric-radius invariants. Deliberate-red fixtures must block; the
-   current design-system landing batch emits exact-head pass/block receipts.
-   The same receipt records the Shadcn / Typeset outcome inventory for the
-   enrolled primitive batch (MIT public references only; missing/unknown
-   benchmark dimensions fail closed).
-7. **Live rendered evaluation (JOV-5721)** — source-blind browser evaluation of
-   changed component stories from computed DOM, accessibility output, and
-   screenshots when `--require-rendered` and `--storybook-url` are supplied.
-   It fails closed on missing contracts, token/semantic drift, contrast/axe
-   failures, text/zoom overflow, keyboard gaps, or hover layout shift. During
-   rollout, this section is advisory unless required mode is enabled.
+6. **Rendered certification (JOV-5400 / JOV-5438)** — source-blind fail-closed evaluator
+   for applicable design, copy, accessibility, interaction, layout-stability,
+   theme, semantic-variant, tokenized-padding, and concentric-radius invariants.
+   Deliberate-red fixtures must block; the current design-system landing batch
+   emits exact-head pass/block receipts. The same receipt records the Shadcn /
+   Typeset outcome inventory for the enrolled primitive batch (MIT public
+   references only; missing/unknown benchmark dimensions fail closed).
+7. **Live rendered evaluation (JOV-5721)** — computed DOM/axe/zoom/hover/keyboard/token/screenshot evidence for changed stories when `--require-rendered --storybook-url=<url>` is used; advisory unless required.
 8. **Live Storybook certification (JOV-5454)** — build and serve the real web
    Storybook, resolve the canonical Badge/Button/Card story inventory by exact
    story id and import path, then evaluate those stories at desktop and compact
@@ -82,16 +76,6 @@ pnpm storybook:quality            # story hygiene only
 
 Enforcement: `ci-fast` structural lane (required PR + merge_group check) and
 pre-push affected gate.
-
-## Rendered certification mode
-
-Required mode is `pnpm component-ship-gate -- --require-rendered --storybook-url=http://127.0.0.1:6006`.
-It fails closed without a running Storybook evaluator or rendered contract.
-Plain `pnpm component-ship-gate` stays advisory during legacy rollout; design
-system enrollment still requires the required mode. Stories declare family,
-owner, theme, surface, variant/tone, mapping, spacing/radius tokens,
-interactive state, and optional target attributes. The evaluator verifies those
-contracts from computed DOM/axe evidence; screenshots are receipts.
 
 ## Story matrix (default)
 

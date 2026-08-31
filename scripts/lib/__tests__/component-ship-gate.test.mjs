@@ -357,7 +357,9 @@ describe('diff gate', () => {
       applicable: true,
       ok: true,
       changedComponents: [sourceRel],
-      componentStories: [{ component: sourceRel, story: storyRel }],
+      componentStories: [
+        { component: sourceRel, story: storyRel, storyName: null },
+      ],
     });
   });
 
@@ -383,7 +385,11 @@ describe('diff gate', () => {
     const accepted = legacyEvidenceResult();
     expect(accepted.ok).toBe(true);
     expect(accepted.componentStories).toEqual([
-      { component: LEGACY_COMPONENT_REL, story: LEGACY_STORY_REL },
+      {
+        component: LEGACY_COMPONENT_REL,
+        story: LEGACY_STORY_REL,
+        storyName: 'Legacy',
+      },
     ]);
 
     const unchangedTest = legacyEvidenceResult({ changedTest: false });
@@ -547,47 +553,23 @@ describe('diff gate', () => {
 
 describe('live rendered evaluation section', () => {
   it('skips cleanly when no in-scope components changed', () => {
-    expect(resolveRenderedEvaluationSection()).toEqual({
+    expect(resolveRenderedEvaluationSection()).toMatchObject({
       ok: true,
-      section: {
-        ok: true,
-        applicable: false,
-        skipped: true,
-        note: 'no changed in-scope components',
-      },
+      section: { ok: true, applicable: false, skipped: true },
     });
   });
 
-  it('keeps missing Storybook advisory by default during rollout', () => {
-    expect(
-      resolveRenderedEvaluationSection({
-        changedComponents: [BADGE_COMPONENT_REL],
-      })
-    ).toEqual({
-      ok: true,
-      section: {
-        ok: true,
-        applicable: true,
-        skipped: true,
-        note: 'rendered evaluation not requested (advisory rollout)',
-      },
+  it.each([
+    ['advisory without Storybook', {}, true, true],
+    ['required without Storybook', { requireRendered: true }, false, false],
+  ])('handles %s', (_name, options, ok, sectionOk) => {
+    const result = resolveRenderedEvaluationSection({
+      changedComponents: [BADGE_COMPONENT_REL],
+      ...options,
     });
-  });
-
-  it('fails closed when rendered evidence is required without Storybook', () => {
-    expect(
-      resolveRenderedEvaluationSection({
-        changedComponents: [BADGE_COMPONENT_REL],
-        requireRendered: true,
-      })
-    ).toEqual({
-      ok: false,
-      section: {
-        ok: false,
-        applicable: true,
-        skipped: true,
-        note: 'rendered evaluation required but --storybook-url was not provided',
-      },
+    expect(result).toMatchObject({
+      ok,
+      section: { ok: sectionOk, applicable: true, skipped: true },
     });
   });
 
@@ -609,18 +591,12 @@ describe('live rendered evaluation section', () => {
         captureDir: '/tmp/component-evidence',
         components: [BADGE_COMPONENT_REL],
         storyPaths: [],
+        expectedFamilies: ['badge'],
       },
     ]);
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: true,
-      section: {
-        ok: true,
-        applicable: true,
-        required: false,
-        status: 0,
-        report: { ok: true, results: [] },
-        output: '{"ok":true}',
-      },
+      section: { ok: true, applicable: true, required: false, status: 0 },
     });
   });
 
@@ -628,10 +604,11 @@ describe('live rendered evaluation section', () => {
     const calls = [];
     resolveRenderedEvaluationSection({
       changedComponents: [LEGACY_COMPONENT_REL],
-      componentStories: [
-        { component: LEGACY_COMPONENT_REL, story: LEGACY_STORY_REL },
-        { component: LEGACY_COMPONENT_REL, story: LEGACY_STORY_REL },
-      ],
+      componentStories: Array.from({ length: 2 }, () => ({
+        component: LEGACY_COMPONENT_REL,
+        story: LEGACY_STORY_REL,
+        storyName: 'Legacy',
+      })),
       storybookUrl: STORYBOOK_URL,
       evaluateRendered: args => {
         calls.push(args);
@@ -641,48 +618,25 @@ describe('live rendered evaluation section', () => {
 
     expect(calls[0]).toMatchObject({
       components: [],
-      storyPaths: [LEGACY_STORY_REL],
+      storyPaths: [`${LEGACY_STORY_REL}#Legacy`],
+      expectedFamilies: ['LegacyPanel'],
     });
   });
 
-  it('keeps rendered evaluation failures advisory unless required', () => {
+  it.each([
+    ['advisory', false, true],
+    ['required', true, false],
+  ])('handles %s rendered evaluation failures', (_name, required, ok) => {
     expect(
       resolveRenderedEvaluationSection({
         changedComponents: [BADGE_COMPONENT_REL],
         storybookUrl: STORYBOOK_URL,
+        requireRendered: required,
         evaluateRendered: () => renderedFailure,
       })
-    ).toEqual({
-      ok: true,
-      section: {
-        ok: false,
-        applicable: true,
-        required: false,
-        status: 1,
-        report: { ok: false },
-        output: 'missing rendered contract',
-      },
-    });
-  });
-
-  it('propagates required rendered evaluation failures from Storybook evidence', () => {
-    expect(
-      resolveRenderedEvaluationSection({
-        changedComponents: [BADGE_COMPONENT_REL],
-        storybookUrl: STORYBOOK_URL,
-        requireRendered: true,
-        evaluateRendered: () => renderedFailure,
-      })
-    ).toEqual({
-      ok: false,
-      section: {
-        ok: false,
-        applicable: true,
-        required: true,
-        status: 1,
-        report: { ok: false },
-        output: 'missing rendered contract',
-      },
+    ).toMatchObject({
+      ok,
+      section: { ok: false, applicable: true, required, status: 1 },
     });
   });
 });

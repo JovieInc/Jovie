@@ -971,6 +971,7 @@ function findCanonicalMarketingStory({ sourceRel, componentSource, repoRoot }) {
       importedNames.map(item => [item.localName, item.exportName])
     );
     const openingTags = [];
+    const matchedStoryNames = new Set();
     const componentAllowlist = new Set();
 
     for (const statement of sourceFile.statements) {
@@ -1005,6 +1006,11 @@ function findCanonicalMarketingStory({ sourceRel, componentSource, repoRoot }) {
       });
       if (statementTags.length === 0) continue;
       openingTags.push(...statementTags);
+      for (const declaration of statement.declarationList.declarations) {
+        if (ts.isIdentifier(declaration.name)) {
+          matchedStoryNames.add(declaration.name.text);
+        }
+      }
 
       if (exportNames.length !== 1) continue;
       walkAst(statement, node => {
@@ -1049,7 +1055,12 @@ function findCanonicalMarketingStory({ sourceRel, componentSource, repoRoot }) {
       componentRel: sourceRel,
       storyRel,
     });
-    if (match.ok) return { storyRel, storySource: scopedStorySource };
+    if (match.ok)
+      return {
+        storyRel,
+        storySource: scopedStorySource,
+        storyName: [...matchedStoryNames][0] ?? null,
+      };
   }
 
   return null;
@@ -1194,7 +1205,11 @@ export function checkChangedComponents(
       });
     }
     if (match.ok) {
-      componentStories.push({ component: sourceRel, story: storyRel });
+      componentStories.push({
+        component: sourceRel,
+        story: storyRel,
+        storyName: adjacentStoryRel ? null : (centralStory?.storyName ?? null),
+      });
     }
   }
 
@@ -1232,12 +1247,15 @@ function runRenderedEvaluation({
   captureDir,
   components,
   storyPaths = [],
+  expectedFamilies = [],
 }) {
   const script = join(__dirname, 'component-rendered-evaluator.mjs');
   const args = [script, `--storybook-url=${storybookUrl}`];
   if (captureDir) args.push(`--capture-dir=${captureDir}`);
   for (const component of components) args.push(`--component=${component}`);
   for (const storyPath of storyPaths) args.push(`--story-path=${storyPath}`);
+  for (const family of expectedFamilies)
+    args.push(`--expected-family=${family}`);
   const result = spawnSync(process.execPath, args, {
     cwd: REPO_ROOT,
     encoding: 'utf8',
@@ -1293,6 +1311,14 @@ export function resolveRenderedEvaluationSection({
     };
   }
 
+  const componentFamilyName = component =>
+    String(component)
+      .split('/')
+      .pop()
+      .replace(/\.(?:tsx?|jsx?)$/i, '');
+  const expectedFamilies = [
+    ...new Set(changedComponents.map(componentFamilyName).filter(Boolean)),
+  ];
   const rendered = evaluateRendered({
     storybookUrl,
     captureDir,
@@ -1308,10 +1334,15 @@ export function resolveRenderedEvaluationSection({
     storyPaths: [
       ...new Set(
         componentStories
-          .map(entry => entry?.story)
+          .map(entry =>
+            entry?.storyName
+              ? `${entry.story}#${entry.storyName}`
+              : entry?.story
+          )
           .filter(storyPath => typeof storyPath === 'string' && storyPath)
       ),
     ],
+    expectedFamilies,
   });
   const sectionOk = rendered.ok;
   return {

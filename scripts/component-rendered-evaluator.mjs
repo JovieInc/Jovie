@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-
 import { mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -16,13 +15,13 @@ const VIEWPORTS = Object.freeze([
   { name: 'desktop', width: 1280, height: 900 },
   { name: 'compact', width: 390, height: 844 },
 ]);
-
 function parseArgs(argv) {
   const flags = {
     storybookUrl: null,
     captureDir: null,
     components: [],
     storyPaths: [],
+    expectedFamilies: [],
   };
   for (const arg of argv) {
     if (arg.startsWith('--storybook-url='))
@@ -33,22 +32,79 @@ function parseArgs(argv) {
       flags.components.push(arg.slice(12));
     else if (arg.startsWith('--story-path='))
       flags.storyPaths.push(arg.slice(13));
+    else if (arg.startsWith('--expected-family='))
+      flags.expectedFamilies.push(arg.slice(18));
   }
   return flags;
 }
-
 function normalizeImportPath(value) {
   return String(value ?? '')
     .replaceAll('\\', '/')
     .replace(/^\/+/, '')
     .replace(/^\.\//, '');
 }
-
+function parseStoryPathRequest(value) {
+  const raw = String(value ?? '');
+  const separator = raw.lastIndexOf('#');
+  if (separator === -1) {
+    return {
+      storyPath: normalizeImportPath(raw),
+      storyName: null,
+    };
+  }
+  return {
+    storyPath: normalizeImportPath(raw.slice(0, separator)),
+    storyName: raw.slice(separator + 1).trim() || null,
+  };
+}
+function nameSlug(value) {
+  return String(value ?? '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/[_\s]+/g, '-')
+    .replace(/[^a-z0-9-]+/gi, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase();
+}
+function storyNameMatches(entry, storyName) {
+  const expected = nameSlug(storyName);
+  if (!expected) return false;
+  const idSuffix = String(entry.id ?? '')
+    .split('--')
+    .pop();
+  return [entry.name, entry.exportName, idSuffix].some(
+    candidate => nameSlug(candidate) === expected
+  );
+}
+function componentFamilyName(component) {
+  return basename(normalizeImportPath(component)).replace(
+    /\.(?:tsx?|jsx?)$/i,
+    ''
+  );
+}
+function missingExpectedFamilies(snapshots, flags) {
+  const expected = [
+    ...flags.expectedFamilies,
+    ...flags.components.map(componentFamilyName),
+  ]
+    .filter(Boolean)
+    .map(nameSlug);
+  const rendered = new Set(
+    snapshots.map(snapshot => nameSlug(snapshot.family))
+  );
+  return [...new Set(expected)].filter(family => !rendered.has(family));
+}
 function storyRequestGroups(flags) {
   const requests = flags.storyPaths
-    .map(normalizeImportPath)
-    .filter(Boolean)
-    .map(storyPath => ({ label: storyPath, candidates: [storyPath] }));
+    .map(parseStoryPathRequest)
+    .filter(request => request.storyPath)
+    .map(request => ({
+      label: request.storyName
+        ? `${request.storyPath}#${request.storyName}`
+        : request.storyPath,
+      candidates: [request.storyPath],
+      storyName: request.storyName,
+    }));
   for (const component of flags.components) {
     const normalized = normalizeImportPath(component);
     if (!normalized) continue;
@@ -60,11 +116,11 @@ function storyRequestGroups(flags) {
         `${directory}/${stem}.stories.tsx`,
         `${directory}/${stem}.stories.ts`,
       ],
+      storyName: null,
     });
   }
   return requests;
 }
-
 export function storyCandidates(index, flags) {
   const requests = storyRequestGroups(flags);
   const matched = Object.values(index.entries ?? {})
@@ -82,10 +138,19 @@ export function storyCandidates(index, flags) {
     const requestMatches = matched
       .filter(({ importPath }) => candidatePaths.has(importPath))
       .map(({ entry }) => entry);
-    const certified = requestMatches.filter(entry =>
+    const namedMatches = request.storyName
+      ? requestMatches.filter(entry =>
+          storyNameMatches(entry, request.storyName)
+        )
+      : requestMatches;
+    const certified = namedMatches.filter(entry =>
       entry.tags?.includes('jovie-certification')
     );
-    const selected = certified.length > 0 ? certified : requestMatches;
+    const selected = request.storyName
+      ? namedMatches
+      : certified.length > 0
+        ? certified
+        : namedMatches;
     if (selected.length === 0) {
       missingRequests.push(request.label);
       continue;
@@ -96,10 +161,8 @@ export function storyCandidates(index, flags) {
       stories.push(story);
     }
   }
-
   return { stories, missingRequests };
 }
-
 function slug(value) {
   return String(value)
     .replace(/[^a-z0-9_-]+/gi, '-')
@@ -117,7 +180,47 @@ async function resolveVariantTarget(wrapper) {
   return wrapper;
 }
 
-async function collectSnapshots(page, story, viewport, storybookUrl) {
+async function exerciseKeyboardActivation(page, target) {
+  for (const key of ['Enter', 'Space']) {
+    const marker = `__jovieKeyboardActivation${Date.now()}${key}`;
+    try {
+      await target.evaluate((node, markerName) => {
+        globalThis[markerName] = false;
+        node.addEventListener('click', () => {
+          globalThis[markerName] = true;
+        });
+      }, marker);
+      await target.focus({ timeout: 5_000 });
+      await page.keyboard.press(key);
+      await page.waitForTimeout(20);
+      if (
+        await page.evaluate(
+          markerName => globalThis[markerName] === true,
+          marker
+        )
+      )
+        return true;
+    } catch {}
+  }
+  return false;
+}
+
+async function clearInteractionState(page) {
+  await page.mouse.move(-10, -10);
+  await page.evaluate(() => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+  });
+  await page.waitForTimeout(20);
+}
+
+async function collectSnapshots(
+  page,
+  story,
+  viewport,
+  storybookUrl,
+  capturePath = null
+) {
   await page.setViewportSize({
     width: viewport.width,
     height: viewport.height,
@@ -147,6 +250,8 @@ async function collectSnapshots(page, story, viewport, storybookUrl) {
     undefined,
     { timeout: 5_000 }
   );
+  await clearInteractionState(page);
+  if (capturePath) await page.screenshot({ path: capturePath, fullPage: true });
 
   const roots = page.locator('[data-jovie-eval-family]');
   const rootCount = await roots.count();
@@ -158,19 +263,17 @@ async function collectSnapshots(page, story, viewport, storybookUrl) {
     await root.evaluate((element, id) => {
       element.setAttribute('data-jovie-eval-instance', id);
     }, instanceId);
-    await page.evaluate(() => {
-      // Storybook's a11y tooling may leave a different axe-core build on the
-      // preview window. The evaluator injects its own pinned build per root.
-      Reflect.deleteProperty(window, 'axe');
-    });
+    await page.evaluate(() => Reflect.deleteProperty(window, 'axe'));
     const axe = await new AxeBuilder({ page })
       .include(`[data-jovie-eval-instance="${instanceId}"]`)
-      .withTags(['wcag2a', 'wcag2aa'])
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
       .analyze();
 
     const snapshot = await root.evaluate(
       (element, context) => {
         const parseColor = value => {
+          if (!value || !globalThis.CSS?.supports?.('color', value.trim()))
+            return null;
           const canvas = document.createElement('canvas');
           canvas.width = 1;
           canvas.height = 1;
@@ -212,6 +315,7 @@ async function collectSnapshots(page, story, viewport, storybookUrl) {
           const value = getComputedStyle(document.documentElement)
             .getPropertyValue(token)
             .trim();
+          if (!value) return null;
           return parseColor(value);
         };
         const px = value => Number.parseFloat(value) || 0;
@@ -232,6 +336,8 @@ async function collectSnapshots(page, story, viewport, storybookUrl) {
         };
         const focusableSelector =
           'a[href],button,input,select,textarea,[tabindex],[contenteditable=""],[contenteditable="true"]';
+        const nativeActivationSelector =
+          'button,a[href],input:not([type="hidden"]),select,textarea,summary';
         const isSequentiallyFocusable = node => {
           if (!(node instanceof HTMLElement)) return false;
           if (node.closest('[hidden],[inert]')) return false;
@@ -257,6 +363,24 @@ async function collectSnapshots(page, story, viewport, storybookUrl) {
             node instanceof HTMLTextAreaElement ||
             node.isContentEditable
           );
+        };
+        const graphicPaintColor = node => {
+          const candidates = [
+            ...(node.matches?.('svg') ? [node] : []),
+            ...node.querySelectorAll('svg, svg *'),
+          ];
+          for (const candidate of candidates) {
+            const candidateStyle = getComputedStyle(candidate);
+            for (const property of ['fill', 'stroke']) {
+              const rawValue = candidateStyle[property];
+              if (!rawValue || rawValue === 'none') continue;
+              const value =
+                rawValue === 'currentColor' ? candidateStyle.color : rawValue;
+              const color = parseColor(value);
+              if (color?.a > 0) return color;
+            }
+          }
+          return null;
         };
         const actualTheme = document.documentElement.classList.contains('dark')
           ? 'dark'
@@ -289,7 +413,11 @@ async function collectSnapshots(page, story, viewport, storybookUrl) {
             targetBackground?.a > 0
               ? targetBackground
               : parseColor(surfaceStyle.backgroundColor);
-          const foreground = parseColor(style.color);
+          const text = target.textContent?.trim() ?? '';
+          const hasText = text.length > 0;
+          const foreground = hasText
+            ? parseColor(style.color)
+            : graphicPaintColor(target);
           const radiusValue = tokenLength(radiusToken);
           const variantKey = wrapper.dataset.jovieEvalVariant ?? '';
           const expectedToneMapped = Object.prototype.hasOwnProperty.call(
@@ -305,6 +433,11 @@ async function collectSnapshots(page, story, viewport, storybookUrl) {
           const fontWeight = Number.parseFloat(style.fontWeight) || 0;
           const largeText =
             fontSize >= 24 || (fontSize >= 18.67 && fontWeight >= 700);
+          const requiredContrast = hasText ? (largeText ? 3 : 4.5) : 3;
+          const keyboardActivatable =
+            !interactive ||
+            (isSequentiallyFocusable(target) &&
+              target.matches(nativeActivationSelector));
           return {
             key: variantKey,
             tone: wrapper.dataset.jovieEvalTone ?? null,
@@ -380,14 +513,15 @@ async function collectSnapshots(page, story, viewport, storybookUrl) {
               );
             }),
             textContrast: contrast(foreground, inheritedBackground),
-            requiredContrast: largeText ? 3 : 4.5,
+            requiredContrast: foreground ? requiredContrast : null,
             overflowX: target.scrollWidth - target.clientWidth > 1,
             overflowY: target.scrollHeight - target.clientHeight > 1,
             zoomOverflow: false,
             interactive,
             keyboardReachable: !interactive || tabbables > 0,
+            keyboardActivatable,
             tabbableCount: tabbables,
-            text: target.textContent?.trim() ?? '',
+            text,
             hoverBoxBefore: {
               x: rect.x,
               y: rect.y,
@@ -428,11 +562,24 @@ async function collectSnapshots(page, story, viewport, storybookUrl) {
       if (!variant.interactive) continue;
       const wrapper = root.locator(variant.selector).first();
       const target = await resolveVariantTarget(wrapper);
+      if (variant.keyboardReachable && !variant.keyboardActivatable) {
+        variant.keyboardActivatable = await exerciseKeyboardActivation(
+          page,
+          target
+        );
+      }
       try {
+        await target.scrollIntoViewIfNeeded({ timeout: 5_000 });
+        variant.hoverRootBoxBefore = await root.boundingBox();
+        variant.hoverBoxBefore = await target.boundingBox();
         await target.hover({ timeout: 5_000 });
         variant.hoverBoxAfter = await target.boundingBox();
+        variant.hoverRootBoxAfter = await root.boundingBox();
       } catch (error) {
+        variant.hoverRootBoxBefore ??= null;
+        variant.hoverBoxBefore ??= null;
         variant.hoverBoxAfter = null;
+        variant.hoverRootBoxAfter = null;
         variant.hoverError =
           error instanceof Error ? error.message : String(error);
       }
@@ -441,6 +588,7 @@ async function collectSnapshots(page, story, viewport, storybookUrl) {
     snapshots.push(snapshot);
   }
 
+  await clearInteractionState(page);
   await page.evaluate(() => {
     document.documentElement.style.zoom = '2';
   });
@@ -449,6 +597,11 @@ async function collectSnapshots(page, story, viewport, storybookUrl) {
     .locator('[data-jovie-eval-family]')
     .evaluateAll(elements =>
       elements.map(element => {
+        const rootRect = element.getBoundingClientRect();
+        const rootOverflowX =
+          element.scrollWidth - element.clientWidth > 1 ||
+          rootRect.left < -1 ||
+          rootRect.right - window.innerWidth > 1;
         const variants = [
           ...element.querySelectorAll('[data-jovie-eval-variant]'),
         ].map(wrapper => {
@@ -465,6 +618,7 @@ async function collectSnapshots(page, story, viewport, storybookUrl) {
         return {
           family: element.dataset.jovieEvalFamily ?? '',
           instanceId: element.getAttribute('data-jovie-eval-instance') ?? '',
+          overflowX: rootOverflowX,
           variants,
         };
       })
@@ -486,7 +640,10 @@ async function collectSnapshots(page, story, viewport, storybookUrl) {
       const zoomVariant = zoomVariants.get(variant.key);
       variant.zoomOverflowX = zoomVariant?.overflowX ?? false;
       variant.zoomOverflowY = zoomVariant?.overflowY ?? false;
-      variant.zoomOverflow = variant.zoomOverflowX || variant.zoomOverflowY;
+      variant.zoomOverflow =
+        variant.zoomOverflowX ||
+        variant.zoomOverflowY ||
+        zoom?.overflowX === true;
     }
   }
   return snapshots;
@@ -522,18 +679,12 @@ async function main() {
             page,
             story,
             viewport,
-            flags.storybookUrl
+            flags.storybookUrl,
+            flags.captureDir
+              ? join(flags.captureDir, `${slug(story.id)}-${viewport.name}.png`)
+              : null
           );
           snapshots.push(...storySnapshots);
-          if (flags.captureDir) {
-            await page.screenshot({
-              path: join(
-                flags.captureDir,
-                `${slug(story.id)}-${viewport.name}.png`
-              ),
-              fullPage: true,
-            });
-          }
         } catch (error) {
           missingContracts.push({
             storyId: story.id,
@@ -548,6 +699,7 @@ async function main() {
   }
 
   const evaluated = evaluateRenderedSnapshots(snapshots);
+  const missingFamilies = missingExpectedFamilies(snapshots, flags);
   const report = {
     schemaVersion: 1,
     gate: 'component-rendered-evaluator',
@@ -555,12 +707,14 @@ async function main() {
     stories: stories.map(story => story.id),
     captures: flags.captureDir,
     missingRequests,
+    missingFamilies,
     missingContracts,
     ...evaluated,
     ok:
       evaluated.ok &&
       missingContracts.length === 0 &&
-      missingRequests.length === 0,
+      missingRequests.length === 0 &&
+      missingFamilies.length === 0,
   };
   console.log(JSON.stringify(report));
   process.exit(report.ok ? 0 : 1);
