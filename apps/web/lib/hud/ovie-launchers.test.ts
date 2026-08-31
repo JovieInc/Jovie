@@ -7,9 +7,6 @@ import {
   OVIE_LAUNCHER_CATALOG,
   OVIE_REQUIRED_PRIMARY_LAUNCHER_IDS,
   type OvieLauncherControl,
-  type OvieLauncherDefinition,
-  type OvieLauncherInventory,
-  type OvieLauncherResolvedDestination,
   originFromUrl,
   publicHref,
   rankLaunchers,
@@ -17,21 +14,16 @@ import {
   stripSecrets,
 } from './ovie-launchers';
 
-const READY: Record<string, 'ready'> = Object.fromEntries(
+const READY = Object.fromEntries(
   OVIE_LAUNCHER_CATALOG.filter(item => !item.agentCliOnly).map(item => [
     item.id,
     'ready' as const,
   ])
 );
 
-function destinationsFromConfig(config: {
-  readonly gbrainApiUrl?: string;
-  readonly hermesWebUrl?: string;
-  readonly symphonySshHost?: string;
-  readonly githubOwner?: string;
-  readonly githubRepo?: string;
-  readonly productionOrigin?: string;
-}): Record<string, OvieLauncherResolvedDestination> {
+function destinations(
+  config: Parameters<typeof resolveLauncherDestination>[1]
+) {
   return Object.fromEntries(
     OVIE_LAUNCHER_CATALOG.map(definition => [
       definition.id,
@@ -40,16 +32,13 @@ function destinationsFromConfig(config: {
   );
 }
 
-function catalogItem(id: string): OvieLauncherDefinition {
-  return OVIE_LAUNCHER_CATALOG.find(
-    item => item.id === id
-  ) as OvieLauncherDefinition;
-}
+const QUIET = { timActionCount: 0, availability: READY };
+const item = (id: string) => OVIE_LAUNCHER_CATALOG.find(row => row.id === id)!;
 
 describe('ovie-launchers inventory', () => {
   it('keeps required human controls on the primary rail and agent CLI in advanced', () => {
     const inventory = rankLaunchers({
-      destinations: destinationsFromConfig({
+      destinations: destinations({
         gbrainApiUrl: 'http://100.64.1.2:7801/mcp',
         hermesWebUrl: 'http://127.0.0.1:7800',
         productionOrigin: 'https://jov.ie',
@@ -68,51 +57,50 @@ describe('ovie-launchers inventory', () => {
   });
 
   it('raises review tools from verified Tim-action count only', () => {
-    const destinations = destinationsFromConfig({});
-    const quiet = rankLaunchers({
-      destinations,
-      state: { timActionCount: 0, availability: READY },
-    });
+    const dest = destinations({});
+    const quiet = rankLaunchers({ destinations: dest, state: QUIET });
     const busy = rankLaunchers({
-      destinations,
+      destinations: dest,
       state: { timActionCount: 4, availability: READY },
     });
-    const githubQuiet = quiet.primary.find(item => item.id === 'github-prs');
-    const githubBusy = busy.primary.find(item => item.id === 'github-prs');
-    expect(githubBusy?.rankScore ?? 0).toBeGreaterThan(
-      githubQuiet?.rankScore ?? 0
+    expect(
+      busy.primary.find(item => item.id === 'github-prs')?.rankScore ?? 0
+    ).toBeGreaterThan(
+      quiet.primary.find(item => item.id === 'github-prs')?.rankScore ?? 0
     );
-    expect(githubBusy?.why).toMatch(/4 open Tim-action/);
-    expect(githubQuiet?.why).not.toMatch(/Tim-action/);
+    expect(busy.primary.find(item => item.id === 'github-prs')?.why).toMatch(
+      /4 open Tim-action/
+    );
+    expect(
+      quiet.primary.find(item => item.id === 'github-prs')?.why
+    ).not.toMatch(/Tim-action/);
   });
 
   it('fails closed when required controls are crowded out or agent CLI is promoted', () => {
     const inventory = rankLaunchers({
-      destinations: destinationsFromConfig({}),
-      state: { timActionCount: 0, availability: READY },
+      destinations: destinations({}),
+      state: QUIET,
     });
-    const crowded: OvieLauncherInventory = {
-      ...inventory,
-      primary: inventory.primary.filter(item => item.id !== 'gbrain'),
-    };
-    expect(() => assertPrimaryRailInvariants(crowded)).toThrow(
-      /Required human control "gbrain"/
-    );
-    const poisoned: OvieLauncherInventory = {
-      ...inventory,
-      primary: [
-        ...inventory.primary,
-        inventory.advanced[0] as OvieLauncherControl,
-      ],
-    };
-    expect(() => assertPrimaryRailInvariants(poisoned)).toThrow(
-      /Agent-only control/
-    );
+    expect(() =>
+      assertPrimaryRailInvariants({
+        ...inventory,
+        primary: inventory.primary.filter(item => item.id !== 'gbrain'),
+      })
+    ).toThrow(/Required human control "gbrain"/);
+    expect(() =>
+      assertPrimaryRailInvariants({
+        ...inventory,
+        primary: [
+          ...inventory.primary,
+          inventory.advanced[0] as OvieLauncherControl,
+        ],
+      })
+    ).toThrow(/Agent-only control/);
     expect(() =>
       rankLaunchers({
         catalog: OVIE_LAUNCHER_CATALOG.filter(item => item.id !== 'gbrain'),
-        destinations: destinationsFromConfig({}),
-        state: { timActionCount: 0, availability: READY },
+        destinations: destinations({}),
+        state: QUIET,
       })
     ).toThrow(/Required human control "gbrain"/);
     expect(() =>
@@ -122,22 +110,23 @@ describe('ovie-launchers inventory', () => {
             ? { ...item, requiredOnPrimary: true }
             : item
         ),
-        destinations: destinationsFromConfig({}),
-        state: { timActionCount: 0, availability: READY },
+        destinations: destinations({}),
+        state: QUIET,
       })
     ).toThrow(/Agent-only control "hermes-cli-worker"/);
   });
 
   it('does not invent account-specific or secret-bearing URLs', () => {
-    const gbrain = resolveLauncherDestination(catalogItem('gbrain'), {
-      gbrainApiUrl: 'http://127.0.0.1:7801/mcp?q=1',
-    });
-    expect(gbrain.href).toBe('http://127.0.0.1:7801');
+    expect(
+      resolveLauncherDestination(item('gbrain'), {
+        gbrainApiUrl: 'http://127.0.0.1:7801/mcp?q=1',
+      }).href
+    ).toBe('http://127.0.0.1:7801');
     expect(githubPullsUrl('JovieInc', 'Jovie')).toBe(
       'https://github.com/JovieInc/Jovie/pulls'
     );
     expect(githubPullsUrl('../evil', 'Jovie')).toBeNull();
-    expect(resolveLauncherDestination(catalogItem('mercury'), {}).href).toBe(
+    expect(resolveLauncherDestination(item('mercury'), {}).href).toBe(
       'https://app.mercury.com'
     );
     expect(
@@ -152,29 +141,28 @@ describe('ovie-launchers inventory', () => {
   });
 
   it('keeps Symphony on SSH, searchable, and off the homemade 4041 API', () => {
-    const symphony = resolveLauncherDestination(catalogItem('symphony'), {
+    const symphony = resolveLauncherDestination(item('symphony'), {
       symphonySshHost: 'evil.example',
     });
     expect(symphony.href).toBeUndefined();
     expect(symphony.sshHost).toBe('gem');
     expect(symphony.display).toBe('ssh gem');
-    const control = buildLauncherControl({
-      definition: catalogItem('symphony'),
-      destination: symphony,
-      status: 'ready',
-      timActionCount: 0,
-    });
-    expect(control.why).not.toMatch(/4041/);
+    expect(
+      buildLauncherControl({
+        definition: item('symphony'),
+        destination: symphony,
+        status: 'ready',
+        timActionCount: 0,
+      }).why
+    ).not.toMatch(/4041/);
     const matches = filterLaunchers(
       rankLaunchers({
-        destinations: destinationsFromConfig({
-          gbrainApiUrl: 'http://127.0.0.1:7801',
-        }),
-        state: { timActionCount: 0, availability: READY },
+        destinations: destinations({ gbrainApiUrl: 'http://127.0.0.1:7801' }),
+        state: QUIET,
       }).all,
       'symphony tui'
     );
-    expect(matches.map(item => item.id)).toEqual(['symphony']);
+    expect(matches.map(row => row.id)).toEqual(['symphony']);
     expect(matches[0]?.destinationDisplay).toMatch(/^ssh /);
   });
 });

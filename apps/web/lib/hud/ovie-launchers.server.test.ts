@@ -59,10 +59,9 @@ describe('ovie-launchers.server', () => {
     expect(destinations.symphony?.sshHost).toBe('gem');
     expect(destinations.symphony?.href).toBeUndefined();
     hoisted.serverFetch.mockRejectedValue(new Error('connect ECONNREFUSED'));
-    const result = await preflightWebDestination(
-      'http://127.0.0.1:7801/health'
-    );
-    expect(result).toEqual({
+    await expect(
+      preflightWebDestination('http://127.0.0.1:7801/health')
+    ).resolves.toEqual({
       status: 'unavailable',
       detail: 'Destination unreachable',
     });

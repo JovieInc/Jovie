@@ -1,11 +1,12 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/features/admin/hud/OvieLauncherRail.test.tsx
+
 import { Button, Input } from '@jovie/ui';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { HudObservationStatus } from '@/components/features/admin/hud/HudObservationStatus';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { launchOperatorControl } from '@/lib/desktop/electron-bridge';
-import type { HudObservationState } from '@/lib/hud/observation';
 import {
   filterLaunchers,
   type OvieLauncherControl,
@@ -17,40 +18,16 @@ import {
 const FETCH_URL = '/api/admin/hud/ovie-launchers';
 const FETCH_TIMEOUT_MS = 8_000;
 
+// biome-ignore format: compact status copy
 const STATUS_LABEL: Record<OvieLauncherStatus, string> = {
-  ready: 'Ready',
-  unavailable: 'Unavailable',
-  not_configured: 'Not configured',
-  error: 'Error',
+  ready: 'Ready', unavailable: 'Unavailable',
+  not_configured: 'Not configured', error: 'Error',
 };
-
-function observationFromLoad(input: {
-  readonly isLoading: boolean;
-  readonly fetchFailed: boolean;
-  readonly inventory: OvieLauncherInventory | null;
-}): HudObservationState {
-  if (input.isLoading && !input.inventory) return 'loading';
-  if (input.fetchFailed) return 'unavailable';
-  if (!input.inventory) return 'empty';
-  return 'fresh';
-}
 
 function LaunchControl({
   control,
 }: Readonly<{ readonly control: OvieLauncherControl }>) {
   const disabled = control.status !== 'ready';
-  const title = `${control.label}. ${control.why}`;
-
-  async function handleActivate() {
-    if (disabled) return;
-    await launchOperatorControl({
-      id: control.id,
-      kind: control.kind,
-      href: control.href,
-      sshHost: control.sshHost,
-    });
-  }
-
   return (
     <Button
       type='button'
@@ -58,13 +35,19 @@ function LaunchControl({
       size='sm'
       disabled={disabled}
       aria-label={`${control.label}, ${STATUS_LABEL[control.status]}`}
-      title={title}
+      title={`${control.label}. ${control.why}`}
       data-testid={`ovie-launcher-${control.id}`}
       data-group={control.group}
       data-status={control.status}
       className='min-h-8 justify-start'
       onClick={() => {
-        void handleActivate();
+        if (disabled) return;
+        void launchOperatorControl({
+          id: control.id,
+          kind: control.kind,
+          href: control.href,
+          sshHost: control.sshHost,
+        });
       }}
     >
       <span className='truncate'>{control.label}</span>
@@ -113,24 +96,22 @@ function AllToolsList({
   }
   return (
     <ul className='grid gap-2'>
-      {controls.map(control => (
+      {controls.map(c => (
         <li
-          key={control.id}
+          key={c.id}
           className='rounded-lg border border-subtle bg-surface-0 px-3 py-2'
-          data-testid={`ovie-launcher-all-${control.id}`}
+          data-testid={`ovie-launcher-all-${c.id}`}
         >
-          <div className='flex items-center justify-between gap-2'>
-            <p className='text-xs font-medium text-primary-token'>
-              {control.label}
-            </p>
-            <p className='text-2xs text-tertiary-token'>
-              {STATUS_LABEL[control.status]}
-            </p>
-          </div>
-          <p className='mt-1 text-2xs text-secondary-token'>
-            {control.destinationDisplay}
+          <p className='flex items-center justify-between gap-2 text-xs font-medium text-primary-token'>
+            {c.label}
+            <span className='text-2xs font-normal text-tertiary-token'>
+              {STATUS_LABEL[c.status]}
+            </span>
           </p>
-          <p className='mt-1 text-2xs text-tertiary-token'>{control.why}</p>
+          <p className='mt-1 text-2xs text-secondary-token'>
+            {c.destinationDisplay}
+          </p>
+          <p className='mt-1 text-2xs text-tertiary-token'>{c.why}</p>
         </li>
       ))}
     </ul>
@@ -170,11 +151,14 @@ export function OvieLauncherRail() {
     void fetchInventory();
   }, [fetchInventory]);
 
-  const observation = observationFromLoad({
-    isLoading,
-    fetchFailed,
-    inventory,
-  });
+  const observation =
+    isLoading && !inventory
+      ? 'loading'
+      : fetchFailed
+        ? 'unavailable'
+        : inventory
+          ? 'fresh'
+          : 'empty';
   const primaryInternal =
     inventory?.primary.filter(item => item.group === 'internal') ?? [];
   const primaryExternal =
@@ -217,9 +201,7 @@ export function OvieLauncherRail() {
         <HudObservationStatus
           state='unavailable'
           message='Launcher destinations could not be loaded.'
-          onRetry={() => {
-            void fetchInventory();
-          }}
+          onRetry={() => void fetchInventory()}
           testId='ovie-launcher-observation'
         />
       ) : null}

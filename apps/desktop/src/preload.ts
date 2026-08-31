@@ -198,10 +198,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       kind: 'web' | 'ssh';
       href?: string;
       sshHost?: string;
-    }) => {
-      return ipcRenderer.invoke(
-        LAUNCH_OPERATOR_CONTROL_CHANNEL,
-        request
-      ) as Promise<{ ok: boolean; reason?: string }>;
-    },
+    }) =>
+      ipcRenderer.invoke(LAUNCH_OPERATOR_CONTROL_CHANNEL, request) as Promise<{
+        ok: boolean;
+        reason?: string;
+      }>,
 });

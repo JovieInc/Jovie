@@ -1,230 +1,73 @@
 export type OvieLauncherGroup = 'internal' | 'external';
 export type OvieLauncherKind = 'web' | 'ssh';
 export type OvieLauncherOwner = 'human' | 'agent';
+// biome-ignore format: compact unions
 export type OvieLauncherLoop =
-  | 'review'
-  | 'approve'
-  | 'observe'
-  | 'communicate'
-  | 'recover';
+  | 'review' | 'approve' | 'observe' | 'communicate' | 'recover';
+// biome-ignore format: compact unions
 export type OvieLauncherStatus =
-  | 'ready'
-  | 'unavailable'
-  | 'not_configured'
-  | 'error';
+  | 'ready' | 'unavailable' | 'not_configured' | 'error';
 
+// biome-ignore format: compact required-id list
 export const OVIE_REQUIRED_PRIMARY_LAUNCHER_IDS = [
-  'gbrain',
-  'hermes',
-  'symphony',
-  'mercury',
-  'gmail',
-  'github-prs',
-  'vercel',
+  'gbrain', 'hermes', 'symphony', 'mercury', 'gmail', 'github-prs', 'vercel',
 ] as const;
 
+// biome-ignore format: compact origins
 export const OVIE_CONFIGURED_PUBLIC_ORIGINS = {
-  mercury: 'https://app.mercury.com',
-  gmail: 'https://mail.google.com',
-  linear: 'https://linear.app/jovie',
-  vercelDashboard: 'https://vercel.com/dashboard',
-  status: 'https://status.jov.ie',
-  githubOwner: 'JovieInc',
-  githubRepo: 'Jovie',
+  mercury: 'https://app.mercury.com', gmail: 'https://mail.google.com',
+  linear: 'https://linear.app/jovie', vercelDashboard: 'https://vercel.com/dashboard',
+  status: 'https://status.jov.ie', githubOwner: 'JovieInc', githubRepo: 'Jovie',
 } as const;
 
 export const HERMES_GATEWAY_TEMPLATE_ORIGIN = 'http://127.0.0.1:7800';
 export const GBRAIN_HTTP_TEMPLATE_ORIGIN = 'http://127.0.0.1:7801';
 export const SYMPHONY_SSH_TEMPLATE_HOST = 'gem';
 
+// biome-ignore format: compact definition
 export interface OvieLauncherDefinition {
-  readonly id: string;
-  readonly label: string;
-  readonly group: OvieLauncherGroup;
-  readonly kind: OvieLauncherKind;
-  readonly owner: OvieLauncherOwner;
-  readonly loop: OvieLauncherLoop;
-  readonly requiredOnPrimary: boolean;
-  readonly agentCliOnly: boolean;
-  readonly searchTerms: readonly string[];
-  readonly destinationSummary: string;
+  readonly id: string; readonly label: string;
+  readonly group: OvieLauncherGroup; readonly kind: OvieLauncherKind;
+  readonly owner: OvieLauncherOwner; readonly loop: OvieLauncherLoop;
+  readonly requiredOnPrimary: boolean; readonly agentCliOnly: boolean;
+  readonly searchTerms: readonly string[]; readonly destinationSummary: string;
 }
 
-function human(
-  id: string,
-  label: string,
-  group: OvieLauncherGroup,
-  kind: OvieLauncherKind,
-  loop: OvieLauncherLoop,
-  requiredOnPrimary: boolean,
-  terms: string,
-  destinationSummary: string
-): OvieLauncherDefinition {
+function parseCatalogRow(line: string): OvieLauncherDefinition {
+  const [id, label, group, kind, loop, owner, required, agent, terms, dest] =
+    line.split('|');
+  // biome-ignore format: compact catalog row
   return {
-    id,
-    label,
-    group,
-    kind,
-    owner: 'human',
-    loop,
-    requiredOnPrimary,
-    agentCliOnly: false,
-    searchTerms: terms.split(' '),
-    destinationSummary,
+    id, label, group: group as OvieLauncherGroup, kind: kind as OvieLauncherKind,
+    loop: loop as OvieLauncherLoop, owner: owner as OvieLauncherOwner,
+    requiredOnPrimary: required === '1', agentCliOnly: agent === '1',
+    searchTerms: terms.split(' '), destinationSummary: dest,
   };
 }
 
-function agentCli(
-  id: string,
-  label: string,
-  loop: OvieLauncherLoop,
-  terms: string,
-  destinationSummary: string
-): OvieLauncherDefinition {
-  return {
-    id,
-    label,
-    group: 'internal',
-    kind: 'ssh',
-    owner: 'agent',
-    loop,
-    requiredOnPrimary: false,
-    agentCliOnly: true,
-    searchTerms: terms.split(' '),
-    destinationSummary,
-  };
-}
+export const OVIE_LAUNCHER_CATALOG: readonly OvieLauncherDefinition[] = `
+gbrain|GBrain|internal|web|observe|human|1|0|gbrain memory wiki|GBrain web from GBRAIN_API_URL
+hermes|Hermes|internal|web|observe|human|1|0|hermes gateway air|Hermes web from Air gateway template
+symphony|Symphony|internal|ssh|recover|human|1|0|symphony gem tui elixir|Official Elixir Symphony TUI on Gem via SSH
+mercury|Mercury|external|web|observe|human|1|0|mercury bank cash runway|Official Mercury app
+gmail|Gmail|external|web|communicate|human|1|0|gmail mail email|Official Gmail web app
+github-prs|GitHub PRs|external|web|review|human|1|0|github pull pr review|Configured GitHub repo pull request list
+vercel|Vercel|external|web|observe|human|1|0|vercel deploy production|Canonical Vercel dashboard from Ops costs
+linear|Linear|external|web|approve|human|0|0|linear issues backlog|Jovie Linear team
+status|Status|external|web|observe|human|0|0|status uptime incident|Canonical status.jov.ie
+production|Production|external|web|observe|human|0|0|production jov.ie site|Production origin from NEXT_PUBLIC_APP_URL
+hermes-cli-worker|Hermes CLI worker|internal|ssh|recover|agent|0|1|hermes cli worker agent|Agent-owned CLI worker
+symphony-lease-guard|Symphony lease guard|internal|ssh|recover|agent|0|1|lease guard symphony cli|Agent-owned lease CLI
+gbrain-search-cli|GBrain CLI|internal|ssh|observe|agent|0|1|gbrain cli search|Agent-owned gbrain CLI
+`
+  .trim()
+  .split('\n')
+  .map(parseCatalogRow);
 
-export const OVIE_LAUNCHER_CATALOG: readonly OvieLauncherDefinition[] = [
-  human(
-    'gbrain',
-    'GBrain',
-    'internal',
-    'web',
-    'observe',
-    true,
-    'gbrain memory wiki',
-    'GBrain web from GBRAIN_API_URL'
-  ),
-  human(
-    'hermes',
-    'Hermes',
-    'internal',
-    'web',
-    'observe',
-    true,
-    'hermes gateway air',
-    'Hermes web from Air gateway template'
-  ),
-  human(
-    'symphony',
-    'Symphony',
-    'internal',
-    'ssh',
-    'recover',
-    true,
-    'symphony gem tui elixir',
-    'Official Elixir Symphony TUI on Gem via SSH'
-  ),
-  human(
-    'mercury',
-    'Mercury',
-    'external',
-    'web',
-    'observe',
-    true,
-    'mercury bank cash runway',
-    'Official Mercury app'
-  ),
-  human(
-    'gmail',
-    'Gmail',
-    'external',
-    'web',
-    'communicate',
-    true,
-    'gmail mail email',
-    'Official Gmail web app'
-  ),
-  human(
-    'github-prs',
-    'GitHub PRs',
-    'external',
-    'web',
-    'review',
-    true,
-    'github pull pr review',
-    'Configured GitHub repo pull request list'
-  ),
-  human(
-    'vercel',
-    'Vercel',
-    'external',
-    'web',
-    'observe',
-    true,
-    'vercel deploy production',
-    'Canonical Vercel dashboard from Ops costs'
-  ),
-  human(
-    'linear',
-    'Linear',
-    'external',
-    'web',
-    'approve',
-    false,
-    'linear issues backlog',
-    'Jovie Linear team'
-  ),
-  human(
-    'status',
-    'Status',
-    'external',
-    'web',
-    'observe',
-    false,
-    'status uptime incident',
-    'Canonical status.jov.ie'
-  ),
-  human(
-    'production',
-    'Production',
-    'external',
-    'web',
-    'observe',
-    false,
-    'production jov.ie site',
-    'Production origin from NEXT_PUBLIC_APP_URL'
-  ),
-  agentCli(
-    'hermes-cli-worker',
-    'Hermes CLI worker',
-    'recover',
-    'hermes cli worker agent',
-    'Agent-owned CLI worker'
-  ),
-  agentCli(
-    'symphony-lease-guard',
-    'Symphony lease guard',
-    'recover',
-    'lease guard symphony cli',
-    'Agent-owned lease CLI'
-  ),
-  agentCli(
-    'gbrain-search-cli',
-    'GBrain CLI',
-    'observe',
-    'gbrain cli search',
-    'Agent-owned gbrain CLI'
-  ),
-];
-
+// biome-ignore format: compact destination
 export interface OvieLauncherResolvedDestination {
-  readonly href?: string;
-  readonly sshHost?: string;
-  readonly display: string;
-  readonly configured: boolean;
-  readonly source: string;
+  readonly href?: string; readonly sshHost?: string;
+  readonly display: string; readonly configured: boolean; readonly source: string;
 }
 
 export interface OvieLauncherVerifiedState {
@@ -232,23 +75,11 @@ export interface OvieLauncherVerifiedState {
   readonly availability: Readonly<Record<string, OvieLauncherStatus>>;
 }
 
-export interface OvieLauncherControl {
-  readonly id: string;
-  readonly label: string;
-  readonly group: OvieLauncherGroup;
-  readonly kind: OvieLauncherKind;
-  readonly owner: OvieLauncherOwner;
-  readonly loop: OvieLauncherLoop;
-  readonly requiredOnPrimary: boolean;
-  readonly agentCliOnly: boolean;
-  readonly status: OvieLauncherStatus;
-  readonly rankScore: number;
-  readonly why: string;
-  readonly destinationSummary: string;
-  readonly destinationDisplay: string;
-  readonly href?: string;
-  readonly sshHost?: string;
-  readonly searchText: string;
+// biome-ignore format: compact control
+export interface OvieLauncherControl extends OvieLauncherDefinition {
+  readonly status: OvieLauncherStatus; readonly rankScore: number;
+  readonly why: string; readonly destinationDisplay: string;
+  readonly href?: string; readonly sshHost?: string; readonly searchText: string;
 }
 
 export interface OvieLauncherInventory {
@@ -268,6 +99,15 @@ export class OvieLauncherInvariantError extends Error {
 const TOKENISH =
   /(?:api[_-]?key|token|secret|password|bearer|authorization)=([^&\s]+)/gi;
 
+const STATIC_WEB: Record<string, readonly [href: string, source: string]> = {
+  mercury: [OVIE_CONFIGURED_PUBLIC_ORIGINS.mercury, 'official Mercury app'],
+  gmail: [OVIE_CONFIGURED_PUBLIC_ORIGINS.gmail, 'official Gmail app'],
+  // biome-ignore format: compact tuple
+  vercel: [OVIE_CONFIGURED_PUBLIC_ORIGINS.vercelDashboard, 'Ops costs Vercel dashboard'],
+  linear: [OVIE_CONFIGURED_PUBLIC_ORIGINS.linear, 'Jovie Linear team URL'],
+  status: [OVIE_CONFIGURED_PUBLIC_ORIGINS.status, 'status.jov.ie'],
+};
+
 export function stripSecrets(text: string): string {
   return text.replace(
     TOKENISH,
@@ -278,8 +118,9 @@ export function stripSecrets(text: string): string {
 export function publicHref(raw: string): string | null {
   try {
     const parsed = new URL(raw);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
       return null;
+    }
     parsed.username = '';
     parsed.password = '';
     parsed.search = '';
@@ -318,34 +159,55 @@ function webOrigin(
   return { href, display: href, configured, source };
 }
 
+// biome-ignore format: compact destination helpers
+function optionalWeb(
+  href: string | null,
+  missing: string,
+  source: string
+): OvieLauncherResolvedDestination {
+  return { href: href ?? undefined, display: href ?? missing, configured: Boolean(href), source };
+}
+
+function resolvedWeb(
+  raw: string | undefined,
+  fallback: string,
+  configuredSource: string,
+  fallbackSource: string
+): OvieLauncherResolvedDestination {
+  const configured = originFromUrl(raw);
+  return webOrigin(
+    configured ?? fallback,
+    configured ? configuredSource : fallbackSource,
+    Boolean(configured)
+  );
+}
+
 export function resolveLauncherDestination(
   definition: OvieLauncherDefinition,
+  // biome-ignore format: compact config
   config: {
-    readonly gbrainApiUrl?: string;
-    readonly hermesWebUrl?: string;
-    readonly symphonySshHost?: string;
-    readonly githubOwner?: string;
-    readonly githubRepo?: string;
-    readonly productionOrigin?: string;
+    readonly gbrainApiUrl?: string; readonly hermesWebUrl?: string;
+    readonly symphonySshHost?: string; readonly githubOwner?: string;
+    readonly githubRepo?: string; readonly productionOrigin?: string;
   }
 ): OvieLauncherResolvedDestination {
+  const staticWeb = STATIC_WEB[definition.id];
+  if (staticWeb) return webOrigin(staticWeb[0], staticWeb[1]);
   switch (definition.id) {
-    case 'gbrain': {
-      const configured = originFromUrl(config.gbrainApiUrl);
-      return webOrigin(
-        configured ?? GBRAIN_HTTP_TEMPLATE_ORIGIN,
-        configured ? 'GBRAIN_API_URL' : 'gbrain HTTP template',
-        Boolean(configured)
+    case 'gbrain':
+      return resolvedWeb(
+        config.gbrainApiUrl,
+        GBRAIN_HTTP_TEMPLATE_ORIGIN,
+        'GBRAIN_API_URL',
+        'gbrain HTTP template'
       );
-    }
-    case 'hermes': {
-      const configured = originFromUrl(config.hermesWebUrl);
-      return webOrigin(
-        configured ?? HERMES_GATEWAY_TEMPLATE_ORIGIN,
-        configured ? 'HERMES_WEB_URL' : 'Hermes Air gateway template',
-        Boolean(configured)
+    case 'hermes':
+      return resolvedWeb(
+        config.hermesWebUrl,
+        HERMES_GATEWAY_TEMPLATE_ORIGIN,
+        'HERMES_WEB_URL',
+        'Hermes Air gateway template'
       );
-    }
     case 'symphony':
       return {
         sshHost: SYMPHONY_SSH_TEMPLATE_HOST,
@@ -353,49 +215,20 @@ export function resolveLauncherDestination(
         configured: true,
         source: 'documented Gem SSH alias',
       };
-    case 'mercury':
-      return webOrigin(
-        OVIE_CONFIGURED_PUBLIC_ORIGINS.mercury,
-        'official Mercury app'
+    case 'github-prs':
+      return optionalWeb(
+        githubPullsUrl(config.githubOwner, config.githubRepo),
+        'GitHub PRs not configured',
+        config.githubOwner || config.githubRepo
+          ? 'HUD_GITHUB_OWNER/HUD_GITHUB_REPO'
+          : 'desktop GitHub repo constants'
       );
-    case 'gmail':
-      return webOrigin(
-        OVIE_CONFIGURED_PUBLIC_ORIGINS.gmail,
-        'official Gmail app'
+    case 'production':
+      return optionalWeb(
+        originFromUrl(config.productionOrigin),
+        'Production origin not configured',
+        'NEXT_PUBLIC_APP_URL'
       );
-    case 'github-prs': {
-      const href = githubPullsUrl(config.githubOwner, config.githubRepo);
-      return {
-        href: href ?? undefined,
-        display: href ?? 'GitHub PRs not configured',
-        configured: Boolean(href),
-        source:
-          config.githubOwner || config.githubRepo
-            ? 'HUD_GITHUB_OWNER/HUD_GITHUB_REPO'
-            : 'desktop GitHub repo constants',
-      };
-    }
-    case 'vercel':
-      return webOrigin(
-        OVIE_CONFIGURED_PUBLIC_ORIGINS.vercelDashboard,
-        'Ops costs Vercel dashboard'
-      );
-    case 'linear':
-      return webOrigin(
-        OVIE_CONFIGURED_PUBLIC_ORIGINS.linear,
-        'Jovie Linear team URL'
-      );
-    case 'status':
-      return webOrigin(OVIE_CONFIGURED_PUBLIC_ORIGINS.status, 'status.jov.ie');
-    case 'production': {
-      const origin = originFromUrl(config.productionOrigin);
-      return {
-        href: origin ?? undefined,
-        display: origin ?? 'Production origin not configured',
-        configured: Boolean(origin),
-        source: 'NEXT_PUBLIC_APP_URL',
-      };
-    }
     default:
       return { display: 'CLI only', configured: false, source: 'agent CLI' };
   }
@@ -410,12 +243,13 @@ export function rankScoreForControl(input: {
   if (definition.agentCliOnly || definition.owner === 'agent') return -1000;
   let score = definition.requiredOnPrimary ? 100 : 40;
   if (status === 'ready') score += 20;
-  if (status === 'unavailable' || status === 'error') {
+  else if (status === 'unavailable' || status === 'error') {
     score += definition.loop === 'recover' ? 25 : -5;
   }
   if (timActionCount > 0) {
-    if (definition.loop === 'review' || definition.loop === 'approve')
+    if (definition.loop === 'review' || definition.loop === 'approve') {
       score += 30;
+    }
     if (definition.loop === 'communicate') score += 15;
   }
   return score;
@@ -455,53 +289,39 @@ export function buildLauncherControl(input: {
 }): OvieLauncherControl {
   const { definition, destination, status, timActionCount } = input;
   return {
-    id: definition.id,
-    label: definition.label,
-    group: definition.group,
-    kind: definition.kind,
-    owner: definition.owner,
-    loop: definition.loop,
-    requiredOnPrimary: definition.requiredOnPrimary,
-    agentCliOnly: definition.agentCliOnly,
+    ...definition,
     status,
     rankScore: rankScoreForControl({ definition, status, timActionCount }),
     why: whyForControl({ definition, status, destination, timActionCount }),
-    destinationSummary: definition.destinationSummary,
     destinationDisplay: stripSecrets(destination.display),
+    // biome-ignore format: compact control fields
     href: destination.href,
     sshHost: destination.sshHost,
+    // biome-ignore format: compact search blob
     searchText: [
-      definition.label,
-      definition.id,
-      definition.loop,
-      definition.group,
-      destination.display,
-      ...definition.searchTerms,
-    ]
-      .join(' ')
-      .toLowerCase(),
+      definition.label, definition.id, definition.loop, definition.group,
+      destination.display, ...definition.searchTerms,
+    ].join(' ').toLowerCase(),
   };
 }
 
-function byRankThenLabel(
-  a: OvieLauncherControl,
-  b: OvieLauncherControl
-): number {
+function byRankThenLabel(a: OvieLauncherControl, b: OvieLauncherControl) {
   return b.rankScore !== a.rankScore
     ? b.rankScore - a.rankScore
     : a.label.localeCompare(b.label);
 }
 
 export function assertPrimaryRailInvariants(
-  inventory: Pick<OvieLauncherInventory, 'primary' | 'advanced' | 'all'>
+  inventory: Pick<OvieLauncherInventory, 'primary'>
 ): void {
   const primaryIds = new Set(inventory.primary.map(control => control.id));
-  for (const requiredId of OVIE_REQUIRED_PRIMARY_LAUNCHER_IDS) {
-    if (!primaryIds.has(requiredId)) {
-      throw new OvieLauncherInvariantError(
-        `Required human control "${requiredId}" is missing from the primary rail`
-      );
-    }
+  const missing = OVIE_REQUIRED_PRIMARY_LAUNCHER_IDS.find(
+    id => !primaryIds.has(id)
+  );
+  if (missing) {
+    throw new OvieLauncherInvariantError(
+      `Required human control "${missing}" is missing from the primary rail`
+    );
   }
   const agentOnPrimary = inventory.primary.find(
     control => control.owner === 'agent' || control.agentCliOnly
@@ -515,9 +335,8 @@ export function assertPrimaryRailInvariants(
 
 export function rankLaunchers(input: {
   readonly catalog?: readonly OvieLauncherDefinition[];
-  readonly destinations: Readonly<
-    Record<string, OvieLauncherResolvedDestination>
-  >;
+  // biome-ignore format: compact dest map
+  readonly destinations: Readonly<Record<string, OvieLauncherResolvedDestination>>;
   readonly state: OvieLauncherVerifiedState;
   readonly generatedAtIso?: string;
 }): OvieLauncherInventory {
@@ -528,12 +347,12 @@ export function rankLaunchers(input: {
       configured: false,
       source: 'missing',
     };
+    const readyish =
+      destination.configured || destination.href || destination.sshHost;
     const status = definition.agentCliOnly
       ? 'not_configured'
       : (input.state.availability[definition.id] ??
-        (destination.configured || destination.href || destination.sshHost
-          ? 'unavailable'
-          : 'not_configured'));
+        (readyish ? 'unavailable' : 'not_configured'));
     return buildLauncherControl({
       definition,
       destination,
@@ -541,25 +360,23 @@ export function rankLaunchers(input: {
       timActionCount: input.state.timActionCount,
     });
   });
-  const primary = all
+  const rankedHuman = all
     .filter(
-      control =>
-        control.owner === 'human' &&
-        !control.agentCliOnly &&
-        (control.requiredOnPrimary || control.rankScore >= 60)
+      c =>
+        c.owner === 'human' &&
+        !c.agentCliOnly &&
+        (c.requiredOnPrimary || c.rankScore >= 60)
     )
     .toSorted(byRankThenLabel);
-  const required = all.filter(control => control.requiredOnPrimary);
+  const required = all.filter(c => c.requiredOnPrimary);
   const inventory: OvieLauncherInventory = {
     generatedAtIso: input.generatedAtIso ?? new Date(0).toISOString(),
     primary: [
-      ...primary,
-      ...required.filter(
-        control => !primary.some(item => item.id === control.id)
-      ),
+      ...rankedHuman,
+      ...required.filter(c => !rankedHuman.some(h => h.id === c.id)),
     ].toSorted(byRankThenLabel),
     advanced: all
-      .filter(control => control.agentCliOnly || control.owner === 'agent')
+      .filter(c => c.agentCliOnly || c.owner === 'agent')
       .toSorted(byRankThenLabel),
     all: all.toSorted(byRankThenLabel),
   };

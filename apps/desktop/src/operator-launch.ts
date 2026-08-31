@@ -1,15 +1,7 @@
-/**
- * Ovie operator launcher allowlist (JOV-5491).
- * Never invents URLs or interpolates secrets into command text.
- */
-
+// biome-ignore format: compact allowlist
 export const OPERATOR_WEB_ORIGINS = [
-  'https://app.mercury.com',
-  'https://mail.google.com',
-  'https://linear.app',
-  'https://vercel.com',
-  'https://status.jov.ie',
-  'https://jov.ie',
+  'https://app.mercury.com', 'https://mail.google.com', 'https://linear.app',
+  'https://vercel.com', 'https://status.jov.ie', 'https://jov.ie',
   'https://github.com',
 ] as const;
 
@@ -17,41 +9,23 @@ export const OPERATOR_SSH_HOSTS = ['gem'] as const;
 
 export type OperatorLaunchKind = 'web' | 'ssh';
 
+// biome-ignore format: compact request
 export interface OperatorLaunchRequest {
-  readonly id: string;
-  readonly kind: OperatorLaunchKind;
-  readonly href?: string;
-  readonly sshHost?: string;
+  readonly id: string; readonly kind: OperatorLaunchKind;
+  readonly href?: string; readonly sshHost?: string;
 }
 
+// biome-ignore format: compact decision union
 export type OperatorLaunchDecision =
+  | { readonly ok: true; readonly action: 'open-external'; readonly url: string }
   | {
-      readonly ok: true;
-      readonly action: 'open-external';
-      readonly url: string;
-    }
-  | {
-      readonly ok: true;
-      readonly action: 'open-ssh';
-      readonly host: string;
-      readonly command: string;
+      readonly ok: true; readonly action: 'open-ssh';
+      readonly host: string; readonly command: string;
       readonly argv: readonly string[];
     }
   | { readonly ok: false; readonly reason: string };
 
 const TAILSCALE_CGNAT = /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./;
-
-function isLoopbackHostname(hostname: string): boolean {
-  return hostname === '127.0.0.1' || hostname === 'localhost';
-}
-
-function isTailscaleHostname(hostname: string): boolean {
-  return TAILSCALE_CGNAT.test(hostname);
-}
-
-function isJoviePublicHostname(hostname: string): boolean {
-  return hostname === 'jov.ie' || hostname.endsWith('.jov.ie');
-}
 
 export function isAllowedOperatorWebUrl(urlString: string): boolean {
   let parsed: URL;
@@ -63,14 +37,14 @@ export function isAllowedOperatorWebUrl(urlString: string): boolean {
   if (parsed.username || parsed.password || parsed.search || parsed.hash) {
     return false;
   }
+  const host = parsed.hostname;
   if (parsed.protocol === 'http:') {
     return (
-      isLoopbackHostname(parsed.hostname) ||
-      isTailscaleHostname(parsed.hostname)
+      host === '127.0.0.1' || host === 'localhost' || TAILSCALE_CGNAT.test(host)
     );
   }
   if (parsed.protocol !== 'https:') return false;
-  if (isJoviePublicHostname(parsed.hostname)) return true;
+  if (host === 'jov.ie' || host.endsWith('.jov.ie')) return true;
   return OPERATOR_WEB_ORIGINS.some(origin => parsed.origin === origin);
 }
 
@@ -118,7 +92,6 @@ export function decideOperatorLaunch(
       argv,
     };
   }
-
   const url = request.href ?? '';
   if (!isAllowedOperatorWebUrl(url)) {
     return { ok: false, reason: 'blocked-url' };

@@ -5,7 +5,7 @@ import {
   terminalLaunchSpec,
 } from '../src/operator-launch.ts';
 
-test('allows configured operator web origins and rejects secret-bearing URLs', () => {
+test('allowlists operator web origins and pins Symphony to ssh gem', () => {
   expect(
     isAllowedOperatorWebUrl('https://github.com/JovieInc/Jovie/pulls')
   ).toBe(true);
@@ -19,9 +19,7 @@ test('allows configured operator web origins and rejects secret-bearing URLs', (
     )
   ).toBe(false);
   expect(isAllowedOperatorWebUrl('javascript:alert(1)')).toBe(false);
-});
 
-test('Symphony launch stays on the approved SSH host and never interpolates secrets', () => {
   const allowed = decideOperatorLaunch({
     id: 'symphony',
     kind: 'ssh',
@@ -41,7 +39,6 @@ test('Symphony launch stays on the approved SSH host and never interpolates secr
       sshHost: 'evil; curl http://example',
     })
   ).toEqual({ ok: false, reason: 'blocked-ssh-host' });
-
   const spec = terminalLaunchSpec('darwin', 'ssh -t gem');
   expect(spec?.command).toBe('osascript');
   expect(spec?.args.join(' ')).toContain('ssh -t gem');

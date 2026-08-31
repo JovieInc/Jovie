@@ -21,11 +21,10 @@ import { logger } from '@/lib/utils/logger';
 const PREFLIGHT_TIMEOUT_MS = 2000;
 const SSH_PREFLIGHT_TIMEOUT_MS = 2500;
 
+// biome-ignore format: compact config
 export interface OvieLauncherConfig {
-  readonly gbrainApiUrl?: string;
-  readonly githubOwner?: string;
-  readonly githubRepo?: string;
-  readonly productionOrigin?: string;
+  readonly gbrainApiUrl?: string; readonly githubOwner?: string;
+  readonly githubRepo?: string; readonly productionOrigin?: string;
 }
 
 export function readOvieLauncherConfig(): OvieLauncherConfig {
@@ -48,30 +47,11 @@ export function resolveOvieLauncherDestinations(
   );
 }
 
-function preflightUrl(
-  destination: OvieLauncherResolvedDestination
-): string | null {
-  if (destination.sshHost) return null;
-  if (!destination.href) return null;
-  return originFromUrl(destination.href);
-}
-
-function classifyHttpStatus(status: number): OvieLauncherStatus {
-  if (status >= 200 && status < 500) return 'ready';
-  return 'unavailable';
-}
-
-function safePreflightMessage(): string {
-  return 'Destination unreachable';
-}
-
 export async function preflightWebDestination(
   href: string
 ): Promise<{ status: OvieLauncherStatus; detail: string }> {
   const target = publicHref(href);
-  if (!target) {
-    return { status: 'not_configured', detail: 'No public href' };
-  }
+  if (!target) return { status: 'not_configured', detail: 'No public href' };
   try {
     const response = await serverFetch(target, {
       method: 'GET',
@@ -82,12 +62,13 @@ export async function preflightWebDestination(
       headers: { Accept: 'text/html,application/json;q=0.9,*/*;q=0.8' },
     });
     void response.body?.cancel().catch(() => {});
+    const ready = response.status >= 200 && response.status < 500;
     return {
-      status: classifyHttpStatus(response.status),
+      status: ready ? 'ready' : 'unavailable',
       detail: `HTTP ${response.status}`,
     };
   } catch {
-    return { status: 'unavailable', detail: safePreflightMessage() };
+    return { status: 'unavailable', detail: 'Destination unreachable' };
   }
 }
 
@@ -101,39 +82,28 @@ export function preflightSshDestination(
       detail: 'SSH host is not a safe alias',
     });
   }
-
   return new Promise(resolve => {
     const child = spawnSsh(
       'ssh',
-      [
-        '-o',
-        'BatchMode=yes',
-        '-o',
-        'ConnectTimeout=2',
-        '-o',
-        'StrictHostKeyChecking=yes',
-        host,
-        'true',
-      ],
+      // biome-ignore format: keep argv compact
+      ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=2', '-o', 'StrictHostKeyChecking=yes', host, 'true'],
       { stdio: 'ignore' }
     );
-
     const timer = setTimeout(() => {
       child.kill('SIGKILL');
       resolve({ status: 'unavailable', detail: 'SSH preflight timed out' });
     }, SSH_PREFLIGHT_TIMEOUT_MS);
-
     child.once('error', () => {
       clearTimeout(timer);
       resolve({ status: 'unavailable', detail: 'SSH client unavailable' });
     });
     child.once('exit', code => {
       clearTimeout(timer);
-      if (code === 0) {
-        resolve({ status: 'ready', detail: 'SSH reachable' });
-        return;
-      }
-      resolve({ status: 'unavailable', detail: 'SSH destination unreachable' });
+      resolve(
+        code === 0
+          ? { status: 'ready', detail: 'SSH reachable' }
+          : { status: 'unavailable', detail: 'SSH destination unreachable' }
+      );
     });
   });
 }
@@ -143,18 +113,15 @@ export async function preflightLauncherDestinations(
 ): Promise<Record<string, OvieLauncherStatus>> {
   const entries = await Promise.all(
     OVIE_LAUNCHER_CATALOG.map(async definition => {
-      if (definition.agentCliOnly) {
-        return [definition.id, 'not_configured' as const] as const;
-      }
       const destination = destinations[definition.id];
-      if (!destination) {
+      if (definition.agentCliOnly || !destination) {
         return [definition.id, 'not_configured' as const] as const;
       }
       if (destination.sshHost) {
         const result = await preflightSshDestination(destination.sshHost);
         return [definition.id, result.status] as const;
       }
-      const href = preflightUrl(destination);
+      const href = destination.href ? originFromUrl(destination.href) : null;
       if (!href) {
         return [definition.id, 'not_configured' as const] as const;
       }
@@ -178,7 +145,6 @@ export async function loadOvieLauncherInventory(): Promise<OvieLauncherInventory
     timActions.observation === 'ok' || timActions.observation === 'empty'
       ? timActions.issues.length
       : 0;
-
   return rankLaunchers({
     destinations,
     state: { timActionCount, availability },

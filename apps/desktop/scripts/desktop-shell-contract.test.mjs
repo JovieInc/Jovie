@@ -472,7 +472,10 @@ test('preload marks the hosted app as Electron after the document root is ready'
   assert.match(preloadSource, /launchOperatorControl:/);
   assert.match(preloadSource, /LAUNCH_OPERATOR_CONTROL_CHANNEL/);
   assert.match(mainSource, /from '\.\/operator-launch'/);
-  assert.match(mainSource, /ipcMain\.handle\(\s*LAUNCH_OPERATOR_CONTROL_CHANNEL/);
+  assert.match(
+    mainSource,
+    /ipcMain\.handle\(\s*LAUNCH_OPERATOR_CONTROL_CHANNEL/
+  );
 });
 
 test('desktop bridge exposes bounded dictation support', async () => {

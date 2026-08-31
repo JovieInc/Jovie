@@ -2,90 +2,38 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { OvieLauncherRail } from '@/components/features/admin/hud/OvieLauncherRail';
-import type {
-  OvieLauncherControl,
-  OvieLauncherInventory,
+import {
+  OVIE_LAUNCHER_CATALOG,
+  rankLaunchers,
+  resolveLauncherDestination,
 } from '@/lib/hud/ovie-launchers';
 
 vi.mock('@/lib/desktop/electron-bridge', () => ({
   launchOperatorControl: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
-function control(
-  overrides: Partial<OvieLauncherControl> &
-    Pick<OvieLauncherControl, 'id' | 'label' | 'group'>
-): OvieLauncherControl {
-  return {
-    kind: 'web',
-    owner: 'human',
-    loop: 'observe',
-    requiredOnPrimary: true,
-    agentCliOnly: false,
-    status: 'ready',
-    rankScore: 100,
-    why: 'Destination preflight succeeded.',
-    destinationSummary: overrides.label,
-    destinationDisplay: overrides.id,
-    searchText: overrides.id,
-    ...overrides,
-  };
-}
+const READY = Object.fromEntries(
+  OVIE_LAUNCHER_CATALOG.filter(item => !item.agentCliOnly).map(item => [
+    item.id,
+    'ready' as const,
+  ])
+);
 
-const INVENTORY: OvieLauncherInventory = {
-  generatedAtIso: '2026-08-31T00:00:00.000Z',
-  primary: [
-    control({
-      id: 'gbrain',
-      label: 'GBrain',
-      group: 'internal',
-      destinationDisplay: 'http://127.0.0.1:7801',
-      href: 'http://127.0.0.1:7801',
-      searchText: 'gbrain memory wiki',
-    }),
-    control({
-      id: 'symphony',
-      label: 'Symphony',
-      group: 'internal',
-      kind: 'ssh',
-      loop: 'recover',
-      status: 'unavailable',
-      why: 'Preflight did not reach the destination.',
-      destinationDisplay: 'ssh gem',
-      sshHost: 'gem',
-      searchText: 'symphony gem tui',
-    }),
-    control({
-      id: 'gmail',
-      label: 'Gmail',
-      group: 'external',
-      loop: 'communicate',
-      destinationDisplay: 'https://mail.google.com',
-      href: 'https://mail.google.com',
-      searchText: 'gmail mail email',
-    }),
-  ],
-  advanced: [
-    control({
-      id: 'hermes-cli-worker',
-      label: 'Hermes CLI worker',
-      group: 'internal',
-      kind: 'ssh',
-      owner: 'agent',
-      agentCliOnly: true,
-      requiredOnPrimary: false,
-      status: 'not_configured',
-      rankScore: -1000,
-      why: 'Agent-owned CLI.',
-      destinationDisplay: 'CLI only',
-      searchText: 'hermes cli worker agent',
-    }),
-  ],
-  all: [],
-};
-INVENTORY.all.push(...INVENTORY.primary, ...INVENTORY.advanced);
+const INVENTORY = rankLaunchers({
+  destinations: Object.fromEntries(
+    OVIE_LAUNCHER_CATALOG.map(definition => [
+      definition.id,
+      resolveLauncherDestination(definition, {}),
+    ])
+  ),
+  state: {
+    timActionCount: 0,
+    availability: { ...READY, symphony: 'unavailable' },
+  },
+});
 
 describe('OvieLauncherRail', () => {
-  it('separates local/SSH from web, disables unavailable controls, and keeps agent CLI off the rail', async () => {
+  it('separates local/SSH from web, disables unavailable, and hides agent CLI', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({ ok: true, json: async () => INVENTORY })
