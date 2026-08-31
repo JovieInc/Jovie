@@ -161,7 +161,7 @@ def fetch_symphony(url: str, *, timeout: float = 1.5) -> dict[str, Any]:
         "running": running if isinstance(running, int) else None,
         "retrying": retrying if isinstance(retrying, int) else None,
         "hookFailed": "workspace_hook_failed" in blob,
-        "shipping": any(token in blob for token in ('"html_url"', '"pr_url"', "pull/", "token")),
+        "shipping": any(token in blob for token in ('"html_url"', '"pr_url"', "pull/")),
     }
 def bottleneck(alive: dict[str, Any], wow: dict[str, Any], ships: dict[str, int], symphony: dict[str, Any]) -> str:
     if alive["status"] == "DEAD":

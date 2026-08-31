@@ -449,7 +449,7 @@ const GEM_PR_REHABILITATION_PYTHON_TESTS = [
   'scripts/hermes/tests/test-model-router.py',
 ];
 const GEM_CHECKIN_HUD_PRIMARY_INPUTS = new Set([
-  'WORKFLOW.md',
+  'scripts/hermes/symphony/WORKFLOW.md',
   'scripts/hermes/gem-checkin-hud.py',
   'scripts/hermes/gem-checkin-tty1.sh',
   'scripts/hermes/systemd/symphony-burrito.service',

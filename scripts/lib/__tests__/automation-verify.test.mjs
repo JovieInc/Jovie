@@ -206,7 +206,7 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
 const GEM_CHECKIN_HUD_LANE = [
-  'WORKFLOW.md',
+  'scripts/hermes/symphony/WORKFLOW.md',
   'scripts/hermes/gem-checkin-hud.py',
   'scripts/hermes/gem-checkin-tty1.sh',
   'scripts/hermes/systemd/symphony-burrito.service',

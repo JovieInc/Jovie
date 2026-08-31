@@ -93,6 +93,13 @@ class CheckinGlassTests(unittest.TestCase):
             state = HUD.fetch_symphony("http://127.0.0.1:4043/api/v1/state")
         self.assertEqual((state["running"], state["retrying"], state["hookFailed"]), (4, 3, True))
         self.assertIn("4043", opener.call_args.args[0])
+        token_only = json.dumps({"counts": {"running": 0, "retrying": 0}, "token": "x"}).encode()
+        fake2 = mock.Mock()
+        fake2.read.return_value = token_only
+        fake2.__enter__ = mock.Mock(return_value=fake2)
+        fake2.__exit__ = mock.Mock(return_value=False)
+        with mock.patch.object(HUD.urllib.request, "urlopen", return_value=fake2):
+            self.assertFalse(HUD.fetch_symphony("http://127.0.0.1:4043/api/v1/state")["shipping"])
 
 
 if __name__ == "__main__":

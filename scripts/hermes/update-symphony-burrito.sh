@@ -13,28 +13,24 @@ TIMER_SRC="${REPO_ROOT}/scripts/hermes/systemd/symphony-burrito-update.timer"
 TIMER_DST="${TARGET_HOME}/.config/systemd/user/symphony-burrito-update.timer"
 UPDATE_UNIT_SRC="${REPO_ROOT}/scripts/hermes/systemd/symphony-burrito-update.service"
 UPDATE_UNIT_DST="${TARGET_HOME}/.config/systemd/user/symphony-burrito-update.service"
-WORKFLOW_SRC="${REPO_ROOT}/WORKFLOW.md"
+WORKFLOW_SRC="${SYMPHONY_WORKFLOW_SRC:-${REPO_ROOT}/scripts/hermes/symphony/WORKFLOW.md}"
 WORKFLOW_DST="${TARGET_HOME}/.config/symphony/WORKFLOW.md"
 LOG_DIR="${TARGET_HOME}/symphony-burrito-logs"
 RESTART=1
 DRY_RUN=0
+SKIP_BINARY=0
 
-usage() {
-  echo "usage: $0 [--dry-run] [--no-restart]" >&2
-}
+usage() { echo "usage: $0 [--dry-run] [--no-restart] [--skip-binary]" >&2; }
 
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=1 ;;
     --no-restart) RESTART=0 ;;
+    --skip-binary) SKIP_BINARY=1 ;;
     -h|--help) usage; exit 0 ;;
     *) usage; exit 2 ;;
   esac
 done
-
-json_get() {
-  python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get(sys.argv[1],""))' "$1"
-}
 
 pick_asset() {
   python3 - "$ASSET_NAME_NEEDLE" <<'PY'
@@ -86,6 +82,26 @@ print(digest)
 PY
 }
 
+maybe_copy_workflow() {
+  mkdir -p "$(dirname "$WORKFLOW_DST")"
+  if python3 - "$WORKFLOW_SRC" <<'PY'
+import pathlib, sys
+t = pathlib.Path(sys.argv[1]).read_text()
+h = t.split("after_create:", 1)[-1].split("agent:", 1)[0]
+raise SystemExit(0 if ('project_slug: "symphony-ui-pilot-96d6b9c5b2d5"' in t and "git clone --depth 1 https://github.com/JovieInc/Jovie.git ." in t and "symphony-elixir-workspaces" in t and "git@" not in h and "max_concurrent_agents: 3" in t and "gh CLI" in t and "create_branch" in t and "76869538009648d5b282a4bb21c3d157" in t and "jovie-ba6736cbfbb9" not in t) else 1)
+PY
+  then install -m 0644 "$WORKFLOW_SRC" "$WORKFLOW_DST" && echo "INSTALLED $WORKFLOW_DST"
+  else echo "CONFIG_COPY_RED repo WORKFLOW does not match live slug+HTTPS+git/gh; leaving $WORKFLOW_DST untouched"
+  fi
+}
+
+if [ "$SKIP_BINARY" -eq 1 ]; then
+  echo "SKIP_BINARY"
+  maybe_copy_workflow
+  echo "DONE"
+  exit 0
+fi
+
 release_json="$(fetch_json "$RELEASE_API")"
 mapfile -t ASSET_META < <(printf '%s' "$release_json" | pick_asset)
 BIN_NAME="${ASSET_META[0]}"
@@ -121,13 +137,9 @@ install -m 0755 "${tmpdir}/${BIN_NAME}" "$BIN_DST"
 install -m 0644 "$UNIT_SRC" "$UNIT_DST"
 install -m 0644 "$TIMER_SRC" "$TIMER_DST"
 install -m 0644 "$UPDATE_UNIT_SRC" "$UPDATE_UNIT_DST"
-if [ -f "$WORKFLOW_DST" ] && grep -qE 'git@|mix ' "$WORKFLOW_DST"; then
-  echo "PATCH_HOOK replacing SSH/mix after_create with HTTPS WORKFLOW"
-fi
-install -m 0644 "$WORKFLOW_SRC" "$WORKFLOW_DST"
 echo "INSTALLED $BIN_DST"
 echo "INSTALLED $UNIT_DST"
-echo "INSTALLED $WORKFLOW_DST"
+maybe_copy_workflow
 
 if [ "$RESTART" -eq 1 ]; then
   if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
