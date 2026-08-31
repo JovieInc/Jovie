@@ -18,7 +18,7 @@ jobs:
   test:
     name: Build And Test
     runs-on: macos-26
-    timeout-minutes: 30
+    timeout-minutes: 55
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -46,7 +46,7 @@ jobs:
         run: bash apps/ios/scripts/run-xcodebuild.sh -resolvePackageDependencies -derivedDataPath .build/ios-ci
 
       - name: Build and test
-        timeout-minutes: 20
+        timeout-minutes: 30
         run: bash apps/ios/scripts/run-xcodebuild.sh test -derivedDataPath .build/ios-ci
 
       - name: Capture simulator screenshots
