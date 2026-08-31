@@ -10,7 +10,7 @@
 #
 # CONSOLIDATED WORKFLOWS (removed their cron schedules; kept workflow_dispatch):
 #   agent-landing-sweep      — sweep eligible agent PRs into the merge queue
-#   auto-ready-agent-drafts  — flip green agent draft PRs to "ready for review"
+#   auto-ready-agent-drafts  — audit writer-owned PR promotion drift
 #   github-ai-dispatcher     — dispatch agent-ready issues to the orchestrator
 #
 # RESTORED STANDALONE CRONS (no longer consolidated here):
@@ -164,14 +164,15 @@ jobs:
 
   # --------------------------------------------------------------------------
   # JOB: auto-ready
-  # Formerly: auto-ready-agent-drafts.yml (every 15 min + events)
+  # Observer-only audit for writer-owned promotion drift. Manual recovery lives
+  # in auto-ready-agent-drafts.yml; successful promotion belongs to the writer.
   # --------------------------------------------------------------------------
   auto-ready:
-    name: Auto-Ready Agent Drafts
+    name: Audit Writer-Owned Promotion Drift
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      pull-requests: write
+      pull-requests: read
       contents: read
       checks: read
 
@@ -185,12 +186,13 @@ jobs:
       - name: Verify GitHub CLI
         run: gh --version
 
-      - name: Auto-ready green agent drafts
+      - name: Audit proven writer-owned promotion drift
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           GH_RETRY_ATTEMPTS: 8
           GH_RETRY_MAX_DELAY: 60
+          DRY_RUN: '1'
         run: bash scripts/auto-ready-agent-drafts.sh
 
   # --------------------------------------------------------------------------
