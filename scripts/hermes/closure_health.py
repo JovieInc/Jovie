@@ -767,8 +767,13 @@ def _readback_promotion_batch(
         commit = repository.get(f"commit_{number}")
         if not isinstance(pr, dict) or not isinstance(commit, dict):
             raise ValueError("GitHub promotion readback omitted pull request")
-        if commit.get("oid") != candidate.get("headRefOid"):
+        expected_head_oid = candidate.get("headRefOid")
+        if commit.get("oid") != expected_head_oid:
             raise ValueError("GitHub promotion readback returned the wrong commit")
+        if pr.get("headRefOid") != expected_head_oid:
+            raise ValueError(
+                "GitHub promotion readback returned the wrong pull request head"
+            )
         try:
             required_checks = _normalize_named_required_checks(commit, required_names)
             check_evidence_status = "complete"

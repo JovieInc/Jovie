@@ -238,6 +238,45 @@ class ClosurePromotionEvidenceTests(unittest.TestCase):
         self.assertEqual(sorted(batch_sizes), [2, 4, 4, 4, 4, 4, 4])
         self.assertEqual(len(observed["prs"]), 26)
 
+    def test_readback_rejects_pr_head_drift_before_accepting_exact_checks(self):
+        candidate = {"number": 7, "headRefOid": "b" * 40}
+
+        def run(_command: list[str], **_kwargs: object) -> mock.Mock:
+            return mock.Mock(
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "data": {
+                            "repository": {
+                                "base": {"target": {"oid": "a" * 40}},
+                                "pr_7": {
+                                    "state": "OPEN",
+                                    "headRefOid": "c" * 40,
+                                    "baseRefName": "main",
+                                    "isDraft": False,
+                                    "isCrossRepository": False,
+                                    "mergeStateStatus": "CLEAN",
+                                    "updatedAt": "2026-08-30T16:00:00Z",
+                                    "author": {"login": "itstimwhite"},
+                                    "labels": {"totalCount": 0, "nodes": []},
+                                    "mergeQueueEntry": None,
+                                },
+                                "commit_7": named_commit(),
+                            }
+                        }
+                    }
+                ),
+            )
+
+        with self.assertRaisesRegex(ValueError, "wrong pull request head"):
+            MODULE._readback_promotion_batch(
+                "JovieInc/Jovie",
+                [candidate],
+                MODULE.EXPECTED_REQUIRED_CHECKS,
+                time.monotonic() + 5,
+                run_impl=run,
+            )
+
     def test_compare_evidence_rejects_the_wrong_base_identity(self):
         candidate = {"number": 7, "headRefOid": "7" * 40}
 
