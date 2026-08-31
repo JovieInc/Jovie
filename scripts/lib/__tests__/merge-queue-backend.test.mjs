@@ -70,7 +70,7 @@ const VALID_BRANCH_PROTECTION_REF = Object.freeze({
   minimumEntriesToMergeWaitTime: number,
 }} */
 const VALID_LIVE_QUEUE_CONFIGURATION = Object.freeze({
-  checkResponseTimeout: 60,
+  checkResponseTimeout: 3600,
   maximumEntriesToBuild: 3,
   maximumEntriesToMerge: 10,
   mergeMethod: 'SQUASH',
