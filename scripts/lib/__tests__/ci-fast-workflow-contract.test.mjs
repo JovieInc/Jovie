@@ -222,7 +222,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|ownership-inventory)'
     );
     expect(structuralDecision).toContain(
-      'scripts/backlog-orchestrator/__tests__/(pre-lease-gates|gate-next-hold|ownership-inventory)'
+      'scripts/backlog-orchestrator/__tests__/(backlog-orchestrator|pre-lease-gates|gate-next-hold|ownership-inventory)\\.test\\.mjs$'
     );
     expect(structuralDecision).toContain('canon/invariants\\.jsonl');
     expect(structuralDecision).toContain('scripts/invariants/');
@@ -305,7 +305,10 @@ describe('ci-fast bounded parallel workflow', () => {
     );
 
     expect(remaining).toContain(
-      'scripts/hermes/(gem-|gem_|install-gem-pr-rehabilitation)'
+      'scripts/hermes/(closure_health\\.py$|config/(gem-repo-registry|model-registry)\\.json$|evaluate-fleet-gate\\.sh$|fleet_admission_receipt\\.py$|gem-|gem_|install-gem-(fleet-controller|pr-rehabilitation)\\.sh$|model-router\\.py$|symphony-reconciler\\.py$|systemd/gem-pr-drain\\.(service|timer)$)'
+    );
+    expect(remaining).toContain(
+      'scripts/hermes/tests/(closure-health\\.test\\.py$|gem-(pr-drain|ops-hud|pr-rehabilitation-contract|priority-gate|rehabilitation-policy)\\.test\\.py$|symphony-reconciler\\.test\\.py$|test(-model-router|_evaluate_fleet_gate|_fleet_admission_receipt)\\.py$)'
     );
     expect(CI_FAST_SOURCE).toContain(
       'coverage run --branch scripts/hermes/tests/gem-rehabilitation-policy.test.py'
@@ -316,6 +319,15 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain(
       "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs"
     );
+    for (const gemContractCommand of [
+      'python3 scripts/hermes/tests/gem-pr-drain.test.py',
+      'python3 scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
+      'python3 scripts/hermes/tests/gem-priority-gate.test.py',
+      'python3 scripts/hermes/tests/test_evaluate_fleet_gate.py',
+      'python3 scripts/hermes/tests/test-model-router.py',
+    ]) {
+      expect(CI_FAST_SOURCE).toContain(gemContractCommand);
+    }
     expect(CI_FAST_SOURCE).toContain(
       'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs'
     );
@@ -510,16 +522,51 @@ describe('ci-fast bounded parallel workflow', () => {
       )
     ).toBe(true);
     for (const mergeQueueControllerPath of [
+      'scripts/automation-verify.sh',
+      'scripts/run-affected-tests.mjs',
+      'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
       'scripts/drain-pr-queue.sh',
+      'scripts/drain-pr-remediate.mjs',
       'scripts/merge-queue-backend.mjs',
+      'scripts/ownerless-recovery-sweeper.mjs',
+      'scripts/lib/ownerless-recovery-policy.mjs',
+      'scripts/lib/pr-check-failures.mjs',
+      'scripts/lib/pre-land-changelog.mjs',
+      'scripts/lib/resolve-merge-group-path-diff.mjs',
+      'scripts/lib/upsert-pr-comment.sh',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
       'scripts/lib/__tests__/merge-queue-backend.test.mjs',
+      'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+      'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
+      'scripts/lib/__tests__/pre-land-changelog.test.mjs',
+      'scripts/lib/__tests__/pr-check-failures.test.mjs',
       'scripts/tests/test_gh_retry.py',
+      'scripts/tests/test_runner_routing.py',
+      'scripts/tests/test_symphony_ui_pilot_runtime.py',
+      'scripts/tests/test_symphony_reconciler_runtime.py',
+      'scripts/hermes/closure_health.py',
+      'scripts/hermes/config/gem-repo-registry.json',
+      'scripts/hermes/config/model-registry.json',
+      'scripts/hermes/evaluate-fleet-gate.sh',
+      'scripts/hermes/fleet_admission_receipt.py',
+      'scripts/hermes/install-gem-fleet-controller.sh',
+      'scripts/hermes/model-router.py',
+      'scripts/hermes/symphony-reconciler.py',
+      'scripts/hermes/systemd/gem-pr-drain.service',
+      'scripts/hermes/systemd/gem-pr-drain.timer',
+      'scripts/hermes/tests/closure-health.test.py',
+      'scripts/hermes/tests/gem-pr-drain.test.py',
+      'scripts/hermes/tests/gem-ops-hud.test.py',
+      'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
+      'scripts/hermes/tests/gem-priority-gate.test.py',
+      'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
+      'scripts/hermes/tests/symphony-reconciler.test.py',
+      'scripts/hermes/tests/test-model-router.py',
+      'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+      'scripts/hermes/tests/test_fleet_admission_receipt.py',
     ]) {
       expect(selectsStructural.test(mergeQueueControllerPath)).toBe(true);
     }
-    expect(
-      selectsStructural.test('scripts/lib/__tests__/merge-queue-guard.test.mjs')
-    ).toBe(false);
     expect(selectsStructural.test('.github/workflows/ci.yml')).toBe(true);
     expect(selectsStructural.test('.claude/rules/ci-branching.md')).toBe(true);
     expect(selectsStructural.test('apps/web/components/atoms/Button.tsx')).toBe(
