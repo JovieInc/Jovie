@@ -164,7 +164,7 @@ export async function GET(request: Request) {
         updatedAt: connectorAccounts.updatedAt,
       });
     if (!account) throw new Error('Failed to upsert YouTube connector account');
-    await storeTokens(
+    const observedUpdatedAt = await storeTokens(
       tokens.refresh_token
         ? {
             connectorAccountId: account.id,
@@ -185,7 +185,7 @@ export async function GET(request: Request) {
       creatorProfileId: state.creatorProfileId,
       channelId: channel.id,
       source: 'manual',
-      observedUpdatedAt: account.updatedAt,
+      observedUpdatedAt,
       deadlineMs: syncDeadlineMs,
     });
     if (sync.status === 'needs_reauth') {

@@ -341,7 +341,6 @@ export function createYouTubeLibraryProvider(input: {
         timeoutMs: boundedTimeoutMs(timeoutMs, input.deadlineMs),
         deadlineMs: input.deadlineMs,
       });
-      input.onUploadsPageToken?.(nextPageToken);
       const videos: YouTubeChannelVideo[] = [];
       for (const batch of batches(videoIds, MAX_VIDEO_BATCH)) {
         if (!hasRequestBudget(timeoutMs, input.deadlineMs)) return videos;
@@ -360,14 +359,24 @@ export function createYouTubeLibraryProvider(input: {
           if (video) videos.push(video);
         }
       }
+      input.onUploadsPageToken?.(nextPageToken);
       return videos;
     },
 
     async fetchVideoMetrics(channelId, videoIds, windows) {
       const output: YouTubeVideoMetrics[] = [];
       let requestCount = 0;
-      for (const window of windows) {
-        const { start, end } = metricRange(window, now());
+      const referenceNow = now();
+      const offset =
+        input.maxAnalyticsRequests === undefined || windows.length === 0
+          ? 0
+          : Math.floor(referenceNow.getTime() / DAY_MS) % windows.length;
+      const orderedWindows = [
+        ...windows.slice(offset),
+        ...windows.slice(0, offset),
+      ];
+      for (const window of orderedWindows) {
+        const { start, end } = metricRange(window, referenceNow);
         for (const batch of batches(videoIds, analyticsBatchSize(start, end))) {
           if (
             input.maxAnalyticsRequests !== undefined &&

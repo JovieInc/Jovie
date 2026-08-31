@@ -66,12 +66,13 @@ const REFRESH_LOCK_DURATION_MS = 60_000;
  *
  * @throws Will throw if the DB write fails or encryption is unavailable in prod.
  */
-export async function storeTokens(params: StoreTokensParams): Promise<void> {
+export async function storeTokens(params: StoreTokensParams): Promise<Date> {
   const { connectorAccountId, accessToken, refreshToken, expiresAt } = params;
 
   // Encrypt tokens — encryptPII throws in prod if PII_ENCRYPTION_KEY is missing.
   const encryptedAccessToken = encryptPII(accessToken);
   const encryptedRefreshToken = refreshToken ? encryptPII(refreshToken) : null;
+  const updatedAt = new Date();
 
   const updated = await db
     .update(connectorAccounts)
@@ -79,16 +80,20 @@ export async function storeTokens(params: StoreTokensParams): Promise<void> {
       encryptedAccessToken,
       encryptedRefreshToken,
       tokenExpiresAt: expiresAt,
-      updatedAt: new Date(),
+      updatedAt,
     })
     .where(eq(connectorAccounts.id, connectorAccountId))
-    .returning({ id: connectorAccounts.id });
+    .returning({
+      id: connectorAccounts.id,
+      updatedAt: connectorAccounts.updatedAt,
+    });
 
   if (updated.length === 0) {
     throw new Error(
       `storeTokens: connector account not found: ${connectorAccountId}`
     );
   }
+  return updated[0].updatedAt;
 }
 
 // ---------------------------------------------------------------------------

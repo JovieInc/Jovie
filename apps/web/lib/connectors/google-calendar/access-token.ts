@@ -39,7 +39,8 @@ export class GoogleAccessTokenRefreshError extends Error {
 }
 
 export async function loadFreshGoogleAccessToken(
-  connectorAccountId: string
+  connectorAccountId: string,
+  options?: { readonly onStoreTokens?: (updatedAt: Date) => void }
 ): Promise<string | null> {
   const current = await loadDecryptedToken(connectorAccountId);
   if (!current) return null;
@@ -84,12 +85,13 @@ export async function loadFreshGoogleAccessToken(
     }
     const refreshed = (await response.json()) as RefreshResponse;
     const expiresAt = new Date(Date.now() + refreshed.expires_in * 1000);
-    await storeTokens({
+    const updatedAt = await storeTokens({
       connectorAccountId,
       accessToken: refreshed.access_token,
       refreshToken: reloaded.refreshToken,
       expiresAt,
     });
+    options?.onStoreTokens?.(updatedAt);
     return refreshed.access_token;
   });
 }
