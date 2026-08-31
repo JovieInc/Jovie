@@ -8,17 +8,103 @@ import { db } from '@/lib/db';
 import { connectorAccounts } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
 import { reconcileApprovedYouTubeCollaborators } from '@/lib/library/graph-store';
-import { syncChannelVideos } from '@/lib/youtube-library/sync';
+import {
+  type SyncChannelVideosResult,
+  syncChannelVideos,
+} from '@/lib/youtube-library/sync';
 import { createYouTubeLibraryProvider } from './provider';
 
 const REFRESH_AFTER_MS = 24 * 60 * 60 * 1000;
 const MAX_CHANNELS_PER_RUN = 1;
+
+const FAILURE_CAPTURE_MESSAGES = {
+  manual: 'YouTube Library manual sync failed',
+  scheduled: 'Connected YouTube refresh failed',
+} as const;
 
 export interface ConnectedYouTubeRefreshResult {
   readonly attempted: number;
   readonly synced: number;
   readonly needsReauth: number;
   readonly failed: number;
+}
+
+export type ConnectedYouTubeRefreshSource =
+  keyof typeof FAILURE_CAPTURE_MESSAGES;
+
+export type ConnectedYouTubeRefreshOutcome =
+  | { readonly status: 'synced'; readonly result: SyncChannelVideosResult }
+  | { readonly status: 'needs_reauth' }
+  | { readonly status: 'failed'; readonly error: unknown };
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Unknown YouTube sync error';
+}
+
+export async function refreshConnectedYouTubeAccount(input: {
+  readonly connectorAccountId: string;
+  readonly creatorProfileId: string;
+  readonly channelId: string;
+  readonly source: ConnectedYouTubeRefreshSource;
+  readonly now?: Date;
+}): Promise<ConnectedYouTubeRefreshOutcome> {
+  const now = input.now ?? new Date();
+
+  try {
+    const accessToken = await loadFreshGoogleAccessToken(
+      input.connectorAccountId
+    );
+    if (!accessToken) {
+      await db
+        .update(connectorAccounts)
+        .set({
+          status: asConnectorStatusSql('needs_reauth'),
+          lastErrorCode: 'youtube_reauth_required',
+          lastErrorDevMessage: null,
+          lastErrorUserMessage:
+            'Reconnect YouTube to keep the Library in sync.',
+          updatedAt: now,
+        })
+        .where(eq(connectorAccounts.id, input.connectorAccountId));
+      return { status: 'needs_reauth' };
+    }
+
+    const result = await syncChannelVideos({
+      creatorProfileId: input.creatorProfileId,
+      channelId: input.channelId,
+      provider: createYouTubeLibraryProvider({ accessToken }),
+      now,
+    });
+    await reconcileApprovedYouTubeCollaborators(input.creatorProfileId, now);
+    await db
+      .update(connectorAccounts)
+      .set({
+        lastSyncAt: now,
+        lastErrorCode: null,
+        lastErrorDevMessage: null,
+        lastErrorUserMessage: null,
+        updatedAt: now,
+      })
+      .where(eq(connectorAccounts.id, input.connectorAccountId));
+    return { status: 'synced', result };
+  } catch (error) {
+    await db
+      .update(connectorAccounts)
+      .set({
+        lastErrorCode: 'youtube_sync_failed',
+        lastErrorDevMessage: getErrorMessage(error),
+        lastErrorUserMessage:
+          'YouTube could not be synced. Reconnect the channel and try again.',
+        updatedAt: now,
+      })
+      .where(eq(connectorAccounts.id, input.connectorAccountId));
+    await captureError(FAILURE_CAPTURE_MESSAGES[input.source], error, {
+      connectorAccountId: input.connectorAccountId,
+      creatorProfileId: input.creatorProfileId,
+      channelId: input.channelId,
+    });
+    return { status: 'failed', error };
+  }
 }
 
 export async function runConnectedYouTubeRefreshes(
@@ -51,50 +137,19 @@ export async function runConnectedYouTubeRefreshes(
   let failed = 0;
   for (const account of accounts) {
     if (!account.creatorProfileId) continue;
-    try {
-      const accessToken = await loadFreshGoogleAccessToken(account.id);
-      if (!accessToken) {
-        needsReauth++;
-        await db
-          .update(connectorAccounts)
-          .set({
-            status: asConnectorStatusSql('needs_reauth'),
-            lastErrorCode: 'youtube_reauth_required',
-            lastErrorUserMessage:
-              'Reconnect YouTube to keep the Library in sync.',
-            updatedAt: now,
-          })
-          .where(eq(connectorAccounts.id, account.id));
-        continue;
-      }
-      await syncChannelVideos({
-        creatorProfileId: account.creatorProfileId,
-        channelId: account.channelId,
-        provider: createYouTubeLibraryProvider({ accessToken }),
-        now,
-      });
-      await reconcileApprovedYouTubeCollaborators(
-        account.creatorProfileId,
-        now
-      );
+    const outcome = await refreshConnectedYouTubeAccount({
+      connectorAccountId: account.id,
+      creatorProfileId: account.creatorProfileId,
+      channelId: account.channelId,
+      source: 'scheduled',
+      now,
+    });
+    if (outcome.status === 'synced') {
       synced++;
-      await db
-        .update(connectorAccounts)
-        .set({
-          lastSyncAt: now,
-          lastErrorCode: null,
-          lastErrorDevMessage: null,
-          lastErrorUserMessage: null,
-          updatedAt: now,
-        })
-        .where(eq(connectorAccounts.id, account.id));
-    } catch (error) {
+    } else if (outcome.status === 'needs_reauth') {
+      needsReauth++;
+    } else {
       failed++;
-      await captureError('Connected YouTube refresh failed', error, {
-        connectorAccountId: account.id,
-        creatorProfileId: account.creatorProfileId,
-        channelId: account.channelId,
-      });
     }
   }
 

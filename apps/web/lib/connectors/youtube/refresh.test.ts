@@ -89,6 +89,7 @@ describe('connected YouTube refresh', () => {
     expect(mocks.syncChannelVideos).not.toHaveBeenCalled();
     expect(mocks.setValues.at(-1)).toMatchObject({
       lastErrorCode: 'youtube_reauth_required',
+      lastErrorDevMessage: null,
     });
   });
 
@@ -107,6 +108,11 @@ describe('connected YouTube refresh', () => {
       'profile-1',
       now
     );
+    expect(mocks.setValues.at(-1)).toMatchObject({
+      lastSyncAt: now,
+      lastErrorCode: null,
+      lastErrorUserMessage: null,
+    });
   });
 
   it('records provider failure without aborting the cron loop', async () => {
@@ -116,6 +122,10 @@ describe('connected YouTube refresh', () => {
       synced: 0,
       needsReauth: 0,
       failed: 1,
+    });
+    expect(mocks.setValues.at(-1)).toMatchObject({
+      lastErrorCode: 'youtube_sync_failed',
+      lastErrorDevMessage: 'provider down',
     });
     expect(mocks.captureError).toHaveBeenCalledOnce();
   });
