@@ -11,6 +11,7 @@ import {
 
 export type DesignSystemAuthorityMapIssueCode =
   | 'duplicate-authority-id'
+  | 'duplicate-owned-capability'
   | 'invalid-authority-check-path'
   | 'invalid-authority-dependency'
   | 'invalid-authority-layer'
@@ -137,6 +138,7 @@ export function validateDesignSystemAuthorityMap({
   const order = new Map(
     map.dependencyOrder.map((id, index) => [id, index] as const)
   );
+  const capabilityOwners = new Map<string, string>();
 
   if (orderedIds.size !== map.dependencyOrder.length) {
     add(issues, 'duplicate-authority-id', 'dependencyOrder');
@@ -178,8 +180,29 @@ export function validateDesignSystemAuthorityMap({
     } else if (statusFloor !== entry.status) {
       add(issues, 'invalid-authority-status-floor', entry.id);
     }
-    if (!entry.owns.length || entry.owns.some(capability => !has(capability))) {
+    if (!entry.owns.length) {
       add(issues, 'missing-owned-capability', entry.id);
+    } else {
+      const entryCapabilities = new Set<string>();
+      for (const capability of entry.owns) {
+        if (!has(capability)) {
+          add(issues, 'missing-owned-capability', entry.id);
+          continue;
+        }
+        const priorOwner = entryCapabilities.has(capability)
+          ? entry.id
+          : capabilityOwners.get(capability);
+        if (priorOwner) {
+          add(
+            issues,
+            'duplicate-owned-capability',
+            `${entry.id}:${capability}:${priorOwner}`
+          );
+        } else {
+          capabilityOwners.set(capability, entry.id);
+        }
+        entryCapabilities.add(capability);
+      }
     }
     if (!has(entry.classificationReason)) {
       add(issues, 'missing-classification-reason', entry.id);

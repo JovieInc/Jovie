@@ -111,6 +111,20 @@ describe('design-system authority map', () => {
     ).toContain('missing-owned-capability');
     expect(
       authorityCodes(
+        authorityMapWith('surface.marketing-routes', entry => ({
+          owns: [...entry.owns, entry.owns[0]],
+        }))
+      )
+    ).toContain('duplicate-owned-capability');
+    expect(
+      authorityCodes(
+        authorityMapWith('interaction.families', entry => ({
+          owns: [...entry.owns, 'button'],
+        }))
+      )
+    ).toContain('duplicate-owned-capability');
+    expect(
+      authorityCodes(
         authorityMapWith('interaction.families', () => ({
           dependsOn: ['surface.product-routes'],
         }))

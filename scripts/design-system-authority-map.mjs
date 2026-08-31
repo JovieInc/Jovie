@@ -128,6 +128,7 @@ export function validateDesignSystemAuthorityMap(map, repoRoot = null) {
   const ids = new Set();
   const orderedIds = new Set(map.dependencyOrder);
   const order = new Map(map.dependencyOrder.map((id, index) => [id, index]));
+  const capabilityOwners = new Map();
   if (orderedIds.size !== map.dependencyOrder.length) {
     add(issues, 'duplicate-authority-id', 'dependencyOrder');
   }
@@ -171,12 +172,29 @@ export function validateDesignSystemAuthorityMap(map, repoRoot = null) {
     } else if (statusFloor !== entry.status) {
       add(issues, 'invalid-authority-status-floor', entry.id);
     }
-    if (
-      !Array.isArray(entry.owns) ||
-      entry.owns.length === 0 ||
-      entry.owns.some(item => !has(item))
-    ) {
+    if (!Array.isArray(entry.owns) || entry.owns.length === 0) {
       add(issues, 'missing-owned-capability', entry.id);
+    } else {
+      const entryCapabilities = new Set();
+      for (const capability of entry.owns) {
+        if (!has(capability)) {
+          add(issues, 'missing-owned-capability', entry.id);
+          continue;
+        }
+        const priorOwner = entryCapabilities.has(capability)
+          ? entry.id
+          : capabilityOwners.get(capability);
+        if (priorOwner) {
+          add(
+            issues,
+            'duplicate-owned-capability',
+            `${entry.id}:${capability}:${priorOwner}`
+          );
+        } else {
+          capabilityOwners.set(capability, entry.id);
+        }
+        entryCapabilities.add(capability);
+      }
     }
     if (!has(entry.classificationReason)) {
       add(issues, 'missing-classification-reason', entry.id);
