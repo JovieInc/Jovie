@@ -132,15 +132,17 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
       <PaletteList
         sections={[]}
         selectedIndex={0}
-        setSelectedIndex={() => undefined}
-        commitIndex={() => undefined}
+        setSelectedIndex={vi.fn()}
+        commitIndex={vi.fn()}
         emptyHint='No matches'
       />
     );
+
     expect(screen.getByText('No matches')).toBeInTheDocument();
     expect(fuzzyMatch('SharedCommandPalette', 'palette')).toBe(true);
     expect(fuzzyMatch('SharedCommandPalette', 'missing')).toBe(false);
   });
+
   it('exposes both skills and navs from the registry on the cmdk surface', () => {
     const cmds = commandsForSurface('cmdk');
     const skills = cmds.filter(c => c.kind === 'skill');

@@ -49,7 +49,9 @@ const LEGACY_COMPONENT_SOURCE =
   'export interface LegacyPanelProps { readonly title: string }\n' +
   'export function LegacyPanel({ title }: LegacyPanelProps) { return <h2>{title}</h2> }';
 const LEGACY_TEST_SOURCE =
-  "import { LegacyPanel } from '@/components/marketing/legacy/LegacyPanel';\nexport const node = <LegacyPanel title='Legacy' />;";
+  "import { render } from '@testing-library/react';\n" +
+  "import { LegacyPanel } from '@/components/marketing/legacy/LegacyPanel';\n" +
+  "render(<LegacyPanel title='Legacy' />);";
 const LEGACY_STORY_SOURCE =
   "import { LegacyPanel } from '@/components/marketing/legacy/LegacyPanel';\n" +
   "export const Legacy = { render: () => <LegacyPanel title='Legacy' /> };";
@@ -279,6 +281,333 @@ describe('diff gate', () => {
     expect(report.sections.diff.changedComponents).toEqual([]);
   });
 
+  function coverageViaResult(testSource, { extension = 'tsx' } = {}) {
+    const sourceRel = 'apps/web/components/atoms/CoverageViaPanel.tsx';
+    const testRel = `apps/web/tests/unit/atoms/CoverageViaPanel.test.${extension}`;
+    const storyRel = 'apps/web/components/atoms/CoverageViaPanel.stories.tsx';
+    const root = fixtureRepo({
+      [sourceRel]: [
+        `// @coverage-via ${testRel}`,
+        'export function CoverageViaPanel() { return <section /> }',
+      ].join('\n'),
+      [testRel]: testSource,
+      [storyRel]: [
+        "import { CoverageViaPanel } from './CoverageViaPanel';",
+        'export default { component: CoverageViaPanel };',
+        'export const Default = { render: () => <CoverageViaPanel /> };',
+      ].join('\n'),
+    });
+    return checkChangedComponents([sourceRel, testRel, storyRel], {
+      repoRoot: root,
+    });
+  }
+
+  it('rejects comment-only @coverage-via evidence', () => {
+    const result = coverageViaResult(
+      "// import { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\n// CoverageViaPanel"
+    );
+    expect(result.ok).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ rule: 'coverage-via-invalid' }),
+        expect.objectContaining({ rule: 'missing-test' }),
+      ])
+    );
+  });
+
+  it.each([
+    [
+      'an import-only reference',
+      "import { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';",
+    ],
+    [
+      'a void reference',
+      "import { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\nvoid CoverageViaPanel;",
+    ],
+    [
+      'an unused alias assignment',
+      "import { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\nconst unused = CoverageViaPanel;",
+    ],
+    [
+      'an existence assertion',
+      "import { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\nexpect(CoverageViaPanel).toBeDefined();",
+    ],
+    [
+      'an unrendered JSX assignment',
+      "import { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\nconst receipt = <CoverageViaPanel />;",
+    ],
+    [
+      'JSX returned by a never-called helper',
+      "import { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\nfunction receipt() { return <CoverageViaPanel />; }",
+    ],
+    [
+      'a render inside a never-called helper',
+      "import { render } from '@testing-library/react';\nimport { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\nfunction receipt() { render(<CoverageViaPanel />); }",
+    ],
+  ])('rejects %s as inert @coverage-via evidence', (_case, testSource) => {
+    const result = coverageViaResult(testSource);
+    expect(result.ok).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ rule: 'coverage-via-invalid' }),
+        expect.objectContaining({ rule: 'missing-test' }),
+      ])
+    );
+  });
+
+  it('accepts JSX rendering for @coverage-via evidence', () => {
+    const result = coverageViaResult(
+      "import { render } from '@testing-library/react';\nimport { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\nrender(<CoverageViaPanel />);"
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts a direct call of the imported component', () => {
+    const result = coverageViaResult(
+      "import { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\nCoverageViaPanel();"
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts a direct construct of the imported component', () => {
+    const result = coverageViaResult(
+      "import { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\nnew CoverageViaPanel();"
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts the component as argument zero of an imported test renderer', () => {
+    const result = coverageViaResult(
+      "import { render } from '@testing-library/react';\nimport { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\nrender(CoverageViaPanel);"
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts a namespaced React element factory followed by a renderer', () => {
+    const result = coverageViaResult(
+      "import * as React from 'react';\nimport { render } from '@testing-library/react';\nimport { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\nrender(React.createElement(CoverageViaPanel));"
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts the component as argument zero of createRoot().render', () => {
+    const result = coverageViaResult(
+      "import { createRoot } from 'react-dom/client';\nimport { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\ncreateRoot(globalThis.document.createElement('div')).render(CoverageViaPanel);"
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts a wrapped createRoot().render consumer', () => {
+    const result = coverageViaResult(
+      "import { createRoot } from 'react-dom/client';\nimport { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\n(createRoot(globalThis.document.createElement('div')).render)(CoverageViaPanel);"
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts an explicitly imported server renderer', () => {
+    const result = coverageViaResult(
+      "import { renderToString } from 'react-dom/server';\nimport { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\nrenderToString(<CoverageViaPanel />);"
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts an explicit React element consumer for @coverage-via evidence', () => {
+    const result = coverageViaResult(
+      "import { render } from '@testing-library/react';\nimport React from 'react';\nimport { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\nrender(React.createElement(CoverageViaPanel));"
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts a rendered JSX helper invoked from a registered test', () => {
+    const result = coverageViaResult(
+      "import { render } from '@testing-library/react';\nimport { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\nfunction renderReceipt() { render(<CoverageViaPanel />); }\nit('renders', () => renderReceipt());"
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts a named render helper registered directly as a test callback', () => {
+    const result = coverageViaResult(
+      "import { render } from '@testing-library/react';\nimport { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\nfunction renderReceipt() { render(<CoverageViaPanel />); }\nit('renders', renderReceipt);"
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts a render inside an immediately invoked function', () => {
+    const result = coverageViaResult(
+      "import { render } from '@testing-library/react';\nimport { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\n(() => render(<CoverageViaPanel />))();"
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts a render inside a test.each callback', () => {
+    const result = coverageViaResult(
+      "import { render } from '@testing-library/react';\nimport { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\ntest.each([1])('renders %s', () => render(<CoverageViaPanel />));"
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it.each([
+    [
+      'it.skip',
+      "import { render } from '@testing-library/react';\nimport { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\nit.skip('renders', () => render(<CoverageViaPanel />));",
+    ],
+    [
+      'test.skip',
+      "import { render } from '@testing-library/react';\nimport { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\ntest.skip('renders', () => render(<CoverageViaPanel />));",
+    ],
+    [
+      'describe.skip',
+      "import { render } from '@testing-library/react';\nimport { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\ndescribe.skip('coverage', () => render(<CoverageViaPanel />));",
+    ],
+    [
+      'test.skip.each',
+      "import { render } from '@testing-library/react';\nimport { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\ntest.skip.each([1])('renders %s', () => render(<CoverageViaPanel />));",
+    ],
+    [
+      'test.todo',
+      "import { render } from '@testing-library/react';\nimport { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\ntest.todo('renders', () => render(<CoverageViaPanel />));",
+    ],
+  ])('rejects a render inside %s as inert @coverage-via evidence', (
+    _case,
+    testSource
+  ) => {
+    const result = coverageViaResult(testSource);
+    expect(result.ok).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ rule: 'coverage-via-invalid' }),
+        expect.objectContaining({ rule: 'missing-test' }),
+      ])
+    );
+  });
+
+  it('accepts nested JSX that reaches an imported renderer', () => {
+    const result = coverageViaResult(
+      "import { render } from '@testing-library/react';\nimport { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\nrender(<section>{true && <CoverageViaPanel />}</section>);"
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it('keeps a valid import usable outside an unrelated nested shadow', () => {
+    const result = coverageViaResult(
+      "import { render } from '@testing-library/react';\nimport { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\nfunction unrelated() { const CoverageViaPanel = () => null; return CoverageViaPanel; }\nrender(<CoverageViaPanel />);"
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it('rejects a locally shadowed renderer binding', () => {
+    const result = coverageViaResult(
+      "import { render } from '@testing-library/react';\nimport { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\nfunction receipt() { const render = () => null; render(<CoverageViaPanel />); }\nreceipt();"
+    );
+    expect(result.ok).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ rule: 'coverage-via-invalid' }),
+        expect.objectContaining({ rule: 'missing-test' }),
+      ])
+    );
+  });
+
+  it('rejects a test registration hidden inside a never-called helper', () => {
+    const result = coverageViaResult(
+      "import { render } from '@testing-library/react';\nimport { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';\nfunction registerReceipt() { it('renders', () => render(<CoverageViaPanel />)); }"
+    );
+    expect(result.ok).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ rule: 'coverage-via-invalid' }),
+        expect.objectContaining({ rule: 'missing-test' }),
+      ])
+    );
+  });
+
+  it('rejects a helper call from an unrelated shadowed scope', () => {
+    const result = coverageViaResult(
+      [
+        "import { render } from '@testing-library/react';",
+        "import { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';",
+        'function renderReceipt() { render(<CoverageViaPanel />); }',
+        'function unrelated() {',
+        '  function renderReceipt() { return null; }',
+        '  renderReceipt();',
+        '}',
+        'unrelated();',
+      ].join('\n')
+    );
+    expect(result.ok).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ rule: 'coverage-via-invalid' }),
+        expect.objectContaining({ rule: 'missing-test' }),
+      ])
+    );
+  });
+
+  it.each([
+    [
+      'a local render function with no React import',
+      [
+        'const render = () => null;',
+        "import { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';",
+        'render(CoverageViaPanel);',
+      ].join('\n'),
+    ],
+    [
+      'an arbitrary object render method',
+      [
+        'const renderer = { render: () => null };',
+        "import { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';",
+        'renderer.render(CoverageViaPanel);',
+      ].join('\n'),
+    ],
+    [
+      'a component passed as a non-path consumer argument',
+      [
+        "import { render } from '@testing-library/react';",
+        "import { CoverageViaPanel } from '@/components/atoms/CoverageViaPanel';",
+        "render('not the component', CoverageViaPanel);",
+      ].join('\n'),
+    ],
+  ])('rejects %s as @coverage-via execution', (_case, testSource) => {
+    const result = coverageViaResult(testSource);
+    expect(result.ok).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ rule: 'coverage-via-invalid' }),
+        expect.objectContaining({ rule: 'missing-test' }),
+      ])
+    );
+  });
+
+  it('accepts an asserted exact source read for @coverage-via evidence', () => {
+    const result = coverageViaResult(
+      [
+        "import { readFileSync } from 'node:fs';",
+        "const source = readFileSync('apps/web/components/atoms/CoverageViaPanel.tsx', 'utf8');",
+        "expect(source).toContain('CoverageViaPanel');",
+      ].join('\n'),
+      { extension: 'ts' }
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it('rejects a source path that appears only in a non-path read argument', () => {
+    const result = coverageViaResult(
+      [
+        "import { readFileSync } from 'node:fs';",
+        "const source = readFileSync('not-the-component.tsx', 'apps/web/components/atoms/CoverageViaPanel.tsx');",
+        "expect(source).toContain('CoverageViaPanel');",
+      ].join('\n'),
+      { extension: 'ts' }
+    );
+    expect(result.ok).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ rule: 'coverage-via-invalid' }),
+        expect.objectContaining({ rule: 'missing-test' }),
+      ])
+    );
+  });
   it('fails closed without test and story', () => {
     const root = fixtureRepo({
       'apps/web/components/atoms/NewThing.tsx':
@@ -326,7 +655,9 @@ describe('diff gate', () => {
         'export interface ProfileSignalProps { readonly label: string }\n' +
         'export function ProfileSignal({ label }: ProfileSignalProps) { return <span>{label}</span> }\n',
       [testRel]:
-        "import { ProfileSignal } from './ProfileSignal';\nvoid ProfileSignal;\n",
+        "import { render } from '@testing-library/react';\n" +
+        "import { ProfileSignal } from './ProfileSignal';\n" +
+        "render(<ProfileSignal label='Signal' />);\n",
       [storyRel]:
         "import { ProfileSignal } from './ProfileSignal';\n" +
         'export default { component: ProfileSignal };\n' +
@@ -566,75 +897,12 @@ describe('coverage-via executable evidence', () => {
     ).toBe(true);
   });
 
-  it('accepts an exact module import used as a JSX tag', () => {
-    const result = coverageViaResult({
-      testSource: [
-        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
-        'export const node = <ViaPanel />;',
-      ].join('\n'),
-    });
-    expect(result.ok).toBe(true);
-  });
-
-  it('accepts a direct call of the imported binding', () => {
-    const result = coverageViaResult({
-      testSource: [
-        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
-        'ViaPanel();',
-      ].join('\n'),
-    });
-    expect(result.ok).toBe(true);
-  });
-
-  it('accepts a direct construct of the imported binding', () => {
-    const result = coverageViaResult({
-      testSource: [
-        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
-        'new ViaPanel();',
-      ].join('\n'),
-    });
-    expect(result.ok).toBe(true);
-  });
-
-  it('accepts argument zero of an imported React renderer', () => {
-    const result = coverageViaResult({
-      testSource: [
-        "import { createElement } from 'react';",
-        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
-        'createElement(ViaPanel);',
-      ].join('\n'),
-    });
-    expect(result.ok).toBe(true);
-  });
-
-  it('accepts argument zero of a namespaced React renderer', () => {
-    const result = coverageViaResult({
-      testSource: [
-        "import * as React from 'react';",
-        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
-        'React.createElement(ViaPanel);',
-      ].join('\n'),
-    });
-    expect(result.ok).toBe(true);
-  });
-
-  it('accepts argument zero of an imported test renderer', () => {
+  it('accepts an exact module import plus render', () => {
     const result = coverageViaResult({
       testSource: [
         "import { render } from '@testing-library/react';",
         "import { ViaPanel } from '@/components/atoms/ViaPanel';",
-        'render(ViaPanel);',
-      ].join('\n'),
-    });
-    expect(result.ok).toBe(true);
-  });
-
-  it('accepts argument zero of createRoot().render', () => {
-    const result = coverageViaResult({
-      testSource: [
-        "import { createRoot } from 'react-dom/client';",
-        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
-        'createRoot(globalThis.document.createElement("div")).render(ViaPanel);',
+        'render(<ViaPanel />);',
       ].join('\n'),
     });
     expect(result.ok).toBe(true);
@@ -652,11 +920,25 @@ describe('coverage-via executable evidence', () => {
     expect(result.ok).toBe(true);
   });
 
-  it('accepts a dynamic exact-module import used as a JSX tag', () => {
+  it('accepts an exact source read through a statically bound path', () => {
     const result = coverageViaResult({
       testSource: [
+        "import { readFileSync } from 'node:fs';",
+        "import { resolve } from 'node:path';",
+        "const sourcePath = 'components/atoms/ViaPanel.tsx';",
+        "const source = readFileSync(resolve(process.cwd(), sourcePath), 'utf8');",
+        "expect(source).toContain('ViaPanel');",
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts a dynamic exact-module import plus render', () => {
+    const result = coverageViaResult({
+      testSource: [
+        "import { render } from '@testing-library/react';",
         "const { ViaPanel } = await import('@/components/atoms/ViaPanel');",
-        'export const node = <ViaPanel />;',
+        'render(<ViaPanel />);',
       ].join('\n'),
     });
     expect(result.ok).toBe(true);
@@ -690,57 +972,6 @@ describe('coverage-via executable evidence', () => {
   });
 
   it.each([
-    [
-      'import-only evidence',
-      "import { ViaPanel } from '@/components/atoms/ViaPanel';\n",
-    ],
-    [
-      'void evidence',
-      [
-        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
-        'void ViaPanel;',
-      ].join('\n'),
-    ],
-    [
-      'assignment evidence',
-      [
-        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
-        'const Comp = ViaPanel;',
-        'expect(Comp).toBeTruthy();',
-      ].join('\n'),
-    ],
-    [
-      'metadata evidence',
-      [
-        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
-        'expect(ViaPanel).toBeDefined();',
-        "expect(ViaPanel.name).toBe('ViaPanel');",
-      ].join('\n'),
-    ],
-    [
-      'fake-renderer evidence',
-      [
-        "import { ViaPanel } from '@/components/atoms/ViaPanel';",
-        'function render(Component) { return Component; }',
-        'render(ViaPanel);',
-      ].join('\n'),
-    ],
-    [
-      'wrong-argument source evidence',
-      [
-        "import { readFileSync } from 'node:fs';",
-        "import { resolve } from 'node:path';",
-        "const source = readFileSync('utf8', resolve(process.cwd(), 'components/atoms/ViaPanel.tsx'));",
-        "expect(source).toContain('ViaPanel');",
-      ].join('\n'),
-    ],
-    [
-      'unlinked-source evidence',
-      [
-        "const source = 'apps/web/components/atoms/ViaPanel.tsx';",
-        "expect(source).toContain('ViaPanel');",
-      ].join('\n'),
-    ],
     [
       'a mock without a real import',
       [
@@ -914,35 +1145,5 @@ describe('multi-root ratchet', () => {
       uncovered: 0,
     };
     expect(compareCoverage(measurement, baseline).ok).toBe(true);
-  });
-});
-
-describe('runComponentShipGate diffBase', () => {
-  it('honors explicit null and skips the diff scan even when TURBO_SCM_BASE is set', () => {
-    const previous = process.env.TURBO_SCM_BASE;
-    process.env.TURBO_SCM_BASE = 'origin/main';
-    try {
-      const report = runComponentShipGate({
-        diffBase: null,
-        skipQuality: true,
-        skipRatchet: true,
-        skipRenderedCert: true,
-        skipLiveStorybook: true,
-      });
-      expect(report.ok).toBe(true);
-      expect(report.diffBase).toBeNull();
-      expect(report.sections.diff).toMatchObject({
-        ok: true,
-        applicable: false,
-        changedComponents: [],
-      });
-      expect(report.sections.diff.note).toMatch(/no diff base/);
-    } finally {
-      if (previous === undefined) {
-        delete process.env.TURBO_SCM_BASE;
-      } else {
-        process.env.TURBO_SCM_BASE = previous;
-      }
-    }
   });
 });

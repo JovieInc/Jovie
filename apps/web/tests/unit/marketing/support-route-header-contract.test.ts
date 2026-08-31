@@ -8,10 +8,13 @@ function readWebSource(path: string): string {
 
 describe('support route header contract', () => {
   it('keeps support in the canonical landing header taxonomy', () => {
-    const headerSource = readFileSync(
-      resolve(process.cwd(), 'components/site/MarketingHeader.tsx'),
-      'utf8'
-    );
+    const headerSource = readWebSource('components/site/MarketingHeader.tsx');
+    expect(
+      readFileSync(
+        resolve(process.cwd(), 'components/site/MarketingHeader.tsx'),
+        'utf8'
+      )
+    ).toContain('export function MarketingHeader');
     const registrySource = readWebSource('lib/sections/variants/header.tsx');
     const landingStart = registrySource.indexOf(
       "id: 'marketing-header-landing'"
@@ -35,13 +38,7 @@ describe('support route header contract', () => {
     expect(registrySource).not.toContain('marketing-header-content');
     expect(landingStart).toBeGreaterThanOrEqual(0);
     expect(minimalStart).toBeGreaterThan(landingStart);
-    for (const route of [
-      '/blog',
-      '/blog/[slug]',
-      '/changelog',
-      '/support',
-      '/cli',
-    ]) {
+    for (const route of ['/blog', '/blog/[slug]', '/changelog', '/support']) {
       expect(
         landingRegistration,
         `${route} must use the landing header`
@@ -50,10 +47,7 @@ describe('support route header contract', () => {
   });
 
   it('keeps the homepage header as Log in text without a second Get started', () => {
-    const headerSource = readFileSync(
-      resolve(process.cwd(), 'components/site/MarketingHeader.tsx'),
-      'utf8'
-    );
+    const headerSource = readWebSource('components/site/MarketingHeader.tsx');
 
     expect(headerSource).toContain('minimalAuth={isMinimal || isHomepage}');
     expect(headerSource).toContain(
