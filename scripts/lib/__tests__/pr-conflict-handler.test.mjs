@@ -1289,6 +1289,22 @@ describe('conflict workflow contract', () => {
     );
   });
 
+  it('sets non-secret local committer identity before both merge reproductions', () => {
+    const prepare = workflowStep(
+      'Prepare exact conflict manifest without credentials'
+    );
+    const delivery = workflowStep('Validate, reread, and deliver once');
+    for (const step of [prepare, delivery]) {
+      const identityIndex = step.indexOf('git config user.name');
+      const mergeIndex = step.indexOf('git merge --no-commit --no-ff');
+      expect(identityIndex).toBeGreaterThan(-1);
+      expect(identityIndex).toBeLessThan(mergeIndex);
+      expect(step).not.toContain('git config --global');
+    }
+    expect(prepare).not.toContain('JOVIE_BOT_PRIVATE_KEY');
+    expect(prepare).not.toContain('GH_TOKEN');
+  });
+
   it('deliberate red: workflow refuses stale-head or force-push conflict delivery', () => {
     expect(WORKFLOW).not.toContain('expected_base:0:12');
     expect(WORKFLOW).not.toContain('BASE_HEAD:0:12');
