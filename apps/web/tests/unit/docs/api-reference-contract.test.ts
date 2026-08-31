@@ -38,7 +38,11 @@ describe('docs API reference contract', () => {
     expect(apiReference).toContain(
       'RateLimit-Policy: "public-artist";q=100;w=60'
     );
+    expect(apiReference).toContain('versioning` object');
     expect(apiReference).toContain('Retry-After: 30');
+    expect(apiReference).toMatch(
+      /does\s+not emit `RateLimit` or `X-RateLimit-\*` remaining\/reset fields/
+    );
     expect(apiReference).toContain('Cache-Control: private, no-store');
     expect(apiReference).toContain('The `v1` public artist API is active');
     expect(apiReference).toContain(

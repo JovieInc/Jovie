@@ -199,7 +199,9 @@ describe('GET /api/v1/[username]', () => {
     expect(res.headers.get('Cache-Control')).toBe('no-store');
     expect(res.headers.get('Link')).toContain('rel="deprecation"');
     expect(res.headers.get('Retry-After')).toBe('30');
-    expect(res.headers.get('RateLimit-Policy')).toBeNull();
+    expect(res.headers.get('RateLimit-Policy')).toBe(
+      '"public-artist";q=100;w=60'
+    );
     expect(res.headers.get('RateLimit')).toBeNull();
     expect(res.headers.get('X-RateLimit-Limit')).toBeNull();
     expect(await res.json()).toEqual({

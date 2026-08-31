@@ -8,10 +8,45 @@ export const PUBLIC_ARTIST_API_VERSION = '1.0.0';
 /** Canonical same-origin policy and lifecycle page for the active API. */
 export const PUBLIC_ARTIST_API_POLICY_URL = `${BASE_URL}${APP_ROUTES.API_VERSIONING}`;
 
+/**
+ * Machine-readable lifecycle policy shared by the discovery index and OpenAPI
+ * document. Active v1 intentionally has no deprecation or sunset signal.
+ */
+export const PUBLIC_ARTIST_API_VERSIONING_POLICY = {
+  strategy: 'url',
+  activeVersion: 'v1',
+  additiveChanges: 'remain-within-active-version',
+  breakingChanges: 'publish-a-new-url-version',
+  policyUrl: PUBLIC_ARTIST_API_POLICY_URL,
+  lifecycle: {
+    deprecation: {
+      header: 'Deprecation',
+      standard: 'RFC 9745',
+      active: false,
+      trigger:
+        'Only when a version is genuinely deprecated and migration guidance is published.',
+    },
+    sunset: {
+      header: 'Sunset',
+      standard: 'RFC 8594',
+      active: false,
+      trigger:
+        'Only when a dated retirement window is announced for a deprecated version.',
+    },
+  },
+} as const;
+
 /** Structured-field policy identifier used by the public profile endpoint. */
 export const PUBLIC_ARTIST_API_RATE_LIMIT_POLICY = 'public-artist';
 export const PUBLIC_ARTIST_API_RATE_LIMIT = 100;
 export const PUBLIC_ARTIST_API_RATE_LIMIT_WINDOW_SECONDS = 60;
+/**
+ * Configured profile quota advertised when a request cannot read current
+ * limiter state. This is policy only; remaining/reset fields are not implied.
+ */
+export const PUBLIC_ARTIST_API_RATE_LIMIT_POLICY_VALUE = `${JSON.stringify(
+  PUBLIC_ARTIST_API_RATE_LIMIT_POLICY
+)};q=${PUBLIC_ARTIST_API_RATE_LIMIT};w=${PUBLIC_ARTIST_API_RATE_LIMIT_WINDOW_SECONDS}`;
 
 export const PUBLIC_ARTIST_API_INDEX_URL = `${BASE_URL}/api/v1`;
 export const PUBLIC_ARTIST_API_PROFILE_TEMPLATE_URL = `${BASE_URL}/api/v1/{username}`;
@@ -46,6 +81,7 @@ export interface PublicArtistApiIndex {
   readonly access: 'anonymous';
   readonly scope: 'read-only';
   readonly methods: readonly ['GET'];
+  readonly versioning: typeof PUBLIC_ARTIST_API_VERSIONING_POLICY;
   readonly rateLimit: {
     readonly appliesTo: 'artist-profile';
     readonly policy: typeof PUBLIC_ARTIST_API_RATE_LIMIT_POLICY;
@@ -82,6 +118,7 @@ export const PUBLIC_ARTIST_API_INDEX: PublicArtistApiIndex = {
   access: 'anonymous',
   scope: 'read-only',
   methods: ['GET'],
+  versioning: PUBLIC_ARTIST_API_VERSIONING_POLICY,
   rateLimit: {
     appliesTo: 'artist-profile',
     policy: PUBLIC_ARTIST_API_RATE_LIMIT_POLICY,
