@@ -1,5 +1,7 @@
-const UNTRUSTED_SOURCE_PATTERN =
-  /^<untrusted-source url="([^"]*)"(?: encoding="(entities-v1)")?>([\s\S]*)<\/untrusted-source>$/;
+const FENCE_OPEN_PREFIX = '<untrusted-source url="';
+const LEGACY_OPEN_SUFFIX = '">';
+const VERSIONED_OPEN_SUFFIX = '" encoding="entities-v1">';
+const FENCE_CLOSE = '</untrusted-source>';
 const RAW_FENCE_TOKEN_PATTERN = /<\s*\/?\s*untrusted-source\b/i;
 
 interface ValidFence {
@@ -22,13 +24,39 @@ function unescapeFenceText(value: string): string {
 }
 
 function matchValidFence(content: string): ValidFence | null {
-  const match = content.match(UNTRUSTED_SOURCE_PATTERN);
-  const payload = match?.[3];
-  if (payload === undefined || RAW_FENCE_TOKEN_PATTERN.test(payload)) {
+  if (
+    !content.startsWith(FENCE_OPEN_PREFIX) ||
+    !content.endsWith(FENCE_CLOSE)
+  ) {
     return null;
   }
+
+  const afterPrefix = content.slice(FENCE_OPEN_PREFIX.length);
+  const versionedUrlEnd = afterPrefix.indexOf(VERSIONED_OPEN_SUFFIX);
+  const legacyUrlEnd = afterPrefix.indexOf(LEGACY_OPEN_SUFFIX);
+  const hasVersionedSuffix =
+    versionedUrlEnd >= 0 &&
+    (legacyUrlEnd < 0 || versionedUrlEnd <= legacyUrlEnd);
+  const urlEnd = hasVersionedSuffix ? versionedUrlEnd : legacyUrlEnd;
+
+  if (urlEnd < 0 || afterPrefix.slice(0, urlEnd).includes('"')) {
+    return null;
+  }
+
+  const openLength =
+    FENCE_OPEN_PREFIX.length +
+    urlEnd +
+    (hasVersionedSuffix
+      ? VERSIONED_OPEN_SUFFIX.length
+      : LEGACY_OPEN_SUFFIX.length);
+  const payloadEnd = content.length - FENCE_CLOSE.length;
+  if (openLength > payloadEnd) return null;
+
+  const payload = content.slice(openLength, payloadEnd);
+  if (RAW_FENCE_TOKEN_PATTERN.test(payload)) return null;
+
   return {
-    encoding: match?.[2] === 'entities-v1' ? 'entities-v1' : null,
+    encoding: hasVersionedSuffix ? 'entities-v1' : null,
     payload,
   };
 }

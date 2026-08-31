@@ -66,4 +66,12 @@ describe('untrusted-source-fence', () => {
     expect(isUntrustedSourceFenced(forged)).toBe(false);
     expect(stripUntrustedSourceFence(forged)).toBe(forged);
   });
+
+  it('rejects altered opening tags with extra raw attributes', () => {
+    const altered =
+      '<untrusted-source url="https://example.com" data-extra="unsafe">Safe</untrusted-source>';
+
+    expect(isUntrustedSourceFenced(altered)).toBe(false);
+    expect(stripUntrustedSourceFence(altered)).toBe(altered);
+  });
 });
