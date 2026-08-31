@@ -46,7 +46,10 @@ function redirectWith(
 }
 
 type TokenData = z.infer<typeof tokenSchema>;
-type OAuthCredentials = { readonly clientId: string; readonly clientSecret: string };
+type OAuthCredentials = {
+  readonly clientId: string;
+  readonly clientSecret: string;
+};
 type TokenExchangeResult =
   | { readonly ok: true; readonly tokenData: TokenData }
   | { readonly ok: false; readonly error: string };
@@ -65,19 +68,22 @@ async function exchangeYouTubeTokens(input: {
   readonly origin: string;
   readonly credentials: OAuthCredentials;
 }): Promise<TokenExchangeResult> {
-  const tokenResponse = await serverFetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      code: input.code,
-      client_id: input.credentials.clientId,
-      client_secret: input.credentials.clientSecret,
-      redirect_uri: youtubeOAuthRedirectUri(input.origin),
-      grant_type: 'authorization_code',
-    }).toString(),
-    timeoutMs: 10_000,
-    context: 'YouTube token exchange',
-  });
+  const tokenResponse = await serverFetch(
+    'https://oauth2.googleapis.com/token',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code: input.code,
+        client_id: input.credentials.clientId,
+        client_secret: input.credentials.clientSecret,
+        redirect_uri: youtubeOAuthRedirectUri(input.origin),
+        grant_type: 'authorization_code',
+      }).toString(),
+      timeoutMs: 10_000,
+      context: 'YouTube token exchange',
+    }
+  );
   if (!tokenResponse.ok) return { ok: false, error: 'youtube_token_exchange' };
 
   const parsed = tokenSchema.safeParse(
@@ -160,7 +166,8 @@ async function markYouTubeConnectorNeedsReauth(accountId: string) {
     .set({
       status: asConnectorStatusSql('needs_reauth'),
       lastErrorCode: 'youtube_oauth_failed',
-      lastErrorUserMessage: 'Reconnect YouTube to finish connecting the channel.',
+      lastErrorUserMessage:
+        'Reconnect YouTube to finish connecting the channel.',
       updatedAt: new Date(),
     })
     .where(eq(connectorAccounts.id, accountId))
