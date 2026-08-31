@@ -88,6 +88,8 @@ class CheckinGlassTests(unittest.TestCase):
         self.assertIn("█", output)
         self.assertIn("run 2", output)
         self.assertIn("retry 1", output)
+        self.assertTrue(output.rstrip().splitlines()[-1].replace(" ", "").startswith("└"))
+        self.assertNotIn("└  │", output.splitlines()[-1])
 
     def test_zero_revenue_with_burn_is_dead(self):
         output = paint(

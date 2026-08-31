@@ -237,7 +237,13 @@ def render_tile(title: str, headline: str, detail: str, values: list[float] | No
 
 def compose_tiles(tiles: list[list[str]]) -> list[str]:
     height = max(len(tile) for tile in tiles)
-    padded = [tile + ["│"] * (height - len(tile)) for tile in tiles]
+    padded: list[list[str]] = []
+    for tile in tiles:
+        extra = height - len(tile)
+        if extra:
+            padded.append([*tile[:-1], *["│"] * extra, tile[-1]])
+        else:
+            padded.append(tile)
     return ["  ".join(tile[index] for tile in padded) for index in range(height)]
 
 
