@@ -380,6 +380,29 @@ const SYMPHONY_THROUGHPUT_SCRIPT_TESTS = [
 const SYMPHONY_THROUGHPUT_PYTHON_TESTS = [
   'scripts/hermes/tests/codex-rotate.test.py',
 ];
+const BACKLOG_REMEDIATION_PRIMARY_INPUTS = new Set([
+  'scripts/backlog-orchestrator/backlog-remediation.mjs',
+  'scripts/backlog-orchestrator/__tests__/backlog-remediation.test.mjs',
+]);
+const BACKLOG_REMEDIATION_LANE = new Set([
+  ...BACKLOG_REMEDIATION_PRIMARY_INPUTS,
+  'scripts/backlog-orchestrator/admission-disposition.mjs',
+  'scripts/backlog-orchestrator/admission-policy.mjs',
+  'scripts/backlog-orchestrator/backlog-orchestrator.mjs',
+  'scripts/backlog-orchestrator/backlog-reduction.mjs',
+  'scripts/backlog-orchestrator/config.json',
+  'scripts/backlog-orchestrator/linear-client.mjs',
+  'scripts/backlog-orchestrator/ownership-inventory.mjs',
+  '.github/workflows/fleet-gate-refresh.yml',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/run-affected-tests.mjs',
+]);
+const BACKLOG_REMEDIATION_NODE_TESTS = [
+  'scripts/backlog-orchestrator/__tests__/backlog-remediation.test.mjs',
+];
+const BACKLOG_REMEDIATION_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+];
 const FLEET_PROMOTION_GATE_INPUTS = new Set([
   'scripts/hermes/gem-priority-gate.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
@@ -766,6 +789,22 @@ export function buildAffectedTestPlan(
   const files = unique(changedFiles.filter(Boolean)).sort();
   if (files.some(file => GLOBAL_TEST_INPUTS.has(file))) {
     return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+  }
+  const isBoundedBacklogRemediationChange =
+    files.some(file => BACKLOG_REMEDIATION_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => BACKLOG_REMEDIATION_LANE.has(file));
+  if (isBoundedBacklogRemediationChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: BACKLOG_REMEDIATION_SCRIPT_TESTS,
+      nodeTests: BACKLOG_REMEDIATION_NODE_TESTS,
+    };
   }
   const isBoundedProductLaneFoundation =
     files.some(file => PRODUCT_LANE_FOUNDATION_PRIMARY_INPUTS.has(file)) &&
@@ -1445,7 +1484,8 @@ export function buildAffectedTestPlan(
   const hasIncompleteEventDrivenShipper =
     hasManifestInputBeyondDirectTests(EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST) &&
     !isExactEventDrivenShipper &&
-    !isBoundedFleetPromotionGateChange;
+    !isBoundedFleetPromotionGateChange &&
+    !isBoundedBacklogRemediationChange;
   const hasIncompletePrSizeGuard =
     hasManifestInputBeyondDirectTests(PR_SIZE_GUARD_MANIFEST) &&
     !isExactPrSizeGuard &&
@@ -1553,6 +1593,9 @@ export function buildAffectedTestPlan(
     !isExactRunnerPrerequisiteRepair &&
     !isExactLayoutGuardContract &&
     !isExactPrSizeGuardWithSelector;
+  const hasUnboundedBacklogRemediationChange =
+    files.some(file => BACKLOG_REMEDIATION_PRIMARY_INPUTS.has(file)) &&
+    !isBoundedBacklogRemediationChange;
   const hasUncoveredSource =
     !isExactEventDrivenShipper &&
     (relatedFiles.some(file => !isCoveredSource(file)) ||
@@ -1561,6 +1604,7 @@ export function buildAffectedTestPlan(
         !isExactScannerLoadRepairPrimary &&
         !isExactScannerLoadRepairWithSelector) ||
       hasUnboundedFleetPromotionGateChange ||
+      hasUnboundedBacklogRemediationChange ||
       hasUnknownCiCancellationHealerPeer ||
       hasStandaloneCiFastLanesChange ||
       hasIncompletePrerequisiteTrain ||

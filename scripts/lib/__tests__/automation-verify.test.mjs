@@ -707,6 +707,33 @@ describe('automation-verify affected scope', () => {
     ).toBe('full');
   });
 
+  it('selects the official Symphony backlog remediation lane', () => {
+    expect(
+      buildAffectedTestPlan([
+        'scripts/backlog-orchestrator/backlog-remediation.mjs',
+      ])
+    ).toMatchObject({
+      mode: 'selected',
+      nodeTests: [
+        'scripts/backlog-orchestrator/__tests__/backlog-remediation.test.mjs',
+      ],
+      scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
+    });
+    expect(
+      buildAffectedTestPlan([
+        'scripts/backlog-orchestrator/backlog-remediation.mjs',
+        '.github/workflows/fleet-gate-refresh.yml',
+        'scripts/run-affected-tests.mjs',
+      ]).mode
+    ).toBe('selected');
+    expect(
+      buildAffectedTestPlan([
+        'scripts/backlog-orchestrator/backlog-remediation.mjs',
+        'scripts/backlog-orchestrator/unknown.mjs',
+      ]).mode
+    ).toBe('full');
+  });
+
   it('selects CI/UI guardrail contracts without widening to the web suite', () => {
     expect(buildAffectedTestPlan(CI_UI_DRIFT_GUARDRAIL_INPUTS)).toMatchObject({
       mode: 'selected',

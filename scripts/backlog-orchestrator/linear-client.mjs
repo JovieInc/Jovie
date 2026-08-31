@@ -788,6 +788,22 @@ export async function addComment(issueId, body) {
 }
 
 /**
+ * Replace a machine-owned comment in place so standing reports stay singular.
+ */
+export async function updateComment(commentId, body) {
+  return graphql(
+    `
+    mutation($id: String!, $body: String!) {
+      commentUpdate(id: $id, input: { body: $body }) {
+        success
+      }
+    }
+  `,
+    { id: commentId, body }
+  );
+}
+
+/**
  * Transition an issue to a new state.
  */
 export async function transitionIssue(issueId, stateId, options = {}) {
