@@ -179,7 +179,7 @@ export function AutomaticReleaseSmartlinksSection() {
 
                   {/* Release info */}
                   <div className='mt-4 w-full text-center'>
-                    <h3 className='text-lg font-(--font-weight-semibold) leading-snug tracking-tight'>
+                    <h3 className='text-lg font-(--linear-font-weight-semibold) leading-snug tracking-tight'>
                       The Deep End
                     </h3>
                     <p className='mt-1 text-sm text-secondary-token'>
@@ -217,7 +217,7 @@ export function AutomaticReleaseSmartlinksSection() {
                   <div className='mt-3 pt-3 text-center'>
                     <span className='inline-flex items-center gap-1 text-2xs uppercase tracking-widest text-secondary-token'>
                       <span>Powered by</span>
-                      <span className='font-(--font-weight-semibold)'>
+                      <span className='font-(--linear-font-weight-semibold)'>
                         Jovie
                       </span>
                     </span>

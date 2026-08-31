@@ -57,7 +57,7 @@
   --clerk-radius-pill: 999px;
   --clerk-motion-duration: 220ms;
   --clerk-motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
-  font-feature-settings: var(--font-features);
+  font-feature-settings: var(--linear-font-features);
 }
 
 @keyframes clerk-auth-enter {
@@ -241,7 +241,7 @@
 /* Reserve balanced space only when the badge exists so Apple/Google labels
    remain centered and never run under Clerk's inline "Last used" badge. */
 :is(.cl-signIn-root, .cl-signUp-root)
-.cl-socialButtonsBlockButton:has(.cl-lastAuthenticationStrategyBadge) {
+  .cl-socialButtonsBlockButton:has(.cl-lastAuthenticationStrategyBadge) {
   padding-inline: 4.5rem;
 }
 

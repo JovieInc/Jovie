@@ -28,11 +28,12 @@ export function ProblemSection() {
             className='text-center heading-gap-linear text-primary-token'
             style={{
               fontSize: 'var(--linear-h2-size)',
-              fontWeight: 'var(--font-weight-medium)',
+              fontWeight: 'var(--linear-font-weight-medium)',
               lineHeight: 'var(--linear-h2-leading)',
               letterSpacing: 'var(--linear-h2-tracking)',
             }}
           >
+            {/* ui-casing-allow: marketing sentence-style headline */}
             Built for growth with discipline.{' '}
             <span className='text-tertiary-token'>Clear value. No fluff.</span>
           </h2>
@@ -55,7 +56,7 @@ export function ProblemSection() {
                     className='text-primary-token'
                     style={{
                       fontSize: 'var(--linear-h4-size)',
-                      fontWeight: 'var(--font-weight-medium)',
+                      fontWeight: 'var(--linear-font-weight-medium)',
                       marginBottom: 'var(--linear-space-1)',
                     }}
                   >

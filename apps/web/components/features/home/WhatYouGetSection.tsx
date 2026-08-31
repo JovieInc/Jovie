@@ -40,7 +40,7 @@ export function WhatYouGetSection() {
             className='text-center heading-gap-linear text-primary-token'
             style={{
               fontSize: 'var(--linear-h2-size)',
-              fontWeight: 'var(--font-weight-medium)',
+              fontWeight: 'var(--linear-font-weight-medium)',
               lineHeight: 'var(--linear-h2-leading)',
               letterSpacing: 'var(--linear-h2-tracking)',
             }}
@@ -72,7 +72,7 @@ export function WhatYouGetSection() {
                       className='text-primary-token'
                       style={{
                         fontSize: 'var(--linear-body-sm-size)',
-                        fontWeight: 'var(--font-weight-medium)',
+                        fontWeight: 'var(--linear-font-weight-medium)',
                         marginBottom: 'var(--linear-space-1)',
                       }}
                     >
