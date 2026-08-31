@@ -29,6 +29,7 @@ import {
   isAllowlistedAuthorityPath,
   NAMED_AUTHORITY_PATHS,
   readMergeQueue,
+  readWorkflow,
   resolveNamedAuthorityPath,
 } from '@/lib/ovie/shipping-state/live';
 
@@ -1122,6 +1123,368 @@ describe('live GitHub shipping reader', () => {
     expect(readFile).toHaveBeenCalledWith(
       resolveNamedAuthorityPath('fleet-receipt')
     );
+  });
+
+  function productionRunResponse(overrides: Record<string, unknown> = {}) {
+    return new Response(
+      JSON.stringify({
+        workflow_runs: [
+          {
+            id: 77,
+            run_attempt: 2,
+            run_number: 9,
+            name: `Production Controller ${SHA}`,
+            status: 'completed',
+            conclusion: 'success',
+            head_sha: SHA,
+            updated_at: T0,
+            ...overrides,
+          },
+        ],
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } }
+    );
+  }
+
+  function productionJobsResponse(jobs: unknown, totalCount?: number) {
+    return new Response(
+      JSON.stringify({
+        total_count:
+          totalCount ?? (Array.isArray(jobs) ? jobs.length : undefined),
+        jobs,
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }
+    );
+  }
+
+  function currentMainResponse(sha = SHA) {
+    return new Response(JSON.stringify({ sha }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
+
+  function ciRunsResponse(runs: unknown[]) {
+    return new Response(JSON.stringify({ workflow_runs: runs }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
+
+  it('binds exact-SHA CI to the current main push run', async () => {
+    const exactRun = {
+      id: 91,
+      run_number: 10,
+      event: 'push',
+      head_branch: 'main',
+      head_sha: SHA,
+      status: 'completed',
+      conclusion: 'success',
+      created_at: '2026-08-21T23:50:00.000Z',
+      run_started_at: '2026-08-21T23:55:47.000Z',
+      updated_at: '2026-08-21T23:56:48.000Z',
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(currentMainResponse())
+      .mockResolvedValueOnce(
+        ciRunsResponse([
+          {
+            ...exactRun,
+            id: 93,
+            event: 'merge_group',
+            head_branch: 'gh-readonly-queue/main/pr-1',
+          },
+          {
+            ...exactRun,
+            id: 92,
+            event: 'pull_request',
+            head_branch: 'feature',
+          },
+          exactRun,
+        ])
+      );
+
+    const read = await readWorkflow(
+      {
+        readFile: vi.fn(),
+        fetch: fetchMock,
+        githubToken: 'test-token',
+        githubOwner: 'JovieInc',
+        githubRepo: 'Jovie',
+      },
+      'exact-sha-ci',
+      'ci.yml'
+    );
+
+    expect(read).toMatchObject({
+      status: 'ok',
+      eventId: '91',
+      correlation: { ciRunId: '91', sha: SHA },
+      measuredMeanings: { ciGreen: true },
+    });
+    expect(fetchMock.mock.calls[0]?.[0]).toContain('/commits/main');
+    expect(fetchMock.mock.calls[1]?.[0]).toContain('branch=main&event=push');
+  });
+
+  it('fails unavailable when current main has no matching push CI run', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(currentMainResponse(SHA_B))
+      .mockResolvedValueOnce(
+        ciRunsResponse([
+          {
+            id: 91,
+            run_number: 10,
+            event: 'push',
+            head_branch: 'main',
+            head_sha: SHA,
+            status: 'completed',
+            conclusion: 'success',
+            updated_at: T0,
+          },
+        ])
+      );
+
+    const read = await readWorkflow(
+      {
+        readFile: vi.fn(),
+        fetch: fetchMock,
+        githubToken: 'test-token',
+        githubOwner: 'JovieInc',
+        githubRepo: 'Jovie',
+      },
+      'exact-sha-ci',
+      'ci.yml'
+    );
+
+    expect(read).toMatchObject({
+      status: 'unavailable',
+      errorCode: 'current-main-run-missing',
+      sourceRevision: SHA_B,
+      correlation: { sha: SHA_B },
+    });
+  });
+
+  it('uses the exact Production Verified job from the latest run attempt', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(productionRunResponse())
+      .mockResolvedValueOnce(
+        productionJobsResponse([
+          {
+            id: 88,
+            name: 'Production Verified',
+            run_id: 77,
+            run_attempt: 2,
+            head_sha: SHA,
+            status: 'completed',
+            conclusion: 'success',
+            completed_at: T0,
+          },
+        ])
+      );
+
+    const read = await readWorkflow(
+      {
+        readFile: vi.fn(),
+        fetch: fetchMock,
+        githubToken: 'test-token',
+        githubOwner: 'JovieInc',
+        githubRepo: 'Jovie',
+      },
+      'production-controller',
+      'production-controller.yml'
+    );
+
+    expect(read).toMatchObject({
+      status: 'ok',
+      correlation: {
+        ciRunId: '77',
+        deploymentId: null,
+        sha: SHA,
+      },
+      measuredMeanings: { productionVerified: true },
+    });
+    expect(fetchMock.mock.calls[1]?.[0]).toContain(
+      '/actions/runs/77/attempts/2/jobs?per_page=100'
+    );
+  });
+
+  it.each([
+    ['missing run id', { id: null }],
+    ['invalid run attempt', { run_attempt: 0 }],
+    ['invalid run SHA', { head_sha: 'not-an-exact-sha' }],
+  ])('rejects malformed Production Controller identity: %s', async (_label, overrides) => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(productionRunResponse(overrides));
+    const read = await readWorkflow(
+      {
+        readFile: vi.fn(),
+        fetch: fetchMock,
+        githubToken: 'test-token',
+        githubOwner: 'JovieInc',
+        githubRepo: 'Jovie',
+      },
+      'production-controller',
+      'production-controller.yml'
+    );
+
+    expect(read).toMatchObject({
+      sourceId: 'production-controller',
+      status: 'unavailable',
+      errorCode: 'malformed',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [
+      'duplicate verification jobs',
+      [
+        {
+          id: 88,
+          name: 'Production Verified',
+          run_id: 77,
+          run_attempt: 2,
+          head_sha: SHA,
+        },
+        {
+          id: 89,
+          name: 'Production Verified',
+          run_id: 77,
+          run_attempt: 2,
+          head_sha: SHA,
+        },
+      ],
+    ],
+    [
+      'mismatched verification job',
+      [
+        {
+          id: 88,
+          name: 'Production Verified',
+          run_id: 76,
+          run_attempt: 2,
+          head_sha: SHA,
+        },
+      ],
+    ],
+  ])('rejects %s as unavailable production proof', async (_label, jobs) => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(productionRunResponse())
+      .mockResolvedValueOnce(productionJobsResponse(jobs));
+    const read = await readWorkflow(
+      {
+        readFile: vi.fn(),
+        fetch: fetchMock,
+        githubToken: 'test-token',
+        githubOwner: 'JovieInc',
+        githubRepo: 'Jovie',
+      },
+      'production-controller',
+      'production-controller.yml'
+    );
+
+    expect(read).toMatchObject({
+      sourceId: 'production-controller',
+      status: 'unavailable',
+    });
+  });
+
+  it.each([
+    ['missing verification job', []],
+    [
+      'failed verification job',
+      [
+        {
+          id: 88,
+          name: 'Production Verified',
+          run_id: 77,
+          run_attempt: 2,
+          head_sha: SHA,
+          status: 'completed',
+          conclusion: 'failure',
+          completed_at: T0,
+        },
+      ],
+    ],
+  ])('measures %s as false without deployment proof', async (_label, jobs) => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(productionRunResponse())
+      .mockResolvedValueOnce(productionJobsResponse(jobs));
+    const read = await readWorkflow(
+      {
+        readFile: vi.fn(),
+        fetch: fetchMock,
+        githubToken: 'test-token',
+        githubOwner: 'JovieInc',
+        githubRepo: 'Jovie',
+      },
+      'production-controller',
+      'production-controller.yml'
+    );
+
+    expect(read).toMatchObject({
+      sourceId: 'production-controller',
+      status: 'ok',
+      correlation: { deploymentId: null },
+      errorCode: 'production-not-verified',
+      measuredMeanings: { productionVerified: false },
+    });
+  });
+
+  it.each([
+    [
+      'jobs HTTP failure',
+      () => Promise.resolve(new Response('{}', { status: 502 })),
+    ],
+    [
+      'malformed jobs payload',
+      () => Promise.resolve(productionJobsResponse('invalid')),
+    ],
+    [
+      'truncated jobs payload',
+      () =>
+        Promise.resolve(
+          productionJobsResponse(
+            Array.from({ length: 100 }, (_, id) => ({
+              id,
+              name: `unrelated-${id}`,
+            })),
+            101
+          )
+        ),
+    ],
+    ['jobs transport failure', () => Promise.reject(new Error('offline'))],
+  ])('fails Production Controller unavailable on %s', async (_label, jobsRead) => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(productionRunResponse())
+      .mockImplementationOnce(jobsRead);
+
+    const read = await readWorkflow(
+      {
+        readFile: vi.fn(),
+        fetch: fetchMock,
+        githubToken: 'test-token',
+        githubOwner: 'JovieInc',
+        githubRepo: 'Jovie',
+      },
+      'production-controller',
+      'production-controller.yml'
+    );
+
+    expect(read).toMatchObject({
+      sourceId: 'production-controller',
+      status: 'unavailable',
+    });
   });
 });
 
