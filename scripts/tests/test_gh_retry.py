@@ -1763,28 +1763,73 @@ JSON
         assert heads["1003"] not in result.stdout
         assert enrolled.read_text(encoding="utf-8").splitlines() == ["1001", "1002"]
 
-    def test_surviving_mutex_run_recovers_one_missed_head_with_target_under_total_cap(
+    def test_enqueued_continuation_recovers_next_eligible_head_without_duplicate_mutations(
         self, tmp_path: Path
     ) -> None:
-        """One surviving pass recovers lost clean work without exceeding two admissions."""
-        heads = {"1001": "d" * 40, "1002": "e" * 40, "1003": "f" * 40}
+        """Each native enqueued event advances one bounded missed-admission cohort."""
+        heads = {
+            "1001": "d" * 40,
+            "1002": "e" * 40,
+            "1003": "f" * 40,
+            "1004": "a" * 40,
+            "1005": "b" * 40,
+        }
+        real_node = shutil.which("node")
+        assert real_node is not None
         enrolled = tmp_path / "enrolled"
         enrolled.write_text("", encoding="utf-8")
+        conflict_label_calls = tmp_path / "conflict-label-calls"
+        conflict_label_calls.write_text("", encoding="utf-8")
         fake_node = tmp_path / "node"
         fake_node.write_text(
             textwrap.dedent(
                 f"""\\
                 #!/usr/bin/env bash
                 set -euo pipefail
+                queued_json() {{
+                  if grep -qx -- "$1" "{enrolled}"; then
+                    printf true
+                  else
+                    printf false
+                  fi
+                }}
+                queue_entry_json() {{
+                  if grep -qx -- "$1" "{enrolled}"; then
+                    printf '{{"id":"MQE_%s","state":"AWAITING_CHECKS","position":1}}' "$1"
+                  else
+                    printf null
+                  fi
+                }}
+                queue_state() {{
+                  printf '{{"1001":{{"headRefOid":"{heads["1001"]}","queued":%s,"isInMergeQueue":%s,"mergeQueueEntry":%s}},"1002":{{"headRefOid":"{heads["1002"]}","queued":%s,"isInMergeQueue":%s,"mergeQueueEntry":%s}},"1003":{{"headRefOid":"{heads["1003"]}","queued":%s,"isInMergeQueue":%s,"mergeQueueEntry":%s}},"1004":{{"headRefOid":"{heads["1004"]}","queued":%s,"isInMergeQueue":%s,"mergeQueueEntry":%s}},"1005":{{"headRefOid":"{heads["1005"]}","queued":%s,"isInMergeQueue":%s,"mergeQueueEntry":%s}}}}\\n' \
+                    "$(queued_json 1001)" "$(queued_json 1001)" "$(queue_entry_json 1001)" \
+                    "$(queued_json 1002)" "$(queued_json 1002)" "$(queue_entry_json 1002)" \
+                    "$(queued_json 1003)" "$(queued_json 1003)" "$(queue_entry_json 1003)" \
+                    "$(queued_json 1004)" "$(queued_json 1004)" "$(queue_entry_json 1004)" \
+                    "$(queued_json 1005)" "$(queued_json 1005)" "$(queue_entry_json 1005)"
+                }}
                 case "${{2:-}}" in
                   preflight) exit 0 ;;
-                  list-state)
-                    echo '{{"1001":{{"headRefOid":"{heads["1001"]}","queued":false}},"1002":{{"headRefOid":"{heads["1002"]}","queued":false}},"1003":{{"headRefOid":"{heads["1003"]}","queued":false}}}}'
+                  list-state) queue_state ;;
+                  explain-selector)
+                    cat >/dev/null
+                    number="${{3:?}}"
+                    if grep -qx -- "$number" "{enrolled}"; then
+                      echo '{{"observed":true,"queued":true,"eligible":false,"reason":"already-queued"}}'
+                    else
+                      echo '{{"observed":true,"queued":false,"eligible":true,"reason":"eligible"}}'
+                    fi
                     ;;
+                  prove-receipt) echo '{{"ok":false,"state":{{"queued":false}},"explanation":{{"reason":"not-queued"}}}}' ;;
                   enroll)
-                    echo "${{3:?}}" >>"{enrolled}"
+                    number="${{3:?}}"
                     head_var="${{4:?}}"
-                    echo "{{\\"state\\":{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"headRefOid\\":\\"$head_var\\",\\"mergeQueueEntry\\":{{\\"id\\":\\"MQE_${{3}}\\",\\"state\\":\\"AWAITING_CHECKS\\",\\"position\\":1}}}}}}"
+                    if grep -qx -- "$number" "{enrolled}"; then
+                      echo "duplicate native enrollment for #$number" >&2
+                      exit 91
+                    fi
+                    echo "$number" >>"{enrolled}"
+                    echo "{{\\"state\\":{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"headRefOid\\":\\"$head_var\\",\\"mergeQueueEntry\\":{{\\"id\\":\\"MQE_$number\\",\\"state\\":\\"AWAITING_CHECKS\\",\\"position\\":1}}}}}}"
                     ;;
                   dequeue) echo '{{"state":{{"queued":false}}}}' ;;
                   max-queue-depth) echo 16 ;;
@@ -1793,7 +1838,7 @@ JSON
                   changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
                   changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
                   changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
-                  --classify-queue) echo '[]' ;;
+                  --classify-queue) exec "{real_node}" "$@" ;;
                   *) echo "unexpected node args: $*" >&2; exit 2 ;;
                 esac
                 """
@@ -1809,23 +1854,32 @@ JSON
                 set -euo pipefail
                 if [[ "$1 $2" == "pr list" ]]; then
                   cat <<'JSON'
-                [{{"n":1001,"t":"Exact event target","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/event","headOid":"{heads["1001"]}","base":"main","body":"","L":[],"fail":[]}},{{"n":1002,"t":"Missed exact event","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/missed","headOid":"{heads["1002"]}","base":"main","body":"","L":[],"fail":[]}},{{"n":1003,"t":"Deferred by total cap","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/deferred","headOid":"{heads["1003"]}","base":"main","body":"","L":[],"fail":[]}}]
+                [{{"n":1001,"t":"Exact event target","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/event","headOid":"{heads["1001"]}","base":"main","body":"","L":["merge-queue"],"fail":[]}},{{"n":1002,"t":"Missed exact event","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/missed","headOid":"{heads["1002"]}","base":"main","body":"","L":["merge-queue"],"fail":[]}},{{"n":1003,"t":"Already-labelled conflict","draft":false,"m":"CONFLICTING","ms":"DIRTY","head":"codex/conflict","headOid":"{heads["1003"]}","base":"main","body":"","L":["merge-queue","needs-conflict-resolution"],"fail":[]}},{{"n":1004,"t":"Terminal red","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/red","headOid":"{heads["1004"]}","base":"main","body":"","L":["merge-queue"],"fail":["PR Ready"]}},{{"n":1005,"t":"Deferred by total cap","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/deferred","headOid":"{heads["1005"]}","base":"main","body":"","L":["merge-queue"],"fail":[]}}]
 JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  case "$3" in
+                    1004) echo '[{{"name":"PR Ready","bucket":"fail","state":"FAILURE"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]' ;;
+                    *) echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]' ;;
+                  esac
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
                   case "$3" in
-                    1001) head="{heads["1001"]}" ;;
-                    1002) head="{heads["1002"]}" ;;
-                    1003) head="{heads["1003"]}" ;;
+                    1001) head="{heads["1001"]}"; labels='[{{"name":"merge-queue"}}]' ;;
+                    1002) head="{heads["1002"]}"; labels='[{{"name":"merge-queue"}}]' ;;
+                    1003) head="{heads["1003"]}"; labels='[{{"name":"merge-queue"}},{{"name":"needs-conflict-resolution"}}]' ;;
+                    1004) head="{heads["1004"]}"; labels='[{{"name":"merge-queue"}}]' ;;
+                    1005) head="{heads["1005"]}"; labels='[{{"name":"merge-queue"}}]' ;;
                     *) echo "unexpected PR view: $*" >&2; exit 2 ;;
                   esac
-                  echo "{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"mergeable\\":\\"MERGEABLE\\",\\"labels\\":[],\\"headRefOid\\":\\"$head\\",\\"baseRefName\\":\\"main\\",\\"body\\":\\"\\"}}"
+                  echo "{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"mergeable\\":\\"MERGEABLE\\",\\"labels\\":$labels,\\"headRefOid\\":\\"$head\\",\\"baseRefName\\":\\"main\\",\\"body\\":\\"\\"}}"
                   exit 0
+                fi
+                if [[ "$1 $2" == "pr edit" ]]; then
+                  printf '%s\\n' "$*" >>"{conflict_label_calls}"
+                  exit 97
                 fi
                 if [[ "$1" == "api" ]]; then
                   if [[ "$2" == *"/commits/"*"/status"* ]]; then
@@ -1846,7 +1900,7 @@ JSON
         )
         fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
 
-        result = _run_bash(
+        first = _run_bash(
             _drain_command(
                 tmp_path,
                 backend="native",
@@ -1859,13 +1913,67 @@ JSON
             )
         )
 
-        assert result.returncode == 0, f"stdout={result.stdout}\\nstderr={result.stderr}"
-        assert "bounded exact-head native admission" in result.stdout
-        assert "exact missed admission at " + heads["1002"] in result.stdout
-        assert "reached total exact admission cap (2)" in result.stdout
-        assert "exact missed admission at " + heads["1001"] not in result.stdout
-        assert "exact missed admission at " + heads["1003"] not in result.stdout
+        assert first.returncode == 0, f"stdout={first.stdout}\\nstderr={first.stderr}"
+        assert "bounded exact-head native admission" in first.stdout
+        assert "exact missed admission at " + heads["1002"] in first.stdout
+        assert "reached total exact admission cap (2)" in first.stdout
+        assert "exact missed admission at " + heads["1001"] not in first.stdout
+        assert "exact missed admission at " + heads["1003"] not in first.stdout
+        assert "exact missed admission at " + heads["1004"] not in first.stdout
+        assert "exact missed admission at " + heads["1005"] not in first.stdout
+        assert "#1004" in first.stdout
+        assert "PR Ready" in first.stdout
         assert enrolled.read_text(encoding="utf-8").splitlines() == ["1001", "1002"]
+        assert conflict_label_calls.read_text(encoding="utf-8") == ""
+
+        second = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    f"DRAIN_ADMISSION_PR=1002 DRAIN_ADMISSION_HEAD={heads['1002']} "
+                    "DRAIN_RECONCILE_MISSED_ADMISSION=1 "
+                    "DRAIN_QUEUE_REENTRY_MAX_PER_RUN=2 "
+                    "GITHUB_RUN_ID=79 GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert second.returncode == 0, (
+            f"stdout={second.stdout}\\nstderr={second.stderr}"
+        )
+        assert "exact missed admission at " + heads["1005"] in second.stdout
+        assert "exact missed admission at " + heads["1003"] not in second.stdout
+        assert "exact missed admission at " + heads["1004"] not in second.stdout
+        assert enrolled.read_text(encoding="utf-8").splitlines() == [
+            "1001",
+            "1002",
+            "1005",
+        ]
+        assert enrolled.read_text(encoding="utf-8").splitlines().count("1002") == 1
+        assert conflict_label_calls.read_text(encoding="utf-8") == ""
+
+        third = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    f"DRAIN_ADMISSION_PR=1005 DRAIN_ADMISSION_HEAD={heads['1005']} "
+                    "DRAIN_RECONCILE_MISSED_ADMISSION=1 "
+                    "DRAIN_QUEUE_REENTRY_MAX_PER_RUN=2 "
+                    "GITHUB_RUN_ID=80 GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert third.returncode == 0, f"stdout={third.stdout}\\nstderr={third.stderr}"
+        assert "exact missed admission at " not in third.stdout
+        assert enrolled.read_text(encoding="utf-8").splitlines() == [
+            "1001",
+            "1002",
+            "1005",
+        ]
+        assert conflict_label_calls.read_text(encoding="utf-8") == ""
 
     def test_missed_admission_recovery_refuses_a_head_that_moved(
         self, tmp_path: Path
