@@ -38,6 +38,19 @@ RUNTIME_NAMES = tuple(path.name for path in RUNTIME_ARTIFACTS)
 LAUNCHER_NAMES = (WRAPPER.name, CONTROLLER.name, SIDECAR.name, GROK_SHIP.name, CURSOR_STD.name)
 
 
+class OfficialServiceOwnershipContract(unittest.TestCase):
+    def test_recovery_targets_only_official_elixir_service(self):
+        module = importlib.util.module_from_spec(
+            spec := importlib.util.spec_from_file_location("symphony_codex_exhausted", CONTROLLER)
+        )
+        assert spec and spec.loader
+        spec.loader.exec_module(module)
+        self.assertEqual(module.PRIMARY_SERVICE, "symphony-elixir.service")
+        self.assertEqual(module.OPTIONAL_SERVICES, ())
+        self.assertNotIn("symphony-ui-pilot.service", module.SERVICES)
+        self.assertNotIn("symphony-lyb.service", module.SERVICES)
+
+
 def issue_revision(identifier, title="", description=""):
     canonical = f"{identifier}\n{title.strip()}\n{description.strip()}"
     return hashlib.sha256(canonical.encode()).hexdigest()[:24]

@@ -66,8 +66,11 @@ TYPED_PICKUP_REFUSE_REASONS = frozenset(
         "state_not_admitted",
     )
 )
-PRIMARY_SERVICE = "symphony-ui-pilot.service"
-OPTIONAL_SERVICES = ("symphony-lyb.service",)
+# The upstream Elixir runtime is the sole owner of :4041 on Gem.  This
+# recovery helper may observe/start only that unit; LogYourBody owns :4042 and
+# is deliberately outside every recovery lifecycle.
+PRIMARY_SERVICE = "symphony-elixir.service"
+OPTIONAL_SERVICES: tuple[str, ...] = ()
 SERVICES = (PRIMARY_SERVICE, *OPTIONAL_SERVICES)
 LINEAR_API = "https://api.linear.app/graphql"
 LINEAR_ENV_PATH = "~/.config/symphony/linear.env"
