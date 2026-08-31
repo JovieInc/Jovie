@@ -131,6 +131,7 @@ ALTER TABLE "artist_rules" ADD CONSTRAINT "artist_rules_supersedes_rule_id_artis
 ALTER TABLE "creator_brands" ADD CONSTRAINT "creator_brands_creator_profile_id_creator_profiles_id_fk" FOREIGN KEY ("creator_profile_id") REFERENCES "public"."creator_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "creator_offers" ADD CONSTRAINT "creator_offers_creator_profile_id_creator_profiles_id_fk" FOREIGN KEY ("creator_profile_id") REFERENCES "public"."creator_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "creator_offers" ADD CONSTRAINT "creator_offers_brand_id_creator_brands_id_fk" FOREIGN KEY ("brand_id") REFERENCES "public"."creator_brands"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "creator_offers" ADD CONSTRAINT "creator_offers_source_link_id_audience_source_links_id_fk" FOREIGN KEY ("source_link_id") REFERENCES "public"."audience_source_links"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "library_relationships" ADD CONSTRAINT "library_relationships_creator_profile_id_creator_profiles_id_fk" FOREIGN KEY ("creator_profile_id") REFERENCES "public"."creator_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "library_relationships" ADD CONSTRAINT "library_relationships_reviewed_by_users_id_fk" FOREIGN KEY ("reviewed_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "optimization_experiments" ADD CONSTRAINT "optimization_experiments_creator_profile_id_creator_profiles_id_fk" FOREIGN KEY ("creator_profile_id") REFERENCES "public"."creator_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -295,6 +296,11 @@ SET search_path = public, pg_temp
 AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM youtube_videos v WHERE v.id = OLD.video_id
+    ) THEN
+      RETURN OLD;
+    END IF;
     RAISE EXCEPTION 'youtube thumbnail history is append-only';
   END IF;
   IF NEW.video_id IS DISTINCT FROM OLD.video_id
@@ -309,7 +315,6 @@ BEGIN
   IF NEW.kind IS DISTINCT FROM OLD.kind AND NOT (
     (OLD.kind IN ('original', 'current') AND NEW.kind = 'previous')
     OR (OLD.kind = 'candidate' AND NEW.kind = 'current')
-    OR (OLD.kind = 'previous' AND NEW.kind = 'current')
   ) THEN
     RAISE EXCEPTION 'invalid youtube thumbnail lifecycle transition';
   END IF;
@@ -331,6 +336,14 @@ LANGUAGE plpgsql
 SET search_path = public, pg_temp
 AS $$
 BEGIN
+  IF TG_OP = 'DELETE' AND (
+    NOT EXISTS (SELECT 1 FROM artist_rules r WHERE r.id = OLD.rule_id)
+    OR NOT EXISTS (
+      SELECT 1 FROM creator_profiles p WHERE p.id = OLD.creator_profile_id
+    )
+  ) THEN
+    RETURN OLD;
+  END IF;
   RAISE EXCEPTION 'artist rule events are immutable';
 END;
 $$;
@@ -341,6 +354,70 @@ CREATE TRIGGER artist_rule_event_immutable_guard
   FOR EACH ROW EXECUTE FUNCTION enforce_artist_rule_event_immutable();
 --> statement-breakpoint
 
+CREATE OR REPLACE FUNCTION enforce_artist_rule_lifecycle()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF NEW.status IS DISTINCT FROM OLD.status THEN
+    IF OLD.status IN (
+      'superseded'::artist_rule_status,
+      'revoked'::artist_rule_status
+    ) THEN
+      RAISE EXCEPTION 'terminal artist rules cannot be reactivated';
+    END IF;
+    IF OLD.status = 'active'::artist_rule_status
+      AND NEW.status NOT IN (
+        'superseded'::artist_rule_status,
+        'revoked'::artist_rule_status
+      )
+    THEN
+      RAISE EXCEPTION 'invalid artist rule lifecycle transition';
+    END IF;
+    IF OLD.status = 'suggested'::artist_rule_status
+      AND NEW.status NOT IN (
+        'active'::artist_rule_status,
+        'revoked'::artist_rule_status
+      )
+    THEN
+      RAISE EXCEPTION 'invalid artist rule lifecycle transition';
+    END IF;
+  END IF;
+
+  IF OLD.status IN (
+    'active'::artist_rule_status,
+    'superseded'::artist_rule_status,
+    'revoked'::artist_rule_status
+  ) AND (
+    NEW.creator_profile_id IS DISTINCT FROM OLD.creator_profile_id
+    OR NEW.category IS DISTINCT FROM OLD.category
+    OR NEW.rule_key IS DISTINCT FROM OLD.rule_key
+    OR NEW.instruction IS DISTINCT FROM OLD.instruction
+    OR NEW.strength IS DISTINCT FROM OLD.strength
+    OR NEW.scope IS DISTINCT FROM OLD.scope
+    OR NEW.scope_value IS DISTINCT FROM OLD.scope_value
+    OR NEW.allow_override IS DISTINCT FROM OLD.allow_override
+    OR NEW.provenance IS DISTINCT FROM OLD.provenance
+    OR NEW.confirmed_by IS DISTINCT FROM OLD.confirmed_by
+    OR NEW.confirmed_at IS DISTINCT FROM OLD.confirmed_at
+    OR NEW.effective_at IS DISTINCT FROM OLD.effective_at
+    OR NEW.expires_at IS DISTINCT FROM OLD.expires_at
+    OR NEW.supersedes_rule_id IS DISTINCT FROM OLD.supersedes_rule_id
+  ) THEN
+    RAISE EXCEPTION 'artist rule content is immutable after activation';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+--> statement-breakpoint
+
+CREATE TRIGGER artist_rule_lifecycle_guard
+  BEFORE UPDATE ON artist_rules
+  FOR EACH ROW EXECUTE FUNCTION enforce_artist_rule_lifecycle();
+--> statement-breakpoint
+
 CREATE OR REPLACE FUNCTION record_artist_rule_status_event()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -348,15 +425,21 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_event artist_rule_event_type;
+  v_actor_user_id uuid;
 BEGIN
   IF TG_OP = 'INSERT' THEN
     v_event := CASE NEW.status
       WHEN 'active' THEN 'activated'::artist_rule_event_type
       ELSE 'suggested'::artist_rule_event_type
     END;
+    v_actor_user_id := COALESCE(current_app_user_uuid(), NEW.confirmed_by);
   ELSIF NEW.status IS NOT DISTINCT FROM OLD.status THEN
     RETURN NEW;
   ELSE
+    v_actor_user_id := current_app_user_uuid();
+    IF v_actor_user_id IS NULL AND NOT is_system_rls_session() THEN
+      RAISE EXCEPTION 'artist rule status transition actor is required';
+    END IF;
     v_event := CASE NEW.status
       WHEN 'active' THEN 'activated'::artist_rule_event_type
       WHEN 'superseded' THEN 'superseded'::artist_rule_event_type
@@ -375,7 +458,7 @@ BEGIN
     NEW.creator_profile_id,
     NEW.id,
     v_event,
-    NEW.confirmed_by,
+    v_actor_user_id,
     jsonb_build_object(
       'previousStatus', CASE WHEN TG_OP = 'UPDATE' THEN OLD.status ELSE NULL END,
       'status', NEW.status,
