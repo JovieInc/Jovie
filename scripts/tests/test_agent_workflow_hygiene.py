@@ -1093,7 +1093,7 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     assert "synchronize" in trigger
     assert "Production Marker Recovery]" not in trigger
     assert "workflows: [CI, Production Controller, Queue-Deferred Release]" not in trigger
-    assert "group: fleet-gate-event-admission" in workflow
+    assert "group: fleet-gate-event-refresh" in workflow
     assert "cancel-in-progress: false" in workflow
     assert "github.event.workflow_run.conclusion != 'cancelled'" in block
     assert "github.event.pull_request.merged != true" in block
