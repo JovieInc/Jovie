@@ -156,6 +156,12 @@ export const ServerEnvSchema = z.object({
   STRIPE_PRICE_PRO_MONTHLY: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_PRO_ANNUAL: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_PRO_YEARLY: z.string().startsWith('price_').optional(),
+  // Product-specific founder offer. Maps to Pro base entitlements while the
+  // exact price ID remains the YouTube thumbnail entitlement source of truth.
+  STRIPE_PRICE_YOUTUBE_THUMBNAILS_FOUNDER_MONTHLY: z
+    .string()
+    .startsWith('price_')
+    .optional(),
 
   // Stripe price IDs for Growth tier (legacy, kept for backward compat)
   STRIPE_PRICE_GROWTH_MONTHLY: z.string().startsWith('price_').optional(),
@@ -408,6 +414,12 @@ export const ServerEnvSchema = z.object({
    */
   OUTBOUND_SMS_ENABLED: z.string().optional(),
   /**
+   * Live send for the one-time artist first-sale SMS.
+   * Unset/false is dry-run: the webhook still claims the milestone and logs,
+   * but does not call Twilio. OUTBOUND_SMS_ENABLED remains the provider gate.
+   */
+  FIRST_SALE_TEXT_LIVE: z.string().optional(),
+  /**
    * Demo override that bypasses the existing SMS Pro-gating in
    * subscribeToNotificationsDomain when set to 'true'. Off by default;
    * intended for the YC demo window only. See autoplan decision row #32 / F7.
@@ -487,6 +499,7 @@ export const ENV_KEYS = [
   'STRIPE_PRICE_PRO_MONTHLY',
   'STRIPE_PRICE_PRO_ANNUAL',
   'STRIPE_PRICE_PRO_YEARLY',
+  'STRIPE_PRICE_YOUTUBE_THUMBNAILS_FOUNDER_MONTHLY',
   'STRIPE_PRICE_GROWTH_MONTHLY',
   'STRIPE_PRICE_GROWTH_YEARLY',
   'STRIPE_PRICE_MAX_MONTHLY',
@@ -608,6 +621,7 @@ export const ENV_KEYS = [
   'TWILIO_VERIFY_SERVICE_SID',
   'NATIVE_SMS_ENABLED',
   'OUTBOUND_SMS_ENABLED',
+  'FIRST_SALE_TEXT_LIVE',
   'SMS_DEMO_BYPASS_PRO_GATE',
   'GOOGLE_OAUTH_CLIENT_ID',
   'GOOGLE_OAUTH_CLIENT_SECRET',
