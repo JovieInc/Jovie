@@ -67,7 +67,9 @@ export async function POST(request: Request) {
     outcome => outcome.status === 'needs_reauth'
   ).length;
   const failed = outcomes.filter(outcome => outcome.status === 'failed').length;
-  const busy = outcomes.filter(outcome => outcome.status === 'busy').length;
+  const busy = outcomes.filter(
+    outcome => outcome.status === 'busy' || outcome.status === 'incomplete'
+  ).length;
 
   if (synced.length === 0) {
     if (needsReauth > 0) {
