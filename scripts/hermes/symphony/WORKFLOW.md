@@ -43,7 +43,7 @@ hooks:
       find ./apps ./packages ./workers -mindepth 2 -maxdepth 2 -type d -name node_modules -exec rm -rf {} + 2>/dev/null || true
     fi
 agent:
-  max_concurrent_agents: 40
+  max_concurrent_agents: 8
   max_turns: 20
 codex:
   command: ./scripts/hermes/symphony-codex-router app-server

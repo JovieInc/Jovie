@@ -292,7 +292,13 @@ SERVICE_CONTROL_GROUP="$(systemctl --user show "${SERVICE}" --property=ControlGr
 [[ "${SERVICE_PID}" =~ ^[1-9][0-9]*$ ]]
 [[ "${SERVICE_CONTROL_GROUP}" == */symphony-elixir.service ]]
 grep -Fq "${SERVICE_CONTROL_GROUP}" "${PROC_ROOT}/${SERVICE_PID}/cgroup"
-ss -ltnp 'sport = :4041' | grep -Fq "pid=${SERVICE_PID},"
+LISTENER_PID="$(
+  ss -ltnp 'sport = :4041' \
+    | sed -n 's/.*pid=\([0-9][0-9]*\),.*/\1/p' \
+    | head -n 1
+)"
+[[ "${LISTENER_PID}" =~ ^[1-9][0-9]*$ ]]
+grep -Fq "${SERVICE_CONTROL_GROUP}" "${PROC_ROOT}/${LISTENER_PID}/cgroup"
 
 # File writes are not runtime proof. Attest the exact source revision and both
 # deployed configuration surfaces only after daemon-reload, service activation,
@@ -319,6 +325,7 @@ export \
   CLOSURE_SOURCE_SHA \
   CLOSURE_TARGET_SHA \
   SERVICE_PID \
+  LISTENER_PID \
   SERVICE_CONTROL_GROUP \
   GEM_ROOT
 python3 - <<'PY'
@@ -338,7 +345,7 @@ temporary = destination.with_suffix(".json.tmp")
 # update this value while the official workflow hot-reloads, so attest that
 # semantic overlay without restarting or replacing the running Elixir process.
 concurrency_pattern = re.compile(
-    r"^(\s*max_concurrent_agents:\s*)([1-9]|[1-3][0-9]|40)(\s*)$",
+    r"^(\s*max_concurrent_agents:\s*)([1-8])(\s*)$",
     re.MULTILINE,
 )
 workflow_source_bytes = pathlib.Path(os.environ["WORKFLOW_SOURCE"]).read_bytes()
@@ -381,7 +388,8 @@ receipt = {
     "healthy": True,
     "listener": {
         "port": 4041,
-        "pid": int(os.environ["SERVICE_PID"]),
+        "pid": int(os.environ["LISTENER_PID"]),
+        "wrapperPid": int(os.environ["SERVICE_PID"]),
         "controlGroup": os.environ["SERVICE_CONTROL_GROUP"],
         "boundToService": True,
     },

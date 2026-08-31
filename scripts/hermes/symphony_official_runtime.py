@@ -32,7 +32,7 @@ OFFICIAL_PROJECT_SLUG = "symphony-ui-pilot-96d6b9c5b2d5"
 OFFICIAL_WORKSPACE_ROOT = "~/symphony-elixir-workspaces"
 OFFICIAL_WORKFLOW_TARGET = "%h/.config/symphony/WORKFLOW.md"
 OFFICIAL_LOGS_ROOT = "%h/symphony-elixir-logs"
-OFFICIAL_MAX_CONCURRENT_AGENTS = 40
+OFFICIAL_MAX_CONCURRENT_AGENTS = 8
 MIN_POLL_INTERVAL_MS = 30_000
 LINEAR_HOURLY_REQUEST_BUDGET = 2_500
 LINEAR_PAGE_SIZE = 50
@@ -554,17 +554,6 @@ def _print_gate_wait_exhausted(gate: dict[str, Any], max_sleep_seconds: int) -> 
     )
 
 
-def _terminate_child(process: subprocess.Popen[str]) -> None:
-    if process.poll() is not None:
-        return
-    process.terminate()
-    try:
-        process.wait(timeout=10)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait(timeout=10)
-
-
 def run_official_binary_once(
     command: list[str], *, gate_file: pathlib.Path
 ) -> int:
@@ -582,9 +571,9 @@ def run_official_binary_once(
         print(line, end="", flush=True)
         classification = classify_linear_log_line(line)
         if classification and write_rate_limit_gate(gate_file, classification):
+            # The official scheduler may be supervising active agents. Record the
+            # reset gate for restarts without killing the child process here.
             rate_limited = True
-            _terminate_child(process)
-            break
     returncode = process.wait()
     return RATE_LIMIT_EXIT_CODE if rate_limited else returncode
 

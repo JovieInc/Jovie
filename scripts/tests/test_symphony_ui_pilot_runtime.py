@@ -156,8 +156,11 @@ def test_activation_requires_exact_production_revision_and_attestation() -> None
     assert "GEM_CONTROLLER_EXPECTED_REVISION" in activation
     assert 'gem-service-attestation/v1' in activation
     assert "ss -ltnp 'sport = :4041'" in installer
+    assert "LISTENER_PID" in installer
     assert '"boundToService": True' in installer
+    assert '"wrapperPid": int(os.environ["SERVICE_PID"])' in installer
     assert ".listener.boundToService == true" in activation
+    assert ".listener.wrapperPid > 0" in activation
 
 
 def test_activation_uses_the_provisioned_gem_host_runner_contract() -> None:

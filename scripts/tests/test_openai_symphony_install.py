@@ -24,7 +24,7 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
         self.assertRegex(workflow, re.compile(r"^\s+command: codex .*app-server$", re.M))
         self.assertNotIn("symphony-codex-router", workflow)
         self.assertIn("interval_ms: 30000", workflow)
-        self.assertIn("max_concurrent_agents: 40", workflow)
+        self.assertIn("max_concurrent_agents: 8", workflow)
         self.assertIn("port: 4041", workflow)
 
         installer = (ROOT / "scripts/install-openai-symphony.sh").read_text()

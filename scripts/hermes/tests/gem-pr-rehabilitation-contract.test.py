@@ -461,7 +461,7 @@ case "$*" in
     [ "${FAKE_RUNTIME_FAILURE:-false}" != true ]
     exit
     ;;
-  *"show symphony-elixir.service --property=MainPID"*) printf '4242\n'; exit 0 ;;
+  *"show symphony-elixir.service --property=MainPID"*) printf '3131\n'; exit 0 ;;
   *"show symphony-elixir.service --property=ControlGroup"*)
     printf '/user.slice/user-1000.slice/user@1000.service/app.slice/symphony-elixir.service\n'
     exit 0
@@ -492,11 +492,12 @@ exit 0
         )
         ss.chmod(0o755)
         proc_root = root / "proc"
-        (proc_root / "4242").mkdir(parents=True)
-        (proc_root / "4242/cgroup").write_text(
-            "0::/user.slice/user-1000.slice/user@1000.service/app.slice/symphony-elixir.service\n",
-            encoding="utf-8",
-        )
+        for pid in ("3131", "4242"):
+            (proc_root / pid).mkdir(parents=True)
+            (proc_root / pid / "cgroup").write_text(
+                "0::/user.slice/user-1000.slice/user@1000.service/app.slice/symphony-elixir.service\n",
+                encoding="utf-8",
+            )
         env = {
             "HOME": str(home),
             "GEM_WORKSPACE": str(gem),
@@ -608,8 +609,10 @@ exit 0
             attestation["policy"]["installedSha256"],
         )
         self.assertEqual(attestation["workflow"]["matchMode"], "exact")
-        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 40)
-        self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 40)
+        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 8)
+        self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 8)
+        self.assertEqual(attestation["listener"]["wrapperPid"], 3131)
+        self.assertEqual(attestation["listener"]["pid"], 4242)
 
     def test_install_attests_controller_owned_bounded_concurrency_overlay(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -625,7 +628,7 @@ exit 0
         self.assertEqual(
             attestation["workflow"]["matchMode"], "bounded_concurrency_overlay"
         )
-        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 40)
+        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 8)
         self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 1)
         self.assertNotEqual(
             attestation["workflow"]["sourceSha256"],
@@ -636,7 +639,7 @@ exit 0
         with tempfile.TemporaryDirectory() as directory:
             fixture = self._fixture(directory)
             paths, env = self._runtime(directory)
-            process = self._install(fixture, env, workflow_overlay="41")
+            process = self._install(fixture, env, workflow_overlay="9")
             restored_workflow = paths["workflow"].read_text(encoding="utf-8")
             attestation_exists = paths["attestation"].exists()
 

@@ -47,7 +47,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertNotIn("jovie-ba6736cbfbb9", WORKFLOW)
         self.assertIn("root: ~/symphony-elixir-workspaces", WORKFLOW)
         self.assertIn("timeout_ms: 900000", WORKFLOW)
-        self.assertIn("max_concurrent_agents: 40", WORKFLOW)
+        self.assertIn("max_concurrent_agents: 8", WORKFLOW)
         self.assertIn("api_key: $LINEAR_API_KEY", WORKFLOW)
         self.assertIn("required_labels:", WORKFLOW)
         self.assertIn("    - symphony", WORKFLOW)
@@ -107,17 +107,18 @@ class OfficialSymphonyContractTests(unittest.TestCase):
     def test_budget_fails_for_five_second_polling_or_unbounded_concurrency(self):
         helper = _load_helper()
         unsafe_interval = helper.compute_budget(
-            helper.BudgetInputs(poll_interval_ms=5000, max_concurrent_agents=40)
+            helper.BudgetInputs(poll_interval_ms=5000, max_concurrent_agents=8)
         )
         self.assertFalse(unsafe_interval["withinBudget"])
         self.assertEqual(unsafe_interval["schedulerRequestsPerHour"], 2160)
         safe = helper.compute_budget(
-            helper.BudgetInputs(poll_interval_ms=30000, max_concurrent_agents=40)
+            helper.BudgetInputs(poll_interval_ms=30000, max_concurrent_agents=8)
         )
         self.assertTrue(safe["withinBudget"], safe)
         self.assertEqual(safe["schedulerRequestsPerHour"], 360)
+        self.assertEqual(safe["steadyStateRequestsPerHour"], 1100)
         unsafe_concurrency = helper.compute_budget(
-            helper.BudgetInputs(poll_interval_ms=30000, max_concurrent_agents=80)
+            helper.BudgetInputs(poll_interval_ms=30000, max_concurrent_agents=55)
         )
         self.assertFalse(unsafe_concurrency["withinBudget"])
 
@@ -222,6 +223,45 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertEqual(payload["schema"], helper.RATE_LIMIT_GATE_SCHEMA)
             self.assertEqual(payload["kind"], "rate_limited")
 
+    def test_official_runtime_wrapper_records_gate_without_terminating_child(self):
+        helper = _load_helper()
+        self.assertNotIn("_terminate_child", HELPER_PATH.read_text(encoding="utf-8"))
+        line = (
+            'status=400 retry-after: 3600 '
+            '{"errors":[{"message":"request budget exhausted",'
+            '"extensions":{"code":"RATELIMITED"}}]}'
+        )
+        script = (
+            "import sys\n"
+            f"print({line!r})\n"
+            "sys.stdout.flush()\n"
+            "print('child-drained-after-rate-limit')\n"
+            "sys.stdout.flush()\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            gate = pathlib.Path(tmp) / "linear-rate-limit.json"
+            result = subprocess.run(
+                [
+                    "python3",
+                    str(HELPER_PATH),
+                    "run",
+                    "--gate-file",
+                    str(gate),
+                    "--max-gate-sleep-seconds",
+                    "0",
+                    "--",
+                    "python3",
+                    "-c",
+                    script,
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, helper.RATE_LIMIT_EXIT_CODE)
+            self.assertIn("child-drained-after-rate-limit", result.stdout)
+            self.assertTrue(gate.is_file())
+
     def test_updater_dry_run_and_config_copy_refuse_obsolete_shape(self):
         self.assertIn("linux_x86_64", UPDATER)
         self.assertIn('SYMPHONY_VERSION="${SYMPHONY_VERSION:-v0.0.2}"', UPDATER)
@@ -246,7 +286,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertEqual(dry.returncode, 0, dry.stderr)
         self.assertIn("SERVICE symphony-elixir.service", dry.stdout)
         self.assertIn("PORT 4041", dry.stdout)
-        self.assertIn("BUDGET_OK", dry.stdout)
+        self.assertIn("BUDGET_OK steady=1100 budget=2500 headroom=1400 pages=3 polls=120", dry.stdout)
         self.assertIn("UNTOUCHED symphony-lyb.service http://127.0.0.1:4042/api/v1/state", dry.stdout)
         self.assertNotIn("4043", dry.stdout)
         obsolete = subprocess.run(
@@ -291,7 +331,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertFalse((pathlib.Path(tmp) / "home/.config/systemd/user/symphony-burrito.service").exists())
             existing.write_text(
                 existing.read_text().replace(
-                    "max_concurrent_agents: 40", "max_concurrent_agents: 20"
+                    "max_concurrent_agents: 8", "max_concurrent_agents: 4"
                 )
             )
             overlay = subprocess.run(

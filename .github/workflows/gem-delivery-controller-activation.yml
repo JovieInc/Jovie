@@ -86,6 +86,7 @@ jobs:
             .healthy == true and
             .listener.port == 4041 and
             .listener.pid > 0 and
+            .listener.wrapperPid > 0 and
             .listener.boundToService == true and
             .workflow.matches == true and
             .unit.matches == true
@@ -124,12 +125,21 @@ jobs:
           done
           systemctl --user is-active --quiet symphony-lyb.service
           test -z "$(ss -H -ltn 'sport = :4043')"
-          pid="$(systemctl --user show symphony-elixir.service --property=MainPID --value)"
-          cmdline="$(tr '\0' ' ' < "/proc/${pid}/cmdline")"
+          wrapper_pid="$(systemctl --user show symphony-elixir.service --property=MainPID --value)"
+          [[ "$wrapper_pid" =~ ^[1-9][0-9]*$ ]]
           control_group="$(systemctl --user show symphony-elixir.service --property=ControlGroup --value)"
           [[ "$control_group" == */symphony-elixir.service ]]
-          grep -Fq "$control_group" "/proc/${pid}/cgroup"
-          ss -ltnp 'sport = :4041' | grep -Fq "pid=${pid},"
-          grep -Fq '.burrito/symphony_erts-' <<<"$cmdline"
-          grep -Fq -- '--port 4041' <<<"$cmdline"
-          ! grep -Fq 'symphony-ui-pilot' <<<"$cmdline"
+          grep -Fq "$control_group" "/proc/${wrapper_pid}/cgroup"
+          wrapper_cmdline="$(tr '\0' ' ' < "/proc/${wrapper_pid}/cmdline")"
+          grep -Fq 'symphony-official-runtime' <<<"$wrapper_cmdline"
+          listener_pid="$(
+            ss -ltnp 'sport = :4041' \
+              | sed -n 's/.*pid=\([0-9][0-9]*\),.*/\1/p' \
+              | head -n 1
+          )"
+          [[ "$listener_pid" =~ ^[1-9][0-9]*$ ]]
+          grep -Fq "$control_group" "/proc/${listener_pid}/cgroup"
+          listener_cmdline="$(tr '\0' ' ' < "/proc/${listener_pid}/cmdline")"
+          grep -Fq '.burrito/symphony_erts-' <<<"$listener_cmdline"
+          grep -Fq -- '--port 4041' <<<"$listener_cmdline"
+          ! grep -Fq 'symphony-ui-pilot' <<<"$listener_cmdline"
