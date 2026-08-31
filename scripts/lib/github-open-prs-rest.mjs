@@ -24,7 +24,13 @@ function statusContext(status) {
     __typename: 'StatusContext',
     context: status.context,
     state: upper(status.state),
+    description: status.description ?? '',
+    targetUrl: status.target_url ?? '',
+    creator: status.creator
+      ? { login: status.creator.login ?? '', type: status.creator.type ?? '' }
+      : null,
     startedAt: status.created_at,
+    createdAt: status.created_at,
   };
 }
 
@@ -37,6 +43,15 @@ export function normalizeRestPullRequest(detail, statusCheckRollup) {
     createdAt: detail.created_at,
     updatedAt: detail.updated_at,
     isDraft: detail.draft === true,
+    autoMergeRequest: detail.auto_merge
+      ? {
+          enabledAt: detail.auto_merge.enabled_at ?? null,
+          enabledBy: detail.auto_merge.enabled_by
+            ? { login: detail.auto_merge.enabled_by.login ?? '' }
+            : null,
+          mergeMethod: upper(detail.auto_merge.merge_method ?? ''),
+        }
+      : null,
     mergeable: mergeableValue(detail.mergeable),
     mergeStateStatus: upper(detail.mergeable_state || 'UNKNOWN'),
     baseRefName: detail.base?.ref ?? '',

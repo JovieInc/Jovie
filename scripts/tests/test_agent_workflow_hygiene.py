@@ -534,8 +534,10 @@ def test_conflict_handler_coalesces_audits_without_cancelling_manual_apply() -> 
         "cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}"
         in block
     )
-    assert 'if [[ "${{ github.event_name }}" == "workflow_dispatch"' in block
-    assert '"${{ inputs.apply }}" == "true"' in block
+    assert "EVENT_NAME: ${{ github.event_name }}" in block
+    assert "APPLY_INPUT: ${{ inputs.apply || 'false' }}" in block
+    assert 'if [[ "$EVENT_NAME" == "workflow_dispatch"' in block
+    assert '"$APPLY_INPUT" == "true"' in block
     assert 'MODE="--apply"' in block
 
 
@@ -579,9 +581,12 @@ def test_agent_pipeline_remediation_mutex_is_scoped_per_pr() -> None:
     assert "cancel-in-progress: false" in fix
 
 
-def test_conflict_paths_never_merge_or_force_push_pr_branches() -> None:
-    """Conflict repair uses the shared exact-head GitHub REBASE mutation only."""
+def test_conflict_paths_preserve_native_queue_and_use_only_non_force_delivery() -> None:
+    """Conflict delivery has no force-push, ready flip, direct merge, or dequeue."""
     fleet = (REPO_ROOT / "scripts/pr-conflict-handler.mjs").read_text(
+        encoding="utf-8"
+    )
+    workflow = (WORKFLOWS / "pr-conflict-handler.yml").read_text(
         encoding="utf-8"
     )
 
@@ -592,6 +597,46 @@ def test_conflict_paths_never_merge_or_force_push_pr_branches() -> None:
     assert "git merge" not in fleet
     assert "force-with-lease" not in fleet
     assert "gh pr update-branch" not in fleet
+    assert "JOV-INV-021" in workflow
+    assert "fx ask" in workflow
+    assert "FX_MODEL: openai/gpt-5.6-sol" in workflow
+    assert workflow.count("actions/create-github-app-token@") >= 2
+    assert (
+        workflow.count(
+            "max-parallel: ${{ fromJSON(needs.plan.outputs.adaptive_cap) }}"
+        )
+        >= 2
+    )
+    for exact_identity_check in (
+        'pulls/$PR_NUMBER',
+        ".head.sha",
+        ".base.sha",
+        '.state == "open"',
+        ".draft == $draft",
+        ".autoMerge == $autoMerge",
+        ".sameRepo == true",
+        ".ref == $ref",
+    ):
+        assert exact_identity_check in workflow
+    assert re.search(
+        r'push\s+"https://github\.com/\$REPOSITORY\.git"\s+'
+        r'"(?:HEAD|\$[A-Z_]*(?:HEAD|COMMIT)):refs/heads/\$HEAD_REF"',
+        workflow,
+        re.IGNORECASE,
+    )
+    assert "expected_base:0:12" not in workflow
+    assert "BASE_HEAD:0:12" not in workflow
+    for forbidden in (
+        "force-with-lease",
+        "git push --force",
+        "gh pr merge",
+        "gh pr ready",
+        "dequeuePullRequest",
+        "disablePullRequestAutoMerge",
+        "merge-queue-backend.mjs dequeue",
+        "withgraphite/graphite-ci-action",
+    ):
+        assert forbidden not in workflow
 
 
 def test_standalone_health_monitors_have_independent_bounded_schedules() -> None:

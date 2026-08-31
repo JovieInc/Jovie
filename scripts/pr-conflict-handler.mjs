@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 import { execFile } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { fetchOpenPrsRest } from './lib/github-open-prs-rest.mjs';
 import { tryGitHubRebase } from './lib/github-update-branch.mjs';
 import {
   buildPlan,
   DEFAULT_BLOCKED_LABEL,
-  DEFAULT_MANUAL_REBASE_LABEL,
   DEFAULT_REQUIRED_CHECKS,
   formatPlan,
+  parseConflictFxCohortComments,
 } from './lib/pr-conflict-handler.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -18,13 +19,18 @@ function parseArgs(argv) {
     repo: 'JovieInc/Jovie',
     repoOwner: 'JovieInc',
     dryRun: true,
-    maxConcurrent: 2,
+    maxConcurrent: 40,
     limit: 200,
     apply: false,
     json: false,
-    manualRebaseLabel: DEFAULT_MANUAL_REBASE_LABEL,
     blockedLabel: DEFAULT_BLOCKED_LABEL,
     requiredChecks: [...DEFAULT_REQUIRED_CHECKS],
+    runnerCapacity: 2,
+    activeCi: 0,
+    queuedCi: 0,
+    cohortId: process.env.GITHUB_RUN_ID ?? 'local',
+    planFile: '',
+    historyIssue: 16794,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -40,6 +46,24 @@ function parseArgs(argv) {
       case '--limit':
         options.limit = Number.parseInt(argv[++index], 10);
         break;
+      case '--runner-capacity':
+        options.runnerCapacity = Number.parseInt(argv[++index], 10);
+        break;
+      case '--active-ci':
+        options.activeCi = Number.parseInt(argv[++index], 10);
+        break;
+      case '--queued-ci':
+        options.queuedCi = Number.parseInt(argv[++index], 10);
+        break;
+      case '--cohort-id':
+        options.cohortId = argv[++index];
+        break;
+      case '--plan-file':
+        options.planFile = argv[++index];
+        break;
+      case '--history-issue':
+        options.historyIssue = Number.parseInt(argv[++index], 10);
+        break;
       case '--required-check':
         options.requiredChecks.push(argv[++index]);
         break;
@@ -48,9 +72,6 @@ function parseArgs(argv) {
           .split(',')
           .map(value => value.trim())
           .filter(Boolean);
-        break;
-      case '--manual-rebase-label':
-        options.manualRebaseLabel = argv[++index];
         break;
       case '--blocked-label':
         options.blockedLabel = argv[++index];
@@ -82,6 +103,16 @@ function parseArgs(argv) {
   if (!Number.isInteger(options.limit) || options.limit < 1) {
     throw new Error('--limit must be a positive integer');
   }
+  for (const key of ['runnerCapacity', 'activeCi', 'queuedCi']) {
+    if (!Number.isInteger(options[key]) || options[key] < 0) {
+      throw new Error(
+        `--${key.replace(/[A-Z]/gu, match => `-${match.toLowerCase()}`)} must be a non-negative integer`
+      );
+    }
+  }
+  if (!Number.isInteger(options.historyIssue) || options.historyIssue < 1) {
+    throw new Error('--history-issue must be a positive integer');
+  }
   return options;
 }
 
@@ -94,10 +125,15 @@ Options:
   --dry-run                    Print classification/order/actions without mutations (default)
   --apply                      Execute safe mutations (labels, exact-head GitHub rebase)
   --repo OWNER/REPO            Repository (default: JovieInc/Jovie)
-  --max-concurrent N           Cap CI-heavy retriggers including in-flight CI (default: 2)
+  --max-concurrent N           Operator ceiling above adaptive 2→10→40 cohorts (default: 40)
   --limit N                    Max open PRs to inspect (default: 200)
+  --runner-capacity N          Observed GitHub-hosted runner pool size (fail-low default: 2)
+  --active-ci N                Current in-progress Actions runs (default: 0)
+  --queued-ci N                Current queued Actions runs (default: 0)
+  --cohort-id ID               Durable cohort identifier (default: GITHUB_RUN_ID)
+  --plan-file PATH             Write the machine-readable plan to PATH
+  --history-issue N            Durable cohort ledger issue (default: 16794)
   --required-checks a,b,c      Required aggregate checks to use for BLOCKED classification
-  --manual-rebase-label NAME   Label for non-trivial conflicts (default: needs-manual-rebase)
   --blocked-label NAME         Label for failing required checks (default: needs-ci-fix)
   --json                       Emit JSON plan as well as logs
 `);
@@ -171,7 +207,50 @@ async function fetchOpenPrs(options) {
     limit: options.limit,
     request,
   });
+  const [owner, name] = options.repo.split('/');
+  for (let offset = 0; offset < prs.length; offset += 50) {
+    const batch = prs.slice(offset, offset + 50);
+    const selections = batch
+      .map(
+        pr =>
+          `pr${pr.number}:pullRequest(number:${pr.number}){number isInMergeQueue mergeQueueEntry{position}}`
+      )
+      .join('\n');
+    const response = await ghJson([
+      'api',
+      'graphql',
+      '-f',
+      `query=query { repository(owner:${JSON.stringify(owner)},name:${JSON.stringify(name)}) { ${selections} } }`,
+    ]);
+    const repository = response?.data?.repository;
+    if (!repository) {
+      throw new Error('GraphQL native merge-queue inventory was incomplete');
+    }
+    for (const pr of batch) {
+      const queue = repository[`pr${pr.number}`];
+      if (!queue || queue.number !== pr.number) {
+        throw new Error(
+          `GraphQL native merge-queue inventory omitted PR #${pr.number}`
+        );
+      }
+      pr.isInMergeQueue = queue.isInMergeQueue === true;
+      pr.mergeQueuePosition = queue.mergeQueueEntry?.position ?? null;
+    }
+  }
   return { prs, degradedChecks: false };
+}
+
+async function fetchCohortHistory(options) {
+  const pages = await ghJson([
+    'api',
+    '--method',
+    'GET',
+    '--paginate',
+    '--slurp',
+    `repos/${options.repo}/issues/${options.historyIssue}/comments?per_page=100`,
+  ]);
+  const comments = Array.isArray(pages) ? pages.flat() : [];
+  return parseConflictFxCohortComments(comments);
 }
 
 async function ensureLabel(repo, label, color, description) {
@@ -213,12 +292,6 @@ async function executePlan(plan, options) {
   const results = [];
   await ensureLabel(
     options.repo,
-    options.manualRebaseLabel,
-    'B60205',
-    'Conflict handler found a non-trivial rebase that needs a human'
-  );
-  await ensureLabel(
-    options.repo,
     options.blockedLabel,
     'D93F0B',
     'Required checks are failing; fix CI before freshness updates'
@@ -230,9 +303,6 @@ async function executePlan(plan, options) {
       if (item.action === 'flag_blocked_checks' && item.label) {
         await addLabel(options.repo, item.number, item.label);
         results.push({ pr: item.number, ok: true, action: item.action });
-      } else if (item.action === 'label_needs_manual_rebase' && item.label) {
-        await addLabel(options.repo, item.number, item.label);
-        results.push({ pr: item.number, ok: true, action: item.action });
       } else if (item.action === 'request_github_rebase') {
         const result = await tryGitHubRebase({
           repo: options.repo,
@@ -242,9 +312,6 @@ async function executePlan(plan, options) {
           expectedHeadOid: item.pr.headRefOid,
           dryRun: false,
         });
-        if (!result.ok && result.conflict) {
-          await addLabel(options.repo, item.number, options.manualRebaseLabel);
-        }
         results.push({ pr: item.number, action: item.action, ...result });
       }
     } catch (error) {
@@ -269,7 +336,11 @@ async function executePlan(plan, options) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
-  const { prs, degradedChecks } = await fetchOpenPrs(options);
+  const [{ prs, degradedChecks }, cohortHistory] = await Promise.all([
+    fetchOpenPrs(options),
+    fetchCohortHistory(options),
+  ]);
+  options.cohortHistory = cohortHistory;
   if (degradedChecks) {
     // Without check rollups, "required check missing" is indistinguishable
     // from "not fetched" — drop required-check-based BLOCKED classification
@@ -280,6 +351,13 @@ async function main() {
     );
   }
   const plan = buildPlan(prs, options);
+
+  if (options.planFile) {
+    writeFileSync(options.planFile, `${JSON.stringify(plan, null, 2)}\n`, {
+      encoding: 'utf8',
+      mode: 0o600,
+    });
+  }
 
   console.log(formatPlan(plan, { dryRun: options.dryRun }));
   for (const item of plan.items) logDecision(item, { phase: 'plan' });
