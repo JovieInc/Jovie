@@ -4223,7 +4223,9 @@ describe('production promotion exact-artifact contract', () => {
     );
     expect(exactGate).toContain('superseded_after_public_bind=false');
     expect(exactGate).toContain('superseded_after_public_bind=true');
-    expect(exactGate).toContain('not used as proof for the newer main SHA');
+    expect(exactGate).toContain(
+      'not used as proof for the newer main SHA'
+    );
     expect(exactGate).toContain(
       'EXPECTED_PRODUCTION_DEPLOYMENT_ID: ${{ needs.production-release.outputs.production_deployment_id }}'
     );
