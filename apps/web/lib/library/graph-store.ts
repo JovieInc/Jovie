@@ -192,6 +192,59 @@ export async function reconcileApprovedYouTubeCollaborators(
       .map(credit => [`${credit.videoId}:${credit.artistId}`, credit] as const)
   );
 
+  if (current.size > 0) {
+    const values = [...current.values()].map(credit => ({
+      creatorProfileId,
+      kind: 'collaborator_credit' as const,
+      subjectType: 'youtube_video' as const,
+      subjectId: credit.videoId,
+      objectType: 'artist' as const,
+      objectId: credit.artistId,
+      status: 'active' as const,
+      confidence: '1.0000',
+      evidence: {
+        source: 'catalog_credit',
+        sourceId: credit.linkId,
+        rationale: `${credit.creditName?.trim() || credit.artistName} · ${credit.role}`,
+        observedAt: now.toISOString(),
+      },
+      effectiveAt: now,
+      expiresAt: null,
+      updatedAt: now,
+    }));
+    await db
+      .insert(libraryRelationships)
+      .values(values)
+      .onConflictDoUpdate({
+        target: [
+          libraryRelationships.creatorProfileId,
+          libraryRelationships.kind,
+          libraryRelationships.subjectType,
+          libraryRelationships.subjectId,
+          libraryRelationships.objectType,
+          libraryRelationships.objectId,
+        ],
+        set: {
+          status: 'active',
+          confidence: '1.0000',
+          evidence: drizzleSql`excluded.evidence`,
+          effectiveAt: now,
+          expiresAt: null,
+          updatedAt: now,
+        },
+      });
+  }
+
+  const staleRelationshipFilter =
+    current.size === 0
+      ? drizzleSql`true`
+      : drizzleSql`(${libraryRelationships.subjectId}, ${libraryRelationships.objectId}) not in (${drizzleSql.join(
+          [...current.values()].map(
+            credit => drizzleSql`(${credit.videoId}, ${credit.artistId})`
+          ),
+          drizzleSql`, `
+        )})`;
+
   await db
     .update(libraryRelationships)
     .set({ status: 'removed', updatedAt: now })
@@ -201,50 +254,10 @@ export async function reconcileApprovedYouTubeCollaborators(
         eq(libraryRelationships.kind, 'collaborator_credit'),
         eq(libraryRelationships.subjectType, 'youtube_video'),
         eq(libraryRelationships.status, 'active'),
-        drizzleSql`${libraryRelationships.evidence}->>'source' = 'catalog_credit'`
+        drizzleSql`${libraryRelationships.evidence}->>'source' = 'catalog_credit'`,
+        staleRelationshipFilter
       )
     );
 
-  if (current.size === 0) return 0;
-  const values = [...current.values()].map(credit => ({
-    creatorProfileId,
-    kind: 'collaborator_credit' as const,
-    subjectType: 'youtube_video' as const,
-    subjectId: credit.videoId,
-    objectType: 'artist' as const,
-    objectId: credit.artistId,
-    status: 'active' as const,
-    confidence: '1.0000',
-    evidence: {
-      source: 'catalog_credit',
-      sourceId: credit.linkId,
-      rationale: `${credit.creditName?.trim() || credit.artistName} · ${credit.role}`,
-      observedAt: now.toISOString(),
-    },
-    effectiveAt: now,
-    expiresAt: null,
-    updatedAt: now,
-  }));
-  await db
-    .insert(libraryRelationships)
-    .values(values)
-    .onConflictDoUpdate({
-      target: [
-        libraryRelationships.creatorProfileId,
-        libraryRelationships.kind,
-        libraryRelationships.subjectType,
-        libraryRelationships.subjectId,
-        libraryRelationships.objectType,
-        libraryRelationships.objectId,
-      ],
-      set: {
-        status: 'active',
-        confidence: '1.0000',
-        evidence: drizzleSql`excluded.evidence`,
-        effectiveAt: now,
-        expiresAt: null,
-        updatedAt: now,
-      },
-    });
   return current.size;
 }

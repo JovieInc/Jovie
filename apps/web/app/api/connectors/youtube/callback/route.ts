@@ -1,4 +1,3 @@
-import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
@@ -7,21 +6,19 @@ import { asConnectorStatusSql } from '@/lib/connectors/db-expressions';
 import { verifyGoogleOAuthState } from '@/lib/connectors/google-calendar/oauth-state';
 import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
 import { storeTokens } from '@/lib/connectors/token-vault';
-import {
-  createYouTubeLibraryProvider,
-  listOwnedYouTubeChannels,
-} from '@/lib/connectors/youtube/provider';
+import { listOwnedYouTubeChannels } from '@/lib/connectors/youtube/provider';
+import { refreshConnectedYouTubeAccount } from '@/lib/connectors/youtube/refresh';
 import { db } from '@/lib/db';
 import { connectorAccounts } from '@/lib/db/schema/connectors';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { serverFetch } from '@/lib/http/server-fetch';
-import { reconcileApprovedYouTubeCollaborators } from '@/lib/library/graph-store';
 import { logger } from '@/lib/utils/logger';
-import { syncChannelVideos } from '@/lib/youtube-library/sync';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+const INITIAL_SYNC_DEADLINE_MS = 25_000;
 
 interface GoogleTokenResponse {
   readonly access_token: string;
@@ -46,6 +43,7 @@ function redirectWith(
 }
 
 export async function GET(request: Request) {
+  const deadlineMs = Date.now() + INITIAL_SYNC_DEADLINE_MS;
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
   const stateParam = url.searchParams.get('state');
@@ -162,7 +160,10 @@ export async function GET(request: Request) {
           updatedAt: new Date(),
         },
       })
-      .returning({ id: connectorAccounts.id });
+      .returning({
+        id: connectorAccounts.id,
+        updatedAt: connectorAccounts.updatedAt,
+      });
     if (!account) throw new Error('Failed to upsert YouTube connector account');
     await storeTokens(
       tokens.refresh_token
@@ -179,26 +180,27 @@ export async function GET(request: Request) {
           }
     );
 
-    const sync = await syncChannelVideos({
+    const sync = await refreshConnectedYouTubeAccount({
+      connectorAccountId: account.id,
       creatorProfileId: state.creatorProfileId,
       channelId: channel.id,
-      provider: createYouTubeLibraryProvider({
-        accessToken: tokens.access_token,
-      }),
+      source: 'manual',
+      observedUpdatedAt: account.updatedAt,
+      deadlineMs,
     });
-    await reconcileApprovedYouTubeCollaborators(state.creatorProfileId);
-    await db
-      .update(connectorAccounts)
-      .set({ lastSyncAt: new Date(), updatedAt: new Date() })
-      .where(
-        and(
-          eq(connectorAccounts.id, account.id),
-          eq(connectorAccounts.userId, userId)
-        )
-      );
+    if (sync.status === 'needs_reauth') {
+      return redirectWith(url.origin, returnTo, {
+        error: 'youtube_reauth_required',
+      });
+    }
+    if (sync.status === 'failed') {
+      throw sync.error instanceof Error
+        ? sync.error
+        : new Error('YouTube initial sync failed');
+    }
     return redirectWith(url.origin, returnTo, {
       connected: 'youtube',
-      imported: String(sync.total),
+      imported: sync.status === 'synced' ? String(sync.result.total) : '0',
     });
   } catch (error) {
     logger.error('[connectors/youtube/callback] Unexpected error', { error });

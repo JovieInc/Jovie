@@ -256,7 +256,7 @@ describe('YouTube Library provider', () => {
     ]);
   });
 
-  it('bounds lifetime batches by the Analytics report cell limit', async () => {
+  it('bounds lifetime batches by the Analytics report cell limit and request cap', async () => {
     const fetcher = vi.fn(async () =>
       jsonResponse({
         columnHeaders: [{ name: 'video' }],
@@ -267,6 +267,7 @@ describe('YouTube Library provider', () => {
       accessToken: 'access-token',
       now: () => new Date('2026-08-28T12:00:00.000Z'),
       fetcher,
+      maxAnalyticsRequests: 1,
     });
 
     await provider.fetchVideoMetrics(
@@ -275,7 +276,7 @@ describe('YouTube Library provider', () => {
       ['lifetime']
     );
 
-    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher).toHaveBeenCalledTimes(1);
     expect(
       fetcher.mock.calls.map(([input]) =>
         new URL(String(input)).searchParams
@@ -285,7 +286,6 @@ describe('YouTube Library provider', () => {
       )
     ).toEqual([
       ['video-1', 'video-2', 'video-3', 'video-4', 'video-5', 'video-6'],
-      ['video-7'],
     ]);
   });
 });

@@ -20,7 +20,10 @@ import { createYouTubeLibraryProvider } from './provider';
 const REFRESH_AFTER_MS = 24 * 60 * 60 * 1000;
 const FAILURE_BACKOFF_MS = 60 * 60 * 1000;
 const MAX_CHANNELS_PER_RUN = 1;
-const MAX_SCHEDULED_VIDEO_IDS = 50;
+const MAX_REFRESH_VIDEO_IDS = 50;
+const PROVIDER_REQUEST_TIMEOUT_MS = 5_000;
+const MAX_SCHEDULED_ANALYTICS_REQUESTS = 2;
+const MAX_MANUAL_ANALYTICS_REQUESTS = 1;
 const SYNC_LOCK_DURATION_MS = 10 * 60 * 1000;
 const SYNC_LOCK_RESOURCE_KIND = 'youtube_library_refresh';
 
@@ -66,6 +69,23 @@ function readYouTubeRefreshCursor(cursor: unknown): YouTubeRefreshCursor {
   return typeof uploadsPageToken === 'string' && uploadsPageToken.trim()
     ? { uploadsPageToken }
     : {};
+}
+
+function connectorAccountStillObserved(input: {
+  readonly connectorAccountId: string;
+  readonly creatorProfileId: string;
+  readonly channelId: string;
+  readonly observedUpdatedAt?: Date;
+}) {
+  const identity = and(
+    eq(connectorAccounts.id, input.connectorAccountId),
+    eq(connectorAccounts.creatorProfileId, input.creatorProfileId),
+    eq(connectorAccounts.providerAccountId, input.channelId),
+    eq(connectorAccounts.status, 'connected')
+  );
+  return input.observedUpdatedAt
+    ? and(identity, eq(connectorAccounts.updatedAt, input.observedUpdatedAt))
+    : identity;
 }
 
 async function acquireYouTubeLibrarySyncLock(
@@ -151,6 +171,8 @@ export async function refreshConnectedYouTubeAccount(input: {
   readonly creatorProfileId: string;
   readonly channelId: string;
   readonly source: ConnectedYouTubeRefreshSource;
+  readonly observedUpdatedAt?: Date;
+  readonly deadlineMs?: number;
   readonly now?: Date;
 }): Promise<ConnectedYouTubeRefreshOutcome> {
   const now = input.now ?? new Date();
@@ -171,17 +193,25 @@ export async function refreshConnectedYouTubeAccount(input: {
       input.connectorAccountId
     );
     if (!accessToken) {
-      await db
-        .update(connectorAccounts)
-        .set({
-          status: asConnectorStatusSql('needs_reauth'),
-          lastErrorCode: 'youtube_reauth_required',
-          lastErrorDevMessage: null,
-          lastErrorUserMessage:
-            'Reconnect YouTube to keep the Library in sync.',
-          updatedAt: now,
-        })
-        .where(eq(connectorAccounts.id, input.connectorAccountId));
+      try {
+        await db
+          .update(connectorAccounts)
+          .set({
+            status: asConnectorStatusSql('needs_reauth'),
+            lastErrorCode: 'youtube_reauth_required',
+            lastErrorDevMessage: null,
+            lastErrorUserMessage:
+              'Reconnect YouTube to keep the Library in sync.',
+            updatedAt: now,
+          })
+          .where(connectorAccountStillObserved(input));
+      } catch (error) {
+        await captureError('YouTube reauth status update failed', error, {
+          connectorAccountId: input.connectorAccountId,
+          creatorProfileId: input.creatorProfileId,
+          channelId: input.channelId,
+        });
+      }
       return { status: 'needs_reauth' };
     }
 
@@ -190,8 +220,7 @@ export async function refreshConnectedYouTubeAccount(input: {
       channelId: input.channelId,
       provider: createYouTubeLibraryProvider({
         accessToken,
-        maxVideosPerSync:
-          input.source === 'scheduled' ? MAX_SCHEDULED_VIDEO_IDS : undefined,
+        maxVideosPerSync: MAX_REFRESH_VIDEO_IDS,
         uploadsPageToken:
           input.source === 'scheduled'
             ? syncCursor.uploadsPageToken
@@ -202,6 +231,12 @@ export async function refreshConnectedYouTubeAccount(input: {
                 nextUploadsPageToken = pageToken;
               }
             : undefined,
+        timeoutMs: PROVIDER_REQUEST_TIMEOUT_MS,
+        maxAnalyticsRequests:
+          input.source === 'scheduled'
+            ? MAX_SCHEDULED_ANALYTICS_REQUESTS
+            : MAX_MANUAL_ANALYTICS_REQUESTS,
+        deadlineMs: input.deadlineMs,
       }),
       now,
     });
@@ -222,7 +257,7 @@ export async function refreshConnectedYouTubeAccount(input: {
         lastErrorUserMessage: null,
         updatedAt: now,
       })
-      .where(eq(connectorAccounts.id, input.connectorAccountId));
+      .where(connectorAccountStillObserved(input));
     return { status: 'synced', result };
   } catch (error) {
     if (isRefreshLockBusyError(error)) {
@@ -237,7 +272,7 @@ export async function refreshConnectedYouTubeAccount(input: {
           'YouTube could not be synced. Reconnect the channel and try again.',
         updatedAt: now,
       })
-      .where(eq(connectorAccounts.id, input.connectorAccountId));
+      .where(connectorAccountStillObserved(input));
     await captureError(FAILURE_CAPTURE_MESSAGES[input.source], error, {
       connectorAccountId: input.connectorAccountId,
       creatorProfileId: input.creatorProfileId,
@@ -252,7 +287,8 @@ export async function refreshConnectedYouTubeAccount(input: {
 }
 
 export async function runConnectedYouTubeRefreshes(
-  now = new Date()
+  now = new Date(),
+  options?: { readonly deadlineMs?: number }
 ): Promise<ConnectedYouTubeRefreshResult> {
   const cutoff = new Date(now.getTime() - REFRESH_AFTER_MS);
   const failureRetryCutoff = new Date(now.getTime() - FAILURE_BACKOFF_MS);
@@ -261,6 +297,7 @@ export async function runConnectedYouTubeRefreshes(
       id: connectorAccounts.id,
       creatorProfileId: connectorAccounts.creatorProfileId,
       channelId: connectorAccounts.providerAccountId,
+      updatedAt: connectorAccounts.updatedAt,
     })
     .from(connectorAccounts)
     .where(
@@ -304,6 +341,8 @@ export async function runConnectedYouTubeRefreshes(
       creatorProfileId: account.creatorProfileId,
       channelId: account.channelId,
       source: 'scheduled',
+      observedUpdatedAt: account.updatedAt,
+      deadlineMs: options?.deadlineMs,
       now,
     });
     if (outcome.status === 'synced') {

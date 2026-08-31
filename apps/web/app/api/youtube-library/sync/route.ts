@@ -12,7 +12,10 @@ import { connectorAccounts } from '@/lib/db/schema/connectors';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+const MANUAL_SYNC_DEADLINE_MS = 25_000;
+
 export async function POST(request: Request) {
+  const deadlineMs = Date.now() + MANUAL_SYNC_DEADLINE_MS;
   const validation = await validateYouTubeProfileMutationRequest(request);
   if (!validation.ok) return validation.response;
   const { userId, creatorProfileId } = validation;
@@ -21,6 +24,7 @@ export async function POST(request: Request) {
     .select({
       id: connectorAccounts.id,
       channelId: connectorAccounts.providerAccountId,
+      updatedAt: connectorAccounts.updatedAt,
     })
     .from(connectorAccounts)
     .where(
@@ -38,17 +42,18 @@ export async function POST(request: Request) {
     );
   }
 
-  const outcomes: ConnectedYouTubeRefreshOutcome[] = [];
-  for (const account of accounts) {
-    outcomes.push(
-      await refreshConnectedYouTubeAccount({
+  const outcomes: ConnectedYouTubeRefreshOutcome[] = await Promise.all(
+    accounts.map(account =>
+      refreshConnectedYouTubeAccount({
         connectorAccountId: account.id,
         creatorProfileId,
         channelId: account.channelId,
         source: 'manual',
+        observedUpdatedAt: account.updatedAt,
+        deadlineMs,
       })
-    );
-  }
+    )
+  );
 
   const synced = outcomes.filter(
     (
