@@ -1,18 +1,10 @@
 import { render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
-
-import {
-  CHAT_EMPTY_GREETING_STORAGE_KEY,
-  CHAT_EMPTY_ROTATE_GREETINGS,
-} from '../chat-empty-greeting';
+import { describe, expect, it } from 'vitest';
+import { CHAT_HOME_HEADING } from '@/lib/chat/new-chat-entry-contract';
 import { ChatEmptyStateComposerRegion } from './ChatEmptyStateComposerRegion';
 
 describe('ChatEmptyStateComposerRegion', () => {
-  beforeEach(() => {
-    sessionStorage.removeItem(CHAT_EMPTY_GREETING_STORAGE_KEY);
-  });
-
-  it('renders one locked greeting and no brand logo', () => {
+  it('renders the role-neutral heading and no brand logo', () => {
     render(
       <ChatEmptyStateComposerRegion>
         <div data-testid='composer-child' />
@@ -21,40 +13,18 @@ describe('ChatEmptyStateComposerRegion', () => {
 
     expect(screen.queryByTestId('chat-empty-state-logo')).toBeNull();
     expect(screen.getByTestId('chat-empty-state-greeting').textContent).toBe(
-      "Let's get it"
+      CHAT_HOME_HEADING
     );
   });
 
-  it('rotates through the locked set across empty-chat mounts', () => {
-    const { unmount } = render(
-      <ChatEmptyStateComposerRegion>
-        <div data-testid='composer-child' />
-      </ChatEmptyStateComposerRegion>
-    );
-    expect(screen.getByTestId('chat-empty-state-greeting').textContent).toBe(
-      CHAT_EMPTY_ROTATE_GREETINGS[0]
-    );
-    unmount();
-
-    render(
-      <ChatEmptyStateComposerRegion>
-        <div data-testid='composer-child' />
-      </ChatEmptyStateComposerRegion>
-    );
-    expect(screen.getByTestId('chat-empty-state-greeting').textContent).toBe(
-      CHAT_EMPTY_ROTATE_GREETINGS[1]
-    );
-  });
-
-  it("never ships What's next? as the empty greeting", () => {
+  it('never ships persona context in the shared heading', () => {
     render(
       <ChatEmptyStateComposerRegion>
         <div data-testid='composer-child' />
       </ChatEmptyStateComposerRegion>
     );
 
-    expect(screen.queryByText("What's next?")).toBeNull();
-    expect(screen.queryByText("What's next, Tim?")).toBeNull();
+    expect(screen.queryByText(/artist|band|creator|dj|musician/i)).toBeNull();
   });
 
   it('staggers the enter animation across greeting and composer', () => {
@@ -159,7 +129,7 @@ describe('ChatEmptyStateComposerRegion', () => {
     expect(welcome.className).toContain('items-center');
     expect(screen.queryByTestId('chat-empty-state-logo')).toBeNull();
     expect(screen.getByTestId('chat-empty-state-greeting').textContent).toBe(
-      "Let's get it"
+      CHAT_HOME_HEADING
     );
   });
 
@@ -177,5 +147,20 @@ describe('ChatEmptyStateComposerRegion', () => {
     expect(screen.queryByTestId('chat-empty-state-welcome')).toBeNull();
     expect(screen.queryByTestId('chat-empty-state-logo')).toBeNull();
     expect(screen.queryByTestId('chat-empty-state-greeting')).toBeNull();
+  });
+
+  it('marks the composer and its container as one canonical grid column', () => {
+    render(
+      <ChatEmptyStateComposerRegion stableDocked>
+        <div data-testid='composer-child' />
+      </ChatEmptyStateComposerRegion>
+    );
+
+    expect(
+      screen.getByTestId('chat-empty-state-composer-region')
+    ).toHaveAttribute('data-chat-grid-column', 'canonical');
+    expect(
+      screen.getByTestId('chat-empty-state-centered-composer')
+    ).toHaveAttribute('data-chat-grid-anchor', 'composer');
   });
 });

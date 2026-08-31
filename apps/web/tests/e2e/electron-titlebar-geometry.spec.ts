@@ -87,13 +87,9 @@ async function assertElectronShellControls(
   await expect(
     page.locator('header a[aria-label="New Conversation"]')
   ).toHaveCount(0);
-  const newChatRowCount = await page
-    .getByRole('link', { name: 'New Conversation' })
-    .count();
-  expect(newChatRowCount).toBeLessThanOrEqual(1);
-  if (expectedNewChatRows === 1) {
-    expect(newChatRowCount).toBe(1);
-  }
+  await expect(page.getByRole('link', { name: 'New Chat' })).toHaveCount(
+    expectedNewChatRows
+  );
 }
 
 test('titlebar DOM has a single sidebar toggle and an empty main-cell drag region', async ({
@@ -181,9 +177,7 @@ test('no duplicate sidebar dock button and titlebar toggle on the same page', as
   await expect(
     page.locator('[data-testid="electron-sidebar-toggle"]')
   ).toHaveCount(1);
-  await expect(
-    page.getByRole('link', { name: 'New Conversation' })
-  ).toHaveCount(1);
+  await expect(page.getByRole('link', { name: 'New Chat' })).toHaveCount(1);
 
   // The titlebar sidebar toggle must be present (it is the canonical one in Electron).
   const titlebarToggle = page.locator(
@@ -260,7 +254,7 @@ test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignmen
   }
 });
 
-test('Electron shell keeps one control contract across chat, calendar, tasks, releases, settings, and admin routes', async ({
+test('Electron shell keeps one control contract across chat, calendar, tasks, library, and settings routes', async ({
   page,
 }) => {
   // Skip outside the explicit dev-auth E2E lane; cross-route Electron controls need bypassed personas.
@@ -293,18 +287,13 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, re
       expectedNewChatRows: 1,
     },
     {
-      route: APP_ROUTES.RELEASES,
+      route: APP_ROUTES.LIBRARY,
       persona: 'creator-ready',
       expectedNewChatRows: 1,
     },
     {
       route: APP_ROUTES.SETTINGS_ACCOUNT,
       persona: 'creator-ready',
-      expectedNewChatRows: 0,
-    },
-    {
-      route: APP_ROUTES.ADMIN_OPS,
-      persona: 'admin',
       expectedNewChatRows: 0,
     },
   ];
@@ -315,5 +304,85 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, re
       page.locator('[data-testid="electron-titlebar-row"]')
     ).toBeAttached({ timeout: 30_000 });
     await assertElectronShellControls(page, expectedNewChatRows);
+
+    const geometry = await page.evaluate(() => {
+      const titlebar = document.querySelector<HTMLElement>(
+        '[data-electron-titlebar="true"]'
+      );
+      const body = document.querySelector<HTMLElement>(
+        '[data-app-shell-body="true"]'
+      );
+      const sidebar = document.querySelector<HTMLElement>(
+        '[data-app-shell-sidebar-mount="true"]'
+      );
+      const mainPlane = document.querySelector<HTMLElement>(
+        '[data-app-shell-main-plane="true"]'
+      );
+      if (!titlebar || !body || !sidebar || !mainPlane) return null;
+
+      const titlebarBox = titlebar.getBoundingClientRect();
+      const bodyBox = body.getBoundingClientRect();
+      const sidebarBox = sidebar.getBoundingClientRect();
+      const mainPlaneBox = mainPlane.getBoundingClientRect();
+      return {
+        bodyPaddingTop: Number.parseFloat(getComputedStyle(body).paddingTop),
+        titlebarBottom: titlebarBox.bottom,
+        bodyTop: bodyBox.top,
+        sidebarTop: sidebarBox.top,
+        mainPlaneTop: mainPlaneBox.top,
+      };
+    });
+
+    expect(geometry, `${route} exposes shell geometry`).not.toBeNull();
+    expect(
+      geometry?.bodyPaddingTop,
+      `${route} has no second top-gap owner`
+    ).toBe(0);
+    expect(
+      Math.abs((geometry?.titlebarBottom ?? 0) - (geometry?.bodyTop ?? 0)),
+      `${route} body begins at the titlebar boundary`
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs((geometry?.sidebarTop ?? 0) - (geometry?.bodyTop ?? 0)),
+      `${route} sidebar aligns to the body grid`
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs((geometry?.mainPlaneTop ?? 0) - (geometry?.bodyTop ?? 0)),
+      `${route} main plane aligns to the body grid`
+    ).toBeLessThanOrEqual(1);
+
+    if (route === APP_ROUTES.CHAT) {
+      await expect(
+        page.locator('[data-chat-grid-anchor="starter"]')
+      ).toBeVisible({ timeout: 30_000 });
+      await expect(
+        page.locator('[data-chat-grid-anchor="composer"]')
+      ).toBeVisible({ timeout: 30_000 });
+      const chatGrid = await page.evaluate(() => {
+        const starter = document
+          .querySelector<HTMLElement>('[data-chat-grid-anchor="starter"]')
+          ?.getBoundingClientRect();
+        const composer = document
+          .querySelector<HTMLElement>('[data-chat-grid-anchor="composer"]')
+          ?.getBoundingClientRect();
+        if (!starter || !composer) return null;
+        return {
+          starterLeft: starter.left,
+          starterRight: starter.right,
+          composerLeft: composer.left,
+          composerRight: composer.right,
+        };
+      });
+      expect(
+        chatGrid,
+        'New Chat exposes both canonical grid anchors'
+      ).not.toBeNull();
+      expect(
+        Math.abs((chatGrid?.starterLeft ?? 0) - (chatGrid?.composerLeft ?? 0))
+      ).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs((chatGrid?.starterRight ?? 0) - (chatGrid?.composerRight ?? 0))
+      ).toBeLessThanOrEqual(1);
+    }
   }
 });

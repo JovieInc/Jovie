@@ -44,7 +44,7 @@ export const chatNavItem: NavItem = {
   id: 'chat',
   icon: SquarePen,
   iconName: 'SquarePen',
-  tone: 'secondary',
+  tone: 'primary',
   tier: 'core',
   description: 'Start a new conversation',
 };

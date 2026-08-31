@@ -1,7 +1,7 @@
 export type ChatEmptyStateAffordance =
   | 'none'
   | 'opportunity-cards'
-  | 'starter-actions'
+  | 'starter-conversations'
   | 'suggestion-pills';
 
 interface ResolveChatEmptyStateAffordanceInput {
@@ -9,7 +9,7 @@ interface ResolveChatEmptyStateAffordanceInput {
   readonly conversationInProgress: boolean;
   readonly composerHasIntent: boolean;
   readonly opportunityCardCount: number;
-  readonly starterActionCount: number;
+  readonly starterConversationCount: number;
   readonly suggestionCount: number;
 }
 
@@ -19,14 +19,14 @@ export function resolveChatEmptyStateAffordance({
   conversationInProgress,
   composerHasIntent,
   opportunityCardCount,
-  starterActionCount,
+  starterConversationCount,
   suggestionCount,
 }: ResolveChatEmptyStateAffordanceInput): ChatEmptyStateAffordance {
   if (conversationExists || conversationInProgress || composerHasIntent) {
     return 'none';
   }
   if (opportunityCardCount > 0) return 'opportunity-cards';
-  if (starterActionCount > 0) return 'starter-actions';
+  if (starterConversationCount > 0) return 'starter-conversations';
   if (suggestionCount > 0) return 'suggestion-pills';
   return 'none';
 }

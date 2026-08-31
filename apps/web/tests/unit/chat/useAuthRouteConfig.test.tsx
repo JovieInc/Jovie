@@ -32,6 +32,16 @@ describe('useAuthRouteConfig', () => {
     expect(result.current.isChatRoute).toBe(true);
   });
 
+  it('uses the direct role-neutral heading on the exact New Chat route', () => {
+    mockUsePathname.mockReturnValue(APP_ROUTES.CHAT);
+
+    const { result } = renderHook(() => useAuthRouteConfig());
+
+    expect(result.current.breadcrumbs).toEqual([
+      { label: 'Just ask', href: APP_ROUTES.CHAT },
+    ]);
+  });
+
   it('uses Inbox as the single shell title for the root opportunity surface', () => {
     mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
 

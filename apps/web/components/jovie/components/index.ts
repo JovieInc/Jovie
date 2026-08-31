@@ -20,7 +20,6 @@ export { ChatPitchCard } from './ChatPitchCard';
 export { ChatUploadManifest } from './ChatUploadManifest';
 export { EntityChip, type EntityChipData } from './EntityChip';
 export { ErrorDisplay } from './ErrorDisplay';
-export { FeatureIntroCard, FeatureIntroHost } from './FeatureIntroCard';
 export { FeedbackForm } from './FeedbackForm';
 export { ImagePreviewStrip } from './ImagePreviewStrip';
 export { ScrollToBottom } from './ScrollToBottom';

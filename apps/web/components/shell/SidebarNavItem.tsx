@@ -36,16 +36,13 @@ interface SidebarNavChromeOptions {
   readonly className?: string;
 }
 
-// Create actions are deliberately not a second selected-nav treatment. Keep
-// them compact and secondary so the active destination remains the strongest
-// signal in the rail.
+// Secondary actions stay compact so the active destination remains strongest.
 const SIDEBAR_SECONDARY_CHROME =
   'w-fit grid-cols-[18px_auto] gap-x-1.5 px-2.5 text-sidebar-item-foreground font-medium hover:bg-sidebar-accent';
 
-// Retained for callers that explicitly need the established elevated action
-// treatment. Customer navigation uses the quiet secondary tone instead.
+// Available primary actions use primary-token copy and a filled surface.
 const SIDEBAR_PRIMARY_CHROME =
-  'w-fit grid-cols-[18px_auto] gap-x-1.5 bg-sidebar-accent/40 px-2.5 text-sidebar-item-foreground font-medium shadow-none hover:bg-sidebar-accent/70';
+  'w-fit grid-cols-[18px_auto] gap-x-1.5 bg-sidebar-accent/70 px-2.5 text-primary-token font-medium shadow-none hover:bg-sidebar-accent-active';
 
 // Active state uses a quiet neutral fill with primary-token type and a Jovie teal icon.
 // Avoid a left rail or guide decoration so every shared sidebar consumer keeps
