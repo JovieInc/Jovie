@@ -98,6 +98,64 @@ struct MobileMeResponseTests {
     #expect(ovie.navigationDivergenceReason == "operator-capabilities")
   }
 
+  @Test func decodesFutureWorkspaceIDsWithoutRejectingMeResponse() throws {
+    let data = """
+      {
+        "state": "ready",
+        "displayName": "Tim White",
+        "username": "tim",
+        "publicProfileUrl": "https://jov.ie/tim",
+        "qrPayload": "https://jov.ie/tim",
+        "avatarUrl": null,
+        "appleWalletProfilePassAvailable": true,
+        "chatEnabled": true,
+        "continueOnWebUrl": "https://jov.ie/app",
+        "appShell": {
+          "launchWorkspaceId": "customer",
+          "primaryWorkspaceId": "customer",
+          "shellOwner": "jovie",
+          "chatOwner": "jovie-chat",
+          "workspaces": [
+            {
+              "id": "customer",
+              "label": "Jovie",
+              "href": "/app",
+              "role": "primary",
+              "access": "authenticated",
+              "shellOwner": "jovie",
+              "chatOwner": "jovie-chat",
+              "chatMode": null,
+              "selectedAgent": "jovie",
+              "dataScope": "customer",
+              "navigationDivergenceReason": null
+            },
+            {
+              "id": "future",
+              "label": "Future",
+              "href": "/app/future",
+              "role": "secondary",
+              "access": "authenticated",
+              "shellOwner": "jovie",
+              "chatOwner": "jovie-chat",
+              "chatMode": "future",
+              "selectedAgent": "future-agent",
+              "dataScope": "future",
+              "navigationDivergenceReason": "future-workspace"
+            }
+          ]
+        }
+      }
+      """.data(using: .utf8)!
+
+    let response = try JSONDecoder().decode(MobileMeResponse.self, from: data)
+    let future = try #require(response.appShell.workspaces.first { $0.id.rawValue == "future" })
+
+    #expect(response.appShell.launchWorkspaceID == .customer)
+    #expect(response.appShell.primaryWorkspaceID == .customer)
+    #expect(future.id == .unknown("future"))
+    #expect(response.appShell.canAccessOvie == false)
+  }
+
   @Test func decodesNeedsOnboardingResponse() throws {
     let data = """
       {

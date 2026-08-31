@@ -1,9 +1,42 @@
 import Foundation
 
 struct MobileAppShellContract: Codable, Equatable, Sendable {
-  enum WorkspaceID: String, Codable, Sendable {
+  enum WorkspaceID: Codable, Equatable, Sendable {
     case customer
     case ov
+    case unknown(String)
+
+    init(rawValue: String) {
+      switch rawValue {
+      case "customer":
+        self = .customer
+      case "ov":
+        self = .ov
+      default:
+        self = .unknown(rawValue)
+      }
+    }
+
+    var rawValue: String {
+      switch self {
+      case .customer:
+        return "customer"
+      case .ov:
+        return "ov"
+      case .unknown(let value):
+        return value
+      }
+    }
+
+    init(from decoder: Decoder) throws {
+      let container = try decoder.singleValueContainer()
+      self.init(rawValue: try container.decode(String.self))
+    }
+
+    func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      try container.encode(rawValue)
+    }
   }
 
   enum WorkspaceRole: String, Codable, Sendable {
