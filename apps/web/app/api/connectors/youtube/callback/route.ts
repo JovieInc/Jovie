@@ -43,7 +43,6 @@ function redirectWith(
 }
 
 export async function GET(request: Request) {
-  const deadlineMs = Date.now() + INITIAL_SYNC_DEADLINE_MS;
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
   const stateParam = url.searchParams.get('state');
@@ -180,13 +179,14 @@ export async function GET(request: Request) {
           }
     );
 
+    const syncDeadlineMs = Date.now() + INITIAL_SYNC_DEADLINE_MS;
     const sync = await refreshConnectedYouTubeAccount({
       connectorAccountId: account.id,
       creatorProfileId: state.creatorProfileId,
       channelId: channel.id,
       source: 'manual',
       observedUpdatedAt: account.updatedAt,
-      deadlineMs,
+      deadlineMs: syncDeadlineMs,
     });
     if (sync.status === 'needs_reauth') {
       return redirectWith(url.origin, returnTo, {
