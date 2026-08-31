@@ -2,12 +2,15 @@ import {
   type CountMeasurement,
   EMPTY_CORRELATION,
   emptyCounts,
+  emptyDurations,
   isExactSha,
   measuredCount,
+  measuredDuration,
   NOT_MEASURED_COUNT,
   type ObservationState,
   SHIPPING_SOURCE_IDS,
   SHIPPING_SOURCE_SCHEMAS,
+  SHIPPING_SOURCE_SEMANTIC_FRESHNESS_MS,
   type ShippingCorrelation,
   type ShippingEntity,
   type ShippingSourceId,
@@ -22,6 +25,7 @@ import {
   parseTimestamp,
   type SourceCursor,
   sanitizedError,
+  sanitizeOpaqueIdentifier,
 } from './envelope';
 
 export type AuthorityReadStatus =
@@ -132,7 +136,8 @@ export function disconnectedRead(
 export function interpretCounts(
   sourceId: ShippingSourceId,
   payload: Readonly<Record<string, unknown>> | null,
-  status: AuthorityReadStatus
+  status: AuthorityReadStatus,
+  truncated = false
 ): SourceObservation['counts'] {
   if (status !== 'ok' || payload == null) return emptyCounts();
   if (sourceId === 'symphony-runtime' || sourceId === 'symphony-task') {
@@ -141,6 +146,7 @@ export function interpretCounts(
       retrying: countFromList(payload.retrying, 'retrying' in payload),
       blocked: countFromList(payload.blocked, 'blocked' in payload),
       queued: NOT_MEASURED_COUNT,
+      openPullRequests: NOT_MEASURED_COUNT,
       capacityAvailable: NOT_MEASURED_COUNT,
     };
   }
@@ -155,10 +161,49 @@ export function interpretCounts(
     const entries = payload.entries ?? payload.nodes;
     return {
       ...emptyCounts(),
-      queued: countFromList(entries, Array.isArray(entries)),
+      queued:
+        truncated || payload.truncated === true
+          ? NOT_MEASURED_COUNT
+          : countFromList(entries, Array.isArray(entries)),
+      openPullRequests: countFromNumber(payload.openPullRequests),
     };
   }
   return emptyCounts();
+}
+
+function elapsedMs(start: unknown, end: unknown) {
+  const startMs = typeof start === 'string' ? Date.parse(start) : Number.NaN;
+  const endMs = typeof end === 'string' ? Date.parse(end) : Number.NaN;
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) {
+    return null;
+  }
+  return Math.round(endMs - startMs);
+}
+
+function interpretDurations(
+  sourceId: ShippingSourceId,
+  payload: Readonly<Record<string, unknown>> | null,
+  status: AuthorityReadStatus
+): SourceObservation['durations'] {
+  if (status !== 'ok' || payload == null || sourceId !== 'exact-sha-ci') {
+    return emptyDurations();
+  }
+  const startedAt = payload.run_started_at;
+  const queueWaitMs = elapsedMs(payload.created_at, startedAt);
+  const runDurationMs =
+    payload.status === 'completed'
+      ? elapsedMs(startedAt, payload.updated_at)
+      : null;
+  return {
+    queueWaitMs:
+      queueWaitMs == null
+        ? emptyDurations().queueWaitMs
+        : measuredDuration(queueWaitMs),
+    runDurationMs:
+      runDurationMs == null
+        ? emptyDurations().runDurationMs
+        : measuredDuration(runDurationMs),
+  };
 }
 
 function taskEntities(
@@ -179,12 +224,13 @@ function taskEntities(
   for (const group of groups) {
     for (const item of asList(payload[group.key])) {
       if (!isRecord(item)) continue;
-      const issue =
+      const issue = sanitizeOpaqueIdentifier(
         typeof item.issue_identifier === 'string'
           ? item.issue_identifier
           : typeof item.issue === 'string'
             ? item.issue
-            : null;
+            : null
+      );
       if (issue == null) continue;
       entities.push({
         ...identityFields({
@@ -227,7 +273,7 @@ function queueEntities(
 ): ShippingEntity[] {
   return asList(payload.entries ?? payload.nodes).flatMap((entry, index) => {
     if (!isRecord(entry)) return [];
-    const id = typeof entry.id === 'string' ? entry.id : `entry:${index}`;
+    const id = sanitizeOpaqueIdentifier(entry.id) ?? `entry:${index}`;
     const pr = isRecord(entry.pullRequest) ? entry.pullRequest : entry;
     const sha =
       typeof pr.headRefOid === 'string' && isExactSha(pr.headRefOid)
@@ -268,9 +314,14 @@ export function interpretAuthorityRead(
 ): { readonly observation: SourceObservation; readonly cursor: SourceCursor } {
   const schemaOk =
     read.status !== 'ok' || schemaMatches(read.sourceId, read.schema);
-  const sequence = read.sequence ?? cursor.lastSequence + 1;
-  const revision = read.sourceRevision;
-  const eventId = read.eventId ?? eventIdFor(read.sourceId, sequence, revision);
+  const sequence =
+    Number.isSafeInteger(read.sequence) && Number(read.sequence) >= 1
+      ? Number(read.sequence)
+      : cursor.lastSequence + 1;
+  const revision = sanitizeOpaqueIdentifier(read.sourceRevision);
+  const eventId =
+    sanitizeOpaqueIdentifier(read.eventId) ??
+    eventIdFor(read.sourceId, sequence, revision);
   const ingest = ingestSourceEvent(cursor, {
     eventId,
     sequence,
@@ -288,14 +339,39 @@ export function interpretAuthorityRead(
   ) {
     state = 'degraded';
   }
+  const semanticFreshnessMs =
+    SHIPPING_SOURCE_SEMANTIC_FRESHNESS_MS[read.sourceId];
+  const sourceMs = read.sourceTimestamp
+    ? Date.parse(read.sourceTimestamp)
+    : Number.NaN;
+  const observationMs = Date.parse(observationTimestamp);
+  if (
+    state === 'fresh' &&
+    semanticFreshnessMs != null &&
+    Number.isFinite(sourceMs) &&
+    Number.isFinite(observationMs) &&
+    observationMs - sourceMs > semanticFreshnessMs
+  ) {
+    state = 'stale';
+  }
 
+  const rejectedGap = ingest.action === 'gap-rejected';
   const lastError =
-    read.errorCode || read.status !== 'ok' || !schemaOk
+    read.errorCode || read.status !== 'ok' || !schemaOk || rejectedGap
       ? sanitizedError(
           observationTimestamp,
-          read.errorCode ?? (schemaOk ? read.status : 'schema-mismatch'),
+          read.errorCode ??
+            (rejectedGap
+              ? 'sequence-gap-too-large'
+              : schemaOk
+                ? read.status
+                : 'schema-mismatch'),
           read.errorMessage ??
-            (schemaOk ? read.status : 'producer schema mismatch')
+            (rejectedGap
+              ? 'Source sequence gap exceeded the accepted bound'
+              : schemaOk
+                ? read.status
+                : 'producer schema mismatch')
         )
       : null;
   const lastSuccess =
@@ -351,14 +427,24 @@ export function interpretAuthorityRead(
       sequenceGap: ingest.sequenceGap,
       ingest: ingest.action as IngestAction,
       measuredMeanings: {
-        merged: read.measuredMeanings?.merged ?? null,
-        queued: read.measuredMeanings?.queued ?? null,
-        ciGreen: read.measuredMeanings?.ciGreen ?? null,
-        productionVerified: read.measuredMeanings?.productionVerified ?? null,
-        exactLiveBuild: read.measuredMeanings?.exactLiveBuild ?? null,
+        merged: live ? (read.measuredMeanings?.merged ?? null) : null,
+        queued: live ? (read.measuredMeanings?.queued ?? null) : null,
+        ciGreen: live ? (read.measuredMeanings?.ciGreen ?? null) : null,
+        productionVerified: live
+          ? (read.measuredMeanings?.productionVerified ?? null)
+          : null,
+        exactLiveBuild: live
+          ? (read.measuredMeanings?.exactLiveBuild ?? null)
+          : null,
       },
       entities,
       counts: interpretCounts(
+        read.sourceId,
+        payload,
+        live ? 'ok' : read.status,
+        read.truncated
+      ),
+      durations: interpretDurations(
         read.sourceId,
         payload,
         live ? 'ok' : read.status

@@ -80,7 +80,47 @@ struct AppShellIntentNavigationTests {
     #expect(state.selectedTab == .chat)
     #expect(state.chatDraft == "keep draft")
     #expect(state.shouldStartVoiceCapture)
+    #expect(state.talkAutoSubmit)
+    #expect(state.eyesFreeLaunch?.destination == .jovie)
     #expect(state.pendingRequest == nil)
+  }
+
+  @Test func summerCaptureRejectsOrdinaryUsersWithoutStartingMic() {
+    var state = eyesFreeState(.summer, spokenText: "what is blocked")
+    AppShellIntentNavigation.applyPendingRequest(
+      chatEnabled: true,
+      canUseSummer: false,
+      state: &state
+    )
+    #expect(state.shouldStartVoiceCapture == false)
+    #expect(state.autoSendMessage == nil)
+    #expect(state.unavailableMessage == EyesFreeCaptureGate.summerForbiddenMessage)
+  }
+
+  @Test func founderSummerSpokenTextAutoSubmits() {
+    var state = eyesFreeState(.summer, spokenText: "park the teardown")
+    AppShellIntentNavigation.applyPendingRequest(
+      chatEnabled: true,
+      canUseSummer: true,
+      state: &state
+    )
+    #expect(state.selectedTab == .chat)
+    #expect(state.autoSendMessage == "park the teardown")
+    #expect(state.talkAutoSubmit)
+    #expect(state.eyesFreeLaunch?.destination == .summer)
+    #expect(state.shouldStartVoiceCapture == false)
+    #expect(state.unavailableMessage == nil)
+  }
+
+  @Test func offlineEyesFreeCaptureSurfacesRetryWithoutListening() {
+    var state = eyesFreeState(.jovie, spokenText: nil)
+    AppShellIntentNavigation.applyPendingRequest(
+      chatEnabled: true,
+      isOffline: true,
+      state: &state
+    )
+    #expect(state.shouldStartVoiceCapture == false)
+    #expect(state.unavailableMessage == EyesFreeCaptureGate.offlineMessage)
   }
 
   @Test func sendMessageWithoutAutoSendPrefillsDraft() {
@@ -159,6 +199,7 @@ struct AppShellIntentNavigationTests {
     #expect(state.selectedTab == .profile)
     #expect(state.chatDraft == "existing draft")
     #expect(state.shouldStartVoiceCapture == false)
+    #expect(state.unavailableMessage == EyesFreeCaptureGate.unavailableMessage)
     #expect(state.pendingRequest == nil)
   }
 
@@ -227,4 +268,23 @@ struct AppShellIntentNavigationTests {
     #expect(state.selectedTab == .profile)
     #expect(state.chatDraft == "")
   }
+}
+
+private func eyesFreeState(
+  _ destination: EyesFreeCaptureDestination,
+  spokenText: String?
+) -> AppShellIntentNavigationState {
+  AppShellIntentNavigationState(
+    selectedTab: .profile,
+    chatDraft: "",
+    autoSendMessage: nil,
+    openConversationID: nil,
+    pendingRequest: .startEyesFreeCapture(
+      EyesFreeCaptureLaunch(
+        destination: destination,
+        spokenText: spokenText,
+        idempotencyKey: "turn_\(destination.rawValue)"
+      )
+    )
+  )
 }

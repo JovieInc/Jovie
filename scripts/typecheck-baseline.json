@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "tool": "scripts/typecheck-scripts.mjs",
-  "generatedAt": "2026-08-18T03:22:07.664Z",
-  "totalErrors": 168,
+  "generatedAt": "2026-08-31T01:24:07.836Z",
+  "totalErrors": 167,
   "files": {
     ".github/scripts/verify-main-release-readiness.mjs": {
       "TS2339": 3
@@ -146,9 +146,6 @@
       "TS2345": 1
     },
     "scripts/pr-comment-retro.mjs": {
-      "TS2339": 1
-    },
-    "scripts/pr-conflict-handler.mjs": {
       "TS2339": 1
     },
     "scripts/qa-swarm/linear.mjs": {

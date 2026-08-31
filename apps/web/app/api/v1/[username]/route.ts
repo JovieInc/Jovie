@@ -4,6 +4,7 @@ import {
   PUBLIC_ARTIST_API_COMMON_HEADERS,
   PUBLIC_ARTIST_API_PROFILE_CACHE_CONTROL,
   PUBLIC_ARTIST_API_RATE_LIMIT_POLICY,
+  PUBLIC_ARTIST_API_RATE_LIMIT_POLICY_VALUE,
   PUBLIC_ARTIST_API_RATE_LIMIT_WINDOW_SECONDS,
 } from '@/lib/api/v1/contract';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
@@ -59,6 +60,7 @@ export async function GET(
         headers: {
           ...NO_STORE_HEADERS,
           ...PUBLIC_ARTIST_API_COMMON_HEADERS,
+          'RateLimit-Policy': PUBLIC_ARTIST_API_RATE_LIMIT_POLICY_VALUE,
           'Retry-After': RETRY_AFTER_SERVICE,
         },
       }

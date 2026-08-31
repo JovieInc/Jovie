@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { LyricRow } from './LyricRow';
@@ -42,5 +44,12 @@ describe('LyricRow', () => {
     render(<LyricRow {...baseProps} editing onStamp={onStamp} />);
     fireEvent.click(screen.getByTitle(/Stamp this line/));
     expect(onStamp).toHaveBeenCalledOnce();
+  });
+});
+
+describe('JOV-5466 token retire', () => {
+  it('does not keep retired --linear-app-* tokens', () => {
+    const source = readFileSync(resolve(__dirname, './LyricRow.tsx'), 'utf8');
+    expect(source).not.toMatch(/--linear-app-/);
   });
 });

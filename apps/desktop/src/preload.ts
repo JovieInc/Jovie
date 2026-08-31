@@ -16,6 +16,7 @@ const DICTATION_STATUS_CHANNEL = 'dictation-status';
 const TRAY_SET_STATE_CHANNEL = 'tray-set-state';
 const TRAY_ACTION_CHANNEL = 'tray-action';
 const APP_BOOTED_CHANNEL = 'app-booted';
+const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
 
 interface MinimalDocument {
   readonly documentElement?: {
@@ -191,4 +192,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     notifyAppBooted: () => {
       ipcRenderer.send(APP_BOOTED_CHANNEL);
     },
+
+    launchOperatorControl: (request: {
+      id: string;
+      kind: 'web' | 'ssh';
+      href?: string;
+      sshHost?: string;
+    }) =>
+      ipcRenderer.invoke(LAUNCH_OPERATOR_CONTROL_CHANNEL, request) as Promise<{
+        ok: boolean;
+        reason?: string;
+      }>,
 });

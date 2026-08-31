@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { TaskBoardResult, TaskStatus } from '@/lib/tasks/types';
@@ -45,5 +47,12 @@ describe('TaskBoard geometry', () => {
     expect(getTaskBoardGridTemplate(columnCount)).toBe(
       `repeat(${expectedColumnCount}, minmax(0, 1fr))`
     );
+  });
+});
+
+describe('JOV-5466 token retire', () => {
+  it('does not keep retired --linear-app-* tokens', () => {
+    const source = readFileSync(resolve(__dirname, './TaskBoard.tsx'), 'utf8');
+    expect(source).not.toMatch(/--linear-app-/);
   });
 });

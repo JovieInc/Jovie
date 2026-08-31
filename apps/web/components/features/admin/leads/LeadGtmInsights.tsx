@@ -69,7 +69,7 @@ export async function LeadGtmInsights() {
           subtitle='Attributed cohort performance and ramp recommendation'
           className='px-app-header py-3'
         />
-        <div className='space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
+        <div className='space-y-4 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)'>
           <div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-5'>
             <KpiItem
               title='Scraped'

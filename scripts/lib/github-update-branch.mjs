@@ -654,7 +654,6 @@ export async function tryGitHubRebase({
 
   if (
     before.state !== 'OPEN' ||
-    before.isDraft ||
     before.headRefName !== pr.headRefName ||
     before.isCrossRepository ||
     before.headRepositoryOwner?.login?.toLowerCase() !==

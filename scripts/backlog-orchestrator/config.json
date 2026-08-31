@@ -12,5 +12,10 @@
     "founderFastTrack": "founder-fast-track",
     "humanReview": "human-review-required",
     "backlogOrchestratorManaged": "backlog-orchestrator"
+  },
+  "remediation": {
+    "workpadIssue": "JOV-5492",
+    "symphonyStateUrl": "http://127.0.0.1:4041/api/v1/state",
+    "symphonyRefreshUrl": "http://127.0.0.1:4041/api/v1/refresh"
   }
 }

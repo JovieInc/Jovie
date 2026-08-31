@@ -317,10 +317,10 @@ export function OnboardingProfileRail({
   return (
     <aside
       className={cn(
-        'overflow-hidden bg-(--linear-app-content-surface) text-primary-token transition-[opacity,transform,width,border-color] duration-cinematic ease-out',
+        'overflow-hidden bg-(--app-shell-content-surface) text-primary-token transition-[opacity,transform,width,border-color] duration-cinematic ease-out',
         isInline
           ? 'relative z-0 w-full rounded-3xl lg:hidden'
-          : 'z-30 max-lg:hidden lg:relative lg:h-full lg:w-95 lg:border-l lg:border-(--linear-app-shell-border)'
+          : 'z-30 max-lg:hidden lg:relative lg:h-full lg:w-95 lg:border-l lg:border-(--app-shell-border)'
       )}
       data-testid={
         isInline ? 'onboarding-profile-rail-inline' : 'onboarding-profile-rail'

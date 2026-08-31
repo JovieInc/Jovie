@@ -10,12 +10,11 @@ export type ShellMetadataChipTone =
 
 const TONE_CLASSES: Record<ShellMetadataChipTone, string> = {
   neutral:
-    'border-(--linear-app-shell-border)/70 bg-(--surface-1)/40 text-tertiary-token',
+    'border-(--app-shell-border)/70 bg-(--surface-1)/40 text-tertiary-token',
   soon: 'border-cyan-300/40 bg-cyan-500/10 text-cyan-200/90',
   warning: 'border-amber-500/20 bg-amber-500/5 text-amber-300/90',
   danger: 'border-red-500/20 bg-red-500/5 text-red-300/90',
-  muted:
-    'border-(--linear-app-shell-border)/45 bg-transparent text-quaternary-token',
+  muted: 'border-(--app-shell-border)/45 bg-transparent text-quaternary-token',
 };
 
 export interface ShellMetadataChipProps {

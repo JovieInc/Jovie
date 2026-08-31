@@ -99,9 +99,9 @@ export const cardTokens = {
 
   // Glass effects — reserved for sticky headers/toolbars only (not content cards)
   glass: {
-    subtle: 'backdrop-blur-sm bg-(--linear-app-content-surface)/80',
-    medium: 'backdrop-blur-md bg-(--linear-app-content-surface)/70',
-    strong: 'backdrop-blur-lg bg-(--linear-app-content-surface)/60',
+    subtle: 'backdrop-blur-sm bg-(--app-shell-content-surface)/80',
+    medium: 'backdrop-blur-md bg-(--app-shell-content-surface)/70',
+    strong: 'backdrop-blur-lg bg-(--app-shell-content-surface)/60',
   },
 
   // Status variants for feedback

@@ -6510,3 +6510,89 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 }
 
 /* SYSTEM B HOME RELEASE OPERATING SYSTEM SHOWCASE PRIMITIVES END */
+
+/* HOMEPAGE SSR CONTENT FALLBACK START
+   Keep the canonical no-script copy in ordinary HTML so non-rendering agents
+   can read it. Scripting-enabled browsers already have the full interactive
+   homepage, so the fallback is removed from their layout and accessibility
+   tree by the standards-based scripting media feature. */
+
+.homepage-no-script-content {
+  width: min(
+    var(--homepage-grid-max),
+    calc(100% - var(--homepage-grid-gutter) * 2)
+  );
+  margin-inline: auto;
+  border-top: 1px solid var(--homepage-chapter-rule);
+  padding-block: var(--homepage-chapter-space);
+  color: var(--system-b-text-primary);
+}
+
+.homepage-no-script-content h2,
+.homepage-no-script-content h3 {
+  margin: 0;
+  color: var(--system-b-text-primary);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-tight);
+}
+
+.homepage-no-script-content h2 {
+  font-size: var(--text-3xl);
+  line-height: var(--leading-tight);
+}
+
+.homepage-no-script-content h3 {
+  margin-top: var(--space-8);
+  font-size: var(--text-xl);
+  line-height: var(--leading-tight);
+}
+
+.homepage-no-script-content p,
+.homepage-no-script-content li,
+.homepage-no-script-content dt,
+.homepage-no-script-content dd {
+  color: var(--color-text-secondary-token);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+
+.homepage-no-script-content p {
+  margin-top: var(--space-3);
+  max-width: 70ch;
+}
+
+.homepage-no-script-content ul {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-4) 0 0;
+  padding-left: var(--space-6);
+}
+
+.homepage-no-script-content dl {
+  display: grid;
+  gap: var(--space-4);
+  margin: var(--space-4) 0 0;
+}
+
+.homepage-no-script-content dt {
+  color: var(--system-b-text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.homepage-no-script-content dd {
+  margin: var(--space-1) 0 0;
+}
+
+.homepage-no-script-content a {
+  color: var(--system-b-text-primary);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+@media (scripting: enabled) {
+  .homepage-no-script-content {
+    display: none;
+  }
+}
+
+/* HOMEPAGE SSR CONTENT FALLBACK END */

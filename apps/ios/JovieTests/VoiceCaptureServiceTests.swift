@@ -258,6 +258,26 @@ struct VoiceCaptureServiceTests {
     #expect(result.latencyMilliseconds == 120)
   }
 
+  @Test func eyesFreeGateKeepsSummerFounderOnlyAndSurfacesOfflineRetry() {
+    func gate(
+      destination: EyesFreeCaptureDestination,
+      canUseSummer: Bool,
+      isOffline: Bool
+    ) -> EyesFreeCaptureGate {
+      EyesFreeCaptureGate.resolve(
+        isSignedIn: true,
+        chatEnabled: true,
+        isOffline: isOffline,
+        destination: destination,
+        canUseSummer: canUseSummer
+      )
+    }
+    #expect(gate(destination: .jovie, canUseSummer: false, isOffline: false) == .ready)
+    #expect(gate(destination: .summer, canUseSummer: false, isOffline: false) == .summerForbidden)
+    #expect(gate(destination: .jovie, canUseSummer: true, isOffline: true) == .offline)
+    #expect(EyesFreeCaptureGate.summerForbidden.message.contains("founder"))
+  }
+
   @Test func emptyTranscriptErrorCopyIsUserFacing() {
     #expect(VoiceCaptureError.emptyTranscript.errorDescription == "Nothing heard.")
   }

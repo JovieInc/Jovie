@@ -1,14 +1,22 @@
 #!/usr/bin/env node
 import { execFile } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 import { promisify } from 'node:util';
-import { fetchOpenPrsRest } from './lib/github-open-prs-rest.mjs';
+import {
+  annotateNativeMergeQueue,
+  fetchNativeMergeQueue,
+} from './lib/github-merge-queue.mjs';
+import { hydrateOpenPrStatusContexts } from './lib/github-open-prs-rest.mjs';
 import { tryGitHubRebase } from './lib/github-update-branch.mjs';
 import {
+  bindOpenPrsToLiveBaseRefs,
+  buildLiveBaseRefQuery,
   buildPlan,
   DEFAULT_BLOCKED_LABEL,
-  DEFAULT_MANUAL_REBASE_LABEL,
   DEFAULT_REQUIRED_CHECKS,
   formatPlan,
+  parseConflictFxCohortComments,
+  requireSuccessfulMutationResults,
 } from './lib/pr-conflict-handler.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -18,13 +26,18 @@ function parseArgs(argv) {
     repo: 'JovieInc/Jovie',
     repoOwner: 'JovieInc',
     dryRun: true,
-    maxConcurrent: 2,
+    maxConcurrent: 40,
     limit: 200,
     apply: false,
     json: false,
-    manualRebaseLabel: DEFAULT_MANUAL_REBASE_LABEL,
     blockedLabel: DEFAULT_BLOCKED_LABEL,
     requiredChecks: [...DEFAULT_REQUIRED_CHECKS],
+    runnerCapacity: 2,
+    activeCi: 0,
+    queuedCi: 0,
+    cohortId: process.env.GITHUB_RUN_ID ?? 'local',
+    planFile: '',
+    historyIssue: 16794,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -40,6 +53,24 @@ function parseArgs(argv) {
       case '--limit':
         options.limit = Number.parseInt(argv[++index], 10);
         break;
+      case '--runner-capacity':
+        options.runnerCapacity = Number.parseInt(argv[++index], 10);
+        break;
+      case '--active-ci':
+        options.activeCi = Number.parseInt(argv[++index], 10);
+        break;
+      case '--queued-ci':
+        options.queuedCi = Number.parseInt(argv[++index], 10);
+        break;
+      case '--cohort-id':
+        options.cohortId = argv[++index];
+        break;
+      case '--plan-file':
+        options.planFile = argv[++index];
+        break;
+      case '--history-issue':
+        options.historyIssue = Number.parseInt(argv[++index], 10);
+        break;
       case '--required-check':
         options.requiredChecks.push(argv[++index]);
         break;
@@ -48,9 +79,6 @@ function parseArgs(argv) {
           .split(',')
           .map(value => value.trim())
           .filter(Boolean);
-        break;
-      case '--manual-rebase-label':
-        options.manualRebaseLabel = argv[++index];
         break;
       case '--blocked-label':
         options.blockedLabel = argv[++index];
@@ -82,6 +110,16 @@ function parseArgs(argv) {
   if (!Number.isInteger(options.limit) || options.limit < 1) {
     throw new Error('--limit must be a positive integer');
   }
+  for (const key of ['runnerCapacity', 'activeCi', 'queuedCi']) {
+    if (!Number.isInteger(options[key]) || options[key] < 0) {
+      throw new Error(
+        `--${key.replace(/[A-Z]/gu, match => `-${match.toLowerCase()}`)} must be a non-negative integer`
+      );
+    }
+  }
+  if (!Number.isInteger(options.historyIssue) || options.historyIssue < 1) {
+    throw new Error('--history-issue must be a positive integer');
+  }
   return options;
 }
 
@@ -94,10 +132,15 @@ Options:
   --dry-run                    Print classification/order/actions without mutations (default)
   --apply                      Execute safe mutations (labels, exact-head GitHub rebase)
   --repo OWNER/REPO            Repository (default: JovieInc/Jovie)
-  --max-concurrent N           Cap CI-heavy retriggers including in-flight CI (default: 2)
+  --max-concurrent N           Operator ceiling above adaptive 2→10→40 cohorts (default: 40)
   --limit N                    Max open PRs to inspect (default: 200)
+  --runner-capacity N          Observed GitHub-hosted runner pool size (fail-low default: 2)
+  --active-ci N                Current in-progress Actions runs (default: 0)
+  --queued-ci N                Current queued Actions runs (default: 0)
+  --cohort-id ID               Durable cohort identifier (default: GITHUB_RUN_ID)
+  --plan-file PATH             Write the machine-readable plan to PATH
+  --history-issue N            Durable cohort ledger issue (default: 16794)
   --required-checks a,b,c      Required aggregate checks to use for BLOCKED classification
-  --manual-rebase-label NAME   Label for non-trivial conflicts (default: needs-manual-rebase)
   --blocked-label NAME         Label for failing required checks (default: needs-ci-fix)
   --json                       Emit JSON plan as well as logs
 `);
@@ -121,12 +164,22 @@ function logDecision(item, extra = {}) {
   );
 }
 
-async function ghJson(args, { retries = 3 } = {}) {
+/**
+ * @param {string[]} args
+ * @param {{ retries?: number; token?: string }} [options]
+ */
+async function ghJson(args, { retries = 3, token } = {}) {
   for (let attempt = 1; attempt <= retries; attempt += 1) {
     try {
       const { stdout } = await execFileAsync('gh', args, {
         encoding: 'utf8',
         maxBuffer: 50 * 1024 * 1024,
+        env: token
+          ? {
+              ...process.env,
+              GH_TOKEN: token,
+            }
+          : process.env,
       });
       return JSON.parse(stdout);
     } catch (error) {
@@ -157,83 +210,146 @@ async function ghJson(args, { retries = 3 } = {}) {
 }
 
 async function fetchOpenPrs(options) {
-  const request = endpoint =>
+  const fields = [
+    'number',
+    'title',
+    'url',
+    'author',
+    'createdAt',
+    'updatedAt',
+    'isDraft',
+    'autoMergeRequest',
+    'mergeable',
+    'mergeStateStatus',
+    'baseRefName',
+    'baseRefOid',
+    'headRefName',
+    'headRefOid',
+    'headRepository',
+    'headRepositoryOwner',
+    'isCrossRepository',
+    'labels',
+    'changedFiles',
+    'additions',
+    'deletions',
+    'maintainerCanModify',
+  ];
+  const request = ({ owner, name, query }) =>
     ghJson([
       'api',
-      '--method',
-      'GET',
-      '-H',
-      'Accept: application/vnd.github+json',
-      endpoint,
+      'graphql',
+      '-f',
+      `query=${query}`,
+      '-F',
+      `owner=${owner}`,
+      '-F',
+      `name=${name}`,
     ]);
-  const prs = await fetchOpenPrsRest({
+  // Metadata without statusCheckRollup is a small paginated GraphQL query.
+  // Hydrate only the trusted commit-status receipts needed for actual
+  // conflicts, with bounded parallelism. This avoids the former 3*N REST
+  // inventory fanout while preserving exact head/base identity.
+  const metadata = await ghJson([
+    'pr',
+    'list',
+    '--repo',
+    options.repo,
+    '--state',
+    'open',
+    '--limit',
+    String(options.limit),
+    '--json',
+    fields.join(','),
+  ]);
+  const [owner, name] = options.repo.split('/');
+  const liveMetadata =
+    metadata.length === 0
+      ? []
+      : bindOpenPrsToLiveBaseRefs({
+          prs: metadata,
+          response: await request({
+            owner,
+            name,
+            query: buildLiveBaseRefQuery(metadata),
+          }),
+        });
+  const prs = await hydrateOpenPrStatusContexts({
     repo: options.repo,
-    limit: options.limit,
+    prs: liveMetadata,
     request,
+    includeStatuses: pr =>
+      pr.mergeable === 'CONFLICTING' || pr.mergeStateStatus === 'DIRTY',
+    batchSize: 40,
   });
-  return { prs, degradedChecks: false };
+  const queueToken = process.env.GH_QUEUE_TOKEN || process.env.GH_TOKEN;
+  const queuePositions = await fetchNativeMergeQueue({
+    branches: prs.map(pr => pr.baseRefName),
+    request: async ({ branch, cursor, pageSize }) => {
+      const args = [
+        'api',
+        'graphql',
+        '-f',
+        'query=query($owner:String!,$name:String!,$branch:String!,$first:Int!,$cursor:String){repository(owner:$owner,name:$name){mergeQueue(branch:$branch){entries(first:$first,after:$cursor){nodes{position pullRequest{number}}pageInfo{hasNextPage endCursor}}}}}',
+        '-F',
+        `owner=${owner}`,
+        '-F',
+        `name=${name}`,
+        '-F',
+        `branch=${branch}`,
+        '-F',
+        `first=${pageSize}`,
+      ];
+      if (cursor !== null) args.push('-F', `cursor=${cursor}`);
+      return ghJson(args, { token: queueToken });
+    },
+  });
+  annotateNativeMergeQueue(prs, queuePositions);
+  return { prs, degradedChecks: true };
 }
 
-async function ensureLabel(repo, label, color, description) {
-  try {
-    await execFileAsync(
-      'gh',
-      [
-        'label',
-        'create',
-        label,
-        '--repo',
-        repo,
-        '--color',
-        color,
-        '--description',
-        description,
-      ],
-      { encoding: 'utf8' }
+async function fetchCohortHistory(options) {
+  const pages = await ghJson([
+    'api',
+    '--method',
+    'GET',
+    '--paginate',
+    '--slurp',
+    `repos/${options.repo}/issues/${options.historyIssue}/comments?per_page=100`,
+  ]);
+  const comments = Array.isArray(pages) ? pages.flat() : [];
+  return parseConflictFxCohortComments(comments);
+}
+
+async function withMutationToken(run) {
+  const token = process.env.GH_MUTATION_TOKEN;
+  if (!token) {
+    throw new Error(
+      'GH_MUTATION_TOKEN is required for conflict-controller mutations'
     );
-  } catch (error) {
-    const stderr = `${error.stderr ?? ''}${error.stdout ?? ''}`;
-    if (/already exists/i.test(stderr)) return;
-    throw error;
   }
-}
-
-async function addLabel(repo, number, label) {
-  await execFileAsync(
-    'gh',
-    ['pr', 'edit', String(number), '--repo', repo, '--add-label', label],
-    {
-      encoding: 'utf8',
-    }
-  );
+  const hadToken = Object.hasOwn(process.env, 'GH_TOKEN');
+  const priorToken = process.env.GH_TOKEN;
+  process.env.GH_TOKEN = token;
+  try {
+    return await run();
+  } finally {
+    if (hadToken) process.env.GH_TOKEN = priorToken;
+    else delete process.env.GH_TOKEN;
+  }
 }
 
 async function executePlan(plan, options) {
   if (options.dryRun) return [];
-  const results = [];
-  await ensureLabel(
-    options.repo,
-    options.manualRebaseLabel,
-    'B60205',
-    'Conflict handler found a non-trivial rebase that needs a human'
+  const mutableItems = plan.items.filter(
+    item => item.action === 'request_github_rebase'
   );
-  await ensureLabel(
-    options.repo,
-    options.blockedLabel,
-    'D93F0B',
-    'Required checks are failing; fix CI before freshness updates'
-  );
+  if (mutableItems.length === 0) return [];
 
-  for (const item of plan.items) {
-    logDecision(item, { phase: 'execute' });
-    try {
-      if (item.action === 'flag_blocked_checks' && item.label) {
-        await addLabel(options.repo, item.number, item.label);
-        results.push({ pr: item.number, ok: true, action: item.action });
-      } else if (item.action === 'label_needs_manual_rebase' && item.label) {
-        await addLabel(options.repo, item.number, item.label);
-        results.push({ pr: item.number, ok: true, action: item.action });
-      } else if (item.action === 'request_github_rebase') {
+  return withMutationToken(async () => {
+    const results = [];
+    for (const item of mutableItems) {
+      logDecision(item, { phase: 'execute' });
+      try {
         const result = await tryGitHubRebase({
           repo: options.repo,
           pr: item.pr,
@@ -242,34 +358,35 @@ async function executePlan(plan, options) {
           expectedHeadOid: item.pr.headRefOid,
           dryRun: false,
         });
-        if (!result.ok && result.conflict) {
-          await addLabel(options.repo, item.number, options.manualRebaseLabel);
-        }
         results.push({ pr: item.number, action: item.action, ...result });
-      }
-    } catch (error) {
-      results.push({
-        pr: item.number,
-        ok: false,
-        action: item.action,
-        error: error.message,
-      });
-      console.error(
-        JSON.stringify({
-          ts: new Date().toISOString(),
+      } catch (error) {
+        results.push({
           pr: item.number,
+          ok: false,
           action: item.action,
           error: error.message,
-        })
-      );
+        });
+        console.error(
+          JSON.stringify({
+            ts: new Date().toISOString(),
+            pr: item.number,
+            action: item.action,
+            error: error.message,
+          })
+        );
+      }
     }
-  }
-  return results;
+    return results;
+  });
 }
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
-  const { prs, degradedChecks } = await fetchOpenPrs(options);
+  const [{ prs, degradedChecks }, cohortHistory] = await Promise.all([
+    fetchOpenPrs(options),
+    fetchCohortHistory(options),
+  ]);
+  options.cohortHistory = cohortHistory;
   if (degradedChecks) {
     // Without check rollups, "required check missing" is indistinguishable
     // from "not fetched" — drop required-check-based BLOCKED classification
@@ -281,6 +398,13 @@ async function main() {
   }
   const plan = buildPlan(prs, options);
 
+  if (options.planFile) {
+    writeFileSync(options.planFile, `${JSON.stringify(plan, null, 2)}\n`, {
+      encoding: 'utf8',
+      mode: 0o600,
+    });
+  }
+
   console.log(formatPlan(plan, { dryRun: options.dryRun }));
   for (const item of plan.items) logDecision(item, { phase: 'plan' });
   if (options.json) console.log(JSON.stringify(plan, null, 2));
@@ -291,6 +415,7 @@ async function main() {
       JSON.stringify({ ts: new Date().toISOString(), results }, null, 2)
     );
   }
+  requireSuccessfulMutationResults(results);
 }
 
 main().catch(error => {

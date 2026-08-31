@@ -8,7 +8,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'The canonical, user-readable homepage fallback emitted for clients that do not execute JavaScript.',
+          'The canonical, user-readable homepage copy emitted in ordinary SSR HTML. Scripting-enabled browsers hide this fallback with the home stylesheet; clients without JavaScript keep the full public proposition and links.',
       },
     },
   },

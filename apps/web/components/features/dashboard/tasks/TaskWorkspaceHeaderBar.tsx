@@ -191,7 +191,7 @@ export function TaskWorkspaceHeaderBar({
       <PageToolbar
         start={toolbarStart}
         end={toolbarEnd}
-        className='h-(--linear-app-header-height-compact) min-h-(--linear-app-header-height-compact) max-sm:px-4'
+        className='h-(--app-shell-header-height-compact) min-h-(--app-shell-header-height-compact) max-sm:px-4'
         startClassName='overflow-visible'
         endClassName='gap-0.5'
       />

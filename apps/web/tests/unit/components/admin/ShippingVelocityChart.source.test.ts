@@ -10,13 +10,13 @@ function readComponentSource() {
 }
 
 describe('ShippingVelocityChart source guard', () => {
-  it('keeps chart colors on semantic design tokens', () => {
+  it('keeps chart colors on neutral categorical design tokens', () => {
     const source = readComponentSource();
 
     expect(source).not.toMatch(/#[0-9a-f]{3,8}\b/i);
-    expect(source).toContain("merged: 'var(--color-accent)'");
-    expect(source).toContain("opened: 'var(--color-success)'");
-    expect(source).toContain("closed: 'var(--color-error)'");
+    expect(source).toContain("merged: 'var(--color-accent-blue)'");
+    expect(source).toContain("opened: 'var(--color-accent-purple)'");
+    expect(source).toContain("closed: 'var(--color-accent-gray)'");
   });
 
   it('keeps shell, labels, and controls on token classes', () => {

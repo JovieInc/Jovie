@@ -19,7 +19,7 @@ import {
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
-import { APP_NAME, BASE_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { AiDemo } from '@/features/home/AiDemo';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
@@ -108,8 +108,6 @@ export async function generateMetadata(): Promise<Metadata> {
           height: 630,
         },
       ],
-      creator: '@jovie',
-      site: '@jovie',
     },
     robots: {
       index: true,
@@ -147,10 +145,9 @@ const SOFTWARE_SCHEMA = buildSoftwareSchema(
 );
 
 const ORGANIZATION_SCHEMA = buildOrganizationSchema({
-  legalName: 'Jovie Inc',
+  legalName: LEGAL_ENTITY_NAME,
   description:
     'An AI-powered operating system for indie artists — smart links, link-in-bio, fan notifications, and AI assistant in one platform.',
-  sameAs: ['https://twitter.com/jovie', 'https://instagram.com/jovie'],
 });
 
 const PLATFORM_LOGOS = [

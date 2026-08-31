@@ -240,9 +240,7 @@ describe('DashboardHeader', () => {
     expect(header).not.toHaveClass('bg-(--app-shell-content-surface)');
     // Layout is unchanged — the desktop row keeps the compact header height.
     expect(
-      container.querySelector(
-        '.sm\\:h-\\(--linear-app-header-height-compact\\)'
-      )
+      container.querySelector('.sm\\:h-\\(--app-shell-header-height-compact\\)')
     ).not.toBeNull();
   });
 });

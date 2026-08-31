@@ -705,4 +705,19 @@ struct MobileChatClientTests {
     #expect(artist["chatMode"] == nil)
     #expect(ovie["chatMode"] as? String == "ov")
   }
+
+  @Test func eyesFreeRequestEncodesClosedDestination() throws {
+    let data = try JSONEncoder().encode(
+      EyesFreeCaptureAPIRequest(
+        destination: "summer",
+        transcript: "what is blocked",
+        clientTurnId: "turn_1234",
+        clientMessageId: "msg_1234"
+      )
+    )
+    let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+    #expect(json?["destination"] as? String == "summer")
+    #expect(json?["transcript"] as? String == "what is blocked")
+    #expect(json?["clientTurnId"] as? String == "turn_1234")
+  }
 }

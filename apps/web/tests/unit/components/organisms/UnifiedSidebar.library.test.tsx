@@ -288,20 +288,28 @@ describe('UnifiedSidebar library route', () => {
       join(__dirname, '../../../..', 'styles/linear-tokens.css'),
       'utf8'
     );
+    const designSystem = readFileSync(
+      join(__dirname, '../../../..', 'styles/design-system.css'),
+      'utf8'
+    );
 
     expect(linearTokens).toMatch(
       /--linear-border-subtle:\s*rgba\(0, 0, 0, 0\.06\);/
     );
-    expect(linearTokens).toMatch(
-      /--linear-app-frame-seam:\s*rgba\(0, 0, 0, 0\.045\);/
+    // --app-shell-frame-seam was retired from linear-tokens.css to
+    // design-system.css (JOV-5466); assert canonical location.
+    expect(designSystem).toMatch(
+      /--app-shell-frame-seam:\s*rgba\(0, 0, 0, 0\.045\);/
     );
     expect(linearTokens).toMatch(
       /:root\.dark[\s\S]*--linear-border-subtle:\s*rgba\(168, 176, 195, 0\.1\);/
     );
-    expect(linearTokens).toMatch(
-      /:root\.dark[\s\S]*--linear-app-frame-seam:\s*rgba\(168, 176, 195, 0\.1\);/
+    expect(designSystem).toMatch(
+      /:root\.dark[\s\S]*--app-shell-frame-seam:\s*rgba\(168, 176, 195, 0\.1\);/
     );
     expect(linearTokens).not.toMatch(/--linear-border-divider-subtle/);
+    // The retired token must not reappear in the linear namespace.
+    expect(linearTokens).not.toMatch(/--linear-app-frame-seam/);
   });
 
   it('preserves the generic route-override contract for legitimate consumers', async () => {

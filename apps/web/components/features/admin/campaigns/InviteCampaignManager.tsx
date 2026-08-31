@@ -101,12 +101,12 @@ function CampaignSection({
         title={title}
         subtitle={subtitle}
         actions={actions}
-        className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+        className='min-h-0 px-(--app-shell-header-padding-x) py-3'
         actionsClassName='w-auto shrink-0'
       />
       <div
         className={cn(
-          'space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)',
+          'space-y-4 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)',
           bodyClassName
         )}
       >

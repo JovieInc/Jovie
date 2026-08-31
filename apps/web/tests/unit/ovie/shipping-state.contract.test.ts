@@ -7,17 +7,20 @@ import {
   emptyCursor,
   FORBIDDEN_ACTUATION,
   FORBIDDEN_QUERY_KEYS,
+  getLastKnownShippingState,
   ingestSourceEvent,
   measuredCount,
   publishShippingState,
   resetShippingStatePublisher,
   SHIP_MEANING_KEYS,
   SHIPPING_SOURCE_IDS,
+  SHIPPING_SOURCE_READ_TIMEOUT_MS,
   SHIPPING_SOURCE_SCHEMAS,
   SHIPPING_STATE_SCHEMA,
   OBSERVATION_STATES as SHIPPING_STATES,
   type ShippingClock,
   type ShippingSourceId,
+  sanitizeOpaqueIdentifier,
   snapshotReaders,
   stopPublishingShippingState,
 } from '@/lib/ovie/shipping-state';
@@ -141,6 +144,7 @@ async function publish(
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   resetShippingStatePublisher();
 });
 
@@ -158,6 +162,8 @@ describe('ovie.shipping-state.v1 contract', () => {
       'fleet-receipt',
     ]);
     expect(BUDGET).toBe(10_000);
+    expect(measuredCount(-1)).toEqual({ state: 'not-measured', value: null });
+    expect(measuredCount(1.5)).toEqual({ state: 'not-measured', value: null });
     for (const state of OPERATIONAL_TRUTH_STATES) {
       if (state === 'failure') expect(SHIPPING_STATES).toContain('error');
       else if (state !== 'recovery') expect(SHIPPING_STATES).toContain(state);
@@ -223,6 +229,100 @@ describe('zero, states, ordering, meanings, cadence', () => {
     expect(missing.capacityAvailable.state).toBe('not-measured');
     expect(missing.meanings.merged.state).toBe('not-measured');
     expect(missing.timeToShipSeconds.state).toBe('not-measured');
+  });
+
+  it('measures repository PR inventory, native queue, and completed CI timing', async () => {
+    const projection = await publish(
+      baseline({
+        'github-native-merge-queue': ok('github-native-merge-queue', {
+          entries: [{ id: 'mq-1', state: 'QUEUED', position: 1 }],
+          openPullRequests: 126,
+        }),
+        'exact-sha-ci': ok(
+          'exact-sha-ci',
+          {
+            status: 'completed',
+            conclusion: 'success',
+            created_at: '2026-08-21T23:50:00.000Z',
+            run_started_at: '2026-08-21T23:55:47.000Z',
+            updated_at: '2026-08-21T23:56:48.000Z',
+          },
+          {
+            correlation: { ciRunId: '1', sha: SHA },
+            measuredMeanings: { ciGreen: true },
+          }
+        ),
+      })
+    );
+
+    expect(
+      projection.sources['github-native-merge-queue'].counts.openPullRequests
+    ).toEqual({ state: 'measured-nonzero', value: 126 });
+    expect(
+      projection.sources['github-native-merge-queue'].counts.queued
+    ).toEqual({ state: 'measured-nonzero', value: 1 });
+    expect(projection.sources['exact-sha-ci'].durations).toEqual({
+      queueWaitMs: { state: 'measured-nonzero', value: 347_000 },
+      runDurationMs: { state: 'measured-nonzero', value: 61_000 },
+    });
+  });
+
+  it.each([
+    undefined,
+    null,
+  ])('does not infer CI timing when run_started_at is %s', async runStartedAt => {
+    const projection = await publish(
+      baseline({
+        'exact-sha-ci': ok('exact-sha-ci', {
+          status: 'completed',
+          conclusion: 'success',
+          created_at: '2026-08-21T23:50:00.000Z',
+          run_started_at: runStartedAt,
+          updated_at: '2026-08-21T23:56:48.000Z',
+        }),
+      })
+    );
+
+    expect(projection.sources['exact-sha-ci'].durations).toEqual({
+      queueWaitMs: { state: 'not-measured', value: null },
+      runDurationMs: { state: 'not-measured', value: null },
+    });
+  });
+
+  it.each([
+    { liveSha: null, deployedSha: SHA },
+    { liveSha: 'invalid', deployedSha: SHA },
+    { liveSha: SHA, deployedSha: null },
+    { liveSha: SHA, deployedSha: 'invalid' },
+  ])('does not synthesize exact-build false from $liveSha / $deployedSha', async ({
+    liveSha,
+    deployedSha,
+  }) => {
+    const projection = await publish(
+      baseline({
+        'production-controller': ok(
+          'production-controller',
+          { conclusion: 'success' },
+          {
+            correlation: { sha: deployedSha },
+            measuredMeanings: { productionVerified: true },
+          }
+        ),
+        'live-build-info': ok(
+          'live-build-info',
+          { commitSha: liveSha },
+          {
+            correlation: { sha: liveSha },
+            measuredMeanings: { exactLiveBuild: false },
+          }
+        ),
+      })
+    );
+
+    expect(projection.meanings.exactLiveBuild).toEqual({
+      state: 'not-measured',
+      value: null,
+    });
   });
 
   it('covers each observation state without synthesizing current truth', async () => {
@@ -295,6 +395,288 @@ describe('zero, states, ordering, meanings, cadence', () => {
     ).toBe('partial');
   });
 
+  it('separates current observation freshness from durable event age', async () => {
+    const fetchedAt = '2026-08-22T01:00:00.000Z';
+    const projection = await publish(
+      {
+        'exact-sha-ci': ok(
+          'exact-sha-ci',
+          { conclusion: 'success' },
+          {
+            sourceTimestamp: T0,
+            correlation: { ciRunId: '1', sha: SHA },
+            measuredMeanings: { ciGreen: true },
+          }
+        ),
+      },
+      clockAt(fetchedAt)
+    );
+
+    expect(projection.sources['exact-sha-ci']).toMatchObject({
+      sourceTimestamp: T0,
+      observationTimestamp: fetchedAt,
+      freshnessDeadline: '2026-08-22T01:00:10.000Z',
+      state: 'fresh',
+    });
+  });
+
+  it('expires the canonical fleet receipt at its semantic ten-minute TTL', async () => {
+    const fetchedAt = '2026-08-22T00:10:00.001Z';
+    const projection = await publish(baseline(), clockAt(fetchedAt));
+
+    expect(projection.sources['fleet-receipt']).toMatchObject({
+      sourceTimestamp: T0,
+      observationTimestamp: fetchedAt,
+      freshnessDeadline: '2026-08-22T00:10:10.001Z',
+      state: 'stale',
+    });
+  });
+
+  it('coalesces concurrent publications so completion order cannot regress last-known', async () => {
+    let releaseFirst!: (read: AuthorityRead) => void;
+    const heldCapacityRead = new Promise<AuthorityRead>(resolve => {
+      releaseFirst = resolve;
+    });
+    const firstReaders = snapshotReaders(baseline());
+    const firstCapacityReader = vi.fn(() => heldCapacityRead);
+    const readers = {
+      ...firstReaders,
+      'lease-guard-capacity': firstCapacityReader,
+    };
+
+    const first = publishShippingState({
+      readers,
+      clock: clockAt(T0),
+    });
+    const second = publishShippingState({
+      readers,
+      clock: clockAt('2026-08-22T00:00:01.000Z'),
+    });
+
+    releaseFirst(
+      ok('lease-guard-capacity', {
+        capacity: { available: 7, accounts: 4, locked: 1, cooldown: 1 },
+      })
+    );
+    const [firstProjection, secondProjection] = await Promise.all([
+      first,
+      second,
+    ]);
+
+    expect(firstCapacityReader).toHaveBeenCalledTimes(1);
+    expect(secondProjection).toBe(firstProjection);
+    expect(firstProjection.capacityAvailable).toEqual({
+      state: 'measured-nonzero',
+      value: 7,
+    });
+    expect(getLastKnownShippingState()).toBe(firstProjection);
+  });
+
+  it('bounds a hung authority reader below the projection latency budget', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(T0));
+    const readers = snapshotReaders(baseline());
+    const hung = new Promise<AuthorityRead>(() => {});
+    const publication = publishShippingState({
+      readers: { ...readers, 'symphony-runtime': () => hung },
+      clock: {
+        nowIso: () => new Date(Date.now()).toISOString(),
+        nowMs: () => Date.now(),
+      },
+    });
+
+    await vi.advanceTimersByTimeAsync(SHIPPING_SOURCE_READ_TIMEOUT_MS);
+    const projection = await publication;
+
+    expect(projection.latencyMs).toBe(SHIPPING_SOURCE_READ_TIMEOUT_MS);
+    expect(projection.withinM1Budget).toBe(true);
+    expect(projection.sources['symphony-runtime']).toMatchObject({
+      state: 'unavailable',
+      lastError: { code: 'reader-timeout' },
+    });
+  });
+
+  it('serializes concurrent publications with different reader dependencies', async () => {
+    let releaseFirst!: (read: AuthorityRead) => void;
+    const heldCapacityRead = new Promise<AuthorityRead>(resolve => {
+      releaseFirst = resolve;
+    });
+    const firstBase = snapshotReaders(baseline());
+    const secondBase = snapshotReaders(baseline());
+    const secondCapacityReader = vi.fn(async () =>
+      ok(
+        'lease-guard-capacity',
+        { capacity: { available: 1 } },
+        { sequence: 2, eventId: 'lease-guard-capacity:2:later-request' }
+      )
+    );
+    const first = publishShippingState({
+      readers: {
+        ...firstBase,
+        'lease-guard-capacity': () => heldCapacityRead,
+      },
+      clock: clockAt(T0),
+    });
+    const second = publishShippingState({
+      readers: {
+        ...secondBase,
+        'lease-guard-capacity': secondCapacityReader,
+      },
+      clock: clockAt('2026-08-22T00:00:01.000Z'),
+    });
+
+    releaseFirst(ok('lease-guard-capacity', { capacity: { available: 7 } }));
+    const [firstProjection, secondProjection] = await Promise.all([
+      first,
+      second,
+    ]);
+
+    expect(firstProjection.capacityAvailable.value).toBe(7);
+    expect(secondCapacityReader).toHaveBeenCalledTimes(1);
+    expect(secondProjection.capacityAvailable.value).toBe(1);
+    expect(getLastKnownShippingState()).toBe(secondProjection);
+  });
+
+  it('bounds shared projection caching and rejects backward-clock cache age', async () => {
+    const readers = snapshotReaders(baseline());
+    const capacityReader = vi.fn(readers['lease-guard-capacity']);
+    const configuredReaders = {
+      ...readers,
+      'lease-guard-capacity': capacityReader,
+    };
+    const first = await publishShippingState({
+      readers: configuredReaders,
+      clock: clockAt(T0),
+      maxAgeMs: 8_000,
+    });
+    const exactBoundary = await publishShippingState({
+      readers: configuredReaders,
+      clock: clockAt('2026-08-22T00:00:08.000Z'),
+      maxAgeMs: 8_000,
+    });
+    expect(exactBoundary).not.toBe(first);
+    expect(exactBoundary.projectionId).toBe(first.projectionId);
+    expect(capacityReader).toHaveBeenCalledTimes(1);
+
+    const expired = await publishShippingState({
+      readers: configuredReaders,
+      clock: clockAt('2026-08-22T00:00:08.001Z'),
+      maxAgeMs: 8_000,
+    });
+    expect(expired).not.toBe(first);
+    expect(capacityReader).toHaveBeenCalledTimes(2);
+
+    await publishShippingState({
+      readers: configuredReaders,
+      clock: clockAt('2026-08-21T23:59:59.000Z'),
+      maxAgeMs: 8_000,
+    });
+    expect(capacityReader).toHaveBeenCalledTimes(3);
+  });
+
+  it('re-ages cached source truth without rereading its authorities', async () => {
+    const readers = snapshotReaders(baseline());
+    const capacityReader = vi.fn(readers['lease-guard-capacity']);
+    const configuredReaders = {
+      ...readers,
+      'lease-guard-capacity': capacityReader,
+    };
+    const first = await publishShippingState({
+      readers: configuredReaders,
+      clock: clockAt(T0),
+      maxAgeMs: 12_000,
+    });
+    const aged = await publishShippingState({
+      readers: configuredReaders,
+      clock: clockAt('2026-08-22T00:00:11.000Z'),
+      maxAgeMs: 12_000,
+    });
+
+    expect(first.state).toBe('fresh');
+    expect(aged.state).toBe('stale');
+    expect(aged.sources['lease-guard-capacity'].state).toBe('stale');
+    expect(aged.projectionId).toBe(first.projectionId);
+    expect(capacityReader).toHaveBeenCalledTimes(1);
+    expect(getLastKnownShippingState()).toBe(aged);
+  });
+
+  it('keeps stop authoritative when a publication is already in flight', async () => {
+    let releaseCapacity!: (read: AuthorityRead) => void;
+    const heldCapacityRead = new Promise<AuthorityRead>(resolve => {
+      releaseCapacity = resolve;
+    });
+    const readers = snapshotReaders(baseline());
+    const publication = publishShippingState({
+      readers: {
+        ...readers,
+        'lease-guard-capacity': () => heldCapacityRead,
+      },
+      clock: clockAt(T0),
+    });
+
+    expect(stopPublishingShippingState()).toBeNull();
+    releaseCapacity(ok('lease-guard-capacity', { capacity: { available: 3 } }));
+    const stopped = await publication;
+
+    expect(stopped).toMatchObject({ publishing: false, state: 'unknown' });
+    expect(stopped.capacityAvailable).toEqual({
+      state: 'not-measured',
+      value: null,
+    });
+    expect(getLastKnownShippingState()).toBe(stopped);
+  });
+
+  it('keeps a publication from before reset isolated from the new runtime', async () => {
+    let releaseOld!: (read: AuthorityRead) => void;
+    const heldCapacityRead = new Promise<AuthorityRead>(resolve => {
+      releaseOld = resolve;
+    });
+    const oldReaders = snapshotReaders(baseline());
+    const oldPublication = publishShippingState({
+      readers: {
+        ...oldReaders,
+        'lease-guard-capacity': () => heldCapacityRead,
+      },
+      clock: clockAt(T0),
+    });
+
+    resetShippingStatePublisher();
+    const replacementReaders = snapshotReaders(
+      baseline({
+        'lease-guard-capacity': ok('lease-guard-capacity', {
+          capacity: { available: 9, accounts: 4, locked: 1, cooldown: 1 },
+        }),
+      })
+    );
+    const replacementCapacityReader = vi.fn(
+      replacementReaders['lease-guard-capacity']
+    );
+    const replacementPublication = publishShippingState({
+      readers: {
+        ...replacementReaders,
+        'lease-guard-capacity': replacementCapacityReader,
+      },
+      clock: clockAt('2026-08-22T00:00:01.000Z'),
+    });
+
+    await Promise.resolve();
+    expect(replacementCapacityReader).toHaveBeenCalledTimes(1);
+    const replacement = await replacementPublication;
+
+    releaseOld(
+      ok('lease-guard-capacity', {
+        capacity: { available: 1, accounts: 4, locked: 1, cooldown: 1 },
+      })
+    );
+    await oldPublication;
+
+    expect(getLastKnownShippingState()).toBe(replacement);
+    expect(getLastKnownShippingState()?.capacityAvailable).toEqual({
+      state: 'measured-nonzero',
+      value: 9,
+    });
+  });
+
   it('drops duplicates, replays, and gaps without replacing truth', () => {
     const ingest = (
       cursor: ReturnType<typeof emptyCursor>,
@@ -317,7 +699,7 @@ describe('zero, states, ordering, meanings, cadence', () => {
     expect(gap).toMatchObject({
       action: 'gap',
       sequenceGap: true,
-      cursor: { gapSequences: [2, 3] },
+      cursor: { gapCount: 2, gapRanges: [{ from: 2, to: 3 }] },
     });
     expect(ingest(gap.cursor, 'evt-2', 2).replaceCurrent).toBe(false);
     expect(
@@ -330,6 +712,37 @@ describe('zero, states, ordering, meanings, cadence', () => {
         reachable: true,
       }).clockSkew
     ).toBe(true);
+  });
+
+  it('rejects excessive sequence gaps without enumerating or accepting them', () => {
+    const first = ingestSourceEvent(emptyCursor(), {
+      eventId: 'evt-1',
+      sequence: 1,
+      sourceTimestamp: T0,
+      observationTimestamp: T0,
+      schemaOk: true,
+      reachable: true,
+    });
+
+    const rejected = ingestSourceEvent(first.cursor, {
+      eventId: 'evt-million',
+      sequence: 1_000_001,
+      sourceTimestamp: T0,
+      observationTimestamp: T0,
+      schemaOk: true,
+      reachable: true,
+    });
+
+    expect(rejected).toMatchObject({
+      action: 'gap-rejected',
+      replaceCurrent: false,
+      sequenceGap: true,
+      cursor: {
+        lastSequence: 1,
+        gapCount: 999_999,
+        gapRanges: [{ from: 2, to: 1_000_000 }],
+      },
+    });
   });
 
   it('reconnects after disconnect and keeps meanings distinct', async () => {
@@ -477,11 +890,73 @@ describe('shipping-state security', () => {
     ).toBe(true);
     expect(resolveNamedAuthorityPath('exact-sha-ci')).toBeNull();
     const { sanitizeErrorMessage } = await import('@/lib/ovie/shipping-state');
-    expect(
-      sanitizeErrorMessage(
-        'failed ghp_abcdefghijklmnopqrstuvwxyz012345 /home/timwhite/.ssh/id_rsa Bearer abcdef'
-      )
-    ).not.toMatch(/ghp_|Bearer abcdef|\/home\/timwhite/);
+    const githubTokens = ['ghp_', 'gho_', 'ghu_', 'ghs_', 'ghr_'].map(
+      prefix => `${prefix}abcdefghijklmnopqrstuvwxyz012345`
+    );
+    const sensitiveMessage = `failed ${githubTokens.join(' ')} github_pat_abcdefghijklmnopqrstuvwxyz012345 /home/timwhite/.ssh/id_rsa Bearer abcdef`;
+    expect(sanitizeErrorMessage(sensitiveMessage)).not.toMatch(
+      /gh[pousr]_|github_pat_|Bearer abcdef|\/home\/timwhite/
+    );
+    for (const unsafe of [
+      ...githubTokens,
+      'github_pat_abcdefghijklmnopqrstuvwxyz012345',
+      '/Users/timwhite/private.json',
+      'contains whitespace',
+      'a'.repeat(129),
+    ]) {
+      expect(sanitizeOpaqueIdentifier(unsafe)).toBeNull();
+    }
+    expect(sanitizeOpaqueIdentifier('JOV-5248:attempt_2')).toBe(
+      'JOV-5248:attempt_2'
+    );
+
+    const taintedProjection = await publish(
+      baseline({
+        'symphony-runtime': ok(
+          'symphony-runtime',
+          { running: [], retrying: [], blocked: [] },
+          {
+            schema: githubTokens[0],
+            sourceRevision: githubTokens[1],
+            eventId: '/Users/timwhite/private.json',
+            sequence: -1,
+            correlation: {
+              workId: githubTokens[2],
+              leaseId: '/private/tmp/lease',
+              prNumber: -1,
+              ciRunId: githubTokens[3],
+              deploymentId: githubTokens[4],
+              buildId: 'contains whitespace',
+              sha: 'not-an-exact-sha',
+            },
+            errorCode: githubTokens[0],
+            errorMessage: sensitiveMessage,
+          }
+        ),
+      })
+    );
+    const serialized = JSON.stringify(taintedProjection);
+    expect(serialized).not.toMatch(
+      /gh[pousr]_|github_pat_|Bearer abcdef|timwhite|private\.json/
+    );
+    expect(taintedProjection.sources['symphony-runtime']).toMatchObject({
+      schema: SHIPPING_SOURCE_SCHEMAS['symphony-runtime'],
+      sequence: 1,
+      sourceRevision: null,
+      correlation: {
+        workId: null,
+        leaseId: null,
+        prNumber: null,
+        ciRunId: null,
+        deploymentId: null,
+        buildId: null,
+        sha: null,
+      },
+      lastError: { code: 'source-error' },
+    });
+    expect(taintedProjection.sources['symphony-runtime'].eventId).not.toContain(
+      'timwhite'
+    );
     const readFile = vi.fn(async (path: string) => {
       throw Object.assign(new Error(`refused ${path}`), { code: 'ENOENT' });
     });

@@ -1072,7 +1072,7 @@ export function OnboardingChat({
 
   return (
     <section
-      className='relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-(--linear-app-content-surface)'
+      className='relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-(--app-shell-content-surface)'
       aria-label='Jovie Onboarding Chat'
       data-testid='onboarding-chat'
       data-picker-open={composerPickerOpen ? 'true' : undefined}
@@ -1117,7 +1117,7 @@ export function OnboardingChat({
 
       {shouldDockComposer ? (
         <div
-          className='shrink-0 bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-6 sm:pb-5 sm:pt-2.5 lg:px-8'
+          className='shrink-0 bg-(--app-shell-content-surface) px-4 pb-4 pt-2 sm:px-6 sm:pb-5 sm:pt-2.5 lg:px-8'
           data-testid='onboarding-composer-dock'
         >
           {onboardingComposerSurface}

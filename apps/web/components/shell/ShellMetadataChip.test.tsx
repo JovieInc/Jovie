@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { Calendar } from 'lucide-react';
 import { describe, expect, it } from 'vitest';
@@ -28,5 +30,15 @@ describe('ShellMetadataChip', () => {
     expect(
       (container.firstElementChild as HTMLElement).className
     ).not.toContain('hover:');
+  });
+});
+
+describe('JOV-5466 token retire', () => {
+  it('does not keep retired --linear-app-* tokens', () => {
+    const source = readFileSync(
+      resolve(__dirname, './ShellMetadataChip.tsx'),
+      'utf8'
+    );
+    expect(source).not.toMatch(/--linear-app-/);
   });
 });

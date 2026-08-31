@@ -11,6 +11,12 @@ import { captureWarning } from '@/lib/error-tracking';
 // stale binaries and fail gracefully instead of throwing at the user.
 // ---------------------------------------------------------------------------
 
+// biome-ignore format: compact request
+export interface OperatorLaunchRequest {
+  readonly id: string; readonly kind: 'web' | 'ssh';
+  readonly href?: string; readonly sshHost?: string;
+}
+
 export interface ElectronAPI {
   readonly platform: NodeJS.Platform;
   readonly electronVersion: string;
@@ -74,6 +80,10 @@ export interface ElectronAPI {
    * boot watchdog (JOV-3595). Optional — older binaries ignore the channel.
    */
   readonly notifyAppBooted?: () => void;
+  /** Launch a preflighted Ovie web origin or SSH TUI. Optional on older binaries. */
+  readonly launchOperatorControl?: (
+    request: OperatorLaunchRequest
+  ) => Promise<{ readonly ok: boolean; readonly reason?: string }>;
 }
 
 export interface DesktopAuthCompletion {
@@ -632,6 +642,21 @@ export function onDesktopTrayAction(cb: (action: string) => void): () => void {
   return typeof unsubscribe === 'function' ? unsubscribe : noopUnsubscribe;
 }
 
+export async function launchOperatorControl(
+  request: OperatorLaunchRequest
+): Promise<{ readonly ok: boolean; readonly reason?: string }> {
+  const api = getRawElectronAPI();
+  if (api && typeof api.launchOperatorControl === 'function') {
+    return api.launchOperatorControl(request);
+  }
+  if (request.kind === 'web' && request.href && typeof window !== 'undefined') {
+    const opened = window.open(request.href, '_blank', 'noopener,noreferrer');
+    return opened ? { ok: true } : { ok: false, reason: 'popup-blocked' };
+  }
+  if (api) reportMissingBridgeMethod('launchOperatorControl');
+  return { ok: false, reason: 'ovie-desktop-required' };
+}
+
 // Exported for tests only — do not call directly from product code.
 export const __testing = {
   reset: () => {
@@ -648,6 +673,7 @@ export const __testing = {
   consumeDesktopAuthCompletion,
   setDesktopTrayState,
   onDesktopTrayAction,
+  launchOperatorControl,
   notifyDesktopAppBooted,
   RELEASE_DOWNLOAD_URL,
 };

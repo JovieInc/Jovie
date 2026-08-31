@@ -174,7 +174,7 @@ describe('CookieBannerSection', () => {
     // Inner card surface matching upgrade compact + floating
     const card = banner.firstChild as HTMLElement;
     expect(card.className).toContain('rounded-2xl');
-    expect(card.className).toContain('border-(--linear-app-frame-seam)');
+    expect(card.className).toContain('border-(--app-shell-frame-seam)');
     expect(card.className).toContain('bg-surface-1');
     expect(card.className).toContain('shadow-card');
     // Compact actions always visible (no mobile Manage toggle)

@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
@@ -72,6 +73,11 @@ import {
   packagedDesktopAppId,
   packagedUsesCompetingStagingShell,
 } from './ovie-door';
+import {
+  decideOperatorLaunch,
+  parseOperatorLaunchRequest,
+  terminalLaunchSpec,
+} from './operator-launch';
 import { evaluateRemoteDebuggingGuard } from './remote-debugging-guard';
 import {
   classifyDesktopLoadFailure,
@@ -199,6 +205,7 @@ const TRAY_SET_STATE_CHANNEL = 'tray-set-state';
 const TRAY_ACTION_CHANNEL = 'tray-action';
 /** Renderer → main: first successful React paint of the hosted app (JOV-3595). */
 const APP_BOOTED_CHANNEL = 'app-booted';
+const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
 type UpdateChannel =
   | typeof UPDATE_AVAILABLE_CHANNEL
   | typeof UPDATE_DOWNLOADED_CHANNEL;
@@ -2631,5 +2638,37 @@ ipcMain.handle(
     }
     menuBarTray.setState(payload as TrayStatePayload);
     return { ok: true };
+  }
+);
+
+ipcMain.handle(
+  LAUNCH_OPERATOR_CONTROL_CHANNEL,
+  async (event: IpcMainInvokeEvent, payload: unknown, ...rest: unknown[]) => {
+    if (!isTrustedIpcSender(event) || rest.length !== 0) {
+      return { ok: false, reason: 'invalid-request' };
+    }
+    const request = parseOperatorLaunchRequest(payload);
+    if (!request) return { ok: false, reason: 'invalid-payload' };
+    const decision = decideOperatorLaunch(request);
+    if (!decision.ok) return { ok: false, reason: decision.reason };
+    if (decision.action === 'open-external') {
+      try {
+        await shell.openExternal(decision.url);
+        return { ok: true };
+      } catch {
+        return { ok: false, reason: 'open-external-failed' };
+      }
+    }
+    const spec = terminalLaunchSpec(process.platform, decision.command);
+    if (!spec) return { ok: false, reason: 'unsupported-platform' };
+    try {
+      spawn(spec.command, [...spec.args], {
+        detached: true,
+        stdio: 'ignore',
+      }).unref();
+      return { ok: true };
+    } catch {
+      return { ok: false, reason: 'open-terminal-failed' };
+    }
   }
 );

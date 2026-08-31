@@ -235,20 +235,27 @@ describe('diff gate', () => {
   });
 
   it('still auto-resolves a base when diffBase is omitted', () => {
-    // When diffBase is not provided at all, the gate may fall back to
-    // origin/main; the diff section then reflects a real scan.
-    const report = runComponentShipGate({
-      skipQuality: true,
-      skipRatchet: true,
-      skipRenderedCert: true,
-      skipLiveStorybook: true,
-    });
-    // An omitted base must not be treated as an explicit opt-out: the gate
-    // auto-resolves a base (origin/main is present in CI and locally), so
-    // report.diffBase is set. `applicable` additionally requires the resolved
-    // diff to contain an in-scope component, so it is not asserted here.
-    expect(report.diffBase).toBeTruthy();
-    expect(report.sections.diff.note).toBeUndefined();
+    // When diffBase is not provided at all, the gate falls back to
+    // COMPONENT_SHIP_DIFF_BASE / origin/main. Pin an empty-diff ref so this
+    // 5s control stays isolated from large mechanical PRs (JOV-5466).
+    const previous = process.env.COMPONENT_SHIP_DIFF_BASE;
+    process.env.COMPONENT_SHIP_DIFF_BASE = 'HEAD';
+    try {
+      const report = runComponentShipGate({
+        skipQuality: true,
+        skipRatchet: true,
+        skipRenderedCert: true,
+        skipLiveStorybook: true,
+      });
+      expect(report.diffBase).toBe('HEAD');
+      expect(report.sections.diff.note).toBeUndefined();
+    } finally {
+      if (previous === undefined) {
+        delete process.env.COMPONENT_SHIP_DIFF_BASE;
+      } else {
+        process.env.COMPONENT_SHIP_DIFF_BASE = previous;
+      }
+    }
   });
 
   it('treats a resolved base with no in-scope changes as scanned but not applicable', () => {
@@ -256,20 +263,20 @@ describe('diff gate', () => {
     // resolve a diff base yet contain no ship-scope component changes, so
     // `applicable` is false even though the scan ran. `applicable` must never
     // be conflated with "a base resolved" — only the skip note marks an
-    // explicit opt-out.
+    // explicit opt-out. Use HEAD...HEAD (empty) so the 5s control does not
+    // scan this PR against origin/main (JOV-5466).
     const report = runComponentShipGate({
-      diffBase: 'origin/main',
+      diffBase: 'HEAD',
       skipQuality: true,
       skipRatchet: true,
       skipRenderedCert: true,
       skipLiveStorybook: true,
     });
-    expect(report.diffBase).toBe('origin/main');
+    expect(report.diffBase).toBe('HEAD');
     expect(report.sections.diff.note).toBeUndefined();
     expect(report.sections.diff.ok).toBe(true);
-    expect(report.sections.diff.applicable).toBe(
-      report.sections.diff.changedComponents.length > 0
-    );
+    expect(report.sections.diff.applicable).toBe(false);
+    expect(report.sections.diff.changedComponents).toEqual([]);
   });
 
   it('fails closed without test and story', () => {
@@ -907,5 +914,35 @@ describe('multi-root ratchet', () => {
       uncovered: 0,
     };
     expect(compareCoverage(measurement, baseline).ok).toBe(true);
+  });
+});
+
+describe('runComponentShipGate diffBase', () => {
+  it('honors explicit null and skips the diff scan even when TURBO_SCM_BASE is set', () => {
+    const previous = process.env.TURBO_SCM_BASE;
+    process.env.TURBO_SCM_BASE = 'origin/main';
+    try {
+      const report = runComponentShipGate({
+        diffBase: null,
+        skipQuality: true,
+        skipRatchet: true,
+        skipRenderedCert: true,
+        skipLiveStorybook: true,
+      });
+      expect(report.ok).toBe(true);
+      expect(report.diffBase).toBeNull();
+      expect(report.sections.diff).toMatchObject({
+        ok: true,
+        applicable: false,
+        changedComponents: [],
+      });
+      expect(report.sections.diff.note).toMatch(/no diff base/);
+    } finally {
+      if (previous === undefined) {
+        delete process.env.TURBO_SCM_BASE;
+      } else {
+        process.env.TURBO_SCM_BASE = previous;
+      }
+    }
   });
 });

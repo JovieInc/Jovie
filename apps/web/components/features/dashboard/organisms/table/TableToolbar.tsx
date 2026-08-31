@@ -53,7 +53,7 @@ export function TableToolbar({
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 border-b border-subtle bg-(--linear-app-content-surface) px-3.5 py-2',
+        'flex items-center justify-between gap-3 border-b border-subtle bg-(--app-shell-content-surface) px-3.5 py-2',
         className
       )}
     >
