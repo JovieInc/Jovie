@@ -107,6 +107,8 @@ struct AuthScreenStyleGuardTests {
     #expect(!source.contains("textPrimary = Color(hex: 0xFFFFFF)"))
     #expect(!source.contains("0xE3E4E6"))
     #expect(!source.contains("0x969799"))
+    #expect(!source.contains("borderSubtle = Color.white.opacity(0.05)"))
+    #expect(!source.contains("borderDefault = Color.white.opacity(0.08)"))
     #expect(!source.contains("Color.white.opacity(0.05)"))
     #expect(!source.contains("Color.white.opacity(0.08)"))
     #expect(!source.contains("borderStrong = Color.white.opacity(0.10)"))
