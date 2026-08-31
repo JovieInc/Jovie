@@ -16,7 +16,7 @@ git -C "$SEED" config commit.gpgsign false
 git -C "$SEED" remote add origin "file://$ORIGIN"
 git -C "$SEED" switch -q -c main
 
-for revision in 1 2 3 4; do
+for revision in {1..40}; do
   printf 'base-%s\n' "$revision" >"$SEED/base.txt"
   git -C "$SEED" add base.txt
   git -C "$SEED" commit -q -m "base $revision"
@@ -167,6 +167,34 @@ git -C "$SEED" merge -q --no-ff queue-one queue-two -m 'synthetic merge group'
 QUEUE_HEAD="$(git -C "$SEED" rev-parse HEAD)"
 QUEUE_REF='refs/heads/gh-readonly-queue/main/pr-1-test'
 git -C "$SEED" push -q origin "$QUEUE_HEAD:$QUEUE_REF"
+
+# GitHub can create a merge-group child whose committer timestamp predates a
+# newly advanced queue base. TruffleHog 3.97.1's go-git traversal then walks
+# below the base into a shallow boundary and silently scans zero bytes. Keep a
+# real multi-commit side in the graph so the local scan-only anchor must retain
+# introduced-then-removed history, not merely the final tree.
+BASE_EPOCH="$(git -C "$SEED" show -s --format='%ct' "$BASE_SHA")"
+SKEWED_QUEUE_EPOCH=$(( BASE_EPOCH - 60 ))
+(( SKEWED_QUEUE_EPOCH > 0 )) \
+  || { echo 'FAIL: skewed merge-group timestamp fixture underflowed' >&2; exit 1; }
+SKEWED_QUEUE_DATE="@${SKEWED_QUEUE_EPOCH} +0000"
+SKEWED_QUEUE_TREE="$(
+  git -C "$SEED" merge-tree --write-tree "$BASE_SHA" "$SOURCE_HEAD"
+)"
+SKEWED_QUEUE_HEAD="$(
+  printf 'older-dated synthetic merge group\n' \
+    | env \
+        GIT_AUTHOR_NAME='Secret Scan Test' \
+        GIT_AUTHOR_EMAIL='secret-scan-test@example.invalid' \
+        GIT_AUTHOR_DATE="$SKEWED_QUEUE_DATE" \
+        GIT_COMMITTER_NAME='Secret Scan Test' \
+        GIT_COMMITTER_EMAIL='secret-scan-test@example.invalid' \
+        GIT_COMMITTER_DATE="$SKEWED_QUEUE_DATE" \
+        git -C "$SEED" commit-tree "$SKEWED_QUEUE_TREE" \
+          -p "$BASE_SHA" -p "$SOURCE_HEAD"
+)"
+SKEWED_QUEUE_REF='refs/heads/gh-readonly-queue/main/pr-2-skewed'
+git -C "$SEED" push -q origin "$SKEWED_QUEUE_HEAD:$SKEWED_QUEUE_REF"
 
 # Direct-main fallback scans every commit since push.before.
 git -C "$SEED" switch -q -C main "$BASE_SHA"
@@ -401,6 +429,65 @@ git -C "$SCENARIO_DIR" cat-file -e "${QUEUE_TWO_SHA}^{commit}" \
 # queue head); the prepared range may never silently widen below it (JOV-4333).
 [[ "$(git -C "$SCENARIO_DIR" rev-parse refs/secret-scan/exact-base)" == "$BASE_SHA" ]] \
   || fail 'merge-group scan base did not resolve to the exact event base_sha'
+
+checkout_range \
+  skewed-merge-group "$SKEWED_QUEUE_REF" "$BASE_SHA" "$SKEWED_QUEUE_HEAD" \
+  "$SKEWED_QUEUE_REF" "$SKEWED_QUEUE_HEAD" ''
+SKEWED_QUEUE_DIR="$SCENARIO_DIR"
+SKEWED_SCAN_HEAD="$(git -C "$SKEWED_QUEUE_DIR" rev-parse HEAD)"
+[[ "$SKEWED_SCAN_HEAD" != "$SKEWED_QUEUE_HEAD" ]] \
+  || fail 'older-dated merge-group head was not locally anchored'
+[[ "$(git -C "$SKEWED_QUEUE_DIR" rev-parse "${SKEWED_SCAN_HEAD}^{tree}")" == "$SKEWED_QUEUE_TREE" ]] \
+  || fail 'timestamp anchor changed the exact merge-group event tree'
+[[ "$(git -C "$SKEWED_QUEUE_DIR" show -s --format='%P' "$SKEWED_SCAN_HEAD")" == "$SKEWED_QUEUE_HEAD" ]] \
+  || fail 'timestamp anchor did not retain the exact merge-group event head as its sole parent'
+[[ "$(git -C "$SKEWED_QUEUE_DIR" show -s --format='%ct' "$SKEWED_SCAN_HEAD")" -gt "$BASE_EPOCH" ]] \
+  || fail 'timestamp anchor did not sort strictly after the exact queue base'
+[[ "$(git -C "$SKEWED_QUEUE_DIR" rev-parse refs/secret-scan/exact-head)" == "$SKEWED_SCAN_HEAD" ]] \
+  || fail 'exact-head receipt did not bind the local timestamp anchor'
+git -C "$SKEWED_QUEUE_DIR" merge-base --is-ancestor \
+  "$INTRODUCED_SHA" "$SKEWED_SCAN_HEAD" \
+  || fail 'timestamp anchor hid an introduced-then-removed secret commit'
+grep -q 'Anchored older-dated scan head' "$TEST_ROOT/skewed-merge-group.output" \
+  || fail 'timestamp anchor lacks an explicit preparation receipt'
+
+# A base commit that is itself a shallow boundary is not enough for go-git's
+# merge-base traversal, even when Git can answer base-is-ancestor. The helper
+# must deepen again before creating the timestamp anchor.
+BASE_BOUNDARY_DIR="$TEST_ROOT/base-boundary"
+git init -q "$BASE_BOUNDARY_DIR"
+git -C "$BASE_BOUNDARY_DIR" remote add origin "file://$ORIGIN"
+git -C "$BASE_BOUNDARY_DIR" fetch -q --depth=2 origin "$SKEWED_QUEUE_REF"
+git -C "$BASE_BOUNDARY_DIR" checkout -q --detach FETCH_HEAD
+BASE_BOUNDARY_SHALLOW="$(git -C "$BASE_BOUNDARY_DIR" rev-parse --git-path shallow)"
+grep -qxF "$BASE_SHA" "$BASE_BOUNDARY_DIR/$BASE_BOUNDARY_SHALLOW" \
+  || fail 'base-boundary fixture did not begin with the exact base marked shallow'
+(
+  cd "$BASE_BOUNDARY_DIR"
+  "$RANGE_SCRIPT" "$BASE_SHA" "$SKEWED_QUEUE_HEAD" "$SKEWED_QUEUE_REF" \
+    "$SKEWED_QUEUE_HEAD" ''
+) >"$TEST_ROOT/base-boundary.output"
+if [[ -f "$BASE_BOUNDARY_DIR/$BASE_BOUNDARY_SHALLOW" ]]; then
+  ! grep -qxF "$BASE_SHA" "$BASE_BOUNDARY_DIR/$BASE_BOUNDARY_SHALLOW" \
+    || fail 'range preparation left the exact base as a shallow boundary'
+fi
+
+if TRUFFLEHOG_BIN="${TRUFFLEHOG_BIN:-$(command -v trufflehog || true)}" \
+  && [[ -n "$TRUFFLEHOG_BIN" ]]; then
+  "$TRUFFLEHOG_BIN" git "file://$SKEWED_QUEUE_DIR" \
+    --since-commit "$BASE_SHA" \
+    --branch HEAD \
+    --no-verification \
+    --fail >"$TEST_ROOT/skewed-trufflehog.output" 2>&1 \
+    || fail 'trufflehog could not scan the older-dated anchored merge group'
+  grep -q 'scanning repo' "$TEST_ROOT/skewed-trufflehog.output" \
+    || fail 'trufflehog did not emit a positive repository-scan receipt'
+  ! grep -q 'encountered errors during scan' "$TEST_ROOT/skewed-trufflehog.output" \
+    || fail 'trufflehog still aborted its older-dated merge-group scan'
+  echo 'PASS: trufflehog scanned the older-dated anchored merge group'
+else
+  echo 'SKIP: trufflehog binary unavailable for older-dated merge-group assertion'
+fi
 
 # A merge_group event without an exact base_sha (empty, malformed, or zero)
 # must fail closed with an explicit classification. Substituting any other ref
