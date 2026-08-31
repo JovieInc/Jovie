@@ -1973,12 +1973,15 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(verified).toContain('verify-production-alias.sh');
     expect(verified).toContain('superseded by $current_sha');
     expect(verified).toContain(
+      'exact production bind will be proven before marker preservation'
+    );
+    expect(verified).not.toContain(
       'node .github/scripts/assert-live-production-bind.mjs'
     );
     expect(verified).not.toContain('neutral with no notification');
     expect(verified).toContain("steps.current.outputs.is_current == 'true'");
     expect(verified).toContain(
-      "always() && steps.current.outputs.is_current == 'true'"
+      "steps.verify.outputs.canonical_verified == 'true'"
     );
     expect(verified).toContain('Finalize exact current release generation');
     expect(verified).toContain('Notify exact verified production generation');
@@ -4163,6 +4166,9 @@ describe('production promotion exact-artifact contract', () => {
     expect(reusable).not.toContain('concurrency:');
     expect(verified).toContain('canonical_verified=true');
     expect(verified).toContain(
+      'exact production bind will be proven before marker preservation'
+    );
+    expect(verified).not.toContain(
       'node .github/scripts/assert-live-production-bind.mjs'
     );
     expect(verified).not.toContain('neutral with no notification');
@@ -4178,6 +4184,97 @@ describe('production promotion exact-artifact contract', () => {
     expect(finalizeStep).toContain('verified=true');
     expect(verified).not.toContain('Write exact verified-generation marker');
     expect(verified).toContain('Preserve exact verified-generation marker');
+  });
+
+  it('preserves a superseded post-promotion marker before releasing the controller FIFO', () => {
+    const workflow = readFileSync(productionControllerWorkflowPath, 'utf8');
+    const verified = getJobBlock(workflow, 'production-verified');
+    const current = getStepBlock(
+      verified,
+      'Resolve current main before final verification'
+    );
+    const exactGate = getStepBlock(
+      verified,
+      'Require exact deployment and every post-deploy probe'
+    );
+    const finalize = getStepBlock(
+      verified,
+      'Finalize exact current release generation'
+    );
+    const upload = getStepBlock(
+      verified,
+      'Preserve exact verified-generation marker'
+    );
+    const notify = getStepBlock(
+      verified,
+      'Notify exact verified production generation'
+    );
+
+    expect(current).toContain('superseded_before_marker=false');
+    expect(current).toContain('superseded_before_marker=true');
+    expect(current).toContain(
+      'exact production bind will be proven before marker preservation'
+    );
+    expect(current).not.toContain(
+      'assert-live-production-bind.mjs --main-sha "$current_sha"'
+    );
+    expect(verified).toContain(
+      "steps.current.outputs.superseded_before_marker == 'true'"
+    );
+    expect(exactGate).toContain('superseded_after_public_bind=false');
+    expect(exactGate).toContain('superseded_after_public_bind=true');
+    expect(exactGate).toContain('not used as proof for the newer main SHA');
+    expect(exactGate).toContain(
+      'EXPECTED_PRODUCTION_DEPLOYMENT_ID: ${{ needs.production-release.outputs.production_deployment_id }}'
+    );
+    expect(exactGate).toContain(
+      'Production release omitted the exact deployment ID.'
+    );
+    expect(exactGate).toContain(
+      'Production release did not complete successfully.'
+    );
+    expect(exactGate).toContain('Post-Deploy Smoke');
+    expect(exactGate).toContain('Authenticated Better Auth OTP smoke');
+    expect(exactGate).toContain(
+      'bash .github/scripts/verify-production-alias.sh'
+    );
+    expect(exactGate).toContain('canonical_verified=true');
+    expect(exactGate).toContain('canonical_sha=$EXPECTED_COMMIT_SHA');
+    expect(finalize).toContain(
+      "steps.verify.outputs.canonical_verified == 'true'"
+    );
+    expect(finalize).toContain('superseded_after_public_bind=true');
+    expect(finalize).toContain('terminalReason');
+    expect(finalize).toContain('skipped_superseded');
+    expect(finalize).toContain(
+      '[ "${{ steps.verify.outputs.canonical_deployment_id }}" = "$DEPLOYMENT_ID" ]'
+    );
+    expect(upload).toContain("production-generation-verified-{0}");
+    expect(notify).toContain("steps.current.outputs.is_current == 'true'");
+  });
+
+  it('keeps superseded marker preservation red without exact deployment and public bind proof', () => {
+    const workflow = readFileSync(productionControllerWorkflowPath, 'utf8');
+    const verified = getJobBlock(workflow, 'production-verified');
+    const exactGate = getStepBlock(
+      verified,
+      'Require exact deployment and every post-deploy probe'
+    );
+    const verifier = readFileSync(productionAliasVerifierPath, 'utf8');
+
+    expect(exactGate).toContain('Production release omitted');
+    expect(exactGate).toContain('exit 1');
+    expect(exactGate).toContain('deployment_id');
+    expect(exactGate).toContain('production_deployment_url');
+    expect(exactGate).toContain(
+      'Production release did not complete successfully.'
+    );
+    expect(exactGate).toContain('verify-production-alias.sh');
+    expect(verifier).toContain('current_observation="mismatch"');
+    expect(verifier).toContain('routing_matches[routing_index]=0');
+    expect(verifier).toContain(
+      'Canonical production did not converge: current='
+    );
   });
 
   it('requires canonical deployment ID and SHA convergence only in the leased final tail', () => {
