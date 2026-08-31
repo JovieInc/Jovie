@@ -40,7 +40,7 @@ def receipt(**overrides):
     return base
 
 
-def paint(symphony=None, mq=None, review=None, measured=None, width=200, sha="469d4bb", ship_path=None, tps=None):
+def paint(symphony=None, mq=None, review=None, measured=None, width=200, sha="469d4bb", tps=None):
     return HUD.render(
         symphony=symphony
         or {
@@ -61,7 +61,6 @@ def paint(symphony=None, mq=None, review=None, measured=None, width=200, sha="46
         now=NOW,
         width=width,
         sha=sha,
-        ship_path=ship_path,
         tps=tps,
     )
 
@@ -142,7 +141,6 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertIn("440ea404-041f-461e-ae45-dd6a2e98e4a1", source)
         self.assertIn("symphony-ui-pilot-96d6b9c5b2d5", source)
         self.assertIn("project(id: $id)", HUD.LINEAR_QUERY)
-        self.assertIn("project(id: $id)", HUD.LINEAR_STAGES_QUERY)
         self.assertIn("In Review", HUD.LINEAR_QUERY)
         self.assertIsNone(TEAM_JOV.search(source))
         self.assertNotIn("team:JOV", source)
@@ -310,13 +308,7 @@ class UltrawideHudTests(unittest.TestCase):
             state = HUD.fetch_symphony("http://127.0.0.1:4043/api/v1/state", cap=3)
         self.assertEqual(state["seconds_running"], 942)
         self.assertEqual(state["totals"]["total_tokens"], 69134)
-        snapshots = [
-            {
-                "at": "2026-08-31T11:59:55Z",
-                "total_tokens": 64134,
-                "seconds_running": 937,
-            }
-        ]
+        snapshots = [{"at": "2026-08-31T11:59:55Z", "total_tokens": 64134, "seconds_running": 937}]
         tps = HUD.compute_throughput(state["totals"], snapshots, now=NOW)
         self.assertAlmostEqual(tps, 1000.0)
         plain = strip(paint(state, tps=tps, width=430))
@@ -329,8 +321,7 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertIn("total 69,134", plain)
         self.assertIn("claude-sonnet-4.5", plain)
         self.assertIn("4,950/5,000", plain)
-        session_avg = HUD.compute_throughput(state["totals"], [], now=NOW)
-        self.assertAlmostEqual(session_avg, 69134 / 942)
+        self.assertAlmostEqual(HUD.compute_throughput(state["totals"], [], now=NOW), 69134 / 942)
 
     def test_null_rate_limits_render_dash_never_invented(self):
         fake = mock.Mock()
@@ -344,75 +335,6 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertIn("Rate Limits -", plain)
         self.assertNotIn("4,950/5,000", plain)
         self.assertNotIn("unlimited", plain)
-
-    def test_missing_ci_series_is_dash_not_zero(self):
-        plain = strip(paint(width=430))
-        self.assertIn("SYMPHONY STATUS", plain)
-        self.assertIn("Todo/pickup", plain)
-        self.assertIn("ci-fast", plain)
-        self.assertIn("PR Ready", plain)
-        self.assertIn("merge_group CI", plain)
-        self.assertIn("n=- p95 -", plain)
-        self.assertNotIn("p95 0", plain)
-        self.assertNotIn("p95 0s", plain)
-        self.assertNotIn("n=0 p95 0", plain)
-        self.assertNotIn("$0", plain)
-        self.assertNotIn("GEM OPERATIONS", plain)
-        measured = HUD.build_ship_path(
-            symphony={"ok": True, "running": 1, "retrying": 2, "cap": 3},
-            mq={"ok": True, "count": 3, "rows": [{"number": 1}]},
-            linear={"ok": True, "todo": 4, "pickup_durations": [60, 120, 180, 240]},
-            github={
-                "ok": True,
-                "pr_open": 2,
-                "pr_open_durations": [300, 400],
-                "ci_fast": 1,
-                "ci_fast_queued": False,
-                "ci_fast_durations": [90, 100, 110],
-                "pr_ready": 0,
-                "pr_ready_queued": False,
-                "pr_ready_durations": None,
-                "merge_group_in": 0,
-                "merge_group_durations": None,
-                "merged": 5,
-                "merged_durations": None,
-                "mq_durations": None,
-            },
-        )
-        ready = next(stage for stage in measured["stages"] if stage["id"] == "pr_ready")
-        merged = next(stage for stage in measured["stages"] if stage["id"] == "merged")
-        mq = next(stage for stage in measured["stages"] if stage["id"] == "mq")
-        self.assertIsNone(ready["p95"])
-        self.assertIsNone(merged["p95"])
-        self.assertIsNone(mq["p95"])
-        self.assertEqual(ready["count"], 0)
-        self.assertEqual(measured["bottleneck"]["id"], "running")
-        painted = strip(paint(ship_path=measured, width=430))
-        self.assertIn("retrying agents 2", painted)
-        self.assertIn("n=0 p95 -", painted)
-        self.assertNotIn("p95 0", painted)
-
-    def test_p95_empty_is_none_and_queue_beats_worst_p95(self):
-        self.assertIsNone(HUD.p95_seconds([]))
-        self.assertIsNone(HUD.p95_seconds(None))
-        self.assertNotEqual(HUD.p95_seconds([10, 20, 30]), 0)
-        path = HUD.build_ship_path(
-            symphony={"ok": True, "running": 1, "retrying": 0, "cap": 3},
-            mq={"ok": True, "count": 2, "rows": [{"number": 8}, {"number": 9}]},
-            linear={"ok": False},
-            github={
-                "ok": True,
-                "pr_open": 1,
-                "ci_fast": 0,
-                "ci_fast_durations": [30, 40, 50, 60, 400],
-                "pr_ready": 0,
-                "merge_group_in": 0,
-                "merged": 1,
-                "mq_durations": None,
-            },
-        )
-        self.assertEqual(path["bottleneck"]["id"], "mq")
-        self.assertIn("MQ awaiting checks", path["bottleneck"]["reason"])
 
 
 if __name__ == "__main__":
