@@ -39,14 +39,80 @@ struct MobileAppShellContract: Codable, Equatable, Sendable {
     }
   }
 
-  enum WorkspaceRole: String, Codable, Sendable {
+  enum WorkspaceRole: Codable, Equatable, Sendable {
     case primary
     case secondary
+    case unknown(String)
+
+    init(rawValue: String) {
+      switch rawValue {
+      case "primary":
+        self = .primary
+      case "secondary":
+        self = .secondary
+      default:
+        self = .unknown(rawValue)
+      }
+    }
+
+    var rawValue: String {
+      switch self {
+      case .primary:
+        return "primary"
+      case .secondary:
+        return "secondary"
+      case .unknown(let value):
+        return value
+      }
+    }
+
+    init(from decoder: Decoder) throws {
+      let container = try decoder.singleValueContainer()
+      self.init(rawValue: try container.decode(String.self))
+    }
+
+    func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      try container.encode(rawValue)
+    }
   }
 
-  enum WorkspaceAccess: String, Codable, Sendable {
+  enum WorkspaceAccess: Codable, Equatable, Sendable {
     case authenticated
     case admin
+    case unknown(String)
+
+    init(rawValue: String) {
+      switch rawValue {
+      case "authenticated":
+        self = .authenticated
+      case "admin":
+        self = .admin
+      default:
+        self = .unknown(rawValue)
+      }
+    }
+
+    var rawValue: String {
+      switch self {
+      case .authenticated:
+        return "authenticated"
+      case .admin:
+        return "admin"
+      case .unknown(let value):
+        return value
+      }
+    }
+
+    init(from decoder: Decoder) throws {
+      let container = try decoder.singleValueContainer()
+      self.init(rawValue: try container.decode(String.self))
+    }
+
+    func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      try container.encode(rawValue)
+    }
   }
 
   struct Workspace: Codable, Equatable, Sendable {

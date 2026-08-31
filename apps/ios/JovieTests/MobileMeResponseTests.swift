@@ -133,8 +133,8 @@ struct MobileMeResponseTests {
               "id": "future",
               "label": "Future",
               "href": "/app/future",
-              "role": "secondary",
-              "access": "authenticated",
+              "role": "future-role",
+              "access": "future-access",
               "shellOwner": "jovie",
               "chatOwner": "jovie-chat",
               "chatMode": "future",
@@ -153,6 +153,8 @@ struct MobileMeResponseTests {
     #expect(response.appShell.launchWorkspaceID == .customer)
     #expect(response.appShell.primaryWorkspaceID == .customer)
     #expect(future.id == .unknown("future"))
+    #expect(future.role == .unknown("future-role"))
+    #expect(future.access == .unknown("future-access"))
     #expect(response.appShell.canAccessOvie == false)
   }
 
