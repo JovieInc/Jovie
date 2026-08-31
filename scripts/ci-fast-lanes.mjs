@@ -27,7 +27,10 @@ import { spawnSync } from 'node:child_process';
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { classifyCiRepoLanes } from './lib/ci-repo-lanes.mjs';
+import {
+  affectsJovieTypecheck,
+  classifyCiRepoLanes,
+} from './lib/ci-repo-lanes.mjs';
 
 const REPO_ROOT = process.cwd();
 const selectedProductLanes = () =>
@@ -37,7 +40,7 @@ const selectedProductLanes = () =>
       .filter(Boolean)
   );
 
-/** @typedef {{ id: string, name: string, nextLocalCommand: string, status: 'success'|'failure'|'skipped', logExcerpt: string }} LaneResult */
+/** @typedef {{ id: string, name: string, nextLocalCommand: string, status: 'success'|'failure'|'skipped', logExcerpt: string, durationMs: number }} LaneResult */
 
 const LANES = [
   {
@@ -352,17 +355,8 @@ function runTypecheck() {
     };
   }
   if (event === 'pull_request') {
-    const files = changedFiles([
-      '**/*.ts',
-      '**/*.tsx',
-      '**/*.mts',
-      '**/*.cts',
-      '**/tsconfig*.json',
-      'turbo.json',
-      'package.json',
-      'pnpm-lock.yaml',
-    ]);
-    if (files && files.length === 0) {
+    const files = listAllChangedFiles();
+    if (files && !files.some(file => affectsJovieTypecheck(file))) {
       return {
         code: 0,
         output: 'No TypeScript graph files changed\n',
@@ -726,7 +720,7 @@ function writeLaneResults(results, laneGroup, setupError) {
     outPath,
     JSON.stringify(
       {
-        schemaVersion: 1,
+        schemaVersion: 2,
         job: 'ci-fast',
         group: laneGroup || 'all',
         lanes: results,
@@ -753,6 +747,7 @@ function main() {
 
     for (const lane of selectedLanes) {
       console.log(`\n======== lane: ${lane.id} ========`);
+      const laneStartedAt = Date.now();
       let outcome;
       try {
         outcome = lane.run();
@@ -785,6 +780,7 @@ function main() {
         nextLocalCommand: lane.nextLocalCommand,
         status,
         logExcerpt,
+        durationMs: Math.max(0, Date.now() - laneStartedAt),
       });
     }
   } catch (error) {
