@@ -72,9 +72,7 @@ describe('Spotify catalog connection route', () => {
 
   it('matches only the Spotify catalog connection request', () => {
     expect(
-      shouldOpenSpotifyCatalogConnection(
-        new URLSearchParams('connect=spotify')
-      )
+      shouldOpenSpotifyCatalogConnection(new URLSearchParams('connect=spotify'))
     ).toBe(true);
     expect(
       shouldOpenSpotifyCatalogConnection(new URLSearchParams('connect=apple'))

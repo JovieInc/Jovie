@@ -346,6 +346,7 @@ export interface ShellReleasesViewProps {
   readonly allowArtworkDownloads?: boolean;
   readonly spotifyConnected?: boolean;
   readonly appleMusicConnected?: boolean;
+  readonly initialSpotifyConnectOpen?: boolean;
   readonly initialImporting?: boolean;
   readonly initialTotalCount?: number;
 }
@@ -366,12 +367,14 @@ export function ShellReleasesView({
   allowArtworkDownloads = false,
   spotifyConnected = false,
   appleMusicConnected = false,
+  initialSpotifyConnectOpen = false,
   initialImporting = false,
   initialTotalCount = 0,
 }: ShellReleasesViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const shouldOpenSpotifyConnect =
+    initialSpotifyConnectOpen ||
     shouldOpenSpotifyCatalogConnection(searchParams);
   const {
     postCreateRelease,

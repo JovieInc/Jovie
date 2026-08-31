@@ -19,24 +19,27 @@ import {
 } from '@/contexts/RightPanelContext';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
-const { mockUseDspMatchesQuery, mockUsePlanGate, navigationState } =
-  vi.hoisted(() => ({
-    mockUseDspMatchesQuery: vi.fn(() => ({ data: [], isLoading: false })),
-    mockUsePlanGate: vi.fn(() => ({
-      isLoading: false,
-      isError: false,
-      smartLinksLimit: null as number | null,
-      isPro: true,
-      canCreateManualReleases: true,
-      canGenerateAlbumArt: false,
-      canGenerateReleasePlans: true,
-      canEditSmartLinks: true,
-      canAccessFutureReleases: true,
-    })),
-    navigationState: {
-      searchParams: new URLSearchParams(),
-    },
-  }));
+const {
+  mockUseDspMatchesQuery,
+  mockUsePlanGate,
+  navigationState,
+} = vi.hoisted(() => ({
+  mockUseDspMatchesQuery: vi.fn(() => ({ data: [], isLoading: false })),
+  mockUsePlanGate: vi.fn(() => ({
+    isLoading: false,
+    isError: false,
+    smartLinksLimit: null as number | null,
+    isPro: true,
+    canCreateManualReleases: true,
+    canGenerateAlbumArt: false,
+    canGenerateReleasePlans: true,
+    canEditSmartLinks: true,
+    canAccessFutureReleases: true,
+  })),
+  navigationState: {
+    searchParams: new URLSearchParams(),
+  },
+}));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -480,7 +483,7 @@ describe('ShellReleasesView', () => {
     ).toBeInTheDocument();
   });
 
-  it('opens the Spotify connection action from the catalog connection route', () => {
+  it('opens Spotify connection from the catalog connection route', () => {
     navigationState.searchParams = new URLSearchParams('connect=spotify');
 
     renderShell([]);
