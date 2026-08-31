@@ -128,10 +128,12 @@ test.describe('Ovie CEO metric stability', () => {
   test('keeps mobile row geometry fixed across fresh and degraded polls', async ({
     page,
   }) => {
+    // Intentional conditional skip: this geometry check needs the dev auth bypass
+    // to create an admin HUD session in local and CI environments. NOSONAR S1607
     test.skip(
       process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
       'dev-auth bypass not enabled — set E2E_USE_TEST_AUTH_BYPASS=1'
-    );
+    ); // NOSONAR
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.addInitScript(() => {
