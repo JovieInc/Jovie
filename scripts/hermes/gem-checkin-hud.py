@@ -124,6 +124,13 @@ def _int(value: Any) -> int | None:
     return int(number)
 
 
+def _rounded_int(value: Any) -> int | None:
+    number = _num(value)
+    if number is None:
+        return None
+    return int(round(number))
+
+
 def _text(record: dict[str, Any], keys: tuple[str, ...]) -> str | None:
     for key in keys:
         value = record.get(key)
@@ -266,9 +273,9 @@ def due_label(due: Any, *, now: datetime | None = None) -> str:
 
 
 def compact_tokens(total: Any, incoming: Any = None, outgoing: Any = None) -> str:
-    count = _int(total)
+    count = _rounded_int(total)
     if count is None:
-        inn, out = _int(incoming), _int(outgoing)
+        inn, out = _rounded_int(incoming), _rounded_int(outgoing)
         if inn is None and out is None:
             return "-"
         count = (inn or 0) + (out or 0)

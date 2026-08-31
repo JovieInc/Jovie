@@ -319,6 +319,13 @@ class UltrawideHudTests(unittest.TestCase):
                 self.assertEqual(HUD.compact_tokens(value), expected)
         self.assertEqual(HUD.compact_tokens(None, incoming=500, outgoing=500), "1K")
 
+    def test_token_notation_rounds_fractional_throughput_before_compacting(self):
+        self.assertEqual(HUD.compact_tokens(73.6), "74")
+        state, _ = fetch_state(official_state())
+        plain = strip(paint(state, width=240, height=60, tps=73.6))
+        self.assertIn("74 tps", plain)
+        self.assertNotIn("73 tps", plain)
+
     def test_token_notation_covers_rows_overview_and_footer(self):
         state, _ = fetch_state(
             official_state(
