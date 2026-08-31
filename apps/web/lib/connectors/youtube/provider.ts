@@ -126,14 +126,25 @@ async function listUploadVideoIds(input: {
   readonly accessToken: string;
   readonly fetcher: ProviderFetch;
   readonly maxVideoIds?: number;
-}): Promise<string[]> {
+  readonly pageToken?: string;
+}): Promise<{
+  readonly videoIds: string[];
+  readonly nextPageToken: string | null;
+}> {
   const ids: string[] = [];
-  let pageToken: string | undefined;
+  const seen = new Set<string>();
+  let pageToken: string | undefined = input.pageToken;
   do {
+    const remaining = input.maxVideoIds
+      ? input.maxVideoIds - ids.length
+      : MAX_VIDEO_BATCH;
     const url = new URL(`${YOUTUBE_DATA_API}/playlistItems`);
     url.searchParams.set('part', 'contentDetails');
     url.searchParams.set('playlistId', input.uploadsPlaylistId);
-    url.searchParams.set('maxResults', '50');
+    url.searchParams.set(
+      'maxResults',
+      String(Math.max(1, Math.min(MAX_VIDEO_BATCH, remaining)))
+    );
     if (pageToken) url.searchParams.set('pageToken', pageToken);
     const page = await authorizedJson<PlaylistItemsResponse>(
       url,
@@ -143,14 +154,20 @@ async function listUploadVideoIds(input: {
     );
     for (const item of page.items ?? []) {
       const videoId = item.contentDetails?.videoId?.trim();
-      if (videoId) ids.push(videoId);
+      if (videoId && !seen.has(videoId)) {
+        ids.push(videoId);
+        seen.add(videoId);
+      }
       if (input.maxVideoIds && ids.length >= input.maxVideoIds) {
-        return [...new Set(ids)].slice(0, input.maxVideoIds);
+        return {
+          videoIds: ids.slice(0, input.maxVideoIds),
+          nextPageToken: page.nextPageToken ?? null,
+        };
       }
     }
     pageToken = page.nextPageToken;
   } while (pageToken);
-  return [...new Set(ids)];
+  return { videoIds: ids, nextPageToken: null };
 }
 
 function batches<T>(items: readonly T[], size: number): T[][] {
@@ -271,6 +288,8 @@ export function createYouTubeLibraryProvider(input: {
   readonly now?: () => Date;
   readonly fetcher?: ProviderFetch;
   readonly maxVideosPerSync?: number;
+  readonly uploadsPageToken?: string;
+  readonly onUploadsPageToken?: (pageToken: string | null) => void;
 }): YouTubeLibraryProvider {
   const fetcher = input.fetcher ?? serverFetch;
   const now = input.now ?? (() => new Date());
@@ -287,12 +306,14 @@ export function createYouTubeLibraryProvider(input: {
           403
         );
       }
-      const videoIds = await listUploadVideoIds({
+      const { videoIds, nextPageToken } = await listUploadVideoIds({
         uploadsPlaylistId: channel.uploadsPlaylistId,
         accessToken: input.accessToken,
         fetcher,
         maxVideoIds: input.maxVideosPerSync,
+        pageToken: input.uploadsPageToken,
       });
+      input.onUploadsPageToken?.(nextPageToken);
       const videos: YouTubeChannelVideo[] = [];
       for (const batch of batches(videoIds, MAX_VIDEO_BATCH)) {
         const url = new URL(`${YOUTUBE_DATA_API}/videos`);
