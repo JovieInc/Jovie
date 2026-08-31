@@ -8,6 +8,8 @@ import {
   getLibraryAssetShareMapForProfile,
   loadArtistHandleForProfile,
 } from '@/lib/library/asset-share.server';
+import { listLibraryPostReleaseBundle } from '@/lib/library/post-release-store';
+import type { LibraryPostReleaseBundle } from '@/lib/library/post-release-types';
 import type { LibraryProfileVisibility } from '@/lib/library/profile-visibility';
 import { getLibraryProfileStateMapForProfile } from '@/lib/library/profile-visibility.server';
 import { getLibraryMerchCardsForProfile } from '@/lib/merch/service';
@@ -26,6 +28,12 @@ import { loadAppShellRouteContext } from '../app-shell-route-context';
 import { LibraryPageClient } from './LibraryPageClient';
 
 export const runtime = 'nodejs';
+
+const EMPTY_LIBRARY_POST_RELEASE_BUNDLE: LibraryPostReleaseBundle = {
+  downloads: [],
+  findings: [],
+  rightsholders: [],
+};
 
 export default async function LibraryPage({
   searchParams,
@@ -59,6 +67,8 @@ export default async function LibraryPage({
   let approvalStatusByAssetId: Record<string, string> = {};
   let profileVisibilityByAssetId: Record<string, LibraryProfileVisibility> = {};
   let assetShareByAssetId: Record<string, LibraryAssetShareViewModel> = {};
+  let postReleaseBundle: LibraryPostReleaseBundle =
+    EMPTY_LIBRARY_POST_RELEASE_BUNDLE;
   let creatorDocuments: CreatorDocumentListItem[] = [];
   let creatorDocumentsNextCursor: string | null = null;
   let creatorDocumentsLoadFailed = false;
@@ -100,6 +110,16 @@ export default async function LibraryPage({
           appleMusicId: selectedProfile.appleMusicId ?? null,
           settings: selectedProfile.settings ?? null,
         };
+        const postReleaseBundlePromise = listLibraryPostReleaseBundle(
+          profileId
+        ).catch(error => {
+          void captureError(
+            'Post-release bundle load failed on library page',
+            error,
+            { route: APP_ROUTES.LIBRARY }
+          );
+          return EMPTY_LIBRARY_POST_RELEASE_BUNDLE;
+        });
         const [
           _releases,
           archivedReleaseRows,
@@ -108,6 +128,7 @@ export default async function LibraryPage({
           profileStates,
           assetShares,
           videos,
+          postRelease,
         ] = await Promise.all([
           queryClient.fetchQuery({
             queryKey: queryKeys.releases.matrix(profileId),
@@ -119,6 +140,7 @@ export default async function LibraryPage({
           getLibraryProfileStateMapForProfile(profileId),
           assetSharesPromise,
           listVideosForProfile({ creatorProfileId: profileId }),
+          postReleaseBundlePromise,
         ]);
         merchCards = merch;
         archivedMerchCards = archivedMerch;
@@ -137,6 +159,7 @@ export default async function LibraryPage({
         );
         assetShareByAssetId = Object.fromEntries(assetShares);
         youtubeVideos = videos;
+        postReleaseBundle = postRelease;
       } catch (error) {
         void captureError(
           'Release matrix prefetch failed on library page',
@@ -159,6 +182,7 @@ export default async function LibraryPage({
         approvalStatusByAssetId={approvalStatusByAssetId}
         profileVisibilityByAssetId={profileVisibilityByAssetId}
         assetShareByAssetId={assetShareByAssetId}
+        postReleaseBundle={postReleaseBundle}
         creatorDocuments={creatorDocuments}
         creatorDocumentsNextCursor={creatorDocumentsNextCursor}
         creatorDocumentsLoadFailed={creatorDocumentsLoadFailed}
