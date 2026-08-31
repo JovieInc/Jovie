@@ -376,7 +376,7 @@ describe('codex issue shipper prompt', () => {
     expect(prompt).toContain('gh pr create --draft');
     expect(prompt).toContain('Create a draft PR first');
     expect(prompt).toContain(
-      "bash '/controller/scripts/writer-owned-pr-promote.sh' --pr <number> --issue GH-123"
+      "env GITHUB_REPOSITORY='JovieInc/Jovie' bash '/controller/scripts/writer-owned-pr-promote.sh' --pr <number> --issue GH-123"
     );
     expect(prompt).toContain('jovie-writer-pr-proof/v1');
     expect(prompt).toContain('jovie-writer-pr-promotion-blocker/v1');
@@ -391,6 +391,17 @@ describe('codex issue shipper prompt', () => {
     expect(prompt).toContain('Session model: cheap-model');
     expect(prompt).toContain(
       'Captured slug: ops/codex-issue-shipper/github-123'
+    );
+  });
+
+  it('binds writer promotion helper instructions to the issue repository', () => {
+    const { prompt } = buildPromptForIssue({
+      number: 42,
+      url: 'https://github.com/JovieInc/LogYourBody/issues/42',
+    });
+
+    expect(prompt).toContain(
+      "env GITHUB_REPOSITORY='JovieInc/LogYourBody' bash '/repo/scripts/writer-owned-pr-promote.sh' --pr <number> --issue GH-42"
     );
   });
 

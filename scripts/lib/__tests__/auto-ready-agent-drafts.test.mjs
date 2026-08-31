@@ -13,7 +13,9 @@ import {
 } from '../auto-ready-provenance.mjs';
 import {
   buildWriterProofReceipt,
+  evaluateWriterPromotion,
   renderWriterProofReceipt,
+  WRITER_PROMOTION_BLOCKER_SCHEMA,
 } from '../writer-owned-pr-promotion.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
@@ -25,6 +27,10 @@ const workflow = readFileSync(
   resolve(repoRoot, '.github/workflows/auto-ready-agent-drafts.yml'),
   'utf8'
 );
+const promotionScript = readFileSync(
+  resolve(repoRoot, 'scripts/writer-owned-pr-promote.sh'),
+  'utf8'
+);
 const fxWorkflow = readFileSync(
   resolve(repoRoot, '.github/workflows/rolling-ci-dispatch.yml'),
   'utf8'
@@ -33,6 +39,18 @@ const parent = 'a'.repeat(40);
 const child = 'b'.repeat(40);
 const other = 'c'.repeat(40);
 const prNumber = 14359;
+const writerLogin = 'itstimwhite';
+const proofBase = {
+  issueId: 'JOV-5751',
+  prNumber,
+  headSha: child,
+  writerLogin,
+  requiredTests: 'passed: focused tests and hosted CI',
+  reviewSweep: 'complete: top-level, inline, and review summaries checked',
+  ticketEvidence: 'attached: Linear workpad is current',
+  prEvidence: 'attached: PR body has validation evidence',
+  issuedAt: '2026-08-31T00:00:00.000Z',
+};
 
 function trustedFxRun(overrides = {}) {
   return {
@@ -61,27 +79,18 @@ function fxCommit(overrides = {}) {
   };
 }
 
+function proofReceipt(overrides = {}) {
+  return buildWriterProofReceipt({ ...proofBase, ...overrides });
+}
+
 function proofBody(overrides = {}) {
-  return renderWriterProofReceipt(
-    buildWriterProofReceipt({
-      issueId: 'JOV-5751',
-      prNumber,
-      headSha: child,
-      writerLogin: 'itstimwhite',
-      requiredTests: 'passed: focused tests and typecheck',
-      reviewSweep: 'complete: PR comments and reviews checked',
-      ticketEvidence: 'attached: Linear workpad is current',
-      prEvidence: 'attached: PR body has validation evidence',
-      issuedAt: '2026-08-31T00:00:00.000Z',
-      ...overrides,
-    })
-  );
+  return renderWriterProofReceipt(proofReceipt(overrides));
 }
 
 function promotion(overrides = {}) {
   return classifyAutoReadyPromotion({
     prNumber,
-    authorLogin: 'itstimwhite',
+    authorLogin: writerLogin,
     title: 'fix(ci): remediate exact-head failure',
     branch: 'tim/jov-5477-human-draft',
     labels: [],
@@ -90,6 +99,28 @@ function promotion(overrides = {}) {
     commit: fxCommit(),
     fxRun: trustedFxRun(),
     ...overrides,
+  });
+}
+
+function prState(overrides = {}) {
+  return {
+    state: 'OPEN',
+    draft: true,
+    head: child,
+    labels: [],
+    autoMerge: false,
+    queued: false,
+    ...overrides,
+  };
+}
+
+function writerPromotion(receipt = proofReceipt(), state = prState()) {
+  return evaluateWriterPromotion({
+    receipt,
+    state,
+    expectedHeadSha: child,
+    writerLogin,
+    prNumber,
   });
 }
 
@@ -300,6 +331,73 @@ describe('Auto-Ready provenance selector', () => {
       eligible: false,
       reason: 'fx-run-missing',
     });
+  });
+});
+
+describe('Writer-owned PR promotion proof', () => {
+  it.each([
+    ['reviewSweep', 'pending', 'review-sweep'],
+    ['requiredTests', 'failed: 12 tests failed', 'required-tests'],
+    ['ticketEvidence', 'missing: Linear workpad absent', 'ticket-evidence'],
+    ['prEvidence', 'skipped: PR body not updated', 'pr-evidence'],
+  ])('blocks incomplete or negative %s proof', (field, value, gateId) => {
+    expect(writerPromotion(proofReceipt({ [field]: value }))).toMatchObject({
+      action: 'block',
+      reason: `gate-${gateId}`,
+    });
+  });
+
+  it('accepts only exact-head draft proof on the writer path', () => {
+    expect(writerPromotion()).toMatchObject({
+      action: 'promote',
+      reason: 'proof-complete',
+    });
+    expect(writerPromotion(proofReceipt({ headSha: other }))).toMatchObject({
+      action: 'block',
+      reason: 'head-mismatch',
+    });
+  });
+
+  it('rejects reconciliation dependency, hard holds, and ready-unenrolled state', () => {
+    expect(
+      writerPromotion(proofReceipt({ reconciliationRequired: true }))
+    ).toMatchObject({
+      action: 'block',
+      reason: 'gate-writer-promotion-path',
+    });
+    expect(
+      writerPromotion(proofReceipt(), prState({ draft: false }))
+    ).toMatchObject({
+      action: 'compensate',
+      reason: 'ready-unenrolled',
+    });
+    expect(
+      writerPromotion(proofReceipt(), prState({ labels: ['controlled-proof'] }))
+    ).toMatchObject({
+      action: 'block',
+      reason: 'held-by-controlled-proof',
+    });
+  });
+
+  it('accepts terminal exact-head promotion state', () => {
+    expect(
+      writerPromotion(
+        proofReceipt(),
+        prState({ state: 'MERGED', draft: false })
+      ).reason
+    ).toBe('merged-at-exact-head');
+  });
+
+  it('emits typed blockers and keeps the shell entrypoint atomic', () => {
+    expect(WRITER_PROMOTION_BLOCKER_SCHEMA).toBe(
+      'jovie-writer-pr-promotion-blocker/v1'
+    );
+    [
+      '--match-head-commit "$EXPECTED_HEAD"',
+      'dequeuePullRequest',
+      'compensate_to_draft',
+      'render-blocker',
+    ].forEach(token => expect(promotionScript).toContain(token));
   });
 });
 

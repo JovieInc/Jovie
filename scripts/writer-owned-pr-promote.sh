@@ -31,9 +31,9 @@ upsert_status_comment() {
 }
 read_state() {
   gh_retry api graphql \
-    -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){number state isDraft headRefOid body labels(first:100){nodes{name}} autoMergeRequest{enabledAt} isInMergeQueue mergeQueueEntry{id state position}}}}' \
+    -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id number state isDraft headRefOid body labels(first:100){nodes{name}} autoMergeRequest{enabledAt} isInMergeQueue mergeQueueEntry{id state position}}}}' \
     -f owner="${REPO%%/*}" -f name="${REPO#*/}" -F number="$PR_NUMBER" \
-    --jq '.data.repository.pullRequest | {number, state, draft: .isDraft, head: ((.headRefOid // "") | ascii_downcase), body: (.body // ""), labels: [.labels.nodes[].name], autoMerge: (.autoMergeRequest != null), queued: (.isInMergeQueue == true and .mergeQueueEntry != null), mergeQueueEntry}'
+    --jq '.data.repository.pullRequest | {id, number, state, draft: .isDraft, head: ((.headRefOid // "") | ascii_downcase), body: (.body // ""), labels: [.labels.nodes[].name], autoMerge: (.autoMergeRequest != null), queued: (.isInMergeQueue == true and .mergeQueueEntry != null), mergeQueueEntry}'
 }
 blocker_body() {
   jq -nc \
@@ -45,9 +45,25 @@ blocker_body() {
     | node "$PROMOTION_LIB" render-blocker
 }
 compensate_to_draft() {
-  local state
+  local state pr_id queued
   gh_retry pr merge "$PR_NUMBER" -R "$REPO" --disable-auto >/dev/null 2>&1 || true
+  state="$(read_state 2>/dev/null)" || { printf 'null'; return 1; }
+  queued="$(jq -r '.queued == true' <<<"$state")"
+  pr_id="$(jq -r '.id // ""' <<<"$state")"
+  if [[ "$queued" == "true" && -n "$pr_id" ]]; then
+    gh_retry api graphql \
+      -f query='mutation($id:ID!){dequeuePullRequest(input:{id:$id}){clientMutationId}}' \
+      -f id="$pr_id" >/dev/null 2>&1 || true
+  fi
   gh_retry pr ready "$PR_NUMBER" -R "$REPO" --undo >/dev/null 2>&1 || true
+  state="$(read_state 2>/dev/null)" || { printf 'null'; return 1; }
+  queued="$(jq -r '.queued == true' <<<"$state")"
+  pr_id="$(jq -r '.id // ""' <<<"$state")"
+  if [[ "$queued" == "true" && -n "$pr_id" ]]; then
+    gh_retry api graphql \
+      -f query='mutation($id:ID!){dequeuePullRequest(input:{id:$id}){clientMutationId}}' \
+      -f id="$pr_id" >/dev/null 2>&1 || true
+  fi
   state="$(read_state 2>/dev/null)" || { printf 'null'; return 1; }
   printf '%s' "$state"
   jq -e '.state != "OPEN" or (.draft == true and .autoMerge == false and .queued == false)' <<<"$state" >/dev/null

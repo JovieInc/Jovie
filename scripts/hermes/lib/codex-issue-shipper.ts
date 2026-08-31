@@ -678,6 +678,13 @@ export function shellQuote(value: string): string {
   return `'${normalized.replace(/'/g, "'\\''")}'`;
 }
 
+function repoFromIssueUrl(url: string): string {
+  const match = /^https:\/\/github\.com\/([^/\s]+\/[^/\s]+)\/issues\/\d+/.exec(
+    url
+  );
+  return match?.[1] ?? 'JovieInc/Jovie';
+}
+
 export function boundedUntrustedMarkdown(
   value: string | null | undefined,
   maxLength = 6000
@@ -693,6 +700,7 @@ export function buildAgentPrompt(input: BuildPromptInput): string {
   // Invariant consumer: JOV-INV-012, JOV-INV-022.
   const issueTitle = boundedUntrustedMarkdown(input.issue.title, 300);
   const issueBody = boundedUntrustedMarkdown(input.issue.body);
+  const issueRepo = repoFromIssueUrl(input.issue.url);
   const promotionHelperPath =
     input.promotionHelperPath ??
     `${input.repoRoot}/scripts/writer-owned-pr-promote.sh`;
@@ -731,7 +739,7 @@ export function buildAgentPrompt(input: BuildPromptInput): string {
     '- Keep progress file-backed: do not rely on chat-only handoff. Put the current state, blockers, and verification evidence in the PR body or GitHub issue comment, and preserve generated prompt/log/state artifact paths when available.',
     '- When you create or update a PR, include the repo-standard hidden `<!-- agent-run-artifact ... -->` evidence block when the workflow provides one, and keep its verification gate statuses truthful.',
     '- Create a draft PR first. An autonomous PR must remain draft until the owning writer has completed required tests, review sweep, ticket evidence, and PR evidence.',
-    `- Do not run \`gh pr ready\` directly and do not rely on \`auto-ready-agent-drafts\` or \`agent-tick\` for successful promotion. After author-owned proof is complete, run \`bash ${shellQuote(promotionHelperPath)} --pr <number> --issue GH-${input.issue.number} --head <exact-head-sha> --writer <github-login> --required-tests <evidence> --review-sweep <evidence> --ticket-evidence <evidence> --pr-evidence <evidence>\`.`,
+    `- Do not run \`gh pr ready\` directly and do not rely on \`auto-ready-agent-drafts\` or \`agent-tick\` for successful promotion. After author-owned proof is complete, run \`env GITHUB_REPOSITORY=${shellQuote(issueRepo)} bash ${shellQuote(promotionHelperPath)} --pr <number> --issue GH-${input.issue.number} --head <exact-head-sha> --writer <github-login> --required-tests <evidence> --review-sweep <evidence> --ticket-evidence <evidence> --pr-evidence <evidence>\`.`,
     '- Writer-owned promotion must emit `jovie-writer-pr-proof/v1`, pair ready-for-review with native `gh pr merge --auto --match-head-commit` intent for the exact head, and leave or restore draft with `jovie-writer-pr-promotion-blocker/v1` if enrollment fails.',
     '- Run local CodeRabbit review before shipping: `coderabbit review --agent -c AGENTS.md -t uncommitted`. Fix actionable issues, then rerun if the diff changed.',
     '- Exhaustively QA your own work. Run typecheck and focused tests. For UI edits, verify layout-shift states and capture screenshots. For backend/control-plane edits, test the failure path and the empty path.',

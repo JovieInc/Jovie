@@ -287,7 +287,7 @@ $DESC
 Work only in this checkout of $BRANCH. Do not open a second PR. Do not reset to main. If the branch is behind or conflicting with origin/main, finish the merge/rebase onto origin/main, then push to the existing head.
 Satisfy the issue optimization contract (stable variant identity, exposure, outcome, attribution, eligible context dimensions, hypothesis and primary metric, guardrails, privacy and consent, optimizer owner and cadence, decision writeback, and rollback or control) using the existing analytics, model-experiment, audience event, YouTube experiment, and release-to-revenue surfaces. If the work is non-product or non-optimizable, explicitly declare a justified exception instead of omitting the contract.
 Fix the failing checks. If scripts-typecheck exceeds the baseline, fix the new TypeScript errors; do not regenerate the baseline unless the errors are genuinely pre-existing on main.
-Do not weaken or skip gates. Do not merge, deploy, remove queue-deferred, or run gh pr ready directly. If the PR must leave draft, run $PROMOTION_SCRIPT only after exact-head author proof is complete. If blocked, write BLOCKER.md with the exact reason and exit. Start now."
+Do not weaken or skip gates. Do not merge, deploy, remove queue-deferred, or run gh pr ready directly. If the PR must leave draft, run env REPO=$REPO GITHUB_REPOSITORY=$REPO bash $PROMOTION_SCRIPT only after exact-head author proof is complete. If blocked, write BLOCKER.md with the exact reason and exit. Start now."
 else
   PROMPT="You are implementing admitted Linear issue $ID in $REPO under a revision-scoped fallback lease.
 
@@ -301,7 +301,7 @@ Work only in this checkout. Make the smallest correct issue-scoped change. Do no
 Satisfy the issue optimization contract (stable variant identity, exposure, outcome, attribution, eligible context dimensions, hypothesis and primary metric, guardrails, privacy and consent, optimizer owner and cadence, decision writeback, and rollback or control) using the existing analytics, model-experiment, audience event, YouTube experiment, and release-to-revenue surfaces. If the work is non-product or non-optimizable, explicitly declare a justified exception instead of omitting the contract.
 If scripts-typecheck exceeds the baseline, fix the new TypeScript errors; do not regenerate the baseline unless the errors are genuinely pre-existing on main.
 Create commits on $BRANCH, push normally, and open a draft PR to main with validation evidence and Fixes $ID.
-After required tests, review sweep, ticket evidence, and PR evidence are attached, run $PROMOTION_SCRIPT against the exact PR head. That helper emits jovie-writer-pr-proof/v1, marks ready, and requests native auto-merge with --match-head-commit in one bounded writer action. Do not run gh pr ready directly and do not rely on auto-ready-agent-drafts or agent-tick for successful promotion.
+After required tests, review sweep, ticket evidence, and PR evidence are attached, run env REPO=$REPO GITHUB_REPOSITORY=$REPO bash $PROMOTION_SCRIPT against the exact PR head. That helper emits jovie-writer-pr-proof/v1, marks ready, and requests native auto-merge with --match-head-commit in one bounded writer action. Do not run gh pr ready directly and do not rely on auto-ready-agent-drafts or agent-tick for successful promotion.
 Do not add the queue-deferred label. Native merge-queue autoenroll is the hold during hold-intake.
 Do not merge, deploy, or bypass writer-owned promotion. If blocked, write BLOCKER.md with the exact reason and exit. Start now."
 fi

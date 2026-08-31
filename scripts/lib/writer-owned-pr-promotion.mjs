@@ -316,6 +316,13 @@ export function evaluateWriterPromotion(input = {}) {
   const normalized = normalizePromotionState(state);
   if (!expected)
     return { ok: false, action: 'block', reason: 'expected-head-missing' };
+  if (normalized.state === 'MERGED' && normalized.headSha === expected) {
+    return {
+      ok: true,
+      action: 'already-complete',
+      reason: 'merged-at-exact-head',
+    };
+  }
   if (hasNativePromotionIntent(normalized, expected)) {
     return {
       ok: true,
