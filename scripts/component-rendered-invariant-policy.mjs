@@ -59,6 +59,15 @@ export function evaluateRenderedFamily(snapshot) {
   const reference = variants[0];
   for (const variant of variants) {
     const key = variant.key ?? '(unnamed)';
+    if (variant.variantKeyMissing === true || !variant.key) {
+      fail('variant-key-missing', `${key} missing variant key`, key);
+    }
+    if (variant.variantKeyDuplicate === true) {
+      fail('variant-key-duplicate', `${key} duplicate variant key`, key);
+    }
+    if (variant.targetVisible !== true) {
+      fail('variant-target-hidden', `${key} target hidden`, key);
+    }
     if (!variant.owner || variant.owner !== snapshot.canonicalOwner) {
       fail('split-component-owner', `${key} owner mismatch`, key);
     }

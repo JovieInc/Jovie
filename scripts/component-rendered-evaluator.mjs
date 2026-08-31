@@ -108,13 +108,15 @@ function storyRequestGroups(flags) {
   for (const component of flags.components) {
     const normalized = normalizeImportPath(component);
     if (!normalized) continue;
-    const stem = basename(normalized).replace(/\.tsx$/i, '');
+    const stem = basename(normalized).replace(/\.(?:tsx?|jsx?)$/i, '');
     const directory = dirname(normalized);
     requests.push({
       label: normalized,
       candidates: [
         `${directory}/${stem}.stories.tsx`,
         `${directory}/${stem}.stories.ts`,
+        `${directory}/${stem}.stories.jsx`,
+        `${directory}/${stem}.stories.js`,
       ],
       storyName: null,
     });
@@ -311,6 +313,24 @@ async function collectSnapshots(
           const dark = Math.min(luminance(foreground), luminance(background));
           return (bright + 0.05) / (dark + 0.05);
         };
+        const composite = (source, backdrop) => {
+          if (!source) return null;
+          if (!backdrop || source.a >= 1) return source;
+          const alpha = source.a + backdrop.a * (1 - source.a);
+          if (alpha <= 0) return null;
+          return {
+            r:
+              (source.r * source.a + backdrop.r * backdrop.a * (1 - source.a)) /
+              alpha,
+            g:
+              (source.g * source.a + backdrop.g * backdrop.a * (1 - source.a)) /
+              alpha,
+            b:
+              (source.b * source.a + backdrop.b * backdrop.a * (1 - source.a)) /
+              alpha,
+            a: alpha,
+          };
+        };
         const tokenColor = token => {
           const value = getComputedStyle(document.documentElement)
             .getPropertyValue(token)
@@ -336,8 +356,6 @@ async function collectSnapshots(
         };
         const focusableSelector =
           'a[href],button,input,select,textarea,[tabindex],[contenteditable=""],[contenteditable="true"]';
-        const nativeActivationSelector =
-          'button,a[href],input:not([type="hidden"]),select,textarea,summary';
         const isSequentiallyFocusable = node => {
           if (!(node instanceof HTMLElement)) return false;
           if (node.closest('[hidden],[inert]')) return false;
@@ -382,6 +400,41 @@ async function collectSnapshots(
           }
           return null;
         };
+        const belongsToFamily = (node, familyRoot) =>
+          node.closest('[data-jovie-eval-family]') === familyRoot;
+        const findScopedTarget = (wrapper, familyRoot) => {
+          if (
+            wrapper.matches('[data-jovie-eval-target]') &&
+            belongsToFamily(wrapper, familyRoot)
+          ) {
+            return wrapper;
+          }
+          const explicit = [
+            ...wrapper.querySelectorAll('[data-jovie-eval-target]'),
+          ].find(node => belongsToFamily(node, familyRoot));
+          if (explicit) return explicit;
+          if (
+            wrapper.firstElementChild &&
+            belongsToFamily(wrapper.firstElementChild, familyRoot)
+          ) {
+            return wrapper.firstElementChild;
+          }
+          return wrapper;
+        };
+        const isRenderedVisible = node => {
+          if (!(node instanceof HTMLElement)) return false;
+          if (node.closest('[hidden],[inert]')) return false;
+          const style = getComputedStyle(node);
+          if (
+            style.display === 'none' ||
+            style.visibility === 'hidden' ||
+            Number.parseFloat(style.opacity) <= 0
+          ) {
+            return false;
+          }
+          const rect = node.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        };
         const actualTheme = document.documentElement.classList.contains('dark')
           ? 'dark'
           : 'light';
@@ -391,11 +444,35 @@ async function collectSnapshots(
         const owner = element.dataset.jovieEvalOwner ?? '';
         const variants = [
           ...element.querySelectorAll('[data-jovie-eval-variant]'),
-        ].map(wrapper => {
-          const target =
-            wrapper.querySelector('[data-jovie-eval-target]') ||
-            wrapper.firstElementChild ||
-            wrapper;
+        ].filter(wrapper => belongsToFamily(wrapper, element));
+        const variantKeyCounts = variants.reduce((counts, wrapper) => {
+          const key = wrapper.dataset.jovieEvalVariant ?? '';
+          counts.set(key, (counts.get(key) ?? 0) + 1);
+          return counts;
+        }, new Map());
+        const bodyBackground = parseColor(
+          getComputedStyle(document.body).backgroundColor
+        ) ?? {
+          r: 255,
+          g: 255,
+          b: 255,
+          a: 1,
+        };
+        const surfaceBackground =
+          composite(parseColor(surfaceStyle.backgroundColor), bodyBackground) ??
+          bodyBackground;
+        const variantSnapshots = variants.map((wrapper, variantIndex) => {
+          const target = findScopedTarget(wrapper, element);
+          const variantInstanceId = `${context.instanceId}-variant-${variantIndex}`;
+          const targetInstanceId = `${variantInstanceId}-target`;
+          wrapper.setAttribute(
+            'data-jovie-eval-variant-instance',
+            variantInstanceId
+          );
+          target.setAttribute(
+            'data-jovie-eval-target-instance',
+            targetInstanceId
+          );
           const style = getComputedStyle(target);
           const paddingXToken = wrapper.dataset.jovieEvalPaddingX ?? '';
           const paddingYToken = wrapper.dataset.jovieEvalPaddingY ?? '';
@@ -411,13 +488,14 @@ async function collectSnapshots(
           const targetBackground = parseColor(style.backgroundColor);
           const inheritedBackground =
             targetBackground?.a > 0
-              ? targetBackground
-              : parseColor(surfaceStyle.backgroundColor);
+              ? composite(targetBackground, surfaceBackground)
+              : surfaceBackground;
           const text = target.textContent?.trim() ?? '';
           const hasText = text.length > 0;
-          const foreground = hasText
+          const rawForeground = hasText
             ? parseColor(style.color)
             : graphicPaintColor(target);
+          const foreground = composite(rawForeground, inheritedBackground);
           const radiusValue = tokenLength(radiusToken);
           const variantKey = wrapper.dataset.jovieEvalVariant ?? '';
           const expectedToneMapped = Object.prototype.hasOwnProperty.call(
@@ -425,21 +503,34 @@ async function collectSnapshots(
             variantKey
           );
           const expectedTone = expectedToneMapped ? mapping[variantKey] : null;
-          const tabbables = [
+          const focusTargets = [
             target,
             ...target.querySelectorAll(focusableSelector),
-          ].filter(isSequentiallyFocusable).length;
+          ].filter(
+            node =>
+              belongsToFamily(node, element) && isSequentiallyFocusable(node)
+          );
+          const keyboardTarget = focusTargets[0] ?? null;
+          const keyboardTargetInstanceId = keyboardTarget
+            ? `${variantInstanceId}-keyboard`
+            : null;
+          if (keyboardTarget && keyboardTargetInstanceId) {
+            keyboardTarget.setAttribute(
+              'data-jovie-eval-keyboard-target-instance',
+              keyboardTargetInstanceId
+            );
+          }
           const fontSize = px(style.fontSize);
           const fontWeight = Number.parseFloat(style.fontWeight) || 0;
           const largeText =
             fontSize >= 24 || (fontSize >= 18.67 && fontWeight >= 700);
           const requiredContrast = hasText ? (largeText ? 3 : 4.5) : 3;
-          const keyboardActivatable =
-            !interactive ||
-            (isSequentiallyFocusable(target) &&
-              target.matches(nativeActivationSelector));
           return {
             key: variantKey,
+            variantInstanceId,
+            variantKeyDuplicate: (variantKeyCounts.get(variantKey) ?? 0) > 1,
+            variantKeyMissing: variantKey.length === 0,
+            targetVisible: isRenderedVisible(target),
             tone: wrapper.dataset.jovieEvalTone ?? null,
             expectedTone,
             expectedToneMapped,
@@ -518,9 +609,9 @@ async function collectSnapshots(
             overflowY: target.scrollHeight - target.clientHeight > 1,
             zoomOverflow: false,
             interactive,
-            keyboardReachable: !interactive || tabbables > 0,
-            keyboardActivatable,
-            tabbableCount: tabbables,
+            keyboardReachable: !interactive || focusTargets.length > 0,
+            keyboardActivatable: !interactive,
+            tabbableCount: focusTargets.length,
             text,
             hoverBoxBefore: {
               x: rect.x,
@@ -528,7 +619,11 @@ async function collectSnapshots(
               width: rect.width,
               height: rect.height,
             },
-            selector: `[data-jovie-eval-variant="${CSS.escape(wrapper.dataset.jovieEvalVariant ?? '')}"]`,
+            selector: `[data-jovie-eval-variant-instance="${CSS.escape(variantInstanceId)}"]`,
+            targetSelector: `[data-jovie-eval-target-instance="${CSS.escape(targetInstanceId)}"]`,
+            keyboardTargetSelector: keyboardTargetInstanceId
+              ? `[data-jovie-eval-keyboard-target-instance="${CSS.escape(keyboardTargetInstanceId)}"]`
+              : null,
           };
         });
         return {
@@ -546,7 +641,7 @@ async function collectSnapshots(
           ),
           canonicalOwner: owner,
           axeViolations: context.axeViolations,
-          variants,
+          variants: variantSnapshots,
         };
       },
       {
@@ -561,11 +656,16 @@ async function collectSnapshots(
     for (const variant of snapshot.variants) {
       if (!variant.interactive) continue;
       const wrapper = root.locator(variant.selector).first();
-      const target = await resolveVariantTarget(wrapper);
-      if (variant.keyboardReachable && !variant.keyboardActivatable) {
+      const target = variant.targetSelector
+        ? root.locator(variant.targetSelector).first()
+        : await resolveVariantTarget(wrapper);
+      const keyboardTarget = variant.keyboardTargetSelector
+        ? root.locator(variant.keyboardTargetSelector).first()
+        : target;
+      if (variant.keyboardReachable) {
         variant.keyboardActivatable = await exerciseKeyboardActivation(
           page,
-          target
+          keyboardTarget
         );
       }
       try {
@@ -589,32 +689,60 @@ async function collectSnapshots(
   }
 
   await clearInteractionState(page);
-  await page.evaluate(() => {
-    document.documentElement.style.zoom = '2';
+  await page.setViewportSize({
+    width: Math.max(1, Math.floor(viewport.width / 2)),
+    height: Math.max(1, Math.floor(viewport.height / 2)),
   });
   await page.waitForTimeout(50);
   const zoomSnapshots = await page
     .locator('[data-jovie-eval-family]')
     .evaluateAll(elements =>
       elements.map(element => {
+        const belongsToFamily = node =>
+          node.closest('[data-jovie-eval-family]') === element;
+        const findScopedTarget = wrapper => {
+          if (
+            wrapper.matches('[data-jovie-eval-target]') &&
+            belongsToFamily(wrapper)
+          )
+            return wrapper;
+          const explicit = [
+            ...wrapper.querySelectorAll('[data-jovie-eval-target]'),
+          ].find(belongsToFamily);
+          if (explicit) return explicit;
+          if (
+            wrapper.firstElementChild &&
+            belongsToFamily(wrapper.firstElementChild)
+          )
+            return wrapper.firstElementChild;
+          return wrapper;
+        };
         const rootRect = element.getBoundingClientRect();
+        const documentOverflowX =
+          document.documentElement.scrollWidth -
+            document.documentElement.clientWidth >
+          1;
         const rootOverflowX =
           element.scrollWidth - element.clientWidth > 1 ||
           rootRect.left < -1 ||
-          rootRect.right - window.innerWidth > 1;
+          rootRect.right - window.innerWidth > 1 ||
+          documentOverflowX;
         const variants = [
           ...element.querySelectorAll('[data-jovie-eval-variant]'),
-        ].map(wrapper => {
-          const target =
-            wrapper.querySelector('[data-jovie-eval-target]') ||
-            wrapper.firstElementChild ||
-            wrapper;
-          return {
-            key: wrapper.dataset.jovieEvalVariant ?? '',
-            overflowX: target.scrollWidth - target.clientWidth > 1,
-            overflowY: target.scrollHeight - target.clientHeight > 1,
-          };
-        });
+        ]
+          .filter(
+            wrapper => wrapper.closest('[data-jovie-eval-family]') === element
+          )
+          .map(wrapper => {
+            const target = findScopedTarget(wrapper);
+            return {
+              key: wrapper.dataset.jovieEvalVariant ?? '',
+              variantInstanceId:
+                wrapper.getAttribute('data-jovie-eval-variant-instance') ?? '',
+              overflowX: target.scrollWidth - target.clientWidth > 1,
+              overflowY: target.scrollHeight - target.clientHeight > 1,
+            };
+          });
         return {
           family: element.dataset.jovieEvalFamily ?? '',
           instanceId: element.getAttribute('data-jovie-eval-instance') ?? '',
@@ -623,9 +751,6 @@ async function collectSnapshots(
         };
       })
     );
-  await page.evaluate(() => {
-    document.documentElement.style.zoom = '';
-  });
 
   for (const snapshot of snapshots) {
     const zoom =
@@ -636,8 +761,15 @@ async function collectSnapshots(
     const zoomVariants = new Map(
       (zoom?.variants ?? []).map(variant => [variant.key, variant])
     );
+    const zoomVariantsByInstance = new Map(
+      (zoom?.variants ?? [])
+        .filter(variant => variant.variantInstanceId)
+        .map(variant => [variant.variantInstanceId, variant])
+    );
     for (const variant of snapshot.variants) {
-      const zoomVariant = zoomVariants.get(variant.key);
+      const zoomVariant =
+        zoomVariantsByInstance.get(variant.variantInstanceId) ??
+        zoomVariants.get(variant.key);
       variant.zoomOverflowX = zoomVariant?.overflowX ?? false;
       variant.zoomOverflowY = zoomVariant?.overflowY ?? false;
       variant.zoomOverflow =

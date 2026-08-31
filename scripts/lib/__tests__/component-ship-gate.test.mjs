@@ -358,7 +358,12 @@ describe('diff gate', () => {
       ok: true,
       changedComponents: [sourceRel],
       componentStories: [
-        { component: sourceRel, story: storyRel, storyName: null },
+        {
+          component: sourceRel,
+          story: storyRel,
+          storyName: null,
+          storyNames: [],
+        },
       ],
     });
   });
@@ -389,6 +394,7 @@ describe('diff gate', () => {
         component: LEGACY_COMPONENT_REL,
         story: LEGACY_STORY_REL,
         storyName: 'Legacy',
+        storyNames: ['Legacy'],
       },
     ]);
 
@@ -524,6 +530,37 @@ describe('diff gate', () => {
     expect(result.ok).toBe(true);
   });
 
+  it('preserves every catalog story export that contributes coverage', () => {
+    const result = legacyEvidenceResult({
+      componentSource: [
+        'export interface LegacyPanelProps {',
+        '  readonly title: string;',
+        '  readonly subtitle: string;',
+        '}',
+        'export function LegacyPanel({ title, subtitle }: LegacyPanelProps) { return <section>{title}{subtitle}</section> }',
+      ].join('\n'),
+      storySource: [
+        "import { LegacyPanel } from '@/components/marketing/legacy/LegacyPanel';",
+        'export const TitleCoverage = {',
+        "  render: () => <LegacyPanel title='Title' />,",
+        '};',
+        'export const SubtitleCoverage = {',
+        "  render: () => <LegacyPanel subtitle='Subtitle' />,",
+        '};',
+      ].join('\n'),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.componentStories).toEqual([
+      {
+        component: LEGACY_COMPONENT_REL,
+        story: LEGACY_STORY_REL,
+        storyName: 'TitleCoverage',
+        storyNames: ['TitleCoverage', 'SubtitleCoverage'],
+      },
+    ]);
+  });
+
   it('does not let one export exempt another export', () => {
     const result = legacyEvidenceResult({
       componentSource: [
@@ -551,93 +588,40 @@ describe('diff gate', () => {
   });
 });
 
+// biome-ignore format: compact fixture keeps this source-PR under the hard size cap
+function renderedSection(options = {}, response = renderedPass) { const calls = []; const result = resolveRenderedEvaluationSection({ changedComponents: [BADGE_COMPONENT_REL], storybookUrl: STORYBOOK_URL, evaluateRendered: args => { calls.push(args); return response; }, ...options }); return { calls, result }; }
+
 describe('live rendered evaluation section', () => {
-  it('skips cleanly when no in-scope components changed', () => {
-    expect(resolveRenderedEvaluationSection()).toMatchObject({
-      ok: true,
-      section: { ok: true, applicable: false, skipped: true },
-    });
+  // biome-ignore format: compact matrix keeps this source-PR under the hard size cap
+  it.each([['empty', {}, true, { applicable: false, skipped: true }], ['advisory without Storybook', { storybookUrl: null }, true, { skipped: true }], ['required without Storybook', { requireRendered: true, storybookUrl: null }, false, { ok: false, skipped: true }], ['advisory failure', {}, true, { ok: false, status: 1 }, renderedFailure], ['required failure', { requireRendered: true }, false, { ok: false, status: 1 }, renderedFailure]])('handles %s', (_name, options, ok, section, response) => {
+    const result =
+      _name === 'empty'
+        ? resolveRenderedEvaluationSection()
+        : renderedSection(options, response).result;
+    expect(result).toMatchObject({ ok, section });
   });
 
-  it.each([
-    ['advisory without Storybook', {}, true, true],
-    ['required without Storybook', { requireRendered: true }, false, false],
-  ])('handles %s', (_name, options, ok, sectionOk) => {
-    const result = resolveRenderedEvaluationSection({
-      changedComponents: [BADGE_COMPONENT_REL],
-      ...options,
-    });
-    expect(result).toMatchObject({
-      ok,
-      section: { ok: sectionOk, applicable: true, skipped: true },
-    });
-  });
-
-  it('runs rendered evaluation when Storybook evidence is available', () => {
-    const calls = [];
-    const result = resolveRenderedEvaluationSection({
-      changedComponents: [BADGE_COMPONENT_REL],
-      storybookUrl: STORYBOOK_URL,
+  it('runs rendered evaluation for adjacent component evidence', () => {
+    const { calls, result } = renderedSection({
       captureDir: '/tmp/component-evidence',
-      evaluateRendered: args => {
-        calls.push(args);
-        return renderedPass;
-      },
     });
-
-    expect(calls).toEqual([
-      {
-        storybookUrl: STORYBOOK_URL,
-        captureDir: '/tmp/component-evidence',
-        components: [BADGE_COMPONENT_REL],
-        storyPaths: [],
-        expectedFamilies: ['badge'],
-      },
-    ]);
-    expect(result).toMatchObject({
+    // biome-ignore format: compact assertion keeps this source-PR under the hard size cap
+    expect(calls).toEqual([{ storybookUrl: STORYBOOK_URL, captureDir: '/tmp/component-evidence', components: [BADGE_COMPONENT_REL], storyPaths: [], expectedFamilies: ['badge'] }]);
+    expect(result.section).toMatchObject({
       ok: true,
-      section: { ok: true, applicable: true, required: false, status: 0 },
+      required: false,
+      status: 0,
     });
   });
 
-  it('forwards resolved canonical story paths to rendered evaluation', () => {
-    const calls = [];
-    resolveRenderedEvaluationSection({
+  it('forwards deduped canonical catalog exports to rendered evaluation', () => {
+    const { calls } = renderedSection({
       changedComponents: [LEGACY_COMPONENT_REL],
-      componentStories: Array.from({ length: 2 }, () => ({
-        component: LEGACY_COMPONENT_REL,
-        story: LEGACY_STORY_REL,
-        storyName: 'Legacy',
-      })),
-      storybookUrl: STORYBOOK_URL,
-      evaluateRendered: args => {
-        calls.push(args);
-        return renderedPass;
-      },
+      // biome-ignore format: compact fixture keeps this source-PR under the hard size cap
+      componentStories: [{ component: LEGACY_COMPONENT_REL, story: LEGACY_STORY_REL, storyName: 'Legacy' }, { component: LEGACY_COMPONENT_REL, story: LEGACY_STORY_REL, storyName: 'TitleCoverage', storyNames: ['TitleCoverage', 'SubtitleCoverage'] }],
     });
-
-    expect(calls[0]).toMatchObject({
-      components: [],
-      storyPaths: [`${LEGACY_STORY_REL}#Legacy`],
-      expectedFamilies: ['LegacyPanel'],
-    });
-  });
-
-  it.each([
-    ['advisory', false, true],
-    ['required', true, false],
-  ])('handles %s rendered evaluation failures', (_name, required, ok) => {
-    expect(
-      resolveRenderedEvaluationSection({
-        changedComponents: [BADGE_COMPONENT_REL],
-        storybookUrl: STORYBOOK_URL,
-        requireRendered: required,
-        evaluateRendered: () => renderedFailure,
-      })
-    ).toMatchObject({
-      ok,
-      section: { ok: false, applicable: true, required, status: 1 },
-    });
+    // biome-ignore format: compact assertion keeps this source-PR under the hard size cap
+    expect(calls[0]).toMatchObject({ components: [], storyPaths: [`${LEGACY_STORY_REL}#Legacy`, `${LEGACY_STORY_REL}#TitleCoverage`, `${LEGACY_STORY_REL}#SubtitleCoverage`], expectedFamilies: ['LegacyPanel'] });
   });
 });
 

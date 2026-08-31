@@ -1055,12 +1055,15 @@ function findCanonicalMarketingStory({ sourceRel, componentSource, repoRoot }) {
       componentRel: sourceRel,
       storyRel,
     });
-    if (match.ok)
+    if (match.ok) {
+      const storyNames = [...matchedStoryNames];
       return {
         storyRel,
         storySource: scopedStorySource,
-        storyName: [...matchedStoryNames][0] ?? null,
+        storyName: storyNames[0] ?? null,
+        storyNames,
       };
+    }
   }
 
   return null;
@@ -1205,10 +1208,18 @@ export function checkChangedComponents(
       });
     }
     if (match.ok) {
+      const selectedStoryNames = adjacentStoryRel
+        ? [null]
+        : centralStory?.storyNames?.length
+          ? centralStory.storyNames
+          : [centralStory?.storyName ?? null];
       componentStories.push({
         component: sourceRel,
         story: storyRel,
-        storyName: adjacentStoryRel ? null : (centralStory?.storyName ?? null),
+        storyName: selectedStoryNames[0] ?? null,
+        storyNames: selectedStoryNames.filter(
+          storyName => typeof storyName === 'string' && storyName
+        ),
       });
     }
   }
@@ -1334,11 +1345,21 @@ export function resolveRenderedEvaluationSection({
     storyPaths: [
       ...new Set(
         componentStories
-          .map(entry =>
-            entry?.storyName
-              ? `${entry.story}#${entry.storyName}`
-              : entry?.story
-          )
+          .flatMap(entry => {
+            if (!entry?.story) return [];
+            const storyNames = Array.isArray(entry.storyNames)
+              ? entry.storyNames.filter(
+                  storyName => typeof storyName === 'string' && storyName
+                )
+              : [];
+            if (storyNames.length > 0)
+              return storyNames.map(storyName => `${entry.story}#${storyName}`);
+            return [
+              entry?.storyName
+                ? `${entry.story}#${entry.storyName}`
+                : entry.story,
+            ];
+          })
           .filter(storyPath => typeof storyPath === 'string' && storyPath)
       ),
     ],
