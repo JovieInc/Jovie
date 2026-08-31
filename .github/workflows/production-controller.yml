@@ -777,6 +777,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
+          PRODUCTION_BUILD_INFO_URL: https://jov.ie/api/health/build-info
         run: |
           set -euo pipefail
           {
@@ -789,6 +790,7 @@ jobs:
           }
           if [ "$current_sha" != "$EXPECTED_SHA" ]; then
             echo "::warning::Post-deploy verification for $EXPECTED_SHA was superseded by $current_sha; exact production bind will be proven before marker preservation."
+            node .github/scripts/assert-live-production-bind.mjs --main-sha "$current_sha"
             echo "is_current=false" >> "$GITHUB_OUTPUT"
             echo "superseded_before_marker=true" >> "$GITHUB_OUTPUT"
             exit 0
@@ -881,6 +883,7 @@ jobs:
           fi
           if [ "$boundary_sha" != "$EXPECTED_COMMIT_SHA" ]; then
             echo "::notice::Main advanced to $boundary_sha before canonical verification; exact production bind for $EXPECTED_COMMIT_SHA will be preserved and not used as proof for the newer main SHA."
+            node .github/scripts/assert-live-production-bind.mjs --main-sha "$boundary_sha"
             echo "superseded_after_public_bind=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -921,6 +924,7 @@ jobs:
             exit 1
           fi
           if [ "$boundary_sha" != "$EXPECTED_SHA" ]; then
+            node .github/scripts/assert-live-production-bind.mjs --main-sha "$boundary_sha"
             if [ "$RUN_WEB" = true ] &&
               [ "${{ steps.verify.outcome }}" = "success" ] &&
               [ "${{ steps.verify.outputs.canonical_verified }}" = "true" ] &&

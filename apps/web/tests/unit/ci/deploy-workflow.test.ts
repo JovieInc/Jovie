@@ -4233,7 +4233,7 @@ describe('production promotion exact-artifact contract', () => {
     expect(current).toContain(
       'exact production bind will be proven before marker preservation'
     );
-    expect(current).not.toContain(
+    expect(current).toContain(
       'assert-live-production-bind.mjs --main-sha "$current_sha"'
     );
     expect(verified).toContain(
