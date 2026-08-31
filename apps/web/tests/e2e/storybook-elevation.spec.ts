@@ -14,6 +14,7 @@ import { expect, test } from '@playwright/test';
  */
 
 const STORYBOOK_THEME_STORAGE_KEY = 'jovie-theme-storybook';
+const STORYBOOK_RENDER_TIMEOUT_MS = 60_000;
 
 const STORIES = [
   // Allowed patterns
@@ -95,10 +96,11 @@ async function openStory(
     { key: STORYBOOK_THEME_STORAGE_KEY, value: theme }
   );
   await page.goto(`/iframe.html?id=${storyId}&viewMode=story`, {
-    waitUntil: 'networkidle',
+    waitUntil: 'domcontentloaded',
   });
   const root = page.locator('#storybook-root');
-  await expect(root).toBeVisible();
+  await expect(root).toBeVisible({ timeout: STORYBOOK_RENDER_TIMEOUT_MS });
+  await expect(root).not.toBeEmpty({ timeout: STORYBOOK_RENDER_TIMEOUT_MS });
   return root;
 }
 
