@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   artistRuleStatusEnum,
   libraryEntityTypeEnum,
-} from '@/lib/db/schema/library-graph';
+} from '@/lib/db/schema/library-content-graph';
 import {
   libraryCollisionDispositionEnum,
   libraryPresenceFindingKindEnum,
