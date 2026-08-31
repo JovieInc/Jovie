@@ -921,6 +921,44 @@ describe('queue workflow mutation safety', () => {
     );
     expect(enroll).toContain('if [[ "$MERGE_QUEUE_BACKEND" != "native" ]]');
     expect(enroll).toContain('bash scripts/drain-pr-queue.sh');
+    expect(enroll).toContain('EVENT_NAME: ${{ github.event_name }}');
+    expect(enroll).toContain(
+      "WORKFLOW_RUN_EVENT: ${{ github.event.workflow_run.event || '' }}"
+    );
+    expect(enroll).toContain('set +e');
+    expect(enroll).toContain('drain_rc=$?');
+    expect(enroll).toContain('product_pr_check=0');
+    expect(enroll).toContain('[[ "$EVENT_NAME" == "pull_request" ]]');
+    expect(enroll).toContain(
+      '[[ "$EVENT_NAME" == "workflow_run" && "$WORKFLOW_RUN_EVENT" == "pull_request" ]]'
+    );
+    expect(enroll).toContain(
+      'queue-noop is a controller disposition, not a product-quality failure'
+    );
+    expect(enroll).toContain("failure='dropped-controller-event'");
+    expect(enroll).toContain("failure='queue-noop'");
+    expect(enroll).toContain('[[ "$drain_rc" -eq 3 ]]');
+    expect(enroll).toContain('--arg failure "$failure"');
+    expect(enroll).toContain(
+      'delivery-control-failure dispatched for $failure'
+    );
+    expect(enroll).not.toContain("--arg failure 'queue-noop'");
+    expect(enroll).toContain(
+      'Cannot emit delivery-control-failure without exact PR/head'
+    );
+    expect(enroll).toContain(
+      'gh api --method POST "repos/$REPO/dispatches" --input -'
+    );
+    expect(enroll).toContain('event_type: "delivery-control-failure"');
+    expect(enroll).toContain('source: $source');
+    expect(enroll).toContain('failure: $failure');
+    expect(enroll).toContain('pr_number: ($pr_number | tonumber)');
+    expect(enroll).toContain('head_sha: $head_sha');
+    expect(enroll).toContain('not failing the product PR check');
+    expect(enroll.indexOf('gh api --method POST')).toBeLessThan(
+      enroll.indexOf('not failing the product PR check')
+    );
+    expect(enroll).toContain('exit "$drain_rc"');
     expect(rebasePreflight).toContain(
       'if [[ "$MERGE_QUEUE_BACKEND" != "native" ]]'
     );
