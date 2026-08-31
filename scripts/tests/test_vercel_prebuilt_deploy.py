@@ -18,7 +18,7 @@ PRODUCTION_RELEASE_WORKFLOW = REPO_ROOT / ".github/workflows/production-release.
 CANARY_WORKFLOW = REPO_ROOT / ".github/workflows/canary-health-gate.yml"
 EXPECTED_COMMIT_SHA = "a" * 40
 ACTION_CACHE_RESTORE_V6_1_0_SHA = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
-ACTION_CACHE_SAVE_V4_2_3_SHA = "5a3ec84eff668545956fd18022155c47e93e2684"
+ACTION_CACHE_SAVE_V6_1_0_SHA = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
 
 
 def test_production_next_cache_experiment_is_bounded_and_restore_only_by_default() -> None:
@@ -53,7 +53,7 @@ def test_production_next_cache_experiment_is_bounded_and_restore_only_by_default
     assert save_match, "production release must save through the bounded cache step"
     save = save_match.group("body")
     assert "actions/cache/save@" in save
-    assert f"actions/cache/save@{ACTION_CACHE_SAVE_V4_2_3_SHA}" in save
+    assert f"actions/cache/save@{ACTION_CACHE_SAVE_V6_1_0_SHA}" in save
     assert "0c45773b623bea8c8e75f6c82b208c3cf94ea4f9" not in workflow
     assert "path: apps/web/.next/cache" in save
     assert "steps.verify-production.outcome == 'success'" in save

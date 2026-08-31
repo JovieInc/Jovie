@@ -1177,6 +1177,15 @@ export async function dequeuePullRequest({
   );
 }
 
+/**
+ * @param {string[]} argv
+ * @param {{
+ *   env?: NodeJS.ProcessEnv,
+ *   runner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
+ *   mutationRunner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
+ *   write?: (value: any) => unknown,
+ * }} [options]
+ */
 export async function runCli(
   argv,
   {
