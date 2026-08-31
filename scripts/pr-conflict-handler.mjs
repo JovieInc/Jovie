@@ -2,6 +2,10 @@
 import { execFile } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { promisify } from 'node:util';
+import {
+  annotateNativeMergeQueue,
+  fetchNativeMergeQueue,
+} from './lib/github-merge-queue.mjs';
 import { fetchOpenPrsRest } from './lib/github-open-prs-rest.mjs';
 import { tryGitHubRebase } from './lib/github-update-branch.mjs';
 import {
@@ -157,12 +161,22 @@ function logDecision(item, extra = {}) {
   );
 }
 
-async function ghJson(args, { retries = 3 } = {}) {
+/**
+ * @param {string[]} args
+ * @param {{ retries?: number; token?: string }} [options]
+ */
+async function ghJson(args, { retries = 3, token } = {}) {
   for (let attempt = 1; attempt <= retries; attempt += 1) {
     try {
       const { stdout } = await execFileAsync('gh', args, {
         encoding: 'utf8',
         maxBuffer: 50 * 1024 * 1024,
+        env: token
+          ? {
+              ...process.env,
+              GH_TOKEN: token,
+            }
+          : process.env,
       });
       return JSON.parse(stdout);
     } catch (error) {
@@ -208,35 +222,29 @@ async function fetchOpenPrs(options) {
     request,
   });
   const [owner, name] = options.repo.split('/');
-  for (let offset = 0; offset < prs.length; offset += 50) {
-    const batch = prs.slice(offset, offset + 50);
-    const selections = batch
-      .map(
-        pr =>
-          `pr${pr.number}:pullRequest(number:${pr.number}){number isInMergeQueue mergeQueueEntry{position}}`
-      )
-      .join('\n');
-    const response = await ghJson([
-      'api',
-      'graphql',
-      '-f',
-      `query=query { repository(owner:${JSON.stringify(owner)},name:${JSON.stringify(name)}) { ${selections} } }`,
-    ]);
-    const repository = response?.data?.repository;
-    if (!repository) {
-      throw new Error('GraphQL native merge-queue inventory was incomplete');
-    }
-    for (const pr of batch) {
-      const queue = repository[`pr${pr.number}`];
-      if (!queue || queue.number !== pr.number) {
-        throw new Error(
-          `GraphQL native merge-queue inventory omitted PR #${pr.number}`
-        );
-      }
-      pr.isInMergeQueue = queue.isInMergeQueue === true;
-      pr.mergeQueuePosition = queue.mergeQueueEntry?.position ?? null;
-    }
-  }
+  const queueToken = process.env.GH_QUEUE_TOKEN || process.env.GH_TOKEN;
+  const queuePositions = await fetchNativeMergeQueue({
+    branches: prs.map(pr => pr.baseRefName),
+    request: async ({ branch, cursor, pageSize }) => {
+      const args = [
+        'api',
+        'graphql',
+        '-f',
+        'query=query($owner:String!,$name:String!,$branch:String!,$first:Int!,$cursor:String){repository(owner:$owner,name:$name){mergeQueue(branch:$branch){entries(first:$first,after:$cursor){nodes{position pullRequest{number}}pageInfo{hasNextPage endCursor}}}}}',
+        '-F',
+        `owner=${owner}`,
+        '-F',
+        `name=${name}`,
+        '-F',
+        `branch=${branch}`,
+        '-F',
+        `first=${pageSize}`,
+      ];
+      if (cursor !== null) args.push('-F', `cursor=${cursor}`);
+      return ghJson(args, { token: queueToken });
+    },
+  });
+  annotateNativeMergeQueue(prs, queuePositions);
   return { prs, degradedChecks: false };
 }
 
