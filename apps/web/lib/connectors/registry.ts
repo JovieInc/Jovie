@@ -83,7 +83,7 @@ export const CONNECTOR_REGISTRY = {
     id: CONNECTOR_PROVIDERS.youtube,
     label: 'YouTube',
     description:
-      'Import channel videos into Library and verify approved thumbnail changes.',
+      'Import channel videos into Library, match releases, and verify performance-backed thumbnail changes.',
     iconKey: 'youtube',
     oauthBundle: 'youtube',
     oauthScopes: YOUTUBE_OAUTH_SCOPES,
