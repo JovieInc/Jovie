@@ -6,8 +6,7 @@ const mocks = vi.hoisted(() => {
   };
   return {
     ...state,
-    getCachedAuth: vi.fn(),
-    getExactProfileAccess: vi.fn(),
+    validateYouTubeProfileMutationRequest: vi.fn(),
     refreshConnectedYouTubeAccount: vi.fn(),
     dbMock: {
       select: vi.fn(() => ({
@@ -21,9 +20,9 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('@/lib/auth/cached', () => ({ getCachedAuth: mocks.getCachedAuth }));
-vi.mock('@/lib/auth/profile-access', () => ({
-  getExactProfileAccess: mocks.getExactProfileAccess,
+vi.mock('@/lib/connectors/youtube/profile-request', () => ({
+  validateYouTubeProfileMutationRequest:
+    mocks.validateYouTubeProfileMutationRequest,
 }));
 vi.mock('@/lib/connectors/youtube/refresh', () => ({
   refreshConnectedYouTubeAccount: mocks.refreshConnectedYouTubeAccount,
@@ -48,16 +47,22 @@ describe('POST /api/youtube-library/sync', () => {
       id: 'account-1',
       channelId: 'channel-1',
     });
-    mocks.getCachedAuth.mockResolvedValue({ userId: 'user-1' });
-    mocks.getExactProfileAccess.mockResolvedValue({ ok: true });
+    mocks.validateYouTubeProfileMutationRequest.mockResolvedValue({
+      ok: true,
+      userId: 'user-1',
+      creatorProfileId: profileId,
+    });
     mocks.refreshConnectedYouTubeAccount.mockResolvedValue({
       status: 'synced',
       result: { imported: 12 },
     });
   });
 
-  it('requires exact profile access', async () => {
-    mocks.getExactProfileAccess.mockResolvedValueOnce({ ok: false });
+  it('returns profile validation failures', async () => {
+    mocks.validateYouTubeProfileMutationRequest.mockResolvedValueOnce({
+      ok: false,
+      response: Response.json({ error: 'Forbidden' }, { status: 403 }),
+    });
     const response = await POST(request());
     expect(response.status).toBe(403);
     expect(mocks.refreshConnectedYouTubeAccount).not.toHaveBeenCalled();

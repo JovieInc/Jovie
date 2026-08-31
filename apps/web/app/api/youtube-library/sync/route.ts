@@ -1,9 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
-import { getCachedAuth } from '@/lib/auth/cached';
-import { getExactProfileAccess } from '@/lib/auth/profile-access';
 import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
+import { validateYouTubeProfileMutationRequest } from '@/lib/connectors/youtube/profile-request';
 import { refreshConnectedYouTubeAccount } from '@/lib/connectors/youtube/refresh';
 import { db } from '@/lib/db';
 import { connectorAccounts } from '@/lib/db/schema/connectors';
@@ -11,25 +9,10 @@ import { connectorAccounts } from '@/lib/db/schema/connectors';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const bodySchema = z.object({ creatorProfileId: z.string().uuid() });
-
 export async function POST(request: Request) {
-  const { userId } = await getCachedAuth();
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
-  }
-  const access = await getExactProfileAccess(
-    db,
-    userId,
-    parsed.data.creatorProfileId
-  );
-  if (!access.ok) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const validation = await validateYouTubeProfileMutationRequest(request);
+  if (!validation.ok) return validation.response;
+  const { userId, creatorProfileId } = validation;
 
   const [account] = await db
     .select({
@@ -40,7 +23,7 @@ export async function POST(request: Request) {
     .where(
       and(
         eq(connectorAccounts.userId, userId),
-        eq(connectorAccounts.creatorProfileId, parsed.data.creatorProfileId),
+        eq(connectorAccounts.creatorProfileId, creatorProfileId),
         eq(connectorAccounts.provider, CONNECTOR_PROVIDERS.youtube),
         eq(connectorAccounts.status, 'connected')
       )
@@ -55,7 +38,7 @@ export async function POST(request: Request) {
 
   const outcome = await refreshConnectedYouTubeAccount({
     connectorAccountId: account.id,
-    creatorProfileId: parsed.data.creatorProfileId,
+    creatorProfileId,
     channelId: account.channelId,
     source: 'manual',
   });
