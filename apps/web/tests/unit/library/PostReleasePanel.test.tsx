@@ -86,6 +86,21 @@ const bundle: LibraryPostReleaseBundle = {
       collisionDisposition: 'unreviewed',
       draftRequest: null,
     },
+    {
+      id: 'finding-draft',
+      subjectType: 'release',
+      subjectId: 'release-1',
+      kind: 'repair',
+      issueType: 'wrong_url',
+      platform: 'Apple Music',
+      title: 'Update Apple Music profile link',
+      currentUrl: null,
+      expectedUrl: 'https://music.apple.com/us/artist/tim-white',
+      actionMode: 'draft_request',
+      status: 'drafted',
+      collisionDisposition: null,
+      draftRequest: 'Please update this Apple Music profile link.',
+    },
   ],
   rightsholders: [
     {
@@ -132,6 +147,7 @@ describe('PostReleasePanel', () => {
     );
     expect(screen.getAllByText('Not connected')).toHaveLength(2);
     expect(screen.getByText('Observed')).toBeInTheDocument();
+    expect(screen.getByText('2 open · 1 drafted')).toBeInTheDocument();
     expect(
       screen.getByText(/public composition observations, not proof/u)
     ).toBeInTheDocument();
