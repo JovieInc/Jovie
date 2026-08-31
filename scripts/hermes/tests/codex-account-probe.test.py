@@ -80,6 +80,16 @@ class CodexAccountProbeTests(unittest.TestCase):
         self.assertEqual(state["cooldowns"]["account-a"], original)
         self.assertLessEqual(state["cooldowns"]["account-b"], int(time.time()))
 
+    def test_malformed_state_fails_closed_and_releases_the_state_lock(self):
+        state_path = self.accounts / "state.json"
+        state_path.write_text("{not-json\n")
+        result = self.run_probe()
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(state_path.read_text(), "{not-json\n")
+        descriptor = os.open(f"{state_path}.lock", os.O_RDWR | os.O_CREAT)
+        self.addCleanup(os.close, descriptor)
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
 
 if __name__ == "__main__":
     unittest.main()

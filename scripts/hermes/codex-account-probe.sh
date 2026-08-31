@@ -20,6 +20,7 @@ fi
 
 python3 <<'PY'
 import fcntl
+import contextlib
 import json
 import os
 import subprocess
@@ -35,6 +36,7 @@ SOURCE = "authenticated_completion_probe/v1"
 READY_MARKER = "SYMPHONY_ACCOUNT_READY"
 
 
+@contextlib.contextmanager
 def locked_state():
     lock_path = Path(f"{STATE}.lock")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -51,29 +53,25 @@ def locked_state():
 
 
 def read_candidates(now):
-    transaction = locked_state()
-    state = next(transaction)
     try:
-        cooldowns = state.get("cooldowns")
-        if not isinstance(cooldowns, dict):
-            return []
-        candidates = []
-        for name, raw_until in cooldowns.items():
-            if not isinstance(name, str):
-                continue
-            try:
-                until = int(raw_until)
-            except (TypeError, ValueError):
-                continue
-            account = ROOT / name
-            if until > now and (account / "auth.json").is_file() and (account / "config.toml").is_file():
-                candidates.append((name, until))
-        return sorted(candidates)
-    finally:
-        try:
-            next(transaction)
-        except StopIteration:
-            pass
+        with locked_state() as state:
+            cooldowns = state.get("cooldowns")
+            if not isinstance(cooldowns, dict):
+                return []
+            candidates = []
+            for name, raw_until in cooldowns.items():
+                if not isinstance(name, str):
+                    continue
+                try:
+                    until = int(raw_until)
+                except (TypeError, ValueError):
+                    continue
+                account = ROOT / name
+                if until > now and (account / "auth.json").is_file() and (account / "config.toml").is_file():
+                    candidates.append((name, until))
+            return sorted(candidates)
+    except (OSError, TypeError, ValueError, json.JSONDecodeError):
+        return []
 
 
 def account_environment(account):
@@ -138,37 +136,33 @@ def authenticated_probe(account):
 
 
 def recover(account, observed_cooldown, now):
-    transaction = locked_state()
-    state = next(transaction)
     try:
-        cooldowns = state.setdefault("cooldowns", {})
-        try:
-            current = int(cooldowns.get(account) or 0)
-        except (TypeError, ValueError):
-            return False
-        # A second limiter event while this probe ran must win.
-        if current != observed_cooldown or current <= now:
-            return False
-        cooldowns[account] = now
-        readiness = state.setdefault("readiness", {})
-        readiness[account] = {
-            "checkedAt": now,
-            "expiresAt": now + TTL,
-            "source": SOURCE,
-        }
-        errors = state.get("last_error")
-        if isinstance(errors, dict):
-            errors.pop(account, None)
-        temporary = STATE.with_suffix(STATE.suffix + ".tmp")
-        temporary.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        os.chmod(temporary, 0o600)
-        os.replace(temporary, STATE)
-        return True
-    finally:
-        try:
-            next(transaction)
-        except StopIteration:
-            pass
+        with locked_state() as state:
+            cooldowns = state.setdefault("cooldowns", {})
+            try:
+                current = int(cooldowns.get(account) or 0)
+            except (TypeError, ValueError):
+                return False
+            # A second limiter event while this probe ran must win.
+            if current != observed_cooldown or current <= now:
+                return False
+            cooldowns[account] = now
+            readiness = state.setdefault("readiness", {})
+            readiness[account] = {
+                "checkedAt": now,
+                "expiresAt": now + TTL,
+                "source": SOURCE,
+            }
+            errors = state.get("last_error")
+            if isinstance(errors, dict):
+                errors.pop(account, None)
+            temporary = STATE.with_suffix(STATE.suffix + ".tmp")
+            temporary.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            os.chmod(temporary, 0o600)
+            os.replace(temporary, STATE)
+            return True
+    except (OSError, TypeError, ValueError, json.JSONDecodeError):
+        return False
 
 
 now = int(time.time())
