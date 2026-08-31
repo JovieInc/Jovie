@@ -33,6 +33,7 @@ export function ProblemSection() {
               letterSpacing: 'var(--linear-h2-tracking)',
             }}
           >
+            {/* ui-casing-allow: marketing sentence-style headline */}
             Built for growth with discipline.{' '}
             <span className='text-tertiary-token'>Clear value. No fluff.</span>
           </h2>
