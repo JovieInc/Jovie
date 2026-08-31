@@ -1,9 +1,9 @@
 import { TooltipProvider } from '@jovie/ui';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildReleaseDownloadsRoute } from '@/constants/routes';
-import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
 import { PostReleasePanel } from '@/app/app/(shell)/library/PostReleasePanel';
+import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
+import { buildReleaseDownloadsRoute } from '@/constants/routes';
 import type { LibraryPostReleaseBundle } from '@/lib/library/post-release-types';
 
 const feedback = vi.hoisted(() => ({
