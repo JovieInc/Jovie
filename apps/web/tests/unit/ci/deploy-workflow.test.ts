@@ -2420,6 +2420,81 @@ describe('canary health gate workflow', () => {
     );
   });
 
+  it('reasserts a private exact preview and emits the only green staging receipt', () => {
+    const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const receiptJob = getJobBlock(release, 'staging-deployment-receipt');
+    const reassert = getStepBlock(
+      receiptJob,
+      'Reassert the exact preview after production settles'
+    );
+    const prove = getStepBlock(
+      receiptJob,
+      'Prove exact staging identity, privacy, and representative routes'
+    );
+    const writeReceipt = getStepBlock(
+      receiptJob,
+      'Write typed staging deployment receipt'
+    );
+    const releaseResult = getJobBlock(release, 'release-result');
+
+    expect(receiptJob).toContain(
+      'needs: [deploy-staging, alias-staging, promote-production, rollback-production]'
+    );
+    expect(receiptJob).toContain("needs.alias-staging.result == 'success'");
+    expect(receiptJob).toContain(
+      "needs.alias-staging.outputs.is_current == 'true'"
+    );
+    expect(reassert).toContain(
+      'vercel alias set "$deployment_url" staging.jov.ie'
+    );
+    expect(reassert).toContain(
+      'gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq \'.sha\''
+    );
+    expect(reassert).toContain(
+      '[[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]'
+    );
+    expect(reassert).toContain('needs.deploy-staging.outputs.deploy_url_b64');
+    expect(prove).toContain('EXPECTED_DEPLOYMENT_ID:');
+    expect(prove).toContain('EXPECTED_COMMIT_SHA:');
+    expect(prove).toContain('(.target | ascii_downcase) == "preview"');
+    expect(prove).toContain('https://staging.jov.ie/api/health/build-info');
+    expect(prove).toContain('.commitSha == $sha and .environment == "preview"');
+    expect(prove).toContain('https://staging.jov.ie/robots.txt');
+    expect(prove).toContain('staging-homepage-headers.txt');
+    expect(prove).toContain("grep -Eiq '^x-robots-tag:.*noindex'");
+    expect(prove).toContain("$'User-Agent: *\\nDisallow: /'");
+    expect(prove).toContain('[[ "$robots" == *\'Sitemap:\'* ]]');
+    expect(writeReceipt).toContain("'jovie-staging-deployment/v1'");
+    expect(writeReceipt).toContain(
+      'gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq \'.sha\''
+    );
+    expect(writeReceipt).toContain(
+      '[[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]'
+    );
+    expect(writeReceipt).toContain('currentMainSha: $currentMainSha');
+    expect(writeReceipt).toContain(
+      'ROLLBACK_RESULT: ${{ needs.rollback-production.result }}'
+    );
+    expect(writeReceipt).toContain('rollbackResult: $rollbackResult');
+    expect(writeReceipt).toContain('state: "deployed"');
+    expect(writeReceipt).toContain('terminal: true');
+    expect(writeReceipt).toContain(
+      'privacy: "robots-block-all-and-http-noindex"'
+    );
+    expect(receiptJob).toContain(
+      'name: staging-deployment-${{ inputs.expected_sha }}'
+    );
+    expect(receiptJob).not.toContain('vercel promote');
+    expect(receiptJob).not.toContain('vercel rollback');
+    expect(releaseResult).toContain('staging-deployment-receipt,');
+    expect(releaseResult).toContain(
+      'staging-deployment-receipt:${{ needs.staging-deployment-receipt.result }}'
+    );
+    expect(release.indexOf('  promote-production:')).toBeLessThan(
+      release.indexOf('  staging-deployment-receipt:')
+    );
+  });
+
   it('retries a safe OAuth test failure with clean artifacts and shared guard state', () => {
     const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const oauthStep = getStepBlock(
@@ -4400,10 +4475,10 @@ describe('production promotion exact-artifact contract', () => {
         'ref: ${{ needs.authorize-production.outputs.expected_sha }}'
       );
     }
-    expect(reusable.match(/actions\/checkout/g)).toHaveLength(8);
+    expect(reusable.match(/actions\/checkout/g)).toHaveLength(9);
     expect(
       reusable.match(/ref: \$\{\{ inputs\.expected_sha \}\}/g)
-    ).toHaveLength(8);
+    ).toHaveLength(9);
   });
 
   it('keeps rollback centralized behind confirmed structured gate failures', () => {
