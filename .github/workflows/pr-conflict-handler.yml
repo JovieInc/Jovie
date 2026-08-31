@@ -483,7 +483,7 @@ jobs:
               . == "canon/invariants.jsonl" or
               startswith("/") or . == ".." or startswith("../") or
               contains("/../") or endswith("/..") or
-              test("[\\u0000-\\u001f\\u007f]") or
+              (explode | any(. < 32 or . == 127)) or
               test("(^|/)\\.git(/|$)") or
               contains("*") or contains("?") or contains("[") or
               contains("]") or contains("{") or contains("}") or contains("\\")
