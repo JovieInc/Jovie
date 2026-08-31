@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -71,6 +72,22 @@ function workflowRunBodies() {
     bodies.push(body.join('\n'));
   }
   return bodies;
+}
+
+function workflowRejectsConflictPaths(paths) {
+  const prepare = workflowStep(
+    'Prepare exact conflict manifest without credentials'
+  );
+  const match = /elif jq -e '([\s\S]*?)'\s+<<<"\$conflict_files"/u.exec(
+    prepare
+  );
+  expect(match).not.toBeNull();
+  const result = spawnSync('jq', ['-e', match[1]], {
+    input: JSON.stringify(paths),
+    encoding: 'utf8',
+  });
+  expect([0, 1]).toContain(result.status);
+  return result.status === 0;
 }
 
 function pr(overrides) {
@@ -1140,6 +1157,28 @@ describe('adaptive conflict capacity', () => {
 });
 
 describe('conflict workflow contract', () => {
+  it('allows ordinary literal conflict paths while rejecting protected or unsafe paths', () => {
+    expect(
+      workflowRejectsConflictPaths([
+        'packages/ui/atoms/button.tsx',
+        'scripts/desktop-release-guard.mjs',
+      ])
+    ).toBe(false);
+    expect(workflowRejectsConflictPaths(['.github/workflows/ci.yml'])).toBe(
+      true
+    );
+    expect(
+      workflowRejectsConflictPaths(['scripts/pr-conflict-handler.mjs'])
+    ).toBe(true);
+    expect(workflowRejectsConflictPaths(['packages/ui/../secrets'])).toBe(true);
+    expect(
+      workflowRejectsConflictPaths(['packages/ui/atoms/\u0000button.tsx'])
+    ).toBe(true);
+    expect(
+      workflowRejectsConflictPaths(['packages/ui/atoms/\u007fbutton.tsx'])
+    ).toBe(true);
+  });
+
   it('computes the FX matrix from live runner and CI pressure instead of a fixed fleet number', () => {
     expect(WORKFLOW).toContain(CONFLICT_CLOSED_LOOP_INVARIANT_ID);
     expect(WORKFLOW).toMatch(
