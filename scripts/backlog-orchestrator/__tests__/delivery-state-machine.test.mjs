@@ -139,6 +139,52 @@ describe('delivery state machine', () => {
     assert.equal(receipt.next.owner, 'gem');
   });
 
+  it('classifies a suppressed product PR queue failure dispatch as exact-head queue repair', () => {
+    const receipt = buildDeliveryReceipt({
+      action: 'delivery-control-failure',
+      client_payload: {
+        source: 'merge-queue-autoenroll',
+        event: 'suppressed-product-pr-check-failure',
+        failure: 'queue-noop',
+        delivery_key: `merge-queue-autoenroll:99:1:16376:${HEAD}:3`,
+        pr_number: 16376,
+        head_sha: HEAD,
+        evidence: {
+          workflow: 'Merge Queue Auto-Enroll',
+          exit_code: '3',
+        },
+      },
+    });
+
+    assert.equal(receipt.event.failure, 'queue-noop');
+    assert.equal(receipt.event.pr, 16376);
+    assert.equal(receipt.event.headSha, HEAD);
+    assert.equal(receipt.next.action, 'reconcile-exact-head-queue-admission');
+  });
+
+  it('classifies a suppressed non-queue product PR drain failure as a dropped controller event', () => {
+    const receipt = buildDeliveryReceipt({
+      action: 'delivery-control-failure',
+      client_payload: {
+        source: 'merge-queue-autoenroll',
+        event: 'suppressed-product-pr-check-failure',
+        failure: 'dropped-controller-event',
+        delivery_key: `merge-queue-autoenroll:99:1:16376:${HEAD}:1`,
+        pr_number: 16376,
+        head_sha: HEAD,
+        evidence: {
+          workflow: 'Merge Queue Auto-Enroll',
+          exit_code: '1',
+        },
+      },
+    });
+
+    assert.equal(receipt.event.failure, 'dropped-controller-event');
+    assert.equal(receipt.event.pr, 16376);
+    assert.equal(receipt.event.headSha, HEAD);
+    assert.equal(receipt.next.action, 'restore-event-trigger-and-reconcile');
+  });
+
   it('routes stale Gem service/config evidence to reload plus post-reload attestation', () => {
     const receipt = attestGemService({
       sourceSha: HEAD,
