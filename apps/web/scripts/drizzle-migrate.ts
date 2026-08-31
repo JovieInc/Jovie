@@ -35,6 +35,24 @@ const NEON_URL_PATTERN = /(postgres)(|ql)(\+neon)(.*)/;
 const CI_CONNECT_RETRY_LIMIT = 12;
 const CI_CONNECT_RETRY_DELAY_MS = 5_000;
 const CONNECT_BOOTSTRAP_TIMEOUT_MS = 15_000;
+const MIGRATION_ADVISORY_LOCK_NAME = 'jovie:drizzle:migrate';
+
+function buildMigrationAdvisoryLockStatements(
+  lockName = MIGRATION_ADVISORY_LOCK_NAME
+) {
+  const values = [lockName];
+
+  return {
+    lock: {
+      sql: `SELECT pg_advisory_lock(hashtext($1::text), hashtext(current_database()))`,
+      values,
+    },
+    unlock: {
+      sql: `SELECT pg_advisory_unlock(hashtext($1::text), hashtext(current_database())) AS unlocked`,
+      values,
+    },
+  };
+}
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const webRootDir = path.resolve(scriptDir, '..');
@@ -278,6 +296,20 @@ async function connectWithRetry(databaseUrl: string) {
   throw lastError;
 }
 
+async function acquireMigrationAdvisoryLock(client: PoolClient) {
+  const { lock } = buildMigrationAdvisoryLockStatements();
+  await client.query(lock.sql, lock.values);
+}
+
+async function releaseMigrationAdvisoryLock(client: PoolClient) {
+  const { unlock } = buildMigrationAdvisoryLockStatements();
+  const result = await client.query<{ unlocked: boolean }>(
+    unlock.sql,
+    unlock.values
+  );
+  return result.rows[0]?.unlocked === true;
+}
+
 // Validate environment variables
 function validateEnvironment(): { isValid: boolean; errors: string[] } {
   const errors: string[] = [];
@@ -419,6 +451,7 @@ async function runMigrations() {
   let pool: Pool;
   let db: Parameters<typeof migrate>[0];
   let client: PoolClient | null = null;
+  let migrationLockHeld = false;
 
   try {
     log.info('Connecting to database...');
@@ -439,6 +472,10 @@ async function runMigrations() {
 
   // Run migrations
   try {
+    log.info('Waiting for migration advisory lock...');
+    await acquireMigrationAdvisoryLock(client);
+    migrationLockHeld = true;
+    log.success('Migration advisory lock acquired');
     log.info('Running migrations...');
 
     const start = Date.now();
@@ -521,6 +558,21 @@ async function runMigrations() {
     }
     process.exit(1);
   } finally {
+    if (migrationLockHeld && client) {
+      try {
+        const unlocked = await releaseMigrationAdvisoryLock(client);
+        if (unlocked) {
+          log.info('Migration advisory lock released');
+        } else {
+          log.warning(
+            'Migration advisory lock was already released before cleanup'
+          );
+        }
+      } catch (error) {
+        log.warning(`Failed to release migration advisory lock: ${error}`);
+      }
+    }
+
     try {
       client?.release();
     } catch {
@@ -547,4 +599,9 @@ if (require.main === module) {
   });
 }
 
-export { getConnectionRetryDelayMs, isRetryableConnectionError, runMigrations };
+export {
+  buildMigrationAdvisoryLockStatements,
+  getConnectionRetryDelayMs,
+  isRetryableConnectionError,
+  runMigrations,
+};
