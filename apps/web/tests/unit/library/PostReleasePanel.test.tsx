@@ -1,6 +1,7 @@
 import { TooltipProvider } from '@jovie/ui';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { buildReleaseDownloadsRoute } from '@/constants/routes';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
 import { PostReleasePanel } from '@/app/app/(shell)/library/PostReleasePanel';
 import type { LibraryPostReleaseBundle } from '@/lib/library/post-release-types';
@@ -125,6 +126,10 @@ describe('PostReleasePanel', () => {
     renderPanel();
 
     expect(screen.getByText('1 attested file live')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Manage' })).toHaveAttribute(
+      'href',
+      buildReleaseDownloadsRoute('release-1')
+    );
     expect(screen.getAllByText('Not connected')).toHaveLength(2);
     expect(screen.getByText('Observed')).toBeInTheDocument();
     expect(
