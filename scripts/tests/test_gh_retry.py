@@ -56,6 +56,7 @@ def _drain_command(
         f'PATH="{tmp_path}:$PATH" '
         f'DRAIN_EXPECT_GH="{expected}" '
         f'DRAIN_MUTATION_AUTHORIZATION={authorization} '
+        'GH_MUTATION_TOKEN=test-fixture-writer-token '
         f'MERGE_QUEUE_BACKEND={backend} '
     )
     if extra_env:

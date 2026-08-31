@@ -46,6 +46,11 @@ if [[ "$DRY_RUN" != "1" ]]; then
       exit 2
       ;;
   esac
+  if [[ "${DRAIN_MUTATION_AUTHORIZATION:-}" == "merge-queue-autoenroll" \
+    && -z "${GH_MUTATION_TOKEN:-}" ]]; then
+    echo "::error::Refusing live drain without GH_MUTATION_TOKEN" >&2
+    exit 2
+  fi
 fi
 if [[ -n "${DRAIN_EXPECT_GH:-}" ]]; then
   resolved_gh="$(command -v gh || true)"
@@ -57,6 +62,24 @@ fi
 
 # shellcheck source=./scripts/lib/gh-retry.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"
+
+# Read the fleet with the workflow-scoped token and reserve the GitHub App
+# installation token for commands that actually mutate repository state. The
+# subshell keeps the read identity authoritative for every subsequent call.
+gh_mutate_retry() {
+  local mutation_token="${GH_MUTATION_TOKEN:-}"
+  if [[ -z "$mutation_token" && "${DRAIN_MUTATION_AUTHORIZATION:-}" == "test-fixture" ]]; then
+    mutation_token="${GH_TOKEN:-test-fixture-token}"
+  fi
+  if [[ -z "$mutation_token" ]]; then
+    echo "::error::GitHub mutation refused without GH_MUTATION_TOKEN" >&2
+    return 2
+  fi
+  (
+    export GH_TOKEN="$mutation_token"
+    gh_retry "$@"
+  )
+}
 
 REPO="${REPO:-JovieInc/Jovie}"
 MERGE_QUEUE_BACKEND="${MERGE_QUEUE_BACKEND:-native}"
@@ -313,13 +336,13 @@ AGENT_RE='^(tim/|codex/|agent/|claude/|linear/|feat/|dependabot/)'
 
 label() {  # label <num> <label>
   [[ "$DRY_RUN" == "1" ]] && { echo "    [dry-run] would +$2 on #$1"; return 0; }
-  gh_retry pr edit "$1" -R "$REPO" --add-label "$2" >/dev/null 2>&1 \
+  gh_mutate_retry pr edit "$1" -R "$REPO" --add-label "$2" >/dev/null 2>&1 \
     && echo "    +$2 on #$1" || echo "    !! failed to add $2 on #$1"
 }
 
 unlabel() {  # unlabel <num> <label>
   [[ "$DRY_RUN" == "1" ]] && { echo "    [dry-run] would -$2 on #$1"; return 0; }
-  gh_retry pr edit "$1" -R "$REPO" --remove-label "$2" >/dev/null 2>&1 \
+  gh_mutate_retry pr edit "$1" -R "$REPO" --remove-label "$2" >/dev/null 2>&1 \
     && echo "    -$2 on #$1" || echo "    !! failed to remove $2 on #$1"
 }
 
@@ -445,7 +468,7 @@ write_fleet_hold_status() {  # write_fleet_hold_status <head> <state> <descripti
   if ! target_url="$(fleet_hold_target_url)"; then
     return 1
   fi
-  gh_retry api -X POST "repos/$REPO/statuses/$head" \
+  gh_mutate_retry api -X POST "repos/$REPO/statuses/$head" \
     -f state="$state" \
     -f context="$FLEET_HOLD_CONTEXT" \
     -f description="$description" \
@@ -573,7 +596,7 @@ record_queue_reentry_receipt() {  # <pr> <expected-head>
     echo "    ⏸ #$n head changed before queue re-entry receipt; compensating enrollment"
     return 2
   fi
-  if ! gh_retry api -X POST "repos/$REPO/statuses/$live_head" \
+  if ! gh_mutate_retry api -X POST "repos/$REPO/statuses/$live_head" \
     -f state=success \
     -f context="$QUEUE_REENTRY_CONTEXT" \
     -f description="Native queue admission recorded at exact head" \
@@ -644,7 +667,7 @@ record_unmergeable_eject_receipt() {  # <pr> <expected-head> <reason>
     return 2
   fi
   description="ejected:${reason}"
-  if ! gh_retry api -X POST "repos/$REPO/statuses/$live_head" \
+  if ! gh_mutate_retry api -X POST "repos/$REPO/statuses/$live_head" \
     -f state=success \
     -f context="$UNMERGEABLE_EJECT_CONTEXT" \
     -f description="$description" \
@@ -724,7 +747,7 @@ record_product_failure_receipt() {  # <pr> <expected-head>
     echo "    ⏸ #$n head changed before product-failure tombstone"
     return 2
   fi
-  if ! gh_retry api -X POST "repos/$REPO/statuses/$live_head" \
+  if ! gh_mutate_retry api -X POST "repos/$REPO/statuses/$live_head" \
     -f state=success \
     -f context="$PRODUCT_FAILURE_CONTEXT" \
     -f description="$PRODUCT_FAILURE_DESCRIPTION" \
@@ -785,7 +808,7 @@ deferred_state_is_releasable() {  # state json <expected head> <expected base>
 restore_deferred_hold() {  # restore_deferred_hold <num>
   local n="$1"
   [[ "$DRY_RUN" == "1" ]] && return 0
-  if gh_retry pr edit "$n" -R "$REPO" --add-label queue-deferred >/dev/null 2>&1; then
+  if gh_mutate_retry pr edit "$n" -R "$REPO" --add-label queue-deferred >/dev/null 2>&1; then
     echo "    +queue-deferred on #$n (compensated changed release state)"
     return 0
   fi
@@ -870,7 +893,7 @@ reconcile_deferred_auto_merge_after_main_push() {
       echo "    [dry-run] would -queue-deferred on #$n"
       continue
     fi
-    if ! gh_retry pr edit "$n" -R "$REPO" --remove-label queue-deferred >/dev/null 2>&1; then
+    if ! gh_mutate_retry pr edit "$n" -R "$REPO" --remove-label queue-deferred >/dev/null 2>&1; then
       echo "    !! failed to remove queue-deferred on #$n" >&2
       continue
     fi
@@ -959,7 +982,7 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     if [[ "$DRY_RUN" == "1" ]]; then
       echo "    [dry-run] would -queue-deferred on #$n (exact admission)"
     else
-      if ! gh_retry pr edit "$n" -R "$REPO" --remove-label queue-deferred >/dev/null 2>&1; then
+      if ! gh_mutate_retry pr edit "$n" -R "$REPO" --remove-label queue-deferred >/dev/null 2>&1; then
         echo "    !! failed to remove queue-deferred on #$n" >&2
         return 1
       fi
@@ -1200,7 +1223,7 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     return 0
   fi
   # native-queue-transport:enrollment:end
-  if ! gh_retry pr edit "$n" -R "$REPO" --add-label merge-queue >/dev/null; then
+  if ! gh_mutate_retry pr edit "$n" -R "$REPO" --add-label merge-queue >/dev/null; then
     echo "    !! failed to add merge-queue on #$n" >&2
     return 1
   fi
@@ -1254,7 +1277,7 @@ dequeue_strict() {  # dequeue_strict <num>
     return 0
   fi
   # native-queue-transport:dequeue:end
-  if ! gh_retry pr edit "$n" -R "$REPO" --remove-label merge-queue >/dev/null; then
+  if ! gh_mutate_retry pr edit "$n" -R "$REPO" --remove-label merge-queue >/dev/null; then
     echo "    !! failed to remove merge-queue hold violation from #$n" >&2
     return 1
   fi

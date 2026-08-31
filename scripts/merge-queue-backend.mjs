@@ -1012,6 +1012,7 @@ export async function enrollPullRequest({
   number,
   expectedHeadOid,
   runner = createGhRunner(),
+  mutationRunner = runner,
   postconditionAttempts = DEFAULT_ENROLLMENT_POSTCONDITION_ATTEMPTS,
   postconditionDelayMs = DEFAULT_ENROLLMENT_POSTCONDITION_DELAY_MS,
   wait = sleep,
@@ -1019,7 +1020,8 @@ export async function enrollPullRequest({
   const resolvedBackend = requireNativeBackend(backend);
   const parsedNumber = parsePullRequestNumber(number);
   const expectedHead = parseExpectedHeadOid(expectedHeadOid);
-  const mutationActor = await assertCanonicalNativeMutationActor(runner);
+  const mutationActor =
+    await assertCanonicalNativeMutationActor(mutationRunner);
   const stateOptions = {
     backend: resolvedBackend,
     repository,
@@ -1050,7 +1052,7 @@ export async function enrollPullRequest({
   let mutationError = null;
   try {
     await runGraphqlMutation(
-      runner,
+      mutationRunner,
       ENABLE_AUTO_MERGE_MUTATION,
       { pullRequestId: before.id, mergeMethod: 'SQUASH' },
       `enrolling PR #${parsedNumber} with ${resolvedBackend}`
@@ -1104,10 +1106,12 @@ export async function dequeuePullRequest({
   repository = DEFAULT_REPOSITORY,
   number,
   runner = createGhRunner(),
+  mutationRunner = runner,
 } = {}) {
   const resolvedBackend = requireNativeBackend(backend);
   const parsedNumber = parsePullRequestNumber(number);
-  const mutationActor = await assertCanonicalNativeMutationActor(runner);
+  const mutationActor =
+    await assertCanonicalNativeMutationActor(mutationRunner);
   const stateOptions = {
     backend: resolvedBackend,
     repository,
@@ -1129,7 +1133,7 @@ export async function dequeuePullRequest({
     try {
       // GitHub's DequeuePullRequestInput.id is the PullRequest node ID.
       await runGraphqlMutation(
-        runner,
+        mutationRunner,
         DEQUEUE_PULL_REQUEST_MUTATION,
         { id: before.id },
         `dequeuing native PR #${parsedNumber}`
@@ -1143,7 +1147,7 @@ export async function dequeuePullRequest({
   if (current.autoMergeRequest !== null) {
     try {
       await runGraphqlMutation(
-        runner,
+        mutationRunner,
         DISABLE_AUTO_MERGE_MUTATION,
         { pullRequestId: current.id },
         `disabling auto-merge for PR #${parsedNumber}`
@@ -1173,11 +1177,21 @@ export async function dequeuePullRequest({
   );
 }
 
+/**
+ * @param {string[]} argv
+ * @param {{
+ *   env?: NodeJS.ProcessEnv,
+ *   runner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
+ *   mutationRunner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
+ *   write?: (value: any) => unknown,
+ * }} [options]
+ */
 export async function runCli(
   argv,
   {
     env = process.env,
     runner = createGhRunner({ env }),
+    mutationRunner,
     write = value => process.stdout.write(`${value}\n`),
   } = {}
 ) {
@@ -1196,6 +1210,14 @@ export async function runCli(
   const baseBranch = env.MERGE_QUEUE_BASE_BRANCH ?? DEFAULT_BASE_BRANCH;
   const allowUnavailableBypassActors =
     env.MERGE_QUEUE_NATIVE_AUTHORIZATION === 'merge-queue-autoenroll';
+  const resolvedMutationRunner =
+    mutationRunner ??
+    (typeof env.GH_MUTATION_TOKEN === 'string' &&
+    env.GH_MUTATION_TOKEN.length > 0
+      ? createGhRunner({
+          env: { ...env, GH_TOKEN: env.GH_MUTATION_TOKEN },
+        })
+      : runner);
   const options = { backend, repository, rulesetId, baseBranch, runner };
   const preflightOptions = { ...options, allowUnavailableBypassActors };
   const commands = {
@@ -1220,8 +1242,14 @@ export async function runCli(
         ...preflightOptions,
         number: args[0],
         expectedHeadOid: args[1],
+        mutationRunner: resolvedMutationRunner,
       }),
-    dequeue: () => dequeuePullRequest({ ...options, number: args[0] }),
+    dequeue: () =>
+      dequeuePullRequest({
+        ...options,
+        number: args[0],
+        mutationRunner: resolvedMutationRunner,
+      }),
   };
   const usage = {
     preflight: [0, 'preflight takes no arguments'],
