@@ -357,7 +357,8 @@ def test_activation_requires_official_runtime_and_retires_custom_automation() ->
     assert "symphony-reconciler.timer" in activation
     assert "symphony-grok-sidecar.timer" in activation
     assert "ControlGroup --value" in activation
-    assert "pid=${pid}," in activation
+    assert "listener_pid" in activation
+    assert "/proc/${listener_pid}/cgroup" in activation
     assert "ss -H -ltn 'sport = :4043'" in activation
 
 
