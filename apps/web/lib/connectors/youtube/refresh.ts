@@ -54,6 +54,10 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Unknown YouTube sync error';
 }
 
+function isRefreshLockBusyError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'RefreshLockBusyError';
+}
+
 function readYouTubeRefreshCursor(cursor: unknown): YouTubeRefreshCursor {
   if (!cursor || typeof cursor !== 'object' || Array.isArray(cursor)) {
     return {};
@@ -221,6 +225,9 @@ export async function refreshConnectedYouTubeAccount(input: {
       .where(eq(connectorAccounts.id, input.connectorAccountId));
     return { status: 'synced', result };
   } catch (error) {
+    if (isRefreshLockBusyError(error)) {
+      return { status: 'busy' };
+    }
     await db
       .update(connectorAccounts)
       .set({

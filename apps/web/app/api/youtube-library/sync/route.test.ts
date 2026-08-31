@@ -90,6 +90,31 @@ describe('POST /api/youtube-library/sync', () => {
     });
   });
 
+  it('prioritizes reconnect guidance when no channels sync and one needs reauth', async () => {
+    mocks.selectRows.splice(
+      0,
+      mocks.selectRows.length,
+      { id: 'account-1', channelId: 'channel-1' },
+      { id: 'account-2', channelId: 'channel-2' }
+    );
+    mocks.refreshConnectedYouTubeAccount
+      .mockResolvedValueOnce({
+        status: 'needs_reauth',
+      })
+      .mockResolvedValueOnce({
+        status: 'failed',
+        error: new Error('provider detail'),
+      });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: 'Reconnect YouTube to refresh access',
+    });
+    expect(mocks.refreshConnectedYouTubeAccount).toHaveBeenCalledTimes(2);
+  });
+
   it('syncs the owned channel through the shared refresh helper', async () => {
     const response = await POST(request());
     expect(response.status).toBe(200);

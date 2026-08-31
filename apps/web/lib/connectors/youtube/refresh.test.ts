@@ -229,6 +229,24 @@ describe('connected YouTube refresh', () => {
     expect(mocks.connectorSetValues).toEqual([]);
   });
 
+  it('treats a concurrent token refresh lock as busy without recording failure', async () => {
+    const error = new Error('refresh lock held');
+    error.name = 'RefreshLockBusyError';
+    mocks.loadFreshGoogleAccessToken.mockRejectedValueOnce(error);
+
+    await expect(runConnectedYouTubeRefreshes()).resolves.toEqual({
+      attempted: 1,
+      synced: 0,
+      needsReauth: 0,
+      failed: 0,
+      skipped: 1,
+    });
+
+    expect(mocks.syncChannelVideos).not.toHaveBeenCalled();
+    expect(mocks.connectorSetValues).toEqual([]);
+    expect(mocks.captureError).not.toHaveBeenCalled();
+  });
+
   it('counts a selected account with a missing profile as failed evidence', async () => {
     mocks.accounts.splice(0, mocks.accounts.length, {
       id: 'account-1',
