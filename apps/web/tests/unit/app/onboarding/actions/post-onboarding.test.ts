@@ -79,6 +79,18 @@ describe('post-onboarding side effects', () => {
     expect(task).toHaveBeenCalledTimes(1);
   });
 
+  it('falls back to queueMicrotask when after() hits the Vercel IPC socket', async () => {
+    const task = vi.fn().mockResolvedValue(undefined);
+    hoisted.afterMock.mockImplementation(() => {
+      throw new Error('connect ECONNREFUSED /opt/vercel/ipc.sock');
+    });
+
+    schedulePostOnboardingWork(task);
+    await new Promise(resolve => queueMicrotask(resolve));
+
+    expect(task).toHaveBeenCalledTimes(1);
+  });
+
   it('runs bounded sync and trial activation once via finalizePostOnboarding', async () => {
     await finalizePostOnboarding('clerk_123', 'artist');
 

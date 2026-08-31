@@ -1,6 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
 import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
-import { after } from 'next/server';
 import { db } from '@/lib/db';
 import {
   discogRecordings,
@@ -9,6 +8,7 @@ import {
 } from '@/lib/db/schema/content';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { ensureImportedReleasePublishedByDefault } from '@/lib/library/approval-status.server';
+import { scheduleAfter } from '@/lib/next/schedule-after';
 import {
   buildSpotifyAlbumUrl,
   buildSpotifyTrackUrl,
@@ -179,21 +179,7 @@ async function discoverLinksForReleases(
 }
 
 function scheduleBackgroundDiscovery(task: () => Promise<void>): void {
-  try {
-    after(task);
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message.includes('outside a request scope')
-    ) {
-      queueMicrotask(() => {
-        void task();
-      });
-      return;
-    }
-
-    throw error;
-  }
+  scheduleAfter(task);
 }
 
 async function reconcileCollaboratorProfilesBestEffort(

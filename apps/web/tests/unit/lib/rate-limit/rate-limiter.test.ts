@@ -36,6 +36,7 @@ const {
 
 const mockCreateRedisRateLimiter = vi.hoisted(() => vi.fn());
 const mockSentryMetricCount = vi.hoisted(() => vi.fn());
+const mockAfter = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/rate-limit/redis-limiter', () => ({
   createRedisRateLimiter: mockCreateRedisRateLimiter,
@@ -54,6 +55,10 @@ vi.mock('@sentry/nextjs', () => ({
 
 vi.mock('@/lib/env-server', () => ({
   env: { NODE_ENV: 'test' },
+}));
+
+vi.mock('next/server', () => ({
+  after: mockAfter,
 }));
 
 // ── Imports (after mocks) ──────────────────────────────────────────────
@@ -83,6 +88,8 @@ describe('rate-limiter.ts', () => {
     resetRedisCircuitBreaker();
     MockMemoryClass.mock.calls = [];
     MockMemoryClass.mock.instances = [];
+    mockAfter.mockReset();
+    mockAfter.mockImplementation(() => undefined);
     // Default: Redis is available (factory returns the mock)
     mockCreateRedisRateLimiter.mockReturnValue(mockRedisLimiter);
     mockIsRedisAvailable.mockReturnValue(true);
@@ -368,6 +375,29 @@ describe('rate-limiter.ts', () => {
       const second = new RateLimiter(baseConfig, { warnOnFallback: false });
       await second.limit('user-1');
       expect(mockRedisLimiter.limit).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not open the circuit when after() hits the Vercel IPC socket (JOV-5605)', async () => {
+      mockAfter.mockImplementation(() => {
+        throw new Error('connect ECONNREFUSED /opt/vercel/ipc.sock');
+      });
+      mockRedisLimiter.limit.mockResolvedValue({
+        success: true,
+        limit: 10,
+        remaining: 9,
+        reset: Date.now() + 60_000,
+        pending: Promise.resolve(),
+      });
+
+      const limiter = new RateLimiter(baseConfig, { warnOnFallback: false });
+      const result = await limiter.limit('user-1');
+
+      expect(result.success).toBe(true);
+      expect(result.degraded).toBeUndefined();
+      expect(mockMemoryInstance.limit).not.toHaveBeenCalled();
+
+      await limiter.limit('user-1');
+      expect(mockRedisLimiter.limit).toHaveBeenCalledTimes(2);
     });
 
     it('retries Redis after the circuit TTL elapses', async () => {

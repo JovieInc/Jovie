@@ -4,31 +4,17 @@
  */
 
 import * as Sentry from '@sentry/nextjs';
-import { after } from 'next/server';
 
 import { syncAllClerkMetadata } from '@/lib/auth/clerk-sync';
 import { captureError } from '@/lib/error-tracking';
+import { scheduleAfter } from '@/lib/next/schedule-after';
 import { withTimeout } from '@/lib/resilience/primitives';
 import { syncCanonicalUsernameFromApp } from '@/lib/username/sync';
 
 export const POST_ONBOARDING_SIDE_EFFECT_TIMEOUT_MS = 2_000;
 
 export function schedulePostOnboardingWork(task: () => Promise<void>): void {
-  try {
-    after(task);
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message.includes('outside a request scope')
-    ) {
-      queueMicrotask(() => {
-        void task();
-      });
-      return;
-    }
-
-    throw error;
-  }
+  scheduleAfter(task);
 }
 
 export async function runBoundedPostOnboardingSideEffect(
