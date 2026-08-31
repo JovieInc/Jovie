@@ -63,7 +63,7 @@ export function AuthProviderButtonSlots({
   return (
     <fieldset
       data-auth-provider-slots
-      className='grid grid-cols-1 gap-1.5'
+      className='grid grid-cols-1 gap-3'
       aria-busy='true'
     >
       <legend className='sr-only'>Loading social sign-in options</legend>

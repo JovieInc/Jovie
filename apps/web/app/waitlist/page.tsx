@@ -1,12 +1,11 @@
-import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { WaitlistPublicLanding } from '@/components/features/waitlist/WaitlistPublicLanding';
 import { WaitlistSuccessView } from '@/components/features/waitlist/WaitlistSuccessView';
 import { getWaitlistRouteRedirect } from '@/lib/auth/access-route-redirect';
-import { auth } from '@/lib/auth/better-auth';
 import {
   CanonicalUserState,
   getWaitlistAccess,
+  resolveRequestAuthIdentity,
   resolveUserState,
 } from '@/lib/auth/gate';
 import { isWaitlistPendingStatus } from '@/lib/waitlist/state-machine';
@@ -17,15 +16,6 @@ function canUseE2ETestAuthFallback(): boolean {
     process.env.NEXT_PUBLIC_E2E_MODE === '1' &&
     process.env.VERCEL_ENV !== 'preview'
   );
-}
-
-async function hasRequestAuthSession(): Promise<boolean> {
-  try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    return Boolean(session?.user?.id);
-  } catch {
-    return false;
-  }
 }
 
 /**
@@ -50,11 +40,15 @@ export default async function WaitlistPage() {
     return <WaitlistPublicLanding />;
   }
 
-  if (!(await hasRequestAuthSession()) && !canUseE2ETestAuthFallback()) {
+  const identity = await resolveRequestAuthIdentity();
+  if (!identity.clerkUserId && !canUseE2ETestAuthFallback()) {
     return <WaitlistPublicLanding />;
   }
 
-  const authResult = await resolveUserState({ createDbUserIfMissing: false });
+  const authResult = await resolveUserState({
+    createDbUserIfMissing: false,
+    ...(identity.clerkUserId ? { knownAuthIdentity: identity } : {}),
+  });
   const waitlistRedirect = getWaitlistRouteRedirect(authResult.state);
   if (waitlistRedirect) {
     redirect(waitlistRedirect);

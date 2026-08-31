@@ -16,6 +16,7 @@ describe('AuthProviderButtonSlots', () => {
       .getByText('Loading social sign-in options')
       .closest('fieldset');
     expect(slots).not.toBeNull();
+    expect(slots).toHaveClass('gap-3');
     expect(
       within(slots!).getByRole('button', {
         name: 'Continue with Google loading',

@@ -2,21 +2,17 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { CanonicalUserState } from '@/lib/auth/canonical-user-state';
 
 const {
-  mockGetSession,
   mockGetWaitlistAccess,
   mockNotFound,
   mockRedirect,
+  mockResolveRequestAuthIdentity,
   mockResolveUserState,
 } = vi.hoisted(() => ({
-  mockGetSession: vi.fn(),
   mockGetWaitlistAccess: vi.fn(),
   mockNotFound: vi.fn(),
   mockRedirect: vi.fn(),
+  mockResolveRequestAuthIdentity: vi.fn(),
   mockResolveUserState: vi.fn(),
-}));
-
-vi.mock('next/headers', () => ({
-  headers: () => new Headers(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -30,28 +26,24 @@ vi.mock('next/navigation', () => ({
   },
 }));
 
-vi.mock('@/lib/auth/better-auth', () => ({
-  auth: {
-    api: {
-      getSession: mockGetSession,
-    },
-  },
-}));
-
 vi.mock('@/lib/auth/gate', () => ({
   CanonicalUserState,
   getWaitlistAccess: mockGetWaitlistAccess,
+  resolveRequestAuthIdentity: mockResolveRequestAuthIdentity,
   resolveUserState: mockResolveUserState,
 }));
 
 describe('WaitlistPage', () => {
   beforeEach(() => {
-    mockGetSession.mockReset();
     mockGetWaitlistAccess.mockReset();
     mockNotFound.mockClear();
     mockRedirect.mockClear();
+    mockResolveRequestAuthIdentity.mockReset();
     mockResolveUserState.mockReset();
-    mockGetSession.mockResolvedValue({ user: { id: 'user_1' } });
+    mockResolveRequestAuthIdentity.mockResolvedValue({
+      clerkUserId: 'user_1',
+      email: 'artist@example.com',
+    });
   });
 
   afterEach(() => {
@@ -93,7 +85,10 @@ describe('WaitlistPage', () => {
   test('renders the public waitlist entry for signed-out visitors', async () => {
     mockRedirect.mockClear();
     mockNotFound.mockClear();
-    mockGetSession.mockResolvedValue(null);
+    mockResolveRequestAuthIdentity.mockResolvedValue({
+      clerkUserId: null,
+      email: null,
+    });
     mockResolveUserState.mockResolvedValue({
       state: CanonicalUserState.UNAUTHENTICATED,
       context: { email: null },
@@ -109,6 +104,7 @@ describe('WaitlistPage', () => {
     expect(result.type).toBe(WaitlistPublicLanding);
     expect(mockRedirect).not.toHaveBeenCalled();
     expect(mockNotFound).not.toHaveBeenCalled();
+    expect(mockResolveRequestAuthIdentity).toHaveBeenCalledTimes(1);
     expect(mockResolveUserState).not.toHaveBeenCalled();
     expect(mockGetWaitlistAccess).not.toHaveBeenCalled();
   });
@@ -127,7 +123,7 @@ describe('WaitlistPage', () => {
     const result = await WaitlistPage();
 
     expect(result.type).toBe(WaitlistPublicLanding);
-    expect(mockGetSession).not.toHaveBeenCalled();
+    expect(mockResolveRequestAuthIdentity).not.toHaveBeenCalled();
     expect(mockResolveUserState).not.toHaveBeenCalled();
     expect(mockRedirect).not.toHaveBeenCalled();
   });
@@ -151,6 +147,14 @@ describe('WaitlistPage', () => {
 
     const result = await WaitlistPage();
 
+    expect(mockResolveRequestAuthIdentity).toHaveBeenCalledTimes(1);
+    expect(mockResolveUserState).toHaveBeenCalledWith({
+      createDbUserIfMissing: false,
+      knownAuthIdentity: {
+        clerkUserId: 'user_1',
+        email: 'artist@example.com',
+      },
+    });
     expect(mockRedirect).not.toHaveBeenCalled();
     expect(mockNotFound).not.toHaveBeenCalled();
     expect(result.type).toBe(WaitlistSuccessView);

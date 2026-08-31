@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/marketing/artist-profile/artist-profile-system-b-style-guard.test.ts
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 import { HomepageV2FinalCta } from '../homepage-v2/HomepageV2Ctas';

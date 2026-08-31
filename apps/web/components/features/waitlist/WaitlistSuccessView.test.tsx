@@ -64,9 +64,8 @@ describe('WaitlistSuccessView', () => {
     expect(routeSource).toContain(
       "import { WaitlistSuccessView } from '@/components/features/waitlist/WaitlistSuccessView';"
     );
-    expect(routeSource).toContain(
-      'resolveUserState({ createDbUserIfMissing: false })'
-    );
+    expect(routeSource).toContain('resolveRequestAuthIdentity');
+    expect(routeSource).toContain('knownAuthIdentity: identity');
     expect(routeSource).toContain('redirect(waitlistRedirect)');
     expect(routeSource).toContain(
       'if (access?.entryId && isWaitlistPendingStatus(access.status))'
