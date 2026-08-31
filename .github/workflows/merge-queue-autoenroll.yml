@@ -30,9 +30,8 @@ name: Merge Queue Auto-Enroll
 
 on:
   pull_request:
-    # `ready_for_review` starts a fresh CI run. New admission must wait for its
-    # completed CI workflow_run; otherwise GitHub legitimately cannot prove a
-    # native queue entry while required checks are pending.
+    # Ready transitions do not restart CI. The owning agent pairs ready with
+    # native auto-merge intent; the first source CI flight remains authoritative.
     types: [reopened, labeled, unlabeled]
   workflow_run:
     workflows: ['CI', 'Production Controller']
