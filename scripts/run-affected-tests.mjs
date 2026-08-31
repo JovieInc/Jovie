@@ -449,6 +449,26 @@ const GEM_PR_REHABILITATION_PYTHON_TESTS = [
   'scripts/hermes/tests/symphony-reconciler.test.py',
   'scripts/hermes/tests/test-model-router.py',
 ];
+const GEM_CHECKIN_HUD_PRIMARY_INPUTS = new Set([
+  'scripts/hermes/symphony/WORKFLOW.md',
+  'scripts/hermes/gem-checkin-hud.py',
+  'scripts/hermes/gem-checkin-tty1.sh',
+  'scripts/hermes/systemd/symphony-burrito.service',
+  'scripts/hermes/systemd/symphony-burrito-update.service',
+  'scripts/hermes/systemd/symphony-burrito-update.timer',
+  'scripts/hermes/update-symphony-burrito.sh',
+  'scripts/hermes/tests/gem-checkin-hud.test.py',
+  'scripts/hermes/tests/symphony-burrito-workflow.test.py',
+]);
+const GEM_CHECKIN_HUD_LANE = new Set([
+  ...GEM_CHECKIN_HUD_PRIMARY_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  '.github/workflows/reusable-ci-lint.yml',
+]);
+const GEM_CHECKIN_HUD_PYTHON_TESTS = [
+  'scripts/hermes/tests/gem-checkin-hud.test.py',
+  'scripts/hermes/tests/symphony-burrito-workflow.test.py',
+];
 const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/hermes/config/gem-repo-registry.json',
   'scripts/hermes/closure_health.py',
@@ -850,6 +870,22 @@ export function buildAffectedTestPlan(
       pythonUnittestTests: [],
       scriptVitestTests: SAFE_PR_REMEDIATION_SCRIPT_TESTS,
       nodeTests: SAFE_PR_REMEDIATION_NODE_TESTS,
+    };
+  }
+  const isBoundedGemCheckinHudChange =
+    files.some(file => GEM_CHECKIN_HUD_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => GEM_CHECKIN_HUD_LANE.has(file));
+  if (isBoundedGemCheckinHudChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: GEM_CHECKIN_HUD_PYTHON_TESTS,
+      scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
+      nodeTests: [],
     };
   }
   const isBoundedGemPrRehabilitationChange =
