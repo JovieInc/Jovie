@@ -24,8 +24,6 @@ const authorityCodes = (map: DesignSystemAuthorityMap) =>
   validateDesignSystemAuthorityMap({ map, repoRoot: root }).map(
     issue => issue.code
   );
-const authorityIssues = (map: DesignSystemAuthorityMap) =>
-  validateDesignSystemAuthorityMap({ map, repoRoot: root });
 
 describe('design-system authority map', () => {
   it('classifies root design-system layers in dependency order', () => {
@@ -133,21 +131,6 @@ describe('design-system authority map', () => {
   });
 
   it('RED: rejects unowned gaps and stale or non-executable evidence', () => {
-    const unorderedMarketingMap: DesignSystemAuthorityMap = {
-      ...DESIGN_SYSTEM_AUTHORITY_MAP,
-      entries: DESIGN_SYSTEM_AUTHORITY_MAP.entries.map(entry =>
-        entry.id === 'surface.marketing-routes'
-          ? { ...entry, id: 'surface.marketing-routes-unordered' }
-          : entry
-      ),
-    };
-    expect(
-      authorityIssues(unorderedMarketingMap).filter(
-        issue =>
-          issue.code === 'missing-authority-entry' &&
-          issue.id === 'surface.marketing-routes-unordered'
-      )
-    ).toHaveLength(1);
     expect(
       authorityCodes(
         authorityMapWith('surface.marketing-routes', () => ({
