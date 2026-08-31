@@ -2,19 +2,27 @@
 
 :where(.system-b-chat-drop-zone-overlay) {
   position: absolute;
-  inset: var(--space-3);
-  z-index: 6;
+  top: 0;
+  right: 0;
+  bottom: var(--system-b-chat-composer-thread-scroll-padding);
+  left: 0;
+  z-index: 4;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  border: 1px dashed
-    color-mix(in oklab, var(--color-border-focus) 74%, transparent);
-  border-radius: var(--radius-xl);
-  background: color-mix(
-    in oklab,
-    var(--system-b-app-content-surface) 10%,
-    transparent
-  );
+  pointer-events: none;
+  overflow: hidden;
+  contain: paint;
+  padding-top: var(--space-5);
+  border-radius: inherit;
+  background: color-mix(in oklab, var(--color-border-focus) 8%, transparent);
+}
+
+:where(.system-b-chat-drop-zone-border) {
+  position: absolute;
+  inset: var(--space-3);
+  border: 1px dashed var(--color-border-focus);
+  border-radius: inherit;
   pointer-events: none;
 }
 
