@@ -1,7 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
-import { SHIPPING_SOURCE_SCHEMAS, type ShippingSourceId } from './contract';
+import {
+  isExactSha,
+  SHIPPING_SOURCE_SCHEMAS,
+  type ShippingSourceId,
+} from './contract';
 import { parseTimestamp } from './envelope';
 import {
   type AuthorityRead,
@@ -26,6 +30,7 @@ export const NAMED_AUTHORITY_URLS = {
 const ALLOWED_PATHS = new Set<string>(Object.values(NAMED_AUTHORITY_PATHS));
 const MERGE_QUEUE_QUERY =
   'query ShippingStateMergeQueue($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:1){totalCount}mergeQueue(branch:"main"){entries(first:20){pageInfo{hasNextPage}nodes{id position state pullRequest{number headRefOid}}}}}}';
+const PRODUCTION_VERIFIED_JOB_NAME = 'Production Verified';
 const GITHUB_RATE_LIMIT_MIN_BACKOFF_MS = 60_000;
 const GITHUB_RATE_LIMIT_MAX_BACKOFF_MS = 60 * 60_000;
 
@@ -403,8 +408,45 @@ export async function readWorkflow(
   sourceId: 'exact-sha-ci' | 'production-controller',
   workflow: string
 ): Promise<AuthorityRead> {
-  const url = `${GITHUB_API_URL}/repos/${encodeURIComponent(io.githubOwner ?? '')}/${encodeURIComponent(io.githubRepo ?? '')}/actions/workflows/${encodeURIComponent(workflow)}/runs?per_page=5&exclude_pull_requests=true`;
+  const repositoryUrl = `${GITHUB_API_URL}/repos/${encodeURIComponent(io.githubOwner ?? '')}/${encodeURIComponent(io.githubRepo ?? '')}`;
+  const query =
+    sourceId === 'exact-sha-ci'
+      ? 'branch=main&event=push&per_page=5&exclude_pull_requests=true'
+      : 'per_page=5&exclude_pull_requests=true';
+  const url = `${repositoryUrl}/actions/workflows/${encodeURIComponent(workflow)}/runs?${query}`;
   try {
+    let currentMainSha: string | null = null;
+    if (sourceId === 'exact-sha-ci') {
+      const mainResponse = await githubFetch(
+        io,
+        sourceId,
+        `${repositoryUrl}/commits/main`,
+        {}
+      );
+      if (!('ok' in mainResponse)) return mainResponse;
+      if (!mainResponse.ok) {
+        return failedRead(
+          sourceId,
+          'unavailable',
+          `GitHub current main returned ${mainResponse.status}`,
+          { errorCode: `http-${mainResponse.status}` }
+        );
+      }
+      const mainBody: unknown = await mainResponse.json();
+      currentMainSha =
+        isRecord(mainBody) && isExactSha(mainBody.sha)
+          ? String(mainBody.sha)
+          : null;
+      if (!currentMainSha) {
+        return failedRead(
+          sourceId,
+          'unavailable',
+          'GitHub current main response was malformed',
+          { errorCode: 'malformed' }
+        );
+      }
+    }
+
     const response = await githubFetch(io, sourceId, url, {});
     if (!('ok' in response)) return response;
     if (!response.ok) {
@@ -416,12 +458,41 @@ export async function readWorkflow(
       );
     }
     const body: unknown = await response.json();
-    const runs =
-      isRecord(body) && Array.isArray(body.workflow_runs)
-        ? body.workflow_runs
-        : [];
-    const latest = runs.find(isRecord) ?? null;
+    if (
+      !isRecord(body) ||
+      !Array.isArray(body.workflow_runs) ||
+      !body.workflow_runs.every(isRecord)
+    ) {
+      return failedRead(
+        sourceId,
+        'unavailable',
+        'GitHub Actions runs response was malformed',
+        { errorCode: 'malformed' }
+      );
+    }
+    const runs = body.workflow_runs;
+    const latest =
+      sourceId === 'exact-sha-ci'
+        ? (runs.find(
+            run =>
+              run.event === 'push' &&
+              run.head_branch === 'main' &&
+              run.head_sha === currentMainSha
+          ) ?? null)
+        : (runs[0] ?? null);
     if (latest == null) {
+      if (sourceId === 'exact-sha-ci' && currentMainSha) {
+        return failedRead(
+          sourceId,
+          'unavailable',
+          'Current main has no matching push CI run',
+          {
+            errorCode: 'current-main-run-missing',
+            sourceRevision: currentMainSha,
+            correlation: { sha: currentMainSha },
+          }
+        );
+      }
       return {
         sourceId,
         status: 'ok',
@@ -434,20 +505,123 @@ export async function readWorkflow(
         eventId: null,
       };
     }
-    const sha = typeof latest.head_sha === 'string' ? latest.head_sha : null;
+    const sha = isExactSha(latest.head_sha) ? String(latest.head_sha) : null;
     const conclusion =
       typeof latest.conclusion === 'string' ? latest.conclusion : null;
-    const verified =
-      sourceId === 'production-controller' &&
-      typeof latest.name === 'string' &&
-      latest.name.includes('Production Verified');
     const green = conclusion === 'success';
+
+    if (sourceId === 'production-controller') {
+      const runId =
+        typeof latest.id === 'string' || typeof latest.id === 'number'
+          ? String(latest.id)
+          : null;
+      const runAttempt = latest.run_attempt;
+      if (
+        !runId ||
+        !Number.isInteger(runAttempt) ||
+        Number(runAttempt) < 1 ||
+        !isExactSha(sha)
+      ) {
+        return failedRead(
+          sourceId,
+          'unavailable',
+          'Production Controller run identity was malformed',
+          { errorCode: 'malformed' }
+        );
+      }
+
+      const jobsUrl = `${GITHUB_API_URL}/repos/${encodeURIComponent(io.githubOwner ?? '')}/${encodeURIComponent(io.githubRepo ?? '')}/actions/runs/${encodeURIComponent(runId)}/attempts/${String(runAttempt)}/jobs?per_page=100`;
+      const jobsResponse = await githubFetch(io, sourceId, jobsUrl, {});
+      if (!('ok' in jobsResponse)) return jobsResponse;
+      if (!jobsResponse.ok) {
+        return failedRead(
+          sourceId,
+          'unavailable',
+          `Production Controller jobs returned ${jobsResponse.status}`,
+          { errorCode: `http-${jobsResponse.status}` }
+        );
+      }
+      const jobsBody: unknown = await jobsResponse.json();
+      if (
+        !isRecord(jobsBody) ||
+        !Number.isInteger(jobsBody.total_count) ||
+        Number(jobsBody.total_count) < 0 ||
+        !Array.isArray(jobsBody.jobs) ||
+        !jobsBody.jobs.every(isRecord) ||
+        jobsBody.total_count !== jobsBody.jobs.length
+      ) {
+        return failedRead(
+          sourceId,
+          'unavailable',
+          'Production Controller jobs response was malformed or incomplete',
+          { errorCode: 'malformed' }
+        );
+      }
+      const verifiedJobs = jobsBody.jobs.filter(
+        job => job.name === PRODUCTION_VERIFIED_JOB_NAME
+      );
+      if (verifiedJobs.length > 1) {
+        return failedRead(
+          sourceId,
+          'unavailable',
+          'Production Controller returned duplicate verification jobs',
+          { errorCode: 'malformed' }
+        );
+      }
+      const verifiedJob = verifiedJobs[0] ?? null;
+      if (
+        verifiedJob &&
+        (String(verifiedJob.run_id) !== runId ||
+          verifiedJob.run_attempt !== runAttempt ||
+          verifiedJob.head_sha !== sha)
+      ) {
+        return failedRead(
+          sourceId,
+          'unavailable',
+          'Production Controller verification job did not match its run',
+          { errorCode: 'identity-mismatch' }
+        );
+      }
+      const verified = Boolean(
+        verifiedJob?.status === 'completed' &&
+          verifiedJob.conclusion === 'success'
+      );
+      return {
+        sourceId,
+        status: 'ok',
+        schema: SHIPPING_SOURCE_SCHEMAS[sourceId],
+        payload: { ...latest, productionVerifiedJob: verifiedJob },
+        truncated: false,
+        sourceTimestamp:
+          parseTimestamp(verifiedJob?.completed_at) ??
+          parseTimestamp(latest.updated_at),
+        sourceRevision: sha,
+        sequence:
+          typeof latest.run_number === 'number' ? latest.run_number : null,
+        eventId: runId,
+        correlation: {
+          sha,
+          ciRunId: runId,
+          deploymentId: null,
+        },
+        errorCode: verified ? undefined : 'production-not-verified',
+        errorMessage: verified
+          ? undefined
+          : typeof verifiedJob?.conclusion === 'string'
+            ? verifiedJob.conclusion
+            : 'production-not-verified',
+        measuredMeanings: { productionVerified: verified },
+      };
+    }
+
     return {
       sourceId,
       status: 'ok',
       schema: SHIPPING_SOURCE_SCHEMAS[sourceId],
       payload: latest,
-      truncated: runs.length >= 5,
+      // This reader's authority is the latest run only. Older-run pagination
+      // does not make that first record partial.
+      truncated: false,
       sourceTimestamp: parseTimestamp(latest.updated_at),
       sourceRevision: sha,
       sequence:
@@ -456,22 +630,31 @@ export async function readWorkflow(
       correlation: {
         sha,
         ciRunId: latest.id != null ? String(latest.id) : null,
-        deploymentId: verified && green ? String(latest.id) : null,
+        deploymentId: null,
       },
       errorCode: green ? undefined : 'ci-not-green',
       errorMessage: green ? undefined : (conclusion ?? 'ci-not-green'),
       measuredMeanings:
-        sourceId === 'exact-sha-ci'
-          ? { ciGreen: green }
-          : { productionVerified: Boolean(verified && green) },
+        sourceId === 'exact-sha-ci' ? { ciGreen: green } : undefined,
     };
   } catch (error) {
+    if (sourceId === 'production-controller') {
+      return failedRead(
+        sourceId,
+        'unavailable',
+        error instanceof Error
+          ? error.message
+          : 'Production Controller unavailable',
+        { errorCode: 'unavailable' }
+      );
+    }
     return disconnectedRead(
       sourceId,
       error instanceof Error ? error.message : 'workflow unreachable'
     );
   }
 }
+
 async function defaultReadFile(path: string): Promise<string> {
   if (!isAllowlistedAuthorityPath(path)) {
     throw new Error('refused-arbitrary-path');
