@@ -41,6 +41,8 @@ function fixtureRepo(tree) {
   return root;
 }
 
+const BADGE_COMPONENT_REL = 'packages/ui/atoms/badge.tsx';
+const STORYBOOK_URL = 'http://127.0.0.1:6006';
 const LEGACY_COMPONENT_REL =
   'apps/web/components/marketing/legacy/LegacyPanel.tsx';
 const LEGACY_TEST_REL = 'apps/web/tests/unit/marketing/LegacyPanel.test.tsx';
@@ -76,6 +78,19 @@ function legacyEvidenceResult({
     }
   );
 }
+
+const renderedPass = {
+  ok: true,
+  status: 0,
+  report: { ok: true, results: [] },
+  output: '{"ok":true}',
+};
+const renderedFailure = {
+  ok: false,
+  status: 1,
+  report: { ok: false },
+  output: 'missing rendered contract',
+};
 
 describe('component-ship-policy scope', () => {
   it('includes shippable surfaces and excludes tests/stories/utils', () => {
@@ -546,7 +561,7 @@ describe('live rendered evaluation section', () => {
   it('keeps missing Storybook advisory by default during rollout', () => {
     expect(
       resolveRenderedEvaluationSection({
-        changedComponents: ['packages/ui/atoms/badge.tsx'],
+        changedComponents: [BADGE_COMPONENT_REL],
       })
     ).toEqual({
       ok: true,
@@ -562,7 +577,7 @@ describe('live rendered evaluation section', () => {
   it('fails closed when rendered evidence is required without Storybook', () => {
     expect(
       resolveRenderedEvaluationSection({
-        changedComponents: ['packages/ui/atoms/badge.tsx'],
+        changedComponents: [BADGE_COMPONENT_REL],
         requireRendered: true,
       })
     ).toEqual({
@@ -579,25 +594,20 @@ describe('live rendered evaluation section', () => {
   it('runs rendered evaluation when Storybook evidence is available', () => {
     const calls = [];
     const result = resolveRenderedEvaluationSection({
-      changedComponents: ['packages/ui/atoms/badge.tsx'],
-      storybookUrl: 'http://127.0.0.1:6006',
+      changedComponents: [BADGE_COMPONENT_REL],
+      storybookUrl: STORYBOOK_URL,
       captureDir: '/tmp/component-evidence',
       evaluateRendered: args => {
         calls.push(args);
-        return {
-          ok: true,
-          status: 0,
-          report: { ok: true, results: [] },
-          output: '{"ok":true}',
-        };
+        return renderedPass;
       },
     });
 
     expect(calls).toEqual([
       {
-        storybookUrl: 'http://127.0.0.1:6006',
+        storybookUrl: STORYBOOK_URL,
         captureDir: '/tmp/component-evidence',
-        components: ['packages/ui/atoms/badge.tsx'],
+        components: [BADGE_COMPONENT_REL],
         storyPaths: [],
       },
     ]);
@@ -606,6 +616,7 @@ describe('live rendered evaluation section', () => {
       section: {
         ok: true,
         applicable: true,
+        required: false,
         status: 0,
         report: { ok: true, results: [] },
         output: '{"ok":true}',
@@ -621,41 +632,53 @@ describe('live rendered evaluation section', () => {
         { component: LEGACY_COMPONENT_REL, story: LEGACY_STORY_REL },
         { component: LEGACY_COMPONENT_REL, story: LEGACY_STORY_REL },
       ],
-      storybookUrl: 'http://127.0.0.1:6006',
+      storybookUrl: STORYBOOK_URL,
       evaluateRendered: args => {
         calls.push(args);
-        return {
-          ok: true,
-          status: 0,
-          report: { ok: true },
-          output: '{"ok":true}',
-        };
+        return renderedPass;
       },
     });
 
     expect(calls[0]).toMatchObject({
-      components: [LEGACY_COMPONENT_REL],
+      components: [],
       storyPaths: [LEGACY_STORY_REL],
     });
   });
 
-  it('propagates rendered evaluation failures from Storybook evidence', () => {
+  it('keeps rendered evaluation failures advisory unless required', () => {
     expect(
       resolveRenderedEvaluationSection({
-        changedComponents: ['packages/ui/atoms/badge.tsx'],
-        storybookUrl: 'http://127.0.0.1:6006',
-        evaluateRendered: () => ({
-          ok: false,
-          status: 1,
-          report: { ok: false },
-          output: 'missing rendered contract',
-        }),
+        changedComponents: [BADGE_COMPONENT_REL],
+        storybookUrl: STORYBOOK_URL,
+        evaluateRendered: () => renderedFailure,
+      })
+    ).toEqual({
+      ok: true,
+      section: {
+        ok: false,
+        applicable: true,
+        required: false,
+        status: 1,
+        report: { ok: false },
+        output: 'missing rendered contract',
+      },
+    });
+  });
+
+  it('propagates required rendered evaluation failures from Storybook evidence', () => {
+    expect(
+      resolveRenderedEvaluationSection({
+        changedComponents: [BADGE_COMPONENT_REL],
+        storybookUrl: STORYBOOK_URL,
+        requireRendered: true,
+        evaluateRendered: () => renderedFailure,
       })
     ).toEqual({
       ok: false,
       section: {
         ok: false,
         applicable: true,
+        required: true,
         status: 1,
         report: { ok: false },
         output: 'missing rendered contract',

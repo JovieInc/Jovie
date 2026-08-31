@@ -1296,7 +1296,15 @@ export function resolveRenderedEvaluationSection({
   const rendered = evaluateRendered({
     storybookUrl,
     captureDir,
-    components: changedComponents,
+    components: changedComponents.filter(
+      component =>
+        !componentStories.some(
+          entry =>
+            entry?.component === component &&
+            typeof entry.story === 'string' &&
+            entry.story
+        )
+    ),
     storyPaths: [
       ...new Set(
         componentStories
@@ -1305,11 +1313,13 @@ export function resolveRenderedEvaluationSection({
       ),
     ],
   });
+  const sectionOk = rendered.ok;
   return {
-    ok: rendered.ok,
+    ok: requireRendered ? sectionOk : true,
     section: {
-      ok: rendered.ok,
+      ok: sectionOk,
       applicable: true,
+      required: requireRendered,
       status: rendered.status,
       report: rendered.report,
       output: rendered.output,

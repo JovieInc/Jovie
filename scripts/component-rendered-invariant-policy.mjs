@@ -12,7 +12,7 @@ function differs(left, right) {
 }
 
 function boxesDiffer(left, right) {
-  if (!left || !right) return false;
+  if (!left || !right) return true;
   return ['x', 'y', 'width', 'height'].some(key =>
     differs(left[key], right[key])
   );

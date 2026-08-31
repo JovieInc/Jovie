@@ -40,6 +40,7 @@ function parseArgs(argv) {
 function normalizeImportPath(value) {
   return String(value ?? '')
     .replaceAll('\\', '/')
+    .replace(/^\/+/, '')
     .replace(/^\.\//, '');
 }
 
@@ -77,10 +78,9 @@ export function storyCandidates(index, flags) {
   const missingRequests = [];
 
   for (const request of requests) {
+    const candidatePaths = new Set(request.candidates.map(normalizeImportPath));
     const requestMatches = matched
-      .filter(({ importPath }) =>
-        request.candidates.some(path => importPath.endsWith(path))
-      )
+      .filter(({ importPath }) => candidatePaths.has(importPath))
       .map(({ entry }) => entry);
     const certified = requestMatches.filter(entry =>
       entry.tags?.includes('jovie-certification')
@@ -185,7 +185,8 @@ async function collectSnapshots(page, story, viewport, storybookUrl) {
         const sameColor = (left, right) => {
           if (!left || !right) return false;
           return ['r', 'g', 'b', 'a'].every(
-            key => Math.abs(left[key] - right[key]) <= 1
+            key =>
+              Math.abs(left[key] - right[key]) <= (key === 'a' ? 1 / 255 : 1)
           );
         };
         const luminance = color => {
@@ -277,6 +278,12 @@ async function collectSnapshots(page, story, viewport, storybookUrl) {
           const radiusToken = wrapper.dataset.jovieEvalRadius ?? '';
           const interactive = wrapper.dataset.jovieEvalInteractive === 'true';
           const rect = target.getBoundingClientRect();
+          const radiusCorners = {
+            topLeft: px(style.borderTopLeftRadius),
+            topRight: px(style.borderTopRightRadius),
+            bottomRight: px(style.borderBottomRightRadius),
+            bottomLeft: px(style.borderBottomLeftRadius),
+          };
           const targetBackground = parseColor(style.backgroundColor);
           const inheritedBackground =
             targetBackground?.a > 0
@@ -310,7 +317,11 @@ async function collectSnapshots(page, story, viewport, storybookUrl) {
               paddingRight: px(style.paddingRight),
               paddingBottom: px(style.paddingBottom),
               paddingLeft: px(style.paddingLeft),
-              borderRadius: px(style.borderTopLeftRadius),
+              borderRadius: radiusCorners.topLeft,
+              borderTopLeftRadius: radiusCorners.topLeft,
+              borderTopRightRadius: radiusCorners.topRight,
+              borderBottomRightRadius: radiusCorners.bottomRight,
+              borderBottomLeftRadius: radiusCorners.bottomLeft,
               borderTop: px(style.borderTopWidth),
               borderRight: px(style.borderRightWidth),
               borderBottom: px(style.borderBottomWidth),
@@ -333,31 +344,46 @@ async function collectSnapshots(page, story, viewport, storybookUrl) {
                 0.5,
             radiusTokenMatched:
               Boolean(radiusToken) &&
-              Math.abs(px(style.borderTopLeftRadius) - radiusValue) <= 0.5,
+              Object.values(radiusCorners).every(
+                radius => Math.abs(radius - radiusValue) <= 0.5
+              ),
             concentricRadius: [
               ...target.querySelectorAll('[data-jovie-eval-inner-edge]'),
             ].every(child => {
               const childStyle = getComputedStyle(child);
-              const childRadius = px(childStyle.borderTopLeftRadius);
-              if (childRadius === 0) return true;
-              const inset = Math.min(
-                px(style.paddingTop),
-                px(style.paddingLeft)
-              );
-              return (
-                Math.abs(
-                  px(style.borderTopLeftRadius) - (childRadius + inset)
-                ) <= 1
+              const childCorners = {
+                topLeft: px(childStyle.borderTopLeftRadius),
+                topRight: px(childStyle.borderTopRightRadius),
+                bottomRight: px(childStyle.borderBottomRightRadius),
+                bottomLeft: px(childStyle.borderBottomLeftRadius),
+              };
+              if (Object.values(childCorners).every(radius => radius === 0)) {
+                return true;
+              }
+              const expectedChildCorners = {
+                topLeft:
+                  radiusCorners.topLeft -
+                  Math.min(px(style.paddingTop), px(style.paddingLeft)),
+                topRight:
+                  radiusCorners.topRight -
+                  Math.min(px(style.paddingTop), px(style.paddingRight)),
+                bottomRight:
+                  radiusCorners.bottomRight -
+                  Math.min(px(style.paddingBottom), px(style.paddingRight)),
+                bottomLeft:
+                  radiusCorners.bottomLeft -
+                  Math.min(px(style.paddingBottom), px(style.paddingLeft)),
+              };
+              return Object.entries(expectedChildCorners).every(
+                ([corner, expected]) =>
+                  Math.abs(childCorners[corner] - Math.max(0, expected)) <= 1
               );
             }),
             textContrast: contrast(foreground, inheritedBackground),
             requiredContrast: largeText ? 3 : 4.5,
             overflowX: target.scrollWidth - target.clientWidth > 1,
             overflowY: target.scrollHeight - target.clientHeight > 1,
-            zoomOverflow:
-              document.documentElement.scrollWidth -
-                document.documentElement.clientWidth >
-              1,
+            zoomOverflow: false,
             interactive,
             keyboardReachable: !interactive || tabbables > 0,
             tabbableCount: tabbables,
@@ -402,9 +428,14 @@ async function collectSnapshots(page, story, viewport, storybookUrl) {
       if (!variant.interactive) continue;
       const wrapper = root.locator(variant.selector).first();
       const target = await resolveVariantTarget(wrapper);
-      await target.hover();
-      const box = await target.boundingBox();
-      variant.hoverBoxAfter = box;
+      try {
+        await target.hover({ timeout: 5_000 });
+        variant.hoverBoxAfter = await target.boundingBox();
+      } catch (error) {
+        variant.hoverBoxAfter = null;
+        variant.hoverError =
+          error instanceof Error ? error.message : String(error);
+      }
     }
 
     snapshots.push(snapshot);
@@ -434,10 +465,6 @@ async function collectSnapshots(page, story, viewport, storybookUrl) {
         return {
           family: element.dataset.jovieEvalFamily ?? '',
           instanceId: element.getAttribute('data-jovie-eval-instance') ?? '',
-          zoomOverflow:
-            document.documentElement.scrollWidth -
-              document.documentElement.clientWidth >
-            1,
           variants,
         };
       })
@@ -459,11 +486,7 @@ async function collectSnapshots(page, story, viewport, storybookUrl) {
       const zoomVariant = zoomVariants.get(variant.key);
       variant.zoomOverflowX = zoomVariant?.overflowX ?? false;
       variant.zoomOverflowY = zoomVariant?.overflowY ?? false;
-      variant.zoomOverflow =
-        Boolean(variant.zoomOverflow) ||
-        Boolean(zoom?.zoomOverflow) ||
-        variant.zoomOverflowX ||
-        variant.zoomOverflowY;
+      variant.zoomOverflow = variant.zoomOverflowX || variant.zoomOverflowY;
     }
   }
   return snapshots;

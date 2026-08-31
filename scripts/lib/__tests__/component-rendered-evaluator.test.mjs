@@ -2,12 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { storyCandidates } from '../../component-rendered-evaluator.mjs';
 
 function story(id, importPath, tags = []) {
-  return {
-    id,
-    importPath,
-    tags,
-    type: 'story',
-  };
+  return { id, importPath, tags, type: 'story' };
 }
 
 describe('rendered evaluator story selection', () => {
@@ -66,5 +61,31 @@ describe('rendered evaluator story selection', () => {
       'apps/web/components/missing/MissingStory.stories.tsx',
       'packages/ui/atoms/Missing.tsx',
     ]);
+  });
+
+  it('matches requested Storybook import paths exactly after normalization', () => {
+    const result = storyCandidates(
+      {
+        entries: {
+          duplicateSuffix: story(
+            'duplicate--suffix',
+            './apps/web/legacy/packages/ui/atoms/Badge.stories.tsx',
+            ['jovie-certification']
+          ),
+          badge: story(
+            'badge--certified',
+            './packages/ui/atoms/Badge.stories.tsx',
+            ['jovie-certification']
+          ),
+        },
+      },
+      {
+        components: ['packages/ui/atoms/Badge.tsx'],
+        storyPaths: [],
+      }
+    );
+
+    expect(result.missingRequests).toEqual([]);
+    expect(result.stories.map(entry => entry.id)).toEqual(['badge--certified']);
   });
 });

@@ -14,6 +14,10 @@ const SHARED_GEOMETRY = Object.freeze({
   borderRight: 1,
   borderBottom: 1,
   borderLeft: 1,
+  borderTopLeftRadius: 9999,
+  borderTopRightRadius: 9999,
+  borderBottomRightRadius: 9999,
+  borderBottomLeftRadius: 9999,
   minHeight: 20,
   height: 20,
   fontSize: 12,
@@ -47,9 +51,6 @@ function variant(key, tone) {
 function validFixture() {
   return {
     family: 'Priority status',
-    storyId: 'dashboard-atoms-status-badges--light',
-    viewport: 'desktop',
-    zoom: 1,
     declaredTheme: 'light',
     actualTheme: 'light',
     surfaceToken: '--color-bg-surface-0',
@@ -63,6 +64,9 @@ function validFixture() {
   };
 }
 
+const rulesFor = fixture =>
+  evaluateRenderedFamily(fixture).issues.map(issue => issue.rule);
+
 describe('rendered component invariant policy', () => {
   it('accepts one source-blind semantic family with shared anatomy and geometry', () => {
     expect(evaluateRenderedFamily(validFixture())).toEqual({
@@ -74,18 +78,14 @@ describe('rendered component invariant policy', () => {
   it('deliberate red: rejects a light treatment rendered on a dark surface', () => {
     const fixture = validFixture();
     fixture.actualTheme = 'dark';
-    expect(
-      evaluateRenderedFamily(fixture).issues.map(issue => issue.rule)
-    ).toContain('theme-surface-mismatch');
+    expect(rulesFor(fixture)).toContain('theme-surface-mismatch');
   });
 
   it('deliberate red: rejects split ownership and arbitrary variant anatomy', () => {
     const fixture = validFixture();
     fixture.variants[1].owner = 'MediumBadge';
     fixture.variants[1].anatomy = 'div[span[],span[]]';
-    expect(
-      evaluateRenderedFamily(fixture).issues.map(issue => issue.rule)
-    ).toEqual(
+    expect(rulesFor(fixture)).toEqual(
       expect.arrayContaining([
         'split-component-owner',
         'arbitrary-variant-anatomy',
@@ -119,9 +119,7 @@ describe('rendered component invariant policy', () => {
   it('fails closed when an approved surface token is not declared', () => {
     const fixture = validFixture();
     fixture.surfaceToken = '';
-    expect(
-      evaluateRenderedFamily(fixture).issues.map(issue => issue.rule)
-    ).toContain('surface-token-missing');
+    expect(rulesFor(fixture)).toContain('surface-token-missing');
   });
 
   it('deliberate red: rejects padding, radius, geometry, and semantic-tone drift', () => {
@@ -131,9 +129,7 @@ describe('rendered component invariant policy', () => {
     fixture.variants[2].radiusTokenMatched = false;
     fixture.variants[2].concentricRadius = false;
     fixture.variants[2].tone = 'warning';
-    expect(
-      evaluateRenderedFamily(fixture).issues.map(issue => issue.rule)
-    ).toEqual(
+    expect(rulesFor(fixture)).toEqual(
       expect.arrayContaining([
         'arbitrary-variant-geometry',
         'padding-token-mismatch',
@@ -148,9 +144,7 @@ describe('rendered component invariant policy', () => {
     const fixture = validFixture();
     fixture.variants[1].expectedTone = null;
     fixture.variants[1].expectedToneMapped = false;
-    expect(
-      evaluateRenderedFamily(fixture).issues.map(issue => issue.rule)
-    ).toContain('semantic-tone-missing');
+    expect(rulesFor(fixture)).toContain('semantic-tone-missing');
   });
 
   it('deliberate red: rejects AA, zoom, keyboard, hover, emoji, and decorative caps failures', () => {
@@ -165,9 +159,7 @@ describe('rendered component invariant policy', () => {
       hoverBoxBefore: { x: 0, y: 0, width: 40, height: 20 },
       hoverBoxAfter: { x: 0, y: -1, width: 40, height: 20 },
     };
-    expect(
-      evaluateRenderedFamily(fixture).issues.map(issue => issue.rule)
-    ).toEqual(
+    expect(rulesFor(fixture)).toEqual(
       expect.arrayContaining([
         'contrast-below-aa',
         'text-or-zoom-overflow',
@@ -179,7 +171,7 @@ describe('rendered component invariant policy', () => {
     );
   });
 
-  it('skips hover layout-shift evaluation when hover geometry is unavailable', () => {
+  it('fails closed when hover geometry is unavailable for an interactive variant', () => {
     const fixture = validFixture();
     fixture.variants[0] = {
       ...fixture.variants[0],
@@ -188,17 +180,25 @@ describe('rendered component invariant policy', () => {
       hoverBoxBefore: { x: 0, y: 0, width: 40, height: 20 },
       hoverBoxAfter: null,
     };
-    expect(
-      evaluateRenderedFamily(fixture).issues.map(issue => issue.rule)
-    ).not.toContain('hover-layout-shift');
+    expect(rulesFor(fixture)).toContain('hover-layout-shift');
+  });
+
+  it('rejects arbitrary corner radius geometry', () => {
+    const fixture = validFixture();
+    fixture.variants[1].geometry.borderTopRightRadius = 4;
+    fixture.variants[1].radiusTokenMatched = false;
+    expect(rulesFor(fixture)).toEqual(
+      expect.arrayContaining([
+        'arbitrary-variant-geometry',
+        'radius-token-mismatch',
+      ])
+    );
   });
 
   it('rejects an accidental tab stop on a non-interactive status display', () => {
     const fixture = validFixture();
     fixture.variants[1].tabbableCount = 1;
-    expect(
-      evaluateRenderedFamily(fixture).issues.map(issue => issue.rule)
-    ).toContain('noninteractive-tab-stop');
+    expect(rulesFor(fixture)).toContain('noninteractive-tab-stop');
   });
 
   it('aggregates viewport receipts and fails an empty rendered run', () => {

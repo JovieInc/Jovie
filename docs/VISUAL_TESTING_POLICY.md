@@ -56,12 +56,11 @@ source lacks:
    enrolled primitive batch (MIT public references only; missing/unknown
    benchmark dimensions fail closed).
 7. **Live rendered evaluation (JOV-5721)** — source-blind browser evaluation of
-   changed in-scope component stories from computed DOM, accessibility output,
-   and screenshot receipts when `--require-rendered` and `--storybook-url` are
-   supplied. It fails closed on missing evaluator access, missing rendered
-   contracts, token drift, semantic drift, contrast/axe failures, text/zoom
-   overflow, keyboard gaps, or hover layout shift. During rollout, this section
-   remains advisory unless required mode is explicitly enabled.
+   changed component stories from computed DOM, accessibility output, and
+   screenshots when `--require-rendered` and `--storybook-url` are supplied.
+   It fails closed on missing contracts, token/semantic drift, contrast/axe
+   failures, text/zoom overflow, keyboard gaps, or hover layout shift. During
+   rollout, this section is advisory unless required mode is enabled.
 8. **Live Storybook certification (JOV-5454)** — build and serve the real web
    Storybook, resolve the canonical Badge/Button/Card story inventory by exact
    story id and import path, then evaluate those stories at desktop and compact
@@ -86,46 +85,13 @@ pre-push affected gate.
 
 ## Rendered certification mode
 
-`component-ship-gate` also owns the source-blind browser evaluation used to
-certify a component family. This is an extension of the same gate, not a second
-component-quality framework:
-
-```bash
-pnpm component-ship-gate -- \
-  --require-rendered \
-  --storybook-url=http://127.0.0.1:6006 \
-  --capture-dir=/tmp/component-certification
-```
-
-`--require-rendered` fails closed when a changed in-scope component has no
-running Storybook evaluator or no rendered contract. During the legacy rollout,
-plain `pnpm component-ship-gate` keeps this section advisory so a newly encoded
-rule does not freeze unrelated pre-existing debt. A component may not be called
-certified or enrolled from the design-system lock batch without the required
-mode.
-
-Rendered stories expose evidence through DOM attributes on their review wrapper:
-
-| Attribute | Contract |
-| --- | --- |
-| `data-jovie-eval-family` | Stable semantic family name |
-| `data-jovie-eval-owner` | One canonical reusable component owner |
-| `data-jovie-eval-theme` | `light` or `dark`, matching the actual root theme |
-| `data-jovie-eval-surface-token` | Approved CSS surface token resolved at runtime |
-| `data-jovie-eval-mapping` | JSON map from variant key to documented semantic tone |
-| `data-jovie-eval-variant` | Member key such as `high`, `medium`, or `low` |
-| `data-jovie-eval-tone` | Rendered semantic tone for that member |
-| `data-jovie-eval-padding-x/y` | Shared spacing tokens for computed padding |
-| `data-jovie-eval-radius` | Shared radius token for computed geometry |
-| `data-jovie-eval-interactive` | Whether keyboard/focus/hover checks apply |
-| `data-jovie-eval-target` | Optional exact rendered node when the evidence wrapper is `display: contents` |
-
-The evaluator reads only computed DOM and accessibility output. It verifies
-theme/surface pairing, one owner and anatomy, documented semantic mapping,
-shared tokenized padding/radius/edge/type geometry, concentric radii, AA text
-contrast, constrained text, 200% zoom, keyboard relevance, and stable hover
-boxes. It captures desktop and compact screenshots as evidence, not as the
-assertion itself.
+Required mode is `pnpm component-ship-gate -- --require-rendered --storybook-url=http://127.0.0.1:6006`.
+It fails closed without a running Storybook evaluator or rendered contract.
+Plain `pnpm component-ship-gate` stays advisory during legacy rollout; design
+system enrollment still requires the required mode. Stories declare family,
+owner, theme, surface, variant/tone, mapping, spacing/radius tokens,
+interactive state, and optional target attributes. The evaluator verifies those
+contracts from computed DOM/axe evidence; screenshots are receipts.
 
 ## Story matrix (default)
 
