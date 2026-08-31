@@ -13,8 +13,8 @@ EnvironmentFile=-%h/.config/symphony/linear.env
 ExecStart=%h/.local/bin/symphony --port 4043 --logs-root %h/symphony-burrito-logs %h/.config/symphony/WORKFLOW.md
 Restart=always
 RestartSec=5
-StandardOutput=append:%h/symphony-burrito-logs/stdout.log
-StandardError=append:%h/symphony-burrito-logs/stdout.log
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=default.target

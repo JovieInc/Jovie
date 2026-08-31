@@ -1,32 +1,45 @@
 #!/usr/bin/env python3
-"""Gem tty1 check-in glass HUD. Fourth HUD — not the ops grid, not empty red bars."""
+"""Gem tty1 Buildkite-list HUD. Night-dj: blue / hot pink / purple. Dark only."""
 from __future__ import annotations
+
 import argparse
 import json
-import math
 import os
-import re
+import subprocess
 import sys
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
+from datetime import datetime, timezone
 from typing import Any
-BARS = "▁▂▃▄▅▆▇█"
-UNKNOWN = "UNKNOWN"
-UNMEASURED = "unmeasured"
-PROD_SHA_RE = re.compile(r"^[0-9a-f]{7,40}$", re.I)
-DEFAULT_MEASURED = Path.home() / ".local/state/gem-checkin-hud/measured.json"
+
+BLUE, PINK, PURPLE = (75, 145, 255), (255, 72, 210), (168, 85, 247)
+DIM, FG = (138, 138, 148), (236, 236, 240)
+BG = (10, 10, 10)
+LIVE_SLUG = "symphony-ui-pilot-96d6b9c5b2d5"
 DEFAULT_SYMPHONY = os.environ.get("SYMPHONY_STATE_URL", "http://127.0.0.1:4043/api/v1/state")
+LINEAR_API = os.environ.get("LINEAR_API_URL", "https://api.linear.app/graphql")
+MQ_QUERY = (
+    "query { repository(owner: \"JovieInc\", name: \"Jovie\") { "
+    "mergeQueue(branch: \"main\") { entries(first: 20) { nodes { position enqueuedAt "
+    "pullRequest { number title } } } } } }"
+)
+LINEAR_QUERY = (
+    "query($id: String!) { project(id: $id) { issues(filter: { state: { name: { eq: \"In Review\" } } }) "
+    "{ totalCount } } }"
+)
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
-def _num(value: Any) -> float | None:
-    if isinstance(value, bool) or value is None:
-        return None
-    if isinstance(value, (int, float)) and value == value:
-        return float(value)
-    return None
+
+
+def _rgb(rgb: tuple[int, int, int], text: str, *, bold: bool = False, bg: bool = False) -> str:
+    code = 48 if bg else 38
+    prefix = "\033[1m" if bold else ""
+    return f"{prefix}\033[{code};2;{rgb[0]};{rgb[1]};{rgb[2]}m{text}\033[0m"
+
+
 def _iso(value: Any) -> datetime | None:
     if not isinstance(value, str) or not value.strip():
         return None
@@ -35,229 +48,207 @@ def _iso(value: Any) -> datetime | None:
     except ValueError:
         return None
     return stamp if stamp.tzinfo else stamp.replace(tzinfo=timezone.utc)
+
+
 def _text(record: dict[str, Any], keys: tuple[str, ...]) -> str | None:
     for key in keys:
         value = record.get(key)
-        if isinstance(value, (int, float)) and value == value and value > 0:
-            return str(int(value))
         if isinstance(value, str) and value.strip():
             return value.strip()
+        if isinstance(value, (int, float)) and value == value:
+            return str(int(value)) if float(value).is_integer() else str(value)
     return None
-def load_measured(path: Path) -> dict[str, Any]:
-    if not path.is_file():
-        return {}
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return payload if isinstance(payload, dict) else {}
-def compute_alive(alive: Any) -> dict[str, Any]:
-    source = alive if isinstance(alive, dict) else {}
-    cash = _num(source.get("cashUsd"))
-    burn = _num(source.get("weeklyBurnUsd"))
-    revenue = _num(source.get("weeklyRevenueUsd"))
-    growth = _num(source.get("weeklyRevenueGrowthRate"))
-    profit = None if burn is None or revenue is None else revenue - burn
-    if cash is None or burn is None or revenue is None:
-        status = UNKNOWN
-    elif revenue == 0 and burn > 0:
-        status = "DEAD"
-    elif burn - revenue <= 0:
-        status = "ALIVE"
-    else:
-        net = burn - revenue
-        weeks_cash = cash / net if cash > 0 else 0.0
-        profit_weeks = (
-            math.log(burn / revenue) / math.log(1 + growth)
-            if revenue > 0 and growth is not None and growth > 0
-            else None
-        )
-        status = "ALIVE" if profit_weeks is not None and weeks_cash > 0 and profit_weeks <= weeks_cash else "DEAD"
-    return {
-        "status": status,
-        "cashUsd": cash,
-        "weeklyBurnUsd": burn,
-        "weeklyRevenueUsd": revenue,
-        "profitBeforeZeroUsd": profit,
-    }
-def compute_wow(wow: Any) -> dict[str, Any]:
-    source = wow if isinstance(wow, dict) else {}
-    this_rev = _num(source.get("thisWeekRevenueUsd"))
-    last_rev = _num(source.get("lastWeekRevenueUsd"))
-    this_users = _num(source.get("thisWeekActiveUsers"))
-    last_users = _num(source.get("lastWeekActiveUsers"))
-    if this_rev is not None and last_rev is not None and (this_rev > 0 or last_rev > 0):
-        rate = 0.0 if last_rev == 0 else (this_rev - last_rev) / last_rev
-        return {"rate": rate, "basis": "revenue", "thisWeekRevenueUsd": this_rev, "lastWeekRevenueUsd": last_rev}
-    if this_users is not None and last_users is not None:
-        rate = 0.0 if last_users == 0 else (this_users - last_users) / last_users
-        return {"rate": rate, "basis": "active-users", "thisWeekRevenueUsd": this_rev, "lastWeekRevenueUsd": last_rev}
-    return {"rate": None, "basis": UNKNOWN, "thisWeekRevenueUsd": this_rev, "lastWeekRevenueUsd": last_rev}
-def _receipt(item: Any) -> dict[str, str] | None:
-    if not isinstance(item, dict):
-        return None
-    linear = _text(item, ("linearIssueId", "linearIssue", "issueNumber", "issue"))
-    symphony = _text(item, ("symphonyRef", "symphony"))
-    queue = _text(item, ("mergeQueueRef", "mergeQueue", "mergeQueueEntry"))
-    sha = _text(item, ("prodSha", "prodSHA"))
-    receipt = _text(item, ("receiptAt", "receiptedAt"))
-    if not (linear and symphony and queue and sha and receipt and PROD_SHA_RE.match(sha) and _iso(receipt)):
-        return None
-    return {"receiptAt": receipt}
-def count_ships_this_week(ships: Any, *, now: datetime | None = None) -> dict[str, int]:
-    receipts = ships.get("receipts") if isinstance(ships, dict) else None
-    if not isinstance(receipts, list):
-        receipts = []
-    clock = now or _now()
-    week_ago = clock - timedelta(days=7)
-    counted = 0
-    for item in receipts:
-        parsed = _receipt(item)
-        if parsed is None:
-            continue
-        stamped = _iso(parsed["receiptAt"])
-        if stamped is not None and week_ago <= stamped <= clock:
-            counted += 1
-    return {"thisWeek": counted}
-def sparkline(values: list[float]) -> str:
-    lo, hi = min(values), max(values)
-    if hi <= lo:
-        return BARS[0] * len(values)
-    last = len(BARS) - 1
-    return "".join(BARS[max(0, min(last, int(round((value - lo) / (hi - lo) * last))))] for value in values)
-def vertical_bars(values: list[float], *, height: int = 4) -> list[str]:
-    lo, hi = min(values), max(values)
-    rows: list[str] = []
-    for level in range(height, 0, -1):
-        cells = []
-        for value in values:
-            rank = 1 if hi <= lo else 1 + int(round((value - lo) / (hi - lo) * (height - 1)))
-            cells.append("█" if rank >= level else " ")
-        rows.append("".join(cells))
-    return rows
-def series_values(measured: dict[str, Any], key: str) -> list[float] | None:
-    series = measured.get("series")
-    raw = series.get(key) if isinstance(series, dict) else None
-    if not isinstance(raw, list) or not raw:
-        return None
-    values: list[float] = []
-    for item in raw:
-        number = _num(item.get("value") if isinstance(item, dict) else item)
-        if number is None:
-            return None
-        values.append(number)
-    return values or None
+
+
+def elapsed_label(started: Any, *, now: datetime | None = None) -> str:
+    stamp = _iso(started) if not isinstance(started, datetime) else started
+    if stamp is None:
+        return "-"
+    seconds = max(0, int(((now or _now()) - stamp).total_seconds()))
+    if seconds < 60:
+        return f"{seconds}s"
+    if seconds < 3600:
+        return f"{seconds // 60}m"
+    return f"{seconds // 3600}h"
+
+
+def dash(value: Any) -> str:
+    if value is None or value == "":
+        return "-"
+    return str(value)
+
+
 def fetch_symphony(url: str, *, timeout: float = 1.5) -> dict[str, Any]:
     try:
         with urllib.request.urlopen(url, timeout=timeout) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
-        return {"ok": False, "running": None, "retrying": None, "hookFailed": False, "shipping": False}
-    counts = payload.get("counts") if isinstance(payload, dict) and isinstance(payload.get("counts"), dict) else {}
-    running, retrying = counts.get("running"), counts.get("retrying")
-    blob = json.dumps(payload)
-    return {
-        "ok": True,
-        "running": running if isinstance(running, int) else None,
-        "retrying": retrying if isinstance(retrying, int) else None,
-        "hookFailed": "workspace_hook_failed" in blob,
-        "shipping": any(token in blob for token in ('"html_url"', '"pr_url"', "pull/")),
-    }
-def bottleneck(alive: dict[str, Any], wow: dict[str, Any], ships: dict[str, int], symphony: dict[str, Any]) -> str:
-    if alive["status"] == "DEAD":
-        return "cash or profit-before-zero is dead"
-    if alive["status"] == UNKNOWN:
-        return "ALIVE unmeasured — do not invent P&L"
-    if wow["rate"] is None:
-        return "WOW unmeasured — revenue first, else active users"
-    if wow["rate"] < 0.05:
-        return "WOW below 5–7%/wk YC bar"
-    if ships["thisWeek"] == 0:
-        return "no receipted ships this week"
-    if symphony.get("ok") and symphony.get("hookFailed"):
-        return "workspace_hook_failed — patch after_create (HTTPS only, no mix)"
-    if symphony.get("ok") and symphony.get("retrying"):
-        return f"Symphony retrying {symphony['retrying']}"
-    if not symphony.get("ok"):
-        return "official Symphony :4043 unreachable"
-    return "keep shipping receipted work"
-def _money(value: float | None) -> str:
-    if value is None:
-        return UNMEASURED
-    sign = "-" if value < 0 else ""
-    return f"{sign}${abs(value):,.0f}"
-def _pct(value: float | None) -> str:
-    return UNMEASURED if value is None else f"{value * 100:.1f}%"
-def _count(value: int | None) -> str:
-    return UNMEASURED if value is None else str(value)
-def render_tile(title: str, headline: str, detail: str, values: list[float] | None) -> list[str]:
-    spark = sparkline(values) if values is not None else UNMEASURED
-    lines = [f"┌ {title}", f"│ {headline}", f"│ {detail}", f"│ {spark}"]
-    if values is not None:
-        lines.extend(f"│ {row}" for row in vertical_bars(values))
+        return {"ok": False, "count": None, "cap": None, "rows": []}
+    if not isinstance(payload, dict):
+        return {"ok": False, "count": None, "cap": None, "rows": []}
+    counts = payload.get("counts") if isinstance(payload.get("counts"), dict) else {}
+    raw = payload.get("jobs") or payload.get("running") or payload.get("items") or []
+    if isinstance(raw, dict):
+        raw = list(raw.values())
+    rows: list[dict[str, Any]] = []
+    if isinstance(raw, list):
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            issue = item.get("issue") if isinstance(item.get("issue"), dict) else {}
+            running = item.get("running") if isinstance(item.get("running"), dict) else {}
+            status = str(item.get("status") or item.get("state") or "").lower()
+            if status in {"queued", "blocked", "done", "canceled", "cancelled"}:
+                continue
+            ident = _text(item, ("identifier", "id")) or _text(issue, ("identifier", "id"))
+            title = _text(item, ("title", "name")) or _text(issue, ("title", "name"))
+            started = item.get("started_at") or item.get("startedAt") or running.get("started_at") or running.get("startedAt")
+            owner = _text(item, ("owner", "agent", "account")) or _text(running, ("owner", "agent"))
+            if ident or title:
+                rows.append({"id": ident, "title": title, "started": started, "owner": owner})
+    run, retry = counts.get("running"), counts.get("retrying")
+    if isinstance(run, int) or isinstance(retry, int):
+        count = (run if isinstance(run, int) else 0) + (retry if isinstance(retry, int) else 0)
     else:
-        lines.append("│")
-    lines.append("└")
-    return lines
-def compose_tiles(tiles: list[list[str]]) -> list[str]:
-    height = max(len(tile) for tile in tiles)
-    padded: list[list[str]] = []
-    for tile in tiles:
-        extra = height - len(tile)
-        if extra:
-            padded.append([*tile[:-1], *["│"] * extra, tile[-1]])
-        else:
-            padded.append(tile)
-    return ["  ".join(tile[index] for tile in padded) for index in range(height)]
-def render(*, measured: dict[str, Any], symphony: dict[str, Any], now: datetime | None = None) -> str:
-    alive = compute_alive(measured.get("alive"))
-    wow = compute_wow(measured.get("wow"))
-    ships = count_ships_this_week(measured.get("ships"), now=now)
-    named = bottleneck(alive, wow, ships, symphony)
-    tiles = compose_tiles(
-        [
-            render_tile(
-                "ALIVE",
-                alive["status"],
-                f"cash {_money(alive['cashUsd'])}  burn {_money(alive['weeklyBurnUsd'])}  rev {_money(alive['weeklyRevenueUsd'])}  p0 {_money(alive['profitBeforeZeroUsd'])}",
-                series_values(measured, "alive"),
-            ),
-            render_tile(
-                "WOW",
-                UNKNOWN if wow["rate"] is None else _pct(wow["rate"]),
-                f"{wow['basis']}  this {_money(wow['thisWeekRevenueUsd'])} / last {_money(wow['lastWeekRevenueUsd'])}",
-                series_values(measured, "wow"),
-            ),
-            render_tile("SHIPS", str(ships["thisWeek"]), "receipted this week", series_values(measured, "ships")),
-            render_tile(
-                "#1",
-                named,
-                f"symphony :4043  run {_count(symphony.get('running'))}  retry {_count(symphony.get('retrying'))}",
-                None,
-            ),
-        ]
+        count = len(rows) if rows else None
+    cap = counts.get("max_concurrent") or counts.get("capacity") or payload.get("max_concurrent_agents")
+    cap = cap if isinstance(cap, int) and cap > 0 else None
+    return {"ok": True, "count": count, "cap": cap, "rows": rows}
+
+
+def fetch_mq(*, timeout: float = 8.0) -> dict[str, Any]:
+    try:
+        completed = subprocess.run(
+            ["gh", "api", "graphql", "-f", f"query={MQ_QUERY}"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env={**os.environ, "GH_PAGER": "cat", "PAGER": "cat"},
+        )
+        payload = json.loads(completed.stdout)
+        nodes = (
+            (((payload.get("data") or {}).get("repository") or {}).get("mergeQueue") or {}).get("entries") or {}
+        ).get("nodes") or []
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError, TypeError, AttributeError):
+        return {"ok": False, "count": None, "rows": []}
+    rows = []
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        pr = node.get("pullRequest") if isinstance(node.get("pullRequest"), dict) else {}
+        number = pr.get("number")
+        title = _text(pr, ("title",))
+        rows.append({"number": number if isinstance(number, int) else None, "title": title, "enqueued": node.get("enqueuedAt"), "position": node.get("position")})
+    return {"ok": True, "count": len(rows), "rows": rows}
+
+
+def fetch_review(*, timeout: float = 8.0) -> int | None:
+    key = os.environ.get("LINEAR_API_KEY")
+    if not key:
+        return None
+    request = urllib.request.Request(
+        LINEAR_API,
+        data=json.dumps({"query": LINEAR_QUERY, "variables": {"id": LIVE_SLUG}}).encode(),
+        headers={"Authorization": key, "Content-Type": "application/json", "User-Agent": "gem-checkin-hud/2"},
+        method="POST",
     )
-    clock = (now or _now()).astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    return "\n".join(["GEM CHECK-IN", clock, "official burrito 127.0.0.1:4043", "", *tiles]) + "\n"
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        count = (((payload.get("data") or {}).get("project") or {}).get("issues") or {}).get("totalCount")
+        return count if isinstance(count, int) else None
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
+        return None
+
+
+def _gutter(glyph: str, elapsed: str, color: tuple[int, int, int]) -> tuple[str, str]:
+    return _rgb(color, glyph), _rgb(color, f"{elapsed:<3}")
+
+
+def _row(glyph: str, elapsed: str, color: tuple[int, int, int], title: str, meta: str) -> list[str]:
+    g1, g2 = _gutter(glyph, elapsed, color)
+    return [f"{g1}  {_rgb(FG, title, bold=True)}", f"{g2}  {_rgb(DIM, meta)}"]
+
+
+def _pills() -> str:
+    running = _rgb(BLUE, "● Running", bold=True)
+    review = _rgb(PINK, "○ Review")
+    mq = _rgb(PURPLE, "○ MQ")
+    return f"{running}   {review}   {mq}"
+
+
+def _bar(running: int | None, cap: int | None, mq: int | None) -> str:
+    parts = [_rgb(BLUE, "JOVIE", bold=True), _rgb(PINK, "main")]
+    if running != 0:
+        parts.append(_rgb(BLUE, f"RUN {dash(running)}/{dash(cap)}"))
+    if mq is None:
+        parts.append(_rgb(PURPLE, "MQ -"))
+    elif mq > 0:
+        parts.append(_rgb(PURPLE, f"MQ {mq}"))
+    return f" {_rgb(DIM, '|')} ".join(parts)
+
+
+def render(
+    *,
+    symphony: dict[str, Any],
+    mq: dict[str, Any],
+    review: int | None,
+    now: datetime | None = None,
+) -> str:
+    clock = now or _now()
+    running_rows = symphony.get("rows") or []
+    mq_rows = mq.get("rows") or []
+    cap = symphony.get("cap") if symphony.get("ok") else None
+    running_n = symphony.get("count") if symphony.get("ok") else None
+    mq_n = mq.get("count") if mq.get("ok") else None
+    lines = [_bar(running_n, cap, mq_n), "", _pills(), _rgb(DIM, "─" * 56)]
+    for index, row in enumerate(running_rows):
+        ident = dash(row.get("id"))
+        title = dash(row.get("title"))
+        progress = f"{index + 1}/{cap}" if isinstance(cap, int) and cap > 0 else "-"
+        meta = " · ".join(("symphony", progress, dash(row.get("owner"))))
+        lines.extend(_row("●", elapsed_label(row.get("started"), now=clock), BLUE, f"{ident} {title}", meta))
+        lines.append(_rgb(DIM, "─" * 56))
+    for row in mq_rows:
+        number = row.get("number")
+        ident = f"#{number}" if isinstance(number, int) else "-"
+        title = dash(row.get("title"))
+        pos = dash(row.get("position"))
+        meta = " · ".join(("github", "main", f"pos {pos}"))
+        lines.extend(_row("○", elapsed_label(row.get("enqueued"), now=clock), PURPLE, f"MQ {ident} {title}", meta))
+        lines.append(_rgb(DIM, "─" * 56))
+    if review is None:
+        lines.append(f"{_rgb(PINK, 'v')}  {_rgb(PINK, 'Review -')}")
+    elif review > 0:
+        lines.append(f"{_rgb(PINK, 'v')}  {_rgb(PINK, f'Review {review}')}")
+    lines.extend(["", _bar(running_n, cap, mq_n)])
+    return f"\033[48;2;{BG[0]};{BG[1]};{BG[2]}m" + "\n".join(lines) + "\033[0m\n"
+
+
+def frame(*, symphony_url: str) -> str:
+    return render(symphony=fetch_symphony(symphony_url), mq=fetch_mq(), review=fetch_review())
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Gem check-in glass HUD")
+    parser = argparse.ArgumentParser(description="Gem tty1 Buildkite-list HUD")
     parser.add_argument("--once", action="store_true")
-    parser.add_argument("--measured", default=os.environ.get("HUD_MEASURED_PATH", str(DEFAULT_MEASURED)))
     parser.add_argument("--symphony-url", default=DEFAULT_SYMPHONY)
     parser.add_argument("--interval", type=float, default=5.0)
     return parser.parse_args(argv)
-def frame(*, measured_path: Path, symphony_url: str) -> str:
-    return render(measured=load_measured(measured_path), symphony=fetch_symphony(symphony_url))
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    path = Path(args.measured)
     if args.once:
-        sys.stdout.write(frame(measured_path=path, symphony_url=args.symphony_url))
+        sys.stdout.write(frame(symphony_url=args.symphony_url))
         return 0
     while True:
         sys.stdout.write("\033[2J\033[H")
-        sys.stdout.write(frame(measured_path=path, symphony_url=args.symphony_url))
+        sys.stdout.write(frame(symphony_url=args.symphony_url))
         sys.stdout.flush()
         time.sleep(max(0.5, args.interval))
+
+
 if __name__ == "__main__":
     raise SystemExit(main())

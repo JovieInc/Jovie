@@ -42,6 +42,8 @@ class OfficialBurritoContractTests(unittest.TestCase):
         self.assertIn("--port 4043", UNIT)
         self.assertIn("Restart=always", UNIT)
         self.assertIn("CODEX_HOME=%h/.codex-accounts/meetjovie", UNIT)
+        self.assertIn("StandardOutput=journal", UNIT)
+        self.assertNotIn("tty1", UNIT)
 
     def test_updater_config_copy_is_red_unless_live_match(self):
         self.assertIn("linux_x86_64", UPDATER)
@@ -50,7 +52,9 @@ class OfficialBurritoContractTests(unittest.TestCase):
         self.assertIn("CONFIG_COPY_RED", UPDATER)
         self.assertLess(UPDATER.index(LIVE_SLUG), UPDATER.index('install -m 0644 "$WORKFLOW_SRC" "$WORKFLOW_DST"'))
         tty1 = (ROOT / "scripts/hermes/gem-checkin-tty1.sh").read_text()
-        self.assertIn("until a pickup has a PR", tty1)
+        self.assertIn("List HUD owns tty1", tty1)
+        self.assertIn("gem-checkin-hud.py", tty1)
+        self.assertNotIn("until a pickup has a PR", tty1)
         updater = ROOT / "scripts/hermes/update-symphony-burrito.sh"
         with tempfile.TemporaryDirectory() as tmp:
             dest = pathlib.Path(tmp) / "home/.config/symphony"
