@@ -8,7 +8,7 @@ const webRoot = path.resolve(__dirname, '../../..');
 describe('homepage hero next-move contract (JOV-4475)', () => {
   it('uses the exact approved headline and supporting line', () => {
     expect(HOMEPAGE_LAUNCH_COPY.hero.headline).toBe(
-      'Jovie helps you move your music forward.'
+      'Own your story. Know your audience. Never lose a fan.'
     );
     expect(HOMEPAGE_LAUNCH_COPY.hero.subhead).toBe(
       'It uses your catalog, audience, and artist presence to surface the one action most likely to pay off.'

@@ -135,13 +135,15 @@ exceptions are invalid.
 
 **Font:** Inter Variable (self-hosted, weight range 100–900)
 
-**Hero exception (homepage `(home)/*`):** the homepage hero H1 uses **Satoshi
-Variable** at 80px / weight 600 / letter-spacing -0.045em. Satoshi is loaded
-globally in `app/layout.tsx` so the variable resolves outside the marketing
-wrapper. Everything else on the homepage (subhead, CTAs, body, section
-headings) stays Inter. This deviation is approved as of 2026-04-28 — the
-hero needed a wider, heavier display character to match the Frame.io-inspired
-poster composition; Inter at 80px reads narrow and tech-y in this context.
+**Hero exception (homepage `(home)/*`, founder-locked 2026-08-31):** the Quiet
+homepage hero H1 uses **Satoshi Variable** on the existing responsive marketing
+title ramp: 38px compact, 56px medium, and 64px wide; weight 510;
+letter-spacing -0.022em; line-height 1.06. It paints at most two visual lines
+while the complete authored text remains in the DOM and accessibility tree.
+Satoshi is loaded globally in `app/layout.tsx` so the variable resolves outside
+the marketing wrapper. Everything else on the homepage (subhead, CTAs, body,
+section headings) stays Inter. This supersedes the 2026-04-28 80px poster
+treatment without introducing another type scale.
 
 ### Font Weights
 
@@ -1169,7 +1171,7 @@ mark intentional marketing sentence-case headlines with
 | 2026-04-11 | No brand color (Apple approach) | White-on-black CTAs. Accent colors are supporting cast for feature differentiation only. Restraint is the brand. |
 | 2026-04-22 | Homepage migrated from System A to System B | Chat-intake is product, not marketing. Satoshi-editorial typography on a utility entrypoint was a category error. Lovable, v0, Bolt, and ChatGPT all use one system across homepage and product. System A scope shrinks to editorial surfaces (blog, pricing, changelog, support, legal). Full System A retirement deferred 3 months pending shipping data. |
 | 2026-04-22 | Homepage hero typography: Inter 40→48→56px, weight 680 (Linear bold / `font-bold` token) | Replaces Satoshi 800 marketing display. Product-powerful without tipping into marketing-shout. Letter-spacing -2.5% at display sizes. `--font-weight-bold` resolves to 680 (verified at runtime); the plan's initial "try 590 first, 680 if too muted" landed on 680. |
-| 2026-04-28 | Homepage hero H1 exception in System B: Satoshi 80px / 600 / -0.045em | Supersedes the 2026-04-22 Inter-only hero decision for `(home)` H1 only. Subhead, CTAs, body, and section headings on the homepage stay Inter. Driven by Frame.io-inspired hero composition where Inter at 80px reads narrow; Satoshi at 600/-0.045em matches Frame.io's FrameGothic computed style spec (verified by getComputedStyle). |
+| 2026-04-28 | Homepage hero H1 exception in System B: Satoshi 80px / 600 / -0.045em | **Superseded 2026-08-31 by the Quiet hero lock.** Superseded the 2026-04-22 Inter-only hero decision for `(home)` H1 only. Subhead, CTAs, body, and section headings on the homepage stayed Inter. |
 | 2026-04-11 | Canonical 1200px width for all marketing | Fixed inconsistent widths (header 1200px, hero 1120px). **Superseded 2026-06-28** by DS_FOUNDATION_V1 1298px. |
 | 2026-06-28 | Canonical 1298px public/marketing width (DS_FOUNDATION_V1) | One width in code + docs. `--ds-public-content-max` is canonical; legacy 1200/1280 aliases resolve to 1298px. Linear.app container parity. |
 | 2026-07-02 | Canonical button variants shipped (DS_FOUNDATION_V1 Wave 1) | 5 variants (`primary`, `secondary`, `tertiary`, `ghost`, `link`) + `destructive` prop. 3 sizes (`sm`/`md`/`lg`) + `icon`. 19 surface-specific `system-b-*-button` classes migrated behind a shrink-only ratchet. |
@@ -1178,3 +1180,4 @@ mark intentional marketing sentence-case headlines with
 | 2026-04-11 | Ban gold colors | Gold signals prestige-seeking. Not appropriate for Jovie's DJ audience. |
 | 2026-06-18 | **Unify on one design system, two languages.** Retire System A; conform whole app to System B tokens. | Founder-directed (supersedes the 2026-04-22 "defer 3 months" note). Target = one token foundation, one palette, one core typeface (Inter), expressed as a compact product language + an editorial marketing language. Aligns with gbrain "design system review" canon ("not two design systems — one system, two languages"). Editorial layouts are preserved; surfaces are reskinned onto System B tokens, each with a `*-system-b-style-guard` test + a global shrink-only ratchet. |
 | 2026-06-18 | Retire DM Sans; Inter is the sole body/UI face; Satoshi kept for display only | One core typeface for the unified system. Satoshi remains the single approved display exception (hero / large editorial headings), generalizing the 2026-04-28 homepage-hero exception. DM Sans `next/font` load removed from `app/layout.tsx`; `--font-body` and `--marketing-font-body` repoint to Inter. |
+| 2026-08-31 | Quiet homepage hero: Satoshi 38→56→64px / 510 / -0.022em / 1.06, max two visual lines | Founder-locked source contract. Reuses the canonical responsive marketing title ramp, preserves the complete DOM/accessibility text, and supersedes the 2026-04-28 80px poster treatment. |

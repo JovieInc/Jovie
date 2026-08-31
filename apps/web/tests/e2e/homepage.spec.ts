@@ -64,7 +64,7 @@ test.describe('Homepage', () => {
     await expect(hero.getByText('operating system')).toHaveCount(0);
     await expect(
       hero.getByRole('heading', {
-        name: 'Jovie helps you move your music forward.',
+        name: 'Own your story. Know your audience. Never lose a fan.',
       })
     ).toBeVisible();
     await expect(
@@ -619,7 +619,7 @@ test.describe('Homepage', () => {
 
     await expect(
       page.getByRole('heading', {
-        name: 'Jovie helps you move your music forward.',
+        name: 'Own your story. Know your audience. Never lose a fan.',
       })
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,

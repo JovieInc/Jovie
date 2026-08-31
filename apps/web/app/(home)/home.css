@@ -1803,10 +1803,11 @@ body:has(.home-viewport)::-webkit-scrollbar {
   min-height: 100svh;
   flex-direction: column;
   align-items: center;
+  justify-content: space-between;
   overflow: clip;
   padding-top: calc(
     var(--homepage-header-height) +
-    clamp(var(--space-10), 4.25vw, var(--space-16))
+    clamp(var(--space-12), 6.8vw, var(--space-24))
   );
   background: var(--system-b-bg-page);
   color: var(--color-text-primary-token);
@@ -1827,16 +1828,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-poster-hero__headline {
-  max-width: 18ch;
+  max-width: 28ch;
   margin: 0;
   color: var(--color-text-primary-token);
-  font-family:
-    var(--font-satoshi), "Satoshi", -apple-system, "system-ui", sans-serif;
-  font-size: var(--ds-marketing-display-size);
-  font-weight: 600;
-  letter-spacing: var(--ds-marketing-display-tracking);
-  line-height: var(--ds-marketing-display-leading);
-  text-wrap: balance;
+  line-height: 1.06;
   white-space: pre-line;
 }
 
@@ -1870,9 +1865,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
   position: relative;
   z-index: 2;
   flex-shrink: 0;
-  width: min(48rem, calc(100% - var(--homepage-page-gutter) * 2));
+  width: min(34rem, calc(100% - var(--homepage-page-gutter) * 2));
   min-height: var(--space-6);
   margin-block: var(--space-5) var(--space-6);
+  opacity: 0.46;
 }
 
 .homepage-poster-hero__electric-seam {
@@ -1926,6 +1922,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
     var(--homepage-grid-max),
     calc(100% - var(--homepage-grid-gutter) * 2)
   );
+  max-width: 64rem;
 }
 
 .homepage-poster-hero__media::before {
@@ -3054,13 +3051,11 @@ body:has(.home-viewport)::-webkit-scrollbar {
   }
 
   .homepage-poster-hero {
-    padding-top: calc(var(--homepage-header-height) + var(--space-8));
+    padding-top: calc(var(--homepage-header-height) + var(--space-12));
   }
 
   .homepage-poster-hero__headline {
-    max-width: 20ch;
-    font-size: clamp(2.4rem, 9vw, 3.1rem);
-    line-height: 0.94;
+    max-width: 28ch;
   }
 
   .homepage-poster-hero__subtitle {
@@ -3074,6 +3069,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
   .homepage-poster-hero__seam {
     margin-block: var(--space-6) var(--space-5);
+  }
+
+  .homepage-poster-hero__media {
+    width: 100%;
   }
 
   .homepage-product-pane {

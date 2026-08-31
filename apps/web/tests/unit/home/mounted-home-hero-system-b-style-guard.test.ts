@@ -77,6 +77,8 @@ describe('mounted homepage hero System B source contract', () => {
       'homepage-poster-hero',
       'homepage-poster-hero__copy',
       'homepage-poster-hero__headline',
+      'marketing-h1-linear',
+      'marketing-h1-max-two-lines',
       'homepage-poster-hero__subtitle',
       'homepage-poster-hero__actions',
       'homepage-poster-hero__seam',
@@ -101,15 +103,13 @@ describe('mounted homepage hero System B source contract', () => {
     expect(css).toContain('var(--homepage-grid-max)');
     expect(css).toContain('var(--homepage-grid-gutter)');
     expect(css).toContain('var(--space-');
-    expect(css).toContain('var(--font-satoshi)');
-    expect(css).toContain(
-      'letter-spacing: var(--ds-marketing-display-tracking);'
-    );
-    expect(css).toContain('font-size: var(--ds-marketing-display-size);');
-    expect(css).toContain('line-height: var(--ds-marketing-display-leading);');
+    expect(css).toContain('line-height: 1.06;');
     expect(css).toContain('font-size: var(--text-lg);');
     expect(css).toContain('text-wrap: pretty;');
     expect(css).toContain('mask-image: linear-gradient(');
     expect(css).toContain('min-height: var(--space-6);');
+    expect(css).toContain('var(--homepage-grid-max)');
+    expect(css).toContain('var(--homepage-grid-gutter)');
+    expect(css).toContain('max-width: 64rem;');
   });
 });

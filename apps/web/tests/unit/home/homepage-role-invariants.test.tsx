@@ -56,7 +56,7 @@ describe('JOV-5386 homepage role and shipping invariants', () => {
     expect(liveHomepageSource).not.toContain('MarketingShippedSitesShowcase');
     expect(liveHomepageSource).not.toContain('MarketingPlatformSpecBento');
     expect(HOMEPAGE_LAUNCH_COPY.hero.headline).toBe(
-      'Jovie helps you move your music forward.'
+      'Own your story. Know your audience. Never lose a fan.'
     );
     expect(HOMEPAGE_LAUNCH_COPY.hero.secondaryCta.href).toBe(
       '/artist-profiles'

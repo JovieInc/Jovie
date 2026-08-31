@@ -2020,6 +2020,7 @@ jobs:
                 pnpm exec playwright test \
                   tests/e2e/storybook-elevation.spec.ts \
                   tests/e2e/storybook-input.spec.ts \
+                  tests/e2e/storybook-marketing-h1.spec.ts \
                   tests/e2e/storybook-marketing-faq.spec.ts \
                   tests/e2e/storybook-skeleton.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line

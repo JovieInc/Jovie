@@ -37,6 +37,7 @@ describe('MarketingHero source-backed default story', () => {
       'id',
       MARKETING_HERO_DEFAULT_PROPS.headingId
     );
+    expect(heading).toHaveClass('marketing-h1-max-two-lines');
     expect(
       screen.getByText(
         'The AI workspace for artists to plan releases, create assets, pitch playlists, and promote every drop.'
