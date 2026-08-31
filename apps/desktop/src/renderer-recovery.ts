@@ -136,6 +136,7 @@ export interface LocalHostedLoadRetryController {
     readonly errorCode: number;
     readonly retryUrl: string;
   }) => LocalHostedLoadFailureResult;
+  readonly onHostedNavigationStarted: () => void;
   readonly onMainFrameDocumentCommitted: (input: {
     readonly isHostedAppDocument: boolean;
   }) => LocalHostedDocumentAction;
@@ -181,6 +182,7 @@ export function createLocalHostedLoadRetryController(input: {
       }, LOCAL_HOSTED_LOAD_RETRY_DELAY_MS);
       return { action, attempt: retryCount };
     },
+    onHostedNavigationStarted: clearPendingRetry,
     onMainFrameDocumentCommitted: ({ isHostedAppDocument }) => {
       if (!recoveryActive) return 'ignore';
       if (!isHostedAppDocument) return 'preserve-retry';

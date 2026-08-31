@@ -206,6 +206,11 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   );
   assert.match(mainSource, /createLocalHostedLoadRetryController/);
   assert.match(mainSource, /onMainFrameLoadFailure/);
+  assert.match(mainSource, /onHostedNavigationStarted/);
+  assert.match(
+    mainSource,
+    /win\.webContents\.on\('did-start-navigation'[\s\S]*?localHostedLoadRecovery\.onHostedNavigationStarted\(\)/
+  );
   assert.match(mainSource, /onMainFrameDocumentCommitted/);
   assert.match(mainSource, /isHostedAppDocument/);
   assert.match(mainSource, /win\.webContents\.on\('did-navigate'/);

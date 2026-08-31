@@ -149,6 +149,31 @@ test('a manual hosted reload completes recovery and cancels the stale retry time
   expect(retriedUrls).toEqual([]);
 });
 
+test('a hosted navigation start cancels a stale retry without resetting the budget', () => {
+  vi.useFakeTimers();
+  const retriedUrls: string[] = [];
+  const controller = createLocalHostedLoadRetryController({
+    retry: url => retriedUrls.push(url),
+    isWindowDestroyed: () => false,
+  });
+  const retryUrl = 'http://localhost:3100/app/chat?runtime=electron';
+
+  expect(
+    controller.onMainFrameLoadFailure({ errorCode: -102, retryUrl })
+  ).toEqual({ action: 'retry', attempt: 1 });
+
+  controller.onHostedNavigationStarted();
+  vi.advanceTimersByTime(LOCAL_HOSTED_LOAD_RETRY_DELAY_MS);
+  expect(retriedUrls).toEqual([]);
+
+  expect(
+    controller.onMainFrameDocumentCommitted({ isHostedAppDocument: false })
+  ).toBe('preserve-retry');
+  expect(
+    controller.onMainFrameLoadFailure({ errorCode: -102, retryUrl })
+  ).toEqual({ action: 'retry', attempt: 2 });
+});
+
 test('a failed manual reload replaces rather than overlaps the pending retry', () => {
   vi.useFakeTimers();
   const retriedUrls: string[] = [];

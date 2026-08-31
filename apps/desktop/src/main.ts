@@ -1703,6 +1703,7 @@ function attachRendererRecovery(
         isInPlace: navigation.isInPlace,
       }) === 'arm-load-watchdog'
     ) {
+      localHostedLoadRecovery.onHostedNavigationStarted();
       lastHostedUrl = navigation.url;
       armLoadWatchdog(navigation.url);
     }
