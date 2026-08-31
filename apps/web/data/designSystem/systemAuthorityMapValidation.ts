@@ -37,16 +37,16 @@ const has = (value?: string | null): value is string => Boolean(value?.trim());
 const STATUS_FLOORS: Readonly<
   Partial<Record<string, DesignSystemAuthorityStatus>>
 > = Object.freeze({
-    'foundation.tokens': 'partially-migrated',
-    'primitive.components': 'partially-migrated',
-    'interaction.families': 'canonical-enforced',
-    'composition.shared-owners': 'partially-migrated',
-    'archetype.product-screens': 'canonical-enforced',
-    'recipe.marketing-pages': 'canonical-enforced',
-    'surface.product-routes': 'partially-migrated',
-    'surface.marketing-routes': 'duplicated',
-    'certification.changed-surfaces': 'partially-migrated',
-    'legacy.historical-inventories': 'obsolete-superseded',
+  'foundation.tokens': 'partially-migrated',
+  'primitive.components': 'partially-migrated',
+  'interaction.families': 'canonical-enforced',
+  'composition.shared-owners': 'partially-migrated',
+  'archetype.product-screens': 'canonical-enforced',
+  'recipe.marketing-pages': 'canonical-enforced',
+  'surface.product-routes': 'partially-migrated',
+  'surface.marketing-routes': 'duplicated',
+  'certification.changed-surfaces': 'partially-migrated',
+  'legacy.historical-inventories': 'obsolete-superseded',
 });
 const LAYER_RANK = new Map(
   DESIGN_SYSTEM_AUTHORITY_LAYER_VALUES.map(
@@ -70,6 +70,7 @@ const layerFromId = (id: string) =>
   DESIGN_SYSTEM_AUTHORITY_LAYER_VALUES.find(layer =>
     id.startsWith(`${layer}.`)
   ) ?? null;
+const capabilityKey = (value: string) => (has(value) ? value.trim() : null);
 const CHECK_PATH_EXTENSIONS =
   /\.(?:cjs|cts|js|mjs|mts|sh|spec\.[cm]?[jt]sx?|test\.[cm]?[jt]sx?|ts|tsx|ya?ml)$/;
 const TEST_PATH_PATTERN = /(?:^|\/)(?:__tests__|tests)\//;
@@ -185,23 +186,27 @@ export function validateDesignSystemAuthorityMap({
     } else {
       const entryCapabilities = new Set<string>();
       for (const capability of entry.owns) {
-        if (!has(capability)) {
+        const key = capabilityKey(capability);
+        if (!key) {
           add(issues, 'missing-owned-capability', entry.id);
           continue;
         }
-        const priorOwner = entryCapabilities.has(capability)
+        if (key !== capability) {
+          add(issues, 'missing-owned-capability', `${entry.id}:${capability}`);
+        }
+        const priorOwner = entryCapabilities.has(key)
           ? entry.id
-          : capabilityOwners.get(capability);
+          : capabilityOwners.get(key);
         if (priorOwner) {
           add(
             issues,
             'duplicate-owned-capability',
-            `${entry.id}:${capability}:${priorOwner}`
+            `${entry.id}:${key}:${priorOwner}`
           );
         } else {
-          capabilityOwners.set(capability, entry.id);
+          capabilityOwners.set(key, entry.id);
         }
-        entryCapabilities.add(capability);
+        entryCapabilities.add(key);
       }
     }
     if (!has(entry.classificationReason)) {

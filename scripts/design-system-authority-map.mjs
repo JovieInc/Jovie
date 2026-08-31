@@ -44,6 +44,7 @@ const has = value => typeof value === 'string' && value.trim() !== '';
 const add = (issues, code, detail) => issues.push({ code, detail });
 const layerFromId = id =>
   AUTHORITY_MAP_LAYER_VALUES.find(layer => id.startsWith(`${layer}.`)) ?? null;
+const capabilityKey = value => (has(value) ? value.trim() : null);
 const CHECK_PATH_EXTENSIONS =
   /\.(?:cjs|cts|js|mjs|mts|sh|spec\.[cm]?[jt]sx?|test\.[cm]?[jt]sx?|ts|tsx|ya?ml)$/;
 const TEST_PATH_PATTERN = /(?:^|\/)(?:__tests__|tests)\//;
@@ -177,23 +178,27 @@ export function validateDesignSystemAuthorityMap(map, repoRoot = null) {
     } else {
       const entryCapabilities = new Set();
       for (const capability of entry.owns) {
-        if (!has(capability)) {
+        const key = capabilityKey(capability);
+        if (!key) {
           add(issues, 'missing-owned-capability', entry.id);
           continue;
         }
-        const priorOwner = entryCapabilities.has(capability)
+        if (key !== capability) {
+          add(issues, 'missing-owned-capability', `${entry.id}:${capability}`);
+        }
+        const priorOwner = entryCapabilities.has(key)
           ? entry.id
-          : capabilityOwners.get(capability);
+          : capabilityOwners.get(key);
         if (priorOwner) {
           add(
             issues,
             'duplicate-owned-capability',
-            `${entry.id}:${capability}:${priorOwner}`
+            `${entry.id}:${key}:${priorOwner}`
           );
         } else {
-          capabilityOwners.set(capability, entry.id);
+          capabilityOwners.set(key, entry.id);
         }
-        entryCapabilities.add(capability);
+        entryCapabilities.add(key);
       }
     }
     if (!has(entry.classificationReason)) {

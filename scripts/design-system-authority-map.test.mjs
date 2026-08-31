@@ -104,6 +104,18 @@ test('RED: authority map rejects empty capability ownership', () => {
     })),
     'duplicate-owned-capability'
   );
+  expectCode(
+    mutateEntry('surface.marketing-routes', entry => ({
+      owns: [...entry.owns, `${entry.owns[0]} `],
+    })),
+    'missing-owned-capability'
+  );
+  expectCode(
+    mutateEntry('interaction.families', entry => ({
+      owns: [...entry.owns, 'button '],
+    })),
+    'duplicate-owned-capability'
+  );
 });
 
 test('RED: authority map rejects reverse dependency edges', () => {
