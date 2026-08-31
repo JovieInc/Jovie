@@ -133,7 +133,7 @@ export async function hydrateOpenPrStatusContexts({
   repo,
   prs,
   request,
-  includeStatuses = () => true,
+  includeStatuses = _pr => true,
   batchSize = 40,
 }) {
   if (!Number.isSafeInteger(batchSize) || batchSize < 1 || batchSize > 50) {
