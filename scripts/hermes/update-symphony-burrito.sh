@@ -9,6 +9,10 @@ ASSET_NAME_NEEDLE="${SYMPHONY_ASSET_NEEDLE:-linux_x86_64}"
 BIN_DST="${TARGET_HOME}/.local/bin/symphony"
 UNIT_SRC="${REPO_ROOT}/scripts/hermes/systemd/symphony-burrito.service"
 UNIT_DST="${TARGET_HOME}/.config/systemd/user/symphony-burrito.service"
+TIMER_SRC="${REPO_ROOT}/scripts/hermes/systemd/symphony-burrito-update.timer"
+TIMER_DST="${TARGET_HOME}/.config/systemd/user/symphony-burrito-update.timer"
+UPDATE_UNIT_SRC="${REPO_ROOT}/scripts/hermes/systemd/symphony-burrito-update.service"
+UPDATE_UNIT_DST="${TARGET_HOME}/.config/systemd/user/symphony-burrito-update.service"
 WORKFLOW_SRC="${REPO_ROOT}/WORKFLOW.md"
 WORKFLOW_DST="${TARGET_HOME}/.config/symphony/WORKFLOW.md"
 LOG_DIR="${TARGET_HOME}/symphony-burrito-logs"
@@ -115,6 +119,8 @@ echo "VERIFIED $DIGEST"
 mkdir -p "$(dirname "$BIN_DST")" "$(dirname "$UNIT_DST")" "$(dirname "$WORKFLOW_DST")" "$LOG_DIR"
 install -m 0755 "${tmpdir}/${BIN_NAME}" "$BIN_DST"
 install -m 0644 "$UNIT_SRC" "$UNIT_DST"
+install -m 0644 "$TIMER_SRC" "$TIMER_DST"
+install -m 0644 "$UPDATE_UNIT_SRC" "$UPDATE_UNIT_DST"
 install -m 0644 "$WORKFLOW_SRC" "$WORKFLOW_DST"
 echo "INSTALLED $BIN_DST"
 echo "INSTALLED $UNIT_DST"
@@ -126,8 +132,9 @@ if [ "$RESTART" -eq 1 ]; then
     export XDG_RUNTIME_DIR
   fi
   systemctl --user daemon-reload
-  systemctl --user enable symphony-burrito.service
+  systemctl --user enable symphony-burrito.service symphony-burrito-update.timer
   systemctl --user restart symphony-burrito.service
+  systemctl --user start symphony-burrito-update.timer
   echo "RESTARTED symphony-burrito.service"
 fi
 

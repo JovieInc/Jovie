@@ -7,7 +7,8 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=%h
 Environment=HOME=%h
-Environment=PATH=%h/.local/bin:/usr/bin:/bin
+Environment=PATH=%h/.local/bin:%h/.hermes/bin:%h/.npm-global/bin:/usr/bin:/bin
+Environment=CODEX_HOME=%h/.codex-accounts/meetjovie
 EnvironmentFile=-%h/.config/symphony/linear.env
 ExecStart=%h/.local/bin/symphony --port 4043 --logs-root %h/symphony-burrito-logs %h/.config/symphony/WORKFLOW.md
 Restart=always

@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Gem tty1 check-in glass HUD. Fourth HUD — not the ops grid, not empty red bars."""
-
 from __future__ import annotations
-
 import argparse
 import json
 import math
@@ -15,27 +13,20 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
-
 BARS = "▁▂▃▄▅▆▇█"
 UNKNOWN = "UNKNOWN"
 UNMEASURED = "unmeasured"
 PROD_SHA_RE = re.compile(r"^[0-9a-f]{7,40}$", re.I)
 DEFAULT_MEASURED = Path.home() / ".local/state/gem-checkin-hud/measured.json"
 DEFAULT_SYMPHONY = os.environ.get("SYMPHONY_STATE_URL", "http://127.0.0.1:4043/api/v1/state")
-
-
 def _now() -> datetime:
     return datetime.now(timezone.utc)
-
-
 def _num(value: Any) -> float | None:
     if isinstance(value, bool) or value is None:
         return None
     if isinstance(value, (int, float)) and value == value:
         return float(value)
     return None
-
-
 def _iso(value: Any) -> datetime | None:
     if not isinstance(value, str) or not value.strip():
         return None
@@ -44,8 +35,6 @@ def _iso(value: Any) -> datetime | None:
     except ValueError:
         return None
     return stamp if stamp.tzinfo else stamp.replace(tzinfo=timezone.utc)
-
-
 def _text(record: dict[str, Any], keys: tuple[str, ...]) -> str | None:
     for key in keys:
         value = record.get(key)
@@ -54,8 +43,6 @@ def _text(record: dict[str, Any], keys: tuple[str, ...]) -> str | None:
         if isinstance(value, str) and value.strip():
             return value.strip()
     return None
-
-
 def load_measured(path: Path) -> dict[str, Any]:
     if not path.is_file():
         return {}
@@ -64,8 +51,6 @@ def load_measured(path: Path) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError):
         return {}
     return payload if isinstance(payload, dict) else {}
-
-
 def compute_alive(alive: Any) -> dict[str, Any]:
     source = alive if isinstance(alive, dict) else {}
     cash = _num(source.get("cashUsd"))
@@ -95,8 +80,6 @@ def compute_alive(alive: Any) -> dict[str, Any]:
         "weeklyRevenueUsd": revenue,
         "profitBeforeZeroUsd": profit,
     }
-
-
 def compute_wow(wow: Any) -> dict[str, Any]:
     source = wow if isinstance(wow, dict) else {}
     this_rev = _num(source.get("thisWeekRevenueUsd"))
@@ -110,8 +93,6 @@ def compute_wow(wow: Any) -> dict[str, Any]:
         rate = 0.0 if last_users == 0 else (this_users - last_users) / last_users
         return {"rate": rate, "basis": "active-users", "thisWeekRevenueUsd": this_rev, "lastWeekRevenueUsd": last_rev}
     return {"rate": None, "basis": UNKNOWN, "thisWeekRevenueUsd": this_rev, "lastWeekRevenueUsd": last_rev}
-
-
 def _receipt(item: Any) -> dict[str, str] | None:
     if not isinstance(item, dict):
         return None
@@ -123,8 +104,6 @@ def _receipt(item: Any) -> dict[str, str] | None:
     if not (linear and symphony and queue and sha and receipt and PROD_SHA_RE.match(sha) and _iso(receipt)):
         return None
     return {"receiptAt": receipt}
-
-
 def count_ships_this_week(ships: Any, *, now: datetime | None = None) -> dict[str, int]:
     receipts = ships.get("receipts") if isinstance(ships, dict) else None
     if not isinstance(receipts, list):
@@ -140,16 +119,12 @@ def count_ships_this_week(ships: Any, *, now: datetime | None = None) -> dict[st
         if stamped is not None and week_ago <= stamped <= clock:
             counted += 1
     return {"thisWeek": counted}
-
-
 def sparkline(values: list[float]) -> str:
     lo, hi = min(values), max(values)
     if hi <= lo:
         return BARS[0] * len(values)
     last = len(BARS) - 1
     return "".join(BARS[max(0, min(last, int(round((value - lo) / (hi - lo) * last))))] for value in values)
-
-
 def vertical_bars(values: list[float], *, height: int = 4) -> list[str]:
     lo, hi = min(values), max(values)
     rows: list[str] = []
@@ -160,8 +135,6 @@ def vertical_bars(values: list[float], *, height: int = 4) -> list[str]:
             cells.append("█" if rank >= level else " ")
         rows.append("".join(cells))
     return rows
-
-
 def series_values(measured: dict[str, Any], key: str) -> list[float] | None:
     series = measured.get("series")
     raw = series.get(key) if isinstance(series, dict) else None
@@ -174,23 +147,22 @@ def series_values(measured: dict[str, Any], key: str) -> list[float] | None:
             return None
         values.append(number)
     return values or None
-
-
 def fetch_symphony(url: str, *, timeout: float = 1.5) -> dict[str, Any]:
     try:
         with urllib.request.urlopen(url, timeout=timeout) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
-        return {"ok": False, "running": None, "retrying": None}
+        return {"ok": False, "running": None, "retrying": None, "hookFailed": False, "shipping": False}
     counts = payload.get("counts") if isinstance(payload, dict) and isinstance(payload.get("counts"), dict) else {}
     running, retrying = counts.get("running"), counts.get("retrying")
+    blob = json.dumps(payload)
     return {
         "ok": True,
         "running": running if isinstance(running, int) else None,
         "retrying": retrying if isinstance(retrying, int) else None,
+        "hookFailed": "workspace_hook_failed" in blob,
+        "shipping": any(token in blob for token in ('"html_url"', '"pr_url"', "pull/", "token")),
     }
-
-
 def bottleneck(alive: dict[str, Any], wow: dict[str, Any], ships: dict[str, int], symphony: dict[str, Any]) -> str:
     if alive["status"] == "DEAD":
         return "cash or profit-before-zero is dead"
@@ -202,28 +174,22 @@ def bottleneck(alive: dict[str, Any], wow: dict[str, Any], ships: dict[str, int]
         return "WOW below 5–7%/wk YC bar"
     if ships["thisWeek"] == 0:
         return "no receipted ships this week"
+    if symphony.get("ok") and symphony.get("hookFailed"):
+        return "workspace_hook_failed — patch after_create (HTTPS only, no mix)"
     if symphony.get("ok") and symphony.get("retrying"):
         return f"Symphony retrying {symphony['retrying']}"
     if not symphony.get("ok"):
         return "official Symphony :4043 unreachable"
     return "keep shipping receipted work"
-
-
 def _money(value: float | None) -> str:
     if value is None:
         return UNMEASURED
     sign = "-" if value < 0 else ""
     return f"{sign}${abs(value):,.0f}"
-
-
 def _pct(value: float | None) -> str:
     return UNMEASURED if value is None else f"{value * 100:.1f}%"
-
-
 def _count(value: int | None) -> str:
     return UNMEASURED if value is None else str(value)
-
-
 def render_tile(title: str, headline: str, detail: str, values: list[float] | None) -> list[str]:
     spark = sparkline(values) if values is not None else UNMEASURED
     lines = [f"┌ {title}", f"│ {headline}", f"│ {detail}", f"│ {spark}"]
@@ -233,8 +199,6 @@ def render_tile(title: str, headline: str, detail: str, values: list[float] | No
         lines.append("│")
     lines.append("└")
     return lines
-
-
 def compose_tiles(tiles: list[list[str]]) -> list[str]:
     height = max(len(tile) for tile in tiles)
     padded: list[list[str]] = []
@@ -245,8 +209,6 @@ def compose_tiles(tiles: list[list[str]]) -> list[str]:
         else:
             padded.append(tile)
     return ["  ".join(tile[index] for tile in padded) for index in range(height)]
-
-
 def render(*, measured: dict[str, Any], symphony: dict[str, Any], now: datetime | None = None) -> str:
     alive = compute_alive(measured.get("alive"))
     wow = compute_wow(measured.get("wow"))
@@ -277,8 +239,6 @@ def render(*, measured: dict[str, Any], symphony: dict[str, Any], now: datetime 
     )
     clock = (now or _now()).astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     return "\n".join(["GEM CHECK-IN", clock, "official burrito 127.0.0.1:4043", "", *tiles]) + "\n"
-
-
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Gem check-in glass HUD")
     parser.add_argument("--once", action="store_true")
@@ -286,12 +246,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--symphony-url", default=DEFAULT_SYMPHONY)
     parser.add_argument("--interval", type=float, default=5.0)
     return parser.parse_args(argv)
-
-
 def frame(*, measured_path: Path, symphony_url: str) -> str:
     return render(measured=load_measured(measured_path), symphony=fetch_symphony(symphony_url))
-
-
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     path = Path(args.measured)
@@ -303,7 +259,5 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.write(frame(measured_path=path, symphony_url=args.symphony_url))
         sys.stdout.flush()
         time.sleep(max(0.5, args.interval))
-
-
 if __name__ == "__main__":
     raise SystemExit(main())

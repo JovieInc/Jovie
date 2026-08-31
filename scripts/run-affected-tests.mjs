@@ -451,7 +451,10 @@ const GEM_PR_REHABILITATION_PYTHON_TESTS = [
 const GEM_CHECKIN_HUD_PRIMARY_INPUTS = new Set([
   'WORKFLOW.md',
   'scripts/hermes/gem-checkin-hud.py',
+  'scripts/hermes/gem-checkin-tty1.sh',
   'scripts/hermes/systemd/symphony-burrito.service',
+  'scripts/hermes/systemd/symphony-burrito-update.service',
+  'scripts/hermes/systemd/symphony-burrito-update.timer',
   'scripts/hermes/update-symphony-burrito.sh',
   'scripts/hermes/tests/gem-checkin-hud.test.py',
   'scripts/hermes/tests/symphony-burrito-workflow.test.py',
