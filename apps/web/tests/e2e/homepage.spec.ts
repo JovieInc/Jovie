@@ -414,7 +414,7 @@ test.describe('Homepage', () => {
     );
     await expect(
       page.getByTestId('homepage-v2-final-cta-primary')
-    ).toHaveAttribute('href', /\/start\?starter_prompt=/);
+    ).toHaveAttribute('href', '/start');
     const footer = page.getByTestId('marketing-footer');
     await expect(footer).toBeVisible();
     await expect(footer.getByRole('link', { name: 'Privacy' })).toHaveAttribute(
