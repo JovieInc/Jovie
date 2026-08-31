@@ -97,9 +97,11 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(typecheck).toMatch(
       /uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+if: >-\n\s+github\.event_name != 'pull_request' \|\|\n\s+needs\.ci-path-changes\.outputs\.run_jovie_typecheck == 'true'/
     );
-    // The lane runner remains unconditional and independently evaluates the
-    // diff. A false-negative selector therefore tries to execute without pnpm
-    // and fails red instead of silently skipping the gate.
+    expect(typecheck).toContain(
+      'CI_FAST_RUN_JOVIE_TYPECHECK: ${{ needs.ci-path-changes.outputs.run_jovie_typecheck }}'
+    );
+    // The lane runner remains unconditional so the required job still emits a
+    // lane receipt; it consumes the same path receipt that controls hydration.
     expect(typecheck).toMatch(
       /- name: Run ci-fast lanes\n\s+id: lanes\n(?!\s+if:)/
     );
@@ -107,6 +109,42 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(typecheck).toMatch(
       /name: Validate CI\/release incident prevention contract[\s\S]*?run: node scripts\/ci-release-incident-contract\.mjs/
     );
+  });
+
+  it('uses the path preselection receipt when hydration is intentionally skipped', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'ci-fast-no-typecheck-'));
+    const outPath = join(repo, 'ci-fast-lanes.json');
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [resolve(REPO_ROOT, 'scripts/ci-fast-lanes.mjs')],
+        {
+          cwd: repo,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            CI_FAST_LANE_GROUP: 'typecheck',
+            CI_FAST_LANES_OUT: outPath,
+            CI_FAST_RUN_JOVIE_TYPECHECK: 'false',
+            GITHUB_EVENT_NAME: 'pull_request',
+            GITHUB_BASE_REF: 'main',
+            TURBO_SCM_BASE: 'origin/main',
+            PATH: '/usr/bin:/bin',
+          },
+        }
+      );
+
+      expect(result.status).toBe(0);
+      const payload = JSON.parse(readFileSync(outPath, 'utf8'));
+      expect(payload.lanes).toEqual([
+        expect.objectContaining({ id: 'typecheck', status: 'skipped' }),
+      ]);
+      expect(payload.lanes[0].logExcerpt).toContain(
+        'ci-path-changes preselection'
+      );
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 
   it('fails red when hydration is skipped but the exact diff requires typecheck', () => {

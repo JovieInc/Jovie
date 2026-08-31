@@ -347,6 +347,17 @@ function runEslintServerBoundaries() {
 function runTypecheck() {
   // --force is mandatory (JOV-3499). Gate guard scans this file + ci.yml.
   const event = process.env.GITHUB_EVENT_NAME || '';
+  if (
+    event === 'pull_request' &&
+    process.env.CI_FAST_RUN_JOVIE_TYPECHECK === 'false'
+  ) {
+    return {
+      code: 0,
+      output:
+        'No TypeScript graph files changed (ci-path-changes preselection)\n',
+      skipped: true,
+    };
+  }
   if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
     return {
       code: 0,
