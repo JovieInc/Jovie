@@ -354,6 +354,49 @@ describe('no unattended red loop', () => {
     assert.equal(projectSummerQueue([], { now: NOW }).items.length, 0);
   });
 
+  it('emits a current-generation tombstone when a stale partial draft-stack tombstone is invisible', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'jovie-red-partial-tombstone-'));
+    try {
+      const root = 16606;
+      const resolvedAt = '2026-08-28T23:00:00.000Z';
+      const abandonedKey = '2'.repeat(64);
+      const currentKey = '3'.repeat(64);
+      const authority = { schema: 'jovie-draft-stack-authority/v1', snapshotKey: currentKey, observedAt: resolvedAt };
+      const legacy = {
+        ...open('draft-stack-policy', { issue: null, pr: root, delivery_key: `stack-${root}` }),
+        draftStackGeneration: null,
+      };
+      const partial = {
+        ...legacy,
+        loopKey: 'f'.repeat(64),
+        issueKey: `draft-stack-resolved:${root}:${resolvedAt}`,
+        outcome: 'healthy',
+        terminal: true,
+        dispatchState: 'complete',
+        observedAt: resolvedAt,
+        reason: 'draft-stack-policy-current-action-absent',
+        supersedesLoopKey: legacy.loopKey,
+        draftStackGeneration: abandonedKey,
+      };
+      await persistLoopOutcome(legacy, { stateDir: directory });
+      await withSummerQueueLock(directory, () => persistLoopOutcome(partial, { stateDir: directory, queueLockHeld: true }));
+
+      const recovered = await persistDraftStackResolutions([], {
+        stateDir: directory,
+        now: resolvedAt,
+        draftStackAuthority: authority,
+      });
+
+      assert.equal(recovered.status, 'resolved');
+      assert.equal(recovered.resolved[0].record.draftStackGeneration, currentKey);
+      assert.equal(recovered.resolved[0].record.supersedesLoopKey, legacy.loopKey);
+      assert.equal(recovered.queue.items.some(item => item.pr === root), false);
+      assert.equal(recovered.queue.terminalTombstones.some(item => item.pr === root), true);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it('serializes queue generations and recovers after a dead writer', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'jovie-red-queue-lock-'));
     /** @type {((value?: unknown) => void) | undefined} */

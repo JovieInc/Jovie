@@ -241,6 +241,11 @@ function createApi() {
     if (left.outcome === 'healthy' && right.outcome !== 'healthy') return left;
     return preferQueueRecord(left, right);
   }
+  function draftStackRecordVisibleForAuthority(record, authority) {
+    if (record.stallClass !== 'draft-stack-policy' || !authority) return true;
+    const authorityAt = Date.parse(authority?.observedAt);
+    return record.draftStackGeneration === authority.snapshotKey || (!record.draftStackGeneration && Date.parse(record.observedAt) < authorityAt);
+  }
   function projectSummerQueue(records, { now = new Date().toISOString() } = {}) {
     const source = [...(records || [])];
     const collapsed = new Map();
@@ -332,8 +337,7 @@ function createApi() {
     const records = await loadLoopRecords(stateDir);
     const current = await readSummerQueue(stateDir);
     const authority = draftStackAuthority || current?.draftStackAuthority || null;
-    const authorityAt = Date.parse(authority?.observedAt);
-    const visibleRecords = records.filter(record => record.stallClass !== 'draft-stack-policy' || !authority || record.draftStackGeneration === authority.snapshotKey || (!record.draftStackGeneration && Date.parse(record.observedAt) < authorityAt));
+    const visibleRecords = records.filter(record => draftStackRecordVisibleForAuthority(record, authority));
     const queueObservedAt = visibleRecords.reduce(
       (latest, record) => Date.parse(record.observedAt) > Date.parse(latest) ? record.observedAt : latest,
       Date.parse(current?.observedAt) > Date.parse(observedAt) ? current.observedAt : observedAt
@@ -401,6 +405,7 @@ function createApi() {
       const resolutionObservedAt = iso(now);
       const records = await loadLoopRecords(stateDir);
       const latest = new Map();
+      const visibleLatest = new Map();
       for (const record of records) {
         if (record.stallClass !== 'draft-stack-policy' || !prn(record.pr)) continue;
         const root = prn(record.pr);
@@ -410,21 +415,33 @@ function createApi() {
             ? preferDraftStackRecord(latest.get(root), record)
             : record
         );
+        if (draftStackRecordVisibleForAuthority(record, draftStackAuthority)) {
+          visibleLatest.set(
+            root,
+            visibleLatest.has(root)
+              ? preferDraftStackRecord(visibleLatest.get(root), record)
+              : record
+          );
+        }
       }
       const resolved = [];
       for (const [root, record] of latest) {
-        if (roots.has(root) || record.outcome === 'healthy' || !(Date.parse(resolutionObservedAt) > Date.parse(record.observedAt))) continue;
+        const visibleRecord = visibleLatest.get(root);
+        const resolutionRecord = record.outcome === 'healthy' && !draftStackRecordVisibleForAuthority(record, draftStackAuthority)
+          ? visibleRecord
+          : record;
+        if (!resolutionRecord || roots.has(root) || resolutionRecord.outcome === 'healthy' || !(Date.parse(resolutionObservedAt) > Date.parse(resolutionRecord.observedAt))) continue;
         const tombstone = {
-          ...record,
-          loopKey: digest({ supersedes: record.loopKey, outcome: 'healthy', observedAt: resolutionObservedAt }),
+          ...resolutionRecord,
+          loopKey: digest({ supersedes: resolutionRecord.loopKey, outcome: 'healthy', observedAt: resolutionObservedAt }),
           issueKey: `draft-stack-resolved:${root}:${resolutionObservedAt}`,
           outcome: 'healthy',
           terminal: true,
           dispatchState: 'complete',
           observedAt: resolutionObservedAt,
           reason: 'draft-stack-policy-current-action-absent',
-          supersedesLoopKey: record.loopKey,
-          draftStackGeneration: draftStackAuthority?.snapshotKey || record.draftStackGeneration || null,
+          supersedesLoopKey: resolutionRecord.loopKey,
+          draftStackGeneration: draftStackAuthority?.snapshotKey || resolutionRecord.draftStackGeneration || null,
           externalMutations: 0,
         };
         const destination = join(stateDir, 'red-loop', `${tombstone.loopKey}.json`);
