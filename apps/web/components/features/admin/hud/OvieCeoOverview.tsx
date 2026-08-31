@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/features/admin/hud/OvieCeoOverview.test.tsx
 import { ChevronRight, ExternalLink, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
