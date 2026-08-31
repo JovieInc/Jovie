@@ -7,8 +7,11 @@ import {
   ADMISSION_TARGET_FIELDS,
   admissionTargetsCollide,
   authoritativeBehaviorOwners,
+  collisionDomainsForPaths,
+  laneForArtifact,
   loadOwnershipInventory,
   resolveAdmissionTarget,
+  resourceForArtifact,
 } from '../ownership-inventory.mjs';
 import * as planGate from '../plan-gate.mjs';
 import { planEvidenceFor, withPreLeaseReceipts } from './pre-lease.mjs';
@@ -221,6 +224,23 @@ Change JovieInc/LogYourBody.
     assert.equal(admissionTargetsCollide(jovieWeb, jovieWebPeer), true);
     assert.equal(admissionTargetsCollide(jovieWeb, logYourBody), false);
     assert.ok(jovieWeb.collision_domains.length > 0);
+  });
+
+  it('adds lane and exact-resource domains without treating every workflow as control-plane risk', () => {
+    assert.equal(laneForArtifact('apps/ios/App/AppDelegate.swift'), 'ios');
+    assert.equal(laneForArtifact('apps/web/app/page.tsx'), 'web');
+    assert.equal(
+      resourceForArtifact('.github/workflows/ios-testflight.yml'),
+      'github-actions:ios-testflight'
+    );
+    assert.deepEqual(
+      collisionDomainsForPaths(['.github/workflows/ios-testflight.yml']),
+      [
+        'artifact:JovieInc/Jovie:.github/workflows',
+        'lane:JovieInc/Jovie:ios',
+        'resource:JovieInc/Jovie:github-actions:ios-testflight',
+      ]
+    );
   });
 
   it('keeps LYB packets on LogYourBody', () => {
