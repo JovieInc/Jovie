@@ -8,7 +8,11 @@ import {
   expectedDesktopAssetNames,
   validateReleaseAssets,
 } from './desktop-release-assets.mjs';
-import { evaluateDesktopReleaseGuard } from './desktop-release-guard.mjs';
+import {
+  evaluateDesktopReleaseGuard,
+  formatReleaseStampFailureDetails,
+  readGitObjectContent,
+} from './desktop-release-guard.mjs';
 import { discoverVersionedManifests, planStamp } from './version-stamp.mjs';
 
 const desktopRequire = createRequire(
@@ -260,6 +264,7 @@ test('fails when desktop changes include a pre-land version artifact', () => {
 
   assert.equal(result.passed, false);
   assert.deepEqual(result.prelandReleaseStateFiles, ['VERSION']);
+  assert.deepEqual(formatReleaseStampFailureDetails(result), []);
 });
 
 test('passes explicit release deterministic fan-out with desktop package only', () => {
@@ -278,6 +283,16 @@ test('passes explicit release deterministic fan-out with desktop package only', 
   assert.deepEqual(result.releaseStampExtraFiles, []);
 });
 
+test('preserves git object bytes for release-stamp content validation', () => {
+  const version = readGitObjectContent('HEAD', 'VERSION');
+
+  assert.equal(
+    version,
+    readFileSync(new URL('../VERSION', import.meta.url), 'utf8')
+  );
+  assert.equal(version?.endsWith('\n'), true);
+});
+
 test('fails deterministic fan-out on a feature branch', () => {
   const result = evaluateDesktopReleaseGuard({
     branch: 'tim/jov-5748-release-stamp',
@@ -293,6 +308,7 @@ test('fails deterministic fan-out on a feature branch', () => {
     'CHANGELOG.md',
     'VERSION',
   ]);
+  assert.deepEqual(formatReleaseStampFailureDetails(result), []);
 });
 
 test('fails release fan-out bundled with desktop source changes', () => {
@@ -313,6 +329,29 @@ test('fails release fan-out bundled with desktop source changes', () => {
     'apps/desktop/src/main.ts',
   ]);
   assert.deepEqual(result.releaseStampExtraFiles, ['apps/desktop/src/main.ts']);
+  assert.deepEqual(formatReleaseStampFailureDetails(result), [
+    'Release-stamp extra files:',
+    '- apps/desktop/src/main.ts',
+  ]);
+});
+
+test('reports release fan-out missing files in guard diagnostics', () => {
+  const result = evaluateDesktopReleaseGuard({
+    branch: 'release/2026-08-31',
+    changedFiles: deterministicReleaseStampFiles.filter(
+      file => file !== 'version.json'
+    ),
+    versionedManifests: releaseStampManifests,
+    ...releaseStampContents(),
+  });
+
+  assert.equal(result.passed, false);
+  assert.equal(result.releaseStampAuthorized, false);
+  assert.deepEqual(result.releaseStampMissingFiles, ['version.json']);
+  assert.deepEqual(formatReleaseStampFailureDetails(result), [
+    'Release-stamp missing files:',
+    '- version.json',
+  ]);
 });
 
 test('fails release fan-out when desktop package changes more than version', () => {
@@ -337,6 +376,10 @@ test('fails release fan-out when desktop package changes more than version', () 
   assert.equal(result.releaseStampAuthorized, false);
   assert.deepEqual(result.releaseStampContentViolations, [
     'apps/desktop/package.json changed more than the version field',
+  ]);
+  assert.deepEqual(formatReleaseStampFailureDetails(result), [
+    'Release-stamp content violations:',
+    '- apps/desktop/package.json changed more than the version field',
   ]);
 });
 
