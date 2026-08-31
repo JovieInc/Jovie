@@ -27,7 +27,7 @@
 #     immediately before exact-head enrollment (defaults 6 / 2)
 #   DRAIN_ADMISSION_PR / DRAIN_ADMISSION_HEAD  optional exact new-admission
 #     scope; when both are empty this run is maintenance-only
-#   DRAIN_RECONCILE_MISSED_ADMISSION  permit one bounded exact-green recovery
+#   DRAIN_RECONCILE_MISSED_ADMISSION  permit bounded exact-green recovery
 #     pass for admission events replaced while pending in the workflow mutex
 #   DRAIN_QUEUE_REENTRY_MAX_PER_RUN  total event + recovery admission cap (1-2)
 #   DRAIN_PROMOTION_MODE  normal, isolated-only, draft-only, hold-intake, or blocked
@@ -2139,13 +2139,13 @@ echo "$SNAP" | jq -r --arg re "$AGENT_RE" '.[]
   | select(.m=="CONFLICTING")
   | select(.base=="main")
   | select(.head|test($re))
-  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"') | not)
+  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or .=="needs-conflict-resolution" or '"$NO_AUTO_HOLD_JQ"') | not)
   | "  #\(.n)  \(.t)  [\(.head)]"'
 echo "$SNAP" | jq -r --arg re "$AGENT_RE" '.[]
   | select(.m=="CONFLICTING")
   | select(.base=="main")
   | select(.head|test($re))
-  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"') | not) | .n' \
+  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or .=="needs-conflict-resolution" or '"$NO_AUTO_HOLD_JQ"') | not) | .n' \
 | while read -r n; do [[ -n "$n" ]] && label "$n" needs-conflict-resolution; done
 
 # --- BLOCKED: mergeable but red checks → hand to fix agent ---

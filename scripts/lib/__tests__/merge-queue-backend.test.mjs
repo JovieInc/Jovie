@@ -270,11 +270,12 @@ function workflowRunScript(workflow, name) {
 }
 
 function executeAdmissionScope({
-  path,
-  conclusion,
-  name,
+  path = null,
+  conclusion = null,
+  name = null,
   workflowEvent = 'pull_request',
   pullRequests = [],
+  pullRequestEvent = null,
 }) {
   const workflow = readRepoFile('.github/workflows/merge-queue-autoenroll.yml');
   const script = workflowRunScript(workflow, 'Resolve exact admission scope');
@@ -291,15 +292,17 @@ function executeAdmissionScope({
   chmodSync(ghPath, 0o755);
   writeFileSync(
     eventPath,
-    JSON.stringify({
-      workflow_run: {
-        path,
-        conclusion,
-        name,
-        event: workflowEvent,
-        head_sha: HEAD,
-      },
-    })
+    JSON.stringify(
+      pullRequestEvent ?? {
+        workflow_run: {
+          path,
+          conclusion,
+          name,
+          event: workflowEvent,
+          head_sha: HEAD,
+        },
+      }
+    )
   );
   writeFileSync(outputPath, '');
   try {
@@ -310,7 +313,7 @@ function executeAdmissionScope({
         encoding: 'utf8',
         env: {
           ...process.env,
-          EVENT_NAME: 'workflow_run',
+          EVENT_NAME: pullRequestEvent ? 'pull_request' : 'workflow_run',
           GITHUB_EVENT_PATH: eventPath,
           GITHUB_OUTPUT: outputPath,
           MANUAL_PR: '',
@@ -555,7 +558,9 @@ describe('queue workflow mutation safety', () => {
     const fleetPolicy = workflowStep(workflow, 'Evaluate fresh fleet policy');
     const drain = readRepoFile('scripts/drain-pr-queue.sh');
 
-    expect(workflow).toContain('types: [reopened, labeled, unlabeled]');
+    expect(workflow).toContain(
+      'types: [reopened, labeled, unlabeled, enqueued]'
+    );
     expect(workflow).not.toContain('ready_for_review, reopened');
 
     expect(fleetPolicy).toContain('github-token: ${{ github.token }}');
@@ -708,6 +713,28 @@ describe('queue workflow mutation safety', () => {
         pr_number: '',
         head_sha: '',
         reconcile_queue_reentry: '0',
+      })
+    );
+  });
+
+  it('treats a native enqueued event as an exact-head continuation candidate', () => {
+    const outputs = executeAdmissionScope({
+      pullRequestEvent: {
+        action: 'enqueued',
+        pull_request: {
+          number: 16762,
+          base: { ref: 'main' },
+          head: { sha: HEAD },
+        },
+      },
+    });
+
+    expect(outputs).toEqual(
+      expect.objectContaining({
+        disposition: 'candidate',
+        reason: 'pull-request-exact-head',
+        pr_number: '16762',
+        head_sha: HEAD,
       })
     );
   });
