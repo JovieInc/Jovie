@@ -223,7 +223,7 @@ describe('delivery state machine', () => {
       const action = {
         schema: 'jovie-stack-health-action/v1',
         taskKey: 'b'.repeat(64),
-        deliveryKey: 'closure-stack:test-root',
+        deliveryKey: `closure-stack:${'b'.repeat(64)}`,
         action: 'split-or-retarget-draft-stack',
         owner: 'symphony',
         writer: 'symphony',
@@ -231,10 +231,14 @@ describe('delivery state machine', () => {
         rootPr: 16510,
         rootHeadSha: HEAD,
         prNumbers: [16510, 16511],
-        maxDepth: 5,
+        memberHeads: [
+          { pr: 16510, headSha: HEAD },
+          { pr: 16511, headSha: HEAD },
+        ],
+        maxDepth: 2,
         promotionPath: [
-          { pr: 16510, base: 'main', head: 'stack/root' },
-          { pr: 16511, base: 'stack/root', head: 'stack/child' },
+          { pr: 16510, base: 'main', head: 'stack/root', headSha: HEAD },
+          { pr: 16511, base: 'stack/root', head: 'stack/child', headSha: HEAD },
         ],
         integrator: null,
         deadline: null,
@@ -243,17 +247,83 @@ describe('delivery state machine', () => {
       };
       const source = {
         schema: 'jovie-closure-health/v1',
+        authority: 'Summer',
         observedAt: '2026-08-28T22:00:00.000Z',
+        reasons: [],
+        stackHealth: { violations: [] },
         repairActions: [action],
       };
-      const first = await persistClosureHealthActions(source, {
-        stateDir: directory,
+      const variant = (key, rootPr) => ({
+        ...action,
+        taskKey: key.repeat(64),
+        deliveryKey: `closure-stack:${key.repeat(64)}`,
+        rootPr,
+        rootHeadSha: key.repeat(40),
+        prNumbers: [rootPr],
+        memberHeads: [{ pr: rootPr, headSha: key.repeat(40) }],
+        maxDepth: 1,
+        promotionPath: [
+          { pr: rootPr, base: 'main', head: key, headSha: key.repeat(40) },
+        ],
       });
-      const duplicate = await persistClosureHealthActions(source, {
-        stateDir: directory,
-      });
+      const persist = (
+        repairActions,
+        observedAt = source.observedAt,
+        violationRoots = repairActions.map(item => item.rootPr),
+        reasons = violationRoots.length ? ['draft-stack-policy-violation'] : []
+      ) =>
+        persistClosureHealthActions(
+          {
+            ...source,
+            observedAt,
+            reasons,
+            stackHealth: {
+              violations: violationRoots.map(rootPr => ({ rootPr })),
+            },
+            repairActions,
+          },
+          { stateDir: directory }
+        );
+      const readQueue = async () =>
+        JSON.parse(
+          await readFile(join(directory, 'summer-queue.json'), 'utf8')
+        );
+      const otherRoot = variant('c', 16512);
+      const advancedRoot = variant('d', 16510);
+      const first = await persist([action]);
+      const stillViolatingWithoutExactEvidence = await persist(
+        [],
+        '2026-08-28T22:30:00.000Z',
+        [16510, 16513]
+      );
+      assert.equal(stillViolatingWithoutExactEvidence.evidenceCount, 2);
+      const firstSeenEvidence =
+        stillViolatingWithoutExactEvidence.evidence.find(
+          item => item.rootPr === 16513
+        );
+      assert.equal(firstSeenEvidence.task.action, 'collect-missing-evidence');
+      assert.equal(firstSeenEvidence.loop.mode, 'collect-evidence');
+      const unknownObservation = await persist(
+        [],
+        '2026-08-28T22:45:00.000Z',
+        [],
+        ['closure-observation-unknown']
+      );
+      assert.equal(unknownObservation.resolution.status, 'unobserved');
+      await persist([action, otherRoot], '2026-08-28T23:00:00.000Z');
+      await persist([advancedRoot, otherRoot], '2026-08-29T00:00:00.000Z');
+      const duplicate = await persist(
+        [advancedRoot, otherRoot],
+        '2026-08-29T00:00:00.000Z'
+      );
       assert.equal(first.status, 'created');
       assert.equal(duplicate.status, 'duplicate');
+      const queue = await readQueue();
+      assert.equal(queue.items.length, 2);
+      assert.equal(
+        queue.items.find(item => item.pr === 16510).headSha,
+        'd'.repeat(40)
+      );
       assert.equal(
         first.actions[0].task.action,
         'split-or-retarget-draft-stack'
@@ -262,7 +332,45 @@ describe('delivery state machine', () => {
         await readFile(first.actions[0].taskPath, 'utf8')
       );
       assert.deepEqual(task.evidence.prNumbers, [16510, 16511]);
+      assert.deepEqual(task.evidence.memberHeads, action.memberHeads);
       assert.equal(task.evidence.rootHeadSha, HEAD);
+      assert.equal(task.evidence.promotionPath[0].headSha, HEAD);
+      const resolved = await persist([], '2026-08-29T01:00:00.000Z');
+      assert.equal(resolved.status, 'resolved');
+      assert.deepEqual(
+        resolved.resolution.resolved.map(item => item.rootPr).sort(),
+        [16510, 16512]
+      );
+      const resolvedQueue = await readQueue();
+      assert.equal(resolvedQueue.items.length, 0);
+      assert.equal(resolvedQueue.terminalTombstones.length, 2);
+      assert.equal(
+        resolvedQueue.terminalTombstones[0].reason,
+        'draft-stack-policy-current-action-absent'
+      );
+      // Resolution is append-only: task/receipt history remains readable.
+      assert.equal(
+        JSON.parse(await readFile(first.actions[0].taskPath, 'utf8')).taskKey,
+        task.taskKey
+      );
+      await persist([action], '2026-08-29T02:00:00.000Z');
+      await persist([advancedRoot], '2026-08-29T03:00:00.000Z');
+      const returned = await persist([action], '2026-08-29T04:00:00.000Z');
+      assert.equal(returned.resolution.queue.items[0].headSha, HEAD);
+      assert.ok(returned.actions[0].loop.supersedesLoopKey);
+      await Promise.all([
+        persist([action, otherRoot], '2026-08-29T05:00:00.000Z'),
+        persist([], '2026-08-29T06:00:00.000Z'),
+      ]);
+      assert.equal((await readQueue()).items.length, 0);
+      await persist([action], '2026-08-29T07:00:00.000Z');
+      const olderEmpty = await persist([], '2026-08-29T06:30:00.000Z');
+      assert.equal(olderEmpty.status, 'stale');
+      const refreshed = await persist([action], '2026-08-29T08:00:00.000Z');
+      assert.equal(
+        (await readQueue()).items[0].observedAt,
+        refreshed.observedAt
+      );
       await assert.rejects(
         persistClosureHealthActions(
           { ...source, repairActions: [{ ...action, rootHeadSha: null }] },

@@ -3797,7 +3797,10 @@ class TestReleaseQueueDeferred:
         assert "Queue-Deferred Release]" not in fleet_gate_refresh
         assert "workflows: ['Fleet Gate Refresh']" in workflow
         assert "workflows: ['CI', 'Production Controller', 'Fleet Gate Refresh']" not in workflow
-        assert "pull_request:" in fleet_gate_refresh
+        assert "pull_request_target:" in fleet_gate_refresh
+        assert "\n  pull_request:\n" not in fleet_gate_refresh
+        assert "converted_to_draft" in fleet_gate_refresh
+        assert "github.event_name != 'pull_request_target'" in fleet_gate_refresh
         assert "branches: [main]" in fleet_gate_refresh
         assert "github.event.workflow_run.conclusion != 'cancelled'" in fleet_gate_refresh
         assert "github.event.pull_request.merged != true" in fleet_gate_refresh

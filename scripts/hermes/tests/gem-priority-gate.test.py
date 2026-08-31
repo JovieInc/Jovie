@@ -1648,7 +1648,7 @@ class WorkflowContractTests(unittest.TestCase):
         content = (self.WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
         self.assertNotIn("schedule:", content)
         self.assertNotIn("cron:", content)
-        self.assertIn("pull_request:", content)
+        self.assertIn("pull_request_target:", content)
         self.assertIn("workflow_run:", content)
         self.assertIn(
             "workflows: [CI, Production Controller]",
