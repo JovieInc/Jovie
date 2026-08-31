@@ -47,6 +47,27 @@ function sign(body: string): string {
   return createHmac('sha256', 'linear-secret').update(body).digest('hex');
 }
 
+function planReadyPayload(webhookId?: string) {
+  return {
+    type: 'Comment',
+    action: 'create',
+    createdAt: '2026-03-10T00:00:00.000Z',
+    webhookId,
+    data: {
+      id: 'comment_123',
+      body: 'coderabbit-plan-ready verify_required=true',
+      user: { name: 'CodeRabbit' },
+      issue: {
+        id: 'issue_123',
+        identifier: 'JOV-123',
+        updatedAt: '2026-03-10T00:00:01.000Z',
+        state: { name: 'Todo' },
+        team: { key: 'JOV' },
+      },
+    },
+  };
+}
+
 describe('POST /api/webhooks/linear', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -60,19 +81,7 @@ describe('POST /api/webhooks/linear', () => {
     });
 
     const { POST } = await import('@/app/api/webhooks/linear/route');
-    const payload = {
-      type: 'Issue',
-      action: 'update',
-      createdAt: '2026-03-10T00:00:00.000Z',
-      updatedFrom: { stateId: 'old' },
-      data: {
-        id: 'issue_123',
-        updatedAt: '2026-03-10T00:00:01.000Z',
-        stateId: 'new',
-        state: { name: 'Todo' },
-        team: { key: 'JOV' },
-      },
-    };
+    const payload = planReadyPayload();
     const body = JSON.stringify(payload);
     const request = new Request('https://example.com/api/webhooks/linear', {
       method: 'POST',
@@ -89,7 +98,7 @@ describe('POST /api/webhooks/linear', () => {
     expect(data).toEqual({
       received: true,
       deduplicated: true,
-      eventId: 'issue_123:2026-03-10T00:00:01.000Z:intake',
+      eventId: 'issue_123:2026-03-10T00:00:01.000Z:plan',
     });
     expect(mockServerFetch).not.toHaveBeenCalled();
     expect(mockClearRecentDispatch).not.toHaveBeenCalled();
@@ -102,19 +111,7 @@ describe('POST /api/webhooks/linear', () => {
     });
 
     const { POST } = await import('@/app/api/webhooks/linear/route');
-    const payload = {
-      type: 'Issue',
-      action: 'update',
-      createdAt: '2026-03-10T00:00:00.000Z',
-      updatedFrom: { stateId: 'old' },
-      data: {
-        id: 'issue_123',
-        updatedAt: '2026-03-10T00:00:01.000Z',
-        stateId: 'new',
-        state: { name: 'Todo' },
-        team: { key: 'JOV' },
-      },
-    };
+    const payload = planReadyPayload();
     const body = JSON.stringify(payload);
     const request = new Request('https://example.com/api/webhooks/linear', {
       method: 'POST',
@@ -153,19 +150,7 @@ describe('POST /api/webhooks/linear', () => {
     );
 
     const { POST } = await import('@/app/api/webhooks/linear/route');
-    const payload = {
-      type: 'Issue',
-      action: 'update',
-      createdAt: '2026-03-10T00:00:00.000Z',
-      updatedFrom: { stateId: 'old' },
-      data: {
-        id: 'issue_123',
-        updatedAt: '2026-03-10T00:00:01.000Z',
-        stateId: 'new',
-        state: { name: 'Todo' },
-        team: { key: 'JOV' },
-      },
-    };
+    const payload = planReadyPayload();
     const body = JSON.stringify(payload);
     const request = new Request('https://example.com/api/webhooks/linear', {
       method: 'POST',
@@ -183,7 +168,7 @@ describe('POST /api/webhooks/linear', () => {
       received: true,
       dispatchState: 'ambiguous',
       reconcileRequired: true,
-      eventId: 'issue_123:2026-03-10T00:00:01.000Z:intake',
+      eventId: 'issue_123:2026-03-10T00:00:01.000Z:plan',
     });
     expect(mockClearRecentDispatch).not.toHaveBeenCalled();
     expect(mockCaptureCriticalError).toHaveBeenCalledWith(
@@ -208,19 +193,7 @@ describe('POST /api/webhooks/linear', () => {
     );
 
     const { POST } = await import('@/app/api/webhooks/linear/route');
-    const payload = {
-      type: 'Issue',
-      action: 'update',
-      createdAt: '2026-03-10T00:00:00.000Z',
-      updatedFrom: { stateId: 'old' },
-      data: {
-        id: 'issue_123',
-        updatedAt: '2026-03-10T00:00:01.000Z',
-        stateId: 'new',
-        state: { name: 'Todo' },
-        team: { key: 'JOV' },
-      },
-    };
+    const payload = planReadyPayload();
     const body = JSON.stringify(payload);
     const request = new Request('https://example.com/api/webhooks/linear', {
       method: 'POST',
@@ -243,13 +216,7 @@ describe('POST /api/webhooks/linear', () => {
     expect(mockServerFetch.mock.calls[0]?.[1]).not.toHaveProperty('retry');
   });
 
-  it('dispatches a label-free JOV backlog create as an intake event', async () => {
-    mockAcquireRecentDispatch.mockResolvedValue({
-      acquired: true,
-      reason: 'acquired',
-    });
-    mockServerFetch.mockResolvedValue(new Response(null, { status: 204 }));
-
+  it('leaves JOV issue pickup to upstream OpenAI Symphony', async () => {
     const { POST } = await import('@/app/api/webhooks/linear/route');
     const payload = {
       type: 'Issue',
@@ -274,22 +241,12 @@ describe('POST /api/webhooks/linear', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
-      received: true,
-      dispatched: true,
-      eventId: 'issue_backlog:2026-08-15T00:00:00.000Z:intake',
-    });
-    expect(mockServerFetch.mock.calls[0]?.[1]).toEqual(
-      expect.objectContaining({
-        body: expect.stringContaining('"event_type":"linear-intake-changed"'),
-      })
-    );
-    expect(mockServerFetch.mock.calls[0]?.[1]?.body).toContain(
-      '"team_key":"JOV"'
-    );
+    expect(await response.json()).toEqual({ received: true, ignored: true });
+    expect(mockAcquireRecentDispatch).not.toHaveBeenCalled();
+    expect(mockServerFetch).not.toHaveBeenCalled();
   });
 
-  it('carries provider delivery identity in a bounded durable payload', async () => {
+  it('keeps plan-ready dispatches bounded and distinct from issue pickup', async () => {
     mockAcquireRecentDispatch.mockResolvedValue({
       acquired: true,
       reason: 'acquired',
@@ -297,18 +254,7 @@ describe('POST /api/webhooks/linear', () => {
     mockServerFetch.mockResolvedValue(new Response(null, { status: 204 }));
 
     const { POST } = await import('@/app/api/webhooks/linear/route');
-    const payload = {
-      type: 'Issue',
-      action: 'update',
-      webhookId: 'linear-delivery-5306',
-      data: {
-        id: 'issue_5306',
-        identifier: 'JOV-5306',
-        updatedAt: '2026-08-22T00:00:00.000Z',
-        team: { key: 'JOV' },
-        state: { name: 'Todo' },
-      },
-    };
+    const payload = planReadyPayload('linear-delivery-5306');
     const body = JSON.stringify(payload);
     const response = await POST(
       new Request('https://example.com/api/webhooks/linear', {
@@ -320,14 +266,15 @@ describe('POST /api/webhooks/linear', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
-      eventId: 'linear-delivery-5306:intake',
+      eventId: 'linear-delivery-5306:plan',
     });
     const dispatch = JSON.parse(mockServerFetch.mock.calls[0]?.[1]?.body);
     expect(Object.keys(dispatch.client_payload).length).toBeLessThanOrEqual(10);
     expect(dispatch.client_payload.delivery_id).toBe('linear-delivery-5306');
+    expect(dispatch.event_type).toBe('linear_plan_ready');
     expect(mockAcquireRecentDispatch).toHaveBeenCalledWith(
       'linear',
-      'linear-delivery-5306:intake',
+      'linear-delivery-5306:plan',
       21_600
     );
   });

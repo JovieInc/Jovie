@@ -13,9 +13,6 @@
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs reconcile --issue JOV-123
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs reconcile --dry-run
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs audit
- *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs admit-next
- *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs gate-next
- *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs approve-plan --issue=JOV-123 --evidence-file=/path/evidence.json
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs report
  */
 
@@ -138,16 +135,19 @@ Usage:
   node backlog-orchestrator.mjs reconcile --dry-run  Dry run (no mutations)
   node backlog-orchestrator.mjs reconcile --issue=JOV-123  Single issue
   node backlog-orchestrator.mjs audit                Full backlog audit (shadow)
-  node backlog-orchestrator.mjs admit-next            Admit next work item
-  node backlog-orchestrator.mjs gate-next             Plan, approve, and admit one safe issue
-  node backlog-orchestrator.mjs gate-next --dry-run   Show the next issue without mutations
   node backlog-orchestrator.mjs intake-readiness      Classify changed intake work (always dry-run)
   node backlog-orchestrator.mjs backlog-reduction     Audit high-confidence duplicate reduction (dry-run)
-  node backlog-orchestrator.mjs approve-plan --issue=JOV-123 --evidence-file=/path/evidence.json
   node backlog-orchestrator.mjs approve-research --issue=JOV-123 --evidence-file=/path/research.json
   node backlog-orchestrator.mjs report                Generate shadow report
 `);
     return;
+  }
+
+  if (['admit-next', 'gate-next', 'approve-plan'].includes(command)) {
+    console.error(
+      `${command} is disabled; upstream openai/symphony owns Linear pickup and dispatch`
+    );
+    process.exit(78);
   }
 
   const cache = loadCache();
