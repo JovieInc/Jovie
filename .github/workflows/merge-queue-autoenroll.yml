@@ -1,6 +1,6 @@
 name: Merge Queue Auto-Enroll
 
-# Fully event-driven — zero polling crons.
+# Event-driven with a bounded maintenance heartbeat.
 #
 # Eligibility changes wake one repo-wide writer mutex. GitHub may replace an
 # older pending run in that mutex, so every surviving clean-admitting pass also
@@ -12,8 +12,10 @@ name: Merge Queue Auto-Enroll
 # Triggers:
 #   pull_request      — PR label/reopen maintenance plus native-enqueue continuation
 #   workflow_run      — CI completion (green PRs are now enrollable)
+#   repository_dispatch — ownerless-recovery maintenance nudge from the existing sweeper
 #   push (main)       — main moved → queued PRs may conflict or get stale
 #   workflow_dispatch — maintenance-only unless exact PR + head are supplied
+#   schedule          — bounded exact-head recovery for replaced/missed events
 #
 # Two jobs run (not at the same time — concurrency group serializes):
 #   enroll    — classify open PRs, enroll the event-scoped exact head plus a
@@ -26,7 +28,7 @@ name: Merge Queue Auto-Enroll
 # GH-13630 scope boundary: pr-conflict-handler debounce + lighter model are
 # follow-ups — handler lacks a durable "recently resolved" marker contract.
 #
-# No schedule. No watchdog label-cycling. No polling.
+# No watchdog label-cycling. No unbounded polling.
 
 on:
   pull_request:
@@ -39,8 +41,12 @@ on:
   workflow_run:
     workflows: ['CI', 'Production Controller']
     types: [completed]
+  repository_dispatch:
+    types: [ownerless-recovery-admission]
   push:
     branches: [main]
+  schedule:
+    - cron: '12,27,42,57 * * * *'
   workflow_dispatch:
     inputs:
       pr_number:
@@ -74,18 +80,30 @@ jobs:
     outputs:
       mode: ${{ steps.policy.outputs.promotion_mode }}
       receipt_b64: ${{ steps.policy.outputs.receipt_b64 }}
+      main_sha: ${{ steps.main-head.outputs.sha }}
     steps:
       - name: Checkout canonical main policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           persist-credentials: false
+      - name: Resolve immutable main policy head
+        id: main-head
+        shell: bash
+        run: |
+          main_sha="$(git rev-parse HEAD)"
+          if [[ ! "$main_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Invalid main policy SHA: $main_sha" >&2
+            exit 2
+          fi
+          echo "sha=$main_sha" >>"$GITHUB_OUTPUT"
       - name: Evaluate fresh fleet policy
         id: policy
         uses: ./.github/actions/evaluate-fleet-gate
         with:
           github-token: ${{ github.token }}
           dry-run: 'false'
+          expected-sha: ${{ steps.main-head.outputs.sha }}
 
   enroll:
     needs: fleet-policy
@@ -126,6 +144,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           MANUAL_PR: ${{ inputs.pr_number || '' }}
           MANUAL_HEAD: ${{ inputs.head_sha || '' }}
+          FLEET_POLICY_MAIN_SHA: ${{ needs.fleet-policy.outputs.main_sha }}
         run: |
           pr_number=''
           head_sha=''
@@ -222,6 +241,7 @@ jobs:
               if [[ -z "$MANUAL_PR" && -z "$MANUAL_HEAD" ]]; then
                 echo 'Untargeted manual dispatch; no primary target (bounded reconciliation remains enabled)'
                 admission_reason='manual-maintenance'
+                recover_holds=1
               elif [[ "$MANUAL_PR" =~ ^[1-9][0-9]*$ && "${MANUAL_HEAD,,}" =~ ^[0-9a-f]{40}$ ]]; then
                 pr_number="$MANUAL_PR"
                 head_sha="${MANUAL_HEAD,,}"
@@ -232,9 +252,36 @@ jobs:
                 exit 2
               fi
               ;;
+            repository_dispatch)
+              sender="$(jq -er '.sender.login' "$GITHUB_EVENT_PATH")"
+              pr_number="$(jq -er '.client_payload.pr_number | tostring | select(test("^[1-9][0-9]*$"))' "$GITHUB_EVENT_PATH")"
+              head_sha="$(jq -er '.client_payload.head_sha | ascii_downcase | select(test("^[0-9a-f]{40}$"))' "$GITHUB_EVENT_PATH")"
+              payload_main_sha="$(jq -r '(.client_payload.main_sha // empty) | strings | ascii_downcase | select(test("^[0-9a-f]{40}$"))' "$GITHUB_EVENT_PATH")"
+              payload_ownerless_since="$(jq -r '(.client_payload.ownerless_since // empty) | strings | select(test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$"))' "$GITHUB_EVENT_PATH")"
+              if [[ "$sender" != 'jovie-bot[bot]' ]]; then
+                echo "::error::Ownerless recovery admission requires the Jovie Bot sender" >&2
+                exit 2
+              fi
+              if [[ "$payload_main_sha" == "$FLEET_POLICY_MAIN_SHA" && -n "$payload_ownerless_since" ]]; then
+                echo "Ownerless recovery exact admission for #$pr_number at $head_sha on main $payload_main_sha"
+                admission_disposition='candidate'
+                admission_reason='ownerless-recovery-exact-head'
+                recover_holds=1
+              else
+                echo "Ownerless recovery nudge is malformed or not bound to immutable main; maintenance-only"
+                pr_number=''
+                head_sha=''
+              fi
+              ;;
             push)
               echo 'Main push; no primary target (bounded reconciliation remains enabled)'
               admission_reason='main-push-reconcile'
+              recover_holds=1
+              ;;
+            schedule)
+              echo 'Scheduled maintenance; bounded exact-head recovery only'
+              admission_reason='scheduled-maintenance'
+              recover_holds=1
               ;;
             *)
               echo "::error::Unsupported admission event: $EVENT_NAME" >&2
@@ -310,7 +357,13 @@ jobs:
           DRAIN_RECONCILE_QUEUE_DEFERRED: '0'
           EVENT_NAME: ${{ github.event_name }}
           WORKFLOW_RUN_EVENT: ${{ github.event.workflow_run.event || '' }}
+          FLEET_POLICY_MAIN_SHA: ${{ needs.fleet-policy.outputs.main_sha }}
         run: |
+          policy_checkout_sha="$(git rev-parse HEAD)"
+          if [[ "$policy_checkout_sha" != "$FLEET_POLICY_MAIN_SHA" ]]; then
+            echo "::error::Main policy checkout drifted from fleet-policy evidence ($policy_checkout_sha != $FLEET_POLICY_MAIN_SHA)" >&2
+            exit 2
+          fi
           if [[ "$MERGE_QUEUE_BACKEND" != "native" ]]; then
             echo "::error::Merge Queue Auto-Enroll requires MERGE_QUEUE_BACKEND=native" >&2
             exit 2
@@ -395,7 +448,7 @@ jobs:
   rebase:
     needs: enroll
     if: >-
-      github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+      github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     steps:
       - name: Generate Jovie Bot token

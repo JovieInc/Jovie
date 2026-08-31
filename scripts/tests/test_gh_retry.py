@@ -3977,10 +3977,16 @@ def _run_single_candidate_release(
 
 
 class TestReleaseQueueDeferred:
-    def test_workflow_is_event_driven_with_no_cron(self) -> None:
+    def test_workflow_has_bounded_heartbeat_with_event_sources(self) -> None:
         workflow = _RELEASE_WORKFLOW.read_text(encoding="utf-8")
+        autoenroll = (_REPO_ROOT / _TRUSTED_WORKFLOW_PATH).read_text(
+            encoding="utf-8"
+        )
         fleet_gate_refresh = _FLEET_GATE_REFRESH_WORKFLOW.read_text(encoding="utf-8")
         assert "schedule:" not in workflow
+        assert "schedule:" in autoenroll
+        assert "cron: '12,27,42,57 * * * *'" in autoenroll
+        assert "No unbounded polling." in autoenroll
         assert "workflow_run:" in workflow
         # CI and Production Controller are direct upstream semantic inputs.
         # Marker Recovery dispatches a fresh Fleet Gate event after durable

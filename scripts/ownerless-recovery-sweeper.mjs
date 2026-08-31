@@ -1,18 +1,28 @@
 #!/usr/bin/env node
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { TODO_STATE_ID } from './backlog-orchestrator/stale-lease-guard.mjs';
 import {
+  buildPrFleetClosureAudit,
   evaluateRecoveryCandidate,
+  findOfficialSymphonyLease,
   hasCompletePatch,
+  hasFleetClosureRemediationLease,
+  renderFleetClosureRemediationLease,
+  renderPrFleetClosureAudit,
   renderRecoveryReceipt,
-  validateRecoveryMergeProof,
 } from './lib/ownerless-recovery-policy.mjs';
 import { classifyQueueCheckBlockers } from './lib/pr-check-failures.mjs';
+import { readPullRequestQueueState } from './merge-queue-backend.mjs';
 
 const execFileAsync = promisify(execFile);
 const repo =
   process.env.REPO || process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
 const dryRun = /^(1|true)$/i.test(process.env.DRY_RUN || 'false');
+const EXACT_SHA = /^[0-9a-f]{40}$/;
+const JOVIE_LINEAR_TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
+const OFFICIAL_SYMPHONY_STATE_URL =
+  process.env.SYMPHONY_STATE_URL || 'http://127.0.0.1:4041/api/v1/state';
 
 async function gh(args) {
   const { stdout } = await execFileAsync('gh', args, {
@@ -31,14 +41,119 @@ const apiJson = endpoint => ghJson(['api', endpoint]);
 const prCommand = (command, number, ...args) =>
   gh(['pr', command, String(number), '-R', repo, ...args]);
 
+const dispatchExactAdmission = (
+  number,
+  expectedHead,
+  mainSha,
+  ownerlessSince
+) =>
+  gh([
+    'api',
+    '-X',
+    'POST',
+    `repos/${repo}/dispatches`,
+    '-f',
+    'event_type=ownerless-recovery-admission',
+    '-F',
+    `client_payload[pr_number]=${number}`,
+    '-f',
+    `client_payload[head_sha]=${expectedHead}`,
+    '-f',
+    `client_payload[main_sha]=${mainSha}`,
+    '-f',
+    `client_payload[ownerless_since]=${ownerlessSince}`,
+  ]);
+
 async function mainHead() {
   return gh(['api', `repos/${repo}/git/ref/heads/main`, '--jq', '.object.sha']);
+}
+
+async function policyHead() {
+  const { stdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+    env: process.env,
+  });
+  return stdout.trim();
+}
+
+export async function resolveExactMainPolicyHead(dependencies = {}) {
+  const { mainHeadImpl = mainHead, policyHeadImpl = policyHead } = dependencies;
+  const [checkedOutHead, liveMain] = await Promise.all([
+    policyHeadImpl(),
+    mainHeadImpl(),
+  ]);
+  if (!EXACT_SHA.test(checkedOutHead) || !EXACT_SHA.test(liveMain)) {
+    throw new Error(
+      'ownerless recovery requires exact lowercase policy and main SHAs'
+    );
+  }
+  if (checkedOutHead !== liveMain) {
+    throw new Error(
+      `ownerless recovery policy head ${checkedOutHead} is not live main ${liveMain}`
+    );
+  }
+  return liveMain;
 }
 
 const openPulls = (base = '') =>
   pages(
     `repos/${repo}/pulls?state=open${base ? `&base=${base}` : ''}&per_page=100`
   );
+
+async function linearActiveIssueSnapshot() {
+  const linear = await import('./backlog-orchestrator/linear-client.mjs');
+  return linear.fetchTeamFleetClosureIssueSnapshot(JOVIE_LINEAR_TEAM_ID);
+}
+
+async function linearClient() {
+  return import('./backlog-orchestrator/linear-client.mjs');
+}
+
+export async function fetchOfficialSymphonyState({
+  fetchImpl = globalThis.fetch,
+  url = OFFICIAL_SYMPHONY_STATE_URL,
+} = {}) {
+  try {
+    const response = await fetchImpl(url, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response?.ok) {
+      return {
+        source: 'official-symphony-state',
+        error: `http-${response?.status || 'unknown'}`,
+      };
+    }
+    const body = await response.json();
+    return {
+      ...(body && typeof body === 'object' ? body : {}),
+      source: 'official-symphony-state',
+    };
+  } catch (error) {
+    return {
+      source: 'official-symphony-state',
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+function prPacketMap(linearIssues) {
+  const packetIssue = linearIssues.find(
+    issue => String(issue?.identifier || '').toUpperCase() === 'JOV-5610'
+  );
+  if (!packetIssue) return {};
+  const text = [
+    packetIssue.title,
+    packetIssue.description,
+    ...(packetIssue.comments?.nodes ?? packetIssue.comments ?? []).map(
+      comment => comment?.body ?? comment
+    ),
+  ].join('\n');
+  return Object.fromEntries(
+    [...text.matchAll(/\b(?:PR\s*#|pull\/)(\d+)\b/gi)].map(match => [
+      match[1],
+      'JOV-5610',
+    ])
+  );
+}
 
 async function pages(endpoint) {
   const value = await ghJson([
@@ -92,11 +207,6 @@ async function repoGraph(query, fields = {}) {
   return data?.data?.repository;
 }
 
-async function readQueueProof(number) {
-  const query = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){state headRefOid isInMergeQueue autoMergeRequest{enabledAt} mergedAt mergeCommit{oid} mergeQueueEntry{id position state}}}}`;
-  return (await repoGraph(query, { number }))?.pullRequest ?? null;
-}
-
 async function openStackHeadShas(mainSha) {
   const query = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:100){pageInfo{hasNextPage} nodes{number headRefOid commits(first:100){pageInfo{hasNextPage} nodes{commit{oid}}} timelineItems(itemTypes:[HEAD_REF_FORCE_PUSHED_EVENT],first:100){pageInfo{hasNextPage} nodes{... on HeadRefForcePushedEvent{beforeCommit{oid} afterCommit{oid}}}}}}}}`;
   const pulls = (await repoGraph(query))?.pullRequests;
@@ -138,7 +248,7 @@ async function openStackHeadShas(mainSha) {
   return [...stackHeads, ...priorCommits.flat()];
 }
 
-async function upsertReceipt(number, body) {
+async function upsertReceipt(number, body, dedupeKey) {
   await execFileAsync(
     'bash',
     [
@@ -146,12 +256,82 @@ async function upsertReceipt(number, body) {
       String(number),
       'ownerless-recovery',
       body,
+      dedupeKey,
     ],
     {
-      env: { ...process.env, GITHUB_REPOSITORY: repo },
+      env: {
+        ...process.env,
+        GITHUB_REPOSITORY: repo,
+        BOT_COMMENT_TRUSTED_AUTHORS_JSON: '["jovie-bot[bot]"]',
+      },
       maxBuffer: 5 * 1024 * 1024,
     }
   );
+}
+
+export function classifyQueueOwnership(queueState, expectedHead) {
+  if (
+    !queueState ||
+    queueState.headRefOid?.toLowerCase() !== expectedHead.toLowerCase()
+  ) {
+    return { action: 'fail', outcome: 'queue-ownership-head-mismatch' };
+  }
+  if (queueState.queued === true) {
+    return { action: 'no_dispatch', outcome: 'already-delegated-exact-head' };
+  }
+  if (queueState.autoMergeEnabled === true) {
+    return { action: 'fail', outcome: 'foreign-auto-merge-hold' };
+  }
+  return { action: 'dispatch', outcome: 'unowned-exact-head' };
+}
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+function mutationSucceeded(result) {
+  if (result === undefined || result === true) return true;
+  if (result === false || result?.success === false) return false;
+  const nestedSuccess = [
+    result?.commentCreate?.success,
+    result?.issueUpdate?.success,
+  ].filter(value => value !== undefined);
+  return nestedSuccess.length === 0 || nestedSuccess.every(Boolean);
+}
+
+function issueStateName(issue) {
+  return String(issue?.state?.name || issue?.state || '').trim();
+}
+
+/** @returns {Promise<Record<string, any>>} */
+async function waitForOfficialLease(identifier, options) {
+  const {
+    fetchOfficialSymphonyStateImpl,
+    nowImpl,
+    attempts,
+    delayMs,
+    sleepImpl,
+  } = options;
+  let last = /** @type {Record<string, any>} */ ({
+    ok: false,
+    reason: 'symphony-state-not-read',
+  });
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      last = findOfficialSymphonyLease(
+        await fetchOfficialSymphonyStateImpl(),
+        identifier,
+        { now: new Date(nowImpl()) }
+      );
+    } catch (error) {
+      last = {
+        ok: false,
+        reason: 'symphony-state-read-threw',
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+    if (last.ok) return { ...last, attempts: attempt };
+    if (attempt < attempts) await sleepImpl(delayMs);
+  }
+  return { ...last, attempts };
 }
 
 async function candidateEvidence(summary, mainSha, openHeadShas) {
@@ -192,7 +372,27 @@ async function candidateEvidence(summary, mainSha, openHeadShas) {
   };
 }
 
-async function promote(summary, mainSha, evidence, decision) {
+export async function dispatchRecoveryIntent(
+  summary,
+  mainSha,
+  evidence,
+  decision,
+  dependencies = {}
+) {
+  const {
+    apiJsonImpl = apiJson,
+    candidateEvidenceImpl = candidateEvidence,
+    checksAreGreenImpl = checksAreGreen,
+    dispatchExactAdmissionImpl = dispatchExactAdmission,
+    evaluateRecoveryCandidateImpl = evaluateRecoveryCandidate,
+    mainHeadImpl = mainHead,
+    nowImpl = () => new Date().toISOString(),
+    openStackHeadShasImpl = openStackHeadShas,
+    pagesImpl = pages,
+    prCommandImpl = prCommand,
+    readPullRequestQueueStateImpl = readPullRequestQueueState,
+    upsertReceiptImpl = upsertReceipt,
+  } = dependencies;
   const number = summary.number;
   const expectedHead = evidence.pr.head.sha;
   if (dryRun) {
@@ -200,17 +400,17 @@ async function promote(summary, mainSha, evidence, decision) {
     return { queued: false, dryRun: true };
   }
 
-  const liveMain = await mainHead();
-  const live = await apiJson(`repos/${repo}/pulls/${number}`);
-  const liveTimeline = await pages(
+  const liveMain = await mainHeadImpl();
+  const live = await apiJsonImpl(`repos/${repo}/pulls/${number}`);
+  const liveTimeline = await pagesImpl(
     `repos/${repo}/issues/${number}/timeline?per_page=100`
   );
-  const liveDecision = evaluateRecoveryCandidate({
+  const liveDecision = evaluateRecoveryCandidateImpl({
     ...evidence,
     pr: live,
     timeline: liveTimeline,
     mainSha: liveMain,
-    checksPassing: await checksAreGreen(number),
+    checksPassing: await checksAreGreenImpl(number),
   });
   if (
     liveMain !== mainSha ||
@@ -221,8 +421,8 @@ async function promote(summary, mainSha, evidence, decision) {
     return { queued: false };
   }
 
-  const writeReceipt = (outcome, proof = null) =>
-    upsertReceipt(
+  const writeReceipt = outcome =>
+    upsertReceiptImpl(
       number,
       renderRecoveryReceipt({
         pr: number,
@@ -230,74 +430,71 @@ async function promote(summary, mainSha, evidence, decision) {
         main: mainSha,
         ownerlessSince: liveDecision.ownerlessSince,
         lanes: liveDecision.lanes,
-        action: 'gh-pr-merge-auto-squash',
+        action: 'dispatch-to-merge-queue-autoenroll',
         outcome,
-        mergeQueueState: proof?.mergeQueueEntry?.state,
-        mergeQueuePosition: proof?.mergeQueueEntry?.position,
-        mergeQueueEntryId: proof?.mergeQueueEntry?.id,
-        observedAt: new Date().toISOString(),
-      })
+        observedAt: nowImpl(),
+      }),
+      `${expectedHead}-${outcome}`
     );
+
+  let queueOwnership;
+  try {
+    queueOwnership = classifyQueueOwnership(
+      await readPullRequestQueueStateImpl({
+        backend: 'native',
+        repository: repo,
+        number,
+      }),
+      expectedHead
+    );
+  } catch (error) {
+    await writeReceipt('queue-ownership-read-failed');
+    throw error;
+  }
+  if (queueOwnership.action === 'no_dispatch') {
+    await writeReceipt(queueOwnership.outcome);
+    console.log(`#${number} exact head is already in the native queue`);
+    return { queued: true, pending: false };
+  }
+  if (queueOwnership.action === 'fail') {
+    await writeReceipt(queueOwnership.outcome);
+    return { queued: false, pending: false };
+  }
 
   await writeReceipt('attempting');
 
   const restoreDraft = live.draft;
-  const restoreDeferred = (live.labels ?? []).some(
-    label => label.name === 'queue-deferred'
-  );
   const compensate = async () => {
     const failures = [];
-    const current = await apiJson(`repos/${repo}/pulls/${number}`).catch(
+    const current = await apiJsonImpl(`repos/${repo}/pulls/${number}`).catch(
       () => null
     );
     if (!current) failures.push('state-read');
-    if (
-      restoreDeferred &&
-      (!current ||
-        !current.labels.some(label => label.name === 'queue-deferred'))
-    ) {
-      await prCommand('edit', number, '--add-label', 'queue-deferred').catch(
-        () => failures.push('queue-deferred-restore')
-      );
-    }
     if (restoreDraft && current?.draft !== true) {
-      await prCommand('ready', number, '--undo').catch(() =>
+      await prCommandImpl('ready', number, '--undo').catch(() =>
         failures.push('draft-restore')
       );
     }
     return failures;
   };
-  const disableAuto = async () => {
-    await prCommand('merge', number, '--disable-auto').catch(() => null);
-    const proof = await readQueueProof(number).catch(() => null);
-    const safe =
-      proof?.state === 'OPEN' &&
-      proof.headRefOid === expectedHead &&
-      proof.autoMergeRequest == null &&
-      proof.isInMergeQueue === false;
-    return { proof, safe };
-  };
 
   try {
     if (live.draft) {
-      await prCommand('ready', number);
-    }
-    if (restoreDeferred) {
-      await prCommand('edit', number, '--remove-label', 'queue-deferred');
+      await prCommandImpl('ready', number);
     }
 
-    const postMutationEvidence = await candidateEvidence(
+    const postMutationEvidence = await candidateEvidenceImpl(
       summary,
       mainSha,
-      await openStackHeadShas(mainSha)
+      await openStackHeadShasImpl(mainSha)
     );
     const postMutationChecksPassing =
-      restoreDraft || (await checksAreGreen(number));
+      restoreDraft || (await checksAreGreenImpl(number));
     const [postMutationMain, postMutationPr] = await Promise.all([
-      mainHead(),
-      apiJson(`repos/${repo}/pulls/${number}`),
+      mainHeadImpl(),
+      apiJsonImpl(`repos/${repo}/pulls/${number}`),
     ]);
-    const postMutationDecision = evaluateRecoveryCandidate({
+    const postMutationDecision = evaluateRecoveryCandidateImpl({
       ...postMutationEvidence,
       pr: postMutationPr,
       mainSha: postMutationMain,
@@ -330,87 +527,173 @@ async function promote(summary, mainSha, evidence, decision) {
       return { queued: false };
     }
 
-    await prCommand(
-      'merge',
+    await dispatchExactAdmissionImpl(
       number,
-      '--auto',
-      '--squash',
-      '--match-head-commit',
-      expectedHead
+      expectedHead,
+      mainSha,
+      liveDecision.ownerlessSince
     );
   } catch (error) {
-    const racedProof = await readQueueProof(number).catch(() => null);
-    const raced = validateRecoveryMergeProof(racedProof, expectedHead);
-    if (raced.proven) {
-      await writeReceipt(raced.outcome, racedProof);
-      console.log(
-        `#${number} recovery action: ${raced.outcome} (concurrent controller)`
-      );
-      return { queued: true };
-    }
-    const disabled = await disableAuto();
-    const concurrent = validateRecoveryMergeProof(disabled.proof, expectedHead);
-    if (concurrent.proven) {
-      await writeReceipt(concurrent.outcome, disabled.proof);
-      return { queued: true };
-    }
-    if (!disabled.safe) {
-      await writeReceipt(
-        'merge-request-unproven-disable-failed',
-        disabled.proof
-      );
-      return { queued: false };
-    }
     const failures = await compensate();
     await writeReceipt(
       failures.length === 0
-        ? 'merge-request-failed-compensated'
-        : `merge-request-compensation-failed:${failures.join(',')}`
+        ? 'dispatch-failed-compensated'
+        : `dispatch-failed-compensation-failed:${failures.join(',')}`
     );
     throw error;
   }
+  await writeReceipt('delegated-exact-head-admission');
+  console.log(
+    `#${number} recovery action: delegated exact head to Merge Queue Auto-Enroll`
+  );
+  return { queued: false, pending: true };
+}
 
-  let proof = null;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    proof = await readQueueProof(number);
-    if (validateRecoveryMergeProof(proof, expectedHead).proven) break;
-    await new Promise(resolve => setTimeout(resolve, 2_000));
-  }
-  const verified = validateRecoveryMergeProof(proof, expectedHead);
-  if (!verified.proven) {
-    const disabled = await disableAuto();
-    const concurrent = validateRecoveryMergeProof(disabled.proof, expectedHead);
-    if (concurrent.proven) {
-      await writeReceipt(concurrent.outcome, disabled.proof);
-      return { queued: true };
+export async function processFleetClosureRemediationIntents(
+  audit,
+  dependencies = {}
+) {
+  const {
+    clientImpl,
+    fetchOfficialSymphonyStateImpl = fetchOfficialSymphonyState,
+    nowImpl = () => new Date().toISOString(),
+    sleepImpl = sleep,
+    symphonyReadbackAttempts = 3,
+    symphonyReadbackDelayMs = 1000,
+    todoStateId = process.env.FLEET_REMEDIATION_TODO_STATE_ID || TODO_STATE_ID,
+    todoStateName = 'Todo',
+  } = dependencies;
+  const client = clientImpl ?? (await linearClient());
+  const intents = (audit?.remediationIntents ?? []).filter(
+    intent => intent?.action === 'reattach-remediation-lane' && intent.issue
+  );
+  const leaseOptions = {
+    fetchOfficialSymphonyStateImpl,
+    nowImpl,
+    sleepImpl,
+    attempts: Math.max(1, Number(symphonyReadbackAttempts) || 1),
+    delayMs: Math.max(0, Number(symphonyReadbackDelayMs) || 0),
+  };
+  const results = [];
+  for (const intent of intents) {
+    const record = (status, extra = {}) =>
+      results.push({ ...intent, status, ...extra });
+    const fail = (reason, extra = {}) => record('failed', { reason, ...extra });
+    let issue = await client.fetchIssue(intent.issue);
+    if (!issue?.id) {
+      fail('issue-read-failed');
+      continue;
     }
-    if (!disabled.safe) {
-      await writeReceipt('requested-unproven-disable-failed', disabled.proof);
-      console.log(
-        `#${number} recovery action: requested-unproven-disable-failed`
-      );
-      return { queued: false };
+    const currentLease = await waitForOfficialLease(intent.issue, leaseOptions);
+    if (currentLease.ok) {
+      record('idempotent', { readback: currentLease });
+      continue;
     }
-    const failures = await compensate();
-    const outcome =
-      failures.length === 0
-        ? 'requested-unproven-compensated'
-        : `requested-unproven-compensation-failed:${failures.join(',')}`;
-    await writeReceipt(outcome, proof);
-    console.log(`#${number} recovery action: ${outcome}`);
-    return { queued: false };
+    if (currentLease.reason !== 'symphony-lease-readback-missing') {
+      fail(currentLease.reason, { readback: currentLease });
+      continue;
+    }
+    try {
+      if (!hasFleetClosureRemediationLease(issue, intent)) {
+        const body = renderFleetClosureRemediationLease({
+          ...intent,
+          observedAt: nowImpl(),
+        });
+        const created = await client.addComment(issue.id, body);
+        if (!mutationSucceeded(created)) {
+          fail('intent-create-failed');
+          continue;
+        }
+        issue = await client.fetchIssue(intent.issue);
+        if (!hasFleetClosureRemediationLease(issue, intent)) {
+          fail('intent-readback-missing');
+          continue;
+        }
+      }
+      if (issueStateName(issue) !== todoStateName) {
+        if (typeof client.transitionIssue !== 'function') {
+          fail('linear-transition-unavailable');
+          continue;
+        }
+        const transitioned = await client.transitionIssue(
+          issue.id,
+          todoStateId
+        );
+        if (!mutationSucceeded(transitioned)) {
+          fail('linear-transition-failed');
+          continue;
+        }
+        issue = await client.fetchIssue(intent.issue);
+        if (
+          issueStateName(issue) !== todoStateName ||
+          !hasFleetClosureRemediationLease(issue, intent)
+        ) {
+          fail('linear-transition-readback-missing');
+          continue;
+        }
+      }
+    } catch (error) {
+      fail('linear-mutation-threw', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      continue;
+    }
+    const lease = await waitForOfficialLease(intent.issue, leaseOptions);
+    if (lease.ok) {
+      record('reattached', { readback: lease });
+    } else {
+      fail(lease.reason, { readback: lease });
+    }
   }
-  await writeReceipt(verified.outcome, proof);
-  console.log(`#${number} recovery action: ${verified.outcome}`);
-  return { queued: true };
+  return {
+    ok: results.every(result => result.status !== 'failed'),
+    results,
+  };
 }
 
 export async function run() {
-  const mainSha = await mainHead();
+  const mainSha = await resolveExactMainPolicyHead();
+  const snapshotStartedAt = new Date().toISOString();
   const open = await openPulls('main');
+  const snapshotCompletedAt = new Date().toISOString();
+  const linearSnapshot = await linearActiveIssueSnapshot();
+  const linearIssues = linearSnapshot.issues;
+  const symphonyState = await fetchOfficialSymphonyState();
+  const audit = buildPrFleetClosureAudit({
+    repository: repo,
+    pullRequests: open,
+    linearIssues,
+    prPacketMap: prPacketMap(linearIssues),
+    symphonyState,
+    snapshot: {
+      complete: true,
+      startedAt: snapshotStartedAt,
+      completedAt: snapshotCompletedAt,
+      linear: linearSnapshot.coverage,
+    },
+    now: new Date(snapshotCompletedAt),
+  });
+  console.log(renderPrFleetClosureAudit(audit));
+  if (audit.status !== 'healthy') {
+    const remediation = await processFleetClosureRemediationIntents(audit);
+    console.log(
+      JSON.stringify({
+        schema: 'jovie-pr-fleet-remediation-run/v1',
+        ...remediation,
+      })
+    );
+    console.error(
+      `Ownerless recovery sweep blocked by PR fleet closure audit: ${audit.violations
+        .map(violation => violation.reason)
+        .join(', ')}`
+    );
+    process.exitCode = 1;
+    return;
+  }
   const openHeadShas = await openStackHeadShas(mainSha);
-  let promoted = 0;
-  let unproven = 0;
+  let dispatched = 0;
+  let alreadyQueued = 0;
+  let failed = 0;
   for (const summary of open) {
     try {
       const evidence = await candidateEvidence(summary, mainSha, openHeadShas);
@@ -431,20 +714,26 @@ export async function run() {
         console.log(`#${summary.number} skipped: ${decision.reason}`);
         continue;
       }
-      const result = await promote(summary, mainSha, evidence, decision);
-      if (result.queued) promoted += 1;
-      else if (!result.dryRun && !result.pending) unproven += 1;
+      const result = await dispatchRecoveryIntent(
+        summary,
+        mainSha,
+        evidence,
+        decision
+      );
+      if (result.queued) alreadyQueued += 1;
+      else if (result.pending) dispatched += 1;
+      else if (!result.dryRun) failed += 1;
     } catch (error) {
-      unproven += 1;
+      failed += 1;
       console.error(
         `#${summary.number} recovery failed: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   }
   console.log(
-    `Ownerless recovery sweep complete: promoted=${promoted} unproven=${unproven} dryRun=${dryRun}`
+    `Ownerless recovery sweep complete: dispatched=${dispatched} alreadyQueued=${alreadyQueued} failed=${failed} dryRun=${dryRun}`
   );
-  if (unproven > 0) process.exitCode = 1;
+  if (failed > 0) process.exitCode = 1;
 }
 
 if (import.meta.url === new URL(process.argv[1], 'file:').href) {

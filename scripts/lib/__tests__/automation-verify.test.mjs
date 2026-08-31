@@ -105,6 +105,7 @@ const GEM_PR_REHABILITATION_LANE = [
   'scripts/hermes/tests/gem-ops-hud.test.py',
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
   'scripts/hermes/tests/closure-health.test.py',
   'scripts/hermes/tests/symphony-reconciler.test.py',
@@ -121,6 +122,7 @@ const MERGE_QUEUE_CONTROLLER_INPUTS = [
   'docs/PR_FLOW.md',
   'scripts/ci-merge-queue-check.mjs',
   'scripts/drain-pr-queue.sh',
+  'scripts/drain-pr-remediate.mjs',
   'scripts/hermes/evaluate-fleet-gate.sh',
   'scripts/hermes/fleet_admission_receipt.py',
   'scripts/hermes/tests/test_evaluate_fleet_gate.py',
@@ -134,7 +136,11 @@ const MERGE_QUEUE_CONTROLLER_INPUTS = [
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
+  'scripts/lib/ownerless-recovery-policy.mjs',
+  'scripts/lib/pr-check-failures.mjs',
+  'scripts/lib/upsert-pr-comment.sh',
   'scripts/merge-queue-backend.mjs',
+  'scripts/ownerless-recovery-sweeper.mjs',
   'scripts/tests/test_gh_retry.py',
 ];
 const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
@@ -143,6 +149,7 @@ const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
 ];
@@ -631,8 +638,10 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/ci-harness.test.mjs',
         'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
         'scripts/lib/__tests__/ci-branching-guard.test.mjs',
+        'scripts/lib/__tests__/merge-queue-backend.test.mjs',
         'scripts/lib/__tests__/merge-queue-guard.test.mjs',
         'scripts/lib/__tests__/pre-land-changelog.test.mjs',
+        'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
         'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
         'scripts/lib/__tests__/auto-ready-agent-drafts.test.mjs',
         'scripts/lib/__tests__/eval-main-health-action.test.mjs',
@@ -813,11 +822,11 @@ describe('automation-verify affected scope', () => {
         selectedTests: [
           'apps/web/tests/unit/api/health/deploy.critical.test.ts',
         ],
-        pythonTests: [
+        pythonTests: ['scripts/hermes/tests/test_fleet_admission_receipt.py'],
+        pythonUnittestTests: [
+          'scripts/hermes/tests/gem-priority-gate.test.py',
           'scripts/hermes/tests/test_evaluate_fleet_gate.py',
-          'scripts/hermes/tests/test_fleet_admission_receipt.py',
         ],
-        pythonUnittestTests: ['scripts/hermes/tests/gem-priority-gate.test.py'],
         scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
       });
     }
@@ -855,6 +864,7 @@ describe('automation-verify affected scope', () => {
       pythonUnittestTests: [
         'scripts/hermes/tests/closure-health.test.py',
         'scripts/hermes/tests/gem-priority-gate.test.py',
+        'scripts/hermes/tests/test_evaluate_fleet_gate.py',
         'scripts/hermes/tests/gem-pr-drain.test.py',
         'scripts/hermes/tests/gem-ops-hud.test.py',
         'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',

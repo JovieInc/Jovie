@@ -15,7 +15,7 @@ inputs:
     required: false
     default: fleet
   expected-sha:
-    description: When set, receipt main.sha must match this exact subject.
+    description: When set, receipt main.sha must match this exact subject for every consumer.
     required: false
     default: ''
   github-token:
