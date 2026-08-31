@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => {
       id: string;
       creatorProfileId: string | null;
       channelId: string;
+      updatedAt: Date;
     }[],
     connectorSetValues: [] as Record<string, unknown>[],
     syncStateSetValues: [] as Record<string, unknown>[],
@@ -95,6 +96,7 @@ describe('connected YouTube refresh', () => {
       id: 'account-1',
       creatorProfileId: 'profile-1',
       channelId: 'channel-1',
+      updatedAt: new Date('2026-08-28T11:00:00.000Z'),
     });
     mocks.connectorSetValues.splice(0);
     mocks.syncStateSetValues.splice(0);
@@ -142,7 +144,10 @@ describe('connected YouTube refresh', () => {
 
   it('syncs one bounded channel and refreshes collaborator edges', async () => {
     const now = new Date('2026-08-28T12:00:00.000Z');
-    await expect(runConnectedYouTubeRefreshes(now)).resolves.toEqual({
+    const deadlineMs = now.getTime() + 50_000;
+    await expect(
+      runConnectedYouTubeRefreshes(now, { deadlineMs })
+    ).resolves.toEqual({
       attempted: 1,
       synced: 1,
       needsReauth: 0,
@@ -153,7 +158,10 @@ describe('connected YouTube refresh', () => {
       expect.objectContaining({
         accessToken: 'access-token',
         maxVideosPerSync: 50,
+        maxAnalyticsRequests: 2,
+        timeoutMs: 5000,
         uploadsPageToken: undefined,
+        deadlineMs,
       })
     );
     expect(mocks.syncChannelVideos).toHaveBeenCalledWith(
@@ -252,6 +260,7 @@ describe('connected YouTube refresh', () => {
       id: 'account-1',
       creatorProfileId: null,
       channelId: 'channel-1',
+      updatedAt: new Date('2026-08-28T11:00:00.000Z'),
     });
     await expect(runConnectedYouTubeRefreshes()).resolves.toEqual({
       attempted: 1,

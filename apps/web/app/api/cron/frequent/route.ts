@@ -298,7 +298,9 @@ export async function GET(request: Request) {
   results.youtubeLibraryRefresh = await runSubJob(
     'youtubeLibraryRefresh',
     async () => {
-      const refreshResult = await runConnectedYouTubeRefreshes();
+      const refreshResult = await runConnectedYouTubeRefreshes(new Date(), {
+        deadlineMs: startTime + 50_000,
+      });
       return refreshResult as unknown as Record<string, unknown>;
     }
   );

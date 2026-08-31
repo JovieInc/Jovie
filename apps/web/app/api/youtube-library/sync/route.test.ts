@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => {
   const state = {
-    selectRows: [] as { id: string; channelId: string }[],
+    selectRows: [] as { id: string; channelId: string; updatedAt: Date }[],
   };
   return {
     ...state,
@@ -44,6 +44,7 @@ describe('POST /api/youtube-library/sync', () => {
     mocks.selectRows.splice(0, mocks.selectRows.length, {
       id: 'account-1',
       channelId: 'channel-1',
+      updatedAt: new Date('2026-08-28T11:00:00.000Z'),
     });
     mocks.validateYouTubeProfileMutationRequest.mockResolvedValue({
       ok: true,
@@ -80,8 +81,16 @@ describe('POST /api/youtube-library/sync', () => {
     mocks.selectRows.splice(
       0,
       mocks.selectRows.length,
-      { id: 'account-1', channelId: 'channel-1' },
-      { id: 'account-2', channelId: 'channel-2' }
+      {
+        id: 'account-1',
+        channelId: 'channel-1',
+        updatedAt: new Date('2026-08-28T11:00:00.000Z'),
+      },
+      {
+        id: 'account-2',
+        channelId: 'channel-2',
+        updatedAt: new Date('2026-08-28T11:01:00.000Z'),
+      }
     );
     mocks.refreshConnectedYouTubeAccount
       .mockResolvedValueOnce({
@@ -110,6 +119,8 @@ describe('POST /api/youtube-library/sync', () => {
       creatorProfileId: profileId,
       channelId: 'channel-1',
       source: 'manual',
+      observedUpdatedAt: new Date('2026-08-28T11:00:00.000Z'),
+      deadlineMs: expect.any(Number),
     });
   });
 
@@ -117,8 +128,16 @@ describe('POST /api/youtube-library/sync', () => {
     mocks.selectRows.splice(
       0,
       mocks.selectRows.length,
-      { id: 'account-1', channelId: 'channel-1' },
-      { id: 'account-2', channelId: 'channel-2' }
+      {
+        id: 'account-1',
+        channelId: 'channel-1',
+        updatedAt: new Date('2026-08-28T11:00:00.000Z'),
+      },
+      {
+        id: 'account-2',
+        channelId: 'channel-2',
+        updatedAt: new Date('2026-08-28T11:01:00.000Z'),
+      }
     );
     mocks.refreshConnectedYouTubeAccount
       .mockResolvedValueOnce({
@@ -150,6 +169,8 @@ describe('POST /api/youtube-library/sync', () => {
       creatorProfileId: profileId,
       channelId: 'channel-2',
       source: 'manual',
+      observedUpdatedAt: new Date('2026-08-28T11:01:00.000Z'),
+      deadlineMs: expect.any(Number),
     });
   });
 

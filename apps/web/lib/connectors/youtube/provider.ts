@@ -79,11 +79,12 @@ async function authorizedJson<T>(
   url: URL,
   accessToken: string,
   fetcher: ProviderFetch,
-  context: string
+  context: string,
+  timeoutMs = 15_000
 ): Promise<T> {
   const response = await fetcher(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
-    timeoutMs: 15_000,
+    timeoutMs,
     context,
   });
   if (!response.ok) {
@@ -98,6 +99,7 @@ async function authorizedJson<T>(
 export async function listOwnedYouTubeChannels(input: {
   readonly accessToken: string;
   readonly fetcher?: ProviderFetch;
+  readonly timeoutMs?: number;
 }): Promise<OwnedYouTubeChannel[]> {
   const url = new URL(`${YOUTUBE_DATA_API}/channels`);
   url.searchParams.set('part', 'id,snippet,contentDetails');
@@ -106,7 +108,8 @@ export async function listOwnedYouTubeChannels(input: {
     url,
     input.accessToken,
     input.fetcher ?? serverFetch,
-    'YouTube channel lookup'
+    'YouTube channel lookup',
+    input.timeoutMs
   );
   return (data.items ?? []).flatMap(item => {
     const uploadsPlaylistId = item.contentDetails?.relatedPlaylists?.uploads;
@@ -127,6 +130,7 @@ async function listUploadVideoIds(input: {
   readonly fetcher: ProviderFetch;
   readonly maxVideoIds?: number;
   readonly pageToken?: string;
+  readonly timeoutMs?: number;
 }): Promise<{
   readonly videoIds: string[];
   readonly nextPageToken: string | null;
@@ -150,7 +154,8 @@ async function listUploadVideoIds(input: {
       url,
       input.accessToken,
       input.fetcher,
-      'YouTube uploads page'
+      'YouTube uploads page',
+      input.timeoutMs
     );
     for (const item of page.items ?? []) {
       const videoId = item.contentDetails?.videoId?.trim();
@@ -204,6 +209,16 @@ function toChannelVideo(
 
 function dateOnly(date: Date): string {
   return date.toISOString().slice(0, 10);
+}
+
+function boundedTimeoutMs(timeoutMs: number, deadlineMs?: number): number {
+  return deadlineMs === undefined
+    ? timeoutMs
+    : Math.max(1_000, Math.min(timeoutMs, deadlineMs - Date.now()));
+}
+
+function hasRequestBudget(timeoutMs: number, deadlineMs?: number): boolean {
+  return deadlineMs === undefined || Date.now() + timeoutMs <= deadlineMs;
 }
 
 function analyticsBatchSize(start: Date, end: Date): number {
@@ -290,14 +305,19 @@ export function createYouTubeLibraryProvider(input: {
   readonly maxVideosPerSync?: number;
   readonly uploadsPageToken?: string;
   readonly onUploadsPageToken?: (pageToken: string | null) => void;
+  readonly timeoutMs?: number;
+  readonly maxAnalyticsRequests?: number;
+  readonly deadlineMs?: number;
 }): YouTubeLibraryProvider {
   const fetcher = input.fetcher ?? serverFetch;
   const now = input.now ?? (() => new Date());
+  const timeoutMs = input.timeoutMs ?? 15_000;
   return {
     async listChannelVideos(channelId) {
       const channels = await listOwnedYouTubeChannels({
         accessToken: input.accessToken,
         fetcher,
+        timeoutMs: boundedTimeoutMs(timeoutMs, input.deadlineMs),
       });
       const channel = channels.find(item => item.id === channelId);
       if (!channel) {
@@ -312,6 +332,7 @@ export function createYouTubeLibraryProvider(input: {
         fetcher,
         maxVideoIds: input.maxVideosPerSync,
         pageToken: input.uploadsPageToken,
+        timeoutMs: boundedTimeoutMs(timeoutMs, input.deadlineMs),
       });
       input.onUploadsPageToken?.(nextPageToken);
       const videos: YouTubeChannelVideo[] = [];
@@ -323,7 +344,8 @@ export function createYouTubeLibraryProvider(input: {
           url,
           input.accessToken,
           fetcher,
-          'YouTube video details'
+          'YouTube video details',
+          boundedTimeoutMs(timeoutMs, input.deadlineMs)
         );
         for (const item of data.items ?? []) {
           const video = toChannelVideo(item, channelId);
@@ -335,9 +357,20 @@ export function createYouTubeLibraryProvider(input: {
 
     async fetchVideoMetrics(channelId, videoIds, windows) {
       const output: YouTubeVideoMetrics[] = [];
+      let requestCount = 0;
       for (const window of windows) {
         const { start, end } = metricRange(window, now());
         for (const batch of batches(videoIds, analyticsBatchSize(start, end))) {
+          if (
+            input.maxAnalyticsRequests !== undefined &&
+            requestCount >= input.maxAnalyticsRequests
+          ) {
+            return output;
+          }
+          if (!hasRequestBudget(timeoutMs, input.deadlineMs)) {
+            return output;
+          }
+          requestCount++;
           const url = new URL(YOUTUBE_ANALYTICS_API);
           url.searchParams.set('ids', `channel==${channelId}`);
           url.searchParams.set('startDate', dateOnly(start));
@@ -352,7 +385,8 @@ export function createYouTubeLibraryProvider(input: {
             url,
             input.accessToken,
             fetcher,
-            'YouTube analytics report'
+            'YouTube analytics report',
+            boundedTimeoutMs(timeoutMs, input.deadlineMs)
           );
           output.push(...analyticsRows({ data, window, start, end }));
         }
