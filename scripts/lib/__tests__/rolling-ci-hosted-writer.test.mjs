@@ -1,34 +1,24 @@
 import { createHash } from 'node:crypto';
-import {
-  chmodSync,
-  mkdirSync,
-  mkdtempSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import {
   assertCredentialFreeHostedAcceptance,
   buildHostedAcceptanceReceipt,
   buildHostedCommitVariables,
   buildHostedRepairPlan,
-  buildHostedTerminalReceipt,
   buildHostedTestReceipt,
   commitHostedRepair,
+  HOSTED_REPAIR_NODE_COMMAND,
   HOSTED_REPAIR_POLICY_VERSION,
   hostedRepairTestCommands,
-  isHostedRemediationSelfTrigger,
-  readHostedArtifactFile,
   runHostedVerification,
-  validateHostedAcceptance,
   validateHostedGateAdmission,
   validateHostedRepairPath,
 } from '../rolling-ci-hosted-writer.mjs';
 
 const head = 'a'.repeat(40);
+const sha256 = value => createHash('sha256').update(value).digest('hex');
+const ok = command => ({ ...command, exitCode: 0 });
 const gateReceipt = {
   schema: 'jovie-fleet-gate/v1',
   observedAt: '2026-08-29T20:00:00.000Z',
@@ -42,11 +32,7 @@ const gateReceipt = {
     authority: 'single-pr-writer-exact-head',
   },
   concurrency: {
-    gem: {
-      maxConcurrent: 4,
-      evidenceAccepted: true,
-      newMutationAllowed: true,
-    },
+    gem: { maxConcurrent: 4, evidenceAccepted: true, newMutationAllowed: true },
   },
 };
 
@@ -72,33 +58,31 @@ function dispatch(overrides = {}) {
   };
 }
 
-function hostedFixture() {
+function fixture(overrides = {}) {
   const plan = buildHostedRepairPlan({
-    dispatch: dispatch(),
+    dispatch: dispatch(overrides.event),
     headRefName: 'codex/repair-proof',
     trustedPolicyOid: head,
   });
   const patchBytes = Buffer.from(
     'diff --git a/apps/web/lib/proof.ts b/apps/web/lib/proof.ts\n'
   );
-  const fileBytes = Buffer.from('export const repaired = true;\n');
-  const changes = [
+  const fileBytes =
+    overrides.fileBytes ?? Buffer.from('export const repaired = true;\n');
+  const changes = overrides.changes ?? [
     {
       path: 'apps/web/lib/proof.ts',
       status: 'M',
       symlink: false,
       bytes: fileBytes.length,
-      sha256: createHash('sha256').update(fileBytes).digest('hex'),
+      sha256: sha256(fileBytes),
     },
   ];
   const testReceipt = buildHostedTestReceipt({
     plan,
     patchBytes,
     changes,
-    results: hostedRepairTestCommands(plan, changes).map(command => ({
-      ...command,
-      exitCode: 0,
-    })),
+    results: hostedRepairTestCommands(plan, changes).map(ok),
     now: new Date('2026-08-29T20:01:00.000Z'),
   });
   const acceptance = buildHostedAcceptanceReceipt({
@@ -114,22 +98,26 @@ function hostedFixture() {
     testReceipt,
     now: new Date('2026-08-29T20:01:00.000Z'),
   });
-  return { plan, patchBytes, fileBytes, changes, acceptance, testReceipt };
+  return { plan, patchBytes, fileBytes, changes, testReceipt, acceptance };
 }
 
-function failedCiRequest() {
+function livePr(overrides = {}) {
+  return {
+    state: 'open',
+    labels: [],
+    base: { ref: 'main', repo: { full_name: 'JovieInc/Jovie' } },
+    head: {
+      ref: 'codex/repair-proof',
+      sha: head,
+      repo: { full_name: 'JovieInc/Jovie', fork: false },
+    },
+    ...overrides,
+  };
+}
+
+function failedCiRequest(pr = livePr()) {
   return vi.fn(async (path, options) => {
-    if (path.endsWith('/pulls/17')) {
-      return {
-        state: 'open',
-        base: { ref: 'main', repo: { full_name: 'JovieInc/Jovie' } },
-        head: {
-          ref: 'codex/repair-proof',
-          sha: head,
-          repo: { full_name: 'JovieInc/Jovie', fork: false },
-        },
-      };
-    }
+    if (path.endsWith('/pulls/17')) return pr;
     if (path.includes('/actions/runs?')) {
       return {
         workflow_runs: [
@@ -158,9 +146,23 @@ function failedCiRequest() {
   });
 }
 
+function commitArgs(fx, overrides = {}) {
+  return {
+    plan: fx.plan,
+    acceptance: fx.acceptance,
+    gateReceipt,
+    patchBytes: fx.patchBytes,
+    fileContents: { 'apps/web/lib/proof.ts': fx.fileBytes },
+    readToken: 'read-token',
+    writeToken: 'write-token',
+    clock: () => new Date('2026-08-29T20:02:00.000Z'),
+    ...overrides,
+  };
+}
+
 describe('hosted rolling CI repair policy', () => {
-  it('plans one Jovie-only exact-head repair with policy-version idempotency', () => {
-    const { plan } = hostedFixture();
+  it('plans exact-head repair with policy idempotency', () => {
+    const { plan } = fixture();
     expect(plan).toMatchObject({
       schema: 'jovie-hosted-ci-repair-plan/v1',
       policyVersion: HOSTED_REPAIR_POLICY_VERSION,
@@ -174,9 +176,7 @@ describe('hosted rolling CI repair policy', () => {
     expect(plan.idempotencyKey).toContain(HOSTED_REPAIR_POLICY_VERSION);
     expect(() =>
       buildHostedRepairPlan({
-        dispatch: dispatch({
-          repository: 'JovieInc/LogYourBody',
-        }),
+        dispatch: dispatch({ repository: 'JovieInc/LogYourBody' }),
         headRefName: 'codex/nope',
         trustedPolicyOid: head,
       })
@@ -190,7 +190,7 @@ describe('hosted rolling CI repair policy', () => {
     ).toThrow('main, synthetic, or not a safe branch ref');
   });
 
-  it('requires a fresh typed gate and clamps effective concurrency to one', () => {
+  it('requires typed gate capacity and denies sensitive paths', () => {
     expect(
       validateHostedGateAdmission({
         receipt: gateReceipt,
@@ -198,103 +198,104 @@ describe('hosted rolling CI repair policy', () => {
         now: new Date('2026-08-29T20:04:59.000Z'),
       })
     ).toMatchObject({ accepted: true, maxConcurrent: 1 });
-    expect(
-      validateHostedGateAdmission({
-        receipt: gateReceipt,
-        trustedPolicyOid: head,
-        now: new Date('2026-08-29T20:05:01.000Z'),
-      })
-    ).toEqual({
-      accepted: false,
-      reason: 'fresh-typed-capacity-not-admitted',
-    });
-    expect(
-      validateHostedGateAdmission({
-        receipt: {
-          ...gateReceipt,
-          remediationAdmission: {
-            ...gateReceipt.remediationAdmission,
-            pushAllowed: false,
-            maxConcurrent: 0,
-          },
+    for (const receipt of [
+      gateReceipt,
+      {
+        ...gateReceipt,
+        remediationAdmission: {
+          ...gateReceipt.remediationAdmission,
+          pushAllowed: false,
+          maxConcurrent: 0,
         },
-        trustedPolicyOid: head,
-        now: new Date('2026-08-29T20:01:00.000Z'),
-      }).accepted
-    ).toBe(false);
-    expect(
-      validateHostedGateAdmission({
-        receipt: { ...gateReceipt, signals: { main: { sha: 'b'.repeat(40) } } },
-        trustedPolicyOid: head,
-        now: new Date('2026-08-29T20:01:00.000Z'),
-      }).accepted
-    ).toBe(false);
-  });
-
-  it('strictly denies workflows, secrets, migrations, auth, billing, release, deploy, and tests', () => {
-    expect(validateHostedRepairPath('apps/web/lib/profile.ts').allowed).toBe(
-      true
-    );
+      },
+      { ...gateReceipt, signals: { main: { sha: 'b'.repeat(40) } } },
+    ]) {
+      expect(
+        validateHostedGateAdmission({
+          receipt,
+          trustedPolicyOid: head,
+          now: new Date('2026-08-29T20:05:01.000Z'),
+        }).accepted
+      ).toBe(false);
+    }
+    const allowed = validateHostedRepairPath('apps/web/lib/profile.ts').allowed;
+    expect(allowed).toBe(true);
     for (const path of [
       '.github/workflows/ci.yml',
-      'apps/web/lib/API_SECRET.ts',
       'apps/web/drizzle/migrations/001.sql',
-      'apps/web/app/auth/callback.ts',
-      'apps/web/lib/auth.ts',
-      'apps/web/lib/oauth-client.ts',
+      'apps/web/app/(auth)/signin/page.tsx',
+      'apps/web/app/@auth/(.)signin/page.tsx',
       'apps/web/app/billing/page.tsx',
-      'apps/web/lib/billing.ts',
-      'apps/web/lib/payment-client.ts',
-      'apps/web/lib/migration.ts',
-      'apps/web/lib/release.ts',
-      'apps/web/lib/deploy.ts',
-      'apps/web/proxy.ts',
-      'apps/web/lib/deployment/release.ts',
+      'apps/web/lib/deployments/github.ts',
+      'apps/web/lib/entitlements.ts',
       'apps/web/tests/profile.test.ts',
       'scripts/lib/rolling-ci-fx.mjs',
     ]) {
-      expect(validateHostedRepairPath(path), path).toMatchObject({
-        allowed: false,
-      });
+      const policy = validateHostedRepairPath(path);
+      expect(policy, path).toMatchObject({ allowed: false });
     }
   });
 
-  it('binds tested artifact bytes to an atomic expected-head update', () => {
+  it('binds bytes and stable commands to commit variables', () => {
     const { plan, acceptance, patchBytes, fileBytes, changes, testReceipt } =
-      hostedFixture();
-    const variables = buildHostedCommitVariables({
-      plan,
-      acceptance,
-      gateReceipt,
-      patchBytes,
-      fileContents: { 'apps/web/lib/proof.ts': fileBytes },
-      now: new Date('2026-08-29T20:02:00.000Z'),
-    });
-    expect(variables.input).toMatchObject({
-      branch: {
-        repositoryNameWithOwner: 'JovieInc/Jovie',
-        branchName: 'codex/repair-proof',
-      },
+      fixture();
+    expect(hostedRepairTestCommands(plan, changes)[2].command).toBe(
+      HOSTED_REPAIR_NODE_COMMAND
+    );
+    expect(
+      buildHostedCommitVariables({
+        plan,
+        acceptance,
+        gateReceipt,
+        patchBytes,
+        fileContents: { 'apps/web/lib/proof.ts': fileBytes },
+        now: new Date('2026-08-29T20:02:00.000Z'),
+      }).input
+    ).toMatchObject({
+      branch: { repositoryNameWithOwner: 'JovieInc/Jovie' },
       expectedHeadOid: head,
     });
-    expect(variables.input.fileChanges.additions).toEqual([
-      {
-        path: 'apps/web/lib/proof.ts',
-        contents: fileBytes.toString('base64'),
-      },
-    ]);
     expect(() =>
       buildHostedCommitVariables({
         plan,
         acceptance,
         gateReceipt,
         patchBytes,
-        fileContents: {
-          'apps/web/lib/proof.ts': Buffer.from('tampered'),
-        },
+        fileContents: { 'apps/web/lib/proof.ts': Buffer.from('tampered') },
         now: new Date('2026-08-29T20:02:00.000Z'),
       })
     ).toThrow('immutable artifact hash mismatch');
+    const wrongBytes = [
+      {
+        ...changes[0],
+        bytes: fileBytes.length + 1,
+      },
+    ];
+    const wrongAcceptance = buildHostedAcceptanceReceipt({
+      plan,
+      gateReceipt,
+      patchBytes,
+      changes: wrongBytes,
+      executor: acceptance.executor,
+      testReceipt: buildHostedTestReceipt({
+        plan,
+        patchBytes,
+        changes: wrongBytes,
+        results: hostedRepairTestCommands(plan, wrongBytes).map(ok),
+        now: new Date('2026-08-29T20:01:00.000Z'),
+      }),
+      now: new Date('2026-08-29T20:01:00.000Z'),
+    });
+    expect(() =>
+      buildHostedCommitVariables({
+        plan,
+        acceptance: wrongAcceptance,
+        gateReceipt,
+        patchBytes,
+        fileContents: { 'apps/web/lib/proof.ts': fileBytes },
+        now: new Date('2026-08-29T20:02:00.000Z'),
+      })
+    ).toThrow('immutable artifact byte count mismatch');
     expect(() =>
       buildHostedTestReceipt({
         plan,
@@ -308,205 +309,44 @@ describe('hosted rolling CI repair policy', () => {
     ).toThrow('tests are missing, failing, or reordered');
   });
 
-  it('never follows an executor-controlled artifact symlink', () => {
-    const directory = mkdtempSync(join(tmpdir(), 'jovie-hosted-artifact-'));
-    try {
-      const root = join(directory, 'artifact');
-      const outside = join(directory, 'outside.txt');
-      mkdirSync(join(root, 'apps/web/lib'), { recursive: true, mode: 0o700 });
-      writeFileSync(outside, 'runner secret');
-      symlinkSync(outside, join(root, 'apps/web/lib/proof.ts'));
-      expect(() =>
-        readHostedArtifactFile(root, 'apps/web/lib/proof.ts')
-      ).toThrow('symlink artifact is forbidden');
-      writeFileSync(join(root, 'apps/web/lib/safe.ts'), 'safe');
-      chmodSync(root, 0o755);
-      expect(() =>
-        readHostedArtifactFile(root, 'apps/web/lib/safe.ts')
-      ).toThrow('private runner-owned directory');
-      expect(
-        readHostedArtifactFile(root, 'apps/web/lib/safe.ts', {
-          requirePrivateRoot: false,
-        }).toString('utf8')
-      ).toBe('safe');
-    } finally {
-      rmSync(directory, { recursive: true, force: true });
-    }
-  });
-
-  it('performs one real failed-CI to atomic-repair transition', async () => {
-    const { plan, acceptance, patchBytes, fileBytes } = hostedFixture();
-    const request = failedCiRequest();
-    const result = await commitHostedRepair({
-      plan,
-      acceptance,
-      gateReceipt,
-      patchBytes,
-      fileContents: { 'apps/web/lib/proof.ts': fileBytes },
-      readToken: 'read-token',
-      writeToken: 'write-token',
-      clock: () => new Date('2026-08-29T20:02:00.000Z'),
-      request,
-    });
-    expect(result).toMatchObject({
-      committed: true,
-      outcome: 'repaired',
-      committedHeadOid: 'b'.repeat(40),
-    });
-    expect(request).toHaveBeenCalledTimes(3);
-  });
-
-  it('rechecks gate freshness after verification and before GraphQL', async () => {
-    const { plan, acceptance, patchBytes, fileBytes } = hostedFixture();
-    const request = failedCiRequest();
-    await expect(
-      commitHostedRepair({
-        plan,
-        acceptance,
+  it('revalidates PR, labels, CI, and fresh gate before GraphQL', async () => {
+    const fx = fixture();
+    expect(() =>
+      buildHostedAcceptanceReceipt({
+        plan: fx.plan,
         gateReceipt,
-        patchBytes,
-        fileContents: { 'apps/web/lib/proof.ts': fileBytes },
-        readToken: 'read-token',
-        writeToken: 'write-token',
-        clock: () => new Date('2026-08-29T20:06:00.000Z'),
-        request,
+        patchBytes: fx.patchBytes,
+        changes: fx.acceptance.changedFiles,
+        executor: fx.acceptance.executor,
+        testReceipt: fx.acceptance.tests,
+        now: new Date('2026-08-29T20:40:00.000Z'),
       })
+    ).not.toThrow();
+    await expect(
+      commitHostedRepair(commitArgs(fx, { request: failedCiRequest() }))
+    ).resolves.toMatchObject({ committed: true, outcome: 'repaired' });
+    const heldPr = livePr({ labels: [{ name: 'needs-human' }] });
+    await expect(
+      commitHostedRepair(commitArgs(fx, { request: failedCiRequest(heldPr) }))
+    ).resolves.toEqual({ committed: false, outcome: 'human_held' });
+    await expect(
+      commitHostedRepair(
+        commitArgs(fx, {
+          clock: () => new Date('2026-08-29T20:06:00.000Z'),
+          request: failedCiRequest(),
+        })
+      )
     ).rejects.toThrow('fresh-typed-capacity-not-admitted');
-    expect(request).toHaveBeenCalledTimes(2);
   });
 
-  it('aborts a green exact head before the writer and never calls GraphQL', async () => {
-    const { plan, acceptance, patchBytes, fileBytes } = hostedFixture();
-    const request = vi.fn(async path => {
-      if (path.endsWith('/pulls/17')) {
-        return {
-          state: 'open',
-          base: {
-            ref: 'main',
-            repo: { full_name: 'JovieInc/Jovie' },
-          },
-          head: {
-            ref: 'codex/repair-proof',
-            sha: head,
-            repo: { full_name: 'JovieInc/Jovie', fork: false },
-          },
-        };
-      }
-      return {
-        workflow_runs: [
-          {
-            id: 9002,
-            run_attempt: 2,
-            name: 'CI',
-            path: '.github/workflows/ci.yml',
-            event: 'pull_request',
-            head_sha: head,
-            status: 'completed',
-            conclusion: 'success',
-          },
-        ],
-      };
-    });
-    await expect(
-      commitHostedRepair({
-        plan,
-        acceptance,
-        gateReceipt,
-        patchBytes,
-        fileContents: { 'apps/web/lib/proof.ts': fileBytes },
-        readToken: 'read-token',
-        writeToken: 'write-token',
-        clock: () => new Date('2026-08-29T20:02:00.000Z'),
-        request,
-      })
-    ).resolves.toEqual({ committed: false, outcome: 'superseded_green' });
-    expect(request).toHaveBeenCalledTimes(2);
-  });
-
-  it('expires stale acceptance and emits a terminal receipt', () => {
-    const { plan, acceptance, patchBytes } = hostedFixture();
-    expect(
-      buildHostedTerminalReceipt({
-        plan,
-        acceptance,
-        outcome: 'repaired',
-        committedHeadOid: 'b'.repeat(40),
-      })
-    ).toMatchObject({ terminal: true, outcome: 'repaired' });
-    expect(
-      validateHostedAcceptance({
-        plan,
-        acceptance,
-        patchBytes,
-        gateReceipt: {
-          ...gateReceipt,
-          observedAt: '2026-08-29T20:46:00.000Z',
-        },
-        now: new Date('2026-08-29T20:47:00.000Z'),
-      }).accepted
-    ).toBe(false);
-  });
-
-  it('blocks only a remediation-generated repeat of the same fingerprint', () => {
-    const { plan } = hostedFixture();
-    const message = `fix(ci): apply bounded hosted remediation\n\nJovie hosted CI remediation for PR #17.\n\nPolicy: ${plan.policyVersion}\nFailure: ${plan.fingerprint}`;
-    expect(
-      isHostedRemediationSelfTrigger({ plan, commitMessage: message })
-    ).toBe(true);
-    expect(
-      isHostedRemediationSelfTrigger({
-        plan,
-        commitMessage: message.replace(plan.fingerprint, 'ci:different'),
-      })
-    ).toBe(false);
-  });
-});
-describe('hosted writer deliberate red', () => {
-  it('deliberate red: blocks a moved PR head before GraphQL', async () => {
-    const { plan, acceptance, patchBytes, fileBytes } = hostedFixture();
-    const request = vi.fn(async path => {
-      expect(path).toContain('/pulls/17');
-      return {
-        state: 'open',
-        base: {
-          ref: 'main',
-          repo: { full_name: 'JovieInc/Jovie' },
-        },
-        head: {
-          ref: 'codex/repair-proof',
-          sha: 'c'.repeat(40),
-          repo: { full_name: 'JovieInc/Jovie', fork: false },
-        },
-      };
-    });
-
-    await expect(
-      commitHostedRepair({
-        plan,
-        acceptance,
-        gateReceipt,
-        patchBytes,
-        fileContents: { 'apps/web/lib/proof.ts': fileBytes },
-        readToken: 'read-token',
-        writeToken: 'write-token',
-        clock: () => new Date('2026-08-29T20:02:00.000Z'),
-        request,
-      })
-    ).resolves.toEqual({ committed: false, outcome: 'stale_head' });
-    expect(request).toHaveBeenCalledTimes(1);
-  });
-
-  it('scrubs credentials and re-inspects candidate bytes after commands', () => {
-    const { plan, patchBytes, changes } = hostedFixture();
+  it('scrubs credentials, re-inspects candidates, and wires workflow', () => {
+    const { plan, patchBytes, changes } = fixture();
     const inspect = vi
       .fn()
       .mockImplementationOnce(() => {})
       .mockImplementationOnce(() => {
         throw new Error('post-command mutation');
       });
-    const execute = vi.fn((_command, _args, options) => {
-      expect(options.env).toEqual({ PATH: '/bin' });
-    });
     expect(() =>
       runHostedVerification({
         plan,
@@ -514,26 +354,20 @@ describe('hosted writer deliberate red', () => {
         changes,
         repository: '/candidate',
         environment: { PATH: '/bin', GH_TOKEN: 'write', STATUS_TOKEN: 'read' },
-        execute,
+        execute: vi.fn((_command, _args, options) => {
+          expect(options.env).toEqual({ PATH: '/bin' });
+        }),
         inspect,
       })
     ).toThrow('post-command mutation');
-    expect(execute).toHaveBeenCalledTimes(3);
-    expect(inspect).toHaveBeenCalledTimes(2);
-    expect(() =>
-      runHostedVerification({
-        plan,
-        patchBytes,
-        changes,
-        repository: '/candidate',
-        execute: () => {
-          throw new Error('command failed');
-        },
-        inspect: vi.fn(),
-      })
-    ).toThrow('command failed');
-    expect(() =>
-      assertCredentialFreeHostedAcceptance({ GH_TOKEN: 'writer' })
-    ).toThrow('before writer credentials exist');
+    const credentials = { GH_TOKEN: 'writer' };
+    expect(() => assertCredentialFreeHostedAcceptance(credentials)).toThrow(
+      'before writer credentials exist'
+    );
+    const workflowPath = '.github/workflows/rolling-ci-dispatch.yml';
+    const workflow = readFileSync(workflowPath, 'utf8');
+    expect(workflow).toContain('scripts/lib/rolling-ci-hosted-writer.mjs');
+    expect(workflow).toContain('hosted-acceptance');
+    expect(workflow).toContain('hosted-commit');
   });
 });

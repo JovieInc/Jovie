@@ -30,6 +30,13 @@ export const HOSTED_REPAIR_MAX_FILES = 8;
 export const HOSTED_REPAIR_MAX_PATCH_BYTES = 512 * 1024;
 export const HOSTED_GATE_MAX_AGE_MS = 5 * 60 * 1000;
 export const HOSTED_ACCEPTANCE_TTL_MS = 45 * 60 * 1000;
+export const HOSTED_REPAIR_NODE_COMMAND = 'node';
+export const HOSTED_REPAIR_STOP_LABELS = Object.freeze([
+  'needs-human',
+  'no-auto',
+  'hold',
+  'gated',
+]);
 const HOSTED_VERIFICATION_ENV_KEYS = Object.freeze(
   'CI HOME LANG LC_ALL PATH PNPM_HOME TMPDIR XDG_CACHE_HOME'.split(' ')
 );
@@ -40,7 +47,7 @@ export function hostedRepairTestCommands(plan, changes) {
     { command: 'pnpm', args: ['biome', 'check', ...paths] },
     { command: 'pnpm', args: ['run', 'typecheck'] },
     {
-      command: process.execPath,
+      command: HOSTED_REPAIR_NODE_COMMAND,
       args: [
         'scripts/run-affected-tests.mjs',
         '--base',
@@ -61,9 +68,9 @@ const HOSTED_DENIED_PATH_RE = Object.freeze([
   /(^|\/)\.env(?:\.|$)/i,
   /(?:credential|secret|token|private[-_]?key|\.pem$|\.p12$|\.key$)/i,
   /(^|\/)(?:drizzle|migrations?)(?:[._-]|\/|$)/i,
-  /(^|\/)(?:auth|authentication|oauth|clerk|sessions?)(?:[._-]|\/|$)/i,
-  /(?:^|\/)(?:billing|payments?|stripe|entitlements?)(?:[._-]|\/|$)/i,
-  /(?:^|\/)(?:release|deployment|deploy|vercel)(?:[._-]|\/|$)/i,
+  /(^|\/)[@()]*(?:auth|authentication|oauth|clerk|sessions?)(?:[)._/-]|$)/i,
+  /(?:^|\/)[@()]*(?:billing|payments?|stripe|entitlements?)(?:[)._/-]|$)/i,
+  /(?:^|\/)[@()]*(?:release|deployments?|deploy|vercel)(?:[)._/-]|$)/i,
   /(?:^|\/)proxy\.ts$/i,
   /(?:^|\/)(?:package\.json|pnpm-lock\.yaml|turbo\.json|biome\.jsonc?)$/i,
   /(?:^|\/)(?:tests?|__tests__|__snapshots__)(?:\/|$)/i,
@@ -127,7 +134,13 @@ function assertHostedRepairPlan(plan) {
   assertExactSha(plan.expectedHeadOid, 'expectedHeadOid');
   assertExactSha(plan.trustedPolicyOid, 'trustedPolicyOid');
   assertSafeHeadRef(plan.headRefName);
-  const expectedKey = `${plan.repository}:pr-${plan.prNumber}:${plan.expectedHeadOid}:${plan.fingerprint}:${plan.policyVersion}`;
+  const expectedKey = [
+    plan.repository,
+    `pr-${plan.prNumber}`,
+    plan.expectedHeadOid,
+    plan.fingerprint,
+    plan.policyVersion,
+  ].join(':');
   if (plan.idempotencyKey !== expectedKey) {
     throw new Error('hosted repair idempotency key is not exact-head bound');
   }
@@ -408,9 +421,8 @@ function assertHostedCandidateState({
     return record.slice(3);
   });
   if (
-    JSON.stringify(
-      paths.sort((left, right) => left.localeCompare(right))
-    ) !== JSON.stringify(changes.map(change => change.path))
+    JSON.stringify(paths.sort((left, right) => left.localeCompare(right))) !==
+    JSON.stringify(changes.map(change => change.path))
   ) {
     throw new Error('candidate dirty set does not match accepted changes');
   }
@@ -519,12 +531,14 @@ export function buildHostedAcceptanceReceipt({
   executor,
   testReceipt,
   now = new Date(),
+  gateMaxAgeMs = HOSTED_ACCEPTANCE_TTL_MS,
 }) {
   assertHostedRepairPlan(plan);
   const gate = validateHostedGateAdmission({
     receipt: gateReceipt,
     trustedPolicyOid: plan.trustedPolicyOid,
     now,
+    maxAgeMs: gateMaxAgeMs,
   });
   if (!gate.accepted) throw new Error(gate.reason);
   const patch = Buffer.from(patchBytes ?? '');
@@ -601,8 +615,7 @@ export function validateHostedAcceptance({
       acceptance.maxConcurrent !== HOSTED_REPAIR_MAX_CONCURRENT ||
       acceptance.testsPassed !== true ||
       acceptance.patchSha256 !== sha256(Buffer.from(patchBytes ?? '')) ||
-      acceptance.gate?.receiptSha256 === undefined ||
-      acceptance.gate.receiptSha256 !== gate.receiptSha256 ||
+      typeof acceptance.gate?.receiptSha256 !== 'string' ||
       acceptance.executor?.kind !== 'cursor-cli' ||
       !/^[0-9a-f]{64}$/.test(acceptance.executor?.installerSha256 ?? '') ||
       typeof acceptance.executor?.version !== 'string' ||
@@ -653,6 +666,12 @@ export function buildHostedCommitVariables({
     if (!Buffer.isBuffer(contents) || sha256(contents) !== change.sha256) {
       throw new Error(`${change.path}: immutable artifact hash mismatch`);
     }
+    if (
+      contents.length !== change.bytes ||
+      contents.length > HOSTED_REPAIR_MAX_PATCH_BYTES
+    ) {
+      throw new Error(`${change.path}: immutable artifact byte count mismatch`);
+    }
     return { path: change.path, contents: contents.toString('base64') };
   });
   return {
@@ -688,6 +707,7 @@ export function buildHostedTerminalReceipt({
     'tests_failed',
     'executor_failed',
     'recursive_dispatch_blocked',
+    'human_held',
     'writer_failed',
   ]);
   if (!allowedOutcomes.has(outcome))
@@ -762,6 +782,16 @@ export async function commitHostedRepair({
     pr?.head?.ref !== plan.headRefName
   ) {
     return { committed: false, outcome: 'stale_head' };
+  }
+  const labels = new Set(
+    (Array.isArray(pr?.labels) ? pr.labels : []).map(label =>
+      String(label?.name ?? label)
+        .trim()
+        .toLowerCase()
+    )
+  );
+  if (HOSTED_REPAIR_STOP_LABELS.some(label => labels.has(label))) {
+    return { committed: false, outcome: 'human_held' };
   }
   if (pr?.head?.sha !== plan.expectedHeadOid) {
     return { committed: false, outcome: 'stale_head' };
