@@ -12,6 +12,7 @@ import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   createGitRunner,
+  formatMetaEnv,
   LIVE_MAIN_FETCH_REF,
   resolveMergeGroupPathDiff,
 } from '../resolve-merge-group-path-diff.mjs';
@@ -184,8 +185,18 @@ describe('merge_group workflow contract', () => {
       'MERGE_GROUP_HEAD_SHA="${{ github.event.merge_group.head_sha }}"'
     );
     expect(CI_WORKFLOW).toContain(
-      'node scripts/lib/resolve-merge-group-path-diff.mjs'
+      'git show "${MERGE_GROUP_BASE_SHA}:scripts/lib/resolve-merge-group-path-diff.mjs"'
     );
+    expect(CI_WORKFLOW).toContain('node "$TRUSTED_PATH_DIFF_RESOLVER"');
+    expect(CI_WORKFLOW).not.toContain(
+      'node scripts/lib/resolve-merge-group-path-diff.mjs \\'
+    );
+    expect(CI_WORKFLOW).not.toContain('source "$PATH_DIFF_DIR/meta.env"');
+    expect(CI_WORKFLOW).toContain(
+      'git show "${MERGE_GROUP_BASE_SHA}:scripts/lib/ci-repo-lanes.mjs"'
+    );
+    expect(CI_WORKFLOW).toContain('node "$TRUSTED_CI_REPO_LANES"');
+    expect(CI_WORKFLOW).not.toContain('node scripts/lib/ci-repo-lanes.mjs');
     expect(CI_WORKFLOW).toContain('--base "$MERGE_GROUP_BASE_SHA"');
     expect(CI_WORKFLOW).toContain('--head "$MERGE_GROUP_HEAD_SHA"');
     expect(PATH_DIFF_HELPER).toContain(
@@ -495,9 +506,7 @@ describe('merge_group workflow contract', () => {
 
     const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
     expect(macos).toContain('runs-on: macos-26');
-    expect(CI_WORKFLOW).toContain(
-      'node scripts/lib/product-lane-classifier.mjs'
-    );
+    expect(CI_WORKFLOW).toContain('node "$TRUSTED_PRODUCT_LANE_CLASSIFIER"');
     expect(CI_WORKFLOW).not.toContain('.github/workflows/macos-ci.yml');
     expect(macos).toContain("github.event_name == 'merge_group'");
     expect(macos).not.toContain("github.event_name == 'pull_request'");
@@ -571,9 +580,7 @@ describe('merge_group workflow contract', () => {
     expect(pathChanges).toContain(
       'MERGE_GROUP_HEAD_SHA="${{ github.event.merge_group.head_sha }}"'
     );
-    expect(pathChanges).toContain(
-      'node scripts/lib/resolve-merge-group-path-diff.mjs'
-    );
+    expect(pathChanges).toContain('node "$TRUSTED_PATH_DIFF_RESOLVER"');
     expect(pathChanges).toContain('--base "$MERGE_GROUP_BASE_SHA"');
     expect(pathChanges).toContain('--head "$MERGE_GROUP_HEAD_SHA"');
     expect(PATH_DIFF_HELPER).toContain(
@@ -596,7 +603,7 @@ describe('merge_group workflow contract', () => {
       "run_summer_ops: ${{ steps.detect.outputs.run_summer_ops || 'false' }}"
     );
     expect(pathChanges).toContain(
-      'node scripts/lib/ci-repo-lanes.mjs --emit-github-output'
+      'node "$TRUSTED_CI_REPO_LANES" --emit-github-output'
     );
     expect(pathChanges).toContain(
       'echo "is_noop_merge_group=true" >> "$GITHUB_OUTPUT"'
@@ -687,6 +694,34 @@ describe('merge_group workflow contract', () => {
       "is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}"
     );
     expect(pathChanges).toContain('product-lane-classifier.mjs');
+    expect(pathChanges).toContain('persist-credentials: false');
+    expect(pathChanges).toContain(
+      'git show "${DIFF_BASE}:scripts/brand-scrub.py"'
+    );
+    expect(pathChanges).toContain('python3 "$TRUSTED_BRAND_SCRUBBER"');
+    expect(pathChanges).not.toContain('python3 scripts/brand-scrub.py');
+    expect(pathChanges).toContain(
+      'git show "${CLASSIFICATION_BASE_REF}:scripts/lib/product-lane-classifier.mjs"'
+    );
+    expect(pathChanges).toContain('node "$TRUSTED_PRODUCT_LANE_CLASSIFIER"');
+    expect(pathChanges).not.toContain(
+      'node scripts/lib/product-lane-classifier.mjs \\'
+    );
+    expect(pathChanges).toContain('--base-ref "$CLASSIFICATION_BASE_REF"');
+    expect(pathChanges).toContain('--head-ref "$CLASSIFICATION_HEAD_REF"');
+    expect(pathChanges).toContain(
+      'CLASSIFICATION_BASE_REF="$PATH_DIFF_BASE_SHA"'
+    );
+    expect(pathChanges).toContain(
+      'CLASSIFICATION_HEAD_REF="$PATH_DIFF_HEAD_SHA"'
+    );
+    expect(pathChanges).toContain(
+      'git merge-base --is-ancestor "$PATH_DIFF_BASE_SHA" "$PATH_DIFF_HEAD_SHA"'
+    );
+    expect(pathChanges).toContain(
+      'CLASSIFICATION_BASE_REF="origin/${{ github.base_ref }}"'
+    );
+    expect(pathChanges).toContain('CLASSIFICATION_BASE_REF="$PUSH_BASE_SHA"');
     expect(pathChanges).toContain(
       "run_web: ${{ steps.detect.outputs.run_web || 'false' }}"
     );
@@ -1516,8 +1551,11 @@ describe('resolveMergeGroupPathDiff coalesced heads (JOV-4905)', () => {
       source: 'live_main_merge_base',
       isNoop: false,
       files: ['apps/web/product.ts'],
+      baseSha: rootSha,
       headSha,
     });
+    expect(formatMetaEnv(result)).toContain(`PATH_DIFF_BASE_SHA=${rootSha}`);
+    expect(formatMetaEnv(result)).toContain(`PATH_DIFF_HEAD_SHA=${headSha}`);
   });
 
   it('treats a valid empty live-main range as a typed no-op', () => {

@@ -1,5 +1,7 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 
 export const PRODUCT_LANES = ['ios', 'mac', 'web'];
 
@@ -98,11 +100,16 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
 ]);
 
 const ALL_LANES = [...PRODUCT_LANES, 'operations', 'cross-product'];
+const OPERATIONS_ONLY_PACKAGE_SCRIPTS = new Set(['invariants:check']);
+const OPERATIONS_ONLY_INVARIANT_ADDITION =
+  /^python3 scripts\/hermes\/tests\/[a-z0-9-]+\.test\.py$/;
 
 const normalizePath = path =>
   String(path ?? '')
     .trim()
     .replace(/^\.\//, '');
+const isJsonObject = value =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
 
 export class ProductLaneClassificationError extends Error {
   constructor(paths) {
@@ -113,7 +120,110 @@ export class ProductLaneClassificationError extends Error {
   }
 }
 
-export function classifyProductLanes(paths) {
+function sharedPackageClassification(rule = 'shared-js-workspace') {
+  return [rule, 'shared-contract', PRODUCT_LANES];
+}
+
+function isOperationsOnlyInvariantChange(beforeCommand, afterCommand) {
+  if (typeof beforeCommand !== 'string' || typeof afterCommand !== 'string') {
+    return false;
+  }
+
+  const beforeCommands = beforeCommand
+    .split(' && ')
+    .map(command => command.trim());
+  const addedCommands = [];
+  let beforeIndex = 0;
+  for (const command of afterCommand
+    .split(' && ')
+    .map(candidate => candidate.trim())) {
+    if (command === beforeCommands[beforeIndex]) {
+      beforeIndex += 1;
+    } else {
+      addedCommands.push(command);
+    }
+  }
+
+  return (
+    beforeIndex === beforeCommands.length &&
+    addedCommands.length > 0 &&
+    addedCommands.every(command =>
+      OPERATIONS_ONLY_INVARIANT_ADDITION.test(command)
+    )
+  );
+}
+
+export function classifyPackageJsonChange(beforeSource, afterSource) {
+  if (typeof beforeSource !== 'string' || typeof afterSource !== 'string') {
+    return sharedPackageClassification('shared-js-workspace-unresolved');
+  }
+
+  let before;
+  let after;
+  try {
+    before = JSON.parse(beforeSource);
+    after = JSON.parse(afterSource);
+  } catch {
+    return sharedPackageClassification('shared-js-workspace-unresolved');
+  }
+  if (!isJsonObject(before) || !isJsonObject(after)) {
+    return sharedPackageClassification('shared-js-workspace-unresolved');
+  }
+
+  const changedTopLevelKeys = [
+    ...new Set([...Object.keys(before), ...Object.keys(after)]),
+  ].filter(key => !isDeepStrictEqual(before[key], after[key]));
+  if (
+    changedTopLevelKeys.length !== 1 ||
+    changedTopLevelKeys[0] !== 'scripts'
+  ) {
+    return sharedPackageClassification();
+  }
+
+  const beforeScripts = before.scripts ?? {};
+  const afterScripts = after.scripts ?? {};
+  if (!isJsonObject(beforeScripts) || !isJsonObject(afterScripts)) {
+    return sharedPackageClassification('shared-js-workspace-unresolved');
+  }
+  const changedScripts = [
+    ...new Set([...Object.keys(beforeScripts), ...Object.keys(afterScripts)]),
+  ].filter(
+    script => !isDeepStrictEqual(beforeScripts[script], afterScripts[script])
+  );
+  const hasInvalidChangedScriptValue = changedScripts.some(
+    script =>
+      (beforeScripts[script] !== undefined &&
+        typeof beforeScripts[script] !== 'string') ||
+      (afterScripts[script] !== undefined &&
+        typeof afterScripts[script] !== 'string')
+  );
+  if (
+    changedScripts.length === 0 ||
+    hasInvalidChangedScriptValue ||
+    changedScripts.some(script => !OPERATIONS_ONLY_PACKAGE_SCRIPTS.has(script))
+  ) {
+    return sharedPackageClassification(
+      hasInvalidChangedScriptValue
+        ? 'shared-js-workspace-unresolved'
+        : 'shared-js-workspace'
+    );
+  }
+  if (
+    !isOperationsOnlyInvariantChange(
+      beforeScripts['invariants:check'],
+      afterScripts['invariants:check']
+    )
+  ) {
+    return sharedPackageClassification();
+  }
+
+  return ['operations-package-scripts', 'operations-tooling', []];
+}
+
+export function classifyProductLanes(
+  paths,
+  { packageJsonBefore, packageJsonAfter } = {}
+) {
   const changedPaths = [
     ...new Set(paths.map(normalizePath).filter(Boolean)),
   ].sort();
@@ -121,7 +231,10 @@ export function classifyProductLanes(paths) {
   const unmappedPaths = [];
 
   for (const path of changedPaths) {
-    const rule = RULES.find(([, , , pattern]) => pattern.test(path));
+    const rule =
+      path === 'package.json'
+        ? classifyPackageJsonChange(packageJsonBefore, packageJsonAfter)
+        : RULES.find(([, , , pattern]) => pattern.test(path));
     if (!rule) {
       unmappedPaths.push(path);
       continue;
@@ -181,6 +294,15 @@ export function classifyProductLanes(paths) {
       selectedLanes.map(lane => [lane, GATE_RECEIPTS[lane]])
     ),
   };
+}
+
+function readPackageJsonAtRef(ref, cwd) {
+  return execFileSync('git', ['show', `${ref}:package.json`], {
+    cwd,
+    encoding: 'utf8',
+    maxBuffer: 5 * 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
 }
 
 export function evaluateProductLaneResults(receipt, results) {
@@ -264,10 +386,28 @@ function parseArgs(argv) {
   return args;
 }
 
-export function runProductLaneClassifier(argv = process.argv.slice(2)) {
+export function runProductLaneClassifier(
+  argv = process.argv.slice(2),
+  { cwd = process.cwd() } = {}
+) {
   const args = parseArgs(argv);
   const files = readFileSync(args['files-from'], 'utf8').split(/\r?\n/);
-  const receipt = classifyProductLanes(files);
+  let packageJsonBefore;
+  let packageJsonAfter;
+  if (files.map(normalizePath).includes('package.json')) {
+    try {
+      packageJsonBefore = readPackageJsonAtRef(args['base-ref'], cwd);
+      packageJsonAfter = readPackageJsonAtRef(args['head-ref'], cwd);
+    } catch (error) {
+      console.warn(
+        `::warning::Could not inspect package.json change; selecting every product lane: ${error.message}`
+      );
+    }
+  }
+  const receipt = classifyProductLanes(files, {
+    packageJsonBefore,
+    packageJsonAfter,
+  });
   const json = `${JSON.stringify(receipt, null, 2)}\n`;
   if (args['json-out']) writeFileSync(args['json-out'], json);
   if (args['summary-out'])
