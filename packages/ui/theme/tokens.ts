@@ -265,10 +265,10 @@ export const typography = {
   weight: {
     normal: 'var(--font-weight-normal)', // 400
     book: 'var(--font-weight-book)', // 450 — Linear's UI default!
-    medium: 'var(--font-weight-medium)', // 500
-    semibold: 'var(--font-weight-semibold)', // 538 — Linear-specific
-    bold: 'var(--font-weight-bold)', // 590 — Linear-specific
-    heavy: 'var(--font-weight-heavy)', // 700
+    medium: 'var(--font-weight-medium)', // 510
+    semibold: 'var(--font-weight-semibold)', // 590 — Linear-specific
+    bold: 'var(--font-weight-bold)', // 680 — Linear-specific
+    heavy: 'var(--font-weight-heavy)', // 680 — matches bold today
   },
   leading: {
     none: 'var(--leading-none)',

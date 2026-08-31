@@ -31,7 +31,7 @@ module.exports = {
         normal: 'var(--font-weight-normal)', // 400
         book: 'var(--font-weight-book)', // 450 — Linear's UI default
         caption: 'var(--linear-caption-weight)', // 510 — compact app controls
-        medium: 'var(--font-weight-medium)', // 500
+        medium: 'var(--font-weight-medium)', // 510
         semibold: 'var(--font-weight-semibold)', // 590 — Linear-specific (extracted 2026-03-16)
         bold: 'var(--font-weight-bold)', // 680 — Linear-specific (extracted 2026-03-16)
         heavy: 'var(--font-weight-heavy)', // 680 — matches bold today; reserve for future step
