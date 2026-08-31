@@ -73,6 +73,12 @@ test('RED: authority map rejects advisory-only enforced layers', () => {
   );
   expectCode(
     mutateEntry('foundation.tokens', () => ({
+      status: 'canonical-enforced',
+    })),
+    'invalid-authority-status-floor'
+  );
+  expectCode(
+    mutateEntry('foundation.tokens', () => ({
       layer: 'legacy',
     })),
     'invalid-authority-layer'
@@ -127,6 +133,13 @@ test('RED: authority map rejects unowned gaps and stale evidence paths', () => {
       executableChecks: ['scripts'],
     })),
     'invalid-repo-path',
+    process.cwd()
+  );
+  expectCode(
+    mutateEntry('interaction.families', () => ({
+      executableChecks: ['README.md'],
+    })),
+    'invalid-authority-check-path',
     process.cwd()
   );
 });

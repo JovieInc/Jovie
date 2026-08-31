@@ -23,16 +23,6 @@ const AUTHORITY_MAP_LAYER_VALUES = Object.freeze([
   'certification',
   'legacy',
 ]);
-const AUTHORITY_MAP_STATUS_RANK = new Map(
-  [
-    'missing',
-    'duplicated',
-    'partially-migrated',
-    'canonical-unenforced',
-    'canonical-enforced',
-    'obsolete-superseded',
-  ].map((status, index) => [status, index])
-);
 const AUTHORITY_MAP_STATUS_FLOORS = Object.freeze({
   'foundation.tokens': 'partially-migrated',
   'primitive.components': 'partially-migrated',
@@ -54,6 +44,10 @@ const has = value => typeof value === 'string' && value.trim() !== '';
 const add = (issues, code, detail) => issues.push({ code, detail });
 const layerFromId = id =>
   AUTHORITY_MAP_LAYER_VALUES.find(layer => id.startsWith(`${layer}.`)) ?? null;
+const CHECK_PATH_EXTENSIONS =
+  /\.(?:cjs|cts|js|mjs|mts|sh|spec\.[cm]?[jt]sx?|test\.[cm]?[jt]sx?|ts|tsx|ya?ml)$/;
+const TEST_PATH_PATTERN = /(?:^|\/)(?:__tests__|tests)\//;
+const TEST_FILE_PATTERN = /(?:^|\/)[^/]+\.(?:spec|test)\.[cm]?[jt]sx?$/;
 
 function safeRepoPath(value) {
   return (
@@ -73,7 +67,17 @@ function exactStringArray(value, expected) {
   );
 }
 
-function validatePathList(issues, entryId, paths, repoRoot) {
+function isExecutableCheckPath(value) {
+  return (
+    CHECK_PATH_EXTENSIONS.test(value) &&
+    (value.startsWith('scripts/') ||
+      value.startsWith('.github/workflows/') ||
+      TEST_PATH_PATTERN.test(value) ||
+      TEST_FILE_PATTERN.test(value))
+  );
+}
+
+function validatePathList(issues, entryId, paths, repoRoot, options = {}) {
   if (!Array.isArray(paths)) {
     add(issues, 'invalid-authority-path-list', entryId);
     return;
@@ -83,15 +87,19 @@ function validatePathList(issues, entryId, paths, repoRoot) {
       add(issues, 'invalid-repo-path', `${entryId}:${sourcePath}`);
       continue;
     }
-    if (!repoRoot) {
-      continue;
-    }
-    try {
-      if (!statSync(resolve(repoRoot, sourcePath)).isFile()) {
+    if (repoRoot) {
+      try {
+        if (!statSync(resolve(repoRoot, sourcePath)).isFile()) {
+          add(issues, 'invalid-repo-path', `${entryId}:${sourcePath}`);
+          continue;
+        }
+      } catch {
         add(issues, 'invalid-repo-path', `${entryId}:${sourcePath}`);
+        continue;
       }
-    } catch {
-      add(issues, 'invalid-repo-path', `${entryId}:${sourcePath}`);
+    }
+    if (options.executable && !isExecutableCheckPath(sourcePath)) {
+      add(issues, 'invalid-authority-check-path', `${entryId}:${sourcePath}`);
     }
   }
 }
@@ -160,10 +168,7 @@ export function validateDesignSystemAuthorityMap(map, repoRoot = null) {
     const statusFloor = AUTHORITY_MAP_STATUS_FLOORS[entry.id];
     if (!statusFloor) {
       add(issues, 'invalid-authority-status-floor', entry.id);
-    } else if (
-      (AUTHORITY_MAP_STATUS_RANK.get(entry.status) ?? -1) <
-      (AUTHORITY_MAP_STATUS_RANK.get(statusFloor) ?? -1)
-    ) {
+    } else if (statusFloor !== entry.status) {
       add(issues, 'invalid-authority-status-floor', entry.id);
     }
     if (
@@ -214,7 +219,9 @@ export function validateDesignSystemAuthorityMap(map, repoRoot = null) {
     }
 
     validatePathList(issues, entry.id, entry.canonicalSources ?? [], repoRoot);
-    validatePathList(issues, entry.id, entry.executableChecks ?? [], repoRoot);
+    validatePathList(issues, entry.id, entry.executableChecks ?? [], repoRoot, {
+      executable: true,
+    });
 
     const entryOrder = order.get(entry.id);
     if (!Array.isArray(entry.dependsOn)) {

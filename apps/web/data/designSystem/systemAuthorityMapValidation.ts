@@ -11,6 +11,7 @@ import {
 
 export type DesignSystemAuthorityMapIssueCode =
   | 'duplicate-authority-id'
+  | 'invalid-authority-check-path'
   | 'invalid-authority-dependency'
   | 'invalid-authority-layer'
   | 'invalid-authority-schema'
@@ -32,16 +33,6 @@ export interface DesignSystemAuthorityMapIssue {
 }
 
 const has = (value?: string | null): value is string => Boolean(value?.trim());
-const STATUS_RANK = new Map(
-  [
-    'missing',
-    'duplicated',
-    'partially-migrated',
-    'canonical-unenforced',
-    'canonical-enforced',
-    'obsolete-superseded',
-  ].map((status, index) => [status, index] as const)
-);
 const STATUS_FLOORS: Readonly<
   Partial<Record<string, DesignSystemAuthorityStatus>>
 > = Object.freeze({
@@ -78,27 +69,43 @@ const layerFromId = (id: string) =>
   DESIGN_SYSTEM_AUTHORITY_LAYER_VALUES.find(layer =>
     id.startsWith(`${layer}.`)
   ) ?? null;
+const CHECK_PATH_EXTENSIONS =
+  /\.(?:cjs|cts|js|mjs|mts|sh|spec\.[cm]?[jt]sx?|test\.[cm]?[jt]sx?|ts|tsx|ya?ml)$/;
+const TEST_PATH_PATTERN = /(?:^|\/)(?:__tests__|tests)\//;
+const TEST_FILE_PATTERN = /(?:^|\/)[^/]+\.(?:spec|test)\.[cm]?[jt]sx?$/;
+
+const isExecutableCheckPath = (value: string) =>
+  CHECK_PATH_EXTENSIONS.test(value) &&
+  (value.startsWith('scripts/') ||
+    value.startsWith('.github/workflows/') ||
+    TEST_PATH_PATTERN.test(value) ||
+    TEST_FILE_PATTERN.test(value));
 
 function validatePathList(
   issues: DesignSystemAuthorityMapIssue[],
   entryId: string,
   paths: readonly string[],
-  repoRoot: string | null
+  repoRoot: string | null,
+  options: { readonly executable?: boolean } = {}
 ) {
   for (const sourcePath of paths) {
     if (!isSafeRepoPath(sourcePath)) {
       add(issues, 'invalid-repo-path', `${entryId}:${sourcePath}`);
       continue;
     }
-    if (!repoRoot) {
-      continue;
-    }
-    try {
-      if (!statSync(resolve(repoRoot, sourcePath)).isFile()) {
+    if (repoRoot) {
+      try {
+        if (!statSync(resolve(repoRoot, sourcePath)).isFile()) {
+          add(issues, 'invalid-repo-path', `${entryId}:${sourcePath}`);
+          continue;
+        }
+      } catch {
         add(issues, 'invalid-repo-path', `${entryId}:${sourcePath}`);
+        continue;
       }
-    } catch {
-      add(issues, 'invalid-repo-path', `${entryId}:${sourcePath}`);
+    }
+    if (options.executable && !isExecutableCheckPath(sourcePath)) {
+      add(issues, 'invalid-authority-check-path', `${entryId}:${sourcePath}`);
     }
   }
 }
@@ -168,10 +175,7 @@ export function validateDesignSystemAuthorityMap({
     const statusFloor = STATUS_FLOORS[entry.id];
     if (!statusFloor) {
       add(issues, 'invalid-authority-status-floor', entry.id);
-    } else if (
-      (STATUS_RANK.get(entry.status) ?? -1) <
-      (STATUS_RANK.get(statusFloor) ?? -1)
-    ) {
+    } else if (statusFloor !== entry.status) {
       add(issues, 'invalid-authority-status-floor', entry.id);
     }
     if (!entry.owns.length || entry.owns.some(capability => !has(capability))) {
@@ -205,7 +209,9 @@ export function validateDesignSystemAuthorityMap({
     }
 
     validatePathList(issues, entry.id, entry.canonicalSources, repoRoot);
-    validatePathList(issues, entry.id, entry.executableChecks, repoRoot);
+    validatePathList(issues, entry.id, entry.executableChecks, repoRoot, {
+      executable: true,
+    });
 
     const entryOrder = order.get(entry.id);
     for (const dependency of entry.dependsOn) {
