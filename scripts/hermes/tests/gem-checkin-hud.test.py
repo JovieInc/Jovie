@@ -35,7 +35,7 @@ def receipt(**overrides):
     return base
 
 
-def paint(symphony=None, mq=None, review=None, measured=None, width=200, sha="469d4bb", ship_path=None, tps=None):
+def paint(symphony=None, mq=None, review=None, measured=None, width=200, height=None, sha="469d4bb", ship_path=None, tps=None, pr_flow=None, system_pressure=None):
     return HUD.render(
         symphony=symphony or {"ok": True, "running": 0, "retrying": 0, "blocked": 0, "cap": 3, "rows": [], "up": True, "totals": None, "rate_limits": None, "seconds_running": None},
         mq=mq or {"ok": True, "count": 0, "rows": []},
@@ -43,9 +43,12 @@ def paint(symphony=None, mq=None, review=None, measured=None, width=200, sha="46
         measured=measured or {},
         now=NOW,
         width=width,
+        height=height,
         sha=sha,
         ship_path=ship_path,
         tps=tps,
+        pr_flow=pr_flow,
+        system_pressure=system_pressure,
     )
 
 
@@ -82,7 +85,7 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertIsNone(GREEN.search(output))
         self.assertIsNone(GREEN.search(source))
         self.assertNotIn("lin_", source)
-        for token in ("ALIVE", "WOW", "SHIPS", "#1", "RUN -/-", "RETRY -", "MQ -", "Review -", "unmeasured"):
+        for token in ("ALIVE", "WOW", "SHIPS", "#1", "AGENTS", "-/-", "FAILURES", "QUEUE", "unmeasured"):
             self.assertIn(token, plain)
         self.assertNotIn("cash", plain.lower())
 
@@ -111,7 +114,7 @@ class UltrawideHudTests(unittest.TestCase):
         output = paint(width=200)
         plain, source = strip(output), SOURCE.read_text(encoding="utf-8")
         self.assertIn("get_terminal_size", source)
-        for token in ("ST", "ATTEMPT", "TURN", "TOKENS", "ELAPSED", "WS/PR"):
+        for token in ("ST", "TRY/TURN", "TOKENS", "ELAPSED", "WORKSPACE / PR"):
             self.assertIn(token, plain)
         header = plain.splitlines()[0]
         self.assertGreaterEqual(len(header), 80)
@@ -139,6 +142,7 @@ class UltrawideHudTests(unittest.TestCase):
         payload["codex_totals"] = {"input_tokens": 45678, "output_tokens": 23456, "total_tokens": 69134}
         state, opener = fetch_state(payload)
         self.assertIn("4043", opener.call_args.args[0])
+        self.assertIn("4041", HUD.DEFAULT_SYMPHONY)
         self.assertEqual(state["running"], 1)
         self.assertEqual(state["retrying"], 1)
         self.assertEqual(state["rows"][0]["id"], "JOV-5488")
@@ -146,8 +150,9 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertEqual(state["rows"][1]["attempt"], 2)
         self.assertEqual(state["rows"][1]["turn"], 4)
         plain = strip(paint(state, {"ok": True, "count": 1, "rows": [{"kind": "mq", "number": 16796, "title": "check-in HUD + burrito", "enqueued": STARTED, "position": 5}]}, 11, measured={"ships": {"receipts": [receipt()]}}))
-        for token in ("JOV-5491", "2", "3m", "4", "JOV-5488", "in 5m", "RUN 1/3", "RETRY 1", "MQ 1", "Review 11", "burrito :4043 up", "hook_failed 1", "totals in 45678 out 23456", "receipted this week"):
+        for token in ("JOV-5491", "2/4", "3m", "JOV-5488", "in 5m", "1/3", "FAILURES", "QUEUE", "Symphony :4041 up", "hook_failed 1", "totals in 45678 out 23456", "receipted this week"):
             self.assertIn(token, plain)
+        self.assertNotIn("OpenAI", plain)
         running_line = next(line for line in plain.splitlines() if line.startswith("●") and "JOV-5491" in line)
         self.assertTrue(running_line.rstrip().endswith("JOV-5491") or "…/JOV-5491" in running_line or running_line.rstrip().endswith("…"))
         self.assertLess(plain.index("JOV-5488"), plain.index("JOV-5491"))
@@ -167,6 +172,13 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertIn("$80,000", drawn)
         self.assertNotIn("$0", drawn)
 
+    def test_missing_ship_receipts_are_unknown_never_zero(self):
+        self.assertIsNone(HUD.count_ships_this_week(None, now=NOW)["thisWeek"])
+        plain = strip(paint(measured={}))
+        self.assertGreaterEqual(plain.count("UNKNOWN"), 3)
+        self.assertGreaterEqual(plain.count("unmeasured"), 3)
+        self.assertNotIn("receipted this week", plain)
+
     def test_workflow_cap_reads_max_concurrent_agents(self):
         self.assertEqual(HUD.read_workflow_cap(ROOT / "scripts/hermes/symphony/WORKFLOW.md"), 3)
 
@@ -177,7 +189,7 @@ class UltrawideHudTests(unittest.TestCase):
         tps = HUD.compute_throughput(state["totals"], [{"at": "2026-08-31T11:59:55Z", "total_tokens": 64134, "seconds_running": 937}], now=NOW)
         self.assertAlmostEqual(tps, 1000.0)
         plain = strip(paint(state, tps=tps, width=430))
-        for token in ("SYMPHONY STATUS", "Agents 1/3", "1,000 tps", "15m 42s", "in 45,678", "out 23,456", "total 69,134", "claude-sonnet-4.5", "4,950/5,000"):
+        for token in ("AGENTS", "1/3", "THROUGHPUT", "1,000 tps", "FAILURES", "TOKENS", "69.1k", "Runtime 15m 42s", "claude-sonnet-4.5", "4,950/5,000"):
             self.assertIn(token, plain)
         self.assertAlmostEqual(HUD.compute_throughput(state["totals"], [], now=NOW), 69134 / 942)
 
@@ -185,13 +197,13 @@ class UltrawideHudTests(unittest.TestCase):
         state, _ = fetch_state(official_state(rate_limits=None))
         self.assertIsNone(state["rate_limits"])
         plain = strip(paint(state, width=430))
-        self.assertIn("Rate Limits -", plain)
+        self.assertIn("Rate limits -", plain)
         self.assertNotIn("4,950/5,000", plain)
         self.assertNotIn("unlimited", plain)
 
     def test_missing_ci_series_is_dash_not_zero(self):
         plain = strip(paint(width=430))
-        for token in ("SYMPHONY STATUS", "Todo/pickup", "ci-fast", "PR Ready", "merge_group CI", "n=- p95 -"):
+        for token in ("AGENTS", "Todo/pickup", "ci-fast", "PR Ready", "merge_group CI", "n=- p95 -"):
             self.assertIn(token, plain)
         for token in ("p95 0", "p95 0s", "n=0 p95 0", "$0", "GEM OPERATIONS"):
             self.assertNotIn(token, plain)
@@ -226,6 +238,132 @@ class UltrawideHudTests(unittest.TestCase):
         )
         self.assertEqual(path["bottleneck"]["id"], "mq")
         self.assertIn("MQ awaiting checks", path["bottleneck"]["reason"])
+
+    def test_full_height_reserves_current_work_rows_without_layout_shift(self):
+        empty = strip(paint(width=200, height=40))
+        busy_state, _ = fetch_state(
+            official_state(
+                running=[
+                    {
+                        "issue_identifier": f"JOV-{index}",
+                        "title": f"Worker {index}",
+                        "started_at": STARTED,
+                    }
+                    for index in range(30)
+                ],
+                counts={"running": 30, "retrying": 0, "blocked": 0},
+            )
+        )
+        busy = strip(paint(busy_state, width=200, height=40))
+        self.assertEqual(len(empty.splitlines()), 40)
+        self.assertEqual(len(busy.splitlines()), 40)
+        self.assertIn("CURRENT WORK", busy)
+        self.assertIn("more active receipts", busy)
+
+    def test_header_has_quiet_identity_description_and_natural_freshness(self):
+        state, _ = fetch_state(official_state(generated_at="2026-08-31T11:58:00Z"))
+        plain = strip(paint(state, width=200, height=40))
+        self.assertIn("● JOVIE", plain)
+        self.assertIn(HUD.PRODUCT_DESCRIPTION, plain)
+        self.assertIn("Updated 2 minutes ago", plain)
+        self.assertNotIn("2026-08-31T", plain)
+
+    def test_shared_shipping_information_architecture_is_explicit(self):
+        self.assertEqual(HUD.SHIPPING_DISPLAY_IA["capacity"]["representation"], "active-over-limit")
+        self.assertEqual(HUD.SHIPPING_DISPLAY_IA["throughput"]["representation"], "token-rate")
+        self.assertEqual(HUD.SHIPPING_DISPLAY_IA["failures"]["representation"], "count-and-list")
+        self.assertEqual(HUD.SHIPPING_DISPLAY_IA["tokens"]["representation"], "total-and-per-work-item")
+        self.assertEqual(HUD.SHIPPING_DISPLAY_IA["queue"]["representation"], "count")
+        self.assertEqual(HUD.SHIPPING_DISPLAY_IA["pr_flow"]["representation"], "open-and-rolling-24h")
+        self.assertEqual(HUD.SHIPPING_DISPLAY_IA["system_pressure"]["representation"], "thresholded-host-projection")
+        self.assertEqual(HUD.SHIPPING_DISPLAY_IA["ci_matrix"]["representation"], "bounded-server-aggregate")
+        self.assertEqual(HUD.SHIPPING_DISPLAY_IA["shipping_path"]["representation"], "segmented-stage-bar")
+        self.assertEqual(HUD.SHIPPING_DISPLAY_IA["current_work"]["representation"], "receipt-table")
+        self.assertEqual(HUD.SHIPPING_DISPLAY_IA["freshness"]["representation"], "relative-local-time")
+
+    def test_failures_are_semantic_and_unavailable_never_becomes_zero(self):
+        unavailable = paint(
+            {"ok": False, "running": None, "retrying": None, "blocked": None, "cap": 40, "rows": [], "up": False},
+            width=200,
+            height=40,
+        )
+        failing = paint(
+            {"ok": True, "running": 1, "retrying": 2, "blocked": 1, "cap": 40, "rows": [], "up": True},
+            width=200,
+            height=40,
+        )
+        self.assertIn("FAILURES", strip(unavailable))
+        self.assertNotIn("FAILURES 0", strip(unavailable))
+        self.assertIn("FAILURES", strip(failing))
+        self.assertIn("\033[38;2;255;72;210m3", failing)
+
+    def test_numeric_work_columns_are_right_aligned_and_vendor_is_hidden(self):
+        state, _ = fetch_state(official_state())
+        plain = strip(paint(state, width=200, height=40))
+        header = next(line for line in plain.splitlines() if "TRY/TURN" in line)
+        row = next(line for line in plain.splitlines() if "JOV-5491" in line)
+        self.assertEqual(header.index("TOKENS") + len("TOKENS"), row.index("12.3k") + len("12.3k"))
+        self.assertEqual(header.index("ELAPSED") + len("ELAPSED"), row.index("3m") + len("3m"))
+        self.assertNotIn("OpenAI", plain)
+
+    def test_pr_flow_uses_explicit_rolling_window_and_truthful_unknowns(self):
+        known = strip(
+            paint(
+                width=430,
+                pr_flow={"ok": True, "open_count": 103, "opened_24h": 41, "merged_24h": 37, "generated_at": "2026-08-31T11:58:00Z"},
+            )
+        )
+        for token in ("PR FLOW", "rolling prior 24h", "GitHub", "Updated 2 minutes ago", "OPEN NOW", "103", "OPENED 24H", "41", "MERGED 24H", "37", "NET FLOW", "+4"):
+            self.assertIn(token, known)
+        unknown = strip(paint(width=430, pr_flow={"ok": False}))
+        self.assertIn("source unavailable", unknown)
+        self.assertNotIn("OPEN NOW 0", unknown)
+
+    def test_pressure_and_ci_matrix_keep_unknowns_semantic_and_bounded(self):
+        pressure = {
+            "ok": True,
+            "generated_at": "2026-08-31T11:58:00Z",
+            "cpu": {"status": "failure", "signal_pct": 131, "load1": 49.0, "cores": 16, "psi": 74},
+            "memory": {"status": "healthy", "available_pct": 62, "psi": 1},
+            "io": {"status": "warning", "used_pct": 91, "available_pct": 9, "psi": 12, "full": 1},
+            "network": {"status": "unknown", "util_pct": None, "mbps": None, "speed_mbps": 1000},
+            "slots": {"status": "warning", "util_pct": 80, "running": 32, "cap": 40},
+        }
+        matrix = {
+            "ok": True,
+            "open_count": 103,
+            "opened_24h": 1,
+            "merged_24h": 2,
+            "generated_at": "2026-08-31T11:58:00Z",
+            "query_ms": 412,
+            "ci_matrix": [
+                {"number": number, "title": f"Work {number}", "fast": "success", "ready": "pending", "security": "unknown", "visual": "failure", "all": "pending"}
+                for number in range(1, 12)
+            ],
+        }
+        output = paint(width=430, height=90, pr_flow=matrix, system_pressure=pressure)
+        plain = strip(output)
+        for token in ("SYSTEM PRESSURE", "CPU / LOAD", "131%", "MEMORY", "62% available", "DISK / I/O", "9% available", "NETWORK", "rate window pending", "WORKER SLOTS", "32/40", "CI MATRIX", "cached GitHub rollup", "8/103 rows", "412ms", "✓ PASS", "… RUN", "? UNKNOWN", "× FAIL"):
+            self.assertIn(token, plain)
+        self.assertNotIn("#9 Work 9", plain)
+        self.assertIn("\033[38;2;255;72;210m131%", output)
+
+    def test_github_flow_is_one_server_aggregate_and_absent_checks_are_unknown(self):
+        payload = {
+            "data": {
+                "repository": {"pullRequests": {"totalCount": 103}},
+                "opened": {"issueCount": 41},
+                "merged": {"issueCount": 37},
+            }
+        }
+        with mock.patch.object(HUD, "_gh_json", return_value=payload) as request:
+            counts = HUD._github_flow_counts(NOW - dt.timedelta(hours=24), timeout=3)
+        self.assertEqual(counts, {"open_count": 103, "opened_24h": 41, "merged_24h": 37})
+        request.assert_called_once()
+        self.assertIn("graphql", request.call_args.args[0])
+        self.assertEqual(HUD.aggregate_check_status([]), "unknown")
+        self.assertEqual(HUD.aggregate_check_status([{"name": "Visual", "status": "completed", "conclusion": "failure"}]), "failure")
+        self.assertEqual(HUD.aggregate_check_status([{"name": "Visual", "status": "in_progress"}]), "pending")
 
 
 if __name__ == "__main__":
