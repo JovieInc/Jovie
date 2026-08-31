@@ -32,6 +32,7 @@ import {
   HudShipperNeedPanel,
 } from '@/components/features/admin/hud/HudShipperPanels';
 import { HudSystemHealthStrip } from '@/components/features/admin/hud/HudSystemHealthStrip';
+import { OvieLauncherRail } from '@/components/features/admin/hud/OvieLauncherRail';
 import { VisualQaReviewPanel } from '@/components/features/admin/hud/VisualQaReviewPanel';
 import type { DailyBucket } from '@/components/features/admin/ShippingVelocityChart';
 import { ShippingVelocityChart } from '@/components/features/admin/ShippingVelocityChart';
@@ -1063,6 +1064,7 @@ export function HudDashboardClient({
           </div>
         </ContentSurfaceCard>
       )}
+      {presentation === 'token' ? null : <OvieLauncherRail />}
       {sections.map(section => renderSection(section))}
       <div
         data-testid='hud-bottom-marker'

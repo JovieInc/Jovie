@@ -1,5 +1,6 @@
 import { HudStatusPill } from '@/app/app/(shell)/admin/ops/HudStatusPill';
 import { DesktopTitlebar } from '@/components/atoms/DesktopTitlebar';
+import { OvieLauncherRail } from '@/components/features/admin/hud/OvieLauncherRail';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { type OvieMacHudSnapshot, ycBarLabel } from '@/lib/hud/ovie-mac-hud';
@@ -54,6 +55,7 @@ export function OvieMacHud({
             tone={getDefaultStatusTone(alive.status)}
           />
         </header>
+        <OvieLauncherRail />
         <div className='grid min-h-40 gap-3 md:grid-cols-3'>
           <ContentMetricCard
             className='h-full'

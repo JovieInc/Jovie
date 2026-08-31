@@ -211,6 +211,7 @@ apps/desktop/src/*
 !apps/desktop/src/renderer-recovery.ts
 !apps/desktop/src/tray.ts
 !apps/desktop/src/ovie-door.ts
+!apps/desktop/src/operator-launch.ts
 !apps/desktop/src/summer-runtime-bridge.ts
 !apps/desktop/src/build-identity.ts
 !apps/desktop/scripts/desktop-tray-contract.test.mjs
