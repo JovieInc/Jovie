@@ -712,7 +712,11 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/automation-verify.test.mjs',
         'scripts/lib/__tests__/pre-push-gate.test.mjs',
       ],
-      pythonUnittestTests: ['scripts/hermes/tests/codex-rotate.test.py'],
+      pythonUnittestTests: [
+        'scripts/hermes/tests/codex-account-probe.test.py',
+        'scripts/hermes/tests/codex-rotate.test.py',
+        'scripts/hermes/tests/symphony-lease-guard.test.py',
+      ],
     });
     expect(
       buildAffectedTestPlan([

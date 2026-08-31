@@ -365,7 +365,11 @@ const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = new Set([
   'scripts/backlog-orchestrator/deterministic-gates.mjs',
   'scripts/backlog-orchestrator/gate-next-hold.mjs',
   'scripts/hermes/codex-rotate',
+  'scripts/hermes/codex-account-probe.sh',
+  'scripts/hermes/symphony-lease-guard',
+  'scripts/hermes/tests/codex-account-probe.test.py',
   'scripts/hermes/tests/codex-rotate.test.py',
+  'scripts/hermes/tests/symphony-lease-guard.test.py',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/pre-push-gate.test.mjs',
   'scripts/run-affected-tests.mjs',
@@ -380,7 +384,9 @@ const SYMPHONY_THROUGHPUT_SCRIPT_TESTS = [
   'scripts/lib/__tests__/pre-push-gate.test.mjs',
 ];
 const SYMPHONY_THROUGHPUT_PYTHON_TESTS = [
+  'scripts/hermes/tests/codex-account-probe.test.py',
   'scripts/hermes/tests/codex-rotate.test.py',
+  'scripts/hermes/tests/symphony-lease-guard.test.py',
 ];
 const FLEET_PROMOTION_GATE_INPUTS = new Set([
   'scripts/hermes/gem-priority-gate.py',
