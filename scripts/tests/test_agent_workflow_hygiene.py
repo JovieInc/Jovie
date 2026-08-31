@@ -690,26 +690,43 @@ def test_auto_ready_compensates_live_hold_race(tmp_path: Path) -> None:
             set -euo pipefail
             printf '%s\\n' "$*" >> {call_log}
             if [[ "$1 $2" == "pr list" ]]; then
-              printf '%s\\n' '[{{"n":42,"t":"race guard","draft":true,"m":"MERGEABLE","ms":"CLEAN","head":"codex/race","oid":"{fx_child_head}","author":"itstimwhite","L":[]}}]'
+              printf '%s\\n' '[{{"n":42,"t":"race guard","draft":true,"head":"codex/race","oid":"{fx_child_head}","author":"itstimwhite","L":[]}}]'
             elif [[ "$1 $2" == "pr view" ]]; then
               phase="$(cat {state_file})"
-              if [[ "$phase" == "ready" ]]; then
-                printf '%s\\n' '{{"draft":false,"head":"{fx_child_head}","branch":"codex/race","labels":["gated"],"mergeable":"MERGEABLE","state":"OPEN"}}'
+              if [[ "$phase" == "promoted" ]]; then
+                printf '%s\\n' '{{"draft":false,"head":"{fx_child_head}","branch":"codex/race","labels":["gated"],"state":"OPEN","autoMerge":true,"queued":false}}'
               elif [[ "$phase" == "restored" ]]; then
-                printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","labels":["gated"],"mergeable":"MERGEABLE","state":"OPEN"}}'
+                printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","labels":["gated"],"state":"OPEN","autoMerge":false,"queued":false}}'
               else
-                printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","labels":[],"mergeable":"MERGEABLE","state":"OPEN"}}'
+                printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","labels":[],"state":"OPEN","autoMerge":false,"queued":false}}'
               fi
             elif [[ "$1 $2" == "pr checks" ]]; then
-              printf '%s\\n' '[{{"bucket":"pass","state":"SUCCESS","name":"PR Ready"}},{{"bucket":"pass","state":"SUCCESS","name":"Migration Guard"}},{{"bucket":"pass","state":"SUCCESS","name":"Fork PR Gate"}},{{"bucket":"pass","state":"SUCCESS","name":"PR Size Guard"}}]'
+              printf 'fake gh must never wait for checks before promotion\\n' >&2
+              exit 2
             elif [[ "$1 $2" == "pr ready" ]]; then
               if [[ " $* " == *" --undo "* ]]; then
                 printf '%s\\n' restored > {state_file}
               else
                 printf '%s\\n' ready > {state_file}
               fi
+            elif [[ "$1 $2" == "pr merge" ]]; then
+              if [[ " $* " == *" --disable-auto "* ]]; then
+                :
+              else
+                printf '%s\\n' promoted > {state_file}
+              fi
             elif [[ "$1" == "api" ]]; then
               case "$2" in
+                graphql)
+                  phase="$(cat {state_file})"
+                  if [[ "$phase" == "promoted" ]]; then
+                    printf '%s\\n' '{{"draft":false,"head":"{fx_child_head}","branch":"codex/race","labels":["gated"],"state":"OPEN","autoMerge":true,"queued":false}}'
+                  elif [[ "$phase" == "restored" ]]; then
+                    printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","labels":["gated"],"state":"OPEN","autoMerge":false,"queued":false}}'
+                  else
+                    printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","labels":[],"state":"OPEN","autoMerge":false,"queued":false}}'
+                  fi
+                  ;;
                 repos/*/commits/*)
                   printf '%s\\n' '{{"sha":"{fx_child_head}","message":"fix(ci): fx repair\\n\\nFX-Source-Head: {fx_source_head}\\n","parentShas":["{fx_source_head}"],"authorName":"jovie-fx[bot]","authorEmail":"jovie-fx[bot]@users.noreply.github.com","authorLogin":"jovie-bot[bot]","committerName":"jovie-fx[bot]","committerEmail":"jovie-fx[bot]@users.noreply.github.com","committerLogin":"jovie-bot[bot]","verified":true}}'
                   ;;
@@ -738,7 +755,6 @@ def test_auto_ready_compensates_live_hold_race(tmp_path: Path) -> None:
             "PATH": f"{fake_bin}:{env['PATH']}",
             "REPO": "JovieInc/Jovie",
             "GH_RETRY_ATTEMPTS": "1",
-            "ATTEMPT_COOLDOWN_HOURS": "0",
             "JOVIE_AGENT_PROFILE": "coder",
         }
     )
@@ -757,7 +773,13 @@ def test_auto_ready_compensates_live_hold_race(tmp_path: Path) -> None:
     assert state_file.read_text(encoding="utf-8").strip() == "restored"
     calls = call_log.read_text(encoding="utf-8")
     assert "pr ready 42 -R JovieInc/Jovie" in calls
+    assert (
+        f"pr merge 42 -R JovieInc/Jovie --auto --squash "
+        f"--match-head-commit {fx_child_head}"
+    ) in calls
+    assert "pr merge 42 -R JovieInc/Jovie --disable-auto" in calls
     assert "pr ready 42 -R JovieInc/Jovie --undo" in calls
+    assert "pr checks" not in calls
 
 
 def test_auto_ready_leaves_human_head_without_fx_provenance_draft(
@@ -779,9 +801,7 @@ def test_auto_ready_leaves_human_head_without_fx_provenance_draft(
               printf '%s\\n' '[{{"n":7,"t":"human draft","draft":true,"m":"MERGEABLE","ms":"CLEAN","head":"codex/human","oid":"{human_head}","author":"itstimwhite","L":[]}}]'
             elif [[ "$1 $2" == "pr view" ]]; then
               printf '%s\\n' '{{"draft":true,"head":"{human_head}","branch":"codex/human","labels":[],"mergeable":"MERGEABLE","state":"OPEN"}}'
-            elif [[ "$1 $2" == "pr checks" ]]; then
-              printf '%s\\n' '[{{"bucket":"pass","state":"SUCCESS","name":"PR Ready"}},{{"bucket":"pass","state":"SUCCESS","name":"Migration Guard"}},{{"bucket":"pass","state":"SUCCESS","name":"Fork PR Gate"}},{{"bucket":"pass","state":"SUCCESS","name":"PR Size Guard"}}]'
-            elif [[ "$1 $2" == "pr ready" ]]; then
+            elif [[ "$1 $2" == "pr ready" || "$1 $2" == "pr merge" || "$1 $2" == "pr checks" ]]; then
               printf 'fake gh must never promote a human-authored head\\n' >&2
               exit 2
             elif [[ "$1" == "api" ]]; then
@@ -811,7 +831,6 @@ def test_auto_ready_leaves_human_head_without_fx_provenance_draft(
             "PATH": f"{fake_bin}:{env['PATH']}",
             "REPO": "JovieInc/Jovie",
             "GH_RETRY_ATTEMPTS": "1",
-            "ATTEMPT_COOLDOWN_HOURS": "0",
             "JOVIE_AGENT_PROFILE": "coder",
         }
     )

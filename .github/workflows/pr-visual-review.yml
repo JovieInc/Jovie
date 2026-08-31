@@ -4,7 +4,7 @@ name: PR Visual Review
 # the review step uses only the trusted base script and a configured backend.
 on:
   pull_request_target:
-    types: [opened, reopened, synchronize, ready_for_review]
+    types: [opened, reopened, synchronize]
     paths:
       - 'apps/web/app/**'
       - 'apps/web/components/**'

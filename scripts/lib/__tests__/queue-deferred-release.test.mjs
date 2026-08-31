@@ -29,7 +29,7 @@ const fleetGateRefreshWorkflow = readFileSync(
 );
 
 const STACK_TRIGGER_TYPES =
-  'types: [opened, edited, synchronize, closed, labeled, unlabeled, ready_for_review, reopened]';
+  'types: [opened, edited, synchronize, closed, labeled, unlabeled, reopened]';
 const STACK_EVENT_GUARD =
   /if: >-\s+steps\.refresh\.outcome == 'success' &&\s+\(\s*\(github\.event_name == 'push' && github\.ref == 'refs\/heads\/main'\)\s+\|\|\s+\(github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main'\)\s+\|\|\s+\(github\.event_name == 'workflow_run' &&\s+github\.event\.workflow_run\.head_branch == 'main'\)\s*\)/;
 
@@ -138,7 +138,7 @@ describe('queue-deferred release closed loop (JOV-5054)', () => {
     const regressions = [
       fleetGateRefreshWorkflow.replace(
         STACK_TRIGGER_TYPES,
-        'types: [closed, labeled, unlabeled, ready_for_review, reopened]'
+        'types: [closed, labeled, unlabeled, reopened]'
       ),
       fleetGateRefreshWorkflow.replace(
         'ref: main',

@@ -174,21 +174,41 @@ describe('merge_group workflow contract', () => {
     expect(CI_WORKFLOW).not.toContain('steps.graphite');
   });
 
-  it('re-emits every required source context when a draft becomes reviewable', () => {
-    const readyForReviewTrigger =
-      'types: [opened, synchronize, reopened, ready_for_review]';
+  it('runs source checks once per revision and never on ready_for_review', () => {
+    const sourceRevisionTrigger = 'types: [opened, synchronize, reopened]';
 
-    // A synchronize that occurs while a PR is still a draft cannot be reused
-    // for branch protection. Every source producer must therefore subscribe
-    // to the ready_for_review event on the exact unchanged head.
-    expect(CI_WORKFLOW).toContain(readyForReviewTrigger);
-    expect(SIZE_GUARD_WORKFLOW).toContain(readyForReviewTrigger);
+    // Draft state does not change the source SHA. The original source checks
+    // remain authoritative when the owner pairs ready with native auto-merge.
+    expect(CI_WORKFLOW).toContain(sourceRevisionTrigger);
+    expect(SIZE_GUARD_WORKFLOW).toContain(sourceRevisionTrigger);
     expect(FORK_GATE_WORKFLOW).toContain(
-      `pull_request:\n    ${readyForReviewTrigger}`
+      `pull_request:\n    ${sourceRevisionTrigger}`
     );
     expect(FORK_GATE_WORKFLOW).toContain(
-      `pull_request_target:\n    ${readyForReviewTrigger}`
+      `pull_request_target:\n    ${sourceRevisionTrigger}`
     );
+    expect(CI_WORKFLOW).not.toContain('ready_for_review');
+    expect(SIZE_GUARD_WORKFLOW).not.toContain('ready_for_review');
+    expect(FORK_GATE_WORKFLOW).not.toContain('ready_for_review');
+    expect(CI_WORKFLOW).toMatch(/merge_group:\n\s+types: \[checks_requested\]/);
+    expect(SIZE_GUARD_WORKFLOW).toMatch(
+      /merge_group:\n\s+types: \[checks_requested\]/
+    );
+    expect(FORK_GATE_WORKFLOW).toMatch(
+      /merge_group:\n\s+types: \[checks_requested\]/
+    );
+  });
+
+  it('does not launch any workflow from an unchanged ready transition', () => {
+    const workflowDir = resolve(REPO_ROOT, '.github/workflows');
+    const offenders = readdirSync(workflowDir)
+      .filter(file => file.endsWith('.yml') || file.endsWith('.yaml'))
+      .filter(file => {
+        const source = readFileSync(resolve(workflowDir, file), 'utf8');
+        return /types:\s*\[[^\]]*\bready_for_review\b[^\]]*\]/.test(source);
+      });
+
+    expect(offenders).toEqual([]);
   });
 
   it('quarantines fixed unit capacity until all named warm receipts exist', () => {
