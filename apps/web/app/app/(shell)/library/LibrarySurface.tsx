@@ -129,6 +129,7 @@ import {
   libraryAssetMatchesStage,
   parseLibraryStageParam,
 } from '@/lib/library/lifecycle-stage';
+import type { LibraryPostReleaseBundle } from '@/lib/library/post-release-types';
 import { updateLibraryProfileVisibility } from '@/lib/library/profile-visibility/client-mutations';
 import {
   releaseStatusClasses,
@@ -178,9 +179,15 @@ import {
   persistLibrarySavedView,
   readPersistedLibrarySavedView,
 } from './library-saved-views';
+import { PostReleasePanel } from './PostReleasePanel';
 
 const LIBRARY_TABLE_ROW_HEIGHT = 56;
 const LIBRARY_TABLE_MIN_WIDTH = '0';
+const EMPTY_LIBRARY_POST_RELEASE_BUNDLE: LibraryPostReleaseBundle = {
+  downloads: [],
+  findings: [],
+  rightsholders: [],
+};
 const LIBRARY_CONTENT_INSET_CLASS =
   'px-(--app-shell-header-padding-x) py-(--app-shell-content-padding-y)';
 const LIBRARY_CARD_FOCUS_CLASS =
@@ -1987,6 +1994,7 @@ function AssetDrawer({
   approvalSavingIds,
   artistHandle,
   pressKitCandidates,
+  postReleaseBundle,
   onApprovalStatusChange,
   onShareChange,
 }: {
@@ -2002,6 +2010,7 @@ function AssetDrawer({
   readonly approvalSavingIds: ReadonlySet<string>;
   readonly artistHandle: string | null;
   readonly pressKitCandidates: readonly LibraryReleaseAsset[];
+  readonly postReleaseBundle: LibraryPostReleaseBundle;
   readonly onApprovalStatusChange: (
     asset: LibraryReleaseAsset,
     approvalStatus: LibraryApprovalStatus
@@ -2112,7 +2121,7 @@ function AssetDrawer({
           searchMode='recursive'
         >
           <DrawerSectionGroup
-            defaultOpenSectionId={isMerch ? 'merch' : 'details'}
+            defaultOpenSectionId={isMerch ? 'merch' : 'post-release'}
           >
             <div className='space-y-2.5 overflow-visible px-3'>
               {isMerch ? (
@@ -2151,6 +2160,19 @@ function AssetDrawer({
                       disabled={!open}
                       initialShare={current.share}
                       onShareChange={onShareChange}
+                    />
+                  </DrawerSection>
+
+                  <DrawerSection
+                    sectionId='post-release'
+                    surface='card'
+                    title='Post Release'
+                  >
+                    <PostReleasePanel
+                      asset={current}
+                      creatorProfileId={profileId}
+                      bundle={postReleaseBundle}
+                      disabled={!open}
                     />
                   </DrawerSection>
 
@@ -2356,11 +2378,13 @@ export function LibrarySurface({
   profileId = null,
   artistHandle = null,
   canSyncSpotify = false,
+  postReleaseBundle = EMPTY_LIBRARY_POST_RELEASE_BUNDLE,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
   readonly profileId?: string | null;
   readonly artistHandle?: string | null;
   readonly canSyncSpotify?: boolean;
+  readonly postReleaseBundle?: LibraryPostReleaseBundle;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -2937,6 +2961,7 @@ export function LibrarySurface({
         pressKitCandidates={effectiveAssets.filter(
           item => getLibraryItemKind(item) === 'release'
         )}
+        postReleaseBundle={postReleaseBundle}
         onApprovalStatusChange={handleApprovalStatusChange}
         onShareChange={handleShareChange}
       />
@@ -2954,6 +2979,7 @@ export function LibrarySurface({
       handleTogglePreview,
       playingPreviewId,
       profileId,
+      postReleaseBundle,
       selectedAsset,
     ]
   );

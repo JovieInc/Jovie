@@ -24,6 +24,7 @@ import {
   isLibraryProfileVisibility,
   type LibraryProfileVisibility,
 } from '@/lib/library/profile-visibility';
+import type { LibraryPostReleaseBundle } from '@/lib/library/post-release-types';
 import type { LibraryMerchCard } from '@/lib/merch/types';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import type { PublicVideoListItem } from '@/lib/youtube-library/queries';
@@ -42,6 +43,7 @@ interface ReleaseCatalogPageClientProps {
   readonly assetShareByAssetId?: Readonly<
     Record<string, LibraryAssetShareViewModel>
   >;
+  readonly postReleaseBundle?: LibraryPostReleaseBundle;
   readonly creatorDocuments?: readonly CreatorDocumentListItem[];
   readonly youtubeVideos?: readonly PublicVideoListItem[];
 }
@@ -76,6 +78,7 @@ export function ReleaseCatalogPageClient({
   approvalStatusByAssetId = {},
   profileVisibilityByAssetId = {},
   assetShareByAssetId = {},
+  postReleaseBundle,
   creatorDocuments = [],
   youtubeVideos = [],
 }: ReleaseCatalogPageClientProps) {
@@ -154,6 +157,7 @@ export function ReleaseCatalogPageClient({
         profileId={profileId}
         artistHandle={artistHandle}
         canSyncSpotify={spotifyConnected}
+        postReleaseBundle={postReleaseBundle}
         assets={[
           ...buildLibraryReleaseAssets(
             [...releases, ...archivedReleases],

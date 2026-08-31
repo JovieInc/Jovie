@@ -11,6 +11,7 @@ import {
   LIBRARY_STAGE_LABELS,
   parseLibraryStageParam,
 } from '@/lib/library/lifecycle-stage';
+import type { LibraryPostReleaseBundle } from '@/lib/library/post-release-types';
 import type { LibraryProfileVisibility } from '@/lib/library/profile-visibility';
 import type { LibraryMerchCard } from '@/lib/merch/types';
 import type { PublicVideoListItem } from '@/lib/youtube-library/queries';
@@ -27,6 +28,7 @@ export function LibraryPageClient({
   approvalStatusByAssetId = {},
   profileVisibilityByAssetId = {},
   assetShareByAssetId = {},
+  postReleaseBundle,
   creatorDocuments = [],
   creatorDocumentsNextCursor = null,
   creatorDocumentsLoadFailed = false,
@@ -43,6 +45,7 @@ export function LibraryPageClient({
   readonly assetShareByAssetId?: Readonly<
     Record<string, LibraryAssetShareViewModel>
   >;
+  readonly postReleaseBundle?: LibraryPostReleaseBundle;
   readonly creatorDocuments?: readonly CreatorDocumentListItem[];
   readonly creatorDocumentsNextCursor?: string | null;
   readonly creatorDocumentsLoadFailed?: boolean;
@@ -165,6 +168,7 @@ export function LibraryPageClient({
             approvalStatusByAssetId={approvalStatusByAssetId}
             profileVisibilityByAssetId={profileVisibilityByAssetId}
             assetShareByAssetId={assetShareByAssetId}
+            postReleaseBundle={postReleaseBundle}
             creatorDocuments={creatorDocuments}
             youtubeVideos={youtubeVideos}
           />
