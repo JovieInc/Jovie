@@ -23,10 +23,7 @@ vi.mock('@/components/marketing/homepage-v2/HomepageV2Route', () => ({
   HomepageV2Route: () => (
     <main data-testid='homepage-v2-route'>
       <h1>Make every release feel bigger.</h1>
-      <Link
-        data-testid='homepage-v2-hero-primary-cta'
-        href='https://jov.ie/waitlist'
-      >
+      <Link data-testid='homepage-v2-hero-primary-cta' href='/start'>
         Get started
       </Link>
       <Link href='/artist-profiles'>Explore artist profiles</Link>
@@ -76,7 +73,7 @@ describe('NewLandingPage', () => {
     );
     expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
       'href',
-      'https://jov.ie/waitlist'
+      '/start'
     );
 
     render(<NewLandingPage />);
@@ -89,7 +86,7 @@ describe('NewLandingPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByTestId('homepage-v2-hero-primary-cta')).toHaveAttribute(
       'href',
-      'https://jov.ie/waitlist'
+      '/start'
     );
     expect(
       screen.getByRole('link', { name: 'Explore artist profiles' })

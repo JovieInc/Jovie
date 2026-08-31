@@ -74,7 +74,7 @@ test.describe('Homepage', () => {
     ).toBeVisible();
     await expect(
       hero.getByRole('link', { name: 'Get started', exact: true })
-    ).toHaveAttribute('href', /\/start\?starter_prompt=/);
+    ).toHaveAttribute('href', '/start');
     await expect(
       hero.getByRole('link', {
         name: 'See a live profile',
