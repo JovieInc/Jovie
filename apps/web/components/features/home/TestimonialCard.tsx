@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/design-system/linear-token-retire-jov-5465.test.ts
 interface TestimonialCardProps {
   readonly name: string;
   readonly title: string;
@@ -13,7 +14,7 @@ export function TestimonialCard({
 }: TestimonialCardProps) {
   return (
     <div
-      className='relative flex flex-col items-center rounded-xl p-8 text-center transition-colors duration-(--linear-duration-normal)'
+      className='relative flex flex-col items-center rounded-xl p-8 text-center transition-colors duration-(--duration-normal)'
       style={{
         backgroundColor: 'var(--linear-bg-surface-0)',
         border: '1px solid var(--linear-border-subtle)',

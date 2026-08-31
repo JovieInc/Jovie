@@ -25,7 +25,7 @@ vi.mock('@/components/marketing/homepage-v2/HomepageV2Route', () => ({
       <h1>Make every release feel bigger.</h1>
       <Link
         data-testid='homepage-v2-hero-primary-cta'
-        href='/start?starter_prompt=Hey%2C+I+want+to+get+access+to+Jovie.'
+        href='https://jov.ie/waitlist'
       >
         Get started
       </Link>
@@ -76,7 +76,7 @@ describe('NewLandingPage', () => {
     );
     expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
       'href',
-      '/start?starter_prompt=Hey%2C+I+want+to+get+access+to+Jovie.'
+      'https://jov.ie/waitlist'
     );
 
     render(<NewLandingPage />);
@@ -89,7 +89,7 @@ describe('NewLandingPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByTestId('homepage-v2-hero-primary-cta')).toHaveAttribute(
       'href',
-      '/start?starter_prompt=Hey%2C+I+want+to+get+access+to+Jovie.'
+      'https://jov.ie/waitlist'
     );
     expect(
       screen.getByRole('link', { name: 'Explore artist profiles' })

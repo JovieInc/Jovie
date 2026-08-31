@@ -214,7 +214,6 @@ export function categorizePath(pathname: string): PathCategory {
     isAppShellPath ||
     isAccountPath ||
     isBillingPath ||
-    isWaitlistPath ||
     isOnboardingCheckoutPath;
 
   const needsNonce =

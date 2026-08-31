@@ -181,6 +181,10 @@ describe('ProfileDesktopSurface', () => {
       screen.queryByRole('button', { name: 'Events' })
     ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Alerts' })).toBeInTheDocument();
+    const listenCta = screen.getByRole('button', { name: 'Listen' });
+    expect(listenCta).toHaveClass('h-8');
+    expect(listenCta.className).toContain('before:h-11');
+    expect(listenCta.className).toContain('before:min-w-11');
     expect(screen.getByText('Tim White')).toBeInTheDocument();
     expect(screen.getByTestId('mock-desktop-drawer')).toHaveAttribute(
       'data-presentation',

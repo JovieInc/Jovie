@@ -71,6 +71,12 @@ const LANES = [
     run: runGuardrails,
   },
   {
+    id: 'design-system-source-ratchet',
+    name: 'Design-system source count ratchet',
+    nextLocalCommand: 'pnpm design:source-count-ratchet',
+    run: runDesignSystemSourceRatchet,
+  },
+  {
     id: 'design-exception-registry',
     name: 'Design exception registry',
     nextLocalCommand: 'pnpm design:exception-registry:check',
@@ -118,6 +124,7 @@ export const LANE_GROUPS = Object.freeze({
     'eslint-server-boundaries',
     'scripts-typecheck',
     'guardrails',
+    'design-system-source-ratchet',
     'design-exception-registry',
     'design-conformance',
     'ios-fast',
@@ -450,6 +457,27 @@ function runGuardrails() {
   return { code: 0, output: combined };
 }
 
+function runDesignSystemSourceRatchet() {
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+    return {
+      code: 0,
+      output:
+        'Design-system source ratchet skipped (no Jovie product files changed)\n',
+      skipped: true,
+    };
+  }
+  const selected = selectedProductLanes();
+  if (!selected.has('web')) {
+    return {
+      code: 0,
+      output: 'No web product lane selected\n',
+      skipped: true,
+    };
+  }
+  return shell(LANE_COMMANDS['design-system-source-ratchet']);
+}
+
 function runDesignExceptionRegistry() {
   const event = process.env.GITHUB_EVENT_NAME || '';
   if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
@@ -604,6 +632,8 @@ function runStructural() {
     'pnpm design:shared-ui-visual-arbitrary:check',
     // JOV-4421: hard ship gate — tests + matching stories for shippable UI.
     'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-ship-gate.test.mjs',
+    // JOV-5454: live Storybook certification evaluator + lifecycle.
+    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs',
     'pnpm component-ship-gate',
     'pnpm screen-certification-gate',
     // CI workflow changes live at the repo root, so Turbo --affected can select

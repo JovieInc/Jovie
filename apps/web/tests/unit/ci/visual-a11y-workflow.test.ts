@@ -149,9 +149,13 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(buildLayoutJob).toContain('Run deterministic layout behavior guard');
   });
 
-  it('keeps visual compare informational while refresh remains self-healing', () => {
+  it('keeps refresh self-healing and makes missing-baseline compare fail-closed', () => {
     const workflow = readFileSync(visualRegressionWorkflowPath, 'utf8');
+    const ciWorkflow = readFileSync(workflowPath, 'utf8');
     const visualJob = getJobBlock(workflow, 'visual-regression');
+    const compareJob = getJobBlock(ciWorkflow, 'ci-visual-snapshot-compare');
+    const mergeReadyJob = getJobBlock(ciWorkflow, 'ci-merge-group-ready');
+    const prReadyJob = getJobBlock(ciWorkflow, 'ci-pr-ready');
     const loopbackHostnamePin = visualJob.indexOf('export HOSTNAME=localhost');
     const standaloneServerStart = visualJob.indexOf(
       'PORT=3100 node .next/standalone/apps/web/server.js'
@@ -167,10 +171,24 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(loopbackHostnamePin).toBeGreaterThanOrEqual(0);
     expect(loopbackHostnamePin).toBeLessThan(standaloneServerStart);
     expect(visualJob).toContain('--update-snapshots');
+    expect(visualJob).toContain('if [ "$REFRESH_MODE" = "true" ]');
     expect(visualJob).toContain('BRANCH="visual-baselines/auto-update"');
     expect(visualJob).toContain('gh pr create');
     expect(visualJob).toContain('- name: Cleanup Neon branch');
     expect(visualJob).toContain('if: always()');
+
+    expect(compareJob).toContain("github.event_name == 'merge_group'");
+    expect(compareJob).toContain(
+      'node scripts/visual-snapshot-compare.mjs compare'
+    );
+    expect(compareJob).not.toContain('--update-snapshots');
+    expect(compareJob).not.toContain('continue-on-error');
+    expect(compareJob).not.toContain('neon-create-branch');
+    expect(mergeReadyJob).toContain('ci-visual-snapshot-compare');
+    expect(mergeReadyJob).toContain(
+      'VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"'
+    );
+    expect(prReadyJob).not.toContain('ci-visual-snapshot-compare');
   });
 
   it('scopes chat visual interactions to the active visible composer', () => {

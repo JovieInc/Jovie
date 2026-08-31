@@ -1,5 +1,9 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import {
+  ARTWORK_FIT_CLASSNAME,
+  ArtworkFrame,
+} from '@/components/atoms/ArtworkFrame';
 import { Icon } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
 
@@ -48,18 +52,16 @@ export function SmartLinkArtworkCard({
   className,
 }: Readonly<SmartLinkArtworkCardProps>) {
   return (
-    <div
-      className={cn(
-        'relative aspect-square w-full overflow-hidden rounded-2xl bg-white/5 shadow-2xl outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10',
-        className
-      )}
+    <ArtworkFrame
+      size={272}
+      className={cn('aspect-square w-full bg-white/5 shadow-2xl', className)}
     >
       {artworkUrl ? (
         <Image
           src={artworkUrl}
           alt={`${title} artwork`}
           fill
-          className='object-cover'
+          className={ARTWORK_FIT_CLASSNAME}
           sizes='272px'
           priority
         />
@@ -72,7 +74,7 @@ export function SmartLinkArtworkCard({
           />
         </div>
       )}
-    </div>
+    </ArtworkFrame>
   );
 }
 

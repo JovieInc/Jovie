@@ -7,7 +7,11 @@ import {
   useState,
 } from 'react';
 import { ArtworkFallbackTile } from '@/components/atoms/ArtworkFallbackTile';
-import { ArtworkFrame } from '@/components/atoms/ArtworkFrame';
+import {
+  ARTWORK_FIT_CLASSNAME,
+  ArtworkFrame,
+  getArtworkFitClassName,
+} from '@/components/atoms/ArtworkFrame';
 import { cn } from '@/lib/utils';
 import { LibraryArtworkHoverZoom } from './LibraryArtworkHoverZoom';
 import { LibraryAudioWaveformThumbnail } from './LibraryAudioWaveformThumbnail';
@@ -41,13 +45,24 @@ function LibraryArtworkImage({
   } satisfies Record<LibraryThumbnailSize, string>;
 
   if (asset.artworkUrl) {
+    const itemKind = getLibraryItemKind(asset);
+    const fitClassName =
+      itemKind === 'release' || itemKind === 'audio'
+        ? ARTWORK_FIT_CLASSNAME
+        : getArtworkFitClassName(
+            itemKind === 'merch'
+              ? 'merch'
+              : itemKind === 'image'
+                ? 'image'
+                : 'video'
+          );
     return (
       <Image
         src={asset.artworkUrl}
         alt=''
         width={size === 'row' ? 48 : 320}
         height={size === 'row' ? 48 : 320}
-        className={cn('object-cover', sizeClasses[size])}
+        className={cn(fitClassName, sizeClasses[size])}
         loading={size === 'row' ? 'lazy' : 'eager'}
         unoptimized
       />

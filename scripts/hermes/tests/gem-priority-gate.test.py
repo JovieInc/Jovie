@@ -1650,7 +1650,11 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertNotIn("cron:", content)
         self.assertIn("pull_request:", content)
         self.assertIn("workflow_run:", content)
-        self.assertIn("workflows: [CI, Production Controller]", content)
+        self.assertIn(
+            "workflows: [CI, Production Controller]",
+            content,
+        )
+        self.assertNotIn("Production Marker Recovery]", content)
         self.assertNotIn("workflows: [CI, Production Controller, Queue-Deferred Release]", content)
         self.assertIn("push:", content)
         self.assertIn("branches: [main]", content)

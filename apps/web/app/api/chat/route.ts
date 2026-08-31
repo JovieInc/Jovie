@@ -46,6 +46,7 @@ import { z } from 'zod';
 import { tryHandleAnonymousOnboardingChat } from '@/app/api/chat/onboarding-handler';
 import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
 import { createImportBioFromUrlTool } from '@/lib/ai/tools/import-bio-from-url';
+import { createInspectPressSourceTool } from '@/lib/ai/tools/inspect-press-source';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
 import { createVoicePromoTool } from '@/lib/ai/tools/voice-promo';
 import { getOptionalAuth } from '@/lib/auth/cached';
@@ -2018,6 +2019,7 @@ function buildChatTools(
       : {}),
     proposeProfileEdit: createProfileEditTool(artistContext),
     importBioFromUrl: createImportBioFromUrlTool({ userId: clerkUserId }),
+    inspectPressSource: createInspectPressSourceTool({ userId: clerkUserId }),
     checkCanvasStatus: createCheckCanvasStatusTool(resolvedProfileId, releases),
     suggestRelatedArtists: createSuggestRelatedArtistsTool(artistContext),
     writeWorldClassBio: createWorldClassBioTool(

@@ -156,6 +156,8 @@ export const APP_ROUTES = {
   DEMO: '/demo',
   DEMO_VIDEO: '/demovideo',
   DEVELOPERS: '/developers',
+  CLI: '/cli',
+  API_VERSIONING: '/api-versioning',
   ENGAGEMENT_ENGINE: '/engagement-engine',
   INVESTORS: '/investors',
   PITCH: '/pitch',
@@ -166,6 +168,8 @@ export const APP_ROUTES = {
   /** Legacy campaign URL. Kept only for inbound-link compatibility; do not use for new navigation. */
   LAUNCH_PRICING: '/launch/pricing',
   CHANGELOG: '/changelog',
+  ENGINEERING: '/engineering',
+  ENGINEERING_PREVIEW: '/engineering/preview',
   DOWNLOAD: '/download',
   SUPPORT: '/support',
   PAY: '/pay',

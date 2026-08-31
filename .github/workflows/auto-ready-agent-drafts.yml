@@ -1,11 +1,15 @@
 name: Auto-Ready Agent Drafts
 
-# Flips agent-owned draft PRs to "ready for review" once all required checks
-# are green and the PR is mergeable. The merge-queue autoenroll workflow then
-# picks them up. Without this, draft PRs sit idle until a human flips them.
+# Promotes only trusted bot-created drafts, or exact current heads produced
+# by the trusted FX writer, once required checks are green and the PR is
+# mergeable. Branch prefixes never authorize. Native merge-queue autoenroll
+# is the only enrollment owner; this workflow hands off by marking ready with
+# a short-lived Jovie App token so the ready_for_review/CI cascade is real.
 #
 # Fires on CI completion (immediate), selected PR events, and manual dispatch.
-# Opt out per-PR with any of: needs-human, hold, gated, queue-deferred, fast.
+# Enable this workflow only after the provenance selector and App-token
+# mutation path land. Opt out per-PR with taste/security/hold labels or
+# explicit controlled-proof/canary markers.
 
 on:
   # Trigger hygiene (#13349): no `synchronize` — every push starts CI, whose
@@ -24,9 +28,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  pull-requests: write
   contents: read
-  checks: read
 
 jobs:
   auto-ready:
@@ -39,7 +41,24 @@ jobs:
     # Fleet controller: use the hosted image contract so `gh` is always
     # available. Some self-hosted fast runners intentionally lack it.
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      issues: write
+      pull-requests: write
     steps:
+      - name: Generate short-lived Jovie App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          # Mutations must fire real PR events (ready_for_review) so CI and
+          # native Auto-Enroll wake; GITHUB_TOKEN mutations would not cascade.
+          # Installation permissions stay unbounded here so commit and
+          # Rolling CI Dispatch run provenance can be read.
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
       - name: Checkout main policy code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -51,9 +70,9 @@ jobs:
       - name: Verify GitHub CLI
         run: gh --version
 
-      - name: Auto-ready green agent drafts
+      - name: Auto-ready trusted bot and FX-repaired drafts
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
           GH_RETRY_ATTEMPTS: 8
           GH_RETRY_MAX_DELAY: 60

@@ -126,16 +126,14 @@ describe('EntityCarousel profile geometry', () => {
     }
   });
 
-  it('locks the art zone to a full-width square with cover-fitted artwork', () => {
+  it('locks the art zone to a full-width square with complete contained artwork', () => {
     render(<EntityCarousel items={items} />);
 
     for (const image of screen.getAllByRole('img')) {
-      // Unified card anatomy: the art zone is a square matched to the full
-      // card width (no letterbox bands), and artwork object-covers the
-      // square zone — square art fills it exactly, non-square art crops.
       expect(image.parentElement?.className).toContain('aspect-square');
       expect(image.parentElement?.className).not.toContain('flex-1');
-      expect(image.className).toContain('object-cover');
+      expect(image.className).toContain('object-contain');
+      expect(image.className).not.toContain('object-cover');
     }
   });
 
@@ -282,9 +280,12 @@ describe('EntityCarousel profile geometry', () => {
 
     const image = screen.getByRole('img', { name: 'Release one' });
     expect(image.parentElement?.className).toContain('aspect-square');
-    expect(image.parentElement?.className).toContain(
+    expect(image.parentElement?.className).toContain('rounded-lg');
+    expect(image.parentElement?.className).not.toContain(
       'rounded-(--profile-action-radius)'
     );
+    expect(image.className).toContain('object-contain');
+    expect(image.className).not.toContain('object-cover');
     expect(image.parentElement?.className).toContain('border-0');
     expect(image.parentElement?.className).not.toContain('border-r');
 
@@ -530,7 +531,8 @@ describe('EntityCarousel profile geometry', () => {
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
     const card = screen.getByTestId('entity-card-music');
     const media = card.querySelector('.aspect-square');
-    expect(media?.className).toContain('rounded-(--profile-action-radius)');
+    expect(media?.className).toContain('rounded-lg');
+    expect(media?.className).not.toContain('rounded-(--profile-action-radius)');
     expect(media?.className).toContain('border-0');
     expect(
       screen.getByRole('heading', {
@@ -574,6 +576,17 @@ describe('EntityCarousel profile geometry', () => {
     })) {
       expect(action).toHaveClass('h-11', 'flex-none');
     }
+  });
+
+  it('keeps complete music artwork at 390/768/1440 profile highlights', () => {
+    render(<EntityCarousel items={items} layout='profile-landscape' />);
+    const image = screen.getByRole('img', { name: 'Release one' });
+    expect(image).toHaveClass('object-contain');
+    expect(image).not.toHaveClass('object-cover');
+    expect(image.parentElement).toHaveClass('rounded-lg', 'aspect-square');
+    expect(image.parentElement?.className).not.toContain(
+      '--profile-action-radius'
+    );
   });
 
   it('keeps video and product photography uncropped in landscape rows', () => {

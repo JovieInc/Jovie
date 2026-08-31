@@ -135,6 +135,14 @@ export const bioImportFromUrlHourlyLimiter = createRateLimiter(
   RATE_LIMITERS.bioImportFromUrlHourly
 );
 
+export const inspectPressSourceLimiter = createRateLimiter(
+  RATE_LIMITERS.inspectPressSource
+);
+
+export const inspectPressSourceHourlyLimiter = createRateLimiter(
+  RATE_LIMITERS.inspectPressSourceHourly
+);
+
 // ============================================================================
 // Payment Operations
 // ============================================================================
@@ -260,6 +268,18 @@ export const trackingIpVisitsLimiter = createRateLimiter(
  */
 export const publicProfileLimiter = createRateLimiter(
   RATE_LIMITERS.publicProfile,
+  {
+    requireRedis: true,
+  }
+);
+
+/**
+ * Rate limiter for the anonymous public artist API.
+ * Limit: 100 requests per minute per IP. This is intentionally isolated from
+ * `publicProfileLimiter`, which also meters profile-view telemetry.
+ */
+export const publicArtistApiLimiter = createRateLimiter(
+  RATE_LIMITERS.publicArtistApi,
   {
     requireRedis: true,
   }
@@ -1111,6 +1131,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     trackingIpClicks: trackingIpClicksLimiter,
     trackingIpVisits: trackingIpVisitsLimiter,
     publicProfile: publicProfileLimiter,
+    publicArtistApi: publicArtistApiLimiter,
     claimTokenAccess: claimTokenAccessLimiter,
     publicClick: publicClickLimiter,
     publicVisit: publicVisitLimiter,

@@ -23,6 +23,49 @@ export interface MarketingTerminalCtaProps {
   readonly penContractId: MarketingPenContractId;
 }
 
+interface MarketingTerminalCtaActionConfig {
+  readonly href: string;
+  readonly label: string;
+  readonly variant: 'primary' | 'tertiary';
+  readonly size: 'lg' | 'md';
+  readonly prefetch?: boolean;
+  readonly className?: string;
+  readonly analyticsEvent?: string;
+  readonly analyticsSource?: string;
+  readonly trailing?: ReactNode;
+}
+
+/**
+ * Single canonical action identity for terminal marketing CTAs. Both primary
+ * and optional secondary render through `@jovie/ui` Button asChild so Pen can
+ * map instances to the source-backed Button master instead of raw Link frames.
+ */
+function MarketingTerminalCtaAction({
+  href,
+  label,
+  variant,
+  size,
+  prefetch,
+  className,
+  analyticsEvent,
+  analyticsSource,
+  trailing,
+}: Readonly<MarketingTerminalCtaActionConfig>) {
+  return (
+    <Button variant={variant} size={size} asChild className={className}>
+      <Link
+        href={href}
+        prefetch={prefetch}
+        data-analytics-event={analyticsEvent}
+        data-analytics-source={analyticsSource}
+      >
+        {label}
+        {trailing}
+      </Link>
+    </Button>
+  );
+}
+
 const styles = {
   cinematic: {
     section:
@@ -71,28 +114,26 @@ export function MarketingTerminalCta({
       <h2 className={variantStyles.title}>{title}</h2>
       {body ? <p className={variantStyles.body}>{body}</p> : null}
       <div className={variantStyles.actions}>
-        <Button
+        <MarketingTerminalCtaAction
+          href={ctaHref}
+          label={ctaLabel}
           variant='primary'
           size='lg'
-          asChild
+          prefetch={prefetch}
           className={variantStyles.primary}
-        >
-          <Link
-            href={ctaHref}
-            prefetch={prefetch}
-            data-analytics-event={ctaAnalyticsEvent}
-            data-analytics-source={ctaAnalyticsSource}
-          >
-            {ctaLabel}
-          </Link>
-        </Button>
+          analyticsEvent={ctaAnalyticsEvent}
+          analyticsSource={ctaAnalyticsSource}
+        />
         {secondaryLabel && secondaryHref ? (
-          <Button variant='tertiary' size='md' asChild className='gap-1'>
-            <Link href={secondaryHref} prefetch={prefetch}>
-              {secondaryLabel}
-              <span aria-hidden='true'>→</span>
-            </Link>
-          </Button>
+          <MarketingTerminalCtaAction
+            href={secondaryHref}
+            label={secondaryLabel}
+            variant='tertiary'
+            size='md'
+            prefetch={prefetch}
+            className='gap-1'
+            trailing={<span aria-hidden='true'>→</span>}
+          />
         ) : null}
       </div>
     </div>

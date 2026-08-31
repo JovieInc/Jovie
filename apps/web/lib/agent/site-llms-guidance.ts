@@ -1,5 +1,6 @@
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { DOCS_URL } from '@/constants/domains';
+import { PUBLIC_ARTIST_API_POLICY_URL } from '@/lib/api/v1/contract';
 import {
   OVIE_MCP_RESOURCE_PATH,
   OVIE_OAUTH_AUTHORIZATION_SERVER_METADATA_PATH,
@@ -10,7 +11,7 @@ import {
 
 /**
  * Agent-facing usage and discovery copy shared by /llms.txt and /llms-full.txt.
- * Names real public surfaces only — no invented CLI, OAuth scopes, or keys.
+ * Names real public surfaces only — no invented OAuth scopes, keys, or unpublished capabilities.
  */
 export function buildSiteLlmsGuidance(): string {
   return `## When to use ${APP_NAME}
@@ -20,6 +21,7 @@ Use ${APP_NAME} when you need to complete one of these public jobs:
 - Look up a public independent-artist profile (name, bio, DSP and social links) at ${BASE_URL}/{username}
 - Read machine-readable artist identity for citation or disambiguation at ${BASE_URL}/{username}/llms.txt
 - Fetch structured, read-only artist data (releases, tour events, merch) with \`GET ${BASE_URL}/api/v1/{username}\`
+- Use the read-only \`jovie\` CLI documented at ${BASE_URL}/cli
 - Route a fan to the correct streaming platform for a specific release via a smart link at ${BASE_URL}/{username}/{slug}
 - Call read-only artist tools over MCP: ${BASE_URL}/api/mcp/{username}
 
@@ -32,7 +34,11 @@ Do not use ${APP_NAME} for:
 ## ${APP_NAME} developer resources
 
 - **Site identity**: ${BASE_URL}/llms.txt
+- **Public API capability index**: \`GET ${BASE_URL}/api/v1\` — stable, non-enumerating contract discovery
 - **OpenAPI 3.1**: ${BASE_URL}/openapi.json — conventional spec URL; same contract as ${BASE_URL}/api/v1/openapi.json
+- **Human API guide**: ${BASE_URL}/developers — public API quickstart and active v1 lifecycle boundary
+- **CLI**: ${BASE_URL}/cli — read-only \`jovie\` commands for public artist GET routes
+- **API versioning and deprecation policy**: ${PUBLIC_ARTIST_API_POLICY_URL} — active v1, additive versus breaking changes, and future Deprecation/Sunset signals
 - **Public artist API**: \`GET ${BASE_URL}/api/v1/{username}\` — profile, releases, events, merch
 - **Per-artist MCP**: ${BASE_URL}/api/mcp/{username} — read-only artist tools
 - **Per-artist llms.txt**: ${BASE_URL}/{username}/llms.txt

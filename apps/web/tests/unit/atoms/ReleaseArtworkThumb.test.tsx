@@ -18,7 +18,10 @@ vi.mock('next/image', () => ({
 describe('ReleaseArtworkThumb', () => {
   it('renders image when src is provided', () => {
     render(<ReleaseArtworkThumb src='/art.jpg' alt='Album art' />);
-    expect(screen.getByRole('img')).toHaveAttribute('src', '/art.jpg');
+    const image = screen.getByRole('img');
+    expect(image).toHaveAttribute('src', '/art.jpg');
+    expect(image).toHaveClass('object-contain');
+    expect(image).not.toHaveClass('object-cover');
   });
 
   it('image has correct alt text', () => {

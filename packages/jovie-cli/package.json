@@ -1,0 +1,58 @@
+{
+  "name": "@jovie/cli",
+  "private": false,
+  "type": "module",
+  "description": "Read-only client for Jovie public artist profiles and agent resources.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JovieInc/Jovie.git",
+    "directory": "packages/jovie-cli"
+  },
+  "bugs": {
+    "url": "https://github.com/JovieInc/Jovie/issues"
+  },
+  "homepage": "https://jov.ie/cli",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "registry": "https://registry.npmjs.org"
+  },
+  "bin": {
+    "jovie": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.23.2 <23"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx src/cli.ts",
+    "lint": "biome check .",
+    "pack:dry": "tsx scripts/pack-dry.ts",
+    "test": "vitest run",
+    "test:ci": "vitest run --passWithNoTests",
+    "test:coverage": "vitest run --coverage",
+    "test:fast": "node scripts/test-fast.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "@vitest/coverage-v8": "4.1.10",
+    "tsx": "^4.23.1",
+    "typescript": "^6.0.3",
+    "vitest": "4.1.10"
+  }
+}

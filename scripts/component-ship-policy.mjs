@@ -450,9 +450,12 @@ export function resolveCoverageViaPath(
 
 /**
  * Verify a coverage-via target exists and contains executable evidence:
- * an exact module import plus runtime use of the imported binding, or an
- * asserted node:fs read of the exact component source. Comments, mocks
- * without a real import, same-name text, and unasserted reads fail closed.
+ * an exact module import plus use of the imported binding as a JSX tag,
+ * a direct call/construct, or argument zero of an explicitly imported
+ * React/test renderer; or an asserted node:fs read of the exact component
+ * source from readFileSync argument zero. Comments, mocks without a real
+ * import, same-name text, void/assignment/metadata mentions, local fake
+ * renderers, wrong-argument paths, and unasserted reads fail closed.
  */
 export function verifyCoverageVia({
   viaRel,
@@ -482,7 +485,7 @@ export function verifyCoverageVia({
   if (!executable) {
     return {
       ok: false,
-      detail: `@coverage-via ${viaRel} must import ${componentRel} (${componentBase}) and use the imported binding, or assert an exact node:fs read of that source`,
+      detail: `@coverage-via ${viaRel} must import ${componentRel} (${componentBase}) and use the imported binding as a JSX tag, call/construct it, or pass it as argument zero to an imported React/test renderer, or assert an exact node:fs read of that source from readFileSync argument zero`,
     };
   }
   return { ok: true, detail: null };

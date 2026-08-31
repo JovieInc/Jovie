@@ -83,6 +83,10 @@ describe('MarketingFooter', () => {
       'href',
       '/developers'
     );
+    expect(screen.getByRole('link', { name: 'CLI' })).toHaveAttribute(
+      'href',
+      '/cli'
+    );
   });
 
   it.each([

@@ -1,4 +1,4 @@
-/** Source-blind evaluator controls and deliberate regressions for JOV-5438. */
+/** Source-blind evaluator controls and deliberate regressions for JOV-5438 / JOV-5448. */
 
 const box = { x: 12, y: 8, width: 180, height: 32 };
 const semantic = (roles, signals = []) => ({
@@ -89,6 +89,46 @@ export const COMPARATIVE_QUALIFICATION_CONTROLS = Object.freeze([
     'copy-density': copy(12),
     'content-overflow': overflow(),
   }),
+  sample('qualification-control.atom.input', 'atom.input', {
+    'semantic-anatomy': semantic(['textbox', 'label', 'alert'], ['aria-invalid', 'aria-describedby']),
+    'state-completeness': states(['default', 'focus-visible', 'disabled', 'invalid', 'error', 'loading']),
+    'layout-stability': layout(),
+    'responsive-fit': responsive(),
+    'copy-density': copy(8),
+    'content-overflow': overflow(),
+  }),
+  sample('qualification-control.atom.textarea', 'atom.textarea', {
+    'semantic-anatomy': semantic(['textbox', 'label', 'alert'], ['aria-invalid', 'aria-describedby']),
+    'state-completeness': states(['default', 'focus-visible', 'disabled', 'invalid', 'error']),
+    'layout-stability': layout(),
+    'responsive-fit': responsive(),
+    'copy-density': copy(20),
+    'content-overflow': overflow(),
+  }),
+  sample('qualification-control.atom.checkbox', 'atom.checkbox', {
+    'semantic-anatomy': semantic(['checkbox'], ['aria-checked', 'aria-invalid']),
+    'state-completeness': states(['unchecked', 'checked', 'indeterminate', 'focus-visible', 'disabled', 'invalid']),
+    'keyboard-discovery': { keys: ['Space'] },
+    'layout-stability': layout(),
+    'responsive-fit': responsive(),
+  }),
+  sample('qualification-control.atom.radio-group', 'atom.radio-group', {
+    'semantic-anatomy': semantic(['radiogroup', 'radio'], ['aria-checked', 'aria-invalid']),
+    'state-completeness': states(['unchecked', 'checked', 'focus-visible', 'disabled', 'invalid']),
+    'keyboard-discovery': { keys: ['ArrowDown', 'ArrowUp', 'Space'] },
+    'layout-stability': layout(),
+    'responsive-fit': responsive(),
+    'copy-density': copy(6),
+  }),
+  sample('qualification-control.atom.native-select', 'atom.native-select', {
+    'semantic-anatomy': semantic(['combobox', 'option'], ['aria-invalid', 'aria-describedby']),
+    'state-completeness': states(['default', 'selected', 'focus-visible', 'disabled', 'invalid']),
+    'keyboard-discovery': { keys: ['ArrowDown', 'Enter'] },
+    'layout-stability': layout(),
+    'responsive-fit': responsive(),
+    'copy-density': copy(8),
+    'content-overflow': overflow(),
+  }),
   sample('qualification-control.typography.system-b', 'typography.system-b', {
     'typography-rhythm': { headingLevels: [1, 2, 3], mobileBodyPx: 15, lineHeight: 1.6, measureCh: 72, flowDirection: 'block-start' },
     'responsive-fit': responsive(0),
@@ -146,6 +186,29 @@ export const COMPARATIVE_DELIBERATE_RED_FIXTURES = Object.freeze([
   sample('deliberate-red.quality-bar.form-field-semantics', 'atom.field', {
     ...observationsFor('atom.field'),
     'semantic-anatomy': semantic(['group', 'label', 'textbox']),
+  }),
+  sample('deliberate-red.quality-bar.input-invalid-description-gap', 'atom.input', {
+    ...observationsFor('atom.input'),
+    'semantic-anatomy': semantic(['textbox', 'label'], ['aria-invalid']),
+  }),
+  sample('deliberate-red.quality-bar.textarea-mobile-overflow', 'atom.textarea', {
+    ...observationsFor('atom.textarea'),
+    'copy-density': copy(80),
+    'content-overflow': { containerWidth: 390, contentScrollWidth: 438, documentOverflowPx: 48, wideBlocksContained: false },
+  }),
+  sample('deliberate-red.quality-bar.checkbox-state-keyboard-gap', 'atom.checkbox', {
+    ...observationsFor('atom.checkbox'),
+    'state-completeness': states(['unchecked', 'checked', 'focus-visible', 'disabled', 'invalid']),
+    'keyboard-discovery': { keys: [] },
+  }),
+  sample('deliberate-red.quality-bar.radio-group-semantics-keyboard-gap', 'atom.radio-group', {
+    ...observationsFor('atom.radio-group'),
+    'semantic-anatomy': semantic(['radio'], ['aria-checked']),
+    'keyboard-discovery': { keys: ['Space'] },
+  }),
+  sample('deliberate-red.quality-bar.native-select-layout-shift', 'atom.native-select', {
+    ...observationsFor('atom.native-select'),
+    'layout-stability': { before: box, after: { ...box, y: 16, height: 36 }, unrelatedShiftPx: 12 },
   }),
   sample('deliberate-red.quality-bar.typeset-rhythm-overflow', 'typography.system-b', {
     ...observationsFor('typography.system-b'),
@@ -211,6 +274,47 @@ export const DELIBERATE_RED_CONTRACTS = deepFreeze([
     fingerprints: [
       { dimension: 'semantic-anatomy', code: 'roles-missing' },
       { dimension: 'semantic-anatomy', code: 'signals-missing' },
+    ],
+  },
+  {
+    fixtureId: 'deliberate-red.quality-bar.input-invalid-description-gap',
+    baselineId: 'atom.input',
+    fingerprints: [
+      { dimension: 'semantic-anatomy', code: 'roles-missing' },
+      { dimension: 'semantic-anatomy', code: 'signals-missing' },
+    ],
+  },
+  {
+    fixtureId: 'deliberate-red.quality-bar.textarea-mobile-overflow',
+    baselineId: 'atom.textarea',
+    fingerprints: [
+      { dimension: 'copy-density', code: 'copy-density-exceeded' },
+      { dimension: 'content-overflow', code: 'content-overflow' },
+    ],
+  },
+  {
+    fixtureId: 'deliberate-red.quality-bar.checkbox-state-keyboard-gap',
+    baselineId: 'atom.checkbox',
+    fingerprints: [
+      { dimension: 'state-completeness', code: 'states-missing' },
+      { dimension: 'keyboard-discovery', code: 'keys-missing' },
+    ],
+  },
+  {
+    fixtureId: 'deliberate-red.quality-bar.radio-group-semantics-keyboard-gap',
+    baselineId: 'atom.radio-group',
+    fingerprints: [
+      { dimension: 'semantic-anatomy', code: 'roles-missing' },
+      { dimension: 'semantic-anatomy', code: 'signals-missing' },
+      { dimension: 'keyboard-discovery', code: 'keys-missing' },
+    ],
+  },
+  {
+    fixtureId: 'deliberate-red.quality-bar.native-select-layout-shift',
+    baselineId: 'atom.native-select',
+    fingerprints: [
+      { dimension: 'layout-stability', code: 'control-box-changed' },
+      { dimension: 'layout-stability', code: 'unrelated-content-shifted' },
     ],
   },
   {

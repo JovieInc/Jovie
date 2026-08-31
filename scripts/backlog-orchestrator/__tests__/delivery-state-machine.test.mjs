@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -8,6 +8,7 @@ import {
   attestGemService,
   buildDeliveryReceipt,
   DELIVERY_RECEIPT_SCHEMA,
+  persistClosureHealthActions,
   persistDeliveryOutcome,
   reconcileDeliveryHeartbeat,
   transitionDeliveryReceipt,
@@ -33,6 +34,7 @@ describe('delivery state machine', () => {
       ['provider-unavailable', 'restore-provider-availability'],
       ['missing-owner-lease', 'reconcile-exact-head-lease'],
       ['dropped-controller-event', 'restore-event-trigger-and-reconcile'],
+      ['draft-stack-policy', 'split-or-retarget-draft-stack'],
     ]) {
       const receipt = buildDeliveryReceipt({ delivery_key: failure, failure });
       assert.equal(receipt.schema, DELIVERY_RECEIPT_SCHEMA);
@@ -164,6 +166,64 @@ describe('delivery state machine', () => {
       });
       assert.equal(result.task.owner, 'symphony');
       assert.equal(result.task.route, 'gem-to-symphony');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('consumes one bounded stack repair action per root idempotently and refuses a stack action without exact root-head evidence', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'jovie-stack-repair-'));
+    try {
+      const action = {
+        schema: 'jovie-stack-health-action/v1',
+        taskKey: 'b'.repeat(64),
+        deliveryKey: 'closure-stack:test-root',
+        action: 'split-or-retarget-draft-stack',
+        owner: 'symphony',
+        writer: 'symphony',
+        issue: 'JOV-5362',
+        rootPr: 16510,
+        rootHeadSha: HEAD,
+        prNumbers: [16510, 16511],
+        maxDepth: 5,
+        promotionPath: [
+          { pr: 16510, base: 'main', head: 'stack/root' },
+          { pr: 16511, base: 'stack/root', head: 'stack/child' },
+        ],
+        integrator: null,
+        deadline: null,
+        violations: ['stack-depth-over-4', 'missing-stack-integrator'],
+        safety: 'receipt-only; requalify exact heads before split-or-retarget',
+      };
+      const source = {
+        schema: 'jovie-closure-health/v1',
+        observedAt: '2026-08-28T22:00:00.000Z',
+        repairActions: [action],
+      };
+      const first = await persistClosureHealthActions(source, {
+        stateDir: directory,
+      });
+      const duplicate = await persistClosureHealthActions(source, {
+        stateDir: directory,
+      });
+      assert.equal(first.status, 'created');
+      assert.equal(duplicate.status, 'duplicate');
+      assert.equal(
+        first.actions[0].task.action,
+        'split-or-retarget-draft-stack'
+      );
+      const task = JSON.parse(
+        await readFile(first.actions[0].taskPath, 'utf8')
+      );
+      assert.deepEqual(task.evidence.prNumbers, [16510, 16511]);
+      assert.equal(task.evidence.rootHeadSha, HEAD);
+      await assert.rejects(
+        persistClosureHealthActions(
+          { ...source, repairActions: [{ ...action, rootHeadSha: null }] },
+          { stateDir: directory }
+        ),
+        /exact root PR head SHA/
+      );
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

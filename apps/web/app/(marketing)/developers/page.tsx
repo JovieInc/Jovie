@@ -31,6 +31,12 @@ const BREADCRUMB_SCHEMA = buildBreadcrumbSchema([
 
 const RESOURCE_LINKS = [
   {
+    href: '/api/v1',
+    label: 'Public API capability index',
+    description:
+      'A stable, non-enumerating 200 response describing the anonymous read-only API.',
+  },
+  {
     href: '/openapi.json',
     label: 'OpenAPI 3.1 contract',
     description: 'The machine-readable contract for the public artist API.',
@@ -144,6 +150,21 @@ export default function DevelopersPage() {
               write API, credentials, or a separate developer account. Keep
               private or sensitive information out of requests and use the
               OpenAPI contract as the source of truth.
+            </p>
+            <p className='mt-4 text-base leading-relaxed text-secondary-token'>
+              Profile requests are limited to 100 per client IP in a fixed
+              60-second window. Read the{' '}
+              <Link
+                href={`${DOCS_URL}/docs/api-reference`}
+                className='text-primary-token underline decoration-subtle underline-offset-4 transition-colors hover:decoration-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+              >
+                API reference
+              </Link>{' '}
+              for the current RateLimit and Retry-After response contract.
+            </p>
+            <p className='mt-4 text-base leading-relaxed text-secondary-token'>
+              Version v1 is active. A policy Link relation points to lifecycle
+              guidance; active v1 responses do not claim Deprecation or Sunset.
             </p>
             <p className='mt-4 text-base leading-relaxed text-secondary-token'>
               For a human-oriented overview, visit{' '}

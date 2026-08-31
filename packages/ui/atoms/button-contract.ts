@@ -69,10 +69,12 @@ export interface ButtonPenMaster {
  * Receipts (canonical active Pen file, native save + CLI readback):
  * - `button/primary/lg/idle` → master `g3IC1`, label `iqbJo`; production refs
  *   `NRxLZ` (/download) and `w0wvCh` (footer) persist with independent label
- *   overrides. Live Pen readback shows `g3IC1` has no leading-icon
- *   descendant, so no `leadingIcon` slot is declared and leading-icon
- *   overrides fail closed until the Pen lane returns a verified same-root
- *   icon descendant.
+ *   overrides. Terminal marketing CTAs share that same master through
+ *   `MarketingTerminalCta` (`MarketingFooterCta` cinematic +
+ *   `MarketingFinalCTA` standard) with independent label overrides. Live Pen
+ *   readback shows `g3IC1` has no leading-icon descendant, so no
+ *   `leadingIcon` slot is declared and leading-icon overrides fail closed
+ *   until the Pen lane returns a verified same-root icon descendant.
  */
 export const BUTTON_PEN_CONTRACT: {
   readonly rootByVariantKey: Readonly<

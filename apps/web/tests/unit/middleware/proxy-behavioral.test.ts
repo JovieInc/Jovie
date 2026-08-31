@@ -679,13 +679,12 @@ describe('proxy.ts middleware', () => {
       expect(res.headers.get('location')).toContain('resume=spotify');
     });
 
-    it('redirects unauthenticated GET /waitlist to /start', async () => {
+    it('lets unauthenticated GET /waitlist render the public front door', async () => {
       const req = createUnauthenticatedRequest({ pathname: '/waitlist' });
       const res = await callMiddleware(req);
 
-      expect(res.status).toBeGreaterThanOrEqual(300);
-      expect(res.status).toBeLessThan(400);
-      expect(isRedirectTo(res, '/start')).toBe(true);
+      expect(res.status).toBeLessThan(300);
+      expect(res.headers.get('location')).toBeNull();
     });
 
     it('allows unauthenticated access to public paths', async () => {

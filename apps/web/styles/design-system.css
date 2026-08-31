@@ -954,6 +954,12 @@ html[data-profile-initial-mode]
   /* Popover/dropdown shadow — the only floating surface with visible depth */
   --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.08);
 
+  /* Button surface shadow (migrated from linear button shadow, JOV-5465) */
+  --shadow-button:
+    rgba(0, 0, 0, 0) 0px 8px 2px 0px, rgba(0, 0, 0, 0.01) 0px 5px 2px 0px,
+    rgba(0, 0, 0, 0.04) 0px 3px 2px 0px, rgba(0, 0, 0, 0.07) 0px 1px 1px 0px,
+    rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
+
   /* Button inset shadow */
   --shadow-button-inset:
     0px 4px 4px -1px oklch(0% 0 0 / 6%), 0px 1px 1px 0px oklch(0% 0 0 / 12%);
@@ -1040,13 +1046,13 @@ html[data-profile-initial-mode]
   --color-row-selected: oklch(94.8% 0.006 282);
 
   /* Cross-cutting interaction state tokens (state-matrix.md) */
-  --color-link-default: var(--linear-accent-blue);
+  --color-link-default: var(--color-accent-blue);
   --color-link-hover: color-mix(
     in oklab,
-    var(--linear-accent-blue) 82%,
+    var(--color-accent-blue) 82%,
     var(--linear-text-primary)
   );
-  --color-link-visited: var(--linear-accent-purple);
+  --color-link-visited: var(--color-accent-purple);
   --state-disabled-opacity: 0.5;
   --state-partial-opacity: 0.62;
   --state-offline-bg: var(--color-warning-subtle);
@@ -1064,8 +1070,10 @@ html[data-profile-initial-mode]
     transparent
   );
 
-  /* Focus ring — Jovie/Linear keyboard focus token */
-  --color-focus-ring: var(--linear-border-focus);
+  /* Focus ring — Jovie/Linear keyboard focus token.
+     Light literal (identical to the legacy linear border-focus light value);
+     dark is fully overridden by the :root.dark Noir Ion mapping below. */
+  --color-focus-ring: rgba(0, 0, 0, 0.28);
   --focus-ring-width: 1px;
   --focus-ring-offset: 0px;
 
@@ -1248,6 +1256,7 @@ html[data-profile-initial-mode]
     rgba(0, 0, 0, 0.04) 0px 3px 2px 0px,
     rgba(0, 0, 0, 0.07) 0px 1px 1px 0px,
     rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
+  --shadow-button: var(--shadow-button-inset);
 
   /* Public profile premium surfaces */
   --profile-stage-bg: #050608;
@@ -2050,6 +2059,9 @@ html[data-profile-initial-mode]
   /* Drawer/sheet settle curve (iOS-like; adapted from emil-design-eng, MIT —
      see .claude/rules/motion.md for the easing decision tree) */
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* Blur — header backdrop (migrated from linear blur token, JOV-5465) */
+  --blur-header: 20px;
 
   /* Canonical press-feedback scale for pressable elements
      (.claude/rules/ui.md + .claude/rules/motion.md — tactile, interruptible) */

@@ -110,7 +110,7 @@ function PublicAuthActions({
       </Button>
       <Button
         asChild
-        size='md'
+        size='marketing'
         variant='primary'
         className='focus-ring-themed shrink-0 whitespace-nowrap'
       >
@@ -554,11 +554,11 @@ export function HeaderNav({
         backdropFilter:
           presentation === 'homepage-embedded' || isMarketingGlass
             ? 'none'
-            : `blur(var(--linear-blur-header))`,
+            : `blur(var(--blur-header))`,
         WebkitBackdropFilter:
           presentation === 'homepage-embedded' || isMarketingGlass
             ? 'none'
-            : `blur(var(--linear-blur-header))`,
+            : `blur(var(--blur-header))`,
         minWidth: 0,
         minHeight: 0,
         /* iOS safe area: push header content below the notch/Dynamic Island */

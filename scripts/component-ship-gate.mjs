@@ -3,17 +3,20 @@
  * Hard component ship gate (JOV-4421).
  *
  * Fail closed when a shippable UI component is added/changed without:
- *   1. Matching unit/interaction test (colocated or verified @coverage-via)
+ *   1. Matching unit/interaction test (colocated or verified @coverage-via;
+ *      JOV-5451 rejects inert executable receipts)
  *   2. Matching Storybook story that imports the real component
  *   3. Static match checks (required props / state matrix hints)
  *   4. Story quality hygiene (no pure-black voids / fake CTAs)
  *   5. Multi-root story-coverage ratchet (lock_up + no uncovered growth)
  *   6. Fail-closed source-blind rendered certification (JOV-5400)
  *      including the Shadcn/Typeset outcome inventory (JOV-5438)
+ *   7. Fail-closed live Storybook certification for enrolled canonical
+ *      Badge/Button/Card stories (JOV-5454)
  *
  * Usage:
  *   pnpm component-ship-gate
- *   node scripts/component-ship-gate.mjs [--diff-base=origin/main] [--skip-quality] [--skip-ratchet] [--skip-rendered-cert]
+ *   node scripts/component-ship-gate.mjs [--diff-base=origin/main] [--skip-quality] [--skip-ratchet] [--skip-rendered-cert] [--skip-live-storybook]
  *
  * Env:
  *   COMPONENT_SHIP_DIFF_BASE / STORY_COVERAGE_DIFF_BASE / TURBO_SCM_BASE / GITHUB_BASE_REF
@@ -24,6 +27,7 @@ import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
+import { runLiveStorybookCertification } from './component-live-storybook-certification.mjs';
 import { runRenderedCertification } from './component-rendered-certification.mjs';
 import {
   COVERAGE_ROOTS,
@@ -59,6 +63,7 @@ function parseArgs(argv) {
     skipQuality: false,
     skipRatchet: false,
     skipRenderedCert: false,
+    skipLiveStorybook: false,
     json: false,
     auditCoverageVia: false,
   };
@@ -68,6 +73,7 @@ function parseArgs(argv) {
     else if (arg === '--skip-quality') flags.skipQuality = true;
     else if (arg === '--skip-ratchet') flags.skipRatchet = true;
     else if (arg === '--skip-rendered-cert') flags.skipRenderedCert = true;
+    else if (arg === '--skip-live-storybook') flags.skipLiveStorybook = true;
     else if (arg === '--audit-coverage-via') flags.auditCoverageVia = true;
     else if (arg === '--json') flags.json = true;
     else if (arg === '--help' || arg === '-h') flags.help = true;
@@ -435,15 +441,148 @@ function isExactModuleMocked({ sourceFile, importerRel, sourceRel }) {
   return mocked;
 }
 
-function isTypeOrImportUse(node) {
-  for (let current = node.parent; current; current = current.parent) {
-    if (ts.isImportDeclaration(current) || ts.isTypeNode(current)) return true;
-    if (ts.isBindingElement(current) && isDynamicImportBinding(current)) {
-      return true;
+const RENDERER_MODULES = new Set([
+  'react',
+  'react/jsx-runtime',
+  'react/jsx-dev-runtime',
+  'react-dom',
+  'react-dom/client',
+  'react-dom/server',
+  'react-test-renderer',
+  '@testing-library/react',
+  '@testing-library/react/pure',
+]);
+
+const RENDERER_NAMED_EXPORTS = new Set([
+  'createElement',
+  'createFactory',
+  'jsx',
+  'jsxs',
+  'jsxDEV',
+  'render',
+  'hydrate',
+  'createRoot',
+  'hydrateRoot',
+  'renderToString',
+  'renderToStaticMarkup',
+  'renderToPipeableStream',
+  'renderToReadableStream',
+  'create',
+]);
+
+function unwrapExpression(node) {
+  let current = node;
+  while (
+    current &&
+    (ts.isParenthesizedExpression(current) ||
+      ts.isAsExpression(current) ||
+      ts.isSatisfiesExpression(current) ||
+      ts.isTypeAssertionExpression(current))
+  ) {
+    current = current.expression;
+  }
+  return current;
+}
+
+function importedRendererBindings(sourceFile) {
+  const named = new Set();
+  const namespaces = new Set();
+  for (const statement of sourceFile.statements) {
+    if (
+      !ts.isImportDeclaration(statement) ||
+      !statement.importClause ||
+      statement.importClause.isTypeOnly ||
+      !ts.isStringLiteral(statement.moduleSpecifier) ||
+      !RENDERER_MODULES.has(statement.moduleSpecifier.text)
+    ) {
+      continue;
     }
-    if (ts.isStatement(current)) return false;
+    if (statement.importClause.name) {
+      namespaces.add(statement.importClause.name.text);
+    }
+    const bindings = statement.importClause.namedBindings;
+    if (bindings && ts.isNamespaceImport(bindings)) {
+      namespaces.add(bindings.name.text);
+    } else if (bindings && ts.isNamedImports(bindings)) {
+      for (const element of bindings.elements) {
+        if (element.isTypeOnly) continue;
+        const importedName = (element.propertyName ?? element.name).text;
+        if (RENDERER_NAMED_EXPORTS.has(importedName)) {
+          named.add(element.name.text);
+        }
+      }
+    }
+  }
+  const shadowed = shadowedBindingNames(sourceFile, [...named, ...namespaces]);
+  return {
+    named: new Set([...named].filter(name => !shadowed.has(name))),
+    namespaces: new Set([...namespaces].filter(name => !shadowed.has(name))),
+  };
+}
+
+function isImportedRendererCallee(expression, rendererBindings) {
+  const expr = unwrapExpression(expression);
+  if (ts.isIdentifier(expr) && rendererBindings.named.has(expr.text)) {
+    return true;
+  }
+  if (
+    ts.isPropertyAccessExpression(expr) &&
+    ts.isIdentifier(expr.expression) &&
+    rendererBindings.namespaces.has(expr.expression.text) &&
+    RENDERER_NAMED_EXPORTS.has(expr.name.text)
+  ) {
+    return true;
+  }
+  if (
+    ts.isPropertyAccessExpression(expr) &&
+    expr.name.text === 'render' &&
+    ts.isCallExpression(unwrapExpression(expr.expression))
+  ) {
+    return isImportedRendererCallee(
+      unwrapExpression(expr.expression).expression,
+      rendererBindings
+    );
   }
   return false;
+}
+
+function isJsxTagUse(node) {
+  const parent = node.parent;
+  return Boolean(
+    parent &&
+      (ts.isJsxOpeningElement(parent) || ts.isJsxSelfClosingElement(parent)) &&
+      parent.tagName === node
+  );
+}
+
+function isDirectExecuteUse(node) {
+  const parent = node.parent;
+  return Boolean(
+    parent &&
+      ((ts.isCallExpression(parent) && parent.expression === node) ||
+        (ts.isNewExpression(parent) && parent.expression === node))
+  );
+}
+
+function isRendererArgumentZeroUse(node, rendererBindings) {
+  let current = node;
+  let parent = node.parent;
+  while (
+    parent &&
+    (ts.isParenthesizedExpression(parent) ||
+      ts.isAsExpression(parent) ||
+      ts.isSatisfiesExpression(parent) ||
+      ts.isTypeAssertionExpression(parent))
+  ) {
+    current = parent;
+    parent = parent.parent;
+  }
+  return Boolean(
+    parent &&
+      ts.isCallExpression(parent) &&
+      parent.arguments[0] === current &&
+      isImportedRendererCallee(parent.expression, rendererBindings)
+  );
 }
 
 function hasRuntimeImportedUse(sourceFile, importedNames) {
@@ -451,15 +590,14 @@ function hasRuntimeImportedUse(sourceFile, importedNames) {
   const shadowedNames = shadowedBindingNames(sourceFile, allNames);
   const names = new Set(allNames.filter(name => !shadowedNames.has(name)));
   if (names.size === 0) return false;
+  const rendererBindings = importedRendererBindings(sourceFile);
   let used = false;
   walkAst(sourceFile, node => {
-    if (
-      !used &&
-      ts.isIdentifier(node) &&
-      names.has(node.text) &&
-      !isTypeOrImportUse(node)
-    ) {
-      used = true;
+    if (!used && ts.isIdentifier(node) && names.has(node.text)) {
+      used =
+        isJsxTagUse(node) ||
+        isDirectExecuteUse(node) ||
+        isRendererArgumentZeroUse(node, rendererBindings);
     }
   });
   return used;
@@ -596,31 +734,53 @@ function hasExplicitSourceRead(sourceFile, sourceRel) {
     sourceRel.replace(/^apps\/web\//, ''),
   ]);
   const wrappers = localReadWrappers(sourceFile, readBindings);
-  const pathBindings = new Set();
+  const identifierInits = new Map();
   walkAst(sourceFile, node => {
-    if (!ts.isVariableDeclaration(node) || !ts.isIdentifier(node.name)) return;
-    const value = unwrapStringLiteral(node.initializer);
-    if (value && exactPaths.has(value)) pathBindings.add(node.name.text);
+    if (
+      !ts.isVariableDeclaration(node) ||
+      !ts.isIdentifier(node.name) ||
+      !node.initializer
+    ) {
+      return;
+    }
+    identifierInits.set(node.name.text, node.initializer);
   });
 
-  const nodeReadsExactPath = node => {
-    const literal = unwrapStringLiteral(node);
-    if (literal && exactPaths.has(literal)) return true;
+  const isJoinOrResolveCall = node => {
+    if (!ts.isCallExpression(node)) return false;
+    const callee = node.expression;
+    const name = ts.isIdentifier(callee)
+      ? callee.text
+      : ts.isPropertyAccessExpression(callee)
+        ? callee.name.text
+        : null;
+    return name === 'join' || name === 'resolve';
+  };
+
+  const nodeReadsExactPath = (node, seen = new Set()) => {
+    if (!node) return false;
+    const resolved = staticStringValue(node, identifierInits);
+    if (resolved && exactPaths.has(resolved)) return true;
     const joined = joinedLiteralPath(node);
     if (joined && exactPaths.has(joined)) return true;
-    return ts.isIdentifier(node) && pathBindings.has(node.text);
+    if (isJoinOrResolveCall(node)) {
+      return node.arguments.some(argument =>
+        nodeReadsExactPath(argument, seen)
+      );
+    }
+    if (ts.isIdentifier(node) && identifierInits.has(node.text)) {
+      if (seen.has(node.text)) return false;
+      return nodeReadsExactPath(
+        identifierInits.get(node.text),
+        new Set([...seen, node.text])
+      );
+    }
+    return false;
   };
 
   const callReadsExactPath = call => {
-    if (nodeReadsExactPath(call)) return true;
-    let matches = false;
-    for (const argument of call.arguments) {
-      walkAst(argument, node => {
-        if (matches) return;
-        if (nodeReadsExactPath(node)) matches = true;
-      });
-    }
-    return matches;
+    const pathArg = call.arguments[0];
+    return Boolean(pathArg) && nodeReadsExactPath(pathArg);
   };
 
   const assertedNames = new Set();
@@ -1055,12 +1215,24 @@ function runRatchet() {
 
 export function runComponentShipGate(options = {}) {
   const flags = {
-    diffBase: options.diffBase ?? resolveDiffBase(null),
+    // Honor an explicit null/empty diffBase as "no diff base" instead of
+    // re-resolving origin/main behind the caller's back. In CI origin/main is
+    // always present, so re-resolving turned an explicit opt-out into a diff
+    // scan against main and produced false missing-test/story failures for
+    // components unrelated to the caller (JOV-5454 live-cert contract test).
+    // Only auto-resolve when diffBase is omitted entirely.
+    diffBase:
+      options.diffBase === undefined
+        ? resolveDiffBase(null)
+        : (options.diffBase ?? undefined),
     skipQuality: options.skipQuality ?? false,
     skipRatchet: options.skipRatchet ?? false,
     skipRenderedCert: options.skipRenderedCert ?? false,
+    skipLiveStorybook: options.skipLiveStorybook ?? false,
     headSha: options.headSha ?? null,
     comparativeQualificationControls: options.comparativeQualificationControls,
+    liveObservations: options.liveObservations,
+    liveNodeVersion: options.liveNodeVersion,
   };
 
   const report = {
@@ -1154,6 +1326,36 @@ export function runComponentShipGate(options = {}) {
     report.sections.renderedCertification = { ok: true, skipped: true };
   }
 
+  // 5) Live Storybook certification (JOV-5454)
+  if (!flags.skipLiveStorybook) {
+    try {
+      const live = runLiveStorybookCertification({
+        headSha: flags.headSha ?? undefined,
+        observations: flags.liveObservations,
+        nodeVersion: flags.liveNodeVersion,
+      });
+      report.sections.liveStorybookCertification = {
+        ok: live.ok,
+        schema: live.schema,
+        receipt: live.receipt,
+      };
+      const outcome =
+        report.sections.renderedCertification?.receipt?.shadcnOutcome;
+      if (outcome && live.receipt?.liveVisualCertification) {
+        outcome.liveVisualCertification = live.receipt.liveVisualCertification;
+      }
+      if (!live.ok) report.ok = false;
+    } catch (error) {
+      report.sections.liveStorybookCertification = {
+        ok: false,
+        message: error instanceof Error ? error.message : String(error),
+      };
+      report.ok = false;
+    }
+  } else {
+    report.sections.liveStorybookCertification = { ok: true, skipped: true };
+  }
+
   return report;
 }
 
@@ -1221,7 +1423,7 @@ function printReport(report) {
     const outcome = rendered.receipt?.shadcnOutcome;
     if (outcome) {
       console.log(
-        `[component-ship-gate] shadcn-outcome: ${outcome.ok ? 'ok' : 'FAIL'} enrolled=${(outcome.enrolled ?? []).length}`
+        `[component-ship-gate] shadcn-outcome rubric: ${outcome.ok ? 'qualified' : 'FAIL'} enrolled=${(outcome.enrolled ?? []).length} live-visual=${outcome.liveVisualCertification?.status ?? 'unknown'}`
       );
       for (const item of outcome.fixtures ?? []) {
         console.log(`  outcome-fixture ${item.id}: ${item.verdict}`);
@@ -1252,11 +1454,28 @@ function printReport(report) {
     }
   }
 
+  const live = report.sections.liveStorybookCertification;
+  if (live?.skipped) {
+    console.log('[component-ship-gate] live-storybook-cert: skipped');
+  } else if (live?.ok) {
+    const head = live.receipt?.headSha ?? 'unknown';
+    console.log(`[component-ship-gate] live-storybook-cert: ok head=${head}`);
+    for (const item of live.receipt?.observations ?? []) {
+      console.log(`  live ${item.id}: ${item.verdict}`);
+    }
+  } else {
+    console.error('[component-ship-gate] live-storybook-cert: FAIL');
+    if (live?.message) console.error(live.message);
+    for (const issue of live?.receipt?.issues ?? []) {
+      console.error(`- ${issue}`);
+    }
+  }
+
   if (report.ok) {
     console.log('[component-ship-gate] PASS');
   } else {
     console.error(
-      '[component-ship-gate] FAIL — shippable UI components require matching tests + stories + rendered certification (JOV-4421, JOV-5400, JOV-5438)'
+      '[component-ship-gate] FAIL — shippable UI components require matching tests + stories + rendered certification + live Storybook certification (JOV-4421, JOV-5400, JOV-5438, JOV-5454)'
     );
   }
 }
@@ -1269,6 +1488,7 @@ function main(argv = process.argv.slice(2)) {
   --skip-quality         Skip storybook quality guard
   --skip-ratchet         Skip multi-root story coverage ratchet
   --skip-rendered-cert   Skip source-blind rendered certification
+  --skip-live-storybook  Skip live Storybook certification
   --audit-coverage-via   Whole-tree executable @coverage-via receipt audit
   --json                 Print machine-readable report`);
     return 0;
@@ -1299,6 +1519,7 @@ function main(argv = process.argv.slice(2)) {
     skipQuality: flags.skipQuality,
     skipRatchet: flags.skipRatchet,
     skipRenderedCert: flags.skipRenderedCert,
+    skipLiveStorybook: flags.skipLiveStorybook,
   });
 
   if (flags.json) {

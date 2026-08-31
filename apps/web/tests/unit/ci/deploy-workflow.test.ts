@@ -102,6 +102,10 @@ const productionControllerHealthPath = resolve(
   repoRoot,
   '.github/workflows/production-controller-health.yml'
 );
+const fleetGateRefreshWorkflowPath = resolve(
+  repoRoot,
+  '.github/workflows/fleet-gate-refresh.yml'
+);
 const productionMarkerStatePath = resolve(
   repoRoot,
   '.github/scripts/production-marker-state.mjs'
@@ -1968,6 +1972,10 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(verified).toContain('repos/${{ github.repository }}/commits/main');
     expect(verified).toContain('verify-production-alias.sh');
     expect(verified).toContain('superseded by $current_sha');
+    expect(verified).toContain(
+      'node .github/scripts/assert-live-production-bind.mjs'
+    );
+    expect(verified).not.toContain('neutral with no notification');
     expect(verified).toContain("steps.current.outputs.is_current == 'true'");
     expect(verified).toContain(
       "always() && steps.current.outputs.is_current == 'true'"
@@ -4150,7 +4158,10 @@ describe('production promotion exact-artifact contract', () => {
     expect(verified).not.toContain('concurrency:');
     expect(reusable).not.toContain('concurrency:');
     expect(verified).toContain('canonical_verified=true');
-    expect(verified).toContain('neutral with no notification');
+    expect(verified).toContain(
+      'node .github/scripts/assert-live-production-bind.mjs'
+    );
+    expect(verified).not.toContain('neutral with no notification');
     expect(verified).toContain('Finalize exact current release generation');
     expect(verified).toContain('Notify exact verified production generation');
     expect(verified.match(/commits\/main/g)).toHaveLength(3);
@@ -4467,7 +4478,14 @@ describe('production promotion exact-artifact contract', () => {
       readFileSync(productionControllerRunLiveFixturePath, 'utf8')
     );
 
-    expect(health).toContain("cron: '*/15 * * * *'");
+    expect(health).toContain('workflow_run:');
+    expect(health).toContain('workflows: [Production Controller]');
+    expect(health).not.toContain(
+      'workflows: [Production Controller, Production Marker Recovery]'
+    );
+    expect(health).toContain("cron: '17 4 * * *'");
+    expect(health).toContain('polling-exception:');
+    expect(health).toContain('safety net only');
     expect(controller).toContain(
       'run-name: Production Controller ${{ github.event.workflow_run.head_sha }} from CI'
     );
@@ -4494,6 +4512,14 @@ describe('production promotion exact-artifact contract', () => {
     expect(health).toContain('[ "$source_ci_attempt" -ne 1 ]');
     expect(health).toContain('.id == $id and .run_attempt == 1');
     expect(health).toContain('gh run rerun "$source_ci_id"');
+    expect(health).toContain('predeploy_controller_ci_replayed');
+    expect(health).toContain(
+      'select(.name == "Production Release" and .status == "completed" and .conclusion == "skipped")'
+    );
+    expect(health).toContain(
+      'select(.name | startswith("Production Release /"))'
+    );
+    expect(health).toContain('controller_attempt="$(jq -r');
     expect(health).toContain('gh run rerun "$run_id"');
     expect(health).not.toContain('gh run rerun "$run_id" --failed');
     expect(health).toContain('needs_manual=true');
@@ -4567,6 +4593,9 @@ describe('production promotion exact-artifact contract', () => {
     expect(healthEvaluation).toContain(
       'recovery_reason=policy_generation_superseded'
     );
+    expect(healthEvaluation).toContain(
+      'node .github/scripts/assert-live-production-bind.mjs --main-sha "$current_sha"'
+    );
     expect(
       healthEvaluation.indexOf('checked_out_sha="$(git rev-parse')
     ).toBeLessThan(healthEvaluation.indexOf('production-marker-state.mjs'));
@@ -4638,6 +4667,59 @@ describe('production promotion exact-artifact contract', () => {
         `controller listing must reject a run missing ${missingField}`
       ).not.toBe(0);
     }
+
+    const predeployFilterMatch =
+      /controller_jobs="\$\(gh api[\s\S]*?if jq -e --argjson run_id "\$controller_id" --arg sha "\$current_sha" '\n([\s\S]*?)\n\s+' >\/dev\/null <<<"\$controller_jobs"; then/.exec(
+        healthEvaluation
+      );
+    expect(predeployFilterMatch).not.toBeNull();
+    const predeployFilter = predeployFilterMatch?.[1] ?? 'false';
+    const controllerRunId = 456;
+    const skippedReleaseJob = {
+      id: 1,
+      run_id: controllerRunId,
+      run_attempt: 1,
+      head_sha: exactPolicySha,
+      head_branch: 'main',
+      name: 'Production Release',
+      status: 'completed',
+      conclusion: 'skipped',
+    };
+    const runPredeployFilter = (jobs: object[]) =>
+      spawnSync(
+        'jq',
+        [
+          '-e',
+          '--argjson',
+          'run_id',
+          String(controllerRunId),
+          '--arg',
+          'sha',
+          exactPolicySha,
+          predeployFilter,
+        ],
+        {
+          encoding: 'utf8',
+          input: JSON.stringify({ total_count: jobs.length, jobs }),
+        }
+      ).status;
+
+    expect(runPredeployFilter([skippedReleaseJob])).toBe(0);
+    expect(
+      runPredeployFilter([
+        skippedReleaseJob,
+        {
+          ...skippedReleaseJob,
+          id: 2,
+          name: 'Production Release / deploy-staging',
+          conclusion: 'success',
+        },
+      ])
+    ).not.toBe(0);
+    expect(
+      runPredeployFilter([{ ...skippedReleaseJob, conclusion: 'success' }])
+    ).not.toBe(0);
+
     expect(reusable).toContain(
       'Could not resolve exact main at the release-result boundary'
     );
@@ -4689,20 +4771,52 @@ describe('production promotion exact-artifact contract', () => {
 });
 
 describe('production marker recovery workflow (JOV-4965)', () => {
-  it('is a bounded manual path that never redeploys or mutates aliases', () => {
+  it('is event-driven with a bounded manual fallback and never mutates release state', () => {
     const workflow = readFileSync(productionMarkerRecoveryWorkflowPath, 'utf8');
 
     expect(workflow).toContain('workflow_dispatch:');
-    expect(workflow).not.toContain('workflow_run:');
+    expect(workflow).toContain('workflow_run:');
+    expect(workflow).toContain('workflows: [Production Controller]');
+    expect(workflow).toContain('types: [completed]');
+    expect(workflow).toContain('branches: [main]');
     expect(workflow).not.toContain('push:');
     expect(workflow).not.toContain('schedule:');
     expect(workflow).toContain('group: production-mutation');
+    expect(workflow).toContain('queue: max');
     expect(workflow).toContain('cancel-in-progress: false');
+    expect(workflow).toContain(`jobs:
+  recover-marker:
+    name: Recover exact verified-generation marker`);
+    expect(workflow).toContain(`    permissions:
+      contents: read
+      actions: write`);
+    expect(workflow).toContain('REQUEST_MODE: ${{ github.event_name }}');
+    expect(workflow).toContain(
+      "if: steps.admission.outputs.recovery_required == 'true'"
+    );
+    expect(workflow).toContain('recovery_required=false');
+    expect(workflow).toContain('recovery_required=true');
+    expect(workflow).toContain(
+      'Controller attempt did not finish the exact promotion path; marker recovery is not applicable.'
+    );
     expect(workflow).not.toContain('vercel promote');
     expect(workflow).not.toContain('vercel alias');
     expect(workflow).not.toContain('vercel deploy');
     expect(workflow).not.toContain('vercel rollback');
     expect(workflow).not.toContain('overwrite: true');
+    expect(workflow).toContain('EXPECTED_DEPLOYMENT_ID="$canonical_id"');
+    expect(workflow).toContain(
+      'EXPECTED_PRODUCTION_DEPLOYMENT_ID=$EXPECTED_DEPLOYMENT_ID'
+    );
+    expect(workflow).toContain(
+      'gh workflow run fleet-gate-refresh.yml --ref main'
+    );
+    expect(workflow).toContain(
+      'name: production-generation-verified-${{ env.EXPECTED_SHA }}'
+    );
+    const fleetRefresh = readFileSync(fleetGateRefreshWorkflowPath, 'utf8');
+    expect(fleetRefresh).toContain('workflows: [CI, Production Controller]');
+    expect(fleetRefresh).not.toContain('Production Marker Recovery]');
   });
 
   it('preserves the marker only after canonical ownership and exact probes pass', () => {
@@ -4751,8 +4865,11 @@ describe('production marker recovery workflow (JOV-4965)', () => {
     expect(oauth).toContain('refusing to preserve a marker');
     expect(preserve).toContain('recoveredFromControllerRun');
     expect(preserve).toContain('recoveredFromControllerAttempt');
+    expect(preserve).toContain('marker_upload_required=false');
+    expect(preserve).toContain('marker_upload_required=true');
+    expect(preserve).toContain('artifacts?name=$marker_name&per_page=100');
     expect(workflow).toContain(
-      'name: production-generation-verified-${{ inputs.sha }}'
+      'name: production-generation-verified-${{ env.EXPECTED_SHA }}'
     );
     expect(confirm).not.toContain('production-marker-state.mjs');
     expect(confirm).toContain(
@@ -4776,6 +4893,10 @@ describe('production marker recovery workflow (JOV-4965)', () => {
     expect(markerState).toContain('recoveredFromControllerAttempt');
     expect(markerState).toContain("'exact_recovered_generation_verified'");
     expect(markerState).toContain("run.event === 'workflow_dispatch'");
+    expect(markerState).toContain("run.event === 'workflow_run'");
+    expect(markerState).toContain(
+      "run.event === 'workflow_dispatch' || run.event === 'workflow_run'"
+    );
     expect(markerState).toContain('unsafe_or_contradictory_rollback');
   });
 });
