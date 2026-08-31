@@ -9,6 +9,8 @@ import {
 import { hydrateOpenPrStatusContexts } from './lib/github-open-prs-rest.mjs';
 import { tryGitHubRebase } from './lib/github-update-branch.mjs';
 import {
+  bindOpenPrsToLiveBaseRefs,
+  buildLiveBaseRefQuery,
   buildPlan,
   DEFAULT_BLOCKED_LABEL,
   DEFAULT_REQUIRED_CHECKS,
@@ -259,15 +261,26 @@ async function fetchOpenPrs(options) {
     '--json',
     fields.join(','),
   ]);
+  const [owner, name] = options.repo.split('/');
+  const liveMetadata =
+    metadata.length === 0
+      ? []
+      : bindOpenPrsToLiveBaseRefs({
+          prs: metadata,
+          response: await request({
+            owner,
+            name,
+            query: buildLiveBaseRefQuery(metadata),
+          }),
+        });
   const prs = await hydrateOpenPrStatusContexts({
     repo: options.repo,
-    prs: metadata,
+    prs: liveMetadata,
     request,
     includeStatuses: pr =>
       pr.mergeable === 'CONFLICTING' || pr.mergeStateStatus === 'DIRTY',
     batchSize: 40,
   });
-  const [owner, name] = options.repo.split('/');
   const queueToken = process.env.GH_QUEUE_TOKEN || process.env.GH_TOKEN;
   const queuePositions = await fetchNativeMergeQueue({
     branches: prs.map(pr => pr.baseRefName),
