@@ -23,6 +23,17 @@ test('audit requires the standing enforcement commands', () => {
   assert.equal(scripts?.status, 'PASS');
 });
 
+test('audits the design-system authority map from governance', () => {
+  const { results } = runDesignGovernanceAudit();
+  const authority = results.find(
+    item => item.id === 'design-system-authority-map'
+  );
+  assert.equal(authority?.status, 'PASS');
+  assert.match(authority.detail, /systemAuthorityMap\.json/);
+  assert.match(authority.detail, /dependency order/);
+  assert.match(authority.detail, /canonical owners/);
+});
+
 test('binds design projections to the canonical invariant registry', () => {
   const { results } = runDesignGovernanceAudit();
   const projection = results.find(

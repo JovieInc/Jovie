@@ -5,7 +5,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
-import { loadAndValidateDesignSystemAuthorityMap } from './design-system-authority-map.mjs';
 
 export const MANIFEST_PATH =
   'docs/design-system/design-conformance-manifest.json';
@@ -388,19 +387,12 @@ export function loadAndValidate(repoRoot = process.cwd()) {
     resolve(repoRoot, COMPONENT_REGISTRY_PATH),
     'utf8'
   );
-  const conformanceIssues = validateDesignConformance({
+  return validateDesignConformance({
     repoRoot,
     manifest,
     lockProfiles,
     componentRegistrySource,
   });
-  const authorityMapIssues = loadAndValidateDesignSystemAuthorityMap(
-    repoRoot
-  ).map(issue => ({
-    code: `authority-map-${issue.code}`,
-    detail: issue.detail,
-  }));
-  return [...conformanceIssues, ...authorityMapIssues];
 }
 
 function changedFiles(repoRoot) {

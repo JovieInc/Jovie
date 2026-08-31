@@ -72,6 +72,12 @@ permanent check:
     typography concepts (`pnpm component-ship-gate` + this audit). Missing or
     unknown benchmark dimensions fail closed. No Shadcn/Typeset implementation
     is imported.
+11. **Design-system authority map** — the machine-readable design-system
+    dependency ledger in `apps/web/data/designSystem/systemAuthorityMap.json`
+    must preserve the canonical layer order, current owners, source evidence,
+    executable checks for enforced layers, and shrink-only classification
+    reasons for gaps. The audit delegates to
+    `scripts/design-system-authority-map.mjs`.
 
 Exit code is non-zero on any FAIL; WARN never blocks. Failures print the
 exact offending values so remediation is mechanical.
