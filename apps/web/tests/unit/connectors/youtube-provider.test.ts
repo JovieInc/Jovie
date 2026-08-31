@@ -167,6 +167,18 @@ describe('YouTube Library provider', () => {
     expect(onUploadsPageToken).toHaveBeenCalledWith('page-3');
   });
 
+  it('skips provider calls when the request deadline is exhausted', async () => {
+    const fetcher = vi.fn();
+    const provider = createYouTubeLibraryProvider({
+      accessToken: 'access-token',
+      deadlineMs: Date.now() - 1,
+      fetcher,
+    });
+
+    await expect(provider.listChannelVideos('channel-1')).resolves.toEqual([]);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   it('maps supported Analytics metrics without inventing impressions', async () => {
     const fetcher = vi.fn(async () =>
       jsonResponse({
