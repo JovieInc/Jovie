@@ -2156,6 +2156,10 @@ describe('iOS stage contract', () => {
       "run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}"
     );
     expect(pathChanges).toContain(
+      'git show "${CLASSIFICATION_BASE_REF}:scripts/lib/product-lane-classifier.mjs"'
+    );
+    expect(pathChanges).toContain('node "$TRUSTED_PRODUCT_LANE_CLASSIFIER"');
+    expect(pathChanges).not.toContain(
       'node scripts/lib/product-lane-classifier.mjs'
     );
     expect(ios).toContain("needs.ci-path-changes.outputs.run_ios == 'true'");
