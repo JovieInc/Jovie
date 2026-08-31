@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect, userEvent, within } from 'storybook/test';
 import { DrawerFormGridRow } from './DrawerFormGridRow';
 
 const meta = {
@@ -24,7 +25,14 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  play: async ({ canvasElement }) => {
+    const field = within(canvasElement).getByLabelText('Release date');
+    await expect(field).toHaveAttribute('id', 'release-date');
+    await userEvent.click(field);
+    await expect(field).toHaveFocus();
+  },
+};
 
 export const CustomLabelStyle: Story = {
   args: {
