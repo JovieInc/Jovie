@@ -114,7 +114,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain('files === null || files.length === 0');
   });
 
-  it('runs the official Symphony recovery ownership contract with changed-module coverage', () => {
+  it('runs the official Symphony recovery ownership contract with exact changed-line coverage', () => {
     expect(PACKAGE_JSON.scripts['invariants:check']).toContain(
       'python3 scripts/hermes/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract'
     );
@@ -125,7 +125,10 @@ describe('ci-fast bounded parallel workflow', () => {
       'python3 -m coverage run --branch scripts/hermes/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract'
     );
     expect(CI_FAST_SOURCE).toContain(
-      'python3 -m coverage report --include="*/scripts/hermes/symphony-codex-exhausted.py" --fail-under=9'
+      'python3 -m coverage json -o "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json"'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'required={72,73,74}; missing=required-set(file["executed_lines"])'
     );
   });
 
