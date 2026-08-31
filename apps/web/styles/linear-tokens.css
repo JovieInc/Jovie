@@ -215,45 +215,8 @@
     --shadow-button-inset,
     var(--shadow-button)
   );
-  /* App UI tokens (distinct from marketing page tokens) */
-  --linear-app-radius-item: 8px;
-  --linear-app-radius-menu: 8px;
-  --linear-app-shell-gap: 8px;
-  --linear-app-shell-radius: 12px;
-  --linear-app-shell-border: rgba(0, 0, 0, 0.05);
-  --linear-app-shell-sidebar-seam: rgba(0, 0, 0, 0.05);
-  --linear-app-frame-seam: rgba(0, 0, 0, 0.045);
-  --linear-app-shell-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.03), 0 14px 30px rgba(0, 0, 0, 0.045);
-  --linear-app-sidebar-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.022), 0 14px 28px rgba(0, 0, 0, 0.035);
-  --linear-app-header-height: 40px;
-  /* Desktop breadcrumb/header bar uses a slightly tighter height than content headers. */
-  --linear-app-header-height-compact: 36px;
-  --linear-app-header-padding-x: 12px;
-  --linear-app-content-padding-x: 12px;
-  --linear-app-content-padding-y: 8px;
-  --linear-app-control-height-sm: 28px;
-  --linear-app-control-padding-x: 11px;
-  --linear-app-control-radius: 9999px;
-  --linear-app-toolbar-gap: 4px;
-  --linear-app-content-surface: var(--linear-bg-surface-0);
-  --linear-app-card-shadow: none;
-  --linear-app-drawer-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.03), 0 14px 32px rgba(0, 0, 0, 0.05);
   --linear-row-hover: oklch(96.2% 0.003 282);
   --linear-row-selected: oklch(94.8% 0.006 282);
-  --linear-app-sidebar-width: 224px;
-  --linear-app-audio-bar-max-height: 120px;
-  --linear-app-audio-compact-height: 64px;
-  --linear-app-sidebar-background-rgb: 247 248 248;
-  --linear-app-sidebar-foreground-rgb: 18 18 20;
-  --linear-app-sidebar-border-rgb: 0 0 0 / 0.06;
-  --linear-app-sidebar-accent-rgb: 242 243 245;
-  --linear-app-sidebar-accent-active-rgb: 236 238 241;
-  --linear-app-sidebar-item-foreground-rgb: 88 90 96;
-  --linear-app-sidebar-item-icon-rgb: 122 125 132;
-  --linear-app-sidebar-muted-rgb: 112 116 124;
   /* ============================================
      COMPONENT-SCOPED TOKENS — marketing page effects
      ============================================ */
@@ -429,30 +392,10 @@
   /* Shadows — restrained depth on near-black */
   /* Dark-mode card shadows retired (JOV-5465) — use --shadow-card,
      --shadow-card-elevated from design-system.css. */
-  --linear-app-content-surface: #0a0d16;
-  /* panel — primary framed main-pane surface */
-  --linear-app-card-shadow: none;
-  --linear-app-shell-border: rgba(168, 176, 195, 0.12);
-  --linear-app-shell-sidebar-seam: rgba(168, 176, 195, 0.1);
-  --linear-app-frame-seam: rgba(168, 176, 195, 0.1);
-  --linear-app-shell-shadow:
-    0 0 0 1px rgba(168, 176, 195, 0.06), 0 14px 36px rgba(0, 0, 0, 0.22);
-  --linear-app-sidebar-shadow:
-    0 0 0 1px rgba(168, 176, 195, 0.05), 0 12px 28px rgba(0, 0, 0, 0.18);
-  --linear-app-drawer-shadow:
-    0 0 0 1px rgba(168, 176, 195, 0.1), 0 18px 42px rgba(0, 0, 0, 0.32);
+  /* App-shell dark overrides retired (JOV-5466) — canonical
+     --app-shell-* values live in design-system.css :root.dark. */
   --linear-row-hover: rgba(168, 176, 195, 0.06);
   --linear-row-selected: rgba(17, 175, 255, 0.1);
-  /* Ion selection */
-  --linear-app-sidebar-background-rgb: 6 8 13;
-  /* shell #06080D */
-  --linear-app-sidebar-foreground-rgb: 245 247 251;
-  --linear-app-sidebar-border-rgb: 168 176 195 / 0.1;
-  --linear-app-sidebar-accent-rgb: 168 176 195 / 0.06;
-  --linear-app-sidebar-accent-active-rgb: 17 175 255 / 0.1;
-  --linear-app-sidebar-item-foreground-rgb: 215 220 232;
-  --linear-app-sidebar-item-icon-rgb: 125 135 157;
-  --linear-app-sidebar-muted-rgb: 125 135 157;
 }
 
 /* ============================================

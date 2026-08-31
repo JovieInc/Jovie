@@ -2,10 +2,9 @@ name: CI
 
 on:
   pull_request:
-    # An unchanged head can be synchronized while its PR is still a draft.
-    # Re-run the required contexts when that PR becomes reviewable so it can
-    # enter the native queue without a synthetic close/reopen.
-    types: [opened, synchronize, reopened, ready_for_review]
+    # Source CI runs once per source revision. Marking an unchanged draft ready
+    # must never launch a second copy of the same validation flight.
+    types: [opened, synchronize, reopened]
     branches: [main, 'integration/**']
   # GitHub native merge queue validates the exact synthetic combined head.
   merge_group:

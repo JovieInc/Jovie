@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { PerformanceCard } from './PerformanceCard';
@@ -98,5 +100,15 @@ describe('PerformanceCard', () => {
     expect(
       screen.getByRole('tab', { name: '30d', selected: true })
     ).toBeInTheDocument();
+  });
+});
+
+describe('JOV-5466 token retire', () => {
+  it('does not keep retired --linear-app-* tokens', () => {
+    const source = readFileSync(
+      resolve(__dirname, './PerformanceCard.tsx'),
+      'utf8'
+    );
+    expect(source).not.toMatch(/--linear-app-/);
   });
 });

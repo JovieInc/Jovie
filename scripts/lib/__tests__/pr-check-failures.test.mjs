@@ -502,7 +502,7 @@ describe('pr-check-failures', () => {
     ).toEqual([]);
   });
 
-  it('keeps queue scripts on the shared exact policy and auto-ready fail-closed', () => {
+  it('keeps queue admission exact and auto-ready independent of check completion', () => {
     const autoReady = readFileSync(
       `${repoRoot}/scripts/auto-ready-agent-drafts.sh`,
       'utf8'
@@ -510,16 +510,18 @@ describe('pr-check-failures', () => {
     const drain = readFileSync(`${repoRoot}/scripts/drain-pr-queue.sh`, 'utf8');
 
     for (const source of [autoReady, drain]) {
-      expect(source).toMatch(/--classify-(?:auto-ready|queue)/);
       expect(source).not.toMatch(
         /test\(["']advisory\|Preview Deploy\|Slop Gate/i
       );
       expect(source).not.toMatch(/Verify Draft\|E2E Smoke/);
     }
 
-    expect(autoReady).toContain('--classify-auto-ready');
+    expect(autoReady).toContain('classify_promotion');
+    expect(autoReady).not.toContain('--classify-auto-ready');
+    expect(autoReady).not.toContain('check_failures_for_pr');
     expect(autoReady).not.toContain('Verify Draft Agent PR');
     expect(autoReady).not.toContain('dependabot/');
+    expect(drain).toContain('--classify-queue');
     expect(drain).toContain(`fail='["required check status unavailable"]'`);
     expect(drain).not.toContain("fail='[]'");
   });

@@ -1,18 +1,12 @@
 name: Fleet Gate Refresh
 
-# Event-driven one-writer refresh and Symphony admission. Every event that can
-# change green-ready depth or clear a queue/area hold refreshes the canonical
-# Gem receipt, then admits at most one issue from that fresh evidence. There is
-# no timer fallback: quiet periods have no new capacity signal to consume.
-#
-# The concurrency group serializes event bursts, gate-next's verified lease
-# reread prevents duplicate dispatch, and the absolute timeout bounds a stuck
-# event. An always-run heartbeat records every event outcome without granting
-# admission authority.
+# Event-driven one-writer refresh for the canonical Gem receipt. Work pickup is
+# owned by upstream OpenAI Symphony polling Linear directly; this workflow has
+# no issue admission or worker-dispatch path.
 
 on:
   pull_request:
-    types: [opened, edited, synchronize, closed, labeled, unlabeled, ready_for_review, reopened]
+    types: [opened, edited, synchronize, closed, labeled, unlabeled, reopened]
   workflow_run:
     # Queue-Deferred Release is downstream of this gate. Listening to it here
     # formed a reciprocal workflow_run loop that could retrigger both
@@ -30,7 +24,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: fleet-gate-event-admission
+  group: fleet-gate-event-refresh
   cancel-in-progress: false
 
 jobs:
@@ -100,64 +94,9 @@ jobs:
           set -euo pipefail
           node "$GITHUB_WORKSPACE/scripts/backlog-orchestrator/delivery-state-machine.mjs" \
             --closure-health-file="$GEM_WORKSPACE/state/gem-priority-gate/latest.json"
-
-      - name: Reconcile Symphony pressure-driven concurrency
-        if: always() && steps.refresh.outcome == 'success'
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 scripts/hermes/symphony-concurrency-controller.py
-
-      - name: Admit one issue from the fresh event
-        id: admit
-        if: steps.refresh.outputs.new_issue_intake_allowed == 'true'
-        env:
-          JOVIE_AGENT_PROFILE: no_agent
-          JOVIE_GBRAIN_BIN: /home/timwhite/.local/bin/gbrain
-          JOVIE_GBRAIN_DIALECT: adapter
-        shell: bash
-        run: |
-          set -euo pipefail
-          timeout 180s scripts/backlog-orchestrator/run-backlog.sh reconcile
-          timeout 60s scripts/backlog-orchestrator/run-backlog.sh gate-next
-          timeout 90s scripts/backlog-orchestrator/run-backlog.sh remediate
-
-      - name: Record event admission heartbeat
-        if: always()
-        env:
-          ADMIT_OUTCOME: ${{ steps.admit.outcome || 'skipped' }}
-          EVENT_ACTION: ${{ github.event.action || '' }}
-          EVENT_NAME: ${{ github.event_name }}
-          EVENT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
-          GATE_RC: ${{ steps.refresh.outputs.gate_rc || 'unavailable' }}
-          REFRESH_OUTCOME: ${{ steps.refresh.outcome || 'skipped' }}
-          RUN_ID: ${{ github.run_id }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          heartbeat_dir="${GEM_WORKSPACE:-/home/timwhite/gem-workspace}/state"
-          heartbeat="${heartbeat_dir}/symphony-event-admission-heartbeat.json"
-          mkdir -p "$heartbeat_dir"
-          python3 - "$heartbeat" <<'PY'
-          import json
-          import os
-          import pathlib
-          import sys
-          from datetime import datetime, timezone
-
-          destination = pathlib.Path(sys.argv[1])
-          temporary = destination.with_suffix(".json.tmp")
-          receipt = {
-              "schema": "symphony-event-admission-heartbeat/v1",
-              "observedAt": datetime.now(timezone.utc).isoformat(),
-              "event": os.environ["EVENT_NAME"],
-              "action": os.environ["EVENT_ACTION"] or None,
-              "sha": os.environ["EVENT_SHA"],
-              "runId": int(os.environ["RUN_ID"]),
-              "gateExitCode": os.environ["GATE_RC"],
-              "refreshOutcome": os.environ["REFRESH_OUTCOME"],
-              "admitOutcome": os.environ["ADMIT_OUTCOME"],
-          }
-          temporary.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
-          temporary.replace(destination)
-          PY
+          linear_env="${HOME}/.config/symphony/linear.env"
+          if [[ -z "${LINEAR_API_KEY:-}" && -r "$linear_env" ]]; then
+            LINEAR_API_KEY="$(tr -d '\r\n' < "$linear_env")"
+            export LINEAR_API_KEY="${LINEAR_API_KEY#LINEAR_API_KEY=}"
+          fi
+          timeout 90s node "$GITHUB_WORKSPACE/scripts/backlog-orchestrator/backlog-orchestrator.mjs" remediate

@@ -35,7 +35,7 @@ export function SentryExamplePageClient() {
                 target='_blank'
                 rel='noreferrer'
                 href='https://jovie.sentry.io/issues/?project=4510479236792320'
-                className='underline decoration-(--linear-app-frame-seam) underline-offset-4 transition-colors hover:text-primary-token'
+                className='underline decoration-(--app-shell-frame-seam) underline-offset-4 transition-colors hover:text-primary-token'
               >
                 Issues page
               </a>
@@ -44,7 +44,7 @@ export function SentryExamplePageClient() {
                 target='_blank'
                 rel='noreferrer'
                 href='https://docs.sentry.io/platforms/javascript/guides/nextjs/'
-                className='underline decoration-(--linear-app-frame-seam) underline-offset-4 transition-colors hover:text-primary-token'
+                className='underline decoration-(--app-shell-frame-seam) underline-offset-4 transition-colors hover:text-primary-token'
               >
                 Next.js docs
               </a>
@@ -81,7 +81,7 @@ export function SentryExamplePageClient() {
           {hasSentError ? (
             <ContentSurfaceCard
               surface='nested'
-              className='border-[color-mix(in_oklab,var(--linear-success)_30%,var(--linear-app-frame-seam))] bg-[color-mix(in_oklab,var(--linear-success)_10%,var(--linear-app-content-surface))] p-4'
+              className='border-[color-mix(in_oklab,var(--linear-success)_30%,var(--app-shell-frame-seam))] bg-[color-mix(in_oklab,var(--linear-success)_10%,var(--app-shell-content-surface))] p-4'
             >
               <div className='flex items-center justify-center gap-2 text-app font-semibold text-primary-token'>
                 <CheckCircle2 className='h-4 w-4 text-(--linear-success)' />

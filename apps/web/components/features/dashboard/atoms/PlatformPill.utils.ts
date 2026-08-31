@@ -28,7 +28,7 @@ export interface PillClassNameParams {
 const BASE_CLASSES = [
   'group/pill relative min-w-0 border text-xs font-caption tracking-tight',
   'border-(--pill-border) hover:border-(--pill-border-hover)',
-  'bg-(--linear-app-content-surface) hover:bg-(--pill-bg-hover)',
+  'bg-(--app-shell-content-surface) hover:bg-(--pill-bg-hover)',
   'text-secondary-token hover:text-primary-token',
   'transition-[background-color,border-color,color,grid-template-columns,max-width,opacity,padding,margin] duration-subtle ease-out',
 ] as const;
@@ -89,7 +89,7 @@ function getStateClasses(state: PlatformPillState): string {
  */
 function getToneClasses(tone: PlatformPillTone): string {
   if (tone === 'faded') {
-    return 'bg-(--linear-app-content-surface) text-secondary-token/85 hover:text-primary-token';
+    return 'bg-(--app-shell-content-surface) text-secondary-token/85 hover:text-primary-token';
   }
   return '';
 }

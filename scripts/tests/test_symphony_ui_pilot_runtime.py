@@ -42,7 +42,6 @@ INSTALLER = ROOT / "scripts/hermes/install-symphony-ui-pilot.sh"
 FLEET_INSTALLER = ROOT / "scripts/hermes/install-gem-fleet-controller.sh"
 REHAB_INSTALLER = ROOT / "scripts/hermes/install-gem-pr-rehabilitation.sh"
 USER_SYSTEMD_LIB = ROOT / "scripts/hermes/lib/user-systemd-context.sh"
-INTAKE_WORKFLOW = ROOT / ".github/workflows/jovie-intake-controller.yml"
 FLEET_WORKFLOW = ROOT / ".github/workflows/fleet-gate-refresh.yml"
 ACTIVATION_WORKFLOW = ROOT / ".github/workflows/gem-delivery-controller-activation.yml"
 ACTIONLINT_CONFIG = ROOT / ".github/actionlint.yaml"
@@ -141,72 +140,6 @@ def test_workflow_admission_contract() -> None:
     assert _list_items(tracker, "active_states") == ["Todo", "In Progress"]
     for state in ("Done", "Canceled"):
         assert state in _list_items(tracker, "terminal_states")
-
-
-def test_workflow_uses_event_wake_with_slow_poll_backstop() -> None:
-    polling = _section(_front_matter_lines(), "polling")
-    assert int(_scalar(polling, "interval_ms")) >= 300_000
-    intake = INTAKE_WORKFLOW.read_text()
-    assert "Wake the local lease executor for an admitted event" in intake
-    assert "steps.admission.outputs.admitted == 'true'" in intake
-    assert "-X POST http://127.0.0.1:4041/api/v1/refresh" in intake
-    assert 'any(.teams[]; .status == "admitted"' in intake
-
-
-def test_intake_workflow_pins_the_gem_gbrain_adapter_contract() -> None:
-    intake = INTAKE_WORKFLOW.read_text()
-    assert "JOVIE_GBRAIN_BIN: /home/timwhite/.local/bin/gbrain" in intake
-    assert "JOVIE_GBRAIN_DIALECT: adapter" in intake
-
-
-def _fleet_admit_env(workflow: str) -> dict[str, str]:
-    start_marker = "      - name: Admit one issue from the fresh event\n"
-    end_marker = "\n      - name: Record event admission heartbeat"
-    start = workflow.index(start_marker)
-    end = workflow.index(end_marker, start)
-    step = workflow[start:end]
-    env_start = step.index("        env:\n") + len("        env:\n")
-    values: dict[str, str] = {}
-    for line in step[env_start:].splitlines():
-        if not line.startswith("          "):
-            break
-        key, separator, value = line.strip().partition(":")
-        if separator:
-            values[key] = value.strip().strip("\"'")
-    return values
-
-
-def _assert_exact_fleet_gbrain_bindings(workflow: str) -> None:
-    env = _fleet_admit_env(workflow)
-    assert env.get("JOVIE_GBRAIN_BIN") == "/home/timwhite/.local/bin/gbrain"
-    assert env.get("JOVIE_GBRAIN_DIALECT") == "adapter"
-
-
-def test_fleet_workflow_pins_the_gem_gbrain_adapter_contract() -> None:
-    _assert_exact_fleet_gbrain_bindings(FLEET_WORKFLOW.read_text())
-
-
-def test_fleet_workflow_rejects_missing_blank_and_legacy_gbrain_configuration() -> None:
-    workflow = FLEET_WORKFLOW.read_text()
-    cases = [
-        workflow.replace(
-            "          JOVIE_GBRAIN_BIN: /home/timwhite/.local/bin/gbrain\n", ""
-        ),
-        workflow.replace(
-            "          JOVIE_GBRAIN_BIN: /home/timwhite/.local/bin/gbrain\n",
-            "          JOVIE_GBRAIN_BIN: ''\n",
-        ),
-        workflow.replace(
-            "          JOVIE_GBRAIN_DIALECT: adapter\n",
-            "          JOVIE_GBRAIN_DIALECT: legacy\n",
-        ),
-    ]
-    for invalid_workflow in cases:
-        try:
-            _assert_exact_fleet_gbrain_bindings(invalid_workflow)
-        except AssertionError:
-            continue
-        raise AssertionError("invalid GBrain workflow configuration was accepted")
 
 
 def test_activation_requires_exact_production_revision_and_attestation() -> None:

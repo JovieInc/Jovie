@@ -1,12 +1,6 @@
 /**
- * Official Elixir Symphony backlog remediation loop (JOV-5492).
- *
- * Inventories the JOV backlog against Linear, GitHub PRs, and main; selects a
- * measured, non-overlapping cohort of bounded code-shippable issues; couples
- * admission to runtime capacity; tracks per-issue outcomes; and reports a
- * single Linear workpad. Feeding uses the official Symphony refresh surface
- * only. This module must not revive homemade Symphony admission or JOV-5466
- * wrappers.
+ * Official Elixir Symphony backlog remediation (JOV-5492).
+ * Feed only POST /api/v1/refresh. Homemade admission and JOV-5466 wrappers are forbidden.
  */
 
 import { createHash } from 'node:crypto';
@@ -171,13 +165,6 @@ function isErroredPullRequest(pullRequest) {
   );
 }
 
-/**
- * Inventory Linear issues against GitHub PRs, current main, and relations.
- * Dedup/supersede only when an explicit relation or merged PR proves it.
- *
- * @param {any[]} issues
- * @param {{ pullRequests?: unknown[], mainSha?: string | null, now?: string }} [options]
- */
 export function inventoryBacklog(
   issues,
   { pullRequests = [], mainSha = null, now = new Date().toISOString() } = {}
@@ -261,13 +248,6 @@ function outcomeFromInventory(issue, inventoryRow) {
   return null;
 }
 
-/**
- * Classify one issue for the remediation matrix. Inventory evidence wins
- * over heuristic admission when it proves merged/superseded/split.
- *
- * @param {any} issue
- * @param {{ inventory?: { rows?: Array<{ issue?: string, openPullRequests?: unknown[], mergedPullRequests?: unknown[], duplicateOf?: string | null }> }, now?: string }} [options]
- */
 export function classifyRemediationCandidate(issue, options = {}) {
   const id = identifierOf(issue);
   const inventoryRow = (options.inventory?.rows || []).find(
@@ -446,28 +426,6 @@ function pullRequestRates(pullRequests) {
   };
 }
 
-/**
- * Fail closed on missing/stale signals. Back off on degradation. Scale up
- * only after consecutive clean cohorts.
- *
- * @param {{
- *   schema?: string,
- *   observedAt?: string,
- *   workers?: { running?: number, retrying?: number, maxConcurrent?: number },
- *   host?: {
- *     cpuSomeAvg10?: number,
- *     memoryFullAvg10?: number,
- *     ioFullAvg10?: number,
- *     availableMemoryBytes?: number,
- *   },
- *   provider?: { accounts?: number, ready?: number },
- *   cloneLatencyMs?: number,
- *   ci?: { saturating?: boolean, running?: number, queued?: number },
- *   pullRequests?: unknown[],
- *   mergeQueue?: { health?: string, entries?: number },
- * }} [signals]
- * @param {{ previousCleanStreak?: number, previousCohortSize?: number, now?: string }} [options]
- */
 export function evaluateRuntimeCapacity(signals, options = {}) {
   const now = options.now || new Date().toISOString();
   const nowMs = Date.parse(now);
@@ -567,9 +525,6 @@ export function evaluateRuntimeCapacity(signals, options = {}) {
   };
 }
 
-/**
- * Select a measured wave: one issue per PR, no overlapping collision domains.
- */
 export function selectRemediationCohort(classifications, capacity) {
   const size = capacity?.allowed ? capacity.cohortSize : 0;
   const eligible = (
@@ -637,15 +592,6 @@ export function assertOfficialSymphonyFeed(url) {
   return target;
 }
 
-/**
- * @param {{
- *   url?: string,
- *   fetchImpl?: (
- *     input: string,
- *     init?: RequestInit
- *   ) => Promise<{ ok?: boolean, status?: number, json: () => Promise<unknown> }>,
- * }} [args]
- */
 export async function feedOfficialSymphony({
   url = OFFICIAL_SYMPHONY_REFRESH_URL,
   fetchImpl = globalThis.fetch,
@@ -727,17 +673,6 @@ export function buildRemediationWorkpad(receipt) {
   return lines.join('\n');
 }
 
-/**
- * @param {{
- *   issues?: any[],
- *   pullRequests?: any[] | null,
- *   mainSha?: string | null,
- *   capacitySignals?: Parameters<typeof evaluateRuntimeCapacity>[0],
- *   previousCleanStreak?: number,
- *   previousCohortSize?: number,
- *   now?: string,
- * }} [args]
- */
 export function buildRemediationReceipt({
   issues,
   pullRequests,
@@ -801,17 +736,6 @@ export function buildRemediationReceipt({
   return { ...complete, workpad: buildRemediationWorkpad(complete) };
 }
 
-/**
- * @param {{
- *   client: {
- *     fetchIssue: (identifier: string) => Promise<any>,
- *     addComment: (id: string, body: string) => Promise<any>,
- *     updateComment?: (id: string, body: string) => Promise<any>,
- *   },
- *   workpadIssue: string,
- *   receipt: { workpad: string },
- * }} args
- */
 export async function upsertRemediationWorkpad({
   client,
   workpadIssue,

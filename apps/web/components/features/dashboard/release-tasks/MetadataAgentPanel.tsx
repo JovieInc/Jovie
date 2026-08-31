@@ -328,7 +328,7 @@ export function MetadataAgentPanel({
   }
 
   return (
-    <section className='mb-6 rounded-xl border border-subtle bg-(--linear-app-content-surface) p-4'>
+    <section className='mb-6 rounded-xl border border-subtle bg-(--app-shell-content-surface) p-4'>
       <div className='flex flex-col gap-2 md:flex-row md:items-start md:justify-between'>
         <div>
           <p className='text-2xs font-medium text-tertiary-token'>

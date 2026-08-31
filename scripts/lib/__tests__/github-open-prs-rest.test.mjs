@@ -13,6 +13,11 @@ function detail(number, sha = `sha-${number}`) {
     created_at: '2026-07-12T00:00:00Z',
     updated_at: '2026-07-12T01:00:00Z',
     draft: false,
+    auto_merge: {
+      enabled_at: '2026-07-12T00:30:00Z',
+      enabled_by: { login: 'jovie-bot[bot]' },
+      merge_method: 'squash',
+    },
     mergeable: true,
     mergeable_state: 'behind',
     base: {
@@ -71,6 +76,9 @@ describe('REST open PR inventory', () => {
               context: 'Fork PR Gate',
               state: 'success',
               created_at: '2026-07-12T00:01:00Z',
+              description: 'exact head gate',
+              target_url: 'https://github.com/JovieInc/Jovie/actions/runs/123',
+              creator: { login: 'jovie-bot[bot]', type: 'Bot' },
             },
           ],
         };
@@ -90,7 +98,14 @@ describe('REST open PR inventory', () => {
     expect(prs[0].statusCheckRollup).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'PR Ready', conclusion: 'SUCCESS' }),
-        expect.objectContaining({ context: 'Fork PR Gate', state: 'SUCCESS' }),
+        expect.objectContaining({
+          context: 'Fork PR Gate',
+          state: 'SUCCESS',
+          description: 'exact head gate',
+          targetUrl: 'https://github.com/JovieInc/Jovie/actions/runs/123',
+          creator: { login: 'jovie-bot[bot]', type: 'Bot' },
+          createdAt: '2026-07-12T00:01:00Z',
+        }),
       ])
     );
   });
@@ -240,6 +255,31 @@ describe('REST open PR inventory', () => {
       headRepositoryOwner: { login: 'JovieInc' },
       isCrossRepository: false,
       changedFiles: 2,
+      autoMergeRequest: {
+        enabledAt: '2026-07-12T00:30:00Z',
+        enabledBy: { login: 'jovie-bot[bot]' },
+        mergeMethod: 'SQUASH',
+      },
+    });
+  });
+
+  it('normalizes trusted status provenance fields without dropping timestamps', () => {
+    const normalized = normalizeRestPullRequest(detail(14), [
+      {
+        __typename: 'StatusContext',
+        context: 'Jovie Conflict FX',
+        state: 'PENDING',
+        description: 'typed receipt',
+        targetUrl: 'https://github.com/JovieInc/Jovie/actions/runs/456',
+        creator: { login: 'jovie-bot[bot]', type: 'Bot' },
+        createdAt: '2026-07-12T00:45:00Z',
+      },
+    ]);
+    expect(normalized.statusCheckRollup[0]).toMatchObject({
+      description: 'typed receipt',
+      targetUrl: 'https://github.com/JovieInc/Jovie/actions/runs/456',
+      creator: { login: 'jovie-bot[bot]', type: 'Bot' },
+      createdAt: '2026-07-12T00:45:00Z',
     });
   });
 });

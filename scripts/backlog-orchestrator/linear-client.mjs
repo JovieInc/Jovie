@@ -787,9 +787,6 @@ export async function addComment(issueId, body) {
   );
 }
 
-/**
- * Replace a machine-owned comment in place so standing reports stay singular.
- */
 export async function updateComment(commentId, body) {
   return graphql(
     `

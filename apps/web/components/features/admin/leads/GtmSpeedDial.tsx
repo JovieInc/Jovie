@@ -87,7 +87,7 @@ export function getSpeedPreset(speed: Speed): Partial<LeadPipelineSettings> {
 
 function SpeedDialSkeleton() {
   return (
-    <ContentSurfaceCard className='px-(--linear-app-content-padding-x) py-4'>
+    <ContentSurfaceCard className='px-(--app-shell-content-padding-x) py-4'>
       <div className='flex items-center gap-3'>
         <div className='h-8 w-64 animate-pulse rounded-lg bg-surface-0' />
       </div>
@@ -122,7 +122,7 @@ export function GtmSpeedDial() {
 
   if (settingsQuery.isError || !settings) {
     return (
-      <ContentSurfaceCard className='px-(--linear-app-content-padding-x) py-4'>
+      <ContentSurfaceCard className='px-(--app-shell-content-padding-x) py-4'>
         <p className='text-xs font-book text-destructive'>
           Failed to load pipeline settings.
         </p>
@@ -158,7 +158,7 @@ export function GtmSpeedDial() {
       : currentSpeed === 'custom' && settings.enabled;
 
   return (
-    <ContentSurfaceCard className='px-(--linear-app-content-padding-x) py-4'>
+    <ContentSurfaceCard className='px-(--app-shell-content-padding-x) py-4'>
       <div className='flex flex-wrap items-center gap-2'>
         {SPEED_OPTIONS.map(speed => (
           <Button

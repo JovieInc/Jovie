@@ -182,11 +182,11 @@ import {
 const LIBRARY_TABLE_ROW_HEIGHT = 56;
 const LIBRARY_TABLE_MIN_WIDTH = '0';
 const LIBRARY_CONTENT_INSET_CLASS =
-  'px-(--linear-app-header-padding-x) py-(--linear-app-content-padding-y)';
+  'px-(--app-shell-header-padding-x) py-(--app-shell-content-padding-y)';
 const LIBRARY_CARD_FOCUS_CLASS =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none';
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface) outline-none';
 const LIBRARY_BUTTON_FOCUS_CLASS =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none';
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface) outline-none';
 const LIBRARY_TABLE_SKELETON_CONFIG: Array<{
   readonly width?: string;
   readonly variant?:
@@ -788,7 +788,7 @@ function LibrarySavedViewRow({
       size='sm'
       static
       className={cn(
-        'flex h-7 w-full items-center justify-start gap-2 border px-2 transition-colors duration-fast ease-subtle focus-visible:ring-offset-(--linear-app-content-surface)',
+        'flex h-7 w-full items-center justify-start gap-2 border px-2 transition-colors duration-fast ease-subtle focus-visible:ring-offset-(--app-shell-content-surface)',
         active
           ? 'border-default bg-surface-1 text-primary-token'
           : 'border-transparent text-secondary-token hover:border-default hover:bg-surface-1 hover:text-primary-token'
@@ -1074,7 +1074,7 @@ function FilterRow({
       type='button'
       onClick={onClick}
       className={cn(
-        'system-b-library-filter-row flex h-7 w-full items-center gap-2 border px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none',
+        'system-b-library-filter-row flex h-7 w-full items-center gap-2 border px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface) outline-none',
         active && 'system-b-library-filter-row--active'
       )}
     >
@@ -2338,7 +2338,7 @@ function LibraryStatusBar({
   readonly activePreviewTitle: string | null;
 }) {
   return (
-    <div className='system-b-library-status-bar hidden h-(--app-shell-footer-row-height) shrink-0 items-center justify-between gap-3 border-t border-(--app-shell-frame-seam) px-(--linear-app-header-padding-x) sm:flex'>
+    <div className='system-b-library-status-bar hidden h-(--app-shell-footer-row-height) shrink-0 items-center justify-between gap-3 border-t border-(--app-shell-frame-seam) px-(--app-shell-header-padding-x) sm:flex'>
       <span className='min-w-0 truncate'>
         {visibleCount} of {totalCount} Items
       </span>

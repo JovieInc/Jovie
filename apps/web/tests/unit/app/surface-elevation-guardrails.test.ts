@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 /**
  * Surface elevation guardrails — prevent invisible cards.
  *
- * The main content area uses bg-(--linear-app-content-surface), a dedicated
+ * The main content area uses bg-(--app-shell-content-surface), a dedicated
  * shell canvas tone in dark mode.
  * Shared cards should use bg-surface-1; recessed wells should use bg-surface-0.
  * Semi-transparent surface backgrounds (bg-surface-1/XX) are nearly invisible.
@@ -60,13 +60,13 @@ describe('surface elevation guardrails', () => {
       /:root\.dark[\s\S]*--color-bg-surface-1:\s*var\(--linear-bg-surface-1\);/
     );
     expect(designSystem).toMatch(
-      /:root\.dark[\s\S]*--sidebar-background:\s*var\(--linear-app-sidebar-background-rgb\);/
+      /:root\.dark[\s\S]*--sidebar-background:\s*var\(--app-shell-sidebar-background-rgb\);/
     );
     expect(linearTokens).toMatch(
       /:root\.dark[\s\S]*--linear-bg-page:\s*#06080d;/
     );
-    expect(linearTokens).toMatch(
-      /:root\.dark[\s\S]*--linear-app-sidebar-background-rgb:\s*6 8 13;/
+    expect(designSystem).toMatch(
+      /:root\.dark[\s\S]*--app-shell-sidebar-background-rgb:\s*6 8 13;/
     );
   });
 
@@ -107,7 +107,7 @@ describe('surface elevation guardrails', () => {
 
     expect(contentSurfaceCard).toContain('bg-surface-1');
     expect(contentSurfaceCard).not.toContain(
-      'bg-(--linear-app-content-surface)'
+      'bg-(--app-shell-content-surface)'
     );
   });
 
@@ -396,7 +396,7 @@ describe('surface elevation guardrails', () => {
       expect(
         content,
         `${file} should use card/recessed surface tokens`
-      ).not.toContain('bg-(--linear-app-content-surface)');
+      ).not.toContain('bg-(--app-shell-content-surface)');
     }
   });
 
@@ -413,8 +413,8 @@ describe('surface elevation guardrails', () => {
       join(ROOT, 'components/molecules/drawer/RightDrawer.tsx'),
       'utf-8'
     );
-    const linearTokens = readFileSync(
-      join(ROOT, 'styles/linear-tokens.css'),
+    const designSystem = readFileSync(
+      join(ROOT, 'styles/design-system.css'),
       'utf-8'
     );
     const adminTableShell = readFileSync(
@@ -422,21 +422,21 @@ describe('surface elevation guardrails', () => {
       'utf-8'
     );
 
-    expect(shellFrame).toContain('lg:shadow-(--linear-app-shell-shadow)');
+    expect(shellFrame).toContain('lg:shadow-(--app-shell-shadow)');
     // AppShellFrame uses Tailwind v4 bare-var syntax for the shell gap/padding.
     // Guardrails must match production classes exactly — [var(...)] form drifts
     // and fails Unit Tests after #13831.
     expect(shellFrame).toContain(
       'lg:gap-(--app-shell-gap) lg:p-(--app-shell-gap)'
     );
-    expect(linearTokens).toContain('--linear-app-sidebar-shadow:');
+    expect(designSystem).toContain('--app-shell-sidebar-shadow:');
     expect(sidebar).not.toContain(
       'group-data-[variant=sidebar]:lg:shadow-[var(--linear-app-sidebar-shadow)]'
     );
     expect(rightDrawer).toContain('border-l border-(--app-shell-frame-seam)');
     // The in-flow desktop drawer owns the raised inspector tier. Its children
     // must stay flat so entity surfaces do not reintroduce same-level nesting.
-    expect(rightDrawer).toContain('shadow-(--linear-app-drawer-shadow)');
+    expect(rightDrawer).toContain('shadow-(--app-shell-drawer-shadow)');
     expect(rightDrawer).toContain('rounded-(--app-shell-radius)');
     expect(rightDrawer).toContain('border-(--app-shell-frame-seam)');
     expect(rightDrawer).toContain('bg-surface-1');

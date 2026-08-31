@@ -13,10 +13,7 @@
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs reconcile --issue JOV-123
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs reconcile --dry-run
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs audit
- *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs admit-next
- *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs gate-next
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs remediate
- *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs approve-plan --issue=JOV-123 --evidence-file=/path/evidence.json
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs report
  */
 
@@ -25,6 +22,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 import * as admissionGate from './admission-gate.mjs';
 import { preAdmissionDecision } from './admission-policy.mjs';
@@ -58,7 +57,6 @@ import {
 import { buildAgentReadyTriageWatchdog } from './triage-router.mjs';
 import * as workstreamer from './workstreamer.mjs';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
 const execFileAsync = promisify(execFile);
 const TEAM_FILE_CONFIG = JSON.parse(
   readFileSync(new URL('./config.json', import.meta.url), 'utf8')
@@ -146,18 +144,21 @@ Usage:
   node backlog-orchestrator.mjs reconcile --dry-run  Dry run (no mutations)
   node backlog-orchestrator.mjs reconcile --issue=JOV-123  Single issue
   node backlog-orchestrator.mjs audit                Full backlog audit (shadow)
-  node backlog-orchestrator.mjs admit-next            Admit next work item
-  node backlog-orchestrator.mjs gate-next             Plan, approve, and admit one safe issue
-  node backlog-orchestrator.mjs gate-next --dry-run   Show the next issue without mutations
   node backlog-orchestrator.mjs remediate             Inventory, select a cohort, feed official Symphony
   node backlog-orchestrator.mjs remediate --dry-run   Inventory and report without mutations
   node backlog-orchestrator.mjs intake-readiness      Classify changed intake work (always dry-run)
   node backlog-orchestrator.mjs backlog-reduction     Audit high-confidence duplicate reduction (dry-run)
-  node backlog-orchestrator.mjs approve-plan --issue=JOV-123 --evidence-file=/path/evidence.json
   node backlog-orchestrator.mjs approve-research --issue=JOV-123 --evidence-file=/path/research.json
   node backlog-orchestrator.mjs report                Generate shadow report
 `);
     return;
+  }
+
+  if (['admit-next', 'gate-next', 'approve-plan'].includes(command)) {
+    console.error(
+      `${command} is disabled; upstream openai/symphony owns Linear pickup and dispatch`
+    );
+    process.exit(78);
   }
 
   const cache = loadCache();
@@ -1260,58 +1261,54 @@ async function runRemediate(isDryRun) {
     fleetGate.concurrency?.gem?.maxConcurrent
   );
   const provider = readCodexRotateCapacity();
-  const host = backlogRemediation.readHostPressure('/proc');
-  const cache = loadCache();
-  const previous = cache.backlogRemediation || {};
-  const capacitySignals = {
-    schema: backlogRemediation.CAPACITY_SCHEMA,
-    observedAt: new Date().toISOString(),
-    workers,
-    host,
-    provider: provider
-      ? { accounts: provider.accounts, ready: provider.ready }
-      : null,
-    cloneLatencyMs,
-    ci: {
-      saturating:
-        Number.isInteger(queue?.greenReadyPrs) &&
-        Number.isInteger(queue?.target) &&
-        queue.greenReadyPrs >= queue.target,
-      running: Number.isInteger(queue?.greenReadyPrs)
-        ? queue.greenReadyPrs
-        : null,
-      queued: Number.isInteger(queue?.eligiblePrs) ? queue.eligiblePrs : null,
-    },
-    pullRequests,
-    mergeQueue: {
-      health:
-        fleetGate.promotionMode === admitter.FLEET_PROMOTION_MODE.BLOCKED
-          ? 'blocked'
-          : fleetGate.state === admitter.FLEET_GATE_STATE.GREEN
-            ? 'healthy'
-            : 'degraded',
-      entries: Number.isInteger(queue?.eligiblePrs) ? queue.eligiblePrs : null,
-    },
-  };
+  const previous = loadCache().backlogRemediation || {};
   const receipt = backlogRemediation.buildRemediationReceipt({
     issues,
     pullRequests: pullRequests || [],
     mainSha: rawReceipt?.signals?.main?.sha || null,
-    capacitySignals,
+    capacitySignals: {
+      schema: backlogRemediation.CAPACITY_SCHEMA,
+      observedAt: new Date().toISOString(),
+      workers,
+      host: backlogRemediation.readHostPressure('/proc'),
+      provider: provider
+        ? { accounts: provider.accounts, ready: provider.ready }
+        : null,
+      cloneLatencyMs,
+      ci: {
+        saturating:
+          Number.isInteger(queue?.greenReadyPrs) &&
+          Number.isInteger(queue?.target) &&
+          queue.greenReadyPrs >= queue.target,
+        running: Number.isInteger(queue?.greenReadyPrs)
+          ? queue.greenReadyPrs
+          : null,
+        queued: Number.isInteger(queue?.eligiblePrs) ? queue.eligiblePrs : null,
+      },
+      pullRequests,
+      mergeQueue: {
+        health:
+          fleetGate.promotionMode === admitter.FLEET_PROMOTION_MODE.BLOCKED
+            ? 'blocked'
+            : fleetGate.state === admitter.FLEET_GATE_STATE.GREEN
+              ? 'healthy'
+              : 'degraded',
+        entries: Number.isInteger(queue?.eligiblePrs)
+          ? queue.eligiblePrs
+          : null,
+      },
+    },
     previousCleanStreak: previous.cleanStreak || 0,
     previousCohortSize: previous.cohortSize || 0,
   });
-
   const result = {
     ...receipt,
     mode: isDryRun ? 'dry-run' : 'mutating',
     workpad: undefined,
     workpadBody: receipt.workpad,
-    admissions: [],
     feed: receipt.feed,
     workpadUpsert: null,
   };
-
   if (!isDryRun) {
     result.workpadUpsert = await backlogRemediation.upsertRemediationWorkpad({
       client: linear,
@@ -1320,15 +1317,7 @@ async function runRemediate(isDryRun) {
         backlogRemediation.DEFAULT_WORKPAD_ISSUE,
       receipt,
     });
-    for (const item of receipt.cohort.selected) {
-      result.admissions.push(
-        await runTeamGateNext(team, false, item.identifier)
-      );
-    }
-    const admitted = result.admissions.some(entry =>
-      ['admitted', 'already-admitted', 'would-admit'].includes(entry.status)
-    );
-    if (admitted || receipt.cohort.selected.length > 0) {
+    if (receipt.cohort.selected.length > 0) {
       result.feed = {
         ...receipt.feed,
         refresh: await backlogRemediation.feedOfficialSymphony({
@@ -1338,10 +1327,9 @@ async function runRemediate(isDryRun) {
         }),
       };
     }
-
     const clean = receipt.capacity.allowed === true;
     saveCache({
-      ...cache,
+      ...loadCache(),
       backlogRemediation: {
         fingerprint: receipt.fingerprint,
         cleanStreak: clean ? (previous.cleanStreak || 0) + 1 : 0,

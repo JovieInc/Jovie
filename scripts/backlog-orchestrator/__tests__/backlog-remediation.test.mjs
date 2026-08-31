@@ -88,16 +88,6 @@ function healthySignals(overrides = {}) {
   };
 }
 
-/**
- * @param {any[]} issues
- * @param {{
- *   pullRequests?: unknown[],
- *   mainSha?: string,
- *   capacitySignals?: object,
- *   previousCleanStreak?: number,
- *   previousCohortSize?: number,
- * }} [options]
- */
 function receiptFor(issues, options = {}) {
   return buildRemediationReceipt({
     issues,
@@ -197,35 +187,25 @@ describe('official Symphony backlog remediation', () => {
   });
 
   it('selects only bounded isolated issues and refuses overlapping ownership in a wave', () => {
-    const first = issue('JOV-30');
-    const overlap = issue('JOV-31', {
-      description: `## Proposed fix
-Touch the same scripts/backlog-orchestrator/admission-gate.mjs edge.
-
-## Optimization exception
-- Class: non-product
-- Justification: This control-plane fix ships no user-facing page.
-
-## Acceptance criteria
-- Coverage passes.`,
-    });
     const independent = issue('JOV-32', {
-      description: `## Proposed fix
-Repair a docs-only note in docs/OVIE.md.
-
-## Optimization exception
-- Class: non-product
-- Justification: This control-plane docs fix ships no user-facing page.
-
-## Acceptance criteria
-- Docs stay accurate.`,
+      description: SAFE_DESCRIPTION.replace(
+        'admission-gate.mjs',
+        'docs/OVIE.md'
+      ),
     });
-    const built = receiptFor([first, overlap, independent], {
-      previousCleanStreak: CLEAN_STREAK_REQUIRED,
-      capacitySignals: healthySignals({
-        workers: { running: 0, retrying: 0, maxConcurrent: 4 },
-      }),
-    });
+    const built = receiptFor(
+      [
+        issue('JOV-30'),
+        issue('JOV-31', { description: SAFE_DESCRIPTION }),
+        independent,
+      ],
+      {
+        previousCleanStreak: CLEAN_STREAK_REQUIRED,
+        capacitySignals: healthySignals({
+          workers: { running: 0, retrying: 0, maxConcurrent: 4 },
+        }),
+      }
+    );
     assert.equal(built.schema, REMEDIATION_SCHEMA);
     const selected = built.cohort.selected.map(item => item.identifier);
     assert.ok(selected.includes('JOV-30'));
@@ -447,8 +427,8 @@ Repair a docs-only note in docs/OVIE.md.
       ),
       'utf8'
     );
-    assert.match(workflow, /run-backlog\.sh gate-next/);
-    assert.match(workflow, /run-backlog\.sh remediate/);
+    assert.match(workflow, /backlog-orchestrator\.mjs" remediate/);
+    assert.doesNotMatch(workflow, /run-backlog\.sh/);
     assert.doesNotMatch(workflow, /JOV-5466/);
   });
 });

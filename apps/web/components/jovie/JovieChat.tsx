@@ -692,7 +692,7 @@ export function JovieChat({
           // On chat routes the shell frame paints the canvas fill + ambient
           // wash behind a transparent header (#13386); an opaque fill here
           // would occlude it below the header band.
-          !ambientOwnedByShell && 'bg-(--linear-app-content-surface)'
+          !ambientOwnedByShell && 'bg-(--app-shell-content-surface)'
         )}
         data-testid='chat-content'
         data-picker-open={composerPickerOpen ? 'true' : undefined}

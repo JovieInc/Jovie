@@ -56,7 +56,7 @@ describe('MarketingHeader', () => {
     );
     expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
       'href',
-      'https://jov.ie/waitlist'
+      '/start'
     );
   });
 

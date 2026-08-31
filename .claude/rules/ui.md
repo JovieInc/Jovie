@@ -204,13 +204,13 @@ The main content area (`<main>`) uses `bg-(--app-shell-content-surface)`, the sh
 **Allowed patterns:**
 - Card on app-shell canvas parent → `bg-surface-1` for shared cards and panels
 - Recessed/"well" element inside the shell or a card → `bg-surface-0` (e.g., skeleton containers, empty states, input wells)
-- Sticky shell chrome (toolbars, table headers, shell frame) → `bg-(--linear-app-content-surface)`
+- Sticky shell chrome (toolbars, table headers, shell frame) → `bg-(--app-shell-content-surface)`
 - Card with elevation → `Card` component as-is (has `bg-surface-1 border border-subtle shadow-card`)
 - Nested card inside card → `bg-surface-0` for the inner element
 - Table/workspace routes → consume the shell-owned canvas by default. A nested bordered `LINEAR_SURFACE.contentContainer` canvas is allowed only when the screen declares `canvasOwner: 'screen'` in the app-screen canvas manifest (`apps/web/data/appScreens/canvas.ts`); undeclared nested canvases are rejected by the canvas-ownership guardrail
 
 **Banned patterns (will cause invisible cards):**
-- `bg-(--linear-app-content-surface)` on card-like elements inside the shell unless the element is shell chrome (toolbar/header/frame)
+- `bg-(--app-shell-content-surface)` on card-like elements inside the shell unless the element is shell chrome (toolbar/header/frame)
 - Undeclared canvas-sized surfaces nested inside the shell canvas (for example, a second `LINEAR_SURFACE.contentContainer` without an app-screen canvas-manifest exception)
 - `bg-surface-1` on elements inside a `surface-1` parent WITHOUT border+shadow — same color on same color
 - `bg-surface-1/XX` (semi-transparent) — low opacity surface-1 on surface-1 parent is nearly invisible

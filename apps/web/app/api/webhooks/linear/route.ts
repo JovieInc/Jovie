@@ -3,15 +3,12 @@
  *
  * Invariant consumer: JOV-INV-005.
  *
- * Bridges Linear → GitHub repository_dispatch so Claude Code can pick up work
- * autonomously. Two trigger types:
- *
- * 1. JOV issue create/update in Triage, Backlog, Todo, or To Do → dispatches
- *    `linear-intake-changed`. The downstream controller performs the full,
- *    label-free authoritative read before any admission decision.
- * 2. CodeRabbit posts an implementation-plan comment → dispatches
+ * Bridges Linear → GitHub repository_dispatch when CodeRabbit posts an
+ * implementation-plan comment. It dispatches
  *    `linear_plan_ready` (with verify_required / simplify_bounded / model_tier
  *    parsed from the comment body's automation contract)
+ *
+ * Issue pickup is owned by upstream OpenAI Symphony polling Linear directly.
  *
  * Auth: HMAC-SHA256 verification against LINEAR_WEBHOOK_SECRET via the
  * `linear-signature` header. Missing → 400, invalid → 401.
@@ -113,25 +110,6 @@ function verifySignature(
   }
 }
 
-function isJovieIntakeIssueEvent(payload: LinearWebhookPayload): boolean {
-  if (
-    payload.type !== 'Issue' ||
-    (payload.action !== 'create' && payload.action !== 'update')
-  ) {
-    return false;
-  }
-
-  const issueData = payload.data as LinearIssueData | undefined;
-  const stateName = issueData?.state?.name?.trim().toLowerCase();
-  const teamKey = issueData?.team?.key?.trim().toUpperCase();
-  return (
-    teamKey === 'JOV' &&
-    Boolean(
-      stateName && ['triage', 'backlog', 'todo', 'to do'].includes(stateName)
-    )
-  );
-}
-
 function isCodeRabbitPlanComment(payload: LinearWebhookPayload): boolean {
   if (payload.type !== 'Comment' || payload.action !== 'create') {
     return false;
@@ -174,17 +152,8 @@ function parseAutomationContract(body: string): AutomationContract {
 }
 
 function getAutomationContract(
-  payload: LinearWebhookPayload,
-  isPlanReadyEvent: boolean
+  payload: LinearWebhookPayload
 ): AutomationContract {
-  if (!isPlanReadyEvent) {
-    return {
-      verifyRequired: true,
-      simplifyBounded: true,
-      modelTier: 'premium',
-    };
-  }
-
   const commentData = payload.data as LinearCommentData | undefined;
   return parseAutomationContract(commentData?.body ?? '');
 }
@@ -246,10 +215,9 @@ export async function POST(request: NextRequest) {
 
     const payload = JSON.parse(body) as LinearWebhookPayload;
 
-    const isIntakeIssueEvent = isJovieIntakeIssueEvent(payload);
     const isPlanReadyEvent = isCodeRabbitPlanComment(payload);
 
-    if (!isIntakeIssueEvent && !isPlanReadyEvent) {
+    if (!isPlanReadyEvent) {
       return NextResponse.json(
         { received: true, ignored: true },
         { headers: NO_STORE_HEADERS }
@@ -283,7 +251,7 @@ export async function POST(request: NextRequest) {
       payload.webhookId?.trim() ||
       request.headers.get('linear-delivery')?.trim() ||
       request.headers.get('linear-event')?.trim();
-    const dedupeKey = `${providerDeliveryId || `${issueId}:${issueData?.updatedAt ?? payload.createdAt ?? ''}`}:${isPlanReadyEvent ? 'plan' : 'intake'}`;
+    const dedupeKey = `${providerDeliveryId || `${issueId}:${issueData?.updatedAt ?? payload.createdAt ?? ''}`}:plan`;
     dedupeKeyForRetry = dedupeKey;
     const dedupeResult = await acquireRecentDispatch(
       'linear',
@@ -313,7 +281,7 @@ export async function POST(request: NextRequest) {
 
     const owner = env.VERCEL_GIT_REPO_OWNER ?? 'JovieInc';
     const repo = env.VERCEL_GIT_REPO_SLUG ?? 'Jovie';
-    const automationContract = getAutomationContract(payload, isPlanReadyEvent);
+    const automationContract = getAutomationContract(payload);
 
     const dispatchResponse = await serverFetch(
       `https://api.github.com/repos/${owner}/${repo}/dispatches`,
@@ -325,9 +293,7 @@ export async function POST(request: NextRequest) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          event_type: isPlanReadyEvent
-            ? 'linear_plan_ready'
-            : 'linear-intake-changed',
+          event_type: 'linear_plan_ready',
           client_payload: {
             delivery_id: providerDeliveryId ?? dedupeKey,
             provider_timestamp: observedAt ?? payload.createdAt ?? null,

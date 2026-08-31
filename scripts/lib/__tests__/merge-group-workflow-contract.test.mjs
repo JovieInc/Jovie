@@ -129,6 +129,27 @@ function parseExactCiFastFailureOperands(script) {
   return operands;
 }
 
+function workflowDeclaresReadyForReviewType(source) {
+  const lines = source.split('\n');
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = lines[index].match(/^(\s*)types:\s*(.*?)\s*$/);
+    if (!match) continue;
+
+    const indentation = match[1].length;
+    const declaration = [match[2].replace(/\s+#.*$/, '')];
+    for (let next = index + 1; next < lines.length; next += 1) {
+      const line = lines[next];
+      if (line.trim() === '' || /^\s*#/.test(line)) continue;
+      const nextIndentation = line.match(/^\s*/)?.[0].length ?? 0;
+      if (nextIndentation <= indentation) break;
+      declaration.push(line.replace(/\s+#.*$/, '').trim());
+    }
+
+    if (/\bready_for_review\b/.test(declaration.join(' '))) return true;
+  }
+  return false;
+}
+
 describe('merge_group workflow contract', () => {
   it('accepts reordered exact ci-fast failure operands', () => {
     expect(
@@ -174,21 +195,58 @@ describe('merge_group workflow contract', () => {
     expect(CI_WORKFLOW).not.toContain('steps.graphite');
   });
 
-  it('re-emits every required source context when a draft becomes reviewable', () => {
-    const readyForReviewTrigger =
-      'types: [opened, synchronize, reopened, ready_for_review]';
+  it('runs source checks once per revision and never on ready_for_review', () => {
+    const sourceRevisionTrigger = 'types: [opened, synchronize, reopened]';
 
-    // A synchronize that occurs while a PR is still a draft cannot be reused
-    // for branch protection. Every source producer must therefore subscribe
-    // to the ready_for_review event on the exact unchanged head.
-    expect(CI_WORKFLOW).toContain(readyForReviewTrigger);
-    expect(SIZE_GUARD_WORKFLOW).toContain(readyForReviewTrigger);
+    // Draft state does not change the source SHA. The original source checks
+    // remain authoritative when the owner pairs ready with native auto-merge.
+    expect(CI_WORKFLOW).toContain(sourceRevisionTrigger);
+    expect(SIZE_GUARD_WORKFLOW).toContain(sourceRevisionTrigger);
     expect(FORK_GATE_WORKFLOW).toContain(
-      `pull_request:\n    ${readyForReviewTrigger}`
+      `pull_request:\n    ${sourceRevisionTrigger}`
     );
     expect(FORK_GATE_WORKFLOW).toContain(
-      `pull_request_target:\n    ${readyForReviewTrigger}`
+      `pull_request_target:\n    ${sourceRevisionTrigger}`
     );
+    expect(CI_WORKFLOW).not.toContain('ready_for_review');
+    expect(SIZE_GUARD_WORKFLOW).not.toContain('ready_for_review');
+    expect(FORK_GATE_WORKFLOW).not.toContain('ready_for_review');
+    expect(CI_WORKFLOW).toMatch(/merge_group:\n\s+types: \[checks_requested\]/);
+    expect(SIZE_GUARD_WORKFLOW).toMatch(
+      /merge_group:\n\s+types: \[checks_requested\]/
+    );
+    expect(FORK_GATE_WORKFLOW).toMatch(
+      /merge_group:\n\s+types: \[checks_requested\]/
+    );
+  });
+
+  it('does not launch any workflow from an unchanged ready transition', () => {
+    const workflowDir = resolve(REPO_ROOT, '.github/workflows');
+    const offenders = readdirSync(workflowDir)
+      .filter(file => file.endsWith('.yml') || file.endsWith('.yaml'))
+      .filter(file => {
+        const source = readFileSync(resolve(workflowDir, file), 'utf8');
+        return workflowDeclaresReadyForReviewType(source);
+      });
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('rejects every valid YAML spelling of a ready_for_review type', () => {
+    const unsafeDeclarations = [
+      'types: [opened, ready_for_review]',
+      'types: ready_for_review',
+      'types:\n  - opened\n  - ready_for_review',
+      'types: [\n  opened,\n  ready_for_review\n]',
+    ];
+    for (const declaration of unsafeDeclarations) {
+      expect(workflowDeclaresReadyForReviewType(declaration)).toBe(true);
+    }
+    expect(
+      workflowDeclaresReadyForReviewType(
+        'types:\n  - opened\n  - synchronize\n  - reopened'
+      )
+    ).toBe(false);
   });
 
   it('quarantines fixed unit capacity until all named warm receipts exist', () => {

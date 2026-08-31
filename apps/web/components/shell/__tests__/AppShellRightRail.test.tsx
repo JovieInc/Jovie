@@ -47,10 +47,7 @@ describe('AppShellRightRail', () => {
 
     const rail = screen.getByTestId('app-shell-right-rail');
 
-    expect(rail).toHaveClass(
-      'lg:rounded-(--linear-app-shell-radius)',
-      'lg:p-1.5'
-    );
+    expect(rail).toHaveClass('lg:rounded-(--app-shell-radius)', 'lg:p-1.5');
   });
 
   it('has no desktop overlay positioning and only allocates the width of its drawer child', () => {

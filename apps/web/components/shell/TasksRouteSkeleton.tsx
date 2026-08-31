@@ -27,7 +27,7 @@ export function TasksRouteSkeleton() {
               <span className='skeleton h-7 w-7 rounded-full' />
             </div>
           }
-          className='h-(--linear-app-header-height-compact) min-h-(--linear-app-header-height-compact) max-sm:px-4'
+          className='h-(--app-shell-header-height-compact) min-h-(--app-shell-header-height-compact) max-sm:px-4'
         />
       }
     >
