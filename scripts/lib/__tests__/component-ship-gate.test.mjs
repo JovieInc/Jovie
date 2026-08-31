@@ -733,7 +733,11 @@ describe('coverage-via executable evidence', () => {
   it.each([
     [
       'it.skip',
-      [renderImport, viaImport, "it.skip('renders', () => render(<ViaPanel />));"],
+      [
+        renderImport,
+        viaImport,
+        "it.skip('renders', () => render(<ViaPanel />));",
+      ],
     ],
     [
       'test.skip',
@@ -761,12 +765,13 @@ describe('coverage-via executable evidence', () => {
     ],
     [
       'test.todo',
-      [renderImport, viaImport, "test.todo('renders', () => render(<ViaPanel />));"],
+      [
+        renderImport,
+        viaImport,
+        "test.todo('renders', () => render(<ViaPanel />));",
+      ],
     ],
-  ])('rejects a render inside %s as inert @coverage-via evidence', (
-    _case,
-    testSource
-  ) => {
+  ])('rejects a render inside %s as inert @coverage-via evidence', (_case, testSource) => {
     expectInvalidCoverageVia(testSource.join('\n'));
   });
 

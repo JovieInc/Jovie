@@ -666,12 +666,7 @@ function isRuntimeComponentConsumer(
   if (ts.isIdentifier(value)) {
     return (
       bindings.direct.has(value.text) &&
-      !isBindingShadowedAt(
-        value,
-        value.text,
-        sourceFile,
-        scopedBindingNames
-      )
+      !isBindingShadowedAt(value, value.text, sourceFile, scopedBindingNames)
     );
   }
   return (
@@ -684,9 +679,7 @@ function isRuntimeComponentConsumer(
       sourceFile,
       scopedBindingNames
     ) &&
-    bindings.namespaces
-      .get(value.expression.text)
-      .has(value.name.text)
+    bindings.namespaces.get(value.expression.text).has(value.name.text)
   );
 }
 
@@ -1042,7 +1035,12 @@ function isMeaningfulRuntimeComponentUse(
     );
     return Boolean(
       renderCall &&
-        isExecutedRuntimePath(renderCall, sourceFile, new Set(), scopedBindingNames)
+        isExecutedRuntimePath(
+          renderCall,
+          sourceFile,
+          new Set(),
+          scopedBindingNames
+        )
     );
   }
 
@@ -1050,7 +1048,12 @@ function isMeaningfulRuntimeComponentUse(
     (ts.isCallExpression(parent) || ts.isNewExpression(parent)) &&
     parent.expression === node
   ) {
-    return isExecutedRuntimePath(parent, sourceFile, new Set(), scopedBindingNames);
+    return isExecutedRuntimePath(
+      parent,
+      sourceFile,
+      new Set(),
+      scopedBindingNames
+    );
   }
 
   const rendererCall =
@@ -1095,7 +1098,12 @@ function isMeaningfulRuntimeComponentUse(
   );
   return Boolean(
     renderCall &&
-      isExecutedRuntimePath(renderCall, sourceFile, new Set(), scopedBindingNames)
+      isExecutedRuntimePath(
+        renderCall,
+        sourceFile,
+        new Set(),
+        scopedBindingNames
+      )
   );
 }
 
