@@ -136,6 +136,30 @@ describe('Symphony routing receipts', () => {
       verifyRoutingReceipt(current, { availableModels: models }).model,
       'gpt-5.6-luna'
     );
+    assert.equal(
+      verifyRoutingReceipt(current, {
+        availableModels: models,
+        requireCapacityEvidence: true,
+      }),
+      null
+    );
+
+    const withCapacity = issue('Fix README typo');
+    const capacityDecision = selectSymphonyRoute({
+      issue: withCapacity,
+      availableModels: models,
+      capacity: { accounts: 2, ready: 1, active: 'tim-jov-ie' },
+    });
+    withCapacity.comments.nodes.push({
+      body: buildRoutingReceipt(capacityDecision.route),
+    });
+    assert.equal(
+      verifyRoutingReceipt(withCapacity, {
+        availableModels: models,
+        requireCapacityEvidence: true,
+      }).model,
+      'gpt-5.6-luna'
+    );
 
     // Arbitrary model swap.
     let forged = issue('Fix README typo');
@@ -291,6 +315,35 @@ describe('Symphony routing receipts', () => {
     assert.equal(exhausted.reason, 'attempt-budget-exhausted');
     assert.equal(exhausted.state.attemptCount, 3);
     assert.equal(exhausted.state.terminal, true);
+  });
+
+  it('deliberate red: honors a pre-lease minimum model tier', () => {
+    const current = issue('Fix README typo');
+    const planned = planOfficialSymphonyRoute({
+      issue: current,
+      availableModels: models,
+      minimumTier: 'standard',
+      now: 1_000,
+    });
+    assert.equal(planned.status, 'selected');
+    assert.equal(planned.receipt.modelTier, 'standard');
+    assert.equal(planned.receipt.model, 'gpt-5.6-terra');
+
+    const afterFailure = settleOfficialSymphonyRoute({
+      state: planned.state,
+      issueState: 'In Progress',
+      processOutcome: { kind: 'test_failure' },
+      now: 2_000,
+    });
+    const next = planOfficialSymphonyRoute({
+      issue: current,
+      state: afterFailure.state,
+      availableModels: models,
+      minimumTier: 'economical',
+      now: 3_000,
+    });
+    assert.equal(next.receipt.modelTier, 'premium');
+    assert.equal(next.receipt.model, 'gpt-5.6-sol');
   });
 
   it('deliberate red: reuses one prepared attempt instead of duplicating spend', () => {

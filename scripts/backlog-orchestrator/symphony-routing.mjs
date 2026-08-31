@@ -215,6 +215,15 @@ function capacityEvidence(capacity) {
   };
 }
 
+function capacityEvidenceIsReady(capacity) {
+  return (
+    capacity &&
+    capacity.readable === true &&
+    Number(capacity.accounts || 0) > 0 &&
+    Number(capacity.ready || 0) > 0
+  );
+}
+
 export function selectSymphonyRoute({
   issue,
   availableModels = MODEL_BY_ID,
@@ -421,7 +430,10 @@ export function verifyRoutingReceipt(
     candidates.some(candidate => candidate.id === receipt.modelId)
   )
     return null;
-  if (requireCapacityEvidence && typeof receipt.capacity !== 'object')
+  if (
+    requireCapacityEvidence &&
+    !capacityEvidenceIsReady(receipt.capacity)
+  )
     return null;
   return receipt;
 }
@@ -482,6 +494,8 @@ export function planOfficialSymphonyRoute({
   issue,
   state = null,
   availableModels = MODEL_BY_ID,
+  capacity = undefined,
+  minimumTier: requiredMinimumTier = undefined,
   now = Date.now(),
 }) {
   const classification = classifySymphonyIssue(issue);
@@ -573,12 +587,15 @@ export function planOfficialSymphonyRoute({
     selectedIndex += 1;
     transitionCount += 1;
   }
-  const minimumTier = TIER_ORDER[selectedIndex];
+  const requiredIndex = TIER_ORDER.indexOf(requiredMinimumTier);
+  const minimumIndex = Math.max(selectedIndex, requiredIndex, 0);
+  const selectedMinimumTier = TIER_ORDER[minimumIndex];
   const decision = selectSymphonyRoute({
     issue,
     availableModels,
+    capacity,
     now,
-    minimumTier,
+    minimumTier: selectedMinimumTier,
   });
   if (decision.status !== 'selected') {
     const blocked = {
@@ -587,7 +604,7 @@ export function planOfficialSymphonyRoute({
       issueRevision,
       attemptCount: Number(prior?.attemptCount || 0),
       transitionCount,
-      modelTier: prior?.modelTier || minimumTier,
+      modelTier: prior?.modelTier || selectedMinimumTier,
       terminal: true,
       lastOutcome: {
         kind: 'no-compatible-model-available',
