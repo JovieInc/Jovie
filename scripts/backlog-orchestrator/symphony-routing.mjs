@@ -430,10 +430,7 @@ export function verifyRoutingReceipt(
     candidates.some(candidate => candidate.id === receipt.modelId)
   )
     return null;
-  if (
-    requireCapacityEvidence &&
-    !capacityEvidenceIsReady(receipt.capacity)
-  )
+  if (requireCapacityEvidence && !capacityEvidenceIsReady(receipt.capacity))
     return null;
   return receipt;
 }
