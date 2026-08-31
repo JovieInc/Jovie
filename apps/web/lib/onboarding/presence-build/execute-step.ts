@@ -76,6 +76,12 @@ async function surfaceLibraryOpportunities(
   const observedRightsholders = rightsholders.filter(
     evidence => evidence.evidenceClass === 'observed'
   ).length;
+  const downloadCount = downloads.length;
+  const downloadNoun = downloadCount === 1 ? 'file' : 'files';
+  const downloadsValue =
+    downloadCount === 0
+      ? 'No attested files live'
+      : `${downloadCount} attested ${downloadNoun} live`;
   const facts: PresenceBuildFact[] = [
     { label: 'Repair queue', value: `${countKind('repair')} open` },
     { label: 'Collisions', value: `${countKind('collision')} to review` },
@@ -89,10 +95,7 @@ async function surfaceLibraryOpportunities(
     },
     {
       label: 'Downloads',
-      value:
-        downloads.length === 0
-          ? 'No attested files live'
-          : `${downloads.length} attested ${downloads.length === 1 ? 'file' : 'files'} live`,
+      value: downloadsValue,
     },
     { label: 'Stats', value: 'Not connected' },
   ];
