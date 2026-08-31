@@ -75,8 +75,9 @@ permanent check:
 11. **Design-system authority map** — the machine-readable design-system
     dependency ledger in `apps/web/data/designSystem/systemAuthorityMap.json`
     must preserve the canonical layer order, current owners, source evidence,
-    executable checks for enforced layers, and shrink-only classification
-    reasons for gaps. The audit delegates to
+    immutable status floors, executable checks for enforced layers, and
+    shrink-only classification reasons for gaps. Per-entry status floors live
+    in the validators, outside the mutable ledger. The audit delegates to
     `scripts/design-system-authority-map.mjs`.
 
 Exit code is non-zero on any FAIL; WARN never blocks. Failures print the

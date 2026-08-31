@@ -28,6 +28,7 @@ test('design-system authority map is a source-backed dependency ledger', () => {
   assert.equal(map.schema, AUTHORITY_MAP_SCHEMA);
   assert.deepEqual(map.statusValues, [...AUTHORITY_MAP_STATUS_VALUES]);
   assert.deepEqual(loadAndValidateDesignSystemAuthorityMap(), []);
+  assert.equal(Object.hasOwn(map.entries[0], 'statusFloor'), false);
   assert.deepEqual(map.dependencyOrder, map.entries.map(entry => entry.id));
   assert.deepEqual(map.dependencyOrder.slice(0, 9), [
     'foundation.tokens',
@@ -66,6 +67,7 @@ test('RED: authority map rejects advisory-only enforced layers', () => {
       executableChecks: [],
       classificationReason: 'Regression fixture.',
       status: 'missing',
+      statusFloor: 'missing',
     })),
     'invalid-authority-status-floor'
   );

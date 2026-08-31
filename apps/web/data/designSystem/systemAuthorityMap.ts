@@ -41,7 +41,6 @@ export interface DesignSystemAuthorityEntry {
   readonly id: string;
   readonly layer: DesignSystemAuthorityLayer;
   readonly status: DesignSystemAuthorityStatus;
-  readonly statusFloor: DesignSystemAuthorityStatus;
   readonly classificationReason: string;
   readonly dependsOn: readonly string[];
   readonly owns: readonly string[];

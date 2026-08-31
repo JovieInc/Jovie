@@ -6,6 +6,7 @@ import {
   DESIGN_SYSTEM_AUTHORITY_MAP_SCHEMA,
   DESIGN_SYSTEM_AUTHORITY_STATUS_VALUES,
   type DesignSystemAuthorityMap,
+  type DesignSystemAuthorityStatus,
 } from './systemAuthorityMap';
 
 export type DesignSystemAuthorityMapIssueCode =
@@ -41,6 +42,20 @@ const STATUS_RANK = new Map(
     'obsolete-superseded',
   ].map((status, index) => [status, index] as const)
 );
+const STATUS_FLOORS: Readonly<
+  Partial<Record<string, DesignSystemAuthorityStatus>>
+> = Object.freeze({
+    'foundation.tokens': 'partially-migrated',
+    'primitive.components': 'partially-migrated',
+    'interaction.families': 'canonical-enforced',
+    'composition.shared-owners': 'partially-migrated',
+    'archetype.product-screens': 'canonical-enforced',
+    'recipe.marketing-pages': 'canonical-enforced',
+    'surface.product-routes': 'partially-migrated',
+    'surface.marketing-routes': 'duplicated',
+    'certification.changed-surfaces': 'partially-migrated',
+    'legacy.historical-inventories': 'obsolete-superseded',
+});
 const LAYER_RANK = new Map(
   DESIGN_SYSTEM_AUTHORITY_LAYER_VALUES.map(
     (layer, index) => [layer, index] as const
@@ -125,7 +140,9 @@ export function validateDesignSystemAuthorityMap({
       add(issues, 'invalid-authority-layer', entry.id);
     }
     const expectedLayer = layerFromId(entry.id);
-    if (expectedLayer !== null && entry.layer !== expectedLayer) {
+    if (expectedLayer === null) {
+      add(issues, 'invalid-authority-layer', `${entry.id}:id-prefix`);
+    } else if (entry.layer !== expectedLayer) {
       add(issues, 'invalid-authority-layer', `${entry.id}:${entry.layer}`);
     }
     const entryLayerRank = LAYER_RANK.get(entry.layer);
@@ -138,11 +155,15 @@ export function validateDesignSystemAuthorityMap({
     if (!DESIGN_SYSTEM_AUTHORITY_STATUS_VALUES.includes(entry.status)) {
       add(issues, 'invalid-authority-status', entry.id);
     }
-    if (!DESIGN_SYSTEM_AUTHORITY_STATUS_VALUES.includes(entry.statusFloor)) {
+    if (Object.hasOwn(entry as Record<string, unknown>, 'statusFloor')) {
+      add(issues, 'invalid-authority-status-floor', `${entry.id}:mutable`);
+    }
+    const statusFloor = STATUS_FLOORS[entry.id];
+    if (!statusFloor) {
       add(issues, 'invalid-authority-status-floor', entry.id);
     } else if (
       (STATUS_RANK.get(entry.status) ?? -1) <
-      (STATUS_RANK.get(entry.statusFloor) ?? -1)
+      (STATUS_RANK.get(statusFloor) ?? -1)
     ) {
       add(issues, 'invalid-authority-status-floor', entry.id);
     }
@@ -197,6 +218,9 @@ export function validateDesignSystemAuthorityMap({
   }
 
   for (const id of map.dependencyOrder) {
+    if (!ids.has(id)) add(issues, 'missing-authority-entry', id);
+  }
+  for (const id of Object.keys(STATUS_FLOORS)) {
     if (!ids.has(id)) add(issues, 'missing-authority-entry', id);
   }
 

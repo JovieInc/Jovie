@@ -32,6 +32,7 @@ test('audits the design-system authority map from governance', () => {
   assert.match(authority.detail, /systemAuthorityMap\.json/);
   assert.match(authority.detail, /dependency order/);
   assert.match(authority.detail, /canonical owners/);
+  assert.match(authority.detail, /status floors/);
 });
 
 test('binds design projections to the canonical invariant registry', () => {

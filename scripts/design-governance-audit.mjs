@@ -394,7 +394,7 @@ export function runDesignGovernanceAudit(repoRoot = DEFAULT_REPO_ROOT) {
       report(
         'design-system-authority-map',
         'PASS',
-        `${AUTHORITY_MAP_PATH} validates dependency order, canonical owners, evidence paths, and executable checks`
+        `${AUTHORITY_MAP_PATH} validates dependency order, canonical owners, evidence paths, immutable status floors, and executable checks`
       );
     }
   } catch (error) {

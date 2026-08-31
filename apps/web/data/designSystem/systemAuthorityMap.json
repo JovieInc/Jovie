@@ -25,7 +25,6 @@
       "id": "foundation.tokens",
       "layer": "foundation",
       "status": "partially-migrated",
-      "statusFloor": "partially-migrated",
       "classificationReason": "JOV-3573 landed a machine-readable token source, but live web still carries compatibility token namespaces and active shrink-only retirement lanes.",
       "dependsOn": [],
       "owns": [
@@ -87,7 +86,6 @@
       "id": "primitive.components",
       "layer": "primitive",
       "status": "partially-migrated",
-      "statusFloor": "partially-migrated",
       "classificationReason": "The core public atom registry is source-bound, while the full required primitive catalog still has active convergence work and compatibility consumers.",
       "dependsOn": ["foundation.tokens"],
       "owns": [
@@ -142,7 +140,6 @@
       "id": "interaction.families",
       "layer": "interaction",
       "status": "canonical-enforced",
-      "statusFloor": "canonical-enforced",
       "classificationReason": "JOV-5429 landed closed-world interaction ownership and projects it through the cross-surface UI ownership registry.",
       "dependsOn": ["primitive.components"],
       "owns": [
@@ -179,7 +176,6 @@
       "id": "composition.shared-owners",
       "layer": "composition",
       "status": "partially-migrated",
-      "statusFloor": "partially-migrated",
       "classificationReason": "The UI ownership registry binds shared owners, states, adapters, and duplicate aliases, but several composition families remain backlog leaves under JOV-3570.",
       "dependsOn": ["interaction.families"],
       "owns": [
@@ -230,7 +226,6 @@
       "id": "archetype.product-screens",
       "layer": "archetype",
       "status": "canonical-enforced",
-      "statusFloor": "canonical-enforced",
       "classificationReason": "JOV-5424 landed the eight selectable app-screen archetypes and fail-closed registry validation.",
       "dependsOn": ["composition.shared-owners"],
       "owns": [
@@ -276,7 +271,6 @@
       "id": "recipe.marketing-pages",
       "layer": "recipe",
       "status": "canonical-enforced",
-      "statusFloor": "canonical-enforced",
       "classificationReason": "Marketing recipes, sections, route manifest, and registry gates are typed and executable; JOV-5745 owns public shell convergence around them.",
       "dependsOn": ["composition.shared-owners"],
       "owns": [
@@ -310,7 +304,6 @@
       "id": "surface.product-routes",
       "layer": "surface",
       "status": "partially-migrated",
-      "statusFloor": "partially-migrated",
       "classificationReason": "Authenticated route screens are closed-world in the app-screen registry, but the flagship JOV-3561 acquisition funnel has not shipped end-to-end through canonical owners.",
       "dependsOn": ["archetype.product-screens"],
       "owns": [
@@ -350,7 +343,6 @@
       "id": "surface.marketing-routes",
       "layer": "surface",
       "status": "duplicated",
-      "statusFloor": "duplicated",
       "classificationReason": "Marketing route recipes are registered, while navigation, footer, and long-form public content still have active public-shell consolidation work in JOV-5745.",
       "dependsOn": ["recipe.marketing-pages"],
       "owns": [
@@ -387,7 +379,6 @@
       "id": "certification.changed-surfaces",
       "layer": "certification",
       "status": "partially-migrated",
-      "statusFloor": "partially-migrated",
       "classificationReason": "Source and visual evidence gates exist, but the single certification admission kernel and exact changed-surface proof are still active work.",
       "dependsOn": ["surface.product-routes", "surface.marketing-routes"],
       "owns": [
@@ -437,7 +428,6 @@
       "id": "legacy.historical-inventories",
       "layer": "legacy",
       "status": "obsolete-superseded",
-      "statusFloor": "obsolete-superseded",
       "classificationReason": "Historical inventory docs remain for provenance only and must not override the executable registries above.",
       "dependsOn": [
         "foundation.tokens",
