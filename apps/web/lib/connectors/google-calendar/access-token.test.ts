@@ -68,6 +68,16 @@ describe('loadFreshGoogleAccessToken', () => {
     expect(mocks.storeTokens).not.toHaveBeenCalled();
   });
 
+  it('treats permanent Google OAuth policy errors as reauthorization', async () => {
+    mocks.serverFetch.mockResolvedValueOnce(
+      Response.json({ error: 'admin_policy_enforced' }, { status: 400 })
+    );
+
+    await expect(loadFreshGoogleAccessToken('account-1')).resolves.toBeNull();
+
+    expect(mocks.storeTokens).not.toHaveBeenCalled();
+  });
+
   it('throws on transient token endpoint failures so callers can retry', async () => {
     mocks.serverFetch.mockResolvedValueOnce(
       Response.json({ error: 'temporarily_unavailable' }, { status: 503 })

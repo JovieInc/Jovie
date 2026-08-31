@@ -19,6 +19,13 @@ interface RefreshErrorResponse {
   readonly error?: string;
 }
 
+const GOOGLE_OAUTH_REAUTH_ERRORS = new Set([
+  'invalid_grant',
+  'admin_policy_enforced',
+  'invalid_scope',
+  'unauthorized_client',
+]);
+
 export class GoogleAccessTokenRefreshError extends Error {
   readonly status: number;
   readonly providerError: string | null;
@@ -67,7 +74,12 @@ export async function loadFreshGoogleAccessToken(
         .catch(() => null)) as RefreshErrorResponse | null;
       const providerError =
         typeof payload?.error === 'string' ? payload.error : null;
-      if (providerError === 'invalid_grant') return null;
+      if (
+        providerError !== null &&
+        GOOGLE_OAUTH_REAUTH_ERRORS.has(providerError)
+      ) {
+        return null;
+      }
       throw new GoogleAccessTokenRefreshError(response.status, providerError);
     }
     const refreshed = (await response.json()) as RefreshResponse;

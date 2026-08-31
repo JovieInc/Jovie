@@ -64,20 +64,25 @@ export async function POST(request: Request) {
   const failed = outcomes.filter(outcome => outcome.status === 'failed').length;
   const busy = outcomes.filter(outcome => outcome.status === 'busy').length;
 
-  if (synced.length === 0 && needsReauth > 0 && failed === 0) {
-    return NextResponse.json(
-      { error: 'Reconnect YouTube to refresh access' },
-      { status: 409 }
-    );
-  }
-  if (synced.length === 0 && failed > 0) {
-    return NextResponse.json({ error: 'YouTube sync failed' }, { status: 502 });
-  }
-  if (synced.length === 0 && busy > 0) {
-    return NextResponse.json(
-      { error: 'YouTube sync already in progress' },
-      { status: 409 }
-    );
+  if (synced.length === 0) {
+    if (needsReauth > 0) {
+      return NextResponse.json(
+        { error: 'Reconnect YouTube to refresh access' },
+        { status: 409 }
+      );
+    }
+    if (busy > 0) {
+      return NextResponse.json(
+        { error: 'YouTube sync already in progress' },
+        { status: 409 }
+      );
+    }
+    if (failed > 0) {
+      return NextResponse.json(
+        { error: 'YouTube sync failed' },
+        { status: 502 }
+      );
+    }
   }
 
   if (accounts.length === 1 && synced.length === 1) {
