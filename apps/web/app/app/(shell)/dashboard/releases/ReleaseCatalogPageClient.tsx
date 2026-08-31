@@ -20,6 +20,7 @@ import {
   type LibraryApprovalStatus,
 } from '@/lib/library/approval-status';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
+import type { LibraryRelationshipView } from '@/lib/library/graph-types';
 import type { LibraryPostReleaseBundle } from '@/lib/library/post-release-types';
 import {
   isLibraryProfileVisibility,
@@ -43,9 +44,10 @@ interface ReleaseCatalogPageClientProps {
   readonly assetShareByAssetId?: Readonly<
     Record<string, LibraryAssetShareViewModel>
   >;
-  readonly postReleaseBundle?: LibraryPostReleaseBundle;
   readonly creatorDocuments?: readonly CreatorDocumentListItem[];
   readonly youtubeVideos?: readonly PublicVideoListItem[];
+  readonly libraryRelationships?: readonly LibraryRelationshipView[];
+  readonly postReleaseBundle?: LibraryPostReleaseBundle;
 }
 
 function toApprovalStatusMap(
@@ -78,9 +80,10 @@ export function ReleaseCatalogPageClient({
   approvalStatusByAssetId = {},
   profileVisibilityByAssetId = {},
   assetShareByAssetId = {},
-  postReleaseBundle,
   creatorDocuments = [],
   youtubeVideos = [],
+  libraryRelationships = [],
+  postReleaseBundle = { downloads: [], findings: [], rightsholders: [] },
 }: ReleaseCatalogPageClientProps) {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
@@ -183,6 +186,7 @@ export function ReleaseCatalogPageClient({
             profileVisibilityMap
           ).map(withShare),
         ]}
+        relationships={libraryRelationships}
       />
     );
   }
