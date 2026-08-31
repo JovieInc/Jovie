@@ -220,6 +220,10 @@ export function classifyPackageJsonChange(beforeSource, afterSource) {
   return ['operations-package-scripts', 'operations-tooling', []];
 }
 
+/**
+ * @param {string[]} paths
+ * @param {{ packageJsonBefore?: string, packageJsonAfter?: string }} [options]
+ */
 export function classifyProductLanes(
   paths,
   { packageJsonBefore, packageJsonAfter } = {}
