@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { resetOvieIngestLog } from '@/lib/ovie/ingest';
+import { OVIE_LINEAR_QUEUED_ACK, resetOvieIngestLog } from '@/lib/ovie/ingest';
 import {
   respondToOvieLanded,
   respondToOviePending,
@@ -145,6 +145,63 @@ describe('Ovie durable dump persist', () => {
     });
     const afterBody = (await after.json()) as { initiatives: unknown[] };
     expect(afterBody.initiatives).toEqual([]);
+  });
+
+  it('preserves the Linear queue acknowledgement in pending engineering views', async () => {
+    const store = new MemoryOperatingStore();
+    await applyOvieDump(['jovie bug blocks signup'], { store });
+
+    const pending = await respondToOviePending({
+      authenticated: true,
+      isAdmin: true,
+      store,
+    });
+    expect(pending.status).toBe(200);
+    const pendingBody = (await pending.json()) as {
+      initiatives: Array<{
+        ack: string;
+        destination: string;
+        destinationHandle: string | null;
+      }>;
+    };
+    expect(pendingBody.initiatives[0]?.destination).toBe('linear');
+    expect(pendingBody.initiatives[0]?.ack).toBe(OVIE_LINEAR_QUEUED_ACK);
+    expect(pendingBody.initiatives[0]?.destinationHandle).toBeNull();
+  });
+
+  it('requires Linear evidence when landing engineering initiatives', async () => {
+    const store = new MemoryOperatingStore();
+    await applyOvieDump(['jovie bug blocks signup'], { store });
+    const [initiative] = await listPendingInitiatives(store);
+    if (!initiative) throw new Error('expected engineering initiative');
+
+    const staleKanbanLanding = await respondToOvieLanded({
+      authenticated: true,
+      isAdmin: true,
+      store,
+      id: initiative.id,
+      landed_ref: 'task_kanban_1',
+      task_id: 'task_kanban_1',
+    });
+    expect(staleKanbanLanding.status).toBe(400);
+    expect((await listPendingInitiatives(store)).map(row => row.id)).toEqual([
+      initiative.id,
+    ]);
+
+    const linearLanding = await respondToOvieLanded({
+      authenticated: true,
+      isAdmin: true,
+      store,
+      id: initiative.id,
+      linear_id: 'JOV-5735',
+    });
+    expect(linearLanding.status).toBe(200);
+    const body = (await linearLanding.json()) as {
+      initiative: { destinationHandle: string; ack: string };
+    };
+    expect(body.initiative.destinationHandle).toBe('JOV-5735');
+    expect(body.initiative.ack).toBe('landed:JOV-5735');
+    expect(await listPendingInitiatives(store)).toEqual([]);
   });
 
   it('persists a classified receipt and skips empty chat dumps', async () => {

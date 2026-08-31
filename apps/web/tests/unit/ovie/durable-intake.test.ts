@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   DEST_KANBAN,
+  DEST_LINEAR,
   DEST_PERSONAL,
   DEST_TASTE,
+  OVIE_LINEAR_QUEUED_ACK,
   OVIE_QUEUED_ACK,
   OVIE_UNAVAILABLE_ACK,
   readOvieAckLatencies,
@@ -11,6 +13,7 @@ import {
   setOvieIntakeMode,
 } from '@/lib/ovie/ingest';
 import { MemoryOperatingStore } from '@/lib/ovie/mcp/store';
+import type { OvieInitiative } from '@/lib/ovie/mcp/types';
 import {
   applyOvieDump,
   defaultOvieDumpKey,
@@ -42,6 +45,17 @@ const DUMP_20 = [
   'does this look like taste swipe material',
 ] as const;
 
+class LegacyMigrationFailingStore extends MemoryOperatingStore {
+  failLegacyLinearPuts = false;
+
+  override async putInitiative(record: OvieInitiative): Promise<void> {
+    if (this.failLegacyLinearPuts && record.destination === DEST_LINEAR) {
+      throw new Error('legacy migration write failed');
+    }
+    await super.putInitiative(record);
+  }
+}
+
 function percentile(values: readonly number[], p: number): number {
   const sorted = [...values].sort((a, b) => a - b);
   if (sorted.length === 0) return 0;
@@ -50,6 +64,47 @@ function percentile(values: readonly number[], p: number): number {
     Math.max(0, Math.ceil((p / 100) * sorted.length) - 1)
   );
   return sorted[index] ?? 0;
+}
+
+function legacyEngineeringRecord(id: string, key: string): OvieInitiative {
+  const now = new Date().toISOString();
+  return {
+    id,
+    kind: 'initiative',
+    status: 'proposed',
+    confidence: 'medium',
+    handoff: {
+      title: 'Legacy signup bug',
+      intent: 'Fix a production signup bug',
+      priority: 'engineering',
+    },
+    lane: 'engineering',
+    destination: DEST_KANBAN,
+    receipts: [
+      {
+        text: 'legacy signup bug',
+        lane: 'engineering',
+        destination: DEST_KANBAN,
+        ack: OVIE_QUEUED_ACK,
+        destinationHandle: null,
+        workerSpawned: false,
+        workId: id,
+        idempotencyKey: key,
+      },
+    ],
+    workerSpawned: false,
+    destinationHandle: null,
+    idempotencyKey: key,
+    createdAt: now,
+    updatedAt: now,
+    evidence: [
+      {
+        kind: 'receipt',
+        summary: OVIE_QUEUED_ACK,
+        ref: DEST_KANBAN,
+      },
+    ],
+  };
 }
 
 describe('durable Eve intake (JOV-5215)', () => {
@@ -91,7 +146,7 @@ describe('durable Eve intake (JOV-5215)', () => {
     expect(taste.every(receipt => receipt.destination === DEST_TASTE)).toBe(
       true
     );
-    expect(board).toHaveLength(17);
+    expect(board).toHaveLength(12);
     expect(board.some(card => card.workId === personal?.workId)).toBe(false);
     expect(
       taste.every(
@@ -99,17 +154,17 @@ describe('durable Eve intake (JOV-5215)', () => {
       )
     ).toBe(true);
     expect(
-      board.every(
-        card =>
-          card.lane === 'flash' ||
-          card.lane === 'heavy' ||
-          card.lane === 'engineering'
-      )
+      board.every(card => card.lane === 'flash' || card.lane === 'heavy')
     ).toBe(true);
     expect(
       receipts
         .filter(receipt => receipt.destination === DEST_KANBAN)
         .every(receipt => receipt.ack === OVIE_QUEUED_ACK)
+    ).toBe(true);
+    expect(
+      receipts
+        .filter(receipt => receipt.destination === 'linear')
+        .every(receipt => receipt.ack === OVIE_LINEAR_QUEUED_ACK)
     ).toBe(true);
 
     const latencies = readOvieAckLatencies();
@@ -136,6 +191,42 @@ describe('durable Eve intake (JOV-5215)', () => {
     });
     expect(retry?.workId).toBe(first?.workId);
     expect(await store.listInitiatives()).toHaveLength(1);
+  });
+
+  it('normalizes legacy engineering receipts during direct intake inspection', async () => {
+    const store = new MemoryOperatingStore();
+    const key = defaultOvieDumpKey('legacy signup bug');
+    const workId = ovieWorkIdFromKey(key);
+    await store.putInitiative(legacyEngineeringRecord(workId, key));
+
+    const inspected = await inspectOvieIntake(store, key);
+    expect(inspected?.workId).toBe(workId);
+    expect(inspected?.destination).toBe(DEST_LINEAR);
+    expect(inspected?.ack).toBe(OVIE_LINEAR_QUEUED_ACK);
+    expect(inspected?.routingState).toBe('queued');
+
+    const stored = await store.getInitiative(workId);
+    expect(stored?.status).toBe('proposed');
+    expect(stored?.destination).toBe(DEST_LINEAR);
+    expect(stored?.receipts[0]?.destination).toBe(DEST_LINEAR);
+  });
+
+  it('keeps retry acks available when legacy normalization persistence fails', async () => {
+    const store = new LegacyMigrationFailingStore();
+    const text = 'legacy signup bug';
+    const key = defaultOvieDumpKey(text);
+    const workId = ovieWorkIdFromKey(key);
+    await store.putInitiative(legacyEngineeringRecord(workId, key));
+    store.failLegacyLinearPuts = true;
+
+    const [receipt] = await applyOvieDump([text], { store });
+    expect(receipt?.workId).toBe(workId);
+    expect(receipt?.destination).toBe(DEST_LINEAR);
+    expect(receipt?.ack).toBe(OVIE_LINEAR_QUEUED_ACK);
+    expect(receipt?.routingState).toBe('queued');
+
+    const stored = await store.getInitiative(workId);
+    expect(stored?.destination).toBe(DEST_KANBAN);
   });
 
   it('recovers persist-success/ack-failure without duplication', async () => {
@@ -223,5 +314,27 @@ describe('durable Eve intake (JOV-5215)', () => {
     expect(closed[0]?.routingState).toBe('unavailable');
     expect(closed[0]?.ack).toBe(OVIE_UNAVAILABLE_ACK);
     expect(await queuedStore.listInitiatives()).toHaveLength(1);
+  });
+
+  it('requeues Linear receipts when receipt-only mode recovers', async () => {
+    const store = new MemoryOperatingStore();
+    const text = 'Jovie signup returns 500 on /start';
+    setOvieIntakeMode('receipt-only');
+
+    const [failed] = await applyOvieDump([text], { store });
+    expect(failed?.destination).toBe(DEST_LINEAR);
+    expect(failed?.routingState).toBe('unavailable');
+    expect(failed?.ack).toBe(OVIE_UNAVAILABLE_ACK);
+
+    setOvieIntakeMode('normal');
+    const [recovered] = await applyOvieDump([text], { store });
+    expect(recovered?.workId).toBe(failed?.workId);
+    expect(recovered?.destination).toBe(DEST_LINEAR);
+    expect(recovered?.routingState).toBe('queued');
+    expect(recovered?.ack).toBe(OVIE_LINEAR_QUEUED_ACK);
+
+    const stored = await store.getInitiative(recovered?.workId ?? '');
+    expect(stored?.destination).toBe(DEST_LINEAR);
+    expect(stored?.receipts[0]?.ack).toBe(OVIE_LINEAR_QUEUED_ACK);
   });
 });
